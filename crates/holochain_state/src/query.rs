@@ -84,7 +84,7 @@ pub trait Query: Clone {
     fn query(&self) -> String {
         "".into()
     }
-    fn params(&self) -> Vec<Params> {
+    fn params(&self) -> Vec<Params<'_>> {
         Vec::with_capacity(0)
     }
     fn init_fold(&self) -> StateQueryResult<Self::State>;

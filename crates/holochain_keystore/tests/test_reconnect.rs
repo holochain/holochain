@@ -34,7 +34,7 @@ fn run_test_keystore(dir: &std::path::Path) -> (Proc, url2::Url2) {
     let mut cmd = std::process::Command::cargo_bin("test-keystore-srv").unwrap();
     cmd.arg(dir).stdout(std::process::Stdio::piped());
 
-    println!("{:?}", cmd);
+    println!("{cmd:?}");
 
     let mut cmd = cmd.spawn().unwrap();
 

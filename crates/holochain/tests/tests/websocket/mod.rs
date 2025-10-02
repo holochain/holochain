@@ -542,7 +542,7 @@ async fn list_app_interfaces_succeeds() -> Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
     if let Err(e) = conductor_admin_interface_ends_with_shutdown_inner().await {
-        panic!("{:#?}", e);
+        panic!("{e:#?}");
     }
     Ok(())
 }
@@ -724,7 +724,7 @@ async fn concurrent_install_dna() {
         let zomes = vec![(TestWasm::Foo.into(), TestWasm::Foo.into())];
         let mut client = client.clone();
         tokio::spawn(async move {
-            let name = format!("fake_dna_{}", i);
+            let name = format!("fake_dna_{i}");
 
             // Install Dna
             let dna = holochain_types::test_utils::fake_dna_zomes_named(
@@ -1091,7 +1091,7 @@ async fn filter_messages_that_do_not_deserialize() {
         let response: AdminResponse = admin_client.request(AdminRequest::ListDnas).await.unwrap();
         match response {
             AdminResponse::DnasListed(_) => (),
-            r => panic!("unexpected response: {:?}", r),
+            r => panic!("unexpected response: {r:?}"),
         }
     }
 
@@ -1128,7 +1128,7 @@ async fn filter_messages_that_do_not_deserialize() {
         let response: AppResponse = app_client.request(AppRequest::AppInfo).await.unwrap();
         match response {
             AppResponse::AppInfo(_) => (),
-            r => panic!("unexpected response: {:?}", r),
+            r => panic!("unexpected response: {r:?}"),
         }
     }
 }
@@ -1191,7 +1191,7 @@ async fn bind_ipv6_unspecified() {
         .unwrap();
     let token = match res {
         AdminResponse::AppAuthenticationTokenIssued(token) => token.token,
-        r => panic!("unexpected response: {:?}", r),
+        r => panic!("unexpected response: {r:?}"),
     };
 
     let app_conn = connect(

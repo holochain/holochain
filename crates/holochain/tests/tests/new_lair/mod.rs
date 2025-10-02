@@ -36,7 +36,7 @@ async fn test_new_lair_conductor_integration() {
 
     // print keystore config
     let keystore_config = keystore.get_config();
-    println!("\n## keystore config ##\n{}", keystore_config);
+    println!("\n## keystore config ##\n{keystore_config}");
 
     // set up conductor config to use the started keystore
     let conductor_config = ConductorConfig {
@@ -59,7 +59,7 @@ async fn test_new_lair_conductor_integration() {
     let mut cc_path = tmp.path().to_owned();
     cc_path.push("conductor_config.yml");
     tokio::fs::write(&cc_path, &conductor_config).await.unwrap();
-    println!("\n## conductor config ##\n{}", conductor_config);
+    println!("\n## conductor config ##\n{conductor_config}");
 
     // start a conductor using the new config
     let cmd = std::process::Command::cargo_bin("holochain").unwrap();
@@ -89,23 +89,23 @@ async fn test_new_lair_conductor_integration() {
     let _rx = WsPollRecv::new::<AdminResponse>(rx);
 
     let agent_key = generate_agent_pub_key(&mut client, 15_000).await.unwrap();
-    println!("GENERATED AGENT KEY: {}", agent_key);
+    println!("GENERATED AGENT KEY: {agent_key}");
     let mut agent_key_bytes = [0; 32];
     agent_key_bytes.copy_from_slice(agent_key.get_raw_32());
-    println!("AGENT ED25519 PUBKEY: {:?}", agent_key_bytes);
+    println!("AGENT ED25519 PUBKEY: {agent_key_bytes:?}");
 
     let store = keystore.store().await.unwrap();
     let entry = store
         .get_entry_by_ed25519_pub_key(agent_key_bytes.into())
         .await
         .unwrap();
-    println!("AGENT_STORE_ENTRY: {:?}", entry);
+    println!("AGENT_STORE_ENTRY: {entry:?}");
 
     match &*entry {
         LairEntryInner::Seed { seed_info, .. } => {
             assert_eq!(*seed_info.ed25519_pub_key, agent_key_bytes);
         }
-        oth => panic!("invalid entry type: {:?}", oth),
+        oth => panic!("invalid entry type: {oth:?}"),
     }
 
     child.kill().await.unwrap();

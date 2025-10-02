@@ -64,13 +64,13 @@ mod tests {
 
     #[test]
     fn human_timestamp_conversions() {
-        let show = |v| format!("{:?}", v);
+        let show = |v| format!("{v:?}");
         let s = "2022-02-11T23:05:19.470323Z";
         let t = Timestamp::from_str(s).unwrap();
         let h = HumanTimestamp::from(t);
         let sb = SerializedBytes::try_from(h).unwrap();
         let ser = show(&sb);
-        assert_eq!(ser, format!("\"{}\"", s));
+        assert_eq!(ser, format!("\"{s}\""));
         let h2 = HumanTimestamp::try_from(sb).unwrap();
         let t2 = Timestamp::from(h2);
         assert_eq!(t, t2);

@@ -237,10 +237,7 @@ mod test {
                     ))
                     .await
                     .unwrap(),
-                    "setup {:?} check {} expected {}",
-                    setup,
-                    check,
-                    expected,
+                    "setup {setup:?} check {check} expected {expected}",
                 );
             }
         }
@@ -588,11 +585,7 @@ mod test {
                 ))
                 .await
                 .unwrap(),
-                "block_start {} block_end {} unblock_start {} unblock_end {}",
-                block_start,
-                block_end,
-                unblock_start,
-                unblock_end,
+                "block_start {block_start} block_end {block_end} unblock_start {unblock_start} unblock_end {unblock_end}",
             );
         }
     }
@@ -688,11 +681,7 @@ mod test {
                 ))
                 .await
                 .unwrap(),
-                "block_start {} block_end {} unblock_start {} unblock_end {}",
-                block_start,
-                block_end,
-                unblock_start,
-                unblock_end,
+                "block_start {block_start} block_end {block_end} unblock_start {unblock_start} unblock_end {unblock_end}",
             );
         }
     }
@@ -836,10 +825,7 @@ mod test {
                 ))
                 .await
                 .unwrap(),
-                "start {}, mid {}, end {}",
-                start,
-                mid,
-                end
+                "start {start}, mid {mid}, end {end}"
             );
         }
     }

@@ -387,8 +387,7 @@ async fn validate_valid_warrant_with_cached_dependency() {
             status,
             Some(holochain_zome_types::prelude::ValidationStatus::Valid)
         ),
-        "Warrant was not valid as expected, got: {:?}",
-        status
+        "Warrant was not valid as expected, got: {status:?}"
     );
 }
 
@@ -469,8 +468,7 @@ async fn validate_valid_warrant_with_fetched_dependency() {
             status,
             Some(holochain_zome_types::prelude::ValidationStatus::Valid)
         ),
-        "Warrant was not valid as expected, got: {:?}",
-        status
+        "Warrant was not valid as expected, got: {status:?}"
     );
 }
 
@@ -574,8 +572,7 @@ async fn reject_invalid_warrant() {
             status,
             Some(holochain_zome_types::prelude::ValidationStatus::Rejected)
         ),
-        "Warrant was not rejected as expected, got: {:?}",
-        status
+        "Warrant was not rejected as expected, got: {status:?}"
     );
 }
 
@@ -660,8 +657,7 @@ async fn validate_warrant_with_validated_dependency() {
             status,
             Some(holochain_zome_types::prelude::ValidationStatus::Rejected)
         ),
-        "Warrant was not rejected as expected, got: {:?}",
-        status
+        "Warrant was not rejected as expected, got: {status:?}"
     );
 }
 

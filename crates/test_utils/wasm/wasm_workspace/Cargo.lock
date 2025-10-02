@@ -342,7 +342,7 @@ checksum = "1ced73b1dacfc750a6db6c0a0c3a3853c8b41997e2e2c563dc90804ae6867959"
 
 [[package]]
 name = "fixt"
-version = "0.6.0-dev.5"
+version = "0.6.0-dev.6"
 dependencies = [
  "holochain_serialized_bytes",
  "lazy_static",
@@ -485,7 +485,7 @@ checksum = "5419bdc4f6a9207fbeba6d11b604d481addf78ecd10c11ad51e76c2f6482748d"
 
 [[package]]
 name = "hdi"
-version = "0.7.0-dev.16"
+version = "0.7.0-dev.17"
 dependencies = [
  "getrandom",
  "hdk_derive",
@@ -503,7 +503,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.6.0-dev.19"
+version = "0.6.0-dev.20"
 dependencies = [
  "getrandom",
  "hdi",
@@ -520,7 +520,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.6.0-dev.15"
+version = "0.6.0-dev.16"
 dependencies = [
  "darling 0.21.3",
  "heck",
@@ -540,7 +540,7 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
 name = "holo_hash"
-version = "0.6.0-dev.14"
+version = "0.6.0-dev.15"
 dependencies = [
  "base64",
  "blake2b_simd",
@@ -560,7 +560,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.6.0-dev.15"
+version = "0.6.0-dev.16"
 dependencies = [
  "derive_builder",
  "holo_hash",
@@ -586,7 +586,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_nonce"
-version = "0.6.0-dev.4"
+version = "0.6.0-dev.5"
 dependencies = [
  "getrandom",
  "holochain_secure_primitive",
@@ -629,7 +629,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.6.0-dev.19"
+version = "0.6.0-dev.20"
 dependencies = [
  "hdk",
  "holochain_serialized_bytes",
@@ -638,7 +638,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_timestamp"
-version = "0.6.0-dev.3"
+version = "0.6.0-dev.4"
 dependencies = [
  "chrono",
  "serde",
@@ -646,7 +646,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_util"
-version = "0.6.0-dev.3"
+version = "0.6.0-dev.4"
 dependencies = [
  "cfg-if",
  "colored",
@@ -682,7 +682,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.6.0-dev.18"
+version = "0.6.0-dev.19"
 dependencies = [
  "derive_builder",
  "derive_more",

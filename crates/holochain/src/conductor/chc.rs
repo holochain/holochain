@@ -267,7 +267,7 @@ mod tests {
         let agent = SweetAgents::alice();
 
         let (c0,) = conductors[0]
-            .setup_app_for_agent("app", agent.clone(), &[dna_file.clone()])
+            .setup_app_for_agent("app", agent.clone(), std::slice::from_ref(&dna_file))
             .await
             .unwrap()
             .into_tuple();
@@ -278,7 +278,7 @@ mod tests {
             .install_app(
                 "app",
                 Some(agent.clone()),
-                &[dna_file.clone()],
+                std::slice::from_ref(&dna_file),
                 Some(InstallAppCommonFlags {
                     defer_memproofs: false,
                     ignore_genesis_failure: true,
@@ -289,7 +289,7 @@ mod tests {
             .install_app(
                 "app",
                 Some(agent.clone()),
-                &[dna_file.clone()],
+                std::slice::from_ref(&dna_file),
                 Some(InstallAppCommonFlags {
                     defer_memproofs: false,
                     ignore_genesis_failure: true,
@@ -320,16 +320,16 @@ mod tests {
             r#".*ChcHeadMoved\("genesis", InvalidChain\((\d+), ActionHash\([a-zA-Z0-9-_]+\)\)\).*"#,
         )
         .unwrap()
-        .captures(&format!("{:?}", install_result_1))
+        .captures(&format!("{install_result_1:?}"))
         .unwrap();
         // TODO: check sequence and hash
 
         assert_eq!(
-            format!("{:?}", install_result_1),
+            format!("{install_result_1:?}"),
             format!("{:?}", install_result_2)
         );
         assert_eq!(
-            format!("{:?}", install_result_2),
+            format!("{install_result_2:?}"),
             format!("{:?}", install_result_3)
         );
 
@@ -397,7 +397,7 @@ mod tests {
 
         regex::Regex::new(
             r#".*ChcHeadMoved\("SourceChain::flush", InvalidChain\((\d+), ActionHash\([a-zA-Z0-9-_]+\).*"#
-        ).unwrap().captures(&format!("{:?}", hash1)).unwrap();
+        ).unwrap().captures(&format!("{hash1:?}")).unwrap();
         // TODO: check sequence and hash
 
         // This should trigger a CHC sync
@@ -405,7 +405,7 @@ mod tests {
             .call_fallible(&c2.zome(TestWasm::Create), "create_entry", ())
             .await;
 
-        assert_eq!(format!("{:?}", hash1), format!("{:?}", hash2));
+        assert_eq!(format!("{hash1:?}"), format!("{:?}", hash2));
 
         conductors[1]
             .raw_handle()

@@ -64,7 +64,7 @@ async fn zome_call_error_drop_uncommited() {
             let action_hash: ActionHash = signal.into_inner().decode().unwrap();
             action_hash
         }
-        _ => panic!("Expected AppSignal, got {:?}", msg),
+        _ => panic!("Expected AppSignal, got {msg:?}"),
     };
 
     let entry = conductor
@@ -73,7 +73,6 @@ async fn zome_call_error_drop_uncommited() {
 
     assert!(
         entry.is_none(),
-        "Entry should not have been created due to error: {:?}",
-        err
+        "Entry should not have been created due to error: {err:?}"
     );
 }

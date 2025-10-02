@@ -141,7 +141,7 @@ impl TestData {
             })
             .await
             .unwrap();
-        assert_eq!(val, &[self.expected_link.clone()], "{}", test);
+        assert_eq!(val, std::slice::from_ref(&self.expected_link), "{test}");
     }
 
     async fn not_on_full_key(&self, test: &'static str) {
@@ -178,7 +178,7 @@ impl TestData {
             })
             .await
             .unwrap();
-        assert_eq!(val, &[self.expected_link.clone()], "{}", test);
+        assert_eq!(val, std::slice::from_ref(&self.expected_link), "{test}");
     }
 
     async fn is_on_type(&self, test: &'static str) {
@@ -258,7 +258,7 @@ impl TestData {
             })
             .await
             .unwrap();
-        assert_eq!(val, &[self.expected_link.clone()], "{}", test);
+        assert_eq!(val, std::slice::from_ref(&self.expected_link), "{test}");
     }
 
     async fn is_on_half_tag(&self, test: &'static str) {
@@ -348,7 +348,7 @@ impl TestData {
     async fn only_these_on_base(td: &[Self], test: &'static str) {
         // Check all base hash are the same
         for d in td {
-            assert_eq!(d.base_hash, td[0].base_hash, "{}", test);
+            assert_eq!(d.base_hash, td[0].base_hash, "{test}");
         }
         let base_hash = td[0].base_hash.clone();
         let expected = td
@@ -380,7 +380,7 @@ impl TestData {
                     .unwrap(),
             );
         }
-        assert_eq!(val, expected, "{}", test);
+        assert_eq!(val, expected, "{test}");
     }
 
     async fn only_these_on_query(
@@ -391,7 +391,7 @@ impl TestData {
     ) {
         // Check all base hash are the same
         for d in td {
-            assert_eq!(d.base_hash, td[0].base_hash, "{}", test);
+            assert_eq!(d.base_hash, td[0].base_hash, "{test}");
         }
         let base_hash = td[0].base_hash.clone();
         let expected = td
@@ -421,15 +421,15 @@ impl TestData {
             .await
             .unwrap()
             .collect();
-        assert_eq!(val, expected, "{}", test);
+        assert_eq!(val, expected, "{test}");
     }
 
     async fn only_these_on_full_key(td: &[Self], test: &'static str) {
         // Check all base hash, link type, tag are the same
         for d in td {
-            assert_eq!(d.base_hash, td[0].base_hash, "{}", test);
-            assert_eq!(d.link_type, td[0].link_type, "{}", test);
-            assert_eq!(d.tag, td[0].tag, "{}", test);
+            assert_eq!(d.base_hash, td[0].base_hash, "{test}");
+            assert_eq!(d.link_type, td[0].link_type, "{test}");
+            assert_eq!(d.tag, td[0].tag, "{test}");
         }
         let base_hash = td[0].base_hash.clone();
         let zome_index = td[0].zome_index;
@@ -463,7 +463,7 @@ impl TestData {
                     .unwrap(),
             );
         }
-        assert_eq!(val, expected, "{}", test);
+        assert_eq!(val, expected, "{test}");
     }
 
     async fn only_these_on_half_key(td: &[Self], test: &'static str) {
@@ -473,9 +473,9 @@ impl TestData {
         let half_tag = LinkTag::new(&td[0].tag.0[..tag_len]);
         // Check all base hash, zome_index, half tag are the same
         for d in td {
-            assert_eq!(d.base_hash, td[0].base_hash, "{}", test);
-            assert_eq!(d.link_type, td[0].link_type, "{}", test);
-            assert_eq!(&d.tag.0[..tag_len], &half_tag.0[..], "{}", test);
+            assert_eq!(d.base_hash, td[0].base_hash, "{test}");
+            assert_eq!(d.link_type, td[0].link_type, "{test}");
+            assert_eq!(&d.tag.0[..tag_len], &half_tag.0[..], "{test}");
         }
         let base_hash = td[0].base_hash.clone();
         let zome_index = td[0].zome_index;
@@ -508,7 +508,7 @@ impl TestData {
                     .unwrap(),
             );
         }
-        assert_eq!(val, expected, "{}", test);
+        assert_eq!(val, expected, "{test}");
     }
 }
 

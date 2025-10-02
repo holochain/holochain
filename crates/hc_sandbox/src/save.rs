@@ -240,14 +240,14 @@ pub async fn lock_live(mut hc_dir: PathBuf, path: &Path, port: u16) -> anyhow::R
         Some((i, _)) => i,
         None => return Ok(()),
     };
-    hc_dir.push(format!(".hc_live_{}", index));
+    hc_dir.push(format!(".hc_live_{index}"));
     match std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
         .open(hc_dir)
     {
         Ok(mut file) => {
-            writeln!(file, "{}", port)?;
+            writeln!(file, "{port}")?;
             let mut lock = get_file_locks().lock().await;
             lock.push(index);
         }
@@ -268,7 +268,7 @@ pub fn load_ports(hc_dir: PathBuf) -> anyhow::Result<Vec<Option<u16>>> {
     let paths = load(hc_dir.clone())?;
     for (i, _) in paths.into_iter().enumerate() {
         let mut hc = hc_dir.clone();
-        hc.push(format!(".hc_live_{}", i));
+        hc.push(format!(".hc_live_{i}"));
         if hc.exists() {
             let live = std::fs::read_to_string(hc)?;
             let p = live.lines().next().and_then(|l| l.parse::<u16>().ok());
@@ -289,7 +289,7 @@ pub fn find_ports(hc_dir: PathBuf, paths: &[PathBuf]) -> anyhow::Result<Vec<Opti
         match index {
             Some(i) => {
                 let mut hc = hc_dir.clone();
-                hc.push(format!(".hc_live_{}", i));
+                hc.push(format!(".hc_live_{i}"));
                 if hc.exists() {
                     let live = std::fs::read_to_string(hc)?;
                     let p = live.lines().next().and_then(|l| l.parse::<u16>().ok());
@@ -309,7 +309,7 @@ pub async fn release_ports(hc_dir: PathBuf) -> anyhow::Result<()> {
     let files = get_file_locks().lock().await;
     for file in files.iter() {
         let mut hc = hc_dir.clone();
-        hc.push(format!(".hc_live_{}", file));
+        hc.push(format!(".hc_live_{file}"));
         if hc.exists() {
             std::fs::remove_file(hc)?;
         }

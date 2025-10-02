@@ -126,8 +126,7 @@ impl TryFrom<&Component> for String {
                                 }
                                 None => {
                                     error = Some(Err(SerializedBytesError::Deserialize(format!(
-                                        "unknown char for u32: {}",
-                                        u
+                                        "unknown char for u32: {u}"
                                     ))));
                                 }
                             }

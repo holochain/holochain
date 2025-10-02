@@ -40,7 +40,7 @@ impl TryFrom<Action> for Update {
     fn try_from(value: Action) -> Result<Self, Self::Error> {
         match value {
             Action::Update(h) => Ok(h),
-            _ => Err(WrongActionError(format!("{:?}", value))),
+            _ => Err(WrongActionError(format!("{value:?}"))),
         }
     }
 }
@@ -50,7 +50,7 @@ impl<'a> TryFrom<&'a Action> for &'a Update {
     fn try_from(value: &'a Action) -> Result<Self, Self::Error> {
         match value {
             Action::Update(h) => Ok(h),
-            _ => Err(WrongActionError(format!("{:?}", value))),
+            _ => Err(WrongActionError(format!("{value:?}"))),
         }
     }
 }
@@ -60,7 +60,7 @@ impl TryFrom<Action> for Delete {
     fn try_from(value: Action) -> Result<Self, Self::Error> {
         match value {
             Action::Delete(h) => Ok(h),
-            _ => Err(WrongActionError(format!("{:?}", value))),
+            _ => Err(WrongActionError(format!("{value:?}"))),
         }
     }
 }
@@ -70,7 +70,7 @@ impl<'a> TryFrom<&'a Action> for &'a Delete {
     fn try_from(value: &'a Action) -> Result<Self, Self::Error> {
         match value {
             Action::Delete(h) => Ok(h),
-            _ => Err(WrongActionError(format!("{:?}", value))),
+            _ => Err(WrongActionError(format!("{value:?}"))),
         }
     }
 }
@@ -80,7 +80,7 @@ impl TryFrom<Action> for CreateLink {
     fn try_from(value: Action) -> Result<Self, Self::Error> {
         match value {
             Action::CreateLink(h) => Ok(h),
-            _ => Err(WrongActionError(format!("{:?}", value))),
+            _ => Err(WrongActionError(format!("{value:?}"))),
         }
     }
 }
@@ -90,7 +90,7 @@ impl<'a> TryFrom<&'a Action> for &'a CreateLink {
     fn try_from(value: &'a Action) -> Result<Self, Self::Error> {
         match value {
             Action::CreateLink(h) => Ok(h),
-            _ => Err(WrongActionError(format!("{:?}", value))),
+            _ => Err(WrongActionError(format!("{value:?}"))),
         }
     }
 }
@@ -100,7 +100,7 @@ impl TryFrom<Action> for DeleteLink {
     fn try_from(value: Action) -> Result<Self, Self::Error> {
         match value {
             Action::DeleteLink(h) => Ok(h),
-            _ => Err(WrongActionError(format!("{:?}", value))),
+            _ => Err(WrongActionError(format!("{value:?}"))),
         }
     }
 }
@@ -110,7 +110,7 @@ impl<'a> TryFrom<&'a Action> for &'a DeleteLink {
     fn try_from(value: &'a Action) -> Result<Self, Self::Error> {
         match value {
             Action::DeleteLink(h) => Ok(h),
-            _ => Err(WrongActionError(format!("{:?}", value))),
+            _ => Err(WrongActionError(format!("{value:?}"))),
         }
     }
 }

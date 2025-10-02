@@ -204,7 +204,7 @@ pub async fn attach_app_interface(client: &WebsocketSender, port: Option<u16>) -
     let response = check_timeout(response, 3000).await.unwrap();
     match response {
         AdminResponse::AppInterfaceAttached { port } => port,
-        _ => panic!("Attach app interface failed: {:?}", response),
+        _ => panic!("Attach app interface failed: {response:?}"),
     }
 }
 
@@ -328,7 +328,7 @@ pub async fn register_and_install_dna_named(
     if let AdminResponse::AppInstalled(app) = response {
         Ok(CellId::new(dna_hash, app.agent_pub_key))
     } else {
-        panic!("InstallApp failed: {:?}", response);
+        panic!("InstallApp failed: {response:?}");
     }
 }
 
@@ -369,7 +369,7 @@ fn check_line_for_admin_port(mut line: &str) -> Option<u16> {
 pub async fn check_started(holochain: &mut Child) {
     let started = tokio::time::timeout(std::time::Duration::from_secs(1), holochain.wait()).await;
     if let Ok(status) = started {
-        panic!("Holochain failed to start. status: {:?}", status);
+        panic!("Holochain failed to start. status: {status:?}");
     }
 }
 
@@ -412,8 +412,7 @@ async fn check_timeout_named<T>(
     match tokio::time::timeout(Duration::from_millis(timeout_millis), response).await {
         Ok(response) => response,
         Err(_) => Err(std::io::Error::other(format!(
-            "{}: Timed out on request after {}",
-            name, timeout_millis
+            "{name}: Timed out on request after {timeout_millis}"
         ))
         .into()),
     }
@@ -433,6 +432,6 @@ pub async fn dump_full_state(
 
     match response {
         AdminResponse::FullStateDumped(state) => Ok(state),
-        _ => Err(std::io::Error::other(format!("DumpFullState failed: {:?}", response)).into()),
+        _ => Err(std::io::Error::other(format!("DumpFullState failed: {response:?}")).into()),
     }
 }

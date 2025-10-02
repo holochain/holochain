@@ -81,8 +81,7 @@ pub fn init_lair(
     match init_lair_inner(dir, passphrase) {
         Ok(url) => Ok(url),
         Err(err) => Err(std::io::Error::other(format!(
-            "Failed to execute 'lair-keystore init': {:?}",
-            err
+            "Failed to execute 'lair-keystore init': {err:?}"
         ))
         .into()),
     }

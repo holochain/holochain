@@ -64,7 +64,7 @@ async fn async_read_respects_reader_permit_limits() {
                     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
                 }
                 Err(e) => {
-                    panic!("Got an unexpected error - {:?}", e);
+                    panic!("Got an unexpected error - {e:?}");
                 }
                 Ok(_c) => {
                     panic!("Should not have been able to get a connection");
@@ -135,7 +135,7 @@ async fn get_read_txn_respects_reader_permit_limits() {
                     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
                 }
                 Err(e) => {
-                    panic!("Got an unexpected error - {:?}", e);
+                    panic!("Got an unexpected error - {e:?}");
                 }
                 Ok(_c) => {
                     panic!("Should not have been able to get a txn");

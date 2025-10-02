@@ -216,7 +216,8 @@ pub enum DhtOpType {
 impl ToSql for DhtOpType {
     fn to_sql(
         &self,
-    ) -> holochain_sqlite::rusqlite::Result<holochain_sqlite::rusqlite::types::ToSqlOutput> {
+    ) -> holochain_sqlite::rusqlite::Result<holochain_sqlite::rusqlite::types::ToSqlOutput<'_>>
+    {
         match self {
             DhtOpType::Chain(op) => op.to_sql(),
             DhtOpType::Warrant(op) => op.to_sql(),
@@ -478,7 +479,7 @@ impl ChainOp {
     }
 
     /// Get the entry from this op, if one exists
-    pub fn entry(&self) -> RecordEntryRef {
+    pub fn entry(&self) -> RecordEntryRef<'_> {
         match self {
             Self::StoreRecord(_, _, e) => e.as_ref(),
             Self::StoreEntry(_, _, e) => RecordEntry::Present(e),
@@ -1320,7 +1321,8 @@ impl OpOrder {
 impl holochain_sqlite::rusqlite::ToSql for OpOrder {
     fn to_sql(
         &self,
-    ) -> holochain_sqlite::rusqlite::Result<holochain_sqlite::rusqlite::types::ToSqlOutput> {
+    ) -> holochain_sqlite::rusqlite::Result<holochain_sqlite::rusqlite::types::ToSqlOutput<'_>>
+    {
         Ok(holochain_sqlite::rusqlite::types::ToSqlOutput::Owned(
             self.to_string().into(),
         ))

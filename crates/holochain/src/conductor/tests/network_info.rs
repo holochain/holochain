@@ -16,7 +16,10 @@ async fn network_metrics() {
     let config = SweetConductorConfig::standard();
     let mut conductors = SweetConductorBatch::from_config(number_of_peers, config).await;
     let app_id: InstalledAppId = "app".into();
-    conductors.setup_app(&app_id, &[dna.clone()]).await.unwrap();
+    conductors
+        .setup_app(&app_id, std::slice::from_ref(&dna))
+        .await
+        .unwrap();
 
     conductors.exchange_peer_info().await;
 

@@ -2079,7 +2079,7 @@ impl TestHarness {
 
         match maybe_found {
             Some(CountersigningSessionState::Unknown { resolution, .. }) => resolution,
-            state => panic!("Session not in unknown state: {:?}", state),
+            state => panic!("Session not in unknown state: {state:?}"),
         }
     }
 
@@ -2103,7 +2103,7 @@ impl TestHarness {
 
                 resolution
             }
-            state => panic!("Session not in unknown state: {:?}", state),
+            state => panic!("Session not in unknown state: {state:?}"),
         }
     }
 

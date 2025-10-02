@@ -51,7 +51,7 @@ impl AgentSigner for ClientAgentSigner {
         let credentials_lock = self.credentials.read();
         let credentials = credentials_lock
             .get(cell_id)
-            .ok_or_else(|| anyhow::anyhow!("No credentials found for cell: {:?}", cell_id))?;
+            .ok_or_else(|| anyhow::anyhow!("No credentials found for cell: {cell_id:?}"))?;
         let signature = credentials.keypair.try_sign(&data_to_sign)?;
         Ok(Signature(signature.to_bytes()))
     }

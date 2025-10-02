@@ -75,7 +75,10 @@ async fn main_workflow() {
     let dna_hash = dna_file.dna_hash().clone();
 
     let mut conductor = SweetConductor::from_config(SweetConductorConfig::standard()).await;
-    let app = conductor.setup_app("", &[dna_file.clone()]).await.unwrap();
+    let app = conductor
+        .setup_app("", std::slice::from_ref(&dna_file))
+        .await
+        .unwrap();
     let cell_id = app.cells()[0].cell_id().clone();
 
     let app_validation_workspace = Arc::new(AppValidationWorkspace::new(
@@ -290,7 +293,10 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
     let dna_hash = dna_file.dna_hash().clone();
 
     let mut conductor = SweetConductor::from_standard_config().await;
-    let app = conductor.setup_app("", &[dna_file.clone()]).await.unwrap();
+    let app = conductor
+        .setup_app("", std::slice::from_ref(&dna_file))
+        .await
+        .unwrap();
     let cell_id = app.cells()[0].cell_id().clone();
 
     let app_validation_workspace = Arc::new(AppValidationWorkspace::new(
@@ -408,7 +414,10 @@ async fn validate_ops_in_sequence_must_get_action() {
     let dna_hash = dna_file.dna_hash().clone();
 
     let mut conductor = SweetConductor::from_standard_config().await;
-    let app = conductor.setup_app("", &[dna_file.clone()]).await.unwrap();
+    let app = conductor
+        .setup_app("", std::slice::from_ref(&dna_file))
+        .await
+        .unwrap();
     let cell_id = app.cells()[0].cell_id().clone();
 
     let app_validation_workspace = Arc::new(AppValidationWorkspace::new(
@@ -574,7 +583,10 @@ async fn handle_error_in_op_validation() {
     let dna_hash = dna_file.dna_hash().clone();
 
     let mut conductor = SweetConductor::from_standard_config().await;
-    let app = conductor.setup_app("", &[dna_file.clone()]).await.unwrap();
+    let app = conductor
+        .setup_app("", std::slice::from_ref(&dna_file))
+        .await
+        .unwrap();
     let cell_id = app.cells()[0].cell_id().clone();
 
     let app_validation_workspace = Arc::new(AppValidationWorkspace::new(
@@ -958,7 +970,10 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
     let dna_hash = dna_file.dna_hash().clone();
 
     let mut conductor = SweetConductor::from_standard_config().await;
-    let app = conductor.setup_app("", &[dna_file.clone()]).await.unwrap();
+    let app = conductor
+        .setup_app("", std::slice::from_ref(&dna_file))
+        .await
+        .unwrap();
     let cell_id = app.cells()[0].cell_id().clone();
 
     let app_validation_workspace = Arc::new(AppValidationWorkspace::new(
@@ -1386,7 +1401,7 @@ async fn run_test(
         .read_async(move |txn| -> DatabaseResult<()> {
             // Validation should be empty
             let limbo = show_limbo(txn);
-            assert!(limbo_is_empty(txn), "{:?}", limbo);
+            assert!(limbo_is_empty(txn), "{limbo:?}");
 
             Ok(())
         })
@@ -1418,7 +1433,7 @@ async fn run_test(
             move |txn| -> DatabaseResult<()> {
                 // Validation should be empty
                 let limbo = show_limbo(txn);
-                assert!(limbo_is_empty(txn), "{:?}", limbo);
+                assert!(limbo_is_empty(txn), "{limbo:?}");
 
                 assert!(expected_invalid_entry(
                     txn,
@@ -1460,7 +1475,7 @@ async fn run_test(
             move |txn| -> DatabaseResult<()> {
                 // Validation should be empty
                 let limbo = show_limbo(txn);
-                assert!(limbo_is_empty(txn), "{:?}", limbo);
+                assert!(limbo_is_empty(txn), "{limbo:?}");
 
                 assert!(expected_invalid_entry(
                     txn,
@@ -1513,7 +1528,7 @@ async fn run_test(
             move |txn| -> DatabaseResult<()> {
                 // Validation should be empty
                 let limbo = show_limbo(txn);
-                assert!(limbo_is_empty(txn), "{:?}", limbo);
+                assert!(limbo_is_empty(txn), "{limbo:?}");
 
                 assert!(expected_invalid_entry(
                     txn,
@@ -1565,7 +1580,7 @@ async fn run_test(
             move |txn| -> DatabaseResult<()> {
                 // Validation should be empty
                 let limbo = show_limbo(txn);
-                assert!(limbo_is_empty(txn), "{:?}", limbo);
+                assert!(limbo_is_empty(txn), "{limbo:?}");
 
                 assert!(expected_invalid_entry(
                     txn,
@@ -1619,7 +1634,7 @@ async fn run_test(
             move |txn| -> DatabaseResult<()> {
                 // Validation should be empty
                 let limbo = show_limbo(txn);
-                assert!(limbo_is_empty(txn), "{:?}", limbo);
+                assert!(limbo_is_empty(txn), "{limbo:?}");
 
                 assert!(expected_invalid_entry(
                     txn,
@@ -1675,7 +1690,7 @@ async fn run_test_entry_def_id(
         .read_async(move |txn| -> DatabaseResult<()> {
             // Validation should be empty
             let limbo = show_limbo(txn);
-            assert!(limbo_is_empty(txn), "{:?}", limbo);
+            assert!(limbo_is_empty(txn), "{limbo:?}");
 
             assert!(expected_invalid_entry(
                 txn,

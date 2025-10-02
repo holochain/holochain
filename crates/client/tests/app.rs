@@ -182,7 +182,7 @@ async fn close_on_drop_is_clone_safe() {
 async fn deferred_memproof_installation() {
     let conductor = SweetConductor::from_standard_config().await;
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
-    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{}", admin_port), None)
+    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{admin_port}"), None)
         .await
         .unwrap();
     let app_id: InstalledAppId = "test-app".into();
@@ -274,7 +274,7 @@ async fn connect_multiple_addresses() {
     let conductor = SweetConductor::from_standard_config().await;
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
 
-    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{}", admin_port), None)
+    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{admin_port}"), None)
         .await
         .unwrap();
     let app_port = admin_ws
@@ -330,7 +330,7 @@ async fn connect_with_custom_origin() {
     let conductor = SweetConductor::from_standard_config().await;
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
 
-    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{}", admin_port), None)
+    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{admin_port}"), None)
         .await
         .unwrap();
     let app_port = admin_ws
@@ -396,7 +396,7 @@ async fn connect_with_custom_origin() {
 async fn dump_network_stats() {
     let conductor = SweetConductor::from_standard_config().await;
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
-    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{}", admin_port), None)
+    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{admin_port}"), None)
         .await
         .unwrap();
     let app_port = admin_ws
@@ -454,7 +454,7 @@ async fn dump_network_stats() {
 async fn dump_network_metrics() {
     let conductor = SweetConductor::from_standard_config().await;
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
-    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{}", admin_port), None)
+    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{admin_port}"), None)
         .await
         .unwrap();
     let app_port = admin_ws
@@ -512,7 +512,7 @@ async fn dump_network_metrics() {
 async fn agent_info() {
     let conductor = SweetConductor::from_standard_config().await;
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
-    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{}", admin_port), None)
+    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{admin_port}"), None)
         .await
         .unwrap();
 
@@ -577,7 +577,7 @@ async fn peer_meta_info() {
 
     let conductor = SweetConductor::from_standard_config().await;
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
-    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{}", admin_port), None)
+    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{admin_port}"), None)
         .await
         .unwrap();
     let app_id: InstalledAppId = "test-app".into();

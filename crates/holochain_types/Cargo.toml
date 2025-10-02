@@ -1,6 +1,6 @@
 [package]
 name = "holochain_types"
-version = "0.6.0-dev.24"
+version = "0.6.0-dev.25"
 description = "Holochain common types"
 license = "Apache-2.0"
 repository = "https://github.com/holochain/holochain"
@@ -18,33 +18,33 @@ base64 = "0.22"
 derive_builder = "0.20"
 derive_more = { version = "2.0", features = ["constructor", "into_iterator"] }
 futures = "0.3"
-holo_hash = { version = "^0.6.0-dev.14", path = "../holo_hash", features = [
+holo_hash = { version = "^0.6.0-dev.15", path = "../holo_hash", features = [
   "encoding",
   "schema",
 ] }
-holochain_keystore = { version = "^0.6.0-dev.18", path = "../holochain_keystore" }
-holochain_nonce = { version = "^0.6.0-dev.4", path = "../holochain_nonce" }
+holochain_keystore = { version = "^0.6.0-dev.19", path = "../holochain_keystore" }
+holochain_nonce = { version = "^0.6.0-dev.5", path = "../holochain_nonce" }
 holochain_serialized_bytes = "=0.0.56"
-holochain_sqlite = { path = "../holochain_sqlite", version = "^0.6.0-dev.23" }
-holochain_trace = { version = "^0.6.0-dev.3", path = "../holochain_trace" }
-holochain_util = { version = "^0.6.0-dev.3", path = "../holochain_util", features = [
+holochain_sqlite = { path = "../holochain_sqlite", version = "^0.6.0-dev.24" }
+holochain_trace = { version = "^0.6.0-dev.4", path = "../holochain_trace" }
+holochain_util = { version = "^0.6.0-dev.4", path = "../holochain_util", features = [
   "backtrace",
 ] }
-holochain_zome_types = { path = "../holochain_zome_types", version = "^0.6.0-dev.18", features = [
+holochain_zome_types = { path = "../holochain_zome_types", version = "^0.6.0-dev.19", features = [
   "full",
 ] }
-holochain_timestamp = { version = "^0.6.0-dev.3", path = "../timestamp" }
+holochain_timestamp = { version = "^0.6.0-dev.4", path = "../timestamp" }
 kitsune2_api = "0.3.0-dev.3"
 itertools = { version = "0.14" }
 mr_bundle = { path = "../mr_bundle", features = [
   "fs",
-], version = "^0.6.0-dev.6" }
+], version = "^0.6.0-dev.7" }
 must_future = "0.1.1"
 nanoid = "0.4"
 parking_lot = "0.12"
 rand = "0.9"
 regex = "1.4"
-rusqlite = { version = "0.36" }
+rusqlite = { version = "0.37" }
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_derive = "1.0"
 serde_json = "1.0"
@@ -61,7 +61,7 @@ indexmap = { version = "2.6.0", features = ["serde"] }
 schemars = "0.9"
 bytes = { version = "1.10.1", features = ["serde"] }
 
-fixt = { path = "../fixt", version = "^0.6.0-dev.5", optional = true }
+fixt = { path = "../fixt", version = "^0.6.0-dev.6", optional = true }
 isotest = { version = "0", optional = true }
 proptest = { version = "1", optional = true }
 proptest-derive = { version = "0", optional = true }

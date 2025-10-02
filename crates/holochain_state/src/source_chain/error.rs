@@ -140,7 +140,7 @@ impl SourceChainError {
 // serde_json::Error does not implement PartialEq - why is that a requirement??
 impl From<serde_json::Error> for SourceChainError {
     fn from(e: serde_json::Error) -> Self {
-        Self::SerdeJsonError(format!("{:?}", e))
+        Self::SerdeJsonError(format!("{e:?}"))
     }
 }
 

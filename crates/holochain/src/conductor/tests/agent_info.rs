@@ -47,7 +47,7 @@ async fn setup_tests() -> (
 
     // Install app2
     let installed_app2_id = conductors[0]
-        .setup_app(&app2_id, &[dna3.0.clone()])
+        .setup_app(&app2_id, std::slice::from_ref(&dna3.0))
         .await
         .unwrap()
         .installed_app_id()
@@ -69,12 +69,12 @@ async fn setup_tests() -> (
 
     // Install app3 on both conductors
     let _ = conductors[0]
-        .setup_app(&app3_id, &[dna4.0.clone()])
+        .setup_app(&app3_id, std::slice::from_ref(&dna4.0))
         .await
         .unwrap();
 
     let installed_app3_id = conductors[1]
-        .setup_app(&app3_id, &[dna4.0.clone()])
+        .setup_app(&app3_id, std::slice::from_ref(&dna4.0))
         .await
         .unwrap()
         .installed_app_id()

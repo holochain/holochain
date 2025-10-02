@@ -469,7 +469,7 @@ impl TryFrom<Action> for EntryCreationAction {
         match value {
             Action::Create(h) => Ok(EntryCreationAction::Create(h)),
             Action::Update(h) => Ok(EntryCreationAction::Update(h)),
-            _ => Err(crate::WrongActionError(format!("{:?}", value))),
+            _ => Err(crate::WrongActionError(format!("{value:?}"))),
         }
     }
 }
