@@ -192,6 +192,17 @@ impl WireDeleteLink {
         )
     }
 }
+// TODO: Probably don't want to send the whole actions.
+// We could probably come up with a more compact
+// network Wire type in the future
+/// Link response to get links
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+pub struct GetLinksResponse {
+    /// All the link adds on the key you searched for
+    pub link_adds: Vec<(CreateLink, Signature)>,
+    /// All the link removes on the key you searched for
+    pub link_removes: Vec<(DeleteLink, Signature)>,
+}
 
 /// How do we match this link in queries?
 pub enum LinkMatch<S: Into<String>> {
