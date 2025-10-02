@@ -3,6 +3,7 @@ name = "test_wasm_genesis_self_check_valid"
 version = "0.0.1"
 authors = ["thedavidmeister", "thedavidmeister@gmail.com"]
 edition = "2021"
+publish = false
 
 [lib]
 name = "test_wasm_genesis_self_check_valid"

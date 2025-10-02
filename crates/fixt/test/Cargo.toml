@@ -9,6 +9,7 @@ authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 keywords = ["holochain", "holo", "test", "fixture"]
 categories = ["fixtures"]
 edition = "2021"
+publish = false
 
 # reminder - do not use workspace deps
 [dependencies]
