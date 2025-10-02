@@ -76,9 +76,9 @@ impl ChainOpType {
 
 #[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
 impl rusqlite::ToSql for ChainOpType {
-    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
         Ok(rusqlite::types::ToSqlOutput::Owned(
-            format!("{}", self).into(),
+            format!("{self}").into(),
         ))
     }
 }

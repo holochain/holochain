@@ -47,7 +47,7 @@ impl CallbackResult for ValidateCallbackResult {
 
 #[cfg(feature = "full")]
 impl rusqlite::ToSql for ValidationStatus {
-    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
         Ok(rusqlite::types::ToSqlOutput::Owned((*self as i32).into()))
     }
 }

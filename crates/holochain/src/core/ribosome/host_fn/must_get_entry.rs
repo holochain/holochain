@@ -58,7 +58,7 @@ pub fn must_get_entry(
                         | HostContext::GenesisSelfCheckV2(_)
                         | HostContext::PostCommit(_)
                         | HostContext::ZomeCall(_) => Err(wasm_error!(WasmErrorInner::Host(
-                            format!("Failed to get EntryHashed {}", entry_hash)
+                            format!("Failed to get EntryHashed {entry_hash}")
                         ))
                         .into()),
                         HostContext::Init(_) => Err(wasm_error!(WasmErrorInner::HostShortCircuit(

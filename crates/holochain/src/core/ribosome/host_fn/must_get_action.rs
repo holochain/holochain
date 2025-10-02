@@ -59,7 +59,7 @@ pub fn must_get_action(
                         | HostContext::GenesisSelfCheckV2(_)
                         | HostContext::PostCommit(_)
                         | HostContext::ZomeCall(_) => Err(wasm_error!(WasmErrorInner::Host(
-                            format!("Failed to get SignedActionHashed {}", action_hash)
+                            format!("Failed to get SignedActionHashed {action_hash}")
                         ))
                         .into()),
                         HostContext::Init(_) => Err(wasm_error!(WasmErrorInner::HostShortCircuit(

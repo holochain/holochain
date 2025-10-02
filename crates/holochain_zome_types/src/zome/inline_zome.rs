@@ -218,7 +218,7 @@ impl<T: PartialOrd> PartialOrd for InlineZome<T> {
 
 impl PartialOrd for DynInlineZome {
     fn partial_cmp(&self, other: &DynInlineZome) -> Option<std::cmp::Ordering> {
-        Some(self.0.uuid().cmp(&other.0.uuid()))
+        Some(self.cmp(other))
     }
 }
 

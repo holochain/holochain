@@ -333,14 +333,14 @@ impl HcDnaBundleSubcommand {
                 let schema_string = serde_json::to_string_pretty(&schema)
                     .context("Failed to pretty print schema")?;
 
-                println!("{}", schema_string);
+                println!("{schema_string}");
             }
             Self::Hash { path } => {
                 let bundle = FileSystemBundler::load_from::<ValidatedDnaManifest>(path)
                     .await
                     .map(DnaBundle::from)?;
                 let dna_hash_b64 = bundle.to_dna_file().await?.0.dna_hash().to_string();
-                println!("{}", dna_hash_b64);
+                println!("{dna_hash_b64}");
             }
         }
         Ok(())
@@ -393,7 +393,7 @@ impl HcAppBundleSubcommand {
                 let schema_string = serde_json::to_string_pretty(&schema)
                     .context("Failed to pretty print schema")?;
 
-                println!("{}", schema_string);
+                println!("{schema_string}");
             }
         }
         Ok(())
@@ -447,7 +447,7 @@ impl HcWebAppBundleSubcommand {
                 let schema_string = serde_json::to_string_pretty(&schema)
                     .context("Failed to pretty print schema")?;
 
-                println!("{}", schema_string);
+                println!("{schema_string}");
             }
         }
         Ok(())

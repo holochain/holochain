@@ -46,7 +46,10 @@ async fn schedule_ephemeral_ok() {
 
     let dna = SweetDnaFile::unique_from_inline_zomes(zome).await;
     let mut conductor = SweetConductor::from_standard_config().await;
-    let app = conductor.setup_app("app", &[dna.0.clone()]).await.unwrap();
+    let app = conductor
+        .setup_app("app", std::slice::from_ref(&dna.0))
+        .await
+        .unwrap();
     let cell = app.into_cells()[0].clone();
     let mut app_signal = conductor.subscribe_to_app_signals("app".into());
     let host_fn_caller =
@@ -94,7 +97,10 @@ async fn schedule_ephemeral_error() {
 
     let dna = SweetDnaFile::unique_from_inline_zomes(zome).await;
     let mut conductor = SweetConductor::from_standard_config().await;
-    let app = conductor.setup_app("app", &[dna.0.clone()]).await.unwrap();
+    let app = conductor
+        .setup_app("app", std::slice::from_ref(&dna.0))
+        .await
+        .unwrap();
     let cell = app.into_cells()[0].clone();
     let mut app_signal = conductor.subscribe_to_app_signals("app".into());
     let host_fn_caller =
@@ -142,7 +148,10 @@ async fn schedule_persisted_fn_then_unschedule() {
 
     let dna = SweetDnaFile::unique_from_inline_zomes(zome).await;
     let mut conductor = SweetConductor::from_standard_config().await;
-    let app = conductor.setup_app("app", &[dna.0.clone()]).await.unwrap();
+    let app = conductor
+        .setup_app("app", std::slice::from_ref(&dna.0))
+        .await
+        .unwrap();
     let cell = app.into_cells()[0].clone();
     let mut app_signal = conductor.subscribe_to_app_signals("app".into());
     let host_fn_caller =
@@ -264,11 +273,11 @@ async fn schedule_same_dna() {
     let mut conductor = SweetConductor::from_standard_config().await;
     // Set up 2 apps each using the same dna but with different agent pub key
     let app0 = conductor
-        .setup_app("app0", &[dna_0.0.clone()])
+        .setup_app("app0", std::slice::from_ref(&dna_0.0))
         .await
         .unwrap();
     let app1 = conductor
-        .setup_app("app1", &[dna_0.0.clone()])
+        .setup_app("app1", std::slice::from_ref(&dna_0.0))
         .await
         .unwrap();
     let cell_0 = app0.into_cells()[0].clone();
@@ -349,7 +358,10 @@ async fn schedule_persisted_fn_with_bad_crontab() {
 
     let dna = SweetDnaFile::unique_from_inline_zomes(zome).await;
     let mut conductor = SweetConductor::from_standard_config().await;
-    let app = conductor.setup_app("app", &[dna.0.clone()]).await.unwrap();
+    let app = conductor
+        .setup_app("app", std::slice::from_ref(&dna.0))
+        .await
+        .unwrap();
     let cell = app.into_cells()[0].clone();
     let mut app_signal = conductor.subscribe_to_app_signals("app".into());
     let host_fn_caller =
@@ -389,7 +401,10 @@ async fn schedule_persisted_fn_that_errors() {
 
     let dna = SweetDnaFile::unique_from_inline_zomes(zome).await;
     let mut conductor = SweetConductor::from_standard_config().await;
-    let app = conductor.setup_app("app", &[dna.0.clone()]).await.unwrap();
+    let app = conductor
+        .setup_app("app", std::slice::from_ref(&dna.0))
+        .await
+        .unwrap();
     let cell = app.into_cells()[0].clone();
     let mut app_signal = conductor.subscribe_to_app_signals("app".into());
     let host_fn_caller =
@@ -429,7 +444,10 @@ async fn schedule_persisted_crontab_end() {
 
     let dna = SweetDnaFile::unique_from_inline_zomes(zome).await;
     let mut conductor = SweetConductor::from_standard_config().await;
-    let app = conductor.setup_app("app", &[dna.0.clone()]).await.unwrap();
+    let app = conductor
+        .setup_app("app", std::slice::from_ref(&dna.0))
+        .await
+        .unwrap();
     let cell = app.into_cells()[0].clone();
     let mut app_signal = conductor.subscribe_to_app_signals("app".into());
     let host_fn_caller =
@@ -460,7 +478,10 @@ async fn schedule_persisted_expired() {
 
     let dna = SweetDnaFile::unique_from_inline_zomes(zome).await;
     let mut conductor = SweetConductor::from_standard_config().await;
-    let app = conductor.setup_app("app", &[dna.0.clone()]).await.unwrap();
+    let app = conductor
+        .setup_app("app", std::slice::from_ref(&dna.0))
+        .await
+        .unwrap();
     let cell = app.into_cells()[0].clone();
     let pubkey = cell.agent_pubkey().clone();
     let mut app_signal = conductor.subscribe_to_app_signals("app".into());
@@ -544,7 +565,7 @@ async fn wait_for_signal(
             let input: Option<Schedule> = signal.into_inner().decode().unwrap();
             Ok(input)
         }
-        _ => panic!("Expected AppSignal, got {:?}", msg),
+        _ => panic!("Expected AppSignal, got {msg:?}"),
     }
 }
 

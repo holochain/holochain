@@ -410,7 +410,7 @@ impl RealRibosome {
             let mut store_mut = store.as_store_mut();
             instance = Arc::new(Instance::new(&mut store_mut, &module, &imports).map_err(
                 |e| -> RuntimeError {
-                    wasm_error!(WasmErrorInner::ModuleBuild(format!("{}: {}", name, e))).into()
+                    wasm_error!(WasmErrorInner::ModuleBuild(format!("{name}: {e}"))).into()
                 },
             )?);
         }
@@ -674,7 +674,7 @@ impl RealRibosome {
                 .map_or(Ok(None), |func| Ok(Some(func.call(&mut store_mut)?)))
                 .map_err(|e: RuntimeError| {
                     RibosomeError::WasmRuntimeError(
-                        wasm_error!(WasmErrorInner::Host(format!("{}", e))).into(),
+                        wasm_error!(WasmErrorInner::Host(format!("{e}"))).into(),
                     )
                 })?;
         }
@@ -888,11 +888,8 @@ impl RibosomeT for RealRibosome {
                     })? {
                     EntryDefsResult::Err(zome, error_string) => {
                         return Err(RibosomeError::WasmRuntimeError(
-                            wasm_error!(WasmErrorInner::Host(format!(
-                                "{}: {}",
-                                zome, error_string
-                            )))
-                            .into(),
+                            wasm_error!(WasmErrorInner::Host(format!("{zome}: {error_string}")))
+                                .into(),
                         ))
                     }
                     EntryDefsResult::Defs(defs) => {

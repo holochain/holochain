@@ -87,7 +87,7 @@ async fn async_main() {
     if opt.config_schema {
         let schema = schemars::schema_for!(ConductorConfig);
         let schema_string = serde_json::to_string_pretty(&schema).unwrap();
-        println!("{}", schema_string);
+        println!("{schema_string}");
         return;
     }
 
@@ -132,7 +132,7 @@ async fn async_main() {
     // This println has special meaning. Other processes can detect it and know
     // that the conductor has been initialized, in particular that the admin
     // interfaces are running, and can be connected to.
-    println!("{}", MAGIC_CONDUCTOR_READY_STRING);
+    println!("{MAGIC_CONDUCTOR_READY_STRING}");
 
     // Lets systemd units know that holochain is ready via sd_notify socket
     // Requires NotifyAccess=all and Type=notify attributes on holochain systemd unit
@@ -171,7 +171,7 @@ async fn conductor_handle_from_config(opt: &Opt, config: ConductorConfig) -> Con
         match result {
             Ok(()) => println!("Created database at {}.", env_path.display()),
             Err(e) => {
-                println!("Couldn't create database: {}", e);
+                println!("Couldn't create database: {e}");
                 std::process::exit(ERROR_CODE);
             }
         }
@@ -185,10 +185,7 @@ async fn conductor_handle_from_config(opt: &Opt, config: ConductorConfig) -> Con
         .build()
         .await
     {
-        Err(err) => panic!(
-            "Could not initialize Conductor from configuration: {:?}",
-            err
-        ),
+        Err(err) => panic!("Could not initialize Conductor from configuration: {err:?}"),
         Ok(res) => res,
     }
 }

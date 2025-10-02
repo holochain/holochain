@@ -42,7 +42,7 @@ fixt = { version = "^0.6.0-dev.5", path = "../fixt", optional = true }
 rand = { version = "0.9", optional = true }
 
 # sqlite dependencies
-rusqlite = { version = "0.36", optional = true }
+rusqlite = { version = "0.37", optional = true }
 num_enum = { version = "0.7", optional = true }
 
 # full-dna-def dependencies

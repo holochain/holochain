@@ -181,10 +181,10 @@ pub mod __inner {
             let mut values = String::new();
             for (count, metric) in metrics.iter().zip(names.iter()) {
                 let count = count.load(std::sync::atomic::Ordering::Relaxed);
-                write!(keys, "{},", metric).expect("Failed to write metrics");
-                write!(values, "{},", count).expect("Failed to write metrics");
+                write!(keys, "{metric},").expect("Failed to write metrics");
+                write!(values, "{count},").expect("Failed to write metrics");
             }
-            std::fs::write(path, format!("{}\n{}\n", keys, values))
+            std::fs::write(path, format!("{keys}\n{values}\n"))
                 .expect("Failed to write metrics to csv");
             tracing::info!(metrics = "Saved csv to", ?path);
         }

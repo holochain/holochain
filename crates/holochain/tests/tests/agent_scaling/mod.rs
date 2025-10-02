@@ -272,14 +272,14 @@ async fn many_concurrent_zome_calls_dont_gunk_up_the_works() {
                     .unwrap();
                 match res {
                     AppResponse::ZomeCalled(_) => Instant::now().duration_since(start),
-                    other => panic!("unexpected ws response: {:?}", other),
+                    other => panic!("unexpected ws response: {other:?}"),
                 }
             },
         ))
         .await;
 
         for (i, duration) in calls.iter().enumerate() {
-            println!("{:>3}: {:?}", i, duration);
+            println!("{i:>3}: {duration:?}");
         }
     }
 

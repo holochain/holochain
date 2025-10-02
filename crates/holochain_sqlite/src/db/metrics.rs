@@ -12,7 +12,7 @@ pub fn create_pool_usage_metric(kind: DbKind, db_semaphores: Vec<Arc<Semaphore>>
         None::<&'static str>,
         Some(vec![
             KeyValue::new("kind", db_kind_name(kind.clone())),
-            KeyValue::new("id", format!("{}", kind)),
+            KeyValue::new("id", format!("{kind}")),
         ]),
     );
 
@@ -46,7 +46,7 @@ pub fn create_connection_use_time_metric(kind: DbKind) -> UseTimeMetric {
         None::<&'static str>,
         Some(vec![
             KeyValue::new("kind", db_kind_name(kind.clone())),
-            KeyValue::new("id", format!("{}", kind)),
+            KeyValue::new("id", format!("{kind}")),
         ]),
     )
     .f64_histogram("hc.db.connections.use_time")

@@ -174,12 +174,12 @@ impl InlineZomeSet {
     pub fn merge(mut self, other: Self) -> Self {
         for (k, v) in other.integrity_zomes {
             if self.integrity_zomes.insert(k, v).is_some() {
-                panic!("InlineZomeSet contains duplicate key {} on merge.", k);
+                panic!("InlineZomeSet contains duplicate key {k} on merge.");
             }
         }
         for (k, v) in other.coordinator_zomes {
             if self.coordinator_zomes.insert(k, v).is_some() {
-                panic!("InlineZomeSet contains duplicate key {} on merge.", k);
+                panic!("InlineZomeSet contains duplicate key {k} on merge.");
             }
         }
         self.integrity_order.extend(other.integrity_order);
@@ -210,13 +210,8 @@ impl InlineZomeSet {
 
     /// Add a integrity dependency for a coordinator zome
     pub fn with_dependency(mut self, from: &'static str, to: &'static str) -> Self {
-        assert!(
-            self.coordinator_zomes.contains_key(from),
-            "{} -> {}",
-            to,
-            from
-        );
-        assert!(self.integrity_zomes.contains_key(to), "{} -> {}", to, from);
+        assert!(self.coordinator_zomes.contains_key(from), "{to} -> {from}");
+        assert!(self.integrity_zomes.contains_key(to), "{to} -> {from}");
         self.dependencies.insert(from.into(), to.into());
         self
     }

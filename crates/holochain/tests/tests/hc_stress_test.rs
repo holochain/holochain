@@ -12,16 +12,16 @@ async fn hc_stress_test_check_zome_functions() {
     let mut test = HcStressTest::new(conductor, &[dna]).await;
 
     let rec = test.create_file(0, "hello world").await;
-    println!("create: {:?}", rec);
+    println!("create: {rec:?}");
     assert_eq!("hello world", HcStressTest::record_to_file_data(&rec),);
 
     let all = test.get_all_images(0).await;
-    println!("all: {:?}", all);
+    println!("all: {all:?}");
     assert_eq!(1, all.len());
 
     for hash in all {
         let rec = test.get_file(0, hash.clone()).await.unwrap();
-        println!("get: {hash:?}: {:?}", rec);
+        println!("get: {hash:?}: {rec:?}");
         assert_eq!("hello world", HcStressTest::record_to_file_data(&rec),);
     }
 }

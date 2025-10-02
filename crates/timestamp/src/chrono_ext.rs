@@ -25,7 +25,7 @@ impl fmt::Display for Timestamp {
 
 impl fmt::Debug for Timestamp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Timestamp({})", self)
+        write!(f, "Timestamp({self})")
     }
 }
 

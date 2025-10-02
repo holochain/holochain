@@ -35,8 +35,7 @@ async fn validate_valid_dna_op() {
 
     assert!(
         matches!(outcome, Outcome::Accepted),
-        "Expected Accepted but actual outcome was {:?}",
-        outcome
+        "Expected Accepted but actual outcome was {outcome:?}"
     );
 }
 
@@ -153,8 +152,7 @@ async fn validate_valid_agent_validation_package_op() {
 
     assert!(
         matches!(outcome, Outcome::Accepted),
-        "Expected Accepted but actual outcome was {:?}",
-        outcome
+        "Expected Accepted but actual outcome was {outcome:?}"
     );
 }
 
@@ -199,8 +197,7 @@ async fn validate_valid_create_op() {
 
     assert!(
         matches!(outcome, Outcome::Accepted),
-        "Expected Accepted but actual outcome was {:?}",
-        outcome
+        "Expected Accepted but actual outcome was {outcome:?}"
     );
 }
 
@@ -258,8 +255,7 @@ async fn validate_create_op_with_prev_from_network() {
 
     assert!(
         matches!(outcome, Outcome::Accepted),
-        "Expected Accepted but actual outcome was {:?}",
-        outcome
+        "Expected Accepted but actual outcome was {outcome:?}"
     );
 }
 
@@ -300,8 +296,7 @@ async fn validate_create_op_with_prev_action_not_found() {
 
     assert!(
         matches!(outcome, Outcome::MissingDhtDep),
-        "Expected MissingDhtDep but actual outcome was {:?}",
-        outcome
+        "Expected MissingDhtDep but actual outcome was {outcome:?}"
     );
 }
 
@@ -718,8 +713,7 @@ async fn validate_valid_store_record_with_no_entry() {
 
     assert!(
         matches!(outcome, Outcome::Accepted),
-        "Expected Accepted but actual outcome was {:?}",
-        outcome
+        "Expected Accepted but actual outcome was {outcome:?}"
     );
 }
 
@@ -1001,8 +995,7 @@ async fn validate_valid_store_record_update() {
 
     assert!(
         matches!(outcome, Outcome::Accepted),
-        "Expected Accepted but actual outcome was {:?}",
-        outcome
+        "Expected Accepted but actual outcome was {outcome:?}"
     );
 }
 
@@ -1637,8 +1630,7 @@ async fn validate_register_updated_content_missing_updates_ref() {
 
     assert!(
         matches!(outcome, Outcome::MissingDhtDep),
-        "Expected MissingDhtDep but actual outcome was {:?}",
-        outcome
+        "Expected MissingDhtDep but actual outcome was {outcome:?}"
     );
 }
 
@@ -1746,8 +1738,7 @@ async fn validate_register_updated_record_missing_updates_ref() {
 
     assert!(
         matches!(outcome, Outcome::MissingDhtDep),
-        "Expected MissingDhtDep but actual outcome was {:?}",
-        outcome
+        "Expected MissingDhtDep but actual outcome was {outcome:?}"
     );
 }
 
@@ -1828,8 +1819,7 @@ async fn validate_register_deleted_by_with_missing_deletes_ref() {
 
     assert!(
         matches!(outcome, Outcome::MissingDhtDep),
-        "Expected MissingDhtDep but actual outcome was {:?}",
-        outcome
+        "Expected MissingDhtDep but actual outcome was {outcome:?}"
     );
 }
 
@@ -1943,8 +1933,7 @@ async fn validate_register_deleted_entry_action_with_missing_deletes_ref() {
 
     assert!(
         matches!(outcome, Outcome::MissingDhtDep),
-        "Expected MissingDhtDep but actual outcome was {:?}",
-        outcome
+        "Expected MissingDhtDep but actual outcome was {outcome:?}"
     );
 }
 
@@ -2138,8 +2127,7 @@ async fn validate_remove_link_missing_link_add_ref() {
 
     assert!(
         matches!(outcome, Outcome::MissingDhtDep),
-        "Expected MissingDhtDep but actual outcome was {:?}",
-        outcome
+        "Expected MissingDhtDep but actual outcome was {outcome:?}"
     );
 }
 

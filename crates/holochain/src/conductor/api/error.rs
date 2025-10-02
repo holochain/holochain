@@ -165,7 +165,7 @@ impl From<ConductorApiError> for ExternalApiWireError {
 
 impl From<SerializationError> for ExternalApiWireError {
     fn from(e: SerializationError) -> Self {
-        ExternalApiWireError::Deserialization(format!("{:?}", e))
+        ExternalApiWireError::Deserialization(format!("{e:?}"))
     }
 }
 
@@ -184,6 +184,6 @@ pub fn zome_call_response_to_conductor_api_result<T: DeserializeOwned + std::fmt
 ) -> ConductorApiResult<T> {
     match zcr {
         ZomeCallResponse::Ok(bytes) => Ok(bytes.decode().map_err(SerializationError::from)?),
-        other => Err(ConductorApiError::other(format!("{:?}", other))),
+        other => Err(ConductorApiError::other(format!("{other:?}"))),
     }
 }

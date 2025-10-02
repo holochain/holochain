@@ -81,7 +81,7 @@ impl Widget for NetworkMetricsWidget {
                 match get_network_metrics_params(app_client.clone(), app_id.clone()) {
                     Ok(p) => Some(p),
                     Err(e) => {
-                        show_message(format!("{:?}", e).as_str(), area, buf);
+                        show_message(format!("{e:?}").as_str(), area, buf);
                         return;
                     }
                 };
@@ -106,7 +106,7 @@ impl Widget for NetworkMetricsWidget {
                         *get_network_metrics().write().unwrap() = metrics;
                     }
                     Err(e) => {
-                        show_message(format!("{:?}", e).as_str(), area, buf);
+                        show_message(format!("{e:?}").as_str(), area, buf);
                         return;
                     }
                 }
@@ -151,7 +151,7 @@ impl Widget for NetworkMetricsWidget {
             .unwrap()
             .1
             .into_iter()
-            .map(|(name, dna_hash)| ListItem::new(format!("{} - {:?}", name, dna_hash)))
+            .map(|(name, dna_hash)| ListItem::new(format!("{name} - {dna_hash:?}")))
             .collect();
 
         let list = List::new(list_items)
@@ -285,7 +285,7 @@ fn get_network_metrics_params(
         Duration::from_secs(10),
     ) {
         Ok(Ok(p)) => Ok(p),
-        Ok(Err(e)) => Err(anyhow!("Error fetching network metrics params - {:?}", e)),
+        Ok(Err(e)) => Err(anyhow!("Error fetching network metrics params - {e:?}")),
         Err(_) => Err(anyhow!("Timeout while fetching network metrics params")),
     }
 }
@@ -298,7 +298,7 @@ fn fetch_network_metrics(
         Duration::from_secs(10),
     ) {
         Ok(Ok(metrics)) => Ok(metrics),
-        Ok(Err(e)) => Err(anyhow!("Failed to fetch network metrics - {:?}", e)),
+        Ok(Err(e)) => Err(anyhow!("Failed to fetch network metrics - {e:?}")),
         Err(_) => Err(anyhow!("Timeout while fetching network metrics")),
     }
 }

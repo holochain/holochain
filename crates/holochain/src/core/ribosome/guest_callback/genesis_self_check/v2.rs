@@ -71,7 +71,7 @@ impl From<Vec<ValidateCallbackResult>> for GenesisSelfCheckResultV2 {
                 // this can't happen because self check has no DHT access.
                 // don't want to panic so i guess it is invalid.
                 ValidateCallbackResult::UnresolvedDependencies(_) => {
-                    Self::Invalid(format!("{:?}", x))
+                    Self::Invalid(format!("{x:?}"))
                 }
             }
         })

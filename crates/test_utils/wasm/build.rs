@@ -123,13 +123,13 @@ fn build_test_wasms(
                 cmd.env("CARGO_TARGET_DIR", wasm_out);
             }
             None => {
-                cmd.env("CARGO_TARGET_DIR", format!("{}/target", wasms_path));
+                cmd.env("CARGO_TARGET_DIR", format!("{wasms_path}/target"));
             }
         }
         let output = cmd.output().unwrap();
         if !output.status.success() {
             std::io::stderr().write_all(&output.stderr).ok();
-            eprintln!("While building {:?}", path);
+            eprintln!("While building {path:?}");
             assert!(output.status.success());
         }
     }
@@ -218,7 +218,7 @@ fn toml_string(value: toml::Value) -> String {
     if let toml::Value::String(string) = value {
         string
     } else {
-        panic!("Expected TOML string, got: {:?}", value)
+        panic!("Expected TOML string, got: {value:?}")
     }
 }
 
@@ -227,7 +227,7 @@ fn toml_table(value: toml::Value) -> toml::value::Table {
     if let toml::Value::Table(table) = value {
         table
     } else {
-        panic!("Expected TOML table, got: {:?}", value)
+        panic!("Expected TOML table, got: {value:?}")
     }
 }
 
@@ -236,6 +236,6 @@ fn toml_array(value: toml::Value) -> toml::value::Array {
     if let toml::Value::Array(array) = value {
         array
     } else {
-        panic!("Expected TOML array, got: {:?}", value)
+        panic!("Expected TOML array, got: {value:?}")
     }
 }

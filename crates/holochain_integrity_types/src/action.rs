@@ -54,7 +54,7 @@ impl Display for Action {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Action::Dna(dna) =>
-                write!(f, "dna={:?}", dna),
+                write!(f, "dna={dna:?}"),
 
             Action::AgentValidationPkg(avp) =>
                 write!(

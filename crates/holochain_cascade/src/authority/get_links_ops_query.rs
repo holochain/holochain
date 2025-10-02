@@ -60,11 +60,10 @@ impl Query for GetLinksOpsQuery {
             let tag = Self::tag_to_hex(tag.as_ref());
             common_query = format!(
                 "
-                    {}
+                    {common_query}
                     AND
-                    HEX(Action.tag) LIKE '{}%'
-                ",
-                common_query, tag
+                    HEX(Action.tag) LIKE '{tag}%'
+                "
             );
         }
         common_query = format!(
@@ -75,8 +74,8 @@ impl Query for GetLinksOpsQuery {
             common_query,
             self.type_query.to_sql_statement(),
         );
-        let create_query = format!("{}{}", create, common_query);
-        let sub_create_query = format!("{}{}", sub_create, common_query);
+        let create_query = format!("{create}{common_query}");
+        let sub_create_query = format!("{sub_create}{common_query}");
         let delete_query = format!(
             "
             SELECT Action.blob AS action_blob, DhtOp.type AS dht_type,
@@ -87,14 +86,13 @@ impl Query for GetLinksOpsQuery {
             AND
             DhtOp.when_integrated IS NOT NULL
             AND
-            Action.create_link_hash IN ({})
-            ",
-            sub_create_query
+            Action.create_link_hash IN ({sub_create_query})
+            "
         );
-        format!("{} UNION ALL {}", create_query, delete_query)
+        format!("{create_query} UNION ALL {delete_query}")
     }
 
-    fn params(&self) -> Vec<Params> {
+    fn params(&self) -> Vec<Params<'_>> {
         let params = named_params! {
             ":create": ChainOpType::RegisterAddLink,
             ":delete": ChainOpType::RegisterRemoveLink,

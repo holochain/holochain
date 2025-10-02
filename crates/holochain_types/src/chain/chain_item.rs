@@ -180,7 +180,7 @@ impl From<(PrevActionErrorKind, Action)> for PrevActionError {
             source: inner,
             seq: action.action_seq(),
             action_hash: action.to_hash(),
-            action_display: format!("{}", action),
+            action_display: format!("{action}"),
         }
     }
 }

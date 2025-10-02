@@ -91,7 +91,7 @@ pub async fn pack<M: Manifest>(
 }
 
 fn dir_to_bundle_path(dir_path: &Path, name: String, extension: &str) -> HcBundleResult<PathBuf> {
-    Ok(dir_path.join(format!("{}.{}", name, extension)))
+    Ok(dir_path.join(format!("{name}.{extension}")))
 }
 
 #[cfg(test)]
@@ -149,7 +149,7 @@ integrity:
         assert!(bundle_path.is_file());
         assert_eq!(bundle_path, dir.join("test_dna.dna"));
 
-        println!("Loaded bundle: {:?}", bundle);
+        println!("Loaded bundle: {bundle:?}");
 
         // Ensure we can resolve all files, including the local one
         assert_eq!(bundle.get_all_resources().values().len(), 3);

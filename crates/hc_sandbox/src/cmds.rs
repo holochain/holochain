@@ -146,8 +146,7 @@ Run `hc sandbox generate --help` or `hc sandbox create --help` for more options.
             for i in dedup_indices.into_iter() {
                 let Some(result) = sandboxes.get(i) else {
                     return Err(std::io::Error::other(format!(
-                        "Index {} is out of bounds.",
-                        i
+                        "Index {i} is out of bounds."
                     )));
                 };
                 match result {

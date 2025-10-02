@@ -293,7 +293,7 @@ async fn name_has_no_effect_on_dna_hash() {
 fn unwrap_cell_info_clone(cell_info: CellInfo) -> holochain_zome_types::clone::ClonedCell {
     match cell_info {
         CellInfo::Cloned(cell) => cell,
-        _ => panic!("wrong cell type: {:?}", cell_info),
+        _ => panic!("wrong cell type: {cell_info:?}"),
     }
 }
 

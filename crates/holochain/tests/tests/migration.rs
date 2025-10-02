@@ -33,7 +33,7 @@ async fn migrate_dna_with_second_app_install() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::MigrateInitial]).await;
 
     let app_initial = conductor
-        .setup_app_for_agent("app_initial", alice.clone(), &[dna.clone()])
+        .setup_app_for_agent("app_initial", alice.clone(), std::slice::from_ref(&dna))
         .await
         .unwrap();
 
@@ -70,7 +70,7 @@ async fn migrate_dna_with_second_app_install() {
 
     // Install the new version of the app
     let app_new = conductor
-        .setup_app_for_agent("app_2", alice.clone(), &[new_dna.clone()])
+        .setup_app_for_agent("app_2", alice.clone(), std::slice::from_ref(&new_dna))
         .await
         .unwrap();
 

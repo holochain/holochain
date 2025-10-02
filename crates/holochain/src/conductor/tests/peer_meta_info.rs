@@ -155,13 +155,13 @@ async fn app_peer_meta_info() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let app_id1: InstalledAppId = "app1".into();
     conductor
-        .setup_app(&app_id1, &[dna1.clone()])
+        .setup_app(&app_id1, std::slice::from_ref(&dna1))
         .await
         .unwrap();
 
     let app_id2: InstalledAppId = "app2".into();
     conductor
-        .setup_app(&app_id2, &[dna2.clone()])
+        .setup_app(&app_id2, std::slice::from_ref(&dna2))
         .await
         .unwrap();
 

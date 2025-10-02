@@ -157,7 +157,7 @@ impl Db {
                                 |row| row.get(0),
                             )
                             .unwrap();
-                        assert!(found, "{}\n{:?}", here, op);
+                        assert!(found, "{here}\n{op:?}");
                     }
                     Db::IntQueue(op) => {
                         let op_hash = DhtOpHash::with_data_sync(&op);
@@ -180,7 +180,7 @@ impl Db {
                                 |row| row.get(0),
                             )
                             .unwrap();
-                        assert!(found, "{}\n{:?}", here, op);
+                        assert!(found, "{here}\n{op:?}");
                     }
                     Db::ValidateQueue(op) => {
                         let op_hash = DhtOpHash::with_data_sync(&op);
@@ -201,7 +201,7 @@ impl Db {
                                 |row| row.get(0),
                             )
                             .unwrap();
-                        assert!(found, "{}\n{:?}", here, op);
+                        assert!(found, "{here}\n{op:?}");
                     }
                     Db::MetaActivity(action) => {
                         let hash = ActionHash::with_data_sync(&action);
@@ -227,7 +227,7 @@ impl Db {
                                 |row| row.get(0),
                             )
                             .unwrap();
-                        assert!(found, "{}\n{:?}", here, action);
+                        assert!(found, "{here}\n{action:?}");
                     }
                     Db::MetaUpdate(base, action) => {
                         let hash = ActionHash::with_data_sync(&action);
@@ -253,7 +253,7 @@ impl Db {
                                 |row| row.get(0),
                             )
                             .unwrap();
-                        assert!(found, "{}\n{:?}", here, action);
+                        assert!(found, "{here}\n{action:?}");
                     }
                     Db::MetaDelete(deleted_action_hash, action) => {
                         let hash = ActionHash::with_data_sync(&action);
@@ -282,7 +282,7 @@ impl Db {
                                 |row| row.get(0),
                             )
                             .unwrap();
-                        assert!(found, "{}\n{:?}", here, action);
+                        assert!(found, "{here}\n{action:?}");
                     }
                     Db::IntQueueEmpty => {
                         let not_empty: bool = txn
@@ -302,7 +302,7 @@ impl Db {
                             GetLinksFilter::default(),
                         );
                         let res = query.run(CascadeTxnWrapper::from(txn)).unwrap();
-                        assert_eq!(res.len(), 0, "{}", here);
+                        assert_eq!(res.len(), 0, "{here}");
                     }
                 }
             }

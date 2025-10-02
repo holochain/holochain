@@ -23,7 +23,7 @@ chrono = { version = "0.4.22", default-features = false, features = [
 ], optional = true }
 
 # Dependencies only needed for full.
-rusqlite = { version = "0.36", optional = true }
+rusqlite = { version = "0.37", optional = true }
 
 [dev-dependencies]
 holochain_serialized_bytes = "=0.0.56"

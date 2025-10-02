@@ -67,7 +67,7 @@ pub mod wasm_test {
         let output: holochain_zome_types::prelude::Bytes =
             random_bytes(Arc::new(ribosome), Arc::new(call_context), LEN).unwrap();
 
-        println!("{:?}", output);
+        println!("{output:?}");
 
         assert_ne!(&[0; LEN as usize], output.as_ref(),);
     }
