@@ -18,9 +18,6 @@ pub enum CascadeError {
     DatabaseError(#[from] DatabaseError),
 
     #[error(transparent)]
-    RecordGroupError(#[from] RecordGroupError),
-
-    #[error(transparent)]
     ActionError(#[from] ActionError),
 
     #[error("Expected this Action to contain an Entry: {0}")]

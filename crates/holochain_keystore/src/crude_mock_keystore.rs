@@ -26,34 +26,6 @@ where
     )
 }
 
-/// Spawn a test keystore that can switch between mocked and real.
-/// It starts off as real and can be switched to the given callback mock
-/// using the [`MockLairControl`].
-pub async fn spawn_real_or_mock_keystore<F>(
-    func: F,
-) -> LairResult<(MetaLairClient, MockLairControl)>
-where
-    F: Fn(LairApiEnum) -> LairResult<LairApiEnum> + Send + Sync + 'static,
-{
-    let real = spawn_test_keystore().await?;
-    let use_mock = Arc::new(AtomicBool::new(false));
-    let mock = RealOrMockKeystore {
-        mock: Box::new(func),
-        real,
-        use_mock: use_mock.clone(),
-    };
-
-    let control = MockLairControl(use_mock);
-
-    let (s, _) = tokio::sync::mpsc::unbounded_channel();
-    Ok((
-        MetaLairClient(
-            Arc::new(parking_lot::Mutex::new(LairClient(Arc::new(mock)))),
-            s,
-        ),
-        control,
-    ))
-}
 /// A keystore which always returns the same LairError for every call.
 struct RealOrMockKeystore {
     mock: Box<dyn Fn(LairApiEnum) -> LairResult<LairApiEnum> + Send + Sync + 'static>,
@@ -61,26 +33,6 @@ struct RealOrMockKeystore {
     use_mock: Arc<AtomicBool>,
 }
 
-/// Control if a mocked lair keystore is using
-/// the real keystore or the mock callback.
-pub struct MockLairControl(Arc<AtomicBool>);
-
-impl MockLairControl {
-    /// Use the mock callback.
-    pub fn use_mock(&self) {
-        self.0.store(true, std::sync::atomic::Ordering::SeqCst);
-    }
-
-    /// Use the real test keystore.
-    pub fn use_real(&self) {
-        self.0.store(false, std::sync::atomic::Ordering::SeqCst);
-    }
-
-    /// Is the keystore using the mock?
-    pub fn using_mock(&self) -> bool {
-        self.0.load(std::sync::atomic::Ordering::SeqCst)
-    }
-}
 /// A keystore which always returns the same LairError for every call.
 struct CrudeMockKeystore(Arc<dyn Fn() -> one_err::OneErr + Send + Sync + 'static>);
 

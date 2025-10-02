@@ -106,9 +106,6 @@ pub enum SourceChainError {
     RecordMissing(String),
 
     #[error(transparent)]
-    RecordGroupError(#[from] RecordGroupError),
-
-    #[error(transparent)]
     StateMutationError(#[from] StateMutationError),
 
     #[error(transparent)]
