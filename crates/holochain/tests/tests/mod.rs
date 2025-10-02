@@ -30,3 +30,4 @@ mod test_utils;
 mod validate;
 mod websocket;
 mod websocket_stress;
+mod zero_arc;
