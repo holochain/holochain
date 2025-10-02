@@ -61,6 +61,31 @@ pub fn get_bounded_activity(
     }
 }
 
+/// Consume the chain filter (if present) from a bounded response to produce an
+/// unbounded response.
+pub fn filter_then_check(
+    response: BoundedMustGetAgentActivityResponse,
+) -> MustGetAgentActivityResponse {
+    match response {
+        BoundedMustGetAgentActivityResponse::Activity {
+            activity,
+            filter,
+            warrants,
+        } => {
+            // Filter the activity from the database and check the invariants of the
+            // filter still hold.
+            filter.filter_then_check(activity, warrants)
+        }
+        BoundedMustGetAgentActivityResponse::IncompleteChain => {
+            MustGetAgentActivityResponse::IncompleteChain
+        }
+        BoundedMustGetAgentActivityResponse::ChainTopNotFound(a) => {
+            MustGetAgentActivityResponse::ChainTopNotFound(a)
+        }
+        BoundedMustGetAgentActivityResponse::EmptyRange => MustGetAgentActivityResponse::EmptyRange,
+    }
+}
+
 /// Find the filter's sequence bounds.
 fn find_bounds(
     txn: &Transaction,

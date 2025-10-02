@@ -559,6 +559,44 @@ impl ChainFilterRange {
     pub fn range(&self) -> &RangeInclusive<u32> {
         &self.range
     }
+        /// Filter the chain items then check the invariants hold.
+    pub fn filter_then_check(
+        self,
+        chain: Vec<RegisterAgentActivity>,
+        warrants: Vec<WarrantOp>,
+    ) -> MustGetAgentActivityResponse {
+        let until_hashes = self.filter.get_until_hash().cloned();
+
+        // Create the filter iterator and collect the filtered actions.
+        let actions: Vec<_> = ChainFilterIter::new(self.filter, chain).collect();
+
+        // Check the invariants hold.
+        match actions.last().zip(actions.first()) {
+            // The actual results after the filter must match the range.
+            Some((lowest, highest))
+                if (lowest.action.action().action_seq()..=highest.action.action().action_seq())
+                    == self.range =>
+            {
+                // If the range start was an until hash then the first action must
+                // actually be an action from the until set.
+                if let Some(hashes) = until_hashes {
+                    if matches!(self.chain_bottom_type, ChainBottomType::UntilHash)
+                        && !hashes.contains(lowest.action.action_address())
+                    {
+                        return MustGetAgentActivityResponse::IncompleteChain;
+                    }
+                }
+
+                // The constraints are met the activity can be returned.
+                MustGetAgentActivityResponse::Activity {
+                    activity: actions,
+                    warrants,
+                }
+            }
+            // The constraints are not met so the chain is not complete.
+            _ => MustGetAgentActivityResponse::IncompleteChain,
+        }
+    }
 }
 
 #[cfg(test)]
