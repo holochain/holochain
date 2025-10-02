@@ -4,8 +4,6 @@ pub mod bool;
 pub mod bytes;
 pub mod number;
 pub mod prelude;
-#[deny(missing_docs)]
-mod rng;
 pub mod serialized_bytes;
 pub mod string;
 pub mod unit;

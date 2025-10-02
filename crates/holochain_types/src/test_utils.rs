@@ -10,11 +10,6 @@ use std::path::PathBuf;
 #[warn(missing_docs)]
 pub mod chain;
 
-#[derive(Serialize, Deserialize, SerializedBytes, Debug)]
-struct FakeProperties {
-    test: String,
-}
-
 /// A fixture example dna for unit testing.
 pub fn fake_dna_file(network_seed: &str) -> DnaFile {
     fake_dna_file_named(network_seed, "test")
