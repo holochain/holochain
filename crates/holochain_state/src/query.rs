@@ -162,6 +162,7 @@ pub trait Store {
     /// The second parameter determines whether the warrant op should be checked for validity.
     /// It should be set to false if reading from an Authored DB, where everything is valid,
     /// and true if reading from a DHT DB, where validation status matters
+    #[cfg(feature = "unstable-warrants")]
     fn get_warrants_for_basis(
         &self,
         hash: &AnyLinkableHash,
@@ -347,6 +348,7 @@ impl Store for CascadeTxnWrapper<'_, '_> {
         }
     }
 
+    #[cfg(feature = "unstable-warrants")]
     fn get_warrants_for_basis(
         &self,
         hash: &AnyLinkableHash,
@@ -674,6 +676,7 @@ impl Store for Txns<'_, '_> {
         Ok(None)
     }
 
+    #[cfg(feature = "unstable-warrants")]
     fn get_warrants_for_basis(
         &self,
         hash: &AnyLinkableHash,
@@ -785,6 +788,7 @@ impl Store for DbScratch<'_, '_> {
         }
     }
 
+    #[cfg(feature = "unstable-warrants")]
     fn get_warrants_for_basis(
         &self,
         hash: &AnyLinkableHash,

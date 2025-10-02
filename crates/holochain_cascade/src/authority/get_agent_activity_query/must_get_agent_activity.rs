@@ -36,7 +36,11 @@ pub fn get_bounded_activity(
 ) -> StateQueryResult<BoundedMustGetAgentActivityResponse> {
     // Find the bounds of the range specified in the filter.
     let txn = CascadeTxnWrapper::from(txn);
+
+    #[cfg(feature = "unstable-warrants")]
     let warrants = txn.get_warrants_for_basis(&AnyLinkableHash::from(author.clone()), true)?;
+    #[cfg(not(feature = "unstable-warrants"))]
+    let warrants = vec![];
 
     match find_bounds(&txn, scratch, author, filter)? {
         Sequences::Found(filter) => {
