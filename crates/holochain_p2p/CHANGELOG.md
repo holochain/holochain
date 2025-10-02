@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.6.0-dev.25
+
+- Add index to database field `peer_meta.expires_at` to improve  get query performance ([\#5318](https://github.com/holochain/holochain/pull/5318))
+
+## 0.6.0-dev.24
+
 ## 0.6.0-dev.23
 
 ## 0.6.0-dev.22

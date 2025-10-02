@@ -4,11 +4,11 @@ pub fn bytes_to_hex(bytes: &[u8], caps: bool) -> String {
     let mut s = String::with_capacity(bytes.len() + 2);
     if caps {
         for b in bytes {
-            write!(&mut s, "{:02X}", b).ok();
+            write!(&mut s, "{b:02X}").ok();
         }
     } else {
         for b in bytes {
-            write!(&mut s, "{:02x}", b).ok();
+            write!(&mut s, "{b:02x}").ok();
         }
     }
     s

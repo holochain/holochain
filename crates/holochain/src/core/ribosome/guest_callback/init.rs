@@ -456,7 +456,7 @@ mod slow_tests {
                     break;
                 }
                 Err(e) => {
-                    panic!("Other types of error are not expected {:?}", e);
+                    panic!("Other types of error are not expected {e:?}");
                 }
             }
 

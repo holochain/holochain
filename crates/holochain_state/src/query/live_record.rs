@@ -32,7 +32,7 @@ impl Query for GetLiveRecordQuery {
         "
         .into()
     }
-    fn params(&self) -> Vec<Params> {
+    fn params(&self) -> Vec<Params<'_>> {
         let params = named_params! {
             ":create_type": ChainOpType::StoreRecord,
             ":delete_type": ChainOpType::RegisterDeletedBy,

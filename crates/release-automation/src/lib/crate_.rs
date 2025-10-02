@@ -104,7 +104,7 @@ pub struct CrateCheckArgs {
 
 /// These crate.io handles are used as the default minimum crate owners for all published crates.
 pub const MINIMUM_CRATE_OWNERS: &str =
-    "github:holochain:core-dev,holochain-release-automation,holochain-release-automation2,zippy,steveeJ";
+    "github:holochain:core-dev,holochain-release-automation,holochain-release-automation2,zippy";
 
 #[derive(Debug, StructOpt)]
 pub struct EnsureCrateOwnersArgs {

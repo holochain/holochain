@@ -48,7 +48,7 @@ impl LinksQuery {
         use std::fmt::Write;
         let mut s = String::with_capacity(tag.0.len());
         for b in &tag.0 {
-            write!(&mut s, "{:02X}", b).ok();
+            write!(&mut s, "{b:02X}").ok();
         }
         s
     }
@@ -63,7 +63,7 @@ impl LinksQuery {
     }
 
     fn create_query(create: String, delete: String) -> String {
-        format!("{} UNION ALL {}", create, delete)
+        format!("{create} UNION ALL {delete}")
     }
 
     pub fn query(&self) -> String {
@@ -111,10 +111,9 @@ impl LinksQuery {
         match tag {
             Some(tag) => {
                 format!(
-                    "{}
+                    "{q}
                     AND
-                    HEX(Action.tag) like '{}%'",
-                    q, tag
+                    HEX(Action.tag) like '{tag}%'"
                 )
             }
             None => q,
@@ -123,22 +122,22 @@ impl LinksQuery {
 
     fn add_after(q: String, after: Option<Timestamp>) -> String {
         match after {
-            Some(_) => format!("{} AND DhtOp.authored_timestamp >= :after", q),
-            None => format!("{} AND :after IS NULL", q),
+            Some(_) => format!("{q} AND DhtOp.authored_timestamp >= :after"),
+            None => format!("{q} AND :after IS NULL"),
         }
     }
 
     fn add_before(q: String, before: Option<Timestamp>) -> String {
         match before {
-            Some(_) => format!("{} AND DhtOp.authored_timestamp <= :before", q),
-            None => format!("{} AND :before IS NULL", q),
+            Some(_) => format!("{q} AND DhtOp.authored_timestamp <= :before"),
+            None => format!("{q} AND :before IS NULL"),
         }
     }
 
     fn add_author(q: String, author: Option<&AgentPubKey>) -> String {
         match author {
-            Some(_) => format!("{} AND Action.author = :author", q),
-            None => format!("{} AND :author IS NULL", q),
+            Some(_) => format!("{q} AND Action.author = :author"),
+            None => format!("{q} AND :author IS NULL"),
         }
     }
 
@@ -158,18 +157,17 @@ impl LinksQuery {
             JOIN Action On DhtOp.action_hash = Action.hash
             WHERE DhtOp.type = :delete
             AND
-            Action.create_link_hash IN ({})
+            Action.create_link_hash IN ({sub_create_query})
             AND
             DhtOp.validation_status = :status
             AND
             DhtOp.when_integrated IS NOT NULL
-            ",
-            sub_create_query
+            "
         );
         delete_query
     }
 
-    pub fn params(&self) -> Vec<Params> {
+    pub fn params(&self) -> Vec<Params<'_>> {
         {
             named_params! {
                 ":create": ChainOpType::RegisterAddLink,
@@ -212,7 +210,7 @@ impl Query for GetLinksQuery {
         self.query.query()
     }
 
-    fn params(&self) -> Vec<Params> {
+    fn params(&self) -> Vec<Params<'_>> {
         self.query.params()
     }
 

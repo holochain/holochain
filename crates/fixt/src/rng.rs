@@ -20,9 +20,9 @@ lazy_static::lazy_static! {
                 seed_str.parse().expect("Expected integer for FIXT_SEED")
             }
             Err(std::env::VarError::NotPresent) => { rand::random() },
-            Err(std::env::VarError::NotUnicode(v)) => { panic!("Invalid FIXT_SEED value: {:?}", v) },
+            Err(std::env::VarError::NotUnicode(v)) => { panic!("Invalid FIXT_SEED value: {v:?}") },
         };
-        println!("Fixturator seed: {}", seed);
+        println!("Fixturator seed: {seed}");
         FixtRng(Arc::new(
             Mutex::new(StdRng::seed_from_u64(seed))
         ))

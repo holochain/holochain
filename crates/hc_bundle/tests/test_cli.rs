@@ -100,7 +100,8 @@ async fn test_integrity() {
         let mut cmd = Command::cargo_bin("hc-dna").unwrap();
         let cmd = cmd.args(["pack", path]);
         cmd.assert().success();
-        let dna_path = PathBuf::from(format!("{}/integrity dna.dna", path));
+        let mut dna_path = PathBuf::from(path);
+        dna_path.push("integrity dna.dna");
         let original_dna = read_dna(&dna_path).await.unwrap();
         original_dna
             .into_dna_file(DnaModifiersOpt::none())
@@ -173,7 +174,7 @@ async fn test_multi_integrity() {
         let mut cmd = Command::cargo_bin("hc-dna").unwrap();
         let cmd = cmd.args(["pack", path]);
         cmd.assert().success();
-        let dna_path = PathBuf::from(format!("{}/multi integrity dna.dna", path));
+        let dna_path = PathBuf::from(format!("{path}/multi integrity dna.dna"));
         let original_dna = read_dna(&dna_path).await.unwrap();
         original_dna
             .into_dna_file(DnaModifiersOpt::none())
@@ -278,10 +279,7 @@ async fn test_multi_integrity() {
         let mut cmd = Command::cargo_bin("hc-dna").unwrap();
         let cmd = cmd.args(["pack", path]);
         cmd.assert().success();
-        let dna_path = PathBuf::from(format!(
-            "{}/multi integrity dna unstable-migration.dna",
-            path
-        ));
+        let dna_path = PathBuf::from(format!("{path}/multi integrity dna unstable-migration.dna"));
         let original_dna = read_dna(&dna_path).await.unwrap();
         original_dna
             .into_dna_file(DnaModifiersOpt::none())
@@ -403,11 +401,7 @@ async fn test_hash_dna_function() {
         let stdout = cmd.assert().success().get_output().stdout.clone();
         let actual = String::from_utf8_lossy(&stdout).replace(['\r', '\n'], ""); // Normalize Windows/linux
         let expected = "uhC0klF08DnZkYBN3YiE7knVHdl5eK-9f7m9Co1ICK7Xwgaxct8h5";
-        assert_eq!(
-            expected, actual,
-            "Expected: {}\nActual: {}",
-            expected, actual
-        );
+        assert_eq!(expected, actual, "Expected: {expected}\nActual: {actual}");
     }
 }
 
@@ -552,8 +546,8 @@ fn get_schema<T: JsonSchema>() -> Value {
 fn validate_schema(schema: &Value, manifest: &Value, context: &str) {
     let result = jsonschema::validate(schema, manifest);
     if let Err(error) = result {
-        println!("Validation error: {}", error);
+        println!("Validation error: {error}");
 
-        panic!("There were schema validation errors for {}", context);
+        panic!("There were schema validation errors for {context}");
     }
 }

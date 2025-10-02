@@ -42,7 +42,7 @@ async fn sanity() {
     });
 
     let addr = addr_r.await.unwrap()[0];
-    println!("addr: {}", addr);
+    println!("addr: {addr}");
 
     let r_task = tokio::task::spawn(async move {
         let (send, mut recv) = connect(Arc::new(WebsocketConfig::CLIENT_DEFAULT), addr)
@@ -95,7 +95,7 @@ async fn blocks_connect_with_mismatched_origin() {
                 assert_eq!(e.to_string(), "HTTP error: 400 Bad Request");
             }
             Err(e) => {
-                panic!("unexpected error: {:?}", e);
+                panic!("unexpected error: {e:?}");
             }
         }
     });
@@ -116,7 +116,7 @@ async fn blocks_connect_with_mismatched_origin() {
                 assert_eq!(e.to_string(), "HTTP error: 400 Bad Request");
             }
             Err(e) => {
-                panic!("unexpected error: {:?}", e);
+                panic!("unexpected error: {e:?}");
             }
         }
     });
@@ -150,7 +150,7 @@ async fn blocks_connect_without_origin() {
                 assert_eq!(e.to_string(), "HTTP error: 400 Bad Request");
             }
             Err(e) => {
-                panic!("unexpected error: {:?}", e);
+                panic!("unexpected error: {e:?}");
             }
         }
     });
@@ -169,7 +169,7 @@ async fn blocks_connect_without_origin() {
                 assert_eq!(e.to_string(), "HTTP error: 400 Bad Request");
             }
             Err(e) => {
-                panic!("unexpected error: {:?}", e);
+                panic!("unexpected error: {e:?}");
             }
         }
     });
@@ -372,7 +372,7 @@ async fn handle_client_close() {
                         break;
                     }
                     Err(e) => {
-                        panic!("unexpected error: {:?}", e);
+                        panic!("unexpected error: {e:?}");
                     }
                 };
             }
@@ -386,7 +386,7 @@ async fn handle_client_close() {
     });
 
     let addr = addr_r.await.unwrap()[0];
-    println!("addr: {}", addr);
+    println!("addr: {addr}");
 
     let r_task = tokio::task::spawn(async move {
         let (_send, mut recv) = connect(Arc::new(WebsocketConfig::CLIENT_DEFAULT), addr)

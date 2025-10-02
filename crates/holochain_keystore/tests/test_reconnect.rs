@@ -34,7 +34,7 @@ fn run_test_keystore(dir: &std::path::Path) -> (Proc, url2::Url2) {
     let mut cmd = std::process::Command::cargo_bin("test-keystore-srv").unwrap();
     cmd.arg(dir).stdout(std::process::Stdio::piped());
 
-    println!("{:?}", cmd);
+    println!("{cmd:?}");
 
     let mut cmd = cmd.spawn().unwrap();
 
@@ -75,7 +75,7 @@ async fn connect_cli(connection_url: url2::Url2) -> Cli {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_reconnect() {
-    let tmpdir = tempdir::TempDir::new("lair keystore test").unwrap();
+    let tmpdir = tempfile::TempDir::with_prefix("lair keystore test").unwrap();
     let tag: Arc<str> = "test-tag".into();
 
     let start = std::time::Instant::now();

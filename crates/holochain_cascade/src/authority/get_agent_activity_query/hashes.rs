@@ -69,7 +69,7 @@ impl Query for GetAgentActivityHashesQuery {
         .to_string()
     }
 
-    fn params(&self) -> Vec<holochain_state::query::Params> {
+    fn params(&self) -> Vec<holochain_state::query::Params<'_>> {
         let params = named_params! {
             ":author": self.agent,
             ":author_basis": self.agent_basis,

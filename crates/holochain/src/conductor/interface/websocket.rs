@@ -132,7 +132,7 @@ pub fn spawn_admin_interface_tasks(
     api: AdminInterfaceApi,
     port: u16,
 ) {
-    tm.add_conductor_task_ignored(&format!("admin interface, port {}", port), move || {
+    tm.add_conductor_task_ignored(&format!("admin interface, port {port}"), move || {
         async move {
             let mut task_list = TaskList::default();
             // establish a new connection to a client
@@ -628,7 +628,7 @@ mod test {
 
         let (dna_file, _, _) =
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::PostCommitSignal]).await;
-        let app_bundle = app_bundle_from_dnas(&[dna_file.clone()], false, None)
+        let app_bundle = app_bundle_from_dnas(std::slice::from_ref(&dna_file), false, None)
             .await
             .pack()
             .expect("failed to encode app bundle as bytes");
@@ -960,7 +960,7 @@ mod test {
                 assert!(blob_two.cache_data_size > 8_000);
                 assert!(blob_two.cache_data_size_on_disk > 94_000);
             }
-            other => panic!("unexpected response {:?}", other),
+            other => panic!("unexpected response {other:?}"),
         };
         test_handle_incoming_admin_message(msg, respond, AdminInterfaceApi::new(handle.clone()))
             .await

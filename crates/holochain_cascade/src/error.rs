@@ -78,12 +78,12 @@ pub enum AuthorityDataError {
 
 impl AuthorityDataError {
     pub fn missing_data<T: std::fmt::Debug>(data: T) -> CascadeError {
-        Self::MissingData(format!("Missing action {:?}", data)).into()
+        Self::MissingData(format!("Missing action {data:?}")).into()
     }
     pub fn missing_data_entry<T: std::fmt::Debug>(data: T) -> CascadeError {
-        Self::MissingData(format!("Missing entry for action {:?}", data)).into()
+        Self::MissingData(format!("Missing entry for action {data:?}")).into()
     }
     pub fn missing_metadata<T: std::fmt::Debug>(data: T) -> CascadeError {
-        Self::MissingMetadata(format!("{:?}", data)).into()
+        Self::MissingMetadata(format!("{data:?}")).into()
     }
 }

@@ -309,7 +309,7 @@ async fn simple_validation() -> anyhow::Result<()> {
         },
         _ => false,
     };
-    assert!(correct, "Error was: {:?}", err);
+    assert!(correct, "Error was: {err:?}");
 
     Ok(())
 }
@@ -326,7 +326,10 @@ async fn can_call_real_zomes_too() {
     let (dna, _, _) =
         SweetDnaFile::unique_from_zomes(integrity, coordinator, TestWasm::Create.into()).await;
 
-    let app = conductor.setup_app("app1", &[dna.clone()]).await.unwrap();
+    let app = conductor
+        .setup_app("app1", std::slice::from_ref(&dna))
+        .await
+        .unwrap();
 
     let (cell,) = app.into_tuple();
 

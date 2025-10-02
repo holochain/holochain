@@ -843,7 +843,7 @@ where
                             // Value should not be 'Some' until it has at least one value
                             args.push((":entry_type".to_string(), Box::new(types.first().unwrap().as_sql())));
                             for i in 1..types.len() {
-                                args.push((format!(":entry_type_{}", i), Box::new(types.get(i).unwrap().as_sql())));
+                                args.push((format!(":entry_type_{i}"), Box::new(types.get(i).unwrap().as_sql())));
                             }
                         }
                     }
@@ -854,7 +854,7 @@ where
                             // Value should not be 'Some' until it has at least one value
                             args.push((":action_type".to_string(), Box::new(types.first().as_ref().unwrap().as_sql())));
                             for i in 1..types.len() {
-                                args.push((format!(":action_type_{}", i), Box::new(types.get(i).unwrap().as_sql())));
+                                args.push((format!(":action_type_{i}"), Box::new(types.get(i).unwrap().as_sql())));
                             }
                         }
                     }
@@ -980,9 +980,9 @@ fn named_param_seq(base_name: &str, repeat: usize) -> String {
         return String::new();
     }
 
-    let mut seq = format!(":{}", base_name);
+    let mut seq = format!(":{base_name}");
     for i in 1..repeat {
-        seq.push_str(format!(", :{}_{}", base_name, i).as_str());
+        seq.push_str(format!(", :{base_name}_{i}").as_str());
     }
 
     seq
@@ -2280,8 +2280,7 @@ mod tests {
                     assert!(queried.iter().all(|e| e.action().author() == &alice));
                     assert_eq!(
                         num_expected, actual,
-                        "Expected {} items but got {} with filter {:?}",
-                        num_expected, actual, query
+                        "Expected {num_expected} items but got {actual} with filter {query:?}"
                     );
                 }
             }

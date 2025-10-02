@@ -202,7 +202,7 @@ impl From<TestWasm> for ZomeName {
 impl From<TestWasm> for TestWasmPair<ZomeName> {
     fn from(test_wasm: TestWasm) -> Self {
         let coordinator: ZomeName = test_wasm.into();
-        let integrity = ZomeName::new(format!("integrity_{}", coordinator));
+        let integrity = ZomeName::new(format!("integrity_{coordinator}"));
         TestWasmPair {
             integrity,
             coordinator,
@@ -417,11 +417,10 @@ fn get_code(path: PathBuf) -> Vec<u8> {
             .join(path),
     };
     let warning = format!(
-        "Wasm: {:?} was not found. Maybe you need to build the test wasms\n
+        "Wasm: {path:?} was not found. Maybe you need to build the test wasms\n
         Run `cargo build --features 'build_wasms' --manifest-path=crates/holochain/Cargo.toml`
         or pass the feature flag to `cargo test`
-        ",
-        path
+        "
     );
     std::fs::read(path).expect(&warning)
 }

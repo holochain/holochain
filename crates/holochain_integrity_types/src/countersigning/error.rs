@@ -44,39 +44,33 @@ impl core::fmt::Display for CounterSigningError {
             ),
             CounterSigningError::CounterSigningSessionResponsesLength(resp, num_agents) => {
                 write!(f,
-                    "The countersigning session responses ({}) did not match the number of signing agents ({})",
-                    resp,
-                    num_agents
+                    "The countersigning session responses ({resp}) did not match the number of signing agents ({num_agents})"
                 )
             }
             CounterSigningError::CounterSigningSessionResponsesOrder(index, pos) => write!(f,
-                    "The countersigning session response with agent index {} was found in index position {}",
-                    index, pos
+                    "The countersigning session response with agent index {index} was found in index position {pos}"
             ),
             CounterSigningError::EnzymeMismatch(required_signer, optional_signer) => write!(f,
-                "The enzyme is mismatche for required signer {:?} and optional signer {:?}",
-                required_signer, optional_signer
+                "The enzyme is mismatche for required signer {required_signer:?} and optional signer {optional_signer:?}"
 
             ),
             CounterSigningError::NonEnzymaticOptionalSigners => write!(f, "There are optional signers without an enzyme."),
             CounterSigningError::AgentsLength(len) => {
-                write!(f, "The signing agents list is too long or short {}", len)
+                write!(f, "The signing agents list is too long or short {len}")
             },
             CounterSigningError::OptionalAgentsLength(min, len) => {
-                write!(f, "The optional signing agents list length is {} which is less than the minimum {} required to sign", len, min)
+                write!(f, "The optional signing agents list length is {len} which is less than the minimum {min} required to sign")
             },
             CounterSigningError::MinOptionalAgents(min, len) => {
-                write!(f, "The minimum optional agents {} is not a majority of {}", min, len)
+                write!(f, "The minimum optional agents {min} is not a majority of {len}")
             },
             CounterSigningError::AgentsDupes(agents) => write!(
                 f,
-                "The signing agents list contains duplicates {:?}",
-                agents
+                "The signing agents list contains duplicates {agents:?}"
             ),
             CounterSigningError::CounterSigningSessionTimes(times) => write!(
                 f,
-                "The countersigning session times were not valid {:?}",
-                times
+                "The countersigning session times were not valid {times:?}"
             ),
         }
     }

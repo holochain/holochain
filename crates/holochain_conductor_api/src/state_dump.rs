@@ -91,11 +91,7 @@ impl std::fmt::Display for JsonDump {
         let num_other_peers = self.peer_dump.peers.len();
         let s = &self.source_chain_dump;
         writeln!(f, "--- Cell State Dump Summary ---")?;
-        writeln!(
-            f,
-            "Number of other peers in p2p store: {},",
-            num_other_peers
-        )?;
+        writeln!(f, "Number of other peers in p2p store: {num_other_peers},")?;
         writeln!(
             f,
             "Records authored: {}, Ops published: {}",
@@ -109,7 +105,7 @@ impl std::fmt::Display for IntegrationStateDumps {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "[")?;
         for i in &self.0 {
-            write!(f, "{},", i)?;
+            write!(f, "{i},")?;
         }
         writeln!(f, "]")
     }
@@ -141,10 +137,10 @@ impl std::fmt::Display for P2pAgentsDump {
             writeln!(f, "This DNA {:?} is {:?}", this_dna.0, this_dna.1)?;
         }
         if let Some(this_agent_info) = &self.this_agent_info {
-            writeln!(f, "This agents info: {}", this_agent_info)?;
+            writeln!(f, "This agents info: {this_agent_info}")?;
         }
         for peer in &self.peers {
-            writeln!(f, "{}", peer)?;
+            writeln!(f, "{peer}")?;
         }
         Ok(())
     }

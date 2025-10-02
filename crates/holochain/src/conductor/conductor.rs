@@ -1540,7 +1540,7 @@ mod app_impls {
             installed_app_id: &InstalledAppId,
         ) -> ConductorResult<Vec<DnaHash>> {
             let app_info = self.get_app_info(installed_app_id).await?.ok_or_else(|| {
-                ConductorError::other(format!("App not installed: {}", installed_app_id))
+                ConductorError::other(format!("App not installed: {installed_app_id}"))
             })?;
 
             let mut app_dnas: HashSet<DnaHash> = HashSet::new();
@@ -3063,11 +3063,11 @@ impl Conductor {
         self.admin_websocket_ports
             .share_ref(|admin_websocket_ports| {
                 for port in admin_websocket_ports {
-                    writeln!(&mut out, "###ADMIN_PORT:{}###", port)
+                    writeln!(&mut out, "###ADMIN_PORT:{port}###")
                         .expect("Can't write setup to std out");
                 }
             });
-        println!("\n###HOLOCHAIN_SETUP###\n{}###HOLOCHAIN_SETUP_END###", out);
+        println!("\n###HOLOCHAIN_SETUP###\n{out}###HOLOCHAIN_SETUP_END###");
     }
 }
 
@@ -3299,7 +3299,7 @@ fn query_dht_ops_from_statement(
     dht_ops_cursor: Option<u64>,
 ) -> ConductorApiResult<Vec<DhtOp>> {
     let final_stmt_str = match dht_ops_cursor {
-        Some(cursor) => format!("{} AND DhtOp.rowid > {}", stmt_str, cursor),
+        Some(cursor) => format!("{stmt_str} AND DhtOp.rowid > {cursor}"),
         None => stmt_str.into(),
     };
 

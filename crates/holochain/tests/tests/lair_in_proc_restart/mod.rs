@@ -40,7 +40,7 @@ async fn lair_in_proc_sql_pool_factory_restart() {
 
     // print keystore config
     let keystore_config = keystore.get_config();
-    println!("\n## keystore config ##\n{}", keystore_config);
+    println!("\n## keystore config ##\n{keystore_config}");
 
     // set up conductor config to use the started keystore
     let conductor_config = ConductorConfig {

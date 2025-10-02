@@ -24,7 +24,7 @@ impl Query for GetLinkDetailsQuery {
         self.query.query()
     }
 
-    fn params(&self) -> Vec<Params> {
+    fn params(&self) -> Vec<Params<'_>> {
         self.query.params()
     }
 

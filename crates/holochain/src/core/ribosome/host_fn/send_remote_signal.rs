@@ -181,7 +181,7 @@ mod tests {
         let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(("zome", zome)).await;
 
         let apps = conductors
-            .setup_app_for_zipped_agents("app", &agents, &[dna_file.clone()])
+            .setup_app_for_zipped_agents("app", &agents, std::slice::from_ref(&dna_file))
             .await
             .unwrap();
 

@@ -43,7 +43,7 @@ impl<'de, T: HashType> serde::de::Visitor<'de> for HoloHashVisitor<T> {
             ))
         } else {
             HoloHash::try_from_raw_39(h.to_vec())
-                .map_err(|e| serde::de::Error::custom(format!("HoloHash error: {:?}", e)))
+                .map_err(|e| serde::de::Error::custom(format!("HoloHash error: {e:?}")))
         }
     }
 
@@ -66,14 +66,14 @@ impl<'de, T: HashType> serde::de::Visitor<'de> for HoloHashVisitor<T> {
         E: serde::de::Error,
     {
         let h = crate::holo_hash_decode_unchecked(b64)
-            .map_err(|e| serde::de::Error::custom(format!("HoloHash error: {:?}", e)))?;
+            .map_err(|e| serde::de::Error::custom(format!("HoloHash error: {e:?}")))?;
         if !h.len() == 39 {
             Err(serde::de::Error::custom(
                 "HoloHash serialized representation must be exactly 39 bytes",
             ))
         } else {
             HoloHash::try_from_raw_39(h.to_vec())
-                .map_err(|e| serde::de::Error::custom(format!("HoloHash error: {:?}", e)))
+                .map_err(|e| serde::de::Error::custom(format!("HoloHash error: {e:?}")))
         }
     }
 }
@@ -275,7 +275,7 @@ mod tests {
         );
         let hash_type_sb: SerializedBytes = any_hash.hash_type().try_into().unwrap();
         let hash_type_json = r#"{"Action":[132,41,36]}"#;
-        assert_eq!(format!("{:?}", hash_type_sb), hash_type_json.to_string());
+        assert_eq!(format!("{hash_type_sb:?}"), hash_type_json.to_string());
 
         let hash_type_from_sb: hash_type::AnyDht = hash_type_sb.try_into().unwrap();
         assert_eq!(hash_type_from_sb, hash_type::AnyDht::Action);

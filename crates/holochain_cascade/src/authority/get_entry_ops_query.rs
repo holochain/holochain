@@ -45,7 +45,7 @@ impl Query for GetEntryOpsQuery {
         .into()
     }
 
-    fn params(&self) -> Vec<Params> {
+    fn params(&self) -> Vec<Params<'_>> {
         let params = named_params! {
             ":store_entry": ChainOpType::StoreEntry,
             ":delete": ChainOpType::RegisterDeletedEntryAction,

@@ -37,7 +37,7 @@ impl AppClient {
             .client
             .app_info()
             .await?
-            .ok_or(anyhow!("App not found {}", app_id))?;
+            .ok_or(anyhow!("App not found {app_id}"))?;
 
         let agent = app_info.agent_pub_key;
         let named_dna_hashes: Vec<(String, DnaHash)> = app_info

@@ -14,6 +14,146 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20251002.102845
+
+## [hc\_service\_check-0.3.0-dev.6](crates/hc_service_check/CHANGELOG.md#0.3.0-dev.6)
+
+## [hcterm-0.6.0-dev.25](crates/hcterm/CHANGELOG.md#0.6.0-dev.25)
+
+## [holochain\_cli-0.6.0-dev.25](crates/holochain_cli/CHANGELOG.md#0.6.0-dev.25)
+
+## [holochain\_cli\_bundle-0.6.0-dev.25](crates/holochain_cli_bundle/CHANGELOG.md#0.6.0-dev.25)
+
+## [holochain\_cli\_sandbox-0.6.0-dev.25](crates/holochain_cli_sandbox/CHANGELOG.md#0.6.0-dev.25)
+
+## [holochain\_client-0.8.0-dev.22](crates/holochain_client/CHANGELOG.md#0.8.0-dev.22)
+
+## [holochain-0.6.0-dev.25](crates/holochain/CHANGELOG.md#0.6.0-dev.25)
+
+- Update the Lair keystore dependency to require 0.6.3, which is not a functional change but eliminates multiple unmaintained dependencies. \#5317
+- **BREAKING CHANGE**: Dependency updates mean that Holochain now requires Rust 1.88 or later. \#5317
+
+## [holochain\_cascade-0.6.0-dev.25](crates/holochain_cascade/CHANGELOG.md#0.6.0-dev.25)
+
+## [holochain\_conductor\_config-0.6.0-dev.25](crates/holochain_conductor_config/CHANGELOG.md#0.6.0-dev.25)
+
+## [holochain\_test\_wasm\_common-0.6.0-dev.20](crates/holochain_test_wasm_common/CHANGELOG.md#0.6.0-dev.20)
+
+## [holochain\_wasm\_test\_utils-0.6.0-dev.25](crates/holochain_wasm_test_utils/CHANGELOG.md#0.6.0-dev.25)
+
+## [holochain\_websocket-0.6.0-dev.25](crates/holochain_websocket/CHANGELOG.md#0.6.0-dev.25)
+
+## [hdk-0.6.0-dev.20](crates/hdk/CHANGELOG.md#0.6.0-dev.20)
+
+## [holochain\_conductor\_api-0.6.0-dev.25](crates/holochain_conductor_api/CHANGELOG.md#0.6.0-dev.25)
+
+## [holochain\_p2p-0.6.0-dev.25](crates/holochain_p2p/CHANGELOG.md#0.6.0-dev.25)
+
+- Add index to database field `peer_meta.expires_at` to improve  get query performance ([\#5318](https://github.com/holochain/holochain/pull/5318))
+
+## [hdi-0.7.0-dev.17](crates/hdi/CHANGELOG.md#0.7.0-dev.17)
+
+## [holochain\_state-0.6.0-dev.25](crates/holochain_state/CHANGELOG.md#0.6.0-dev.25)
+
+## [hdk\_derive-0.6.0-dev.16](crates/hdk_derive/CHANGELOG.md#0.6.0-dev.16)
+
+## [holochain\_chc-0.3.0-dev.25](crates/holochain_chc/CHANGELOG.md#0.3.0-dev.25)
+
+## [holochain\_state\_types-0.6.0-dev.16](crates/holochain_state_types/CHANGELOG.md#0.6.0-dev.16)
+
+## [holochain\_types-0.6.0-dev.25](crates/holochain_types/CHANGELOG.md#0.6.0-dev.25)
+
+## [holochain\_keystore-0.6.0-dev.19](crates/holochain_keystore/CHANGELOG.md#0.6.0-dev.19)
+
+## [holochain\_sqlite-0.6.0-dev.24](crates/holochain_sqlite/CHANGELOG.md#0.6.0-dev.24)
+
+## [mr\_bundle-0.6.0-dev.7](crates/mr_bundle/CHANGELOG.md#0.6.0-dev.7)
+
+## [holochain\_trace-0.6.0-dev.4](crates/holochain_trace/CHANGELOG.md#0.6.0-dev.4)
+
+## [holochain\_zome\_types-0.6.0-dev.19](crates/holochain_zome_types/CHANGELOG.md#0.6.0-dev.19)
+
+## [holochain\_integrity\_types-0.6.0-dev.16](crates/holochain_integrity_types/CHANGELOG.md#0.6.0-dev.16)
+
+## [holochain\_nonce-0.6.0-dev.5](crates/holochain_nonce/CHANGELOG.md#0.6.0-dev.5)
+
+## [holo\_hash-0.6.0-dev.15](crates/holo_hash/CHANGELOG.md#0.6.0-dev.15)
+
+## [holochain\_timestamp-0.6.0-dev.4](crates/holochain_timestamp/CHANGELOG.md#0.6.0-dev.4)
+
+## [fixt-0.6.0-dev.6](crates/fixt/CHANGELOG.md#0.6.0-dev.6)
+
+## [holochain\_util-0.6.0-dev.4](crates/holochain_util/CHANGELOG.md#0.6.0-dev.4)
+
+# 20251001.001313
+
+## [hcterm-0.6.0-dev.24](crates/hcterm/CHANGELOG.md#0.6.0-dev.24)
+
+## [holochain\_cli-0.6.0-dev.24](crates/holochain_cli/CHANGELOG.md#0.6.0-dev.24)
+
+## [holochain\_cli\_bundle-0.6.0-dev.24](crates/holochain_cli_bundle/CHANGELOG.md#0.6.0-dev.24)
+
+## [holochain\_cli\_sandbox-0.6.0-dev.24](crates/holochain_cli_sandbox/CHANGELOG.md#0.6.0-dev.24)
+
+## [holochain\_client-0.8.0-dev.21](crates/holochain_client/CHANGELOG.md#0.8.0-dev.21)
+
+## [holochain-0.6.0-dev.24](crates/holochain/CHANGELOG.md#0.6.0-dev.24)
+
+- Switch from the unmaintained `structopt` library to the maintained `clap` library in the Holochain conductor CLI. \#5316
+- **BREAKING CHANGE**: Remove the NetId hash types from the `holo_hash` crate. These were added speculatively and are not used for anything. \#5306
+- Remove the NetIdHash types from the `holo_hash` crate. These were added speculatively and are not used for anything. \#5306
+- Permit `must_get_valid_record` to retrieve data from the network when called from a coordinator zome. \#5304
+- Remove agents from peer store when they are blocked.
+- Refactor HDK call `block_agent` to use `HolochainP2pActor::block`.
+
+## [holochain\_cascade-0.6.0-dev.24](crates/holochain_cascade/CHANGELOG.md#0.6.0-dev.24)
+
+## [holochain\_conductor\_config-0.6.0-dev.24](crates/holochain_conductor_config/CHANGELOG.md#0.6.0-dev.24)
+
+## [holochain\_metrics-0.6.0-dev.4](crates/holochain_metrics/CHANGELOG.md#0.6.0-dev.4)
+
+## [holochain\_test\_wasm\_common-0.6.0-dev.19](crates/holochain_test_wasm_common/CHANGELOG.md#0.6.0-dev.19)
+
+## [holochain\_wasm\_test\_utils-0.6.0-dev.24](crates/holochain_wasm_test_utils/CHANGELOG.md#0.6.0-dev.24)
+
+## [holochain\_websocket-0.6.0-dev.24](crates/holochain_websocket/CHANGELOG.md#0.6.0-dev.24)
+
+## [hdk-0.6.0-dev.19](crates/hdk/CHANGELOG.md#0.6.0-dev.19)
+
+## [holochain\_conductor\_api-0.6.0-dev.24](crates/holochain_conductor_api/CHANGELOG.md#0.6.0-dev.24)
+
+## [holochain\_p2p-0.6.0-dev.24](crates/holochain_p2p/CHANGELOG.md#0.6.0-dev.24)
+
+## [hdi-0.7.0-dev.16](crates/hdi/CHANGELOG.md#0.7.0-dev.16)
+
+## [holochain\_state-0.6.0-dev.24](crates/holochain_state/CHANGELOG.md#0.6.0-dev.24)
+
+## [hdk\_derive-0.6.0-dev.15](crates/hdk_derive/CHANGELOG.md#0.6.0-dev.15)
+
+## [holochain\_chc-0.3.0-dev.24](crates/holochain_chc/CHANGELOG.md#0.3.0-dev.24)
+
+## [holochain\_state\_types-0.6.0-dev.15](crates/holochain_state_types/CHANGELOG.md#0.6.0-dev.15)
+
+## [holochain\_types-0.6.0-dev.24](crates/holochain_types/CHANGELOG.md#0.6.0-dev.24)
+
+## [holochain\_keystore-0.6.0-dev.18](crates/holochain_keystore/CHANGELOG.md#0.6.0-dev.18)
+
+## [holochain\_sqlite-0.6.0-dev.23](crates/holochain_sqlite/CHANGELOG.md#0.6.0-dev.23)
+
+## [holochain\_trace-0.6.0-dev.3](crates/holochain_trace/CHANGELOG.md#0.6.0-dev.3)
+
+## [holochain\_zome\_types-0.6.0-dev.18](crates/holochain_zome_types/CHANGELOG.md#0.6.0-dev.18)
+
+## [holochain\_integrity\_types-0.6.0-dev.15](crates/holochain_integrity_types/CHANGELOG.md#0.6.0-dev.15)
+
+## [holochain\_nonce-0.6.0-dev.4](crates/holochain_nonce/CHANGELOG.md#0.6.0-dev.4)
+
+## [holo\_hash-0.6.0-dev.14](crates/holo_hash/CHANGELOG.md#0.6.0-dev.14)
+
+## [holochain\_secure\_primitive-0.6.0-dev.2](crates/holochain_secure_primitive/CHANGELOG.md#0.6.0-dev.2)
+
+## [fixt-0.6.0-dev.5](crates/fixt/CHANGELOG.md#0.6.0-dev.5)
+
 # 20250924.001733
 
 ## [hcterm-0.6.0-dev.23](crates/hcterm/CHANGELOG.md#0.6.0-dev.23)

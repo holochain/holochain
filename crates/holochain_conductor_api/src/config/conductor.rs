@@ -481,8 +481,7 @@ impl NetworkConfig {
             } else {
                 // The configuration for this module exists, but isn't an object
                 return Err(ConductorConfigError::InvalidNetworkConfig(format!(
-                    "advanced.{} field must be an object",
-                    module
+                    "advanced.{module} field must be an object"
                 )));
             }
         } else {
@@ -665,7 +664,7 @@ mod tests {
         let result = ConductorConfig::load_yaml(bad_path);
         assert_eq!(
             "Err(ConfigMissing(\"fake\"))".to_string(),
-            format!("{:?}", result)
+            format!("{result:?}")
         );
 
         // successful load test in conductor/interactive

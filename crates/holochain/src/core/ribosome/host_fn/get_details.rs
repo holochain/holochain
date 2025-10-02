@@ -79,7 +79,7 @@ pub mod wasm_test {
             Some(Details::Record(ref record_details)) => {
                 match record_details.record.entry().to_app_option::<CounTree>() {
                     Ok(Some(CounTree(u))) => assert_eq!(u, count),
-                    _ => panic!("failed to deserialize {:?}, {}, {}", details, count, delete),
+                    _ => panic!("failed to deserialize {details:?}, {count}, {delete}"),
                 }
                 assert_eq!(record_details.deletes.len(), delete);
             }
@@ -94,12 +94,11 @@ pub mod wasm_test {
                         assert_eq!(countree, CounTree(count));
                     }
                     _ => panic!(
-                        "failed to deserialize {:?}, {}, {}, {}",
-                        details, count, update, delete
+                        "failed to deserialize {details:?}, {count}, {update}, {delete}"
                     ),
                 }
-                assert_eq!(entry_details.updates.len(), update, "{}", line);
-                assert_eq!(entry_details.deletes.len(), delete, "{}", line);
+                assert_eq!(entry_details.updates.len(), update, "{line}");
+                assert_eq!(entry_details.deletes.len(), delete, "{line}");
             }
             _ => panic!("no entry"),
         };

@@ -109,11 +109,7 @@ impl Widget for BootstrapWidget {
                     *get_agents().write().unwrap() = agents;
                 }
                 Err(e) => {
-                    show_message(
-                        format!("Error fetching agents - {:?}", e).as_str(),
-                        area,
-                        buf,
-                    );
+                    show_message(format!("Error fetching agents - {e:?}").as_str(), area, buf);
                     return;
                 }
             };
@@ -191,7 +187,7 @@ impl Widget for BootstrapWidget {
                 .map(|i| i.elapsed().as_secs())
                 .unwrap_or(10) as i64;
         let refresh_timeout_message = if timeout_remaining > 0 {
-            format!("{}s", timeout_remaining)
+            format!("{timeout_remaining}s")
         } else {
             "ready".to_string()
         };
@@ -201,7 +197,7 @@ impl Widget for BootstrapWidget {
                 "r",
                 Style::default().add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
             ),
-            Span::raw(format!(": refresh ({})", refresh_timeout_message)),
+            Span::raw(format!(": refresh ({refresh_timeout_message})")),
         ]);
 
         Widget::render(
