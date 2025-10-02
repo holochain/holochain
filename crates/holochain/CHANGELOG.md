@@ -7,10 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Switch from the unmaintained `structopt` library to the maintained `clap` library in the Holochain conductor CLI. #5316
-- **BREAKING CHANGE**: Remove the NetId hash types from the `holo_hash` crate. These were added speculatively and are not used for anything. #5306
-- Remove the NetIdHash types from the `holo_hash` crate. These were added speculatively and are not used for anything. #5306
-- Permit `must_get_valid_record` to retrieve data from the network when called from a coordinator zome. #5304
+## 0.6.0-dev.24
+
+- Switch from the unmaintained `structopt` library to the maintained `clap` library in the Holochain conductor CLI. \#5316
+- **BREAKING CHANGE**: Remove the NetId hash types from the `holo_hash` crate. These were added speculatively and are not used for anything. \#5306
+- Remove the NetIdHash types from the `holo_hash` crate. These were added speculatively and are not used for anything. \#5306
+- Permit `must_get_valid_record` to retrieve data from the network when called from a coordinator zome. \#5304
 - Remove agents from peer store when they are blocked.
 - Refactor HDK call `block_agent` to use `HolochainP2pActor::block`.
 

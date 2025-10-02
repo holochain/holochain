@@ -2025,7 +2025,7 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "fixt"
-version = "0.6.0-dev.4"
+version = "0.6.0-dev.5"
 dependencies = [
  "holochain_serialized_bytes",
  "lazy_static",
@@ -2501,7 +2501,7 @@ dependencies = [
 
 [[package]]
 name = "hcterm"
-version = "0.6.0-dev.23"
+version = "0.6.0-dev.24"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2523,7 +2523,7 @@ dependencies = [
 
 [[package]]
 name = "hdi"
-version = "0.7.0-dev.15"
+version = "0.7.0-dev.16"
 dependencies = [
  "fixt",
  "getrandom 0.3.3",
@@ -2545,7 +2545,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.6.0-dev.18"
+version = "0.6.0-dev.19"
 dependencies = [
  "getrandom 0.3.3",
  "hdi",
@@ -2563,7 +2563,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.6.0-dev.14"
+version = "0.6.0-dev.15"
 dependencies = [
  "darling 0.21.3",
  "heck 0.5.0",
@@ -2635,7 +2635,7 @@ dependencies = [
 
 [[package]]
 name = "holo_hash"
-version = "0.6.0-dev.13"
+version = "0.6.0-dev.14"
 dependencies = [
  "base64 0.22.1",
  "blake2b_simd",
@@ -2649,7 +2649,7 @@ dependencies = [
  "kitsune2_api",
  "must_future",
  "proptest",
- "proptest-derive 0.6.0",
+ "proptest-derive",
  "rand 0.9.2",
  "rusqlite",
  "schemars 0.9.0",
@@ -2662,7 +2662,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.6.0-dev.23"
+version = "0.6.0-dev.24"
 dependencies = [
  "anyhow",
  "assert2",
@@ -2770,7 +2770,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.6.0-dev.23"
+version = "0.6.0-dev.24"
 dependencies = [
  "async-trait",
  "fixt",
@@ -2800,7 +2800,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_chc"
-version = "0.3.0-dev.23"
+version = "0.3.0-dev.24"
 dependencies = [
  "async-trait",
  "derive_more 2.0.1",
@@ -2829,7 +2829,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.6.0-dev.23"
+version = "0.6.0-dev.24"
 dependencies = [
  "anyhow",
  "clap 4.5.48",
@@ -2842,7 +2842,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.6.0-dev.23"
+version = "0.6.0-dev.24"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -2864,7 +2864,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.6.0-dev.23"
+version = "0.6.0-dev.24"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -2901,7 +2901,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_client"
-version = "0.8.0-dev.20"
+version = "0.8.0-dev.21"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2931,7 +2931,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.6.0-dev.23"
+version = "0.6.0-dev.24"
 dependencies = [
  "derive_more 2.0.1",
  "holo_hash",
@@ -2963,7 +2963,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_config"
-version = "0.6.0-dev.23"
+version = "0.6.0-dev.24"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -2980,7 +2980,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.6.0-dev.14"
+version = "0.6.0-dev.15"
 dependencies = [
  "derive_builder",
  "fixt",
@@ -2991,7 +2991,7 @@ dependencies = [
  "holochain_timestamp",
  "holochain_util",
  "proptest",
- "proptest-derive 0.6.0",
+ "proptest-derive",
  "schemars 0.9.0",
  "serde",
  "serde_bytes",
@@ -3003,7 +3003,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_keystore"
-version = "0.6.0-dev.17"
+version = "0.6.0-dev.18"
 dependencies = [
  "assert_cmd",
  "base64 0.22.1",
@@ -3033,7 +3033,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_metrics"
-version = "0.6.0-dev.3"
+version = "0.6.0-dev.4"
 dependencies = [
  "influxive",
  "opentelemetry_api",
@@ -3052,7 +3052,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_nonce"
-version = "0.6.0-dev.3"
+version = "0.6.0-dev.4"
 dependencies = [
  "getrandom 0.3.3",
  "holochain_secure_primitive",
@@ -3061,7 +3061,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.6.0-dev.23"
+version = "0.6.0-dev.24"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -3103,7 +3103,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_secure_primitive"
-version = "0.6.0-dev.1"
+version = "0.6.0-dev.2"
 dependencies = [
  "paste",
  "serde",
@@ -3119,7 +3119,7 @@ dependencies = [
  "arbitrary",
  "holochain_serialized_bytes_derive",
  "proptest",
- "proptest-derive 0.5.1",
+ "proptest-derive",
  "rmp-serde",
  "serde",
  "serde-transcode",
@@ -3140,7 +3140,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_sqlite"
-version = "0.6.0-dev.22"
+version = "0.6.0-dev.23"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3185,7 +3185,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.6.0-dev.23"
+version = "0.6.0-dev.24"
 dependencies = [
  "async-recursion",
  "base64 0.22.1",
@@ -3225,7 +3225,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state_types"
-version = "0.6.0-dev.14"
+version = "0.6.0-dev.15"
 dependencies = [
  "holo_hash",
  "holochain_integrity_types",
@@ -3234,7 +3234,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.6.0-dev.18"
+version = "0.6.0-dev.19"
 dependencies = [
  "hdk",
  "holochain_serialized_bytes",
@@ -3253,7 +3253,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_trace"
-version = "0.6.0-dev.2"
+version = "0.6.0-dev.3"
 dependencies = [
  "chrono",
  "derive_more 2.0.1",
@@ -3270,7 +3270,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.6.0-dev.23"
+version = "0.6.0-dev.24"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3303,7 +3303,7 @@ dependencies = [
  "parking_lot",
  "pretty_assertions",
  "proptest",
- "proptest-derive 0.6.0",
+ "proptest-derive",
  "rand 0.9.2",
  "regex",
  "rusqlite",
@@ -3343,7 +3343,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.6.0-dev.23"
+version = "0.6.0-dev.24"
 dependencies = [
  "holochain_types",
  "strum 0.27.2",
@@ -3398,7 +3398,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_websocket"
-version = "0.6.0-dev.23"
+version = "0.6.0-dev.24"
 dependencies = [
  "async-trait",
  "bytes",
@@ -3417,7 +3417,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.6.0-dev.17"
+version = "0.6.0-dev.18"
 dependencies = [
  "contrafact",
  "derive_builder",
@@ -3433,7 +3433,7 @@ dependencies = [
  "num_enum",
  "once_cell",
  "proptest",
- "proptest-derive 0.6.0",
+ "proptest-derive",
  "rand 0.9.2",
  "rusqlite",
  "schemars 0.9.0",
@@ -5446,17 +5446,6 @@ name = "proptest-derive"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ee1c9ac207483d5e7db4940700de86a9aae46ef90c48b57f99fe7edb8345e49"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.106",
-]
-
-[[package]]
-name = "proptest-derive"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "095a99f75c69734802359b682be8daaf8980296731f6470434ea2c652af1dd30"
 dependencies = [
  "proc-macro2",
  "quote",
