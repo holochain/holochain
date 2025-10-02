@@ -1,5 +1,3 @@
-use crate::{judged::Judged, prelude::*};
-use holo_hash::ActionHash;
 use holochain_serialized_bytes::prelude::*;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]

@@ -10,16 +10,8 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum DatabaseError {
-    #[error("A database's database map was initialized more than once: {0}")]
-    EnvironmentDoubleInitialized(PathBuf),
-
     #[error("database directory does not exist at configured path: {0}")]
     DatabaseMissing(PathBuf),
-
-    #[error(
-        "Attempted to access a private entry in a context where no private database is specified: {0}"
-    )]
-    NoPrivateDb(String),
 
     #[error("Error encoding to MsgPack: {0}")]
     MsgPackEncodeError(#[from] rmp_serde::encode::Error),
@@ -41,15 +33,6 @@ pub enum DatabaseError {
 
     #[error(transparent)]
     DbConnectionPoolError(#[from] r2d2::Error),
-
-    #[error("Empty keys cannot be used with SQLite")]
-    EmptyKey,
-
-    #[error("Key range must be not empty and start < end")]
-    InvalidKeyRange,
-
-    #[error("Unable to construct a value key")]
-    KeyConstruction,
 
     #[error("transparent")]
     FailedToJoinBlocking(#[from] tokio::task::JoinError),

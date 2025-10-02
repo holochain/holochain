@@ -2,14 +2,12 @@
 //! call. This is about as close as we can get to a true mock which would allow
 //! tweaking individual handlers, hence why this is a "crude" mock.
 
-use crate::spawn_test_keystore;
 use crate::MetaLairClient;
 use futures::FutureExt;
 use lair_keystore::dependencies::lair_keystore_api::lair_client::client_traits::AsLairClient;
 use lair_keystore::dependencies::lair_keystore_api::prelude::{LairApiEnum, LairClient};
 use lair_keystore::dependencies::lair_keystore_api::types::SharedSizedLockedArray;
 use lair_keystore::dependencies::lair_keystore_api::LairResult;
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 /// Spawn a test keystore which always returns the same LairError for every call.
@@ -24,13 +22,6 @@ where
         )))),
         s,
     )
-}
-
-/// A keystore which always returns the same LairError for every call.
-struct RealOrMockKeystore {
-    mock: Box<dyn Fn(LairApiEnum) -> LairResult<LairApiEnum> + Send + Sync + 'static>,
-    real: MetaLairClient,
-    use_mock: Arc<AtomicBool>,
 }
 
 /// A keystore which always returns the same LairError for every call.
@@ -55,32 +46,6 @@ impl AsLairClient for CrudeMockKeystore {
     ) -> futures::future::BoxFuture<'static, LairResult<LairApiEnum>> {
         let err = (self.0)();
         async move { Err(err) }.boxed()
-    }
-}
-
-impl AsLairClient for RealOrMockKeystore {
-    fn get_enc_ctx_key(&self) -> SharedSizedLockedArray<32> {
-        self.real.cli().0.get_enc_ctx_key()
-    }
-
-    fn get_dec_ctx_key(&self) -> SharedSizedLockedArray<32> {
-        self.real.cli().0.get_dec_ctx_key()
-    }
-
-    fn shutdown(&self) -> futures::future::BoxFuture<'static, LairResult<()>> {
-        self.real.cli().0.shutdown().boxed()
-    }
-
-    fn request(
-        &self,
-        request: LairApiEnum,
-    ) -> futures::future::BoxFuture<'static, LairResult<LairApiEnum>> {
-        if self.use_mock.load(std::sync::atomic::Ordering::SeqCst) {
-            let r = (self.mock)(request);
-            async move { r }.boxed()
-        } else {
-            AsLairClient::request(&*self.real.cli().0 .0, request)
-        }
     }
 }
 

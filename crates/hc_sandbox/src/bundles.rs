@@ -26,25 +26,6 @@ pub fn parse_happ(happ: Option<PathBuf>) -> anyhow::Result<PathBuf> {
     Ok(happ)
 }
 
-// TODO: Look for multiple dnas
-fn search_for_dna(dna: &Path) -> anyhow::Result<PathBuf> {
-    let dir: Vec<_> = WalkDir::new(dna)
-        .max_depth(1)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|d| d.file_type().is_file())
-        .filter(|f| f.file_name().to_string_lossy().ends_with(".dna"))
-        .map(|f| f.into_path())
-        .collect();
-    if dir.len() != 1 {
-        bail!(
-            "Could not find a DNA file (e.g. my-dna.dna) in directory {}",
-            dna.display()
-        )
-    }
-    Ok(dir.into_iter().next().expect("Safe due to check above"))
-}
-
 fn search_for_happ(happ: &Path) -> anyhow::Result<PathBuf> {
     let dir = WalkDir::new(happ)
         .max_depth(1)

@@ -138,25 +138,6 @@ pub(crate) mod tests;
 /// Cloneable reference to a Conductor
 pub type ConductorHandle = Arc<Conductor>;
 
-/// The reason why a cell is waiting to join the network.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum PendingJoinReason {
-    /// The initial state, no attempt has been made to join the network yet.
-    Initial,
-
-    /// The join failed with an error that is safe to retry, such as not
-    /// being connected to the internet.
-    Retry(String),
-
-    /// The network join failed and will not be retried. This will impact
-    /// the status of the associated
-    /// app and require manual intervention from the user.
-    Failed(String),
-
-    /// The join attempt has timed out.
-    TimedOut,
-}
-
 #[allow(dead_code)]
 pub(crate) type StopBroadcaster = task_motel::StopBroadcaster;
 pub(crate) type StopReceiver = task_motel::StopListener;

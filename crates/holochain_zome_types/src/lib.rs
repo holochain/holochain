@@ -56,10 +56,6 @@ pub use holochain_timestamp as timestamp;
 pub mod trace;
 #[allow(missing_docs)]
 pub mod validate;
-/// Tracking versions between the WASM host and guests and other interfaces.
-///
-/// Needed to ensure compatibility as code develops.
-pub mod version;
 pub mod warrant;
 #[allow(missing_docs)]
 pub mod x_salsa20_poly1305;

@@ -1,21 +1,6 @@
 //! Rate limiting data types
 
-use crate::{Create, CreateLink, Delete, Entry, Update};
 use holochain_serialized_bytes::prelude::*;
-
-/// Input to the `weigh` callback. Includes an "unweighed" action, and Entry
-/// if applicable.
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, SerializedBytes, Debug)]
-pub enum WeighInput {
-    /// A Link to be weighed
-    Link(CreateLink<()>),
-    /// A new Entry to be weighed
-    Create(Create<()>, Entry),
-    /// An updated Entry to be weighed
-    Update(Update<()>, Entry),
-    /// An Entry deletion to be weighed
-    Delete(Delete<()>),
-}
 
 /// A bucket ID, for rate limiting
 pub type RateBucketId = u8;

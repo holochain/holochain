@@ -6,7 +6,6 @@
 
 use crate::action::NewEntryAction;
 use crate::prelude::*;
-use crate::record::RecordGroup;
 use crate::warrant::WarrantOp;
 use holo_hash::*;
 use holochain_sqlite::rusqlite::types::FromSql;
@@ -956,15 +955,6 @@ pub fn produce_op_lites_from_records(actions: Vec<&Record>) -> DhtOpResult<Vec<C
         )
     });
     produce_op_lites_from_iter(actions_and_hashes)
-}
-
-/// Data minimal clone (no cloning entries) cheap &Record to DhtOpLite conversion
-fn produce_op_lites_from_parts<'a>(
-    actions_and_hashes: impl Iterator<Item = (&'a ActionHash, &'a Action)>,
-    maybe_entry_hash: Option<&EntryHash>,
-) -> DhtOpResult<Vec<ChainOpLite>> {
-    let iter = actions_and_hashes.map(|(head, hash)| (head, hash, maybe_entry_hash.cloned()));
-    produce_op_lites_from_iter(iter)
 }
 
 /// Produce op lites from iter of (action hash, action, maybe entry).

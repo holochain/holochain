@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 
-use std::path::PathBuf;
 
 /// The location of all our sql scrips
 const SQL_DIR: &str = "./src/sql";

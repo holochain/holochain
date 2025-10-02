@@ -52,7 +52,7 @@ use holochain_serialized_bytes::SerializedBytesError;
 use holochain_types::chain::ChainItem;
 use holochain_types::prelude::*;
 use must_future::MustBoxFuture;
-use std::{collections::HashMap, fmt::Debug, sync::Arc};
+use std::{fmt::Debug, sync::Arc};
 
 pub mod chc_local;
 
