@@ -271,28 +271,6 @@ pub struct GetRecordsRequest {
 #[derive(Debug, serde::Serialize, serde::Deserialize, derive_more::From)]
 pub struct EncryptedEntry(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
-/// Assemble records from a list of Actions and a map of Entries
-pub fn records_from_actions_and_entries(
-    actions: Vec<SignedActionHashed>,
-    mut entries: HashMap<EntryHash, Entry>,
-) -> ChcResult<Vec<Record>> {
-    let mut records = vec![];
-    for action in actions {
-        let entry = if let Some(hash) = action.hashed.entry_hash() {
-            Some(
-                entries
-                    .remove(hash)
-                    .ok_or_else(|| ChcError::MissingEntryForAction(action.as_hash().clone()))?,
-            )
-        } else {
-            None
-        };
-        let record = Record::new(action, entry);
-        records.push(record);
-    }
-    Ok(records)
-}
-
 #[allow(missing_docs)]
 #[derive(Debug, thiserror::Error)]
 pub enum ChcError {

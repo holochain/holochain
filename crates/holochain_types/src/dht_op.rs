@@ -663,34 +663,6 @@ impl DhtOpLite {
             Self::Warrant(op) => op.get_type().into(),
         }
     }
-
-    /// Get the AnyDhtHash which would be used in a `must_get_*` context.
-    ///
-    /// For instance, `must_get_entry` will use an EntryHash, and requires a
-    /// StoreEntry record to be integrated to succeed. All other must_gets take
-    /// an ActionHash.
-    pub fn fetch_dependency_hashes(&self) -> Vec<AnyDhtHash> {
-        match self {
-            Self::Chain(op) => match &**op {
-                ChainOpLite::StoreEntry(_, entry_hash, _) => vec![entry_hash.clone().into()],
-                other => vec![other.action_hash().clone().into()],
-            },
-            Self::Warrant(op) => match &op.proof {
-                WarrantProof::ChainIntegrity(w) => match w {
-                    ChainIntegrityWarrant::InvalidChainOp {
-                        action: action_hash,
-                        ..
-                    } => vec![action_hash.0.clone().into()],
-                    ChainIntegrityWarrant::ChainFork { action_pair, .. } => {
-                        vec![
-                            action_pair.0 .0.clone().into(),
-                            action_pair.1 .0.clone().into(),
-                        ]
-                    }
-                },
-            },
-        }
-    }
 }
 
 impl ChainOpLite {
@@ -983,16 +955,6 @@ pub fn produce_op_lites_from_records(actions: Vec<&Record>) -> DhtOpResult<Vec<C
         )
     });
     produce_op_lites_from_iter(actions_and_hashes)
-}
-
-/// Produce all the op lites from this record group
-/// with a shared entry
-pub fn produce_op_lites_from_record_group(
-    records: &RecordGroup<'_>,
-) -> DhtOpResult<Vec<ChainOpLite>> {
-    let actions_and_hashes = records.actions_and_hashes();
-    let maybe_entry_hash = Some(records.entry_hash());
-    produce_op_lites_from_parts(actions_and_hashes, maybe_entry_hash)
 }
 
 /// Data minimal clone (no cloning entries) cheap &Record to DhtOpLite conversion

@@ -89,25 +89,6 @@ fn check_fmt(path: &std::path::Path) {
     }
 }
 
-fn _check_migrations() {
-    let root = PathBuf::from(SQL_DIR);
-
-    for dir in [
-        root.join("cell/schema"),
-        root.join("conductor/schema"),
-        root.join("p2p_agent_store/schema"),
-        root.join("p2p_metrics/schema"),
-        root.join("wasm/schema"),
-    ] {
-        for _path in find_sql(&dir) {
-            // TODO: ensure that each schema migration script not introduced "recently"
-            // (for some value of "recently") has not changed. We don't ever
-            // want these to change, we only want to add new ones.
-            // Probably the best way to accomplish this is through a git commit hook or something.
-        }
-    }
-}
-
 fn main() {
     println!("cargo:rerun-if-env-changed=CHK_SQL_FMT");
     println!("cargo:rerun-if-env-changed=FIX_SQL_FMT");
