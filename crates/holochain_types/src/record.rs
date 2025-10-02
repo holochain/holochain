@@ -12,10 +12,6 @@ use holochain_zome_types::entry::EntryHashed;
 use std::borrow::Cow;
 use std::collections::BTreeSet;
 
-#[allow(missing_docs)]
-mod error;
-pub use error::*;
-
 /// A condensed version of get record request.
 /// This saves bandwidth by removing duplicated and implied data.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes, Default)]
