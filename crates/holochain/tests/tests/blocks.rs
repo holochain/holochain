@@ -60,7 +60,7 @@ async fn publish_does_not_go_to_blocked_peers() {
 
     let action1: ActionHash = alice_conductor.call(&alice, "create_entry", ()).await;
 
-    // Consistency should not be reach, entry should not be published to Bob.
+    // Consistency should not be reached, entry should not be published to Bob.
     await_consistency(10, [&alice_cell, &bob_cell])
         .await
         .unwrap_err();
