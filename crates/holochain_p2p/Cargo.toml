@@ -40,7 +40,7 @@ tracing = "0.1"
 tracing-appender = "0.2.3"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 
-kitsune2 = "0.3.0-dev.3"
+kitsune2 = { version = "0.3.0-dev.3", default-features = false }
 kitsune2_api = "0.3.0-dev.3"
 kitsune2_core = "0.3.0-dev.3"
 kitsune2_gossip = "0.3.0-dev.3"
