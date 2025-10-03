@@ -1,27 +1,22 @@
 use ::fixt::fixt;
 use holo_hash::{
-    fixt::{
-        ActionHashFixturator, AgentPubKeyFixturator, DhtOpHashFixturator, DnaHashFixturator,
-        HashTypeAnyDht,
-    },
-    hash_type::AnyLinkable,
-    ActionHash, DnaHash, HashType, OpBasis,
+    fixt::{ActionHashFixturator, AgentPubKeyFixturator, DhtOpHashFixturator, DnaHashFixturator},
+    DnaHash,
 };
 use holochain_keystore::{test_keystore, MetaLairClient};
 use holochain_p2p::{
-    actor::{self, DynHcP2p},
-    event::MockHcP2pHandler,
-    spawn_holochain_p2p, HolochainP2pConfig, HolochainP2pError, HolochainP2pLocalAgent,
+    actor::DynHcP2p, event::MockHcP2pHandler, spawn_holochain_p2p, HolochainP2pConfig,
+    HolochainP2pError, HolochainP2pLocalAgent,
 };
 use holochain_state::{block::get_all_cell_blocks, prelude::test_conductor_db};
 use holochain_timestamp::{InclusiveTimestampInterval, Timestamp};
 use holochain_types::{
     db::{DbKindConductor, DbKindDht, DbKindPeerMetaStore, DbWrite},
-    prelude::{Block, CellBlockReason, CellId, Record},
+    prelude::{Block, CellBlockReason, CellId},
     record::WireRecordOps,
 };
 use holochain_zome_types::block::BlockTarget;
-use kitsune2_api::{AgentInfo, AgentInfoSigned, DhtArc, DynBlocks, DynPeerStore, PeerStore};
+use kitsune2_api::{AgentInfo, AgentInfoSigned, DhtArc, DynBlocks};
 use std::{sync::Arc, time::Duration};
 
 #[tokio::test(flavor = "multi_thread")]
@@ -494,7 +489,7 @@ impl TestCase {
         };
         let actor = spawn_holochain_p2p(config, keystore).await.unwrap();
         let mut handler = MockHcP2pHandler::new();
-        handler.expect_handle_get().returning(|a, b, c| {
+        handler.expect_handle_get().returning(|_, _, _| {
             Box::pin(async move {
                 Ok(holochain_types::dht_op::WireOps::Record(
                     WireRecordOps::new(),
