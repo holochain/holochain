@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.6.0-dev.26
+
 ## 0.6.0-dev.25
 
 - Update the Lair keystore dependency to require 0.6.3, which is not a functional change but eliminates multiple unmaintained dependencies. \#5317

@@ -1,6 +1,6 @@
 [package]
 name = "holochain_sqlite"
-version = "0.6.0-dev.24"
+version = "0.6.0-dev.25"
 description = "Abstractions for persistence of Holochain state via SQLite"
 license = "Apache-2.0"
 repository = "https://github.com/holochain/holochain"

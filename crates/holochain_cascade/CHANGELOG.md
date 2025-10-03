@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.6.0-dev.26
+
 - Refactor `merge_bounded_agent_activity_responses` to reduce unnecessary cloning which significantly improves performance ([\#5312](https://github.com/holochain/holochain/pull/5312))
 
 ## 0.6.0-dev.25
