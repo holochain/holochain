@@ -304,6 +304,35 @@ async fn app_validation_workflow_inner(
                         {
                             tracing::warn!("Error writing warrant op: {err}");
                         }
+
+                        #[cfg(feature = "unstable-functions")]
+                        match InclusiveTimestampInterval::try_new(
+                            Timestamp::now(),
+                            Timestamp::max(),
+                        ) {
+                            Ok(interval) => {
+                                // Block agent
+                                if let Err(err) = conductor
+                                    .holochain_p2p()
+                                    .block(Block::new(
+                                        BlockTarget::Cell(
+                                            CellId::new(
+                                                (*dna_hash).clone(),
+                                                chain_op.author().clone(),
+                                            ),
+                                            CellBlockReason::InvalidOp(dht_op_hash.clone()),
+                                        ),
+                                        interval,
+                                    ))
+                                    .await
+                                {
+                                    tracing::warn!(?err, "Error blocking agent");
+                                }
+                            }
+                            Err(err) => {
+                                tracing::warn!(?err, "Invalid interval when blocking agent")
+                            }
+                        }
                     }
                 }
 
