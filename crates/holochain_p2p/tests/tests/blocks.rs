@@ -1,22 +1,28 @@
 use ::fixt::fixt;
 use holo_hash::{
-    fixt::{AgentPubKeyFixturator, DhtOpHashFixturator, DnaHashFixturator},
-    DnaHash,
+    fixt::{
+        ActionHashFixturator, AgentPubKeyFixturator, DhtOpHashFixturator, DnaHashFixturator,
+        HashTypeAnyDht,
+    },
+    hash_type::AnyLinkable,
+    ActionHash, DnaHash, HashType, OpBasis,
 };
 use holochain_keystore::{test_keystore, MetaLairClient};
 use holochain_p2p::{
-    actor::DynHcP2p, event::MockHcP2pHandler, spawn_holochain_p2p, HolochainP2pConfig,
-    HolochainP2pLocalAgent,
+    actor::{self, DynHcP2p},
+    event::MockHcP2pHandler,
+    spawn_holochain_p2p, HolochainP2pConfig, HolochainP2pError, HolochainP2pLocalAgent,
 };
 use holochain_state::{block::get_all_cell_blocks, prelude::test_conductor_db};
 use holochain_timestamp::{InclusiveTimestampInterval, Timestamp};
 use holochain_types::{
     db::{DbKindConductor, DbKindDht, DbKindPeerMetaStore, DbWrite},
-    prelude::{Block, CellBlockReason, CellId},
+    prelude::{Block, CellBlockReason, CellId, Record},
+    record::WireRecordOps,
 };
 use holochain_zome_types::block::BlockTarget;
-use kitsune2_api::{AgentInfo, AgentInfoSigned, DhtArc, DynBlocks};
-use std::sync::Arc;
+use kitsune2_api::{AgentInfo, AgentInfoSigned, DhtArc, DynBlocks, DynPeerStore, PeerStore};
+use std::{sync::Arc, time::Duration};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn cell_blocks_are_committed_to_database() {
@@ -325,6 +331,120 @@ async fn block_is_scoped_per_dna() {
         .unwrap());
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn get_from_blocked_agent_fails() {
+    let dna_hash = DnaHash::from_raw_32(vec![0xaa; 32]);
+    let keystore_1 = test_keystore();
+    let keystore_2 = test_keystore();
+    let TestCase { actor: actor_1, .. } = TestCase::new_with_keystore(&dna_hash, &keystore_1).await;
+    let TestCase { actor: actor_2, .. } = TestCase::new_with_keystore(&dna_hash, &keystore_2).await;
+    let agent_1 = keystore_1.new_sign_keypair_random().await.unwrap();
+    let agent_2 = keystore_2.new_sign_keypair_random().await.unwrap();
+    actor_1
+        .join(dna_hash.clone(), agent_1.clone(), None)
+        .await
+        .unwrap();
+    actor_2
+        .join(dna_hash.clone(), agent_2.clone(), None)
+        .await
+        .unwrap();
+    actor_2.test_set_full_arcs(dna_hash.to_k2_space()).await;
+
+    // Exchange peer infos to accelerate bootstrapping.
+    tokio::time::timeout(Duration::from_secs(10), async {
+        loop {
+            let maybe_agent_info_1 = actor_1
+                .peer_store(dna_hash.clone())
+                .await
+                .unwrap()
+                .get(agent_1.to_k2_agent())
+                .await
+                .unwrap();
+            let maybe_agent_info_2 = actor_2
+                .peer_store(dna_hash.clone())
+                .await
+                .unwrap()
+                .get(agent_2.to_k2_agent())
+                .await
+                .unwrap();
+            if let (Some(agent_info_1), Some(agent_info_2)) =
+                (maybe_agent_info_1, maybe_agent_info_2)
+            {
+                actor_1
+                    .peer_store(dna_hash.clone())
+                    .await
+                    .unwrap()
+                    .insert(vec![agent_info_2])
+                    .await
+                    .unwrap();
+                actor_2
+                    .peer_store(dna_hash.clone())
+                    .await
+                    .unwrap()
+                    .insert(vec![agent_info_1])
+                    .await
+                    .unwrap();
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    })
+    .await
+    .unwrap();
+
+    let response = actor_1
+        .get(dna_hash.clone(), fixt!(ActionHash).into())
+        .await;
+    assert!(response.is_ok());
+
+    actor_1
+        .block(Block::new(
+            BlockTarget::Cell(
+                CellId::new(dna_hash.clone(), agent_2.clone()),
+                CellBlockReason::BadCrypto,
+            ),
+            InclusiveTimestampInterval::try_new(
+                holochain_timestamp::Timestamp::now(),
+                holochain_timestamp::Timestamp::max(),
+            )
+            .unwrap(),
+        ))
+        .await
+        .unwrap();
+
+    // Blocking removes an agent from the peer store.
+    // To make sure the block is being enforced, the agent should be re-added to the
+    // peer 1's peer store. That isn't possible, however, because the peer store
+    // implementation internally discards blocked agents when inserting.
+
+    // Attempt to insert the blocked agent into peer1's peer store anyway, even though
+    // it will not be successful.
+    let agent_info_2 = actor_2
+        .peer_store(dna_hash.clone())
+        .await
+        .unwrap()
+        .get(agent_2.to_k2_agent())
+        .await
+        .unwrap()
+        .expect("peer 2 must be present in peer store");
+
+    actor_1
+        .peer_store(dna_hash.clone())
+        .await
+        .unwrap()
+        .insert(vec![agent_info_2])
+        .await
+        .unwrap();
+
+    let response = actor_1
+        .get(dna_hash.clone(), fixt!(ActionHash).into())
+        .await;
+    assert!(matches!(
+        response,
+        Err(HolochainP2pError::NoPeersForLocation(_, _))
+    ));
+}
+
 struct TestCase {
     actor: DynHcP2p,
     blocks_module: DynBlocks,
@@ -373,10 +493,15 @@ impl TestCase {
             ..Default::default()
         };
         let actor = spawn_holochain_p2p(config, keystore).await.unwrap();
-        actor
-            .register_handler(Arc::new(MockHcP2pHandler::new()))
-            .await
-            .unwrap();
+        let mut handler = MockHcP2pHandler::new();
+        handler.expect_handle_get().returning(|a, b, c| {
+            Box::pin(async move {
+                Ok(holochain_types::dht_op::WireOps::Record(
+                    WireRecordOps::new(),
+                ))
+            })
+        });
+        actor.register_handler(Arc::new(handler)).await.unwrap();
         let space = actor
             .test_kitsune()
             .space(dna_hash.to_k2_space())
