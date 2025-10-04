@@ -1,8 +1,6 @@
-use std::time::Duration;
-
 use hdk::prelude::{
-    ActivityRequest, ChainTopOrdering, CreateInput, EntryDef, EntryDefIndex, EntryVisibility,
-    GetAgentActivityInput, Op, SerializedBytes, ValidateCallbackResult,
+    ChainTopOrdering, CreateInput, EntryDef, EntryDefIndex, EntryVisibility, Op, SerializedBytes,
+    ValidateCallbackResult,
 };
 use holo_hash::ActionHash;
 use holochain::{
@@ -15,6 +13,7 @@ use holochain::{
 use holochain_state::query::{CascadeTxnWrapper, Store};
 use holochain_zome_types::Entry;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 // Alice creates an invalid op and publishes it to Bob. Bob issues a warrant and
 // blocks Alice.
@@ -248,7 +247,7 @@ async fn warrant_is_gossiped() {
         loop {
             let alice_pubkey = alice.agent_pubkey().clone();
             let invalid_ops = conductors[2]
-                .get_invalid_integrated_ops(&carol.dht_db())
+                .get_invalid_integrated_ops(&conductors[2].get_dht_db(dna_hash).unwrap())
                 .await
                 .unwrap();
             if invalid_ops.len() == 3 {
