@@ -270,3 +270,172 @@ async fn warrant_is_gossiped() {
     .await
     .unwrap();
 }
+
+mod zero_arc {
+    use hdk::prelude::{
+        ActivityRequest, AgentActivity, GetAgentActivityInput, GetInput, GetOptions,
+    };
+    use holo_hash::AnyDhtHash;
+    use holochain::{
+        prelude::Kitsune2NetworkMetricsRequest, sweettest::SweetConductor,
+        test_utils::retry_fn_until_timeout,
+    };
+    use kitsune2_api::DhtArc;
+
+    use super::*;
+
+    // Alice creates an invalid op, Bob receives it and issues a warrant.
+    // Carol is a zero arc node and makes a get_agent_activity request to Bob.
+    // Bob serves the warrant.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn zero_arc_node_is_served_warrant() {
+        holochain_trace::test_run();
+
+        #[derive(Serialize, Deserialize, SerializedBytes, Debug)]
+        struct AppString(String);
+
+        let string_entry_def = EntryDef::default_from_id("string");
+        let zome_common = SweetInlineZomes::new(vec![string_entry_def], 0)
+            .function("create_string", |api, s: AppString| {
+                let entry = Entry::app(s.try_into().unwrap()).unwrap();
+                let hash = api.create(CreateInput::new(
+                    InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
+                    EntryVisibility::Public,
+                    entry,
+                    ChainTopOrdering::default(),
+                ))?;
+                Ok(hash)
+            })
+            .function("get_agent_activity", |api, agent_pubkey| {
+                Ok(api.get_agent_activity(GetAgentActivityInput {
+                    agent_pubkey,
+                    chain_query_filter: Default::default(),
+                    activity_request: ActivityRequest::Full,
+                })?)
+            });
+
+        let zome_without_validation = zome_common
+            .clone()
+            .integrity_function("validate", move |_api, _op: Op| {
+                Ok(ValidateCallbackResult::Valid)
+            });
+        // Any action after the genesis actions is invalid.
+        let zome_with_validation =
+            zome_common
+                .clone()
+                .integrity_function("validate", move |_api, op: Op| {
+                    if op.action_seq() > 3 {
+                        Ok(ValidateCallbackResult::Invalid("nope".to_string()))
+                    } else {
+                        Ok(ValidateCallbackResult::Valid)
+                    }
+                });
+
+        let network_seed = "seed".to_string();
+
+        let (dna_without_validation, _, _) =
+            SweetDnaFile::from_inline_zomes(network_seed.clone(), zome_without_validation).await;
+        let (dna_with_validation, _, _) =
+            SweetDnaFile::from_inline_zomes(network_seed.clone(), zome_with_validation).await;
+        assert_eq!(
+            dna_without_validation.dna_hash(),
+            dna_with_validation.dna_hash()
+        );
+        let dna_hash = dna_without_validation.dna_hash();
+
+        let config = SweetConductorConfig::rendezvous(true)
+            .tune_network_config(|nc| nc.disable_publish = true);
+        // Disable warrants on Carol's conductor, so that she doesn't issue warrants herself
+        // but receives them from Bob.
+        let config_zero_arc = SweetConductorConfig::rendezvous(true)
+            .tune_network_config(|nc| nc.target_arc_factor = 0);
+        let mut conductors =
+            SweetConductorBatch::from_configs_rendezvous([config.clone(), config, config_zero_arc])
+                .await;
+        let (alice,) = conductors[0]
+            .setup_app("test_app", [&dna_without_validation])
+            .await
+            .unwrap()
+            .into_tuple();
+        let (bob,) = conductors[1]
+            .setup_app("test_app", [&dna_with_validation])
+            .await
+            .unwrap()
+            .into_tuple();
+        let (carol,) = conductors[2]
+            .setup_app("test_app", [&dna_with_validation])
+            .await
+            .unwrap()
+            .into_tuple();
+
+        await_consistency(10, [&alice, &bob]).await.unwrap();
+        // Wait for Bob to declare full arc so he responds to Carol's request later on.
+        retry_fn_until_timeout(
+            || async {
+                conductors[1]
+                    .dump_network_metrics(Kitsune2NetworkMetricsRequest::default())
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .next()
+                    .unwrap()
+                    .1
+                    .local_agents[0]
+                    .storage_arc
+                    == DhtArc::FULL
+            },
+            Some(10_000),
+            None,
+        )
+        .await
+        .unwrap();
+        // Update Bob's peer info in Carol's peer store after the full storage arc declaration.
+        SweetConductor::exchange_peer_info([&conductors[1], &conductors[2]]).await;
+
+        // Alice creates an invalid action.
+        let _: ActionHash = conductors[0]
+            .call(
+                &alice.zome(SweetInlineZomes::COORDINATOR),
+                "create_string",
+                AppString("entry1".into()),
+            )
+            .await;
+
+        await_consistency(10, [&alice, &bob]).await.unwrap();
+
+        // Bob should have issued a warrant against Alice.
+        let alice_pubkey = alice.agent_pubkey().clone();
+        retry_fn_until_timeout(
+            || async {
+                let alice_pubkey = alice_pubkey.clone();
+                let warrants = conductors[1]
+                    .get_spaces()
+                    .dht_db(dna_hash)
+                    .unwrap()
+                    .test_read(move |txn| {
+                        let store = CascadeTxnWrapper::from(txn);
+                        // TODO: check_valid here should be removed once warrants are validated.
+                        store.get_warrants_for_agent(&alice_pubkey, false).unwrap()
+                    });
+                warrants.len() == 1
+            },
+            Some(10_000),
+            None,
+        )
+        .await
+        .unwrap();
+
+        // Shutdown Alice so that Carol's request will go to Bob.
+        conductors[0].shutdown().await;
+
+        let alice_activity: AgentActivity = conductors[2]
+            .call(
+                &carol.zome(SweetInlineZomes::COORDINATOR),
+                "get_agent_activity",
+                alice.agent_pubkey().clone(),
+            )
+            .await;
+        assert_eq!(alice_activity.warrants.len(), 1);
+        assert_eq!(alice_activity.warrants[0].warrantee, *alice.agent_pubkey());
+    }
+}
