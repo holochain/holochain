@@ -1,19 +1,19 @@
 use hdk::prelude::{
-    CellId, ChainTopOrdering, CreateInput, EntryDef, EntryDefIndex, EntryVisibility, Op,
-    SerializedBytes, ValidateCallbackResult,
+    ActivityRequest, CellId, ChainTopOrdering, CreateInput, EntryDef, EntryDefIndex,
+    EntryVisibility, GetAgentActivityInput, Op, SerializedBytes, ValidateCallbackResult,
 };
-use holo_hash::ActionHash;
+use holo_hash::{ActionHash, DnaHash};
 use holochain::{
     prelude::InlineZomeSet,
     sweettest::{
-        await_consistency, SweetConductorBatch, SweetConductorConfig, SweetDnaFile,
-        SweetInlineZomes,
+        await_consistency, SweetCell, SweetConductor, SweetConductorBatch, SweetConductorConfig,
+        SweetDnaFile, SweetInlineZomes,
     },
+    test_utils::retry_fn_until_timeout,
 };
 use holochain_state::query::{CascadeTxnWrapper, Store};
 use holochain_zome_types::Entry;
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
 
 // Alice creates an invalid op and publishes it to Bob. Bob issues a warrant and
 // blocks Alice.
@@ -21,108 +21,59 @@ use std::time::Duration;
 async fn warranted_agent_is_blocked() {
     holochain_trace::test_run();
 
-    #[derive(Serialize, Deserialize, SerializedBytes, Debug)]
-    struct AppString(String);
-
-    let string_entry_def = EntryDef::default_from_id("string");
-    let zome_common = SweetInlineZomes::new(vec![string_entry_def], 0).function(
-        "create_string",
-        move |api, s: AppString| {
-            let entry = Entry::app(s.try_into().unwrap()).unwrap();
-            let hash = api.create(CreateInput::new(
-                InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
-                EntryVisibility::Public,
-                entry,
-                ChainTopOrdering::default(),
-            ))?;
-            Ok(hash)
-        },
-    );
-
-    let zome_without_validation = zome_common
-        .clone()
-        .integrity_function("validate", move |_api, _op: Op| {
-            Ok(ValidateCallbackResult::Valid)
-        });
-
-    let zome_with_validation =
-        zome_common
-            .clone()
-            .integrity_function("validate", move |_api, op: Op| {
-                if op.action_seq() > 3 {
-                    Ok(ValidateCallbackResult::Invalid("nope".to_string()))
-                } else {
-                    Ok(ValidateCallbackResult::Valid)
-                }
-            });
-
-    let network_seed = "seed".to_string();
-
-    let (dna_without_validation, _, _) =
-        SweetDnaFile::from_inline_zomes(network_seed.clone(), zome_without_validation).await;
-    let (dna_with_validation, _, _) =
-        SweetDnaFile::from_inline_zomes(network_seed.clone(), zome_with_validation).await;
-    assert_eq!(
-        dna_without_validation.dna_hash(),
-        dna_with_validation.dna_hash()
-    );
-
-    let dna_hash = dna_without_validation.dna_hash();
-
-    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
-    let (alice,) = conductors[0]
-        .setup_app("test_app", [&dna_without_validation])
-        .await
-        .unwrap()
-        .into_tuple();
-    let (bob,) = conductors[1]
-        .setup_app("test_app", [&dna_with_validation])
-        .await
-        .unwrap()
-        .into_tuple();
+    let config = SweetConductorConfig::rendezvous(true);
+    let TestCase {
+        mut conductors_and_cells,
+        dna_hash,
+    } = TestCase::create([config.clone(), config]).await;
+    let (alice_conductor, alice_cell) = conductors_and_cells.remove(0);
+    let (bob_conductor, bob_cell) = conductors_and_cells.remove(0);
 
     // Let all agents sync.
-    await_consistency(10, [&alice, &bob]).await.unwrap();
+    await_consistency(10, [&alice_cell, &bob_cell])
+        .await
+        .unwrap();
 
     // Alice creates an invalid action.
-    let _: ActionHash = conductors[0]
+    let _: ActionHash = alice_conductor
         .call(
-            &alice.zome(SweetInlineZomes::COORDINATOR),
+            &alice_cell.zome(SweetInlineZomes::COORDINATOR),
             "create_string",
-            AppString("entry1".into()),
+            "entry1".to_string(),
         )
         .await;
 
-    await_consistency(10, [&alice, &bob]).await.unwrap();
+    await_consistency(10, [&alice_cell, &bob_cell])
+        .await
+        .unwrap();
 
     // The warrant against Alice and the warrant op should have been written to Bob's authored database.
-    tokio::time::timeout(Duration::from_secs(5), async {
-        loop {
-            let alice_pubkey = alice.agent_pubkey().clone();
-            let warrants = conductors[1]
+    retry_fn_until_timeout(
+        || async {
+            let alice_pubkey = alice_cell.agent_pubkey().clone();
+            let warrants = bob_conductor
                 .get_spaces()
-                .get_all_authored_dbs(dna_hash)
+                .get_all_authored_dbs(&dna_hash)
                 .unwrap()[0]
                 .test_read(move |txn| {
                     let store = CascadeTxnWrapper::from(txn);
                     store.get_warrants_for_agent(&alice_pubkey, false).unwrap()
                 });
 
-            if warrants.len() == 1 && warrants[0].warrant().warrantee == *alice.agent_pubkey() {
-                break;
-            }
-            tokio::time::sleep(Duration::from_millis(100)).await;
-        }
-    })
+            warrants.len() == 1 && warrants[0].warrant().warrantee == *alice_cell.agent_pubkey()
+        },
+        Some(5_000),
+        None,
+    )
     .await
     .unwrap();
 
     // Check that Alice is blocked by Bob.
     let target = hdk::prelude::BlockTargetId::Cell(CellId::new(
         dna_hash.clone(),
-        alice.agent_pubkey().clone(),
+        alice_cell.agent_pubkey().clone(),
     ));
-    assert!(conductors[1]
+    assert!(bob_conductor
         .holochain_p2p()
         .is_blocked(target)
         .await
@@ -139,53 +90,6 @@ async fn warranted_agent_is_blocked() {
 async fn warrant_is_gossiped() {
     holochain_trace::test_run();
 
-    #[derive(Serialize, Deserialize, SerializedBytes, Debug)]
-    struct AppString(String);
-
-    let string_entry_def = EntryDef::default_from_id("string");
-    let zome_common = SweetInlineZomes::new(vec![string_entry_def], 0).function(
-        "create_string",
-        move |api, s: AppString| {
-            let entry = Entry::app(s.try_into().unwrap()).unwrap();
-            let hash = api.create(CreateInput::new(
-                InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
-                EntryVisibility::Public,
-                entry,
-                ChainTopOrdering::default(),
-            ))?;
-            Ok(hash)
-        },
-    );
-
-    let zome_without_validation = zome_common
-        .clone()
-        .integrity_function("validate", move |_api, _op: Op| {
-            Ok(ValidateCallbackResult::Valid)
-        });
-    // Any action after the genesis actions is invalid.
-    let zome_with_validation =
-        zome_common
-            .clone()
-            .integrity_function("validate", move |_api, op: Op| {
-                if op.action_seq() > 3 {
-                    Ok(ValidateCallbackResult::Invalid("nope".to_string()))
-                } else {
-                    Ok(ValidateCallbackResult::Valid)
-                }
-            });
-
-    let network_seed = "seed".to_string();
-
-    let (dna_without_validation, _, _) =
-        SweetDnaFile::from_inline_zomes(network_seed.clone(), zome_without_validation).await;
-    let (dna_with_validation, _, _) =
-        SweetDnaFile::from_inline_zomes(network_seed.clone(), zome_with_validation).await;
-    assert_eq!(
-        dna_without_validation.dna_hash(),
-        dna_with_validation.dna_hash()
-    );
-    let dna_hash = dna_without_validation.dna_hash();
-
     let config =
         SweetConductorConfig::rendezvous(true).tune_network_config(|nc| nc.disable_publish = true);
     // Disable warrants on Carol's conductor, so that she doesn't issue warrants herself
@@ -193,96 +97,76 @@ async fn warrant_is_gossiped() {
     let config_no_warranting = SweetConductorConfig::rendezvous(true)
         .tune_conductor(|tc| tc.disable_warrant_issuance = true)
         .tune_network_config(|nc| nc.disable_publish = true);
-    let mut conductors = SweetConductorBatch::from_configs_rendezvous([
-        config.clone(),
-        config,
-        config_no_warranting,
-    ])
-    .await;
-    let (alice,) = conductors[0]
-        .setup_app("test_app", [&dna_without_validation])
-        .await
-        .unwrap()
-        .into_tuple();
-    let (bob,) = conductors[1]
-        .setup_app("test_app", [&dna_with_validation])
-        .await
-        .unwrap()
-        .into_tuple();
-    let (carol,) = conductors[2]
-        .setup_app("test_app", [&dna_with_validation])
-        .await
-        .unwrap()
-        .into_tuple();
 
-    await_consistency(10, [&alice, &bob, &carol]).await.unwrap();
+    let TestCase {
+        mut conductors_and_cells,
+        dna_hash,
+    } = TestCase::create([config.clone(), config, config_no_warranting]).await;
+    let (mut alice_conductor, alice_cell) = conductors_and_cells.remove(0);
+    let (_bob_conductor, bob_cell) = conductors_and_cells.remove(0);
+    let (mut carol_conductor, carol_cell) = conductors_and_cells.remove(0);
+
+    await_consistency(10, [&alice_cell, &bob_cell, &carol_cell])
+        .await
+        .unwrap();
 
     // Shutdown Carol's conductor.
-    conductors[2].shutdown().await;
+    carol_conductor.shutdown().await;
 
     // Alice creates an invalid action.
-    let _: ActionHash = conductors[0]
+    let _: ActionHash = alice_conductor
         .call(
-            &alice.zome(SweetInlineZomes::COORDINATOR),
+            &alice_cell.zome(SweetInlineZomes::COORDINATOR),
             "create_string",
-            AppString("entry1".into()),
+            "s".to_string(),
         )
         .await;
 
-    await_consistency(10, [&alice, &bob]).await.unwrap();
+    await_consistency(10, [&alice_cell, &bob_cell])
+        .await
+        .unwrap();
 
     // Bob should have issued a warrant against Alice.
 
     // Shutdown Alice and startup Carol.
-    conductors[0].shutdown().await;
-    conductors[2].startup(false).await;
+    alice_conductor.shutdown().await;
+    carol_conductor.startup(false).await;
 
     // Carol should receive the warrant against Alice.
     // The warrant and the warrant op should have been written to the DHT database,
     // as well as the invalid ops.
-    tokio::time::timeout(Duration::from_secs(10), async {
-        loop {
-            let alice_pubkey = alice.agent_pubkey().clone();
-            let invalid_ops = conductors[2]
-                .get_invalid_integrated_ops(&conductors[2].get_dht_db(dna_hash).unwrap())
+    retry_fn_until_timeout(
+        || async {
+            let alice_pubkey = alice_cell.agent_pubkey().clone();
+            let invalid_ops = carol_conductor
+                .get_invalid_integrated_ops(&carol_conductor.get_dht_db(&dna_hash).unwrap())
                 .await
                 .unwrap();
-            if invalid_ops.len() == 3 {
-                let warrants = conductors[2]
+            invalid_ops.len() == 3 && {
+                let warrants = carol_conductor
                     .get_spaces()
-                    .dht_db(dna_hash)
+                    .dht_db(&dna_hash)
                     .unwrap()
                     .test_read(move |txn| {
                         let store = CascadeTxnWrapper::from(txn);
                         // TODO: check_valid here should be removed once warrants are validated.
                         store.get_warrants_for_agent(&alice_pubkey, false).unwrap()
                     });
-                if warrants.len() == 1 {
-                    assert_eq!(warrants[0].warrant().warrantee, *alice.agent_pubkey());
-                    // Make sure that Bob authored the warrant and it's not been authored by Carol.
-                    assert_eq!(warrants[0].warrant().author, *bob.agent_pubkey());
-                    break;
-                }
+                warrants.len() == 1
+                    && warrants[0].warrant().warrantee == *alice_cell.agent_pubkey()
+                    && warrants[0].warrant().author == *bob_cell.agent_pubkey() // Make sure that Bob authored the warrant and it's not been authored by Carol.
             }
-            tokio::time::sleep(Duration::from_millis(100)).await;
-        }
-    })
+        },
+        Some(10_000),
+        None,
+    )
     .await
     .unwrap();
 }
 
 mod zero_arc {
-    use hdk::prelude::{
-        ActivityRequest, AgentActivity, GetAgentActivityInput, GetInput, GetOptions,
-    };
-    use holo_hash::AnyDhtHash;
-    use holochain::{
-        prelude::Kitsune2NetworkMetricsRequest, sweettest::SweetConductor,
-        test_utils::retry_fn_until_timeout,
-    };
-    use kitsune2_api::DhtArc;
-
     use super::*;
+    use hdk::prelude::AgentActivity;
 
     // Alice creates an invalid op, Bob receives it and issues a warrant.
     // Carol is a zero arc node and makes a get_agent_activity request to Bob.
@@ -291,13 +175,80 @@ mod zero_arc {
     async fn zero_arc_node_is_served_warrant() {
         holochain_trace::test_run();
 
+        let config = SweetConductorConfig::rendezvous(true)
+            .tune_network_config(|nc| nc.disable_publish = true);
+        // Carol's conductor is a zero arc conductor.
+        let config_zero_arc = SweetConductorConfig::rendezvous(true)
+            .tune_network_config(|nc| nc.target_arc_factor = 0);
+
+        let TestCase {
+            mut conductors_and_cells,
+            dna_hash,
+        } = TestCase::create([config.clone(), config, config_zero_arc]).await;
+        let (mut alice_conductor, alice_cell) = conductors_and_cells.remove(0);
+        let (bob_conductor, bob_cell) = conductors_and_cells.remove(0);
+        let (carol_conductor, carol_cell) = conductors_and_cells.remove(0);
+
+        await_consistency(10, [&alice_cell, &bob_cell])
+            .await
+            .unwrap();
+        bob_conductor
+            .holochain_p2p()
+            .test_set_full_arcs(dna_hash.to_k2_space())
+            .await;
+        // Update Bob's peer info in Carol's peer store after the full storage arc declaration.
+        SweetConductor::exchange_peer_info([&bob_conductor, &carol_conductor]).await;
+
+        // Alice creates an invalid action.
+        let _: ActionHash = alice_conductor
+            .call(
+                &alice_cell.zome(SweetInlineZomes::COORDINATOR),
+                "create_string",
+                "s".to_string(),
+            )
+            .await;
+
+        await_consistency(10, [&alice_cell, &bob_cell])
+            .await
+            .unwrap();
+
+        // Bob should have issued a warrant against Alice.
+
+        // Shutdown Alice so that Carol's request will go to Bob.
+        alice_conductor.shutdown().await;
+
+        // Carol queries Alice's agent activity and should get the warrant.
+        let alice_activity: AgentActivity = carol_conductor
+            .call(
+                &carol_cell.zome(SweetInlineZomes::COORDINATOR),
+                "get_agent_activity",
+                alice_cell.agent_pubkey().clone(),
+            )
+            .await;
+        assert_eq!(alice_activity.warrants.len(), 1);
+        assert_eq!(
+            alice_activity.warrants[0].warrantee,
+            *alice_cell.agent_pubkey()
+        );
+    }
+}
+
+// The first conductor and cell use the zome without validation, in other words the bad actor.
+// All subsequent conductors/cells are honest actors and use the zome with validation.
+struct TestCase {
+    conductors_and_cells: Vec<(SweetConductor, SweetCell)>,
+    dna_hash: DnaHash,
+}
+
+impl TestCase {
+    async fn create<T: IntoIterator<Item = SweetConductorConfig>>(configs: T) -> Self {
         #[derive(Serialize, Deserialize, SerializedBytes, Debug)]
         struct AppString(String);
 
         let string_entry_def = EntryDef::default_from_id("string");
         let zome_common = SweetInlineZomes::new(vec![string_entry_def], 0)
-            .function("create_string", |api, s: AppString| {
-                let entry = Entry::app(s.try_into().unwrap()).unwrap();
+            .function("create_string", |api, s: String| {
+                let entry = Entry::app(AppString(s).try_into().unwrap()).unwrap();
                 let hash = api.create(CreateInput::new(
                     InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
                     EntryVisibility::Public,
@@ -341,101 +292,33 @@ mod zero_arc {
             dna_without_validation.dna_hash(),
             dna_with_validation.dna_hash()
         );
-        let dna_hash = dna_without_validation.dna_hash();
+        let dna_hash = dna_without_validation.dna_hash().clone();
 
-        let config = SweetConductorConfig::rendezvous(true)
-            .tune_network_config(|nc| nc.disable_publish = true);
-        // Disable warrants on Carol's conductor, so that she doesn't issue warrants herself
-        // but receives them from Bob.
-        let config_zero_arc = SweetConductorConfig::rendezvous(true)
-            .tune_network_config(|nc| nc.target_arc_factor = 0);
-        let mut conductors =
-            SweetConductorBatch::from_configs_rendezvous([config.clone(), config, config_zero_arc])
-                .await;
-        let (alice,) = conductors[0]
+        let conductors = SweetConductorBatch::from_configs_rendezvous(configs).await;
+        let mut conductors = conductors.into_inner();
+        let mut conductors_and_cells = Vec::new();
+
+        // Set up bad actor conductor and cell.
+        let mut bad_conductor = conductors.remove(0);
+        let (bad_cell,) = bad_conductor
             .setup_app("test_app", [&dna_without_validation])
             .await
             .unwrap()
             .into_tuple();
-        let (bob,) = conductors[1]
-            .setup_app("test_app", [&dna_with_validation])
-            .await
-            .unwrap()
-            .into_tuple();
-        let (carol,) = conductors[2]
-            .setup_app("test_app", [&dna_with_validation])
-            .await
-            .unwrap()
-            .into_tuple();
+        conductors_and_cells.push((bad_conductor, bad_cell));
 
-        await_consistency(10, [&alice, &bob]).await.unwrap();
-        // Wait for Bob to declare full arc so he responds to Carol's request later on.
-        retry_fn_until_timeout(
-            || async {
-                conductors[1]
-                    .dump_network_metrics(Kitsune2NetworkMetricsRequest::default())
-                    .await
-                    .unwrap()
-                    .into_iter()
-                    .next()
-                    .unwrap()
-                    .1
-                    .local_agents[0]
-                    .storage_arc
-                    == DhtArc::FULL
-            },
-            Some(10_000),
-            None,
-        )
-        .await
-        .unwrap();
-        // Update Bob's peer info in Carol's peer store after the full storage arc declaration.
-        SweetConductor::exchange_peer_info([&conductors[1], &conductors[2]]).await;
-
-        // Alice creates an invalid action.
-        let _: ActionHash = conductors[0]
-            .call(
-                &alice.zome(SweetInlineZomes::COORDINATOR),
-                "create_string",
-                AppString("entry1".into()),
-            )
-            .await;
-
-        await_consistency(10, [&alice, &bob]).await.unwrap();
-
-        // Bob should have issued a warrant against Alice.
-        let alice_pubkey = alice.agent_pubkey().clone();
-        retry_fn_until_timeout(
-            || async {
-                let alice_pubkey = alice_pubkey.clone();
-                let warrants = conductors[1]
-                    .get_spaces()
-                    .dht_db(dna_hash)
-                    .unwrap()
-                    .test_read(move |txn| {
-                        let store = CascadeTxnWrapper::from(txn);
-                        // TODO: check_valid here should be removed once warrants are validated.
-                        store.get_warrants_for_agent(&alice_pubkey, false).unwrap()
-                    });
-                warrants.len() == 1
-            },
-            Some(10_000),
-            None,
-        )
-        .await
-        .unwrap();
-
-        // Shutdown Alice so that Carol's request will go to Bob.
-        conductors[0].shutdown().await;
-
-        let alice_activity: AgentActivity = conductors[2]
-            .call(
-                &carol.zome(SweetInlineZomes::COORDINATOR),
-                "get_agent_activity",
-                alice.agent_pubkey().clone(),
-            )
-            .await;
-        assert_eq!(alice_activity.warrants.len(), 1);
-        assert_eq!(alice_activity.warrants[0].warrantee, *alice.agent_pubkey());
+        // Set up honest conductors and cells.
+        for mut conductor in conductors.into_iter() {
+            let (cell,) = conductor
+                .setup_app("test_app", [&dna_with_validation])
+                .await
+                .unwrap()
+                .into_tuple();
+            conductors_and_cells.push((conductor, cell));
+        }
+        Self {
+            conductors_and_cells,
+            dna_hash,
+        }
     }
 }
