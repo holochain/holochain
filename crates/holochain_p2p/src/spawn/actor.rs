@@ -2192,6 +2192,23 @@ impl actor::HcP2p for HolochainP2pActor {
             Ok(())
         })
     }
+
+    fn is_blocked(&self, target: BlockTargetId) -> BoxFut<'_, HolochainP2pResult<bool>> {
+        Box::pin(async move {
+            let db = self.conductor_db_getter()().await;
+            db.read_async(|txn| {
+                holochain_state::block::query_is_blocked(
+                    txn,
+                    target,
+                    holochain_timestamp::Timestamp::now(),
+                )
+            })
+            .await
+            .map_err(|err| {
+                HolochainP2pError::other(format!("Could not read block from database: {err}"))
+            })
+        })
+    }
 }
 
 #[cfg(test)]

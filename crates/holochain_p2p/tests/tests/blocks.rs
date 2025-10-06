@@ -42,6 +42,28 @@ async fn cell_blocks_are_committed_to_database() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn agent_is_blocked() {
+    let conductor_db = DbWrite::test_in_mem(DbKindConductor).unwrap();
+    let dna_hash = fixt!(DnaHash);
+    let TestCase { actor, .. } =
+        TestCase::new_with_conductor_db(&dna_hash, conductor_db.clone()).await;
+    let agent = fixt!(AgentPubKey);
+    let cell_id = CellId::new(dna_hash, agent.clone());
+    let cell_block_reason = CellBlockReason::InvalidOp(fixt!(DhtOpHash));
+    let block = Block::new(
+        BlockTarget::Cell(cell_id.clone(), cell_block_reason.clone()),
+        InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::max()).unwrap(),
+    );
+
+    let target = BlockTargetId::Cell(cell_id);
+    assert!(!actor.is_blocked(target.clone()).await.unwrap());
+
+    actor.block(block).await.unwrap();
+
+    assert!(actor.is_blocked(target).await.unwrap());
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn block_someone() {
     let dna_hash = fixt!(DnaHash);
     let agent = fixt!(AgentPubKey);
