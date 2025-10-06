@@ -7,8 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Removed the hdk host function `version`, which was not implemented.
-- Removed the following public functions, types and enum variants that were not implemented or not used:
+- **BREAKING CHANGE** Removed the hdk host function `version`, which was not implemented.
+- **BREAKING CHANGE** Removed the following public functions, types and enum variants that were not implemented or not used:
   - `holochain_cascade`
     - `CascadeError::RecordGroupError`
   - `holochain_integrity_types`
