@@ -8,9 +8,6 @@ pub type InlineZomeResult<T> = Result<T, InlineZomeError>;
 
 #[derive(Error, Debug)]
 pub enum InlineZomeError {
-    #[error("No such InlineZome callback: {0}")]
-    NoSuchCallback(FunctionName),
-
     #[error("Error during host fn call: {0}")]
     HostFnApiError(#[from] HostFnApiError),
 

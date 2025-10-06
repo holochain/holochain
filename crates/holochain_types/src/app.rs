@@ -287,29 +287,9 @@ impl InstalledCell {
         Self { cell_id, role_name }
     }
 
-    /// Get the CellId
-    pub fn into_id(self) -> CellId {
-        self.cell_id
-    }
-
-    /// Get the RoleName
-    pub fn into_role_name(self) -> RoleName {
-        self.role_name
-    }
-
     /// Get the inner data as a tuple
     pub fn into_inner(self) -> (CellId, RoleName) {
         (self.cell_id, self.role_name)
-    }
-
-    /// Get the CellId
-    pub fn as_id(&self) -> &CellId {
-        &self.cell_id
-    }
-
-    /// Get the RoleName
-    pub fn as_role_name(&self) -> &RoleName {
-        &self.role_name
     }
 }
 
@@ -349,12 +329,6 @@ impl InstalledApp {
             app,
             status: AppStatus::Enabled,
         }
-    }
-
-    /// Return the common app info, as well as a status which encodes the remaining
-    /// information
-    pub fn into_app_and_status(self) -> (InstalledAppCommon, AppStatus) {
-        (self.app, self.status)
     }
 
     /// Accessor
@@ -922,11 +896,6 @@ impl AppRolePrimary {
         } else {
             None
         }
-    }
-
-    /// Accessor
-    pub fn clone_ids(&self) -> impl Iterator<Item = &CloneId> {
-        self.clones.keys()
     }
 
     /// Accessor

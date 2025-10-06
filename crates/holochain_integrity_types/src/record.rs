@@ -270,15 +270,6 @@ impl Record {
 }
 
 impl<A> Record<A> {
-    /// Mutable reference to the RecordEntry.
-    /// This is useless and dangerous in production usage.
-    /// Guaranteed to make hashes and signatures mismatch whatever the RecordEntry is mutated to (at least).
-    /// This may be useful for tests that rely heavily on mocked and fixturated data.
-    #[cfg(feature = "test_utils")]
-    pub fn as_entry_mut(&mut self) -> &mut RecordEntry {
-        &mut self.entry
-    }
-
     /// Break this record into its components
     pub fn into_inner(self) -> (A, RecordEntry) {
         (self.signed_action, self.entry)

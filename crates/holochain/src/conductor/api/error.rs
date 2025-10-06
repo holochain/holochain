@@ -26,17 +26,6 @@ pub enum ConductorApiError {
     #[error("The Cell for this cell id is not installed in the conductor! CellId: {0}")]
     CellMissing(CellId),
 
-    /// Cell was referenced, but is missing from the conductor.
-    #[error(
-        "A Cell attempted to use an CellConductorApi it was not given.\nAPI CellId: {api_cell_id:?}\nInvocation CellId: {call_cell_id:?}"
-    )]
-    ZomeCallCellMismatch {
-        /// The CellId which is referenced by the CellConductorApi
-        api_cell_id: CellId,
-        /// The CellId which is referenced by the ZomeCallInvocation
-        call_cell_id: CellId,
-    },
-
     /// Conductor threw an error during API call.
     #[error("Conductor returned an error while using a ConductorApi: {0:?}")]
     ConductorError(#[from] ConductorError),

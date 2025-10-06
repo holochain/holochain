@@ -11,8 +11,6 @@ pub enum ZomeTypesError {
     LinkTypeIndexOverflow,
     #[error("Missing dependencies for zome {0}")]
     MissingDependenciesForZome(ZomeName),
-    #[error("Missing type scope for zome id {0}")]
-    MissingZomeType(ZomeIndex),
 }
 
 pub type ZomeTypesResult<T> = Result<T, ZomeTypesError>;

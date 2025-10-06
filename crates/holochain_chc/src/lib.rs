@@ -52,7 +52,7 @@ use holochain_serialized_bytes::SerializedBytesError;
 use holochain_types::chain::ChainItem;
 use holochain_types::prelude::*;
 use must_future::MustBoxFuture;
-use std::{collections::HashMap, fmt::Debug, sync::Arc};
+use std::{fmt::Debug, sync::Arc};
 
 pub mod chc_local;
 
@@ -270,28 +270,6 @@ pub struct GetRecordsRequest {
 /// Encrypted bytes of an Entry
 #[derive(Debug, serde::Serialize, serde::Deserialize, derive_more::From)]
 pub struct EncryptedEntry(#[serde(with = "serde_bytes")] pub Vec<u8>);
-
-/// Assemble records from a list of Actions and a map of Entries
-pub fn records_from_actions_and_entries(
-    actions: Vec<SignedActionHashed>,
-    mut entries: HashMap<EntryHash, Entry>,
-) -> ChcResult<Vec<Record>> {
-    let mut records = vec![];
-    for action in actions {
-        let entry = if let Some(hash) = action.hashed.entry_hash() {
-            Some(
-                entries
-                    .remove(hash)
-                    .ok_or_else(|| ChcError::MissingEntryForAction(action.as_hash().clone()))?,
-            )
-        } else {
-            None
-        };
-        let record = Record::new(action, entry);
-        records.push(record);
-    }
-    Ok(records)
-}
 
 #[allow(missing_docs)]
 #[derive(Debug, thiserror::Error)]

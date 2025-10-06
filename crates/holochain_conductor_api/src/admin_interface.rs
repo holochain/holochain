@@ -628,8 +628,6 @@ pub enum ExternalApiWireError {
     DnaReadError(String),
     /// There was an error in the ribosome.
     RibosomeError(String),
-    /// Error activating app.
-    ActivateApp(String),
     /// The zome call failed authentication.
     ///
     /// [How to sign zome calls.](crate::AppRequest::CallZome)

@@ -60,12 +60,6 @@ pub enum SourceChainError {
     )]
     InvalidStructure(ChainInvalidReason),
 
-    #[error("The source chain's head is pointing to an address which has no content.")]
-    MissingHead,
-
-    #[error("The content at address {0} is malformed and can't be deserialized.")]
-    MalformedEntry(EntryHash),
-
     #[error("Serialization error: {0}")]
     SerializationError(#[from] SerializedBytesError),
 
@@ -79,34 +73,17 @@ pub enum SourceChainError {
     #[error("Record signature is invalid")]
     InvalidSignature,
 
-    /// Record previous action reference is invalid
-    #[error("Record previous action reference is invalid: {0}")]
-    InvalidPreviousAction(String),
-
     #[error("InvalidCommit error: {0}")]
     InvalidCommit(String),
 
     #[error("The commit could not be completed but may be retried: {0:?}")]
     IncompleteCommit(IncompleteCommitReason),
 
-    #[error("InvalidLink error: {0}")]
-    InvalidLink(String),
-
     #[error("KeystoreError: {0}")]
     KeystoreError(#[from] holochain_keystore::KeystoreError),
 
     #[error(transparent)]
     DhtOpError(#[from] DhtOpError),
-
-    #[error("Required the scratch space to be empty but contained values")]
-    ScratchNotFresh,
-
-    /// Record signature doesn't validate against the action
-    #[error("Record associated with action {0} was not found on the source chain")]
-    RecordMissing(String),
-
-    #[error(transparent)]
-    RecordGroupError(#[from] RecordGroupError),
 
     #[error(transparent)]
     StateMutationError(#[from] StateMutationError),

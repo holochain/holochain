@@ -78,16 +78,4 @@ pub enum EntryDhtStatus {
     Live,
     /// This [Entry] has no actions that have not been deleted
     Dead,
-    /// This [Entry] is awaiting validation
-    Pending,
-    /// This [Entry] has failed validation and will not be served by the DHT
-    Rejected,
-    /// This [Entry] has taken too long / too many resources to validate, so we gave up
-    Abandoned,
-    /// **not implemented** There has been a conflict when validating this [Entry]
-    Conflict,
-    /// **not implemented** The author has withdrawn their publication of this record.
-    Withdrawn,
-    /// **not implemented** We have agreed to drop this [Entry] content from the system. Action can stay with no entry
-    Purged,
 }

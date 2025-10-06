@@ -1,7 +1,7 @@
 //! Error types for the conductor.
 
+use super::entry_def_store::error::EntryDefStoreError;
 use super::interface::error::InterfaceError;
-use super::{entry_def_store::error::EntryDefStoreError, state::AppInterfaceId};
 use crate::conductor::cell::error::CellError;
 use crate::core::workflow::WorkflowError;
 use holochain_conductor_api::conductor::ConductorConfigError;
@@ -38,9 +38,6 @@ pub enum ConductorError {
     #[error("Cell already exists. CellId: {0:?}")]
     CellAlreadyExists(CellId),
 
-    #[error("Cell is not initialized.")]
-    CellNotInitialized,
-
     #[error("Cell was referenced, but is currently disabled. CellId: {0:?}")]
     CellDisabled(CellId),
 
@@ -52,9 +49,6 @@ pub enum ConductorError {
 
     #[error(transparent)]
     ConductorConfigError(#[from] ConductorConfigError),
-
-    #[error("Configuration consistency error: {0}")]
-    ConfigError(String),
 
     #[error(transparent)]
     CountersigningError(#[from] CountersigningError),
@@ -80,9 +74,6 @@ pub enum ConductorError {
     #[error("Workflow error: {0:?}")]
     WorkflowError(#[from] WorkflowError),
 
-    #[error("Attempted to add two app interfaces with the same id: {0:?}")]
-    AppInterfaceIdCollision(AppInterfaceId),
-
     // Box is to avoid cycle in error definition
     #[error(transparent)]
     InterfaceError(#[from] Box<InterfaceError>),
@@ -101,9 +92,6 @@ pub enum ConductorError {
 
     #[error("Tried to install an app using an already-used InstalledAppId: {0}")]
     AppAlreadyInstalled(InstalledAppId),
-
-    #[error("Tried to perform an operation on an app that was not running: {0}")]
-    AppNotRunning(InstalledAppId),
 
     #[error("App status could not be changed: {0}")]
     AppStatusError(String),
@@ -150,12 +138,6 @@ pub enum ConductorError {
 
     #[error("The conductor has no data directory.")]
     NoDataRootPath,
-
-    #[error("The conductor has no config directory.")]
-    NoConfigPath,
-
-    #[error("A required trigger is missing: {0}")]
-    MissingTrigger(String),
 }
 
 impl ConductorError {

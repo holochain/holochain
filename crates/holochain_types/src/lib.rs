@@ -15,7 +15,6 @@ pub mod access;
 pub mod action;
 pub mod activity;
 pub mod app;
-pub mod autonomic;
 pub mod chain;
 pub mod combinators;
 pub mod countersigning;

@@ -7,6 +7,93 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE** Removed the hdk host function `version`, which was not implemented.
+- **BREAKING CHANGE** Removed the following public functions, types and enum variants that were not implemented or not used:
+  - `holochain_cascade`
+    - `CascadeError::RecordGroupError`
+  - `holochain_integrity_types`
+    - `UpdateAction`
+    - `DeleteAction`
+    - `agent_state_mut`
+    - `signature_mut`
+    - `WeighInput`
+    - `Record::as_entry_mut`
+    - `RequiredValidationType`
+  - `holochain_sqlite`
+    - `_check_migrations`
+    - `DatabaseError::EnvironmentDoubleInitialized` \
+    - `DatabaseError::NoPrivateDb`
+  - `holochain_state`
+    - `SourceChainError::MissingHead`
+    - `SourceChainError::MalformedEntry`
+    - `SourceChainError::InvalidPreviousAction`
+    - `SourceChainError::InvalidLink`
+    - `SourceChainError::ScratchNotFresh`
+    - `SourceChainError::RecordMissing`
+    - `SourceChainError::RecordGroupError`
+    - `Scratch::num_actions`
+  - `holochain_types`
+    - `InstalledCell::into_id`
+    - `InstalledCell::into_role_name`
+    - `InstalledCell::as_id`
+    - `InstalledCell::as_role_name`
+    - `AutonomicProcess`
+    - `first`
+    - `first_ref`
+    - `second`
+    - `second_ref`
+    - `swap2`
+    - `transpose`
+    - `DhtOpLite::fetch_dependency_hashes`
+    - `produce_op_lites_from_record_group`
+    - `produce_op_lites_from_parts`
+    - `RecordGroupError`
+    - `ZomeTypesError::MissingZomeType`
+    - `GetLinksResponse`
+    - `WireRecord`
+    - `RecordGroup`
+    - `GetRecordResponse`
+    - `RawGetEntryResponse`
+    - `FakeProperties`
+  - `holochain_zome_types`
+    - `DeterministicGetAgentActivityFilter`
+    - `DeterministicGetAgentActivityResponse`
+    - `InlineZomeError::NoSuchCallback`
+    - `EntryDhtStatus::Pending`
+    - `EntryDhtStatus::Rejected`
+    - `EntryDhtStatus::Abandoned`
+    - `EntryDhtStatus::Conflict`
+    - `EntryDhtStatus::Withdrawn`
+    - `EntryDhtStatus::Purged`
+    - `ZomeApiVersion`
+  - `holochain`
+    - `TaskManagerError::TaskManagerFailedToStart`
+    - `TaskManagerClient::stop_all_tasks`
+    - `PendingJoinReason`
+    - `ConductorApiError::ZomeCallCellMismatch`
+    - `EntryDefStoreError::TooManyEntryDefs`
+    - `ConductorError::CellNotInitialized`
+    - `ConductorError::ConfigError`
+    - `ConductorError::AppInterfaceIdCollision`
+    - `ConductorError::AppNotRunning`
+    - `ConductorError::NoConfigPath`
+    - `ConductorError::MissingTrigger`
+    - `RibosomeError::InvalidCloneTarget`
+    - `check_spam`
+    - `ValidationDependencies::get_network_fetched_hashes`
+  - `hc_sandbox`
+    - `parse_dnas`
+  - `holochain_keystore`
+    - `spawn_real_or_mock_keystore`
+    - `RealOrMockKeystore`
+    - `MockLairControl`
+  - `hc_demo_cli`
+    - `BUILD_MODE`
+  - `holochain_chc`
+    - `records_from_actions_and_entries`
+  - `holochain_util`
+    - `run_on`
+
 ## 0.6.0-dev.27
 
 ## 0.6.0-dev.26

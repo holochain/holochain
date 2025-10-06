@@ -97,25 +97,6 @@ impl ValidationDependencies {
             .collect()
     }
 
-    /// Get the hashes of all dependencies that have been fetched from the network.
-    /// We need to let the incoming dht ops workflow know about these so that it can ingest them and get them validated.
-    pub fn get_network_fetched_hashes(&self) -> Vec<ActionHash> {
-        self.states
-            .iter()
-            .filter_map(|(hash, state)| match state {
-                ValidationDependencyState {
-                    dependency:
-                        Some(ValidationDependency {
-                            fetched_from: CascadeSource::Network,
-                            ..
-                        }),
-                    ..
-                } => Some(hash.clone()),
-                _ => None,
-            })
-            .collect()
-    }
-
     /// Insert an action which was found after this set of dependencies was created.
     pub fn insert_action(&mut self, action: SignedActionHashed, source: CascadeSource) -> bool {
         let hash = action.as_hash();

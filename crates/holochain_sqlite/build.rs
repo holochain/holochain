@@ -1,7 +1,5 @@
 #![allow(dead_code)]
 
-use std::path::PathBuf;
-
 /// The location of all our sql scrips
 const SQL_DIR: &str = "./src/sql";
 
@@ -86,25 +84,6 @@ fn check_fmt(path: &std::path::Path) {
         }
     } else if chk_sql_fmt() {
         panic_on_diff(path, src_sql, fmt_sql);
-    }
-}
-
-fn _check_migrations() {
-    let root = PathBuf::from(SQL_DIR);
-
-    for dir in [
-        root.join("cell/schema"),
-        root.join("conductor/schema"),
-        root.join("p2p_agent_store/schema"),
-        root.join("p2p_metrics/schema"),
-        root.join("wasm/schema"),
-    ] {
-        for _path in find_sql(&dir) {
-            // TODO: ensure that each schema migration script not introduced "recently"
-            // (for some value of "recently") has not changed. We don't ever
-            // want these to change, we only want to add new ones.
-            // Probably the best way to accomplish this is through a git commit hook or something.
-        }
     }
 }
 
