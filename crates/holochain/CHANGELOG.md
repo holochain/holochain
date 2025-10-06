@@ -31,7 +31,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
     - `SourceChainError::ScratchNotFresh`
     - `SourceChainError::RecordMissing`
     - `SourceChainError::RecordGroupError`
-    - `unset_withhold_publish`
     - `Scratch::num_actions`
   - `holochain_types`
     - `InstalledCell::into_id`
