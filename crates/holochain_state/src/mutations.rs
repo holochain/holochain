@@ -696,6 +696,17 @@ pub fn set_withhold_publish(
     Ok(())
 }
 
+/// Unset withhold publish for a [DhtOp].
+pub fn unset_withhold_publish(
+    txn: &mut Txn<DbKindAuthored>,
+    hash: &DhtOpHash,
+) -> StateMutationResult<()> {
+    dht_op_update!(txn, hash, {
+        "withhold_publish": Null,
+    })?;
+    Ok(())
+}
+
 /// Set the receipt count for a [DhtOp].
 pub fn set_receipts_complete(
     txn: &mut Txn<DbKindAuthored>,
