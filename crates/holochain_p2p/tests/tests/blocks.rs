@@ -64,49 +64,6 @@ async fn agent_is_blocked() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn block_someone() {
-    let dna_hash = fixt!(DnaHash);
-    let agent = fixt!(AgentPubKey);
-    let cell_id = CellId::new(dna_hash.clone(), agent.clone());
-
-    let TestCase {
-        actor,
-        blocks_module,
-    } = TestCase::new(&dna_hash).await;
-
-    assert!(!blocks_module
-        .is_blocked(kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()))
-        .await
-        .unwrap());
-    assert!(!blocks_module.are_all_blocked(vec![]).await.unwrap());
-    assert!(!blocks_module
-        .are_all_blocked(vec![kitsune2_api::BlockTarget::Agent(agent.to_k2_agent())])
-        .await
-        .unwrap());
-
-    // Block an agent.
-    actor
-        .block(Block::new(
-            BlockTarget::Cell(cell_id, CellBlockReason::BadCrypto),
-            InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::max()).unwrap(),
-        ))
-        .await
-        .unwrap();
-
-    // Check agent is blocked now.
-    assert!(blocks_module
-        .is_blocked(kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()))
-        .await
-        .unwrap());
-    assert!(blocks_module
-        .are_all_blocked(vec![kitsune2_api::BlockTarget::Agent(agent.to_k2_agent())])
-        .await
-        .unwrap());
-    // Empty target vector is still not blocked.
-    assert!(!blocks_module.are_all_blocked(vec![]).await.unwrap());
-}
-
-#[tokio::test(flavor = "multi_thread")]
 async fn agent_is_removed_from_peer_store_when_blocked() {
     let dna_hash = fixt!(DnaHash);
 
@@ -163,199 +120,246 @@ async fn agent_is_removed_from_peer_store_when_blocked() {
         .is_none());
 }
 
-#[tokio::test(flavor = "multi_thread")]
-async fn are_all_blocked_mixed_then_all_blocked() {
-    let dna_hash = fixt!(DnaHash);
-    let agent_1 = fixt!(AgentPubKey);
-    let agent_2 = fixt!(AgentPubKey);
-    let cell_id_1 = CellId::new(dna_hash.clone(), agent_1.clone());
-    let cell_id_2 = CellId::new(dna_hash.clone(), agent_2.clone());
+mod blocks_impl {
+    use super::*;
 
-    let TestCase {
-        actor,
-        blocks_module,
-    } = TestCase::new(&dna_hash).await;
+    #[tokio::test(flavor = "multi_thread")]
+    async fn block_someone() {
+        let dna_hash = fixt!(DnaHash);
+        let agent = fixt!(AgentPubKey);
+        let cell_id = CellId::new(dna_hash.clone(), agent.clone());
 
-    // Initially not blocked.
-    assert!(!blocks_module
-        .are_all_blocked(vec![
-            kitsune2_api::BlockTarget::Agent(agent_1.to_k2_agent()),
-            kitsune2_api::BlockTarget::Agent(agent_2.to_k2_agent()),
-        ])
-        .await
-        .unwrap());
+        let TestCase {
+            actor,
+            blocks_module,
+        } = TestCase::new(&dna_hash).await;
 
-    // Block agent1 only.
-    actor
-        .block(Block::new(
-            BlockTarget::Cell(cell_id_1, CellBlockReason::BadCrypto),
-            InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::max()).unwrap(),
-        ))
-        .await
-        .unwrap();
+        assert!(!blocks_module
+            .is_blocked(kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()))
+            .await
+            .unwrap());
+        assert!(!blocks_module.are_all_blocked(vec![]).await.unwrap());
+        assert!(!blocks_module
+            .are_all_blocked(vec![kitsune2_api::BlockTarget::Agent(agent.to_k2_agent())])
+            .await
+            .unwrap());
 
-    // Mixed list should yield false.
-    assert!(!blocks_module
-        .are_all_blocked(vec![
-            kitsune2_api::BlockTarget::Agent(agent_1.to_k2_agent()),
-            kitsune2_api::BlockTarget::Agent(agent_2.to_k2_agent()),
-        ])
-        .await
-        .unwrap());
+        // Block an agent.
+        actor
+            .block(Block::new(
+                BlockTarget::Cell(cell_id, CellBlockReason::BadCrypto),
+                InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::max()).unwrap(),
+            ))
+            .await
+            .unwrap();
 
-    // Block agent2 as well.
-    actor
-        .block(Block::new(
-            BlockTarget::Cell(cell_id_2, CellBlockReason::BadCrypto),
-            InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::max()).unwrap(),
-        ))
-        .await
-        .unwrap();
+        // Check agent is blocked now.
+        assert!(blocks_module
+            .is_blocked(kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()))
+            .await
+            .unwrap());
+        assert!(blocks_module
+            .are_all_blocked(vec![kitsune2_api::BlockTarget::Agent(agent.to_k2_agent())])
+            .await
+            .unwrap());
+        // Empty target vector is still not blocked.
+        assert!(!blocks_module.are_all_blocked(vec![]).await.unwrap());
+    }
 
-    // Now all should be blocked.
-    assert!(blocks_module
-        .are_all_blocked(vec![
-            kitsune2_api::BlockTarget::Agent(agent_1.to_k2_agent()),
-            kitsune2_api::BlockTarget::Agent(agent_2.to_k2_agent()),
-        ])
-        .await
-        .unwrap());
-}
+    #[tokio::test(flavor = "multi_thread")]
+    async fn are_all_blocked_mixed_then_all_blocked() {
+        let dna_hash = fixt!(DnaHash);
+        let agent_1 = fixt!(AgentPubKey);
+        let agent_2 = fixt!(AgentPubKey);
+        let cell_id_1 = CellId::new(dna_hash.clone(), agent_1.clone());
+        let cell_id_2 = CellId::new(dna_hash.clone(), agent_2.clone());
 
-#[tokio::test(flavor = "multi_thread")]
-async fn are_all_blocked_with_duplicate_targets() {
-    let dna_hash = fixt!(DnaHash);
-    let agent = fixt!(AgentPubKey);
-    let cell_id = CellId::new(dna_hash.clone(), agent.clone());
+        let TestCase {
+            actor,
+            blocks_module,
+        } = TestCase::new(&dna_hash).await;
 
-    let TestCase {
-        actor,
-        blocks_module,
-    } = TestCase::new(&dna_hash).await;
+        // Initially not blocked.
+        assert!(!blocks_module
+            .are_all_blocked(vec![
+                kitsune2_api::BlockTarget::Agent(agent_1.to_k2_agent()),
+                kitsune2_api::BlockTarget::Agent(agent_2.to_k2_agent()),
+            ])
+            .await
+            .unwrap());
 
-    // Not blocked initially even with duplicates in query.
-    assert!(!blocks_module
-        .are_all_blocked(vec![
-            kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()),
-            kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()),
-            kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()),
-        ])
-        .await
-        .unwrap());
+        // Block agent1 only.
+        actor
+            .block(Block::new(
+                BlockTarget::Cell(cell_id_1, CellBlockReason::BadCrypto),
+                InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::max()).unwrap(),
+            ))
+            .await
+            .unwrap();
 
-    // Block the agent.
-    actor
-        .block(Block::new(
-            BlockTarget::Cell(cell_id, CellBlockReason::BadCrypto),
-            InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::max()).unwrap(),
-        ))
-        .await
-        .unwrap();
+        // Mixed list should yield false.
+        assert!(!blocks_module
+            .are_all_blocked(vec![
+                kitsune2_api::BlockTarget::Agent(agent_1.to_k2_agent()),
+                kitsune2_api::BlockTarget::Agent(agent_2.to_k2_agent()),
+            ])
+            .await
+            .unwrap());
 
-    // Duplicates in the query should still resolve to true once blocked.
-    assert!(blocks_module
-        .are_all_blocked(vec![
-            kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()),
-            kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()),
-        ])
-        .await
-        .unwrap());
-}
+        // Block agent2 as well.
+        actor
+            .block(Block::new(
+                BlockTarget::Cell(cell_id_2, CellBlockReason::BadCrypto),
+                InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::max()).unwrap(),
+            ))
+            .await
+            .unwrap();
 
-#[tokio::test(flavor = "multi_thread")]
-async fn blocking_same_agent_twice_is_ok() {
-    let dna_hash = fixt!(DnaHash);
-    let agent = fixt!(AgentPubKey);
-    let cell_id = CellId::new(dna_hash.clone(), agent.clone());
+        // Now all should be blocked.
+        assert!(blocks_module
+            .are_all_blocked(vec![
+                kitsune2_api::BlockTarget::Agent(agent_1.to_k2_agent()),
+                kitsune2_api::BlockTarget::Agent(agent_2.to_k2_agent()),
+            ])
+            .await
+            .unwrap());
+    }
 
-    let TestCase {
-        actor,
-        blocks_module,
-    } = TestCase::new(&dna_hash).await;
+    #[tokio::test(flavor = "multi_thread")]
+    async fn are_all_blocked_with_duplicate_targets() {
+        let dna_hash = fixt!(DnaHash);
+        let agent = fixt!(AgentPubKey);
+        let cell_id = CellId::new(dna_hash.clone(), agent.clone());
 
-    // First block.
-    actor
-        .block(Block::new(
-            BlockTarget::Cell(cell_id.clone(), CellBlockReason::BadCrypto),
-            InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::max()).unwrap(),
-        ))
-        .await
-        .unwrap();
+        let TestCase {
+            actor,
+            blocks_module,
+        } = TestCase::new(&dna_hash).await;
 
-    // Second block should not error.
-    actor
-        .block(Block::new(
-            BlockTarget::Cell(cell_id, CellBlockReason::App(vec![])),
-            InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::max()).unwrap(),
-        ))
-        .await
-        .unwrap();
+        // Not blocked initially even with duplicates in query.
+        assert!(!blocks_module
+            .are_all_blocked(vec![
+                kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()),
+                kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()),
+                kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()),
+            ])
+            .await
+            .unwrap());
 
-    // Still blocked.
-    assert!(blocks_module
-        .is_blocked(kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()))
-        .await
-        .unwrap());
-}
+        // Block the agent.
+        actor
+            .block(Block::new(
+                BlockTarget::Cell(cell_id, CellBlockReason::BadCrypto),
+                InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::max()).unwrap(),
+            ))
+            .await
+            .unwrap();
 
-// Same conductor DB, but two different DNA hashes.
-#[tokio::test(flavor = "multi_thread")]
-async fn block_is_scoped_per_dna() {
-    let agent = fixt!(AgentPubKey);
-    let dna_hash_1 = fixt!(DnaHash);
-    let dna_hash_2 = fixt!(DnaHash);
-    let cell_id_1 = CellId::new(dna_hash_1.clone(), agent.clone());
+        // Duplicates in the query should still resolve to true once blocked.
+        assert!(blocks_module
+            .are_all_blocked(vec![
+                kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()),
+                kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()),
+            ])
+            .await
+            .unwrap());
+    }
 
-    let conductor_db = test_conductor_db().to_db();
-    let TestCase {
-        actor: actor_1,
-        blocks_module: blocks_module_1,
-    } = TestCase::new_with_conductor_db(&dna_hash_1, conductor_db.clone()).await;
-    let TestCase {
-        blocks_module: blocks_module_2,
-        ..
-    } = TestCase::new_with_conductor_db(&dna_hash_2, conductor_db).await;
+    #[tokio::test(flavor = "multi_thread")]
+    async fn blocking_same_agent_twice_is_ok() {
+        let dna_hash = fixt!(DnaHash);
+        let agent = fixt!(AgentPubKey);
+        let cell_id = CellId::new(dna_hash.clone(), agent.clone());
 
-    // Initially not blocked in either DNA.
-    assert!(!blocks_module_1
-        .is_blocked(kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()))
-        .await
-        .unwrap());
-    assert!(!blocks_module_2
-        .is_blocked(kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()))
-        .await
-        .unwrap());
+        let TestCase {
+            actor,
+            blocks_module,
+        } = TestCase::new(&dna_hash).await;
 
-    // Block in DNA1 only.
-    actor_1
-        .block(Block::new(
-            BlockTarget::Cell(cell_id_1, CellBlockReason::BadCrypto),
-            InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::max()).unwrap(),
-        ))
-        .await
-        .unwrap();
+        // First block.
+        actor
+            .block(Block::new(
+                BlockTarget::Cell(cell_id.clone(), CellBlockReason::BadCrypto),
+                InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::max()).unwrap(),
+            ))
+            .await
+            .unwrap();
 
-    // Blocked in DNA1.
-    assert!(blocks_module_1
-        .is_blocked(kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()))
-        .await
-        .unwrap());
+        // Second block should not error.
+        actor
+            .block(Block::new(
+                BlockTarget::Cell(cell_id, CellBlockReason::App(vec![])),
+                InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::max()).unwrap(),
+            ))
+            .await
+            .unwrap();
 
-    // Still not blocked in DNA2.
-    assert!(!blocks_module_2
-        .is_blocked(kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()))
-        .await
-        .unwrap());
+        // Still blocked.
+        assert!(blocks_module
+            .is_blocked(kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()))
+            .await
+            .unwrap());
+    }
 
-    // All-blocked checks respect DNA scoping too.
-    assert!(blocks_module_1
-        .are_all_blocked(vec![kitsune2_api::BlockTarget::Agent(agent.to_k2_agent())])
-        .await
-        .unwrap());
-    assert!(!blocks_module_2
-        .are_all_blocked(vec![kitsune2_api::BlockTarget::Agent(agent.to_k2_agent())])
-        .await
-        .unwrap());
+    // Same conductor DB, but two different DNA hashes.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn block_is_scoped_per_dna() {
+        let agent = fixt!(AgentPubKey);
+        let dna_hash_1 = fixt!(DnaHash);
+        let dna_hash_2 = fixt!(DnaHash);
+        let cell_id_1 = CellId::new(dna_hash_1.clone(), agent.clone());
+
+        let conductor_db = test_conductor_db().to_db();
+        let TestCase {
+            actor: actor_1,
+            blocks_module: blocks_module_1,
+        } = TestCase::new_with_conductor_db(&dna_hash_1, conductor_db.clone()).await;
+        let TestCase {
+            blocks_module: blocks_module_2,
+            ..
+        } = TestCase::new_with_conductor_db(&dna_hash_2, conductor_db).await;
+
+        // Initially not blocked in either DNA.
+        assert!(!blocks_module_1
+            .is_blocked(kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()))
+            .await
+            .unwrap());
+        assert!(!blocks_module_2
+            .is_blocked(kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()))
+            .await
+            .unwrap());
+
+        // Block in DNA1 only.
+        actor_1
+            .block(Block::new(
+                BlockTarget::Cell(cell_id_1, CellBlockReason::BadCrypto),
+                InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::max()).unwrap(),
+            ))
+            .await
+            .unwrap();
+
+        // Blocked in DNA1.
+        assert!(blocks_module_1
+            .is_blocked(kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()))
+            .await
+            .unwrap());
+
+        // Still not blocked in DNA2.
+        assert!(!blocks_module_2
+            .is_blocked(kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()))
+            .await
+            .unwrap());
+
+        // All-blocked checks respect DNA scoping too.
+        assert!(blocks_module_1
+            .are_all_blocked(vec![kitsune2_api::BlockTarget::Agent(agent.to_k2_agent())])
+            .await
+            .unwrap());
+        assert!(!blocks_module_2
+            .are_all_blocked(vec![kitsune2_api::BlockTarget::Agent(agent.to_k2_agent())])
+            .await
+            .unwrap());
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]

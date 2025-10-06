@@ -1,6 +1,6 @@
 use hdk::prelude::{
-    ChainTopOrdering, CreateInput, EntryDef, EntryDefIndex, EntryVisibility, Op, SerializedBytes,
-    ValidateCallbackResult,
+    CellId, ChainTopOrdering, CreateInput, EntryDef, EntryDefIndex, EntryVisibility, Op,
+    SerializedBytes, ValidateCallbackResult,
 };
 use holo_hash::ActionHash;
 use holochain::{
@@ -118,16 +118,13 @@ async fn warranted_agent_is_blocked() {
     .unwrap();
 
     // Check that Alice is blocked by Bob.
+    let target = hdk::prelude::BlockTargetId::Cell(CellId::new(
+        dna_hash.clone(),
+        alice.agent_pubkey().clone(),
+    ));
     assert!(conductors[1]
         .holochain_p2p()
-        .test_kitsune()
-        .space(dna_hash.to_k2_space())
-        .await
-        .unwrap()
-        .blocks()
-        .is_blocked(kitsune2_api::BlockTarget::Agent(
-            alice.agent_pubkey().to_k2_agent()
-        ))
+        .is_blocked(target)
         .await
         .unwrap());
 }
