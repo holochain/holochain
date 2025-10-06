@@ -10,6 +10,7 @@ use holo_hash::*;
 use holochain_nonce::Nonce256Bits;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_sqlite::rusqlite;
+use holochain_sqlite::rusqlite::types::Null;
 use holochain_sqlite::rusqlite::{named_params, params, OptionalExtension};
 use holochain_sqlite::rusqlite::{Row, Transaction};
 use holochain_sqlite::sql::sql_conductor;
