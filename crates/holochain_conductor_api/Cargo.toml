@@ -1,6 +1,6 @@
 [package]
 name = "holochain_conductor_api"
-version = "0.6.0-dev.25"
+version = "0.6.0-dev.27"
 description = "Message types for Holochain admin and app interface protocols"
 license = "Apache-2.0"
 repository = "https://github.com/holochain/holochain"
@@ -17,7 +17,7 @@ holo_hash = { version = "^0.6.0-dev.15", path = "../holo_hash", features = [
 ] }
 holochain_state_types = { version = "^0.6.0-dev.16", path = "../holochain_state_types" }
 holochain_serialized_bytes = "=0.0.56"
-holochain_types = { version = "^0.6.0-dev.25", path = "../holochain_types" }
+holochain_types = { version = "^0.6.0-dev.27", path = "../holochain_types" }
 holochain_zome_types = { version = "^0.6.0-dev.19", path = "../holochain_zome_types" }
 holochain_util = { version = "^0.6.0-dev.4", default-features = false, path = "../holochain_util", features = [
   "jsonschema",

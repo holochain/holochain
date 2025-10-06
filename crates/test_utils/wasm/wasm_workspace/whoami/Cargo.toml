@@ -3,6 +3,7 @@ name = "test_wasm_whoami"
 version = "0.0.1"
 authors = ["thedavidmeister", "thedavidmeister@gmail.com"]
 edition = "2021"
+publish = false
 
 [lib]
 name = "test_wasm_whoami"

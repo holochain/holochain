@@ -3,6 +3,7 @@ name = "test_wasm_coordinator_zome_update"
 version = "0.0.1"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
+publish = false
 
 [lib]
 name = "test_wasm_coordinator_zome_update"
