@@ -305,7 +305,6 @@ async fn app_validation_workflow_inner(
                             tracing::warn!("Error writing warrant op: {err}");
                         }
 
-                        #[cfg(feature = "unstable-functions")]
                         match InclusiveTimestampInterval::try_new(
                             Timestamp::now(),
                             Timestamp::max(),
