@@ -350,14 +350,36 @@ async fn sys_validation_workflow_inner(
     #[cfg(feature = "unstable-warrants")]
     {
         let mut warrants = vec![];
-        for chain_op in _invalid_ops.iter().filter_map(|op| op.1.as_chain_op()) {
+        for (op_hash, chain_op) in _invalid_ops
+            .into_iter()
+            .filter_map(|(h, op)| op.as_chain_op().map(|op| (h, op.clone())))
+        {
+            match holochain_state::warrant::is_action_warranted_as_invalid(
+                &workspace.dht_db,
+                chain_op.action().to_hash(),
+                chain_op.author().clone(),
+            )
+            .await
+            {
+                Ok(true) => {
+                    tracing::trace!(
+                        "Op {} is already warranted, not issuing a new warrant",
+                        op_hash
+                    );
+                    continue;
+                }
+                Ok(false) => {
+                    // Not warranted yet, should issue a warrant.
+                }
+                Err(e) => {
+                    tracing::error!(error = ?e, "Error checking if op is warranted");
+                    continue;
+                }
+            }
+
             let warrant_op =
-                crate::core::workflow::sys_validation_workflow::make_invalid_chain_warrant_op(
-                    &_keystore,
-                    _representative_agent.clone(),
-                    chain_op,
-                )
-                .await?;
+                make_invalid_chain_warrant_op(&_keystore, _representative_agent.clone(), &chain_op)
+                    .await?;
             warrants.push(warrant_op);
         }
 

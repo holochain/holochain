@@ -38,6 +38,11 @@ pub mod sql_cell {
             include_str!("sql/cell/state_dump/dht_ops_in_validation_limbo.sql");
         pub const DHT_OPS_ROW_ID: &str = include_str!("sql/cell/state_dump/dht_ops_row_id.sql");
     }
+
+    pub mod warrant {
+        pub const SELECT_BY_TYPE_AND_WARRANTEE: &str =
+            include_str!("sql/cell/warrant/select_by_type_and_warrantee.sql");
+    }
 }
 
 pub mod sql_dht {
