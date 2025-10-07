@@ -110,9 +110,7 @@ async fn get_ops_to_validate(
     db.read_async(move |txn| {
         let mut stmt = txn.prepare(&sql)?;
         let r = stmt.query_and_then([], |row| {
-            let op = WorkflowResult::Ok(holochain_state::query::map_sql_dht_op(
-                true, "dht_type", row,
-            )?)?;
+            let op = holochain_state::query::map_sql_dht_op(true, "dht_type", row)?;
             let hash = row.get("dht_hash")?;
             Ok(DhtOpHashed::with_pre_hashed(op, hash))
         })?;

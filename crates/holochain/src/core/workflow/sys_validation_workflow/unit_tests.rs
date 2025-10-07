@@ -348,7 +348,7 @@ async fn validate_valid_warrant_with_cached_dependency() {
         .unwrap();
 
     let warrant_op = test_case
-        .create_and_store_warrant(
+        .create_and_sign_warrant(
             &warranted_action,
             &warrant_agent,
             holochain_zome_types::op::ChainOpType::StoreRecord,
@@ -427,7 +427,7 @@ async fn validate_valid_warrant_with_fetched_dependency() {
     test_case.with_network_behaviour(network);
 
     let warrant_op = test_case
-        .create_and_store_warrant(
+        .create_and_sign_warrant(
             &warranted_action,
             &warrant_agent,
             holochain_zome_types::op::ChainOpType::StoreRecord,
@@ -508,7 +508,7 @@ async fn reject_invalid_warrant() {
 
     // Invalid warrant against a valid action
     let warrant_op = test_case
-        .create_and_store_warrant(
+        .create_and_sign_warrant(
             &valid_action,
             &bad_warrant_agent,
             holochain_zome_types::op::ChainOpType::StoreRecord,
@@ -625,7 +625,7 @@ async fn validate_warrant_with_validated_dependency() {
 
     // Invalid warrant against a valid action
     let warrant_op = test_case
-        .create_and_store_warrant(
+        .create_and_sign_warrant(
             &valid_action,
             &bad_warrant_agent,
             holochain_zome_types::op::ChainOpType::StoreRecord,
@@ -741,7 +741,7 @@ impl TestCase {
     }
 
     #[cfg(feature = "unstable-warrants")]
-    async fn create_and_store_warrant(
+    async fn create_and_sign_warrant(
         &self,
         warranted_action: &SignedActionHashed,
         issuing_agent: &AgentPubKey,
