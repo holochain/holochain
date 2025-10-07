@@ -24,7 +24,7 @@
 #![warn(missing_docs)]
 
 use crate::error::CascadeError;
-use crate::authority::get_agent_activity_query::must_get_agent_activity::{get_filtered_agent_activity, get_filtered_agent_activity_from_scratch, merge_agent_activity, merge_warrants, exclude_forked_activity, is_activity_complete};
+use crate::authority::get_agent_activity_query::must_get_agent_activity::{get_filtered_agent_activity, get_filtered_agent_activity_from_scratch, merge_agent_activity, merge_warrants, exclude_forked_activity, is_activity_complete, is_activity_chained};
 use error::CascadeResult;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
@@ -929,8 +929,9 @@ impl CascadeImpl {
             }
 
             // If activity list does not contain the full sequence of activity
-            // from start of filtered range through end, then it is incomplete
-            else if !is_activity_complete(&merged_activity) {
+            // from start of filtered range through end, or if the sequence activity
+            // is not hash-chained, then it is incomplete.
+            else if !is_activity_complete(&merged_activity) || !is_activity_chained(&merged_activity) {
                 MustGetAgentActivityResponse::IncompleteChain
             }
 

@@ -45,8 +45,9 @@ pub async fn must_get_agent_activity(
         }
 
         // If activity list does not contain the full sequence of activity
-        // from start of the filtered range through end, then it is incomplete.
-        else if !is_activity_complete(&activity) {
+        // from start of filtered range through end, or if the sequence activity
+        // is not hash-chained, then it is incomplete.
+        else if !is_activity_complete(&activity) || !is_activity_chained(&activity) {
             MustGetAgentActivityResponse::IncompleteChain
         }
 
@@ -226,10 +227,18 @@ pub(crate) fn exclude_forked_activity(activity: &mut Vec<RegisterAgentActivity>)
     activity.retain(|a| activity_seqs.insert(a.action.seq()));
 }
 
-/// Compare the complete set of Action sequence numbers to the set included in this lis of RegisterAgentActivity
+/// Compare the complete set of Action sequence numbers to the set included in this list of RegisterAgentActivity
 pub(crate) fn is_activity_complete(activity: &Vec<RegisterAgentActivity>) -> bool {
     let complete_seqs: HashSet<u32> = (activity[0].action.seq()..=activity[activity.len() - 1].action.seq()).into_iter().collect();
     let found_seqs: HashSet<u32> = activity.iter().map(|a| a.action.seq()).collect();
 
     found_seqs == complete_seqs
+}
+
+pub(crate) fn is_activity_chained(activity: &Vec<RegisterAgentActivity>) -> bool {
+    activity
+        .windows(2)
+        .all(|window|
+            window[1].action.prev_hash() == Some(&window[0].action.hashed.hash)
+        )
 }
