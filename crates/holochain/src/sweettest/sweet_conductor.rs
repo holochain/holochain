@@ -1005,14 +1005,17 @@ impl SweetConductor {
                 let mut stmt = txn.prepare(
                     "
                     SELECT
-                    DhtOp.hash as hash, DhtOp.type as dht_type, DhtOp.validation_status,
-                    Action.blob as action_blob, Entry.blob as entry_blob
-                    FROM DhtOp
-                    JOIN Action ON Action.hash = DhtOp.action_hash
-                    LEFT JOIN Entry ON Entry.hash = Action.entry_hash
-                    WHERE DhtOp.when_integrated IS NOT NULL
-                    AND DhtOp.validation_status = :status
-                    ORDER BY DhtOp.when_integrated ASC
+                        DhtOp.hash as hash, DhtOp.type as dht_type, DhtOp.validation_status,
+                        Action.blob as action_blob, Entry.blob as entry_blob
+                    FROM
+                        DhtOp
+                        JOIN Action ON Action.hash = DhtOp.action_hash
+                        LEFT JOIN Entry ON Entry.hash = Action.entry_hash
+                    WHERE
+                        DhtOp.when_integrated IS NOT NULL
+                        AND DhtOp.validation_status = :status
+                    ORDER BY
+                        DhtOp.when_integrated ASC
                 ",
                 )?;
                 let rows = stmt.query_map(
