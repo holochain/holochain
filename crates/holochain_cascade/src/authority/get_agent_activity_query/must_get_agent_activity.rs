@@ -229,6 +229,10 @@ pub(crate) fn exclude_forked_activity(activity: &mut Vec<RegisterAgentActivity>)
 
 /// Compare the complete set of Action sequence numbers to the set included in this list of RegisterAgentActivity
 pub(crate) fn is_activity_complete(activity: &Vec<RegisterAgentActivity>) -> bool {
+    if activity.len() <= 1 {
+        return true;
+    }
+    
     let complete_seqs: HashSet<u32> = (activity[0].action.seq()..=activity[activity.len() - 1].action.seq()).into_iter().collect();
     let found_seqs: HashSet<u32> = activity.iter().map(|a| a.action.seq()).collect();
 
@@ -236,6 +240,10 @@ pub(crate) fn is_activity_complete(activity: &Vec<RegisterAgentActivity>) -> boo
 }
 
 pub(crate) fn is_activity_chained(activity: &Vec<RegisterAgentActivity>) -> bool {
+    if activity.len() <= 1 {
+        return true;
+    }
+    
     activity
         .windows(2)
         .all(|window|
