@@ -250,6 +250,10 @@ impl HolochainP2pDnaT for PassThroughNetwork {
     fn chc(&self) -> Option<ChcImpl> {
         None
     }
+
+    async fn block(&self, _block: Block) -> HolochainP2pResult<()> {
+        todo!()
+    }
 }
 
 /// Insert ops directly into the database and mark integrated as valid

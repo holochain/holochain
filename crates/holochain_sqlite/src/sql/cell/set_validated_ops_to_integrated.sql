@@ -9,4 +9,5 @@ WHERE
 RETURNING
   hash,
   basis_hash,
+  type,
   authored_timestamp
