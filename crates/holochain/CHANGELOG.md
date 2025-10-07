@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Avoid issuing duplicate warrants for invalid actions during sys validation by checking for existing warrants before creating new ones. #5337
 - **BREAKING CHANGE** Removed unused public SQL queries from `holochain_sqlite`:
   - `ACTIVITY_INTEGRATED_UPPER_BOUND`
   - `ALL_ACTIVITY_AUTHORS`
