@@ -7,6 +7,8 @@ use holochain_types::test_utils::chain::*;
 use isotest::Iso;
 use std::sync::Arc;
 use test_case::test_case;
+use ::fixt::fixt;
+use crate::fixt::ActionHashFixturator;
 
 #[test_case(
     agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[8]))
@@ -157,4 +159,268 @@ async fn test_responses(
     must_get_agent_activity(db.clone().into(), agent.clone(), filter)
         .await
         .unwrap()
+}
+
+/// Helper function to create a RegisterAgentActivity
+fn create_activity(seq: u32) -> RegisterAgentActivity {
+    let mut create = fixt!(Create);
+    create.action_seq = seq;
+
+    RegisterAgentActivity {
+        action: SignedHashed::new_unchecked(
+            Action::Create(create.clone()), 
+            fixt!(Signature)
+        ),
+        cached_entry: None,
+    }
+}
+
+/// Helper function to create a WarrantOp
+fn create_warrant_op() -> WarrantOp {
+    let author = fake_agent_pub_key(0);
+    Signed::new(
+        Warrant::new_now(
+            WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp { 
+                action_author: author.clone(),
+                action: (fixt!(ActionHash), fixt!(Signature)),
+                chain_op_type: ChainOpType::RegisterAddLink, 
+            }), 
+        fake_agent_pub_key(1),
+            author,
+        ),
+        fixt!(Signature)
+    ).into()
+}
+
+#[test_case(
+    vec![
+        create_activity(0),
+        create_activity(1),
+        create_activity(2)
+    ]
+    => true ; "Complete sequence 0-2")]
+#[test_case(
+    vec![
+        create_activity(0),
+        create_activity(2)
+    ]
+    => false ; "Missing sequence number 1")]
+#[test_case(
+    vec![
+        create_activity(0)
+    ]
+    => true ; "Single activity")]
+fn test_is_activity_complete(activity: Vec<RegisterAgentActivity>) -> bool {
+    is_activity_complete(&activity)
+}
+
+/// Helper function to create a RegisterAgentActivity with specific hash and prev_action
+fn create_activity_with_prev(seq: u32, hash: ActionHash, prev: ActionHash) -> RegisterAgentActivity {
+    let mut create = fixt!(Create);
+    create.action_seq = seq;
+    create.prev_action = prev;
+
+    RegisterAgentActivity {
+        action: SignedActionHashed::with_presigned(
+            ActionHashed::with_pre_hashed(Action::Create(create), hash),
+            fixt!(Signature)
+        ),
+        cached_entry: None,
+    }
+}
+
+#[test]
+fn is_activity_chained_valid_chain() {
+    let hash0 = action_hash(&[0]);
+    let hash1 = action_hash(&[1]);
+    let hash2 = action_hash(&[2]);
+
+    let activity = vec![
+        create_activity_with_prev(0, hash0.clone(), action_hash(&[4])),
+        create_activity_with_prev(1, hash1.clone(), hash0.clone()),
+        create_activity_with_prev(2, hash2.clone(), hash1.clone()),
+    ];
+
+    assert!(is_activity_chained(&activity));
+}
+
+#[test]
+fn is_activity_chained_bad_prev_hash() {
+    let hash0 = action_hash(&[0]);
+    let hash1 = action_hash(&[1]);
+    let hash2 = action_hash(&[2]);
+    let hash_wrong = action_hash(&[99]);
+
+    let activity = vec![
+        create_activity_with_prev(0, hash0.clone(), action_hash(&[100])),
+        create_activity_with_prev(1, hash1.clone(), hash0.clone()),
+        create_activity_with_prev(2, hash2.clone(), hash_wrong), // Broken chain
+    ];
+
+    assert!(!is_activity_chained(&activity));
+}
+
+#[test]
+fn is_activity_chained_single() {
+    let hash0 = action_hash(&[0]);
+    let activity = vec![
+        create_activity_with_prev(0, hash0, action_hash(&[5])),
+    ];
+
+    assert!(is_activity_chained(&activity));
+}
+
+#[test]
+fn is_activity_chained_empty() {
+    let activity: Vec<RegisterAgentActivity> = vec![];
+
+    assert!(is_activity_chained(&activity));
+}
+
+#[test]
+fn exclude_forked_activity_removes_duplicate_seqs() {
+    // Construct duplicate activity
+    let mut create = fixt!(Create);
+    create.action_seq = 1;
+    let fork_activity_first = RegisterAgentActivity {
+        action: SignedHashed::new_unchecked(
+            Action::Create(create.clone()), 
+            fixt!(Signature)
+        ),
+        cached_entry: None,
+    };
+
+    let mut activity = vec![
+        create_activity(0),
+        fork_activity_first.clone(),
+        create_activity(1),  // Fork at seq 1
+        create_activity(2),
+    ];
+    exclude_forked_activity(&mut activity);
+
+    assert_eq!(activity.len(), 3);
+
+    // Removes duplicate seqs
+    let seqs: Vec<u32> = activity.iter().map(|a| a.action.seq()).collect();
+    assert_eq!(seqs, vec![0, 1, 2]);
+
+    // Retains first occurance of duplicate seq
+    assert_eq!(activity[1].action.hashed.hash, fork_activity_first.action.hashed.hash);
+}
+
+#[test]
+fn exclude_forked_activity_multiple_forks() {
+    let mut activity = vec![
+        create_activity(0),
+        create_activity(1),
+        create_activity(1), // Fork at seq 1
+        create_activity(2),
+        create_activity(2), // Fork at seq 2
+        create_activity(2), // Another fork at seq 2
+        create_activity(3),
+    ];
+    exclude_forked_activity(&mut activity);
+
+    assert_eq!(activity.len(), 4);
+    let seqs: Vec<u32> = activity.iter().map(|a| a.action.seq()).collect();
+    assert_eq!(seqs, vec![0, 1, 2, 3]);
+}
+
+#[test]
+fn exclude_forked_activity_no_forks() {
+    let mut activity = vec![
+        create_activity(0),
+        create_activity(1),
+        create_activity(2),
+    ];
+    let original_len = activity.len();
+    exclude_forked_activity(&mut activity);
+
+    assert_eq!(activity.len(), original_len);
+}
+
+#[test]
+fn merge_agent_activity_deduplicates() {
+    let duplicate_activity = create_activity(1);
+
+    let activity1 = vec![
+        create_activity(0),
+        duplicate_activity.clone(),
+    ];
+    let activity2 = vec![
+        duplicate_activity, // Duplicate
+        create_activity(2),
+    ];
+    let activity3 = vec![
+        create_activity(3),
+    ];
+
+    let merged = merge_agent_activity(vec![activity1, activity2, activity3]);
+
+    assert_eq!(merged.len(), 4);
+    let seqs: Vec<u32> = merged.iter().map(|a| a.action.seq()).collect();
+    assert_eq!(seqs, vec![0, 1, 2, 3]);
+}
+
+#[test]
+fn merge_agent_activity_empty_lists() {
+    let merged = merge_agent_activity(vec![vec![], vec![], vec![]]);
+    assert_eq!(merged.len(), 0);
+}
+
+#[test]
+fn merge_warrants_deduplicates() {
+    let warrant1 = create_warrant_op();
+    let warrant2 = create_warrant_op();
+
+    let warrants1 = vec![warrant1.clone(), warrant2.clone()];
+    let warrants2 = vec![warrant2.clone(), create_warrant_op()];
+
+    let merged = merge_warrants(vec![warrants1, warrants2]);
+
+    assert_eq!(merged.len(), 3);
+    assert_eq!(merged[0].to_hash(), warrant1.to_hash());
+    assert_eq!(merged[1].to_hash(), warrant2.to_hash());
+}
+
+#[test]
+fn merge_warrants_empty_lists() {
+    let merged = merge_warrants(vec![vec![], vec![], vec![]]);
+    assert_eq!(merged.len(), 0);
+}
+
+#[test]
+fn merge_warrants_single_list() {
+    let warrant = create_warrant_op();
+    let warrants = vec![warrant.clone()];
+
+    let merged = merge_warrants(vec![warrants]);
+
+    assert_eq!(merged.len(), 1);
+    assert_eq!(merged[0].to_hash(), warrant.to_hash());
+}
+
+#[test]
+fn flatten_deduplicate_merges_and_removes_duplicates() {
+    let list1 = vec!["a".to_string(), "b".to_string()];
+    let list2 = vec!["b".to_string(), "c".to_string()];
+    let list3 = vec!["d".to_string()];
+
+    let result = flatten_deduplicate(vec![list1, list2, list3], |s| s.clone());
+
+    assert_eq!(result.len(), 4);
+    assert_eq!(result, vec!["a", "b", "c", "d"]);
+}
+
+#[test]
+fn flatten_deduplicate_preserves_first_occurrence() {
+    let list1 = vec![(1, "first"), (2, "a")];
+    let list2 = vec![(1, "second"), (3, "b")]; // (1, "second") should be filtered out
+
+    let result = flatten_deduplicate(vec![list1, list2], |(id, _)| *id);
+
+    assert_eq!(result.len(), 3);
+    assert_eq!(result[0], (1, "first")); // First occurrence kept
+    assert_eq!(result[1], (2, "a"));
+    assert_eq!(result[2], (3, "b"));
 }
