@@ -304,16 +304,19 @@ async fn validation_callback_awaiting_deps_agent_activity() {
             assert_eq!(author, alice);
             assert_eq!(&filter.chain_top, expected_chain_top.as_hash());
 
-            Ok(vec![MustGetAgentActivityResponse::activity(vec![
-                RegisterAgentActivity {
-                    action: create_action_signed_hashed.clone(),
-                    cached_entry: None,
-                },
-                RegisterAgentActivity {
-                    action: delete_action_signed_hashed.clone(),
-                    cached_entry: None,
-                },
-            ])])
+            Ok(vec![MustGetAgentActivityResponse::Activity {
+                activity: vec![
+                    RegisterAgentActivity {
+                        action: create_action_signed_hashed.clone(),
+                        cached_entry: None,
+                    },
+                    RegisterAgentActivity {
+                        action: delete_action_signed_hashed.clone(),
+                        cached_entry: None,
+                    },
+                ],
+                warrants: vec![],
+            }])
         }
     });
     let network = Arc::new(network);

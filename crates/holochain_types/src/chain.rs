@@ -17,24 +17,6 @@ mod test;
 mod chain_item;
 pub use chain_item::*;
 
-/// Helpers for constructing AgentActivity
-pub trait AgentActivityExt {
-    /// Create an empty chain status
-    fn empty<T>(agent: &AgentPubKey) -> AgentActivityResponse {
-        AgentActivityResponse {
-            agent: agent.clone(),
-            valid_activity: ChainItems::NotRequested,
-            rejected_activity: ChainItems::NotRequested,
-            status: ChainStatus::Empty,
-            // TODO: Add the actual highest observed in a follow up PR
-            highest_observed: None,
-            warrants: vec![],
-        }
-    }
-}
-
-impl AgentActivityExt for AgentActivityResponse {}
-
 /// Iterate over a source chain and apply the [`ChainFilter`] to each element.
 /// This iterator will:
 /// - Ignore any ops that are not a direct ancestor to the starting position.
