@@ -20,6 +20,15 @@ pub fn must_get_agent_activity(
     input: MustGetAgentActivityInput,
 ) -> Result<Vec<RegisterAgentActivity>, RuntimeError> {
     tracing::debug!("begin must_get_agent_activity");
+
+    // Check that input ChainFilter is valid
+    if input.chain_filter.get_take() == Some(0) {
+        let MustGetAgentActivityInput { author, chain_filter } = input;
+        return Err(wasm_error!(WasmErrorInner::Host(format!(
+            "must_get_agent_activity chain has produced an invalid range because the range is empty for author {author} and filter {chain_filter:?}"
+        ))).into());
+    }
+
     let ret = match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             read_workspace_deterministic: Permission::Allow,
@@ -104,11 +113,6 @@ pub fn must_get_agent_activity(
                     (ChainTopNotFound(missing_action), _) => Err(wasm_error!(WasmErrorInner::Host(format!(
                         "must_get_agent_activity is missing action {} for author {} and filter {:?}",
                         missing_action, author, chain_filter
-                    )))
-                    .into()),
-                    (EmptyRange, _) => Err(wasm_error!(WasmErrorInner::Host(format!(
-                        "must_get_agent_activity chain has produced an invalid range because the range is empty for author {} and filter {:?}",
-                        author, chain_filter
                     )))
                     .into()),
                 };

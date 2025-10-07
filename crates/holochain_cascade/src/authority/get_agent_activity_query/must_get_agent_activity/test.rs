@@ -143,9 +143,6 @@ async fn returns_full_sequence_from_filter(
 #[test_case(
     agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[8])).until_hash(action_hash(&[9]))
     => matches MustGetAgentActivityResponse::Activity { .. }; "Until is higher then chain_top")]
-#[test_case(
-    agent_chain(&[(0, 0..2)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[1])).take(0)
-    => MustGetAgentActivityResponse::EmptyRange; "Take nothing produces an empty range")]
 /// Check the query returns the appropriate responses.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_responses(
