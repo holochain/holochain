@@ -24,6 +24,7 @@
 #![warn(missing_docs)]
 
 use crate::error::CascadeError;
+use crate::authority::get_agent_activity_query::must_get_agent_activity::{get_filtered_agent_activity, get_filtered_agent_activity_from_scratch, merge_agent_activity, merge_warrants, exclude_forked_activity, is_activity_complete};
 use error::CascadeResult;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
@@ -882,50 +883,82 @@ impl CascadeImpl {
         let mut txn_guards = self.get_txn_guards().await?;
         let scratch = self.scratch.clone();
 
-        // For each store try to get the bounded activity.
-        let bounded_responses = tokio::task::spawn_blocking({
+        // Get the filtered activity and warrants from each db store.
+        let (mut activity_lists, warrants_lists) = tokio::task::spawn_blocking({
             let author = author.clone();
             let filter = filter.clone();
             move || {
-                let mut results = Vec::with_capacity(txn_guards.len() + 1);
+                let mut activity = Vec::with_capacity(txn_guards.len() + 1);
+                let mut warrants = Vec::with_capacity(txn_guards.len() + 1);
+
                 for txn_guard in &mut txn_guards {
                     let txn = txn_guard.transaction()?;
-                    let r = match &scratch {
-                        Some(scratch) => {
-                            scratch.apply_and_then(|scratch| {
-                                authority::get_agent_activity_query::must_get_agent_activity::get_bounded_activity(&txn, Some(scratch), &author, filter.clone())
-                            })?
-                        }
-                        None => authority::get_agent_activity_query::must_get_agent_activity::get_bounded_activity(&txn, None, &author, filter.clone())?
-                    };
-                    results.push(r);
+
+                    let r = get_filtered_agent_activity(&txn, &author, filter.clone())?;
+                    activity.push(r);
+
+                    // TODO: check valid should be *true* for Dht DB, *false* for author DB. Insane.
+                    let w = CascadeTxnWrapper::from(&txn).get_warrants_for_agent(&author, true)?;
+                    warrants.push(w);
                 }
-                CascadeResult::Ok(results)
+
+                CascadeResult::Ok((activity, warrants))
             }
         })
-            .await??;
+        .await??;
 
-        let merged_bounded_response =
-            holochain_types::chain::merge_bounded_agent_activity_responses(bounded_responses);
-        let merged_response: MustGetAgentActivityResponse = merged_bounded_response.into();
+        // If Scratch store is available, get the filtered activity from it.
+        // Warrants are never written to Scratch.
+        if let Some(scratch) = scratch {
+            let activity_list_from_scratch = scratch.apply_and_then(|scratch| {
+                get_filtered_agent_activity_from_scratch(scratch, &author, filter.clone())
+            })?;
+            activity_lists.push(activity_list_from_scratch);
+        }
+
+        // Merge and deduplicate retrieved activity lists
+        let mut merged_activity = merge_agent_activity(activity_lists);
+            
+        // Remove forked activity from activity list
+        exclude_forked_activity(&mut merged_activity);
+
+        let result = 
+            // If no activity was returned, then we never found the chain top hash specified by the filter.
+            if merged_activity.len() == 0 {
+               MustGetAgentActivityResponse::ChainTopNotFound(filter.chain_top.clone())
+            }
+
+            // If activity list does not contain the full sequence of activity
+            // from start of filtered range through end, then it is incomplete
+            else if !is_activity_complete(&merged_activity) {
+                MustGetAgentActivityResponse::IncompleteChain
+            }
+
+            // Otherwise, activity is complete
+            else {
+                // Merge and deduplicate retrieved warrants lists
+                let merged_warrants = merge_warrants(warrants_lists);
+
+                MustGetAgentActivityResponse::Activity {
+                    activity: merged_activity,
+                    warrants: merged_warrants,
+                }
+            };
 
         // If we have a success result, return it
-        if matches!(
-            merged_response,
-            MustGetAgentActivityResponse::Activity { .. }
-                | MustGetAgentActivityResponse::EmptyRange
-        ) {
-            Ok(merged_response)
-        }
-        // Otherwise, if we are an authority then return whatever failure response we have,
-        // without trying to fetch from the network.
+        if matches!(result, MustGetAgentActivityResponse::Activity { .. }) {
+            return Ok(result);
+        } 
+        
+        // Otherwise, if we are an authority, return the failure result we have
         else if self.am_i_an_authority(author.clone().into()).await? {
-            return Ok(merged_response);
+            return Ok(result)
         }
-        // Otherwise, try to fetch from the network.
+
+        // Otherwise, try to fetch from the network
         else {
-            Ok(self
-                .fetch_must_get_agent_activity(author.clone(), filter)
+            return Ok(self
+                .fetch_must_get_agent_activity(author.clone(), filter.clone())
                 .await?)
         }
     }
