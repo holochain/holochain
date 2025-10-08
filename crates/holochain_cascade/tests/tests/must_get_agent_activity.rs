@@ -109,8 +109,6 @@ async fn test_must_get_agent_activity_inner(
     author: AgentPubKey,
     filter: ChainFilter,
 ) -> MustGetAgentActivityResponse {
-    tracing::error!("test_must_get_agent_activity_inner 1");
-
     let Data {
         scratch,
         authored,
