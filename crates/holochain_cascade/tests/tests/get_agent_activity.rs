@@ -1,4 +1,3 @@
-use holo_hash::AgentPubKey;
 use holochain_cascade::error::CascadeResult;
 use holochain_cascade::test_utils::*;
 use holochain_cascade::CascadeImpl;
@@ -6,12 +5,13 @@ use holochain_p2p::actor::GetActivityOptions;
 use holochain_sqlite::db::DbKindCache;
 use holochain_sqlite::db::DbKindDht;
 use holochain_state::prelude::*;
-use holochain_types::test_utils::chain::*;
 #[cfg(feature = "unstable-warrants")]
 use {
     holo_hash::fixt::{ActionHashFixturator, AgentPubKeyFixturator},
     holochain_state::integrate::insert_locally_validated_op,
 };
+#[cfg(feature = "unstable-warrants")]
+use holo_hash::AgentPubKey;
 
 macro_rules! assert_agent_activity_responses_eq {
     ($expected:expr, $actual:expr) => {
