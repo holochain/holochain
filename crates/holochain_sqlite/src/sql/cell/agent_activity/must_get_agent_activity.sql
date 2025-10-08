@@ -30,7 +30,7 @@ WHERE
 -- Optionally, Action sequence numbers must be greater than or equal to the sequence number of the Action with a hash matching ChainFilter `LimitCondition::UntilHash`
 AND 
     IIF(
-        :chain_filter_limit_conditions_until_hashes IS NOT NULL,
+        :chain_filter_limit_conditions_until_hashes_max_seq IS NOT NULL,
         Action.seq >= :chain_filter_limit_conditions_until_hashes_max_seq,
         1=1
     ) 
