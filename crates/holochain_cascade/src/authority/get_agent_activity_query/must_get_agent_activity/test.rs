@@ -230,51 +230,66 @@ fn create_activity_with_prev(seq: u32, hash: ActionHash, prev: ActionHash) -> Re
 }
 
 #[test]
-fn is_activity_chained_valid_chain() {
+fn is_activity_chained_decsending_valid_chain() {
     let hash0 = action_hash(&[0]);
     let hash1 = action_hash(&[1]);
     let hash2 = action_hash(&[2]);
 
     let activity = vec![
-        create_activity_with_prev(0, hash0.clone(), action_hash(&[4])),
-        create_activity_with_prev(1, hash1.clone(), hash0.clone()),
         create_activity_with_prev(2, hash2.clone(), hash1.clone()),
+        create_activity_with_prev(1, hash1.clone(), hash0.clone()),
+        create_activity_with_prev(0, hash0.clone(), action_hash(&[4])),
     ];
 
-    assert!(is_activity_chained(&activity));
+    assert!(is_activity_chained_descending(&activity));
 }
 
 #[test]
-fn is_activity_chained_bad_prev_hash() {
+fn is_activity_chained_descending_single() {
+    let hash0 = action_hash(&[0]);
+    let activity = vec![
+        create_activity_with_prev(0, hash0, action_hash(&[5])),
+    ];
+
+    assert!(is_activity_chained_descending(&activity));
+}
+
+#[test]
+fn is_activity_chained_descending_empty() {
+    let activity: Vec<RegisterAgentActivity> = vec![];
+
+    assert!(is_activity_chained_descending(&activity));
+}
+
+#[test]
+fn is_activity_chained_descending_wrong_prev_hash() {
     let hash0 = action_hash(&[0]);
     let hash1 = action_hash(&[1]);
     let hash2 = action_hash(&[2]);
     let hash_wrong = action_hash(&[99]);
 
     let activity = vec![
-        create_activity_with_prev(0, hash0.clone(), action_hash(&[100])),
-        create_activity_with_prev(1, hash1.clone(), hash0.clone()),
-        create_activity_with_prev(2, hash2.clone(), hash_wrong), // Broken chain
+        create_activity_with_prev(2, hash2.clone(), hash1.clone()),
+        create_activity_with_prev(1, hash1.clone(), hash_wrong), // Broken chain
+        create_activity_with_prev(0, hash0.clone(), action_hash(&[4])),
     ];
 
-    assert!(!is_activity_chained(&activity));
+    assert!(!is_activity_chained_descending(&activity));
 }
 
 #[test]
-fn is_activity_chained_single() {
+fn is_activity_chained_descending_wrong_order() {
     let hash0 = action_hash(&[0]);
+    let hash1 = action_hash(&[1]);
+    let hash2 = action_hash(&[2]);
+
     let activity = vec![
-        create_activity_with_prev(0, hash0, action_hash(&[5])),
+        create_activity_with_prev(0, hash0.clone(), action_hash(&[4])),
+        create_activity_with_prev(0, hash0.clone(), action_hash(&[4])),
+        create_activity_with_prev(2, hash2.clone(), hash1.clone()),
     ];
 
-    assert!(is_activity_chained(&activity));
-}
-
-#[test]
-fn is_activity_chained_empty() {
-    let activity: Vec<RegisterAgentActivity> = vec![];
-
-    assert!(is_activity_chained(&activity));
+    assert!(!is_activity_chained_descending(&activity));
 }
 
 #[test]
@@ -322,7 +337,9 @@ fn exclude_forked_activity_multiple_forks() {
     exclude_forked_activity(&mut activity);
 
     assert_eq!(activity.len(), 4);
+
     let seqs: Vec<u32> = activity.iter().map(|a| a.action.seq()).collect();
+
     assert_eq!(seqs, vec![0, 1, 2, 3]);
 }
 
@@ -333,33 +350,137 @@ fn exclude_forked_activity_no_forks() {
         create_activity(1),
         create_activity(2),
     ];
-    let original_len = activity.len();
     exclude_forked_activity(&mut activity);
 
-    assert_eq!(activity.len(), original_len);
+    assert_eq!(activity.len(), 3);
+}
+
+
+#[test]
+fn exclude_forked_activity_single_element() {
+    let mut activity = vec![
+        create_activity(0),
+    ];
+    exclude_forked_activity(&mut activity);
+
+    assert_eq!(activity.len(), 1);
+}
+
+
+#[test]
+fn exclude_forked_activity_empty() {
+    let mut activity = vec![];
+    exclude_forked_activity(&mut activity);
+
+    assert_eq!(activity.len(), 0);
+}
+
+#[test]
+fn flatten_deduplicate_sort_merges() {
+    let list1 = vec!["a".to_string(), "b".to_string()];
+    let list2 = vec!["c".to_string(), "d".to_string()];
+    let list3 = vec!["e".to_string(), "f".to_string()];
+
+    let result = flatten_deduplicate_sort(vec![list1, list2, list3], |s| s.clone());
+
+    assert_eq!(result, vec!["a", "b", "c", "d", "e", "f"]);
+}
+
+#[test]
+fn flatten_deduplicate_sort_merges_and_sorts() {
+    let list1 = vec!["c".to_string(), "d".to_string()];
+    let list2 = vec!["f".to_string(), "e".to_string()];
+    let list3 = vec!["b".to_string(), "a".to_string()];
+
+    let result = flatten_deduplicate_sort(vec![list1, list2, list3], |s| s.clone());
+
+    assert_eq!(result, vec!["a", "b", "c", "d", "e", "f"]);
+}
+
+#[test]
+fn flatten_deduplicate_sort_merges_sorts_deduplicates() {
+    let list1 = vec!["q".to_string(), "d".to_string()];
+    let list2 = vec!["f".to_string(), "e".to_string()];
+    let list3 = vec!["b".to_string(), "q".to_string()];
+
+    let result = flatten_deduplicate_sort(vec![list1, list2, list3], |s| s.clone());
+
+    assert_eq!(result, vec!["b", "d", "e", "f", "q"]);
 }
 
 #[test]
 fn merge_agent_activity_deduplicates() {
     let duplicate_activity = create_activity(1);
 
-    let activity1 = vec![
+    let source1 = vec![
         create_activity(0),
         duplicate_activity.clone(),
     ];
-    let activity2 = vec![
+    let source2: Vec<RegisterAgentActivity> = vec![
         duplicate_activity, // Duplicate
         create_activity(2),
     ];
-    let activity3 = vec![
+    let source3 = vec![
         create_activity(3),
     ];
 
-    let merged = merge_agent_activity(vec![activity1, activity2, activity3]);
+    let merged = merge_agent_activity(vec![source1, source2, source3]);
 
     assert_eq!(merged.len(), 4);
+    
     let seqs: Vec<u32> = merged.iter().map(|a| a.action.seq()).collect();
-    assert_eq!(seqs, vec![0, 1, 2, 3]);
+    assert_eq!(seqs, vec![3, 2, 1, 0]);
+}
+
+#[test]
+fn merge_agent_activity_deduplicates_multiple() {
+    let duplicate_activity = create_activity(1);
+    let duplicate_activity2 = create_activity(4);
+
+    let source1 = vec![
+        create_activity(0),
+        duplicate_activity.clone(),
+        duplicate_activity2.clone(),
+    ];
+    let source2 = vec![
+        duplicate_activity.clone(), // Duplicate
+        duplicate_activity2.clone(), // Duplicate 2
+        create_activity(2),
+    ];
+    let source3 = vec![
+        create_activity(3),
+        duplicate_activity2, // Duplicate 2
+    ];
+
+    let merged = merge_agent_activity(vec![source1, source2, source3]);
+
+    assert_eq!(merged.len(), 5);
+    
+    let seqs: Vec<u32> = merged.iter().map(|a| a.action.seq()).collect();
+    assert_eq!(seqs, vec![4, 3, 2, 1, 0]);
+}
+
+#[test]
+fn merge_agent_activity_sorts_by_action_seq_descending() {
+    let source1 = vec![
+        create_activity(9),
+        create_activity(4),
+        create_activity(25),
+    ];
+    let source2: Vec<RegisterAgentActivity> = vec![
+        create_activity(15),
+    ];
+    let source3 = vec![
+        create_activity(2),
+        create_activity(7),
+        create_activity(8),
+        create_activity(10),
+    ];
+
+    let merged = merge_agent_activity(vec![source1, source2, source3]);
+
+    let action_seqs: Vec<u32> = merged.iter().map(|a| a.action.seq()).collect();
+    assert_eq!(action_seqs, vec![25, 15, 10, 9, 8, 7, 4, 2]);
 }
 
 #[test]
@@ -373,14 +494,52 @@ fn merge_warrants_deduplicates() {
     let warrant1 = create_warrant_op();
     let warrant2 = create_warrant_op();
 
-    let warrants1 = vec![warrant1.clone(), warrant2.clone()];
-    let warrants2 = vec![warrant2.clone(), create_warrant_op()];
+    let source1 = vec![warrant1.clone(), warrant2.clone()];
+    let source2 = vec![warrant2.clone(), create_warrant_op()];
 
-    let merged = merge_warrants(vec![warrants1, warrants2]);
+    let merged = merge_warrants(vec![source1, source2]);
 
+    // Deduplicated
     assert_eq!(merged.len(), 3);
-    assert_eq!(merged[0].to_hash(), warrant1.to_hash());
-    assert_eq!(merged[1].to_hash(), warrant2.to_hash());
+
+    // Duplicate warrant only occurs once
+    assert_eq!(merged.iter().filter(|w| w.to_hash() == warrant2.to_hash()).collect::<Vec<_>>().len(), 1);
+}
+
+#[test]
+fn merge_warrants_deduplicates_multiple() {
+    let warrant1 = create_warrant_op();
+    let warrant2 = create_warrant_op();
+    let warrant3 = create_warrant_op();
+
+    let source1 = vec![warrant1.clone(), warrant2.clone()];
+    let source2 = vec![warrant2.clone(), create_warrant_op(), warrant3.clone()];
+    let source3 = vec![warrant3.clone(), create_warrant_op()];
+
+    let merged = merge_warrants(vec![source1, source2, source3]);
+
+    // Deduplicated
+    assert_eq!(merged.len(), 5);
+
+    // Duplicate warrants only occurs once
+    assert_eq!(merged.iter().filter(|w| w.to_hash() == warrant2.to_hash()).collect::<Vec<_>>().len(), 1);
+    assert_eq!(merged.iter().filter(|w| w.to_hash() == warrant3.to_hash()).collect::<Vec<_>>().len(), 1);
+}
+
+#[test]
+fn merge_warrants_sorts_by_warrant_hash_ascending() {
+
+    let source1 = vec![create_warrant_op(), create_warrant_op(), create_warrant_op()];
+    let source2 = vec![create_warrant_op(), create_warrant_op(), create_warrant_op(), create_warrant_op()];
+    let source3 = vec![create_warrant_op(), create_warrant_op()];
+
+    let merged = merge_warrants(vec![source1, source2, source3]);
+
+    // Sorted by hash
+    let mut merged_sorted = merged.clone();
+    merged_sorted.sort_unstable_by_key(|w| w.to_hash());
+
+    assert_eq!(merged, merged_sorted);
 }
 
 #[test]
@@ -398,29 +557,4 @@ fn merge_warrants_single_list() {
 
     assert_eq!(merged.len(), 1);
     assert_eq!(merged[0].to_hash(), warrant.to_hash());
-}
-
-#[test]
-fn flatten_deduplicate_merges_and_removes_duplicates() {
-    let list1 = vec!["a".to_string(), "b".to_string()];
-    let list2 = vec!["b".to_string(), "c".to_string()];
-    let list3 = vec!["d".to_string()];
-
-    let result = flatten_deduplicate(vec![list1, list2, list3], |s| s.clone());
-
-    assert_eq!(result.len(), 4);
-    assert_eq!(result, vec!["a", "b", "c", "d"]);
-}
-
-#[test]
-fn flatten_deduplicate_preserves_first_occurrence() {
-    let list1 = vec![(1, "first"), (2, "a")];
-    let list2 = vec![(1, "second"), (3, "b")]; // (1, "second") should be filtered out
-
-    let result = flatten_deduplicate(vec![list1, list2], |(id, _)| *id);
-
-    assert_eq!(result.len(), 3);
-    assert_eq!(result[0], (1, "first")); // First occurrence kept
-    assert_eq!(result[1], (2, "a"));
-    assert_eq!(result[2], (3, "b"));
 }
