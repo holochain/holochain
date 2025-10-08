@@ -221,11 +221,6 @@ pub fn insert_op_when(
     let signature = op.signature().clone();
     let op_order = OpOrder::new(op_type, op.timestamp());
 
-    #[cfg(not(feature = "unstable-warrants"))]
-    let create_op = true;
-    #[cfg(feature = "unstable-warrants")]
-    let mut create_op = true;
-
     match op {
         DhtOp::ChainOp(op) => {
             let action = op.action();
@@ -243,25 +238,22 @@ pub fn insert_op_when(
             #[cfg(feature = "unstable-warrants")]
             {
                 let warrant = (***_warrant_op).clone();
-                let inserted = insert_warrant(txn, warrant)?;
-                if inserted == 0 {
-                    create_op = false;
-                }
+                insert_warrant(txn, warrant)?;
             }
         }
     }
-    if create_op {
-        insert_op_lite_when(
-            txn,
-            &op_lite,
-            hash,
-            &op_order,
-            &timestamp,
-            serialized_size,
-            transfer_data,
-            when_stored,
-        )?;
-    }
+
+    insert_op_lite_when(
+        txn,
+        &op_lite,
+        hash,
+        &op_order,
+        &timestamp,
+        serialized_size,
+        transfer_data,
+        when_stored,
+    )?;
+
     Ok(())
 }
 
@@ -744,29 +736,14 @@ pub fn insert_warrant(txn: &mut Transaction, warrant: SignedWarrant) -> StateMut
     let timestamp = warrant.timestamp;
     let warrantee = warrant.warrantee.clone();
 
-    // Don't produce a warrant if one, of any kind, already exists for the warrantee.
-    // TODO: If warrants were permanent, this would relieve peers from having to store a possibly endless
-    // number of warrants for an agent. However, warrants may be redeemable at some stage, which is when
-    // there needs to be a different check performed here.
-    // TODO: Move this check to the calling function.
-    let exists = txn
-        .prepare_cached("SELECT 1 FROM Warrant WHERE warrantee = :warrantee")?
-        .exists(named_params! {
-            ":warrantee": warrantee,
-        })?;
-
-    Ok(if !exists {
-        sql_insert!(txn, Warrant, {
-            "hash": hash,
-            "author": author,
-            "timestamp": timestamp,
-            "warrantee": warrantee,
-            "type": warrant_type,
-            "blob": to_blob(&warrant)?,
-        })?
-    } else {
-        0
-    })
+    Ok(sql_insert!(txn, Warrant, {
+        "hash": hash,
+        "author": author,
+        "timestamp": timestamp,
+        "warrantee": warrantee,
+        "type": warrant_type,
+        "blob": to_blob(&warrant)?,
+    })?)
 }
 
 /// Insert a [`Action`] into the database.
