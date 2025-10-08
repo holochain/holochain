@@ -1,0 +1,12 @@
+[package]
+name = "spam_detection"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+hdk = { path = "../../../hdk" }
+holochain_zome_types = { path = "../../../holochain_zome_types" }
+
