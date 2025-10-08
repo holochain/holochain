@@ -24,7 +24,7 @@
 #![warn(missing_docs)]
 
 use crate::error::CascadeError;
-use crate::authority::get_agent_activity_query::must_get_agent_activity::{get_filtered_agent_activity, get_filtered_agent_activity_from_scratch, merge_agent_activity, merge_warrants, exclude_forked_activity, is_activity_complete_descending, is_activity_chained_descending};
+use crate::authority::get_agent_activity_query::must_get_agent_activity::{exclude_forked_activity, get_action_seq, get_action_seq_from_scratch, get_filtered_agent_activity, get_filtered_agent_activity_from_scratch, is_activity_chained_descending, is_activity_complete_descending, merge_agent_activity, merge_warrants};
 use error::CascadeResult;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
@@ -879,14 +879,52 @@ impl CascadeImpl {
         author: AgentPubKey,
         filter: ChainFilter,
     ) -> CascadeResult<MustGetAgentActivityResponse> {
-        // Get the available databases.
-        let mut txn_guards = self.get_txn_guards().await?;
-        let scratch = self.scratch.clone();
+        // Get the seq of the ChainFilter.chain_top Action
+        // We must try every database and Scratch because it may only be stored in one.
+        // Once the Action is found, break.
+        let mut maybe_chain_top_action_seq = None;
+
+        // Try to find chain top action in Scratch
+        if let Some(scratch) = self.scratch.clone() {
+            maybe_chain_top_action_seq = scratch.apply_and_then(|scratch|
+                get_action_seq_from_scratch(scratch, &author, &filter.chain_top)
+            )?;
+        }
+
+        // If not found in Scratch, try to find in dbs. Break once found.
+        if maybe_chain_top_action_seq.is_none() {
+            maybe_chain_top_action_seq = tokio::task::spawn_blocking({
+                let mut txn_guards = self.get_txn_guards().await?;
+                let author = author.clone();
+                let chain_top = filter.chain_top.clone();
+                move || {
+                    for txn_guard in &mut txn_guards {
+                        let txn = txn_guard.transaction()?;
+                        let res = get_action_seq(&txn, &author, &chain_top)?;
+                        tracing::error!("db res {:?}", res);
+                        if res.is_some() {
+                            return CascadeResult::Ok(res)
+                        }
+                    }
+
+                    CascadeResult::Ok(None)
+                }
+            })
+            .await??;
+        }
+
+        // If chain top action seq was not found, return ChainTopNotFound
+        let chain_top_action_seq = if let Some(seq) = maybe_chain_top_action_seq {
+            seq
+        } else {
+            return Ok(MustGetAgentActivityResponse::ChainTopNotFound(filter.chain_top));
+        };
 
         // Get the filtered activity and warrants from each db store.
         let (mut activity_lists, warrants_lists) = tokio::task::spawn_blocking({
             let author = author.clone();
             let filter = filter.clone();
+            let mut txn_guards = self.get_txn_guards().await?;
             move || {
                 let mut activity = Vec::with_capacity(txn_guards.len() + 1);
                 let mut warrants = Vec::with_capacity(txn_guards.len() + 1);
@@ -894,7 +932,7 @@ impl CascadeImpl {
                 for txn_guard in &mut txn_guards {
                     let txn = txn_guard.transaction()?;
 
-                    let r = get_filtered_agent_activity(&txn, &author, filter.clone())?;
+                    let r = get_filtered_agent_activity(&txn, &author, filter.clone(), chain_top_action_seq)?;
                     activity.push(r);
 
                     // TODO: check valid should be *true* for Dht DB, *false* for author DB. Insane.
@@ -909,7 +947,7 @@ impl CascadeImpl {
 
         // If Scratch store is available, get the filtered activity from it.
         // Warrants are never written to Scratch.
-        if let Some(scratch) = scratch {
+        if let Some(scratch) = self.scratch.clone() {
             let activity_list_from_scratch = scratch.apply_and_then(|scratch| {
                 get_filtered_agent_activity_from_scratch(scratch, &author, filter.clone())
             })?;
@@ -918,7 +956,7 @@ impl CascadeImpl {
 
         // Merge and deduplicate retrieved activity lists
         let mut merged_activity = merge_agent_activity(activity_lists);
-            
+
         // Remove forked activity from activity list
         exclude_forked_activity(&mut merged_activity);
 
@@ -932,15 +970,10 @@ impl CascadeImpl {
         }
 
         let result = 
-            // If no activity was returned, then we never found the chain top hash specified by the filter.
-            if merged_activity.len() == 0 {
-               MustGetAgentActivityResponse::ChainTopNotFound(filter.chain_top.clone())
-            }
-
             // If activity list does not contain the full sequence of activity
-            // from start of filtered range through end, or if the sequence activity
-            // is not hash-chained, then it is incomplete.
-            else if !is_activity_complete_descending(&merged_activity) || !is_activity_chained_descending(&merged_activity) {
+            // from start of filtered range through end, it is incomplete.
+            // Or, if the activity list is not hash-chained, it is incomplete.
+            if !is_activity_complete_descending(&merged_activity) || !is_activity_chained_descending(&merged_activity) {
                 MustGetAgentActivityResponse::IncompleteChain
             }
 

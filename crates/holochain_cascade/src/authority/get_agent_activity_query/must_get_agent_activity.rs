@@ -25,12 +25,29 @@ pub async fn must_get_agent_activity(
     author: AgentPubKey,
     filter: ChainFilter,
 ) -> StateQueryResult<MustGetAgentActivityResponse> {
+    let maybe_chain_top_action_seq = env
+        .read_async({
+            let filter = filter.clone();
+            let author = author.clone();
+
+            move |txn| get_action_seq(txn, &author, &filter.chain_top)
+        })
+        .await?;
+
+    // If chain top action seq was not found, return ChainTopNotFound
+    let chain_top_action_seq = if let Some(seq) = maybe_chain_top_action_seq {
+        seq
+    } else {
+        return Ok(MustGetAgentActivityResponse::ChainTopNotFound(filter.chain_top));
+    };
+
+
     let activity = env
         .read_async({
             let filter = filter.clone();
             let author = author.clone();
 
-            move |txn| get_filtered_agent_activity(txn, &author, filter)
+            move |txn| get_filtered_agent_activity(txn, &author, filter, chain_top_action_seq)
         })
         .await?;
 
@@ -39,16 +56,10 @@ pub async fn must_get_agent_activity(
     // The sql query itself already excludes forked actions.
 
     let result = 
-        // If no activity was returned, then we never found the chain top hash specified by the filter.
-        if activity.len() == 0 {
-            let chain_top = filter.clone().chain_top;
-            MustGetAgentActivityResponse::ChainTopNotFound(chain_top)
-        }
-
         // If activity list does not contain the full sequence of activity
         // from start of filtered range through end, or if the sequence activity
         // is not hash-chained, then it is incomplete.
-        else if !is_activity_complete_descending(&activity) || !is_activity_chained_descending(&activity) {
+        if !is_activity_complete_descending(&activity) || !is_activity_chained_descending(&activity) {
             MustGetAgentActivityResponse::IncompleteChain
         }
 
@@ -66,6 +77,51 @@ pub async fn must_get_agent_activity(
     Ok(result)
 }
 
+/// Get the ChainFilter chain_top Action seq from a database
+/// If not found, returns Ok(None)
+pub(crate) fn get_action_seq(
+    txn: &Transaction,
+    author: &AgentPubKey,
+    action_hash: &ActionHash
+) -> StateQueryResult<Option<u32>> {
+    let maybe_chain_top_action_seq: Option<u32> = txn
+        .prepare("
+            SELECT 
+                Action.seq as seq
+            FROM
+                Action
+                JOIN DhtOp ON DhtOp.action_hash = Action.hash
+            WHERE
+                Action.hash = :action_hash
+                AND Action.author = :author
+                AND DhtOp.type = :op_type_register_agent_activity
+                AND DhtOp.when_integrated IS NOT NULL
+        ")?
+        .query_row(
+            named_params! {
+                ":author": author,
+                ":action_hash": action_hash,
+                ":op_type_register_agent_activity": ChainOpType::RegisterAgentActivity,
+            },
+            |row| row.get::<&str, u32>("seq")
+        )
+        .optional()?;
+
+    Ok(maybe_chain_top_action_seq)
+}
+
+/// Get the ChainFilter chain_top Action seq from Scratch
+/// If not found, returns Ok(None)
+pub(crate) fn get_action_seq_from_scratch(
+    scratch: &mut Scratch,
+    author: &AgentPubKey,
+    action_hash: &ActionHash,
+) -> StateQueryResult<Option<u32>> {
+    match scratch.actions().find(|a| a.action().author() == author && &a.hashed.hash == action_hash) {
+        Some(chain_top_action) => Ok(Some(chain_top_action.seq())),
+        None => Ok(None)
+    }
+}
 
 /// Get the agent activity for a given range of actions from the Scratch.
 /// Note that Scratch actions should always be more recently created than database actions
@@ -118,7 +174,6 @@ pub(crate) fn get_filtered_agent_activity_from_scratch(
         },
         None => Ok(vec![])
     }
-    
 }
 
 /// Get the agent activity for a given range of actions from the database.
@@ -126,40 +181,8 @@ pub(crate) fn get_filtered_agent_activity(
     txn: &Transaction,
     author: &AgentPubKey,
     filter: ChainFilter,
+    filter_chain_top_action_seq: u32,
 ) -> StateQueryResult<Vec<RegisterAgentActivity>> {
-    // Get chain top Action seq
-    // This is necessary so we can premptively check that the maximum until hash Action seq is less than or equal to the chain top Action seq.
-    // And then return an invalid input error.
-    let maybe_chain_top_action_seq: Option<u32> = txn
-        .prepare("
-            SELECT 
-                Action.seq
-            FROM
-                Action
-                JOIN DhtOp ON DhtOp.action_hash = Action.hash
-            WHERE
-                Action.hash = :chain_top_action_hash
-                AND Action.author = :author
-                AND DhtOp.type = :op_type_register_agent_activity
-                AND DhtOp.when_integrated IS NOT NULL
-        ")?
-        .query_row(
-            named_params! {
-                ":author": author,
-                ":op_type_register_agent_activity": ChainOpType::RegisterAgentActivity,
-                ":chain_top_action_hash": filter.chain_top,
-            },
-            |row| row.get::<&str, u32>("seq")
-        )
-        .optional()?;
-
-    // If chain top not found, return empty activity
-    let chain_top_action_seq = if let Some(value) = maybe_chain_top_action_seq {
-        value
-    } else {
-        return Ok(vec![]);
-    };
-
     // Get the max action seq of all Actions in the set of until hashes.
     let chain_filter_limit_conditions_until_hashes_max_seq = if let Some(filter_hashes) = filter.get_until_hash() {
         // Construct sql query with placeholders for list elements
@@ -202,7 +225,7 @@ pub(crate) fn get_filtered_agent_activity(
 
     // Until hash Action seq must be less than or equal to ChainFilter chain_top Action seq
     if let Some(until_action_seq) = chain_filter_limit_conditions_until_hashes_max_seq {
-        if until_action_seq > chain_top_action_seq {
+        if until_action_seq > filter_chain_top_action_seq {
             return Err(StateQueryError::InvalidInput("The largest ChainFilter until hash Action seq must be less than or equal to the ChainFilter chain_top action seq.".to_string()));
         }
     }
@@ -214,7 +237,7 @@ pub(crate) fn get_filtered_agent_activity(
             named_params! {
                 ":author": author,
                 ":op_type_register_agent_activity": ChainOpType::RegisterAgentActivity,
-                ":chain_filter_chain_top": filter.chain_top,
+                ":chain_filter_chain_top_action_seq": filter_chain_top_action_seq,
                 ":chain_filter_limit_conditions_until_hashes_max_seq": chain_filter_limit_conditions_until_hashes_max_seq,
                 ":chain_filter_limit_conditions_until_timestamp": filter.get_until_timestamp(),
                 ":chain_filter_limit_conditions_take": filter.get_take(),
