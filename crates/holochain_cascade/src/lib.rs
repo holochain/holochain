@@ -922,6 +922,15 @@ impl CascadeImpl {
         // Remove forked activity from activity list
         exclude_forked_activity(&mut merged_activity);
 
+        // Apply ChainFilter take to the merged result.
+        //
+        // The take limit was already applied in each db query,
+        // but if a db result had skipped any Action sequences,
+        // then the merged result may still have a length larger than the desired take limit.
+        if let Some(take) = filter.get_take() {
+            merged_activity.truncate(take as usize);
+        }
+
         let result = 
             // If no activity was returned, then we never found the chain top hash specified by the filter.
             if merged_activity.len() == 0 {
