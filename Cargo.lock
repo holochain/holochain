@@ -2626,7 +2626,6 @@ dependencies = [
  "async-once-cell",
  "async-trait",
  "base64 0.22.1",
- "base64ct",
  "bytes",
  "cfg-if",
  "chrono",
