@@ -95,6 +95,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
     - `records_from_actions_and_entries`
   - `holochain_util`
     - `run_on`
+- Test: Test that blocks are enforced for network get requests and publish.
 
 ## 0.6.0-dev.27
 
