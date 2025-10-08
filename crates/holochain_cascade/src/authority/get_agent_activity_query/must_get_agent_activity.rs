@@ -174,7 +174,10 @@ pub(crate) fn get_filtered_agent_activity(
 ) -> StateQueryResult<Vec<RegisterAgentActivity>> {
     // Get the max action seq of all Actions in the set of until hashes.
     let chain_filter_limit_conditions_until_hashes_max_seq = if let Some(filter_hashes) = filter.get_until_hash() {
-        // Construct sql query with placeholders for list elements
+        // Construct sql query with placeholders for list elements.
+        //
+        // We cannot keep this sql query in a standalone file,
+        // because at compile-time we don't know how many '?' placeholders to include.
         let filter_hashes_placeholder = filter_hashes.iter().map(|_| "?").collect::<Vec<&str>>().join(", ");
         let sql_query_seq_hash_in_set = format!("
             SELECT
