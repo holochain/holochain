@@ -341,49 +341,47 @@ async fn get_from_blocked_agent_fails() {
     let dna_hash = DnaHash::from_raw_32(vec![0xaa; 32]);
     let keystore_1 = test_keystore();
     let keystore_2 = test_keystore();
-    let TestCase { actor: actor_1, .. } = TestCase::new_with_keystore(&dna_hash, &keystore_1).await;
-    let TestCase { actor: actor_2, .. } = TestCase::new_with_keystore(&dna_hash, &keystore_2).await;
-    let agent_1 = keystore_1.new_sign_keypair_random().await.unwrap();
-    let agent_2 = keystore_2.new_sign_keypair_random().await.unwrap();
-    actor_1
-        .join(dna_hash.clone(), agent_1.clone(), None)
+    let TestCase { actor: alice, .. } = TestCase::new_with_keystore(&dna_hash, &keystore_1).await;
+    let TestCase { actor: bob, .. } = TestCase::new_with_keystore(&dna_hash, &keystore_2).await;
+    let alice_pubkey = keystore_1.new_sign_keypair_random().await.unwrap();
+    let bob_pubkey = keystore_2.new_sign_keypair_random().await.unwrap();
+    alice
+        .join(dna_hash.clone(), alice_pubkey.clone(), None)
         .await
         .unwrap();
-    actor_2
-        .join(dna_hash.clone(), agent_2.clone(), None)
+    bob.join(dna_hash.clone(), bob_pubkey.clone(), None)
         .await
         .unwrap();
-    actor_2.test_set_full_arcs(dna_hash.to_k2_space()).await;
+    bob.test_set_full_arcs(dna_hash.to_k2_space()).await;
 
     // Exchange peer infos to accelerate bootstrapping.
     tokio::time::timeout(Duration::from_secs(10), async {
         loop {
-            let maybe_agent_info_1 = actor_1
+            let maybe_agent_info_1 = alice
                 .peer_store(dna_hash.clone())
                 .await
                 .unwrap()
-                .get(agent_1.to_k2_agent())
+                .get(alice_pubkey.to_k2_agent())
                 .await
                 .unwrap();
-            let maybe_agent_info_2 = actor_2
+            let maybe_agent_info_2 = bob
                 .peer_store(dna_hash.clone())
                 .await
                 .unwrap()
-                .get(agent_2.to_k2_agent())
+                .get(bob_pubkey.to_k2_agent())
                 .await
                 .unwrap();
             if let (Some(agent_info_1), Some(agent_info_2)) =
                 (maybe_agent_info_1, maybe_agent_info_2)
             {
-                actor_1
+                alice
                     .peer_store(dna_hash.clone())
                     .await
                     .unwrap()
                     .insert(vec![agent_info_2])
                     .await
                     .unwrap();
-                actor_2
-                    .peer_store(dna_hash.clone())
+                bob.peer_store(dna_hash.clone())
                     .await
                     .unwrap()
                     .insert(vec![agent_info_1])
@@ -397,15 +395,13 @@ async fn get_from_blocked_agent_fails() {
     .await
     .unwrap();
 
-    let response = actor_1
-        .get(dna_hash.clone(), fixt!(ActionHash).into())
-        .await;
+    let response = alice.get(dna_hash.clone(), fixt!(ActionHash).into()).await;
     assert!(response.is_ok());
 
-    actor_1
+    alice
         .block(Block::new(
             BlockTarget::Cell(
-                CellId::new(dna_hash.clone(), agent_2.clone()),
+                CellId::new(dna_hash.clone(), bob_pubkey.clone()),
                 CellBlockReason::BadCrypto,
             ),
             InclusiveTimestampInterval::try_new(
@@ -422,28 +418,7 @@ async fn get_from_blocked_agent_fails() {
     // peer 1's peer store. That isn't possible, however, because the peer store
     // implementation internally discards blocked agents when inserting.
 
-    // Attempt to insert the blocked agent into peer1's peer store anyway, even though
-    // it will not be successful.
-    let agent_info_2 = actor_2
-        .peer_store(dna_hash.clone())
-        .await
-        .unwrap()
-        .get(agent_2.to_k2_agent())
-        .await
-        .unwrap()
-        .expect("peer 2 must be present in peer store");
-
-    actor_1
-        .peer_store(dna_hash.clone())
-        .await
-        .unwrap()
-        .insert(vec![agent_info_2])
-        .await
-        .unwrap();
-
-    let response = actor_1
-        .get(dna_hash.clone(), fixt!(ActionHash).into())
-        .await;
+    let response = alice.get(dna_hash.clone(), fixt!(ActionHash).into()).await;
     assert!(matches!(
         response,
         Err(HolochainP2pError::NoPeersForLocation(_, _))
