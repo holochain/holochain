@@ -2487,7 +2487,7 @@ dependencies = [
  "holochain_types",
  "holochain_util",
  "kitsune2_api",
- "kitsune2_bootstrap_client",
+ "kitsune2_bootstrap_client 0.3.0-dev.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "kitsune2_core",
  "once_cell",
  "ratatui",
@@ -2901,8 +2901,8 @@ dependencies = [
  "indexmap 2.11.1",
  "kitsune2_api",
  "kitsune2_core",
- "kitsune2_gossip",
- "kitsune2_transport_tx5",
+ "kitsune2_gossip 0.3.0-dev.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "kitsune2_transport_tx5 0.3.0-dev.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "matches",
  "pretty_assertions",
  "rmp-serde",
@@ -3039,7 +3039,7 @@ dependencies = [
  "kitsune2",
  "kitsune2_api",
  "kitsune2_core",
- "kitsune2_gossip",
+ "kitsune2_gossip 0.3.0-dev.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "kitsune2_test_utils",
  "lair_keystore_api",
  "mockall",
@@ -4111,22 +4111,20 @@ dependencies = [
 [[package]]
 name = "kitsune2"
 version = "0.3.0-dev.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7914a4e8d048ffba9762ace3e58fef73b0a68b5e4b2c3c57100ec549402dfd1e"
+source = "git+https://github.com/holochain/kitsune2#b989553f385ca263f689245b11501ca9b06e306f"
 dependencies = [
  "bytes",
  "kitsune2_api",
  "kitsune2_core",
- "kitsune2_gossip",
- "kitsune2_transport_tx5",
+ "kitsune2_gossip 0.3.0-dev.3 (git+https://github.com/holochain/kitsune2)",
+ "kitsune2_transport_tx5 0.3.0-dev.3 (git+https://github.com/holochain/kitsune2)",
  "serde",
 ]
 
 [[package]]
 name = "kitsune2_api"
 version = "0.3.0-dev.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43ae0f0bbfed0be8a204c5c2e624286d7eba020aaa390b69929ecfdc114ac3fe"
+source = "git+https://github.com/holochain/kitsune2#b989553f385ca263f689245b11501ca9b06e306f"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -4144,6 +4142,20 @@ name = "kitsune2_bootstrap_client"
 version = "0.3.0-dev.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "654e72d9cef55e8cc31600022b0dad0ef86b73cf98d5fe60a4285fb503cd0028"
+dependencies = [
+ "base64 0.22.1",
+ "kitsune2_api",
+ "serde",
+ "serde_json",
+ "tracing",
+ "ureq 3.1.2",
+ "url",
+]
+
+[[package]]
+name = "kitsune2_bootstrap_client"
+version = "0.3.0-dev.3"
+source = "git+https://github.com/holochain/kitsune2#b989553f385ca263f689245b11501ca9b06e306f"
 dependencies = [
  "base64 0.22.1",
  "kitsune2_api",
@@ -4183,14 +4195,13 @@ dependencies = [
 [[package]]
 name = "kitsune2_core"
 version = "0.3.0-dev.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b8b09e18aa0d40837e716f52dee69131f29159f02683f348377db0e78eae9d9"
+source = "git+https://github.com/holochain/kitsune2#b989553f385ca263f689245b11501ca9b06e306f"
 dependencies = [
  "bytes",
  "ed25519-dalek",
  "futures",
  "kitsune2_api",
- "kitsune2_bootstrap_client",
+ "kitsune2_bootstrap_client 0.3.0-dev.3 (git+https://github.com/holochain/kitsune2)",
  "prost",
  "rand 0.8.5",
  "schemars 0.9.0",
@@ -4213,6 +4224,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "kitsune2_dht"
+version = "0.3.0-dev.3"
+source = "git+https://github.com/holochain/kitsune2#b989553f385ca263f689245b11501ca9b06e306f"
+dependencies = [
+ "bytes",
+ "kitsune2_api",
+ "tracing",
+]
+
+[[package]]
 name = "kitsune2_gossip"
 version = "0.3.0-dev.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4222,10 +4243,29 @@ dependencies = [
  "futures",
  "kitsune2_api",
  "kitsune2_core",
- "kitsune2_dht",
+ "kitsune2_dht 0.3.0-dev.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "prost",
  "rand 0.8.5",
  "schemars 0.9.0",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "kitsune2_gossip"
+version = "0.3.0-dev.3"
+source = "git+https://github.com/holochain/kitsune2#b989553f385ca263f689245b11501ca9b06e306f"
+dependencies = [
+ "bytes",
+ "futures",
+ "kitsune2_api",
+ "kitsune2_core",
+ "kitsune2_dht 0.3.0-dev.3 (git+https://github.com/holochain/kitsune2)",
+ "prost",
+ "rand 0.8.5",
  "serde",
  "serde_json",
  "thiserror 2.0.17",
@@ -4259,6 +4299,22 @@ dependencies = [
  "bytes",
  "kitsune2_api",
  "schemars 0.9.0",
+ "serde",
+ "tokio",
+ "tracing",
+ "tx5",
+ "tx5-core 0.8.0",
+ "url",
+]
+
+[[package]]
+name = "kitsune2_transport_tx5"
+version = "0.3.0-dev.3"
+source = "git+https://github.com/holochain/kitsune2#b989553f385ca263f689245b11501ca9b06e306f"
+dependencies = [
+ "base64 0.22.1",
+ "bytes",
+ "kitsune2_api",
  "serde",
  "tokio",
  "tracing",
