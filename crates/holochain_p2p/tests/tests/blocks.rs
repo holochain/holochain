@@ -373,10 +373,9 @@ mod blocks_impl {
     }
 }
 
+// Alice blocks Bob and makes a get request that fails.
 #[tokio::test(flavor = "multi_thread")]
-async fn get_from_blocked_agent_fails() {
-    test_run();
-
+async fn get_to_blocked_agent_fails() {
     let dna_hash = DnaHash::from_raw_32(vec![0xaa; 32]);
     let keystore_1 = test_keystore();
     let keystore_2 = test_keystore();
@@ -437,6 +436,7 @@ async fn get_from_blocked_agent_fails() {
     .await
     .unwrap();
 
+    // Before the block Alice can make get request and Bob answers them.
     let response = alice.get(dna_hash.clone(), fixt!(ActionHash).into()).await;
     assert!(
         response.is_ok(),
@@ -463,11 +463,100 @@ async fn get_from_blocked_agent_fails() {
     // peer 1's peer store. That isn't possible, however, because the peer store
     // implementation internally discards blocked agents when inserting.
 
+    // Alice makes a get request. Bob is blocked, so there should be no one to respond.
     let response = alice.get(dna_hash.clone(), fixt!(ActionHash).into()).await;
     assert!(matches!(
         response,
         Err(HolochainP2pError::NoPeersForLocation(_, _))
     ));
+}
+
+// Alice blocks Bob and Bob makes a get request that fails.
+#[tokio::test(flavor = "multi_thread")]
+async fn get_by_blocked_agent_fails() {
+    let dna_hash = DnaHash::from_raw_32(vec![0xaa; 32]);
+    let keystore_1 = test_keystore();
+    let keystore_2 = test_keystore();
+    let TestCase { actor: alice, .. } = TestCase::new_with_keystore(&dna_hash, &keystore_1).await;
+    let TestCase { actor: bob, .. } = TestCase::new_with_keystore(&dna_hash, &keystore_2).await;
+    let alice_pubkey = keystore_1.new_sign_keypair_random().await.unwrap();
+    let bob_pubkey = keystore_2.new_sign_keypair_random().await.unwrap();
+    alice
+        .join(dna_hash.clone(), alice_pubkey.clone(), None)
+        .await
+        .unwrap();
+    bob.join(dna_hash.clone(), bob_pubkey.clone(), None)
+        .await
+        .unwrap();
+    alice.test_set_full_arcs(dna_hash.to_k2_space()).await;
+
+    // Exchange peer infos to accelerate bootstrapping.
+    tokio::time::timeout(Duration::from_secs(10), async {
+        loop {
+            let maybe_agent_info_1 = alice
+                .peer_store(dna_hash.clone())
+                .await
+                .unwrap()
+                .get(alice_pubkey.to_k2_agent())
+                .await
+                .unwrap();
+            let maybe_agent_info_2 = bob
+                .peer_store(dna_hash.clone())
+                .await
+                .unwrap()
+                .get(bob_pubkey.to_k2_agent())
+                .await
+                .unwrap();
+            if let (Some(agent_info_1), Some(agent_info_2)) =
+                (maybe_agent_info_1, maybe_agent_info_2)
+            {
+                alice
+                    .peer_store(dna_hash.clone())
+                    .await
+                    .unwrap()
+                    .insert(vec![agent_info_2])
+                    .await
+                    .unwrap();
+                bob.peer_store(dna_hash.clone())
+                    .await
+                    .unwrap()
+                    .insert(vec![agent_info_1])
+                    .await
+                    .unwrap();
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    })
+    .await
+    .unwrap();
+
+    // Before the block Bob can make get requests and Alice answers them.
+    let response = bob.get(dna_hash.clone(), fixt!(ActionHash).into()).await;
+    assert!(response.is_ok());
+
+    alice
+        .block(Block::new(
+            BlockTarget::Cell(
+                CellId::new(dna_hash.clone(), bob_pubkey.clone()),
+                CellBlockReason::BadCrypto,
+            ),
+            InclusiveTimestampInterval::try_new(
+                holochain_timestamp::Timestamp::now(),
+                holochain_timestamp::Timestamp::max(),
+            )
+            .unwrap(),
+        ))
+        .await
+        .unwrap();
+
+    // Bob makes a get request. Alice could respond, but must not, to prove the block for incoming
+    // requests is effective.
+    let response = bob.get(dna_hash.clone(), fixt!(ActionHash).into()).await;
+    assert!(
+        matches!(response, Err(_)),
+        "expected error, got {response:?}"
+    );
 }
 
 struct TestCase {
