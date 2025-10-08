@@ -87,23 +87,24 @@ async fn block_someone() {
 #[tokio::test(flavor = "multi_thread")]
 async fn agent_is_removed_from_peer_store_when_blocked() {
     let dna_hash = fixt!(DnaHash);
-    let keystore = test_keystore();
-    let agent = keystore.new_sign_keypair_random().await.unwrap();
-    let cell_id = CellId::new(dna_hash.clone(), agent.clone());
 
-    let TestCase { actor, .. } = TestCase::new_with_keystore(&dna_hash, &keystore).await;
-    let space = actor
+    let TestCase { actor: alice, .. } = TestCase::new(&dna_hash).await;
+    let space = alice
         .test_kitsune()
         .space(dna_hash.to_k2_space())
         .await
         .unwrap();
     let peer_store = space.peer_store();
 
-    let local_agent = HolochainP2pLocalAgent::new(agent.clone(), DhtArc::FULL, 1, keystore.clone());
+    // Create Bob's keys so he can be blocked by Alice.
+    let keystore = test_keystore();
+    let bob_pubkey = keystore.new_sign_keypair_random().await.unwrap();
+    let local_agent =
+        HolochainP2pLocalAgent::new(bob_pubkey.clone(), DhtArc::FULL, 1, keystore.clone());
     let agent_info_signed = AgentInfoSigned::sign(
         &local_agent,
         AgentInfo {
-            agent: agent.to_k2_agent(),
+            agent: bob_pubkey.to_k2_agent(),
             created_at: kitsune2_api::Timestamp::now(),
             expires_at: kitsune2_api::Timestamp::from_micros(i64::MAX),
             space: dna_hash.to_k2_space(),
@@ -116,10 +117,15 @@ async fn agent_is_removed_from_peer_store_when_blocked() {
     .unwrap();
     peer_store.insert(vec![agent_info_signed]).await.unwrap();
 
-    assert!(peer_store.get(agent.to_k2_agent()).await.unwrap().is_some());
+    assert!(peer_store
+        .get(bob_pubkey.to_k2_agent())
+        .await
+        .unwrap()
+        .is_some());
 
-    // Block an agent.
-    actor
+    // Alice blocks Bob.
+    let cell_id = CellId::new(dna_hash.clone(), bob_pubkey.clone());
+    alice
         .block(Block::new(
             BlockTarget::Cell(cell_id, CellBlockReason::BadCrypto),
             InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::max()).unwrap(),
@@ -127,8 +133,12 @@ async fn agent_is_removed_from_peer_store_when_blocked() {
         .await
         .unwrap();
 
-    // Check agent has been removed from peer store.
-    assert!(peer_store.get(agent.to_k2_agent()).await.unwrap().is_none());
+    // Check Bob has been removed from Alice's peer store.
+    assert!(peer_store
+        .get(bob_pubkey.to_k2_agent())
+        .await
+        .unwrap()
+        .is_none());
 }
 
 #[tokio::test(flavor = "multi_thread")]

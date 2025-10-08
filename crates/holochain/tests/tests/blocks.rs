@@ -53,7 +53,7 @@ async fn publish_does_not_go_to_blocked_peers() {
     let bob_get0: Option<Record> = bob_conductor.call(&bob, "get_post", action0.clone()).await;
     assert!(bob_get0.is_some());
 
-    // Bob gets blocked by alice.
+    // Bob gets blocked by Alice.
     let _block: () = alice_conductor
         .call(&alice, "block_agent", bob_pubkey)
         .await;
