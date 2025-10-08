@@ -2025,7 +2025,7 @@ impl actor::HcP2p for HolochainP2pActor {
         })
     }
 
-    fn dump_network_stats(&self) -> BoxFut<'_, HolochainP2pResult<TransportStats>> {
+    fn dump_network_stats(&self) -> BoxFut<'_, HolochainP2pResult<ApiTransportStats>> {
         Box::pin(async move { Ok(self.kitsune.transport().await?.dump_network_stats().await?) })
     }
 
