@@ -9,5 +9,15 @@ WHERE
 RETURNING
   hash,
   basis_hash,
-  type,
-  authored_timestamp
+  authored_timestamp,
+  -- Return warrantee from Warrant table for warrant ops.
+  (
+    SELECT
+      warrantee
+    FROM
+      Warrant
+    WHERE
+      Warrant.hash = DhtOp.action_hash
+    LIMIT
+      1
+  )

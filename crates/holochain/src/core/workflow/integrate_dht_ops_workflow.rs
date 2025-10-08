@@ -34,22 +34,14 @@ pub async fn integrate_dht_ops_workflow(
                 |row| {
                     let op_hash = row.get::<_, DhtOpHash>(0)?;
                     let op_basis = row.get::<_, OpBasis>(1)?;
-                    let op_type: DhtOpType = row.get(2)?;
-                    let created_at = row.get::<_, Timestamp>(3)?;
+                    let created_at = row.get::<_, Timestamp>(2)?;
                     let stored_op = StoredOp {
                         created_at: kitsune2_api::Timestamp::from_micros(created_at.as_micros()),
                         op_id: op_hash.to_located_k2_op_id(&op_basis),
                     };
-                    if matches!(op_type, DhtOpType::Warrant(_)) {
-                        // The op basis of a warrant op is the warrantee's agent pub key.
-                        if let Some(warrantee) = op_basis.clone().into_agent_pub_key() {
-                            warrantees.push((warrantee, op_hash));
-                        } else {
-                            tracing::error!(
-                                ?op_basis,
-                                "expected basis hash of warrant op to be an agent pub key"
-                            );
-                        }
+                    let warrantee = row.get::<_, Option<AgentPubKey>>(3)?;
+                    if let Some(agent_pubkey) = warrantee {
+                        warrantees.push((agent_pubkey, op_hash));
                     }
                     Ok(stored_op)
                 },
