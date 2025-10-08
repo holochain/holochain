@@ -54,7 +54,7 @@ impl Display for Action {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Action::Dna(dna) =>
-                write!(f, "dna={:?}", dna),
+                write!(f, "dna={dna:?}"),
 
             Action::AgentValidationPkg(avp) =>
                 write!(
@@ -683,31 +683,6 @@ pub struct Delete<W = RateWeight> {
     pub deletes_entry_address: EntryHash,
 
     pub weight: W,
-}
-
-/// Placeholder for future when we want to have updates on actions
-/// Not currently in use.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
-pub struct UpdateAction {
-    pub author: AgentPubKey,
-    pub timestamp: Timestamp,
-    pub action_seq: u32,
-    pub prev_action: ActionHash,
-
-    pub original_action_address: ActionHash,
-}
-
-/// Placeholder for future when we want to have deletes on actions
-/// Not currently in use.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
-pub struct DeleteAction {
-    pub author: AgentPubKey,
-    pub timestamp: Timestamp,
-    pub action_seq: u32,
-    pub prev_action: ActionHash,
-
-    /// Address of the action being deleted
-    pub deletes_address: ActionHash,
 }
 
 /// Allows Actions which reference Entries to know what type of Entry it is

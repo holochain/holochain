@@ -262,12 +262,12 @@ async fn retry_countersigning_commit_on_missing_deps() {
                     // Expected
                 }
                 _ => {
-                    panic!("Expected IncompleteCommit error, got: {:?}", e);
+                    panic!("Expected IncompleteCommit error, got: {e:?}");
                 }
             }
         }
         _ => {
-            panic!("Expected CellError::WorkflowError, got: {:?}", result);
+            panic!("Expected CellError::WorkflowError, got: {result:?}");
         }
     }
 
@@ -862,7 +862,10 @@ async fn multiple_agents_on_same_conductor_with_chc_enabled() {
     let mut conductors = SweetConductorBatch::from_config_rendezvous(3, config).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
-    let apps = conductors.setup_app("app", &[dna.clone()]).await.unwrap();
+    let apps = conductors
+        .setup_app("app", std::slice::from_ref(&dna))
+        .await
+        .unwrap();
     let cells = apps.cells_flattened();
     let alice = &cells[0];
     let bob = &cells[1];
@@ -1664,7 +1667,7 @@ async fn alice_can_force_publish_session_when_automatic_resolution_has_failed_af
         Signal::System(SystemSignal::SuccessfulCountersigning(entry_hash)) => {
             assert_eq!(entry_hash, preflight_request.app_entry_hash.clone());
         }
-        s => panic!("Expected successful countersigning signal but got: {:?}", s),
+        s => panic!("Expected successful countersigning signal but got: {s:?}"),
     }
     // Alice's session should be gone from memory.
     let alice_state = conductors[0]
@@ -1679,7 +1682,7 @@ async fn alice_can_force_publish_session_when_automatic_resolution_has_failed_af
         Signal::System(SystemSignal::SuccessfulCountersigning(entry_hash)) => {
             assert_eq!(entry_hash, preflight_request.app_entry_hash.clone());
         }
-        s => panic!("Expected successful countersigning signal but got: {:?}", s),
+        s => panic!("Expected successful countersigning signal but got: {s:?}"),
     }
     // Bob's session should be gone from memory.
     let bob_state = conductors[1]
@@ -1700,10 +1703,7 @@ async fn wait_for_completion(mut signal_rx: Receiver<Signal>, expected_hash: Ent
             assert_eq!(expected_hash, hash);
         }
         _ => {
-            panic!(
-                "Expected SuccessfulCountersigning signal, got: {:?}",
-                signal
-            );
+            panic!("Expected SuccessfulCountersigning signal, got: {signal:?}");
         }
     }
 }
@@ -1718,10 +1718,7 @@ async fn wait_for_abandoned(mut signal_rx: Receiver<Signal>, expected_hash: Entr
             assert_eq!(expected_hash, hash);
         }
         _ => {
-            panic!(
-                "Expected SuccessfulCountersigning signal, got: {:?}",
-                signal
-            );
+            panic!("Expected SuccessfulCountersigning signal, got: {signal:?}");
         }
     }
 }

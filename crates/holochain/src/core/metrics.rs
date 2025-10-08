@@ -11,11 +11,11 @@ pub fn create_workflow_duration_metric(
 ) -> WorkflowDurationMetric {
     let mut attr = vec![
         KeyValue::new("workflow", workflow_name),
-        KeyValue::new("dna_hash", format!("{:?}", dna_hash)),
+        KeyValue::new("dna_hash", format!("{dna_hash:?}")),
     ];
 
     if let Some(agent) = agent {
-        attr.push(KeyValue::new("agent", format!("{:?}", agent)));
+        attr.push(KeyValue::new("agent", format!("{agent:?}")));
     }
 
     meter_with_version(

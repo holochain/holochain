@@ -446,7 +446,7 @@ impl TryFrom<Action> for NewEntryAction {
         match value {
             Action::Create(a) => Ok(NewEntryAction::Create(a)),
             Action::Update(a) => Ok(NewEntryAction::Update(a)),
-            _ => Err(WrongActionError(format!("{:?}", value))),
+            _ => Err(WrongActionError(format!("{value:?}"))),
         }
     }
 }
@@ -457,7 +457,7 @@ impl<'a> TryFrom<&'a Action> for NewEntryActionRef<'a> {
         match value {
             Action::Create(a) => Ok(NewEntryActionRef::Create(a)),
             Action::Update(a) => Ok(NewEntryActionRef::Update(a)),
-            _ => Err(WrongActionError(format!("{:?}", value))),
+            _ => Err(WrongActionError(format!("{value:?}"))),
         }
     }
 }
@@ -523,7 +523,7 @@ mod tests {
         )
         .into();
         let bytes = holochain_serialized_bytes::encode(&orig).unwrap();
-        println!("{:?}", bytes);
+        println!("{bytes:?}");
         let res: Action = holochain_serialized_bytes::decode(&bytes).unwrap();
         assert_eq!(orig, res);
     }

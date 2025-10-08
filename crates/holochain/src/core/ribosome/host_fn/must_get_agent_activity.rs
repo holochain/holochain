@@ -106,13 +106,11 @@ pub fn must_get_agent_activity(
                         .into())
                     }
                     (IncompleteChain, _) => Err(wasm_error!(WasmErrorInner::Host(format!(
-                        "must_get_agent_activity chain is incomplete for author {} and filter {:?}",
-                        author, chain_filter
+                        "must_get_agent_activity chain is incomplete for author {author} and filter {chain_filter:?}"
                     )))
                     .into()),
                     (ChainTopNotFound(missing_action), _) => Err(wasm_error!(WasmErrorInner::Host(format!(
-                        "must_get_agent_activity is missing action {} for author {} and filter {:?}",
-                        missing_action, author, chain_filter
+                        "must_get_agent_activity is missing action {missing_action} for author {author} and filter {chain_filter:?}"
                     )))
                     .into()),
                 };

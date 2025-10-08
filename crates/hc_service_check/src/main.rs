@@ -53,7 +53,7 @@ async fn bootstrap(url: impl AsRef<str>) -> Result<()> {
         bootstrap_url.host().expect("Missing host"),
         bootstrap_url
             .port()
-            .map(|p| format!(":{}", p))
+            .map(|p| format!(":{p}"))
             .unwrap_or_default()
     ));
     println!("Checking 'health' at: {bootstrap_url}");
@@ -68,7 +68,7 @@ async fn bootstrap(url: impl AsRef<str>) -> Result<()> {
     if health == "{}" {
         println!("Bootstrap server appears healthy");
     } else {
-        eprintln!("Got health result: {}", health);
+        eprintln!("Got health result: {health}");
     }
 
     Ok(())

@@ -200,7 +200,7 @@ impl DnaBundle {
                         ZomeManifest {
                             name: name.clone(),
                             hash: Some(hash),
-                            path: format!("{}.wasm", name),
+                            path: format!("{name}.wasm"),
                             dependencies: Some(dependencies),
                         }
                     }
@@ -229,7 +229,7 @@ impl DnaBundle {
                         ZomeManifest {
                             name: name.clone(),
                             hash: Some(hash),
-                            path: format!("{}.wasm", name),
+                            path: format!("{name}.wasm"),
                             dependencies: Some(dependencies),
                         }
                     }
@@ -244,8 +244,7 @@ impl DnaBundle {
                 network_seed: Some(dna_def.modifiers.network_seed),
                 properties: Some(dna_def.modifiers.properties.try_into().map_err(|e| {
                     DnaError::DnaFileToBundleConversionError(format!(
-                        "DnaDef properties were not YAML-deserializable: {}",
-                        e
+                        "DnaDef properties were not YAML-deserializable: {e}"
                     ))
                 })?),
                 zomes: integrity,

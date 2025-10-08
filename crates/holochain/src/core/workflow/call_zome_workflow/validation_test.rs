@@ -68,9 +68,9 @@ async fn run_test(alice_cell_id: CellId, handle: ConductorHandle) {
     match &result {
         Err(ConductorApiError::CellError(CellError::WorkflowError(wfe))) => match **wfe {
             WorkflowError::SourceChainError(SourceChainError::InvalidCommit(_)) => {}
-            _ => panic!("Expected InvalidCommit got {:?}", result),
+            _ => panic!("Expected InvalidCommit got {result:?}"),
         },
-        _ => panic!("Expected InvalidCommit got {:?}", result),
+        _ => panic!("Expected InvalidCommit got {result:?}"),
     }
 }
 // ,

@@ -126,7 +126,7 @@ where
     T: HashTypeAsync,
 {
     /// Construct a HoloHash from a reference
-    fn to_hash(&self) -> MustBoxFuture<HoloHash<T>>;
+    fn to_hash(&self) -> MustBoxFuture<'_, HoloHash<T>>;
     /// Move into a HoloHashed
     fn into_hashed(self) -> MustBoxFuture<'a, HoloHashed<Self>>;
 }
@@ -150,7 +150,7 @@ where
     T: HashTypeAsync,
     C: 'a + HashableContent<HashType = T> + Send + Sync,
 {
-    fn to_hash(&self) -> MustBoxFuture<HoloHash<T>> {
+    fn to_hash(&self) -> MustBoxFuture<'_, HoloHash<T>> {
         async move { HoloHash::with_data(self).await }
             .boxed()
             .into()

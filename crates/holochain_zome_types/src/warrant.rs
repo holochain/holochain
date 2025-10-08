@@ -116,9 +116,9 @@ impl From<Warrant> for WarrantType {
 
 #[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
 impl ToSql for WarrantType {
-    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
         Ok(rusqlite::types::ToSqlOutput::Owned(
-            format!("{:?}", self).into(),
+            format!("{self:?}").into(),
         ))
     }
 }

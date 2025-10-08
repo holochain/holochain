@@ -58,16 +58,6 @@ impl TaskManagerClient {
         }
     }
 
-    /// Stop all managed tasks and await their completion.
-    pub fn stop_all_tasks(&self) -> ShutdownHandle {
-        if let Some(tm) = self.tm.lock().as_mut() {
-            tokio::spawn(tm.stop_group(&TaskGroup::Conductor))
-        } else {
-            tracing::warn!("Tried to shutdown task manager while it's already shutting down");
-            tokio::spawn(async move {})
-        }
-    }
-
     /// Stop all tasks associated with a Cell and await their completion.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     pub fn stop_cell_tasks(&self, cell_id: CellId) -> ShutdownHandle {
@@ -125,16 +115,6 @@ impl TaskManagerClient {
         f: impl FnOnce(StopListener) -> Fut + Send + 'static,
     ) {
         self.add_dna_task(name, TaskKind::DnaCritical(dna_hash.clone()), dna_hash, f)
-    }
-
-    /// Add a Cell-level task whose outcome is ignored
-    pub fn add_cell_task_ignored<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
-        &self,
-        name: &str,
-        cell_id: CellId,
-        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
-    ) {
-        self.add_cell_task(name, TaskKind::Ignore, cell_id, f)
     }
 
     /// Add a Cell-level task which will cause that to be disabled if the task fails
@@ -329,19 +309,19 @@ fn produce_task_outcome(kind: &TaskKind, result: ManagedTaskResult, name: String
     use TaskOutcome::*;
     match kind {
         TaskKind::Ignore => match result {
-            Ok(_) => LogInfo(format!("task completed: {}", name)),
+            Ok(_) => LogInfo(format!("task completed: {name}")),
             Err(err) => MinorError(Box::new(err), name),
         },
         TaskKind::Unrecoverable => match result {
-            Ok(_) => LogInfo(format!("task completed: {}", name)),
+            Ok(_) => LogInfo(format!("task completed: {name}")),
             Err(err) => ShutdownConductor(Box::new(err), name),
         },
         TaskKind::CellCritical(cell_id) => match result {
-            Ok(_) => LogInfo(format!("task completed: {}", name)),
+            Ok(_) => LogInfo(format!("task completed: {name}")),
             Err(err) => StopApps(cell_id.to_owned(), Box::new(err), name),
         },
         TaskKind::DnaCritical(dna_hash) => match result {
-            Ok(_) => LogInfo(format!("task completed: {}", name)),
+            Ok(_) => LogInfo(format!("task completed: {name}")),
             Err(err) => StopAppsWithDna(dna_hash.to_owned(), Box::new(err), name),
         },
     }
@@ -362,7 +342,7 @@ pub fn handle_shutdown(result: Result<TaskManagerResult, tokio::task::JoinError>
                 // Resume the panic on the main task
                 std::panic::resume_unwind(reason);
             }
-            Err(error) => panic!("Error while joining threads during shutdown {:?}", error),
+            Err(error) => panic!("Error while joining threads during shutdown {error:?}"),
         },
     }
 }

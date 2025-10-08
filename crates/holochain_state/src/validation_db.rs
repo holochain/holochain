@@ -27,7 +27,8 @@ pub enum ValidationStage {
 impl ToSql for ValidationStage {
     fn to_sql(
         &self,
-    ) -> holochain_sqlite::rusqlite::Result<holochain_sqlite::rusqlite::types::ToSqlOutput> {
+    ) -> holochain_sqlite::rusqlite::Result<holochain_sqlite::rusqlite::types::ToSqlOutput<'_>>
+    {
         let stage = match self {
             ValidationStage::Pending => None,
             ValidationStage::AwaitingSysDeps => Some(0),

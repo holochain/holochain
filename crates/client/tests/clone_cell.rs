@@ -52,7 +52,7 @@ async fn clone_cell_management() {
         .unwrap();
     let signer = ClientAgentSigner::default();
     let app_ws = AppWebsocket::connect(
-        format!("127.0.0.1:{}", app_api_port),
+        format!("127.0.0.1:{app_api_port}"),
         issued_token.token,
         signer.clone().into(),
         None,
@@ -247,7 +247,7 @@ pub async fn app_info_refresh() {
         .expect_err("Should fail because the client doesn't know the clone cell exists");
     match err {
         ConductorApiError::CellNotFound => (),
-        _ => panic!("Unexpected error: {:?}", err),
+        _ => panic!("Unexpected error: {err:?}"),
     }
 
     // Refresh the app info, which means the app agent will now know about the clone cell

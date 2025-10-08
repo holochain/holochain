@@ -196,12 +196,6 @@ pub fn check_valid_if_dna(action: &Action, dna_hash: &DnaHash) -> SysValidationR
     }
 }
 
-/// Placeholder for future spam check.
-/// Check action timestamps don't exceed MAX_PUBLISH_FREQUENCY
-pub async fn check_spam(_action: &Action) -> SysValidationResult<()> {
-    Ok(())
-}
-
 /// Check that created agents are always paired with an AgentValidationPkg and vice versa
 pub fn check_agent_validation_pkg_predecessor(
     action: &Action,

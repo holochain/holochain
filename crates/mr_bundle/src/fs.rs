@@ -50,7 +50,7 @@ impl FileSystemBundler {
             .await
             .map_err(|e| {
                 MrBundleError::IoError(
-                    format!("Failed to read manifest file: {:?}", manifest_path),
+                    format!("Failed to read manifest file: {manifest_path:?}"),
                     e,
                 )
             })?;
@@ -77,7 +77,7 @@ impl FileSystemBundler {
                         .map(|resource| (resource_id, resource.into()))
                         .map_err(|e| {
                             MrBundleError::IoError(
-                                format!("Failed to read resource at path: {:?}", resource_path),
+                                format!("Failed to read resource at path: {resource_path:?}"),
                                 e,
                             )
                         })
@@ -137,7 +137,7 @@ impl FileSystemBundler {
     ) -> MrBundleResult<Bundle<M>> {
         let bundle_path = bundle_path.as_ref();
         let bundle_bytes = tokio::fs::read(bundle_path).await.map_err(|e| {
-            MrBundleError::IoError(format!("Failed to read bundle file: {:?}", bundle_path), e)
+            MrBundleError::IoError(format!("Failed to read bundle file: {bundle_path:?}"), e)
         })?;
         Bundle::unpack(&bundle_bytes[..])
     }
@@ -176,7 +176,7 @@ impl FileSystemBundler {
         // Create the directory to work into.
         tokio::fs::create_dir_all(&target_dir).await.map_err(|e| {
             MrBundleError::IoError(
-                format!("Failed to create target directory: {:?}", target_dir),
+                format!("Failed to create target directory: {target_dir:?}"),
                 e,
             )
         })?;
@@ -188,7 +188,7 @@ impl FileSystemBundler {
             .await
             .map_err(|e| {
                 MrBundleError::IoError(
-                    format!("Failed to write manifest to path: {:?}", manifest_path),
+                    format!("Failed to write manifest to path: {manifest_path:?}"),
                     e,
                 )
             })?;
@@ -202,12 +202,12 @@ impl FileSystemBundler {
                 .ok_or_else(|| MrBundleError::ParentlessPath(path.clone()))?;
             tokio::fs::create_dir_all(&parent).await.map_err(|e| {
                 MrBundleError::IoError(
-                    format!("Failed to create resource directory: {:?}", parent),
+                    format!("Failed to create resource directory: {parent:?}"),
                     e,
                 )
             })?;
             tokio::fs::write(&path, resource).await.map_err(|e| {
-                MrBundleError::IoError(format!("Failed to write resource to path: {:?}", path), e)
+                MrBundleError::IoError(format!("Failed to write resource to path: {path:?}"), e)
             })?;
         }
 

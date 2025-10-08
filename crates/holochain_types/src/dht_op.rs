@@ -6,7 +6,6 @@
 
 use crate::action::NewEntryAction;
 use crate::prelude::*;
-use crate::record::RecordGroup;
 use crate::warrant::WarrantOp;
 use holo_hash::*;
 use holochain_sqlite::rusqlite::types::FromSql;
@@ -216,7 +215,8 @@ pub enum DhtOpType {
 impl ToSql for DhtOpType {
     fn to_sql(
         &self,
-    ) -> holochain_sqlite::rusqlite::Result<holochain_sqlite::rusqlite::types::ToSqlOutput> {
+    ) -> holochain_sqlite::rusqlite::Result<holochain_sqlite::rusqlite::types::ToSqlOutput<'_>>
+    {
         match self {
             DhtOpType::Chain(op) => op.to_sql(),
             DhtOpType::Warrant(op) => op.to_sql(),
@@ -478,7 +478,7 @@ impl ChainOp {
     }
 
     /// Get the entry from this op, if one exists
-    pub fn entry(&self) -> RecordEntryRef {
+    pub fn entry(&self) -> RecordEntryRef<'_> {
         match self {
             Self::StoreRecord(_, _, e) => e.as_ref(),
             Self::StoreEntry(_, _, e) => RecordEntry::Present(e),
@@ -661,34 +661,6 @@ impl DhtOpLite {
         match self {
             Self::Chain(op) => op.get_type().into(),
             Self::Warrant(op) => op.get_type().into(),
-        }
-    }
-
-    /// Get the AnyDhtHash which would be used in a `must_get_*` context.
-    ///
-    /// For instance, `must_get_entry` will use an EntryHash, and requires a
-    /// StoreEntry record to be integrated to succeed. All other must_gets take
-    /// an ActionHash.
-    pub fn fetch_dependency_hashes(&self) -> Vec<AnyDhtHash> {
-        match self {
-            Self::Chain(op) => match &**op {
-                ChainOpLite::StoreEntry(_, entry_hash, _) => vec![entry_hash.clone().into()],
-                other => vec![other.action_hash().clone().into()],
-            },
-            Self::Warrant(op) => match &op.proof {
-                WarrantProof::ChainIntegrity(w) => match w {
-                    ChainIntegrityWarrant::InvalidChainOp {
-                        action: action_hash,
-                        ..
-                    } => vec![action_hash.0.clone().into()],
-                    ChainIntegrityWarrant::ChainFork { action_pair, .. } => {
-                        vec![
-                            action_pair.0 .0.clone().into(),
-                            action_pair.1 .0.clone().into(),
-                        ]
-                    }
-                },
-            },
         }
     }
 }
@@ -983,25 +955,6 @@ pub fn produce_op_lites_from_records(actions: Vec<&Record>) -> DhtOpResult<Vec<C
         )
     });
     produce_op_lites_from_iter(actions_and_hashes)
-}
-
-/// Produce all the op lites from this record group
-/// with a shared entry
-pub fn produce_op_lites_from_record_group(
-    records: &RecordGroup<'_>,
-) -> DhtOpResult<Vec<ChainOpLite>> {
-    let actions_and_hashes = records.actions_and_hashes();
-    let maybe_entry_hash = Some(records.entry_hash());
-    produce_op_lites_from_parts(actions_and_hashes, maybe_entry_hash)
-}
-
-/// Data minimal clone (no cloning entries) cheap &Record to DhtOpLite conversion
-fn produce_op_lites_from_parts<'a>(
-    actions_and_hashes: impl Iterator<Item = (&'a ActionHash, &'a Action)>,
-    maybe_entry_hash: Option<&EntryHash>,
-) -> DhtOpResult<Vec<ChainOpLite>> {
-    let iter = actions_and_hashes.map(|(head, hash)| (head, hash, maybe_entry_hash.cloned()));
-    produce_op_lites_from_iter(iter)
 }
 
 /// Produce op lites from iter of (action hash, action, maybe entry).
@@ -1358,7 +1311,8 @@ impl OpOrder {
 impl holochain_sqlite::rusqlite::ToSql for OpOrder {
     fn to_sql(
         &self,
-    ) -> holochain_sqlite::rusqlite::Result<holochain_sqlite::rusqlite::types::ToSqlOutput> {
+    ) -> holochain_sqlite::rusqlite::Result<holochain_sqlite::rusqlite::types::ToSqlOutput<'_>>
+    {
         Ok(holochain_sqlite::rusqlite::types::ToSqlOutput::Owned(
             self.to_string().into(),
         ))

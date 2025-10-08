@@ -91,8 +91,7 @@ not_a_real_field: ~"#;
     let err = serde_yaml::from_str::<DnaManifest>(manifest_yaml).unwrap_err();
     assert!(
         err.to_string().contains("unknown field `not_a_real_field`"),
-        "Should have rejected unknown field but actually got: {}",
-        err,
+        "Should have rejected unknown field but actually got: {err}",
     );
 }
 
@@ -123,8 +122,7 @@ integrity:
     let err = serde_yaml::from_str::<DnaManifest>(manifest_yaml).unwrap_err();
     assert!(
         err.to_string().contains("unknown field `coordinator`"),
-        "Should have rejected coordinator zomes nested under integrity but actually got: {}",
-        err,
+        "Should have rejected coordinator zomes nested under integrity but actually got: {err}",
     );
 }
 
@@ -155,8 +153,7 @@ coordinator:
     let err = serde_yaml::from_str::<DnaManifest>(manifest_yaml).unwrap_err();
     assert!(
         err.to_string().contains("unknown field `integrity`"),
-        "Should have rejected integrity zomes nested under coordinators but actually got: {}",
-        err,
+        "Should have rejected integrity zomes nested under coordinators but actually got: {err}",
     );
 }
 
@@ -182,8 +179,7 @@ integrity:
     let err = serde_yaml::from_str::<DnaManifest>(manifest_yaml).unwrap_err();
     assert!(
         err.to_string().contains("unknown field `not_a_real_field`"),
-        "Should have rejected unknown field but actually got: {}",
-        err,
+        "Should have rejected unknown field but actually got: {err}",
     );
 }
 
@@ -205,8 +201,7 @@ coordinator:
     let err = serde_yaml::from_str::<DnaManifest>(manifest_yaml).unwrap_err();
     assert!(
         err.to_string().contains("unknown field `not_a_real_field`"),
-        "Should have rejected unknown field but actually got: {}",
-        err,
+        "Should have rejected unknown field but actually got: {err}",
     );
 }
 
@@ -232,8 +227,7 @@ integrity:
     let err = serde_yaml::from_str::<DnaManifest>(manifest_yaml).unwrap_err();
     assert!(
         err.to_string().contains("unknown field `not_a_real_field`"),
-        "Should have rejected unknown field but actually got: {}",
-        err,
+        "Should have rejected unknown field but actually got: {err}",
     );
 }
 
@@ -255,7 +249,6 @@ coordinator:
     let err = serde_yaml::from_str::<DnaManifest>(manifest_yaml).unwrap_err();
     assert!(
         err.to_string().contains("unknown field `not_a_real_field`"),
-        "Should have rejected unknown field but actually got: {}",
-        err,
+        "Should have rejected unknown field but actually got: {err}",
     );
 }

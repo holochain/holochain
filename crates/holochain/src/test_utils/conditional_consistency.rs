@@ -329,7 +329,7 @@ fn diff_report(unintegrated: Vec<String>, unpublished: Vec<String>) -> String {
         format!("Unpublished:\n\n{}\n", unpublished.join("\n"))
     };
 
-    format!("{}{}", unintegrated, unpublished)
+    format!("{unintegrated}{unpublished}")
 }
 
 fn display_op(op: &DhtOp) -> String {

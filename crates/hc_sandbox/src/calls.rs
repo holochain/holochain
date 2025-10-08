@@ -477,11 +477,11 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
         }
         AdminRequestCli::DumpState(args) => {
             let state = client.dump_state(args.into()).await?;
-            println!("{}", state);
+            println!("{state}");
         }
         AdminRequestCli::DumpConductorState => {
             let state = client.dump_conductor_state().await?;
-            println!("{}", state);
+            println!("{state}");
         }
         AdminRequestCli::DumpNetworkMetrics(args) => {
             let metrics = client
@@ -505,11 +505,11 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
         }
         AdminRequestCli::RevokeZomeCallCapability(args) => {
             let action_hash = ActionHash::try_from(&args.action_hash)
-                .map_err(|e| anyhow!("Invalid action hash: {}", e))?;
-            let dna_hash = DnaHash::try_from(&args.dna_hash)
-                .map_err(|e| anyhow!("Invalid DNA hash: {}", e))?;
+                .map_err(|e| anyhow!("Invalid action hash: {e}"))?;
+            let dna_hash =
+                DnaHash::try_from(&args.dna_hash).map_err(|e| anyhow!("Invalid DNA hash: {e}"))?;
             let agent_key = AgentPubKey::try_from(&args.agent_key)
-                .map_err(|e| anyhow!("Invalid agent key: {}", e))?;
+                .map_err(|e| anyhow!("Invalid agent key: {e}"))?;
             let cell_id = CellId::new(dna_hash, agent_key);
 
             client
@@ -631,8 +631,7 @@ fn cell_id_to_base64_within_cell_info_map(
     for (key, val) in cell_info_map_map.iter_mut() {
         let serde_json::Value::Array(arr) = val else {
             return Err(serde::de::Error::custom(format!(
-                "Value for `{}` is not an array.",
-                key
+                "Value for `{key}` is not an array."
             )));
         };
         // For each cell
@@ -791,11 +790,11 @@ async fn request_agent_info(
 }
 
 fn parse_agent_key(arg: &str) -> anyhow::Result<AgentPubKey> {
-    AgentPubKey::try_from(arg).map_err(|e| anyhow::anyhow!("{:?}", e))
+    AgentPubKey::try_from(arg).map_err(|e| anyhow::anyhow!("{e:?}"))
 }
 
 fn parse_dna_hash(arg: &str) -> anyhow::Result<DnaHash> {
-    DnaHash::try_from(arg).map_err(|e| anyhow::anyhow!("{:?}", e))
+    DnaHash::try_from(arg).map_err(|e| anyhow::anyhow!("{e:?}"))
 }
 
 fn parse_status_filter(arg: &str) -> anyhow::Result<AppStatusFilter> {
@@ -803,8 +802,7 @@ fn parse_status_filter(arg: &str) -> anyhow::Result<AppStatusFilter> {
         "active" => Ok(AppStatusFilter::Enabled),
         "inactive" => Ok(AppStatusFilter::Disabled),
         _ => Err(anyhow::anyhow!(
-            "Bad app status filter value: {}, only 'active' and 'inactive' are possible",
-            arg
+            "Bad app status filter value: {arg}, only 'active' and 'inactive' are possible"
         )),
     }
 }

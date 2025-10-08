@@ -403,7 +403,7 @@ async fn get_app_client(
     }
 
     Ok(AppWebsocket::connect(
-        format!("localhost:{}", port),
+        format!("localhost:{port}"),
         token.token,
         DynAgentSigner::from(signer),
         Some(String::from("sandbox")),

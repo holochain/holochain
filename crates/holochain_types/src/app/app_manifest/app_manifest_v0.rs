@@ -352,15 +352,14 @@ roles:
       deferred: false
     dna:
       path: /tmp/test.dna
-      installed_hash: {}
+      installed_hash: {installed_hash}
       clone_limit: 50
       network_seed: network_seed
       modifiers:
         properties:
           salad: "bar"
 
-        "#,
-            installed_hash
+        "#
         );
         let actual = serde_yaml::to_value(&manifest).unwrap();
         let expected: serde_yaml::Value = serde_yaml::from_str(&expected_yaml).unwrap();

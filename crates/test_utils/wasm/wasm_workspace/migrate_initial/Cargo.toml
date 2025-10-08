@@ -3,6 +3,7 @@ name = "test_wasm_migrate_initial"
 description = "Test wasm for migration, intended to be the initial version"
 version = "0.0.1"
 edition = "2021"
+publish = false
 
 [lib]
 name = "test_wasm_migrate_initial"

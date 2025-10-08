@@ -3,6 +3,7 @@ name = "test_wasm_init_single"
 description = "Wasm that will error if init is called more than once"
 version = "0.0.1"
 edition = "2021"
+publish = false
 
 [lib]
 name = "test_wasm_init_single"

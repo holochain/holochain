@@ -58,7 +58,7 @@ impl From<String> for AllowedOrigins {
 impl std::fmt::Display for AllowedOrigins {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let str: String = self.clone().into();
-        write!(f, "{}", str)
+        write!(f, "{str}")
     }
 }
 

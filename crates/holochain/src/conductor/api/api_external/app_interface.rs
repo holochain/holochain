@@ -97,14 +97,12 @@ impl AppInterfaceApi {
                     Ok(ZomeCallResponse::Ok(output)) => Ok(AppResponse::ZomeCalled(Box::new(output))),
                     Ok(ZomeCallResponse::AuthenticationFailed(signature, provenance)) => Ok(AppResponse::Error(
                         ExternalApiWireError::ZomeCallAuthenticationFailed(format!(
-                            "Authentication failure. Bad signature {:?} by provenance {:?}.",
-                            signature, provenance,
+                            "Authentication failure. Bad signature {signature:?} by provenance {provenance:?}.",
                         )),
                     )),
                     Ok(ZomeCallResponse::Unauthorized(zome_call_authorization, cap_secret, zome_name, fn_name)) => Ok(AppResponse::Error(
                         ExternalApiWireError::ZomeCallUnauthorized(format!(
-                            "Call was not authorized with reason {:?}, cap secret {:?} to call the function {} in zome {}",
-                            zome_call_authorization, cap_secret, fn_name, zome_name
+                            "Call was not authorized with reason {zome_call_authorization:?}, cap secret {cap_secret:?} to call the function {fn_name} in zome {zome_name}"
                         )),
                     )),
                     Ok(ZomeCallResponse::NetworkError(e)) => unreachable!(
@@ -113,8 +111,7 @@ impl AppInterfaceApi {
                     ),
                     Ok(ZomeCallResponse::CountersigningSession(e)) => Ok(AppResponse::Error(
                         ExternalApiWireError::CountersigningSessionError(format!(
-                            "A countersigning session has failed to start on this zome call because: {}",
-                            e
+                            "A countersigning session has failed to start on this zome call because: {e}"
                         )),
                     )),
                     Err(e) => Ok(AppResponse::Error(e.into())),

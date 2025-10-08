@@ -18,9 +18,6 @@ pub enum CascadeError {
     DatabaseError(#[from] DatabaseError),
 
     #[error(transparent)]
-    RecordGroupError(#[from] RecordGroupError),
-
-    #[error(transparent)]
     ActionError(#[from] ActionError),
 
     #[error("Expected this Action to contain an Entry: {0}")]
@@ -78,12 +75,12 @@ pub enum AuthorityDataError {
 
 impl AuthorityDataError {
     pub fn missing_data<T: std::fmt::Debug>(data: T) -> CascadeError {
-        Self::MissingData(format!("Missing action {:?}", data)).into()
+        Self::MissingData(format!("Missing action {data:?}")).into()
     }
     pub fn missing_data_entry<T: std::fmt::Debug>(data: T) -> CascadeError {
-        Self::MissingData(format!("Missing entry for action {:?}", data)).into()
+        Self::MissingData(format!("Missing entry for action {data:?}")).into()
     }
     pub fn missing_metadata<T: std::fmt::Debug>(data: T) -> CascadeError {
-        Self::MissingMetadata(format!("{:?}", data)).into()
+        Self::MissingMetadata(format!("{data:?}")).into()
     }
 }

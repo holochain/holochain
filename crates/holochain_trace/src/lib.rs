@@ -213,7 +213,7 @@ pub fn standard_filter() -> Result<EnvFilter, errors::TracingError> {
     let mut filter = EnvFilter::from_default_env().add_directive("[wasm_debug]=debug".parse()?);
     if std::env::var("CUSTOM_FILTER").is_ok() {
         EnvFilter::try_from_env("CUSTOM_FILTER")
-            .map_err(|e| eprintln!("Failed to parse CUSTOM_FILTER {:?}", e))
+            .map_err(|e| eprintln!("Failed to parse CUSTOM_FILTER {e:?}"))
             .map(|f| {
                 filter = f;
             })
@@ -263,10 +263,7 @@ where
 {
     let filter = standard_filter()?;
 
-    println!(
-        "Initialising log output formatting with option {:?}",
-        output
-    );
+    println!("Initialising log output formatting with option {output:?}");
 
     match output {
         Output::Json => Registry::default()

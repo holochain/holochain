@@ -165,7 +165,7 @@ async fn start_holochain(
     tracing::info!("\n\n----\nstarting holochain\n----\n\n");
     let mut cmd = Command::new(holochain_path);
     cmd.arg("--piped")
-        .arg(format!("--structured={}", structured))
+        .arg(format!("--structured={structured}"))
         .arg("--config-path")
         .arg(ConfigFilePath::from(config_root_path).as_ref())
         .stdin(Stdio::piped())
@@ -223,7 +223,7 @@ async fn check_lair_running(stdout: tokio::process::ChildStdout) {
     tokio::task::spawn(async move {
         let mut lines = BufReader::new(stdout).lines();
         while let Ok(Some(line)) = lines.next_line().await {
-            println!("{}", line);
+            println!("{line}");
             if line == LAIR_START {
                 if let Some(s) = s.take() {
                     let _ = s.send(());
@@ -256,7 +256,7 @@ fn spawn_output(holochain: &mut Child, config: oneshot::Sender<u16>) {
                         (false, _) => (),
                     }
                 }
-                println!("{}", line);
+                println!("{line}");
             }
         }
     });

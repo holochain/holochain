@@ -289,7 +289,7 @@ async fn signals_are_not_sent_until_after_auth() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal]).await;
 
     let app = conductor
-        .setup_app("test-app", &[dna_file.clone()])
+        .setup_app("test-app", std::slice::from_ref(&dna_file))
         .await
         .unwrap();
 
@@ -323,7 +323,7 @@ async fn signals_are_not_sent_until_after_auth() {
     // We should not receive any signals yet
     tokio::time::timeout(std::time::Duration::from_millis(10), async {
         let receive = app_rx.recv::<AppResponse>().await.unwrap();
-        panic!("Should not have received anything but got {:?}", receive);
+        panic!("Should not have received anything but got {receive:?}");
     })
     .await
     .unwrap_err();
@@ -342,7 +342,7 @@ async fn signals_are_not_sent_until_after_auth() {
     // The original signal is gone, we weren't subscribed yet
     tokio::time::timeout(std::time::Duration::from_millis(10), async {
         let receive = app_rx.recv::<AppResponse>().await.unwrap();
-        panic!("Should not have received anything but got {:?}", receive);
+        panic!("Should not have received anything but got {receive:?}");
     })
     .await
     .unwrap_err();
@@ -364,7 +364,7 @@ async fn signals_are_not_sent_until_after_auth() {
     let receive = app_rx.recv::<AppResponse>().await.unwrap();
     match receive {
         ReceiveMessage::Signal(_) => (),
-        _ => panic!("Expected signal but got {:?}", receive),
+        _ => panic!("Expected signal but got {receive:?}"),
     }
 }
 
@@ -377,12 +377,12 @@ async fn signals_are_restricted_by_app() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal]).await;
 
     let app_1 = conductor
-        .setup_app("test-app-1", &[dna_file.clone()])
+        .setup_app("test-app-1", std::slice::from_ref(&dna_file))
         .await
         .unwrap();
 
     let _app_2 = conductor
-        .setup_app("test-app-2", &[dna_file.clone()])
+        .setup_app("test-app-2", std::slice::from_ref(&dna_file))
         .await
         .unwrap();
 
@@ -478,13 +478,13 @@ async fn signals_are_restricted_by_app() {
     let receive = app_1_rx.recv::<AppResponse>().await.unwrap();
     match receive {
         ReceiveMessage::Signal(_) => (),
-        _ => panic!("Expected signal but got {:?}", receive),
+        _ => panic!("Expected signal but got {receive:?}"),
     }
 
     // app_2_rx is connected to the app_2 interface, so should not see the signal
     tokio::time::timeout(std::time::Duration::from_millis(10), async {
         let receive = app_2_rx.recv::<AppResponse>().await.unwrap();
-        panic!("Should not have received anything but got {:?}", receive);
+        panic!("Should not have received anything but got {receive:?}");
     })
     .await
     .unwrap_err();
@@ -494,14 +494,14 @@ async fn signals_are_restricted_by_app() {
     let receive = app_3_rx_app_1.recv::<AppResponse>().await.unwrap();
     match receive {
         ReceiveMessage::Signal(_) => (),
-        _ => panic!("Expected signal but got {:?}", receive),
+        _ => panic!("Expected signal but got {receive:?}"),
     }
 
     // app_3_rx_app_2 is connected to the app_3 which has no restriction but the connection is for
     // app_2 so should not see the signal
     tokio::time::timeout(std::time::Duration::from_millis(10), async {
         let receive = app_3_rx_app_2.recv::<AppResponse>().await.unwrap();
-        panic!("Should not have received anything but got {:?}", receive);
+        panic!("Should not have received anything but got {receive:?}");
     })
     .await
     .unwrap_err();

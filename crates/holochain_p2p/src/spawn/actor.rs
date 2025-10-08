@@ -1127,7 +1127,7 @@ impl HolochainP2pActor {
             self.request_duration_metric.record(
                 start.elapsed().as_secs_f64(),
                 &[
-                    opentelemetry_api::KeyValue::new("dna_hash", format!("{:?}", dna_hash)),
+                    opentelemetry_api::KeyValue::new("dna_hash", format!("{dna_hash:?}")),
                     opentelemetry_api::KeyValue::new("tag", tag),
                     opentelemetry_api::KeyValue::new("url", to_url.as_str().to_string()),
                     opentelemetry_api::KeyValue::new("error", error),

@@ -352,13 +352,13 @@ use holochain_wasmer_common::WasmErrorInner;
 #[cfg(feature = "holochain-wasmer")]
 impl<T: HashType, P: PrimitiveHashType> From<HashConversionError<T, P>> for WasmErrorInner {
     fn from(err: HashConversionError<T, P>) -> Self {
-        WasmErrorInner::Guest(format!("{:?}", err))
+        WasmErrorInner::Guest(format!("{err:?}"))
     }
 }
 
 #[cfg(feature = "holochain-wasmer")]
 impl<T: HashType> From<CompositeHashConversionError<T>> for WasmErrorInner {
     fn from(err: CompositeHashConversionError<T>) -> Self {
-        WasmErrorInner::Guest(format!("{:?}", err))
+        WasmErrorInner::Guest(format!("{err:?}"))
     }
 }

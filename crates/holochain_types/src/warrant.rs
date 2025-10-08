@@ -77,9 +77,10 @@ impl HashableContent for WarrantOp {
 impl holochain_sqlite::rusqlite::ToSql for WarrantOpType {
     fn to_sql(
         &self,
-    ) -> holochain_sqlite::rusqlite::Result<holochain_sqlite::rusqlite::types::ToSqlOutput> {
+    ) -> holochain_sqlite::rusqlite::Result<holochain_sqlite::rusqlite::types::ToSqlOutput<'_>>
+    {
         Ok(holochain_sqlite::rusqlite::types::ToSqlOutput::Owned(
-            format!("{}", self).into(),
+            format!("{self}").into(),
         ))
     }
 }

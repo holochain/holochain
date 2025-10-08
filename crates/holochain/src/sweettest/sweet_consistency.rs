@@ -314,7 +314,7 @@ mod tests {
         .await
         .0;
         let ((alice,), (bob,)) = conductors
-            .setup_app("", &[dna_file.clone()])
+            .setup_app("", std::slice::from_ref(&dna_file))
             .await
             .unwrap()
             .into_tuples();
@@ -352,7 +352,7 @@ mod tests {
         .await
         .0;
         let ((alice,), (bob,)) = conductors
-            .setup_app("", &[dna_file.clone()])
+            .setup_app("", std::slice::from_ref(&dna_file))
             .await
             .unwrap()
             .into_tuples();

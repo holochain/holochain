@@ -9,8 +9,9 @@ authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 keywords = ["holochain", "holo", "test", "fixture"]
 categories = ["fixtures"]
 edition = "2021"
+publish = false
 
 # reminder - do not use workspace deps
 [dependencies]
-fixt = { path = "..", version = "^0.6.0-dev.5"}
+fixt = { path = "..", version = "^0.6.0-dev.7"}
 paste = "1.0.12"

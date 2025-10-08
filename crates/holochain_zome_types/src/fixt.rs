@@ -47,11 +47,6 @@ fixturator!(
 );
 
 fixturator!(
-    RequiredValidationType;
-    unit variants [ Record SubChain Full ] empty Record;
-);
-
-fixturator!(
     AppEntryDef;
     constructor fn new(U8, U8, EntryVisibility);
 );

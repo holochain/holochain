@@ -139,7 +139,7 @@ async fn countersigning_session_interaction_calls() {
         ))
         .into(),
     );
-    assert_eq!(format!("{:?}", response), format!("{:?}", expected_error));
+    assert_eq!(format!("{response:?}"), format!("{:?}", expected_error));
 
     // Abandoning a non-existing session of an existing cell should return an error.
     let response: AppResponse = request(
@@ -153,7 +153,7 @@ async fn countersigning_session_interaction_calls() {
         ))
         .into(),
     );
-    assert_eq!(format!("{:?}", response), format!("{:?}", expected_error));
+    assert_eq!(format!("{response:?}"), format!("{:?}", expected_error));
 
     // Publishing a session of a non-existing cell should return an error.
     let response: AppResponse = request(
@@ -167,7 +167,7 @@ async fn countersigning_session_interaction_calls() {
         ))
         .into(),
     );
-    assert_eq!(format!("{:?}", response), format!("{:?}", expected_error));
+    assert_eq!(format!("{response:?}"), format!("{:?}", expected_error));
 
     // Publishing a non-existing session of an existing cell should return an error.
     let response: AppResponse = request(
@@ -181,7 +181,7 @@ async fn countersigning_session_interaction_calls() {
         ))
         .into(),
     );
-    assert_eq!(format!("{:?}", response), format!("{:?}", expected_error));
+    assert_eq!(format!("{response:?}"), format!("{:?}", expected_error));
 
     // Set up the session and accept it for both agents.
     let preflight_request: PreflightRequest = alice
@@ -242,7 +242,7 @@ async fn countersigning_session_interaction_calls() {
         ))
         .into(),
     );
-    assert_eq!(format!("{:?}", response), format!("{:?}", expected_error));
+    assert_eq!(format!("{response:?}"), format!("{:?}", expected_error));
 
     // Publishing a session in a resolvable state should not be possible and return an error.
     let response: AppResponse = request(
@@ -256,7 +256,7 @@ async fn countersigning_session_interaction_calls() {
         ))
         .into(),
     );
-    assert_eq!(format!("{:?}", response), format!("{:?}", expected_error));
+    assert_eq!(format!("{response:?}"), format!("{:?}", expected_error));
 
     // Session should be unaffected by the failing calls.
     assert_matches!(
@@ -364,7 +364,7 @@ async fn countersigning_session_interaction_calls() {
         ))
         .into(),
     );
-    assert_eq!(format!("{:?}", response), format!("{:?}", expected_error));
+    assert_eq!(format!("{response:?}"), format!("{:?}", expected_error));
     // Bob's session should still be in Accepted state.
     assert_matches!(
         get_session_state(&bob.cell_id, &bob_app_tx).await,

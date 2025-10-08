@@ -5,7 +5,7 @@ authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 description = "A mock version of the holochain HDI"
 license = "Apache-2.0"
-documentation = "https://docs.rs/holochain_mock_hdi"
+publish = false
 
 # reminder - do not use workspace deps
 [dependencies]

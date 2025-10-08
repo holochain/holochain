@@ -408,7 +408,7 @@ impl ZomeCallInvocation {
                 .map_err(Box::new)?
             {
                 WitnessNonceResult::Fresh => ZomeCallAuthorization::Authorized,
-                nonce_result => ZomeCallAuthorization::BadNonce(format!("{:?}", nonce_result)),
+                nonce_result => ZomeCallAuthorization::BadNonce(format!("{nonce_result:?}")),
             },
         )
     }
@@ -779,7 +779,7 @@ pub mod wasm_test {
 
         match bob_call_result {
             Ok(Ok(ZomeCallResponse::Unauthorized(..))) => { /* (☞ ͡° ͜ʖ ͡°)☞ */ }
-            _ => panic!("{:?}", bob_call_result),
+            _ => panic!("{bob_call_result:?}"),
         }
 
         // The call should NOT fail for alice (e.g. bob's forgery should not consume alice's nonce).
@@ -790,7 +790,7 @@ pub mod wasm_test {
 
         match alice_call_result_0 {
             Ok(Ok(ZomeCallResponse::Ok(_))) => { /* ಥ‿ಥ */ }
-            _ => panic!("{:?}", alice_call_result_0),
+            _ => panic!("{alice_call_result_0:?}"),
         }
 
         // The same call cannot be used a second time.
@@ -801,7 +801,7 @@ pub mod wasm_test {
 
         match alice_call_result_1 {
             Ok(Ok(ZomeCallResponse::Unauthorized(..))) => { /* ☜(ﾟヮﾟ☜) */ }
-            _ => panic!("{:?}", bob_call_result),
+            _ => panic!("{bob_call_result:?}"),
         }
     }
 

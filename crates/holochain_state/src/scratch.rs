@@ -128,10 +128,6 @@ impl Scratch {
         self.entries.iter()
     }
 
-    pub fn num_actions(&self) -> usize {
-        self.actions.len()
-    }
-
     fn get_exact_record(&self, hash: &ActionHash) -> StateQueryResult<Option<Record>> {
         Ok(self.get_action(hash)?.map(|shh| {
             let entry = shh

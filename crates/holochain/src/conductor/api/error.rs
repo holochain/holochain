@@ -26,17 +26,6 @@ pub enum ConductorApiError {
     #[error("The Cell for this cell id is not installed in the conductor! CellId: {0}")]
     CellMissing(CellId),
 
-    /// Cell was referenced, but is missing from the conductor.
-    #[error(
-        "A Cell attempted to use an CellConductorApi it was not given.\nAPI CellId: {api_cell_id:?}\nInvocation CellId: {call_cell_id:?}"
-    )]
-    ZomeCallCellMismatch {
-        /// The CellId which is referenced by the CellConductorApi
-        api_cell_id: CellId,
-        /// The CellId which is referenced by the ZomeCallInvocation
-        call_cell_id: CellId,
-    },
-
     /// Conductor threw an error during API call.
     #[error("Conductor returned an error while using a ConductorApi: {0:?}")]
     ConductorError(#[from] ConductorError),
@@ -165,7 +154,7 @@ impl From<ConductorApiError> for ExternalApiWireError {
 
 impl From<SerializationError> for ExternalApiWireError {
     fn from(e: SerializationError) -> Self {
-        ExternalApiWireError::Deserialization(format!("{:?}", e))
+        ExternalApiWireError::Deserialization(format!("{e:?}"))
     }
 }
 
@@ -184,6 +173,6 @@ pub fn zome_call_response_to_conductor_api_result<T: DeserializeOwned + std::fmt
 ) -> ConductorApiResult<T> {
     match zcr {
         ZomeCallResponse::Ok(bytes) => Ok(bytes.decode().map_err(SerializationError::from)?),
-        other => Err(ConductorApiError::other(format!("{:?}", other))),
+        other => Err(ConductorApiError::other(format!("{other:?}"))),
     }
 }

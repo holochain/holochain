@@ -312,21 +312,9 @@ impl PreflightResponse {
         &self.agent_state
     }
 
-    /// Mutable agent state accessor for testing.
-    #[cfg(feature = "test_utils")]
-    pub fn agent_state_mut(&mut self) -> &mut CounterSigningAgentState {
-        &mut self.agent_state
-    }
-
     /// Signature accessor.
     pub fn signature(&self) -> &Signature {
         &self.signature
-    }
-
-    /// Mutable signature accessor for testing.
-    #[cfg(feature = "test_utils")]
-    pub fn signature_mut(&mut self) -> &mut Signature {
-        &mut self.signature
     }
 }
 

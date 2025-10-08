@@ -138,25 +138,6 @@ pub(crate) mod tests;
 /// Cloneable reference to a Conductor
 pub type ConductorHandle = Arc<Conductor>;
 
-/// The reason why a cell is waiting to join the network.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum PendingJoinReason {
-    /// The initial state, no attempt has been made to join the network yet.
-    Initial,
-
-    /// The join failed with an error that is safe to retry, such as not
-    /// being connected to the internet.
-    Retry(String),
-
-    /// The network join failed and will not be retried. This will impact
-    /// the status of the associated
-    /// app and require manual intervention from the user.
-    Failed(String),
-
-    /// The join attempt has timed out.
-    TimedOut,
-}
-
 #[allow(dead_code)]
 pub(crate) type StopBroadcaster = task_motel::StopBroadcaster;
 pub(crate) type StopReceiver = task_motel::StopListener;
@@ -1540,7 +1521,7 @@ mod app_impls {
             installed_app_id: &InstalledAppId,
         ) -> ConductorResult<Vec<DnaHash>> {
             let app_info = self.get_app_info(installed_app_id).await?.ok_or_else(|| {
-                ConductorError::other(format!("App not installed: {}", installed_app_id))
+                ConductorError::other(format!("App not installed: {installed_app_id}"))
             })?;
 
             let mut app_dnas: HashSet<DnaHash> = HashSet::new();
@@ -3063,11 +3044,11 @@ impl Conductor {
         self.admin_websocket_ports
             .share_ref(|admin_websocket_ports| {
                 for port in admin_websocket_ports {
-                    writeln!(&mut out, "###ADMIN_PORT:{}###", port)
+                    writeln!(&mut out, "###ADMIN_PORT:{port}###")
                         .expect("Can't write setup to std out");
                 }
             });
-        println!("\n###HOLOCHAIN_SETUP###\n{}###HOLOCHAIN_SETUP_END###", out);
+        println!("\n###HOLOCHAIN_SETUP###\n{out}###HOLOCHAIN_SETUP_END###");
     }
 }
 
@@ -3299,7 +3280,7 @@ fn query_dht_ops_from_statement(
     dht_ops_cursor: Option<u64>,
 ) -> ConductorApiResult<Vec<DhtOp>> {
     let final_stmt_str = match dht_ops_cursor {
-        Some(cursor) => format!("{} AND DhtOp.rowid > {}", stmt_str, cursor),
+        Some(cursor) => format!("{stmt_str} AND DhtOp.rowid > {cursor}"),
         None => stmt_str.into(),
     };
 

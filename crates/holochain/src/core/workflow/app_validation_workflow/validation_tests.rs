@@ -380,12 +380,12 @@ async fn app_validation_ops() {
         let mut agents = agents.lock();
 
         let app = conductors[0]
-            .setup_app("test_app", &[dna_file_a.clone()])
+            .setup_app("test_app", std::slice::from_ref(&dna_file_a))
             .await
             .unwrap();
         let (alice,) = app.into_tuple();
         let app = conductors[1]
-            .setup_app("test_app", &[dna_file_b.clone()])
+            .setup_app("test_app", std::slice::from_ref(&dna_file_b))
             .await
             .unwrap();
         let (bob,) = app.into_tuple();
@@ -433,11 +433,11 @@ async fn app_validation_ops() {
         tokio::time::timeout(std::time::Duration::from_secs(5), events_rx.recv()).await
     {
         if !received.insert(event.clone()) {
-            panic!("Got {} twice", event);
+            panic!("Got {event} twice");
         }
         if !expected.0.remove(&event) {
             let mut s = String::new();
-            writeln!(&mut s, "Got event {} that was missing from:", event).unwrap();
+            writeln!(&mut s, "Got event {event} that was missing from:").unwrap();
             let mut events: Vec<String> = expected.0.iter().map(Event::to_string).collect();
             events.sort();
             let events = events.into_iter().fold(String::new(), |mut acc, s| {
@@ -445,7 +445,7 @@ async fn app_validation_ops() {
                 acc.push('\n');
                 acc
             });
-            writeln!(&mut s, "{}", events).unwrap();
+            writeln!(&mut s, "{events}").unwrap();
 
             panic!("{}", s);
         }
@@ -459,9 +459,6 @@ async fn app_validation_ops() {
             acc
         });
 
-        panic!(
-            "The following ops were expected to be validated but never were: \n{}",
-            events
-        );
+        panic!("The following ops were expected to be validated but never were: \n{events}");
     }
 }

@@ -39,7 +39,7 @@ impl Query for GetRecordOpsQuery {
         .into()
     }
 
-    fn params(&self) -> Vec<Params> {
+    fn params(&self) -> Vec<Params<'_>> {
         let params = named_params! {
             ":store_record": ChainOpType::StoreRecord,
             ":delete": ChainOpType::RegisterDeletedBy,

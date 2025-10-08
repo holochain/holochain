@@ -73,7 +73,6 @@ use crate::core::ribosome::host_fn::trace::trace;
 use crate::core::ribosome::host_fn::unblock_agent::unblock_agent;
 use crate::core::ribosome::host_fn::update::update;
 use crate::core::ribosome::host_fn::verify_signature::verify_signature;
-use crate::core::ribosome::host_fn::version::version;
 use crate::core::ribosome::host_fn::x_25519_x_salsa20_poly1305_decrypt::x_25519_x_salsa20_poly1305_decrypt;
 use crate::core::ribosome::host_fn::x_25519_x_salsa20_poly1305_encrypt::x_25519_x_salsa20_poly1305_encrypt;
 use crate::core::ribosome::host_fn::x_salsa20_poly1305_decrypt::x_salsa20_poly1305_decrypt;
@@ -410,7 +409,7 @@ impl RealRibosome {
             let mut store_mut = store.as_store_mut();
             instance = Arc::new(Instance::new(&mut store_mut, &module, &imports).map_err(
                 |e| -> RuntimeError {
-                    wasm_error!(WasmErrorInner::ModuleBuild(format!("{}: {}", name, e))).into()
+                    wasm_error!(WasmErrorInner::ModuleBuild(format!("{name}: {e}"))).into()
                 },
             )?);
         }
@@ -510,7 +509,6 @@ impl RealRibosome {
         host_fn_builder
             .with_host_function(&mut ns, "__hc__agent_info_1", agent_info)
             .with_host_function(&mut ns, "__hc__trace_1", trace)
-            .with_host_function(&mut ns, "__hc__version_1", version)
             .with_host_function(&mut ns, "__hc__verify_signature_1", verify_signature)
             .with_host_function(&mut ns, "__hc__sign_1", sign)
             .with_host_function(&mut ns, "__hc__sign_ephemeral_1", sign_ephemeral)
@@ -674,7 +672,7 @@ impl RealRibosome {
                 .map_or(Ok(None), |func| Ok(Some(func.call(&mut store_mut)?)))
                 .map_err(|e: RuntimeError| {
                     RibosomeError::WasmRuntimeError(
-                        wasm_error!(WasmErrorInner::Host(format!("{}", e))).into(),
+                        wasm_error!(WasmErrorInner::Host(format!("{e}"))).into(),
                     )
                 })?;
         }
@@ -888,11 +886,8 @@ impl RibosomeT for RealRibosome {
                     })? {
                     EntryDefsResult::Err(zome, error_string) => {
                         return Err(RibosomeError::WasmRuntimeError(
-                            wasm_error!(WasmErrorInner::Host(format!(
-                                "{}: {}",
-                                zome, error_string
-                            )))
-                            .into(),
+                            wasm_error!(WasmErrorInner::Host(format!("{zome}: {error_string}")))
+                                .into(),
                         ))
                     }
                     EntryDefsResult::Defs(defs) => {
@@ -1357,7 +1352,6 @@ pub mod wasm_test {
                 "__hc__unblock_agent_1",
                 "__hc__update_1",
                 "__hc__verify_signature_1",
-                "__hc__version_1",
                 "__hc__x_25519_x_salsa20_poly1305_decrypt_1",
                 "__hc__x_25519_x_salsa20_poly1305_encrypt_1",
                 "__hc__x_salsa20_poly1305_decrypt_1",

@@ -10,9 +10,6 @@ pub enum TaskManagerError {
     #[error("Conductor has exited due to an unrecoverable error in a managed task {0}")]
     Unrecoverable(Box<ManagedTaskError>),
 
-    #[error("Task manager failed to start")]
-    TaskManagerFailedToStart,
-
     #[error(transparent)]
     Join(#[from] tokio::task::JoinError),
 

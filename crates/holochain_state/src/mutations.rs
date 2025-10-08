@@ -64,7 +64,7 @@ pub enum TransferMethod {
 }
 
 impl rusqlite::ToSql for TransferMethod {
-    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
         let stage = match self {
             TransferMethod::Publish => 1,
             TransferMethod::Gossip(GossipType::Recent) => 2,
