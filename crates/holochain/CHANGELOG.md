@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- **BREAKING CHANGE** Removed unused sql queries from `holochain_sqlite`:
+- **BREAKING CHANGE** Removed unused public SQL queries from `holochain_sqlite`:
   - `ACTIVITY_INTEGRATED_UPPER_BOUND`
   - `ALL_ACTIVITY_AUTHORS`
   - `FETCH_OP_HASHES_P1`
