@@ -160,7 +160,8 @@ async fn test_must_get_agent_activity_inner(
     };
     let mut cascade = CascadeImpl::empty()
         .with_authored(authored.into())
-        .with_network(network, cache);
+        .with_network(network, cache)
+        .with_dht(dht.into());
     if let Some(sync_scratch) = sync_scratch {
         cascade = cascade.with_scratch(sync_scratch);
     }
