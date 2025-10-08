@@ -1,7 +1,12 @@
 -- Select Actions by the given author, where the Action has a valid RegisterAgentActivity Op
 SELECT
+    Action.seq,
     Action.hash,
-    Action.blob
+    Action.blob,
+
+    -- Ensures that the GROUP BY Action.seq will retain the action with the maximum ActionHash, excluding the rest
+    -- This ensures that de-duplication of forked actions is determanisitic within a single query.
+    MAX(Action.hash) as max_action_hash
 FROM
     DhtOp
     JOIN Action ON DhtOp.action_hash = Action.hash
@@ -43,13 +48,15 @@ AND
         1=1
     )
 
+-- Exclude forked actions, keeping only the first.
+-- Because we are selecting the aggregate function MAX(Action.hash), this will retain the Action with the maximum ActionHash.
+-- This ensures that de-duplication of forked actions is determanisitic within a single query.
+GROUP BY
+    Action.seq
+
 -- Order by seq number, then hash, descending
 ORDER BY
-    Action.seq DESC,
-
-    -- Ordering by hash ensures that forking Actions are still ordered consistently 
-    Action.hash DESC
-
+    Action.seq DESC
 
 -- Optionally, limit returned rows to the ChainFilter `take`
 LIMIT

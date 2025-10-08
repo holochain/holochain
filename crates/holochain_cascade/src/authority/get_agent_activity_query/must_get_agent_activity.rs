@@ -13,8 +13,7 @@ use std::collections::HashSet;
 #[cfg(test)]
 mod test;
 
-/// Get the agent activity for a given agent and
-/// filtered range of actions.
+/// Get the agent activity for a given agent and filtered range of actions.
 ///
 /// If the full filtered range of activity is found, this will return [`MustGetAgentActivityResponse::Activity`].
 /// If the chain top is not found, this will return [`MustGetAgentActivityResponse::ChainTopNotFound`].
@@ -26,7 +25,7 @@ pub async fn must_get_agent_activity(
     author: AgentPubKey,
     filter: ChainFilter,
 ) -> StateQueryResult<MustGetAgentActivityResponse> {
-    let mut activity = env
+    let activity = env
         .read_async({
             let filter = filter.clone();
             let author = author.clone();
@@ -35,8 +34,9 @@ pub async fn must_get_agent_activity(
         })
         .await?;
 
-    // Remove forked activity from activity list
-    exclude_forked_activity(&mut activity);
+    // Note we do *not* need to explicitly exclude forked actions with `exclude_forked_actions`,
+    // because we are only making this query to a single database.
+    // The sql query itself already excludes forked actions.
 
     let result = 
         // If no activity was returned, then we never found the chain top hash specified by the filter.
@@ -261,9 +261,9 @@ fn flatten_deduplicate_sort<T, K, F>(lists: Vec<Vec<T>>, mut key_by: F) -> Vec<T
     merged
 }
 
-/// Merge, sort by action seq descending, and deduplicate a list of RegisterAgentActivity lists
+/// Merge, sort by action seq descending, then action hash descending, and deduplicate a list of RegisterAgentActivity lists
 pub(crate) fn merge_agent_activity(activity_lists: Vec<Vec<RegisterAgentActivity>>) -> Vec<RegisterAgentActivity> {
-    flatten_deduplicate_sort(activity_lists, |a| Reverse(a.action.seq()))
+    flatten_deduplicate_sort(activity_lists, |a| (Reverse(a.action.seq()), Reverse(a.action.hashed.hash.clone())))
 }
 
 /// Merge, sort by action seq descending, and deduplicate a list of WarrantOp lists
