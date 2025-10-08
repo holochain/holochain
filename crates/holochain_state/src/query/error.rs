@@ -23,6 +23,8 @@ pub enum StateQueryError {
     ActionError(#[from] holochain_zome_types::prelude::ActionError),
     #[error(transparent)]
     SyncScratchError(#[from] SyncScratchError),
+    #[error("Input parameters are invalid: {0}")]
+    InvalidInput(String),
     #[error("{0}")]
     Other(String),
 }
