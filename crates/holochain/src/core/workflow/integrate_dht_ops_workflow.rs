@@ -47,7 +47,7 @@ pub async fn integrate_dht_ops_workflow(
                         } else {
                             tracing::error!(
                                 ?op_basis,
-                                "expected basis hash of wearrant op to be an agent pub key"
+                                "expected basis hash of warrant op to be an agent pub key"
                             );
                         }
                     }
