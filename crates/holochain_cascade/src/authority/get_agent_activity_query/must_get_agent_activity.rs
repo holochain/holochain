@@ -6,6 +6,7 @@ use holochain_sqlite::rusqlite::ToSql;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_cell::must_get_agent_activity::MUST_GET_AGENT_ACTIVITY;
 use holochain_state::prelude::*;
+use std::cmp::Reverse;
 use std::collections::HashSet;
 
 #[cfg(test)]
@@ -46,7 +47,7 @@ pub async fn must_get_agent_activity(
         // If activity list does not contain the full sequence of activity
         // from start of filtered range through end, or if the sequence activity
         // is not hash-chained, then it is incomplete.
-        else if !is_activity_complete(&activity) || !is_activity_chained(&activity) {
+        else if !is_activity_complete(&activity) || !is_activity_chained_descending(&activity) {
             MustGetAgentActivityResponse::IncompleteChain
         }
 
@@ -195,39 +196,38 @@ pub(crate) fn get_filtered_agent_activity(
     Ok(out)
 }
 
-/// Merges and deduplicates a list of lists, preserving the original order,
-/// while minimizing cloning.
-fn flatten_deduplicate<T, K, F>(lists: Vec<Vec<T>>, key_by: F) -> Vec<T>
+/// Flattens, sorts and deduplicates a list of lists.
+fn flatten_deduplicate_sort<T, K, F>(lists: Vec<Vec<T>>, mut key_by: F) -> Vec<T>
     where
-        K: std::hash::Hash + Eq + Clone,
-        F: Fn(&T) -> K
+        K: Ord,
+        F: FnMut(&T) -> K,
     {
-    let mut seen_items = HashSet::new();
-    let mut merged_items = Vec::new();
 
-    for mut list in lists {
-        list.retain(|a| {
-            if seen_items.contains(&key_by(a)) {
-                false
-            } else {
-                seen_items.insert(key_by(a).clone());
-                true
-            }
-        });
-        merged_items.extend(list);
+    // Flatten list of lists into a single list
+    let merged_size = lists.iter().map(|l| l.len()).sum();
+    let mut merged = Vec::with_capacity(merged_size);
+    for list in lists {
+        merged.extend(list);
     }
 
-    merged_items
+    // Sort in-place
+    merged.sort_unstable_by_key(&mut key_by);
+
+    // Deduplicate in-place
+    let dedup_key_by = |x: &mut T| key_by(&*x);
+    merged.dedup_by_key(dedup_key_by);
+
+    merged
 }
 
-/// Merge and deduplicate a list of RegisterAgentActivity lists, preserving the original order
+/// Merge, sort by action seq descending, and deduplicate a list of RegisterAgentActivity lists
 pub(crate) fn merge_agent_activity(activity_lists: Vec<Vec<RegisterAgentActivity>>) -> Vec<RegisterAgentActivity> {
-    flatten_deduplicate(activity_lists, |a| a.action.hashed.hash.clone())
+    flatten_deduplicate_sort(activity_lists, |a| Reverse(a.action.seq()))
 }
 
-/// Merge and deduplicate a list of WarrantOp lists, preserving the original order
+/// Merge, sort by action seq descending, and deduplicate a list of WarrantOp lists
 pub(crate) fn merge_warrants(warrants_lists: Vec<Vec<WarrantOp>>) -> Vec<WarrantOp> {
-    flatten_deduplicate(warrants_lists, |w| w.to_hash())
+    flatten_deduplicate_sort(warrants_lists, |w| w.to_hash())
 }
 
 /// Remove all Actions that have a sequence number equivalent to any prior Actions.
@@ -246,7 +246,7 @@ pub(crate) fn is_activity_complete(activity: &Vec<RegisterAgentActivity>) -> boo
 }
 
 /// Check that every Action's prev_hash is equivalent to the next Action in the list's ActionHash.
-pub(crate) fn is_activity_chained(activity: &Vec<RegisterAgentActivity>) -> bool {
+pub(crate) fn is_activity_chained_descending(activity: &Vec<RegisterAgentActivity>) -> bool {
     activity
         .windows(2)
         .all(|window| {
