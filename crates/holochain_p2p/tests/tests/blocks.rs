@@ -12,7 +12,7 @@ use holochain_state::{block::get_all_cell_blocks, prelude::test_conductor_db};
 use holochain_timestamp::{InclusiveTimestampInterval, Timestamp};
 use holochain_types::{
     db::{DbKindConductor, DbKindDht, DbKindPeerMetaStore, DbWrite},
-    prelude::{Block, CellBlockReason, CellId},
+    prelude::{Block, BlockTargetId, CellBlockReason, CellId},
     record::WireRecordOps,
 };
 use holochain_zome_types::block::BlockTarget;

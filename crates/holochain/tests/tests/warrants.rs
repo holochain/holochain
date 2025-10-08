@@ -69,16 +69,7 @@ async fn warranted_agent_is_blocked() {
 
     let dna_hash = dna_without_validation.dna_hash();
 
-    let config = SweetConductorConfig::standard();
-    let config_without_publish = config
-        .clone()
-        .tune_network_config(|nc| nc.disable_publish = true)
-        .tune_conductor(|tc| tc.min_publish_interval = Some(Duration::from_secs(10)));
-    let mut conductors = SweetConductorBatch::from_configs_rendezvous([
-        config_without_publish.clone(),
-        config_without_publish,
-    ])
-    .await;
+    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
     let (alice,) = conductors[0]
         .setup_app("test_app", [&dna_without_validation])
         .await
