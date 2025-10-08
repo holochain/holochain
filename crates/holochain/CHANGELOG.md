@@ -7,6 +7,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE** Removed unused sql queries from `holochain_sqlite`:
+  - `ACTIVITY_INTEGRATED_UPPER_BOUND`
+  - `ALL_ACTIVITY_AUTHORS`
+  - `FETCH_OP_HASHES_P1`
+  - `FETCH_OP_HASHES_P2`
+  - `FETCH_OP_REGION`
+  - `FETCH_OPS_BY_REGION`
+  - `FETCH_REGION_OP_HASHES`
+
 - **BREAKING CHANGE** Removed the hdk host function `version`, which was not implemented.
 - **BREAKING CHANGE** Removed the following public functions, types and enum variants that were not implemented or not used:
   - `holochain_cascade`
