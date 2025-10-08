@@ -4,6 +4,7 @@ use holochain_sqlite::prelude::{DbKindDht, DbRead};
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::ToSql;
 use holochain_sqlite::rusqlite::Transaction;
+use holochain_sqlite::sql::sql_cell::must_get_agent_activity::ACTION_HASH_TO_SEQ;
 use holochain_sqlite::sql::sql_cell::must_get_agent_activity::MUST_GET_AGENT_ACTIVITY;
 use holochain_state::prelude::*;
 use holochain_state::query::StateQueryError;
@@ -40,7 +41,6 @@ pub async fn must_get_agent_activity(
     } else {
         return Ok(MustGetAgentActivityResponse::ChainTopNotFound(filter.chain_top));
     };
-
 
     let activity = env
         .read_async({
@@ -85,18 +85,7 @@ pub(crate) fn get_action_seq(
     action_hash: &ActionHash
 ) -> StateQueryResult<Option<u32>> {
     let maybe_chain_top_action_seq: Option<u32> = txn
-        .prepare("
-            SELECT 
-                Action.seq as seq
-            FROM
-                Action
-                JOIN DhtOp ON DhtOp.action_hash = Action.hash
-            WHERE
-                Action.hash = :action_hash
-                AND Action.author = :author
-                AND DhtOp.type = :op_type_register_agent_activity
-                AND DhtOp.when_integrated IS NOT NULL
-        ")?
+        .prepare(ACTION_HASH_TO_SEQ)?
         .query_row(
             named_params! {
                 ":author": author,
