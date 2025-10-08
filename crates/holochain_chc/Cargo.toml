@@ -1,6 +1,6 @@
 [package]
 name = "holochain_chc"
-version = "0.3.0-dev.27"
+version = "0.3.0-dev.28"
 description = "Defines the Chain Head Coordinator (CHC) API for Holochain and provides an HTTP client implementation."
 license = "Apache-2.0"
 repository = "https://github.com/holochain/holochain"
@@ -14,9 +14,9 @@ async-trait = "0.1"
 derive_more = { version = "2.0", features = ["from"] }
 futures = "0.3"
 getrandom = "0.3"
-holochain_keystore = { version = "^0.6.0-dev.19", path = "../holochain_keystore", default-features = false }
+holochain_keystore = { version = "^0.6.0-dev.20", path = "../holochain_keystore", default-features = false }
 holochain_nonce = { version = "^0.6.0-dev.5", path = "../holochain_nonce" }
-holochain_types = { path = "../holochain_types", version = "^0.6.0-dev.27" }
+holochain_types = { path = "../holochain_types", version = "^0.6.0-dev.28" }
 one_err = "0.0.8"
 must_future = "0.1.1"
 parking_lot = "0.12"
@@ -28,7 +28,7 @@ tracing = "0.1"
 url = "2.4"
 
 holochain_serialized_bytes = { version = "=0.0.56", optional = true }
-holo_hash = { version = "^0.6.0-dev.15", path = "../holo_hash", optional = true }
+holo_hash = { version = "^0.6.0-dev.16", path = "../holo_hash", optional = true }
 reqwest = { version = "0.12", default-features = false, features = [
   "json",
   "rustls-tls",
@@ -37,7 +37,7 @@ reqwest = { version = "0.12", default-features = false, features = [
 [dev-dependencies]
 holochain_chc = { path = ".", features = ["test_utils"] }
 
-fixt = { version = "^0.6.0-dev.6", path = "../fixt" }
+fixt = { version = "^0.6.0-dev.7", path = "../fixt" }
 pretty_assertions = "1.4"
 tokio = { version = "1.36.0", features = ["full"] }
 
