@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.6.0-dev.28
+
 - **BREAKING CHANGE** Removed the hdk host function `version`, which was not implemented.
 - **BREAKING CHANGE** Removed the following public functions, types and enum variants that were not implemented or not used:
   - `holochain_cascade`
@@ -21,7 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
     - `RequiredValidationType`
   - `holochain_sqlite`
     - `_check_migrations`
-    - `DatabaseError::EnvironmentDoubleInitialized` \
+    - `DatabaseError::EnvironmentDoubleInitialized` \\
     - `DatabaseError::NoPrivateDb`
   - `holochain_state`
     - `SourceChainError::MissingHead`
