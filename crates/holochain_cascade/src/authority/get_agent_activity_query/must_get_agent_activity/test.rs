@@ -134,31 +134,56 @@ async fn returns_full_sequence_from_filter(
     => MustGetAgentActivityResponse::ChainTopNotFound(action_hash(&[15])) ; "Starting chain_top not found")]
 #[test_case(
     vec![(agent_hash(&[0]), forked_chain(&[0..6, 3..8]))], agent_hash(&[0]), ChainFilter::new(action_hash(&[7, 1])).take(7)
-    => matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 7 ; "Handles forks")]
+    => matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 7 ; "Excludes forked actions")]
 #[test_case(
     agent_chain(&[(0, 0..5)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[4])).until_hash(action_hash(&[2, 1]))
     => matches MustGetAgentActivityResponse::Activity { .. } ; "Until hash not found")]
 #[test_case(
     vec![(agent_hash(&[0]), forked_chain(&[0..6, 3..8]))], agent_hash(&[0]),
     ChainFilter::new(action_hash(&[5, 0])).until_hash(action_hash(&[4, 1]))
-    => MustGetAgentActivityResponse::IncompleteChain ; "Unit hash on fork")]
+    => matches MustGetAgentActivityResponse::Activity { .. } ; "Until hash is a retained forked action")]
 #[test_case(
-    agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[8])).until_hash(action_hash(&[9]))
-    => matches MustGetAgentActivityResponse::Activity { .. }; "Until is higher then chain_top")]
+    vec![(agent_hash(&[0]), forked_chain(&[0..6, 3..8]))], agent_hash(&[0]),
+    ChainFilter::new(action_hash(&[5, 0])).until_hash(action_hash(&[4, 0]))
+    => matches MustGetAgentActivityResponse::Activity { .. } ; "Until hash is an excluded forked action")]
 /// Check the query returns the appropriate responses.
 #[tokio::test(flavor = "multi_thread")]
-async fn test_responses(
+async fn test_authority_must_get_agent_activity_ok_responses(
     chain: Vec<(AgentPubKey, Vec<TestChainItem>)>,
     agent: AgentPubKey,
     filter: ChainFilter,
 ) -> MustGetAgentActivityResponse {
+    holochain_trace::test_run();
     let db = commit_chain(
         DbKindDht(Arc::new(DnaHash::from_raw_36(vec![0; 36]))),
         chain,
     );
-    must_get_agent_activity(db.clone().into(), agent.clone(), filter)
+    let res = must_get_agent_activity(db.clone().into(), agent.clone(), filter)
         .await
-        .unwrap()
+        .unwrap();
+
+    res
+}
+
+#[test_case(
+    agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[8])).until_hash(action_hash(&[9]))
+    => matches StateQueryError::InvalidInput(_); "Until hash is higher then chain_top")]
+#[tokio::test(flavor = "multi_thread")]
+async fn test_authority_must_get_agent_activity_err_responses(
+    chain: Vec<(AgentPubKey, Vec<TestChainItem>)>,
+    agent: AgentPubKey,
+    filter: ChainFilter,
+) -> StateQueryError {
+    holochain_trace::test_run();
+    let db = commit_chain(
+        DbKindDht(Arc::new(DnaHash::from_raw_36(vec![0; 36]))),
+        chain,
+    );
+    let res = must_get_agent_activity(db.clone().into(), agent.clone(), filter)
+        .await
+        .unwrap_err();
+
+    res
 }
 
 /// Helper function to create a RegisterAgentActivity
