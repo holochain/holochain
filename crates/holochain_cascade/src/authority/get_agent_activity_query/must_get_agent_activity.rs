@@ -6,6 +6,7 @@ use holochain_sqlite::rusqlite::ToSql;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_cell::must_get_agent_activity::MUST_GET_AGENT_ACTIVITY;
 use holochain_state::prelude::*;
+use holochain_state::query::StateQueryError;
 use std::cmp::Reverse;
 use std::collections::HashSet;
 
@@ -126,6 +127,39 @@ pub(crate) fn get_filtered_agent_activity(
     author: &AgentPubKey,
     filter: ChainFilter,
 ) -> StateQueryResult<Vec<RegisterAgentActivity>> {
+    // Get chain top Action seq
+    // This is necessary so we can premptively check that the maximum until hash Action seq is less than or equal to the chain top Action seq.
+    // And then return an invalid input error.
+    let maybe_chain_top_action_seq: Option<u32> = txn
+        .prepare("
+            SELECT 
+                Action.seq
+            FROM
+                Action
+                JOIN DhtOp ON DhtOp.action_hash = Action.hash
+            WHERE
+                Action.hash = :chain_top_action_hash
+                AND Action.author = :author
+                AND DhtOp.type = :op_type_register_agent_activity
+                AND DhtOp.when_integrated IS NOT NULL
+        ")?
+        .query_row(
+            named_params! {
+                ":author": author,
+                ":op_type_register_agent_activity": ChainOpType::RegisterAgentActivity,
+                ":chain_top_action_hash": filter.chain_top,
+            },
+            |row| row.get::<&str, u32>("seq")
+        )
+        .optional()?;
+
+    // If chain top not found, return empty activity
+    let chain_top_action_seq = if let Some(value) = maybe_chain_top_action_seq {
+        value
+    } else {
+        return Ok(vec![]);
+    };
+
     // Get the max action seq of all Actions in the set of until hashes.
     let chain_filter_limit_conditions_until_hashes_max_seq = if let Some(filter_hashes) = filter.get_until_hash() {
         // Construct sql query with placeholders for list elements
@@ -158,7 +192,7 @@ pub(crate) fn get_filtered_agent_activity(
             .prepare(&sql_query_seq_hash_in_set)?
             .query_row(
                 query_params_refs_slice,
-                |row| row.get(0)
+                |row| row.get("max_action_seq")
             )?;
 
         max_action_seq
@@ -166,6 +200,13 @@ pub(crate) fn get_filtered_agent_activity(
         None
     };
 
+    // Until hash Action seq must be less than or equal to ChainFilter chain_top Action seq
+    if let Some(until_action_seq) = chain_filter_limit_conditions_until_hashes_max_seq {
+        if until_action_seq > chain_top_action_seq {
+            return Err(StateQueryError::InvalidInput("The largest ChainFilter until hash Action seq must be less than or equal to the ChainFilter chain_top action seq.".to_string()));
+        }
+    }
+    
     // Get the agent activity, filtered by the chain top, author, 3 optional lower-bounds, and optional limit size.
     let out = txn
         .prepare(MUST_GET_AGENT_ACTIVITY)?
