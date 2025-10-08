@@ -2,8 +2,7 @@ use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holochain_sqlite::prelude::{DbKindDht, DbRead};
 use holochain_sqlite::rusqlite::named_params;
-use holochain_sqlite::rusqlite::params_from_iter;
-use holochain_sqlite::rusqlite::OptionalExtension;
+use holochain_sqlite::rusqlite::ToSql;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_cell::must_get_agent_activity::MUST_GET_AGENT_ACTIVITY;
 use holochain_state::prelude::*;
@@ -128,29 +127,40 @@ pub(crate) fn get_filtered_agent_activity(
 ) -> StateQueryResult<Vec<RegisterAgentActivity>> {
     // Get the max action seq of all Actions in the set of until hashes.
     let chain_filter_limit_conditions_until_hashes_max_seq = if let Some(filter_hashes) = filter.get_until_hash() {
-        // Construct a sql query with placeholders for list elements
+        // Construct sql query with placeholders for list elements
         let filter_hashes_placeholder = filter_hashes.iter().map(|_| "?").collect::<Vec<&str>>().join(", ");
         let sql_query_seq_hash_in_set = format!("
             SELECT
-                MAX(seq)
+                MAX(Action.seq) as max_action_seq
             FROM
                 Action
                 JOIN DhtOp ON DhtOp.action_hash = Action.hash
             WHERE
                 Action.hash IN ({filter_hashes_placeholder})
-                AND DhtOp.type = :op_type_register_agent_activity
+                AND Action.author = ?
+                AND DhtOp.type = ?
                 AND DhtOp.when_integrated IS NOT NULL
-                AND Action.author = :author
         ");
 
-        let max_hash_seq: Option<u32> = txn.prepare(&sql_query_seq_hash_in_set)?
-            .query_row(
-                params_from_iter(filter_hashes.iter()),
-                |row| row.get(0)
-            )
-            .optional()?;
+        // Prepare query parameters
+        let mut query_params: Vec<Box<dyn ToSql>> = filter_hashes.iter().map(|h| -> Box<dyn ToSql> {
+            Box::new(h.clone())
+        }).collect();
+        query_params.push(Box::new(author));
+        query_params.push(Box::new(ChainOpType::RegisterAgentActivity));
 
-        max_hash_seq
+        let query_params_refs: Vec<&dyn ToSql> = query_params.iter().map(|v| v.as_ref()).collect();
+        let query_params_refs_slice: &[&dyn ToSql] = query_params_refs.as_slice();
+        
+        // Execute query
+        let max_action_seq: Option<u32> = txn
+            .prepare(&sql_query_seq_hash_in_set)?
+            .query_row(
+                query_params_refs_slice,
+                |row| row.get(0)
+            )?;
+
+        max_action_seq
     } else {
         None
     };
