@@ -69,8 +69,6 @@ async fn test_must_get_agent_activity(
     author: AgentPubKey,
     filter: ChainFilter,
 ) -> MustGetAgentActivityResponse {
-    tracing::warn!("data is {data:?}");
-    tracing::warn!("BLAHHH test_must_get_agent_activity 1");
     test_must_get_agent_activity_inner(data, author, filter).await
 }
 
