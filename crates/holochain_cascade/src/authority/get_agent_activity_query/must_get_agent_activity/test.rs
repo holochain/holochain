@@ -194,24 +194,35 @@ fn create_warrant_op() -> WarrantOp {
 
 #[test_case(
     vec![
-        create_activity(0),
+        create_activity(3),
+        create_activity(2),
         create_activity(1),
-        create_activity(2)
-    ]
-    => true ; "Complete sequence 0-2")]
-#[test_case(
-    vec![
         create_activity(0),
-        create_activity(2)
     ]
-    => false ; "Missing sequence number 1")]
+    => true ; "Complete sequence 3-0")]
 #[test_case(
     vec![
         create_activity(0)
     ]
     => true ; "Single activity")]
-fn test_is_activity_complete(activity: Vec<RegisterAgentActivity>) -> bool {
-    is_activity_complete(&activity)
+#[test_case(
+    vec![]
+    => true ; "Empty list")]
+#[test_case(
+    vec![
+        create_activity(2),
+        create_activity(0),
+    ]
+    => false ; "Missing sequence number 1")]
+#[test_case(
+    vec![
+        create_activity(0),
+        create_activity(1),
+        create_activity(2),
+    ]
+    => false ; "Not descending order")]
+fn test_is_activity_complete_descending(activity: Vec<RegisterAgentActivity>) -> bool {
+    is_activity_complete_descending(&activity)
 }
 
 /// Helper function to create a RegisterAgentActivity with specific hash and prev_action

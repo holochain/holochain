@@ -47,7 +47,7 @@ pub async fn must_get_agent_activity(
         // If activity list does not contain the full sequence of activity
         // from start of filtered range through end, or if the sequence activity
         // is not hash-chained, then it is incomplete.
-        else if !is_activity_complete(&activity) || !is_activity_chained_descending(&activity) {
+        else if !is_activity_complete_descending(&activity) || !is_activity_chained_descending(&activity) {
             MustGetAgentActivityResponse::IncompleteChain
         }
 
@@ -238,11 +238,27 @@ pub(crate) fn exclude_forked_activity(activity: &mut Vec<RegisterAgentActivity>)
 }
 
 /// Check that the complete set of Action sequence numbers is included in the RegisterAgentActivity list
-pub(crate) fn is_activity_complete(activity: &Vec<RegisterAgentActivity>) -> bool {
-    let complete_seqs: HashSet<u32> = (activity[activity.len() - 1].action.seq()..=activity[0].action.seq()).collect();
-    let found_seqs: HashSet<u32> = activity.iter().map(|a| a.action.seq()).collect();
+/// which must be already sorted by Action sequence number descending.
+pub(crate) fn is_activity_complete_descending(activity: &Vec<RegisterAgentActivity>) -> bool {
+    // Check if activity is empty
+    if activity.is_empty() {
+        return true;
+    }
 
-    found_seqs == complete_seqs
+    // Get min and max Action seqs
+    let max = activity[0].action.seq();
+    let min = activity[activity.len() - 1].action.seq();
+    if max < min {
+        return false;
+    }
+
+    // Check that activity length matches action seq range
+    if max - min + 1 != activity.len() as u32 {
+        return false;
+    }
+
+    // Check that activity includes complete action seq range
+    activity.windows(2).all(|w| w[0].action.seq() == w[1].action.seq() + 1)
 }
 
 /// Check that every Action's prev_hash is equivalent to the next Action in the list's ActionHash.
