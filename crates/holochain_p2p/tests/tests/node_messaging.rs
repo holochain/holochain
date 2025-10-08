@@ -173,10 +173,7 @@ impl HcP2pHandler for Handler {
                 .lock()
                 .unwrap()
                 .push("must_get_agent_activity".into());
-            Ok(MustGetAgentActivityResponse::Activity {
-                activity: vec![],
-                warrants: vec![]
-            })
+            Ok(MustGetAgentActivityResponse::activity(Vec::new()))
         })
     }
 

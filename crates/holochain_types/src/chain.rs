@@ -28,3 +28,14 @@ pub enum MustGetAgentActivityResponse {
     /// The requested chain top was not found in the chain.
     ChainTopNotFound(ActionHash),
 }
+
+impl MustGetAgentActivityResponse {
+    /// Constructor
+    #[cfg(feature = "test_utils")]
+    pub fn activity(activity: Vec<RegisterAgentActivity>) -> Self {
+        Self::Activity {
+            activity,
+            warrants: vec![],
+        }
+    }
+}
