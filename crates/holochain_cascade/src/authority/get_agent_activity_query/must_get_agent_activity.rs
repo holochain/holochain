@@ -227,26 +227,21 @@ pub(crate) fn exclude_forked_activity(activity: &mut Vec<RegisterAgentActivity>)
     activity.retain(|a| activity_seqs.insert(a.action.seq()));
 }
 
-/// Compare the complete set of Action sequence numbers to the set included in this list of RegisterAgentActivity
+/// Check that the complete set of Action sequence numbers is included in the RegisterAgentActivity list
 pub(crate) fn is_activity_complete(activity: &Vec<RegisterAgentActivity>) -> bool {
-    if activity.len() <= 1 {
-        return true;
-    }
-    
-    let complete_seqs: HashSet<u32> = (activity[0].action.seq()..=activity[activity.len() - 1].action.seq()).into_iter().collect();
+    let complete_seqs: HashSet<u32> = (activity[activity.len() - 1].action.seq()..=activity[0].action.seq()).collect();
     let found_seqs: HashSet<u32> = activity.iter().map(|a| a.action.seq()).collect();
 
     found_seqs == complete_seqs
 }
 
+/// Check that every Action's prev_hash is equivalent to the next Action in the list's ActionHash.
 pub(crate) fn is_activity_chained(activity: &Vec<RegisterAgentActivity>) -> bool {
-    if activity.len() <= 1 {
-        return true;
-    }
-    
     activity
         .windows(2)
-        .all(|window|
-            window[1].action.prev_hash() == Some(&window[0].action.hashed.hash)
-        )
+        .all(|window| {
+            let [w1, w2] = window else { return true; };
+
+            w1.action.prev_hash() == Some(&w2.action.hashed.hash)
+        })
 }
