@@ -23,8 +23,8 @@ use std::{sync::Arc, time::Duration};
 async fn cell_blocks_are_committed_to_database() {
     let conductor_db = DbWrite::test_in_mem(DbKindConductor).unwrap();
     let dna_hash = fixt!(DnaHash);
-    let TestCase { actor, .. } =
-        TestCase::new_with_conductor_db(&dna_hash, conductor_db.clone()).await;
+    let TestActor { actor, .. } =
+        TestActor::new_with_conductor_db(&dna_hash, conductor_db.clone()).await;
     let cell_id = CellId::new(dna_hash, fixt!(AgentPubKey));
     let cell_block_reason = CellBlockReason::InvalidOp(fixt!(DhtOpHash));
     let block = Block::new(
@@ -47,10 +47,10 @@ async fn block_someone() {
     let agent = fixt!(AgentPubKey);
     let cell_id = CellId::new(dna_hash.clone(), agent.clone());
 
-    let TestCase {
+    let TestActor {
         actor,
         blocks_module,
-    } = TestCase::new(&dna_hash).await;
+    } = TestActor::new(&dna_hash).await;
 
     assert!(!blocks_module
         .is_blocked(kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()))
@@ -88,7 +88,7 @@ async fn block_someone() {
 async fn agent_is_removed_from_peer_store_when_blocked() {
     let dna_hash = fixt!(DnaHash);
 
-    let TestCase { actor: alice, .. } = TestCase::new(&dna_hash).await;
+    let TestActor { actor: alice, .. } = TestActor::new(&dna_hash).await;
     let space = alice
         .test_kitsune()
         .space(dna_hash.to_k2_space())
@@ -149,10 +149,10 @@ async fn are_all_blocked_mixed_then_all_blocked() {
     let cell_id_1 = CellId::new(dna_hash.clone(), agent_1.clone());
     let cell_id_2 = CellId::new(dna_hash.clone(), agent_2.clone());
 
-    let TestCase {
+    let TestActor {
         actor,
         blocks_module,
-    } = TestCase::new(&dna_hash).await;
+    } = TestActor::new(&dna_hash).await;
 
     // Initially not blocked.
     assert!(!blocks_module
@@ -206,10 +206,10 @@ async fn are_all_blocked_with_duplicate_targets() {
     let agent = fixt!(AgentPubKey);
     let cell_id = CellId::new(dna_hash.clone(), agent.clone());
 
-    let TestCase {
+    let TestActor {
         actor,
         blocks_module,
-    } = TestCase::new(&dna_hash).await;
+    } = TestActor::new(&dna_hash).await;
 
     // Not blocked initially even with duplicates in query.
     assert!(!blocks_module
@@ -246,10 +246,10 @@ async fn blocking_same_agent_twice_is_ok() {
     let agent = fixt!(AgentPubKey);
     let cell_id = CellId::new(dna_hash.clone(), agent.clone());
 
-    let TestCase {
+    let TestActor {
         actor,
         blocks_module,
-    } = TestCase::new(&dna_hash).await;
+    } = TestActor::new(&dna_hash).await;
 
     // First block.
     actor
@@ -285,14 +285,14 @@ async fn block_is_scoped_per_dna() {
     let cell_id_1 = CellId::new(dna_hash_1.clone(), agent.clone());
 
     let conductor_db = test_conductor_db().to_db();
-    let TestCase {
+    let TestActor {
         actor: actor_1,
         blocks_module: blocks_module_1,
-    } = TestCase::new_with_conductor_db(&dna_hash_1, conductor_db.clone()).await;
-    let TestCase {
+    } = TestActor::new_with_conductor_db(&dna_hash_1, conductor_db.clone()).await;
+    let TestActor {
         blocks_module: blocks_module_2,
         ..
-    } = TestCase::new_with_conductor_db(&dna_hash_2, conductor_db).await;
+    } = TestActor::new_with_conductor_db(&dna_hash_2, conductor_db).await;
 
     // Initially not blocked in either DNA.
     assert!(!blocks_module_1
@@ -342,8 +342,8 @@ async fn get_to_blocked_agent_fails() {
     let dna_hash = DnaHash::from_raw_32(vec![0xaa; 32]);
     let keystore_1 = test_keystore();
     let keystore_2 = test_keystore();
-    let TestCase { actor: alice, .. } = TestCase::new_with_keystore(&dna_hash, &keystore_1).await;
-    let TestCase { actor: bob, .. } = TestCase::new_with_keystore(&dna_hash, &keystore_2).await;
+    let TestActor { actor: alice, .. } = TestActor::new_with_keystore(&dna_hash, &keystore_1).await;
+    let TestActor { actor: bob, .. } = TestActor::new_with_keystore(&dna_hash, &keystore_2).await;
     let alice_pubkey = keystore_1.new_sign_keypair_random().await.unwrap();
     let bob_pubkey = keystore_2.new_sign_keypair_random().await.unwrap();
     alice
@@ -356,45 +356,7 @@ async fn get_to_blocked_agent_fails() {
     bob.test_set_full_arcs(dna_hash.to_k2_space()).await;
 
     // Exchange peer infos to accelerate bootstrapping.
-    tokio::time::timeout(Duration::from_secs(10), async {
-        loop {
-            let maybe_agent_info_1 = alice
-                .peer_store(dna_hash.clone())
-                .await
-                .unwrap()
-                .get(alice_pubkey.to_k2_agent())
-                .await
-                .unwrap();
-            let maybe_agent_info_2 = bob
-                .peer_store(dna_hash.clone())
-                .await
-                .unwrap()
-                .get(bob_pubkey.to_k2_agent())
-                .await
-                .unwrap();
-            if let (Some(agent_info_1), Some(agent_info_2)) =
-                (maybe_agent_info_1, maybe_agent_info_2)
-            {
-                alice
-                    .peer_store(dna_hash.clone())
-                    .await
-                    .unwrap()
-                    .insert(vec![agent_info_2])
-                    .await
-                    .unwrap();
-                bob.peer_store(dna_hash.clone())
-                    .await
-                    .unwrap()
-                    .insert(vec![agent_info_1])
-                    .await
-                    .unwrap();
-                break;
-            }
-            tokio::time::sleep(Duration::from_millis(100)).await;
-        }
-    })
-    .await
-    .unwrap();
+    exchange_agent_infos(alice.clone(), bob.clone(), &dna_hash).await;
 
     // Before the block Alice can make get request and Bob answers them.
     let response = alice.get(dna_hash.clone(), fixt!(ActionHash).into()).await;
@@ -434,8 +396,8 @@ async fn get_by_blocked_agent_fails() {
     let dna_hash = DnaHash::from_raw_32(vec![0xaa; 32]);
     let keystore_1 = test_keystore();
     let keystore_2 = test_keystore();
-    let TestCase { actor: alice, .. } = TestCase::new_with_keystore(&dna_hash, &keystore_1).await;
-    let TestCase { actor: bob, .. } = TestCase::new_with_keystore(&dna_hash, &keystore_2).await;
+    let TestActor { actor: alice, .. } = TestActor::new_with_keystore(&dna_hash, &keystore_1).await;
+    let TestActor { actor: bob, .. } = TestActor::new_with_keystore(&dna_hash, &keystore_2).await;
     let alice_pubkey = keystore_1.new_sign_keypair_random().await.unwrap();
     let bob_pubkey = keystore_2.new_sign_keypair_random().await.unwrap();
     alice
@@ -448,45 +410,7 @@ async fn get_by_blocked_agent_fails() {
     alice.test_set_full_arcs(dna_hash.to_k2_space()).await;
 
     // Exchange peer infos to accelerate bootstrapping.
-    tokio::time::timeout(Duration::from_secs(10), async {
-        loop {
-            let maybe_agent_info_1 = alice
-                .peer_store(dna_hash.clone())
-                .await
-                .unwrap()
-                .get(alice_pubkey.to_k2_agent())
-                .await
-                .unwrap();
-            let maybe_agent_info_2 = bob
-                .peer_store(dna_hash.clone())
-                .await
-                .unwrap()
-                .get(bob_pubkey.to_k2_agent())
-                .await
-                .unwrap();
-            if let (Some(agent_info_1), Some(agent_info_2)) =
-                (maybe_agent_info_1, maybe_agent_info_2)
-            {
-                alice
-                    .peer_store(dna_hash.clone())
-                    .await
-                    .unwrap()
-                    .insert(vec![agent_info_2])
-                    .await
-                    .unwrap();
-                bob.peer_store(dna_hash.clone())
-                    .await
-                    .unwrap()
-                    .insert(vec![agent_info_1])
-                    .await
-                    .unwrap();
-                break;
-            }
-            tokio::time::sleep(Duration::from_millis(100)).await;
-        }
-    })
-    .await
-    .unwrap();
+    exchange_agent_infos(alice.clone(), bob.clone(), &dna_hash).await;
 
     // Before the block Bob can make get requests and Alice answers them.
     let response = bob.get(dna_hash.clone(), fixt!(ActionHash).into()).await;
@@ -516,12 +440,12 @@ async fn get_by_blocked_agent_fails() {
     );
 }
 
-struct TestCase {
+struct TestActor {
     actor: DynHcP2p,
     blocks_module: DynBlocks,
 }
 
-impl TestCase {
+impl TestActor {
     async fn new(dna_hash: &DnaHash) -> Self {
         let conductor_db = DbWrite::test_in_mem(DbKindConductor).unwrap();
         Self::create_test_case(dna_hash, conductor_db, test_keystore()).await
@@ -585,4 +509,44 @@ impl TestCase {
             blocks_module,
         }
     }
+}
+
+async fn exchange_agent_infos(alice: DynHcP2p, bob: DynHcP2p, dna_hash: &DnaHash) {
+    tokio::time::timeout(Duration::from_secs(10), async {
+        loop {
+            let alice_agent_infos = alice
+                .peer_store(dna_hash.clone())
+                .await
+                .unwrap()
+                .get_all()
+                .await
+                .unwrap();
+            let bob_agent_infos = bob
+                .peer_store(dna_hash.clone())
+                .await
+                .unwrap()
+                .get_all()
+                .await
+                .unwrap();
+            if alice_agent_infos.len() >= 1 && bob_agent_infos.len() >= 1 {
+                alice
+                    .peer_store(dna_hash.clone())
+                    .await
+                    .unwrap()
+                    .insert(bob_agent_infos)
+                    .await
+                    .unwrap();
+                bob.peer_store(dna_hash.clone())
+                    .await
+                    .unwrap()
+                    .insert(alice_agent_infos)
+                    .await
+                    .unwrap();
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    })
+    .await
+    .unwrap();
 }
