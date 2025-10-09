@@ -16,6 +16,7 @@ use holochain_conductor_api::{
     AdminRequest, AdminResponse, AppAuthenticationRequest, CellInfo, ProvisionedCell,
 };
 use holochain_keystore::MetaLairClient;
+use holochain_sqlite::error::DatabaseResult;
 use holochain_state::mutations::StateMutationResult;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::source_chain::SourceChain;
@@ -988,6 +989,51 @@ impl SweetConductor {
                 .unwrap();
             Ok(all_integrated)
         })
+    }
+
+    /// Get all invalid integrated ops from the DHT database.
+    pub async fn get_invalid_integrated_ops(
+        &self,
+        dht_db: &DbWrite<DbKindDht>,
+    ) -> ConductorApiResult<Vec<DhtOpHashed>> {
+        use holo_hash::DhtOpHash;
+        use holochain_state::query::map_sql_dht_op;
+        use holochain_zome_types::prelude::ValidationStatus;
+
+        let result = dht_db
+            .read_async(move |txn| -> DatabaseResult<_> {
+                let mut stmt = txn.prepare(
+                    "
+                    SELECT
+                        DhtOp.hash as hash, DhtOp.type as dht_type, DhtOp.validation_status,
+                        Action.blob as action_blob, Entry.blob as entry_blob
+                    FROM
+                        DhtOp
+                        JOIN Action ON Action.hash = DhtOp.action_hash
+                        LEFT JOIN Entry ON Entry.hash = Action.entry_hash
+                    WHERE
+                        DhtOp.when_integrated IS NOT NULL
+                        AND DhtOp.validation_status = :status
+                    ORDER BY
+                        DhtOp.when_integrated ASC
+                ",
+                )?;
+                let rows = stmt.query_map(
+                    named_params! { ":status": ValidationStatus::Rejected },
+                    |row| {
+                        let hash: DhtOpHash = row.get("hash").unwrap();
+                        let op = map_sql_dht_op(false, "dht_type", row).unwrap();
+                        Ok(DhtOpHashed::with_pre_hashed(op, hash))
+                    },
+                )?;
+                let mut ops = Vec::new();
+                for row in rows {
+                    ops.push(row?);
+                }
+                Ok(ops)
+            })
+            .await?;
+        Ok(result)
     }
 
     /// Manually trigger scheduled fn dispatch

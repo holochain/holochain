@@ -312,6 +312,7 @@ unstable-migration = [
 
 # Enables unstable warrants feature.
 unstable-warrants = [
+  "unstable-functions",
   "holochain_state/unstable-warrants",
   "holochain_cascade/unstable-warrants",
 ]
