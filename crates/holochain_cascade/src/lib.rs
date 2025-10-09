@@ -23,8 +23,13 @@
 //!
 #![warn(missing_docs)]
 
+use crate::authority::get_agent_activity_query::must_get_agent_activity::{
+    exclude_forked_activity, get_action_seq, get_action_seq_from_scratch,
+    get_filtered_agent_activity, get_filtered_agent_activity_from_scratch,
+    is_activity_chained_descending, is_activity_complete_descending, merge_agent_activity,
+    merge_warrants,
+};
 use crate::error::CascadeError;
-use crate::authority::get_agent_activity_query::must_get_agent_activity::{exclude_forked_activity, get_action_seq, get_action_seq_from_scratch, get_filtered_agent_activity, get_filtered_agent_activity_from_scratch, is_activity_chained_descending, is_activity_complete_descending, merge_agent_activity, merge_warrants};
 use error::CascadeResult;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
@@ -473,7 +478,7 @@ impl CascadeImpl {
         if self.network.is_none() {
             return Err(CascadeError::NetworkNotInitialized);
         }
-        
+
         let network = self.network.as_ref().unwrap();
         let results = match network.must_get_agent_activity(author, filter).await {
             Ok(response) => response,
@@ -882,7 +887,9 @@ impl CascadeImpl {
     ) -> CascadeResult<MustGetAgentActivityResponse> {
         // Check that filter take is valid
         if filter.get_take() == Some(0) {
-            return Err(CascadeError::InvalidInput("ChainFilter take must be greater than 0".to_string()));
+            return Err(CascadeError::InvalidInput(
+                "ChainFilter take must be greater than 0".to_string(),
+            ));
         }
 
         // Get the seq of the ChainFilter.chain_top Action
@@ -892,9 +899,9 @@ impl CascadeImpl {
 
         // Try to find chain top action in Scratch
         if let Some(scratch) = self.scratch.clone() {
-            maybe_chain_top_action_seq = scratch.apply_and_then(|scratch|
+            maybe_chain_top_action_seq = scratch.apply_and_then(|scratch| {
                 get_action_seq_from_scratch(scratch, &author, &filter.chain_top)
-            )?;
+            })?;
         }
 
         // If not found in Scratch, try to find in dbs. Break once found.
@@ -908,7 +915,7 @@ impl CascadeImpl {
                         let txn = txn_guard.transaction()?;
                         let res = get_action_seq(&txn, &author, &chain_top)?;
                         if res.is_some() {
-                            return CascadeResult::Ok(res)
+                            return CascadeResult::Ok(res);
                         }
                     }
 
@@ -922,7 +929,9 @@ impl CascadeImpl {
         let chain_top_action_seq = if let Some(seq) = maybe_chain_top_action_seq {
             seq
         } else {
-            return Ok(MustGetAgentActivityResponse::ChainTopNotFound(filter.chain_top));
+            return Ok(MustGetAgentActivityResponse::ChainTopNotFound(
+                filter.chain_top,
+            ));
         };
 
         // Get the filtered activity and warrants from each db store.
@@ -937,7 +946,12 @@ impl CascadeImpl {
                 for txn_guard in &mut txn_guards {
                     let txn = txn_guard.transaction()?;
 
-                    let r = get_filtered_agent_activity(&txn, &author, filter.clone(), chain_top_action_seq)?;
+                    let r = get_filtered_agent_activity(
+                        &txn,
+                        &author,
+                        filter.clone(),
+                        chain_top_action_seq,
+                    )?;
                     activity.push(r);
 
                     // TODO: check valid should be *true* for Dht DB, *false* for author DB. Insane.
@@ -974,40 +988,37 @@ impl CascadeImpl {
             merged_activity.truncate(take as usize);
         }
 
-        let result = 
-            // If activity list does not contain the full sequence of activity
-            // from start of filtered range through end, it is incomplete.
-            // Or, if the activity list is not hash-chained, it is incomplete.
-            if !is_activity_complete_descending(&merged_activity) || !is_activity_chained_descending(&merged_activity) {
-                MustGetAgentActivityResponse::IncompleteChain
+        // If activity list does not contain the full sequence of activity
+        // from start of filtered range through end, it is incomplete.
+        // Or, if the activity list is not hash-chained, it is incomplete.
+        let result = if !is_activity_complete_descending(&merged_activity)
+            || !is_activity_chained_descending(&merged_activity)
+        {
+            MustGetAgentActivityResponse::IncompleteChain
+        }
+        // Otherwise, activity is complete
+        else {
+            // Merge and deduplicate retrieved warrants lists
+            let merged_warrants = merge_warrants(warrants_lists);
+
+            MustGetAgentActivityResponse::Activity {
+                activity: merged_activity,
+                warrants: merged_warrants,
             }
-
-            // Otherwise, activity is complete
-            else {
-                // Merge and deduplicate retrieved warrants lists
-                let merged_warrants = merge_warrants(warrants_lists);
-
-                MustGetAgentActivityResponse::Activity {
-                    activity: merged_activity,
-                    warrants: merged_warrants,
-                }
-            };
-
+        };
         // If we have a success result, return it
         if matches!(result, MustGetAgentActivityResponse::Activity { .. }) {
-            return Ok(result);
-        } 
-        
+            Ok(result)
+        }
         // Otherwise, if we are an authority, return the failure result we have
         else if self.am_i_an_authority(author.clone().into()).await? {
-            return Ok(result)
+            return Ok(result);
         }
-
         // Otherwise, try to fetch from the network
         else if self.network.is_some() {
-            return Ok(self
+            return self
                 .fetch_must_get_agent_activity(author.clone(), filter.clone())
-                .await?)
+                .await;
         } else {
             return Ok(result);
         }

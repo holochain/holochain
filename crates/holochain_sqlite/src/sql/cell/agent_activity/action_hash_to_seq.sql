@@ -1,5 +1,5 @@
-SELECT 
-  Action.seq as seq
+SELECT
+  Action.seq AS seq
 FROM
   Action
   JOIN DhtOp ON DhtOp.action_hash = Action.hash

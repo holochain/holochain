@@ -28,23 +28,20 @@ pub async fn must_get_agent_activity(
     author: AgentPubKey,
     filter: ChainFilter,
 ) -> StateQueryResult<MustGetAgentActivityResponse> {
-    Ok(
-        CascadeImpl::empty()
-            .with_dht(env)
-            .must_get_agent_activity(author, filter)
-            .await
-
-            // Error handling workaround because we cannot implement
-            // `From<CascadeError> for StateQueryError`. As this crate depends 
-            // on `holochain_state` where StateQueryError is defined.
-            .map_err(|e| {
-                tracing::error!("error is {:?}", e);
-                match e {
-                    CascadeError::QueryError(s) => s,
-                    _ => StateQueryError::Other(e.to_string())
-                }
-            })?
-    )
+    CascadeImpl::empty()
+        .with_dht(env)
+        .must_get_agent_activity(author, filter)
+        .await
+        // Error handling workaround because we cannot implement
+        // `From<CascadeError> for StateQueryError`. As this crate depends
+        // on `holochain_state` where StateQueryError is defined.
+        .map_err(|e| {
+            tracing::error!("error is {:?}", e);
+            match e {
+                CascadeError::QueryError(s) => s,
+                _ => StateQueryError::Other(e.to_string()),
+            }
+        })
 }
 
 /// Get the ChainFilter chain_top Action seq from a database
@@ -52,7 +49,7 @@ pub async fn must_get_agent_activity(
 pub(crate) fn get_action_seq(
     txn: &Transaction,
     author: &AgentPubKey,
-    action_hash: &ActionHash
+    action_hash: &ActionHash,
 ) -> StateQueryResult<Option<u32>> {
     let maybe_chain_top_action_seq: Option<u32> = txn
         .prepare(ACTION_HASH_TO_SEQ)?
@@ -62,7 +59,7 @@ pub(crate) fn get_action_seq(
                 ":action_hash": action_hash,
                 ":op_type_register_agent_activity": ChainOpType::RegisterAgentActivity,
             },
-            |row| row.get::<&str, u32>("seq")
+            |row| row.get::<&str, u32>("seq"),
         )
         .optional()?;
 
@@ -76,9 +73,12 @@ pub(crate) fn get_action_seq_from_scratch(
     author: &AgentPubKey,
     action_hash: &ActionHash,
 ) -> StateQueryResult<Option<u32>> {
-    match scratch.actions().find(|a| a.action().author() == author && &a.hashed.hash == action_hash) {
+    match scratch
+        .actions()
+        .find(|a| a.action().author() == author && &a.hashed.hash == action_hash)
+    {
         Some(chain_top_action) => Ok(Some(chain_top_action.seq())),
-        None => Ok(None)
+        None => Ok(None),
     }
 }
 
@@ -90,7 +90,10 @@ pub(crate) fn get_filtered_agent_activity_from_scratch(
     author: &AgentPubKey,
     filter: ChainFilter,
 ) -> StateQueryResult<Vec<RegisterAgentActivity>> {
-    match scratch.actions().find(|a| a.hashed.hash == filter.chain_top) {
+    match scratch
+        .actions()
+        .find(|a| a.hashed.hash == filter.chain_top)
+    {
         // If the filter's chain top Action is in scratch space, then we need to get some Actions from scratch.
         // Otherwise, we know there are no Actions in Scratch that are within the filter range.
         Some(chain_top_action) => {
@@ -99,7 +102,9 @@ pub(crate) fn get_filtered_agent_activity_from_scratch(
             // TODO: is this accurate?
             let mut max_until_hash_action = None;
             if let Some(until_hashes) = filter.get_until_hash() {
-                max_until_hash_action = scratch.actions().find(|a| until_hashes.contains(a.hashed.action_hash()))
+                max_until_hash_action = scratch
+                    .actions()
+                    .find(|a| until_hashes.contains(a.hashed.action_hash()))
             }
 
             // Filter scratch Actions by ChainFilter
@@ -120,7 +125,10 @@ pub(crate) fn get_filtered_agent_activity_from_scratch(
                         is_gte_max_until_hash_seq = a.action().action_seq() >= until_action.seq();
                     }
 
-                    is_author && is_lte_chain_top && is_gte_until_timestamp && is_gte_max_until_hash_seq
+                    is_author
+                        && is_lte_chain_top
+                        && is_gte_until_timestamp
+                        && is_gte_max_until_hash_seq
                 })
                 .map(|action| RegisterAgentActivity {
                     action: action.clone(),
@@ -128,10 +136,10 @@ pub(crate) fn get_filtered_agent_activity_from_scratch(
                     cached_entry: None,
                 })
                 .collect();
-        
+
             Ok(activity)
-        },
-        None => Ok(vec![])
+        }
+        None => Ok(vec![]),
     }
 }
 
@@ -143,13 +151,20 @@ pub(crate) fn get_filtered_agent_activity(
     filter_chain_top_action_seq: u32,
 ) -> StateQueryResult<Vec<RegisterAgentActivity>> {
     // Get the max action seq of all Actions in the set of until hashes.
-    let chain_filter_limit_conditions_until_hashes_max_seq = if let Some(filter_hashes) = filter.get_until_hash() {
+    let chain_filter_limit_conditions_until_hashes_max_seq = if let Some(filter_hashes) =
+        filter.get_until_hash()
+    {
         // Construct sql query with placeholders for list elements.
         //
         // We cannot keep this sql query in a standalone file,
         // because at compile-time we don't know how many '?' placeholders to include.
-        let filter_hashes_placeholder = filter_hashes.iter().map(|_| "?").collect::<Vec<&str>>().join(", ");
-        let sql_query_seq_hash_in_set = format!("
+        let filter_hashes_placeholder = filter_hashes
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<&str>>()
+            .join(", ");
+        let sql_query_seq_hash_in_set = format!(
+            "
             SELECT
                 MAX(Action.seq) as max_action_seq
             FROM
@@ -160,25 +175,24 @@ pub(crate) fn get_filtered_agent_activity(
                 AND Action.author = ?
                 AND DhtOp.type = ?
                 AND DhtOp.when_integrated IS NOT NULL
-        ");
+        "
+        );
 
         // Prepare query parameters
-        let mut query_params: Vec<Box<dyn ToSql>> = filter_hashes.iter().map(|h| -> Box<dyn ToSql> {
-            Box::new(h.clone())
-        }).collect();
+        let mut query_params: Vec<Box<dyn ToSql>> = filter_hashes
+            .iter()
+            .map(|h| -> Box<dyn ToSql> { Box::new(h.clone()) })
+            .collect();
         query_params.push(Box::new(author));
         query_params.push(Box::new(ChainOpType::RegisterAgentActivity));
 
         let query_params_refs: Vec<&dyn ToSql> = query_params.iter().map(|v| v.as_ref()).collect();
         let query_params_refs_slice: &[&dyn ToSql] = query_params_refs.as_slice();
-        
+
         // Execute query
         let max_action_seq: Option<u32> = txn
             .prepare(&sql_query_seq_hash_in_set)?
-            .query_row(
-                query_params_refs_slice,
-                |row| row.get("max_action_seq")
-            )?;
+            .query_row(query_params_refs_slice, |row| row.get("max_action_seq"))?;
 
         max_action_seq
     } else {
@@ -191,7 +205,7 @@ pub(crate) fn get_filtered_agent_activity(
             return Err(StateQueryError::InvalidInput("The largest ChainFilter until hash Action seq must be less than or equal to the ChainFilter chain_top action seq.".to_string()));
         }
     }
-    
+
     // Get the agent activity, filtered by the chain top, author, 3 optional lower-bounds, and optional limit size.
     let out = txn
         .prepare(MUST_GET_AGENT_ACTIVITY)?
@@ -224,11 +238,10 @@ pub(crate) fn get_filtered_agent_activity(
 
 /// Flattens, sorts and deduplicates a list of lists.
 fn flatten_deduplicate_sort<T, K, F>(lists: Vec<Vec<T>>, mut key_by: F) -> Vec<T>
-    where
-        K: Ord,
-        F: FnMut(&T) -> K,
-    {
-
+where
+    K: Ord,
+    F: FnMut(&T) -> K,
+{
     // Flatten list of lists into a single list
     let merged_size = lists.iter().map(|l| l.len()).sum();
     let mut merged = Vec::with_capacity(merged_size);
@@ -247,8 +260,15 @@ fn flatten_deduplicate_sort<T, K, F>(lists: Vec<Vec<T>>, mut key_by: F) -> Vec<T
 }
 
 /// Merge, sort by action seq descending, then action hash descending, and deduplicate a list of RegisterAgentActivity lists
-pub(crate) fn merge_agent_activity(activity_lists: Vec<Vec<RegisterAgentActivity>>) -> Vec<RegisterAgentActivity> {
-    flatten_deduplicate_sort(activity_lists, |a| (Reverse(a.action.seq()), Reverse(a.action.hashed.hash.clone())))
+pub(crate) fn merge_agent_activity(
+    activity_lists: Vec<Vec<RegisterAgentActivity>>,
+) -> Vec<RegisterAgentActivity> {
+    flatten_deduplicate_sort(activity_lists, |a| {
+        (
+            Reverse(a.action.seq()),
+            Reverse(a.action.hashed.hash.clone()),
+        )
+    })
 }
 
 /// Merge, sort by action seq descending, and deduplicate a list of WarrantOp lists
@@ -265,7 +285,7 @@ pub(crate) fn exclude_forked_activity(activity: &mut Vec<RegisterAgentActivity>)
 
 /// Check that the complete set of Action sequence numbers is included in the RegisterAgentActivity list
 /// which must be already sorted by Action sequence number descending.
-pub(crate) fn is_activity_complete_descending(activity: &Vec<RegisterAgentActivity>) -> bool {
+pub(crate) fn is_activity_complete_descending(activity: &[RegisterAgentActivity]) -> bool {
     // Check if activity is empty
     if activity.is_empty() {
         return true;
@@ -284,16 +304,18 @@ pub(crate) fn is_activity_complete_descending(activity: &Vec<RegisterAgentActivi
     }
 
     // Check that activity includes complete action seq range
-    activity.windows(2).all(|w| w[0].action.seq() == w[1].action.seq() + 1)
+    activity
+        .windows(2)
+        .all(|w| w[0].action.seq() == w[1].action.seq() + 1)
 }
 
 /// Check that every Action's prev_hash is equivalent to the next Action in the list's ActionHash.
-pub(crate) fn is_activity_chained_descending(activity: &Vec<RegisterAgentActivity>) -> bool {
-    activity
-        .windows(2)
-        .all(|window| {
-            let [w1, w2] = window else { return true; };
+pub(crate) fn is_activity_chained_descending(activity: &[RegisterAgentActivity]) -> bool {
+    activity.windows(2).all(|window| {
+        let [w1, w2] = window else {
+            return true;
+        };
 
-            w1.action.prev_hash() == Some(&w2.action.hashed.hash)
-        })
+        w1.action.prev_hash() == Some(&w2.action.hashed.hash)
+    })
 }

@@ -9,7 +9,6 @@ use holochain_zome_types::prelude::*;
 mod chain_item;
 pub use chain_item::*;
 
-
 /// Intermediate data structure used during a `must_get_agent_activity` call.
 /// Note that this is not the final return value of `must_get_agent_activity`.
 #[derive(Debug, Clone, PartialEq, Eq, SerializedBytes, Serialize, Deserialize)]
