@@ -960,7 +960,8 @@ impl CascadeImpl {
 
                     #[cfg(feature = "unstable-warrants")]
                     {
-                        let w = CascadeTxnWrapper::from(&txn).get_warrants_for_agent(&author, true)?;
+                        let w =
+                            CascadeTxnWrapper::from(&txn).get_warrants_for_agent(&author, true)?;
                         warrants.push(w);
                     }
                 }
@@ -1007,8 +1008,7 @@ impl CascadeImpl {
             || !is_activity_chained_descending(&merged_activity)
         {
             MustGetAgentActivityResponse::IncompleteChain
-        }
-        else {
+        } else {
             MustGetAgentActivityResponse::Activity {
                 activity: merged_activity,
                 warrants: merge_warrants(warrants_lists),
@@ -1019,12 +1019,10 @@ impl CascadeImpl {
         if matches!(result, MustGetAgentActivityResponse::Activity { .. }) {
             // If we have a success result, return it.
             Ok(result)
-        }
-        else if self.am_i_an_authority(author.clone().into()).await? {
+        } else if self.am_i_an_authority(author.clone().into()).await? {
             // If we are an authority, return the failure result we have
             return Ok(result);
-        }
-        else if self.network.is_some() {
+        } else if self.network.is_some() {
             // If we are not an authority, try to fetch from the network
             return self
                 .fetch_must_get_agent_activity(author.clone(), filter.clone())
