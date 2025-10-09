@@ -1,6 +1,7 @@
 use super::*;
-use crate::fixt::ActionHashFixturator;
-use crate::test_utils::commit_chain;
+use crate::test_utils::{
+    commit_chain, create_activity, create_activity_with_prev, create_warrant_op,
+};
 use ::fixt::fixt;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
@@ -186,35 +187,6 @@ async fn test_authority_must_get_agent_activity_err_responses(
     res
 }
 
-/// Helper function to create a RegisterAgentActivity
-fn create_activity(seq: u32) -> RegisterAgentActivity {
-    let mut create = fixt!(Create);
-    create.action_seq = seq;
-
-    RegisterAgentActivity {
-        action: SignedHashed::new_unchecked(Action::Create(create.clone()), fixt!(Signature)),
-        cached_entry: None,
-    }
-}
-
-/// Helper function to create a WarrantOp
-fn create_warrant_op() -> WarrantOp {
-    let author = fake_agent_pub_key(0);
-    Signed::new(
-        Warrant::new_now(
-            WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
-                action_author: author.clone(),
-                action: (fixt!(ActionHash), fixt!(Signature)),
-                chain_op_type: ChainOpType::RegisterAddLink,
-            }),
-            fake_agent_pub_key(1),
-            author,
-        ),
-        fixt!(Signature),
-    )
-    .into()
-}
-
 #[test_case(
     vec![
         create_activity(3),
@@ -246,25 +218,6 @@ fn create_warrant_op() -> WarrantOp {
     => false ; "Not descending order")]
 fn test_is_activity_complete_descending(activity: Vec<RegisterAgentActivity>) -> bool {
     is_activity_complete_descending(&activity)
-}
-
-/// Helper function to create a RegisterAgentActivity with specific hash and prev_action
-fn create_activity_with_prev(
-    seq: u32,
-    hash: ActionHash,
-    prev: ActionHash,
-) -> RegisterAgentActivity {
-    let mut create = fixt!(Create);
-    create.action_seq = seq;
-    create.prev_action = prev;
-
-    RegisterAgentActivity {
-        action: SignedActionHashed::with_presigned(
-            ActionHashed::with_pre_hashed(Action::Create(create), hash),
-            fixt!(Signature),
-        ),
-        cached_entry: None,
-    }
 }
 
 #[test]

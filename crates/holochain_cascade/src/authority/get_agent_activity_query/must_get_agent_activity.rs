@@ -85,8 +85,6 @@ pub(crate) fn get_action_seq_from_scratch(
 /// Get the agent activity for a given range of actions from the Scratch.
 /// Note that Scratch actions should always be more recently created than database actions
 /// and thus will have a higher action seq than any actions in the database.
-/// 
-// This must have identical logic to get_filtered_agent_activity.
 pub(crate) fn get_filtered_agent_activity_from_scratch(
     scratch: &mut Scratch,
     author: &AgentPubKey,
@@ -94,15 +92,16 @@ pub(crate) fn get_filtered_agent_activity_from_scratch(
     filter_chain_top_action_seq: u32,
 ) -> StateQueryResult<Vec<RegisterAgentActivity>> {
     // Get the max action seq of all Actions in the set of until hashes.
-    let chain_filter_limit_conditions_until_hashes_max_seq = if let Some(until_hashes) = filter.get_until_hash() {
-        scratch
-            .actions()
-            .filter(|a| until_hashes.contains(a.hashed.action_hash()))
-            .max_by_key(|a| a.seq())
-            .map(|a| a.seq())
-    } else {
-        None
-    };
+    let chain_filter_limit_conditions_until_hashes_max_seq =
+        if let Some(until_hashes) = filter.get_until_hash() {
+            scratch
+                .actions()
+                .filter(|a| until_hashes.contains(a.hashed.action_hash()))
+                .max_by_key(|a| a.seq())
+                .map(|a| a.seq())
+        } else {
+            None
+        };
 
     // Until hash Action seq must be less than or equal to ChainFilter chain_top Action seq
     if let Some(until_action_seq) = chain_filter_limit_conditions_until_hashes_max_seq {
@@ -129,10 +128,7 @@ pub(crate) fn get_filtered_agent_activity_from_scratch(
                 is_gte_max_until_hash_seq = a.action().action_seq() >= until_action;
             }
 
-            is_author
-                && is_lte_chain_top
-                && is_gte_until_timestamp
-                && is_gte_max_until_hash_seq
+            is_author && is_lte_chain_top && is_gte_until_timestamp && is_gte_max_until_hash_seq
         })
         .map(|action| RegisterAgentActivity {
             action: action.clone(),
