@@ -537,6 +537,12 @@ pub struct ConductorTuningParams {
     ///
     /// Default: None
     pub publish_trigger_interval: Option<std::time::Duration>,
+    /// Disable self-validation of authored ops.
+    ///
+    /// This is intended *ONLY* for testing. Disabling self-validation means that you lose the
+    /// protection of checking your own ops before publishing them to the DHT. This is useful
+    /// when testing warrants, where you want to intentionally author invalid ops.
+    pub disable_self_validation: bool,
     /// Prevent issuance of warrants. Useful for testing whether warrants are gossiped
     /// and published.
     ///
@@ -554,6 +560,7 @@ impl ConductorTuningParams {
             countersigning_resolution_retry_limit: None,
             min_publish_interval: None,
             publish_trigger_interval: None,
+            disable_self_validation: false,
             #[cfg(feature = "test-utils")]
             disable_warrant_issuance: false,
         }
@@ -589,6 +596,7 @@ impl Default for ConductorTuningParams {
             countersigning_resolution_retry_limit: None,
             publish_trigger_interval: None,
             min_publish_interval: None,
+            disable_self_validation: false,
             #[cfg(feature = "test-utils")]
             disable_warrant_issuance: false,
         }
