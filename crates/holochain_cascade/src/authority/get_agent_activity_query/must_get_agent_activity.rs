@@ -1,3 +1,5 @@
+use crate::error::CascadeError;
+use crate::CascadeImpl;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holochain_sqlite::prelude::{DbKindDht, DbRead};
@@ -26,55 +28,23 @@ pub async fn must_get_agent_activity(
     author: AgentPubKey,
     filter: ChainFilter,
 ) -> StateQueryResult<MustGetAgentActivityResponse> {
-    let maybe_chain_top_action_seq = env
-        .read_async({
-            let filter = filter.clone();
-            let author = author.clone();
+    Ok(
+        CascadeImpl::empty()
+            .with_dht(env)
+            .must_get_agent_activity(author, filter)
+            .await
 
-            move |txn| get_action_seq(txn, &author, &filter.chain_top)
-        })
-        .await?;
-
-    // If chain top action seq was not found, return ChainTopNotFound
-    let chain_top_action_seq = if let Some(seq) = maybe_chain_top_action_seq {
-        seq
-    } else {
-        return Ok(MustGetAgentActivityResponse::ChainTopNotFound(filter.chain_top));
-    };
-
-    let activity = env
-        .read_async({
-            let filter = filter.clone();
-            let author = author.clone();
-
-            move |txn| get_filtered_agent_activity(txn, &author, filter, chain_top_action_seq)
-        })
-        .await?;
-
-    // Note we do *not* need to explicitly exclude forked actions with `exclude_forked_actions`,
-    // because we are only making this query to a single database.
-    // The sql query itself already excludes forked actions.
-
-    let result = 
-        // If activity list does not contain the full sequence of activity
-        // from start of filtered range through end, or if the sequence activity
-        // is not hash-chained, then it is incomplete.
-        if !is_activity_complete_descending(&activity) || !is_activity_chained_descending(&activity) {
-            MustGetAgentActivityResponse::IncompleteChain
-        }
-
-        // Otherwise, activity is complete.
-        else {
-            let warrants = env
-                .read_async(move |txn| CascadeTxnWrapper::from(txn).get_warrants_for_agent(&author, true))
-                .await?;
-            MustGetAgentActivityResponse::Activity {
-                activity,
-                warrants,
-            }
-        };
-
-    Ok(result)
+            // Error handling workaround because we cannot implement
+            // `From<CascadeError> for StateQueryError`. As this crate depends 
+            // on `holochain_state` where StateQueryError is defined.
+            .map_err(|e| {
+                tracing::error!("error is {:?}", e);
+                match e {
+                    CascadeError::QueryError(s) => s,
+                    _ => StateQueryError::Other(e.to_string())
+                }
+            })?
+    )
 }
 
 /// Get the ChainFilter chain_top Action seq from a database

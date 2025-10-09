@@ -879,6 +879,11 @@ impl CascadeImpl {
         author: AgentPubKey,
         filter: ChainFilter,
     ) -> CascadeResult<MustGetAgentActivityResponse> {
+        // Check that filter take is valid
+        if filter.get_take() == Some(0) {
+            return Err(CascadeError::InvalidInput("ChainFilter take must be greater than 0".to_string()));
+        }
+
         // Get the seq of the ChainFilter.chain_top Action
         // We must try every database and Scratch because it may only be stored in one.
         // Once the Action is found, break.

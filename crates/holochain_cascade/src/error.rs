@@ -29,6 +29,9 @@ pub enum CascadeError {
     #[error("Got an invalid response from an authority for the request hash: {0:?}")]
     InvalidResponse(AnyDhtHash),
 
+    #[error("Input parameters are invalid: {0}")]
+    InvalidInput(String),
+
     #[error(transparent)]
     JoinError(#[from] JoinError),
 
