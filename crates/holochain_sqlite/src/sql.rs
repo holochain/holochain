@@ -2,25 +2,13 @@ pub mod sql_cell {
     pub const SET_VALIDATED_OPS_TO_INTEGRATED: &str =
         include_str!("sql/cell/set_validated_ops_to_integrated.sql");
 
-    pub const ACTIVITY_INTEGRATED_UPPER_BOUND: &str =
-        include_str!("sql/cell/activity_integrated_upper_bound.sql");
     pub const ACTION_HASH_BY_PREV: &str = include_str!("sql/cell/action_hash_by_prev.sql");
-    pub const ALL_ACTIVITY_AUTHORS: &str = include_str!("sql/cell/all_activity_authors.sql");
     pub const ALL_READY_ACTIVITY: &str = include_str!("sql/cell/all_ready_activity.sql");
     pub const DELETE_ACTIONS_AFTER_SEQ: &str =
         include_str!("sql/cell/delete_actions_after_seq.sql");
 
     pub const SELECT_VALID_AGENT_PUB_KEY: &str =
         include_str!("sql/cell/select_valid_agent_pub_key.sql");
-
-    pub const FETCH_OP_HASHES_P1: &str =
-        include_str!("sql/cell/fetch_hashes/fetch_op_hashes_p1.sql");
-    pub const FETCH_OP_HASHES_P2: &str =
-        include_str!("sql/cell/fetch_hashes/fetch_op_hashes_p2.sql");
-
-    pub const FETCH_OP_REGION: &str = include_str!("sql/cell/fetch_op_region.sql");
-    pub const FETCH_OPS_BY_REGION: &str = include_str!("sql/cell/fetch_ops_by_region.sql");
-    pub const FETCH_REGION_OP_HASHES: &str = include_str!("sql/cell/fetch_region_op_hashes.sql");
 
     pub const FETCH_PUBLISHABLE_OP: &str = include_str!("sql/cell/fetch_publishable_op.sql");
 
@@ -48,6 +36,11 @@ pub mod sql_cell {
         pub const DHT_OPS_IN_VALIDATION_LIMBO: &str =
             include_str!("sql/cell/state_dump/dht_ops_in_validation_limbo.sql");
         pub const DHT_OPS_ROW_ID: &str = include_str!("sql/cell/state_dump/dht_ops_row_id.sql");
+    }
+
+    pub mod warrant {
+        pub const SELECT_BY_TYPE_AND_WARRANTEE: &str =
+            include_str!("sql/cell/warrant/select_by_type_and_warrantee.sql");
     }
 }
 

@@ -92,6 +92,15 @@ impl ConductorBuilder {
         let builder = self;
         tracing::debug!(?builder.config);
 
+        if builder
+            .config
+            .tuning_params
+            .as_ref()
+            .is_some_and(|p| p.disable_self_validation)
+        {
+            warn!("#\n#\n# WARNING: ConductorConfig.tuning_params.disable_self_validation is set to true. This is dangerous and not recommended outside of testing or debugging.\n#\n#");
+        }
+
         let passphrase = match &builder.passphrase {
             Some(p) => p.clone(),
             None => Arc::new(Mutex::new(sodoken::LockedArray::from(vec![]))),

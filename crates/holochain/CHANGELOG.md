@@ -7,6 +7,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Add a new conductor tuning parameter `disable_self_validation` to disable self-validation of authored data. Intended only
+  for testing warrants. #5340
+- Avoid issuing duplicate warrants for invalid actions during sys validation by checking for existing warrants before creating new ones. #5337
+- Test: Test that blocks are enforced for outgoing network get requests and publish.
+- Chore: remove blocks from validation receipt workflow. It's unclear why blocking was added there. Blocking now happens as part of validation. Validation receipts seem unrelated to blocking.
+- **BREAKING CHANGE** Removed unused public SQL queries from `holochain_sqlite`:
+  - `ACTIVITY_INTEGRATED_UPPER_BOUND`
+  - `ALL_ACTIVITY_AUTHORS`
+  - `FETCH_OP_HASHES_P1`
+  - `FETCH_OP_HASHES_P2`
+  - `FETCH_OP_REGION`
+  - `FETCH_OPS_BY_REGION`
+  - `FETCH_REGION_OP_HASHES`
+
 ## 0.6.0-dev.28
 
 - **BREAKING CHANGE** Removed the hdk host function `version`, which was not implemented.
@@ -95,7 +109,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
     - `records_from_actions_and_entries`
   - `holochain_util`
     - `run_on`
-- Test: Test that blocks are enforced for network get requests and publish.
 
 ## 0.6.0-dev.27
 

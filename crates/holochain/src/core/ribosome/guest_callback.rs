@@ -81,7 +81,6 @@ mod tests {
         let zome_fixturator = ZomeFixturator::new(::fixt::Unpredictable);
         let mut fn_components_fixturator = FnComponentsFixturator::new(::fixt::Unpredictable);
 
-        // let returning_init_invocation = init_invocation.clone();
         let zomes: Vec<Zome> = zome_fixturator.take(3).collect();
         let fn_components: FnComponents = fn_components_fixturator.next().unwrap();
 

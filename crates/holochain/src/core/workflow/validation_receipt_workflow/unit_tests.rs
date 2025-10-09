@@ -4,19 +4,15 @@ use crate::prelude::CreateFixturator;
 use crate::prelude::DhtOpHashed;
 use crate::prelude::SignatureFixturator;
 use ::fixt::fixt;
-use futures::future::BoxFuture;
-use futures::FutureExt;
 use hdk::prelude::Action;
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::HasHash;
 use holo_hash::{AgentPubKey, DhtOpHash};
-use holochain_p2p::HolochainP2pResult;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::prelude::{DbKindDht, DbWrite};
 use holochain_state::prelude::*;
-use parking_lot::RwLock;
 use rusqlite::named_params;
 use std::sync::Arc;
 
@@ -38,7 +34,6 @@ async fn no_running_cells() {
         dna,
         keystore,
         vec![].into_iter().collect(), // No running cells
-        |_block| unreachable!("This test should not send a block"),
     )
     .await
     .unwrap();
@@ -84,7 +79,6 @@ async fn do_not_block_or_send_to_self() {
         dna,
         keystore,
         vec![validator].into_iter().collect(), // No running cells
-        |_block| unreachable!("This test should not send a block"), // Verify no blocks sent
     )
     .await
     .unwrap();
@@ -104,7 +98,7 @@ async fn block_invalid_op_author() {
     let keystore = holochain_keystore::test_keystore();
 
     // Any op created by somebody else, which has been rejected by validation.
-    let (author, op_hash) = create_op_with_status(vault.clone(), None, ValidationStatus::Rejected)
+    let (_author, op_hash) = create_op_with_status(vault.clone(), None, ValidationStatus::Rejected)
         .await
         .unwrap();
 
@@ -120,40 +114,19 @@ async fn block_invalid_op_author() {
         keystore.new_sign_keypair_random().await.unwrap(),
     );
 
-    let blocks = Arc::new(RwLock::new(Vec::<Block>::new()));
-
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
         vault.clone(),
         dna,
         keystore,
         vec![validator].into_iter().collect(),
-        {
-            let blocks = blocks.clone();
-            move |block| -> BoxFuture<HolochainP2pResult<()>> {
-                blocks.write().push(block);
-                async move { Ok(()) }.boxed()
-            }
-        },
     )
     .await
     .unwrap();
 
     assert_eq!(WorkComplete::Complete, work_complete);
 
-    {
-        let read_blocks = blocks.read();
-        assert_eq!(1, read_blocks.len());
-        match read_blocks.first().unwrap().target() {
-            BlockTarget::Cell(cell_id, reason) => {
-                assert_eq!(CellBlockReason::InvalidOp(op_hash.clone()), *reason);
-                assert_eq!(author, *cell_id.agent_pubkey());
-            }
-            _ => unreachable!("Only expect a cell block"),
-        }
-    }
-
-    // The op was rejected and the sender blocked but the `require_receipt` flag should still be cleared
+    // The op was rejected, but the `require_receipt` flag should still be cleared
     // so we don't reprocess the op.
     assert!(!get_requires_receipt(vault, op_hash).await);
 }
@@ -188,7 +161,6 @@ async fn continues_if_receipt_cannot_be_signed() {
         dna,
         keystore,
         vec![invalid_validator].into_iter().collect(),
-        |_block| unreachable!("Should not try to block"),
     )
     .await
     .unwrap();
@@ -228,7 +200,6 @@ async fn send_validation_receipt() {
         dna,
         keystore,
         vec![validator].into_iter().collect(), // No running cells
-        |_block| unreachable!("Should not try to block"),
     )
     .await
     .unwrap();
@@ -283,7 +254,6 @@ async fn errors_for_some_ops_does_not_prevent_the_workflow_proceeding() {
         dna,
         keystore,
         vec![validator].into_iter().collect(), // No running cells
-        |_block| unreachable!("Should not try to block"),
     )
     .await
     .unwrap();

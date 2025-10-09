@@ -661,6 +661,117 @@ async fn validate_warrant_with_validated_dependency() {
     );
 }
 
+/// Checks that validating a warranted op does not result in issuing a new warrant.
+#[cfg(feature = "unstable-warrants")]
+#[tokio::test(flavor = "multi_thread")]
+async fn avoid_duplicate_warrant() {
+    holochain_trace::test_run();
+
+    let mut network = MockHolochainP2pDnaT::new();
+    network
+        .expect_target_arcs()
+        .return_once(move || Ok(vec![kitsune2_api::DhtArc::FULL]));
+
+    let mut test_case = TestCase::new().await;
+    test_case.with_network_behaviour(network);
+
+    let bad_agent = test_case.keystore.new_sign_keypair_random().await.unwrap();
+    let warrant_agent = test_case.keystore.new_sign_keypair_random().await.unwrap();
+    let other_warrant_agent = test_case.keystore.new_sign_keypair_random().await.unwrap();
+
+    // Invalid op
+    let mut create = fixt!(Create);
+    create.author = bad_agent.clone();
+    create.action_seq = 0; // Not allowed for a create op
+    let valid_action = test_case.sign_action(Action::Create(create.clone())).await;
+    let invalid_op = ChainOp::StoreRecord(
+        fixt!(Signature),
+        Action::Create(create),
+        crate::prelude::RecordEntry::NA,
+    );
+    test_case
+        .save_op_to_db(test_case.dht_db_handle(), invalid_op.into())
+        .await
+        .unwrap();
+
+    // Valid warrant against the invalid action
+    let warrant_op = test_case
+        .create_and_sign_warrant(
+            &valid_action,
+            &warrant_agent,
+            holochain_zome_types::op::ChainOpType::StoreRecord,
+        )
+        .await
+        .unwrap();
+    let warrant_op_hash = DhtOpHashed::from_content_sync(warrant_op.clone()).hash;
+    test_case
+        .save_op_to_db(
+            test_case.dht_db_handle(),
+            DhtOp::WarrantOp(warrant_op.into()),
+        )
+        .await
+        .unwrap();
+
+    // Validate the warrant as another agent
+    let work_complete = test_case.run_as_agent(&other_warrant_agent).await;
+    assert!(matches!(work_complete, WorkComplete::Incomplete(_)));
+
+    let work_complete = test_case.run_as_agent(&other_warrant_agent).await;
+    assert!(matches!(work_complete, WorkComplete::Complete));
+
+    // Get the warrant validation outcome
+    let status = test_case
+        .get_warrant_validation_outcome(warrant_op_hash)
+        .unwrap();
+
+    assert!(
+        matches!(
+            status,
+            Some(holochain_zome_types::prelude::ValidationStatus::Valid)
+        ),
+        "Warrant was not rejected as expected, got: {status:?}"
+    );
+
+    // Check that no new warrant was issued
+    let authored_warrants = test_case
+        .get_authored_warrants(
+            &test_case
+                .test_space
+                .space
+                .get_or_create_authored_db(other_warrant_agent.clone())
+                .unwrap(),
+            other_warrant_agent.clone(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        0,
+        authored_warrants.len(),
+        "No new warrant should have been issued"
+    );
+
+    let dht_warrants = test_case
+        .get_authored_warrants(&test_case.dht_db_handle(), other_warrant_agent.clone())
+        .await
+        .unwrap();
+    assert_eq!(
+        0,
+        dht_warrants.len(),
+        "No new warrant should have been issued"
+    );
+
+    // Check that the original warrant is still present
+    let dht_warrants = test_case
+        .get_authored_warrants(&test_case.dht_db_handle(), warrant_agent.clone())
+        .await
+        .unwrap();
+    assert_eq!(
+        1,
+        dht_warrants.len(),
+        "The original warrant should still be present"
+    );
+}
+
 struct TestCase {
     dna_hash: DnaDefHashed,
     test_space: TestSpace,
@@ -769,10 +880,14 @@ impl TestCase {
     }
 
     async fn run(&mut self) -> WorkComplete {
+        self.run_as_agent(&self.agent.clone()).await
+    }
+
+    async fn run_as_agent(&mut self, agent: &AgentPubKey) -> WorkComplete {
         let workspace = SysValidationWorkspace::new(
             self.test_space
                 .space
-                .get_or_create_authored_db(self.agent.clone())
+                .get_or_create_authored_db(agent.clone())
                 .unwrap(),
             self.test_space.space.dht_db.clone(),
             self.test_space.space.cache_db.clone(),
@@ -791,7 +906,7 @@ impl TestCase {
             self.self_trigger.0.clone(),
             actual_network,
             self.keystore.clone(),
-            self.agent.clone(),
+            agent.clone(),
         )
         .await
         .unwrap()
@@ -871,5 +986,55 @@ impl TestCase {
                 Ok(status)
             },
         )
+    }
+
+    #[cfg(feature = "unstable-warrants")]
+    async fn get_authored_warrants<T: DbKindT>(
+        &self,
+        db: &holochain_sqlite::prelude::DbRead<T>,
+        author: AgentPubKey,
+    ) -> holochain_state::prelude::StateQueryResult<Vec<holochain_types::warrant::WarrantOp>> {
+        db.read_async(
+            move |txn| -> holochain_state::prelude::StateQueryResult<
+                Vec<holochain_types::warrant::WarrantOp>,
+            > {
+                let mut stmt = txn.prepare(
+                    r#"
+            SELECT
+                Warrant.blob as action_blob,
+                Warrant.author as author,
+                NULL as entry_blob,
+                DhtOp.type as dht_type,
+                DhtOp.hash as dht_hash,
+                DhtOp.num_validation_attempts,
+                DhtOp.op_order
+            FROM DhtOp
+                JOIN Warrant ON DhtOp.action_hash = Warrant.hash
+            WHERE
+                Warrant.author = :author
+            "#,
+                )?;
+
+                let mut rows = stmt.query(rusqlite::named_params! {
+                    ":author": author,
+                })?;
+
+                let mut ops = Vec::new();
+                while let Ok(Some(row)) = rows.next() {
+                    let op = holochain_state::query::map_sql_dht_op(true, "dht_type", row)?;
+                    let hash = row.get("dht_hash")?;
+                    ops.push(DhtOpHashed::with_pre_hashed(op, hash))
+                }
+
+                Ok(ops
+                    .into_iter()
+                    .filter_map(|o| match o.content {
+                        DhtOp::WarrantOp(warrant_op) => Some(*warrant_op),
+                        _ => None,
+                    })
+                    .collect())
+            },
+        )
+        .await
     }
 }

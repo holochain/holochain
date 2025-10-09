@@ -172,8 +172,18 @@ where
     // If the zome call failed, don't try to validate and store any data it created.
     let result = result?;
 
-    let validation_result =
-        inline_validation(workspace.clone(), network, conductor_handle, ribosome).await;
+    let disable_self_validation = conductor_handle
+        .config
+        .tuning_params
+        .as_ref()
+        .is_some_and(|p| p.disable_self_validation);
+
+    let validation_result = if disable_self_validation {
+        tracing::warn!("Self validation is disabled, skipping validation of local commits");
+        WorkflowResult::Ok(())
+    } else {
+        inline_validation(workspace.clone(), network, conductor_handle, ribosome).await
+    };
 
     // If the validation failed remove any active chain lock that matches the
     // entry that failed validation.

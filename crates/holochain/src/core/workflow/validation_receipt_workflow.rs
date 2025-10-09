@@ -1,13 +1,9 @@
 use super::error::WorkflowResult;
 use crate::core::queue_consumer::WorkComplete;
-use futures::future::BoxFuture;
 use futures::{stream, StreamExt};
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::{DynHolochainP2pDna, HolochainP2pResult};
+use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::prelude::*;
-use holochain_zome_types::block::Block;
-use holochain_zome_types::block::BlockTarget;
-use holochain_zome_types::block::CellBlockReason;
 use itertools::Itertools;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -24,17 +20,13 @@ mod unit_tests;
     tracing::instrument(skip(vault, network, keystore, apply_block))
 )]
 /// Send validation receipts to their authors in serial and without waiting for responses.
-pub async fn validation_receipt_workflow<B>(
+pub async fn validation_receipt_workflow(
     dna_hash: Arc<DnaHash>,
     vault: DbWrite<DbKindDht>,
     network: DynHolochainP2pDna,
     keystore: MetaLairClient,
     running_cell_ids: HashSet<CellId>,
-    apply_block: B,
-) -> WorkflowResult<WorkComplete>
-where
-    B: Fn(Block) -> BoxFuture<'static, HolochainP2pResult<()>> + Clone,
-{
+) -> WorkflowResult<WorkComplete> {
     if running_cell_ids.is_empty() {
         return Ok(WorkComplete::Complete);
     }
@@ -73,13 +65,11 @@ where
     for (author, receipts) in grouped_by_author {
         // Try to send the validation receipts
         match sign_and_send_receipts_to_author(
-            &dna_hash,
             network.clone(),
             &keystore,
             &validators,
             &author,
             receipts.clone(),
-            apply_block.clone(),
         )
         .await
         {
@@ -104,18 +94,13 @@ where
 
 /// Perform the signing and sending of
 /// Requires that the receipts to send are all by the same author.
-async fn sign_and_send_receipts_to_author<B>(
-    dna_hash: &DnaHash,
+async fn sign_and_send_receipts_to_author(
     network: DynHolochainP2pDna,
     keystore: &MetaLairClient,
     validators: &HashSet<AgentPubKey>,
     op_author: &AgentPubKey,
     receipts: Vec<ValidationReceipt>,
-    apply_block: B,
-) -> WorkflowResult<()>
-where
-    B: Fn(Block) -> BoxFuture<'static, HolochainP2pResult<()>>,
-{
+) -> WorkflowResult<()> {
     // Don't send receipt to self. Don't block self.
     if validators.contains(op_author) {
         return Ok(());
@@ -125,29 +110,6 @@ where
 
     let receipts: Vec<SignedValidationReceipt> = stream::iter(receipts)
         .filter_map(|receipt| async {
-            // Block authors of invalid ops.
-            if matches!(receipt.validation_status, ValidationStatus::Rejected) {
-                // Block BEFORE we integrate the outcome because this is not atomic
-                // and if something goes wrong we know the integration will retry.
-                if let Err(e) = apply_block(Block::new(
-                    BlockTarget::Cell(
-                        CellId::new((*dna_hash).clone(), op_author.clone()),
-                        CellBlockReason::InvalidOp(receipt.dht_op_hash.clone()),
-                    ),
-                    match InclusiveTimestampInterval::try_new(Timestamp::MIN, Timestamp::MAX) {
-                        Ok(interval) => interval,
-                        Err(e) => {
-                            error!("Failed to create timestamp interval: {:?}", e);
-                            return None;
-                        }
-                    },
-                ))
-                .await
-                {
-                    error!("Failed to apply block to author {:?}: {:?}", op_author, e)
-                }
-            }
-
             // Sign on the dotted line.
             match ValidationReceipt::sign(receipt, keystore).await {
                 Ok(r) => r,
