@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Replace `BTreeSet` with `HashSet` in `GrantedFunctions::Listed`. #5349
 - Add a new conductor tuning parameter `disable_self_validation` to disable self-validation of authored data. Intended only
   for testing warrants. #5340
 - Avoid issuing duplicate warrants for invalid actions during sys validation by checking for existing warrants before creating new ones. #5337
