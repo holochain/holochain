@@ -58,6 +58,9 @@ pub enum CascadeError {
 
     #[error(transparent)]
     SyncScratchError(#[from] holochain_state::scratch::SyncScratchError),
+
+    #[error("Network not initialized")]
+    NetworkNotInitialized,
 }
 
 pub type CascadeResult<T> = Result<T, CascadeError>;
