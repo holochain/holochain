@@ -46,6 +46,7 @@ impl From<NetworkConfig> for SweetConductorConfig {
                 countersigning_resolution_retry_limit: None,
                 publish_trigger_interval: None,
                 min_publish_interval: None,
+                disable_self_validation: false,
                 disable_warrant_issuance: false,
             }),
             ..Default::default()

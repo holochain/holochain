@@ -44,6 +44,9 @@ pub static SCHEMA_CELL: Lazy<Schema> = Lazy::new(|| Schema {
         M {
             forward: include_str!("sql/cell/schema/8-up.sql").into(),
         },
+        M {
+            forward: include_str!("sql/cell/schema/9-up.sql").into(),
+        },
     ],
 });
 
