@@ -11,7 +11,7 @@ use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holochain_state::query::link::GetLinksQuery;
 use holochain_state::query::CascadeTxnWrapper;
-use holochain_state::query::{Query, Store};
+use holochain_state::query::Query;
 use holochain_types::prelude::*;
 
 #[cfg(test)]
@@ -60,9 +60,10 @@ pub async fn handle_get_agent_activity(
         .read_async(move |txn| -> CascadeResult<AgentActivityResponse> {
             let txn = CascadeTxnWrapper::from(txn);
 
-            let warrants = txn.get_warrants_for_agent(&agent, true)?;
+            // let warrants = txn.get_warrants_for_agent(&agent, true)?;
+            // println!("warrants are {warrants:?}");
 
-            let mut activity_response = if options.include_full_records {
+            let activity_response = if options.include_full_records {
                 // If the caller wanted records, prioritise giving those back.
                 GetAgentActivityRecordsQuery::new(agent, query, options).run(txn)?
             } else {
@@ -70,10 +71,11 @@ pub async fn handle_get_agent_activity(
                 GetAgentActivityHashesQuery::new(agent, query, options).run(txn)?
             };
 
-            if !warrants.is_empty() {
-                // TODO why did we retrieve warrants in the activity query if we're going to overwrite them here?
-                activity_response.warrants = warrants.into_iter().map(|w| (*w).clone()).collect();
-            }
+            // if !warrants.is_empty() {
+            //     println!("activity warrants are {:?}", activity_response.warrants);
+            //     // TODO why did we retrieve warrants in the activity query if we're going to overwrite them here?
+            //     activity_response.warrants = warrants.into_iter().map(|w| (*w).clone()).collect();
+            // }
 
             Ok(activity_response)
         })

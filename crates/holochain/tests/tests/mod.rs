@@ -32,7 +32,7 @@ mod test_utils;
 mod validate;
 #[cfg(feature = "unstable-warrants")]
 mod warrant_issuance;
-#[cfg(feature = "unstable-warrants")]
+// #[cfg(feature = "unstable-warrants")]
 mod warrants;
 mod websocket;
 mod websocket_stress;

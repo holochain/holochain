@@ -1,8 +1,8 @@
 use hdk::prelude::{
-    CellId, ChainTopOrdering, CreateInput, EntryDef, EntryDefIndex, EntryVisibility, Op,
-    SerializedBytes, ValidateCallbackResult,
+    AgentActivity, BlockTargetId, CellId, ChainTopOrdering, CreateInput, EntryDef, EntryDefIndex,
+    EntryVisibility, Op, SerializedBytes, ValidateCallbackResult,
 };
-use holo_hash::ActionHash;
+use holo_hash::{ActionHash, AgentPubKey};
 use holochain::{
     prelude::InlineZomeSet,
     sweettest::{
@@ -11,7 +11,11 @@ use holochain::{
     },
 };
 use holochain_state::query::{CascadeTxnWrapper, Store};
-use holochain_zome_types::Entry;
+use holochain_zome_types::{
+    agent_activity::GetAgentActivityInput,
+    query::{ActivityRequest, ChainQueryFilter},
+    Entry,
+};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
@@ -269,4 +273,159 @@ async fn warrant_is_gossiped() {
     })
     .await
     .unwrap();
+}
+
+mod zero_arc {
+    use holochain::sweettest::SweetConductor;
+
+    use super::*;
+
+    // Test that when get_agent_activity returns warrants, the author of the warrants is blocked.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn get_agent_activity_blocks_warrant_author() {
+        holochain_trace::test_run();
+
+        #[derive(Serialize, Deserialize, SerializedBytes, Debug)]
+        struct AppString(String);
+
+        let string_entry_def = EntryDef::default_from_id("string");
+        let zome_common = SweetInlineZomes::new(vec![string_entry_def], 0)
+            .function("create_string", move |api, s: AppString| {
+                let entry = Entry::app(s.try_into().unwrap()).unwrap();
+                let hash = api.create(CreateInput::new(
+                    InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
+                    EntryVisibility::Public,
+                    entry,
+                    ChainTopOrdering::default(),
+                ))?;
+                Ok(hash)
+            })
+            .function(
+                "get_agent_activity",
+                move |api, agent_pubkey: AgentPubKey| {
+                    let input = GetAgentActivityInput::new(
+                        agent_pubkey,
+                        ChainQueryFilter::new(),
+                        ActivityRequest::Full,
+                    );
+                    let agent_activity = api.get_agent_activity(input)?;
+                    Ok(agent_activity)
+                },
+            );
+
+        let zome_without_validation = zome_common
+            .clone()
+            .integrity_function("validate", move |_api, _op: Op| {
+                Ok(ValidateCallbackResult::Valid)
+            });
+        // Any action after the genesis actions is invalid.
+        let zome_with_validation =
+            zome_common
+                .clone()
+                .integrity_function("validate", move |_api, op: Op| {
+                    if op.action_seq() > 3 {
+                        Ok(ValidateCallbackResult::Invalid("nope".to_string()))
+                    } else {
+                        Ok(ValidateCallbackResult::Valid)
+                    }
+                });
+
+        let network_seed = "seed".to_string();
+
+        let (dna_without_validation, _, _) =
+            SweetDnaFile::from_inline_zomes(network_seed.clone(), zome_without_validation).await;
+        let (dna_with_validation, _, _) =
+            SweetDnaFile::from_inline_zomes(network_seed.clone(), zome_with_validation).await;
+        assert_eq!(
+            dna_without_validation.dna_hash(),
+            dna_with_validation.dna_hash()
+        );
+        let dna_hash = dna_with_validation.dna_hash().clone();
+
+        let config = SweetConductorConfig::standard();
+        // Carol is a zero arc node, so publish and gossip won't transport the warrant to her.
+        let config_zero_arc =
+            SweetConductorConfig::standard().tune_network_config(|nc| nc.target_arc_factor = 0);
+        let mut conductors =
+            SweetConductorBatch::from_configs_rendezvous([config.clone(), config, config_zero_arc])
+                .await;
+        let (alice,) = conductors[0]
+            .setup_app("test_app", [&dna_without_validation])
+            .await
+            .unwrap()
+            .into_tuple();
+        let (bob,) = conductors[1]
+            .setup_app("test_app", [&dna_with_validation])
+            .await
+            .unwrap()
+            .into_tuple();
+        let (carol,) = conductors[2]
+            .setup_app("test_app", [&dna_without_validation])
+            .await
+            .unwrap()
+            .into_tuple();
+        conductors[1]
+            .holochain_p2p()
+            .test_set_full_arcs(dna_hash.to_k2_space())
+            .await;
+        // Ensure that Carol knows about Bob's full arc.
+        SweetConductor::exchange_peer_info([&conductors[1], &conductors[2]]).await;
+
+        await_consistency(20, [&alice, &bob]).await.unwrap();
+
+        // Alice creates an invalid action.
+        let _: ActionHash = conductors[0]
+            .call(
+                &alice.zome(SweetInlineZomes::COORDINATOR),
+                "create_string",
+                AppString("entry1".into()),
+            )
+            .await;
+
+        await_consistency(10, [&alice, &bob]).await.unwrap();
+
+        // Bob should have issued a warrant against Alice.
+        // Wait for the warrant to be issued.
+        tokio::time::timeout(Duration::from_secs(10), async {
+            loop {
+                let alice_pubkey = alice.agent_pubkey().clone();
+                let warrants = conductors[1]
+                    .get_spaces()
+                    .get_all_authored_dbs(dna_without_validation.dna_hash())
+                    .unwrap()[0]
+                    .test_read(move |txn| {
+                        let store = CascadeTxnWrapper::from(txn);
+                        store.get_warrants_for_agent(&alice_pubkey, false).unwrap()
+                    });
+
+                if warrants.len() == 1 && warrants[0].warrant().warrantee == *alice.agent_pubkey() {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+        })
+        .await
+        .unwrap();
+
+        conductors[0].shutdown().await;
+
+        // Carol calls get_agent_activity on Alice and blocks the warrant authors.
+        let _: AgentActivity = conductors[2]
+            .call(
+                &carol.zome(SweetInlineZomes::COORDINATOR),
+                "get_agent_activity",
+                alice.agent_pubkey().clone(),
+            )
+            .await;
+
+        // Check that Carol has blocked Alice.
+        assert!(conductors[2]
+            .holochain_p2p()
+            .is_blocked(BlockTargetId::Cell(CellId::new(
+                dna_hash,
+                alice.agent_pubkey().clone()
+            )))
+            .await
+            .unwrap());
+    }
 }

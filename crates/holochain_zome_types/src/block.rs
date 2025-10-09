@@ -35,6 +35,8 @@ pub enum CellBlockReason {
     InvalidOp(DhtOpHash),
     /// Some bad cryptography.
     BadCrypto,
+    /// Invalid op.
+    InvalOp,
 }
 
 /// Reason why we might want to block a node.

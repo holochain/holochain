@@ -963,6 +963,7 @@ impl CascadeImpl {
         // warrants we don't know about or for countersigning actions, then we will go to the network
         // regardless of authority status.
         let authority = self.am_i_an_authority(agent.clone().into()).await?;
+        println!("authority {authority:?}");
 
         let merged_response = if authority && options.get_options.strategy == GetStrategy::Local {
             match self.dht.clone() {
