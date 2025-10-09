@@ -475,11 +475,11 @@ impl CascadeImpl {
         author: AgentPubKey,
         filter: holochain_zome_types::chain::ChainFilter,
     ) -> CascadeResult<MustGetAgentActivityResponse> {
-        if self.network.is_none() {
-            return Err(CascadeError::NetworkNotInitialized);
-        }
+        let network = self
+            .network
+            .as_ref()
+            .ok_or(CascadeError::NetworkNotInitialized)?;
 
-        let network = self.network.as_ref().unwrap();
         let results = match network.must_get_agent_activity(author, filter).await {
             Ok(response) => response,
             Err(e @ HolochainP2pError::NoPeersForLocation(_, _)) => {

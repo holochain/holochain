@@ -1,9 +1,9 @@
 use super::*;
 use crate::authority::handle_must_get_agent_activity;
+use crate::error::CascadeError;
 use crate::test_utils::{
     commit_chain, create_activity, create_activity_with_prev, create_warrant_op,
 };
-use crate::error::CascadeError;
 use ::fixt::fixt;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
