@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Test: Test that blocks are enforced for incoming network get requests and gossip.
 - Build: Upgrade to latest Kitsune2 release v0.3.0-dev.4
 - **BREAKING CHANGE** Replace `BTreeSet` with `HashSet` in `GrantedFunctions::Listed`. #5349
 - Add a new conductor tuning parameter `disable_self_validation` to disable self-validation of authored data. Intended only
