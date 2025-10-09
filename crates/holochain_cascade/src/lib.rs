@@ -968,7 +968,7 @@ impl CascadeImpl {
         // Warrants are never written to Scratch.
         if let Some(scratch) = self.scratch.clone() {
             let activity_list_from_scratch = scratch.apply_and_then(|scratch| {
-                get_filtered_agent_activity_from_scratch(scratch, &author, filter.clone())
+                get_filtered_agent_activity_from_scratch(scratch, &author, filter.clone(), chain_top_action_seq)
             })?;
             activity_lists.push(activity_list_from_scratch);
         }

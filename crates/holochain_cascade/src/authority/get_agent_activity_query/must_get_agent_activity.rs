@@ -85,62 +85,63 @@ pub(crate) fn get_action_seq_from_scratch(
 /// Get the agent activity for a given range of actions from the Scratch.
 /// Note that Scratch actions should always be more recently created than database actions
 /// and thus will have a higher action seq than any actions in the database.
+/// 
+// This must have identical logic to get_filtered_agent_activity.
 pub(crate) fn get_filtered_agent_activity_from_scratch(
     scratch: &mut Scratch,
     author: &AgentPubKey,
     filter: ChainFilter,
+    filter_chain_top_action_seq: u32,
 ) -> StateQueryResult<Vec<RegisterAgentActivity>> {
-    match scratch
+    // Get the max action seq of all Actions in the set of until hashes.
+    let chain_filter_limit_conditions_until_hashes_max_seq = if let Some(until_hashes) = filter.get_until_hash() {
+        scratch
+            .actions()
+            .filter(|a| until_hashes.contains(a.hashed.action_hash()))
+            .max_by_key(|a| a.seq())
+            .map(|a| a.seq())
+    } else {
+        None
+    };
+
+    // Until hash Action seq must be less than or equal to ChainFilter chain_top Action seq
+    if let Some(until_action_seq) = chain_filter_limit_conditions_until_hashes_max_seq {
+        if until_action_seq > filter_chain_top_action_seq {
+            return Err(StateQueryError::InvalidInput("The largest ChainFilter until hash Action seq must be less than or equal to the ChainFilter chain_top action seq.".to_string()));
+        }
+    }
+
+    // Get the agent activity, filtered by the chain top, author, 3 optional lower-bounds, and optional limit size.
+    let activity = scratch
         .actions()
-        .find(|a| a.hashed.hash == filter.chain_top)
-    {
-        // If the filter's chain top Action is in scratch space, then we need to get some Actions from scratch.
-        // Otherwise, we know there are no Actions in Scratch that are within the filter range.
-        Some(chain_top_action) => {
-            // If ChainFilter includes until hashes, get the *first* Action that is contained in the until hashes set.
-            // The *first* Action will have the highest action seq.
-            // TODO: is this accurate?
-            let mut max_until_hash_action = None;
-            if let Some(until_hashes) = filter.get_until_hash() {
-                max_until_hash_action = scratch
-                    .actions()
-                    .find(|a| until_hashes.contains(a.hashed.action_hash()))
+        .filter(|a| {
+            let action = a.action();
+            let is_author = action.author() == author;
+            let is_lte_chain_top = action.action_seq() <= filter_chain_top_action_seq;
+
+            let mut is_gte_until_timestamp = true;
+            if let Some(until_timestamp) = filter.get_until_timestamp() {
+                is_gte_until_timestamp = a.action().timestamp() >= until_timestamp;
             }
 
-            // Filter scratch Actions by ChainFilter
-            let activity = scratch
-                .actions()
-                .filter(|a| {
-                    let action = a.action();
-                    let is_author = action.author() == author;
-                    let is_lte_chain_top = action.action_seq() <= chain_top_action.seq();
+            let mut is_gte_max_until_hash_seq = true;
+            if let Some(until_action) = chain_filter_limit_conditions_until_hashes_max_seq {
+                is_gte_max_until_hash_seq = a.action().action_seq() >= until_action;
+            }
 
-                    let mut is_gte_until_timestamp = true;
-                    if let Some(until_timestamp) = filter.get_until_timestamp() {
-                        is_gte_until_timestamp = a.action().timestamp() >= until_timestamp;
-                    }
+            is_author
+                && is_lte_chain_top
+                && is_gte_until_timestamp
+                && is_gte_max_until_hash_seq
+        })
+        .map(|action| RegisterAgentActivity {
+            action: action.clone(),
+            // TODO: Implement getting the cached entries.
+            cached_entry: None,
+        })
+        .collect();
 
-                    let mut is_gte_max_until_hash_seq = true;
-                    if let Some(until_action) = max_until_hash_action {
-                        is_gte_max_until_hash_seq = a.action().action_seq() >= until_action.seq();
-                    }
-
-                    is_author
-                        && is_lte_chain_top
-                        && is_gte_until_timestamp
-                        && is_gte_max_until_hash_seq
-                })
-                .map(|action| RegisterAgentActivity {
-                    action: action.clone(),
-                    // TODO: Implement getting the cached entries.
-                    cached_entry: None,
-                })
-                .collect();
-
-            Ok(activity)
-        }
-        None => Ok(vec![]),
-    }
+    Ok(activity)
 }
 
 /// Get the agent activity for a given range of actions from the database.
