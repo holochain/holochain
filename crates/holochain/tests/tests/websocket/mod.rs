@@ -597,8 +597,6 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
     };
 
     // send a request after the conductor has shutdown
-    // let response: Result<Result<AdminResponse, _>, tokio::time::Elapsed> =
-    //     tokio::time::timeout(Duration::from_secs(1), client.request(request)).await;
     let response: Result<Result<AdminResponse, _>, tokio::time::error::Elapsed> =
         tokio::time::timeout(Duration::from_secs(1), client.request(request)).await;
 
@@ -718,8 +716,6 @@ async fn concurrent_install_dna() {
     let (client, rx) = websocket_client_by_port(admin_port).await.unwrap();
     let _rx = WsPollRecv::new::<AdminResponse>(rx);
 
-    // let before = std::time::Instant::now();
-
     let install_tasks_stream = futures::stream::iter((0..NUM_DNA).map(|i| {
         let zomes = vec![(TestWasm::Foo.into(), TestWasm::Foo.into())];
         let mut client = client.clone();
@@ -743,11 +739,6 @@ async fn concurrent_install_dna() {
                 REQ_TIMEOUT_MS,
             )
             .await;
-
-            // println!(
-            //     "[{}] installed app with cell id {} and name {}",
-            //     i, _cell_id, name
-            // );
         })
     }))
     .buffer_unordered(NUM_CONCURRENT_INSTALLS.into());

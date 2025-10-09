@@ -346,13 +346,6 @@ fn bump_versions_on_selection() {
         commit_msg
     );
 
-    // TODO: tag creation has been moved to publishing, test it there
-    // ensure the git tags for the crate releases were created
-    // for expected_tag in &["crate_b-0.0.0", "crate_a-0.0.2", "crate_e-0.0.1"] {
-    //     crate::crate_selection::git_lookup_tag(workspace.git_repo(), &expected_tag)
-    //         .expect(&format!("git tag '{}' not found", &expected_tag));
-    // }
-
     if matches!(option_env!("FAIL_CLI_RELEASE_TEST"), Some(_)) {
         println!("stderr:\n'{}'\n---\nstdout:\n'{}'\n---", output.0, output.1,);
 

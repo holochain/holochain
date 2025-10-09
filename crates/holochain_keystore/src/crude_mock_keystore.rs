@@ -63,19 +63,6 @@ mod tests {
                 holo_hash::AgentPubKey::new_random(&keystore).await,
                 Err(one_err::OneErr::new("err"))
             );
-            // let agent = holo_hash::AgentPubKey::new_from_pure_entropy(&keystore)
-            //     .await
-            //     .unwrap();
-
-            // #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-            // struct MyData(Vec<u8>);
-
-            // let data = MyData(b"signature test data 1".to_vec());
-
-            // assert_eq!(
-            //     agent.sign(&keystore, &data).await,
-            //     Err(KeystoreError::LairError(LairError::other("err")))
-            // );
         })
         .await
         .unwrap();

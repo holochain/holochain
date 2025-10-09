@@ -7,8 +7,6 @@ use holochain_sqlite::error::DatabaseError;
 use holochain_state::source_chain::SourceChainError;
 use holochain_types::prelude::*;
 use holochain_zome_types::action::conversions::WrongActionError;
-// use holochain::conductor::CellError;
-// use holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
 use thiserror::Error;
 use tokio::task::JoinError;
 
