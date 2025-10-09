@@ -117,7 +117,6 @@ async fn test_must_get_agent_activity_inner(
         warrants,
     } = data;
     let dht = commit_chain(DbKindDht(Arc::new(DnaHash::from_raw_36(vec![0; 36]))), dht);
-    let network = PassThroughNetwork::authority_for_nothing(vec![dht.clone().into()]);
     let cache = commit_chain(
         DbKindCache(Arc::new(DnaHash::from_raw_36(vec![0; 36]))),
         cache,
@@ -160,7 +159,7 @@ async fn test_must_get_agent_activity_inner(
     };
     let mut cascade = CascadeImpl::empty()
         .with_authored(authored.into())
-        .with_network(network, cache)
+        .with_cache(cache)
         .with_dht(dht.into());
     if let Some(sync_scratch) = sync_scratch {
         cascade = cascade.with_scratch(sync_scratch);
