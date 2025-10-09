@@ -1,12 +1,12 @@
 //! Functions for the various authorities to handle queries
 
-use self::get_agent_activity_query::must_get_agent_activity::must_get_agent_activity;
 use self::get_entry_ops_query::GetEntryOpsQuery;
 use self::get_links_ops_query::GetLinksOpsQuery;
 use self::get_record_query::GetRecordOpsQuery;
 use super::error::CascadeResult;
 use crate::authority::get_agent_activity_query::hashes::GetAgentActivityHashesQuery;
 use crate::authority::get_agent_activity_query::records::GetAgentActivityRecordsQuery;
+use crate::CascadeImpl;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holochain_state::query::link::GetLinksQuery;
@@ -89,7 +89,10 @@ pub async fn handle_must_get_agent_activity(
     author: AgentPubKey,
     filter: ChainFilter,
 ) -> CascadeResult<MustGetAgentActivityResponse> {
-    Ok(must_get_agent_activity(env, author, filter).await?)
+    CascadeImpl::empty()
+        .with_dht(env)
+        .must_get_agent_activity(author, filter)
+        .await
 }
 
 /// Handler for get_links query to a Record/Entry authority

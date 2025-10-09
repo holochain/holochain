@@ -1,8 +1,5 @@
-use crate::error::CascadeError;
-use crate::CascadeImpl;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
-use holochain_sqlite::prelude::{DbKindDht, DbRead};
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::ToSql;
 use holochain_sqlite::rusqlite::Transaction;
@@ -15,35 +12,6 @@ use std::collections::HashSet;
 
 #[cfg(test)]
 mod test;
-
-/// Get the agent activity for a given agent and filtered range of actions.
-///
-/// If the full filtered range of activity is found, this will return [`MustGetAgentActivityResponse::Activity`].
-/// If the chain top is not found, this will return [`MustGetAgentActivityResponse::ChainTopNotFound`].
-/// If the chain top is found, but the full range of activity within the filter was not found,
-/// this will return [`MustGetAgentActivityResponse::IncompleteChain`].
-#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-pub async fn must_get_agent_activity(
-    env: DbRead<DbKindDht>,
-    author: AgentPubKey,
-    filter: ChainFilter,
-) -> StateQueryResult<MustGetAgentActivityResponse> {
-    CascadeImpl::empty()
-        .with_dht(env)
-        .must_get_agent_activity(author, filter)
-        .await
-        // Error handling workaround because we cannot implement
-        // `From<CascadeError> for StateQueryError`. As this crate depends
-        // on `holochain_state` where StateQueryError is defined.
-        .map_err(|e| {
-            tracing::error!("error is {:?}", e);
-            match e {
-                CascadeError::QueryError(s) => s,
-                CascadeError::InvalidInput(s) => StateQueryError::InvalidInput(s),
-                _ => StateQueryError::Other(e.to_string()),
-            }
-        })
-}
 
 /// Get the ChainFilter chain_top Action seq from a database
 /// If not found, returns Ok(None)

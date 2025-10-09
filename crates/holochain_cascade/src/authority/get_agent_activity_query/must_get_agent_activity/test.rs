@@ -1,7 +1,9 @@
 use super::*;
+use crate::authority::handle_must_get_agent_activity;
 use crate::test_utils::{
     commit_chain, create_activity, create_activity_with_prev, create_warrant_op,
 };
+use crate::error::CascadeError;
 use ::fixt::fixt;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
@@ -101,7 +103,7 @@ async fn returns_full_sequence_from_filter(
         DbKindDht(Arc::new(DnaHash::from_raw_36(vec![0; 36]))),
         chain,
     );
-    let data = must_get_agent_activity(db.clone().into(), agent.clone(), filter)
+    let data = handle_must_get_agent_activity(db.clone().into(), agent.clone(), filter)
         .await
         .unwrap();
     let data = match data {
@@ -149,7 +151,7 @@ async fn returns_full_sequence_from_filter(
     => matches MustGetAgentActivityResponse::Activity { .. } ; "Until hash is an excluded forked action")]
 /// Check the query returns the appropriate responses.
 #[tokio::test(flavor = "multi_thread")]
-async fn test_authority_must_get_agent_activity_ok_responses(
+async fn handle_must_get_agent_activity_ok(
     chain: Vec<(AgentPubKey, Vec<TestChainItem>)>,
     agent: AgentPubKey,
     filter: ChainFilter,
@@ -159,7 +161,7 @@ async fn test_authority_must_get_agent_activity_ok_responses(
         DbKindDht(Arc::new(DnaHash::from_raw_36(vec![0; 36]))),
         chain,
     );
-    let res = must_get_agent_activity(db.clone().into(), agent.clone(), filter)
+    let res = handle_must_get_agent_activity(db.clone().into(), agent.clone(), filter)
         .await
         .unwrap();
 
@@ -168,22 +170,22 @@ async fn test_authority_must_get_agent_activity_ok_responses(
 
 #[test_case(
     agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[8])).until_hash(action_hash(&[9]))
-    => matches StateQueryError::InvalidInput(_); "Until hash is higher then chain_top")]
+    => matches CascadeError::QueryError(StateQueryError::InvalidInput(_)); "Until hash is higher then chain_top")]
 #[test_case(
     agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[8])).take(0)
-    => matches StateQueryError::InvalidInput(_); "Take is 0")]
+    => matches CascadeError::InvalidInput(_); "Take is 0")]
 #[tokio::test(flavor = "multi_thread")]
-async fn test_authority_must_get_agent_activity_err_responses(
+async fn handle_must_get_agent_activity_err(
     chain: Vec<(AgentPubKey, Vec<TestChainItem>)>,
     agent: AgentPubKey,
     filter: ChainFilter,
-) -> StateQueryError {
+) -> CascadeError {
     holochain_trace::test_run();
     let db = commit_chain(
         DbKindDht(Arc::new(DnaHash::from_raw_36(vec![0; 36]))),
         chain,
     );
-    let res = must_get_agent_activity(db.clone().into(), agent.clone(), filter)
+    let res = handle_must_get_agent_activity(db.clone().into(), agent.clone(), filter)
         .await
         .unwrap_err();
 
