@@ -169,6 +169,9 @@ async fn test_authority_must_get_agent_activity_ok_responses(
 #[test_case(
     agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[8])).until_hash(action_hash(&[9]))
     => matches StateQueryError::InvalidInput(_); "Until hash is higher then chain_top")]
+#[test_case(
+    agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[8])).take(0)
+    => matches StateQueryError::InvalidInput(_); "Take is 0")]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_authority_must_get_agent_activity_err_responses(
     chain: Vec<(AgentPubKey, Vec<TestChainItem>)>,

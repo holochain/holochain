@@ -39,6 +39,7 @@ pub async fn must_get_agent_activity(
             tracing::error!("error is {:?}", e);
             match e {
                 CascadeError::QueryError(s) => s,
+                CascadeError::InvalidInput(s) => StateQueryError::InvalidInput(s),
                 _ => StateQueryError::Other(e.to_string()),
             }
         })
