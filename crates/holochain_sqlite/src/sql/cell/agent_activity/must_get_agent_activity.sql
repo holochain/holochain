@@ -11,7 +11,6 @@ FROM
   JOIN Action ON DhtOp.action_hash = Action.hash
 WHERE
   DhtOp.type = :op_type_register_agent_activity
-  -- RegisterAgentActivity Op has been validated as valid
   AND DhtOp.when_integrated IS NOT NULL
   AND Action.author = :author
   -- Action sequence numbers must be less than or equal to the sequence number of the Action with a hash matching ChainFilter `top`
