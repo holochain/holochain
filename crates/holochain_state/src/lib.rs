@@ -42,6 +42,8 @@ pub mod scratch;
 pub mod source_chain;
 pub mod validation_db;
 pub mod validation_receipts;
+#[cfg(feature = "unstable-warrants")]
+pub mod warrant;
 #[allow(missing_docs)]
 pub mod wasm;
 
