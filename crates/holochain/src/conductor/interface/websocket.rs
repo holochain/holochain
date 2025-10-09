@@ -812,11 +812,6 @@ mod test {
         let dna_payload = InstallAppDnaPayload::hash_only(fake_dna_hash(1), "".to_string());
         let agent_key = fake_agent_pubkey_1();
         let payload = todo!("Use new payload struct");
-        // let payload = InstallAppPayload {
-        //     dnas: vec![dna_payload],
-        //     installed_app_id: "test app".to_string(),
-        //     agent_key,
-        // };
         let msg = AdminRequest::InstallApp(Box::new(payload));
         let respond = |response: AdminResponse| {
             assert_matches!(

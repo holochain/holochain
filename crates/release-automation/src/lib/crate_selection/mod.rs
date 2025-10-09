@@ -786,9 +786,6 @@ impl<'a> ReleaseWorkspace<'a> {
             members_states: Default::default(),
         };
 
-        // todo(optimization): eagerly ensure that the workspace is valid, but the following fails lifetime checks
-        // let _ = new.cargo_workspace()?;
-
         Ok(new)
     }
 
