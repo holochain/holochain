@@ -941,7 +941,11 @@ impl CascadeImpl {
             let mut txn_guards = self.get_txn_guards().await?;
             move || {
                 let mut activity = Vec::with_capacity(txn_guards.len() + 1);
+
+                #[cfg(feature = "unstable-warrants")]
                 let mut warrants = Vec::with_capacity(txn_guards.len() + 1);
+                #[cfg(not(feature = "unstable-warrants"))]
+                let warrants = Vec::with_capacity(txn_guards.len() + 1);
 
                 for txn_guard in &mut txn_guards {
                     let txn = txn_guard.transaction()?;
@@ -954,9 +958,11 @@ impl CascadeImpl {
                     )?;
                     activity.push(r);
 
-                    // TODO: check valid should be *true* for Dht DB, *false* for author DB. Insane.
-                    let w = CascadeTxnWrapper::from(&txn).get_warrants_for_agent(&author, true)?;
-                    warrants.push(w);
+                    #[cfg(feature = "unstable-warrants")]
+                    {
+                        let w = CascadeTxnWrapper::from(&txn).get_warrants_for_agent(&author, true)?;
+                        warrants.push(w);
+                    }
                 }
 
                 CascadeResult::Ok((activity, warrants))
@@ -993,34 +999,33 @@ impl CascadeImpl {
             merged_activity.truncate(take as usize);
         }
 
-        // If activity list does not contain the full sequence of activity
-        // from start of filtered range through end, it is incomplete.
-        // Or, if the activity list is not hash-chained, it is incomplete.
+        // Check if the activity list is incomplete.
+        // It is considered complete only if the following are both true:
+        // - There are no gaps in the sequence numbers.
+        // - Every activity's prev_hash equals the hash of the next activity in the list.
         let result = if !is_activity_complete_descending(&merged_activity)
             || !is_activity_chained_descending(&merged_activity)
         {
             MustGetAgentActivityResponse::IncompleteChain
         }
-        // Otherwise, activity is complete
         else {
-            // Merge and deduplicate retrieved warrants lists
-            let merged_warrants = merge_warrants(warrants_lists);
-
             MustGetAgentActivityResponse::Activity {
                 activity: merged_activity,
-                warrants: merged_warrants,
+                warrants: merge_warrants(warrants_lists),
             }
         };
-        // If we have a success result, return it
+
+        // Handle the result
         if matches!(result, MustGetAgentActivityResponse::Activity { .. }) {
+            // If we have a success result, return it.
             Ok(result)
         }
-        // Otherwise, if we are an authority, return the failure result we have
         else if self.am_i_an_authority(author.clone().into()).await? {
+            // If we are an authority, return the failure result we have
             return Ok(result);
         }
-        // Otherwise, try to fetch from the network
         else if self.network.is_some() {
+            // If we are not an authority, try to fetch from the network
             return self
                 .fetch_must_get_agent_activity(author.clone(), filter.clone())
                 .await;
