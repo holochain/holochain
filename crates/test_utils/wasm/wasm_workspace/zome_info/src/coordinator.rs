@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use crate::integrity::*;
 use hdi::prelude::__hc__dna_info_1;
 use hdk::prelude::*;
@@ -5,7 +6,7 @@ use serde_yaml::Value;
 
 #[hdk_extern]
 fn set_access(_: ()) -> ExternResult<()> {
-    let mut fns = BTreeSet::new();
+    let mut fns = HashSet::new();
     fns.insert((hdk::prelude::zome_info()?.name, "call_info".into()));
     fns.insert((hdk::prelude::zome_info()?.name, "remote_call_info".into()));
     let functions = GrantedFunctions::Listed(fns);

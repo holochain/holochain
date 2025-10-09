@@ -1,9 +1,10 @@
+use std::collections::HashSet;
 use crate::integrity::*;
 use hdk::prelude::*;
 
 #[hdk_extern]
 fn set_access(_: ()) -> ExternResult<()> {
-    let mut fns = BTreeSet::new();
+    let mut fns = HashSet::new();
     fns.insert((zome_info()?.name, "ping".into()));
     let functions = GrantedFunctions::Listed(fns);
     create_cap_grant(CapGrantEntry {
