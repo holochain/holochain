@@ -134,22 +134,6 @@ agent_hash(&[0]), ChainFilter::new(TestChainHash::forked(8, 0).into())
 #[test_case(
 Data {
     dht: agent_chain(&[(0, 0..7)]),
-    cache: vec![(agent_hash(&[0]), forked_chain(&[0..3, ]))],
-    ..Default::default()
-},
-agent_hash(&[0]), ChainFilter::new(action_hash(&[5])).take(5)
-=> matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 5; "forked actions between 2 dbs")]
-#[test_case(
-Data {
-    dht: agent_chain(&[(0, 0..7)]),
-    scratch: Some(vec![(agent_hash(&[0]), forked_chain(&[0..3, ]))]),
-    ..Default::default()
-},
-agent_hash(&[0]), ChainFilter::new(action_hash(&[5])).take(5)
-=> matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 5; "forked actions between db and scratch")]
-#[test_case(
-Data {
-    dht: agent_chain(&[(0, 0..7)]),
     cache: agent_chain(&[(0, 0..7)]),
     ..Default::default()
 },
@@ -258,6 +242,61 @@ async fn test_must_get_agent_activity_ok(
     test_must_get_agent_activity_inner(data, author, filter)
         .await
         .unwrap()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_must_get_agent_activity_forks_split_between_2_dbs() {
+    holochain_trace::test_run();
+
+    let author = agent_hash(&[0]);
+    let chain1 = agent_chain(&[(0, 0..7)]);
+    let chain1_fork = vec![
+        (author.clone(), vec![TestChainItem::forked(3, 1, 0)]),
+        (author.clone(), vec![TestChainItem::forked(4, 1, 0)]),
+        (author.clone(), vec![TestChainItem::forked(5, 1, 0)]),
+        (author.clone(), vec![TestChainItem::forked(6, 1, 0)]),
+        (author.clone(), vec![TestChainItem::forked(7, 1, 0)]),
+    ];
+
+    let data = Data {
+        dht: chain1,
+        cache: chain1_fork,
+        ..Default::default()
+    };
+    let filter = ChainFilter::new(action_hash(&[5])).take(5);
+
+    let res = test_must_get_agent_activity_inner(data, author, filter)
+        .await
+        .unwrap();
+
+    assert!(matches!(res, MustGetAgentActivityResponse::IncompleteChain))
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_must_get_agent_activity_forks_split_between_db_and_scratch() {
+    holochain_trace::test_run();
+    let author = agent_hash(&[0]);
+    let chain1 = agent_chain(&[(0, 0..7)]);
+    let chain1_fork = vec![
+        (author.clone(), vec![TestChainItem::forked(3, 1, 0)]),
+        (author.clone(), vec![TestChainItem::forked(4, 1, 0)]),
+        (author.clone(), vec![TestChainItem::forked(5, 1, 0)]),
+        (author.clone(), vec![TestChainItem::forked(6, 1, 0)]),
+        (author.clone(), vec![TestChainItem::forked(7, 1, 0)]),
+    ];
+
+    let data = Data {
+        dht: chain1,
+        scratch: Some(chain1_fork),
+        ..Default::default()
+    };
+    let filter = ChainFilter::new(action_hash(&[5])).take(5);
+
+    let res = test_must_get_agent_activity_inner(data, author, filter)
+        .await
+        .unwrap();
+
+    assert!(matches!(res, MustGetAgentActivityResponse::IncompleteChain))
 }
 
 #[test_case(
