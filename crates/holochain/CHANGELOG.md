@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - `FETCH_OP_REGION`
   - `FETCH_OPS_BY_REGION`
   - `FETCH_REGION_OP_HASHES`
+- Test: Test that blocks are enforced for incoming network get requests and gossip.
 
 ## 0.6.0-dev.28
 
