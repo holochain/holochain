@@ -7,7 +7,7 @@ use holochain_state::source_chain::SourceChainRead;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::prelude::*;
 use matches::assert_matches;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
@@ -26,7 +26,7 @@ async fn signed_zome_call() {
     let cap_access_secret = fixt!(CapSecret);
 
     // set up functions to grant access to
-    let mut functions = BTreeSet::new();
+    let mut functions = HashSet::new();
     let granted_function: GrantedFunction = ("create_entry".into(), "get_entry".into());
     functions.insert(granted_function.clone());
     let granted_functions = GrantedFunctions::Listed(functions);
@@ -253,7 +253,7 @@ async fn cap_grant_info_call() {
     let cap_access_secret: CapSecret = [0; 64].into();
 
     // set up functions to grant access to
-    let mut functions = BTreeSet::new();
+    let mut functions = HashSet::new();
     let granted_function: GrantedFunction = ("create_entry".into(), "get_entry".into());
     functions.insert(granted_function.clone());
     let granted_functions = GrantedFunctions::Listed(functions);
@@ -366,7 +366,7 @@ async fn revoke_zome_call_capability_call() {
     let cap_access_secret: CapSecret = [0; 64].into();
 
     // set up functions to grant access to
-    let mut functions = BTreeSet::new();
+    let mut functions = HashSet::new();
     let granted_function: GrantedFunction = ("create_entry".into(), "get_entry".into());
     functions.insert(granted_function.clone());
     let granted_functions = GrantedFunctions::Listed(functions);

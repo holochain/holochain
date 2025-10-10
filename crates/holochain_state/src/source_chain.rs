@@ -1341,7 +1341,7 @@ mod tests {
     use holochain_keystore::test_keystore;
     use holochain_zome_types::Entry;
     use matches::assert_matches;
-    use std::collections::BTreeSet;
+    use std::collections::{BTreeSet, HashSet};
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_relaxed_ordering() -> SourceChainResult<()> {
@@ -1566,7 +1566,7 @@ mod tests {
         // @todo curry
         let _curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
         let function: GrantedFunction = ("foo".into(), "bar".into());
-        let mut fns = BTreeSet::new();
+        let mut fns = HashSet::new();
         fns.insert(function.clone());
         let functions = GrantedFunctions::Listed(fns);
         let grant = ZomeCallCapGrant::new("tag".into(), secret_access.clone(), functions.clone());
@@ -1903,7 +1903,7 @@ mod tests {
         // first unrestricted cap grant with irrelevant zome and fn
         let some_zome_name: ZomeName = "some_zome".into();
         let some_fn_name: FunctionName = "some_fn".into();
-        let mut granted_fns = BTreeSet::new();
+        let mut granted_fns = HashSet::new();
         granted_fns.insert((some_zome_name.clone(), some_fn_name.clone()));
         let first_unrestricted_grant = ZomeCallCapGrant::new(
             "unrestricted_1".into(),
@@ -1914,7 +1914,7 @@ mod tests {
         // second unrestricted cap grant with the actually granted zome and fn
         let granted_zome_name: ZomeName = "granted_zome".into();
         let granted_fn_name: FunctionName = "granted_fn".into();
-        let mut granted_fns = BTreeSet::new();
+        let mut granted_fns = HashSet::new();
         granted_fns.insert((granted_zome_name.clone(), granted_fn_name.clone()));
         let second_unrestricted_grant = ZomeCallCapGrant::new(
             "unrestricted_2".into(),

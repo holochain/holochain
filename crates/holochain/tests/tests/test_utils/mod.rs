@@ -105,7 +105,7 @@ pub async fn grant_zome_call_capability(
     fn_name: FunctionName,
     signing_key: AgentPubKey,
 ) -> WebsocketResult<CapSecret> {
-    let mut fns = BTreeSet::new();
+    let mut fns = HashSet::new();
     fns.insert((zome_name, fn_name));
     let functions = GrantedFunctions::Listed(fns);
 

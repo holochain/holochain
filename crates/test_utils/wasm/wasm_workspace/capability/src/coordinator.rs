@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use hdk::prelude::*;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
@@ -6,7 +7,7 @@ pub struct CapFor(CapSecret, AgentPubKey);
 #[hdk_extern]
 fn init(_: ()) -> ExternResult<InitCallbackResult> {
     // grant unrestricted access to accept_cap_claim so other agents can send us claims
-    let mut fns = BTreeSet::new();
+    let mut fns = HashSet::new();
     fns.insert((zome_info()?.name, "accept_cap_claim".into()));
     fns.insert((zome_info()?.name, "another_cap_grant".into()));
     let functions = GrantedFunctions::Listed(fns);
@@ -54,7 +55,7 @@ pub fn unblock_agent(target: AgentPubKey) -> ExternResult<()> {
 }
 
 fn cap_grant_entry(secret: CapSecret) -> ExternResult<CapGrantEntry> {
-    let mut fns = BTreeSet::new();
+    let mut fns = HashSet::new();
     let this_zome = zome_info()?.name;
     fns.insert((this_zome, "needs_cap_claim".into()));
     let functions = GrantedFunctions::Listed(fns);
@@ -122,7 +123,7 @@ fn send_assigned_cap_claim(agent: AgentPubKey) -> ExternResult<()> {
     let secret = CapSecret::try_from_random()?;
 
     // grant the secret as assigned (can only be used by the intended agent)
-    let mut fns = BTreeSet::new();
+    let mut fns = HashSet::new();
     let this_zome = zome_info()?.name;
     fns.insert((this_zome.clone(), "needs_cap_claim".into()));
     let functions = GrantedFunctions::Listed(fns);
