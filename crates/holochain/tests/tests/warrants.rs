@@ -73,7 +73,7 @@ async fn warranted_agent_is_blocked() {
                     store.get_warrants_for_agent(&alice_pubkey, false).unwrap()
                 });
 
-            warrants.len() == 3 && warrants[0].warrant().warrantee == *alice_cell.agent_pubkey()
+            warrants.len() == 1 && warrants[0].warrant().warrantee == *alice_cell.agent_pubkey()
         },
         Some(5_000),
         None,
@@ -399,7 +399,7 @@ mod zero_arc {
                 alice_cell.agent_pubkey().clone(),
             )
             .await;
-        assert_eq!(alice_activity.warrants.len(), 3);
+        assert_eq!(alice_activity.warrants.len(), 1);
         assert_eq!(
             alice_activity.warrants[0].warrantee,
             *alice_cell.agent_pubkey()

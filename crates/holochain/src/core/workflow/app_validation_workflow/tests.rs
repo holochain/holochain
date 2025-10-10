@@ -1254,6 +1254,157 @@ async fn app_validation_produces_warrants() {
     }
 }
 
+/// Alice creates an invalid op, Bob authors a warrant, and Carol validates the warrant+op but does
+/// not issue a second warrant.
+#[cfg(feature = "unstable-warrants")]
+#[tokio::test(flavor = "multi_thread")]
+async fn skip_issuing_warrant_if_one_found() {
+    holochain_trace::test_run();
+
+    #[derive(Serialize, Deserialize, SerializedBytes, Debug)]
+    struct AppString(String);
+
+    let string_entry_def = EntryDef::default_from_id("string");
+    let inline_zome = SweetInlineZomes::new(vec![string_entry_def], 0)
+        .function("create_string", move |api, s: AppString| {
+            let entry = Entry::app(s.try_into().unwrap()).unwrap();
+            let hash = api.create(CreateInput::new(
+                InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
+                EntryVisibility::Public,
+                entry,
+                ChainTopOrdering::default(),
+            ))?;
+            Ok(hash)
+        })
+        .function("get_agent_activity", move |api, agent_pubkey| {
+            Ok(api.get_agent_activity(GetAgentActivityInput {
+                agent_pubkey,
+                chain_query_filter: Default::default(),
+                activity_request: ActivityRequest::Full,
+            })?)
+        })
+        .integrity_function("validate", move |_api, op: Op| {
+            if matches!(op, Op::RegisterAgentActivity(_)) && op.action_seq() > 3 {
+                Ok(ValidateCallbackResult::Invalid("nope".to_string()))
+            } else {
+                Ok(ValidateCallbackResult::Valid)
+            }
+        });
+
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(inline_zome).await;
+
+    let no_validate_config = SweetConductorConfig::standard()
+        .tune_conductor(|c| {
+            c.disable_self_validation = true;
+        })
+        .tune_network_config(|nc| {
+            nc.disable_gossip = true;
+        });
+    let other_config = SweetConductorConfig::standard().tune_network_config(|nc| {
+        nc.disable_gossip = true;
+    });
+
+    let mut conductors =
+        SweetConductorBatch::from_configs([no_validate_config, other_config.clone(), other_config])
+            .await;
+
+    let ((alice,), (_bob,), (carol,)) = conductors
+        .setup_app("test_app", [&dna_file])
+        .await
+        .unwrap()
+        .into_tuples();
+
+    // Bob declares full storage arc, so he's a valid publish target for Alice
+    conductors[1]
+        .declare_full_storage_arcs(dna_file.dna_hash())
+        .await;
+
+    // Alice and Carol need to know about Bob's full storage arc for publish and get.
+    conductors.exchange_peer_info().await;
+
+    let _invalid_action_hash: ActionHash = conductors[0]
+        .call(
+            &alice.zome(SweetInlineZomes::COORDINATOR),
+            "create_string",
+            AppString("entry1".into()),
+        )
+        .await;
+
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let alice_pubkey = alice.agent_pubkey().clone();
+            let warrants = conductors[1]
+                .get_spaces()
+                .get_all_authored_dbs(dna_file.dna_hash())
+                .unwrap()[0]
+                .test_read(move |txn| {
+                    let store = CascadeTxnWrapper::from(txn);
+                    store.get_warrants_for_agent(&alice_pubkey, false).unwrap()
+                });
+
+            if !warrants.is_empty() && warrants[0].warrant().warrantee == *alice.agent_pubkey() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    })
+    .await
+    .unwrap();
+
+    // Alice is warranted, don't need her conductor anymore.
+    conductors[0].shutdown().await;
+
+    // Now Carol should be able to get Alice's activity, including the warrant, from Bob.
+    let _activity: AgentActivity = conductors[2]
+        .call(
+            &carol.zome(SweetInlineZomes::COORDINATOR),
+            "get_agent_activity",
+            alice.agent_pubkey().clone(),
+        )
+        .await;
+
+    // Wait for Carol to have a warrant for Alice
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let alice_pubkey = alice.agent_pubkey().clone();
+            let warrants = conductors[2]
+                .get_spaces()
+                .dht_db(dna_file.dna_hash())
+                .unwrap()
+                .test_read(move |txn| {
+                    let store = CascadeTxnWrapper::from(txn);
+                    store.get_warrants_for_agent(&alice_pubkey, false).unwrap()
+                });
+
+            // Check for any warrant against Alice
+            if !warrants.is_empty() && warrants[0].warrant().warrantee == *alice.agent_pubkey() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    })
+    .await
+    .unwrap();
+
+    // Now there's at least one valid warrant, check that there's just one warrant.
+    let alice_pubkey = alice.agent_pubkey().clone();
+    let warrants = conductors[2]
+        .get_spaces()
+        .dht_db(dna_file.dna_hash())
+        .unwrap()
+        .test_read(move |txn| {
+            let store = CascadeTxnWrapper::from(txn);
+            store.get_warrants_for_agent(&alice_pubkey, false).unwrap()
+        });
+
+    assert_eq!(
+        1,
+        warrants.len(),
+        "Actually got {} warrants: {warrants:#?}",
+        warrants.len()
+    );
+}
+
 // These are the expected invalid ops
 fn expected_invalid_entry(
     txn: &Transaction,
