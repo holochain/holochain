@@ -926,14 +926,14 @@ impl CascadeImpl {
         }
 
         let result = if let Some(chain_top_action_seq) = maybe_chain_top_action_seq {
-            // If chain top action seq was found, 
+            // If chain top action seq was found,
             // Get the filtered activity and warrants from each db store.
             let (mut activity_lists, warrants_lists) = tokio::task::spawn_blocking({
                 let author = author.clone();
                 let filter = filter.clone();
                 let mut txn_guards = self.get_txn_guards().await?;
                 move || {
-                  let mut activity = Vec::with_capacity(txn_guards.len() + 1);
+                    let mut activity = Vec::with_capacity(txn_guards.len() + 1);
 
                     #[cfg(feature = "unstable-warrants")]
                     let mut warrants = Vec::with_capacity(txn_guards.len() + 1);
@@ -953,8 +953,8 @@ impl CascadeImpl {
 
                         #[cfg(feature = "unstable-warrants")]
                         {
-                            let w =
-                                CascadeTxnWrapper::from(&txn).get_warrants_for_agent(&author, true)?;
+                            let w = CascadeTxnWrapper::from(&txn)
+                                .get_warrants_for_agent(&author, true)?;
                             warrants.push(w);
                         }
                     }
@@ -997,7 +997,7 @@ impl CascadeImpl {
             // It is considered complete only if the following are both true:
             // - There are no gaps in the sequence numbers.
             // - Every activity's prev_hash equals the hash of the next activity in the list.
-            let result = if !is_activity_complete_descending(&merged_activity)
+            if !is_activity_complete_descending(&merged_activity)
                 || !is_activity_chained_descending(&merged_activity)
             {
                 MustGetAgentActivityResponse::IncompleteChain
@@ -1006,9 +1006,7 @@ impl CascadeImpl {
                     activity: merged_activity,
                     warrants: merge_warrants(warrants_lists),
                 }
-            };
-
-            result
+            }
         } else {
             // If chain top action seq was not found, result is ChainTopNotFound.
             MustGetAgentActivityResponse::ChainTopNotFound(filter.chain_top.clone())
