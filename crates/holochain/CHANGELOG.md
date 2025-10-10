@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Avoid issuing duplicate warrants for invalid actions during app validation by checking for existing warrants before creating new ones. #5352
+
 ## 0.6.0-dev.31
 
 - Feat: Warrants discovered during host function call `must_get_agent_activity` lead to blocking the warranted agent. \#5405
