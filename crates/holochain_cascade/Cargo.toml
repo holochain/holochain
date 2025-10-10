@@ -14,6 +14,7 @@ fixt = { version = "^0.6.0-dev.7", path = "../fixt" }
 futures = "0.3"
 holo_hash = { version = "^0.6.0-dev.16", path = "../holo_hash", features = [
   "full",
+  "rusqlite",
 ] }
 holochain_chc = { version = "^0.3.0-dev.28", path = "../holochain_chc" }
 holochain_sqlite = { version = "^0.6.0-dev.27", path = "../holochain_sqlite" }
