@@ -135,7 +135,7 @@ pub struct GetLinksOptions {
 /// Get agent activity from the DHT.
 /// Fields tagged with `[Network]` are network-level controls.
 /// Fields tagged with `[Remote]` are controls that will be forwarded to the
-/// remote agent processing this `GetLinks` request.
+/// remote agent processing this `GetAgentActivity` request.
 #[derive(Debug, Clone)]
 pub struct GetActivityOptions {
     /// `[Network]`
