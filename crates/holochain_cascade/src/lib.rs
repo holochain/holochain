@@ -893,8 +893,8 @@ impl CascadeImpl {
         }
 
         // Get the seq of the ChainFilter.chain_top Action
-        // We must try every database and Scratch because it may only be stored in one.
-        // Once the Action is found, break.
+        // We must try every database and Scratch until it is found,
+        // because it may only be stored in one.
         let mut maybe_chain_top_action_seq = None;
 
         // Try to find chain top action in Scratch
@@ -904,7 +904,7 @@ impl CascadeImpl {
             })?;
         }
 
-        // If not found in Scratch, try to find in dbs. Break once found.
+        // If not found in Scratch, try to find in databases.
         if maybe_chain_top_action_seq.is_none() {
             maybe_chain_top_action_seq = tokio::task::spawn_blocking({
                 let mut txn_guards = self.get_txn_guards().await?;
@@ -925,7 +925,7 @@ impl CascadeImpl {
             .await??;
         }
 
-        // If chain top action seq was not found, return ChainTopNotFound
+        // If chain top action seq was not found, return ChainTopNotFound.
         let chain_top_action_seq = if let Some(seq) = maybe_chain_top_action_seq {
             seq
         } else {
@@ -985,7 +985,7 @@ impl CascadeImpl {
             activity_lists.push(activity_list_from_scratch);
         }
 
-        // Merge and deduplicate retrieved activity lists
+        // Merge and deduplicate retrieved activity lists.
         let mut merged_activity = merge_agent_activity(activity_lists);
 
         // Remove forked activity from activity list
