@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Remove a check in `holochain_state` that prevented multiple warrants for the same agent being inserted. Not only are
+  multiple warrant types allowed, but it is expected that multiple authorities will issue warrants for the same agent
+  in parallel before discovering each other's warrants. Failing to store those warrants would result in inconsistent
+  views of the DHT. #5342
 - **BREAKING CHANGE** Replace `BTreeSet` with `HashSet` in `GrantedFunctions::Listed`. #5349
 - Add a new conductor tuning parameter `disable_self_validation` to disable self-validation of authored data. Intended only
   for testing warrants. #5340
