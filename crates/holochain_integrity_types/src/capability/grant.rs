@@ -4,7 +4,7 @@ use crate::zome::ZomeName;
 use holo_hash::*;
 use serde::Deserialize;
 use serde::Serialize;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 
 /// Represents a _potentially_ valid access grant to a zome call.
 /// Zome call response will be Unauthorized without a valid grant.
@@ -40,7 +40,7 @@ impl From<holo_hash::AgentPubKey> for CapGrant {
 /// This data is committed to the callee's source chain as a private entry.
 /// The remote calling agent must provide a secret and we source their pubkey from the active
 /// network connection. This must match the strictness of the CapAccess.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct ZomeCallCapGrant {
     /// A string by which to later query for saved grants.
     /// This does not need to be unique within a source chain.
@@ -55,7 +55,7 @@ pub struct ZomeCallCapGrant {
 
 /// The outbound DTO of a ZomeCall capability grant info request.
 /// CapAccess secrets are omitted, Access types and assignees are provided under CapAccessInfo.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct DesensitizedZomeCallCapGrant {
     /// A string by which to later query for saved grants.
     /// This does not need to be unique within a source chain.
@@ -225,13 +225,13 @@ pub struct CapAccessInfo {
 pub type GrantedFunction = (ZomeName, FunctionName);
 
 /// A collection of zome/function pairs
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum GrantedFunctions {
     /// grant all zomes all functions
     All,
     /// grant to specified zomes and functions
-    Listed(BTreeSet<GrantedFunction>),
+    Listed(HashSet<GrantedFunction>),
 }
 
 #[cfg(test)]

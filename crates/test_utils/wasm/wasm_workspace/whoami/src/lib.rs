@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use hdk::prelude::*;
 
 enum Zomes {
@@ -14,7 +15,7 @@ impl From<Zomes> for ZomeName {
 
 #[hdk_extern]
 fn set_access(_: ()) -> ExternResult<()> {
-    let mut fns = BTreeSet::new();
+    let mut fns = HashSet::new();
     fns.insert((zome_info()?.name, "whoami".into()));
     let functions = GrantedFunctions::Listed(fns);
     create_cap_grant(CapGrantEntry {

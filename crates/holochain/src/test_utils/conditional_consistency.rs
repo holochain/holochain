@@ -152,20 +152,23 @@ where
 {
     let start = tokio::time::Instant::now();
     let mut done = HashSet::new();
-    let mut integrated = vec![HashSet::new(); cells.len()];
-    let mut published = HashSet::new();
+    let mut integrated = vec![HashMap::<DhtOpHash, DhtOp>::new(); cells.len()];
+    let mut published = HashMap::<DhtOpHash, DhtOp>::new();
     let mut publish_complete = false;
 
     while start.elapsed() < timeout {
         if !publish_complete {
-            published = HashSet::new();
+            published = HashMap::new();
             for (_author, db, _) in cells.iter() {
                 // Providing the author is redundant
                 let p = request_published_ops(*db, None /*Some((*author).to_owned())*/)
                     .await
                     .unwrap()
                     .into_iter()
-                    .map(|(_, _, op)| op);
+                    .map(|(_, _, op)| {
+                        let hashed = DhtOpHashed::from_content_sync(op);
+                        (hashed.hash, hashed.content)
+                    });
 
                 // Assert that there are no duplicates
                 let expected = p.len() + published.len();
@@ -175,7 +178,7 @@ where
         }
 
         let prev_publish_complete = publish_complete;
-        publish_complete = conditions.check(published.iter())?;
+        publish_complete = conditions.check(published.values())?;
 
         if publish_complete {
             if !prev_publish_complete {
@@ -187,7 +190,14 @@ where
                     continue;
                 }
                 if let Some(db) = dht_db.as_ref() {
-                    integrated[i] = get_integrated_ops(*db).await.into_iter().collect();
+                    integrated[i] = get_integrated_ops(*db)
+                        .await
+                        .into_iter()
+                        .map(|op| {
+                            let hashed = DhtOpHashed::from_content_sync(op);
+                            (hashed.hash, hashed.content)
+                        })
+                        .collect();
 
                     if integrated[i] == published {
                         done.insert(i);
@@ -226,7 +236,7 @@ where
 
     if !publish_complete {
         let published = published
-            .iter()
+            .values()
             .map(display_op)
             .collect::<Vec<_>>()
             .join("\n");
@@ -255,7 +265,7 @@ where
 
         eprintln!("Agent {} is not consistent", cells[*c].0);
 
-        let (unintegrated, unpublished) = diff_ops(published.iter(), integrated.iter());
+        let (unintegrated, unpublished) = diff_ops(published.values(), integrated.values());
         let diff = diff_report(unintegrated, unpublished);
 
         #[allow(clippy::comparison_chain)]

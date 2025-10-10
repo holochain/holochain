@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use hdk::prelude::*;
 
 #[hdk_extern]
@@ -18,7 +19,7 @@ fn recv_remote_signal(signal: ExternIO) -> ExternResult<()> {
 
 #[hdk_extern]
 fn init(_: ()) -> ExternResult<InitCallbackResult> {
-    let mut fns = BTreeSet::new();
+    let mut fns = HashSet::new();
     fns.insert((zome_info()?.name, "recv_remote_signal".into()));
     let functions = GrantedFunctions::Listed(fns);
     create_cap_grant(CapGrantEntry {

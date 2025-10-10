@@ -25,7 +25,7 @@ mod tests;
 /// A unit of DHT gossip. Used to notify an authority of new (meta)data to hold
 /// as well as changes to the status of already held data.
 #[derive(
-    Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, Hash, derive_more::From,
+    Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, derive_more::From,
 )]
 pub enum DhtOp {
     /// An op representing storage of some record information.
@@ -36,7 +36,7 @@ pub enum DhtOp {
 
 /// A unit of DHT gossip concerning source chain data.
 #[derive(
-    Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, Hash, derive_more::Display,
+    Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, derive_more::Display,
 )]
 pub enum ChainOp {
     /// Used to notify the authority for an action that it has been created.

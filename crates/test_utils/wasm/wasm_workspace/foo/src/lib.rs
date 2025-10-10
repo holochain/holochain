@@ -1,9 +1,10 @@
+use std::collections::HashSet;
 use hdk::prelude::*;
 
 #[hdk_extern]
 fn init() -> ExternResult<InitCallbackResult> {
     // grant unrestricted access to accept_cap_claim so other agents can send us claims
-    let mut fns = BTreeSet::new();
+    let mut fns = HashSet::new();
     fns.insert((zome_info()?.name, "foo".into()));
     // fns.insert((zome_info()?.name, "needs_cap_claim".into()));
     let functions = GrantedFunctions::Listed(fns);

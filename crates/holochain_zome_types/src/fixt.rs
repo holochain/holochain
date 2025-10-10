@@ -7,7 +7,7 @@ use holo_hash::fixt::*;
 use holo_hash::EntryHash;
 use holochain_serialized_bytes::prelude::SerializedBytes;
 use rand::Rng;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -283,7 +283,7 @@ fixturator!(
                 let mut rng = rng();
                 let number_of_zomes = rng.random_range(0..5);
 
-                let mut fns = BTreeSet::new();
+                let mut fns = HashSet::new();
                 for _ in 0..number_of_zomes {
                     fns.insert(GrantedFunctionFixturator::new(Empty).next().unwrap());
                 }
@@ -299,7 +299,7 @@ fixturator!(
                 let mut rng = rand::rng();
                 let number_of_zomes = rng.random_range(0..5);
 
-                let mut fns = BTreeSet::new();
+                let mut fns = HashSet::new();
                 for _ in 0..number_of_zomes {
                     fns.insert(
                     GrantedFunctionFixturator::new(Unpredictable)
@@ -322,7 +322,7 @@ fixturator!(
                 .unwrap(),
             {
                 if get_fixt_index!() %2 == 0{
-                    let mut fns = BTreeSet::new();
+                    let mut fns = HashSet::new();
                     for _ in 0..get_fixt_index!() % 3 {
                         fns.insert(GrantedFunctionFixturator::new(Predictable).next().unwrap());
                     }
