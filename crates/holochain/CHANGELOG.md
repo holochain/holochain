@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Implement removing a space (app network) when the last local agent leaves. This was already implemented by Kitsune2 but
+  hadn't yet been integrated into Holochain. #5351
 - **BREAKING CHANGE** Replace `BTreeSet` with `HashSet` in `GrantedFunctions::Listed`. #5349
 - Add a new conductor tuning parameter `disable_self_validation` to disable self-validation of authored data. Intended only
   for testing warrants. #5340
