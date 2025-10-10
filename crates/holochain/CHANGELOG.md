@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Test: Test that blocks are enforced for outgoing network get requests and publish.
 - Chore: remove blocks from validation receipt workflow. It's unclear why blocking was added there. Blocking now happens as part of validation. Validation receipts seem unrelated to blocking.
 - Feat: Block authors of invalid ops after validation in the integration workflow.
+- Test: Zero arc nodes are being served warrants for `get_agent_activity`.
 - **BREAKING CHANGE** Removed unused public SQL queries from `holochain_sqlite`:
   - `ACTIVITY_INTEGRATED_UPPER_BOUND`
   - `ALL_ACTIVITY_AUTHORS`
