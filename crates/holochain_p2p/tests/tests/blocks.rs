@@ -23,8 +23,8 @@ use std::{sync::Arc, time::Duration};
 async fn cell_blocks_are_committed_to_database() {
     let conductor_db = DbWrite::test_in_mem(DbKindConductor).unwrap();
     let dna_hash = fixt!(DnaHash);
-    let TestCase { actor, .. } =
-        TestCase::new_with_conductor_db(&dna_hash, conductor_db.clone()).await;
+    let TestActor { actor, .. } =
+        TestActor::new_with_conductor_db(&dna_hash, conductor_db.clone()).await;
     let cell_id = CellId::new(dna_hash, fixt!(AgentPubKey));
     let cell_block_reason = CellBlockReason::InvalidOp(fixt!(DhtOpHash));
     let block = Block::new(
@@ -67,7 +67,7 @@ async fn agent_is_blocked() {
 async fn agent_is_removed_from_peer_store_when_blocked() {
     let dna_hash = fixt!(DnaHash);
 
-    let TestCase { actor: alice, .. } = TestCase::new(&dna_hash).await;
+    let TestActor { actor: alice, .. } = TestActor::new(&dna_hash).await;
     let space = alice
         .test_kitsune()
         .space(dna_hash.to_k2_space())
@@ -362,13 +362,14 @@ mod blocks_impl {
     }
 }
 
+// Alice blocks Bob and makes a get request that fails.
 #[tokio::test(flavor = "multi_thread")]
-async fn get_from_blocked_agent_fails() {
+async fn get_to_blocked_agent_fails() {
     let dna_hash = DnaHash::from_raw_32(vec![0xaa; 32]);
     let keystore_1 = test_keystore();
     let keystore_2 = test_keystore();
-    let TestCase { actor: alice, .. } = TestCase::new_with_keystore(&dna_hash, &keystore_1).await;
-    let TestCase { actor: bob, .. } = TestCase::new_with_keystore(&dna_hash, &keystore_2).await;
+    let TestActor { actor: alice, .. } = TestActor::new_with_keystore(&dna_hash, &keystore_1).await;
+    let TestActor { actor: bob, .. } = TestActor::new_with_keystore(&dna_hash, &keystore_2).await;
     let alice_pubkey = keystore_1.new_sign_keypair_random().await.unwrap();
     let bob_pubkey = keystore_2.new_sign_keypair_random().await.unwrap();
     alice
@@ -381,46 +382,9 @@ async fn get_from_blocked_agent_fails() {
     bob.test_set_full_arcs(dna_hash.to_k2_space()).await;
 
     // Exchange peer infos to accelerate bootstrapping.
-    tokio::time::timeout(Duration::from_secs(10), async {
-        loop {
-            let maybe_agent_info_1 = alice
-                .peer_store(dna_hash.clone())
-                .await
-                .unwrap()
-                .get(alice_pubkey.to_k2_agent())
-                .await
-                .unwrap();
-            let maybe_agent_info_2 = bob
-                .peer_store(dna_hash.clone())
-                .await
-                .unwrap()
-                .get(bob_pubkey.to_k2_agent())
-                .await
-                .unwrap();
-            if let (Some(agent_info_1), Some(agent_info_2)) =
-                (maybe_agent_info_1, maybe_agent_info_2)
-            {
-                alice
-                    .peer_store(dna_hash.clone())
-                    .await
-                    .unwrap()
-                    .insert(vec![agent_info_2])
-                    .await
-                    .unwrap();
-                bob.peer_store(dna_hash.clone())
-                    .await
-                    .unwrap()
-                    .insert(vec![agent_info_1])
-                    .await
-                    .unwrap();
-                break;
-            }
-            tokio::time::sleep(Duration::from_millis(100)).await;
-        }
-    })
-    .await
-    .unwrap();
+    exchange_agent_infos(alice.clone(), bob.clone(), &dna_hash).await;
 
+    // Before the block Alice can make get request and Bob answers them.
     let response = alice.get(dna_hash.clone(), fixt!(ActionHash).into()).await;
     assert!(response.is_ok());
 
@@ -444,6 +408,7 @@ async fn get_from_blocked_agent_fails() {
     // peer 1's peer store. That isn't possible, however, because the peer store
     // implementation internally discards blocked agents when inserting.
 
+    // Alice makes a get request. Bob is blocked, so there should be no one to respond.
     let response = alice.get(dna_hash.clone(), fixt!(ActionHash).into()).await;
     assert!(matches!(
         response,
@@ -451,12 +416,62 @@ async fn get_from_blocked_agent_fails() {
     ));
 }
 
-struct TestCase {
+// Alice blocks Bob and Bob makes a get request that fails.
+#[tokio::test(flavor = "multi_thread")]
+async fn get_by_blocked_agent_fails() {
+    let dna_hash = DnaHash::from_raw_32(vec![0xaa; 32]);
+    let keystore_1 = test_keystore();
+    let keystore_2 = test_keystore();
+    let TestActor { actor: alice, .. } = TestActor::new_with_keystore(&dna_hash, &keystore_1).await;
+    let TestActor { actor: bob, .. } = TestActor::new_with_keystore(&dna_hash, &keystore_2).await;
+    let alice_pubkey = keystore_1.new_sign_keypair_random().await.unwrap();
+    let bob_pubkey = keystore_2.new_sign_keypair_random().await.unwrap();
+    alice
+        .join(dna_hash.clone(), alice_pubkey.clone(), None)
+        .await
+        .unwrap();
+    bob.join(dna_hash.clone(), bob_pubkey.clone(), None)
+        .await
+        .unwrap();
+    alice.test_set_full_arcs(dna_hash.to_k2_space()).await;
+
+    // Exchange peer infos to accelerate bootstrapping.
+    exchange_agent_infos(alice.clone(), bob.clone(), &dna_hash).await;
+
+    // Before the block Bob can make get requests and Alice answers them.
+    let response = bob.get(dna_hash.clone(), fixt!(ActionHash).into()).await;
+    assert!(response.is_ok());
+
+    alice
+        .block(Block::new(
+            BlockTarget::Cell(
+                CellId::new(dna_hash.clone(), bob_pubkey.clone()),
+                CellBlockReason::BadCrypto,
+            ),
+            InclusiveTimestampInterval::try_new(
+                holochain_timestamp::Timestamp::now(),
+                holochain_timestamp::Timestamp::max(),
+            )
+            .unwrap(),
+        ))
+        .await
+        .unwrap();
+
+    // Bob makes a get request. Alice could respond, but must not, to prove the block for incoming
+    // requests is effective.
+    let response = bob.get(dna_hash.clone(), fixt!(ActionHash).into()).await;
+    assert!(
+        matches!(response, Err(_)),
+        "expected error, got {response:?}"
+    );
+}
+
+struct TestActor {
     actor: DynHcP2p,
     blocks_module: DynBlocks,
 }
 
-impl TestCase {
+impl TestActor {
     async fn new(dna_hash: &DnaHash) -> Self {
         let conductor_db = DbWrite::test_in_mem(DbKindConductor).unwrap();
         Self::create_test_case(dna_hash, conductor_db, test_keystore()).await
@@ -496,6 +511,7 @@ impl TestCase {
                 Box::pin(async move { Ok(peer_meta_db) })
             }),
             k2_test_builder: true,
+            request_timeout: Duration::from_secs(5),
             ..Default::default()
         };
         let actor = spawn_holochain_p2p(config, keystore).await.unwrap();
@@ -519,4 +535,44 @@ impl TestCase {
             blocks_module,
         }
     }
+}
+
+async fn exchange_agent_infos(alice: DynHcP2p, bob: DynHcP2p, dna_hash: &DnaHash) {
+    tokio::time::timeout(Duration::from_secs(10), async {
+        loop {
+            let alice_agent_infos = alice
+                .peer_store(dna_hash.clone())
+                .await
+                .unwrap()
+                .get_all()
+                .await
+                .unwrap();
+            let bob_agent_infos = bob
+                .peer_store(dna_hash.clone())
+                .await
+                .unwrap()
+                .get_all()
+                .await
+                .unwrap();
+            if alice_agent_infos.len() >= 1 && bob_agent_infos.len() >= 1 {
+                alice
+                    .peer_store(dna_hash.clone())
+                    .await
+                    .unwrap()
+                    .insert(bob_agent_infos)
+                    .await
+                    .unwrap();
+                bob.peer_store(dna_hash.clone())
+                    .await
+                    .unwrap()
+                    .insert(alice_agent_infos)
+                    .await
+                    .unwrap();
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    })
+    .await
+    .unwrap();
 }
