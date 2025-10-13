@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Implementation and test blocking of agents who issue invalid warrants. #5358
+
 ## 0.6.0-dev.30
 
 - Remove the `request_validation_receipt` from `holochain_p2p` and related code. Validation receipts are always requested and the parameter is no longer used. \#5366
