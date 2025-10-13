@@ -22,10 +22,10 @@ pub async fn integrate_dht_ops_workflow(
 ) -> WorkflowResult<WorkComplete> {
     let start = std::time::Instant::now();
     let time = holochain_zome_types::prelude::Timestamp::now();
-    let (stored_ops, warrantees) = vault
+    let (stored_ops, block_agents) = vault
         .write_async(move |txn| {
             let mut stored_ops = Vec::new();
-            let mut warrantees = Vec::new();
+            let mut block_agents = Vec::new();
             let mut stmt = txn.prepare_cached(SET_VALIDATED_OPS_TO_INTEGRATED)?;
             let integrated_ops = stmt.query_map(
                 named_params! {
@@ -39,9 +39,37 @@ pub async fn integrate_dht_ops_workflow(
                         created_at: kitsune2_api::Timestamp::from_micros(created_at.as_micros()),
                         op_id: op_hash.to_located_k2_op_id(&op_basis),
                     };
-                    let warrantee = row.get::<_, Option<AgentPubKey>>(3)?;
-                    if let Some(agent_pubkey) = warrantee {
-                        warrantees.push((agent_pubkey, op_hash));
+                    let validation_status = row.get::<_, ValidationStatus>(3)?;
+                    let author = row.get::<_, Option<AgentPubKey>>(4)?;
+                    let warrantee = row.get::<_, Option<AgentPubKey>>(5)?;
+                    if let Some(author) = author {
+                        if let Some(warrantee) = warrantee {
+                            match validation_status {
+                                ValidationStatus::Valid => {
+                                    tracing::info!(
+                                        ?warrantee,
+                                        ?op_hash,
+                                        "Warrant op is valid, will block the warrantee"
+                                    );
+                                    block_agents.push((warrantee, op_hash));
+                                }
+                                ValidationStatus::Rejected => {
+                                    tracing::info!(
+                                        ?author,
+                                        ?op_hash,
+                                        "Warrant op is invalid, will block the author"
+                                    );
+                                    block_agents.push((author, op_hash));
+                                }
+                                _ => {
+                                    tracing::warn!(
+                                        ?validation_status,
+                                        ?op_hash,
+                                        "Unexpected validation status for op being integrated"
+                                    );
+                                }
+                            }
+                        }
                     }
                     Ok(stored_op)
                 },
@@ -50,7 +78,7 @@ pub async fn integrate_dht_ops_workflow(
                 stored_ops.push(integrated_op?);
             }
 
-            WorkflowResult::Ok((stored_ops, warrantees))
+            WorkflowResult::Ok((stored_ops, block_agents))
         })
         .await?;
     let changed = stored_ops.len();
@@ -62,12 +90,12 @@ pub async fn integrate_dht_ops_workflow(
         // Block agents warranted for invalid ops.
         match InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::max()) {
             Ok(interval) => {
-                for (warrantee, invalid_op_hash) in warrantees {
+                for (block_agent, invalid_op_hash) in block_agents {
                     // Block agent
                     if let Err(err) = network
                         .block(Block::new(
                             BlockTarget::Cell(
-                                CellId::new(network.dna_hash(), warrantee),
+                                CellId::new(network.dna_hash(), block_agent),
                                 CellBlockReason::InvalidOp(invalid_op_hash),
                             ),
                             interval.clone(),

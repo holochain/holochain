@@ -144,6 +144,7 @@ pub async fn sys_validation_workflow(
     workspace: Arc<SysValidationWorkspace>,
     current_validation_dependencies: SysValDeps,
     trigger_app_validation: TriggerSender,
+    trigger_integration: TriggerSender,
     trigger_publish: TriggerSender,
     trigger_self: TriggerSender,
     network: DynHolochainP2pDna,
@@ -174,6 +175,14 @@ pub async fn sys_validation_workflow(
         );
 
         trigger_publish.trigger(&"sys_validation_workflow");
+        trigger_integration.trigger(&"sys_validation_workflow");
+    } else if outcome_summary.warrants_rejected > 0 {
+        tracing::debug!(
+            "Sys validation rejected {} warrants",
+            outcome_summary.warrants_rejected
+        );
+
+        trigger_integration.trigger(&"sys_validation_workflow");
     }
 
     // Now go to the network to try to fetch missing dependencies
@@ -338,7 +347,15 @@ async fn sys_validation_workflow_inner(
                     Outcome::Rejected(_) => {
                         invalid_ops.push((op_hash.clone(), op.clone()));
 
-                        summary.rejected += 1;
+                        match op {
+                            DhtOp::ChainOp(_) => {
+                                summary.rejected += 1;
+                            }
+                            DhtOp::WarrantOp(_) => {
+                                summary.warrants_rejected += 1;
+                            }
+                        }
+
                         put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;
                     }
                 }
@@ -1002,7 +1019,6 @@ async fn validate_warrant_op(
 
                 match validation_status {
                     ValidationStatus::Valid => {
-                        // TODO block the warrant author
                         return Err(SysValidationError::ValidationOutcome(
                             ValidationOutcome::InvalidWarrant(
                                 Box::new(op.warrant().clone()),
@@ -1022,7 +1038,6 @@ async fn validate_warrant_op(
                     }
                     ValidationStatus::Rejected => {
                         // This is good, the warrant is valid because we also rejected the op
-                        // TODO block the author of the op
                     }
                 }
 
@@ -1560,8 +1575,11 @@ pub fn detect_fork(
 struct OutcomeSummary {
     accepted: usize,
     missing: usize,
+    /// The number of chain ops that were rejected during sys validation
     rejected: usize,
     warranted: usize,
+    /// The number of warrant ops that were rejected during sys validation
+    warrants_rejected: usize,
     /// The number of warrant dependencies that were copied from the cache to the DHT db
     warrant_deps_copied: usize,
 }
@@ -1573,6 +1591,7 @@ impl OutcomeSummary {
             missing: 0,
             rejected: 0,
             warranted: 0,
+            warrants_rejected: 0,
             warrant_deps_copied: 0,
         }
     }
