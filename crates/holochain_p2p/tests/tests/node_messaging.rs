@@ -11,7 +11,7 @@ use std::{
     time::Duration,
 };
 
-const UNRESPONSIVE_TIMEOUT: Duration = Duration::from_secs(5);
+const UNRESPONSIVE_TIMEOUT: Duration = Duration::from_secs(20);
 const WAIT_BETWEEN_CALLS: Duration = Duration::from_millis(10);
 
 #[derive(Clone, Debug)]
