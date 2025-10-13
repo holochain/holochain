@@ -104,10 +104,6 @@ pub fn must_get_agent_activity(
                         "must_get_agent_activity is missing action {missing_action} for author {author} and filter {chain_filter:?}"
                     )))
                     .into()),
-                    (EmptyRange, _) => Err(wasm_error!(WasmErrorInner::Host(format!(
-                        "must_get_agent_activity chain has produced an invalid range because the range is empty for author {author} and filter {chain_filter:?}"
-                    )))
-                    .into()),
                 };
 
                 result
