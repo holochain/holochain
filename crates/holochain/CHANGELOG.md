@@ -8,8 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 
 - **BREAKING CHANGE** `must_get_agent_activity` error response contents have changed:
- - If the ChainFilter take is 0, then the error contained within the WASM error is now a `CascadeError::InvalidInput`.
- - If the ChainFilter has a `LimitConditions::UntilHash` or `LimitConditions::Multiple` with an until hash, and the until hash with the highest Action sequence is greater than the ChainFilter's chain_top Action sequence, then the error contained within the WASM error is now a `CascadeError::InvalidInput`.
+  - If the ChainFilter take is 0, then the error contained within the WASM error is now a `CascadeError::InvalidInput`.
+  - If the ChainFilter has a `LimitConditions::UntilHash` or `LimitConditions::Multiple` with an until hash, and the until hash with the highest Action sequence is greater than the ChainFilter's chain_top Action sequence, then the error contained within the WASM error is now a `CascadeError::InvalidInput`.
 - **BREAKING CHANGE** `must_get_agent_activity` behavior has changed:
   - `MustGetAgentActivityResponse::Activity` now exclude forked Actions deterministically. If multiple Actions with the same sequence number are found in stores, only the `RegisterAgentActivity` containing the `Action` with the maximum `ActionHash` is retained in the response activity list.
   - If the `ChainFilter` has an `LimitConditions::UntilHash` or `LimitConditions::Multiple` with an until hash, and the until hash was found in a store, but was removed from the final list due to being a fork, the returned value is an `MustGetAgentActivityResponse::Activity` containing the `RegisterAgentActivity` with `Action` sequence numbers ending in the until hash `Action`'s sequence number. Previously `MustGetAgentActivityResponse::IncompleteChain` was returned.
