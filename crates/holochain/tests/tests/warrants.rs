@@ -60,7 +60,7 @@ async fn warranted_agent_is_blocked() {
                     store.get_warrants_for_agent(&alice_pubkey, false).unwrap()
                 });
 
-            warrants.len() == 1 && warrants[0].warrant().warrantee == *alice_cell.agent_pubkey()
+            warrants.len() == 3 && warrants[0].warrant().warrantee == *alice_cell.agent_pubkey()
         },
         Some(5_000),
         None,
@@ -152,7 +152,7 @@ async fn warrant_is_gossiped() {
                         // TODO: check_valid here should be removed once warrants are validated.
                         store.get_warrants_for_agent(&alice_pubkey, false).unwrap()
                     });
-                warrants.len() == 1
+                warrants.len() == 3
                     && warrants[0].warrant().warrantee == *alice_cell.agent_pubkey()
                     && warrants[0].warrant().author == *bob_cell.agent_pubkey() // Make sure that Bob authored the warrant and it's not been authored by Carol.
             }
@@ -225,7 +225,7 @@ mod zero_arc {
                 alice_cell.agent_pubkey().clone(),
             )
             .await;
-        assert_eq!(alice_activity.warrants.len(), 1);
+        assert_eq!(alice_activity.warrants.len(), 3);
         assert_eq!(
             alice_activity.warrants[0].warrantee,
             *alice_cell.agent_pubkey()
