@@ -335,7 +335,8 @@ async fn author_of_invalid_warrant_is_blocked() {
 
 mod zero_arc {
     use super::*;
-    use hdk::prelude::AgentActivity;
+    use hdk::prelude::{AgentActivity, BlockTargetId};
+    use holochain::prelude::DisabledAppReason;
 
     // Alice creates an invalid op, Bob receives it and issues a warrant.
     // Carol is a zero arc node and makes a get_agent_activity request to Bob.
@@ -354,7 +355,7 @@ mod zero_arc {
             mut conductors_and_cells,
             dna_hash,
         } = TestCase::create([config.clone(), config, config_zero_arc]).await;
-        let (mut alice_conductor, alice_cell) = conductors_and_cells.remove(0);
+        let (alice_conductor, alice_cell) = conductors_and_cells.remove(0);
         let (bob_conductor, bob_cell) = conductors_and_cells.remove(0);
         let (carol_conductor, carol_cell) = conductors_and_cells.remove(0);
 
@@ -383,8 +384,11 @@ mod zero_arc {
 
         // Bob should have issued a warrant against Alice.
 
-        // Shutdown Alice so that Carol's request will go to Bob.
-        alice_conductor.shutdown().await;
+        // Disabling Alice's app to ensure that Carol's request goes to Bob.
+        alice_conductor
+            .disable_app("test_app".to_string(), DisabledAppReason::User)
+            .await
+            .unwrap();
 
         // Carol queries Alice's agent activity and should get the warrant.
         let alice_activity: AgentActivity = carol_conductor
@@ -399,6 +403,87 @@ mod zero_arc {
             alice_activity.warrants[0].warrantee,
             *alice_cell.agent_pubkey()
         );
+    }
+
+    // Alice creates an invalid op, Bob receives it and issues a warrant.
+    // Carol is a zero arc node and makes a get_agent_activity request to Bob.
+    // Bob serves the warrant.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn warrantees_returned_from_get_agent_activity_are_blocked() {
+        holochain_trace::test_run();
+
+        let config = SweetConductorConfig::rendezvous(true);
+        // Carol's conductor is a zero arc conductor.
+        let config_zero_arc = SweetConductorConfig::rendezvous(true)
+            .tune_network_config(|nc| nc.target_arc_factor = 0);
+
+        let TestCase {
+            mut conductors_and_cells,
+            dna_hash,
+        } = TestCase::create([config.clone(), config, config_zero_arc]).await;
+        let (alice_conductor, alice_cell) = conductors_and_cells.remove(0);
+        let (bob_conductor, bob_cell) = conductors_and_cells.remove(0);
+        let (carol_conductor, carol_cell) = conductors_and_cells.remove(0);
+
+        await_consistency(10, [&alice_cell, &bob_cell])
+            .await
+            .unwrap();
+
+        // Ensure that Carol knows about Bob's full arc.
+        bob_conductor
+            .holochain_p2p()
+            .test_set_full_arcs(dna_hash.to_k2_space())
+            .await;
+        // Update Bob's peer info in Carol's peer store after the full storage arc declaration.
+        SweetConductor::exchange_peer_info([&bob_conductor, &carol_conductor]).await;
+
+        // Alice creates an invalid action.
+        let _: ActionHash = alice_conductor
+            .call(
+                &alice_cell.zome(SweetInlineZomes::COORDINATOR),
+                "create_string",
+                "entry1".to_string(),
+            )
+            .await;
+
+        await_consistency(10, [&alice_cell, &bob_cell])
+            .await
+            .unwrap();
+
+        // Bob should have issued a warrant against Alice.
+
+        // Disable Alice's app so that Carol's request will go to Bob.
+        alice_conductor
+            .disable_app("test_app".to_string(), DisabledAppReason::User)
+            .await
+            .unwrap();
+
+        // Carol calls get_agent_activity on Alice and blocks the warrant authors.
+        let _: AgentActivity = carol_conductor
+            .call(
+                &carol_cell.zome(SweetInlineZomes::COORDINATOR),
+                "get_agent_activity",
+                alice_cell.agent_pubkey().clone(),
+            )
+            .await;
+
+        // Check that Carol has blocked Alice.
+        retry_fn_until_timeout(
+            || async {
+                carol_conductor
+                    .holochain_p2p()
+                    .is_blocked(BlockTargetId::Cell(CellId::new(
+                        dna_hash.clone(),
+                        alice_cell.agent_pubkey().clone(),
+                    )))
+                    .await
+                    .unwrap()
+            },
+            Some(10_000),
+            None,
+        )
+        .await
+        .unwrap();
     }
 }
 
