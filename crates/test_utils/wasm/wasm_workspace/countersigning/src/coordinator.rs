@@ -1,7 +1,7 @@
 use crate::integrity::*;
 use hdk::prelude::*;
 
-const STANDARD_TIMEOUT_MILLIS: u64 = 30000;
+const STANDARD_TIMEOUT_MILLIS: u64 = 60000;
 const FAST_TIMEOUT_MILLIS: u64 = 10000;
 
 #[hdk_extern]

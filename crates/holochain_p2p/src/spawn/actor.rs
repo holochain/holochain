@@ -1300,9 +1300,24 @@ impl actor::HcP2p for HolochainP2pActor {
         agent_pub_key: AgentPubKey,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
-            let space = self.kitsune.space(dna_hash.to_k2_space()).await?;
+            let space_id = dna_hash.to_k2_space();
+            let space = self.kitsune.space(space_id.clone()).await?;
 
             space.local_agent_leave(agent_pub_key.to_k2_agent()).await;
+
+            // If there are no more local agents in this space, then the space can be removed.
+            if space
+                .local_agent_store()
+                .get_all()
+                .await
+                .is_ok_and(|agents| agents.is_empty())
+            {
+                drop(space);
+                if let Err(err) = self.kitsune.remove_space(space_id).await {
+                    tracing::warn!(?err, "Failed to remove space after last agent left");
+                }
+            }
+
             Ok(())
         })
     }

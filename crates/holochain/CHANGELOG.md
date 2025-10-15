@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Implement removing a space (app network) when the last local agent leaves. This was already implemented by Kitsune2 but
+  hadn't yet been integrated into Holochain. #5351
+
 ## 0.6.0-dev.29
 
 - Remove a check in `holochain_state` that prevented multiple warrants for the same agent being inserted. Not only are multiple warrant types allowed, but it is expected that multiple authorities will issue warrants for the same agent in parallel before discovering each other’s warrants. Failing to store those warrants would result in inconsistent views of the DHT. \#5342
