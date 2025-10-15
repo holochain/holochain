@@ -14,6 +14,73 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20251015.001251
+
+## [hcterm-0.6.0-dev.29](crates/hcterm/CHANGELOG.md#0.6.0-dev.29)
+
+## [holochain\_cli-0.6.0-dev.29](crates/holochain_cli/CHANGELOG.md#0.6.0-dev.29)
+
+## [holochain\_cli\_bundle-0.6.0-dev.29](crates/holochain_cli_bundle/CHANGELOG.md#0.6.0-dev.29)
+
+## [holochain\_cli\_sandbox-0.6.0-dev.29](crates/holochain_cli_sandbox/CHANGELOG.md#0.6.0-dev.29)
+
+## [holochain\_client-0.8.0-dev.26](crates/holochain_client/CHANGELOG.md#0.8.0-dev.26)
+
+## [holochain-0.6.0-dev.29](crates/holochain/CHANGELOG.md#0.6.0-dev.29)
+
+- Remove a check in `holochain_state` that prevented multiple warrants for the same agent being inserted. Not only are multiple warrant types allowed, but it is expected that multiple authorities will issue warrants for the same agent in parallel before discovering each other’s warrants. Failing to store those warrants would result in inconsistent views of the DHT. \#5342
+- **BREAKING CHANGE** Replace `BTreeSet` with `HashSet` in `GrantedFunctions::Listed`. \#5349
+- Add a new conductor tuning parameter `disable_self_validation` to disable self-validation of authored data. Intended only for testing warrants. \#5340
+- Avoid issuing duplicate warrants for invalid actions during sys validation by checking for existing warrants before creating new ones. \#5337
+- Test: Test that blocks are enforced for outgoing network get requests and publish.
+- Chore: remove blocks from validation receipt workflow. It’s unclear why blocking was added there. Blocking now happens as part of validation. Validation receipts seem unrelated to blocking.
+- Feat: Block authors of invalid ops after validation in the integration workflow.
+- Test: Zero arc nodes are being served warrants for `get_agent_activity`.
+- **BREAKING CHANGE** Removed unused public SQL queries from `holochain_sqlite`:
+  - `ACTIVITY_INTEGRATED_UPPER_BOUND`
+  - `ALL_ACTIVITY_AUTHORS`
+  - `FETCH_OP_HASHES_P1`
+  - `FETCH_OP_HASHES_P2`
+  - `FETCH_OP_REGION`
+  - `FETCH_OPS_BY_REGION`
+  - `FETCH_REGION_OP_HASHES`
+
+## [holochain\_cascade-0.6.0-dev.29](crates/holochain_cascade/CHANGELOG.md#0.6.0-dev.29)
+
+## [holochain\_conductor\_config-0.6.0-dev.29](crates/holochain_conductor_config/CHANGELOG.md#0.6.0-dev.29)
+
+## [holochain\_test\_wasm\_common-0.6.0-dev.22](crates/holochain_test_wasm_common/CHANGELOG.md#0.6.0-dev.22)
+
+## [holochain\_wasm\_test\_utils-0.6.0-dev.29](crates/holochain_wasm_test_utils/CHANGELOG.md#0.6.0-dev.29)
+
+## [holochain\_websocket-0.6.0-dev.29](crates/holochain_websocket/CHANGELOG.md#0.6.0-dev.29)
+
+## [hdk-0.6.0-dev.22](crates/hdk/CHANGELOG.md#0.6.0-dev.22)
+
+## [holochain\_conductor\_api-0.6.0-dev.29](crates/holochain_conductor_api/CHANGELOG.md#0.6.0-dev.29)
+
+## [holochain\_p2p-0.6.0-dev.29](crates/holochain_p2p/CHANGELOG.md#0.6.0-dev.29)
+
+## [hdi-0.7.0-dev.19](crates/hdi/CHANGELOG.md#0.7.0-dev.19)
+
+## [holochain\_state-0.6.0-dev.29](crates/holochain_state/CHANGELOG.md#0.6.0-dev.29)
+
+## [hdk\_derive-0.6.0-dev.18](crates/hdk_derive/CHANGELOG.md#0.6.0-dev.18)
+
+## [holochain\_chc-0.3.0-dev.29](crates/holochain_chc/CHANGELOG.md#0.3.0-dev.29)
+
+## [holochain\_state\_types-0.6.0-dev.18](crates/holochain_state_types/CHANGELOG.md#0.6.0-dev.18)
+
+## [holochain\_types-0.6.0-dev.29](crates/holochain_types/CHANGELOG.md#0.6.0-dev.29)
+
+## [holochain\_keystore-0.6.0-dev.21](crates/holochain_keystore/CHANGELOG.md#0.6.0-dev.21)
+
+## [holochain\_sqlite-0.6.0-dev.28](crates/holochain_sqlite/CHANGELOG.md#0.6.0-dev.28)
+
+## [holochain\_zome\_types-0.6.0-dev.21](crates/holochain_zome_types/CHANGELOG.md#0.6.0-dev.21)
+
+## [holochain\_integrity\_types-0.6.0-dev.18](crates/holochain_integrity_types/CHANGELOG.md#0.6.0-dev.18)
+
 # 20251008.002548
 
 ## [hcterm-0.6.0-dev.28](crates/hcterm/CHANGELOG.md#0.6.0-dev.28)

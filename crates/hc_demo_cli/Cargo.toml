@@ -15,11 +15,11 @@ clap = { version = "4.2.2", features = [
   "wrap_help",
 ], optional = true }
 flate2 = { version = "1.0.25", optional = true }
-hdi = { path = "../hdi", version = "^0.7.0-dev.18", optional = true }
-hdk = { path = "../hdk", version = "^0.6.0-dev.21", optional = true }
-holochain = { path = "../holochain", version = "^0.6.0-dev.28", optional = true, default-features = false }
-holochain_types = { path = "../holochain_types", version = "^0.6.0-dev.28", optional = true }
-holochain_keystore = { path = "../holochain_keystore", version = "^0.6.0-dev.20", optional = true }
+hdi = { path = "../hdi", version = "^0.7.0-dev.19", optional = true }
+hdk = { path = "../hdk", version = "^0.6.0-dev.22", optional = true }
+holochain = { path = "../holochain", version = "^0.6.0-dev.29", optional = true, default-features = false }
+holochain_types = { path = "../holochain_types", version = "^0.6.0-dev.29", optional = true }
+holochain_keystore = { path = "../holochain_keystore", version = "^0.6.0-dev.21", optional = true }
 rand = { version = "0.9", optional = true }
 rand-utf8 = { version = "0.0.2", optional = true }
 rustls = { version = "0.23.28", optional = true }
