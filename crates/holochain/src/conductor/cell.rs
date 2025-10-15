@@ -13,6 +13,7 @@ use crate::conductor::cell::error::CellResult;
 use crate::core::queue_consumer::spawn_queue_consumer_tasks;
 use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::core::queue_consumer::QueueTriggers;
+use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::ZomeCallInvocation;
@@ -48,7 +49,6 @@ use tracing::*;
 use tracing_futures::Instrument;
 #[cfg(feature = "unstable-countersigning")]
 use {
-    crate::core::queue_consumer::TriggerSender,
     crate::core::workflow::countersigning_workflow::countersigning_success,
     crate::core::workflow::witnessing_workflow::receive_incoming_countersigning_ops,
 };
