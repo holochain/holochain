@@ -1,3 +1,4 @@
+use futures::future;
 use hdk::prelude::{PreflightRequest, PreflightRequestAcceptance};
 use holo_hash::{ActionHash, EntryHash};
 use holochain::conductor::api::error::{ConductorApiError, ConductorApiResult};
@@ -6,7 +7,8 @@ use holochain::core::workflow::WorkflowError;
 use holochain::prelude::CountersigningSessionState;
 use holochain::retry_until_timeout;
 use holochain::sweettest::{
-    await_consistency, SweetConductorBatch, SweetConductorConfig, SweetDnaFile,
+    await_consistency, SweetConductor, SweetConductorBatch, SweetConductorConfig, SweetDnaFile,
+    SweetLocalRendezvous,
 };
 use holochain_state::prelude::{IncompleteCommitReason, SourceChainError};
 use holochain_types::app::DisabledAppReason;
@@ -132,25 +134,34 @@ async fn listen_for_countersigning_completion() {
 async fn retry_countersigning_commit_on_missing_deps() {
     holochain_trace::test_run();
 
-    let config = SweetConductorConfig::rendezvous(true);
-    let mut conductors = SweetConductorBatch::from_config_rendezvous(3, config).await;
-    for conductor in conductors.iter_mut() {
-        conductor.shutdown().await;
-    }
-    // Allow bootstrapping and network comms so that peers can find each other,
-    // but before creating any data, disable publish and recent gossip.
-    // Now the only way peers can get data is through get requests!
-    for conductor in conductors.iter_mut() {
-        conductor.update_config(|c| {
-            SweetConductorConfig::from(c)
-                .tune_network_config(|nc| {
-                    nc.disable_publish = true;
-                    nc.disable_gossip = true;
-                })
-                .into()
-        });
-        conductor.startup(false).await;
-    }
+    let config = SweetConductorConfig::rendezvous(true).tune_network_config(|nc| {
+        nc.advanced = Some(serde_json::json!({
+            "tx5Transport": {
+                "signalAllowPlainText": true,
+                "timeoutS": 5,
+            }
+        }));
+        nc.disable_publish = true;
+        nc.disable_gossip = true;
+    });
+    let rendezvous = SweetLocalRendezvous::new().await;
+
+    let mut conductors = SweetConductorBatch::new(
+        future::join_all(
+            std::iter::repeat_with(|| {
+                SweetConductor::create_with_defaults_and_metrics(
+                    config.clone(),
+                    None,
+                    Some(rendezvous.clone()),
+                    false,
+                    true,
+                )
+            })
+            .take(3),
+        )
+        .await,
+    );
+
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
     let apps = conductors.setup_app("app", &[dna]).await.unwrap();
     let cells = apps.cells_flattened();
@@ -200,7 +211,7 @@ async fn retry_countersigning_commit_on_missing_deps() {
     let preflight_request: PreflightRequest = conductors[0]
         .call_fallible(
             &alice_zome,
-            "generate_countersigning_preflight_request_fast",
+            "generate_countersigning_preflight_request",
             vec![
                 (alice.agent_pubkey().clone(), vec![Role(0)]),
                 (bob.agent_pubkey().clone(), vec![]),
@@ -241,6 +252,15 @@ async fn retry_countersigning_commit_on_missing_deps() {
         .disable_app("app".into(), DisabledAppReason::User)
         .await
         .unwrap();
+
+    let space = conductors[0]
+        .holochain_p2p()
+        .test_kitsune()
+        .space(alice.dna_hash().to_k2_space())
+        .await
+        .unwrap();
+    let bob_agent_id = bob.agent_pubkey().to_k2_agent();
+    space.peer_store().remove(bob_agent_id).await.unwrap();
 
     // Alice shouldn't be able to commit yet, because she doesn't have Bob's activity
     let result: ConductorApiResult<(ActionHash, EntryHash)> = conductors[0]
@@ -287,7 +307,7 @@ async fn retry_countersigning_commit_on_missing_deps() {
     conductors.exchange_peer_info().await;
 
     // Bob should be able to get Alice's chain head when we commit, so let's do that.
-    retry_until_timeout!({
+    retry_until_timeout!(30_000, {
         if conductors[1]
             .call_fallible::<_, (ActionHash, EntryHash)>(
                 &bob_zome,
