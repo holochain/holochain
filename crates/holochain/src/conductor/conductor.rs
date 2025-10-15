@@ -2123,7 +2123,7 @@ mod misc_impls {
             let integration_trigger = self
                 .cell_by_id(&cell_id)
                 .await?
-                .triggers()
+                .integrate_dht_ops_trigger()
                 .integrate_dht_ops
                 .clone();
             integration_trigger.trigger(&"grant_zome_call_capability call");
@@ -2195,8 +2195,7 @@ mod misc_impls {
             let integration_trigger = self
                 .cell_by_id(&cell_id)
                 .await?
-                .triggers()
-                .integrate_dht_ops
+                .integrate_dht_ops_trigger()
                 .clone();
             integration_trigger.trigger(&"revoke_zome_call_capability call");
 

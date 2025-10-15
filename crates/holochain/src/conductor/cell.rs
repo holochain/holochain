@@ -894,6 +894,10 @@ impl Cell {
         self.queue_triggers.countersigning.clone()
     }
 
+    pub(crate) fn integrate_dht_ops_trigger(&self) -> TriggerSender {
+        self.queue_triggers.integrate_dht_ops.clone()
+    }
+
     #[cfg(any(test, feature = "test_utils"))]
     pub(crate) fn triggers(&self) -> &QueueTriggers {
         &self.queue_triggers
