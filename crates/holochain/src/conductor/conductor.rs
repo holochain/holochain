@@ -2124,7 +2124,6 @@ mod misc_impls {
                 .cell_by_id(&cell_id)
                 .await?
                 .integrate_dht_ops_trigger()
-                .integrate_dht_ops
                 .clone();
             integration_trigger.trigger(&"grant_zome_call_capability call");
 
