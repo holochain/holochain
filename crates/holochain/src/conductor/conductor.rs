@@ -3276,9 +3276,6 @@ pub async fn full_integration_dump(
                 dht_ops_cursor,
             )?;
 
-            // VAlidation limbo and integration limbo DO NOT COVER ALL POSSIBLE DB STATES?
-            // WHAT IF THERE IS A STATE BUG?
-
             let dht_ops_cursor = txn
                 .query_row(state_dump::DHT_OPS_ROW_ID, [], |row| row.get(0))
                 .unwrap_or(0);
