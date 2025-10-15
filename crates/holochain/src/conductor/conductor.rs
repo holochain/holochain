@@ -2120,6 +2120,14 @@ mod misc_impls {
                 )
                 .await?;
 
+            let integration_trigger = self
+                .cell_by_id(&cell_id)
+                .await?
+                .triggers()
+                .integrate_dht_ops
+                .clone();
+            integration_trigger.trigger(&"grant_zome_call_capability call");
+
             Ok(action_hash)
         }
 
@@ -2183,6 +2191,14 @@ mod misc_impls {
                     cell.holochain_p2p_dna().chc(),
                 )
                 .await?;
+
+            let integration_trigger = self
+                .cell_by_id(&cell_id)
+                .await?
+                .triggers()
+                .integrate_dht_ops
+                .clone();
+            integration_trigger.trigger(&"revoke_zome_call_capability call");
 
             Ok(action_hash)
         }
@@ -3259,6 +3275,9 @@ pub async fn full_integration_dump(
                 state_dump::DHT_OPS_IN_INTEGRATION_LIMBO,
                 dht_ops_cursor,
             )?;
+
+            // VAlidation limbo and integration limbo DO NOT COVER ALL POSSIBLE DB STATES?
+            // WHAT IF THERE IS A STATE BUG?
 
             let dht_ops_cursor = txn
                 .query_row(state_dump::DHT_OPS_ROW_ID, [], |row| row.get(0))

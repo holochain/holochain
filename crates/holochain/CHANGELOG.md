@@ -28,6 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - `FETCH_OP_REGION`
   - `FETCH_OPS_BY_REGION`
   - `FETCH_REGION_OP_HASHES`
+- Fix: The integration workflow is now triggered after a zome call capability is created or revoked via `grant_zome_call_capability` or `revoke_zome_call_capability`.
 
 ## 0.6.0-dev.28
 
