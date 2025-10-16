@@ -66,6 +66,9 @@ mod metrics;
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
 
+#[cfg(test)]
+mod tests;
+
 /// Get an item from an option
 /// or return early from the function
 macro_rules! some_or_return {
@@ -321,6 +324,19 @@ impl CascadeImpl {
     }
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+    async fn merge_op_by_type_into_cache(&self, response: WireOpByType) -> CascadeResult<()> {
+        let cache = some_or_return!(self.cache.as_ref());
+        cache
+            .write_async(|txn| {
+                let ops = response.render();
+                Self::insert_rendered_ops(txn, &ops)?;
+                CascadeResult::Ok(ops)
+            })
+            .await?;
+        Ok(())
+    }
+
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn merge_link_ops_into_cache(
         &self,
         responses: Vec<WireLinkOps>,
@@ -420,6 +436,37 @@ impl CascadeImpl {
 
         self.merge_ops_into_cache(results).await?;
         Ok(())
+    }
+
+    /// Fetch a ChainOp from the network by ActionHash and ChainOpType
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
+    pub async fn fetch_op_by_type(
+        &self,
+        action_hash: ActionHash,
+        op_type: ChainOpType,
+    ) -> CascadeResult<Option<Judged<ChainOp>>> {
+        let Some(network) = self.network.as_ref() else {
+            return Ok(None);
+        };
+        let result = match network
+            .get_by_op_type(action_hash, op_type)
+            .instrument(debug_span!("fetch_op_by_type::network_get_op_by_type"))
+            .await
+        {
+            Ok(op) => op,
+            Err(e @ HolochainP2pError::NoPeersForLocation(_, _)) => {
+                tracing::info!(?e, "No peers to fetch op by type from");
+                None
+            }
+            Err(e) => return Err(e.into()),
+        };
+        if let Some(wire_op_by_type) = result {
+            self.merge_op_by_type_into_cache(wire_op_by_type.clone())
+                .await?;
+            Ok(Some(wire_op_by_type.0))
+        } else {
+            Ok(None)
+        }
     }
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
@@ -1309,28 +1356,4 @@ impl MockCascade {
 
         cascade
     }
-}
-
-#[tokio::test]
-async fn test_mock_cascade_with_records() {
-    use ::fixt::fixt;
-    let records = vec![fixt!(Record), fixt!(Record), fixt!(Record)];
-    let cascade = MockCascade::with_records(records.clone());
-    let opts = NetworkGetOptions::default();
-    let (r0, _) = cascade
-        .retrieve(records[0].action_address().clone().into(), opts.clone())
-        .await
-        .unwrap()
-        .unwrap();
-    let (r1, _) = cascade
-        .retrieve(records[1].action_address().clone().into(), opts.clone())
-        .await
-        .unwrap()
-        .unwrap();
-    let (r2, _) = cascade
-        .retrieve(records[2].action_address().clone().into(), opts)
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(records, vec![r0, r1, r2]);
 }

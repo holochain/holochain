@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use fixt::fixt;
-use holo_hash::{AgentPubKey, AnyDhtHash, DnaHash, HasHash};
+use holo_hash::{ActionHash, AgentPubKey, AnyDhtHash, DnaHash, HasHash};
 use holochain_p2p::event::{
     CountersigningSessionNegotiationMessage, DynHcP2pHandler, GetActivityOptions, GetLinksOptions,
     GetMetaOptions, HcP2pHandler,
@@ -14,11 +14,12 @@ use holochain_state::prelude::{
 use holochain_timestamp::Timestamp;
 use holochain_types::activity::AgentActivityResponse;
 use holochain_types::chain::MustGetAgentActivityResponse;
-use holochain_types::dht_op::{ChainOp, DhtOpHashed, WireOps};
+use holochain_types::dht_op::{ChainOp, DhtOpHashed, WireMaybeOpByType, WireOps};
 use holochain_types::link::{CountLinksResponse, WireLinkKey, WireLinkOps, WireLinkQuery};
 use holochain_types::metadata::MetadataSet;
 use holochain_types::prelude::{DhtOp, ValidationReceiptBundle};
 use holochain_zome_types::fixt::{CreateFixturator, EntryFixturator, SignatureFixturator};
+use holochain_zome_types::op::ChainOpType;
 use holochain_zome_types::prelude::ChainQueryFilter;
 use holochain_zome_types::Action;
 use kitsune2_api::*;
@@ -74,6 +75,16 @@ impl HcP2pHandler for StubHost {
         _to_agent: AgentPubKey,
         _dht_hash: AnyDhtHash,
     ) -> BoxFut<'_, HolochainP2pResult<WireOps>> {
+        unimplemented!()
+    }
+
+    fn handle_get_by_op_type(
+        &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
+        _action_hash: ActionHash,
+        _op_type: ChainOpType,
+    ) -> BoxFut<'_, HolochainP2pResult<WireMaybeOpByType>> {
         unimplemented!()
     }
 

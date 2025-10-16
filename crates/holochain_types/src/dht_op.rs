@@ -1182,6 +1182,41 @@ impl WireOps {
     }
 }
 
+/// Chain op by type response for sending across the wire.
+#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes)]
+pub struct WireOpByType(pub Judged<ChainOp>);
+
+/// Option of an op by type.
+pub type WireMaybeOpByType = Option<WireOpByType>;
+
+impl WireOpByType {
+    /// Render the op by type.
+    pub fn render(self) -> RenderedOps {
+        let validation_status = self.0.validation_status();
+        let entry = self
+            .0
+            .data
+            .entry()
+            .into_option()
+            .map(|entry| EntryHashed::from_content_sync(entry.clone()));
+        let action = SignedActionHashed::from_content_sync(self.0.data.signed_action());
+        let dht_op = DhtOp::ChainOp(Box::new(self.0.data));
+        let op_light = dht_op.to_lite();
+        let op_hash = dht_op.to_hash();
+        let rendered_op = RenderedOp {
+            action,
+            op_hash,
+            op_light,
+            validation_status,
+        };
+        RenderedOps {
+            entry,
+            ops: vec![rendered_op],
+            warrant: None,
+        }
+    }
+}
+
 /// The data rendered from a wire op to place in the database.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RenderedOp {

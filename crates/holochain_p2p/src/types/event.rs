@@ -97,6 +97,15 @@ pub trait HcP2pHandler: 'static + Send + Sync + std::fmt::Debug {
         dht_hash: holo_hash::AnyDhtHash,
     ) -> BoxFut<'_, HolochainP2pResult<WireOps>>;
 
+    /// A remote node is requesting an action by op type from us.
+    fn handle_get_by_op_type(
+        &self,
+        dna_hash: DnaHash,
+        to_agent: AgentPubKey,
+        action_hash: ActionHash,
+        op_type: ChainOpType,
+    ) -> BoxFut<'_, HolochainP2pResult<WireMaybeOpByType>>;
+
     /// A remote node is requesting metadata from us.
     fn handle_get_meta(
         &self,

@@ -58,6 +58,21 @@ impl holochain_p2p::event::HcP2pHandler for Conductor {
         })
     }
 
+    fn handle_get_by_op_type(
+        &self,
+        dna_hash: DnaHash,
+        to_agent: AgentPubKey,
+        action_hash: ActionHash,
+        op_type: ChainOpType,
+    ) -> BoxFut<'_, HolochainP2pResult<WireMaybeOpByType>> {
+        Box::pin(async move {
+            self.cell_by_parts(&dna_hash, &to_agent)
+                .await?
+                .handle_get_by_op_type(dna_hash, to_agent, action_hash, op_type)
+                .await
+        })
+    }
+
     fn handle_get_meta(
         &self,
         dna_hash: DnaHash,

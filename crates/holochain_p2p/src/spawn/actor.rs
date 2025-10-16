@@ -99,6 +99,23 @@ impl event::HcP2pHandler for WrapEvtSender {
         )
     }
 
+    fn handle_get_by_op_type(
+        &self,
+        dna_hash: DnaHash,
+        to_agent: AgentPubKey,
+        action_hash: ActionHash,
+        op_type: ChainOpType,
+    ) -> BoxFut<'_, HolochainP2pResult<WireMaybeOpByType>> {
+        timing_trace!(
+            true,
+            {
+                self.0
+                    .handle_get_by_op_type(dna_hash, to_agent, action_hash, op_type)
+            },
+            a = "recv_get_by_op_type",
+        )
+    }
+
     fn handle_get_meta(
         &self,
         dna_hash: DnaHash,
@@ -293,6 +310,7 @@ impl SpaceHandler for HolochainP2pActor {
                     ErrorRes { msg_id, .. }
                     | CallRemoteRes { msg_id, .. }
                     | GetRes { msg_id, .. }
+                    | GetByOpTypeRes { msg_id, .. }
                     | GetMetaRes { msg_id, .. }
                     | GetLinksRes { msg_id, .. }
                     | CountLinksRes { msg_id, .. }
@@ -366,6 +384,36 @@ impl SpaceHandler for HolochainP2pActor {
                             .await
                         {
                             tracing::debug!(?err, "Error sending get response");
+                        }
+                    }
+                    GetByOpTypeReq {
+                        msg_id,
+                        to_agent,
+                        action_hash,
+                        op_type,
+                    } => {
+                        let dna_hash = DnaHash::from_k2_space(&space_id);
+                        let resp = match evt_sender
+                            .get()
+                            .ok_or_else(|| HolochainP2pError::other(EVT_REG_ERR))?
+                            .handle_get_by_op_type(dna_hash, to_agent, action_hash, op_type)
+                            .await
+                        {
+                            Ok(response) => GetByOpTypeRes { msg_id, response },
+                            Err(err) => ErrorRes {
+                                msg_id,
+                                error: format!("{err:?}"),
+                            },
+                        };
+                        let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
+                        if let Err(err) = kitsune
+                            .space_if_exists(space_id)
+                            .await
+                            .ok_or_else(|| HolochainP2pError::other("no such space"))?
+                            .send_notify(from_peer, resp)
+                            .await
+                        {
+                            tracing::debug!(?err, "Error sending get_by_op_type response");
                         }
                     }
                     GetMetaReq {
@@ -1614,6 +1662,60 @@ impl actor::HcP2p for HolochainP2pActor {
 
             timing_trace_out!(out, start, a = "send_get");
             out.map(|x| vec![x])
+        })
+    }
+
+    fn get_by_op_type(
+        &self,
+        dna_hash: DnaHash,
+        action_hash: ActionHash,
+        op_type: ChainOpType,
+    ) -> BoxFut<'_, HolochainP2pResult<WireMaybeOpByType>> {
+        Box::pin(async move {
+            let space_id = dna_hash.to_k2_space();
+            let space = self.kitsune.space(space_id.clone()).await?;
+            let loc = action_hash.get_loc();
+            let agents = self
+                .get_random_peers_for_location("get_by_op_type", &space, loc)
+                .await?;
+
+            let start = std::time::Instant::now();
+
+            let out = select_ok_non_empty(
+                agents.into_iter().map(|(to_agent, to_url)| {
+                    let action_hash = action_hash.clone();
+                    Box::pin(async {
+                        let (msg_id, req) = crate::wire::WireMessage::get_by_op_type_req(
+                            to_agent,
+                            action_hash,
+                            op_type,
+                        );
+
+                        self.send_request(
+                            "get_by_op_type",
+                            &space,
+                            to_url,
+                            msg_id,
+                            req,
+                            dna_hash.clone(),
+                            |res| match res {
+                                crate::wire::WireMessage::GetByOpTypeRes { response, .. } => {
+                                    Ok(response)
+                                }
+                                _ => Err(HolochainP2pError::other(format!(
+                                    "invalid response to get_by_op_type: {res:?}"
+                                ))),
+                            },
+                        )
+                        .await
+                    })
+                }),
+                |maybe_op_by_type| maybe_op_by_type.is_none(),
+            )
+            .await;
+
+            timing_trace_out!(out, start, a = "send_get_by_op_type");
+            out
         })
     }
 
