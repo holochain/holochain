@@ -49,7 +49,7 @@ pub async fn publish_dht_ops_workflow(
     let to_publish_count: usize = to_publish.values().map(Vec::len).sum();
 
     if to_publish_count > 0 {
-        info!("publishing {} ops", to_publish_count);
+        info!(?agent, "publishing {} ops", to_publish_count);
     }
 
     // Commit to the network
@@ -82,16 +82,24 @@ pub async fn publish_dht_ops_workflow(
     }
 
     if to_publish_count > 0 {
-        info!("published {}/{} ops", success.len(), to_publish_count);
+        info!(
+            ?agent,
+            "published {}/{} ops",
+            success.len(),
+            to_publish_count
+        );
     }
 
     let now = time::SystemTime::now().duration_since(time::UNIX_EPOCH)?;
     let continue_publish = db
-        .write_async(move |txn| {
-            for hash in success {
-                set_last_publish_time(txn, &hash, now)?;
+        .write_async({
+            let agent = agent.clone();
+            move |txn| {
+                for hash in success {
+                    set_last_publish_time(txn, &hash, now)?;
+                }
+                WorkflowResult::Ok(publish_query::num_still_needing_publish(txn, agent)? > 0)
             }
-            WorkflowResult::Ok(publish_query::num_still_needing_publish(txn, agent)? > 0)
         })
         .await?;
 
@@ -102,7 +110,7 @@ pub async fn publish_dht_ops_workflow(
         trigger_self.pause_loop();
     }
 
-    debug!("committed published ops");
+    debug!(?agent, "committed published ops");
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 

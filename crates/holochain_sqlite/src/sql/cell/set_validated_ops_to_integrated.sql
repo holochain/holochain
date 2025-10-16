@@ -10,7 +10,19 @@ RETURNING
   hash,
   basis_hash,
   authored_timestamp,
-  -- Return warrantee from Warrant table for warrant ops.
+  validation_status,
+  -- Return author from the Warrant table for warrant ops.
+  (
+    SELECT
+      author
+    FROM
+      Warrant
+    WHERE
+      Warrant.hash = DhtOp.action_hash
+    LIMIT
+      1
+  ),
+  -- Return warrantee from the Warrant table for warrant ops.
   (
     SELECT
       warrantee
