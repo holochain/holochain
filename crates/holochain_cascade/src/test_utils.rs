@@ -87,6 +87,14 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         Ok(out)
     }
 
+    async fn get_by_op_type(
+        &self,
+        _action_hash: ActionHash,
+        _op_type: ChainOpType,
+    ) -> HolochainP2pResult<WireMaybeOpByType> {
+        todo!()
+    }
+
     async fn get_meta(
         &self,
         _dht_hash: holo_hash::AnyDhtHash,

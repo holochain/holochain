@@ -5,6 +5,7 @@ use holo_hash::*;
 use holochain_chc::ChcImpl;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
+use holochain_zome_types::op::ChainOpType;
 use kitsune2_api::{AgentInfoSigned, BoxFut};
 use kitsune2_api::{SpaceId, StoredOp};
 use mockall::automock;
@@ -141,6 +142,13 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
 
     /// Get an entry from the DHT.
     async fn get(&self, dht_hash: holo_hash::AnyDhtHash) -> HolochainP2pResult<Vec<WireOps>>;
+
+    /// Get a specific ChainOp by ActionHash and ChainOpType from the DHT.
+    async fn get_by_op_type(
+        &self,
+        action_hash: ActionHash,
+        op_type: ChainOpType,
+    ) -> HolochainP2pResult<WireMaybeOpByType>;
 
     /// Get metadata from the DHT.
     async fn get_meta(
@@ -322,6 +330,17 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         self.sender
             .get(self.dna_hash(), dht_hash)
             .instrument(tracing::debug_span!("HolochainP2p::get"))
+            .await
+    }
+
+    /// Get a chain op by type from the DHT.
+    async fn get_by_op_type(
+        &self,
+        action_hash: ActionHash,
+        op_type: ChainOpType,
+    ) -> HolochainP2pResult<WireMaybeOpByType> {
+        self.sender
+            .get_by_op_type(self.dna_hash(), action_hash, op_type)
             .await
     }
 
