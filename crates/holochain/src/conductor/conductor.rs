@@ -2120,12 +2120,9 @@ mod misc_impls {
                 )
                 .await?;
 
-            let integration_trigger = self
-                .cell_by_id(&cell_id)
+            self.cell_by_id(&cell_id)
                 .await?
-                .integrate_dht_ops_trigger()
-                .clone();
-            integration_trigger.trigger(&"grant_zome_call_capability call");
+                .notify_authored_ops_moved_to_limbo();
 
             Ok(action_hash)
         }
@@ -2191,12 +2188,9 @@ mod misc_impls {
                 )
                 .await?;
 
-            let integration_trigger = self
-                .cell_by_id(&cell_id)
+            self.cell_by_id(&cell_id)
                 .await?
-                .integrate_dht_ops_trigger()
-                .clone();
-            integration_trigger.trigger(&"revoke_zome_call_capability call");
+                .notify_authored_ops_moved_to_limbo();
 
             Ok(action_hash)
         }
