@@ -1,5 +1,6 @@
 use crate::fixt::AgentPubKeyFixturator;
 use crate::sweettest::{SweetConductor, SweetDnaFile};
+use crate::test_utils::retry_fn_until_timeout;
 use ::fixt::fixt;
 use holochain_nonce::fresh_nonce;
 use holochain_nonce::Nonce256Bits;
@@ -349,7 +350,6 @@ async fn cap_grant_info_call() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[cfg(feature = "test_utils")]
 async fn grant_zome_call_capability_call() {
     use std::collections::HashSet;
 
@@ -426,7 +426,13 @@ async fn grant_zome_call_capability_call() {
     assert_eq!(cap_grant_cell_id.clone(), cell_id.clone());
 
     // Wait for integration workflow to complete
-    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    retry_fn_until_timeout(
+        || async { conductor.all_ops_integrated(dna.dna_hash()).unwrap() },
+        None,
+        None,
+    )
+    .await
+    .unwrap();
 
     // 2 new DhtOps for cap grant are integrated into the source chain
     let after_state_dump = conductor
@@ -443,7 +449,6 @@ async fn grant_zome_call_capability_call() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[cfg(feature = "test_utils")]
 async fn revoke_zome_call_capability_call() {
     use std::collections::HashSet;
 
@@ -542,7 +547,13 @@ async fn revoke_zome_call_capability_call() {
         .lt(&cap_cell_info.revoked_at.unwrap()));
 
     // Wait for integration workflow to complete
-    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    retry_fn_until_timeout(
+        || async { conductor.all_ops_integrated(dna.dna_hash()).unwrap() },
+        None,
+        None,
+    )
+    .await
+    .unwrap();
 
     // 4 new DhtOps for cap grant revocation are integrated into the source chain
     let after_state_dump = conductor
