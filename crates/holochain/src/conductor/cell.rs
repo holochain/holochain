@@ -48,6 +48,7 @@ use tracing::*;
 use tracing_futures::Instrument;
 #[cfg(feature = "unstable-countersigning")]
 use {
+    crate::core::queue_consumer::TriggerSender,
     crate::core::workflow::countersigning_workflow::countersigning_success,
     crate::core::workflow::witnessing_workflow::receive_incoming_countersigning_ops,
 };
