@@ -2733,6 +2733,7 @@ dependencies = [
  "holo_hash",
  "holochain_cascade",
  "holochain_chc",
+ "holochain_keystore",
  "holochain_p2p",
  "holochain_serialized_bytes",
  "holochain_sqlite",

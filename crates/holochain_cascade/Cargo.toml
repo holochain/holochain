@@ -37,6 +37,7 @@ mockall = { version = "0.13", optional = true }
 
 [dev-dependencies]
 holochain_cascade = { path = ".", features = ["test_utils"] }
+holochain_keystore = { path = "../holochain_keystore" }
 
 isotest = "0"
 pretty_assertions = "1.4"
