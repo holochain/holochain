@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Feat: Add network call `get_op_by_type` to fetch a `ChainOp` by type. Previously fetching a record would always return a `StoreRecord` op. Warrant validation requires all kinds of ops to be fetched, so the new call was implemented.
 - Remove the `request_validation_receipt` from `holochain_p2p` and related code. Validation receipts are always requested and the parameter is no longer used. #5366
 - Implement removing a space (app network) when the last local agent leaves. This was already implemented by Kitsune2 but
   hadn't yet been integrated into Holochain. #5351
