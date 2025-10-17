@@ -16,7 +16,7 @@ use holochain_types::{
         ValidationStatus,
     },
 };
-use holochain_zome_types::{Action, Entry};
+use holochain_zome_types::Action;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_action_from_authored() {

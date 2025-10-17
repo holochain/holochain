@@ -41,6 +41,7 @@ holochain_keystore = { path = "../holochain_keystore" }
 
 isotest = "0"
 pretty_assertions = "1.4"
+rand = "0.9"
 test-case = "3.3"
 
 [lints]
