@@ -1,19 +1,12 @@
 use super::*;
 use ::fixt::fixt;
-use holo_hash::{
-    fixt::{ActionHashFixturator, DnaHashFixturator},
-    HashableContentExtSync,
-};
+use holo_hash::{fixt::ActionHashFixturator, HashableContentExtSync};
 use holochain_cascade::CascadeImpl;
-use holochain_keystore::test_keystore;
-use holochain_p2p::{
-    event::{HcP2pHandler, MockHcP2pHandler},
-    spawn_holochain_p2p, HolochainP2pConfig, HolochainP2pDna, HolochainP2pError,
-    MockHolochainP2pDnaT,
-};
-use holochain_state::{prelude::*, query::map_sql_dht_op};
+use holochain_p2p::MockHolochainP2pDnaT;
+use holochain_state::query::map_sql_dht_op;
 use holochain_types::dht_op::{ChainOp, DhtOp};
 use std::sync::Arc;
+use test_utils::create_test_chain_op;
 
 #[tokio::test]
 async fn test_mock_cascade_with_records() {
@@ -259,60 +252,6 @@ async fn different_validation_statuses() {
         let returned_op = result.unwrap();
         assert_eq!(returned_op.data.get_type(), ChainOpType::StoreRecord);
         assert_eq!(returned_op.status, validation_status);
-    }
-}
-
-fn create_test_chain_op(op_type: ChainOpType) -> ChainOp {
-    match op_type {
-        ChainOpType::StoreRecord => {
-            let action = Action::Delete(fixt!(Delete));
-            ChainOp::StoreRecord(fixt!(Signature), action, RecordEntry::NA)
-        }
-        ChainOpType::StoreEntry => {
-            let mut create = fixt!(Create);
-            let entry = fixt!(Entry);
-            create.entry_type = EntryType::App(AppEntryDef::new(
-                0.into(),
-                0.into(),
-                EntryVisibility::Public,
-            ));
-            create.entry_hash = entry.to_hash();
-            let action = NewEntryAction::Create(create);
-            ChainOp::StoreEntry(fixt!(Signature), action, entry)
-        }
-        ChainOpType::RegisterAgentActivity => {
-            ChainOp::RegisterAgentActivity(fixt!(Signature), fixt!(Action))
-        }
-        ChainOpType::RegisterUpdatedContent => {
-            let mut update = fixt!(Update);
-            update.entry_type = EntryType::App(AppEntryDef::new(
-                0.into(),
-                0.into(),
-                EntryVisibility::Public,
-            ));
-            ChainOp::RegisterUpdatedContent(fixt!(Signature), update, RecordEntry::NotStored)
-        }
-        ChainOpType::RegisterUpdatedRecord => {
-            let mut update = fixt!(Update);
-            update.entry_type = EntryType::App(AppEntryDef::new(
-                0.into(),
-                0.into(),
-                EntryVisibility::Public,
-            ));
-            ChainOp::RegisterUpdatedRecord(fixt!(Signature), update, RecordEntry::NotStored)
-        }
-        ChainOpType::RegisterDeletedBy => {
-            ChainOp::RegisterDeletedBy(fixt!(Signature), fixt!(Delete))
-        }
-        ChainOpType::RegisterDeletedEntryAction => {
-            ChainOp::RegisterDeletedEntryAction(fixt!(Signature), fixt!(Delete))
-        }
-        ChainOpType::RegisterAddLink => {
-            ChainOp::RegisterAddLink(fixt!(Signature), fixt!(CreateLink))
-        }
-        ChainOpType::RegisterRemoveLink => {
-            ChainOp::RegisterRemoveLink(fixt!(Signature), fixt!(DeleteLink))
-        }
     }
 }
 

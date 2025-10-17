@@ -3,6 +3,7 @@
 use crate::authority;
 use crate::authority::get_entry_ops_query::GetEntryOpsQuery;
 use crate::authority::get_record_query::GetRecordOpsQuery;
+use ::fixt::fixt;
 pub use activity_test_data::*;
 pub use entry_test_data::*;
 use holo_hash::ActionHash;
@@ -407,4 +408,59 @@ pub fn commit_scratch(scratch: SyncScratch, chain: Vec<(AgentPubKey, Vec<TestCha
             }
         })
         .unwrap();
+}
+
+/// Create chain ops for testing with correctly hooked up entries.
+pub fn create_test_chain_op(op_type: ChainOpType) -> ChainOp {
+    match op_type {
+        ChainOpType::StoreRecord => {
+            let action = Action::Delete(fixt!(Delete));
+            ChainOp::StoreRecord(fixt!(Signature), action, RecordEntry::NA)
+        }
+        ChainOpType::StoreEntry => {
+            let mut create = fixt!(Create);
+            let entry = fixt!(Entry);
+            create.entry_type = EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            ));
+            create.entry_hash = entry.to_hash();
+            let action = NewEntryAction::Create(create);
+            ChainOp::StoreEntry(fixt!(Signature), action, entry)
+        }
+        ChainOpType::RegisterAgentActivity => {
+            ChainOp::RegisterAgentActivity(fixt!(Signature), fixt!(Action))
+        }
+        ChainOpType::RegisterUpdatedContent => {
+            let mut update = fixt!(Update);
+            update.entry_type = EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            ));
+            ChainOp::RegisterUpdatedContent(fixt!(Signature), update, RecordEntry::NotStored)
+        }
+        ChainOpType::RegisterUpdatedRecord => {
+            let mut update = fixt!(Update);
+            update.entry_type = EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            ));
+            ChainOp::RegisterUpdatedRecord(fixt!(Signature), update, RecordEntry::NotStored)
+        }
+        ChainOpType::RegisterDeletedBy => {
+            ChainOp::RegisterDeletedBy(fixt!(Signature), fixt!(Delete))
+        }
+        ChainOpType::RegisterDeletedEntryAction => {
+            ChainOp::RegisterDeletedEntryAction(fixt!(Signature), fixt!(Delete))
+        }
+        ChainOpType::RegisterAddLink => {
+            ChainOp::RegisterAddLink(fixt!(Signature), fixt!(CreateLink))
+        }
+        ChainOpType::RegisterRemoveLink => {
+            ChainOp::RegisterRemoveLink(fixt!(Signature), fixt!(DeleteLink))
+        }
+    }
 }

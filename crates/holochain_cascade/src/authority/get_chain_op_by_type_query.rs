@@ -2,7 +2,6 @@ use holo_hash::ActionHash;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
 use holochain_state::prelude::*;
-use holochain_state::query::StateQueryError;
 use std::sync::Arc;
 
 /// NB: If this query is ever used for multiple stores, instead of only the DHT store,
@@ -76,14 +75,13 @@ impl Query for GetChainOpByTypeQuery {
 
     fn fold(
         &self,
-        mut state: Self::State,
+        _state: Self::State,
         judged_chain_op: Self::Item,
     ) -> StateQueryResult<Self::State> {
-        state = Some(WireOpByType(judged_chain_op));
-        Ok(state)
+        Ok(Some(WireOpByType(judged_chain_op)))
     }
 
-    fn render<S>(&self, mut state: Self::State, stores: S) -> StateQueryResult<Self::Output>
+    fn render<S>(&self, state: Self::State, _stores: S) -> StateQueryResult<Self::Output>
     where
         S: Store,
     {
