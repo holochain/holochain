@@ -427,16 +427,8 @@ impl Spaces {
     }
 
     /// we are receiving a "publish" event from the network.
-    #[cfg_attr(
-        feature = "instrument",
-        tracing::instrument(skip(self, request_validation_receipt, ops))
-    )]
-    pub async fn handle_publish(
-        &self,
-        dna_hash: &DnaHash,
-        request_validation_receipt: bool,
-        ops: Vec<DhtOp>,
-    ) -> ConductorResult<()> {
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, ops)))]
+    pub async fn handle_publish(&self, dna_hash: &DnaHash, ops: Vec<DhtOp>) -> ConductorResult<()> {
         let space = self.get_or_create_space(dna_hash)?;
         let trigger = match self
             .queue_consumer_map
@@ -451,7 +443,7 @@ impl Spaces {
             }
         };
 
-        incoming_dht_ops_workflow(space, trigger, ops, request_validation_receipt).await?;
+        incoming_dht_ops_workflow(space, trigger, ops).await?;
 
         Ok(())
     }

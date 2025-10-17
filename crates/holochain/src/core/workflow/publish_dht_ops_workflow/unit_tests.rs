@@ -59,7 +59,7 @@ async fn workflow_incomplete_on_routing_error() {
     let op_hash = create_op(vault.clone(), agent.clone()).await.unwrap();
 
     let mut network = MockHolochainP2pDnaT::new();
-    network.expect_publish().return_once(|_, _, _, _, _, _| {
+    network.expect_publish().return_once(|_, _, _, _, _| {
         Err(holochain_p2p::HolochainP2pError::RoutingDnaError(fixt!(
             DnaHash
         )))
@@ -97,7 +97,7 @@ async fn workflow_handles_publish_errors() {
     let op_hash = create_op(vault.clone(), agent.clone()).await.unwrap();
 
     let mut network = MockHolochainP2pDnaT::new();
-    network.expect_publish().return_once(|_, _, _, _, _, _| {
+    network.expect_publish().return_once(|_, _, _, _, _| {
         Err(holochain_p2p::HolochainP2pError::InvalidP2pMessage(
             "test error".to_string(),
         ))
@@ -135,9 +135,7 @@ async fn retry_publish_until_receipts_received() {
     let op_hash = create_op(vault.clone(), agent.clone()).await.unwrap();
 
     let mut network = MockHolochainP2pDnaT::new();
-    network
-        .expect_publish()
-        .returning(|_, _, _, _, _, _| Ok(()));
+    network.expect_publish().returning(|_, _, _, _, _| Ok(()));
 
     let (tx, rx) =
         TriggerSender::new_with_loop(Duration::from_secs(5)..Duration::from_secs(30), true);
@@ -189,9 +187,7 @@ async fn loop_resumes_on_new_data() {
     let agent = fixt!(AgentPubKey);
 
     let mut network = MockHolochainP2pDnaT::new();
-    network
-        .expect_publish()
-        .returning(|_, _, _, _, _, _| Ok(()));
+    network.expect_publish().returning(|_, _, _, _, _| Ok(()));
 
     let (tx, rx) =
         TriggerSender::new_with_loop(Duration::from_secs(5)..Duration::from_secs(30), true);
@@ -333,12 +329,7 @@ async fn private_entries_are_not_published() {
     let mut network = MockHolochainP2pDnaT::new();
     let agent2 = agent.clone();
     network.expect_publish().returning(
-        move |_request_validation_receipt,
-              _basis_hash,
-              source,
-              op_hash_list,
-              _timeout_ms,
-              _reflect_ops| {
+        move |_basis_hash, source, op_hash_list, _timeout_ms, _reflect_ops| {
             assert_eq!(source, agent2);
             assert!(
                 op_hash_list.contains(&register_agent_activity_op_hash)

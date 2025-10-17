@@ -434,7 +434,6 @@ impl DhtOpSender for IncomingDhtOpSender {
             self.space.as_ref().clone(),
             self.sys_validation_trigger.clone(),
             ops,
-            false,
         )
         .await
         .map_err(Box::new)?)
