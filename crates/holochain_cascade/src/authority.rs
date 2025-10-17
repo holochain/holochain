@@ -52,6 +52,8 @@ pub async fn handle_get_record(
 
 /// Handler for get_by_op_type query to a Record authority
 // TODO: for sharding to work, this must be the authority of the op type
+// Without sharding this works, because every full arc node holds all ops.
+// For sharding, however, this call would go to a record authority, regardless of the op type that's being requested.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(env)))]
 pub async fn handle_get_by_op_type(
     env: DbRead<DbKindDht>,

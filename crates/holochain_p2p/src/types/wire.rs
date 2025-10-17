@@ -177,6 +177,8 @@ impl WireMessage {
             WireMessage::CallRemoteRes { msg_id, .. } => Some(*msg_id),
             WireMessage::GetReq { msg_id, .. } => Some(*msg_id),
             WireMessage::GetRes { msg_id, .. } => Some(*msg_id),
+            WireMessage::GetOpByTypeReq { msg_id, .. } => Some(*msg_id),
+            WireMessage::GetOpByTypeRes { msg_id, .. } => Some(*msg_id),
             WireMessage::GetMetaReq { msg_id, .. } => Some(*msg_id),
             WireMessage::GetMetaRes { msg_id, .. } => Some(*msg_id),
             WireMessage::GetLinksReq { msg_id, .. } => Some(*msg_id),

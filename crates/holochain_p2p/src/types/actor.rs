@@ -289,7 +289,7 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
         dht_hash: holo_hash::AnyDhtHash,
     ) -> BoxFut<'_, HolochainP2pResult<Vec<WireOps>>>;
 
-    /// Get an entry from the DHT.
+    /// Get a chain op by type from the DHT.
     fn get_by_op_type(
         &self,
         dna_hash: DnaHash,
