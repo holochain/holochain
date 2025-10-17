@@ -135,9 +135,7 @@ async fn retry_publish_until_receipts_received() {
     let op_hash = create_op(vault.clone(), agent.clone()).await.unwrap();
 
     let mut network = MockHolochainP2pDnaT::new();
-    network
-        .expect_publish()
-        .returning(|_, _, _, _, _| Ok(()));
+    network.expect_publish().returning(|_, _, _, _, _| Ok(()));
 
     let (tx, rx) =
         TriggerSender::new_with_loop(Duration::from_secs(5)..Duration::from_secs(30), true);
@@ -189,9 +187,7 @@ async fn loop_resumes_on_new_data() {
     let agent = fixt!(AgentPubKey);
 
     let mut network = MockHolochainP2pDnaT::new();
-    network
-        .expect_publish()
-        .returning(|_, _, _, _, _| Ok(()));
+    network.expect_publish().returning(|_, _, _, _, _| Ok(()));
 
     let (tx, rx) =
         TriggerSender::new_with_loop(Duration::from_secs(5)..Duration::from_secs(30), true);
