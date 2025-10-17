@@ -6,6 +6,7 @@ use holochain_p2p::actor;
 use holochain_state::prelude::{
     insert_op_dht, set_validation_status, set_when_integrated, test_dht_db,
 };
+use rand::seq::IteratorRandom;
 #[cfg(feature = "unstable-warrants")]
 use {crate::authority::handle_get_agent_activity, holochain_types::activity::ChainItems};
 
@@ -145,9 +146,20 @@ async fn get_op_by_type() {
         ChainOpType::RegisterRemoveLink,
     ];
 
-    let expected_validation_status = ValidationStatus::Valid;
+    let validation_statuses = vec![
+        ValidationStatus::Abandoned,
+        ValidationStatus::Rejected,
+        ValidationStatus::Valid,
+    ];
 
     for op_type in op_types {
+        // Use a random validation status for each op type.
+        let expected_validation_status = validation_statuses
+            .iter()
+            .choose(&mut rand::rng())
+            .unwrap()
+            .clone();
+
         // Create an action
         let expected_chain_op = create_test_chain_op(op_type);
         let action_hash = expected_chain_op.action().to_hash();
@@ -178,8 +190,15 @@ async fn get_op_by_type() {
                 .await
                 .unwrap()
                 .unwrap();
-        assert_eq!(chain_op.0.data, expected_chain_op);
-        assert_eq!(chain_op.0.status, Some(expected_validation_status));
+        assert_eq!(
+            chain_op.0.data, expected_chain_op,
+            "Failed for op type: {op_type:?}"
+        );
+        assert_eq!(
+            chain_op.0.status,
+            Some(expected_validation_status),
+            "Failed for op type: {op_type:?}"
+        );
     }
 }
 
