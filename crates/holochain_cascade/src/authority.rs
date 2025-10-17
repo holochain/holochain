@@ -7,6 +7,7 @@ use self::get_record_query::GetRecordOpsQuery;
 use super::error::CascadeResult;
 use crate::authority::get_agent_activity_query::hashes::GetAgentActivityHashesQuery;
 use crate::authority::get_agent_activity_query::records::GetAgentActivityRecordsQuery;
+use get_chain_op_by_type_query::GetChainOpByTypeQuery;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holochain_state::query::link::GetLinksQuery;
@@ -18,6 +19,7 @@ use holochain_types::prelude::*;
 mod test;
 
 pub(crate) mod get_agent_activity_query;
+pub(crate) mod get_chain_op_by_type_query;
 pub(crate) mod get_entry_ops_query;
 pub(crate) mod get_links_ops_query;
 pub(crate) mod get_record_query;
@@ -46,6 +48,21 @@ pub async fn handle_get_record(
         .read_async(move |txn| query.run(CascadeTxnWrapper::from(txn)))
         .await?;
     Ok(results)
+}
+
+/// Handler for get_by_op_type query to a Record authority
+// TODO: for sharding to work, this must be the authority of the op type
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(env)))]
+pub async fn handle_get_by_op_type(
+    env: DbRead<DbKindDht>,
+    action_hash: ActionHash,
+    op_type: ChainOpType,
+) -> CascadeResult<WireMaybeOpByType> {
+    let query = GetChainOpByTypeQuery::new(action_hash, op_type);
+    let result = env
+        .read_async(move |txn| query.run(CascadeTxnWrapper::from(txn)))
+        .await?;
+    Ok(result)
 }
 
 /// Handler for get_agent_activity query to an Activity authority.

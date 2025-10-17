@@ -241,14 +241,6 @@ async fn get_updated_then_deleted_action() {
     assert!(maybe_record.is_none());
 }
 
-#[test]
-fn re() {
-    let r = RecordEntry::new(None, None::<Entry>);
-    println!("r {r:?}");
-    let r = RecordEntry::new(Some(&EntryVisibility::Private), None::<Entry>);
-    println!("r {r:?}");
-}
-
 // Correctness tests for zero arc nodes.
 mod zero_arc {
     use super::*;
