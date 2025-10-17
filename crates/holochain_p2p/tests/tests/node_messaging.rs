@@ -28,7 +28,6 @@ impl HcP2pHandler for UnresponsiveHandler {
     fn handle_publish(
         &self,
         _dna_hash: DnaHash,
-        _request_validation_receipt: bool,
         _ops: Vec<holochain_types::dht_op::DhtOp>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(std::future::pending())
@@ -270,7 +269,6 @@ async fn test_publish() {
 
             hc2.publish(
                 dna_hash.clone(),
-                false,
                 HoloHash::from_raw_36_and_type(
                     op_hash.get_raw_36().to_vec(),
                     holo_hash::hash_type::AnyLinkable::Action,
@@ -314,7 +312,6 @@ async fn test_publish_reflect() {
 
             hc2.publish(
                 dna_hash.clone(),
-                false,
                 HoloHash::from_raw_36_and_type(
                     op_hash.get_raw_36().to_vec(),
                     holo_hash::hash_type::AnyLinkable::Action,

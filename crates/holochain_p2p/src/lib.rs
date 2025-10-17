@@ -125,7 +125,6 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
     #[allow(clippy::ptr_arg)]
     async fn publish(
         &self,
-        request_validation_receipt: bool,
         basis_hash: holo_hash::OpBasis,
         source: AgentPubKey,
         op_hash_list: Vec<DhtOpHash>,
@@ -289,7 +288,6 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     /// Publish data to the correct neighborhood.
     async fn publish(
         &self,
-        request_validation_receipt: bool,
         basis_hash: holo_hash::OpBasis,
         source: AgentPubKey,
         op_hash_list: Vec<DhtOpHash>,
@@ -299,7 +297,6 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         self.sender
             .publish(
                 self.dna_hash(),
-                request_validation_receipt,
                 basis_hash,
                 source,
                 op_hash_list,

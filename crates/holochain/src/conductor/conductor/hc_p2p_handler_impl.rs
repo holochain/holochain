@@ -34,12 +34,11 @@ impl holochain_p2p::event::HcP2pHandler for Conductor {
     fn handle_publish(
         &self,
         dna_hash: DnaHash,
-        request_validation_receipt: bool,
         ops: Vec<holochain_types::dht_op::DhtOp>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
             self.spaces
-                .handle_publish(&dna_hash, request_validation_receipt, ops)
+                .handle_publish(&dna_hash, ops)
                 .await
                 .map_err(HolochainP2pError::other)
         })

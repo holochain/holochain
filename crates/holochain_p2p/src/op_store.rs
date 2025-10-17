@@ -107,7 +107,7 @@ impl OpStore for HolochainOpStore {
             self.sender
                 .get()
                 .ok_or_else(|| K2Error::other("event handler not registered"))?
-                .handle_publish(self.dna_hash.clone(), false, dht_ops)
+                .handle_publish(self.dna_hash.clone(), dht_ops)
                 .await
                 .map_err(|e| K2Error::other_src("Failed to publish incoming ops", e))?;
 

@@ -86,7 +86,6 @@ pub trait HcP2pHandler: 'static + Send + Sync + std::fmt::Debug {
     fn handle_publish(
         &self,
         dna_hash: DnaHash,
-        request_validation_receipt: bool,
         ops: Vec<holochain_types::dht_op::DhtOp>,
     ) -> BoxFut<'_, HolochainP2pResult<()>>;
 
