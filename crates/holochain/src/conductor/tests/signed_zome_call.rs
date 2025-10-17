@@ -384,27 +384,34 @@ async fn grant_zome_call_capability_call() {
         .await
         .expect("failed to init cell");
 
+    // Wait for integration workflow to complete
+    retry_fn_until_timeout(
+        || async { conductor.all_ops_integrated(dna.dna_hash()).unwrap() },
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+
+    // Take state dump before calling grant_zome_call_capability
     let before_state_dump = conductor
         .raw_handle()
         .dump_full_cell_state(cell_id, None)
         .await
         .expect("Failed to get state dump");
 
-    // create a new cap grant entry
-    let cap_grant = ZomeCallCapGrant {
-        tag: "signing_key".into(),
-        functions: granted_functions,
-        access: CapAccess::Assigned {
-            secret: cap_access_secret,
-            assignees,
-        },
-    };
-
-    // create a new cap grant entry
+    // call grant_zome_call_capability
     let _ = conductor
         .grant_zome_call_capability(GrantZomeCallCapabilityPayload {
             cell_id: cell_id.clone(),
-            cap_grant: cap_grant.clone(),
+            cap_grant: ZomeCallCapGrant {
+                tag: "signing_key".into(),
+                functions: granted_functions,
+                access: CapAccess::Assigned {
+                    secret: cap_access_secret,
+                    assignees,
+                },
+            },
         })
         .await
         .unwrap();
@@ -434,12 +441,14 @@ async fn grant_zome_call_capability_call() {
     .await
     .unwrap();
 
-    // 2 new DhtOps for cap grant are integrated into the source chain
+    // Take state dump after calling grant_zome_call_capability
     let after_state_dump = conductor
         .raw_handle()
         .dump_full_cell_state(cell_id, None)
         .await
         .expect("Failed to get state dump");
+
+    // 2 new DhtOps for cap grant are integrated into the source chain
     assert_eq!(
         after_state_dump.integration_dump.integrated.len()
             - before_state_dump.integration_dump.integrated.len(),
