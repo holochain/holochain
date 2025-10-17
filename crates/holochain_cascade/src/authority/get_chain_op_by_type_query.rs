@@ -52,7 +52,7 @@ impl Query for GetChainOpByTypeQuery {
     }
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
-        let op_type = self.1.clone();
+        let op_type = self.1;
         let f = move |row: &Row| {
             let action =
                 from_blob::<SignedAction>(row.get(row.as_ref().column_index("action_blob")?)?)?;
