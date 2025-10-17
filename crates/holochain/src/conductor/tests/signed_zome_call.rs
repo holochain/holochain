@@ -491,13 +491,22 @@ async fn revoke_zome_call_capability_call() {
         .await
         .unwrap();
 
-    let mut cell_set = HashSet::new();
-    cell_set.insert(cell_id.clone());
+    // Wait for integration workflow to complete
+    retry_fn_until_timeout(
+        || async { conductor.all_ops_integrated(dna.dna_hash()).unwrap() },
+        None,
+        None,
+    )
+    .await
+    .unwrap();
 
     // get the cap grant info, not including revoked grants
+    let mut cell_set = HashSet::new();
+    cell_set.insert(cell_id.clone());
     let cap_info = conductor.capability_grant_info(&cell_set, false).await;
     assert!(cap_info.is_ok());
 
+    // Take a state dump, before calling revoke_zome_call_capability
     let before_state_dump = conductor
         .raw_handle()
         .dump_full_cell_state(cell_id, None)
@@ -518,6 +527,13 @@ async fn revoke_zome_call_capability_call() {
     )
     .await
     .unwrap();
+
+    // Take a state dump, after calling revoke_zome_call_capability
+    let after_state_dump = conductor
+        .raw_handle()
+        .dump_full_cell_state(cell_id, None)
+        .await
+        .expect("Failed to get state dump");
 
     // if we get WITHOUT REVOKED, we should not find the cap grant
 
@@ -556,11 +572,6 @@ async fn revoke_zome_call_capability_call() {
         .lt(&cap_cell_info.revoked_at.unwrap()));
 
     // 4 new DhtOps for cap grant revocation are integrated into the source chain
-    let after_state_dump = conductor
-        .raw_handle()
-        .dump_full_cell_state(cell_id, None)
-        .await
-        .expect("Failed to get state dump");
     assert_eq!(
         after_state_dump.integration_dump.integrated.len()
             - before_state_dump.integration_dump.integrated.len(),
