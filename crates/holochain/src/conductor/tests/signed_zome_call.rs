@@ -510,6 +510,15 @@ async fn revoke_zome_call_capability_call() {
         .await
         .expect("Failed to revoke zome call capability");
 
+    // Wait for integration workflow to complete
+    retry_fn_until_timeout(
+        || async { conductor.all_ops_integrated(dna.dna_hash()).unwrap() },
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+
     // if we get WITHOUT REVOKED, we should not find the cap grant
 
     let cap_info = conductor
@@ -545,15 +554,6 @@ async fn revoke_zome_call_capability_call() {
     assert!(cap_cell_info
         .created_at
         .lt(&cap_cell_info.revoked_at.unwrap()));
-
-    // Wait for integration workflow to complete
-    retry_fn_until_timeout(
-        || async { conductor.all_ops_integrated(dna.dna_hash()).unwrap() },
-        None,
-        None,
-    )
-    .await
-    .unwrap();
 
     // 4 new DhtOps for cap grant revocation are integrated into the source chain
     let after_state_dump = conductor
