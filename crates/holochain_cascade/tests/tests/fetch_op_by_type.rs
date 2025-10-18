@@ -84,7 +84,7 @@ async fn fetch_op_by_type_over_network() {
         .with_network(bob_network, bob_cache.to_db());
 
     // Test all ChainOpType variants
-    let op_types = vec![
+    let op_types = [
         ChainOpType::StoreRecord,
         ChainOpType::StoreEntry,
         ChainOpType::RegisterAgentActivity,
@@ -101,7 +101,7 @@ async fn fetch_op_by_type_over_network() {
         let action_hash = chain_op.action().to_hash();
 
         // Use a random validation status for each op type.
-        let validation_statuses = vec![
+        let validation_statuses = [
             ValidationStatus::Abandoned,
             ValidationStatus::Rejected,
             ValidationStatus::Valid,
@@ -110,7 +110,7 @@ async fn fetch_op_by_type_over_network() {
             .iter()
             .choose(&mut rand::rng())
             .unwrap()
-            .clone();
+            .to_owned();
 
         let maybe_chain_op = bob_cascade
             .fetch_op_by_type(action_hash.clone(), chain_op.get_type())
