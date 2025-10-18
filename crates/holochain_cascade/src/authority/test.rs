@@ -134,7 +134,7 @@ async fn get_op_by_type() {
     let db = test_dht_db();
 
     // Test all ChainOpType variants
-    let op_types = vec![
+    let op_types = [
         ChainOpType::StoreRecord,
         ChainOpType::StoreEntry,
         ChainOpType::RegisterAgentActivity,
@@ -146,7 +146,7 @@ async fn get_op_by_type() {
         ChainOpType::RegisterRemoveLink,
     ];
 
-    let validation_statuses = vec![
+    let validation_statuses = [
         ValidationStatus::Abandoned,
         ValidationStatus::Rejected,
         ValidationStatus::Valid,
@@ -158,7 +158,7 @@ async fn get_op_by_type() {
             .iter()
             .choose(&mut rand::rng())
             .unwrap()
-            .clone();
+            .to_owned();
 
         // Create an action
         let expected_chain_op = create_test_chain_op(op_type);
