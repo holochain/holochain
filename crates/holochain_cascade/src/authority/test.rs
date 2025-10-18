@@ -1,11 +1,12 @@
 use super::*;
 use crate::test_utils::*;
 #[cfg(feature = "unstable-warrants")]
-use holo_hash::fixt::ActionHashFixturator;
-#[cfg(feature = "unstable-warrants")]
-use holo_hash::fixt::AgentPubKeyFixturator;
+use holo_hash::fixt::{ActionHashFixturator, AgentPubKeyFixturator};
 use holochain_p2p::actor;
-use holochain_state::prelude::test_dht_db;
+use holochain_state::prelude::{
+    insert_op_dht, set_validation_status, set_when_integrated, test_dht_db,
+};
+use rand::seq::IteratorRandom;
 #[cfg(feature = "unstable-warrants")]
 use {crate::authority::handle_get_agent_activity, holochain_types::activity::ChainItems};
 
@@ -124,6 +125,81 @@ async fn get_record() {
         entry: td.any_entry.clone(),
     };
     assert_eq!(result, expected);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn get_op_by_type() {
+    // Reusing the same database for all queries to test that
+    // query filters are accurate.
+    let db = test_dht_db();
+
+    // Test all ChainOpType variants
+    let op_types = [
+        ChainOpType::StoreRecord,
+        ChainOpType::StoreEntry,
+        ChainOpType::RegisterAgentActivity,
+        ChainOpType::RegisterUpdatedContent,
+        ChainOpType::RegisterUpdatedRecord,
+        ChainOpType::RegisterDeletedBy,
+        ChainOpType::RegisterDeletedEntryAction,
+        ChainOpType::RegisterAddLink,
+        ChainOpType::RegisterRemoveLink,
+    ];
+
+    let validation_statuses = [
+        ValidationStatus::Abandoned,
+        ValidationStatus::Rejected,
+        ValidationStatus::Valid,
+    ];
+
+    for op_type in op_types {
+        // Use a random validation status for each op type.
+        let expected_validation_status = validation_statuses
+            .iter()
+            .choose(&mut rand::rng())
+            .unwrap()
+            .to_owned();
+
+        // Create an action
+        let expected_chain_op = create_test_chain_op(op_type);
+        let action_hash = expected_chain_op.action().to_hash();
+
+        // Check that the call returns None while the DB is empty.
+        let maybe_chain_op = handle_get_by_op_type(
+            db.to_db().into(),
+            action_hash.clone(),
+            expected_chain_op.get_type(),
+        )
+        .await
+        .unwrap();
+        assert!(maybe_chain_op.is_none());
+
+        // Insert op into DHT database and set validation status.
+        db.test_write({
+            let chain_op = expected_chain_op.clone();
+            move |txn| {
+                let dht_op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(chain_op)));
+                insert_op_dht(txn, &dht_op, 0, None).unwrap();
+                set_validation_status(txn, &dht_op.hash, expected_validation_status).unwrap();
+                set_when_integrated(txn, &dht_op.hash, Timestamp::now()).unwrap();
+            }
+        });
+
+        let chain_op =
+            handle_get_by_op_type(db.to_db().into(), action_hash, expected_chain_op.get_type())
+                .await
+                .unwrap()
+                .unwrap();
+        assert_eq!(
+            chain_op.0.data, expected_chain_op,
+            "Failed for op type: {op_type:?}"
+        );
+        assert_eq!(
+            chain_op.0.status,
+            Some(expected_validation_status),
+            "Failed for op type: {op_type:?}"
+        );
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]

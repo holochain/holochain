@@ -424,6 +424,23 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
         })
     }
 
+    /// a remote node is asking us for a chain op by type
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
+    fn handle_get_by_op_type(
+        &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
+        action_hash: ActionHash,
+        op_type: ChainOpType,
+    ) -> BoxFut<'_, HolochainP2pResult<WireMaybeOpByType>> {
+        Box::pin(async move {
+            let db = self.space.dht_db.clone();
+            authority::handle_get_by_op_type(db.into(), action_hash, op_type)
+                .await
+                .map_err(HolochainP2pError::other)
+        })
+    }
+
     /// a remote node is asking us for metadata
     #[cfg_attr(
         feature = "instrument",

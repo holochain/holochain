@@ -16,7 +16,7 @@ use holochain_types::{
         ValidationStatus,
     },
 };
-use holochain_zome_types::{Action, Entry};
+use holochain_zome_types::Action;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_action_from_authored() {
@@ -239,14 +239,6 @@ async fn get_updated_then_deleted_action() {
         .await
         .unwrap();
     assert!(maybe_record.is_none());
-}
-
-#[test]
-fn re() {
-    let r = RecordEntry::new(None, None::<Entry>);
-    println!("r {r:?}");
-    let r = RecordEntry::new(Some(&EntryVisibility::Private), None::<Entry>);
-    println!("r {r:?}");
 }
 
 // Correctness tests for zero arc nodes.

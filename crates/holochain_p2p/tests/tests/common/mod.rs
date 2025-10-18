@@ -78,6 +78,22 @@ impl HcP2pHandler for Handler {
         })
     }
 
+    fn handle_get_by_op_type(
+        &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
+        _action_hash: ActionHash,
+        _op_type: ChainOpType,
+    ) -> BoxFut<'_, HolochainP2pResult<WireMaybeOpByType>> {
+        Box::pin(async move {
+            self.calls.lock().unwrap().push("get_by_op_type".into());
+            Ok(Some(WireOpByType(Judged {
+                data: ChainOp::RegisterAgentActivity(fixt!(Signature), fixt!(Action)),
+                status: Some(ValidationStatus::Valid),
+            })))
+        })
+    }
+
     fn handle_get_meta(
         &self,
         _dna_hash: DnaHash,

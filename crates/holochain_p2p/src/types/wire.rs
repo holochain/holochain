@@ -71,6 +71,16 @@ pub enum WireMessage {
         msg_id: u64,
         response: WireOps,
     },
+    GetByOpTypeReq {
+        msg_id: u64,
+        to_agent: AgentPubKey,
+        action_hash: ActionHash,
+        op_type: ChainOpType,
+    },
+    GetByOpTypeRes {
+        msg_id: u64,
+        response: WireMaybeOpByType,
+    },
     GetMetaReq {
         msg_id: u64,
         to_agent: AgentPubKey,
@@ -167,6 +177,8 @@ impl WireMessage {
             WireMessage::CallRemoteRes { msg_id, .. } => Some(*msg_id),
             WireMessage::GetReq { msg_id, .. } => Some(*msg_id),
             WireMessage::GetRes { msg_id, .. } => Some(*msg_id),
+            WireMessage::GetByOpTypeReq { msg_id, .. } => Some(*msg_id),
+            WireMessage::GetByOpTypeRes { msg_id, .. } => Some(*msg_id),
             WireMessage::GetMetaReq { msg_id, .. } => Some(*msg_id),
             WireMessage::GetMetaRes { msg_id, .. } => Some(*msg_id),
             WireMessage::GetLinksReq { msg_id, .. } => Some(*msg_id),
@@ -222,6 +234,29 @@ impl WireMessage {
     /// Incoming "Get" response.
     pub fn get_res(msg_id: u64, response: WireOps) -> WireMessage {
         Self::GetRes { msg_id, response }
+    }
+
+    /// Outgoing "GetByOpType" request.
+    pub fn get_by_op_type_req(
+        to_agent: AgentPubKey,
+        action_hash: ActionHash,
+        op_type: ChainOpType,
+    ) -> (u64, WireMessage) {
+        let msg_id = next_msg_id();
+        (
+            msg_id,
+            Self::GetByOpTypeReq {
+                msg_id,
+                to_agent,
+                action_hash,
+                op_type,
+            },
+        )
+    }
+
+    /// Incoming "GetByOpType" response.
+    pub fn get_by_op_type_res(msg_id: u64, response: WireMaybeOpByType) -> WireMessage {
+        Self::GetByOpTypeRes { msg_id, response }
     }
 
     /// Outgoing "GetMeta" request.
