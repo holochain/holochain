@@ -238,7 +238,6 @@ async fn signed_zome_call_wildcard() {
 #[cfg(feature = "test_utils")]
 async fn cap_grant_info_call() {
     use crate::test_utils::host_fn_caller::HostFnCaller;
-    use std::collections::HashSet;
 
     let zome = TestWasm::Create;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
@@ -351,8 +350,6 @@ async fn cap_grant_info_call() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn grant_zome_call_capability_call() {
-    use std::collections::HashSet;
-
     let zome = TestWasm::Create;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
     let mut conductor = SweetConductor::from_standard_config().await;
@@ -453,6 +450,88 @@ async fn grant_zome_call_capability_call() {
         after_state_dump.integration_dump.integrated.len()
             - before_state_dump.integration_dump.integrated.len(),
         2
+    );
+    assert_eq!(after_state_dump.integration_dump.integration_limbo.len(), 0);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn grant_zome_call_capability_call_ensures_zome_initialization() {
+    let zome = TestWasm::InitPass;
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let app = conductor.setup_app("app", [&dna]).await.unwrap();
+    let cell_id = app.cells()[0].cell_id();
+
+    // generate a cap access public key
+    let cap_access_public_key = fixt!(AgentPubKey, ::fixt::Predictable, 1);
+
+    // compute a cap access secret
+    let cap_access_secret: CapSecret = [0; 64].into();
+
+    // set up functions to grant access to
+    let mut functions = HashSet::new();
+    let granted_function: GrantedFunction = ("create_entry".into(), "get_entry".into());
+    functions.insert(granted_function.clone());
+    let granted_functions = GrantedFunctions::Listed(functions);
+    // set up assignees which is only the agent key
+    let mut assignees = BTreeSet::new();
+    assignees.insert(cap_access_public_key.clone());
+
+    // Wait for initialize zomes workflow and integration workflow to complete
+    retry_fn_until_timeout(
+        || async { conductor.all_ops_integrated(dna.dna_hash()).unwrap() },
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+
+    // Take state dump before calling grant_zome_call_capability
+    let before_state_dump = conductor
+        .raw_handle()
+        .dump_full_cell_state(cell_id, None)
+        .await
+        .expect("Failed to get state dump");
+
+    // call grant_zome_call_capability
+    let _ = conductor
+        .grant_zome_call_capability(GrantZomeCallCapabilityPayload {
+            cell_id: cell_id.clone(),
+            cap_grant: ZomeCallCapGrant {
+                tag: "signing_key".into(),
+                functions: granted_functions,
+                access: CapAccess::Assigned {
+                    secret: cap_access_secret,
+                    assignees,
+                },
+            },
+        })
+        .await
+        .unwrap();
+
+    // Wait for initialize zomes workflow and integration workflow to complete
+    retry_fn_until_timeout(
+        || async { conductor.all_ops_integrated(dna.dna_hash()).unwrap() },
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+
+    // Take state dump after calling grant_zome_call_capability
+    let after_state_dump = conductor
+        .raw_handle()
+        .dump_full_cell_state(cell_id, None)
+        .await
+        .expect("Failed to get state dump");
+
+    // 4 new DhtOps are integrated into the source chain:
+    // - 2 from the zome initialization workflow
+    // - 2 for the newly created cap grant
+    assert_eq!(
+        after_state_dump.integration_dump.integrated.len()
+            - before_state_dump.integration_dump.integrated.len(),
+        4
     );
     assert_eq!(after_state_dump.integration_dump.integration_limbo.len(), 0);
 }
@@ -585,6 +664,63 @@ async fn revoke_zome_call_capability_call() {
         after_state_dump.integration_dump.integrated.len()
             - before_state_dump.integration_dump.integrated.len(),
         4
+    );
+    assert_eq!(after_state_dump.integration_dump.integration_limbo.len(), 0);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn revoke_zome_call_capability_call_ensures_zome_initialization() {
+    use crate::fixt::ActionHashFixturator;
+
+    let zome = TestWasm::InitPass;
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let app = conductor.setup_app("app", [&dna]).await.unwrap();
+    let cell_id = app.cells()[0].cell_id();
+
+    // Wait for integration workflow to complete
+    retry_fn_until_timeout(
+        || async { conductor.all_ops_integrated(dna.dna_hash()).unwrap() },
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+
+    // Take a state dump, before calling revoke_zome_call_capability
+    let before_state_dump = conductor
+        .raw_handle()
+        .dump_full_cell_state(cell_id, None)
+        .await
+        .expect("Failed to get state dump");
+
+    // try to revoke a non-existent cap grant entry, which fails
+    let _ = conductor
+        .revoke_zome_call_capability(cell_id.clone(), fixt!(ActionHash).clone())
+        .await
+        .unwrap_err();
+
+    // Wait for integration workflow to complete
+    retry_fn_until_timeout(
+        || async { conductor.all_ops_integrated(dna.dna_hash()).unwrap() },
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+
+    // Take a state dump, after calling revoke_zome_call_capability
+    let after_state_dump = conductor
+        .raw_handle()
+        .dump_full_cell_state(cell_id, None)
+        .await
+        .expect("Failed to get state dump");
+
+    // 2 new DhtOps from zome initialization workflow are integrated into the source chain
+    assert_eq!(
+        after_state_dump.integration_dump.integrated.len()
+            - before_state_dump.integration_dump.integrated.len(),
+        2
     );
     assert_eq!(after_state_dump.integration_dump.integration_limbo.len(), 0);
 }
