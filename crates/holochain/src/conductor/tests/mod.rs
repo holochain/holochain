@@ -1,5 +1,6 @@
 mod agent_info;
 mod app_info;
+mod cell;
 mod cell_cloning;
 mod install_app_bundle;
 mod network_info;
