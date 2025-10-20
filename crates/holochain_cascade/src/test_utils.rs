@@ -184,7 +184,6 @@ impl HolochainP2pDnaT for PassThroughNetwork {
 
     async fn publish(
         &self,
-        _request_validation_receipt: bool,
         _basis_hash: holo_hash::OpBasis,
         _source: AgentPubKey,
         _op_hash_list: Vec<DhtOpHash>,

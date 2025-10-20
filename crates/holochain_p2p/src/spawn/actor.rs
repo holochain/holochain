@@ -76,14 +76,13 @@ impl event::HcP2pHandler for WrapEvtSender {
     fn handle_publish(
         &self,
         dna_hash: DnaHash,
-        request_validation_receipt: bool,
         ops: Vec<holochain_types::dht_op::DhtOp>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         let op_count = ops.len();
         timing_trace!(
             true,
             {
-                self.0.handle_publish(dna_hash, request_validation_receipt, ops)
+                self.0.handle_publish(dna_hash, ops)
             }, %op_count, a = "recv_publish")
     }
 
@@ -1438,7 +1437,6 @@ impl actor::HcP2p for HolochainP2pActor {
     fn publish(
         &self,
         dna_hash: DnaHash,
-        request_validation_receipt: bool,
         basis_hash: OpBasis,
         _source: AgentPubKey,
         op_hash_list: Vec<DhtOpHash>,
@@ -1452,7 +1450,7 @@ impl actor::HcP2p for HolochainP2pActor {
                 self.evt_sender
                     .get()
                     .ok_or_else(|| HolochainP2pError::other(EVT_REG_ERR))?
-                    .handle_publish(dna_hash.clone(), request_validation_receipt, reflect_ops)
+                    .handle_publish(dna_hash.clone(), reflect_ops)
                     .await?;
             }
 

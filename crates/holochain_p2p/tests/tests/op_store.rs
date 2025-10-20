@@ -43,7 +43,6 @@ impl HcP2pHandler for StubHost {
     fn handle_publish(
         &self,
         _dna_hash: DnaHash,
-        _request_validation_receipt: bool,
         ops: Vec<DhtOp>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         let db = self.db.clone();

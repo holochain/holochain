@@ -58,7 +58,6 @@ pub async fn publish_dht_ops_workflow(
         let (op_hash_list, op_data_list): (Vec<_>, Vec<_>) = list.into_iter().unzip();
         match network
             .publish(
-                true,
                 basis,
                 agent.clone(),
                 op_hash_list.clone(),

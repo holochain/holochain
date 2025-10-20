@@ -267,7 +267,6 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
     fn publish(
         &self,
         dna_hash: DnaHash,
-        request_validation_receipt: bool,
         basis_hash: holo_hash::OpBasis,
         source: AgentPubKey,
         op_hash_list: Vec<DhtOpHash>,

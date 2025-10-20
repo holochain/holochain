@@ -94,8 +94,6 @@ pub async fn incoming_dht_ops_workflow(
     space: Space,
     sys_validation_trigger: TriggerSender,
     ops: Vec<DhtOp>,
-    // This is no longer used, but keeping here to limit refactor
-    _request_validation_receipt: bool,
 ) -> WorkflowResult<()> {
     let Space {
         incoming_op_hashes,

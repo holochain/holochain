@@ -64,7 +64,6 @@ pub(crate) async fn witnessing_workflow(
                     .into_iter()
                     .map(|(_h, o)| o.into())
                     .collect(),
-                false,
             )
             .await?;
         }
