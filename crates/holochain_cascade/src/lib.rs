@@ -906,8 +906,8 @@ impl CascadeImpl {
 
         // If not found in Scratch, try to find in databases.
         if maybe_chain_top_action_seq.is_none() {
+            let mut txn_guards = self.get_txn_guards().await?;
             maybe_chain_top_action_seq = tokio::task::spawn_blocking({
-                let mut txn_guards = self.get_txn_guards().await?;
                 let author = author.clone();
                 let chain_top = filter.chain_top.clone();
                 move || {
@@ -928,10 +928,10 @@ impl CascadeImpl {
         let result = if let Some(chain_top_action_seq) = maybe_chain_top_action_seq {
             // If chain top action seq was found,
             // Get the filtered activity and warrants from each db store.
+            let mut txn_guards = self.get_txn_guards().await?;
             let (mut activity_lists, warrants_lists) = tokio::task::spawn_blocking({
                 let author = author.clone();
                 let filter = filter.clone();
-                let mut txn_guards = self.get_txn_guards().await?;
                 move || {
                     let mut activity = Vec::with_capacity(txn_guards.len() + 1);
 
