@@ -11,6 +11,15 @@ async fn check_or_run_zome_init_triggers_zome_initialization() {
     let app = conductor.setup_app("app", [&dna]).await.unwrap();
     let cell_id = app.cells()[0].cell_id();
 
+    // Wait for integration workflow to complete
+    retry_fn_until_timeout(
+        || async { conductor.all_ops_integrated(dna.dna_hash()).unwrap() },
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+
     // Take state dump before calling check_or_run_zome_init
     let before_state_dump = conductor
         .raw_handle()
