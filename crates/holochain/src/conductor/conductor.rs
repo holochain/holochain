@@ -2120,6 +2120,10 @@ mod misc_impls {
                 )
                 .await?;
 
+            self.cell_by_id(&cell_id)
+                .await?
+                .notify_authored_ops_moved_to_limbo();
+
             Ok(action_hash)
         }
 
@@ -2183,6 +2187,10 @@ mod misc_impls {
                     cell.holochain_p2p_dna().chc(),
                 )
                 .await?;
+
+            self.cell_by_id(&cell_id)
+                .await?
+                .notify_authored_ops_moved_to_limbo();
 
             Ok(action_hash)
         }
