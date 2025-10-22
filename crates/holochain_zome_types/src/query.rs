@@ -33,18 +33,16 @@ pub enum ChainQueryFilterRange {
     /// Do NOT apply any range filtering for this query.
     Unbounded,
     /// A range over source chain sequence numbers.
-    /// This is ambiguous over forking histories and so should NOT be used in
-    /// validation logic.
+    ///
+    /// This is ambiguous over forking histories.
+    ///
     /// Inclusive start, inclusive end.
     ActionSeqRange(u32, u32),
     /// A range over source chain action hashes.
-    /// This CAN be used in validation logic as forks are disambiguated.
-    /// Inclusive start and end (unlike std::ops::Range).
     ActionHashRange(ActionHash, ActionHash),
-    /// The terminating action hash and N preceeding records.
+    /// The terminating [`ActionHash`] and N preceding records.
+    ///
     /// N = 0 returns only the record with this `ActionHash`.
-    /// This CAN be used in validation logic as forks are not possible when
-    /// "looking up" towards genesis from some `ActionHash`.
     ActionHashTerminated(ActionHash, u32),
 }
 
@@ -63,26 +61,21 @@ impl Default for ChainQueryFilterRange {
 #[derive(
     serde::Serialize, serde::Deserialize, SerializedBytes, Default, PartialEq, Clone, Debug,
 )]
-// TODO: get feedback on whether it's OK to remove non_exhaustive
-// #[non_exhaustive]
 pub struct ChainQueryFilter {
     /// Limit the results to a range of records according to their actions.
     pub sequence_range: ChainQueryFilterRange,
-    /// Filter by EntryType
-    // NB: if this filter is set, you can't verify the results, so don't
-    //     use this in validation
+    /// Filter by a list of [`EntryType`]s.
     pub entry_type: Option<Vec<EntryType>>,
-    /// Filter by a list of `EntryHash`.
+    /// Filter by a set of [`EntryHash`]es.
     pub entry_hashes: Option<HashSet<EntryHash>>,
-    /// Filter by ActionType
-    // NB: if this filter is set, you can't verify the results, so don't
-    //     use this in validation
+    /// Filter by a list of [`ActionType`]s.
     pub action_type: Option<Vec<ActionType>>,
-    /// Include the entries for the actions. The source of chain data being used
-    /// must include entries -- when used with `hdk::chain::get_agent_activity`,
-    /// or when invoking one of the helper methods on `ChainQueryFilter` that
-    /// can be used with a vector of actions, this value is unused because the
-    /// entry data isn't available.
+    /// Include the entries for the actions.
+    ///
+    /// The source of chain data being used must include entries. When used with
+    /// `hdk::chain::get_agent_activity`, or when invoking one of the helper methods on
+    /// [`ChainQueryFilter`] that can be used with a vector of actions, this value is unused
+    /// because the entry data isn't available.
     pub include_entries: bool,
     /// The query should be ordered in descending order (default is ascending),
     /// when run as a database query. There is no provisioning for in-memory ordering.
