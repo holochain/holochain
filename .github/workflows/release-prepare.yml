@@ -223,14 +223,3 @@ jobs:
           echo "latest_holochain_release_version=${LATEST_HOLOCHAIN_RELEASE_VERSION}" >> $GITHUB_OUTPUT
           echo "release_branch=${RELEASE_BRANCH}" >> $GITHUB_OUTPUT
           echo "repo_nix_store_path=${STORE_PATH}" >> $GITHUB_OUTPUT
-
-      - name: Setup SSH session
-        uses: steveeJ-forks/action-upterm@main
-        if: ${{ failure() && inputs.debug == 'true' }}
-        env:
-          HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
-        with:
-          ## limits ssh access and adds the ssh public key for the user which triggered the workflow
-          limit-access-to-actor: true
-          ## limits ssh access and adds the ssh public keys of the listed GitHub users
-          limit-access-to-users: jost-s,ThetaSinner,cdunster,matthme,veeso,mattyg
