@@ -7,9 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Remove the `request_validation_receipt` from `holochain_p2p` and related code. Validation receipts are always requested and the parameter is no longer used. #5366
-- Implement removing a space (app network) when the last local agent leaves. This was already implemented by Kitsune2 but
-  hadn't yet been integrated into Holochain. #5351
+## 0.6.0-dev.30
+
+- Remove the `request_validation_receipt` from `holochain_p2p` and related code. Validation receipts are always requested and the parameter is no longer used. \#5366
+- Implement removing a space (app network) when the last local agent leaves. This was already implemented by Kitsune2 but hadn’t yet been integrated into Holochain. \#5351
 
 ## 0.6.0-dev.29
 
