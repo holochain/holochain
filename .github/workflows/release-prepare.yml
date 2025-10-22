@@ -44,13 +44,8 @@ on:
         type: string
         required: false
         default: "/var/tmp/holochain_repo"
-      CACHIX_REV:
-        type: string
-        required: true
     secrets:
       HRA_GITHUB_TOKEN:
-        required: true
-      CACHIX_SIGNING_KEY:
         required: true
       CACHIX_AUTH_TOKEN:
         required: true
@@ -76,7 +71,6 @@ jobs:
   prepare:
     env:
       HOLOCHAIN_REPO: ${{ inputs.HOLOCHAIN_REPO }}
-      CACHIX_REV: ${{ inputs.CACHIX_REV }}
     runs-on: ubuntu-latest
     outputs:
       latest_holochain_release_tag: ${{ steps.write-env-and-tag.outputs.latest_holochain_release_tag }}
@@ -87,18 +81,17 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Install nix
-        uses: cachix/install-nix-action@v26
+        uses: cachix/install-nix-action@v31
       - name: Setup cachix
-        uses: cachix/cachix-action@v14
+        uses: cachix/cachix-action@v16
         with:
           name: holochain-ci
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
-          installCommand: |
-            nix-env -if https://github.com/cachix/cachix/tarball/${CACHIX_REV:?} \
-              --substituters 'https://cache.nixos.org https://cachix.cachix.org' \
-              --trusted-public-keys 'cachix.cachix.org-1:eWNHQldwUO7G2VkjpnjDbWwy4KQ/HNxht7H4SSoMckM= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY='
+          # Avoid using the daemon to work out what paths to push, because it can't detect the `nix store --add` which
+          # is really the only useful thing to cache from this workflow!
+          useDaemon: false
       # - name: Set NIX_PATH (FIXME)
       #   run: echo NIX_PATH=nixpkgs=$(./scripts/nix_path.sh) >> $GITHUB_ENV
 
@@ -199,7 +192,7 @@ jobs:
         if: ${{ failure() }}
         run: sudo dmesg
 
-      - name: cache the repo and set outputs
+      - name: Cache the repo and set outputs
         id: write-env-and-tag
         env:
           HOLOCHAIN_REPO: ${{ inputs.HOLOCHAIN_REPO }}

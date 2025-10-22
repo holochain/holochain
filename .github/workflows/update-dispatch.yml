@@ -53,7 +53,7 @@ jobs:
         run: echo
       - name: Checkout repository
         if: ${{ steps.skip.outcome != 'skipped' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v45
       - name: Call the update action
         if: ${{ steps.skip.outcome != 'skipped' }}
         uses: ./.github/actions/update
@@ -63,7 +63,6 @@ jobs:
           update_cmd: ${{ matrix.update.cmd }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
-          CACHIX_SIGNING_KEY: ${{ secrets.CACHIX_SIGNING_KEY }}
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
   all-jobs-succeed:
     runs-on: "ubuntu-latest"
