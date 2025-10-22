@@ -1140,7 +1140,7 @@ pub trait Cascade {
         mut options: NetworkGetOptions,
     ) -> CascadeResult<Option<(EntryHashed, CascadeSource)>>;
 
-    /// Retrieve [`SignedActionHashed`] from either locally or from an authority.
+    /// Retrieve [`SignedActionHashed`] either locally or from an authority.
     /// Data might not have been validated yet by the authority.
     async fn retrieve_action(
         &self,
@@ -1148,8 +1148,11 @@ pub trait Cascade {
         mut options: NetworkGetOptions,
     ) -> CascadeResult<Option<(SignedActionHashed, CascadeSource)>>;
 
-    /// Retrieve data from either locally or from an authority.
+    /// Retrieve a complete [`Record`] either locally or from an authority.
     /// Data might not have been validated yet by the authority.
+    ///
+    /// If the [`Action`] has an associated [`Entry`] and the entry is not
+    /// available, `None` is returned.
     async fn retrieve(
         &self,
         hash: AnyDhtHash,
@@ -1229,16 +1232,10 @@ impl Cascade for CascadeImpl {
         hash: AnyDhtHash,
         options: NetworkGetOptions,
     ) -> CascadeResult<Option<(Record, CascadeSource)>> {
-        let private_data = self.private_data.clone();
         let result = self
             .find_map({
                 let hash = hash.clone();
-                move |store| {
-                    Ok(store.get_public_or_authored_record(
-                        &hash,
-                        private_data.as_ref().map(|a| a.as_ref()),
-                    )?)
-                }
+                move |store| Ok(store.get_complete_record(&hash)?)
             })
             .await?;
         if result.is_some() {
@@ -1246,15 +1243,9 @@ impl Cascade for CascadeImpl {
         }
         self.fetch_record(hash.clone(), options).await?;
 
-        let private_data = self.private_data.clone();
         // Check if we have the data now after the network call.
         let result = self
-            .find_map(move |store| {
-                Ok(store.get_public_or_authored_record(
-                    &hash,
-                    private_data.as_ref().map(|a| a.as_ref()),
-                )?)
-            })
+            .find_map(move |store| Ok(store.get_complete_record(&hash)?))
             .await?;
         Ok(result.map(|r| (r, CascadeSource::Network)))
     }

@@ -167,8 +167,12 @@ pub trait Store {
         check_valid: bool,
     ) -> StateQueryResult<Vec<WarrantOp>>;
 
-    /// Get an [`Record`] from this store.
+    /// Get a [`Record`] from this store which includes the [`Entry`] if present.
     fn get_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>>;
+
+    /// Get a [`Record`] from this store. If an [`Entry`] is associated with the [`Action`],
+    /// it will be included. But should the entry not be available, no record is returned.
+    fn get_complete_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>>;
 
     /// Get an [`Record`] from this store that is either public or
     /// authored by the given key.
@@ -411,6 +415,13 @@ impl Store for CascadeTxnWrapper<'_, '_> {
         }
     }
 
+    fn get_complete_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
+        match hash.clone().into_primitive() {
+            AnyDhtHashPrimitive::Entry(hash) => self.get_any_record(&hash),
+            AnyDhtHashPrimitive::Action(hash) => self.get_exact_complete_record(&hash),
+        }
+    }
+
     fn get_public_or_authored_record(
         &self,
         hash: &AnyDhtHash,
@@ -488,6 +499,47 @@ impl CascadeTxnWrapper<'_, '_> {
             Ok(Some(record??))
         }
     }
+
+    // This is nearly identical to get_exact_record, but it returns `None` if an entry
+    // associated to the action is not available.
+    fn get_exact_complete_record(&self, hash: &ActionHash) -> StateQueryResult<Option<Record>> {
+        let record = self.txn.query_row(
+            "
+            SELECT
+            Action.blob AS action_blob, Action.hash, Entry.blob as entry_blob
+            FROM Action
+            JOIN Entry ON Action.entry_hash = Entry.hash
+            WHERE
+            Action.hash = :hash
+            ",
+            named_params! {
+                ":hash": hash,
+            },
+            |row| {
+                let action =
+                    from_blob::<SignedAction>(row.get(row.as_ref().column_index("action_blob")?)?);
+                Ok(action.and_then(|action| {
+                    let (action, signature) = action.into();
+                    let hash: ActionHash = row.get(row.as_ref().column_index("hash")?)?;
+                    let action = ActionHashed::with_pre_hashed(action, hash);
+                    let shh = SignedActionHashed::with_presigned(action, signature);
+                    let entry: Option<Vec<u8>> =
+                        row.get(row.as_ref().column_index("entry_blob")?)?;
+                    let entry = match entry {
+                        Some(entry) => Some(from_blob::<Entry>(entry)?),
+                        None => None,
+                    };
+                    Ok(Record::new(shh, entry))
+                }))
+            },
+        );
+        if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &record {
+            Ok(None)
+        } else {
+            Ok(Some(record??))
+        }
+    }
+
     fn get_any_record(&self, hash: &EntryHash) -> StateQueryResult<Option<Record>> {
         let record = self.txn.query_row(
             "
@@ -696,6 +748,16 @@ impl Store for Txns<'_, '_> {
         Ok(None)
     }
 
+    fn get_complete_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
+        for txn in &self.txns {
+            let r = txn.get_complete_record(hash)?;
+            if r.is_some() {
+                return Ok(r);
+            }
+        }
+        Ok(None)
+    }
+
     fn get_public_or_authored_entry(
         &self,
         hash: &EntryHash,
@@ -797,6 +859,15 @@ impl Store for DbScratch<'_, '_> {
         let r = self.txns.get_record(hash)?;
         if r.is_none() {
             self.scratch.get_record(hash)
+        } else {
+            Ok(r)
+        }
+    }
+
+    fn get_complete_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
+        let r = self.txns.get_complete_record(hash)?;
+        if r.is_none() {
+            self.scratch.get_complete_record(hash)
         } else {
             Ok(r)
         }

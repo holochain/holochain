@@ -619,7 +619,19 @@ async fn retrieve_dependencies(
                         (hash, dep_type, fetched.map(|ok| ok.map(|(a, s)| (ValidationDependencyValue::Action(a), s))))
                     }
                     ValidationDependencyType::Warranted(chain_op_type) => {
-                        let fetched = cascade.retrieve_action(hash.clone(), Default::default()).await;
+                        let fetched = match chain_op_type {
+                            // These chain op types require the entry to be present.
+                            ChainOpType::StoreRecord |
+                            ChainOpType::StoreEntry |
+                            ChainOpType::RegisterUpdatedContent |
+                            ChainOpType::RegisterUpdatedRecord => {
+                                cascade.retrieve(hash.clone().into(), Default::default()).await.map(|ok|ok.map(|(a, s)|(a.signed_action, s)))
+                            }
+                            // Other top types can be constructed without an entry.
+                            _ => {
+                                cascade.retrieve_action(hash.clone(), Default::default()).await
+                            }
+                        };
                         tracing::trace!(hash = ?hash, fetched = ?fetched, "Fetched warranted record for validation");
                         (hash, dep_type, fetched.map(|ok| ok.map(|(a, s)| (ValidationDependencyValue::Warranted(WarrantedDep::Pending(a, chain_op_type)), s))))
                     }

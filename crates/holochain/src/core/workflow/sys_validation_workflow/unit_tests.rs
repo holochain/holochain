@@ -40,6 +40,11 @@ use holochain_zome_types::timestamp::Timestamp;
 use holochain_zome_types::Action;
 use std::collections::HashSet;
 use std::sync::Arc;
+#[cfg(feature = "unstable-warrants")]
+use {
+    hdk::prelude::EntryFixturator, holo_hash::HashableContentExtSync,
+    holochain_serialized_bytes::SerializedBytes, holochain_zome_types::Entry,
+};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_op_with_no_dependency() {
@@ -333,13 +338,15 @@ async fn validate_valid_warrant_with_cached_dependency() {
 
     // Warranted op, to be found in the cache
     let mut create = fixt!(Create);
+    let entry = fixt!(Entry);
     create.author = bad_agent.clone();
+    create.entry_hash = entry.to_hash();
     create.action_seq = 0; // Not allowed to have a 0 seq number for a Create
     let warranted_action = test_case.sign_action(Action::Create(create.clone())).await;
     let warranted_op = ChainOp::StoreRecord(
         fixt!(Signature),
         Action::Create(create),
-        crate::prelude::RecordEntry::NA,
+        crate::prelude::RecordEntry::Present(entry),
     )
     .into();
     test_case
@@ -410,7 +417,9 @@ async fn validate_valid_warrant_with_fetched_dependency() {
 
     // Warranted op, to be fetched from the network
     let mut create = fixt!(Create);
+    let entry = fixt!(Entry);
     create.author = bad_agent.clone();
+    create.entry_hash = entry.to_hash();
     create.action_seq = 0; // Not allowed to have a 0 seq number for a Create
     let warranted_action = test_case.sign_action(Action::Create(create.clone())).await;
 
@@ -419,6 +428,7 @@ async fn validate_valid_warrant_with_fetched_dependency() {
         move |_hash| {
             let mut ops: WireRecordOps = WireRecordOps::new();
             ops.action = Some(Judged::valid(warranted_action.clone().into()));
+            ops.entry = Some(entry);
             let response = WireOps::Record(ops);
             Ok(vec![response])
         }
@@ -492,13 +502,20 @@ async fn reject_invalid_warrant() {
 
     // Valid op, to be found in the DHT database
     let mut create = fixt!(Create);
+    let entry = Entry::app(SerializedBytes::default()).unwrap();
     create.author = good_agent.clone();
+    create.entry_hash = entry.to_hash();
+    create.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     create.action_seq = 30;
     let valid_action = test_case.sign_action(Action::Create(create.clone())).await;
     let valid_op = ChainOp::StoreRecord(
         fixt!(Signature),
         Action::Create(create),
-        crate::prelude::RecordEntry::NA,
+        crate::prelude::RecordEntry::Present(entry),
     );
     let valid_op_hash = DhtOpHashed::from_content_sync(valid_op.clone()).hash;
     test_case
@@ -596,13 +613,15 @@ async fn validate_warrant_with_validated_dependency() {
 
     // Valid op, to be found in the DHT database
     let mut create = fixt!(Create);
+    let entry = fixt!(Entry);
     create.author = good_agent.clone();
+    create.entry_hash = entry.to_hash();
     create.action_seq = 30;
     let valid_action = test_case.sign_action(Action::Create(create.clone())).await;
     let valid_op = ChainOp::StoreRecord(
         fixt!(Signature),
         Action::Create(create),
-        crate::prelude::RecordEntry::NA,
+        crate::prelude::RecordEntry::Present(entry),
     );
     let valid_op_hash = DhtOpHashed::from_content_sync(valid_op.clone()).hash;
     test_case
@@ -681,13 +700,15 @@ async fn avoid_duplicate_warrant() {
 
     // Invalid op
     let mut create = fixt!(Create);
+    let entry = fixt!(Entry);
     create.author = bad_agent.clone();
+    create.entry_hash = entry.to_hash();
     create.action_seq = 0; // Not allowed for a create op
     let valid_action = test_case.sign_action(Action::Create(create.clone())).await;
     let invalid_op = ChainOp::StoreRecord(
         fixt!(Signature),
         Action::Create(create),
-        crate::prelude::RecordEntry::NA,
+        crate::prelude::RecordEntry::Present(entry),
     );
     test_case
         .save_op_to_db(test_case.dht_db_handle(), invalid_op.into())
