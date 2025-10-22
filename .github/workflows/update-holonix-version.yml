@@ -20,10 +20,10 @@ jobs:
   update-holonix-version:
     runs-on: "ubuntu-latest"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: develop
-      - uses: cachix/install-nix-action@v26
+      - uses: cachix/install-nix-action@v31
       - name: Get tags
         run: git fetch --quiet --tags origin
       - name: Configure Git
