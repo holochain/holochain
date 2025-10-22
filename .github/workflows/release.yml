@@ -389,19 +389,6 @@ jobs:
           cd "${GITHUB_WORKSPACE}"
           ./scripts/ci-gh-release.sh
 
-      - name: Setup SSH session
-        uses: steveeJ-forks/action-upterm@main
-        if: ${{ failure() && needs.vars.outputs.debug == 'true' }}
-        env:
-          GITHUB_ACTION_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_HRA_ACTION_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        with:
-          ## limits ssh access and adds the ssh public key for the user which triggered the workflow
-          limit-access-to-actor: true
-          ## limits ssh access and adds the ssh public keys of the listed GitHub users
-          limit-access-to-users: jost-s,ThetaSinner,cdunster,matthme,veeso,mattyg
-
   github-actions-ci-jobs-succeed:
     if: ${{ always() && github.event_name == 'pull_request' }}
     runs-on: "ubuntu-latest"

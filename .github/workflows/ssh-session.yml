@@ -54,15 +54,3 @@ jobs:
           nix-shell --version
           nix --version
           pwd
-
-      - name: Setup SSH session
-        uses: lhotari/action-upterm@v1
-        env:
-          ORIG_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
-        if: ${{ always() }}
-        with:
-          ## limits ssh access and adds the ssh public key for the user which triggered the workflow
-          limit-access-to-actor: true
-          ## limits ssh access and adds the ssh public keys of the listed GitHub users
-          limit-access-to-users: jost-s,ThetaSinner,cdunster,matthme,veeso,mattyg
