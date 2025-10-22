@@ -1,5 +1,5 @@
 use hdk::prelude::{
-    ActivityRequest, CellId, ChainTopOrdering, CreateInput, EntryDef, EntryDefIndex,
+    ActionHashed, ActivityRequest, CellId, ChainTopOrdering, CreateInput, EntryDef, EntryDefIndex,
     EntryVisibility, GetAgentActivityInput, Op, SerializedBytes, ValidateCallbackResult,
 };
 use holo_hash::{ActionHash, DnaHash};
@@ -11,8 +11,20 @@ use holochain::{
     },
     test_utils::retry_fn_until_timeout,
 };
-use holochain_state::query::{CascadeTxnWrapper, Store};
+use holochain_sqlite::prelude::ReadAccess;
+use holochain_state::prelude::{
+    dump_db, insert_op_dht, set_validation_status, set_when_integrated,
+};
+use holochain_state::query::{from_blob, CascadeTxnWrapper, StateQueryResult, Store};
+use holochain_timestamp::Timestamp;
+use holochain_types::dht_op::DhtOpHashed;
+use holochain_types::prelude::WarrantOp;
+use holochain_zome_types::op::ChainOpType;
+use holochain_zome_types::prelude::{ChainIntegrityWarrant, ValidationStatus, Warrant};
+use holochain_zome_types::record::SignedAction;
+use holochain_zome_types::warrant::WarrantProof;
 use holochain_zome_types::Entry;
+use rusqlite::named_params;
 use serde::{Deserialize, Serialize};
 
 // Alice creates an invalid op and publishes it to Bob. Bob issues a warrant and
@@ -160,6 +172,164 @@ async fn warrant_is_gossiped() {
         Some(10_000),
         None,
     )
+    .await
+    .unwrap();
+}
+
+// Alice publishes a valid op, then Bob issues a warrant against her for an invalid op. Alice should
+// block Bob, since the warrant is invalid.
+#[tokio::test(flavor = "multi_thread")]
+async fn author_of_invalid_warrant_is_blocked() {
+    holochain_trace::test_run();
+
+    #[derive(Serialize, Deserialize, SerializedBytes, Debug)]
+    struct AppString(String);
+
+    let string_entry_def = EntryDef::default_from_id("string");
+    let inline_zome = SweetInlineZomes::new(vec![string_entry_def], 0)
+        .function("create_string", |api, s: String| {
+            let entry = Entry::app(AppString(s).try_into().unwrap()).unwrap();
+            let hash = api.create(CreateInput::new(
+                InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
+                EntryVisibility::Public,
+                entry,
+                ChainTopOrdering::default(),
+            ))?;
+            Ok(hash)
+        })
+        .integrity_function("validate", move |_api, _op: Op| {
+            Ok(ValidateCallbackResult::Valid)
+        });
+
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(inline_zome).await;
+
+    let config = SweetConductorConfig::standard();
+
+    let mut conductors = SweetConductorBatch::from_configs([config.clone(), config]).await;
+
+    let apps = conductors.setup_app("app", [&dna_file]).await.unwrap();
+
+    let ((alice,), (bob,)) = apps.into_tuples();
+
+    // Force full storage arcs so that Alice and Bob are valid publish targets for each other.
+    conductors[0]
+        .declare_full_storage_arcs(dna_file.dna_hash())
+        .await;
+    conductors[1]
+        .declare_full_storage_arcs(dna_file.dna_hash())
+        .await;
+    conductors.exchange_peer_info().await;
+
+    // Alice creates a valid action.
+    let valid_action_hash: ActionHash = conductors[0]
+        .call(
+            &alice.zome(SweetInlineZomes::COORDINATOR),
+            "create_string",
+            "text".to_string(),
+        )
+        .await;
+
+    // Wait for Alice and Bob to sync.
+    await_consistency(10, [&alice, &bob]).await.unwrap();
+
+    let alice_authored_db = conductors[0]
+        .get_spaces()
+        .get_or_create_authored_db(dna_file.dna_hash(), alice.agent_pubkey().clone())
+        .unwrap();
+    let action = alice_authored_db
+        .read_async(move |txn| -> StateQueryResult<SignedAction> {
+            let action: Vec<u8> = txn.query_row(
+                "SELECT blob FROM Action WHERE hash = :hash",
+                named_params! {":hash": valid_action_hash},
+                |row| row.get(0),
+            )?;
+
+            from_blob(action)
+        })
+        .await
+        .unwrap();
+
+    // Now Bob needs to create a warrant against Alice's perfectly valid action.
+    let warrant = Warrant::new(
+        WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+            action_author: alice.agent_pubkey().clone(),
+            action: (
+                ActionHashed::from_content_sync(action.action().clone()).hash,
+                action.signature().clone(),
+            ),
+            chain_op_type: ChainOpType::StoreRecord,
+        }),
+        bob.agent_pubkey().clone(),
+        Timestamp::now(),
+        alice.agent_pubkey().clone(),
+    );
+    let warrant_op = WarrantOp::sign(&conductors[1].keystore(), warrant)
+        .await
+        .unwrap();
+
+    // Insert the warrant into Bob's DHT database.
+    let warrant_op_hashed = DhtOpHashed::from_content_sync(warrant_op);
+
+    conductors[1]
+        .get_dht_db(dna_file.dna_hash())
+        .unwrap()
+        .test_write(move |txn| {
+            insert_op_dht(txn, &warrant_op_hashed, 0, None).unwrap();
+            set_validation_status(txn, &warrant_op_hashed.hash, ValidationStatus::Valid).unwrap();
+            set_when_integrated(txn, &warrant_op_hashed.hash, Timestamp::now()).unwrap();
+        });
+
+    // Wait for Alice and Bob to sync so that Alice receives the warrant.
+    await_consistency(10, [&alice, &bob]).await.unwrap();
+
+    tokio::time::timeout(std::time::Duration::from_secs(30), async {
+        loop {
+            tracing::error!("Looping to check for warrant and block...");
+
+            let alice_pubkey = alice.agent_pubkey().clone();
+            let warrants = conductors[0]
+                .get_dht_db(dna_file.dna_hash())
+                .unwrap()
+                .test_read(move |txn| {
+                    dump_db(txn);
+
+                    txn.query_row("select count(*) from Warrant", [], |r| r.get::<_, i32>(0))
+                        .map(|c| tracing::warn!("Warrant count: {}", c))
+                        .unwrap();
+
+                    let store = CascadeTxnWrapper::from(txn);
+                    store.get_warrants_for_agent(&alice_pubkey, false).unwrap()
+                });
+
+            tracing::warn!("Warrants: {:#?}", warrants);
+
+            // Alice should have stored the warrant against herself.
+            if !warrants.is_empty() {
+                break;
+            }
+
+            tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+        }
+
+        loop {
+            // Check that Bob gets blocked by Alice.
+            let target = hdk::prelude::BlockTargetId::Cell(CellId::new(
+                dna_file.dna_hash().clone(),
+                bob.agent_pubkey().clone(),
+            ));
+
+            if conductors[0]
+                .holochain_p2p()
+                .is_blocked(target)
+                .await
+                .unwrap()
+            {
+                break;
+            }
+
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+    })
     .await
     .unwrap();
 }
