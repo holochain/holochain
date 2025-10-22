@@ -25,11 +25,6 @@ on:
     - cron: "0 0 * * 3" # At 12:00am on Wednesday
   workflow_dispatch:
     inputs:
-      # holochain_url:
-      #   description: "holochain git repo url"
-      #   required: false
-      #   default: ""
-      #   type: string
       holochain_source_branch:
         description: "holochain source branch for the release"
         required: false
@@ -72,15 +67,12 @@ concurrency:
 
 env:
   HOLOCHAIN_REPO: "/var/tmp/holochain_repo"
-  CACHIX_REV: "v1.2"
 
 jobs:
   vars:
     runs-on: ubuntu-latest
     outputs:
       HOLOCHAIN_REPO: ${{ steps.eval.outputs.HOLOCHAIN_REPO }}
-      CACHIX_REV: ${{ steps.eval.outputs.CACHIX_REV}}
-      # holochain_url: ${{ steps.eval.outputs.holochain_url }}
       holochain_source_branch: ${{ steps.eval.outputs.holochain_source_branch }}
       holochain_target_branch: ${{ steps.eval.outputs.holochain_target_branch }}
       dry_run: ${{ steps.eval.outputs.dry_run }}
@@ -91,7 +83,6 @@ jobs:
       - name: evaluate variables
         id: eval
         env:
-          # input_holochain_url: ${{ github.event.inputs.holochain_url }}
           input_holochain_source_branch: ${{ github.event.inputs.holochain_source_branch }}
           input_holochain_target_branch: ${{ github.event.inputs.holochain_target_branch }}
           input_dry_run: ${{ github.event.inputs.dry_run}}
@@ -163,7 +154,6 @@ jobs:
           fi
 
           echo "HOLOCHAIN_REPO=${{ env.HOLOCHAIN_REPO }}" >> $GITHUB_OUTPUT
-          echo "CACHIX_REV=${{ env.CACHIX_REV }}" >> $GITHUB_OUTPUT
   prepare:
     needs: [vars]
     uses: ./.github/workflows/release-prepare.yml
@@ -174,9 +164,7 @@ jobs:
       HOLOCHAIN_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_source_branch }}
       HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
       HOLOCHAIN_REPO: ${{ needs.vars.outputs.HOLOCHAIN_REPO }}
-      CACHIX_REV: ${{ needs.vars.outputs.CACHIX_REV }}
     secrets:
-      CACHIX_SIGNING_KEY: ${{ secrets.CACHIX_AUTH_TOKEN }}
       CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
       HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN}}
 
@@ -196,19 +184,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Install nix
-        uses: cachix/install-nix-action@v26
+        uses: cachix/install-nix-action@v31
       - name: Setup cachix
-        uses: cachix/cachix-action@v14
-        if: ${{ ! contains(matrix.platform.runs-on, 'self-hosted') }}
+        uses: cachix/cachix-action@v16
         with:
           name: holochain-ci
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
-          installCommand: |
-            nix-env -if https://github.com/cachix/cachix/tarball/${CACHIX_REV} \
-              --substituters 'https://cache.nixos.org https://cachix.cachix.org' \
-              --trusted-public-keys 'cachix.cachix.org-1:eWNHQldwUO7G2VkjpnjDbWwy4KQ/HNxht7H4SSoMckM= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY='
 
       - name: Restore the holochain release repository
         env:

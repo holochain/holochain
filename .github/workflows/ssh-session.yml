@@ -21,21 +21,21 @@ jobs:
     runs-on: ${{ github.event.inputs.runs-on }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Extend space
         uses: ./.github/actions/extend-space
         if: ${{ github.event.inputs.runs-on == 'ubuntu-latest'  && github.event.inputs.extend-space == 'true' }}
 
       - name: Install nix
-        uses: cachix/install-nix-action@v26
+        uses: cachix/install-nix-action@v31
         if: ${{ github.event.inputs.runs-on != 'multi-arch' }}
         with:
           extra_nix_config: |
             experimental-features = flakes nix-command
 
       - name: Setup cachix
-        uses: cachix/cachix-action@v14
+        uses: cachix/cachix-action@v16
         if: ${{ matrix.platform.runs-on != 'multi-arch' }}
         with:
           name: holochain-ci
