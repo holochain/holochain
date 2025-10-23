@@ -753,7 +753,7 @@ where
         let mut records = self
             .vault
             .read_async({
-                let mut query = query.clone();
+                let query = query.clone();
                 move |txn| {
                     // This type is similar to what `named_params!` from rusqlite creates, except for the use of
                     // boxing to allow references to be passed to the query. The reserved capacity here should
@@ -780,63 +780,19 @@ where
                         );
                     }
 
-                    let add_entry_type_filter = |query: QueryFilter, mut sql: String,
-                                                 mut args: Vec<(String, Box<dyn rusqlite::ToSql>)>,
-                                                 | -> (QueryFilter, String, Vec<(String, Box<dyn rusqlite::ToSql>)>) {
-                        if let Some(entry_types) = &query.entry_type {
-                            if !entry_types.is_empty() {
-                                args.push((":entry_type".to_string(), Box::new(entry_types[0].as_sql())));
-                                for i in 1..entry_types.len() {
-                                    args.push((format!(":entry_type_{i}"), Box::new(entry_types[i].as_sql())));
-                                }
-
-                                sql.push_str(
-                                    format!("Action.entry_type IN ({})",
-                                            named_param_seq("entry_type", entry_types.len())).as_str(),
-                                );
-                            }
-                        }
-
-                        (query, sql, args)
-                    };
-
-                    let add_action_type_filter = |sql: &mut String,
-                                                  args: &mut Vec<(String, Box<dyn rusqlite::ToSql>)>,
-                                                  | {
-                        if let Some(action_types) = query.action_type {
-                            if !action_types.is_empty() {
-                                args.push((":action_type".to_string(), Box::new(action_types[0].as_sql())));
-                                for i in 1..action_types.len() {
-                                    args.push((format!(":action_type_{i}"), Box::new(action_types[i].as_sql())));
-                                }
-
-                                sql.push_str(
-                                    format!("Action.type IN ({})",
-                                            named_param_seq("action_type", action_types.len())).as_str(),
-                                );
-                            }
-                        }
-                    };
-
                     // Now start the WHERE clause
                     args.push((":author".to_string(), Box::new(author)));
                     sql.push_str(
                         "\nWHERE Action.author = :author",
                     );
 
-                    match query.sequence_range {
-                        ChainQueryFilterRange::Unbounded => {
-                            (query, sql, args) = add_entry_type_filter(query, sql, args);
-                            add_action_type_filter(&mut sql, &mut args);
-                        },
+                    match &query.sequence_range {
+                        ChainQueryFilterRange::Unbounded => {},
                         ChainQueryFilterRange::ActionSeqRange(start, end) => {
                             args.push((":range_start".to_string(), Box::new(start)));
                             args.push((":range_end".to_string(), Box::new(end)));
 
                             sql.push_str("\nAND Action.seq BETWEEN :range_start AND :range_end");
-
-                            (query, sql, args) =  add_entry_type_filter(query, sql, args);
-                            add_action_type_filter(&mut sql, &mut args);
                         }
                         ChainQueryFilterRange::ActionHashRange(start_action_hash, end_action_hash) => {
                             args.push((":range_start_hash".to_string(), Box::new(start_action_hash)));
@@ -858,6 +814,39 @@ where
                             (SELECT seq from Action WHERE hash = :range_end_hash)\
                             )");
                         }
+                    }
+
+                    match query.sequence_range {
+                        ChainQueryFilterRange::Unbounded | ChainQueryFilterRange::ActionSeqRange(_, _) => {
+                            if let Some(action_types) = &query.action_type {
+                                if !action_types.is_empty() {
+                                    args.push((":action_type".to_string(), Box::new(action_types[0].as_sql())));
+                                    for i in 1..action_types.len() {
+                                        args.push((format!(":action_type_{i}"), Box::new(action_types[i].as_sql())));
+                                    }
+
+                                    sql.push_str(
+                                        format!("\nAND Action.type IN ({})",
+                                                named_param_seq("action_type", action_types.len())).as_str(),
+                                    );
+                                }
+                            }
+
+                            if let Some(entry_types) = &query.entry_type {
+                                if !entry_types.is_empty() {
+                                    args.push((":entry_type".to_string(), Box::new(entry_types[0].as_sql())));
+                                    for i in 1..entry_types.len() {
+                                        args.push((format!(":entry_type_{i}"), Box::new(entry_types[i].as_sql())));
+                                    }
+
+                                    sql.push_str(
+                                        format!("\nAND Action.entry_type IN ({})",
+                                                named_param_seq("entry_type", entry_types.len())).as_str(),
+                                    );
+                                }
+                            }
+                        },
+                        _ => {}
                     }
 
                     sql.push_str("\nORDER BY Action.seq");
