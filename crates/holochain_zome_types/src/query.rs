@@ -322,6 +322,7 @@ impl ChainQueryFilter {
 
     /// If the sequence range supports fork disambiguation, apply it to remove
     /// actions that are not in the correct branch.
+    ///
     /// Numerical range bounds do NOT support fork disambiguation, and neither
     /// does unbounded, but everything hash bounded does.
     pub fn disambiguate_forks<T: ActionHashedContainer + Clone>(&self, actions: Vec<T>) -> Vec<T> {
@@ -347,6 +348,7 @@ impl ChainQueryFilter {
                         .and_then(|prev_action| action_hashmap.remove(prev_action));
                     let is_start = next_action.action_hash() == start;
                     filtered_actions.push(next_action);
+
                     // This comes after the push to make the range inclusive.
                     if is_start {
                         break;
@@ -368,6 +370,7 @@ impl ChainQueryFilter {
                         .prev_action()
                         .and_then(|prev_action| action_hashmap.remove(prev_action));
                     filtered_actions.push(next_action.clone());
+
                     // This comes after the push to make the range inclusive.
                     if i == *n {
                         break;
