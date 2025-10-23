@@ -15,6 +15,7 @@ use holochain_types::dht_op::OpOrder;
 use holochain_zome_types::entry::EntryHashed;
 
 mod details;
+mod get_exact_complete_record;
 mod links;
 mod links_test;
 mod store;

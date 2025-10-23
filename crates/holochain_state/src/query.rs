@@ -506,11 +506,15 @@ impl CascadeTxnWrapper<'_, '_> {
         let record = self.txn.query_row(
             "
             SELECT
-            Action.blob AS action_blob, Action.hash, Entry.blob as entry_blob
-            FROM Action
-            JOIN Entry ON Action.entry_hash = Entry.hash
+                Action.blob AS action_blob,
+                Action.hash,
+                Entry.blob as entry_blob
+            FROM
+                Action
+                JOIN Entry ON Action.entry_hash = Entry.hash
             WHERE
-            Action.hash = :hash
+                Action.hash = :hash
+                AND Action.private_entry = 0
             ",
             named_params! {
                 ":hash": hash,
