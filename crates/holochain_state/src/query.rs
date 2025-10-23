@@ -526,14 +526,14 @@ impl CascadeTxnWrapper<'_, '_> {
                     let (action, signature) = action.into();
                     let hash: ActionHash = row.get(row.as_ref().column_index("hash")?)?;
                     let action = ActionHashed::with_pre_hashed(action, hash);
-                    let shh = SignedActionHashed::with_presigned(action, signature);
+                    let sah = SignedActionHashed::with_presigned(action, signature);
                     let entry: Option<Vec<u8>> =
                         row.get(row.as_ref().column_index("entry_blob")?)?;
                     let entry = match entry {
                         Some(entry) => Some(from_blob::<Entry>(entry)?),
                         None => None,
                     };
-                    Ok(Record::new(shh, entry))
+                    Ok(Record::new(sah, entry))
                 }))
             },
         );
