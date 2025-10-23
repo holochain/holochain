@@ -232,7 +232,7 @@ impl Store for Scratch {
         }
     }
 
-    fn get_complete_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
+    fn get_public_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
         self.get_record(hash)
     }
 

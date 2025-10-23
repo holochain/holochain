@@ -1152,8 +1152,12 @@ pub trait Cascade {
     /// Data might not have been validated yet by the authority.
     ///
     /// If the [`Action`] has an associated [`Entry`] and the entry is not
-    /// available, `None` is returned.
-    async fn retrieve(
+    /// available, `None` is returned. This applies to private entries too.
+    //
+    // This function is essential for fetching a warranted record, in cases where the action is
+    // already present locally, but the entry is not. Returning the locally available
+    // record without the entry would prevent a network request.
+    async fn retrieve_public_record(
         &self,
         hash: AnyDhtHash,
         mut options: NetworkGetOptions,
@@ -1227,7 +1231,7 @@ impl Cascade for CascadeImpl {
         Ok(result)
     }
 
-    async fn retrieve(
+    async fn retrieve_public_record(
         &self,
         hash: AnyDhtHash,
         options: NetworkGetOptions,
@@ -1235,7 +1239,7 @@ impl Cascade for CascadeImpl {
         let result = self
             .find_map({
                 let hash = hash.clone();
-                move |store| Ok(store.get_complete_record(&hash)?)
+                move |store| Ok(store.get_public_record(&hash)?)
             })
             .await?;
         if result.is_some() {
@@ -1245,7 +1249,7 @@ impl Cascade for CascadeImpl {
 
         // Check if we have the data now after the network call.
         let result = self
-            .find_map(move |store| Ok(store.get_complete_record(&hash)?))
+            .find_map(move |store| Ok(store.get_public_record(&hash)?))
             .await?;
         Ok(result.map(|r| (r, CascadeSource::Network)))
     }
@@ -1271,11 +1275,13 @@ impl MockCascade {
         let map0 = Arc::new(parking_lot::Mutex::new(map));
 
         let map = map0.clone();
-        cascade.expect_retrieve().returning(move |hash, _| {
-            let m = map.lock();
-            let result = m.get(&hash).map(|r| (r.clone(), CascadeSource::Local));
-            Box::pin(async move { Ok(result) })
-        });
+        cascade
+            .expect_retrieve_public_record()
+            .returning(move |hash, _| {
+                let m = map.lock();
+                let result = m.get(&hash).map(|r| (r.clone(), CascadeSource::Local));
+                Box::pin(async move { Ok(result) })
+            });
 
         let map = map0.clone();
         cascade.expect_retrieve_action().returning(move |hash, _| {
@@ -1309,17 +1315,17 @@ async fn test_mock_cascade_with_records() {
     let cascade = MockCascade::with_records(records.clone());
     let opts = NetworkGetOptions::default();
     let (r0, _) = cascade
-        .retrieve(records[0].action_address().clone().into(), opts.clone())
+        .retrieve_public_record(records[0].action_address().clone().into(), opts.clone())
         .await
         .unwrap()
         .unwrap();
     let (r1, _) = cascade
-        .retrieve(records[1].action_address().clone().into(), opts.clone())
+        .retrieve_public_record(records[1].action_address().clone().into(), opts.clone())
         .await
         .unwrap()
         .unwrap();
     let (r2, _) = cascade
-        .retrieve(records[2].action_address().clone().into(), opts)
+        .retrieve_public_record(records[2].action_address().clone().into(), opts)
         .await
         .unwrap()
         .unwrap();

@@ -489,7 +489,7 @@ async fn fetch_missing_dependencies(
                 }
                 ValidationDependencyType::Warranted(chain_op_type) => {
                     match network_cascade
-                        .retrieve(hash.clone().into(), Default::default())
+                        .retrieve_public_record(hash.clone().into(), Default::default())
                         .await
                     {
                         Ok(Some((record, source))) => {
@@ -625,7 +625,7 @@ async fn retrieve_dependencies(
                             ChainOpType::StoreEntry |
                             ChainOpType::RegisterUpdatedContent |
                             ChainOpType::RegisterUpdatedRecord => {
-                                cascade.retrieve(hash.clone().into(), Default::default()).await.map(|ok|ok.map(|(a, s)|(a.signed_action, s)))
+                                cascade.retrieve_public_record(hash.clone().into(), Default::default()).await.map(|ok|ok.map(|(a, s)|(a.signed_action, s)))
                             }
                             // Other top types can be constructed without an entry.
                             _ => {

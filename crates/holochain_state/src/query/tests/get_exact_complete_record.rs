@@ -30,7 +30,7 @@ async fn returns_record_when_entry_present() {
             op.entry().into_option().cloned(),
         );
         let actual_record = CascadeTxnWrapper::from(&txn)
-            .get_exact_complete_record(&action_hash)
+            .get_complete_public_record(&action_hash)
             .unwrap();
         assert!(actual_record.is_some(), "Failed for op type {op_type}");
         let actual_record = actual_record.unwrap();
@@ -64,7 +64,7 @@ async fn returns_none_when_no_entry_present() {
         insert_valid_integrated_op(&mut txn, &op.downcast()).unwrap();
 
         let result = CascadeTxnWrapper::from(&txn)
-            .get_complete_record(&AnyDhtHash::from(action_hash.clone()))
+            .get_public_record(&AnyDhtHash::from(action_hash.clone()))
             .unwrap();
         assert!(result.is_none(), "Failed for op type {op_type}");
     }
@@ -93,7 +93,7 @@ async fn returns_none_when_private_entry_present() {
     insert_valid_integrated_op(&mut txn, &op.downcast()).unwrap();
 
     let result = CascadeTxnWrapper::from(&txn)
-        .get_complete_record(&AnyDhtHash::from(action_hash.clone()))
+        .get_public_record(&AnyDhtHash::from(action_hash.clone()))
         .unwrap();
     assert!(result.is_none(), "Record with private entry returned");
 }

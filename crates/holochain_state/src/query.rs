@@ -172,7 +172,7 @@ pub trait Store {
 
     /// Get a [`Record`] from this store. If an [`Entry`] is associated with the [`Action`],
     /// it will be included. But should the entry not be available, no record is returned.
-    fn get_complete_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>>;
+    fn get_public_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>>;
 
     /// Get an [`Record`] from this store that is either public or
     /// authored by the given key.
@@ -415,10 +415,10 @@ impl Store for CascadeTxnWrapper<'_, '_> {
         }
     }
 
-    fn get_complete_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
+    fn get_public_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
         match hash.clone().into_primitive() {
             AnyDhtHashPrimitive::Entry(hash) => self.get_any_record(&hash),
-            AnyDhtHashPrimitive::Action(hash) => self.get_exact_complete_record(&hash),
+            AnyDhtHashPrimitive::Action(hash) => self.get_complete_public_record(&hash),
         }
     }
 
@@ -502,7 +502,7 @@ impl CascadeTxnWrapper<'_, '_> {
 
     // This is nearly identical to get_exact_record, but it returns `None` if an entry
     // associated to the action is not available.
-    fn get_exact_complete_record(&self, hash: &ActionHash) -> StateQueryResult<Option<Record>> {
+    fn get_complete_public_record(&self, hash: &ActionHash) -> StateQueryResult<Option<Record>> {
         let record = self.txn.query_row(
             "
             SELECT
@@ -752,9 +752,9 @@ impl Store for Txns<'_, '_> {
         Ok(None)
     }
 
-    fn get_complete_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
+    fn get_public_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
         for txn in &self.txns {
-            let r = txn.get_complete_record(hash)?;
+            let r = txn.get_public_record(hash)?;
             if r.is_some() {
                 return Ok(r);
             }
@@ -868,10 +868,10 @@ impl Store for DbScratch<'_, '_> {
         }
     }
 
-    fn get_complete_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
-        let r = self.txns.get_complete_record(hash)?;
+    fn get_public_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
+        let r = self.txns.get_public_record(hash)?;
         if r.is_none() {
-            self.scratch.get_complete_record(hash)
+            self.scratch.get_public_record(hash)
         } else {
             Ok(r)
         }
