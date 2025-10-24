@@ -996,7 +996,7 @@ impl CascadeImpl {
             // Only warrants coming from the network should be added to the scratch. If
             // the caller is an authority for the agent, warrants are already locally present
             // and shouldn't be redundantly added to the database.
-            if !merged_response.warrants.is_empty() {
+            if !authority && !merged_response.warrants.is_empty() {
                 if let Some(scratch) = &self.scratch {
                     if let Err(err) = scratch.apply(|scratch| {
                         for warrant in merged_response.warrants.iter() {

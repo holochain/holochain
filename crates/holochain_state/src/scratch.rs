@@ -238,7 +238,7 @@ impl Store for Scratch {
             .iter()
             .filter_map(|warrant| {
                 // Check if this warrant applies to the agent
-                if warrant.proof.action_author() == agent_key {
+                if warrant.warrantee == *agent_key {
                     Some(WarrantOp::from(warrant.clone()))
                 } else {
                     None

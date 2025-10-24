@@ -396,55 +396,6 @@ impl SourceChain {
             })
             .await;
 
-        // Insert warrants into DHT database.
-        // Check signatures first
-        let mut warrants_to_insert = Vec::new();
-        for warrant in warrants {
-            match warrant
-                .author
-                .verify_signature(warrant.signature(), warrant.data())
-                .await
-            {
-                Ok(is_valid) => {
-                    if !is_valid {
-                        tracing::info!(
-                            "Invalid signature of a warrant in the scratch space. Skipping warrant"
-                        );
-                        continue;
-                    }
-                    warrants_to_insert.push(warrant);
-                }
-                Err(err) => {
-                    tracing::warn!(?err, "Could not verify warrant signature before inserting from scratch space into DHT database. Skipping warrant");
-                    continue;
-                }
-            }
-        }
-
-        // Write warrants to DHT database
-        let total_inserted_warrants = self
-            .dht_db
-            .write_async(|txn| -> DatabaseResult<u32> {
-                let mut inserted_warrants = 0;
-                for warrant in warrants_to_insert {
-                    let warrant_op =
-                        DhtOpHashed::from_content_sync(DhtOp::from(WarrantOp::from(warrant)));
-                    let serialized_size =
-                        encode(&warrant_op).unwrap_or_else(|_| vec![]).len() as u32;
-                    if let Err(err) = insert_op_dht(txn, &warrant_op, serialized_size, None) {
-                        tracing::warn!(
-                            ?err,
-                            "Could not insert warrant from scratch space into DHT database"
-                        );
-                    } else {
-                        inserted_warrants += 1;
-                    }
-                }
-                Ok(inserted_warrants)
-            })
-            .await
-            .unwrap(); // unwrap is safe here because no errors are returned from the closure
-
         match chain_flush_result {
             Err(SourceChainError::HeadMoved(actions, entries, old_head, Some(new_head_info))) => {
                 let is_relaxed =
@@ -493,6 +444,60 @@ impl SourceChain {
                     self.dht_db.clone(),
                 )
                 .await?;
+
+                // Insert warrants into DHT database.
+                // Check signatures first
+                let mut warrants_to_insert = Vec::new();
+                for warrant in warrants {
+                    match warrant
+                        .author
+                        .verify_signature(warrant.signature(), warrant.data())
+                        .await
+                    {
+                        Ok(true) => warrants_to_insert.push(warrant),
+                        Ok(false) => {
+                            tracing::info!(
+                        "Invalid signature of a warrant in the scratch space. Skipping warrant"
+                    );
+                            continue;
+                        }
+                        Err(err) => {
+                            tracing::warn!(?err, "Could not verify warrant signature before inserting from scratch space into DHT database. Skipping warrant");
+                            continue;
+                        }
+                    }
+                }
+
+                // Write warrants to DHT database
+                let total_inserted_warrants = self
+                    .dht_db
+                    .write_async(|txn| -> DatabaseResult<u32> {
+                        let mut inserted_warrants = 0;
+                        for warrant in warrants_to_insert {
+                            let warrant_op = DhtOpHashed::from_content_sync(DhtOp::from(
+                                WarrantOp::from(warrant),
+                            ));
+                            let serialized_size =
+                                encode(&warrant_op).unwrap_or_else(|_| vec![]).len() as u32;
+                            match insert_op_dht(txn, &warrant_op, serialized_size, None) {
+                                // TODO: This should only be increased if the op has actually been inserted.
+                                //       It's not possible to determine that, because mutations don't return
+                                //       the row count. Fix this once row count is returned.
+                                Ok(_) => inserted_warrants += 1,
+                                Err(err) => {
+                                    tracing::warn!(
+                                        ?err,
+                                        "Could not insert warrant from scratch space into DHT database"
+                                    );
+
+                                }
+                            }
+                        }
+                        Ok(inserted_warrants)
+                    })
+                    .await
+                    .unwrap(); // unwrap is safe here because no errors are returned from the closure
+
                 SourceChainResult::Ok((actions, total_inserted_warrants))
             }
             Err(e) => Err(e),
@@ -1424,9 +1429,9 @@ mod tests {
     use crate::source_chain::SourceChainResult;
     use ::fixt::fixt;
     use ::fixt::prelude::*;
-    use holo_hash::fixt::ActionHashFixturator;
-    use holo_hash::fixt::AgentPubKeyFixturator;
     use holo_hash::fixt::DnaHashFixturator;
+    #[cfg(feature = "unstable-warrants")]
+    use holo_hash::fixt::{ActionHashFixturator, AgentPubKeyFixturator};
     use holochain_keystore::test_keystore;
     use holochain_zome_types::Entry;
     use matches::assert_matches;
@@ -2338,6 +2343,7 @@ mod tests {
         assert!(zomes_initialized);
     }
 
+    #[cfg(feature = "unstable-warrants")]
     #[tokio::test(flavor = "multi_thread")]
     async fn flush_writes_warrants_to_dht_db() {
         let TestCase {
@@ -2368,7 +2374,9 @@ mod tests {
             .unwrap();
 
         // Flush should write warrants to DHT database
-        chain.flush(vec![], None).await.unwrap();
+        let (actions, warrant_count) = chain.flush(vec![], None).await.unwrap();
+        assert!(actions.is_empty());
+        assert_eq!(warrant_count, 1);
 
         // Check DHT database
         let actual_warrants = dht.test_read(move |txn| {
@@ -2376,12 +2384,13 @@ mod tests {
                 .get_warrants_for_agent(&warrantee, false)
                 .unwrap()
         });
-        assert_eq!(actual_warrants.len(), 1);
-        assert_eq!(actual_warrants[0], WarrantOp::from(signed_warrant));
+        assert_eq!(actual_warrants, vec![WarrantOp::from(signed_warrant)]);
     }
 
+    #[cfg(feature = "unstable-warrants")]
     #[tokio::test(flavor = "multi_thread")]
     async fn duplicate_warrants_are_not_inserted_during_flush() {
+        holochain_trace::test_run();
         let TestCase {
             chain,
             agent_key,
@@ -2402,7 +2411,9 @@ mod tests {
             .unwrap();
 
         // Flush should write warrant to DHT database
-        chain.flush(vec![], None).await.unwrap();
+        let (actions, warrant_count) = chain.flush(vec![], None).await.unwrap();
+        assert!(actions.is_empty());
+        assert_eq!(warrant_count, 1);
 
         // Check DHT database
         let warrantee_clone = warrantee.clone();
@@ -2411,8 +2422,10 @@ mod tests {
                 .get_warrants_for_agent(&warrantee_clone, false)
                 .unwrap()
         });
-        assert_eq!(actual_warrants.len(), 1);
-        assert_eq!(actual_warrants[0], WarrantOp::from(signed_warrant.clone()));
+        assert_eq!(
+            actual_warrants,
+            vec![WarrantOp::from(signed_warrant.clone())]
+        );
 
         // Add same warrant to scratch again
         chain
@@ -2423,7 +2436,9 @@ mod tests {
             .unwrap();
 
         // Flush should not write duplicate warrant to DHT database
-        chain.flush(vec![], None).await.unwrap();
+        let (actions, warrant_count) = chain.flush(vec![], None).await.unwrap();
+        assert!(actions.is_empty());
+        assert_eq!(warrant_count, 1); // rejected inserts are not reported by the insertion method, so this will indicate 1
 
         // Check DHT database again
         let actual_warrants = dht.test_read(move |txn| {
@@ -2431,10 +2446,10 @@ mod tests {
                 .get_warrants_for_agent(&warrantee, false)
                 .unwrap()
         });
-        assert_eq!(actual_warrants.len(), 1);
-        assert_eq!(actual_warrants[0], WarrantOp::from(signed_warrant));
+        assert_eq!(actual_warrants, vec![WarrantOp::from(signed_warrant)]);
     }
 
+    #[cfg(feature = "unstable-warrants")]
     #[tokio::test(flavor = "multi_thread")]
     async fn counterfeit_warrants_are_not_inserted_during_flush() {
         let TestCase {
@@ -2466,7 +2481,9 @@ mod tests {
             .unwrap();
 
         // Flush should not write warrant to DHT database
-        chain.flush(vec![], None).await.unwrap();
+        let (actions, warrant_count) = chain.flush(vec![], None).await.unwrap();
+        assert!(actions.is_empty());
+        assert_eq!(warrant_count, 0);
 
         // Check DHT database
         let warrantee_clone = warrantee.clone();
@@ -2475,7 +2492,7 @@ mod tests {
                 .get_warrants_for_agent(&warrantee_clone, false)
                 .unwrap()
         });
-        assert_eq!(actual_warrants.len(), 0);
+        assert!(actual_warrants.is_empty());
     }
 
     struct TestCase {
@@ -2522,6 +2539,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "unstable-warrants")]
     async fn create_signed_warrant(
         author: &AgentPubKey,
         warrantee: &AgentPubKey,
