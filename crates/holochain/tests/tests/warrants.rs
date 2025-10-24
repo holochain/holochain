@@ -161,8 +161,7 @@ async fn warrant_is_gossiped() {
                     .unwrap()
                     .test_read(move |txn| {
                         let store = CascadeTxnWrapper::from(txn);
-                        // TODO: check_valid here should be removed once warrants are validated.
-                        store.get_warrants_for_agent(&alice_pubkey, false).unwrap()
+                        store.get_warrants_for_agent(&alice_pubkey, true).unwrap()
                     });
                 warrants.len() == 3
                     && warrants[0].warrant().warrantee == *alice_cell.agent_pubkey()

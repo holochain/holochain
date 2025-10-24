@@ -223,8 +223,7 @@ async fn warrant_is_published() {
                 .unwrap()
                 .test_read(move |txn| {
                     let store = CascadeTxnWrapper::from(txn);
-                    // TODO: The check_valid argument of get_warrants_for_agents should be removed once warrants are validated.
-                    store.get_warrants_for_agent(&alice_pubkey, false).unwrap()
+                    store.get_warrants_for_agent(&alice_pubkey, true).unwrap()
                 });
 
             if warrants.len() == 3 {
