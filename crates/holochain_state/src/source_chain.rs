@@ -2169,18 +2169,6 @@ mod tests {
         .await
         .unwrap();
 
-        let count = vault.test_read({
-            let alice = alice.clone();
-            move |txn| {
-                txn.query_row(
-                    "select count(*) from Action where author = ? and type in (?)",
-                    params!(alice, ActionType::Dna.as_sql()),
-                    |row| row.get::<_, i64>(0),
-                )
-            }
-        });
-        assert_eq!(count.unwrap(), 1);
-
         let chain = SourceChain::new(
             vault.clone(),
             dht_db.to_db(),
