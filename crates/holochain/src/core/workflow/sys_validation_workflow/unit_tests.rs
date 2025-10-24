@@ -42,8 +42,10 @@ use std::collections::HashSet;
 use std::sync::Arc;
 #[cfg(feature = "unstable-warrants")]
 use {
-    hdk::prelude::EntryFixturator, holo_hash::HashableContentExtSync,
-    holochain_serialized_bytes::SerializedBytes, holochain_zome_types::Entry,
+    hdk::prelude::{AppEntryBytesFixturator, EntryFixturator},
+    holo_hash::HashableContentExtSync,
+    holochain_serialized_bytes::SerializedBytes,
+    holochain_zome_types::Entry,
 };
 
 #[tokio::test(flavor = "multi_thread")]
@@ -417,9 +419,14 @@ async fn validate_valid_warrant_with_fetched_dependency() {
 
     // Warranted op, to be fetched from the network
     let mut create = fixt!(Create);
-    let entry = fixt!(Entry);
+    let entry = Entry::App(fixt!(AppEntryBytes));
     create.author = bad_agent.clone();
     create.entry_hash = entry.to_hash();
+    create.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     create.action_seq = 0; // Not allowed to have a 0 seq number for a Create
     let warranted_action = test_case.sign_action(Action::Create(create.clone())).await;
 
