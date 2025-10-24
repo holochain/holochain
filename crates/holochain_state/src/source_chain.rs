@@ -2458,10 +2458,10 @@ mod tests {
             .await
             .unwrap();
 
-        let warrantee2 = warrantee.clone();
+        let warrantee_clone = warrantee.clone();
         let actual_warrants = dht.test_read(move |txn| {
             CascadeTxnWrapper::from(txn)
-                .get_warrants_for_agent(&warrantee2, true)
+                .get_warrants_for_agent(&warrantee_clone, true)
                 .unwrap()
         });
         assert_eq!(actual_warrants.len(), 0);
@@ -2490,6 +2490,84 @@ mod tests {
         chain.flush(vec![], None).await.unwrap();
 
         // Check DHT database
+        let actual_warrants = dht.test_read(move |txn| {
+            CascadeTxnWrapper::from(txn)
+                .get_warrants_for_agent(&warrantee, false)
+                .unwrap()
+        });
+        assert_eq!(actual_warrants.len(), 1);
+        assert_eq!(actual_warrants[0], WarrantOp::from(signed_warrant));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn duplicate_warrants_are_not_inserted_during_flush() {
+        let authored = test_authored_db();
+        let dht = test_dht_db();
+        let keystore = test_keystore();
+        let dna_hash = fixt!(DnaHash);
+        let agent_key = keystore.new_sign_keypair_random().await.unwrap();
+        let warrantee = fixt!(AgentPubKey);
+
+        genesis(
+            authored.to_db(),
+            dht.to_db(),
+            keystore.clone(),
+            dna_hash,
+            agent_key.clone(),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        let chain = SourceChain::new(authored.to_db(), dht.to_db(), keystore, agent_key)
+            .await
+            .unwrap();
+
+        // Create a warrant
+        let warrant = Warrant::new(
+            WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+                action_author: warrantee.clone(),
+                action: (fixt!(ActionHash), fixt!(Signature)),
+                chain_op_type: ChainOpType::RegisterAgentActivity,
+            }),
+            fixt!(AgentPubKey),
+            Timestamp::now(),
+            warrantee.clone(),
+        );
+        let signed_warrant = SignedWarrant::new(warrant, fixt!(Signature));
+        // Add warrant to scratch
+        chain
+            .scratch
+            .apply(|scratch| {
+                scratch.add_warrant(signed_warrant.clone());
+            })
+            .unwrap();
+
+        // Flush should write warrant to DHT database
+        chain.flush(vec![], None).await.unwrap();
+
+        // Check DHT database
+        let warrantee_clone = warrantee.clone();
+        let actual_warrants = dht.test_read(move |txn| {
+            CascadeTxnWrapper::from(txn)
+                .get_warrants_for_agent(&warrantee_clone, false)
+                .unwrap()
+        });
+        assert_eq!(actual_warrants.len(), 1);
+        assert_eq!(actual_warrants[0], WarrantOp::from(signed_warrant.clone()));
+
+        // Add same warrant to scratch again
+        chain
+            .scratch
+            .apply(|scratch| {
+                scratch.add_warrant(signed_warrant.clone());
+            })
+            .unwrap();
+
+        // Flush should not write duplicate warrant to DHT database
+        chain.flush(vec![], None).await.unwrap();
+
+        // Check DHT database again
         let actual_warrants = dht.test_read(move |txn| {
             CascadeTxnWrapper::from(txn)
                 .get_warrants_for_agent(&warrantee, false)
