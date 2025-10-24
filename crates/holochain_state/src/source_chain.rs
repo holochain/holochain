@@ -237,10 +237,10 @@ impl SourceChain {
         &self,
         storage_arcs: Vec<DhtArc>,
         chc: Option<ChcImpl>,
-    ) -> SourceChainResult<Vec<SignedActionHashed>> {
+    ) -> SourceChainResult<(Vec<SignedActionHashed>, u32)> {
         // Nothing to write
         if self.scratch.apply(|s| s.is_empty())? {
-            return Ok(Vec::new());
+            return Ok((Vec::new(), 0));
         }
 
         let (scheduled_fns, actions, ops, entries, records, warrants) =
@@ -422,9 +422,10 @@ impl SourceChain {
         }
 
         // Write warrants to DHT database
-        let _ok_result = self
+        let total_inserted_warrants = self
             .dht_db
-            .write_async(|txn| -> DatabaseResult<()> {
+            .write_async(|txn| -> DatabaseResult<u32> {
+                let mut inserted_warrants = 0;
                 for warrant in warrants_to_insert {
                     let warrant_op =
                         DhtOpHashed::from_content_sync(DhtOp::from(WarrantOp::from(warrant)));
@@ -435,11 +436,14 @@ impl SourceChain {
                             ?err,
                             "Could not insert warrant from scratch space into DHT database"
                         );
+                    } else {
+                        inserted_warrants += 1;
                     }
                 }
-                Ok(())
+                Ok(inserted_warrants)
             })
-            .await;
+            .await
+            .unwrap(); // unwrap is safe here because no errors are returned from the closure
 
         match chain_flush_result {
             Err(SourceChainError::HeadMoved(actions, entries, old_head, Some(new_head_info))) => {
@@ -489,7 +493,7 @@ impl SourceChain {
                     self.dht_db.clone(),
                 )
                 .await?;
-                SourceChainResult::Ok(actions)
+                SourceChainResult::Ok((actions, total_inserted_warrants))
             }
             Err(e) => Err(e),
         }

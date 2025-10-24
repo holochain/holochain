@@ -41,12 +41,14 @@ pub struct CallZomeWorkflowArgs<RibosomeT> {
 }
 
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+#[allow(clippy::too_many_arguments)]
 pub async fn call_zome_workflow<Ribosome>(
     workspace: SourceChainWorkspace,
     network: DynHolochainP2pDna,
     keystore: MetaLairClient,
     args: CallZomeWorkflowArgs<Ribosome>,
     trigger_publish_dht_ops: TriggerSender,
+    trigger_validate_dht_ops: TriggerSender,
     trigger_integrate_dht_ops: TriggerSender,
     trigger_countersigning: TriggerSender,
 ) -> WorkflowResult<ZomeCallResult>
@@ -86,7 +88,7 @@ where
             .flush(network.target_arcs().await?, network.chc())
             .await
         {
-            Ok(flushed_actions) => {
+            Ok((flushed_actions, total_inserted_warrants)) => {
                 // Skip if nothing was written
                 if !flushed_actions.is_empty() {
                     match countersigning_op {
@@ -103,7 +105,12 @@ where
                         }
                         None => {
                             trigger_publish_dht_ops.trigger(&"call_zome_workflow");
-                            trigger_integrate_dht_ops.trigger(&"call_zome_workflow");
+                            if total_inserted_warrants > 0 {
+                                // Warrants received through host functions must be validated.
+                                trigger_validate_dht_ops.trigger(&"call_zome_workflow");
+                            } else {
+                                trigger_integrate_dht_ops.trigger(&"call_zome_workflow");
+                            }
                         }
                     }
 

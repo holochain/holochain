@@ -8,6 +8,8 @@ use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 use wasmer::RuntimeError;
+#[cfg(feature = "unstable-warrants")]
+use {holochain_sqlite::error::DatabaseResult, holochain_state::prelude::insert_op_dht};
 
 pub fn get_agent_activity(
     _ribosome: Arc<impl RibosomeT>,
