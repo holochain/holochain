@@ -417,7 +417,7 @@ impl Store for CascadeTxnWrapper<'_, '_> {
 
     fn get_public_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
         match hash.clone().into_primitive() {
-            AnyDhtHashPrimitive::Entry(hash) => self.get_any_record(&hash),
+            AnyDhtHashPrimitive::Entry(hash) => self.get_any_public_record(&hash),
             AnyDhtHashPrimitive::Action(hash) => self.get_complete_public_record(&hash),
         }
     }
