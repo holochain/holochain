@@ -89,8 +89,12 @@ where
             .await
         {
             Ok((flushed_actions, total_inserted_warrants)) => {
-                // Skip if nothing was written
-                if !flushed_actions.is_empty() {
+                if flushed_actions.is_empty() {
+                    if total_inserted_warrants > 0 {
+                        // Warrants received through host functions must be validated.
+                        trigger_validate_dht_ops.trigger(&"call_zome_workflow");
+                    }
+                } else {
                     match countersigning_op {
                         Some(op) => {
                             if let Err(error_response) =

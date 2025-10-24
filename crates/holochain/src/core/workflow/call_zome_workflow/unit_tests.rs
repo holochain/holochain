@@ -108,7 +108,7 @@ async fn integration_workflow_is_not_triggered_when_no_data_has_been_created() {
 
 #[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
-async fn trigger_validation_workflow_after_inserting_warrants() {
+async fn trigger_validation_workflow_after_inserting_warrants_and_actions() {
     let mut hc_p2p = MockHcP2p::new();
     hc_p2p
         .expect_target_arcs()
@@ -134,6 +134,57 @@ async fn trigger_validation_workflow_after_inserting_warrants() {
         .apply(|scratch| scratch.add_warrant(signed_warrant))
         .unwrap();
 
+    let _ = call_zome_workflow(
+        workspace,
+        network,
+        keystore,
+        args,
+        trigger_publish_dht_ops,
+        trigger_validate_dht_ops,
+        trigger_integrate_dht_ops,
+        trigger_countersigning,
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    // Assert the validation workflow has been triggered.
+    validate_dht_ops_rx.try_recv().unwrap();
+    // Assert integration workflow has not been triggered.
+    assert!(integrate_dht_ops_rx.try_recv().is_none());
+}
+
+#[cfg(feature = "unstable-warrants")]
+#[tokio::test(flavor = "multi_thread")]
+async fn trigger_validation_workflow_after_only_inserting_warrants() {
+    let mut hc_p2p = MockHcP2p::new();
+    hc_p2p
+        .expect_target_arcs()
+        .returning(|_| Box::pin(async { Ok(vec![DhtArc::FULL]) }));
+    hc_p2p
+        .expect_authority_for_hash()
+        .return_once(|_, _| Box::pin(async move { Ok(true) }));
+    let TestCase {
+        workspace,
+        network,
+        keystore,
+        args,
+        _conductor,
+    } = TestCase::new(hc_p2p, "reed", fixt!(ActionHash)).await;
+    let (trigger_publish_dht_ops, _) = TriggerSender::new();
+    let (trigger_validate_dht_ops, mut validate_dht_ops_rx) = TriggerSender::new();
+    let (trigger_integrate_dht_ops, mut integrate_dht_ops_rx) = TriggerSender::new();
+    let (trigger_countersigning, _) = TriggerSender::new();
+
+    // Create a warrant and add it to the scratch space.
+    let signed_warrant =
+        create_signed_warrant(workspace.author().unwrap().as_ref(), &keystore).await;
+    workspace
+        .source_chain()
+        .scratch()
+        .apply(|scratch| scratch.add_warrant(signed_warrant))
+        .unwrap();
+
+    // Shouldn't create actions
     let _ = call_zome_workflow(
         workspace,
         network,
