@@ -243,7 +243,7 @@ impl SourceChain {
             return Ok(Vec::new());
         }
 
-        let (scheduled_fns, actions, ops, entries, records) =
+        let (scheduled_fns, actions, ops, entries, records, warrants) =
             self.scratch.apply_and_then(|scratch| {
                 let records: Vec<Record> = scratch.records().collect();
 
@@ -253,7 +253,8 @@ impl SourceChain {
                 // Drain out any entries.
                 let entries = scratch.drain_entries().collect::<Vec<_>>();
                 let scheduled_fns = scratch.drain_scheduled_fns().collect::<Vec<_>>();
-                SourceChainResult::Ok((scheduled_fns, actions, ops, entries, records))
+                let warrants = scratch.drain_warrants().collect::<Vec<_>>();
+                SourceChainResult::Ok((scheduled_fns, actions, ops, entries, records, warrants))
             })?;
 
         let maybe_countersigned_entry = entries
@@ -392,6 +393,26 @@ impl SourceChain {
                     }
                 }
                 SourceChainResult::Ok(actions)
+            })
+            .await;
+
+        // Insert warrants into DHT database.
+        let _ = self
+            .dht_db
+            .write_async(|txn| -> DatabaseResult<()> {
+                for warrant in warrants {
+                    let warrant_op =
+                        DhtOpHashed::from_content_sync(DhtOp::from(WarrantOp::from(warrant)));
+                    let serialized_size =
+                        encode(&warrant_op).unwrap_or_else(|_| vec![]).len() as u32;
+                    if let Err(err) = insert_op_dht(txn, &warrant_op, serialized_size, None) {
+                        tracing::warn!(
+                            ?err,
+                            "Could not insert warrant from scratch space into DHT database"
+                        );
+                    }
+                }
+                Ok(())
             })
             .await;
 
@@ -1372,7 +1393,9 @@ mod tests {
     use super::*;
     use crate::prelude::*;
     use crate::source_chain::SourceChainResult;
+    use ::fixt::fixt;
     use ::fixt::prelude::*;
+    use holo_hash::fixt::ActionHashFixturator;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holo_hash::fixt::DnaHashFixturator;
     use holochain_keystore::test_keystore;
@@ -2409,5 +2432,70 @@ mod tests {
         // zomes initialized should be true after init zomes has run
         let zomes_initialized = chain.zomes_initialized().await.unwrap();
         assert!(zomes_initialized);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn flush_writes_warrants_to_dht_db() {
+        let authored = test_authored_db();
+        let dht = test_dht_db();
+        let keystore = test_keystore();
+        let dna_hash = fixt!(DnaHash);
+        let agent_key = keystore.new_sign_keypair_random().await.unwrap();
+        let warrantee = fixt!(AgentPubKey);
+
+        genesis(
+            authored.to_db(),
+            dht.to_db(),
+            keystore.clone(),
+            dna_hash,
+            agent_key.clone(),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        let chain = SourceChain::new(authored.to_db(), dht.to_db(), keystore, agent_key)
+            .await
+            .unwrap();
+
+        let warrantee2 = warrantee.clone();
+        let actual_warrants = dht.test_read(move |txn| {
+            CascadeTxnWrapper::from(txn)
+                .get_warrants_for_agent(&warrantee2, true)
+                .unwrap()
+        });
+        assert_eq!(actual_warrants.len(), 0);
+
+        // Create a warrant
+        let warrant = Warrant::new(
+            WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+                action_author: warrantee.clone(),
+                action: (fixt!(ActionHash), fixt!(Signature)),
+                chain_op_type: ChainOpType::RegisterAgentActivity,
+            }),
+            fixt!(AgentPubKey),
+            Timestamp::now(),
+            warrantee.clone(),
+        );
+        let signed_warrant = SignedWarrant::new(warrant, fixt!(Signature));
+        // Add warrant to scratch
+        chain
+            .scratch
+            .apply(|scratch| {
+                scratch.add_warrant(signed_warrant.clone());
+            })
+            .unwrap();
+
+        // Flush should write warrants to DHT database
+        chain.flush(vec![], None).await.unwrap();
+
+        // Check DHT database
+        let actual_warrants = dht.test_read(move |txn| {
+            CascadeTxnWrapper::from(txn)
+                .get_warrants_for_agent(&warrantee, false)
+                .unwrap()
+        });
+        assert_eq!(actual_warrants.len(), 1);
+        assert_eq!(actual_warrants[0], WarrantOp::from(signed_warrant));
     }
 }
