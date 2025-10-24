@@ -37,16 +37,55 @@ pub fn get_agent_activity(
     })
 }
 
-/// Walks the source chain in ascending order (oldest to latest) filtering by action and/or entry type
+/// Query for source chain records for the current agent, with optional filtering.
 ///
-/// Given an action and entry type, returns an [`Vec<Record>`]
+/// Applies filters to the source chain, and returns a list of matching [`Record`]s.
 ///
+/// The primary filter is by range, through a combination of sequence numbers or action hashes.
+/// Each has quite different characteristics, so the choice must be made carefully.
+///
+/// ## Unbounded query
+///
+/// /// Using [`ChainQueryFilterRange::Unbounded`] does not apply any bounds when retrieving data
+/// from the database.
+///
+/// Its characteristics are equivalent to [`ChainQueryFilterRange::ActionSeqRange`] with start=0
+/// and end=`u32::MAX`.
+///
+/// ## Sequence Number Ranges
+///
+///
+/// Using [`ChainQueryFilterRange::ActionSeqRange`] fetches all records whose action sequence
+/// numbers are between the specified start and end bounds (inclusive) from the database.
+///
+/// In the case of chain forks, this may return multiple records for the same sequence number.
+/// Since the filter does not give the query a way to pick a fork, all matching records are
+/// returned.
+///
+/// The filters [`ChainQueryFilter::action_type`] and [`ChainQueryFilter::entry_type`] are
+/// applied as part of the database query, making them reasonably efficient to use.
+///
+/// ## Hash bounded queries
+///
+/// Using either [`ChainQueryFilterRange::ActionHashTerminated`] or [`ChainQueryFilterRange::ActionHashRange`]
+/// will choose action sequence numbers based on the action hashes provided. It will then return
+/// all records whose action sequence numbers are between the calculated start and end bounds
+/// (inclusive).
+///
+/// In either case, the presence of an action hash that defines the latest entry in a chain, allows
+/// choosing a specific chain. This means that even if forks are present, the query will only
+/// return records from the chain defined by the latest action hash.
+///
+/// For chain forks to be handled correctly, it is not possible to apply other filters during the
+/// database query. All relevant records must be loaded, and a chain reconstruction step must be
+/// performed before any other filters are applied. This means that using hash-bounded queries may
+/// be significantly less efficient than other query types.
+//
 // @todo document this better with examples after we make query do all the things we want.
 // @todo implement cap grant/claim usage in terms of query
 // @todo have ability to hash-bound query other agent's chains based on agent activity
-// @todo tie query into validation so we track dependencies e.g. validation packages
-// @todo decide which direction we want to iterate in (paramaterise query?)
-// @todo more expresivity generally?
+// @todo decide which direction we want to iterate in (parameterize query?)
+// @todo more expressive generally?
 pub fn query(filter: ChainQueryFilter) -> ExternResult<Vec<Record>> {
     HDK.with(|h| h.borrow().query(filter))
 }
