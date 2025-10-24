@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## 0.6.0-dev.29
 
+- Handle op ids with invalid length gracefully in `filter_out_existing_ops` and `retrieve_ops` to address [#5244](https://github.com/holochain/holochain/issues/5244) [#5359](https://github.com/holochain/holochain/pull/5359)
 - Remove a check in `holochain_state` that prevented multiple warrants for the same agent being inserted. Not only are multiple warrant types allowed, but it is expected that multiple authorities will issue warrants for the same agent in parallel before discovering each other’s warrants. Failing to store those warrants would result in inconsistent views of the DHT. \#5342
 - **BREAKING CHANGE** Replace `BTreeSet` with `HashSet` in `GrantedFunctions::Listed`. \#5349
 - Add a new conductor tuning parameter `disable_self_validation` to disable self-validation of authored data. Intended only for testing warrants. \#5340
