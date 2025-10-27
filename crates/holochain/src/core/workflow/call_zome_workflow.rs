@@ -89,12 +89,11 @@ where
             .await
         {
             Ok((flushed_actions, total_inserted_warrants)) => {
-                if flushed_actions.is_empty() {
-                    if total_inserted_warrants > 0 {
-                        // Warrants received through host functions must be validated.
-                        trigger_validate_dht_ops.trigger(&"call_zome_workflow");
-                    }
-                } else {
+                if total_inserted_warrants > 0 {
+                    // Warrants received through host functions must be validated.
+                    trigger_validate_dht_ops.trigger(&"call_zome_workflow");
+                }
+                if !flushed_actions.is_empty() {
                     match countersigning_op {
                         Some(op) => {
                             if let Err(error_response) =
@@ -108,13 +107,9 @@ where
                             }
                         }
                         None => {
+                            // Newly created data must be published and integrated.
                             trigger_publish_dht_ops.trigger(&"call_zome_workflow");
-                            if total_inserted_warrants > 0 {
-                                // Warrants received through host functions must be validated.
-                                trigger_validate_dht_ops.trigger(&"call_zome_workflow");
-                            } else {
-                                trigger_integrate_dht_ops.trigger(&"call_zome_workflow");
-                            }
+                            trigger_integrate_dht_ops.trigger(&"call_zome_workflow");
                         }
                     }
 

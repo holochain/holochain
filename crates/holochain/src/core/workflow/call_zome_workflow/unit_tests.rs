@@ -61,12 +61,13 @@ async fn trigger_integration_workflow_after_creating_ops() {
     .unwrap();
     // Assert the integration workflow has been triggered.
     integrate_dht_ops_rx.try_recv().unwrap();
-    // Assert the validation workflow has not been triggered.
+    // Assert the validation workflow has not been triggered as no warrants have been authored.
     assert!(validate_dht_ops_rx.try_recv().is_none());
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn integration_workflow_is_not_triggered_when_no_data_has_been_created() {
+async fn validation_and_integration_workflow_are_not_triggered_when_no_data_and_no_warrants_have_been_created(
+) {
     let mut hc_p2p = MockHcP2p::new();
     hc_p2p
         .expect_target_arcs()
@@ -108,7 +109,7 @@ async fn integration_workflow_is_not_triggered_when_no_data_has_been_created() {
 
 #[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
-async fn trigger_validation_workflow_after_inserting_warrants_and_actions() {
+async fn validation_workflow_triggered_after_inserting_warrants_and_actions() {
     let mut hc_p2p = MockHcP2p::new();
     hc_p2p
         .expect_target_arcs()
@@ -149,8 +150,8 @@ async fn trigger_validation_workflow_after_inserting_warrants_and_actions() {
     .unwrap();
     // Assert the validation workflow has been triggered.
     validate_dht_ops_rx.try_recv().unwrap();
-    // Assert integration workflow has not been triggered.
-    assert!(integrate_dht_ops_rx.try_recv().is_none());
+    // Assert integration workflow has been triggered.
+    integrate_dht_ops_rx.try_recv().unwrap();
 }
 
 #[cfg(feature = "unstable-warrants")]
@@ -200,7 +201,7 @@ async fn trigger_validation_workflow_after_only_inserting_warrants() {
     .unwrap();
     // Assert the validation workflow has been triggered.
     validate_dht_ops_rx.try_recv().unwrap();
-    // Assert integration workflow has not been triggered.
+    // Assert integration workflow has not been triggered, as no actions have been authored.
     assert!(integrate_dht_ops_rx.try_recv().is_none());
 }
 
