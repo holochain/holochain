@@ -1239,7 +1239,28 @@ async fn spawn_test(
 
     hc.register_handler(handler).await.unwrap();
 
-    hc.join(dna_hash, agent.clone(), None).await.unwrap();
+    hc.join(dna_hash.clone(), agent.clone(), None)
+        .await
+        .unwrap();
+
+    // TODO: Wait until the peer sees itself in the peer store.
+    // This shouldn't be necessary, because preflight should come with the agent infos
+    // required to establish a connection.
+    retry_fn_until_timeout(
+        || async {
+            hc.peer_store(dna_hash.clone())
+                .await
+                .unwrap()
+                .get(agent.to_k2_agent())
+                .await
+                .unwrap()
+                .is_some()
+        },
+        Some(100),
+        Some(1),
+    )
+    .await
+    .unwrap();
 
     (agent, hc, lair_client)
 }
