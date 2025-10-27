@@ -49,11 +49,10 @@ pub fn get_agent_activity(
 /// /// Using [`ChainQueryFilterRange::Unbounded`] does not apply any bounds when retrieving data
 /// from the database.
 ///
-/// Its characteristics are equivalent to [`ChainQueryFilterRange::ActionSeqRange`] with start=0
-/// and end=`u32::MAX`.
+/// Its characteristics are equivalent to [`ChainQueryFilterRange::ActionSeqRange`] with `start=0`
+/// and `end=u32::MAX`.
 ///
 /// ## Sequence Number Ranges
-///
 ///
 /// Using [`ChainQueryFilterRange::ActionSeqRange`] fetches all records whose action sequence
 /// numbers are between the specified start and end bounds (inclusive) from the database.

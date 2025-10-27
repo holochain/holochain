@@ -870,11 +870,7 @@ where
                         | ChainQueryFilterRange::ActionSeqRange(_, _) => {
                             if let Some(action_types) = &query.action_type {
                                 if !action_types.is_empty() {
-                                    args.push((
-                                        ":action_type".to_string(),
-                                        Box::new(action_types[0].as_sql()),
-                                    ));
-                                    for (i, _) in action_types.iter().enumerate().skip(1) {
+                                    for (i, _) in action_types.iter().enumerate() {
                                         args.push((
                                             format!(":action_type_{i}"),
                                             Box::new(action_types[i].as_sql()),
@@ -893,11 +889,7 @@ where
 
                             if let Some(entry_types) = &query.entry_type {
                                 if !entry_types.is_empty() {
-                                    args.push((
-                                        ":entry_type".to_string(),
-                                        Box::new(entry_types[0].as_sql()),
-                                    ));
-                                    for (i, _) in entry_types.iter().enumerate().skip(1) {
+                                    for (i, _) in entry_types.iter().enumerate() {
                                         args.push((
                                             format!(":entry_type_{i}"),
                                             Box::new(entry_types[i].as_sql()),
@@ -1026,7 +1018,7 @@ fn named_param_seq(base_name: &str, repeat: usize) -> String {
     }
 
     let mut seq = format!(":{base_name}");
-    for i in 1..repeat {
+    for i in 0..repeat {
         seq.push_str(format!(", :{base_name}_{i}").as_str());
     }
 
