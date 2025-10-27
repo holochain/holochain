@@ -74,7 +74,6 @@ async fn invalid_op_warrant_issuance_can_be_disabled() {
         .unwrap()[0]
         .test_read(move |txn| {
             let store = CascadeTxnWrapper::from(txn);
-            // TODO: The check_valid argument of get_warrants_for_agents should be removed once warrants are validated.
             let warrants = store.get_warrants_for_agent(&alice_pubkey, false).unwrap();
             assert!(warrants.is_empty());
         });
@@ -154,7 +153,6 @@ async fn skip_self_validation_to_cause_warrant() {
             let alice_pubkey = alice_pubkey.clone();
             move |txn| {
                 let store = CascadeTxnWrapper::from(txn);
-                // TODO: The check_valid argument of get_warrants_for_agents should be removed once warrants are validated.
                 store.get_warrants_for_agent(&alice_pubkey, false).unwrap()
             }
         });

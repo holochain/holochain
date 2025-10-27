@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix: Make sure that warrants in the DHT database are always queried filtered by valid status in tests. \#5389
 - Remove the restriction on using action type, entry type, and entry hash filters with bounded queries using the `query` host function. #5384
 - Implementation and test blocking of agents who issue invalid warrants. #5358
 
