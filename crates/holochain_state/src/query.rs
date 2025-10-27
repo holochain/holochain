@@ -501,7 +501,7 @@ impl CascadeTxnWrapper<'_, '_> {
     }
 
     // This is nearly identical to get_exact_record, but it returns `None` if an entry
-    // associated to the action is not available.
+    // associated to the action is not available or if the entry is private.
     fn get_complete_public_record(&self, hash: &ActionHash) -> StateQueryResult<Option<Record>> {
         let record = self.txn.query_row(
             "
