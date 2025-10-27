@@ -4,6 +4,7 @@
 
 use hdk::prelude::*;
 use holo_hash::ActionHash;
+use holochain::retry_until_timeout;
 use holochain::sweettest::SweetConductorBatch;
 use holochain::sweettest::SweetConductorConfig;
 use holochain::sweettest::SweetInlineZomes;
@@ -11,6 +12,7 @@ use holochain::sweettest::{await_consistency, SweetConductor, SweetDnaFile};
 use holochain::test_utils::inline_zomes::simple_crud_zome;
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_conductor_api::conductor::NetworkConfig;
+use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::record::Record;
 
 /// Test that conductors with arcs clamped to zero do not gossip.
@@ -57,6 +59,124 @@ async fn get_with_zero_arc_2_way() {
 
     // 1 can get 0's data, though.
     assert!(record_1.is_some());
+}
+
+/// Test that a full arc conductor can read an entry created by a zero arc conductor.
+#[tokio::test(flavor = "multi_thread")]
+async fn full_arc_can_get_entry_created_by_zero_arc() {
+    holochain_trace::test_run();
+
+    // Standard config with arc clamped to zero and publishing off
+    let empty_arc_conductor_config =
+        SweetConductorConfig::rendezvous(false).tune_network_config(|nc| {
+            nc.target_arc_factor = 0;
+        });
+    let standard_config = SweetConductorConfig::rendezvous(false);
+    let mut conductors =
+        SweetConductorBatch::from_configs_rendezvous([standard_config, empty_arc_conductor_config])
+            .await;
+
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
+    let apps: holochain::sweettest::SweetAppBatch =
+        conductors.setup_app("app", [&dna_file]).await.unwrap();
+    let ((full_arc,), (zero_arc,)) = apps.into_tuples();
+    conductors[0]
+        .declare_full_storage_arcs(dna_file.dna_hash())
+        .await;
+    conductors.exchange_peer_info().await;
+
+    let zome_zero_arc = zero_arc.zome(SweetInlineZomes::COORDINATOR);
+    let action_hash: ActionHash = conductors[1]
+        .call(&zome_zero_arc, "create_string", "hi".to_string())
+        .await;
+
+    let zome_full_arc = full_arc.zome(SweetInlineZomes::COORDINATOR);
+
+    retry_until_timeout!({
+        let record: Option<Record> = conductors[0]
+            .call(&zome_full_arc, "read", action_hash.clone())
+            .await;
+
+        // Full arc conductor can get entry created by zero arc conductor
+        if record.is_some() {
+            break;
+        }
+    })
+}
+
+/// Test that a full arc conductor can read a link created by a zero arc conductor.
+#[tokio::test(flavor = "multi_thread")]
+async fn full_arc_can_get_link_created_by_zero_arc() {
+    holochain_trace::test_run();
+
+    // Standard config with arc clamped to zero and publishing off
+    let empty_arc_conductor_config =
+        SweetConductorConfig::rendezvous(false).tune_network_config(|nc| {
+            nc.target_arc_factor = 0;
+        });
+    let standard_config = SweetConductorConfig::rendezvous(false);
+    let mut conductors =
+        SweetConductorBatch::from_configs_rendezvous([standard_config, empty_arc_conductor_config])
+            .await;
+
+    let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Link])
+        .await
+        .0;
+
+    let apps: holochain::sweettest::SweetAppBatch =
+        conductors.setup_app("app", [&dna_file]).await.unwrap();
+    let ((full_arc,), (zero_arc,)) = apps.into_tuples();
+    conductors[0]
+        .declare_full_storage_arcs(dna_file.dna_hash())
+        .await;
+    conductors.exchange_peer_info().await;
+
+    // Verify that the full arc initially sees 0 links
+    let links: Vec<Link> = conductors[0]
+        .call(
+            &full_arc.zome(TestWasm::Link.coordinator_zome_name()),
+            "get_links",
+            (),
+        )
+        .await;
+
+    assert_eq!(links.len(), 0);
+
+    // zero arc creates link
+    let link_hash: ActionHash = conductors[1]
+        .call(
+            &zero_arc.zome(TestWasm::Link.coordinator_zome_name()),
+            "create_link",
+            (),
+        )
+        .await;
+
+    // Verify that the zero arc can see its own link
+    let links: Vec<Link> = conductors[1]
+        .call(
+            &zero_arc.zome(TestWasm::Link.coordinator_zome_name()),
+            "get_links",
+            (),
+        )
+        .await;
+
+    assert_eq!(links.len(), 1);
+    assert_eq!(links.first().unwrap().create_link_hash, link_hash);
+
+    retry_until_timeout!({
+        let links: Vec<Link> = conductors[0]
+            .call(
+                &full_arc.zome(TestWasm::Link.coordinator_zome_name()),
+                "get_links",
+                (),
+            )
+            .await;
+
+        // Full arc conductor can get entry created by zero arc conductor
+        if links.len() == 1 {
+            break;
+        }
+    })
 }
 
 /// Test that when the conductor shuts down, gossip does not continue,
