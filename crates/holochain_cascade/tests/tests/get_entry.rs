@@ -171,7 +171,7 @@ async fn assert_rejected(
 async fn assert_can_retrieve(td_entry: &EntryTestData, cascade: &CascadeImpl, options: GetOptions) {
     // - Retrieve via entry hash
     let (r, _) = cascade
-        .retrieve(td_entry.hash.clone().into(), options.clone().into())
+        .retrieve_public_record(td_entry.hash.clone().into(), options.clone().into())
         .await
         .unwrap()
         .expect("Failed to retrieve record");
@@ -181,7 +181,7 @@ async fn assert_can_retrieve(td_entry: &EntryTestData, cascade: &CascadeImpl, op
 
     // - Retrieve via action hash
     let (r, _) = cascade
-        .retrieve(td_entry.create_hash.clone().into(), options.clone().into())
+        .retrieve_public_record(td_entry.create_hash.clone().into(), options.clone().into())
         .await
         .unwrap()
         .expect("Failed to retrieve record");

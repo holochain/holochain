@@ -232,6 +232,10 @@ impl Store for Scratch {
         }
     }
 
+    fn get_public_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
+        self.get_record(hash)
+    }
+
     /// It doesn't make sense to search for
     /// a different authored entry in a scratch
     /// then the scratches author so this is

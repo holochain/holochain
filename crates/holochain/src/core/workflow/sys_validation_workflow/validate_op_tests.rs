@@ -2260,7 +2260,7 @@ async fn crash_case() {
     });
 
     cascade
-        .expect_retrieve()
+        .expect_retrieve_public_record()
         .times(1)
         .returning(move |_hash, _options| {
             let signed_action = signed_action.clone();
