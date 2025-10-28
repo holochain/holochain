@@ -9,7 +9,6 @@ use std::sync::Arc;
 #[derive(Debug, Clone)]
 pub struct GetAgentActivityRecordsQuery {
     pub(super) agent: AgentPubKey,
-    pub(super) agent_basis: AnyLinkableHash,
     pub(super) filter: ChainQueryFilter,
     pub(super) options: GetActivityOptions,
 }
@@ -17,7 +16,6 @@ pub struct GetAgentActivityRecordsQuery {
 impl GetAgentActivityRecordsQuery {
     pub fn new(agent: AgentPubKey, filter: ChainQueryFilter, options: GetActivityOptions) -> Self {
         Self {
-            agent_basis: agent.clone().into(),
             agent,
             filter,
             options,
@@ -33,31 +31,22 @@ impl Query for GetAgentActivityRecordsQuery {
     fn query(&self) -> String {
         "
             SELECT
-            Action.hash,
-            Action.blob AS action_blob,
-            Action.private_entry,
-            DhtOp.type AS dht_type,
-            DhtOp.validation_status,
-            DhtOp.when_integrated,
-            Entry.blob AS entry_blob
-            FROM Action
-            JOIN DhtOp ON DhtOp.action_hash = Action.hash
-            LEFT JOIN Entry ON Action.entry_hash = Entry.hash
+                Action.hash,
+                Action.blob AS action_blob,
+                Action.private_entry,
+                DhtOp.type AS dht_type,
+                DhtOp.validation_status,
+                DhtOp.when_integrated,
+                Entry.blob AS entry_blob
+            FROM
+                Action
+                JOIN DhtOp ON DhtOp.action_hash = Action.hash
+                LEFT JOIN Entry ON Action.entry_hash = Entry.hash
             WHERE
-            (
-                -- is an action authored by this agent
                 Action.author = :author
                 AND DhtOp.type = :chain_op_type
-            )
-            OR
-            (
-                -- is an integrated, valid warrant
-                DhtOp.basis_hash = :author_basis
-                AND DhtOp.type = :warrant_op_type
-                AND DhtOp.validation_status = :valid_status
-                AND DhtOp.when_integrated IS NOT NULL
-            )
-            ORDER BY Action.seq ASC
+            ORDER BY
+                Action.seq ASC
         "
         .to_string()
     }
@@ -65,10 +54,7 @@ impl Query for GetAgentActivityRecordsQuery {
     fn params(&self) -> Vec<holochain_state::query::Params<'_>> {
         let params = named_params! {
             ":author": self.agent,
-            ":author_basis": self.agent_basis,
             ":chain_op_type": ChainOpType::RegisterAgentActivity,
-            ":warrant_op_type": WarrantOpType::ChainIntegrityWarrant,
-            ":valid_status": ValidationStatus::Valid,
         };
 
         params.to_vec()
