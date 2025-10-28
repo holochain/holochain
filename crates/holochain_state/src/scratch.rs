@@ -24,6 +24,7 @@ pub struct Scratch {
     chain_top_ordering: ChainTopOrdering,
     scheduled_fns: Vec<ScheduledFn>,
     chain_head: Option<(u32, usize)>,
+    warrants: Vec<SignedWarrant>,
 }
 
 #[derive(Debug, Clone)]
@@ -105,7 +106,7 @@ impl Scratch {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.actions.is_empty() && self.scheduled_fns.is_empty()
+        self.actions.is_empty() && self.scheduled_fns.is_empty() && self.warrants.is_empty()
     }
 
     pub fn actions(&self) -> impl Iterator<Item = &SignedActionHashed> {
@@ -173,6 +174,18 @@ impl Scratch {
             )
         })
     }
+
+    pub fn add_warrant(&mut self, warrant: SignedWarrant) {
+        self.warrants.push(warrant);
+    }
+
+    pub fn warrants(&self) -> impl Iterator<Item = &SignedWarrant> {
+        self.warrants.iter()
+    }
+
+    pub fn drain_warrants(&mut self) -> impl Iterator<Item = SignedWarrant> + '_ {
+        self.warrants.drain(..)
+    }
 }
 
 impl SyncScratch {
@@ -217,12 +230,21 @@ impl Store for Scratch {
 
     fn get_warrants_for_agent(
         &self,
-        _agent_key: &AgentPubKey,
+        agent_key: &AgentPubKey,
         _check_validity: bool,
     ) -> StateQueryResult<Vec<WarrantOp>> {
-        unimplemented!(
-            "Warrants are not committed to the chain, so the scratch will never contain one."
-        )
+        Ok(self
+            .warrants
+            .iter()
+            .filter_map(|warrant| {
+                // Check if this warrant applies to the agent
+                if warrant.warrantee == *agent_key {
+                    Some(WarrantOp::from(warrant.clone()))
+                } else {
+                    None
+                }
+            })
+            .collect())
     }
 
     fn get_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {

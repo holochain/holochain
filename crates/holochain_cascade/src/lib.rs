@@ -988,8 +988,28 @@ impl CascadeImpl {
             let results = self
                 .fetch_agent_activity(agent.clone(), query.clone(), options.clone())
                 .await?;
+
             let merged_response: AgentActivityResponse =
                 agent_activity::merge_activities(agent.clone(), &options, results)?;
+
+            // If there is a scratch and warrants were returned, add them to the scratch.
+            // Only warrants coming from the network should be added to the scratch. Locally
+            // found warrants shouldn't be redundantly added to the database.
+            if !authority && !merged_response.warrants.is_empty() {
+                if let Some(scratch) = &self.scratch {
+                    if let Err(err) = scratch.apply(|scratch| {
+                        for warrant in merged_response.warrants.iter() {
+                            scratch.add_warrant(warrant.clone());
+                        }
+                    }) {
+                        tracing::warn!(
+                            ?err,
+                            "Failed to add warrants from network response to scratch"
+                        );
+                    };
+                }
+            }
+
             merged_response
         };
 

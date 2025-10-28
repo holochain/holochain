@@ -237,13 +237,13 @@ impl SourceChain {
         &self,
         storage_arcs: Vec<DhtArc>,
         chc: Option<ChcImpl>,
-    ) -> SourceChainResult<Vec<SignedActionHashed>> {
+    ) -> SourceChainResult<(Vec<SignedActionHashed>, u32)> {
         // Nothing to write
         if self.scratch.apply(|s| s.is_empty())? {
-            return Ok(Vec::new());
+            return Ok((Vec::new(), 0));
         }
 
-        let (scheduled_fns, actions, ops, entries, records) =
+        let (scheduled_fns, actions, ops, entries, records, warrants) =
             self.scratch.apply_and_then(|scratch| {
                 let records: Vec<Record> = scratch.records().collect();
 
@@ -253,7 +253,8 @@ impl SourceChain {
                 // Drain out any entries.
                 let entries = scratch.drain_entries().collect::<Vec<_>>();
                 let scheduled_fns = scratch.drain_scheduled_fns().collect::<Vec<_>>();
-                SourceChainResult::Ok((scheduled_fns, actions, ops, entries, records))
+                let warrants = scratch.drain_warrants().collect::<Vec<_>>();
+                SourceChainResult::Ok((scheduled_fns, actions, ops, entries, records, warrants))
             })?;
 
         let maybe_countersigned_entry = entries
@@ -443,7 +444,61 @@ impl SourceChain {
                     self.dht_db.clone(),
                 )
                 .await?;
-                SourceChainResult::Ok(actions)
+
+                // Insert warrants into DHT database.
+                // Check signatures first
+                let mut warrants_to_insert = Vec::new();
+                for warrant in warrants {
+                    match warrant
+                        .author
+                        .verify_signature(warrant.signature(), warrant.data())
+                        .await
+                    {
+                        Ok(true) => warrants_to_insert.push(warrant),
+                        Ok(false) => {
+                            tracing::info!(
+                        "Invalid signature of a warrant in the scratch space. Skipping warrant"
+                    );
+                            continue;
+                        }
+                        Err(err) => {
+                            tracing::warn!(?err, "Could not verify warrant signature before inserting from scratch space into DHT database. Skipping warrant");
+                            continue;
+                        }
+                    }
+                }
+
+                // Write warrants to DHT database
+                let total_inserted_warrants = self
+                    .dht_db
+                    .write_async(|txn| -> DatabaseResult<u32> {
+                        let mut inserted_warrants = 0;
+                        for warrant in warrants_to_insert {
+                            let warrant_op = DhtOpHashed::from_content_sync(DhtOp::from(
+                                WarrantOp::from(warrant),
+                            ));
+                            let serialized_size =
+                                encode(&warrant_op).unwrap_or_else(|_| vec![]).len() as u32;
+                            match insert_op_dht(txn, &warrant_op, serialized_size, None) {
+                                // TODO: This should only be increased if the op has actually been inserted.
+                                //       It's not possible to determine that, because mutations don't return
+                                //       the row count. Fix this once row count is returned.
+                                Ok(_) => inserted_warrants += 1,
+                                Err(err) => {
+                                    tracing::warn!(
+                                        ?err,
+                                        "Could not insert warrant from scratch space into DHT database"
+                                    );
+
+                                }
+                            }
+                        }
+                        Ok(inserted_warrants)
+                    })
+                    .await
+                    .unwrap(); // unwrap is safe here because no errors are returned from the closure
+
+                SourceChainResult::Ok((actions, total_inserted_warrants))
             }
             Err(e) => Err(e),
         }
@@ -1372,9 +1427,11 @@ mod tests {
     use super::*;
     use crate::prelude::*;
     use crate::source_chain::SourceChainResult;
+    use ::fixt::fixt;
     use ::fixt::prelude::*;
-    use holo_hash::fixt::AgentPubKeyFixturator;
     use holo_hash::fixt::DnaHashFixturator;
+    #[cfg(feature = "unstable-warrants")]
+    use holo_hash::fixt::{ActionHashFixturator, AgentPubKeyFixturator};
     use holochain_keystore::test_keystore;
     use holochain_zome_types::Entry;
     use matches::assert_matches;
@@ -1382,24 +1439,14 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_relaxed_ordering() -> SourceChainResult<()> {
-        let test_db = test_authored_db();
-        let dht_db = test_dht_db();
-        let keystore = test_keystore();
-        let db = test_db.to_db();
-        let alice = fixt!(AgentPubKey, Predictable, 0);
+        let TestCase {
+            chain: chain_1,
+            agent_key: alice,
+            authored: db,
+            dht: dht_db,
+            keystore,
+        } = TestCase::new().await;
 
-        source_chain::genesis(
-            db.clone(),
-            dht_db.to_db(),
-            keystore.clone(),
-            fake_dna_hash(1),
-            alice.clone(),
-            None,
-            None,
-        )
-        .await?;
-        let chain_1 =
-            SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone()).await?;
         let chain_2 =
             SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone()).await?;
         let chain_3 =
@@ -1446,26 +1493,14 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_relaxed_ordering_with_entry() -> SourceChainResult<()> {
-        let test_db = test_authored_db();
-        let dht_db = test_dht_db();
-        let keystore = test_keystore();
-        let db = test_db.to_db();
-        let alice = fixt!(AgentPubKey, Predictable, 0);
+        let TestCase {
+            chain: chain_1,
+            agent_key: alice,
+            authored: db,
+            dht: dht_db,
+            keystore,
+        } = TestCase::new().await;
 
-        source_chain::genesis(
-            db.clone(),
-            dht_db.to_db(),
-            keystore.clone(),
-            fake_dna_hash(1),
-            alice.clone(),
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-
-        let chain_1 =
-            SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone()).await?;
         let chain_2 =
             SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone()).await?;
         let chain_3 =
@@ -1558,27 +1593,8 @@ mod tests {
     // Test that a valid agent pub key can be deleted and that repeated deletes fail.
     #[tokio::test(flavor = "multi_thread")]
     async fn delete_valid_agent_pub_key() {
-        let authored_db = test_authored_db().to_db();
-        let dht_db = test_dht_db().to_db();
-        let keystore = test_keystore();
-        let agent_key = keystore.new_sign_keypair_random().await.unwrap();
+        let TestCase { chain, .. } = TestCase::new().await;
 
-        source_chain::genesis(
-            authored_db.clone(),
-            dht_db.clone(),
-            keystore.clone(),
-            fake_dna_hash(1),
-            agent_key.clone(),
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-
-        // Delete valid agent pub key should succeed.
-        let chain = SourceChain::new(authored_db, dht_db, keystore, agent_key)
-            .await
-            .unwrap();
         let result = chain.delete_valid_agent_pub_key().await;
         assert!(result.is_ok());
         chain.flush(vec![DhtArc::Empty], None).await.unwrap();
@@ -1591,10 +1607,14 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_get_cap_grant() -> SourceChainResult<()> {
-        let test_db = test_authored_db();
-        let dht_db = test_dht_db();
-        let keystore = test_keystore();
-        let db = test_db.to_db();
+        let TestCase {
+            chain,
+            agent_key: alice,
+            authored: db,
+            dht: dht_db,
+            keystore,
+        } = TestCase::new().await;
+
         let secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
         // create transferable cap grant
         #[allow(clippy::unnecessary_literal_unwrap)] // must be this type
@@ -1607,25 +1627,10 @@ mod tests {
         fns.insert(function.clone());
         let functions = GrantedFunctions::Listed(fns);
         let grant = ZomeCallCapGrant::new("tag".into(), secret_access.clone(), functions.clone());
-        let mut agents = AgentPubKeyFixturator::new(Predictable);
-        let alice = agents.next().unwrap();
-        let bob = agents.next().unwrap();
-        // predictable fixturator creates only two different agent keys
-        let carol = keystore.new_sign_keypair_random().await.unwrap();
-        source_chain::genesis(
-            db.clone(),
-            dht_db.to_db(),
-            keystore.clone(),
-            fake_dna_hash(1),
-            alice.clone(),
-            None,
-            None,
-        )
-        .await
-        .unwrap();
 
-        let chain =
-            SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone()).await?;
+        let bob = keystore.new_sign_keypair_random().await.unwrap();
+        let carol = keystore.new_sign_keypair_random().await.unwrap();
+
         // alice as chain author always has a valid cap grant; provided secrets
         // are ignored
         assert_eq!(
@@ -2105,24 +2110,14 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn source_chain_buffer_dump_entries_json() -> SourceChainResult<()> {
-        let test_db = test_authored_db();
-        let dht_db = test_dht_db();
-        let keystore = test_keystore();
-        let vault = test_db.to_db();
-        let author = keystore.new_sign_keypair_random().await.unwrap();
-        genesis(
-            vault.clone(),
-            dht_db.to_db(),
-            keystore.clone(),
-            fixt!(DnaHash),
-            author.clone(),
-            None,
-            None,
-        )
-        .await
-        .unwrap();
+        let TestCase {
+            chain: _,
+            agent_key,
+            authored,
+            ..
+        } = TestCase::new().await;
 
-        let json = dump_state(vault.clone().into(), author.clone()).await?;
+        let json = dump_state(authored.clone().into(), agent_key.clone()).await?;
         let json = serde_json::to_string_pretty(&json)?;
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
 
@@ -2142,33 +2137,12 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn source_chain_query() {
-        let test_db = test_authored_db();
-        let dht_db = test_dht_db();
-        let keystore = test_keystore();
-        let vault = test_db.to_db();
-        let alice = keystore.new_sign_keypair_random().await.unwrap();
-        let dna_hash = fixt!(DnaHash);
-
-        genesis(
-            vault.clone(),
-            dht_db.to_db(),
-            keystore.clone(),
-            dna_hash.clone(),
-            alice.clone(),
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-
-        let chain = SourceChain::new(
-            vault.clone(),
-            dht_db.to_db(),
-            keystore.clone(),
-            alice.clone(),
-        )
-        .await
-        .unwrap();
+        let TestCase {
+            chain,
+            agent_key: alice,
+            keystore,
+            ..
+        } = TestCase::new().await;
 
         let app_entry_type = EntryType::App(AppEntryDef {
             zome_index: 0.into(),
@@ -2328,28 +2302,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn source_chain_query_ordering() {
-        let test_db = test_authored_db();
-        let dht_db = test_dht_db();
-        let keystore = test_keystore();
-        let vault = test_db.to_db();
-        let alice = keystore.new_sign_keypair_random().await.unwrap();
-        let dna_hash = fixt!(DnaHash);
-
-        genesis(
-            vault.clone(),
-            dht_db.to_db(),
-            keystore.clone(),
-            dna_hash.clone(),
-            alice.clone(),
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-
-        let chain = SourceChain::new(vault, dht_db.to_db(), keystore, alice.clone())
-            .await
-            .unwrap();
+        let TestCase { chain, .. } = TestCase::new().await;
 
         let asc = chain.query(ChainQueryFilter::default()).await.unwrap();
         let desc = chain
@@ -2367,28 +2320,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn init_zomes_complete() {
-        let test_db = test_authored_db();
-        let dht_db = test_dht_db();
-        let keystore = test_keystore();
-        let vault = test_db.to_db();
-        let alice = keystore.new_sign_keypair_random().await.unwrap();
-        let dna_hash = fixt!(DnaHash);
-
-        genesis(
-            vault.clone(),
-            dht_db.to_db(),
-            keystore.clone(),
-            dna_hash.clone(),
-            alice.clone(),
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-
-        let chain = SourceChain::new(vault, dht_db.to_db(), keystore, alice.clone())
-            .await
-            .unwrap();
+        let TestCase { chain, .. } = TestCase::new().await;
 
         // zomes initialized should be false after genesis
         let zomes_initialized = chain.zomes_initialized().await.unwrap();
@@ -2409,5 +2341,223 @@ mod tests {
         // zomes initialized should be true after init zomes has run
         let zomes_initialized = chain.zomes_initialized().await.unwrap();
         assert!(zomes_initialized);
+    }
+
+    #[cfg(feature = "unstable-warrants")]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn flush_writes_warrants_to_dht_db() {
+        let TestCase {
+            chain,
+            agent_key,
+            dht,
+            keystore,
+            ..
+        } = TestCase::new().await;
+        let warrantee = fixt!(AgentPubKey);
+
+        let warrantee_clone = warrantee.clone();
+        let actual_warrants = dht.test_read(move |txn| {
+            CascadeTxnWrapper::from(txn)
+                .get_warrants_for_agent(&warrantee_clone, true)
+                .unwrap()
+        });
+        assert_eq!(actual_warrants.len(), 0);
+
+        // Create a warrant
+        let signed_warrant = create_signed_warrant(&agent_key, &warrantee, &keystore).await;
+        // Add warrant to scratch
+        chain
+            .scratch
+            .apply(|scratch| {
+                scratch.add_warrant(signed_warrant.clone());
+            })
+            .unwrap();
+
+        // Flush should write warrants to DHT database
+        let (actions, warrant_count) = chain.flush(vec![], None).await.unwrap();
+        assert!(actions.is_empty());
+        assert_eq!(warrant_count, 1);
+
+        // Check DHT database
+        let actual_warrants = dht.test_read(move |txn| {
+            CascadeTxnWrapper::from(txn)
+                .get_warrants_for_agent(&warrantee, false)
+                .unwrap()
+        });
+        assert_eq!(actual_warrants, vec![WarrantOp::from(signed_warrant)]);
+    }
+
+    #[cfg(feature = "unstable-warrants")]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn duplicate_warrants_are_not_inserted_during_flush() {
+        holochain_trace::test_run();
+        let TestCase {
+            chain,
+            agent_key,
+            dht,
+            keystore,
+            ..
+        } = TestCase::new().await;
+        let warrantee = fixt!(AgentPubKey);
+
+        // Create a warrant
+        let signed_warrant = create_signed_warrant(&agent_key, &warrantee, &keystore).await;
+        // Add warrant to scratch
+        chain
+            .scratch
+            .apply(|scratch| {
+                scratch.add_warrant(signed_warrant.clone());
+            })
+            .unwrap();
+
+        // Flush should write warrant to DHT database
+        let (actions, warrant_count) = chain.flush(vec![], None).await.unwrap();
+        assert!(actions.is_empty());
+        assert_eq!(warrant_count, 1);
+
+        // Check DHT database
+        let warrantee_clone = warrantee.clone();
+        let actual_warrants = dht.test_read(move |txn| {
+            CascadeTxnWrapper::from(txn)
+                .get_warrants_for_agent(&warrantee_clone, false)
+                .unwrap()
+        });
+        assert_eq!(
+            actual_warrants,
+            vec![WarrantOp::from(signed_warrant.clone())]
+        );
+
+        // Add same warrant to scratch again
+        chain
+            .scratch
+            .apply(|scratch| {
+                scratch.add_warrant(signed_warrant.clone());
+            })
+            .unwrap();
+
+        // Flush should not write duplicate warrant to DHT database
+        let (actions, warrant_count) = chain.flush(vec![], None).await.unwrap();
+        assert!(actions.is_empty());
+        assert_eq!(warrant_count, 1); // rejected inserts are not reported by the insertion method, so this will indicate 1
+
+        // Check DHT database again
+        let actual_warrants = dht.test_read(move |txn| {
+            CascadeTxnWrapper::from(txn)
+                .get_warrants_for_agent(&warrantee, false)
+                .unwrap()
+        });
+        assert_eq!(actual_warrants, vec![WarrantOp::from(signed_warrant)]);
+    }
+
+    #[cfg(feature = "unstable-warrants")]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn counterfeit_warrants_are_not_inserted_during_flush() {
+        let TestCase {
+            chain,
+            agent_key,
+            dht,
+            ..
+        } = TestCase::new().await;
+        let warrantee = fixt!(AgentPubKey);
+
+        // Create a counterfeit warrant
+        let warrant = Warrant::new(
+            WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+                action_author: warrantee.clone(),
+                action: (fixt!(ActionHash), fixt!(Signature)),
+                chain_op_type: ChainOpType::RegisterAgentActivity,
+            }),
+            agent_key.clone(),
+            Timestamp::now(),
+            warrantee.clone(),
+        );
+        let signed_warrant = SignedWarrant::new(warrant, fixt!(Signature));
+        // Add warrant to scratch
+        chain
+            .scratch
+            .apply(|scratch| {
+                scratch.add_warrant(signed_warrant.clone());
+            })
+            .unwrap();
+
+        // Flush should not write warrant to DHT database
+        let (actions, warrant_count) = chain.flush(vec![], None).await.unwrap();
+        assert!(actions.is_empty());
+        assert_eq!(warrant_count, 0);
+
+        // Check DHT database
+        let warrantee_clone = warrantee.clone();
+        let actual_warrants = dht.test_read(move |txn| {
+            CascadeTxnWrapper::from(txn)
+                .get_warrants_for_agent(&warrantee_clone, false)
+                .unwrap()
+        });
+        assert!(actual_warrants.is_empty());
+    }
+
+    struct TestCase {
+        chain: SourceChain,
+        agent_key: AgentPubKey,
+        authored: TestDb<DbKindAuthored>,
+        dht: TestDb<DbKindDht>,
+        keystore: MetaLairClient,
+    }
+
+    impl TestCase {
+        async fn new() -> Self {
+            let authored = test_authored_db();
+            let dht = test_dht_db();
+            let keystore = test_keystore();
+            let dna_hash = fixt!(DnaHash);
+            let agent_key = keystore.new_sign_keypair_random().await.unwrap();
+            genesis(
+                authored.to_db(),
+                dht.to_db(),
+                keystore.clone(),
+                dna_hash,
+                agent_key.clone(),
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+            let chain = SourceChain::new(
+                authored.to_db(),
+                dht.to_db(),
+                keystore.clone(),
+                agent_key.clone(),
+            )
+            .await
+            .unwrap();
+            Self {
+                chain,
+                agent_key,
+                authored,
+                dht,
+                keystore,
+            }
+        }
+    }
+
+    #[cfg(feature = "unstable-warrants")]
+    async fn create_signed_warrant(
+        author: &AgentPubKey,
+        warrantee: &AgentPubKey,
+        keystore: &MetaLairClient,
+    ) -> SignedWarrant {
+        let warrant = Warrant::new(
+            WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+                action_author: warrantee.clone(),
+                action: (fixt!(ActionHash), fixt!(Signature)),
+                chain_op_type: ChainOpType::RegisterAgentActivity,
+            }),
+            author.clone(),
+            Timestamp::now(),
+            warrantee.clone(),
+        );
+        SignedWarrant::new(
+            warrant.clone(),
+            author.sign(keystore, warrant).await.unwrap(),
+        )
     }
 }
