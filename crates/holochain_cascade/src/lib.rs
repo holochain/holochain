@@ -993,9 +993,8 @@ impl CascadeImpl {
                 agent_activity::merge_activities(agent.clone(), &options, results)?;
 
             // If there is a scratch and warrants were returned, add them to the scratch.
-            // Only warrants coming from the network should be added to the scratch. If
-            // the caller is an authority for the agent, warrants are already locally present
-            // and shouldn't be redundantly added to the database.
+            // Only warrants coming from the network should be added to the scratch. Locally
+            // found warrants shouldn't be redundantly added to the database.
             if !authority && !merged_response.warrants.is_empty() {
                 if let Some(scratch) = &self.scratch {
                     if let Err(err) = scratch.apply(|scratch| {
