@@ -7,12 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.6.0-dev.31
+
 - Feat: Insert warrants discovered during host function `get_agent_activity` into DHT database for validation and integration. \#5387
 - Refactor: `get_agent_activity` uses two queries to select actions and warrants from the database. There was a legacy query which selected both from when warrants were stored in the Action table. \#5390
 - Refactor: `retrieve` in the cascade only returns a record if it is complete. For actions with an associated entry, the entry must be included if it is public. If it is not present or private, `retrieve` returns `None`, where before it would return the record without the entry. `retrieve` is also renamed to `retrieve_public_record`. \#5385
 - Fix: Make sure that warrants in the DHT database are always queried filtered by valid status in tests. \#5389
-- Remove the restriction on using action type, entry type, and entry hash filters with bounded queries using the `query` host function. #5384
-- Implementation and test blocking of agents who issue invalid warrants. #5358
+- Remove the restriction on using action type, entry type, and entry hash filters with bounded queries using the `query` host function. \#5384
+- Implementation and test blocking of agents who issue invalid warrants. \#5358
 
 ## 0.6.0-dev.30
 
@@ -21,7 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## 0.6.0-dev.29
 
-- Handle op ids with invalid length gracefully in `filter_out_existing_ops` and `retrieve_ops` to address [#5244](https://github.com/holochain/holochain/issues/5244) [#5359](https://github.com/holochain/holochain/pull/5359)
+- Handle op ids with invalid length gracefully in `filter_out_existing_ops` and `retrieve_ops` to address [\#5244](https://github.com/holochain/holochain/issues/5244) [\#5359](https://github.com/holochain/holochain/pull/5359)
 - Remove a check in `holochain_state` that prevented multiple warrants for the same agent being inserted. Not only are multiple warrant types allowed, but it is expected that multiple authorities will issue warrants for the same agent in parallel before discovering each other’s warrants. Failing to store those warrants would result in inconsistent views of the DHT. \#5342
 - **BREAKING CHANGE** Replace `BTreeSet` with `HashSet` in `GrantedFunctions::Listed`. \#5349
 - Add a new conductor tuning parameter `disable_self_validation` to disable self-validation of authored data. Intended only for testing warrants. \#5340
