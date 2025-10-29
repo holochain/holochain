@@ -46,7 +46,7 @@ pub fn get_agent_activity(
 ///
 /// ## Unbounded query
 ///
-/// /// Using [`ChainQueryFilterRange::Unbounded`] does not apply any bounds when retrieving data
+/// Using [`ChainQueryFilterRange::Unbounded`] does not apply any bounds when retrieving data
 /// from the database.
 ///
 /// Its characteristics are equivalent to [`ChainQueryFilterRange::ActionSeqRange`] with `start=0`
