@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Feat: Add a new cli argument `--target-arc-factor` to `hc-sandbox generate network` for overriding the generated conductor config setting `network.target_arc_factor`.
+
 ## 0.6.0-dev.31
 
 - Feat: Warrants discovered during host function call `must_get_agent_activity` lead to blocking the warranted agent. \#5405
