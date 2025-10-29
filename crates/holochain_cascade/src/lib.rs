@@ -886,6 +886,7 @@ impl CascadeImpl {
         let results = tokio::task::spawn_blocking({
             let author = author.clone();
             let filter = filter.clone();
+            let scratch = scratch.clone();
             move || {
                 let mut results = Vec::with_capacity(txn_guards.len() + 1);
                 for txn_guard in &mut txn_guards {
@@ -924,9 +925,29 @@ impl CascadeImpl {
             // this point then the chain is incomplete for this request.
             Ok(MustGetAgentActivityResponse::IncompleteChain)
         } else {
-            Ok(self
+            let result = self
                 .fetch_must_get_agent_activity(author.clone(), filter)
-                .await?)
+                .await?;
+            // Add warrants received from the network to the scratch space to be written
+            // to the DHT database.
+            if let MustGetAgentActivityResponse::Activity { warrants, .. } = &result {
+                if let Some(scratch) = scratch {
+                    if let Err(err) = scratch.apply(|scratch| {
+                        for warrant in warrants.iter() {
+                            scratch.add_warrant(SignedWarrant::new(
+                                warrant.data().clone(),
+                                warrant.signature().clone(),
+                            ));
+                        }
+                    }) {
+                        tracing::warn!(
+                            ?err,
+                            "Failed to add warrants from network response to scratch"
+                        );
+                    }
+                }
+            }
+            Ok(result)
         }
     }
 
