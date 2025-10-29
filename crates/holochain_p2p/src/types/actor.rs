@@ -11,107 +11,27 @@ use std::collections::HashMap;
 /// Fields tagged with `[Network]` are network-level controls.
 /// Fields tagged with `[Remote]` are controls that will be forwarded to the
 /// remote agent processing this `Get` request.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct GetOptions {
-    /// `[Network]`
-    /// How many remote nodes should we make requests of / aggregate.
-    /// Set to `None` for a default "best-effort".
-    pub remote_agent_count: Option<u8>,
-
     /// `[Network]`
     /// Timeout to await responses for aggregation.
     /// Set to `None` for a default "best-effort".
     /// Note - if all requests time-out you will receive an empty result,
     /// not a timeout error.
     pub timeout_ms: Option<u64>,
-
-    /// `[Network]`
-    /// We are interested in speed. If `true` and we have any results
-    /// when `race_timeout_ms` is expired, those results will be returned.
-    /// After `race_timeout_ms` and before `timeout_ms` the first result
-    /// received will be returned.
-    pub as_race: bool,
-
-    /// `[Network]`
-    /// See `as_race` for details.
-    /// Set to `None` for a default "best-effort" race.
-    pub race_timeout_ms: Option<u64>,
-}
-
-impl Default for GetOptions {
-    fn default() -> Self {
-        Self {
-            remote_agent_count: None,
-            timeout_ms: None,
-            as_race: true,
-            race_timeout_ms: None,
-        }
-    }
 }
 
 impl GetOptions {
     /// Using defaults is dangerous in a must_get as it can undermine determinism.
     /// We want refactors to explicitly consider this.
     pub fn must_get_options() -> Self {
-        Self {
-            remote_agent_count: None,
-            timeout_ms: None,
-            as_race: true,
-            race_timeout_ms: None,
-        }
+        Self { timeout_ms: None }
     }
 }
 
 impl From<holochain_zome_types::entry::GetOptions> for GetOptions {
     fn from(_: holochain_zome_types::entry::GetOptions) -> Self {
         Self::default()
-    }
-}
-
-/// Get metadata from the DHT.
-/// Fields tagged with `[Network]` are network-level controls.
-/// Fields tagged with `[Remote]` are controls that will be forwarded to the
-/// remote agent processing this `GetLinks` request.
-#[derive(Clone, Debug)]
-pub struct GetMetaOptions {
-    /// `[Network]`
-    /// How many remote nodes should we make requests of / aggregate.
-    /// Set to `None` for a default "best-effort".
-    pub remote_agent_count: Option<u8>,
-
-    /// `[Network]`
-    /// Timeout to await responses for aggregation.
-    /// Set to `None` for a default "best-effort".
-    /// Note - if all requests time-out you will receive an empty result,
-    /// not a timeout error.
-    pub timeout_ms: Option<u64>,
-
-    /// `[Network]`
-    /// We are interested in speed. If `true` and we have any results
-    /// when `race_timeout_ms` is expired, those results will be returned.
-    /// After `race_timeout_ms` and before `timeout_ms` the first result
-    /// received will be returned.
-    pub as_race: bool,
-
-    /// `[Network]`
-    /// See `as_race` for details.
-    /// Set to `None` for a default "best-effort" race.
-    pub race_timeout_ms: Option<u64>,
-
-    /// `[Remote]`
-    /// Tells the remote-end which metadata to return
-    pub metadata_request: MetadataRequest,
-}
-
-impl Default for GetMetaOptions {
-    fn default() -> Self {
-        Self {
-            remote_agent_count: None,
-            timeout_ms: None,
-            as_race: true,
-            race_timeout_ms: None,
-            metadata_request: MetadataRequest::default(),
-        }
     }
 }
 
@@ -288,14 +208,6 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
         dna_hash: DnaHash,
         dht_hash: holo_hash::AnyDhtHash,
     ) -> BoxFut<'_, HolochainP2pResult<Vec<WireOps>>>;
-
-    /// Get metadata from the DHT.
-    fn get_meta(
-        &self,
-        dna_hash: DnaHash,
-        dht_hash: holo_hash::AnyDhtHash,
-        options: GetMetaOptions,
-    ) -> BoxFut<'_, HolochainP2pResult<Vec<MetadataSet>>>;
 
     /// Get links from the DHT.
     fn get_links(

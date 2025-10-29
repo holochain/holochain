@@ -78,25 +78,6 @@ impl HcP2pHandler for Handler {
         })
     }
 
-    fn handle_get_meta(
-        &self,
-        _dna_hash: DnaHash,
-        _to_agent: AgentPubKey,
-        _dht_hash: holo_hash::AnyDhtHash,
-        _options: GetMetaOptions,
-    ) -> BoxFut<'_, HolochainP2pResult<MetadataSet>> {
-        Box::pin(async move {
-            self.calls.lock().unwrap().push("get_meta".into());
-            Ok(MetadataSet {
-                actions: Default::default(),
-                invalid_actions: Default::default(),
-                deletes: Default::default(),
-                updates: Default::default(),
-                entry_dht_status: Some(EntryDhtStatus::Live),
-            })
-        })
-    }
-
     fn handle_get_links(
         &self,
         _dna_hash: DnaHash,

@@ -87,14 +87,6 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         Ok(out)
     }
 
-    async fn get_meta(
-        &self,
-        _dht_hash: holo_hash::AnyDhtHash,
-        _options: actor::GetMetaOptions,
-    ) -> HolochainP2pResult<Vec<MetadataSet>> {
-        todo!()
-    }
-
     async fn get_links(
         &self,
         link_key: WireLinkKey,

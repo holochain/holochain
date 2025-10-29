@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Remove `get_meta` from `holochain_p2p` and related code, which was never implemented.
+
 ## 0.6.0-dev.31
 
 - Test: Warrants discovered during host function call `get_agent_activity` lead to blocking the warranted agent. \#5377
