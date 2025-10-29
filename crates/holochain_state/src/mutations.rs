@@ -1180,21 +1180,18 @@ pub async fn copy_cached_op_to_dht(
                 let mut stmt = txn.prepare(
                     r#"
                         SELECT
-                          Action.blob AS action_blob,
-                          Entry.blob AS entry_blob
-                        FROM DhtOp
-                        JOIN Action ON DhtOp.action_hash = Action.hash
-                        LEFT JOIN Entry ON Action.entry_hash = Entry.hash
+                            Action.blob AS action_blob,
+                            Entry.blob AS entry_blob
+                        FROM Action
+                            LEFT JOIN Entry ON Action.entry_hash = Entry.hash
                         WHERE
-                          DhtOp.type == :dht_op_type
-                          AND DhtOp.action_hash = :action_hash
+                            Action.hash = :action_hash
                         "#
                 )?;
 
                 let maybe_action_entry = stmt
                     .query_row(
                         named_params! {
-                            ":dht_op_type": chain_op_type,
                             ":action_hash": action_hash,
                         },
                         |row: &Row| -> rusqlite::Result<(Vec<u8>, Option<Vec<u8>>)> {

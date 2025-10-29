@@ -5,6 +5,8 @@ use holochain::sweettest::{
 };
 use holochain_wasm_test_utils::TestWasm;
 
+/// For a test that checks that zero arc nodes block warranted agents, see [`super::warrants::zero_arc`].
+
 #[tokio::test(flavor = "multi_thread")]
 async fn publish_does_not_go_to_blocked_peers() {
     holochain_trace::test_run();

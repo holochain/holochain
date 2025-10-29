@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## 0.6.0-dev.31
 
+- Test: Warrants discovered during host function call `get_agent_activity` lead to blocking the warranted agent. \#5377
 - Feat: Insert warrants discovered during host function `get_agent_activity` into DHT database for validation and integration. \#5387
 - Refactor: `get_agent_activity` uses two queries to select actions and warrants from the database. There was a legacy query which selected both from when warrants were stored in the Action table. \#5390
 - Refactor: `retrieve` in the cascade only returns a record if it is complete. For actions with an associated entry, the entry must be included if it is public. If it is not present or private, `retrieve` returns `None`, where before it would return the record without the entry. `retrieve` is also renamed to `retrieve_public_record`. \#5385
