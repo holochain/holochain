@@ -70,6 +70,13 @@ pub struct Network {
     /// prior knowledge of each other.
     #[arg(short, long, value_parser = try_parse_url2)]
     pub bootstrap: Option<Url2>,
+
+    /// Set the target arc factor for this conductor.
+    /// In normal operation, leave this as the default 1.
+    /// For leacher/zero-arc nodes that do not contribute to gossip, set to 0.
+    /// To take on additional gossip burden, set to > 1.
+    #[arg(long)]
+    pub target_arc_factor: Option<u32>,
 }
 
 #[derive(Debug, Parser, Clone)]
@@ -200,6 +207,7 @@ impl Network {
         let Network {
             transport,
             bootstrap,
+            target_arc_factor,
         } = match this {
             None => {
                 return Some(NetworkConfig {
@@ -219,6 +227,9 @@ impl Network {
         let mut kit = NetworkConfig::default();
         if let Some(bootstrap) = bootstrap {
             kit.bootstrap_url = bootstrap;
+        }
+        if let Some(target_arc_factor) = target_arc_factor {
+            kit.target_arc_factor = target_arc_factor;
         }
 
         match transport {
