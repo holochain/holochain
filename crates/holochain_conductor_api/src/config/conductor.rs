@@ -258,7 +258,6 @@ pub struct NetworkConfig {
     /// The target arc factor to apply when receiving hints from kitsune2.
     /// In normal operation, leave this as the default 1.
     /// For leacher nodes that do not contribute to gossip, set to zero.
-    /// To take on additional gossip burden, set to > 1.
     #[serde(default = "one")]
     pub target_arc_factor: u32,
 
