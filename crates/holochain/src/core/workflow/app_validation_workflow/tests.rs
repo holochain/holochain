@@ -1373,7 +1373,7 @@ async fn skip_issuing_warrant_if_one_found() {
                 .unwrap()
                 .test_read(move |txn| {
                     let store = CascadeTxnWrapper::from(txn);
-                    store.get_warrants_for_agent(&alice_pubkey, false).unwrap()
+                    store.get_warrants_for_agent(&alice_pubkey, true).unwrap()
                 });
 
             // Check for any warrant against Alice
