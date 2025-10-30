@@ -40,7 +40,7 @@ impl RunOpts {
 }
 
 /// The default configured signal server url.
-pub const DEF_SIGNAL_URL: &str = "wss://dev-test-bootstrap2.holochain.org ";
+pub const DEF_SIGNAL_URL: &str = "wss://dev-test-bootstrap2.holochain.org";
 
 /// The default configured bootstrap server url.
 pub const DEF_BOOTSTRAP_URL: &str = "https://dev-test-bootstrap2.holochain.org";
