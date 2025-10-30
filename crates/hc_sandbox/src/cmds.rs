@@ -74,7 +74,6 @@ pub struct Network {
     /// Set the target arc factor for this conductor.
     /// In normal operation, leave this as the default 1.
     /// For leacher/zero-arc nodes that do not contribute to gossip, set to 0.
-    /// To take on additional gossip burden, set to > 1.
     #[arg(long)]
     pub target_arc_factor: Option<u32>,
 }
