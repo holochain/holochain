@@ -210,16 +210,14 @@ async fn app_validation_workflow_inner(
     let rejected_ops = Arc::new(AtomicUsize::new(0));
     let failed_ops = Arc::new(Mutex::new(HashSet::new()));
     let mut agent_activity_ops = vec![];
-    let warrant_op_hashes: Vec<(DhtOpHash, OpBasis)> = vec![];
-    #[cfg(feature = "unstable-warrants")]
-    let mut warrant_op_hashes = warrant_op_hashes;
+    let mut warrant_op_hashes: Vec<(DhtOpHash, OpBasis)> = vec![];
 
-    #[cfg(all(feature = "unstable-warrants", feature = "test_utils"))]
+    #[cfg(feature = "test_utils")]
     let disable_warrant_issuance = conductor
         .config
         .conductor_tuning_params()
         .disable_warrant_issuance;
-    #[cfg(all(feature = "unstable-warrants", not(feature = "test_utils")))]
+    #[cfg(not(feature = "test_utils"))]
     let disable_warrant_issuance = false;
 
     // Validate ops sequentially
@@ -277,7 +275,6 @@ async fn app_validation_workflow_inner(
                 let awaiting_ops = awaiting_ops.clone();
                 let rejected_ops = rejected_ops.clone();
 
-                #[cfg(feature = "unstable-warrants")]
                 if let Outcome::Rejected(_) = &outcome {
                     let issue_warrant =
                         match holochain_state::warrant::is_action_warranted_as_invalid(
@@ -382,7 +379,6 @@ async fn app_validation_workflow_inner(
     tracing::info!("{ops_validated} out of {num_ops_to_validate} validated: {accepted_ops} accepted, {awaiting_ops} awaiting deps, {rejected_ops} rejected, failed ops {failed_ops:?}.");
 
     // "self-publish" warrants, i.e. insert them into the DHT db as if they were published to us by another node
-    #[cfg(feature = "unstable-warrants")]
     if warranted_ops > 0 {
         holochain_state::integrate::authored_ops_to_dht_db(
             network.target_arcs().await?,
