@@ -59,6 +59,7 @@ holochain_sqlite = { version = "^0.6.0-dev.29", path = "../holochain_sqlite", fe
 holochain_state = { path = "../holochain_state", features = ["test_utils"] }
 kitsune2_test_utils = "0.3.0-dev.3"
 tempfile = "3.21.0"
+kitsune2_bootstrap_srv = { version = "0.3.0-dev.3" }
 
 [lints]
 workspace = true
