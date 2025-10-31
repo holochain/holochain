@@ -602,7 +602,7 @@ impl CascadeImpl {
     ) -> CascadeResult<Option<EntryDetails>> {
         let query: GetEntryDetailsQuery = self.construct_query_with_data_access(entry_hash.clone());
 
-        self.get_local_first_with_query(query, entry_hash.into(), options)
+        self.get_latest_with_query(query, entry_hash.into(), options)
             .await
     }
 
@@ -618,11 +618,7 @@ impl CascadeImpl {
         let query: GetRecordDetailsQuery =
             self.construct_query_with_data_access(action_hash.clone());
 
-        // DESIGN: we can short circuit if we have any local deletes on an action.
-        // Is this bad because we will not go back to the network until our
-        // cache is cleared. Could someone create an attack based on this fact?
-
-        self.get_local_first_with_query(query, action_hash.into(), options)
+        self.get_latest_with_query(query, action_hash.into(), options)
             .await
     }
 
@@ -675,7 +671,27 @@ impl CascadeImpl {
             return Ok(Some(record));
         }
 
-        // If we are allowed to get the data from the network then try to retrieve the missing data.
+        if options.strategy == GetStrategy::Network {
+            // If we are allowed to get the data from the network then try to retrieve the missing data.
+            self.get_latest_with_query(query, get_target, options).await
+        } else {
+            // We're not allowed to get the data from the network, and it's not stored locally so
+            // just return None.
+            Ok(None)
+        }
+    }
+
+    async fn get_latest_with_query<Q, O>(
+        &self,
+        query: Q,
+        get_target: AnyDhtHash,
+        options: GetOptions,
+    ) -> CascadeResult<Q::Output>
+    where
+        Q: Query<Item = Judged<SignedActionHashed>, Output = Option<O>> + Send + 'static,
+        O: Send + 'static,
+    {
+        // If we are allowed to get the data from the network then try to retrieve the latest data.
         if options.strategy == GetStrategy::Network {
             // If we are not in the process of authoring this hash or its
             // authority we need a network call.
@@ -695,14 +711,11 @@ impl CascadeImpl {
                     }
                 }
             }
-
-            // Check if we have the data now after the network call.
-            self.cascading(query).await
-        } else {
-            // We're not allowed to get the data from the network, and it's not stored locally so
-            // just return None.
-            Ok(None)
         }
+
+        // Either the cache was updated by the network fetch, or just get what was already
+        // available from the cache.
+        self.cascading(query).await
     }
 
     /// Perform a concurrent `get` on multiple hashes simultaneously, returning
