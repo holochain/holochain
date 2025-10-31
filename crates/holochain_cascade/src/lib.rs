@@ -784,7 +784,7 @@ impl CascadeImpl {
         key: WireLinkKey,
         options: GetLinksOptions,
     ) -> CascadeResult<Vec<Link>> {
-        // only fetch links from network if i am not an authority and
+        // only fetch links from the network if I am not an authority and
         // GetStrategy is Network
         if let GetStrategy::Network = options.get_options.strategy {
             let authority = self.am_i_an_authority(key.base.clone()).await?;

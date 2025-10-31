@@ -34,7 +34,7 @@ impl LinksQuery {
     ) -> Self {
         let tag = tag.map(|tag| Self::tag_to_hex(&tag));
         let create_string = Self::create_query_string(&type_query, tag.clone(), &filter);
-        let delete_string = Self::delete_query_string(&type_query, tag.clone());
+        let delete_string = Self::delete_query_string();
         Self {
             base: Arc::new(base),
             type_query,
@@ -70,8 +70,13 @@ impl LinksQuery {
         self.query.clone()
     }
 
-    fn common_query_string() -> &'static str {
-        "
+    fn create_query_string(
+        type_query: &LinkTypeFilter,
+        tag: Option<String>,
+        filter: &GetLinksFilter,
+    ) -> String {
+        let mut s = "
+            SELECT Action.blob AS action_blob FROM DhtOp
             JOIN Action On DhtOp.action_hash = Action.hash
             WHERE DhtOp.type = :create
             AND
@@ -79,21 +84,8 @@ impl LinksQuery {
             AND
             DhtOp.validation_status = :status
             AND DhtOp.when_integrated IS NOT NULL
-        "
-    }
-
-    fn create_query_string(
-        type_query: &LinkTypeFilter,
-        tag: Option<String>,
-        filter: &GetLinksFilter,
-    ) -> String {
-        let mut s = format!(
             "
-            SELECT Action.blob AS action_blob FROM DhtOp
-            {}
-            ",
-            Self::common_query_string()
-        );
+        .to_string();
         s = Self::add_type_query(s, type_query);
         s = Self::add_tag(s, tag);
         s = Self::add_after(s, filter.after);
@@ -141,30 +133,19 @@ impl LinksQuery {
         }
     }
 
-    fn delete_query_string(type_query: &LinkTypeFilter, tag: Option<String>) -> String {
-        let mut sub_create_query = format!(
-            "
-            SELECT Action.hash FROM DhtOp
-            {}
-            ",
-            Self::common_query_string()
-        );
-        sub_create_query = Self::add_type_query(sub_create_query, type_query);
-        sub_create_query = Self::add_tag(sub_create_query, tag);
-        let delete_query = format!(
-            "
+    fn delete_query_string() -> String {
+        "
             SELECT Action.blob AS action_blob FROM DhtOp
             JOIN Action On DhtOp.action_hash = Action.hash
             WHERE DhtOp.type = :delete
             AND
-            Action.create_link_hash IN ({sub_create_query})
+            Action.base_hash = :base_hash
             AND
             DhtOp.validation_status = :status
             AND
             DhtOp.when_integrated IS NOT NULL
             "
-        );
-        delete_query
+        .to_string()
     }
 
     pub fn params(&self) -> Vec<Params<'_>> {

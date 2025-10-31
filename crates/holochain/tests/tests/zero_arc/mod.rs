@@ -1,7 +1,9 @@
 use hdk::prelude::{
     Deserialize, Entry, EntryDef, EntryDefIndex, EntryHashed, EntryType, EntryVisibility,
-    MustGetActionInput, MustGetEntryInput, Op, Record, Serialize, ValidateCallbackResult,
+    LinkTypeFilter, MustGetActionInput, MustGetEntryInput, Op, Record, Serialize,
+    ValidateCallbackResult,
 };
+use holo_hash::fixt::ActionHashFixturator;
 use holo_hash::{ActionHash, EntryHash};
 use holochain::prelude::{SerializedBytes, SignedActionHashed};
 use holochain::sweettest::{
@@ -9,12 +11,14 @@ use holochain::sweettest::{
 };
 use holochain::test_utils::retry_fn_until_timeout;
 use holochain_state::prelude::MustGetValidRecordInput;
+use holochain_trace::test_run;
 use holochain_types::fixt::AppEntryBytesFixturator;
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_zome_types::action::ChainTopOrdering;
 use holochain_zome_types::entry::{CreateInput, GetInput, UpdateInput};
+use holochain_zome_types::link::{CreateLinkInput, DeleteLinkInput, GetLinksInput, Link};
 use holochain_zome_types::metadata::RecordDetails;
-use holochain_zome_types::prelude::{BoxApi, Details, GetOptions};
+use holochain_zome_types::prelude::{BoxApi, Details, GetOptions, LinkQuery};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -508,4 +512,104 @@ async fn zero_arc_get_details_discover_updates() {
     )
     .await
     .unwrap();
+}
+
+/// Tests that after deleting a link, later calls to get_links will not return the deleted link.
+#[tokio::test(flavor = "multi_thread")]
+async fn zero_arc_delete_link_get_links() {
+    test_run();
+
+    let entry_def = EntryDef::default_from_id("entry");
+    let zomes = SweetInlineZomes::new(vec![entry_def], 1)
+        .function("create_link", move |api, base: ActionHash| {
+            let hash = api.create_link(CreateLinkInput::new(
+                base.into(),
+                fixt::fixt!(ActionHash).into(),
+                0.into(),
+                0.into(),
+                vec![].into(),
+                ChainTopOrdering::default(),
+            ))?;
+            Ok(hash)
+        })
+        .function("delete_link", move |api, link_hash: ActionHash| {
+            let _ = api.delete_link(DeleteLinkInput::new(
+                link_hash,
+                GetOptions::default(),
+                ChainTopOrdering::default(),
+            ))?;
+            Ok(())
+        })
+        .function("get_links", move |api, base: ActionHash| {
+            let links = api.get_links(vec![GetLinksInput::from_query(
+                LinkQuery::new(base, LinkTypeFilter::single_type(0.into(), 0.into())),
+                GetOptions::default(),
+            )])?;
+            Ok(links.into_iter().flatten().collect::<Vec<_>>())
+        });
+
+    let base = fixt::fixt!(ActionHash);
+
+    let (test_dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
+    let standard_conductor_config = SweetConductorConfig::rendezvous(false);
+    let zero_arc_conductor_config =
+        SweetConductorConfig::rendezvous(false).tune_network_config(|nc| {
+            nc.target_arc_factor = 0;
+        });
+
+    let mut conductors = SweetConductorBatch::from_configs_rendezvous([
+        standard_conductor_config,
+        zero_arc_conductor_config,
+    ])
+    .await;
+
+    let apps = conductors.setup_app("test_app", [&test_dna]).await.unwrap();
+
+    let ((alice,), (bob,)) = apps.into_tuples();
+
+    let alice_zome = alice.zome(SweetInlineZomes::COORDINATOR);
+    let bob_zome = bob.zome(SweetInlineZomes::COORDINATOR);
+
+    // Alice creates a link
+    let link_hash: ActionHash = conductors[0]
+        .call(&alice_zome, "create_link", base.clone())
+        .await;
+
+    // Simulate Alice reaching a full storage arc
+    conductors[0]
+        .declare_full_storage_arcs(test_dna.dna_hash())
+        .await;
+
+    // and ensure Bob knows about Alice's full arc.
+    conductors.exchange_peer_info().await;
+
+    // Wait for Bob to see the link
+    retry_fn_until_timeout(
+        || async {
+            let links: Vec<Link> = conductors[1]
+                .call(&bob_zome, "get_links", base.clone())
+                .await;
+            if links.iter().any(|link| link.create_link_hash == link_hash) {
+                return true;
+            }
+
+            false
+        },
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+
+    // Bob deletes the link
+    conductors[1]
+        .call::<_, ()>(&bob_zome, "delete_link", link_hash.clone())
+        .await;
+
+    // Bob should no longer see the link
+    assert!(conductors[1]
+        .call::<_, Vec<Link>>(&bob_zome, "get_links", base.clone())
+        .await
+        .iter()
+        .all(|link| { link.create_link_hash != link_hash }));
 }
