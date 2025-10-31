@@ -279,18 +279,45 @@ async fn app_validation_workflow_inner(
 
                 #[cfg(feature = "unstable-warrants")]
                 if let Outcome::Rejected(_) = &outcome {
-                    let keystore = conductor.keystore();
-                    let warrant_op =
-                        crate::core::workflow::sys_validation_workflow::make_invalid_chain_warrant_op(
-                            keystore,
-                            _representative_agent.clone(),
-                            &chain_op,
+                    let issue_warrant =
+                        match holochain_state::warrant::is_action_warranted_as_invalid(
+                            &workspace.dht_db,
+                            chain_op.action().to_hash(),
+                            chain_op.author().clone(),
                         )
-                        .await?;
+                        .await
+                        {
+                            Ok(true) => {
+                                tracing::trace!(
+                                    "Op {} is already warranted, not issuing a new warrant",
+                                    dht_op_hash
+                                );
+                                false
+                            }
+                            Ok(false) => {
+                                // Not warranted yet, should issue a warrant.
+                                true
+                            }
+                            Err(e) => {
+                                tracing::error!(error = ?e, "Error checking if op is warranted");
+                                false
+                            }
+                        };
 
                     if disable_warrant_issuance {
                         tracing::warn!("Warrant issuance disabled - skipping issuing a warrant");
+                    } else if !issue_warrant {
+                        tracing::trace!("Not issuing a warrant for op {}", dht_op_hash);
                     } else {
+                        let keystore = conductor.keystore();
+                        let warrant_op =
+                            crate::core::workflow::sys_validation_workflow::make_invalid_chain_warrant_op(
+                                keystore,
+                                _representative_agent.clone(),
+                                &chain_op,
+                            )
+                            .await?;
+
                         warrant_op_hashes
                             .push((warrant_op.to_hash(), warrant_op.dht_basis().clone()));
 

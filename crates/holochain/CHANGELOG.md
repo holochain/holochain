@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Avoid issuing duplicate warrants for invalid actions during app validation by checking for existing warrants before creating new ones. #5352
 - Remove `get_meta` from `holochain_p2p` and related code, which was never implemented.
 
 ## 0.6.0-dev.31
