@@ -180,6 +180,21 @@ pub struct UpdateInput {
     pub chain_top_ordering: ChainTopOrdering,
 }
 
+impl UpdateInput {
+    /// Constructor.
+    pub fn new(
+        original_action_address: holo_hash::ActionHash,
+        entry: crate::entry::Entry,
+        chain_top_ordering: ChainTopOrdering,
+    ) -> Self {
+        Self {
+            original_action_address,
+            entry,
+            chain_top_ordering,
+        }
+    }
+}
+
 /// Zome input for all delete operations.
 #[derive(PartialEq, Debug, Deserialize, Serialize, Clone)]
 pub struct DeleteInput {

@@ -7,11 +7,14 @@ use holochain::prelude::{SerializedBytes, SignedActionHashed};
 use holochain::sweettest::{
     SweetConductorBatch, SweetConductorConfig, SweetDnaFile, SweetInlineZomes,
 };
+use holochain::test_utils::retry_fn_until_timeout;
 use holochain_state::prelude::MustGetValidRecordInput;
+use holochain_types::fixt::AppEntryBytesFixturator;
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_zome_types::action::ChainTopOrdering;
-use holochain_zome_types::entry::{CreateInput, GetInput};
-use holochain_zome_types::prelude::{Details, GetOptions};
+use holochain_zome_types::entry::{CreateInput, GetInput, UpdateInput};
+use holochain_zome_types::metadata::RecordDetails;
+use holochain_zome_types::prelude::{BoxApi, Details, GetOptions};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -383,4 +386,126 @@ async fn self_validation_get_missing() {
         invoked_must_get_entry.load(Ordering::Relaxed),
         "must_get_entry was not invoked"
     );
+}
+
+/// This test ensures that a 0-arc node can discover updates to an entry
+/// made by any other node, using get_details.
+#[tokio::test(flavor = "multi_thread")]
+async fn zero_arc_get_details_discover_updates() {
+    holochain_trace::test_run();
+
+    let entry_def = EntryDef::default_from_id("entry");
+    let zomes = SweetInlineZomes::new(vec![entry_def], 0)
+        // Create function to build the initial entry
+        .function("create", move |api: BoxApi, _: ()| {
+            let entry_bytes = fixt::fixt!(AppEntryBytes);
+            let hash = api.create(CreateInput::new(
+                InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
+                EntryVisibility::Public,
+                Entry::App(entry_bytes),
+                ChainTopOrdering::default(),
+            ))?;
+            Ok(hash)
+        })
+        // Update function to create an update to an existing entry
+        .function("update", move |api, original_action_hash: ActionHash| {
+            let entry_bytes = fixt::fixt!(AppEntryBytes);
+            let hash = api.update(UpdateInput::new(
+                original_action_hash,
+                Entry::App(entry_bytes),
+                ChainTopOrdering::default(),
+            ))?;
+            Ok(hash)
+        })
+        // Wrapper to call get_details
+        .function("get_details", move |api, hash: ActionHash| {
+            let details =
+                api.get_details(vec![GetInput::new(hash.into(), GetOptions::network())])?;
+            Ok(details)
+        });
+
+    let (test_dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
+
+    // Standard config
+    let standard_config = SweetConductorConfig::rendezvous(false);
+    // Standard config with target arc factor 0
+    let zero_arc_conductor_config =
+        SweetConductorConfig::rendezvous(false).tune_network_config(|nc| {
+            nc.target_arc_factor = 0;
+        });
+
+    let mut conductors =
+        SweetConductorBatch::from_configs_rendezvous([standard_config, zero_arc_conductor_config])
+            .await;
+
+    let ((alice,), (bob,)) = conductors
+        .setup_app("test", [&test_dna])
+        .await
+        .unwrap()
+        .into_tuples();
+
+    // Alice declares full storage arcs
+    conductors[0]
+        .declare_full_storage_arcs(test_dna.dna_hash())
+        .await;
+    // and ensure Bob knows about Alice's full arc.
+    conductors.exchange_peer_info().await;
+
+    let alice_zome = alice.zome(SweetInlineZomes::COORDINATOR);
+    let bob_zome = bob.zome(SweetInlineZomes::COORDINATOR);
+
+    // Alice creates a record
+    let entry_action_hash: ActionHash = conductors[0].call(&alice_zome, "create", ()).await;
+
+    // Wait for Bob to discover the entry via get_details
+    retry_fn_until_timeout(
+        || async {
+            let details: Vec<Option<Details>> = conductors[1]
+                .call(&bob_zome, "get_details", entry_action_hash.clone())
+                .await;
+
+            if !details.is_empty()
+                && details[0].is_some()
+                && matches!(details[0].as_ref().unwrap(), Details::Record(RecordDetails {
+            updates,
+            deletes,
+            ..
+        }) if updates.is_empty() && deletes.is_empty())
+            {
+                return true;
+            }
+
+            false
+        },
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+
+    // Alice updates the record
+    let updated_action_hash: ActionHash = conductors[0]
+        .call(&alice_zome, "update", entry_action_hash.clone())
+        .await;
+
+    // Wait for Bob to discover the update via get_details
+    retry_fn_until_timeout(
+        || async {
+            let details: Vec<Option<Details>> = conductors[1]
+                .call(&bob_zome, "get_details", entry_action_hash.clone())
+                .await;
+
+            if let Details::Record(RecordDetails { updates, .. }) = details[0].as_ref().unwrap() {
+                updates
+                    .iter()
+                    .any(|update| update.as_hash() == &updated_action_hash)
+            } else {
+                false
+            }
+        },
+        None,
+        None,
+    )
+    .await
+    .unwrap();
 }
