@@ -1342,7 +1342,7 @@ async fn skip_issuing_warrant_if_one_found() {
                     store.get_warrants_for_agent(&alice_pubkey, false).unwrap()
                 });
 
-            if !warrants.is_empty() && warrants[0].warrant().warrantee == *alice.agent_pubkey() {
+            if !warrants.is_empty() {
                 break;
             }
             tokio::time::sleep(Duration::from_millis(100)).await;
@@ -1352,7 +1352,10 @@ async fn skip_issuing_warrant_if_one_found() {
     .unwrap();
 
     // Alice is warranted, don't need her conductor anymore.
-    conductors[0].shutdown().await;
+    conductors[0]
+        .disable_app("test_app".into(), DisabledAppReason::User)
+        .await
+        .unwrap();
 
     // Now Carol should be able to get Alice's activity, including the warrant, from Bob.
     let _activity: AgentActivity = conductors[2]
@@ -1364,8 +1367,8 @@ async fn skip_issuing_warrant_if_one_found() {
         .await;
 
     // Wait for Carol to have a warrant for Alice
-    tokio::time::timeout(Duration::from_secs(5), async {
-        loop {
+    crate::test_utils::retry_fn_until_timeout(
+        || async {
             let alice_pubkey = alice.agent_pubkey().clone();
             let warrants = conductors[2]
                 .get_spaces()
@@ -1378,11 +1381,14 @@ async fn skip_issuing_warrant_if_one_found() {
 
             // Check for any warrant against Alice
             if !warrants.is_empty() && warrants[0].warrant().warrantee == *alice.agent_pubkey() {
-                break;
+                return true;
             }
-            tokio::time::sleep(Duration::from_millis(100)).await;
-        }
-    })
+
+            false
+        },
+        None,
+        None,
+    )
     .await
     .unwrap();
 

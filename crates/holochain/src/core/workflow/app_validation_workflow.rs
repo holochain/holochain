@@ -279,29 +279,30 @@ async fn app_validation_workflow_inner(
 
                 #[cfg(feature = "unstable-warrants")]
                 if let Outcome::Rejected(_) = &outcome {
-                    let mut issue_warrant = true;
-                    match holochain_state::warrant::is_action_warranted_as_invalid(
-                        &workspace.dht_db,
-                        chain_op.action().to_hash(),
-                        chain_op.author().clone(),
-                    )
-                    .await
-                    {
-                        Ok(true) => {
-                            tracing::trace!(
-                                "Op {} is already warranted, not issuing a new warrant",
-                                dht_op_hash
-                            );
-                            issue_warrant = false;
-                        }
-                        Ok(false) => {
-                            // Not warranted yet, should issue a warrant.
-                        }
-                        Err(e) => {
-                            tracing::error!(error = ?e, "Error checking if op is warranted");
-                            issue_warrant = false;
-                        }
-                    }
+                    let issue_warrant =
+                        match holochain_state::warrant::is_action_warranted_as_invalid(
+                            &workspace.dht_db,
+                            chain_op.action().to_hash(),
+                            chain_op.author().clone(),
+                        )
+                        .await
+                        {
+                            Ok(true) => {
+                                tracing::trace!(
+                                    "Op {} is already warranted, not issuing a new warrant",
+                                    dht_op_hash
+                                );
+                                false
+                            }
+                            Ok(false) => {
+                                // Not warranted yet, should issue a warrant.
+                                true
+                            }
+                            Err(e) => {
+                                tracing::error!(error = ?e, "Error checking if op is warranted");
+                                false
+                            }
+                        };
 
                     if disable_warrant_issuance {
                         tracing::warn!("Warrant issuance disabled - skipping issuing a warrant");
