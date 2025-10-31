@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Add missing `UpdateInput::new` method. The other input types have a `new` constructor method already. #5420
+- Fix an issue where `RegisterUpdatedRecord` ops would be cached with their basis hash set to the entry hash instead
+  of the action hash. This made it impossible for Holochain to return updates when getting record details. #5420
+- Fix an issue where `get_details` would avoid going to the network if the requested record already existed, even if
+  the current caller wasn't an authority and needed to fetch updates and deletes from the network. #5420
 - Avoid issuing duplicate warrants for invalid actions during app validation by checking for existing warrants before creating new ones. #5352
 
 ## 0.6.0-dev.31
