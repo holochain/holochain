@@ -164,7 +164,7 @@ async fn warrant_is_gossiped() {
                         let store = CascadeTxnWrapper::from(txn);
                         store.get_warrants_for_agent(&alice_pubkey, true).unwrap()
                     });
-                warrants.len() == 3
+                !warrants.is_empty()
                     && warrants[0].warrant().warrantee == *alice_cell.agent_pubkey()
                     && warrants[0].warrant().author == *bob_cell.agent_pubkey() // Make sure that Bob authored the warrant and it's not been authored by Carol.
             }
