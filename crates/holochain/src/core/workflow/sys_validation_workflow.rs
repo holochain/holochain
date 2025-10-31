@@ -165,7 +165,10 @@ pub async fn sys_validation_workflow(
     if outcome_summary.accepted > 0 {
         tracing::debug!("Sys validation accepted {} ops", outcome_summary.accepted);
 
+        // If a chain op was accepted
         trigger_app_validation.trigger(&"sys_validation_workflow");
+        // If a warrant op was accepted
+        trigger_integration.trigger(&"sys_validation_workflow");
     }
 
     if outcome_summary.warranted > 0 {
