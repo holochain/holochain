@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix an issue where delete links could not be found in the database unless the create link that they deleted was also
+  present. Now, when getting links, all relevant deletes from the base are fetched and used to filter the currently
+  available list of links. #5421
 - Add missing `UpdateInput::new` method. The other input types have a `new` constructor method already. #5420
 - Fix an issue where `RegisterUpdatedRecord` ops would be cached with their basis hash set to the entry hash instead
   of the action hash. This made it impossible for Holochain to return updates when getting record details. #5420
