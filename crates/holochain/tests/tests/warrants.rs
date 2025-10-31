@@ -1,6 +1,7 @@
 use hdk::prelude::{
-    ActionHashed, ActivityRequest, CellId, ChainTopOrdering, CreateInput, EntryDef, EntryDefIndex,
-    EntryVisibility, GetAgentActivityInput, Op, SerializedBytes, ValidateCallbackResult,
+    ActionHashed, ActivityRequest, CellId, ChainFilter, ChainTopOrdering, CreateInput, EntryDef,
+    EntryDefIndex, EntryVisibility, GetAgentActivityInput, MustGetAgentActivityInput, Op,
+    SerializedBytes, ValidateCallbackResult,
 };
 use holo_hash::{ActionHash, DnaHash};
 use holochain::{
@@ -335,7 +336,7 @@ async fn author_of_invalid_warrant_is_blocked() {
 
 mod zero_arc {
     use super::*;
-    use hdk::prelude::{AgentActivity, BlockTargetId};
+    use hdk::prelude::{AgentActivity, BlockTargetId, RegisterAgentActivity};
     use holochain::prelude::DisabledAppReason;
 
     // Alice creates an invalid op, Bob receives it and issues a warrant.
@@ -485,6 +486,93 @@ mod zero_arc {
         .await
         .unwrap();
     }
+
+    // Alice creates an invalid op, Bob receives it and issues a warrant.
+    // Carol is a zero arc node and makes a must_get_agent_activity request to Bob.
+    // Bob serves the warrant. Carol validates the warrant and blocks Alice.
+    // This test is contrived, because must_get_agent_activity is more commonly
+    // called in validation callbacks. But it serves the purpose of demonstrating
+    // that discovered warrants lead to blocks, in a simple way.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn warrantee_returned_from_must_get_agent_activity_is_blocked() {
+        holochain_trace::test_run();
+
+        let config = SweetConductorConfig::rendezvous(true);
+        // Carol's conductor is a zero arc conductor.
+        let config_zero_arc = SweetConductorConfig::rendezvous(true)
+            .tune_network_config(|nc| nc.target_arc_factor = 0);
+
+        let TestCase {
+            mut conductors_and_cells,
+            dna_hash,
+        } = TestCase::create([config.clone(), config, config_zero_arc]).await;
+        let (alice_conductor, alice_cell) = conductors_and_cells.remove(0);
+        let (bob_conductor, bob_cell) = conductors_and_cells.remove(0);
+        let (carol_conductor, carol_cell) = conductors_and_cells.remove(0);
+
+        await_consistency(10, [&alice_cell, &bob_cell])
+            .await
+            .unwrap();
+
+        // Ensure that Carol knows about Bob's full arc.
+        bob_conductor
+            .holochain_p2p()
+            .test_set_full_arcs(dna_hash.to_k2_space())
+            .await;
+        // Update Bob's peer info in Carol's peer store after the full storage arc declaration.
+        SweetConductor::exchange_peer_info([&bob_conductor, &carol_conductor]).await;
+
+        // Alice creates an invalid action.
+        let action_hash: ActionHash = alice_conductor
+            .call(
+                &alice_cell.zome(SweetInlineZomes::COORDINATOR),
+                "create_string",
+                "entry1".to_string(),
+            )
+            .await;
+
+        await_consistency(10, [&alice_cell, &bob_cell])
+            .await
+            .unwrap();
+
+        // Bob should have issued a warrant against Alice.
+
+        // Disable Alice's app so that Carol's request will go only to Bob.
+        alice_conductor
+            .disable_app("test_app".to_string(), DisabledAppReason::User)
+            .await
+            .unwrap();
+
+        // Carol calls must_get_agent_activity on Alice and blocks the warrant authors.
+        let _: Vec<RegisterAgentActivity> = carol_conductor
+            .call(
+                &carol_cell.zome(SweetInlineZomes::COORDINATOR),
+                "must_get_agent_activity",
+                MustGetAgentActivityInput {
+                    author: alice_cell.agent_pubkey().clone(),
+                    chain_filter: ChainFilter::new(action_hash),
+                },
+            )
+            .await;
+
+        // Check that Carol has blocked Alice.
+        retry_fn_until_timeout(
+            || async {
+                carol_conductor
+                    .holochain_p2p()
+                    .is_blocked(BlockTargetId::Cell(CellId::new(
+                        dna_hash.clone(),
+                        alice_cell.agent_pubkey().clone(),
+                    )))
+                    .await
+                    .unwrap()
+            },
+            Some(10_000),
+            None,
+        )
+        .await
+        .unwrap();
+    }
 }
 
 // The first conductor and cell use the zome without validation, in other words the bad actor.
@@ -517,7 +605,11 @@ impl TestCase {
                     chain_query_filter: Default::default(),
                     activity_request: ActivityRequest::Full,
                 })?)
-            });
+            })
+            .function(
+                "must_get_agent_activity",
+                |api, input: MustGetAgentActivityInput| Ok(api.must_get_agent_activity(input)?),
+            );
 
         let zome_without_validation = zome_common
             .clone()

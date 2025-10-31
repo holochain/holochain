@@ -3038,6 +3038,7 @@ dependencies = [
  "holochain_zome_types",
  "kitsune2",
  "kitsune2_api",
+ "kitsune2_bootstrap_srv",
  "kitsune2_core",
  "kitsune2_gossip",
  "kitsune2_test_utils",

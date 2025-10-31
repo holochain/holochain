@@ -120,6 +120,8 @@ impl std::fmt::Debug for HolochainP2pConfig {
         dbg.field("compat", &self.compat);
         dbg.field("auth_material", &self.auth_material);
         dbg.field("request_timeout", &self.request_timeout);
+        dbg.field("target_arc_factor", &self.target_arc_factor);
+        dbg.field("network_config", &self.network_config);
 
         #[cfg(feature = "test_utils")]
         {
