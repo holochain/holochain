@@ -1,3 +1,4 @@
+use crate::tests::common::spawn_test_bootstrap;
 use ::fixt::fixt;
 use holo_hash::{
     fixt::{ActionHashFixturator, AgentPubKeyFixturator, DhtOpHashFixturator, DnaHashFixturator},
@@ -10,6 +11,7 @@ use holochain_p2p::{
 };
 use holochain_state::{block::get_all_cell_blocks, prelude::test_conductor_db};
 use holochain_timestamp::{InclusiveTimestampInterval, Timestamp};
+use holochain_trace::test_run;
 use holochain_types::{
     db::{DbKindConductor, DbKindDht, DbKindPeerMetaStore, DbWrite},
     prelude::{Block, BlockTargetId, CellBlockReason, CellId},
@@ -17,14 +19,16 @@ use holochain_types::{
 };
 use holochain_zome_types::block::BlockTarget;
 use kitsune2_api::{AgentInfo, AgentInfoSigned, DhtArc, DynBlocks};
+use std::net::SocketAddr;
 use std::{sync::Arc, time::Duration};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn cell_blocks_are_committed_to_database() {
     let conductor_db = DbWrite::test_in_mem(DbKindConductor).unwrap();
     let dna_hash = fixt!(DnaHash);
+    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
     let TestCase { actor, .. } =
-        TestCase::new_with_conductor_db(&dna_hash, conductor_db.clone()).await;
+        TestCase::new_with_conductor_db(&dna_hash, conductor_db.clone(), &addr).await;
     let cell_id = CellId::new(dna_hash, fixt!(AgentPubKey));
     let cell_block_reason = CellBlockReason::InvalidOp(fixt!(DhtOpHash));
     let block = Block::new(
@@ -45,8 +49,9 @@ async fn cell_blocks_are_committed_to_database() {
 async fn agent_is_blocked() {
     let conductor_db = DbWrite::test_in_mem(DbKindConductor).unwrap();
     let dna_hash = fixt!(DnaHash);
+    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
     let TestCase { actor, .. } =
-        TestCase::new_with_conductor_db(&dna_hash, conductor_db.clone()).await;
+        TestCase::new_with_conductor_db(&dna_hash, conductor_db.clone(), &addr).await;
     let agent = fixt!(AgentPubKey);
     let cell_id = CellId::new(dna_hash, agent.clone());
     let cell_block_reason = CellBlockReason::InvalidOp(fixt!(DhtOpHash));
@@ -67,7 +72,8 @@ async fn agent_is_blocked() {
 async fn agent_is_removed_from_peer_store_when_blocked() {
     let dna_hash = fixt!(DnaHash);
 
-    let TestCase { actor: alice, .. } = TestCase::new(&dna_hash).await;
+    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
+    let TestCase { actor: alice, .. } = TestCase::new(&dna_hash, &addr).await;
     let space = alice
         .test_kitsune()
         .space(dna_hash.to_k2_space())
@@ -129,10 +135,11 @@ mod blocks_impl {
         let agent = fixt!(AgentPubKey);
         let cell_id = CellId::new(dna_hash.clone(), agent.clone());
 
+        let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
         let TestCase {
             actor,
             blocks_module,
-        } = TestCase::new(&dna_hash).await;
+        } = TestCase::new(&dna_hash, &addr).await;
 
         assert!(!blocks_module
             .is_blocked(kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()))
@@ -174,10 +181,11 @@ mod blocks_impl {
         let cell_id_1 = CellId::new(dna_hash.clone(), agent_1.clone());
         let cell_id_2 = CellId::new(dna_hash.clone(), agent_2.clone());
 
+        let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
         let TestCase {
             actor,
             blocks_module,
-        } = TestCase::new(&dna_hash).await;
+        } = TestCase::new(&dna_hash, &addr).await;
 
         // Initially not blocked.
         assert!(!blocks_module
@@ -231,10 +239,11 @@ mod blocks_impl {
         let agent = fixt!(AgentPubKey);
         let cell_id = CellId::new(dna_hash.clone(), agent.clone());
 
+        let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
         let TestCase {
             actor,
             blocks_module,
-        } = TestCase::new(&dna_hash).await;
+        } = TestCase::new(&dna_hash, &addr).await;
 
         // Not blocked initially even with duplicates in query.
         assert!(!blocks_module
@@ -271,10 +280,11 @@ mod blocks_impl {
         let agent = fixt!(AgentPubKey);
         let cell_id = CellId::new(dna_hash.clone(), agent.clone());
 
+        let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
         let TestCase {
             actor,
             blocks_module,
-        } = TestCase::new(&dna_hash).await;
+        } = TestCase::new(&dna_hash, &addr).await;
 
         // First block.
         actor
@@ -310,14 +320,15 @@ mod blocks_impl {
         let cell_id_1 = CellId::new(dna_hash_1.clone(), agent.clone());
 
         let conductor_db = test_conductor_db().to_db();
+        let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
         let TestCase {
             actor: actor_1,
             blocks_module: blocks_module_1,
-        } = TestCase::new_with_conductor_db(&dna_hash_1, conductor_db.clone()).await;
+        } = TestCase::new_with_conductor_db(&dna_hash_1, conductor_db.clone(), &addr).await;
         let TestCase {
             blocks_module: blocks_module_2,
             ..
-        } = TestCase::new_with_conductor_db(&dna_hash_2, conductor_db).await;
+        } = TestCase::new_with_conductor_db(&dna_hash_2, conductor_db, &addr).await;
 
         // Initially not blocked in either DNA.
         assert!(!blocks_module_1
@@ -364,11 +375,16 @@ mod blocks_impl {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_from_blocked_agent_fails() {
+    test_run();
+
     let dna_hash = DnaHash::from_raw_32(vec![0xaa; 32]);
     let keystore_1 = test_keystore();
     let keystore_2 = test_keystore();
-    let TestCase { actor: alice, .. } = TestCase::new_with_keystore(&dna_hash, &keystore_1).await;
-    let TestCase { actor: bob, .. } = TestCase::new_with_keystore(&dna_hash, &keystore_2).await;
+    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
+    let TestCase { actor: alice, .. } =
+        TestCase::new_with_keystore(&dna_hash, &keystore_1, &addr).await;
+    let TestCase { actor: bob, .. } =
+        TestCase::new_with_keystore(&dna_hash, &keystore_2, &addr).await;
     let alice_pubkey = keystore_1.new_sign_keypair_random().await.unwrap();
     let bob_pubkey = keystore_2.new_sign_keypair_random().await.unwrap();
     alice
@@ -381,7 +397,7 @@ async fn get_from_blocked_agent_fails() {
     bob.test_set_full_arcs(dna_hash.to_k2_space()).await;
 
     // Exchange peer infos to accelerate bootstrapping.
-    tokio::time::timeout(Duration::from_secs(10), async {
+    tokio::time::timeout(Duration::from_secs(60), async {
         loop {
             let maybe_agent_info_1 = alice
                 .peer_store(dna_hash.clone())
@@ -422,7 +438,10 @@ async fn get_from_blocked_agent_fails() {
     .unwrap();
 
     let response = alice.get(dna_hash.clone(), fixt!(ActionHash).into()).await;
-    assert!(response.is_ok());
+    assert!(
+        response.is_ok(),
+        "Expected get to succeed before block but got: {response:?}"
+    );
 
     alice
         .block(Block::new(
@@ -457,27 +476,33 @@ struct TestCase {
 }
 
 impl TestCase {
-    async fn new(dna_hash: &DnaHash) -> Self {
+    async fn new(dna_hash: &DnaHash, bootstrap_addr: &SocketAddr) -> Self {
         let conductor_db = DbWrite::test_in_mem(DbKindConductor).unwrap();
-        Self::create_test_case(dna_hash, conductor_db, test_keystore()).await
+        Self::create_test_case(dna_hash, conductor_db, test_keystore(), bootstrap_addr).await
     }
 
     async fn new_with_conductor_db(
         dna_hash: &DnaHash,
         conductor_db: DbWrite<DbKindConductor>,
+        bootstrap_addr: &SocketAddr,
     ) -> Self {
-        Self::create_test_case(dna_hash, conductor_db, test_keystore()).await
+        Self::create_test_case(dna_hash, conductor_db, test_keystore(), bootstrap_addr).await
     }
 
-    async fn new_with_keystore(dna_hash: &DnaHash, keystore: &MetaLairClient) -> Self {
+    async fn new_with_keystore(
+        dna_hash: &DnaHash,
+        keystore: &MetaLairClient,
+        bootstrap_addr: &SocketAddr,
+    ) -> Self {
         let conductor_db = DbWrite::test_in_mem(DbKindConductor).unwrap();
-        Self::create_test_case(dna_hash, conductor_db, keystore.clone()).await
+        Self::create_test_case(dna_hash, conductor_db, keystore.clone(), bootstrap_addr).await
     }
 
     async fn create_test_case(
         dna_hash: &DnaHash,
         conductor_db: DbWrite<DbKindConductor>,
         keystore: MetaLairClient,
+        bootstrap_addr: &SocketAddr,
     ) -> Self {
         let op_db = DbWrite::test_in_mem(DbKindDht(Arc::new(dna_hash.clone()))).unwrap();
         let peer_meta_db =
@@ -495,7 +520,16 @@ impl TestCase {
                 let peer_meta_db = peer_meta_db.clone();
                 Box::pin(async move { Ok(peer_meta_db) })
             }),
-            k2_test_builder: true,
+            k2_test_builder: false,
+            network_config: Some(serde_json::json!({
+                "coreBootstrap": {
+                    "serverUrl": format!("http://{bootstrap_addr}"),
+                },
+                "tx5Transport": {
+                    "serverUrl": format!("ws://{bootstrap_addr}"),
+                    "signalAllowPlainText": true,
+                }
+            })),
             ..Default::default()
         };
         let actor = spawn_holochain_p2p(config, keystore).await.unwrap();

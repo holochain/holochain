@@ -4,6 +4,7 @@ use holochain_p2p::event::*;
 use holochain_p2p::*;
 use holochain_types::prelude::*;
 use kitsune2_api::*;
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -200,4 +201,22 @@ impl HcP2pHandler for Handler {
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move { todo!() })
     }
+}
+
+pub(crate) async fn spawn_test_bootstrap(
+) -> std::io::Result<(kitsune2_bootstrap_srv::BootstrapSrv, SocketAddr)> {
+    let mut config = kitsune2_bootstrap_srv::Config::testing();
+    config.listen_address_list = vec![SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0))];
+
+    let bootstrap = tokio::task::spawn_blocking(|| {
+        tracing::info!("Starting bootstrap server");
+        kitsune2_bootstrap_srv::BootstrapSrv::new(config)
+    })
+    .await
+    .unwrap()?;
+
+    let addr = *bootstrap.listen_addrs().first().unwrap();
+    tracing::info!(?addr, "Bootstrap server started");
+
+    Ok((bootstrap, addr))
 }
