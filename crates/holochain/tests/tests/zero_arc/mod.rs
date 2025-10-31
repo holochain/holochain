@@ -570,11 +570,6 @@ async fn zero_arc_delete_link_get_links() {
     let alice_zome = alice.zome(SweetInlineZomes::COORDINATOR);
     let bob_zome = bob.zome(SweetInlineZomes::COORDINATOR);
 
-    // Alice creates a link
-    let link_hash: ActionHash = conductors[0]
-        .call(&alice_zome, "create_link", base.clone())
-        .await;
-
     // Simulate Alice reaching a full storage arc
     conductors[0]
         .declare_full_storage_arcs(test_dna.dna_hash())
@@ -583,17 +578,19 @@ async fn zero_arc_delete_link_get_links() {
     // and ensure Bob knows about Alice's full arc.
     conductors.exchange_peer_info().await;
 
+    // Alice creates a link
+    let link_hash: ActionHash = conductors[0]
+        .call(&alice_zome, "create_link", base.clone())
+        .await;
+
     // Wait for Bob to see the link
     retry_fn_until_timeout(
         || async {
             let links: Vec<Link> = conductors[1]
                 .call(&bob_zome, "get_links", base.clone())
                 .await;
-            if links.iter().any(|link| link.create_link_hash == link_hash) {
-                return true;
-            }
 
-            false
+            links.iter().any(|link| link.create_link_hash == link_hash)
         },
         None,
         None,
