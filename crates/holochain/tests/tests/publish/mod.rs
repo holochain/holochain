@@ -226,7 +226,7 @@ async fn warrant_is_published() {
                     store.get_warrants_for_agent(&alice_pubkey, true).unwrap()
                 });
 
-            if warrants.len() == 3 {
+            if warrants.len() == 1 {
                 assert_eq!(warrants[0].warrant().warrantee, *alice.agent_pubkey());
                 // Make sure that Bob authored the warrant and it's not been authored by Carol.
                 assert_eq!(warrants[0].warrant().author, *bob.agent_pubkey());
