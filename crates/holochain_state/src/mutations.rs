@@ -790,6 +790,7 @@ pub fn insert_action(
                 "seq": action_seq,
                 "author": author,
                 "prev_hash": prev_hash,
+                "base_hash": delete_link.base_address,
                 "create_link_hash": delete_link.link_add_address,
                 "blob": to_blob(&signed_action)?,
             })?;

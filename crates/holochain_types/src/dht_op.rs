@@ -749,7 +749,7 @@ impl ChainOpLite {
                     .cloned()
                     .ok_or_else(|| DhtOpError::ActionWithoutEntry(Box::new(action.clone())))?;
                 let basis = match action {
-                    Action::Update(update) => update.original_entry_address.clone(),
+                    Action::Update(update) => update.original_action_address.clone(),
                     _ => return Err(DhtOpError::OpActionMismatch(op_type, action.action_type())),
                 };
                 Self::RegisterUpdatedRecord(action_hash, entry_hash, basis.into())
