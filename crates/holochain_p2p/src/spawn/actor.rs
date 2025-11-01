@@ -922,7 +922,7 @@ impl HolochainP2pActor {
                             // Prune any expired entries.
                             db.write_async(|txn| -> DatabaseResult<()> {
                                 let prune_count = txn.execute(sql_peer_meta_store::PRUNE, [])?;
-                                tracing::debug!("pruned {prune_count} rows from meta peer store");
+                                tracing::debug!("Pruned {prune_count} expired rows from meta peer store");
                                 Ok(())
                             })
                             .await
@@ -942,11 +942,9 @@ impl HolochainP2pActor {
                                     let mut urls = Vec::new();
                                     while let Some(row) = rows.next()? {
                                         // Expecting is safe here, because the inserted values must have been URLs.
-                                        let peer_url = Url::from_str(row.get::<_, String>(0)?).map_err(|err|DatabaseError::Other(err.into()))?;
-                                        let timestamp =
-                                            rmp_serde::from_slice::<kitsune2_api::Timestamp>(
-                                                &(row.get::<_, BytesSql>(1)?.0),
-                                            )?;
+                                        let peer_url = Url::from_str(row.get::<_, String>(0)?).map_err(|err| DatabaseError::Other(err.into()))?;
+                                        let meta_value = row.get::<_, BytesSql>("meta_value")?;
+                                        let timestamp: kitsune2_api::Timestamp = serde_json::from_slice(&meta_value.0).map_err(|err| DatabaseError::Other(err.into()))?;
                                         if let Some(agent) = agents
                                             .iter()
                                             .find(|agent| agent.url == Some(peer_url.clone()))
@@ -966,6 +964,7 @@ impl HolochainP2pActor {
                                 let values = Rc::new(urls_to_prune);
                                 let mut stmt = txn.prepare(sql_peer_meta_store::DELETE_URLS)?;
                                 stmt.execute(named_params!{":urls": values, ":meta_key": format!("{KEY_PREFIX_ROOT}:{META_KEY_UNRESPONSIVE}")})?;
+                                tracing::debug!("Pruned {} unexpired {KEY_PREFIX_ROOT}:{META_KEY_UNRESPONSIVE} rows from meta peer store because we have newer agent info", values.len());
                                 Ok(())
                             })
                             .await

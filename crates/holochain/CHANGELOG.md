@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 
 - Avoid issuing duplicate warrants for invalid actions during app validation by checking for existing warrants before creating new ones. #5352
+- Fix: Make sure peers that were marked unresponsive are not marked responsive again until their agent info expiration timestamp or a new agent info is received.
 
 ## 0.6.0-dev.31
 
