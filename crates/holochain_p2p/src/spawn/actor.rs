@@ -922,7 +922,7 @@ impl HolochainP2pActor {
                             // Prune any expired entries.
                             db.write_async(|txn| -> DatabaseResult<()> {
                                 let prune_count = txn.execute(sql_peer_meta_store::PRUNE, [])?;
-                                tracing::debug!("Pruned {prune_count} expired rows from meta peer store");
+                                tracing::debug!("Pruned {prune_count} expired rows from peer meta store");
                                 Ok(())
                             })
                             .await
@@ -964,7 +964,7 @@ impl HolochainP2pActor {
                                 let values = Rc::new(urls_to_prune);
                                 let mut stmt = txn.prepare(sql_peer_meta_store::DELETE_URLS)?;
                                 stmt.execute(named_params!{":urls": values, ":meta_key": format!("{KEY_PREFIX_ROOT}:{META_KEY_UNRESPONSIVE}")})?;
-                                tracing::debug!("Pruned {} unexpired {KEY_PREFIX_ROOT}:{META_KEY_UNRESPONSIVE} rows from meta peer store because we have newer agent info", values.len());
+                                tracing::debug!("Pruned {} unexpired {KEY_PREFIX_ROOT}:{META_KEY_UNRESPONSIVE} rows from peer meta store because we have newer agent info", values.len());
                                 Ok(())
                             })
                             .await
