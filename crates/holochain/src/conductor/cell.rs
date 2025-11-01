@@ -424,21 +424,6 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
         })
     }
 
-    /// a remote node is asking us for metadata
-    #[cfg_attr(
-        feature = "instrument",
-        tracing::instrument(skip(self, _dht_hash, _options))
-    )]
-    fn handle_get_meta(
-        &self,
-        _dna_hash: DnaHash,
-        _to_agent: AgentPubKey,
-        _dht_hash: holo_hash::AnyDhtHash,
-        _options: holochain_p2p::event::GetMetaOptions,
-    ) -> BoxFut<'_, HolochainP2pResult<MetadataSet>> {
-        Box::pin(async { unimplemented!() })
-    }
-
     /// a remote node is asking us for links
     // TODO: Right now we are returning all the full actions
     // We could probably send some smaller types instead of the full actions

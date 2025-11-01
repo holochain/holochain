@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Fix an issue where `get_details` would avoid going to the network if the requested record already existed, even if
   the current caller wasn't an authority and needed to fetch updates and deletes from the network. #5420
 - Avoid issuing duplicate warrants for invalid actions during app validation by checking for existing warrants before creating new ones. #5352
+- Remove `get_meta` from `holochain_p2p` and related code, which was never implemented.
 
 ## 0.6.0-dev.31
 
