@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Feat: Add a new cli argument `--target-arc-factor` to `hc-sandbox generate network` for overriding the generated conductor config setting `network.target_arc_factor`.
 - Fix an issue where delete links could not be found in the database unless the create link that they deleted was also
   present. Now, when getting links, all relevant deletes from the base are fetched and used to filter the currently
   available list of links. #5421
