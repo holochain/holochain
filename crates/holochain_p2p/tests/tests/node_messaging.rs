@@ -43,16 +43,6 @@ impl HcP2pHandler for UnresponsiveHandler {
         Box::pin(std::future::pending())
     }
 
-    fn handle_get_meta(
-        &self,
-        _dna_hash: DnaHash,
-        _to_agent: AgentPubKey,
-        _dht_hash: holo_hash::AnyDhtHash,
-        _options: GetMetaOptions,
-    ) -> BoxFut<'_, HolochainP2pResult<MetadataSet>> {
-        Box::pin(std::future::pending())
-    }
-
     fn handle_get_links(
         &self,
         _dna_hash: DnaHash,
@@ -609,92 +599,6 @@ async fn test_get_empty_data_better_than_no_response() {
 
     let requests = empty_handler.calls.lock().unwrap();
     assert_eq!(*requests, ["get"]);
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn test_get_meta() {
-    test_run();
-
-    let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
-    let space = dna_hash.to_k2_space();
-    let handler = Arc::new(Handler::default());
-
-    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
-    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
-    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler, &addr).await;
-
-    hc1.test_set_full_arcs(space.clone()).await;
-    hc2.test_set_full_arcs(space.clone()).await;
-
-    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
-        loop {
-            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
-
-            // if we get a response at all, the full back-n-forth succeeded
-            if hc2
-                .get_meta(
-                    dna_hash.clone(),
-                    HoloHash::from_raw_36_and_type(
-                        vec![1; 36],
-                        holo_hash::hash_type::AnyDht::Entry,
-                    ),
-                    holochain_p2p::actor::GetMetaOptions::default(),
-                )
-                .await
-                .is_ok()
-            {
-                return;
-            }
-        }
-    })
-    .await
-    .unwrap();
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn test_get_meta_with_unresponsive_agents() {
-    let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
-    let space = dna_hash.to_k2_space();
-    let handler = Arc::new(Handler::default());
-    let unresponsive_handler = Arc::new(UnresponsiveHandler);
-
-    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
-    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
-    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), unresponsive_handler.clone(), &addr).await;
-    let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), unresponsive_handler.clone(), &addr).await;
-    let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
-
-    hc1.test_set_full_arcs(space.clone()).await;
-    hc2.test_set_full_arcs(space.clone()).await;
-    hc3.test_set_full_arcs(space.clone()).await;
-    hc4.test_set_full_arcs(space.clone()).await;
-
-    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
-        loop {
-            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
-
-            // If we get a response at all then at least one peer completed the request
-            if hc1
-                .get_meta(
-                    dna_hash.clone(),
-                    HoloHash::from_raw_36_and_type(
-                        vec![1; 36],
-                        holo_hash::hash_type::AnyDht::Entry,
-                    ),
-                    holochain_p2p::actor::GetMetaOptions::default(),
-                )
-                .await
-                .is_ok()
-            {
-                return;
-            }
-        }
-    })
-    .await
-    .unwrap();
-
-    let requests = handler.calls.lock().unwrap();
-    assert_eq!(*requests, ["get_meta"]);
 }
 
 #[tokio::test(flavor = "multi_thread")]

@@ -58,21 +58,6 @@ impl holochain_p2p::event::HcP2pHandler for Conductor {
         })
     }
 
-    fn handle_get_meta(
-        &self,
-        dna_hash: DnaHash,
-        to_agent: AgentPubKey,
-        dht_hash: holo_hash::AnyDhtHash,
-        options: holochain_p2p::event::GetMetaOptions,
-    ) -> BoxFut<'_, HolochainP2pResult<MetadataSet>> {
-        Box::pin(async {
-            self.cell_by_parts(&dna_hash, &to_agent)
-                .await?
-                .handle_get_meta(dna_hash, to_agent, dht_hash, options)
-                .await
-        })
-    }
-
     fn handle_get_links(
         &self,
         dna_hash: DnaHash,

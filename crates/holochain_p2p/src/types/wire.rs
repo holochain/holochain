@@ -71,16 +71,6 @@ pub enum WireMessage {
         msg_id: u64,
         response: WireOps,
     },
-    GetMetaReq {
-        msg_id: u64,
-        to_agent: AgentPubKey,
-        dht_hash: holo_hash::AnyDhtHash,
-        options: event::GetMetaOptions,
-    },
-    GetMetaRes {
-        msg_id: u64,
-        response: MetadataSet,
-    },
     GetLinksReq {
         msg_id: u64,
         to_agent: AgentPubKey,
@@ -167,8 +157,6 @@ impl WireMessage {
             WireMessage::CallRemoteRes { msg_id, .. } => Some(*msg_id),
             WireMessage::GetReq { msg_id, .. } => Some(*msg_id),
             WireMessage::GetRes { msg_id, .. } => Some(*msg_id),
-            WireMessage::GetMetaReq { msg_id, .. } => Some(*msg_id),
-            WireMessage::GetMetaRes { msg_id, .. } => Some(*msg_id),
             WireMessage::GetLinksReq { msg_id, .. } => Some(*msg_id),
             WireMessage::GetLinksRes { msg_id, .. } => Some(*msg_id),
             WireMessage::CountLinksReq { msg_id, .. } => Some(*msg_id),
@@ -222,29 +210,6 @@ impl WireMessage {
     /// Incoming "Get" response.
     pub fn get_res(msg_id: u64, response: WireOps) -> WireMessage {
         Self::GetRes { msg_id, response }
-    }
-
-    /// Outgoing "GetMeta" request.
-    pub fn get_meta_req(
-        to_agent: AgentPubKey,
-        dht_hash: holo_hash::AnyDhtHash,
-        options: event::GetMetaOptions,
-    ) -> (u64, WireMessage) {
-        let msg_id = next_msg_id();
-        (
-            msg_id,
-            Self::GetMetaReq {
-                msg_id,
-                to_agent,
-                dht_hash,
-                options,
-            },
-        )
-    }
-
-    /// Incoming "GetMeta" response.
-    pub fn get_meta_res(msg_id: u64, response: MetadataSet) -> WireMessage {
-        Self::GetMetaRes { msg_id, response }
     }
 
     /// Outgoing "GetLinks" request.

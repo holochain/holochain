@@ -99,23 +99,6 @@ impl event::HcP2pHandler for WrapEvtSender {
         )
     }
 
-    fn handle_get_meta(
-        &self,
-        dna_hash: DnaHash,
-        to_agent: AgentPubKey,
-        dht_hash: holo_hash::AnyDhtHash,
-        options: event::GetMetaOptions,
-    ) -> BoxFut<'_, HolochainP2pResult<MetadataSet>> {
-        timing_trace!(
-            true,
-            {
-                self.0
-                    .handle_get_meta(dna_hash, to_agent, dht_hash, options)
-            },
-            a = "recv_get_meta",
-        )
-    }
-
     fn handle_get_links(
         &self,
         dna_hash: DnaHash,
@@ -293,7 +276,6 @@ impl SpaceHandler for HolochainP2pActor {
                     ErrorRes { msg_id, .. }
                     | CallRemoteRes { msg_id, .. }
                     | GetRes { msg_id, .. }
-                    | GetMetaRes { msg_id, .. }
                     | GetLinksRes { msg_id, .. }
                     | CountLinksRes { msg_id, .. }
                     | GetAgentActivityRes { msg_id, .. }
@@ -366,36 +348,6 @@ impl SpaceHandler for HolochainP2pActor {
                             .await
                         {
                             tracing::debug!(?err, "Error sending get response");
-                        }
-                    }
-                    GetMetaReq {
-                        msg_id,
-                        to_agent,
-                        dht_hash,
-                        options,
-                    } => {
-                        let dna_hash = DnaHash::from_k2_space(&space_id);
-                        let resp = match evt_sender
-                            .get()
-                            .ok_or_else(|| HolochainP2pError::other(EVT_REG_ERR))?
-                            .handle_get_meta(dna_hash, to_agent, dht_hash, options)
-                            .await
-                        {
-                            Ok(response) => GetMetaRes { msg_id, response },
-                            Err(err) => ErrorRes {
-                                msg_id,
-                                error: format!("{err:?}"),
-                            },
-                        };
-                        let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
-                        if let Err(err) = kitsune
-                            .space_if_exists(space_id)
-                            .await
-                            .ok_or_else(|| HolochainP2pError::other("no such space"))?
-                            .send_notify(from_peer, resp)
-                            .await
-                        {
-                            tracing::debug!(?err, "Error sending get_meta response");
                         }
                     }
                     GetLinksReq {
@@ -1613,68 +1565,6 @@ impl actor::HcP2p for HolochainP2pActor {
             .await;
 
             timing_trace_out!(out, start, a = "send_get");
-            out.map(|x| vec![x])
-        })
-    }
-
-    fn get_meta(
-        &self,
-        dna_hash: DnaHash,
-        dht_hash: holo_hash::AnyDhtHash,
-        options: actor::GetMetaOptions,
-    ) -> BoxFut<'_, HolochainP2pResult<Vec<MetadataSet>>> {
-        Box::pin(async move {
-            let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id.clone()).await?;
-            let loc = dht_hash.get_loc();
-            let agents = self
-                .get_random_peers_for_location("get_meta", &space, loc)
-                .await?;
-
-            let start = std::time::Instant::now();
-
-            let out = select_ok_non_empty(
-                agents.into_iter().map(|(to_agent, to_url)| {
-                    Box::pin(async {
-                        let r_options: event::GetMetaOptions = (&options).into();
-
-                        let (msg_id, req) = crate::wire::WireMessage::get_meta_req(
-                            to_agent,
-                            dht_hash.clone(),
-                            r_options,
-                        );
-
-                        self.send_request(
-                            "get_meta",
-                            &space,
-                            to_url,
-                            msg_id,
-                            req,
-                            dna_hash.clone(),
-                            |res| match res {
-                                crate::wire::WireMessage::GetMetaRes { response, .. } => {
-                                    Ok(response)
-                                }
-                                _ => Err(HolochainP2pError::other(format!(
-                                    "invalid response to get_meta: {res:?}"
-                                ))),
-                            },
-                        )
-                        .await
-                    })
-                }),
-                |metadata_set| {
-                    metadata_set.actions.is_empty()
-                        && metadata_set.invalid_actions.is_empty()
-                        && metadata_set.deletes.is_empty()
-                        && metadata_set.updates.is_empty()
-                        && metadata_set.entry_dht_status.is_none()
-                },
-            )
-            .await;
-
-            timing_trace_out!(out, start, a = "send_get_meta");
-
             out.map(|x| vec![x])
         })
     }

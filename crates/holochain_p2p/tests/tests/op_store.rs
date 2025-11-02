@@ -3,7 +3,7 @@ use fixt::fixt;
 use holo_hash::{AgentPubKey, AnyDhtHash, DnaHash, HasHash};
 use holochain_p2p::event::{
     CountersigningSessionNegotiationMessage, DynHcP2pHandler, GetActivityOptions, GetLinksOptions,
-    GetMetaOptions, HcP2pHandler,
+    HcP2pHandler,
 };
 use holochain_p2p::{HolochainOpStore, HolochainP2pResult};
 use holochain_serialized_bytes::SerializedBytes;
@@ -16,7 +16,6 @@ use holochain_types::activity::AgentActivityResponse;
 use holochain_types::chain::MustGetAgentActivityResponse;
 use holochain_types::dht_op::{ChainOp, DhtOpHashed, WireOps};
 use holochain_types::link::{CountLinksResponse, WireLinkKey, WireLinkOps, WireLinkQuery};
-use holochain_types::metadata::MetadataSet;
 use holochain_types::prelude::{DhtOp, ValidationReceiptBundle};
 use holochain_zome_types::fixt::{CreateFixturator, EntryFixturator, SignatureFixturator};
 use holochain_zome_types::prelude::ChainQueryFilter;
@@ -75,16 +74,6 @@ impl HcP2pHandler for StubHost {
         _to_agent: AgentPubKey,
         _dht_hash: AnyDhtHash,
     ) -> BoxFut<'_, HolochainP2pResult<WireOps>> {
-        unimplemented!()
-    }
-
-    fn handle_get_meta(
-        &self,
-        _dna_hash: DnaHash,
-        _to_agent: AgentPubKey,
-        _dht_hash: AnyDhtHash,
-        _options: GetMetaOptions,
-    ) -> BoxFut<'_, HolochainP2pResult<MetadataSet>> {
         unimplemented!()
     }
 

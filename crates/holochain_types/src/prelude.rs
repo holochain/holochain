@@ -17,7 +17,6 @@ pub use crate::fixt::TimestampFixturator;
 #[cfg(feature = "fixturators")]
 pub use crate::fixt::*;
 pub use crate::link::*;
-pub use crate::metadata::*;
 pub use crate::network::*;
 pub use crate::record::*;
 pub use crate::signal::*;
