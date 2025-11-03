@@ -1,6 +1,6 @@
 [package]
 name = "holochain"
-version = "0.6.0-dev.31"
+version = "0.6.0-dev.32"
 description = "Holochain, a framework for distributed applications"
 license = "CAL-1.0"
 repository = "https://github.com/holochain/holochain"
@@ -27,26 +27,26 @@ getrandom = "0.3"
 holo_hash = { version = "^0.6.0-dev.17", path = "../holo_hash", features = [
   "full",
 ] }
-holochain_cascade = { version = "^0.6.0-dev.31", default-features = false, path = "../holochain_cascade" }
-holochain_chc = { version = "^0.3.0-dev.31", path = "../holochain_chc", default-features = false }
-holochain_conductor_api = { version = "^0.6.0-dev.31", path = "../holochain_conductor_api" }
-holochain_keystore = { version = "^0.6.0-dev.22", path = "../holochain_keystore", default-features = false }
-holochain_p2p = { version = "^0.6.0-dev.31", default-features = false, path = "../holochain_p2p" }
-holochain_sqlite = { version = "^0.6.0-dev.29", path = "../holochain_sqlite" }
+holochain_cascade = { version = "^0.6.0-dev.32", default-features = false, path = "../holochain_cascade" }
+holochain_chc = { version = "^0.3.0-dev.32", path = "../holochain_chc", default-features = false }
+holochain_conductor_api = { version = "^0.6.0-dev.32", path = "../holochain_conductor_api" }
+holochain_keystore = { version = "^0.6.0-dev.23", path = "../holochain_keystore", default-features = false }
+holochain_p2p = { version = "^0.6.0-dev.32", default-features = false, path = "../holochain_p2p" }
+holochain_sqlite = { version = "^0.6.0-dev.30", path = "../holochain_sqlite" }
 holochain_serialized_bytes = "=0.0.56"
-holochain_state = { version = "^0.6.0-dev.31", path = "../holochain_state" }
-holochain_types = { version = "^0.6.0-dev.31", path = "../holochain_types" }
+holochain_state = { version = "^0.6.0-dev.32", path = "../holochain_state" }
+holochain_types = { version = "^0.6.0-dev.32", path = "../holochain_types" }
 holochain_util = { version = "^0.6.0-dev.5", path = "../holochain_util" }
 holochain_wasmer_host = { version = "=0.0.101", default-features = false, features = [
   "error_as_host",
 ] }
-holochain_websocket = { version = "^0.6.0-dev.31", path = "../holochain_websocket" }
-holochain_zome_types = { version = "^0.6.0-dev.22", path = "../holochain_zome_types", features = [
+holochain_websocket = { version = "^0.6.0-dev.32", path = "../holochain_websocket" }
+holochain_zome_types = { version = "^0.6.0-dev.23", path = "../holochain_zome_types", features = [
   "full",
 ] }
 holochain_nonce = { version = "^0.6.0-dev.5", path = "../holochain_nonce" }
 holochain_secure_primitive = { version = "^0.6.0-dev.2", path = "../holochain_secure_primitive" }
-holochain_conductor_config = { version = "^0.6.0-dev.31", path = "../holochain_conductor_config" }
+holochain_conductor_config = { version = "^0.6.0-dev.32", path = "../holochain_conductor_config" }
 holochain_timestamp = { version = "^0.6.0-dev.4", path = "../timestamp" }
 human-panic = "2.0"
 itertools = { version = "0.14" }
@@ -99,10 +99,10 @@ wasmer-middlewares = { version = "6.0.1", optional = true, default-features = fa
 fixt = { version = "^0.6.0-dev.7", path = "../fixt", optional = true }
 contrafact = { version = "0.2.0-rc.1", optional = true }
 diff = { version = "0.1", optional = true }
-hdk = { version = "^0.6.0-dev.23", path = "../hdk", optional = true }
+hdk = { version = "^0.6.0-dev.24", path = "../hdk", optional = true }
 matches = { version = "0.1.8", optional = true }
-holochain_wasm_test_utils = { version = "^0.6.0-dev.31", path = "../test_utils/wasm", optional = true }
-holochain_test_wasm_common = { version = "^0.6.0-dev.23", path = "../test_utils/wasm_common", optional = true }
+holochain_wasm_test_utils = { version = "^0.6.0-dev.32", path = "../test_utils/wasm", optional = true }
+holochain_test_wasm_common = { version = "^0.6.0-dev.24", path = "../test_utils/wasm_common", optional = true }
 unwrap_to = { version = "0.1.0", optional = true }
 kitsune2_bootstrap_srv = { version = "0.3.0-dev.3", optional = true }
 async-once-cell = { version = "0.5", optional = true }
@@ -128,7 +128,7 @@ holochain = { path = ".", default-features = false, features = [
   "slow_tests",
   "metrics_influxive",
 ] }
-holochain_state = { version = "^0.6.0-dev.31", path = "../holochain_state", features = [
+holochain_state = { version = "^0.6.0-dev.32", path = "../holochain_state", features = [
   "test_utils",
 ] }
 
@@ -151,7 +151,7 @@ kitsune2_test_utils = "0.3.0-dev.3"
 rand_dalek = { version = "0.8", package = "rand" }
 
 [build-dependencies]
-hdk = { version = "^0.6.0-dev.23", path = "../hdk" }
+hdk = { version = "^0.6.0-dev.24", path = "../hdk" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0.51" }
 chrono = { version = "0.4.6", features = ["serde"] }

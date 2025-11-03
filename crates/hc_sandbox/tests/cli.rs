@@ -616,6 +616,53 @@ async fn generate_sandbox_with_roles_settings_override() {
     shutdown_sandbox(hc_admin).await;
 }
 
+/// Generates a new sandbox with target_arc_factor settings overridden to 0-arc via
+/// the --target-arc-factor argument and verifies that conductor config file has
+/// been written correctly.
+#[tokio::test(flavor = "multi_thread")]
+async fn generate_sandbox_with_target_arc_factor_override() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    package_fixture_if_not_packaged().await;
+    let app_path = std::env::current_dir()
+        .unwrap()
+        .join("tests/fixtures/my-app/");
+
+    holochain_trace::test_run();
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg(format!(
+            "--holochain-path={}",
+            get_holochain_bin_path().to_str().unwrap()
+        ))
+        .arg("--piped")
+        .arg("generate")
+        .arg("--in-process-lair")
+        .arg(app_path)
+        .arg("network")
+        .arg("--target-arc-factor=0")
+        .arg("webrtc")
+        .arg("wss://signal")
+        .current_dir(temp_dir.path())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true);
+
+    println!("@@ {cmd:?}");
+
+    let mut hc_admin = input_piped_password(&mut cmd).await;
+
+    // Read conductor config yaml file
+    let config_root_path = get_config_root_path(&mut hc_admin).await;
+    hc_admin.wait().await.unwrap();
+    let config = read_config(config_root_path.clone().into())
+        .expect("Failed to read config from config_root_path")
+        .unwrap();
+
+    // Assert target_arc_factor has been overridden in config file
+    assert_eq!(config.network.target_arc_factor, 0);
+}
+
 /// Generates a new sandbox with a single app deployed and tries to list DNA
 /// This tests that the conductor gets started up and connected to properly
 /// upon calling `hc-sandbox call`

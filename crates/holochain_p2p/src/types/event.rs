@@ -4,16 +4,6 @@
 use crate::*;
 use holochain_zome_types::signature::Signature;
 
-/// GetMeta options help control how the get is processed at various levels.
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct GetMetaOptions {}
-
-impl From<&actor::GetMetaOptions> for GetMetaOptions {
-    fn from(_a: &actor::GetMetaOptions) -> Self {
-        Self {}
-    }
-}
-
 /// GetLinks options help control how the get is processed at various levels.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct GetLinksOptions {}
@@ -96,15 +86,6 @@ pub trait HcP2pHandler: 'static + Send + Sync + std::fmt::Debug {
         to_agent: AgentPubKey,
         dht_hash: holo_hash::AnyDhtHash,
     ) -> BoxFut<'_, HolochainP2pResult<WireOps>>;
-
-    /// A remote node is requesting metadata from us.
-    fn handle_get_meta(
-        &self,
-        dna_hash: DnaHash,
-        to_agent: AgentPubKey,
-        dht_hash: holo_hash::AnyDhtHash,
-        options: GetMetaOptions,
-    ) -> BoxFut<'_, HolochainP2pResult<MetadataSet>>;
 
     /// A remote node is requesting link data from us.
     fn handle_get_links(
