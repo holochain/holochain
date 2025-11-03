@@ -65,7 +65,7 @@ impl HolochainPeerMetaStore {
         // Prune any expired entries on startup.
         db.write_async(|txn| -> DatabaseResult<()> {
             let prune_count = txn.execute(sql_peer_meta_store::PRUNE, [])?;
-            tracing::debug!("pruned {prune_count} rows from meta peer store");
+            tracing::debug!("pruned {prune_count} rows from peer meta store");
             Ok(())
         })
         .await?;

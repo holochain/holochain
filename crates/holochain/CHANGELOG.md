@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix: Make sure peers that were marked unresponsive are not marked responsive again until their agent info expiration timestamp or a new agent info is received. \#5423
+
 ## 0.6.0-dev.32
 
 - Feat: Add a new cli argument `--target-arc-factor` to `hc-sandbox generate network` for overriding the generated conductor config setting `network.target_arc_factor`.
