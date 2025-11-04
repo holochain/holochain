@@ -119,7 +119,7 @@ async fn warrant_is_gossiped() {
     let (_bob_conductor, bob_cell) = conductors_and_cells.remove(0);
     let (carol_conductor, carol_cell) = conductors_and_cells.remove(0);
 
-    await_consistency(20, [&alice_cell, &bob_cell, &carol_cell])
+    await_consistency(10, [&alice_cell, &bob_cell, &carol_cell])
         .await
         .unwrap();
 
@@ -138,7 +138,7 @@ async fn warrant_is_gossiped() {
         )
         .await;
 
-    await_consistency(20, [&alice_cell, &bob_cell])
+    await_consistency(10, [&alice_cell, &bob_cell])
         .await
         .unwrap();
 
@@ -515,7 +515,7 @@ mod zero_arc {
         let (bob_conductor, bob_cell) = conductors_and_cells.remove(0);
         let (carol_conductor, carol_cell) = conductors_and_cells.remove(0);
 
-        await_consistency(20, [&alice_cell, &bob_cell])
+        await_consistency(10, [&alice_cell, &bob_cell])
             .await
             .unwrap();
 
