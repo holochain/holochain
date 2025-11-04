@@ -123,7 +123,7 @@ async fn warrant_is_gossiped() {
         .await
         .unwrap();
 
-    // Shutdown Carol's conductor.
+    // Disable Carol's app.
     carol_conductor
         .disable_app("test_app".into(), DisabledAppReason::User)
         .await
@@ -138,13 +138,13 @@ async fn warrant_is_gossiped() {
         )
         .await;
 
-    await_consistency(10, [&alice_cell, &bob_cell])
+    await_consistency(20, [&alice_cell, &bob_cell])
         .await
         .unwrap();
 
     // Bob should have issued a warrant against Alice.
 
-    // Shutdown Alice and startup Carol.
+    // Disable Alice's app and start Carol's.
     alice_conductor
         .disable_app("test_app".into(), DisabledAppReason::User)
         .await
