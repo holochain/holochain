@@ -559,7 +559,7 @@ pub enum AdminResponse {
     NetworkMetricsDumped(HashMap<DnaHash, Kitsune2NetworkMetrics>),
 
     /// The successful result of a call to [`AdminRequest::DumpNetworkStats`].
-    NetworkStatsDumped(kitsune2_api::TransportStats),
+    NetworkStatsDumped(kitsune2_api::ApiTransportStats),
 
     /// The successful response to an [`AdminRequest::AddAgentInfo`].
     ///
