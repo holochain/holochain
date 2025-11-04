@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 
 - **BREAKING CHANGE** Refactor: The `ConductorConfig` field `request_timeout_s` has moved into the `NetworkConfig`, so is now available at the sub-field `network.request_timeout_s`.
+- **BREAKING CHANGE** Feat: The advanced network configuration field `network.advanced.transportTx5.timeoutS` is now automatically set to 1/2 of the `NetworkConfig` field `request_timeout_s`. It specifies the timeout for a single transport message (request or response).
+- **BREAKING CHANGE** Feat: The advanced network configuration field `network.advanced.transportTx5.webrtcConnectTimeout` is now automatically set to 3/8 of the `NetworkConfig` field `request_timeout_s`. It specifies the timeout for attempting to establish a webrtc connection before falling back to a relay connection.
 - Fix: Make sure peers that were marked unresponsive are not marked responsive again until their agent info expiration timestamp or a new agent info is received. \#5423
 
 ## 0.6.0-dev.32

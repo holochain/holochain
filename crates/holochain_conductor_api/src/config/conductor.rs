@@ -218,9 +218,14 @@ pub struct NetworkConfig {
     #[schemars(schema_with = "holochain_util::jsonschema::url2_schema")]
     pub signal_url: url2::Url2,
 
-    /// The amount of time, in seconds, to elapse before a request times out.
+    /// The amount of time, in seconds, to elapse before a request-response roundtrip times out.
     ///
-    /// Defaults to 60 seconds.
+    /// This value defaults to 60 seconds.
+    ///
+    /// This additionally sets two related timestamps:
+    /// - The time to elapse before a single transport message times out (i.e. a request or response). Set to the floor of 1/2 of this value, so defaults to 30 seconds.
+    /// - The time to elapse while attempting to establish a webrtc connection, before falling back to a relay connection. Set to the floor of 3/8 of this value, so defaults to 22 seconds.
+    #[serde(default = "default_request_timeout_s")]
     pub request_timeout_s: u64,
 
     /// The Kitsune2 webrtc_config to use for connecting to peers.
@@ -230,6 +235,7 @@ pub struct NetworkConfig {
     /// The target arc factor to apply when receiving hints from kitsune2.
     /// In normal operation, leave this as the default 1.
     /// For leacher nodes that do not contribute to gossip, set to zero.
+    #[serde(default = "default_target_arc_factor")]
     pub target_arc_factor: u32,
 
     /// Configure Kitsune2 Reporting.
@@ -270,9 +276,9 @@ impl Default for NetworkConfig {
             base64_auth_material: None,
             bootstrap_url: url2::Url2::parse("https://dev-test-bootstrap2.holochain.org"),
             signal_url: url2::Url2::parse("wss://dev-test-bootstrap2.holochain.org"),
-            request_timeout_s: 60,
+            request_timeout_s: default_request_timeout_s(),
             webrtc_config: None,
-            target_arc_factor: 1,
+            target_arc_factor: default_target_arc_factor(),
             report: Default::default(),
             advanced: None,
             #[cfg(feature = "test-utils")]
@@ -285,6 +291,14 @@ impl Default for NetworkConfig {
             mem_bootstrap: true,
         }
     }
+}
+
+const fn default_request_timeout_s() -> u64 {
+    60
+}
+
+const fn default_target_arc_factor() -> u32 {
+    1
 }
 
 impl NetworkConfig {
@@ -382,6 +396,25 @@ impl NetworkConfig {
                 "tx5Transport",
                 "serverUrl",
                 serde_json::Value::String(self.signal_url.as_str().into()),
+            )?;
+
+            // webrtcConnectTimeout is set to the floor of 1/2 of the request_timeout_s.
+            let timeout_s: serde_json::Number = (self.request_timeout_s / 2).into();
+            Self::insert_module_config(
+                module_config,
+                "tx5Transport",
+                "timeoutS",
+                serde_json::Value::Number(timeout_s),
+            )?;
+
+            // webrtcConnectTimeout is set to the floor of 3/8 of the request_timeout_s.
+            let webrtc_connect_timeout: serde_json::Number =
+                ((self.request_timeout_s * 3) / 8).into();
+            Self::insert_module_config(
+                module_config,
+                "tx5Transport",
+                "webrtcConnectTimeout",
+                serde_json::Value::Number(webrtc_connect_timeout),
             )?;
 
             if let Some(webrtc_config) = &self.webrtc_config {
@@ -823,7 +856,7 @@ mod tests {
                     "backoffMinMs": "3500",
                 },
                 "tx5Transport": {
-                    "timeoutS": "10",
+                    "signalAllowPlainText": "true"
                 },
                 "coreSpace": {
                     "reSignFreqMs": "1000",
@@ -848,7 +881,9 @@ mod tests {
                 },
                 "tx5Transport": {
                     "serverUrl": "wss://dev-test-bootstrap2.holochain.org/",
-                    "timeoutS": "10",
+                    "timeoutS": 30,
+                    "webrtcConnectTimeout": 22,
+                    "signalAllowPlainText": "true"
                 },
                 "coreSpace": {
                     "reSignFreqMs": "1000",
@@ -866,6 +901,8 @@ mod tests {
                 },
                 "tx5Transport": {
                     "serverUrl": "wss://sbd.nowhere.net",
+                    "timeoutS": 10,
+                    "webrtcConnectTimeout": 10
                 },
             })),
             ..Default::default()
@@ -887,6 +924,8 @@ mod tests {
                 },
                 "tx5Transport": {
                     "serverUrl": "wss://dev-test-bootstrap2.holochain.org/",
+                    "timeoutS": 30,
+                    "webrtcConnectTimeout": 22
                 },
             })
         )
@@ -916,6 +955,8 @@ mod tests {
                 },
                 "tx5Transport": {
                     "serverUrl": "wss://dev-test-bootstrap2.holochain.org/",
+                    "timeoutS": 30,
+                    "webrtcConnectTimeout": 22
                 },
                 "k2Gossip": {
                     "roundTimeoutMs": 100,
