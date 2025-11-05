@@ -40,10 +40,10 @@ tracing = "0.1"
 tracing-appender = "0.2.3"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 
-kitsune2 = { version = "0.3.0-dev.4", default-features = false }
-kitsune2_api = "0.3.0-dev.4"
-kitsune2_core = "0.3.0-dev.4"
-kitsune2_gossip = "0.3.0-dev.4"
+kitsune2 = { version = "0.3.0", default-features = false }
+kitsune2_api = "0.3.0"
+kitsune2_core = "0.3.0"
+kitsune2_gossip = "0.3.0"
 bytes = "1.10"
 holochain_sqlite = { version = "^0.6.0-dev.30", path = "../holochain_sqlite" }
 lair_keystore_api = "=0.6.3"
@@ -57,9 +57,9 @@ holochain_sqlite = { version = "^0.6.0-dev.30", path = "../holochain_sqlite", fe
   "test_utils",
 ] }
 holochain_state = { path = "../holochain_state", features = ["test_utils"] }
-kitsune2_test_utils = "0.3.0-dev.4"
+kitsune2_test_utils = "0.3.0"
 tempfile = "3.21.0"
-kitsune2_bootstrap_srv = { version = "0.3.0-dev.3" }
+kitsune2_bootstrap_srv = { version = "0.3.0" }
 
 [lints]
 workspace = true
