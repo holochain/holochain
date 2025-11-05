@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Stabilize invalid op warrants, no longer behind the `unstable-warrants` feature flag. #5418
 - **BREAKING CHANGE** Build: Upgrade to latest Kitsune2 release v0.3.0-dev.4 (changes `AdminResponse::DumpNetworkStats`) \#5353
 - **BREAKING CHANGE** `AdminRequest::DumpNetworkStats` now returns `ApiTransportStats`. Existing top-level fields are nested under `transport_stats`. \#5353
 - Fix: Make sure peers that were marked unresponsive are not marked responsive again until their agent info expiration timestamp or a new agent info is received. \#5423

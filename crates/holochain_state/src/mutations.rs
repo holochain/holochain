@@ -235,11 +235,8 @@ pub fn insert_op_when(
             insert_action(txn, &action_hashed)?;
         }
         DhtOp::WarrantOp(_warrant_op) => {
-            #[cfg(feature = "unstable-warrants")]
-            {
-                let warrant = (***_warrant_op).clone();
-                insert_warrant(txn, warrant)?;
-            }
+            let warrant = (***_warrant_op).clone();
+            insert_warrant(txn, warrant)?;
         }
     }
 
@@ -336,8 +333,7 @@ pub fn insert_op_lite_when(
             })?;
         }
         DhtOpLite::Warrant(op) => {
-            let _warrant_hash = op.warrant().to_hash();
-            #[cfg(feature = "unstable-warrants")]
+            let warrant_hash = op.warrant().to_hash();
             sql_insert!(txn, DhtOp, {
                 "hash": hash,
                 "type": op_lite.get_type(),
@@ -345,7 +341,7 @@ pub fn insert_op_lite_when(
                 "authored_timestamp": authored_timestamp,
                 "when_stored": when_stored,
                 "basis_hash": basis,
-                "action_hash": _warrant_hash,
+                "action_hash": warrant_hash,
                 "transfer_source": transfer_source,
                 "transfer_method": transfer_method,
                 "transfer_time": transfer_time,
@@ -728,7 +724,6 @@ pub fn set_receipts_complete_redundantly_in_dht_db(
 }
 
 /// Insert a [`Warrant`] into the Warrant table.
-#[cfg(feature = "unstable-warrants")]
 pub fn insert_warrant(txn: &mut Transaction, warrant: SignedWarrant) -> StateMutationResult<usize> {
     let warrant_type = warrant.get_type();
     let hash = warrant.to_hash();
