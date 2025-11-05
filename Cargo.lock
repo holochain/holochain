@@ -386,7 +386,7 @@ dependencies = [
  "hyper 1.7.0",
  "hyper-util",
  "pin-project-lite",
- "rustls 0.23.34",
+ "rustls 0.23.35",
  "rustls-pemfile 2.2.0",
  "rustls-pki-types",
  "tokio",
@@ -2421,7 +2421,7 @@ dependencies = [
  "holochain_types",
  "rand 0.9.2",
  "rand-utf8",
- "rustls 0.23.34",
+ "rustls 0.23.35",
  "serde",
  "tempfile",
  "tokio",
@@ -2689,7 +2689,7 @@ dependencies = [
  "regex",
  "reqwest 0.12.24",
  "rusqlite",
- "rustls 0.23.34",
+ "rustls 0.23.35",
  "schemars 0.9.0",
  "sd-notify",
  "serde",
@@ -3566,7 +3566,7 @@ dependencies = [
  "http 1.3.1",
  "hyper 1.7.0",
  "hyper-util",
- "rustls 0.23.34",
+ "rustls 0.23.35",
  "rustls-pki-types",
  "tokio",
  "tokio-rustls 0.26.4",
@@ -3916,9 +3916,9 @@ checksum = "469fb0b9cefa57e3ef31275ee7cacb78f2fdca44e4765491884a2b119d4eb130"
 
 [[package]]
 name = "iri-string"
-version = "0.7.8"
+version = "0.7.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dbc5ebe9c3a1a7a5127f920a418f7585e9e758e911d0466ed004f393b0e380b2"
+checksum = "4f867b9d1d896b67beb18518eda36fdb77a32ea590de864f1325b294a6d14397"
 dependencies = [
  "memchr",
  "serde",
@@ -4062,9 +4062,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2"
-version = "0.3.0-dev.4"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4ab66f801bb2124afa6fcfc1ffdf54dc1555f6723b50c3842a3ee2f8393224f"
+checksum = "88acf4edc2ab4fb63b2fef5798d5109e3244d23269ad7ab0bb3a40fb0fd4d5cc"
 dependencies = [
  "bytes",
  "kitsune2_api",
@@ -4076,9 +4076,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_api"
-version = "0.3.0-dev.4"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d88e5022abc85e25c0091ae497777121506a17d2bccc793dd90441c8f5d0ca70"
+checksum = "3a52f645777c05b13fa20c1d97fb1359fc4ff0391a02bf08b7cf907e5e735a3c"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -4093,9 +4093,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_bootstrap_client"
-version = "0.3.0-dev.4"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a85c020a586a50de9735a7c3c90703970dfb09e5c6cb38d629caf61fe0c1e544"
+checksum = "2b15e909284bd2a4b5fec0c1783f89cc8de04b6779ac495c546c923eead251f7"
 dependencies = [
  "base64 0.22.1",
  "kitsune2_api",
@@ -4108,9 +4108,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_bootstrap_srv"
-version = "0.3.0-dev.4"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3ef0232568aa5eda4bf60f9399174bf201610b79485c8165eca6d34f6251538"
+checksum = "8ef53db919329c6e6dab5aeeccadec263dae6c6bf2935fd02dd903f65fc3d2e1"
 dependencies = [
  "async-channel",
  "axum",
@@ -4121,22 +4121,24 @@ dependencies = [
  "ctrlc",
  "ed25519-dalek",
  "futures",
+ "http 1.3.1",
  "num_cpus",
- "rustls 0.23.34",
+ "rustls 0.23.35",
  "sbd-server",
  "serde",
  "serde_json",
  "tempfile",
  "tokio",
+ "tower-http",
  "tracing",
  "tracing-subscriber",
 ]
 
 [[package]]
 name = "kitsune2_core"
-version = "0.3.0-dev.4"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a56cdf53d16d24cd29eeed5b0068a1ef94ce108b73262f83477212369150669"
+checksum = "0211475939d8d0990a969dc1875134a5415375ce99f8c9acd937ddc6abc1c43b"
 dependencies = [
  "bytes",
  "ed25519-dalek",
@@ -4155,9 +4157,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_dht"
-version = "0.3.0-dev.4"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a73bf02e735c78af3a0cf94d4b27e081a215fd5e160c628714e1534b39b181da"
+checksum = "80f0b8bf4e23c4d163a9d584a2d9bc4cf77cdbc9510c3eb3f0bd3e1f4fb67aa3"
 dependencies = [
  "bytes",
  "kitsune2_api",
@@ -4166,9 +4168,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_gossip"
-version = "0.3.0-dev.4"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d0ac279cd57c9bc11257aed89fb17d7d4d98d45dd8c59b06f760aa6ce4ef451"
+checksum = "31b7ae1edc348e0c394216800d4179bad370d60c91f623b054023da7a4a5adb0"
 dependencies = [
  "bytes",
  "futures",
@@ -4187,9 +4189,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_test_utils"
-version = "0.3.0-dev.4"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6026ade5fb1352a5d0cf2f2d5d07b18ef07ad204e9915731d64629315f404971"
+checksum = "7de2b65fa8cf9a81621b3fca8ba85471a4ad41339107846e87c175973684998d"
 dependencies = [
  "axum",
  "bytes",
@@ -4203,9 +4205,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_transport_tx5"
-version = "0.3.0-dev.4"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c409693d4fb491d74c242797bb4b609f0e2ad396eb3561d4542d032dbf4f7fc"
+checksum = "475b1940791bd38f437b2580d7ccc610cf31ac26093d1fa90f0e1c5ad8c5c377"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -5502,7 +5504,7 @@ dependencies = [
  "quinn-proto",
  "quinn-udp",
  "rustc-hash 2.1.1",
- "rustls 0.23.34",
+ "rustls 0.23.35",
  "socket2 0.6.1",
  "thiserror 2.0.17",
  "tokio",
@@ -5522,7 +5524,7 @@ dependencies = [
  "rand 0.9.2",
  "ring",
  "rustc-hash 2.1.1",
- "rustls 0.23.34",
+ "rustls 0.23.35",
  "rustls-pki-types",
  "slab",
  "thiserror 2.0.17",
@@ -6059,7 +6061,7 @@ dependencies = [
  "percent-encoding",
  "pin-project-lite",
  "quinn",
- "rustls 0.23.34",
+ "rustls 0.23.35",
  "rustls-pki-types",
  "serde",
  "serde_json",
@@ -6274,9 +6276,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.34"
+version = "0.23.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a9586e9ee2b4f8fab52a0048ca7334d7024eef48e2cb9407e3497bb7cab7fa7"
+checksum = "533f54bc6a7d4f647e46ad909549eda97bf5afc1585190ef692b4286b198bd8f"
 dependencies = [
  "aws-lc-rs",
  "log",
@@ -6404,7 +6406,7 @@ dependencies = [
  "ed25519-dalek",
  "futures",
  "rand 0.8.5",
- "rustls 0.23.34",
+ "rustls 0.23.35",
  "rustls-native-certs",
  "serde",
  "serde_json",
@@ -6445,7 +6447,7 @@ dependencies = [
  "ed25519-dalek",
  "futures",
  "rand 0.8.5",
- "rustls 0.23.34",
+ "rustls 0.23.35",
  "rustls-pemfile 2.2.0",
  "serde",
  "serde_json",
@@ -7378,7 +7380,7 @@ version = "0.26.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1729aa945f29d91ba541258c8df89027d5792d85a8841fb65e8bf0f4ede4ef61"
 dependencies = [
- "rustls 0.23.34",
+ "rustls 0.23.35",
  "tokio",
 ]
 
@@ -7414,7 +7416,7 @@ checksum = "489a59b6730eda1b0171fcfda8b121f4bee2b35cba8645ca35c5f7ba3eb736c1"
 dependencies = [
  "futures-util",
  "log",
- "rustls 0.23.34",
+ "rustls 0.23.35",
  "rustls-pki-types",
  "tokio",
  "tokio-rustls 0.26.4",
@@ -7718,7 +7720,7 @@ dependencies = [
  "httparse",
  "log",
  "rand 0.9.2",
- "rustls 0.23.34",
+ "rustls 0.23.35",
  "rustls-pki-types",
  "sha1",
  "thiserror 2.0.17",
@@ -7948,7 +7950,7 @@ dependencies = [
  "flate2",
  "log",
  "once_cell",
- "rustls 0.23.34",
+ "rustls 0.23.35",
  "rustls-pki-types",
  "url",
  "webpki-roots 0.26.11",
@@ -7965,7 +7967,7 @@ dependencies = [
  "flate2",
  "log",
  "percent-encoding",
- "rustls 0.23.34",
+ "rustls 0.23.35",
  "rustls-pemfile 2.2.0",
  "rustls-pki-types",
  "serde",

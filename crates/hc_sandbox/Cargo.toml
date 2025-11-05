@@ -48,8 +48,8 @@ holochain_trace = { version = "^0.6.0-dev.4", path = "../holochain_trace" }
 holo_hash = { version = "^0.6.0-dev.18", path = "../holo_hash", features = [
   "kitsune2",
 ] }
-kitsune2_api = "0.3.0-dev.4"
-kitsune2_core = "0.3.0-dev.4"
+kitsune2_api = "0.3.0"
+kitsune2_core = "0.3.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 serde_json = "1.0"
@@ -62,7 +62,7 @@ walkdir = "2"
 ed25519-dalek = "2.1"
 
 [dev-dependencies]
-kitsune2_test_utils = "0.3.0-dev.4"
+kitsune2_test_utils = "0.3.0"
 fixt = { version = "^0.6.0-dev.7", path = "../fixt" }
 indexmap = { version = "2.6.0", features = ["serde"] }
 tempfile = "3.20.0"

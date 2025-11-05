@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Update to release version of Kitsune2 v0.3.0. #5429
 - Stabilize invalid op warrants, no longer behind the `unstable-warrants` feature flag. #5418
 
 ## 0.6.0-dev.33
