@@ -14,6 +14,62 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20251105.001147
+
+## [hcterm-0.6.0-dev.33](crates/hcterm/CHANGELOG.md#0.6.0-dev.33)
+
+## [holochain\_cli-0.6.0-dev.33](crates/holochain_cli/CHANGELOG.md#0.6.0-dev.33)
+
+## [holochain\_cli\_bundle-0.6.0-dev.33](crates/holochain_cli_bundle/CHANGELOG.md#0.6.0-dev.33)
+
+## [holochain\_cli\_sandbox-0.6.0-dev.33](crates/holochain_cli_sandbox/CHANGELOG.md#0.6.0-dev.33)
+
+## [holochain\_client-0.8.0-dev.30](crates/holochain_client/CHANGELOG.md#0.8.0-dev.30)
+
+## [holochain-0.6.0-dev.33](crates/holochain/CHANGELOG.md#0.6.0-dev.33)
+
+- **BREAKING CHANGE** Build: Upgrade to latest Kitsune2 release v0.3.0-dev.4 (changes `AdminResponse::DumpNetworkStats`) \#5353
+- **BREAKING CHANGE** `AdminRequest::DumpNetworkStats` now returns `ApiTransportStats`. Existing top-level fields are nested under `transport_stats`. \#5353
+- Fix: Make sure peers that were marked unresponsive are not marked responsive again until their agent info expiration timestamp or a new agent info is received. \#5423
+
+## [holochain\_cascade-0.6.0-dev.33](crates/holochain_cascade/CHANGELOG.md#0.6.0-dev.33)
+
+## [holochain\_conductor\_config-0.6.0-dev.33](crates/holochain_conductor_config/CHANGELOG.md#0.6.0-dev.33)
+
+## [holochain\_test\_wasm\_common-0.6.0-dev.25](crates/holochain_test_wasm_common/CHANGELOG.md#0.6.0-dev.25)
+
+## [holochain\_wasm\_test\_utils-0.6.0-dev.33](crates/holochain_wasm_test_utils/CHANGELOG.md#0.6.0-dev.33)
+
+## [holochain\_websocket-0.6.0-dev.33](crates/holochain_websocket/CHANGELOG.md#0.6.0-dev.33)
+
+## [hdk-0.6.0-dev.25](crates/hdk/CHANGELOG.md#0.6.0-dev.25)
+
+## [holochain\_conductor\_api-0.6.0-dev.33](crates/holochain_conductor_api/CHANGELOG.md#0.6.0-dev.33)
+
+## [holochain\_p2p-0.6.0-dev.33](crates/holochain_p2p/CHANGELOG.md#0.6.0-dev.33)
+
+## [hdi-0.7.0-dev.22](crates/hdi/CHANGELOG.md#0.7.0-dev.22)
+
+## [holochain\_state-0.6.0-dev.33](crates/holochain_state/CHANGELOG.md#0.6.0-dev.33)
+
+## [hdk\_derive-0.6.0-dev.21](crates/hdk_derive/CHANGELOG.md#0.6.0-dev.21)
+
+## [holochain\_chc-0.3.0-dev.33](crates/holochain_chc/CHANGELOG.md#0.3.0-dev.33)
+
+## [holochain\_state\_types-0.6.0-dev.21](crates/holochain_state_types/CHANGELOG.md#0.6.0-dev.21)
+
+## [holochain\_types-0.6.0-dev.33](crates/holochain_types/CHANGELOG.md#0.6.0-dev.33)
+
+## [holochain\_keystore-0.6.0-dev.24](crates/holochain_keystore/CHANGELOG.md#0.6.0-dev.24)
+
+## [holochain\_sqlite-0.6.0-dev.31](crates/holochain_sqlite/CHANGELOG.md#0.6.0-dev.31)
+
+## [holochain\_zome\_types-0.6.0-dev.24](crates/holochain_zome_types/CHANGELOG.md#0.6.0-dev.24)
+
+## [holochain\_integrity\_types-0.6.0-dev.21](crates/holochain_integrity_types/CHANGELOG.md#0.6.0-dev.21)
+
+## [holo\_hash-0.6.0-dev.18](crates/holo_hash/CHANGELOG.md#0.6.0-dev.18)
+
 # 20251103.100646
 
 ## [hcterm-0.6.0-dev.32](crates/hcterm/CHANGELOG.md#0.6.0-dev.32)
