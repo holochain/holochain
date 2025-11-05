@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Test: Test that blocks are enforced for incoming network get requests and gossip. \#5344
+
 ## 0.6.0-rc.0
 
 - Update to release version of Kitsune2 v0.3.0. \#5429
