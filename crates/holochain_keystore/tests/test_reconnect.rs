@@ -1,4 +1,3 @@
-use assert_cmd::cargo::CommandCargoExt;
 use holochain_keystore::lair_keystore::*;
 use holochain_keystore::MetaLairClient;
 use std::io::BufRead;
@@ -31,7 +30,7 @@ impl std::ops::Deref for Cli {
 }
 
 fn run_test_keystore(dir: &std::path::Path) -> (Proc, url2::Url2) {
-    let mut cmd = std::process::Command::cargo_bin("test-keystore-srv").unwrap();
+    let mut cmd = std::process::Command::new(assert_cmd::cargo_bin!("test-keystore-srv"));
     cmd.arg(dir).stdout(std::process::Stdio::piped());
 
     println!("{cmd:?}");
