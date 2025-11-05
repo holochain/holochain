@@ -101,5 +101,3 @@ sqlite = [
   "holochain_types/sqlite",
   "holochain_zome_types/sqlite",
 ]
-
-unstable-warrants = []

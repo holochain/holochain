@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Stabilize invalid op warrants, no longer behind the `unstable-warrants` feature flag. #5418
+
 ## 0.6.0-dev.33
 
 - **BREAKING CHANGE** Build: Upgrade to latest Kitsune2 release v0.3.0-dev.4 (changes `AdminResponse::DumpNetworkStats`) \#5353

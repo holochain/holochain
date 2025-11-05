@@ -1430,7 +1430,6 @@ mod tests {
     use ::fixt::fixt;
     use ::fixt::prelude::*;
     use holo_hash::fixt::DnaHashFixturator;
-    #[cfg(feature = "unstable-warrants")]
     use holo_hash::fixt::{ActionHashFixturator, AgentPubKeyFixturator};
     use holochain_keystore::test_keystore;
     use holochain_zome_types::Entry;
@@ -2343,7 +2342,6 @@ mod tests {
         assert!(zomes_initialized);
     }
 
-    #[cfg(feature = "unstable-warrants")]
     #[tokio::test(flavor = "multi_thread")]
     async fn flush_writes_warrants_to_dht_db() {
         let TestCase {
@@ -2387,7 +2385,6 @@ mod tests {
         assert_eq!(actual_warrants, vec![WarrantOp::from(signed_warrant)]);
     }
 
-    #[cfg(feature = "unstable-warrants")]
     #[tokio::test(flavor = "multi_thread")]
     async fn duplicate_warrants_are_not_inserted_during_flush() {
         holochain_trace::test_run();
@@ -2449,7 +2446,6 @@ mod tests {
         assert_eq!(actual_warrants, vec![WarrantOp::from(signed_warrant)]);
     }
 
-    #[cfg(feature = "unstable-warrants")]
     #[tokio::test(flavor = "multi_thread")]
     async fn counterfeit_warrants_are_not_inserted_during_flush() {
         let TestCase {
@@ -2539,7 +2535,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "unstable-warrants")]
     async fn create_signed_warrant(
         author: &AgentPubKey,
         warrantee: &AgentPubKey,

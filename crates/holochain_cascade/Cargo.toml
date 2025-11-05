@@ -81,5 +81,3 @@ datachannel-vendored = [
   "backend-libdatachannel",
   "holochain_p2p/datachannel-vendored",
 ]
-
-unstable-warrants = ["holochain_state/unstable-warrants"]
