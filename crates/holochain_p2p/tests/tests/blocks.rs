@@ -605,5 +605,5 @@ async fn exchange_agent_infos(alice: DynHcP2p, bob: DynHcP2p, dna_hash: &DnaHash
         }
     })
     .await
-    .unwrap();
+    .expect("exchanging agent infos timed out");
 }
