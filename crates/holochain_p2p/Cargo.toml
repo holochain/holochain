@@ -15,7 +15,7 @@ edition = "2021"
 async-trait = "0.1"
 base64 = "0.22"
 blake2b_simd = "1.0.3"
-fixt = { path = "../fixt", version = "^0.6.0-rc.0"}
+fixt = { path = "../fixt", version = "^0.6.0-rc.0" }
 futures = "0.3"
 holo_hash = { version = "^0.6.0-rc.0", path = "../holo_hash", features = [
   "kitsune2",
