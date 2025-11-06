@@ -43,7 +43,6 @@ mod wait_for;
 pub use wait_for::*;
 
 /// Await consistency for warrants.
-#[cfg(any(feature = "unstable-functions", feature = "unstable-warrants"))]
 pub mod conditional_consistency;
 
 mod big_stack_test;

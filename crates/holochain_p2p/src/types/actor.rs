@@ -4,7 +4,7 @@
 use crate::*;
 use holochain_types::activity::AgentActivityResponse;
 use holochain_types::prelude::ValidationReceiptBundle;
-use kitsune2_api::{SpaceId, StoredOp};
+use kitsune2_api::{DhtArc, SpaceId, StoredOp};
 use std::collections::HashMap;
 
 /// Get options help control how the get is processed at various levels.
@@ -143,10 +143,11 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
     /// Test utility to force local agents to report full storage arcs.
     #[cfg(feature = "test_utils")]
     fn test_set_full_arcs(&self, space: kitsune2_api::SpaceId) -> BoxFut<'_, ()> {
-        Box::pin(async {
+        Box::pin(async move {
+            let mut updated_agents = Vec::new();
             for agent in self
                 .test_kitsune()
-                .space(space)
+                .space(space.clone())
                 .await
                 .unwrap()
                 .local_agent_store()
@@ -157,7 +158,36 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
                 agent.set_cur_storage_arc(kitsune2_api::DhtArc::FULL);
                 agent.set_tgt_storage_arc_hint(kitsune2_api::DhtArc::FULL);
                 agent.invoke_cb();
+                updated_agents.push(agent);
             }
+
+            // Wait for the updated agent infos to have been put in the peer store.
+            retry_fn_until_timeout(
+                || {
+                    let space = space.clone();
+                    let updated_agents = updated_agents.clone();
+                    async move {
+                        let all_agents_in_peer_store = self
+                            .test_kitsune()
+                            .space(space.clone())
+                            .await
+                            .unwrap()
+                            .peer_store()
+                            .get_all()
+                            .await
+                            .unwrap();
+                        updated_agents.into_iter().all(|updated_agent| {
+                            all_agents_in_peer_store.iter().any(|a| {
+                                a.agent == *updated_agent.agent() && a.storage_arc == DhtArc::FULL
+                            })
+                        })
+                    }
+                },
+                None,
+                None,
+            )
+            .await
+            .unwrap();
         })
     }
 
@@ -306,7 +336,8 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
     /// Get network stats from the Kitsune2 transport.
     ///
     /// See [Transport::dump_network_stats](kitsune2_api::Transport::dump_network_stats).
-    fn dump_network_stats(&self) -> BoxFut<'_, HolochainP2pResult<kitsune2_api::TransportStats>>;
+    fn dump_network_stats(&self)
+        -> BoxFut<'_, HolochainP2pResult<kitsune2_api::ApiTransportStats>>;
 
     /// Get the target arcs of the agents currently in this space.
     fn target_arcs(

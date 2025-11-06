@@ -1,5 +1,4 @@
 use super::test_utils::*;
-use assert_cmd::prelude::*;
 use holochain::sweettest::WsPollRecv;
 use holochain_conductor_api::config::conductor::ConductorConfig;
 use holochain_conductor_api::config::conductor::KeystoreConfig;
@@ -62,7 +61,7 @@ async fn test_new_lair_conductor_integration() {
     println!("\n## conductor config ##\n{conductor_config}");
 
     // start a conductor using the new config
-    let cmd = std::process::Command::cargo_bin("holochain").unwrap();
+    let cmd = std::process::Command::new(assert_cmd::cargo_bin!("holochain"));
     let mut cmd = tokio::process::Command::from(cmd);
     cmd.arg("--config-path")
         .arg(cc_path)

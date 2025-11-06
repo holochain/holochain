@@ -12,7 +12,6 @@ use holochain_state::prelude::*;
 use holochain_types::test_utils::chain::*;
 use std::sync::Arc;
 use test_case::test_case;
-#[cfg(feature = "unstable-warrants")]
 use {
     holo_hash::fixt::{ActionHashFixturator, AgentPubKeyFixturator},
     holochain_state::integrate::insert_locally_validated_op,
@@ -340,7 +339,6 @@ async fn filter_out_entries_with_chain_query() {
     assert_agent_activity_responses_eq!(expected, r);
 }
 
-#[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
 async fn get_activity_with_warrants() {
     holochain_trace::test_run();
@@ -466,7 +464,6 @@ struct Data {
     warrants: Vec<WarrantOp>,
 }
 
-#[cfg(feature = "unstable-warrants")]
 fn warrant(warrantee: u8) -> WarrantOp {
     let p = WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
         action_author: ::fixt::fixt!(AgentPubKey),
@@ -608,7 +605,6 @@ async fn test_must_get_agent_activity(
     test_must_get_agent_activity_inner(data, author, filter).await
 }
 
-#[cfg(feature = "unstable-warrants")]
 #[test_case(
     Data { dht: agent_chain(&[(0, 0..3)]), warrants: vec![warrant(0)], ..Default::default() },
     agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
@@ -663,14 +659,12 @@ async fn test_must_get_agent_activity_inner(
     authored_ops_to_dht_db_without_check(hashes, authored.clone().into(), dht.clone())
         .await
         .unwrap();
-    #[cfg(feature = "unstable-warrants")]
-    {
-        dht.test_write(|txn| {
-            for warrant in warrants {
-                insert_locally_validated_op(txn, DhtOpHashed::from_content_sync(warrant)).unwrap();
-            }
-        });
-    }
+
+    dht.test_write(|txn| {
+        for warrant in warrants {
+            insert_locally_validated_op(txn, DhtOpHashed::from_content_sync(warrant)).unwrap();
+        }
+    });
 
     let sync_scratch = match scratch {
         Some(scratch) => {

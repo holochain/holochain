@@ -61,7 +61,7 @@ jobs:
             target: wasmer_sys
           - os: macos-latest
             target: wasmer_sys
-          - os: macos-13
+          - os: macos-15
             target: wasmer_sys
           - os: windows-latest
             target: wasmer_sys

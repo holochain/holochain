@@ -475,6 +475,7 @@ impl Report for HcReport {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::retry_fn_until_timeout;
 
     pub const TEST_SPACE_ID: SpaceId = SpaceId(Id(bytes::Bytes::from_static(
         b"12345678901234567890123456789012",
@@ -652,6 +653,18 @@ mod test {
     async fn report_entry_fetched_ops() {
         let test1 = Test::new().await;
         let test2 = Test::new().await;
+
+        // Wait for peer discovery
+        retry_fn_until_timeout(
+            || async {
+                test1.space.peer_store().get_all().await.unwrap().len() == 2
+                    && test2.space.peer_store().get_all().await.unwrap().len() == 2
+            },
+            Some(10_000),
+            None,
+        )
+        .await
+        .unwrap();
 
         test2.kitsune.report().unwrap().fetched_op(
             TEST_SPACE_ID,

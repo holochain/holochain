@@ -1,6 +1,6 @@
 [package]
 name = "holochain_client"
-version = "0.8.0-dev.29"
+version = "0.8.0-rc.0"
 description = "A Rust client for the Holochain Conductor API"
 authors = [
   "Holochain Core Dev Team <devcore@holochain.org>",
@@ -18,15 +18,15 @@ anyhow = "1.0"
 async-trait = "0.1"
 ed25519-dalek = { version = "2.1", features = ["rand_core"] }
 event-emitter-rs = "0.1"
-holo_hash = { version = "^0.6.0-dev.17", path = "../holo_hash", features = [
+holo_hash = { version = "^0.6.0-rc.0", path = "../holo_hash", features = [
   "encoding",
 ] }
-holochain_conductor_api = { version = "^0.6.0-dev.32", path = "../holochain_conductor_api" }
-holochain_nonce = { version = "^0.6.0-dev.5", path = "../holochain_nonce" }
-holochain_types = { version = "^0.6.0-dev.32", path = "../holochain_types" }
-holochain_websocket = { version = "^0.6.0-dev.32", path = "../holochain_websocket" }
-holochain_zome_types = { version = "^0.6.0-dev.23", path = "../holochain_zome_types" }
-kitsune2_api = "0.3.0-dev.3"
+holochain_conductor_api = { version = "^0.6.0-rc.0", path = "../holochain_conductor_api" }
+holochain_nonce = { version = "^0.6.0-rc.0", path = "../holochain_nonce" }
+holochain_types = { version = "^0.6.0-rc.0", path = "../holochain_types" }
+holochain_websocket = { version = "^0.6.0-rc.0", path = "../holochain_websocket" }
+holochain_zome_types = { version = "^0.6.0-rc.0", path = "../holochain_zome_types" }
+kitsune2_api = "0.3.0"
 lair_keystore_api = { version = "0.6.3", optional = true }
 parking_lot = "0.12.1"
 rand = { version = "0.8" }
@@ -36,14 +36,14 @@ tokio = { version = "1.36", features = ["rt"] }
 
 [dev-dependencies]
 bytes = "1.10.1"
-mr_bundle = { version = "^0.6.0-dev.8", path = "../mr_bundle" }
-holochain = { version = "^0.6.0-dev.32", path = "../holochain", default-features = false, features = [
+mr_bundle = { version = "^0.6.0-rc.0", path = "../mr_bundle" }
+holochain = { version = "^0.6.0-rc.0", path = "../holochain", default-features = false, features = [
   "sweettest",
 ] }
-holochain_wasm_test_utils = { version = "^0.6.0-dev.32", path = "../test_utils/wasm" }
+holochain_wasm_test_utils = { version = "^0.6.0-rc.0", path = "../test_utils/wasm" }
 
-kitsune2_core = "0.3.0-dev.3"
-kitsune2_test_utils = "0.3.0-dev.3"
+kitsune2_core = "0.3.0"
+kitsune2_test_utils = "0.3.0"
 serde_yaml = "0.9"
 
 [features]
