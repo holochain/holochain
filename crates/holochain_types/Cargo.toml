@@ -34,7 +34,7 @@ holochain_zome_types = { path = "../holochain_zome_types", version = "^0.6.0-rc.
   "full",
 ] }
 holochain_timestamp = { version = "^0.6.0-rc.0", path = "../timestamp" }
-kitsune2_api = "0.3.0"
+kitsune2_api = "=0.3.0-dev.3"
 itertools = { version = "0.14" }
 mr_bundle = { path = "../mr_bundle", features = [
   "fs",

@@ -439,7 +439,7 @@ impl AdminWebsocket {
         }
     }
 
-    pub async fn dump_network_stats(&self) -> ConductorApiResult<kitsune2_api::ApiTransportStats> {
+    pub async fn dump_network_stats(&self) -> ConductorApiResult<kitsune2_api::TransportStats> {
         let msg = AdminRequest::DumpNetworkStats;
         let response = self.send(msg).await?;
         match response {

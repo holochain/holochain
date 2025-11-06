@@ -181,32 +181,17 @@ async fn warrant_is_published() {
     println!(
         "0 alice {} url {:?}",
         alice.agent_pubkey(),
-        conductors[0]
-            .dump_network_stats()
-            .await
-            .unwrap()
-            .transport_stats
-            .peer_urls[0]
+        conductors[0].dump_network_stats().await.unwrap().peer_urls[0]
     );
     println!(
         "1 bob   {} url {:?}",
         bob.agent_pubkey(),
-        conductors[1]
-            .dump_network_stats()
-            .await
-            .unwrap()
-            .transport_stats
-            .peer_urls[0]
+        conductors[1].dump_network_stats().await.unwrap().peer_urls[0]
     );
     println!(
         "2 carol {} url {:?}",
         carol.agent_pubkey(),
-        conductors[2]
-            .dump_network_stats()
-            .await
-            .unwrap()
-            .transport_stats
-            .peer_urls[0]
+        conductors[2].dump_network_stats().await.unwrap().peer_urls[0]
     );
 
     await_consistency(10, [&alice, &bob, &carol]).await.unwrap();

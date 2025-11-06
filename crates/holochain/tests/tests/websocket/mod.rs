@@ -782,7 +782,7 @@ async fn network_stats() {
         AdminResponse::NetworkStatsDumped(stats) => {
             println!("{stats:?}");
 
-            assert_eq!(EXPECT, stats.transport_stats.backend);
+            assert_eq!(EXPECT, stats.backend);
         }
         _ => panic!("unexpected"),
     }
