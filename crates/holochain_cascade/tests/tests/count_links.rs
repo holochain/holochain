@@ -113,7 +113,7 @@ async fn count_links_authoring() {
     let mut mock = MockHolochainP2pDnaT::new();
     mock.expect_authority_for_hash().returning(|_| Ok(false));
     mock.expect_count_links()
-        .returning(|_| Ok(CountLinksResponse::new(vec![action_hash(&[1, 2, 3])])));
+        .returning(|_, _| Ok(CountLinksResponse::new(vec![action_hash(&[1, 2, 3])])));
     let mock = Arc::new(mock);
 
     // Cascade
