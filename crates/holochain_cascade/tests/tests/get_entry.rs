@@ -1,6 +1,7 @@
 use holo_hash::HasHash;
 use holochain_cascade::test_utils::*;
 use holochain_cascade::{Cascade, CascadeImpl};
+use holochain_p2p::actor::NetworkRequestOptions;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::mutations::insert_op_scratch;
 use holochain_state::prelude::*;
@@ -168,10 +169,13 @@ async fn assert_rejected(
     assert_eq!(r, expected);
 }
 
-async fn assert_can_retrieve(td_entry: &EntryTestData, cascade: &CascadeImpl, options: GetOptions) {
+async fn assert_can_retrieve(td_entry: &EntryTestData, cascade: &CascadeImpl) {
     // - Retrieve via entry hash
     let (r, _) = cascade
-        .retrieve_public_record(td_entry.hash.clone().into(), options.clone().into())
+        .retrieve_public_record(
+            td_entry.hash.clone().into(),
+            NetworkRequestOptions::default(),
+        )
         .await
         .unwrap()
         .expect("Failed to retrieve record");
@@ -181,7 +185,10 @@ async fn assert_can_retrieve(td_entry: &EntryTestData, cascade: &CascadeImpl, op
 
     // - Retrieve via action hash
     let (r, _) = cascade
-        .retrieve_public_record(td_entry.create_hash.clone().into(), options.clone().into())
+        .retrieve_public_record(
+            td_entry.create_hash.clone().into(),
+            NetworkRequestOptions::default(),
+        )
         .await
         .unwrap()
         .expect("Failed to retrieve record");
@@ -191,7 +198,7 @@ async fn assert_can_retrieve(td_entry: &EntryTestData, cascade: &CascadeImpl, op
 
     // - Retrieve entry
     let (r, _) = cascade
-        .retrieve_entry(td_entry.hash.clone(), options.clone().into())
+        .retrieve_entry(td_entry.hash.clone(), NetworkRequestOptions::default())
         .await
         .unwrap()
         .expect("Failed to retrieve entry");
@@ -200,7 +207,10 @@ async fn assert_can_retrieve(td_entry: &EntryTestData, cascade: &CascadeImpl, op
 
     // - Retrieve action
     let (r, _) = cascade
-        .retrieve_action(td_entry.create_hash.clone(), options.clone().into())
+        .retrieve_action(
+            td_entry.create_hash.clone(),
+            NetworkRequestOptions::default(),
+        )
         .await
         .unwrap()
         .expect("Failed to retrieve action");
@@ -482,7 +492,7 @@ async fn test_pending_data_isnt_returned() {
 
     assert_is_none(&td_entry, &td_record, &cascade, GetOptions::network()).await;
 
-    assert_can_retrieve(&td_entry, &cascade, GetOptions::network()).await;
+    assert_can_retrieve(&td_entry, &cascade).await;
 
     let network = PassThroughNetwork::authority_for_all(vec![authority.to_db().clone().into()]);
 
@@ -491,7 +501,7 @@ async fn test_pending_data_isnt_returned() {
 
     assert_is_none(&td_entry, &td_record, &cascade, GetOptions::network()).await;
 
-    assert_can_retrieve(&td_entry, &cascade, GetOptions::network()).await;
+    assert_can_retrieve(&td_entry, &cascade).await;
 }
 
 mod zero_arc {

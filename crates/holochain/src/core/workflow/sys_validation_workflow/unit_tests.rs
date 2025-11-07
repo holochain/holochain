@@ -177,7 +177,7 @@ async fn validate_op_with_dependency_not_held() {
     let response = WireOps::Record(ops);
     network
         .expect_get()
-        .return_once(move |_| Ok(vec![response]));
+        .return_once(move |_, _| Ok(vec![response]));
 
     network
         .expect_target_arcs()
@@ -240,7 +240,7 @@ async fn validate_op_with_dependency_not_found_on_the_dht() {
     let response = WireOps::Record(WireRecordOps::new());
     network
         .expect_get()
-        .return_once(move |_| Ok(vec![response]));
+        .return_once(move |_, _| Ok(vec![response]));
 
     network
         .expect_target_arcs()
@@ -425,7 +425,7 @@ async fn validate_valid_warrant_with_fetched_dependency() {
 
     network.expect_get().return_once({
         let warranted_action = warranted_action.clone();
-        move |_hash| {
+        move |_hash, _| {
             let mut ops: WireRecordOps = WireRecordOps::new();
             ops.action = Some(Judged::valid(warranted_action.clone().into()));
             ops.entry = Some(entry);
