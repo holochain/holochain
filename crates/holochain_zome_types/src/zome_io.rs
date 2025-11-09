@@ -101,10 +101,10 @@ wasm_io_types! {
     // Attempt to get a live entry from the cascade.
     fn get (Vec<zt::entry::GetInput>) -> Vec<Option<zt::record::Record>>;
 
-    // Retreive a record from the DHT or short circuit.
+    // Retrieve a record from the DHT or short circuit.
     fn must_get_valid_record (zt::entry::MustGetValidRecordInput) -> zt::record::Record;
 
-    // Retreive a entry from the DHT or short circuit.
+    // Retrieve a entry from the DHT or short circuit.
     fn must_get_entry (zt::entry::MustGetEntryInput) -> zt::entry::EntryHashed;
 
     // Retrieve an action from the DHT or short circuit.

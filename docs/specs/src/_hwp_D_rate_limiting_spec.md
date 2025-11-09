@@ -71,7 +71,7 @@ Broadly we have:
     - Update: CapClaim
 - Class C: Links are only headers but still infinite/abusable, the app MAY provide a weight
     - CreateLink
-    - DeleteLink (bounded by existant CreateLink)
+    - DeleteLink (bounded by existent CreateLink)
 - Class D: CRUD are headers and entries (mostly) so are very abusable, the app SHOULD provide a weight
     - Create: App
     - Update: App
@@ -262,7 +262,7 @@ Class A and B and system rate limiting ignores happ buckets and has their own in
 
 Each bucket MUST normalize the units of weight such that element weights will always fit inside a `u8`. This is to minimise the data required in the headers to represent rate limit logic.
 
-By allowing many bucket definitons the intent is that happ developers can define min/max values for many different components of the application to ensure `u8` normalized weights are meaningful.
+By allowing many bucket definitions the intent is that happ developers can define min/max values for many different components of the application to ensure `u8` normalized weights are meaningful.
 
 For example, a single entry type that holds image files could be:
 
