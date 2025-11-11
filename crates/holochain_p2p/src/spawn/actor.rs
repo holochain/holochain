@@ -596,19 +596,16 @@ impl kitsune2_api::KitsuneHandler for HolochainP2pActor {
                 )?);
             }
 
-            // if they sent us agents, spawn a task to insert them into the store
+            // if they sent us agents, insert them into the store
             if !agents.is_empty() {
                 let kitsune = self.kitsune.clone();
-                tokio::task::spawn(async move {
-                    for agent in agents {
-                        let space = match kitsune.space_if_exists(agent.space.clone()).await {
-                            None => continue,
-                            Some(space) => space,
-                        };
-                        space.peer_store().insert(vec![agent]).await?;
-                    }
-                    K2Result::Ok(())
-                });
+                for agent in agents {
+                    let space = match kitsune.space_if_exists(agent.space.clone()).await {
+                        None => continue,
+                        Some(space) => space,
+                    };
+                    space.peer_store().insert(vec![agent]).await?;
+                }
             }
 
             Ok(())
@@ -2025,7 +2022,7 @@ impl actor::HcP2p for HolochainP2pActor {
         })
     }
 
-    fn dump_network_stats(&self) -> BoxFut<'_, HolochainP2pResult<TransportStats>> {
+    fn dump_network_stats(&self) -> BoxFut<'_, HolochainP2pResult<ApiTransportStats>> {
         Box::pin(async move { Ok(self.kitsune.transport().await?.dump_network_stats().await?) })
     }
 

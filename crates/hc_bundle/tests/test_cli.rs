@@ -32,22 +32,22 @@ async fn read_web_app(path: &Path) -> anyhow::Result<WebAppBundle> {
 #[tokio::test]
 async fn round_trip() {
     {
-        let mut cmd = Command::cargo_bin("hc-dna").unwrap();
+        let mut cmd = Command::new(assert_cmd::cargo_bin!("hc-dna"));
         let cmd = cmd.args(["pack", "tests/fixtures/my-app/dnas/dna1"]);
         cmd.assert().success();
     }
     {
-        let mut cmd = Command::cargo_bin("hc-dna").unwrap();
+        let mut cmd = Command::new(assert_cmd::cargo_bin!("hc-dna"));
         let cmd = cmd.args(["pack", "tests/fixtures/my-app/dnas/dna2"]);
         cmd.assert().success();
     }
     {
-        let mut cmd = Command::cargo_bin("hc-app").unwrap();
+        let mut cmd = Command::new(assert_cmd::cargo_bin!("hc-app"));
         let cmd = cmd.args(["pack", "tests/fixtures/my-app/"]);
         cmd.assert().success();
     }
     {
-        let mut cmd = Command::cargo_bin("hc-web-app").unwrap();
+        let mut cmd = Command::new(assert_cmd::cargo_bin!("hc-web-app"));
         let cmd = cmd.args(["pack", "tests/fixtures/web-app/"]);
         cmd.assert().success();
     }
@@ -72,7 +72,7 @@ async fn test_packed_hash_consistency() {
     let mut i = 0;
     let mut hash = None;
     while i < 5 {
-        let mut cmd = Command::cargo_bin("hc-dna").unwrap();
+        let mut cmd = Command::new(assert_cmd::cargo_bin!("hc-dna"));
         let cmd = cmd.args(["pack", "tests/fixtures/my-app/dnas/dna1"]);
         cmd.assert().success();
 
@@ -97,7 +97,7 @@ async fn test_packed_hash_consistency() {
 #[tokio::test]
 async fn test_integrity() {
     let pack_dna = |path| async move {
-        let mut cmd = Command::cargo_bin("hc-dna").unwrap();
+        let mut cmd = Command::new(assert_cmd::cargo_bin!("hc-dna"));
         let cmd = cmd.args(["pack", path]);
         cmd.assert().success();
         let mut dna_path = PathBuf::from(path);
@@ -171,7 +171,7 @@ async fn test_integrity() {
 #[cfg(not(feature = "unstable-migration"))]
 async fn test_multi_integrity() {
     let pack_dna = |path| async move {
-        let mut cmd = Command::cargo_bin("hc-dna").unwrap();
+        let mut cmd = Command::new(assert_cmd::cargo_bin!("hc-dna"));
         let cmd = cmd.args(["pack", path]);
         cmd.assert().success();
         let dna_path = PathBuf::from(format!("{path}/multi integrity dna.dna"));
@@ -276,7 +276,7 @@ async fn test_multi_integrity() {
 #[cfg(feature = "unstable-migration")]
 async fn test_multi_integrity() {
     let pack_dna = |path| async move {
-        let mut cmd = Command::cargo_bin("hc-dna").unwrap();
+        let mut cmd = Command::new(assert_cmd::cargo_bin!("hc-dna"));
         let cmd = cmd.args(["pack", path]);
         cmd.assert().success();
         let dna_path = PathBuf::from(format!("{path}/multi integrity dna unstable-migration.dna"));
@@ -391,12 +391,12 @@ async fn test_multi_integrity() {
 #[cfg_attr(target_os = "windows", ignore = "theres a hash mismatch - check crlf?")]
 async fn test_hash_dna_function() {
     {
-        let mut cmd = Command::cargo_bin("hc-dna").unwrap();
+        let mut cmd = Command::new(assert_cmd::cargo_bin!("hc-dna"));
         let cmd = cmd.args(["hash", "tests/fixtures/my-app/dnas/dna1/a dna.dna"]);
         cmd.assert().success();
     }
     {
-        let mut cmd = Command::cargo_bin("hc-dna").unwrap();
+        let mut cmd = Command::new(assert_cmd::cargo_bin!("hc-dna"));
         let cmd = cmd.args(["hash", "tests/fixtures/my-app/dnas/dna1/a dna.dna"]);
         let stdout = cmd.assert().success().get_output().stdout.clone();
         let actual = String::from_utf8_lossy(&stdout).replace(['\r', '\n'], ""); // Normalize Windows/linux

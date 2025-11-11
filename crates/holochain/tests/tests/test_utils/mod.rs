@@ -2,7 +2,6 @@
 
 use ::fixt::*;
 use anyhow::Result;
-use assert_cmd::prelude::*;
 use ed25519_dalek::{Signer, SigningKey};
 use futures::Future;
 use hdk::prelude::*;
@@ -73,7 +72,7 @@ pub async fn start_holochain_with_lair(
     full_keystore: bool,
 ) -> (SupervisedChild, tokio::sync::oneshot::Receiver<u16>) {
     tracing::info!("\n\n----\nstarting holochain\n----\n\n");
-    let cmd = std::process::Command::cargo_bin("holochain").unwrap();
+    let cmd = std::process::Command::new(assert_cmd::cargo_bin!("holochain"));
     let mut cmd = Command::from(cmd);
     let rust_log = std::env::var("RUST_LOG").unwrap_or_else(|_| "warn".to_string());
     cmd.arg("--config-path")

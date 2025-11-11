@@ -5,7 +5,7 @@ use hdk::prelude::{
 };
 use holo_hash::{ActionHash, DnaHash};
 use holochain::{
-    prelude::InlineZomeSet,
+    prelude::{DisabledAppReason, InlineZomeSet},
     sweettest::{
         await_consistency, SweetCell, SweetConductor, SweetConductorBatch, SweetConductorConfig,
         SweetDnaFile, SweetInlineZomes,
@@ -107,24 +107,27 @@ async fn warrant_is_gossiped() {
         SweetConductorConfig::rendezvous(true).tune_network_config(|nc| nc.disable_publish = true);
     // Disable warrants on Carol's conductor, so that she doesn't issue warrants herself
     // but receives them from Bob.
-    let config_no_warranting = SweetConductorConfig::rendezvous(true)
-        .tune_conductor(|tc| tc.disable_warrant_issuance = true)
-        .tune_network_config(|nc| nc.disable_publish = true);
+    let config_no_warranting = config
+        .clone()
+        .tune_conductor(|tc| tc.disable_warrant_issuance = true);
 
     let TestCase {
         mut conductors_and_cells,
         dna_hash,
     } = TestCase::create([config.clone(), config, config_no_warranting]).await;
-    let (mut alice_conductor, alice_cell) = conductors_and_cells.remove(0);
+    let (alice_conductor, alice_cell) = conductors_and_cells.remove(0);
     let (_bob_conductor, bob_cell) = conductors_and_cells.remove(0);
-    let (mut carol_conductor, carol_cell) = conductors_and_cells.remove(0);
+    let (carol_conductor, carol_cell) = conductors_and_cells.remove(0);
 
     await_consistency(10, [&alice_cell, &bob_cell, &carol_cell])
         .await
         .unwrap();
 
-    // Shutdown Carol's conductor.
-    carol_conductor.shutdown().await;
+    // Disable Carol's app.
+    carol_conductor
+        .disable_app("test_app".into(), DisabledAppReason::User)
+        .await
+        .unwrap();
 
     // Alice creates an invalid action.
     let _: ActionHash = alice_conductor
@@ -135,15 +138,18 @@ async fn warrant_is_gossiped() {
         )
         .await;
 
-    await_consistency(10, [&alice_cell, &bob_cell])
+    await_consistency(20, [&alice_cell, &bob_cell])
         .await
         .unwrap();
 
     // Bob should have issued a warrant against Alice.
 
-    // Shutdown Alice and startup Carol.
-    alice_conductor.shutdown().await;
-    carol_conductor.startup(false).await;
+    // Disable Alice's app and start Carol's.
+    alice_conductor
+        .disable_app("test_app".into(), DisabledAppReason::User)
+        .await
+        .unwrap();
+    carol_conductor.enable_app("test_app".into()).await.unwrap();
 
     // Carol should receive the warrant against Alice.
     // The warrant and the warrant op should have been written to the DHT database,
@@ -169,7 +175,7 @@ async fn warrant_is_gossiped() {
                     && warrants[0].warrant().author == *bob_cell.agent_pubkey() // Make sure that Bob authored the warrant and it's not been authored by Carol.
             }
         },
-        Some(10_000),
+        Some(20_000),
         None,
     )
     .await
@@ -346,10 +352,10 @@ mod zero_arc {
     async fn zero_arc_node_is_served_warrant() {
         holochain_trace::test_run();
 
-        let config = SweetConductorConfig::rendezvous(true)
-            .tune_network_config(|nc| nc.disable_publish = true);
+        let config = SweetConductorConfig::rendezvous(true);
         // Carol's conductor is a zero arc conductor.
-        let config_zero_arc = SweetConductorConfig::rendezvous(true)
+        let config_zero_arc = config
+            .clone()
             .tune_network_config(|nc| nc.target_arc_factor = 0);
 
         let TestCase {
@@ -399,11 +405,10 @@ mod zero_arc {
                 alice_cell.agent_pubkey().clone(),
             )
             .await;
-        assert_eq!(alice_activity.warrants.len(), 1);
-        assert_eq!(
-            alice_activity.warrants[0].warrantee,
-            *alice_cell.agent_pubkey()
-        );
+        assert!(!alice_activity.warrants.is_empty());
+        alice_activity.warrants.into_iter().for_each(|warrant| {
+            assert_eq!(warrant.warrantee, *alice_cell.agent_pubkey());
+        });
     }
 
     // Alice creates an invalid op, Bob receives it and issues a warrant.

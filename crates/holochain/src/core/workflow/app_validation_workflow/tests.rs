@@ -39,7 +39,6 @@ use std::convert::{TryFrom, TryInto};
 use std::hash::Hash;
 use std::sync::Arc;
 use std::time::Duration;
-#[cfg(feature = "unstable-warrants")]
 use {
     crate::test_utils::conditional_consistency::*,
     holochain_state::query::{CascadeTxnWrapper, Store},
@@ -1084,7 +1083,6 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
 /// Alice and Bob join the network, and Alice commits an invalid action.
 /// Bob blocks Alice and authors a Warrant.
 /// Carol joins the network, and receives Bob's warrant via gossip.
-#[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky"]
 async fn app_validation_produces_warrants() {

@@ -16,8 +16,6 @@ pub use types::*;
 
 mod spawn;
 pub use spawn::*;
-#[cfg(feature = "test_utils")]
-pub use test::stub_network;
 
 mod peer_meta_store;
 pub use peer_meta_store::*;
@@ -35,6 +33,17 @@ mod blocks;
 pub use blocks::*;
 
 mod metrics;
+
+#[allow(unused)]
+#[cfg(any(test, feature = "test_utils"))]
+mod test;
+
+#[allow(unused)]
+#[cfg(any(test, feature = "test_utils"))]
+mod test_utils;
+
+#[cfg(any(test, feature = "test_utils"))]
+pub use {test::stub_network, test_utils::retry_fn_until_timeout};
 
 fn check_k2_init() {
     static K2_CONFIG: std::sync::Once = std::sync::Once::new();
@@ -396,7 +405,3 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         self.sender.block(block).await
     }
 }
-
-#[allow(unused)]
-#[cfg(any(test, feature = "test_utils"))]
-mod test;

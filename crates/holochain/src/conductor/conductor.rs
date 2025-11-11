@@ -2439,7 +2439,9 @@ mod misc_impls {
         }
 
         /// Dump of backend network stats from the Kitsune2 network transport.
-        pub async fn dump_network_stats(&self) -> ConductorApiResult<kitsune2_api::TransportStats> {
+        pub async fn dump_network_stats(
+            &self,
+        ) -> ConductorApiResult<kitsune2_api::ApiTransportStats> {
             Ok(self.holochain_p2p.dump_network_stats().await?)
         }
 
@@ -2486,12 +2488,13 @@ mod misc_impls {
             let stats = self.holochain_p2p.dump_network_stats().await?;
             Ok(TransportStats {
                 // Common information, fine to return
-                backend: stats.backend,
+                backend: stats.transport_stats.backend,
                 // These are our peer URLs, always give this back
-                peer_urls: stats.peer_urls,
+                peer_urls: stats.transport_stats.peer_urls,
                 // This contains connections for the whole conductor, filter it down
                 // to only the connections that are relevant to the current app
                 connections: stats
+                    .transport_stats
                     .connections
                     .into_iter()
                     .filter(|s| keep_peer_ids.contains(&s.pub_key))

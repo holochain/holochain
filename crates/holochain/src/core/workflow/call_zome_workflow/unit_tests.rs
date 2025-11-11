@@ -17,7 +17,6 @@ use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune2_api::DhtArc;
 use std::sync::Arc;
-#[cfg(feature = "unstable-warrants")]
 use {
     hdk::prelude::{
         ChainIntegrityWarrant, ChainOpType, SignatureFixturator, SignedWarrant, Warrant,
@@ -107,7 +106,6 @@ async fn validation_and_integration_workflow_are_not_triggered_when_no_data_and_
     assert!(validate_dht_ops_rx.try_recv().is_none());
 }
 
-#[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
 async fn validation_workflow_triggered_after_inserting_warrants_and_actions() {
     let mut hc_p2p = MockHcP2p::new();
@@ -154,7 +152,6 @@ async fn validation_workflow_triggered_after_inserting_warrants_and_actions() {
     integrate_dht_ops_rx.try_recv().unwrap();
 }
 
-#[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
 async fn trigger_validation_workflow_after_only_inserting_warrants() {
     let mut hc_p2p = MockHcP2p::new();
@@ -271,7 +268,6 @@ impl TestCase {
     }
 }
 
-#[cfg(feature = "unstable-warrants")]
 async fn create_signed_warrant(author: &AgentPubKey, keystore: &MetaLairClient) -> SignedWarrant {
     let warrant = Warrant::new(
         WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {

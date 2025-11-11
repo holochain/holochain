@@ -114,7 +114,6 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_sqlite::prelude::*;
 use holochain_sqlite::sql::sql_cell::ACTION_HASH_BY_PREV;
-#[cfg(feature = "unstable-warrants")]
 use holochain_state::integrate::insert_locally_validated_op;
 use holochain_state::prelude::*;
 use rusqlite::Transaction;
@@ -298,9 +297,7 @@ async fn sys_validation_workflow_inner(
         }
     }
 
-    // Allow unused mutable, because it's mutated when feature unstable-warrants is enabled.
-    #[allow(unused_mut)]
-    let (mut summary, _invalid_ops, _forked_pairs) = workspace
+    let (mut summary, invalid_ops, _forked_pairs) = workspace
         .dht_db
         .write_async(move |txn| {
             let mut summary = OutcomeSummary {
@@ -308,7 +305,11 @@ async fn sys_validation_workflow_inner(
                 ..Default::default()
             };
             let mut invalid_ops = vec![];
-            let mut forked_pairs: Vec<(AgentPubKey, ForkedPair)> = vec![];
+
+            #[cfg(feature = "unstable-warrants")]
+            let mut forked_pairs: Vec<(AgentPubKey, ForkedPair)> = Vec::with_capacity(0);
+            #[cfg(not(feature = "unstable-warrants"))]
+            let forked_pairs: Vec<(AgentPubKey, ForkedPair)> = vec![];
 
             for (hashed_op, outcome) in validation_outcomes {
                 let (op, op_hash) = hashed_op.into_inner();
@@ -335,9 +336,7 @@ async fn sys_validation_workflow_inner(
                             DhtOpType::Chain(_) => {
                                 put_validation_limbo(txn, &op_hash, ValidationStage::SysValidated)?
                             }
-                            DhtOpType::Warrant(_) =>
-                            {
-                                #[cfg(feature = "unstable-warrants")]
+                            DhtOpType::Warrant(_) => {
                                 put_integration_limbo(txn, &op_hash, ValidationStatus::Valid)?
                             }
                         };
@@ -367,10 +366,9 @@ async fn sys_validation_workflow_inner(
         })
         .await?;
 
-    #[cfg(feature = "unstable-warrants")]
     {
         let mut warrants = vec![];
-        for (op_hash, chain_op) in _invalid_ops
+        for (op_hash, chain_op) in invalid_ops
             .into_iter()
             .filter_map(|(h, op)| op.as_chain_op().map(|op| (h, op.clone())))
         {

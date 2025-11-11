@@ -3,8 +3,6 @@ use holochain::sweettest::*;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::prelude::GetValidationReceiptsInput;
 use holochain_zome_types::validate::ValidationReceiptSet;
-
-#[cfg(feature = "unstable-warrants")]
 use {
     hdk::prelude::{
         ChainTopOrdering, CreateInput, EntryDef, EntryDefIndex, EntryVisibility, Op,
@@ -101,7 +99,6 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
 // Alice creates an invalid op, Bob receives it and issues a warrant.
 // Carol has warrant issuance disabled and receives the warrant from Bob
 // as he publishes it.
-#[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
 async fn warrant_is_published() {
     holochain_trace::test_run();
@@ -184,17 +181,32 @@ async fn warrant_is_published() {
     println!(
         "0 alice {} url {:?}",
         alice.agent_pubkey(),
-        conductors[0].dump_network_stats().await.unwrap().peer_urls[0]
+        conductors[0]
+            .dump_network_stats()
+            .await
+            .unwrap()
+            .transport_stats
+            .peer_urls[0]
     );
     println!(
         "1 bob   {} url {:?}",
         bob.agent_pubkey(),
-        conductors[1].dump_network_stats().await.unwrap().peer_urls[0]
+        conductors[1]
+            .dump_network_stats()
+            .await
+            .unwrap()
+            .transport_stats
+            .peer_urls[0]
     );
     println!(
         "2 carol {} url {:?}",
         carol.agent_pubkey(),
-        conductors[2].dump_network_stats().await.unwrap().peer_urls[0]
+        conductors[2]
+            .dump_network_stats()
+            .await
+            .unwrap()
+            .transport_stats
+            .peer_urls[0]
     );
 
     await_consistency(10, [&alice, &bob, &carol]).await.unwrap();
