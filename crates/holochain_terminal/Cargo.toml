@@ -1,6 +1,6 @@
 [package]
 name = "hcterm"
-version = "0.6.0-rc.0"
+version = "0.6.0-rc.1"
 description = "A terminal for Holochain"
 license = "Apache-2.0"
 repository = "https://github.com/holochain/holochain"
@@ -26,10 +26,10 @@ holo_hash = { version = "^0.6.0-rc.0", path = "../holo_hash", features = [
   "encoding",
   "kitsune2",
 ] }
-holochain_client = { version = "^0.8.0-rc.0", path = "../client", default-features = false }
+holochain_client = { version = "^0.8.0-rc.1", path = "../client", default-features = false }
 holochain_util = { version = "^0.6.0-rc.0", path = "../holochain_util" }
-holochain_conductor_api = { version = "^0.6.0-rc.0", path = "../holochain_conductor_api" }
-holochain_types = { version = "^0.6.0-rc.0", path = "../holochain_types" }
+holochain_conductor_api = { version = "^0.6.0-rc.1", path = "../holochain_conductor_api" }
+holochain_types = { version = "^0.6.0-rc.1", path = "../holochain_types" }
 tokio = { version = "1.36.0", features = ["full"] }
 kitsune2_api = "0.3.0"
 kitsune2_core = "0.3.0"
