@@ -4,7 +4,7 @@ use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use futures::StreamExt;
 use holochain_cascade::CascadeImpl;
-use holochain_p2p::actor::GetLinksOptions;
+use holochain_p2p::actor::GetLinksRequestOptions;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
@@ -53,7 +53,7 @@ pub fn get_links(
                                 )
                                 .dht_get_links(
                                     key,
-                                    GetLinksOptions {
+                                    GetLinksRequestOptions {
                                         get_options,
                                         ..Default::default()
                                     },

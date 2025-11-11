@@ -2,11 +2,12 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
-use holochain_cascade::CascadeImpl;
+use holochain_cascade::{CascadeImpl, CascadeOptions};
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 use wasmer::RuntimeError;
+use holochain_p2p::actor::NetworkRequestOptions;
 
 #[cfg_attr(
     feature = "instrument",
@@ -37,12 +38,18 @@ pub fn must_get_valid_record(
                                     &workspace,
                                     call_context.host_context.network().clone(),
                                 ),
-                                GetOptions::network(),
+                                CascadeOptions {
+                                    network_request_options: NetworkRequestOptions::must_get_options(),
+                                    get_options: GetOptions::network(),
+                                }
                             )
                         } else {
                             (
                                 CascadeImpl::from_workspace_stores(workspace.stores(), None),
-                                GetOptions::local(),
+                                CascadeOptions {
+                                    network_request_options: NetworkRequestOptions::must_get_options(),
+                                    get_options: GetOptions::local(),
+                                }
                             )
                         }
                     }
@@ -51,7 +58,10 @@ pub fn must_get_valid_record(
                             &workspace,
                             call_context.host_context.network().clone(),
                         ),
-                        GetOptions::network(),
+                        CascadeOptions {
+                            network_request_options: NetworkRequestOptions::must_get_options(),
+                            get_options: GetOptions::network(),
+                        }
                     ),
                 };
                 match cascade

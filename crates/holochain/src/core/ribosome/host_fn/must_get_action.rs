@@ -3,11 +3,11 @@ use crate::core::ribosome::HostContext;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_cascade::{Cascade, CascadeImpl};
-use holochain_p2p::actor::GetOptions as NetworkGetOptions;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 use wasmer::RuntimeError;
+use holochain_p2p::actor::NetworkRequestOptions;
 
 #[cfg_attr(
     feature = "instrument",
@@ -47,7 +47,7 @@ pub fn must_get_action(
                     ),
                 };
                 match cascade
-                    .retrieve_action(action_hash.clone(), NetworkGetOptions::must_get_options())
+                    .retrieve_action(action_hash.clone(), NetworkRequestOptions::must_get_options())
                     .await
                     .map_err(|cascade_error| -> RuntimeError {
                         wasm_error!(WasmErrorInner::Host(cascade_error.to_string())).into()

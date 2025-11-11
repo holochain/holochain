@@ -18,7 +18,7 @@ use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::actor::GetLinksOptions;
+use holochain_p2p::actor::GetLinksRequestOptions;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_types::prelude::*;
@@ -416,7 +416,7 @@ impl HostFnCaller {
         base: AnyLinkableHash,
         type_query: LinkTypeFilter,
         link_tag: Option<LinkTag>,
-        _options: GetLinksOptions,
+        _options: GetLinksRequestOptions,
     ) -> Vec<Link> {
         let (ribosome, call_context, workspace) = self.unpack().await;
         let mut input = GetLinksInputBuilder::try_new(base, type_query).unwrap();
@@ -449,7 +449,7 @@ impl HostFnCaller {
         base: AnyLinkableHash,
         type_query: LinkTypeFilter,
         tag: LinkTag,
-        _options: GetLinksOptions,
+        _options: GetLinksRequestOptions,
     ) -> Vec<(SignedActionHashed, Vec<SignedActionHashed>)> {
         let (ribosome, call_context, workspace) = self.unpack().await;
         let input = GetLinksInputBuilder::try_new(base, type_query)
