@@ -87,13 +87,13 @@ opt-level = "z"
 lto = true
 
 [patch.crates-io]
-# kitsune2_api = { path = "../kitsune2/crates/api" }
-# kitsune2_core = { path = "../kitsune2/crates/core" }
-# kitsune2 = { path = "../kitsune2/crates/kitsune2" }
-# kitsune2_dht = { path = "../kitsune2/crates/dht" }
-# kitsune2_gossip = { path = "../kitsune2/crates/gossip" }
-# kitsune2_bootstrap_srv = { path = "../kitsune2/crates/bootstrap_srv" }
-# kitsune2_bootstrap_client = { path = "../kitsune2/crates/bootstrap_client" }
+kitsune2_api = { git = "https://github.com/holochain/kitsune2.git", branch = "fix/reduce-hold-on-state-lock" }
+kitsune2_core = { git = "https://github.com/holochain/kitsune2.git", branch = "fix/reduce-hold-on-state-lock" }
+kitsune2 = { git = "https://github.com/holochain/kitsune2.git", branch = "fix/reduce-hold-on-state-lock" }
+kitsune2_dht = { git = "https://github.com/holochain/kitsune2.git", branch = "fix/reduce-hold-on-state-lock" }
+kitsune2_gossip = { git = "https://github.com/holochain/kitsune2.git", branch = "fix/reduce-hold-on-state-lock" }
+kitsune2_bootstrap_srv = { git = "https://github.com/holochain/kitsune2.git", branch = "fix/reduce-hold-on-state-lock" }
+kitsune2_bootstrap_client = { git = "https://github.com/holochain/kitsune2.git", branch = "fix/reduce-hold-on-state-lock" }
 # sbd-server = { path = "../sbd/rust/sbd-server" }
 # sbd-client = { path = "../sbd/rust/sbd-client" }
 # sbd-e2e-crypto-client = { path = "../sbd/rust/sbd-e2e-crypto-client" }
