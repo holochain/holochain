@@ -398,7 +398,7 @@ impl NetworkConfig {
                 serde_json::Value::String(self.signal_url.as_str().into()),
             )?;
 
-            // webrtcConnectTimeout is set to the floor of 1/2 of the request_timeout_s.
+            // timeoutS is set to the floor of 1/2 of the request_timeout_s.
             let timeout_s: serde_json::Number = (self.request_timeout_s / 2).into();
             Self::insert_module_config(
                 module_config,
@@ -407,14 +407,14 @@ impl NetworkConfig {
                 serde_json::Value::Number(timeout_s),
             )?;
 
-            // webrtcConnectTimeout is set to the floor of 3/8 of the request_timeout_s.
-            let webrtc_connect_timeout: serde_json::Number =
+            // webrtcConnectTimeoutS is set to the floor of 3/8 of the request_timeout_s.
+            let webrtc_connect_timeout_s: serde_json::Number =
                 ((self.request_timeout_s * 3) / 8).into();
             Self::insert_module_config(
                 module_config,
                 "tx5Transport",
-                "webrtcConnectTimeout",
-                serde_json::Value::Number(webrtc_connect_timeout),
+                "webrtcConnectTimeoutS",
+                serde_json::Value::Number(webrtc_connect_timeout_s),
             )?;
 
             if let Some(webrtc_config) = &self.webrtc_config {
@@ -882,7 +882,7 @@ mod tests {
                 "tx5Transport": {
                     "serverUrl": "wss://dev-test-bootstrap2.holochain.org/",
                     "timeoutS": 30,
-                    "webrtcConnectTimeout": 22,
+                    "webrtcConnectTimeoutS": 22,
                     "signalAllowPlainText": "true"
                 },
                 "coreSpace": {
@@ -902,7 +902,7 @@ mod tests {
                 "tx5Transport": {
                     "serverUrl": "wss://sbd.nowhere.net",
                     "timeoutS": 10,
-                    "webrtcConnectTimeout": 10
+                    "webrtcConnectTimeoutS": 10
                 },
             })),
             ..Default::default()
@@ -925,7 +925,7 @@ mod tests {
                 "tx5Transport": {
                     "serverUrl": "wss://dev-test-bootstrap2.holochain.org/",
                     "timeoutS": 30,
-                    "webrtcConnectTimeout": 22
+                    "webrtcConnectTimeoutS": 22
                 },
             })
         )
@@ -956,7 +956,7 @@ mod tests {
                 "tx5Transport": {
                     "serverUrl": "wss://dev-test-bootstrap2.holochain.org/",
                     "timeoutS": 30,
-                    "webrtcConnectTimeout": 22
+                    "webrtcConnectTimeoutS": 22
                 },
                 "k2Gossip": {
                     "roundTimeoutMs": 100,
