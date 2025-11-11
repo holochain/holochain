@@ -536,7 +536,7 @@ Access is thus mediated by Capability Grants of four types:
 
 * **Author**: Only the agent owning the source change can make the zome call. This capability is granted to all zome functions.
 * **Assigned**: Only the named agent(s) with the given capability secret can make the zome call.
-* **Transferrable**: Anybody with the given capability secret can make the zome call. This is equivalent to the common definition of object-capabilities.
+* **Transferable**: Anybody with the given capability secret can make the zome call. This is equivalent to the common definition of object-capabilities.
 * **Unrestricted**: Anybody can make the zome call (no secret nor proof of authorized key needed to use this capability).
 
 All zome calls must be signed and supply a required capability claim argument that MUST be checked by the system receiving the call. Agents record capability grants on their source chains and distribute their associated secrets as necessary according to the application's needs. Receivers of secrets can record them as claims (usually as a private entry) on their chains for later lookup. The "agent" type grant is just the agent's public key.

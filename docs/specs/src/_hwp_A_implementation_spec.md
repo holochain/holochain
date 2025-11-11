@@ -3053,7 +3053,7 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
 * `IssueAppAuthenticationToken(IssueAppAuthenticationTokenPayload) -> AppAuthenticationTokenIssued(AppAuthenticationTokenIssued)`: Request an authentication token for use by a client that wishes to connect to the app WebSocket.
     * **Notes**: Implementations MUST expect a client to supply a valid token in the initial HTTP request that establishes the WebSocket connection, and MUST reject connection attempts that do not supply a valid token. An invalid token is defined as either one that was never issued or one that is no longer usable. The latter happens in four different cases:
 
-        * The token had an expiry set and the expiry timeout hsa passed,
+        * The token had an expiry set and the expiry timeout has passed,
         * The token was single-use and has been used once,
         * The token was revoked,
         * The conductor has been restarted since the token was issued (implementations MAY implement this case).
@@ -3117,7 +3117,7 @@ enum ExternalApiWireError {
 * `GetAppInfo -> AppInfoReturned(Option<AppInfo>)`: Get info about the app, including info about each cell instantiated by this app. See above for the definition of `AppInfo`.
 
 * `CallZome(ZomeCall) -> ZomeCalled(ExternIO)`: Call a zome function.
-    * **Notes**: Implementations MUST enforce a valid capability for the function being called. This means that if the function is covered by a transferrable or assigned grant, the secret MUST be provided and valid; and if the function is covered by an assigned grant, the provenance MUST be valid. Regardless of the grant's access type, implementations MUST enforce that the provided signature matches the provided provenance. Implementations also MUST prevent replay attacks by rejecting a call that supplies a nonce that has been seen before or an expiry timestamp that has passed. Finally, the provenance (source) of the call MUST match the signature.
+    * **Notes**: Implementations MUST enforce a valid capability for the function being called. This means that if the function is covered by a transferable or assigned grant, the secret MUST be provided and valid; and if the function is covered by an assigned grant, the provenance MUST be valid. Regardless of the grant's access type, implementations MUST enforce that the provided signature matches the provided provenance. Implementations also MUST prevent replay attacks by rejecting a call that supplies a nonce that has been seen before or an expiry timestamp that has passed. Finally, the provenance (source) of the call MUST match the signature.
     * **Arguments**: The payload is defined as:
 
         ```rust
