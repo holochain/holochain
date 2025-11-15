@@ -252,7 +252,6 @@ impl TestCase {
                     let db_conductor = db_conductor.clone();
                     Box::pin(async move { db_conductor })
                 }),
-                k2_test_builder: true,
                 ..Default::default()
             },
             lair_client.clone(),
