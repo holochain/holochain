@@ -71,6 +71,7 @@
 //! pipe the conductor passphrase. These flags aren't used together because the zome call commands
 //! do not need the conductor passphrase.
 
+#[allow(unused)]
 use crate::cmds::Existing;
 use crate::ports::get_admin_ports;
 use anyhow::Context;
@@ -91,6 +92,7 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Parser)]
+#[allow(unused)]
 pub struct ConnectArgs {
     /// Ports to running conductor admin interfaces.
     #[arg(short, long, conflicts_with_all = &["indices"], value_delimiter = ',')]
@@ -103,6 +105,7 @@ pub struct ConnectArgs {
 
 /// Create authentication credentials for making zome calls and deploy them to Holochain.
 #[derive(Debug, Parser)]
+#[allow(unused)]
 pub struct ZomeCallAuth {
     #[command(flatten)]
     pub connect_args: ConnectArgs,
@@ -119,6 +122,7 @@ pub struct ZomeCallAuth {
 
 /// Make a zome call to an app on a running conductor.
 #[derive(Debug, Parser)]
+#[allow(unused)]
 pub struct ZomeCall {
     #[command(flatten)]
     pub connect_args: ConnectArgs,
@@ -173,7 +177,7 @@ pub async fn zome_call_auth(
 
     holochain_util::pw::pw_set_piped(zome_call_auth.piped);
     if !zome_call_auth.piped {
-        msg!("Enter new passphrase to authorize zome calls: ");
+        crate::msg!("Enter new passphrase to authorize zome calls: ");
     }
     let passphrase = holochain_util::pw::pw_get().context("Failed to get passphrase")?;
 
@@ -195,7 +199,7 @@ pub async fn zome_call_auth(
                 ),
             })
             .await?;
-        msg!("Authorized zome calls for cell: {:?}", cell_id);
+        crate::msg!("Authorized zome calls for cell: {:?}", cell_id);
     }
 
     Ok(())
@@ -238,7 +242,7 @@ pub async fn zome_call(zome_call: ZomeCall, admin_port: Option<u16>) -> anyhow::
 
     holochain_util::pw::pw_set_piped(zome_call.piped);
     if !zome_call.piped {
-        msg!("Enter passphrase to authorize zome calls: ");
+        crate::msg!("Enter passphrase to authorize zome calls: ");
     }
     let passphrase = holochain_util::pw::pw_get().context("Failed to get passphrase")?;
 

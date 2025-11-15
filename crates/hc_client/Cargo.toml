@@ -1,0 +1,53 @@
+[package]
+name = "holochain_cli_client"
+version = "0.1.0"
+edition = "2021"
+description = "CLI utilities for interacting with Holochain conductors"
+license = "Apache-2.0"
+repository = "https://github.com/holochain/holochain"
+
+[[bin]]
+name = "hc-client"
+path = "src/bin/hc-client.rs"
+
+[dependencies]
+anyhow = "1.0"
+chrono = { version = "0.4.22", default-features = false, features = [
+  "clock",
+  "std",
+  "oldtime",
+  "serde",
+] }
+clap = { version = "4.0", features = ["derive", "env"] }
+ed25519-dalek = "2.1"
+futures = "0.3"
+hc_serde_json = { version = "1", package = "hc_serde_json" }
+holo_hash = { version = "^0.6.0-rc.0", path = "../holo_hash", features = ["kitsune2"] }
+holochain_chc = { version = "^0.3.0-rc.1", path = "../holochain_chc", optional = true }
+holochain_cli_sandbox = { version = "^0.6.0-rc.1", path = "../hc_sandbox" }
+holochain_client = { version = "^0.8.0-rc.1", path = "../client", default-features = false }
+holochain_conductor_api = { path = "../holochain_conductor_api", version = "^0.6.0-rc.1", features = [
+  "sqlite",
+] }
+holochain_types = { path = "../holochain_types", version = "^0.6.0-rc.1", features = ["sqlite"] }
+holochain_util = { version = "^0.6.0-rc.0", path = "../holochain_util", features = ["pw"] }
+holochain_websocket = { path = "../holochain_websocket", version = "^0.6.0-rc.1" }
+holochain_trace = { version = "^0.6.0-rc.0", path = "../holochain_trace" }
+hc_serde_yaml = { version = "0.1", package = "serde_yaml" }
+kitsune2_api = "0.3.0"
+kitsune2_core = "0.3.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+sodoken = "0.1.0"
+tokio = { version = "1.36.0", features = ["full"] }
+tracing = "0.1"
+url2 = "0.0.6"
+
+[features]
+default = ["wasmer_sys"]
+wasmer_sys = ["holochain_client/wasmer_sys"]
+wasmer_wamr = ["holochain_client/wasmer_wamr"]
+
+[lints]
+workspace = true

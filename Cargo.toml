@@ -31,6 +31,7 @@ members = [
   "crates/timestamp",
 
   "crates/client",
+  "crates/hc_client",
   "crates/hc",
   "crates/hc_bundle",
   "crates/hc_sandbox",
