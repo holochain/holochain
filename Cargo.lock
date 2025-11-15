@@ -3038,7 +3038,6 @@ dependencies = [
  "kitsune2_core",
  "kitsune2_gossip",
  "kitsune2_test_utils",
- "kitsune2_transport_tx5",
  "lair_keystore_api",
  "mockall",
  "opentelemetry_api",

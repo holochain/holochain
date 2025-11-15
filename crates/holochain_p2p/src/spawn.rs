@@ -94,18 +94,20 @@ pub struct HolochainP2pConfig {
 
     /// If true, will replace the default publish module with a no-op module.
     ///
-    /// This flag is only in tests.
+    /// This flag is only used in tests.
     #[cfg(feature = "test_utils")]
     pub disable_publish: bool,
 
     /// If true, will leave the default no-op gossip module in place rather than replacing it with
     /// the real gossip module.
     ///
-    /// This flag is only in tests.
+    /// This flag is only used in tests.
     #[cfg(feature = "test_utils")]
     pub disable_gossip: bool,
 
     /// Request using the in-memory bootstrap module instead of the real one.
+    ///
+    /// This flag is only used in tests.
     #[cfg(feature = "test_utils")]
     pub mem_bootstrap: bool,
 }

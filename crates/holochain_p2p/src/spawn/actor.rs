@@ -835,22 +835,23 @@ impl HolochainP2pActor {
 
         let mut builder = kitsune2::default_builder();
 
-        if config.disable_bootstrap {
-            builder.bootstrap = Arc::new(test::NoopBootstrapFactory);
-        } else if config.mem_bootstrap {
-            tracing::info!("Running with mem bootstrap");
-            builder.bootstrap = kitsune2_core::factories::MemBootstrapFactory::create();
-        }
-
-        // Make it possible to disable the gossip module for testing.
-        if config.disable_gossip {
-            tracing::info!("Running with gossip disabled");
-            builder.gossip = Arc::new(test::NoopGossipFactory);
-        }
-
-        if config.disable_publish {
-            tracing::info!("Running with publish disabled");
-            builder.publish = Arc::new(test::NoopPublishFactory);
+        // The following are flags only used in tests
+        #[cfg(feature = "test_utils")]
+        {
+            if config.disable_bootstrap {
+                builder.bootstrap = Arc::new(test::NoopBootstrapFactory);
+            } else if config.mem_bootstrap {
+                tracing::info!("Running with mem bootstrap");
+                builder.bootstrap = kitsune2_core::factories::MemBootstrapFactory::create();
+            }
+            if config.disable_gossip {
+                tracing::info!("Running with gossip disabled");
+                builder.gossip = Arc::new(test::NoopGossipFactory);
+            }
+            if config.disable_publish {
+                tracing::info!("Running with publish disabled");
+                builder.publish = Arc::new(test::NoopPublishFactory);
+            }
         }
 
         builder.auth_material = config.auth_material;
