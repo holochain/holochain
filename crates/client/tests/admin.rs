@@ -170,7 +170,10 @@ async fn dump_network_stats() {
 
     let network_stats = admin_ws.dump_network_stats().await.unwrap();
 
-    assert_eq!("kitsune2-core-mem", network_stats.transport_stats.backend);
+    assert_eq!(
+        "BackendLibDataChannel",
+        network_stats.transport_stats.backend
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
