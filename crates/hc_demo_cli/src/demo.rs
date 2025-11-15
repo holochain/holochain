@@ -104,7 +104,6 @@ pub async fn run_demo(opts: RunOpts) {
                 base64_auth_material,
                 None,
                 None,
-                true,
             )
             .await;
         }
@@ -139,7 +138,6 @@ pub async fn run_test_demo(
                 base64_auth_material,
                 Some(ready),
                 Some(rendezvous),
-                false,
             )
             .await;
         }
@@ -223,7 +221,6 @@ async fn run(
     base64_auth_material: Option<String>,
     ready: Option<tokio::sync::oneshot::Sender<()>>,
     rendezvous: Option<holochain::sweettest::DynSweetRendezvous>,
-    prod: bool,
 ) {
     let _ = tokio::fs::create_dir_all(&outbox).await;
     let _ = tokio::fs::create_dir_all(&inbox).await;
@@ -283,7 +280,6 @@ async fn run(
         Some(keystore),
         Some(rendezvous),
         true,
-        prod,
     )
     .await;
 
