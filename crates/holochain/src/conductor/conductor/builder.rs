@@ -387,6 +387,13 @@ impl ConductorBuilder {
         self,
         extra_dna_files: &[(CellId, DnaFile)],
     ) -> ConductorResult<ConductorHandle> {
+        if rustls::crypto::aws_lc_rs::default_provider()
+            .install_default()
+            .is_err()
+        {
+            tracing::error!("could not set crypto provider for tls");
+        }
+
         let builder = self;
 
         let keystore = builder
@@ -458,7 +465,6 @@ impl ConductorBuilder {
             report,
             compat,
             request_timeout: std::time::Duration::from_secs(config.request_timeout_s),
-            k2_test_builder: !builder.test_builder_uses_production_k2_builder,
             #[cfg(feature = "test_utils")]
             disable_bootstrap: config.network.disable_bootstrap,
             #[cfg(feature = "test_utils")]
