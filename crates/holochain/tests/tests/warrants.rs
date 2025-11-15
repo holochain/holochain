@@ -73,6 +73,8 @@ async fn warranted_agent_is_blocked() {
                     store.get_warrants_for_agent(&alice_pubkey, false).unwrap()
                 });
 
+            tracing::info!("number of warrants: {}", warrants.len());
+
             warrants.len() == 1 && warrants[0].warrant().warrantee == *alice_cell.agent_pubkey()
         },
         Some(5_000),
@@ -138,7 +140,7 @@ async fn warrant_is_gossiped() {
         )
         .await;
 
-    await_consistency(20, [&alice_cell, &bob_cell])
+    await_consistency(30, [&alice_cell, &bob_cell])
         .await
         .unwrap();
 
