@@ -154,7 +154,6 @@ async fn retry_countersigning_commit_on_missing_deps() {
                     None,
                     Some(rendezvous.clone()),
                     false,
-                    true,
                 )
             })
             .take(3),
