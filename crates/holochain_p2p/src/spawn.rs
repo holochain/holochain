@@ -124,6 +124,7 @@ impl std::fmt::Debug for HolochainP2pConfig {
         #[cfg(feature = "test_utils")]
         {
             dbg.field("disable_bootstrap", &self.disable_bootstrap)
+                .field("mem_bootstrap", &self.mem_bootstrap)
                 .field("disable_publish", &self.disable_publish)
                 .field("disable_gossip", &self.disable_gossip);
         }
