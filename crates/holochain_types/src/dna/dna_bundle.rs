@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use futures::StreamExt;
+use futures::future::try_join_all;
 use holo_hash::*;
 use mr_bundle::{Bundle, ResourceBytes, ResourceIdentifier};
 use std::collections::{BTreeMap, HashMap};
@@ -261,25 +261,20 @@ pub(super) async fn hash_bytes(
     zomes: impl Iterator<Item = ZomeManifest>,
     resources: &mut HashMap<&ResourceIdentifier, &ResourceBytes>,
 ) -> DnaResult<Vec<(ZomeName, WasmHash, DnaWasm, Vec<ZomeName>)>> {
-    let iter = zomes.map(|z| {
-        // TODO A bad bundle can cause a crash here, unaceptable!
-        let bytes: bytes::Bytes = resources
-            .remove(&z.resource_id())
-            .unwrap_or_else(|| {
-                panic!(
-                    "resource referenced in manifest must exist: {}",
-                    z.resource_id()
-                )
-            })
-            .clone()
-            .into();
+    let mut tasks = Vec::new();
+    for z in zomes {
+        let resource_id = z.resource_id();
+        let resource = resources
+            .remove(&resource_id)
+            .ok_or_else(|| DnaError::MissingResource(resource_id.clone()))?;
+        let bytes: bytes::Bytes = resource.clone().into();
         let zome_name = z.name;
         let expected_hash = z.hash.map(WasmHash::from);
         let wasm = DnaWasm::from(bytes);
         let dependencies = z.dependencies.map_or(Vec::with_capacity(0), |deps| {
             deps.into_iter().map(|d| d.name).collect()
         });
-        async move {
+        tasks.push(async move {
             let hash = wasm.to_hash().await;
             if let Some(expected) = expected_hash {
                 if hash != expected {
@@ -287,14 +282,10 @@ pub(super) async fn hash_bytes(
                 }
             }
             DnaResult::Ok((zome_name, hash, wasm, dependencies))
-        }
-    });
-    futures::stream::iter(iter)
-        .buffered(10)
-        .collect::<Vec<_>>()
-        .await
-        .into_iter()
-        .collect()
+        });
+    }
+
+    try_join_all(tasks).await
 }
 
 #[cfg(test)]
@@ -387,6 +378,24 @@ mod tests {
         assert_eq!(
             dna_file.dna.modifiers.properties,
             SerializedBytes::try_from(properties).unwrap()
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn missing_resource_returns_error() {
+        let zome_manifest = ZomeManifest {
+            name: "example".into(),
+            hash: None,
+            path: "example.wasm".into(),
+            dependencies: Default::default(),
+        };
+        let expected_resource = zome_manifest.resource_id();
+        let mut resources: HashMap<&ResourceIdentifier, &ResourceBytes> = HashMap::new();
+
+        let result = hash_bytes(vec![zome_manifest].into_iter(), &mut resources).await;
+        matches::assert_matches!(
+            result,
+            Err(DnaError::MissingResource(resource)) if resource == expected_resource
         );
     }
 
