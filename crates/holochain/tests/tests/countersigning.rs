@@ -137,7 +137,6 @@ async fn retry_countersigning_commit_on_missing_deps() {
     let config = SweetConductorConfig::rendezvous(true).tune_network_config(|nc| {
         nc.advanced = Some(serde_json::json!({
             "tx5Transport": {
-                "signalAllowPlainText": true,
                 "timeoutS": 5,
             }
         }));

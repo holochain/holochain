@@ -893,18 +893,11 @@ impl HolochainP2pActor {
         #[cfg(feature = "test_utils")]
         {
             builder.config.set_module_config(&serde_json::json!({
+                "coreBootstrap": {
+                    "backoffMinMs": 1_000,
+                },
                 "tx5Transport": {
                     "signalAllowPlainText": true,
-                    // macOS somehow/sometimes blocks local candidates
-                    // during the RCTP handshake phase of the WebRTC
-                    // connection protocol, and with a STUN server it
-                    // somehow works better
-                    // #[cfg(target_os = "macos")]
-                    // "webrtcConfig": {
-                    //     "iceServers": [
-                    //         { "urls": ["stun:stun.l.google.com:19302"] }
-                    //     ]
-                    // }
                 }
             }))?;
 
