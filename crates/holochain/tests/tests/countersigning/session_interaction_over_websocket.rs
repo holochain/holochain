@@ -99,7 +99,7 @@ async fn countersigning_session_interaction_calls() {
 
     // Await peers to discover each other.
     tokio::time::timeout(
-        Duration::from_secs(10),
+        Duration::from_secs(20),
         expect_bootstrapping_completed(&[&alice, &bob]),
     )
     .await

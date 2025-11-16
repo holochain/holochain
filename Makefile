@@ -80,7 +80,7 @@ build-workspace-wasmer_wamr:
 
 # execute tests on all crates with wasmer compiler
 test-workspace-wasmer_sys:
-	RUST_LOG=datachannel=debug RUST_BACKTRACE=1 cargo nextest run \
+	RUST_BACKTRACE=1 cargo nextest run \
 		--workspace \
 		--locked \
 		--no-default-features \
