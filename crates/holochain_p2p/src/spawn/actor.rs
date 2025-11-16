@@ -11,6 +11,7 @@ use holochain_sqlite::sql::sql_peer_meta_store;
 use holochain_state::prelude::named_params;
 use kitsune2_api::*;
 use kitsune2_core::get_responsive_remote_agents_near_location;
+use kitsune2_transport_tx5::{IceServers, WebRtcConfig};
 use rand::prelude::IndexedRandom;
 use std::collections::HashMap;
 use std::future::Future;
@@ -897,6 +898,17 @@ impl HolochainP2pActor {
                 .set_module_config(&kitsune2_transport_tx5::Tx5TransportModConfig {
                     tx5_transport: kitsune2_transport_tx5::Tx5TransportConfig {
                         signal_allow_plain_text: true,
+                        // macOS somehow/sometimes blocks local candidates
+                        // during the RCTP handshake phase of the WebRTC
+                        // connection protocol, and with a STUN server it
+                        // somehow works better
+                        webrtc_config: WebRtcConfig {
+                            ice_servers: vec![IceServers {
+                                urls: vec!["stun:stun.l.google.com:19302".to_string()],
+                                ..Default::default()
+                            }],
+                            ..Default::default()
+                        },
                         ..Default::default()
                     },
                 })?;

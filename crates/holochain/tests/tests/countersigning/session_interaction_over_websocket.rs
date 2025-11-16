@@ -643,6 +643,7 @@ impl Agent {
             },
             // Check more often for new peer info, for when the other conductor is restarting.
             "coreBootstrap": {
+                "backoffMinMs": 1000,
                 "backoffMaxMs": 5000,
             }
         }));

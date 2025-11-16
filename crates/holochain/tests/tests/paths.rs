@@ -28,12 +28,7 @@ async fn agents_can_find_entries_at_paths() {
     conductor_batch[1]
         .declare_full_storage_arcs(dna.dna_hash())
         .await;
-
-    // Wait for gossip to start
-    conductor_batch[0]
-        .require_initial_gossip_activity_for_cell(&alice_cell, 1, Duration::from_secs(30))
-        .await
-        .unwrap();
+    conductor_batch.exchange_peer_info().await;
 
     // There should be no books created yet.
     let books: Vec<BookEntry> = conductor_batch[0]
@@ -119,12 +114,7 @@ async fn agents_can_find_multiple_entries_at_same_path() {
     conductor_batch[1]
         .declare_full_storage_arcs(dna.dna_hash())
         .await;
-
-    // Wait for gossip to start
-    conductor_batch[0]
-        .require_initial_gossip_activity_for_cell(&alice_cell, 1, Duration::from_secs(30))
-        .await
-        .unwrap();
+    conductor_batch.exchange_peer_info().await;
 
     // There should be no books created yet.
     let books: Vec<BookEntry> = conductor_batch[0]
@@ -251,12 +241,7 @@ async fn agents_can_find_entries_with_partial_path() {
     conductor_batch[1]
         .declare_full_storage_arcs(dna.dna_hash())
         .await;
-
-    // Wait for gossip to start
-    conductor_batch[0]
-        .require_initial_gossip_activity_for_cell(&alice_cell, 1, Duration::from_secs(30))
-        .await
-        .unwrap();
+    conductor_batch.exchange_peer_info().await;
 
     // There should be no books created yet.
     let books: Vec<BookEntry> = conductor_batch[0]
@@ -350,8 +335,6 @@ async fn paths_are_case_sensitive() {
 
     let alice_cell = app.cells().first().unwrap();
 
-    conductor.declare_full_storage_arcs(dna.dna_hash()).await;
-
     // There should be no books created yet.
     let books: Vec<BookEntry> = conductor
         .call(
@@ -428,12 +411,7 @@ async fn paths_can_be_created_fully_or_with_path_sharding() {
     conductor_batch[1]
         .declare_full_storage_arcs(dna.dna_hash())
         .await;
-
-    // Wait for gossip to start
-    conductor_batch[0]
-        .require_initial_gossip_activity_for_cell(&alice_cell, 1, Duration::from_secs(30))
-        .await
-        .unwrap();
+    conductor_batch.exchange_peer_info().await;
 
     // Alice adds a book entry.
     let () = conductor_batch[0]
