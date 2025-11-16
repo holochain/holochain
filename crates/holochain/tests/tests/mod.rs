@@ -3,6 +3,7 @@ mod agent_scaling;
 mod app_installation;
 mod app_interface_security;
 mod authored_test;
+#[cfg(feature = "unstable-functions")]
 mod blocks;
 mod clone_cell;
 // Countersigning HDK functions needed

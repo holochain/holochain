@@ -30,6 +30,10 @@ async fn agents_can_find_entries_at_paths() {
         .await;
     conductor_batch.exchange_peer_info().await;
 
+    await_consistency(Duration::from_secs(30), [&alice_cell, &bob_cell])
+        .await
+        .unwrap();
+
     // There should be no books created yet.
     let books: Vec<BookEntry> = conductor_batch[0]
         .call(
@@ -115,6 +119,10 @@ async fn agents_can_find_multiple_entries_at_same_path() {
         .declare_full_storage_arcs(dna.dna_hash())
         .await;
     conductor_batch.exchange_peer_info().await;
+
+    await_consistency(Duration::from_secs(30), [&alice_cell, &bob_cell])
+        .await
+        .unwrap();
 
     // There should be no books created yet.
     let books: Vec<BookEntry> = conductor_batch[0]
@@ -242,6 +250,10 @@ async fn agents_can_find_entries_with_partial_path() {
         .declare_full_storage_arcs(dna.dna_hash())
         .await;
     conductor_batch.exchange_peer_info().await;
+
+    await_consistency(Duration::from_secs(30), [&alice_cell, &bob_cell])
+        .await
+        .unwrap();
 
     // There should be no books created yet.
     let books: Vec<BookEntry> = conductor_batch[0]
@@ -412,6 +424,10 @@ async fn paths_can_be_created_fully_or_with_path_sharding() {
         .declare_full_storage_arcs(dna.dna_hash())
         .await;
     conductor_batch.exchange_peer_info().await;
+
+    await_consistency(Duration::from_secs(30), [&alice_cell, &bob_cell])
+        .await
+        .unwrap();
 
     // Alice adds a book entry.
     let () = conductor_batch[0]

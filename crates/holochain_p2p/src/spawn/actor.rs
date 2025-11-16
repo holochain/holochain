@@ -897,7 +897,7 @@ impl HolochainP2pActor {
                 .set_module_config(&kitsune2_transport_tx5::Tx5TransportModConfig {
                     tx5_transport: kitsune2_transport_tx5::Tx5TransportConfig {
                         signal_allow_plain_text: true,
-                        timeout_s: 10,
+                        timeout_s: 20,
                         ..Default::default()
                     },
                 })?;

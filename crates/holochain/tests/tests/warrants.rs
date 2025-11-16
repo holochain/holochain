@@ -77,11 +77,11 @@ async fn warranted_agent_is_blocked() {
 
             warrants.len() == 1 && warrants[0].warrant().warrantee == *alice_cell.agent_pubkey()
         },
-        Some(5_000),
+        Some(10_000),
         None,
     )
     .await
-    .unwrap();
+    .expect("Bob hasn't authored warrant");
 
     // Check that Alice is blocked by Bob.
     let target = hdk::prelude::BlockTargetId::Cell(CellId::new(

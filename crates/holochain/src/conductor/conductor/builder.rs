@@ -229,6 +229,8 @@ impl ConductorBuilder {
             report,
             compat,
             request_timeout: std::time::Duration::from_secs(config.request_timeout_s),
+            #[cfg(feature = "test_utils")]
+            mem_bootstrap: config.network.mem_bootstrap,
             ..Default::default()
         };
 
