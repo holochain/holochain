@@ -30,11 +30,11 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
         holochain::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE as usize
             + 1;
 
-    let mut conductors = SweetConductorBatch::from_config_rendezvous(
-        NUM_CONDUCTORS,
-        SweetConductorConfig::rendezvous(true),
-    )
-    .await;
+    let config = SweetConductorConfig::rendezvous(true).tune_conductor(|cc| {
+        cc.min_publish_interval = Some(Duration::from_secs(5));
+        cc.publish_trigger_interval = Some(Duration::from_secs(5))
+    });
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(NUM_CONDUCTORS, config).await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
