@@ -139,7 +139,7 @@ impl SweetConductor {
         C: Into<SweetConductorConfig>,
         R: Into<DynSweetRendezvous> + Clone,
     {
-        Self::create_with_defaults_and_metrics(config, keystore, rendezvous, false, false).await
+        Self::create_with_defaults_and_metrics(config, keystore, rendezvous, false).await
     }
 
     /// Create a SweetConductor with a new set of TestEnvs from the given config
@@ -149,7 +149,6 @@ impl SweetConductor {
         keystore: Option<MetaLairClient>,
         rendezvous: Option<R>,
         with_metrics: bool,
-        test_builder_uses_production_k2_builder: bool,
     ) -> SweetConductor
     where
         C: Into<SweetConductorConfig>,
@@ -211,13 +210,7 @@ impl SweetConductor {
 
         let keystore = keystore.unwrap_or_else(holochain_keystore::test_keystore);
 
-        let handle = Self::handle_from_existing(
-            keystore,
-            &config,
-            &[],
-            test_builder_uses_production_k2_builder,
-        )
-        .await;
+        let handle = Self::handle_from_existing(keystore, &config, &[]).await;
 
         tracing::info!("Starting with config: {:?}", config);
 
@@ -253,7 +246,6 @@ impl SweetConductor {
         keystore: MetaLairClient,
         config: &ConductorConfig,
         extra_dna_files: &[(CellId, DnaFile)],
-        test_builder_uses_production_k2_builder: bool,
     ) -> ConductorHandle {
         NUM_CREATED.fetch_add(1, Ordering::SeqCst);
 
@@ -261,7 +253,6 @@ impl SweetConductor {
             .config(config.clone())
             .with_keystore(keystore)
             .no_print_setup()
-            .test_builder_uses_production_k2_builder(test_builder_uses_production_k2_builder)
             .test(extra_dna_files)
             .await
             .unwrap()
@@ -700,13 +691,8 @@ impl SweetConductor {
                 false => self.dna_files.clone().into_iter().collect::<Vec<_>>(),
             };
             self.handle = Some(SweetConductorHandle(
-                Self::handle_from_existing(
-                    self.keystore.clone(),
-                    &self.config,
-                    &extra_dna_files,
-                    false,
-                )
-                .await,
+                Self::handle_from_existing(self.keystore.clone(), &self.config, &extra_dna_files)
+                    .await,
             ));
         } else {
             panic!("Attempted to start conductor which was already started");

@@ -774,7 +774,7 @@ async fn network_stats() {
         .admin_ws_client::<AdminResponse>()
         .await;
 
-    const EXPECT: &str = "kitsune2-core-mem";
+    const EXPECT: &str = "BackendLibDataChannel";
 
     let req = AdminRequest::DumpNetworkStats;
     let res: AdminResponse = client.request(req).await.unwrap();
