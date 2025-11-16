@@ -44,6 +44,7 @@ kitsune2 = { version = "0.3.0", default-features = false }
 kitsune2_api = "0.3.0"
 kitsune2_core = "0.3.0"
 kitsune2_gossip = "0.3.0"
+kitsune2_transport_tx5 = { version = "0.3.0", optional = true }
 bytes = "1.10"
 holochain_sqlite = { version = "^0.6.0", path = "../holochain_sqlite" }
 lair_keystore_api = "=0.6.3"
@@ -71,6 +72,7 @@ test_utils = [
   "holochain_zome_types/test_utils",
   "holochain_zome_types/fixturators",
   "holochain_types/test_utils",
+  "dep:kitsune2_transport_tx5",
 ]
 
 mock_network = ["test_utils"]

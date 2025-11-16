@@ -892,15 +892,14 @@ impl HolochainP2pActor {
 
         #[cfg(feature = "test_utils")]
         {
-            builder.config.set_module_config(&serde_json::json!({
-                "coreBootstrap": {
-                    "backoffMinMs": 1_000,
-                },
-                "tx5Transport": {
-                    "signalAllowPlainText": true,
-                }
-            }))?;
-
+            builder
+                .config
+                .set_module_config(&kitsune2_transport_tx5::Tx5TransportModConfig {
+                    tx5_transport: kitsune2_transport_tx5::Tx5TransportConfig {
+                        signal_allow_plain_text: true,
+                        ..Default::default()
+                    },
+                })?;
             builder.config.set_module_config(
                 &kitsune2_core::factories::CoreBootstrapModConfig {
                     core_bootstrap: kitsune2_core::factories::CoreBootstrapConfig {
