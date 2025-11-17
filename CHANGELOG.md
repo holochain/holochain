@@ -14,6 +14,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20251117.215043
+
+## [hcterm-0.6.0-rc.2](crates/hcterm/CHANGELOG.md#0.6.0-rc.2)
+
+## [holochain\_cli-0.6.0-rc.2](crates/holochain_cli/CHANGELOG.md#0.6.0-rc.2)
+
+## [holochain\_cli\_bundle-0.6.0-rc.2](crates/holochain_cli_bundle/CHANGELOG.md#0.6.0-rc.2)
+
+## [holochain\_cli\_sandbox-0.6.0-rc.2](crates/holochain_cli_sandbox/CHANGELOG.md#0.6.0-rc.2)
+
+## [holochain\_client-0.8.0-rc.2](crates/holochain_client/CHANGELOG.md#0.8.0-rc.2)
+
+## [holochain-0.6.0-rc.2](crates/holochain/CHANGELOG.md#0.6.0-rc.2)
+
+- Feat: Upgrade Kitsune2 to v0.3.2 \#5449
+- Fix panic if a DNA bundle is provided to Holochain with missing resources. \#5446
+
+## [holochain\_cascade-0.6.0-rc.2](crates/holochain_cascade/CHANGELOG.md#0.6.0-rc.2)
+
+## [holochain\_conductor\_config-0.6.0-rc.2](crates/holochain_conductor_config/CHANGELOG.md#0.6.0-rc.2)
+
+## [holochain\_wasm\_test\_utils-0.6.0-rc.2](crates/holochain_wasm_test_utils/CHANGELOG.md#0.6.0-rc.2)
+
+## [holochain\_websocket-0.6.0-rc.2](crates/holochain_websocket/CHANGELOG.md#0.6.0-rc.2)
+
+## [holochain\_conductor\_api-0.6.0-rc.2](crates/holochain_conductor_api/CHANGELOG.md#0.6.0-rc.2)
+
+## [holochain\_p2p-0.6.0-rc.2](crates/holochain_p2p/CHANGELOG.md#0.6.0-rc.2)
+
+## [holochain\_state-0.6.0-rc.2](crates/holochain_state/CHANGELOG.md#0.6.0-rc.2)
+
+## [holochain\_chc-0.3.0-rc.2](crates/holochain_chc/CHANGELOG.md#0.3.0-rc.2)
+
+## [holochain\_types-0.6.0-rc.2](crates/holochain_types/CHANGELOG.md#0.6.0-rc.2)
+
 # 20251111.005741
 
 ## [hcterm-0.6.0-rc.1](crates/hcterm/CHANGELOG.md#0.6.0-rc.1)
