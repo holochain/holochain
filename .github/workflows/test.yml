@@ -117,6 +117,12 @@ jobs:
         if: matrix.os != 'windows-latest'
         run: make test-workspace-${{ matrix.target }}
 
+      - name: TestBeats Publish
+        uses: test-results-reporter/publish@v1
+        with:
+          project: holochain
+          config: .testbeats.json
+
       - name: "Common Test Teardown Actions"
         uses: ./.github/actions/common-post
 
