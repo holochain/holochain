@@ -23,6 +23,8 @@ use {
     ignore = "flaky on macos+wasmer_wamr and windows"
 )]
 async fn publish_terminates_after_receiving_required_validation_receipts() {
+    use holochain::test_utils::retry_fn_until_timeout;
+
     holochain_trace::test_run();
 
     // Need DEFAULT_RECEIPT_BUNDLE_SIZE peers to send validation receipts back
@@ -40,24 +42,21 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
 
-    let ((alice,), (bobbo,), (carol,), (danny,), (emma,), (fred,)) = apps.into_tuples();
-
-    let apps = [alice, bobbo, carol, danny, emma, fred];
+    let alice_cell = apps.cells_flattened().into_iter().next().unwrap();
+    let alice_zome = alice_cell.zome(TestWasm::Create);
 
     for c in conductors.iter() {
-        c.declare_full_storage_arcs(apps[0].dna_hash()).await;
+        c.declare_full_storage_arcs(alice_cell.dna_hash()).await;
     }
 
     conductors.exchange_peer_info().await;
 
     // write an action
-    let action_hash: ActionHash = conductors[0]
-        .call(&apps[0].zome(TestWasm::Create), "create_entry", ())
-        .await;
+    let action_hash: ActionHash = conductors[0].call(&alice_zome, "create_entry", ()).await;
 
     // wait for validation receipts
-    tokio::time::timeout(std::time::Duration::from_secs(60), async {
-        loop {
+    retry_fn_until_timeout(
+        || async {
             // check for complete count of our receipts on the
             // millisecond level
 
@@ -65,7 +64,7 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
             // are all complete
             let receipt_sets: Vec<ValidationReceiptSet> = conductors[0]
                 .call(
-                    &apps[0].zome(TestWasm::Create),
+                    &alice_zome,
                     "get_validation_receipts",
                     GetValidationReceiptsInput::new(action_hash.clone()),
                 )
@@ -83,14 +82,11 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
                 == holochain::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE
                     as usize;
 
-            if receipt_sets_len && receipt_sets_complete && agent_activity_receipt_set {
-                // Test Passed!
-                return;
-            }
-
-            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-        }
-    })
+            receipt_sets_len && receipt_sets_complete && agent_activity_receipt_set
+        },
+        Some(60_000),
+        None,
+    )
     .await
     .unwrap();
 }
