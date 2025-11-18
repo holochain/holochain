@@ -117,11 +117,14 @@ jobs:
         if: matrix.os != 'windows-latest'
         run: make test-workspace-${{ matrix.target }}
 
-      - name: TestBeats Publish
-        uses: test-results-reporter/publish@v1
-        with:
-          project: holochain
-          config: .testbeats.json
+      - name: publish test results
+        run: |
+          curl -X 'POST' \
+            'http://159.203.168.154:8080/api/v1/plugin/holochain/junit/import' \
+            -H 'accept: application/json' \
+            -H 'Authorization: Bearer ci_DFef9hsKT6urr24sLpWLcZwFP7hHEJ-yMHUBOkioCgmxrOM2R6YA-_ulfeqqFMUG' \
+            -H 'Content-Type: multipart/form-data' \
+            -F 'file=@target/nextest/default/junit.xml;type=text/xml'
 
       - name: "Common Test Teardown Actions"
         uses: ./.github/actions/common-post
