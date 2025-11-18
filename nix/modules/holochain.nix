@@ -5,7 +5,7 @@
     let
       rustToolchain = config.rustHelper.mkRust {
         track = "stable";
-        version = inputs.versions.rustVersion;
+        version = "1.88.0";
       };
 
       craneLib = (inputs.crane.mkLib pkgs).overrideToolchain rustToolchain;
@@ -13,7 +13,7 @@
       commonArgs = {
         RUST_SODIUM_LIB_DIR = "${pkgs.libsodium}/lib";
         RUST_SODIUM_SHARED = "1";
-        LIBCLANG_PATH="${pkgs.llvmPackages.libclang.lib}/lib";
+        LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
 
         pname = "holochain";
         src = flake.config.srcCleanedHolochain;
@@ -41,7 +41,7 @@
           makeWrapper
           perl
           pkg-config
-          self'.packages.goWrapper
+          go
           # These packages and env vars are required to build holochain with the 'wasmer_wamr' feature 
           clang
           llvmPackages.libclang.lib
