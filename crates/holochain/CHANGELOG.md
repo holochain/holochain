@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE** Chore: Change `ReportConfig` enum serialization to follow convention of `tag = "type"`, i.e. `type: json_lines`.
+
 ## 0.6.0-rc.2
 
 - Feat: Upgrade Kitsune2 to v0.3.2 \#5449
