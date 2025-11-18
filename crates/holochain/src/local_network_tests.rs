@@ -23,7 +23,6 @@ async fn conductors_call_remote(num_conductors: usize) {
         .map(|c| c.into_cells().into_iter().next().unwrap())
         .collect();
 
-    // Make sure the conductors are talking to each other before we start making remote calls.
     await_consistency(30, cells.iter()).await.unwrap();
 
     let agents: Vec<_> = cells.iter().map(|c| c.agent_pubkey().clone()).collect();
