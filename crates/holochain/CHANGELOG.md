@@ -7,6 +7,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.6.0-rc.2
+
+- Feat: Upgrade Kitsune2 to v0.3.2 \#5449
+- Fix panic if a DNA bundle is provided to Holochain with missing resources. \#5446
+
+## 0.6.0-rc.1
+
+- Chore: Upgrade to Kitsune2 v0.3.1 \#5440
+- Test: Test that blocks are enforced for incoming network get requests and gossip. \#5344
+
 ## 0.6.0-rc.0
 
 - Update to release version of Kitsune2 v0.3.0. \#5429
