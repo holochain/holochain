@@ -743,6 +743,10 @@ mod tests {
           { "urls": ["stun:test-stun.tld:443"] },
         ]
       }
+      report:
+        type: json_lines
+        days_retained: 10
+        fetched_op_interval_s: 5
       advanced: {
         "my": {
           "totally": {
@@ -768,6 +772,10 @@ mod tests {
                 { "urls": ["stun:test-stun.tld:443"] },
             ]
         }));
+        network_config.report = ReportConfig::JsonLines {
+            days_retained: 10,
+            fetched_op_interval_s: 5,
+        };
         network_config.advanced = Some(serde_json::json!({
             "my": {
                 "totally": {
