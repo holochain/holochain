@@ -26,14 +26,7 @@
 
         cargoExtraArgs = "--bin lair-keystore";
 
-        buildInputs = (with pkgs; [ openssl ])
-          ++ (lib.optionals pkgs.stdenv.isDarwin
-          (with pkgs.darwin.apple_sdk_11_0.frameworks; [
-            AppKit
-            CoreFoundation
-            CoreServices
-            Security
-          ]));
+        buildInputs = (with pkgs; [ openssl ]);
 
         nativeBuildInputs = (with pkgs; [ perl pkg-config ])
           ++ lib.optionals pkgs.stdenv.isDarwin

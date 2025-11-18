@@ -21,15 +21,7 @@
         buildInputs =
           (with pkgs; [
             openssl
-          ]) ++ (lib.optionals pkgs.stdenv.isDarwin
-            (with self'.legacyPackages.apple_sdk'.frameworks; [
-              AppKit
-              CoreFoundation
-              CoreServices
-              Security
-            ])
-          )
-        ;
+          ]);
 
         nativeBuildInputs =
           (with pkgs; [

@@ -34,20 +34,10 @@
         ])
         ++ (lib.optionals pkgs.stdenv.isLinux
           (with pkgs; [
-            webkitgtk.dev
+            webkitgtk_4_1.dev
             gdk-pixbuf
             gtk3
-          ]))
-        ++ lib.optionals pkgs.stdenv.isDarwin
-          (with self'.legacyPackages.apple_sdk'.frameworks; [
-            AppKit
-            CoreFoundation
-            CoreServices
-            Security
-            IOKit
-            WebKit
-          ])
-        ;
+          ]));
 
         nativeBuildInputs = (with pkgs; [
           perl
@@ -58,7 +48,7 @@
         ])
         ++ (lib.optionals pkgs.stdenv.isLinux
           (with pkgs; [
-            wrapGAppsHook
+            wrapGAppsHook3
           ]))
         ++ (lib.optionals pkgs.stdenv.isDarwin [
           pkgs.xcbuild

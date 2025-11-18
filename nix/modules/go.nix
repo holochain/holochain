@@ -20,8 +20,8 @@
             #
             # the wrapper inherits preconfigured environment variables from the
             # derivation that depends on the propagating go
-          if pkgs.stdenv.isDarwin && pkgs.system == "x86_64-darwin" then
-            pkgs.darwin.apple_sdk_11_0.stdenv.mkDerivation
+          if pkgs.stdenv.isDarwin && pkgs.stdenv.hostPlatform.system == "x86_64-darwin" then
+            pkgs.darwin.apple-sdk_12.stdenv.mkDerivation
               {
                 name = "go";
 

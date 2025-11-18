@@ -63,6 +63,10 @@
         ''
         ;
 
+        shellHook = ''
+          export SDKROOT=$(xcrun --show-sdk-path --sdk macosx12.3)
+        '';
+
         preferLocalBuild = false;
       };
     };

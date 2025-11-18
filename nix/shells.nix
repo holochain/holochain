@@ -63,7 +63,6 @@ rec {
       (with holonix.pkgs.darwin; [
         Security
         IOKit
-        apple_sdk_11_0.frameworks.CoreFoundation
       ])
     );
   };

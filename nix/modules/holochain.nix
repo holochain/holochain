@@ -13,7 +13,7 @@
       commonArgs = {
         RUST_SODIUM_LIB_DIR = "${pkgs.libsodium}/lib";
         RUST_SODIUM_SHARED = "1";
-        LIBCLANG_PATH="${pkgs.llvmPackages.libclang.lib}/lib";
+        LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
 
         pname = "holochain";
         src = flake.config.srcCleanedHolochain;
@@ -27,15 +27,7 @@
           self'.packages.opensslStatic
           sqlcipher
           cmake
-        ])
-        ++ (lib.optionals pkgs.stdenv.isDarwin
-          (with pkgs.darwin.apple_sdk_11_0.frameworks; [
-            AppKit
-            CoreFoundation
-            CoreServices
-            Security
-            IOKit
-          ]));
+        ]);
 
         nativeBuildInputs = (with pkgs; [
           makeWrapper
