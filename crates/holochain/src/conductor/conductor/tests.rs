@@ -25,6 +25,16 @@ mod add_agent_infos;
 mod app_state;
 mod state_dump;
 
+
+/// App can't be installed if another app is already installed under the
+/// same InstalledAppId
+#[tokio::test(flavor = "multi_thread")]
+async fn fake_flaky() {
+    let num = rand::thread_rng().gen_range(0..3);
+
+    assert_eq!(num, 2);
+}
+
 /// App can't be installed if another app is already installed under the
 /// same InstalledAppId
 #[tokio::test(flavor = "multi_thread")]

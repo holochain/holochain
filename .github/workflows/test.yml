@@ -117,11 +117,15 @@ jobs:
         if: matrix.os != 'windows-latest'
         run: make test-workspace-${{ matrix.target }}
 
-      - name: TestBeats Publish
-        uses: test-results-reporter/publish@v1
-        with:
-          project: holochain
-          config: .testbeats.json
+      - uses: actions/setup-node@v6
+
+      - name: publish test results
+        run: |
+          npx junit-to-elasticsearch junit.xml \
+              --es-url https://my-observability-project-c18b91.es.us-central1.gcp.elastic.cloud \
+              --es-server-mode serverless \
+              --es-index junitxml_converted \
+              --es-api-key QVF0YW5ab0JEVS1rSGlrVTVROXo6eUhpaVpaQUlfeXpGV0UwZEdBRGluZw==
 
       - name: "Common Test Teardown Actions"
         uses: ./.github/actions/common-post
