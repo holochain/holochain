@@ -163,13 +163,7 @@ The callbacks are (see above for examples):
   - Any zome failure fails initialization for the DNA, any zome retry (missing dependencies) causes the DNA to retry.
   - Failure overrides retry.
   - See `create_cap_grant` for an explanation of how to set up capabilities in `init`.
-- `fn migrate_agent_{{ open|close }} -> ExternResult<MigrateAgentCallbackResult>`:
-  - Allows the guest to pass/fail a migration attempt to/from another DNA.
-  - Open runs when an agent is starting a new source chain from an old one.
-  - Close runs when an agent is deprecating an old source chain in favour of a new one.
-  - All zomes in a DNA migrate at the same time.
-  - Any failure fails the migration.
-- `fn recv_remote_signal(signal: ExternIO) -> ExternResult<()>`:
+- `fn recv_remote_signal(signal: ExternIO) -> ExternResult<())`:
   - Allows the guest to receive remote signals sent from other agents via the `send_remote_signal` host function.
   - Only receives signals that have been sent from a coordinator zome of the same name in the remote agent's cell.
   - As with all zome functions and callbacks, the single input parameter of this callback can be an arbitrary type with a `serde::Deserialize + std::fmt::Debug` implementation, rather than `ExternIO`. If you choose to do this, deserialization will be handled by the HDK and the call will fail if deserialization fails.
