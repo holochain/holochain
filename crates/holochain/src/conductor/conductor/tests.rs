@@ -25,7 +25,6 @@ mod add_agent_infos;
 mod app_state;
 mod state_dump;
 
-
 /// App can't be installed if another app is already installed under the
 /// same InstalledAppId
 #[tokio::test(flavor = "multi_thread")]
