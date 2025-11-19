@@ -92,8 +92,6 @@ jobs:
           # Avoid using the daemon to work out what paths to push, because it can't detect the `nix store --add` which
           # is really the only useful thing to cache from this workflow!
           useDaemon: false
-      # - name: Set NIX_PATH (FIXME)
-      #   run: echo NIX_PATH=nixpkgs=$(./scripts/nix_path.sh) >> $GITHUB_ENV
 
       - name: Merge source branch (${{ inputs.HOLOCHAIN_SOURCE_BRANCH }}) into target branch (${{ inputs.HOLOCHAIN_TARGET_BRANCH }})
         env:
