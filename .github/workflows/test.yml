@@ -118,14 +118,19 @@ jobs:
         run: make test-workspace-${{ matrix.target }}
 
       - uses: actions/setup-node@v6
+        if: ${{ always() }}
 
       - name: publish test results
+        if: ${{ always() }}
         run: |
           npx junit-to-elasticsearch target/nextest/default/junit.xml \
               --es-url https://my-observability-project-c18b91.es.us-central1.gcp.elastic.cloud \
               --es-server-mode serverless \
               --es-index junitxml_converted \
               --es-api-key QVF0YW5ab0JEVS1rSGlrVTVROXo6eUhpaVpaQUlfeXpGV0UwZEdBRGluZw==
+              --runner-name ${{ matrix.os }}
+              --run-id ${{ github.run_id }}
+              --extra target=${{ matrix.target }}
 
       - name: "Common Test Teardown Actions"
         uses: ./.github/actions/common-post
