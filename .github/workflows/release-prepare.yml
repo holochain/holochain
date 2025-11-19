@@ -176,8 +176,8 @@ jobs:
           
           ./scripts/format-toml.sh
           ./scripts/ci-git-config.sh
-          git add **/*.toml
-          git commit -m "Format toml files"
+          git add **/*.toml || true # step shouldn't fail
+          git commit -m "Format toml files" || true # step shouldn't fail
           
           nix run .#scripts-ci-generate-readmes
           nix run .#cargo-sweep -- sweep -f
