@@ -21,9 +21,8 @@
 name: release holochain
 
 on:
-  # suspend automated releases during release candidate phase
-  # schedule:
-  #   - cron: "0 0 * * 3" # At 12:00am on Wednesday
+  schedule:
+    - cron: "0 0 * * 1" # At 12:00am on Mondays
   workflow_dispatch:
     inputs:
       holochain_source_branch:
