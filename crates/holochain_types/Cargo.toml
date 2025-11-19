@@ -1,6 +1,6 @@
 [package]
 name = "holochain_types"
-version = "0.6.0-rc.2"
+version = "0.6.0"
 description = "Holochain common types"
 license = "Apache-2.0"
 repository = "https://github.com/holochain/holochain"
@@ -18,27 +18,27 @@ base64 = "0.22"
 derive_builder = "0.20"
 derive_more = { version = "2.0", features = ["constructor", "into_iterator"] }
 futures = "0.3"
-holo_hash = { version = "^0.6.0-rc.0", path = "../holo_hash", features = [
+holo_hash = { version = "^0.6.0", path = "../holo_hash", features = [
   "encoding",
   "schema",
 ] }
-holochain_keystore = { version = "^0.6.0-rc.0", path = "../holochain_keystore" }
-holochain_nonce = { version = "^0.6.0-rc.0", path = "../holochain_nonce" }
+holochain_keystore = { version = "^0.6.0", path = "../holochain_keystore" }
+holochain_nonce = { version = "^0.6.0", path = "../holochain_nonce" }
 holochain_serialized_bytes = "=0.0.56"
-holochain_sqlite = { path = "../holochain_sqlite", version = "^0.6.0-rc.1" }
-holochain_trace = { version = "^0.6.0-rc.0", path = "../holochain_trace" }
-holochain_util = { version = "^0.6.0-rc.0", path = "../holochain_util", features = [
+holochain_sqlite = { path = "../holochain_sqlite", version = "^0.6.0"}
+holochain_trace = { version = "^0.6.0", path = "../holochain_trace" }
+holochain_util = { version = "^0.6.0", path = "../holochain_util", features = [
   "backtrace",
 ] }
-holochain_zome_types = { path = "../holochain_zome_types", version = "^0.6.0-rc.0", features = [
+holochain_zome_types = { path = "../holochain_zome_types", version = "^0.6.0", features = [
   "full",
 ] }
-holochain_timestamp = { version = "^0.6.0-rc.0", path = "../timestamp" }
+holochain_timestamp = { version = "^0.6.0", path = "../timestamp" }
 kitsune2_api = "0.3.0"
 itertools = { version = "0.14" }
 mr_bundle = { path = "../mr_bundle", features = [
   "fs",
-], version = "^0.6.0-rc.0" }
+], version = "^0.6.0"}
 must_future = "0.1.1"
 nanoid = "0.4"
 parking_lot = "0.12"
@@ -61,7 +61,7 @@ indexmap = { version = "2.6.0", features = ["serde"] }
 schemars = "0.9"
 bytes = { version = "1.10.1", features = ["serde"] }
 
-fixt = { path = "../fixt", version = "^0.6.0-rc.0", optional = true }
+fixt = { path = "../fixt", version = "^0.6.0", optional = true }
 isotest = { version = "0", optional = true }
 proptest = { version = "1", optional = true }
 proptest-derive = { version = "0", optional = true }

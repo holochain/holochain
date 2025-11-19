@@ -1,6 +1,6 @@
 [package]
 name = "holochain_zome_types"
-version = "0.6.0-rc.0"
+version = "0.6.0"
 description = "Holochain zome types"
 license = "Apache-2.0"
 repository = "https://github.com/holochain/holochain"
@@ -11,14 +11,14 @@ edition = "2021"
 
 # reminder - do not use workspace deps
 [dependencies]
-holochain_timestamp = { version = "^0.6.0-rc.0", path = "../timestamp" }
-holo_hash = { version = "^0.6.0-rc.0", path = "../holo_hash", features = [
+holochain_timestamp = { version = "^0.6.0", path = "../timestamp" }
+holo_hash = { version = "^0.6.0", path = "../holo_hash", features = [
   "encoding",
 ] }
-holochain_integrity_types = { version = "^0.6.0-rc.0", path = "../holochain_integrity_types", features = [
+holochain_integrity_types = { version = "^0.6.0", path = "../holochain_integrity_types", features = [
   "tracing",
 ] }
-holochain_nonce = { version = "^0.6.0-rc.0", path = "../holochain_nonce" }
+holochain_nonce = { version = "^0.6.0", path = "../holochain_nonce" }
 holochain_serialized_bytes = "=0.0.56"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_bytes = "0.11"
@@ -38,7 +38,7 @@ derive_more = { version = "2.0", features = [
 ] }
 
 # fixturator dependencies
-fixt = { version = "^0.6.0-rc.0", path = "../fixt", optional = true }
+fixt = { version = "^0.6.0", path = "../fixt", optional = true }
 rand = { version = "0.9", optional = true }
 
 # sqlite dependencies

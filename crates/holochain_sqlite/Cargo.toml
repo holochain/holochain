@@ -1,6 +1,6 @@
 [package]
 name = "holochain_sqlite"
-version = "0.6.0-rc.1"
+version = "0.6.0"
 description = "Abstractions for persistence of Holochain state via SQLite"
 license = "Apache-2.0"
 repository = "https://github.com/holochain/holochain"
@@ -22,15 +22,15 @@ derive_more = { version = "2.0", features = [
 ] }
 fallible-iterator = "0.3.0"
 futures = "0.3"
-holo_hash = { path = "../holo_hash", version = "^0.6.0-rc.0" }
+holo_hash = { path = "../holo_hash", version = "^0.6.0"}
 holochain_serialized_bytes = "=0.0.56"
-holochain_util = { version = "^0.6.0-rc.0", path = "../holochain_util", features = [
+holochain_util = { version = "^0.6.0", path = "../holochain_util", features = [
   "backtrace",
   "time",
 ], optional = true }
-holochain_zome_types = { version = "^0.6.0-rc.0", path = "../holochain_zome_types" }
-holochain_nonce = { version = "^0.6.0-rc.0", path = "../holochain_nonce" }
-holochain_timestamp = { version = "^0.6.0-rc.0", path = "../timestamp" }
+holochain_zome_types = { version = "^0.6.0", path = "../holochain_zome_types" }
+holochain_nonce = { version = "^0.6.0", path = "../holochain_nonce" }
+holochain_timestamp = { version = "^0.6.0", path = "../timestamp" }
 nanoid = "0.4"
 once_cell = "1.4.1"
 num_cpus = "1.13.0"
@@ -68,7 +68,7 @@ rusqlite = { version = "0.37", features = [
 
 [dev-dependencies]
 holochain_sqlite = { path = ".", features = ["test_utils", "slow_tests"] }
-holochain_trace = { version = "^0.6.0-rc.0", path = "../holochain_trace" }
+holochain_trace = { version = "^0.6.0", path = "../holochain_trace" }
 nanoid = "0.4.0"
 walkdir = "2.5.0"
 
