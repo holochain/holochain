@@ -33,7 +33,7 @@ tokio = { version = "1.44", default-features = false, features = [
 dunce = { version = "1.0", optional = true }
 
 [dev-dependencies]
-mr_bundle = { version = "0.6.0-dev.0", path = ".", features = ["fs"] }
+mr_bundle = { path = ".", features = ["fs"] }
 
 serde_yaml = "0.9"
 tokio = { version = "1.36.0", features = ["full"] }
