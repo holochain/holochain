@@ -101,16 +101,16 @@
     "holochain": {
       "flake": false,
       "locked": {
-        "lastModified": 1733145535,
-        "narHash": "sha256-fDDdYFkkN1kJA32vVF+HKIbLCZTaMBPmZYah9iqB18E=",
+        "lastModified": 1741007205,
+        "narHash": "sha256-t3L5PrXSfq+47cvDQgJMxZ+W7q2UNhkKRiAZuMv//Lo=",
         "owner": "holochain",
         "repo": "holochain",
-        "rev": "eba9927d03edd8f27a827f8cc0026916b493c9ea",
+        "rev": "5025fb1c3969f9284e31511889e88cabed933ffe",
         "type": "github"
       },
       "original": {
         "owner": "holochain",
-        "ref": "holochain-0.3.6",
+        "ref": "holochain-0.5.0-dev.21",
         "repo": "holochain",
         "type": "github"
       }
@@ -118,16 +118,16 @@
     "lair": {
       "flake": false,
       "locked": {
-        "lastModified": 1732711885,
-        "narHash": "sha256-kpMkLPHEAarG6MPFdJMQQnTk7YkXk9mFcWLyvbBEUVo=",
+        "lastModified": 1732721902,
+        "narHash": "sha256-D8sXIpOptaXib5bc6zS7KsGzu4D08jaL8Fx1W/mlADE=",
         "owner": "holochain",
         "repo": "lair",
-        "rev": "6e8938a1d574bd2f8d2f66d1983b58951d700774",
+        "rev": "e82937521ae9b7bdb30c8b0736c13cd4220a0223",
         "type": "github"
       },
       "original": {
         "owner": "holochain",
-        "ref": "lair_keystore-v0.4.7",
+        "ref": "lair_keystore-v0.5.3",
         "repo": "lair",
         "type": "github"
       }
@@ -135,16 +135,16 @@
     "launcher": {
       "flake": false,
       "locked": {
-        "lastModified": 1733246036,
-        "narHash": "sha256-/UpB+zK5Yqhpoo+6I+4yl7D0DPTmh5gOOzipakjpJAA=",
+        "lastModified": 1744836432,
+        "narHash": "sha256-3hvPYn3pYVhKoRMqDQDcm//N6EPrAqWn84Nb7vqK4mo=",
         "owner": "holochain",
         "repo": "hc-launch",
-        "rev": "f6f980801f820f036ef133b6dc31efbef6dd0f99",
+        "rev": "92b4265ebc971cd0e085f9a26f2ae020d605481f",
         "type": "github"
       },
       "original": {
         "owner": "holochain",
-        "ref": "holochain-0.3",
+        "ref": "holochain-weekly",
         "repo": "hc-launch",
         "type": "github"
       }
@@ -233,20 +233,11 @@
         "holochain": [
           "empty"
         ],
-        "lair": [
-          "empty"
-        ],
-        "launcher": [
-          "empty"
-        ],
         "nix-filter": "nix-filter",
         "nixpkgs": "nixpkgs",
         "pre-commit-hooks-nix": "pre-commit-hooks-nix",
         "repo-git": "repo-git",
         "rust-overlay": "rust-overlay",
-        "scaffolding": [
-          "empty"
-        ],
         "versions": "versions"
       }
     },
@@ -273,16 +264,16 @@
     "scaffolding": {
       "flake": false,
       "locked": {
-        "lastModified": 1733422567,
-        "narHash": "sha256-X7MUZ6wXPcsF6cFC4AK27UiUWpVzhdlrnL+1znfzVfM=",
+        "lastModified": 1743001074,
+        "narHash": "sha256-FtFGAFY+d6eEP85PkkyhwD2G9fXx4jrQiNjik3Hyqmk=",
         "owner": "holochain",
         "repo": "scaffolding",
-        "rev": "4d97985a8a93db93c25326a4d75aac0a3ea40a06",
+        "rev": "2ad60188fe6a2bba7b68b414f0d6528967d48400",
         "type": "github"
       },
       "original": {
         "owner": "holochain",
-        "ref": "holochain-0.3",
+        "ref": "holochain-weekly",
         "repo": "scaffolding",
         "type": "github"
       }
@@ -295,16 +286,16 @@
         "scaffolding": "scaffolding"
       },
       "locked": {
-        "dir": "versions/0_3",
-        "lastModified": 1749431479,
-        "narHash": "sha256-eWmPaD68mlzVc0gfx7hbvC/zm7G28djRDHAcezu203U=",
+        "dir": "versions/weekly",
+        "lastModified": 1763465555,
+        "narHash": "sha256-jw9Zp9s4Y/+yWFMgtzgIhVkPW+1uEG0S5y6uO+sc5ik=",
         "owner": "holochain",
         "repo": "holochain",
-        "rev": "ba3c4ecdb3434150d118aede2870e0f6526aaa45",
+        "rev": "892ec3b0762f9e516d0e7027c0ce0febbb677ebd",
         "type": "github"
       },
       "original": {
-        "dir": "versions/0_3",
+        "dir": "versions/weekly",
         "owner": "holochain",
         "repo": "holochain",
         "type": "github"
