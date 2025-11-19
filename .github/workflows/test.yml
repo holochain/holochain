@@ -121,7 +121,7 @@ jobs:
 
       - name: publish test results
         run: |
-          npx junit-to-elasticsearch junit.xml \
+          npx junit-to-elasticsearch target/nextest/default/junit.xml \
               --es-url https://my-observability-project-c18b91.es.us-central1.gcp.elastic.cloud \
               --es-server-mode serverless \
               --es-index junitxml_converted \
