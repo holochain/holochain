@@ -1,0 +1,1 @@
+"--cargo-profile fast-test"
