@@ -202,7 +202,7 @@ async fn gen_dna_file(output: std::path::PathBuf) {
     std::io::Write::write_all(&mut gz, &dna_file).unwrap();
     let dna_file = gz.finish().unwrap();
 
-    if output == std::path::PathBuf::from("-") {
+    if output.as_os_str() == "-" {
         tokio::io::AsyncWriteExt::write_all(&mut tokio::io::stdout(), &dna_file)
             .await
             .unwrap();
