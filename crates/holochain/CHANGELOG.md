@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- CI: Run windows test workflow on Depot.dev runners for improved performance. \#5473
 - Refactor: Use production transport for all tests instead of in-memory implementations. \#5442
 
 ## 0.6.0
