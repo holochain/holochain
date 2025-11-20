@@ -27,7 +27,6 @@ async fn space_shutdown() {
                     "serverUrl": "wss://not_a_host"
                 }
             })),
-            k2_test_builder: false,
             get_db_op_store: Arc::new(move |_space| {
                 let dht_db = dht_db.clone();
                 Box::pin(async move { Ok(dht_db) })

@@ -27,10 +27,6 @@ pub struct ConductorBuilder {
     /// Skip printing setup info to stdout
     pub no_print_setup: bool,
 
-    /// By default the test builder also uses a test kitsune2 builder.
-    /// You can override that by setting this to true.
-    pub test_builder_uses_production_k2_builder: bool,
-
     /// WARNING!! DANGER!! This exposes your database decryption secrets!
     /// Print the database decryption secrets to stderr.
     /// With these PRAGMA commands, you'll be able to run sqlcipher
@@ -70,13 +66,6 @@ impl ConductorBuilder {
     /// directly to manipulate holochain databases.
     pub fn danger_print_db_secrets(mut self, v: bool) -> Self {
         self.danger_print_db_secrets = v;
-        self
-    }
-
-    /// By default the test builder also uses a test kitsune2 builder.
-    /// You can override that by setting this to true.
-    pub fn test_builder_uses_production_k2_builder(mut self, v: bool) -> Self {
-        self.test_builder_uses_production_k2_builder = v;
         self
     }
 
@@ -240,6 +229,8 @@ impl ConductorBuilder {
             report,
             compat,
             request_timeout: std::time::Duration::from_secs(config.request_timeout_s),
+            #[cfg(feature = "test_utils")]
+            mem_bootstrap: config.network.mem_bootstrap,
             ..Default::default()
         };
 
@@ -387,6 +378,13 @@ impl ConductorBuilder {
         self,
         extra_dna_files: &[(CellId, DnaFile)],
     ) -> ConductorResult<ConductorHandle> {
+        if rustls::crypto::aws_lc_rs::default_provider()
+            .install_default()
+            .is_err()
+        {
+            tracing::error!("could not set crypto provider for tls");
+        }
+
         let builder = self;
 
         let keystore = builder
@@ -458,7 +456,6 @@ impl ConductorBuilder {
             report,
             compat,
             request_timeout: std::time::Duration::from_secs(config.request_timeout_s),
-            k2_test_builder: !builder.test_builder_uses_production_k2_builder,
             #[cfg(feature = "test_utils")]
             disable_bootstrap: config.network.disable_bootstrap,
             #[cfg(feature = "test_utils")]
