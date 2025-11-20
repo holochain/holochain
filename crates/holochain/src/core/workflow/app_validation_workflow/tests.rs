@@ -136,7 +136,7 @@ async fn main_workflow() {
     hc_p2p
         .expect_get()
         .times(1)
-        .return_once(|_, _| Box::pin(async { Ok(vec![]) }));
+        .return_once(|_, _, _| Box::pin(async { Ok(vec![]) }));
     hc_p2p
         .expect_target_arcs()
         .returning(|_| Box::pin(async move { Ok(vec![]) }));

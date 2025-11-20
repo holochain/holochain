@@ -1,5 +1,6 @@
 use crate::tests::common::{spawn_test_bootstrap, Handler};
 use holochain_keystore::*;
+use holochain_p2p::actor::{GetLinksRequestOptions, NetworkRequestOptions};
 use holochain_p2p::event::*;
 use holochain_p2p::*;
 use holochain_trace::test_run;
@@ -373,6 +374,7 @@ async fn test_get() {
                         vec![1; 36],
                         holo_hash::hash_type::AnyDht::Entry,
                     ),
+                    NetworkRequestOptions::default(),
                 )
                 .await
                 .is_ok()
@@ -421,6 +423,7 @@ async fn test_get_with_unresponsive_agents() {
                         vec![1; 36],
                         holo_hash::hash_type::AnyDht::Entry,
                     ),
+                    NetworkRequestOptions::default(),
                 )
                 .await
                 .is_ok()
@@ -471,6 +474,7 @@ async fn test_get_when_not_all_agents_have_data() {
                         vec![1; 36],
                         holo_hash::hash_type::AnyDht::Entry,
                     ),
+                    NetworkRequestOptions::default(),
                 )
                 .await
             {
@@ -533,6 +537,7 @@ async fn test_get_when_not_all_agents_have_data_and_unresponsive_agent() {
                         vec![1; 36],
                         holo_hash::hash_type::AnyDht::Entry,
                     ),
+                    NetworkRequestOptions::default(),
                 )
                 .await
             {
@@ -586,6 +591,7 @@ async fn test_get_empty_data_better_than_no_response() {
                         vec![1; 36],
                         holo_hash::hash_type::AnyDht::Entry,
                     ),
+                    NetworkRequestOptions::default(),
                 )
                 .await
                 .is_ok()
@@ -634,7 +640,7 @@ async fn test_get_links() {
                         before: None,
                         author: None,
                     },
-                    holochain_p2p::actor::GetLinksOptions::default(),
+                    GetLinksRequestOptions::default(),
                 )
                 .await
                 .is_ok()
@@ -685,7 +691,7 @@ async fn test_get_links_with_unresponsive_agents() {
                         before: None,
                         author: None,
                     },
-                    holochain_p2p::actor::GetLinksOptions::default(),
+                    GetLinksRequestOptions::default(),
                 )
                 .await
                 .is_ok()
@@ -734,6 +740,7 @@ async fn test_count_links() {
                         after: None,
                         author: None,
                     },
+                    NetworkRequestOptions::default(),
                 )
                 .await
                 .is_ok()
@@ -784,6 +791,7 @@ async fn test_count_links_with_unresponsive_agents() {
                         after: None,
                         author: None,
                     },
+                    NetworkRequestOptions::default(),
                 )
                 .await
                 .is_ok()
@@ -920,6 +928,7 @@ async fn test_must_get_agent_activity() {
                         limit_conditions: LimitConditions::ToGenesis,
                         include_cached_entries: false,
                     },
+                    NetworkRequestOptions::default(),
                 )
                 .await
                 .is_ok()
@@ -964,6 +973,7 @@ async fn test_must_get_agent_activity_with_unresponsive_agents() {
                         limit_conditions: LimitConditions::ToGenesis,
                         include_cached_entries: false,
                     },
+                    NetworkRequestOptions::default(),
                 )
                 .await
                 .is_ok()

@@ -7,101 +7,71 @@ use holochain_types::prelude::ValidationReceiptBundle;
 use kitsune2_api::{DhtArc, SpaceId, StoredOp};
 use std::collections::HashMap;
 
-/// Get options help control how the get is processed at various levels.
-/// Fields tagged with `[Network]` are network-level controls.
-/// Fields tagged with `[Remote]` are controls that will be forwarded to the
-/// remote agent processing this `Get` request.
+/// Get options used to control how data fetching over the network is performed.
 #[derive(Clone, Debug)]
-pub struct GetOptions {
-    /// `[Network]`
-    /// How many remote nodes should we make requests of / aggregate.
-    /// Set to `None` for a default "best-effort".
-    pub remote_agent_count: Option<u8>,
+pub struct NetworkRequestOptions {
+    /// Make requests to this number of remote agents in parallel.
+    ///
+    /// When `GetOptions::as_race` is `true`, the first response received will be returned.
+    /// When `GetOptions::as_race` is `false`, responses will be aggregated until the timeout is
+    /// reached. This is not implemented.
+    ///
+    /// Defaults to `3`.
+    pub remote_agent_count: u8,
 
-    /// `[Network]`
-    /// Timeout to await responses for aggregation.
-    /// Set to `None` for a default "best-effort".
-    /// Note - if all requests time-out you will receive an empty result,
-    /// not a timeout error.
+    /// Timeout within which responses must arrive.
+    ///
+    /// When `None` is specified, the conductor settings will be used to determine the timeout.
     pub timeout_ms: Option<u64>,
 
-    /// `[Network]`
-    /// We are interested in speed. If `true` and we have any results
-    /// when `race_timeout_ms` is expired, those results will be returned.
-    /// After `race_timeout_ms` and before `timeout_ms` the first result
-    /// received will be returned.
+    /// Whether to treat the get as a race, returning the first response received.
+    ///
+    /// Defaults to `true`.
     pub as_race: bool,
-
-    /// `[Network]`
-    /// See `as_race` for details.
-    /// Set to `None` for a default "best-effort" race.
-    pub race_timeout_ms: Option<u64>,
 }
 
-impl Default for GetOptions {
+impl Default for NetworkRequestOptions {
     fn default() -> Self {
         Self {
-            remote_agent_count: None,
+            remote_agent_count: 3,
             timeout_ms: None,
             as_race: true,
-            race_timeout_ms: None,
         }
     }
 }
 
-impl GetOptions {
+impl NetworkRequestOptions {
     /// Using defaults is dangerous in a must_get as it can undermine determinism.
     /// We want refactors to explicitly consider this.
     pub fn must_get_options() -> Self {
         Self {
-            remote_agent_count: None,
+            remote_agent_count: 1,
             timeout_ms: None,
             as_race: true,
-            race_timeout_ms: None,
         }
     }
 }
 
-impl From<holochain_zome_types::entry::GetOptions> for GetOptions {
-    fn from(_: holochain_zome_types::entry::GetOptions) -> Self {
-        Self::default()
-    }
-}
-
-/// Get links from the DHT.
-/// Fields tagged with `[Network]` are network-level controls.
-/// Fields tagged with `[Remote]` are controls that will be forwarded to the
-/// remote agent processing this `GetLinks` request.
+/// Options for getting links from the network.
 #[derive(Debug, Clone, Default)]
-pub struct GetLinksOptions {
-    /// `[Network]`
-    /// Timeout to await responses for aggregation.
-    /// Set to `None` for a default "best-effort".
-    /// Note - if all requests time-out you will receive an empty result,
-    /// not a timeout error.
-    pub timeout_ms: Option<u64>,
+pub struct GetLinksRequestOptions {
+    /// The base network options to use for this call.
+    pub network_req_options: NetworkRequestOptions,
+
     /// Whether to fetch links from the network or return only
     /// locally available links. Defaults to fetching links from network.
     pub get_options: holochain_zome_types::entry::GetOptions,
 }
 
 /// Get agent activity from the DHT.
+///
 /// Fields tagged with `[Network]` are network-level controls.
 /// Fields tagged with `[Remote]` are controls that will be forwarded to the
 /// remote agent processing this `GetLinks` request.
 #[derive(Debug, Clone)]
 pub struct GetActivityOptions {
-    /// `[Network]`
-    /// Timeout to await responses for aggregation.
-    /// Set to `None` for a default "best-effort".
-    /// Note - if all requests time-out you will receive an empty result,
-    /// not a timeout error.
-    pub timeout_ms: Option<u64>,
-    /// Number of times to retry getting records in parallel.
-    /// For a small dht a large parallel get can overwhelm a single
-    /// agent and it can be worth retrying the records that didn't
-    /// get found.
-    pub retry_gets: u8,
+    /// The base network options to use for this call.
+    pub network_req_options: NetworkRequestOptions,
     /// `[Remote]`
     /// Include the all valid activity actions in the response.
     /// If this is false the call becomes a lightweight response with
@@ -116,14 +86,13 @@ pub struct GetActivityOptions {
     /// Include the full signed records in the response, instead of just the hashes.
     pub include_full_records: bool,
     /// Configure how the data should be fetched.
-    pub get_options: holochain_zome_types::entry::GetOptions,
+    pub get_options: GetOptions,
 }
 
 impl Default for GetActivityOptions {
     fn default() -> Self {
         Self {
-            timeout_ms: None,
-            retry_gets: 0,
+            network_req_options: NetworkRequestOptions::default(),
             include_valid_activity: true,
             include_rejected_activity: false,
             include_warrants: true,
@@ -142,7 +111,7 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
 
     /// Test utility to force local agents to report full storage arcs.
     #[cfg(feature = "test_utils")]
-    fn test_set_full_arcs(&self, space: kitsune2_api::SpaceId) -> BoxFut<'_, ()> {
+    fn test_set_full_arcs(&self, space: SpaceId) -> BoxFut<'_, ()> {
         Box::pin(async move {
             let mut updated_agents = Vec::new();
             for agent in self
@@ -155,8 +124,8 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
                 .await
                 .unwrap()
             {
-                agent.set_cur_storage_arc(kitsune2_api::DhtArc::FULL);
-                agent.set_tgt_storage_arc_hint(kitsune2_api::DhtArc::FULL);
+                agent.set_cur_storage_arc(DhtArc::FULL);
+                agent.set_tgt_storage_arc_hint(DhtArc::FULL);
                 agent.invoke_cb();
                 updated_agents.push(agent);
             }
@@ -250,7 +219,7 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
     fn publish(
         &self,
         dna_hash: DnaHash,
-        basis_hash: holo_hash::OpBasis,
+        basis_hash: OpBasis,
         source: AgentPubKey,
         op_hash_list: Vec<DhtOpHash>,
         timeout_ms: Option<u64>,
@@ -261,7 +230,7 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
     fn publish_countersign(
         &self,
         dna_hash: DnaHash,
-        basis_hash: holo_hash::OpBasis,
+        basis_hash: OpBasis,
         op: ChainOp,
     ) -> BoxFut<'_, HolochainP2pResult<()>>;
 
@@ -269,7 +238,8 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
     fn get(
         &self,
         dna_hash: DnaHash,
-        dht_hash: holo_hash::AnyDhtHash,
+        dht_hash: AnyDhtHash,
+        options: NetworkRequestOptions,
     ) -> BoxFut<'_, HolochainP2pResult<Vec<WireOps>>>;
 
     /// Get links from the DHT.
@@ -277,7 +247,7 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
         &self,
         dna_hash: DnaHash,
         link_key: WireLinkKey,
-        options: GetLinksOptions,
+        options: GetLinksRequestOptions,
     ) -> BoxFut<'_, HolochainP2pResult<Vec<WireLinkOps>>>;
 
     /// Get a count of links from the DHT.
@@ -285,6 +255,7 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
         &self,
         dna_hash: DnaHash,
         query: WireLinkQuery,
+        options: NetworkRequestOptions,
     ) -> BoxFut<'_, HolochainP2pResult<CountLinksResponse>>;
 
     /// Get agent activity from the DHT.
@@ -302,6 +273,7 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
         dna_hash: DnaHash,
         author: AgentPubKey,
         filter: holochain_zome_types::chain::ChainFilter,
+        options: NetworkRequestOptions,
     ) -> BoxFut<'_, HolochainP2pResult<Vec<MustGetAgentActivityResponse>>>;
 
     /// Send a validation receipt to a remote node.
