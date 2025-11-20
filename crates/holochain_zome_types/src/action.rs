@@ -16,7 +16,7 @@ pub enum ActionError {
     Rebase(String),
 }
 
-#[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize, Default)]
 pub enum ChainTopOrdering {
     /// Relaxed chain top ordering REWRITES ACTIONS INLINE during a flush of
     /// the source chain to sit on top of the current chain top. The "as at"
@@ -44,13 +44,8 @@ pub enum ChainTopOrdering {
     /// If you are unsure whether your data is order dependent you should err
     /// on the side of caution and handle `HeadMoved` errors on the client of
     /// the zome call and restart the zome call from the start.
+    #[default]
     Strict,
-}
-
-impl Default for ChainTopOrdering {
-    fn default() -> Self {
-        Self::Strict
-    }
 }
 
 pub trait ActionExt {
