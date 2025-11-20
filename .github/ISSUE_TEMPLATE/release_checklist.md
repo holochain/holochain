@@ -77,10 +77,10 @@ flowchart TB
     Complete{Upgrade Complete!}
 
     %% styling 
-    style Start fill:blue
-    style Complete fill:green
-    style AppLibsComplete fill:green
-    style AppToolsComplete fill:green
+    style Start fill:blue,color:white
+    style Complete fill:green,color:white
+    style AppLibsComplete fill:green,color:white
+    style AppToolsComplete fill:green,color:white
 ```
 
 ## Task Assignments
