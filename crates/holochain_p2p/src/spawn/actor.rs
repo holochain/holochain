@@ -833,40 +833,26 @@ impl HolochainP2pActor {
     ) -> HolochainP2pResult<actor::DynHcP2p> {
         check_k2_init();
 
-        #[cfg(feature = "test_utils")]
-        let mut builder = if config.k2_test_builder {
-            let mut builder = kitsune2_core::default_test_builder();
+        let mut builder = kitsune2::default_builder();
 
+        // The following are flags only used in tests
+        #[cfg(feature = "test_utils")]
+        {
             if config.disable_bootstrap {
                 builder.bootstrap = Arc::new(test::NoopBootstrapFactory);
+            } else if config.mem_bootstrap {
+                tracing::info!("Running with mem bootstrap");
+                builder.bootstrap = kitsune2_core::factories::MemBootstrapFactory::create();
             }
-
-            // Make it possible to disable the gossip module for testing.
-            if !config.disable_gossip {
-                // Still want the real gossip module to be used. The test builder comes with a stub
-                // gossip module fur use in K2 testing.
-                builder.gossip = kitsune2_gossip::K2GossipFactory::create();
-            } else {
+            if config.disable_gossip {
                 tracing::info!("Running with gossip disabled");
+                builder.gossip = Arc::new(test::NoopGossipFactory);
             }
-
             if config.disable_publish {
                 tracing::info!("Running with publish disabled");
                 builder.publish = Arc::new(test::NoopPublishFactory);
             }
-
-            if !config.mem_bootstrap {
-                tracing::info!("Running with core bootstrap");
-                builder.bootstrap = kitsune2_core::factories::CoreBootstrapFactory::create();
-            }
-
-            builder
-        } else {
-            kitsune2::default_builder()
-        };
-
-        #[cfg(not(feature = "test_utils"))]
-        let mut builder = kitsune2::default_builder();
+        }
 
         builder.auth_material = config.auth_material;
 
@@ -903,6 +889,27 @@ impl HolochainP2pActor {
 
         // Load default configuration provided by the module factories.
         let builder = builder.with_default_config()?;
+
+        #[cfg(feature = "test_utils")]
+        {
+            builder
+                .config
+                .set_module_config(&kitsune2_transport_tx5::Tx5TransportModConfig {
+                    tx5_transport: kitsune2_transport_tx5::Tx5TransportConfig {
+                        signal_allow_plain_text: true,
+                        timeout_s: 20,
+                        ..Default::default()
+                    },
+                })?;
+            builder.config.set_module_config(
+                &kitsune2_core::factories::CoreBootstrapModConfig {
+                    core_bootstrap: kitsune2_core::factories::CoreBootstrapConfig {
+                        backoff_min_ms: 1_000,
+                        ..Default::default()
+                    },
+                },
+            )?;
+        }
 
         if let ReportConfig::JsonLines(hc_report) = config.report {
             builder

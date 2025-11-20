@@ -1219,7 +1219,6 @@ async fn spawn_test(
                 let conductor_db = conductor_db.clone();
                 Box::pin(async move { conductor_db })
             }),
-            k2_test_builder: false,
             network_config: Some(serde_json::json!({
                 "coreBootstrap": {
                     "serverUrl": format!("http://{bootstrap_addr}"),

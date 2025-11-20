@@ -72,6 +72,7 @@ test_utils = [
   "holochain_zome_types/test_utils",
   "holochain_zome_types/fixturators",
   "holochain_types/test_utils",
+  "dep:kitsune2_transport_tx5",
 ]
 
 mock_network = ["test_utils"]

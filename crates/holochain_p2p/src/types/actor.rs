@@ -184,11 +184,11 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
                         })
                     }
                 },
-                None,
+                Some(10_000),
                 None,
             )
             .await
-            .unwrap();
+            .expect("peer store not updated after declaring full arc");
         })
     }
 

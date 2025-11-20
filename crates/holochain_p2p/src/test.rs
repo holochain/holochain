@@ -7,15 +7,76 @@ use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_nonce::Nonce256Bits;
 use holochain_zome_types::fixt::ActionFixturator;
+use kitsune2_api::DynGossip;
+use kitsune2_api::DynLocalAgentStore;
+use kitsune2_api::DynOpStore;
 use kitsune2_api::DynPeerMetaStore;
+use kitsune2_api::Gossip;
+use kitsune2_api::GossipFactory;
+use kitsune2_api::GossipStateSummary;
+use kitsune2_api::GossipStateSummaryRequest;
 use kitsune2_api::{
     Bootstrap, BootstrapFactory, Builder, Config, DhtArc, DynBootstrap, DynFetch, DynPeerStore,
     DynPublish, DynTransport, K2Result, OpId, Publish, PublishFactory, SpaceId, Url,
 };
+use std::collections::HashMap;
 
 /// Spawn a stub network that doesn't respond to any messages.
 pub async fn stub_network() -> DynHcP2p {
     Arc::new(MockHcP2p::new())
+}
+
+#[derive(Debug)]
+pub struct NoopGossip;
+
+impl Gossip for NoopGossip {
+    fn get_state_summary(
+        &self,
+        _request: GossipStateSummaryRequest,
+    ) -> BoxFut<'_, K2Result<GossipStateSummary>> {
+        Box::pin(async {
+            Ok(GossipStateSummary {
+                accepted_rounds: Default::default(),
+                dht_summary: Default::default(),
+                initiated_round: Default::default(),
+                peer_meta: Default::default(),
+            })
+        })
+    }
+
+    fn inform_ops_stored(&self, ops: Vec<StoredOp>) -> BoxFut<'_, K2Result<()>> {
+        Box::pin(async { Ok(()) })
+    }
+}
+
+#[derive(Debug)]
+pub struct NoopGossipFactory;
+
+impl GossipFactory for NoopGossipFactory {
+    fn default_config(&self, _config: &mut Config) -> K2Result<()> {
+        Ok(())
+    }
+
+    fn validate_config(&self, _config: &Config) -> K2Result<()> {
+        Ok(())
+    }
+
+    fn create(
+        &self,
+        builder: Arc<Builder>,
+        space_id: SpaceId,
+        peer_store: DynPeerStore,
+        local_agent_store: DynLocalAgentStore,
+        peer_meta_store: DynPeerMetaStore,
+        op_store: DynOpStore,
+        transport: DynTransport,
+        fetch: DynFetch,
+    ) -> BoxFut<'static, K2Result<DynGossip>> {
+        Box::pin(async {
+            let instance: DynGossip = Arc::new(NoopGossip);
+            Ok(instance)
+        })
+    }
 }
 
 #[derive(Debug)]

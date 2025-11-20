@@ -252,7 +252,14 @@ impl TestCase {
                     let db_conductor = db_conductor.clone();
                     Box::pin(async move { db_conductor })
                 }),
-                k2_test_builder: true,
+                network_config: Some(serde_json::json!({
+                    "coreBootstrap": {
+                        "serverUrl": "https://not-used"
+                    },
+                    "tx5Transport": {
+                        "serverUrl": "wss://not-used"
+                    }
+                })),
                 ..Default::default()
             },
             lair_client.clone(),
