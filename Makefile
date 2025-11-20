@@ -101,3 +101,10 @@ test-workspace-wasmer_wamr:
 		--locked \
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_wamr
+
+clean:
+	cargo clean
+    # Remove untracked .dna files
+	git ls-files -z --others --ignored --exclude-standard -- '*.dna' | xargs -0 rm --
+    # Remove untracked .happ files
+	git ls-files -z --others --ignored --exclude-standard '*.happ' | xargs -0 rm --
