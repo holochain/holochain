@@ -1,23 +1,18 @@
-//! Helpers for making [`holochain_conductor_api::AdminRequest`]s to the admin API.
+//! Admin API helpers for the `hc-client` CLI.
 //!
-//! This module is designed for use in a CLI so it is more simplified
-//! than calling the [`AdminWebsocket`] directly.
+//! These utilities make it easy to construct [`holochain_conductor_api::AdminRequest`]
+//! calls against a running conductor without having to manually manage websocket
+//! connections in tooling.
 
-use crate::cmds::Existing;
-use crate::ports::get_admin_ports;
-use crate::run::run_async;
 use anyhow::anyhow;
-use anyhow::bail;
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use clap::{Args, Parser, Subcommand};
 use holo_hash::{ActionHash, AgentPubKeyB64, DnaHashB64};
 use holochain_client::AdminWebsocket;
-use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::PeerMetaInfo;
 use holochain_conductor_api::{AdminInterfaceConfig, AppInfo};
-use holochain_trace::Output;
 use holochain_types::app::AppManifest;
 use holochain_types::app::RoleSettingsMap;
 use holochain_types::app::RoleSettingsMapYaml;
@@ -33,23 +28,17 @@ use kitsune2_core::Ed25519Verifier;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 #[doc(hidden)]
 #[derive(Debug, Parser)]
 pub struct Call {
-    /// Ports to running conductor admin interfaces.
-    /// If this is empty existing sandboxes will be used.
-    /// Cannot be combined with existing sandboxes.
-    #[arg(short, long, conflicts_with_all = &["existing_paths", "indices"], value_delimiter = ',')]
-    pub running: Vec<u16>,
+    /// Port of the running conductor admin interface.
+    #[arg(short, long)]
+    pub port: u16,
 
-    #[command(flatten)]
-    pub existing: Existing,
-
-    /// The origin to use in the admin websocket request
+    /// Optional origin header to send with each admin websocket message.
     #[arg(long)]
     pub origin: Option<String>,
 
@@ -310,89 +299,11 @@ pub struct PeerMetaInfoArgs {
 }
 
 #[doc(hidden)]
-pub async fn call(
-    holochain_path: &Path,
-    req: Call,
-    force_admin_ports: Vec<u16>,
-    structured: Output,
-) -> anyhow::Result<()> {
-    let Call {
-        existing,
-        running,
-        origin,
-        call,
-    } = req;
-    // Force admin ports takes precedence over running. They both specify the same thing but force admin ports
-    // is used across other sandbox calls so this makes `call` consistent with others.
-    let running = if force_admin_ports.is_empty() {
-        running
-    } else {
-        force_admin_ports
-    };
+pub async fn call(req: Call) -> anyhow::Result<()> {
+    let Call { port, origin, call } = req;
 
-    let admin_clients = if running.is_empty() {
-        let existing = if existing.is_empty() {
-            Existing {
-                all: true,
-                indices: Vec::with_capacity(0),
-            }
-        } else {
-            existing
-        };
-        let paths = existing.load(std::env::current_dir()?)?;
-        let ports = get_admin_ports(paths.clone()).await?;
-        let mut clients = Vec::with_capacity(ports.len());
-        for (port, path) in ports.into_iter().zip(paths.into_iter()) {
-            match AdminWebsocket::connect(format!("localhost:{port}"), origin.clone()).await {
-                Ok(client) => clients.push((client, None, None)),
-                Err(e) => {
-                    tracing::debug!("Connecting to the sandbox conductor failed: {e}.\nThis is expected in case the conductor is not running. Trying to start it up now...");
-                    // Note that the holochain and lair processes need to be returned here
-                    // in order to not get dropped but keep running until the admin call
-                    // is being made
-                    let (port, holochain, lair) = run_async(
-                        holochain_path,
-                        ConfigRootPath::from(path),
-                        None,
-                        structured.clone(),
-                    )
-                    .await?;
-                    clients.push((
-                        AdminWebsocket::connect(format!("localhost:{port}"), origin.clone())
-                            .await?,
-                        Some(holochain),
-                        Some(lair),
-                    ));
-                }
-            }
-        }
-
-        if clients.is_empty() {
-            bail!(
-                "No running conductors found by searching the current directory. \
-                \nYou need to do one of: \
-                    \n\t1. Start a new sandbox conductor from this directory, \
-                    \n\t2. Change directory to where your sandbox conductor is running, \
-                    \n\t3. Use the --running flag to connect to a running conductor\
-                "
-            );
-        }
-
-        clients
-    } else {
-        let mut clients = Vec::with_capacity(running.len());
-        for port in running {
-            clients.push((
-                AdminWebsocket::connect(format!("localhost:{port}"), origin.clone()).await?,
-                None,
-                None,
-            ));
-        }
-        clients
-    };
-    for mut client in admin_clients {
-        call_inner(&mut client.0, call.clone()).await?;
-    }
+    let mut client = AdminWebsocket::connect(format!("localhost:{port}"), origin.clone()).await?;
+    call_inner(&mut client, call).await?;
     Ok(())
 }
 
@@ -409,7 +320,7 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
                     },
                 }])
                 .await?;
-            msg!("Added admin port {}", port);
+            crate::msg!("Added admin port {}", port);
         }
         AdminRequestCli::AddAppWs(args) => {
             let port = args.port.unwrap_or(0);
@@ -421,7 +332,7 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
                     args.installed_app_id,
                 )
                 .await?;
-            msg!("Added app port {}", port);
+            crate::msg!("Added app port {}", port);
         }
         AdminRequestCli::ListAppWs => {
             let interface_infos = client.list_app_interfaces().await?;
@@ -435,7 +346,7 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
             client
                 .uninstall_app(args.app_id.clone(), args.force)
                 .await?;
-            msg!("Uninstalled app: \"{}\"", args.app_id);
+            crate::msg!("Uninstalled app: \"{}\"", args.app_id);
         }
         AdminRequestCli::ListDnas => {
             let dnas: Vec<DnaHashB64> = client
@@ -469,11 +380,11 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
         }
         AdminRequestCli::EnableApp(args) => {
             client.enable_app(args.app_id.clone()).await?;
-            msg!("Enabled app: \"{}\"", args.app_id);
+            crate::msg!("Enabled app: \"{}\"", args.app_id);
         }
         AdminRequestCli::DisableApp(args) => {
             client.disable_app(args.app_id.clone()).await?;
-            msg!("Disabled app: \"{}\"", args.app_id);
+            crate::msg!("Disabled app: \"{}\"", args.app_id);
         }
         AdminRequestCli::DumpState(args) => {
             let state = client.dump_state(args.into()).await?;
@@ -515,7 +426,7 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
             client
                 .revoke_zome_call_capability(cell_id, action_hash)
                 .await?;
-            msg!(
+            crate::msg!(
                 "Revoked zome call capability for action hash: {}",
                 args.action_hash
             );
@@ -823,18 +734,28 @@ impl From<DumpState> for CellId {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ::fixt::prelude::*;
-    use holo_hash::fixt::AgentPubKeyFixturator;
+    use holo_hash::{AgentPubKey, DnaHash};
     use holochain_client::{SerializedBytes, Timestamp};
     use holochain_conductor_api::CellInfo;
     use holochain_types::app::{AppManifestV0Builder, AppRoleManifest, AppStatus};
-    use holochain_types::fixt::CellIdFixturator;
-    use holochain_types::prelude::{DnaModifiers, RoleName};
+    use holochain_types::prelude::{CellId, DnaModifiers, RoleName};
     use indexmap::IndexMap;
+
+    fn test_dna_hash(bytes: u8) -> DnaHash {
+        DnaHash::from_raw_36(vec![bytes; 36])
+    }
+
+    fn test_agent_key(bytes: u8) -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![bytes; 36])
+    }
+
+    fn test_cell_id(dna: u8, agent: u8) -> CellId {
+        CellId::new(test_dna_hash(dna), test_agent_key(agent))
+    }
 
     #[test]
     fn valid_cell_id_json_to_base64_json() {
-        let cell_id = fixt!(CellId);
+        let cell_id = test_cell_id(0, 1);
         let cell_id_json = serde_json::to_value(&cell_id).unwrap();
         let cell_id_base64_json = cell_id_json_to_base64_json(cell_id_json).unwrap();
         let cell_id_struct: CellIdJson = serde_json::from_value(cell_id_base64_json).unwrap();
@@ -857,7 +778,7 @@ mod tests {
     #[test]
     fn app_info_to_json() {
         let cell_info = CellInfo::new_provisioned(
-            fixt!(CellId),
+            test_cell_id(2, 3),
             DnaModifiers {
                 network_seed: "sample-seed".to_string(),
                 properties: SerializedBytes::default(),
@@ -879,7 +800,7 @@ mod tests {
         let app_info = AppInfo {
             installed_app_id: "test-app".to_string(),
             status: AppStatus::Enabled,
-            agent_pub_key: fixt!(AgentPubKey),
+            agent_pub_key: test_agent_key(4),
             installed_at: Timestamp(42),
             manifest: sample_app_manifest,
             cell_info: cell_info_map,
@@ -908,7 +829,7 @@ mod tests {
 
     #[test]
     fn valid_cell_info_map_json() {
-        let cell_id_1 = fixt!(CellId);
+        let cell_id_1 = test_cell_id(5, 6);
         let cell_info = CellInfo::new_provisioned(
             cell_id_1.clone(),
             DnaModifiers {

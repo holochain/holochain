@@ -2785,6 +2785,7 @@ dependencies = [
  "anyhow",
  "clap",
  "holochain_cli_bundle",
+ "holochain_cli_client",
  "holochain_cli_sandbox",
  "holochain_trace",
  "lazy_static",
@@ -2814,7 +2815,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "holochain_cli_sandbox"
+name = "holochain_cli_client"
 version = "0.6.0"
 dependencies = [
  "ansi_term",
@@ -2822,11 +2823,32 @@ dependencies = [
  "chrono",
  "clap",
  "ed25519-dalek",
- "fixt",
- "futures",
  "hc_serde_json",
  "holo_hash",
- "holochain_chc",
+ "holochain",
+ "holochain_client",
+ "holochain_conductor_api",
+ "holochain_types",
+ "holochain_util",
+ "indexmap 2.11.1",
+ "kitsune2_api",
+ "kitsune2_core",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sodoken",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "holochain_cli_sandbox"
+version = "0.6.0"
+dependencies = [
+ "ansi_term",
+ "anyhow",
+ "clap",
+ "futures",
  "holochain_client",
  "holochain_conductor_api",
  "holochain_conductor_config",
@@ -2834,10 +2856,6 @@ dependencies = [
  "holochain_types",
  "holochain_util",
  "holochain_websocket",
- "indexmap 2.11.1",
- "kitsune2_api",
- "kitsune2_core",
- "kitsune2_test_utils",
  "nix",
  "serde",
  "serde_json",

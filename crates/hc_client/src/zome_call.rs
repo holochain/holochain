@@ -71,8 +71,6 @@
 //! pipe the conductor passphrase. These flags aren't used together because the zome call commands
 //! do not need the conductor passphrase.
 
-use crate::cmds::Existing;
-use crate::ports::get_admin_ports;
 use anyhow::Context;
 use clap::Parser;
 use holochain_client::{
@@ -90,20 +88,18 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
+/// Connection settings for locating the conductor admin interface.
 #[derive(Debug, Parser)]
 pub struct ConnectArgs {
-    /// Ports to running conductor admin interfaces.
-    #[arg(short, long, conflicts_with_all = &["indices"], value_delimiter = ',')]
-    pub running: Option<u16>,
-
-    /// Select from existing conductor sandboxes specified in `$(pwd)/.hc` by index.
-    #[arg(short, long, conflicts_with_all = &["running"])]
-    pub index: Option<u32>,
+    /// Port for a running conductor admin interface.
+    #[arg(short, long)]
+    pub port: u16,
 }
 
 /// Create authentication credentials for making zome calls and deploy them to Holochain.
 #[derive(Debug, Parser)]
 pub struct ZomeCallAuth {
+    /// Connection options for selecting a target conductor.
     #[command(flatten)]
     pub connect_args: ConnectArgs,
 
@@ -120,6 +116,7 @@ pub struct ZomeCallAuth {
 /// Make a zome call to an app on a running conductor.
 #[derive(Debug, Parser)]
 pub struct ZomeCall {
+    /// Connection options for selecting a target conductor.
     #[command(flatten)]
     pub connect_args: ConnectArgs,
 
@@ -145,11 +142,9 @@ pub struct ZomeCall {
     pub payload: String,
 }
 
-pub async fn zome_call_auth(
-    zome_call_auth: ZomeCallAuth,
-    admin_port: Option<u16>,
-) -> anyhow::Result<()> {
-    let admin_port = admin_port_from_connect_args(zome_call_auth.connect_args, admin_port).await?;
+/// Grant signing credentials for the supplied app using the admin API.
+pub async fn zome_call_auth(zome_call_auth: ZomeCallAuth) -> anyhow::Result<()> {
+    let admin_port = zome_call_auth.connect_args.port;
 
     let admin_client = AdminWebsocket::connect(format!("localhost:{admin_port}"), None).await?;
     let app_client = get_app_client(&admin_client, zome_call_auth.app_id.clone(), None).await?;
@@ -173,7 +168,7 @@ pub async fn zome_call_auth(
 
     holochain_util::pw::pw_set_piped(zome_call_auth.piped);
     if !zome_call_auth.piped {
-        msg!("Enter new passphrase to authorize zome calls: ");
+        crate::msg!("Enter new passphrase to authorize zome calls: ");
     }
     let passphrase = holochain_util::pw::pw_get().context("Failed to get passphrase")?;
 
@@ -195,14 +190,15 @@ pub async fn zome_call_auth(
                 ),
             })
             .await?;
-        msg!("Authorized zome calls for cell: {:?}", cell_id);
+        crate::msg!("Authorized zome calls for cell: {:?}", cell_id);
     }
 
     Ok(())
 }
 
-pub async fn zome_call(zome_call: ZomeCall, admin_port: Option<u16>) -> anyhow::Result<()> {
-    let admin_port = admin_port_from_connect_args(zome_call.connect_args, admin_port).await?;
+/// Call a zome function on a running conductor.
+pub async fn zome_call(zome_call: ZomeCall) -> anyhow::Result<()> {
+    let admin_port = zome_call.connect_args.port;
 
     let admin_client = AdminWebsocket::connect(format!("localhost:{admin_port}"), None).await?;
 
@@ -238,7 +234,7 @@ pub async fn zome_call(zome_call: ZomeCall, admin_port: Option<u16>) -> anyhow::
 
     holochain_util::pw::pw_set_piped(zome_call.piped);
     if !zome_call.piped {
-        msg!("Enter passphrase to authorize zome calls: ");
+        crate::msg!("Enter passphrase to authorize zome calls: ");
     }
     let passphrase = holochain_util::pw::pw_get().context("Failed to get passphrase")?;
 
@@ -308,43 +304,6 @@ async fn generate_signing_credentials(
     .await??;
 
     Ok((auth, ed25519_dalek::SigningKey::from_bytes(&hash)))
-}
-
-async fn admin_port_from_connect_args(
-    connect_args: ConnectArgs,
-    admin_port: Option<u16>,
-) -> anyhow::Result<u16> {
-    // Use overridden admin port if provided, otherwise if the running argument was provided, use
-    // that, otherwise load the existing paths from the .hc file, filter by index and get the
-    // admin ports. If nothing is configured, load the `.hc` file from the current directory.
-    if let Some(admin_port) = admin_port {
-        Ok(admin_port)
-    } else if let Some(admin_port) = connect_args.running {
-        Ok(admin_port)
-    } else if let Some(index) = connect_args.index {
-        let paths = Existing {
-            all: false,
-            indices: vec![index as usize],
-        }
-        .load(std::env::current_dir()?)?;
-
-        if let Some(admin_port) = get_admin_ports(paths).await?.first() {
-            Ok(*admin_port)
-        } else {
-            anyhow::bail!("No admin port found")
-        }
-    } else {
-        let paths = Existing {
-            all: true,
-            indices: Vec::with_capacity(0),
-        }
-        .load(std::env::current_dir()?)?;
-        if let Some(admin_port) = get_admin_ports(paths).await?.first() {
-            Ok(*admin_port)
-        } else {
-            anyhow::bail!("No admin port found")
-        }
-    }
 }
 
 async fn get_app_client(
