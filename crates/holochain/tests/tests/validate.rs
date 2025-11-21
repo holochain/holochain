@@ -259,3 +259,95 @@ async fn call_validate_with_invalid_parameters_across_cells() {
         .to_string()
         .contains("The callback has invalid parameters: wrong msgpack marker FixMap(1)"));
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn update_an_update_returns_both_updates() {
+    let config = SweetConductorConfig::standard();
+    let mut conductor = SweetConductor::from_config(config).await;
+    let agent = SweetAgents::one(conductor.keystore()).await;
+    
+    #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+    struct TestEntry {
+        value: String,
+    }
+    
+    let entry_def = EntryDef::default_from_id("test_entry");
+    let zome = SweetInlineZomes::new(vec![entry_def], 0)
+        .function("create_and_update_twice", |api, _: ()| {
+            // Create an entry
+            let entry = TestEntry {
+                value: "original".to_string(),
+            };
+            let create_hash = api.create(CreateInput::new(
+                InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
+                EntryVisibility::Public,
+                Entry::app(entry.try_into().unwrap()).unwrap(),
+                ChainTopOrdering::default(),
+            ))?;
+            
+            // Update it once
+            let entry_v2 = TestEntry {
+                value: "updated_once".to_string(),
+            };
+            let update_hash = api.update(UpdateInput::new(
+                create_hash.clone(),
+                Entry::app(entry_v2.try_into().unwrap()).unwrap(),
+                ChainTopOrdering::default(),
+            ))?;
+            
+            // Update the update
+            let entry_v3 = TestEntry {
+                value: "updated_twice".to_string(),
+            };
+            let _update_update_hash = api.update(UpdateInput::new(
+                update_hash,
+                Entry::app(entry_v3.try_into().unwrap()).unwrap(),
+                ChainTopOrdering::default(),
+            ))?;
+            
+            Ok(create_hash)
+        })
+        .function("get_details", |api, hash: ActionHash| {
+            let details = api.get_details(vec![GetInput::new(
+                hash.into(),
+                GetOptions::local(),
+            )])?;
+            Ok(details)
+        });
+    
+    let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zome).await;
+    let app = conductor
+        .setup_app_for_agent("app", agent, &[dna])
+        .await
+        .unwrap();
+    let (cell,) = app.into_tuple();
+    let zome = cell.zome(SweetInlineZomes::COORDINATOR);
+    
+    // Call the function that creates and updates twice
+    let create_hash: ActionHash = conductor
+        .call(&zome, "create_and_update_twice", ())
+        .await;
+    
+    // Get details of the original create action
+    let details: Vec<Option<Details>> = conductor
+        .call(&zome, "get_details", create_hash)
+        .await;
+    
+    // Verify we get details
+    assert_eq!(details.len(), 1);
+    let details = details[0].as_ref().expect("Expected details to be present");
+    
+    // Extract updates from the RecordDetails
+    let record_details = match details {
+        Details::Record(record_details) => record_details,
+        _ => panic!("Expected RecordDetails"),
+    };
+    
+    // Assert that we have two updates
+    assert_eq!(
+        record_details.updates.len(),
+        2,
+        "Expected two updates (one direct update and one update of the update), but got {}",
+        record_details.updates.len()
+    );
+}
