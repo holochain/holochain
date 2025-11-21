@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- *BREAKING CHANGE* Unrecognized fields in app and webapp manifests are now rejected. This helps prevent typos and stray
+  fields that have been left behind after manifest schema changes. #5467
 - Refactor: Use production transport for all tests instead of in-memory implementations. \#5442
 
 ## 0.6.0
