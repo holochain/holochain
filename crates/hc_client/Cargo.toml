@@ -44,8 +44,10 @@ sodoken = "0.1.0"
 tokio = { version = "1.36.0", features = ["full"] }
 indexmap = "2.0"
 
+holochain = { version = "^0.6.0", path = "../holochain", default-features = false, optional = true }
+
 [dev-dependencies]
-holochain = { version = "^0.6.0-rc.1", path = "../holochain", default-features = false, features = [
+holochain = { version = "^0.6.0", path = "../holochain", default-features = false, features = [
   "sweettest",
   "datachannel-vendored",
 ] }
@@ -56,8 +58,8 @@ tempfile = "3.0"
 [features]
 default = ["wasmer_sys"]
 
-wasmer_sys = ["holochain_client/wasmer_sys", "holochain/wasmer_sys"]
-wasmer_wamr = ["holochain_client/wasmer_wamr", "holochain/wasmer_wamr"]
+wasmer_sys = ["holochain_client/wasmer_sys", "holochain?/wasmer_sys"]
+wasmer_wamr = ["holochain_client/wasmer_wamr", "holochain?/wasmer_wamr"]
 
 [lints]
 workspace = true
