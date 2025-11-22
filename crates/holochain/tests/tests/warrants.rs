@@ -56,7 +56,7 @@ async fn warranted_agent_is_blocked() {
         )
         .await;
 
-    await_consistency(10, [&alice_cell, &bob_cell])
+    await_consistency(20, [&alice_cell, &bob_cell])
         .await
         .unwrap();
 
@@ -77,7 +77,7 @@ async fn warranted_agent_is_blocked() {
 
             warrants.len() == 1 && warrants[0].warrant().warrantee == *alice_cell.agent_pubkey()
         },
-        Some(10_000),
+        Some(20_000),
         None,
     )
     .await

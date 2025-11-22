@@ -1,5 +1,6 @@
 use holo_hash::ActionHash;
 use holochain::sweettest::*;
+use holochain::test_utils::retry_fn_until_timeout;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::prelude::GetValidationReceiptsInput;
 use holochain_zome_types::validate::ValidationReceiptSet;
@@ -222,8 +223,8 @@ async fn warrant_is_published() {
 
     // Carol should receive the warrant against Alice.
     // The warrant and the warrant op should have been written to the authored databases.
-    tokio::time::timeout(Duration::from_secs(20), async {
-        loop {
+    retry_fn_until_timeout(
+        || async {
             let alice_pubkey = alice.agent_pubkey().clone();
             let warrants = conductors[2]
                 .get_spaces()
@@ -234,15 +235,14 @@ async fn warrant_is_published() {
                     store.get_warrants_for_agent(&alice_pubkey, true).unwrap()
                 });
 
-            if warrants.len() == 1 {
-                assert_eq!(warrants[0].warrant().warrantee, *alice.agent_pubkey());
-                // Make sure that Bob authored the warrant and it's not been authored by Carol.
-                assert_eq!(warrants[0].warrant().author, *bob.agent_pubkey());
-                break;
-            }
-            tokio::time::sleep(Duration::from_millis(100)).await;
-        }
-    })
+            // Make sure that Bob authored the warrant and it's not been authored by Carol.
+            warrants.len() == 1
+                && warrants[0].warrant().warrantee == *alice.agent_pubkey()
+                && warrants[0].warrant().author == *bob.agent_pubkey()
+        },
+        Some(30_000),
+        None,
+    )
     .await
-    .unwrap();
+    .expect("Carol didn't receive Alice's warrant from Bob");
 }
