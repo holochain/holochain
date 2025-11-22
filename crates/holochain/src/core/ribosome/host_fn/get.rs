@@ -87,13 +87,16 @@ pub mod slow_tests {
     async fn get_action_entry_local_only() {
         holochain_trace::test_run();
         // agents should not pass around data
-        let config = SweetConductorConfig::rendezvous(false).tune_network_config(|nc| {
+        let config = SweetConductorConfig::standard().tune_network_config(|nc| {
             nc.disable_publish = true;
             nc.disable_gossip = true;
         });
-        let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
+        let mut conductors = SweetConductorBatch::from_config(2, config).await;
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
-        let apps = conductors.setup_app("test", &[dna_file]).await.unwrap();
+        let apps = conductors
+            .setup_app("test", std::slice::from_ref(&dna_file))
+            .await
+            .unwrap();
 
         // alice creates an entry
         let zome_alice = apps[0].cells()[0].zome(TestWasm::Create.coordinator_zome_name());
@@ -104,6 +107,11 @@ pub mod slow_tests {
             .await;
         // alice can get the record
         assert!(local_record_by_action_hash.is_some());
+
+        // alice becomes authority for the record
+        conductors[0]
+            .declare_full_storage_arcs(dna_file.dna_hash())
+            .await;
 
         // now make both agents aware of each other
         conductors.exchange_peer_info().await;
@@ -117,7 +125,6 @@ pub mod slow_tests {
         assert!(local_record_by_action_hash.is_none());
 
         // bob gets record by entry hash from local databases
-        let zome_bob = apps[1].cells()[0].zome(TestWasm::Create.coordinator_zome_name());
         let local_record_by_entry_hash: Option<Record> =
             conductors[1].call(&zome_bob, "get_entry", ()).await;
         // record should be none
