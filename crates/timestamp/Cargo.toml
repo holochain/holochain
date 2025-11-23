@@ -1,6 +1,6 @@
 [package]
 name = "holochain_timestamp"
-version = "0.6.0-rc.0"
+version = "0.6.0"
 description = "Microsecond-precision timestamp datatype for Holochain"
 license = "Apache-2.0"
 repository = "https://github.com/holochain/holochain"

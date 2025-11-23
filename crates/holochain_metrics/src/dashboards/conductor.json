@@ -2,54 +2,28 @@
   {
     "apiVersion": "influxdata.com/v2alpha1",
     "kind": "Dashboard",
-    "metadata": {
-      "name": "ecstatic-benz-6ba001"
-    },
+    "metadata": { "name": "upbeat-goodall-cd5001" },
     "spec": {
       "charts": [
         {
-          "axes": [
-            {
-              "name": "x"
-            },
-            {
-              "label": "seconds",
-              "name": "y"
-            }
-          ],
+          "axes": [{ "name": "x" }, { "label": "seconds", "name": "y" }],
           "binSize": 10,
           "colors": [
-            {
-              "hex": "#000000"
-            },
-            {
-              "hex": "#E69F00"
-            },
-            {
-              "hex": "#56B4E9"
-            },
-            {
-              "hex": "#009E73"
-            },
-            {
-              "hex": "#F0E442"
-            },
-            {
-              "hex": "#0072B2"
-            },
-            {
-              "hex": "#D55E00"
-            },
-            {
-              "hex": "#CC79A7"
-            }
+            { "hex": "#000000" },
+            { "hex": "#E69F00" },
+            { "hex": "#56B4E9" },
+            { "hex": "#009E73" },
+            { "hex": "#F0E442" },
+            { "hex": "#0072B2" },
+            { "hex": "#D55E00" },
+            { "hex": "#CC79A7" }
           ],
           "height": 4,
           "kind": "Heatmap",
           "legendColorizeRows": true,
           "legendOpacity": 1,
           "legendOrientationThreshold": 100000000,
-          "name": "P2P Event duration",
+          "name": "P2P outgoing request duration",
           "queries": [
             {
               "query": "from(bucket: \"influxive\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"hc.holochain_p2p.request.duration.s\")"
@@ -61,41 +35,17 @@
           "yCol": "_value"
         },
         {
-          "axes": [
-            {
-              "name": "x"
-            },
-            {
-              "label": "seconds",
-              "name": "y"
-            }
-          ],
+          "axes": [{ "name": "x" }, { "label": "seconds", "name": "y" }],
           "binSize": 10,
           "colors": [
-            {
-              "hex": "#000000"
-            },
-            {
-              "hex": "#E69F00"
-            },
-            {
-              "hex": "#56B4E9"
-            },
-            {
-              "hex": "#009E73"
-            },
-            {
-              "hex": "#F0E442"
-            },
-            {
-              "hex": "#0072B2"
-            },
-            {
-              "hex": "#D55E00"
-            },
-            {
-              "hex": "#CC79A7"
-            }
+            { "hex": "#000000" },
+            { "hex": "#E69F00" },
+            { "hex": "#56B4E9" },
+            { "hex": "#009E73" },
+            { "hex": "#F0E442" },
+            { "hex": "#0072B2" },
+            { "hex": "#D55E00" },
+            { "hex": "#CC79A7" }
           ],
           "height": 4,
           "kind": "Heatmap",
@@ -115,41 +65,77 @@
           "yPos": 4
         },
         {
-          "axes": [
-            {
-              "name": "x"
-            },
-            {
-              "label": "seconds",
-              "name": "y"
-            }
-          ],
+          "axes": [{ "name": "x" }, { "label": "seconds", "name": "y" }],
           "binSize": 10,
           "colors": [
+            { "hex": "#000000" },
+            { "hex": "#E69F00" },
+            { "hex": "#56B4E9" },
+            { "hex": "#009E73" },
+            { "hex": "#F0E442" },
+            { "hex": "#0072B2" },
+            { "hex": "#D55E00" },
+            { "hex": "#CC79A7" }
+          ],
+          "height": 4,
+          "kind": "Heatmap",
+          "legendColorizeRows": true,
+          "legendOpacity": 1,
+          "legendOrientationThreshold": 100000000,
+          "name": "Sys validation workflow duration",
+          "queries": [
             {
-              "hex": "#000000"
-            },
-            {
-              "hex": "#E69F00"
-            },
-            {
-              "hex": "#56B4E9"
-            },
-            {
-              "hex": "#009E73"
-            },
-            {
-              "hex": "#F0E442"
-            },
-            {
-              "hex": "#0072B2"
-            },
-            {
-              "hex": "#D55E00"
-            },
-            {
-              "hex": "#CC79A7"
+              "query": "from(bucket: \"influxive\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"hc.conductor.workflow.duration.s\")\n  |> filter(fn: (r) => r[\"workflow\"] == \"sys_validation_consumer\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> yield(name: \"mean\")"
             }
+          ],
+          "staticLegend": {},
+          "width": 4,
+          "xCol": "_time",
+          "yCol": "_value",
+          "yPos": 8
+        },
+        {
+          "axes": [{ "name": "x" }, { "label": "seconds", "name": "y" }],
+          "binSize": 10,
+          "colors": [
+            { "hex": "#000000" },
+            { "hex": "#E69F00" },
+            { "hex": "#56B4E9" },
+            { "hex": "#009E73" },
+            { "hex": "#F0E442" },
+            { "hex": "#0072B2" },
+            { "hex": "#D55E00" },
+            { "hex": "#CC79A7" }
+          ],
+          "height": 4,
+          "kind": "Heatmap",
+          "legendColorizeRows": true,
+          "legendOpacity": 1,
+          "legendOrientationThreshold": 100000000,
+          "name": "P2P handle incoming request duration",
+          "queries": [
+            {
+              "query": "from(bucket: \"influxive\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"hc.holochain_p2p.handle_request.duration.s\")"
+            }
+          ],
+          "staticLegend": {},
+          "width": 4,
+          "xCol": "_time",
+          "xPos": 4,
+          "yCol": "_value"
+        },
+        {
+          "axes": [{ "name": "x" }, { "label": "seconds", "name": "y" }],
+          "binSize": 10,
+          "colors": [
+            { "hex": "#000000" },
+            { "hex": "#E69F00" },
+            { "hex": "#56B4E9" },
+            { "hex": "#009E73" },
+            { "hex": "#F0E442" },
+            { "hex": "#0072B2" },
+            { "hex": "#D55E00" },
+            { "hex": "#CC79A7" }
           ],
           "height": 4,
           "kind": "Heatmap",
@@ -166,99 +152,21 @@
           "width": 4,
           "xCol": "_time",
           "xPos": 4,
-          "yCol": "_value"
-        },
-        {
-          "axes": [
-            {
-              "name": "x"
-            },
-            {
-              "label": "seconds",
-              "name": "y"
-            }
-          ],
-          "binSize": 10,
-          "colors": [
-            {
-              "hex": "#000000"
-            },
-            {
-              "hex": "#E69F00"
-            },
-            {
-              "hex": "#56B4E9"
-            },
-            {
-              "hex": "#009E73"
-            },
-            {
-              "hex": "#F0E442"
-            },
-            {
-              "hex": "#0072B2"
-            },
-            {
-              "hex": "#D55E00"
-            },
-            {
-              "hex": "#CC79A7"
-            }
-          ],
-          "height": 4,
-          "kind": "Heatmap",
-          "legendColorizeRows": true,
-          "legendOpacity": 1,
-          "legendOrientationThreshold": 100000000,
-          "name": "Sys validation workflow duration",
-          "queries": [
-            {
-              "query": "from(bucket: \"influxive\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"hc.conductor.workflow.duration.s\")\n  |> filter(fn: (r) => r[\"workflow\"] == \"sys_validation_consumer\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> yield(name: \"mean\")"
-            }
-          ],
-          "staticLegend": {},
-          "width": 4,
-          "xCol": "_time",
-          "xPos": 4,
           "yCol": "_value",
           "yPos": 4
         },
         {
-          "axes": [
-            {
-              "name": "x"
-            },
-            {
-              "label": "seconds",
-              "name": "y"
-            }
-          ],
+          "axes": [{ "name": "x" }, { "label": "seconds", "name": "y" }],
           "binSize": 10,
           "colors": [
-            {
-              "hex": "#000000"
-            },
-            {
-              "hex": "#E69F00"
-            },
-            {
-              "hex": "#56B4E9"
-            },
-            {
-              "hex": "#009E73"
-            },
-            {
-              "hex": "#F0E442"
-            },
-            {
-              "hex": "#0072B2"
-            },
-            {
-              "hex": "#D55E00"
-            },
-            {
-              "hex": "#CC79A7"
-            }
+            { "hex": "#000000" },
+            { "hex": "#E69F00" },
+            { "hex": "#56B4E9" },
+            { "hex": "#009E73" },
+            { "hex": "#F0E442" },
+            { "hex": "#0072B2" },
+            { "hex": "#D55E00" },
+            { "hex": "#CC79A7" }
           ],
           "height": 4,
           "kind": "Heatmap",
@@ -278,41 +186,17 @@
           "yCol": "_value"
         },
         {
-          "axes": [
-            {
-              "name": "x"
-            },
-            {
-              "label": "seconds",
-              "name": "y"
-            }
-          ],
+          "axes": [{ "name": "x" }, { "label": "seconds", "name": "y" }],
           "binSize": 10,
           "colors": [
-            {
-              "hex": "#000000"
-            },
-            {
-              "hex": "#E69F00"
-            },
-            {
-              "hex": "#56B4E9"
-            },
-            {
-              "hex": "#009E73"
-            },
-            {
-              "hex": "#F0E442"
-            },
-            {
-              "hex": "#0072B2"
-            },
-            {
-              "hex": "#D55E00"
-            },
-            {
-              "hex": "#CC79A7"
-            }
+            { "hex": "#000000" },
+            { "hex": "#E69F00" },
+            { "hex": "#56B4E9" },
+            { "hex": "#009E73" },
+            { "hex": "#F0E442" },
+            { "hex": "#0072B2" },
+            { "hex": "#D55E00" },
+            { "hex": "#CC79A7" }
           ],
           "height": 4,
           "kind": "Heatmap",
