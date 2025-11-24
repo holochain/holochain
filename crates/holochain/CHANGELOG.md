@@ -8,13 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 
 - Remove the unused generic type parameter `A` from `Record`, which was always `SignedActionHashed`. #5483
-- *BREAKING CHANGE* Unrecognized fields in app and webapp manifests are now rejected. This helps prevent typos and stray
-  fields that have been left behind after manifest schema changes. #5467
+
+## 0.7.0-dev.0
+
+- *BREAKING CHANGE* Unrecognized fields in app and webapp manifests are now rejected. This helps prevent typos and stray fields that have been left behind after manifest schema changes. \#5467
 - Refactor: Use production transport for all tests instead of in-memory implementations. \#5442
 
 ## 0.6.0
 
-- **BREAKING CHANGE** Remove the `hc sandbox call` functionality from the sandbox, and move it to a new `hc client call` CLI. #5461
+- **BREAKING CHANGE** Remove the `hc sandbox call` functionality from the sandbox, and move it to a new `hc client call` CLI. \#5461
 - Add metrics to record incoming notify requests [\#5451](https://github.com/holochain/holochain/pull/5451)
 
 ## 0.6.0-rc.2

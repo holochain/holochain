@@ -13,5 +13,5 @@ publish = false
 
 # reminder - do not use workspace deps
 [dependencies]
-fixt = { path = "..", version = "^0.6.0"}
+fixt = { path = "..", version = "^0.7.0-dev.0"}
 paste = "1.0.12"
