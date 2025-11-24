@@ -2915,14 +2915,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "holochain_mock_hdi"
-version = "0.0.1"
-dependencies = [
- "hdi",
- "mockall",
-]
-
-[[package]]
 name = "holochain_nonce"
 version = "0.7.0-dev.0"
 dependencies = [

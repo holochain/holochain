@@ -14,8 +14,7 @@ crate-type = ["cdylib", "rlib"]
 serde = "1.0"
 holochain_serialized_bytes = "0.0.56"
 hdi = { path = "../../../../hdi" }
-holochain_mock_hdi = { path = "../../../../mock_hdi", optional = true }
 
 [features]
 default = []
-mock = ["holochain_mock_hdi"]
+mock = []

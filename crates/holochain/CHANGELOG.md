@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Removed unused `holochain_mock_hdi` crate that was never completed.
 - Removed unused `hc_demo_cli` crate.
 - Remove the unused generic type parameter `A` from `Record`, which was always `SignedActionHashed`. #5483
 
