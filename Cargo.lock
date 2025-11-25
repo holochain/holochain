@@ -3167,8 +3167,10 @@ dependencies = [
 name = "holochain_orm"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "num_cpus",
  "sea-orm",
+ "sodoken",
  "tempfile",
  "tokio",
 ]

@@ -14,7 +14,7 @@ async fn test_create_database() {
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let db_id = TestDbId("test_database".to_string());
     
-    let result = setup_holochain_orm(&tmp_dir, db_id.clone()).await;
+    let result = setup_holochain_orm(&tmp_dir, db_id.clone(), None).await;
     
     assert!(result.is_ok(), "Failed to create database connection: {:?}", result.err());
     
@@ -33,8 +33,8 @@ async fn test_multiple_databases_same_directory() {
     let db_id_1 = TestDbId("database_one".to_string());
     let db_id_2 = TestDbId("database_two".to_string());
     
-    let result_1 = setup_holochain_orm(&tmp_dir, db_id_1.clone()).await;
-    let result_2 = setup_holochain_orm(&tmp_dir, db_id_2.clone()).await;
+    let result_1 = setup_holochain_orm(&tmp_dir, db_id_1.clone(), None).await;
+    let result_2 = setup_holochain_orm(&tmp_dir, db_id_2.clone(), None).await;
     
     assert!(result_1.is_ok());
     assert!(result_2.is_ok());
@@ -51,7 +51,7 @@ async fn test_error_on_non_directory_path() {
     std::fs::write(&file_path, b"test").unwrap();
     
     let db_id = TestDbId("test_database".to_string());
-    let result = setup_holochain_orm(file_path, db_id).await;
+    let result = setup_holochain_orm(file_path, db_id, None).await;
     
     assert!(result.is_err(), "Expected error for non-directory path");
     if let Err(err) = result {

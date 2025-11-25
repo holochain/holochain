@@ -3,7 +3,10 @@
 //! This crate does not implement an ORM itself but provides what Holochain needs to use SeaORM.
 
 use std::path::Path;
-use sea_orm::{ConnectOptions, Database, DatabaseConnection, DbErr, RuntimeErr};
+use sea_orm::{ConnectOptions, Database, DatabaseConnection, DbErr, RuntimeErr, ConnectionTrait, Statement};
+
+mod key;
+pub use key::DbKey;
 
 pub trait DatabaseIdentifier {
     fn database_id(&self) -> &str;
@@ -22,6 +25,7 @@ pub struct HolochainDbConn<I: DatabaseIdentifier> {
 pub async fn setup_holochain_orm<I: DatabaseIdentifier>(
     path: impl AsRef<Path>,
     database_id: I,
+    key: Option<DbKey>,
 ) -> Result<HolochainDbConn<I>, DbErr> {
     let path = path.as_ref();
     if !path.is_dir() {
@@ -32,7 +36,7 @@ pub async fn setup_holochain_orm<I: DatabaseIdentifier>(
     
     let db_file = path.join(database_id.database_id());
     let connection_string = format!("sqlite://{}?mode=rwc", db_file.display());
-    let conn = connect_database(&connection_string).await?;
+    let conn = connect_database(&connection_string, key).await?;
     Ok(HolochainDbConn {
         conn,
         identifier: database_id,
@@ -44,7 +48,7 @@ pub async fn test_setup_holochain_orm<I: DatabaseIdentifier>(
     database_id: I,
 ) -> Result<HolochainDbConn<I>, DbErr> {
     let connection_string = "sqlite::memory:".to_string();
-    let conn = connect_database(&connection_string).await?;
+    let conn = connect_database(&connection_string, None).await?;
     Ok(HolochainDbConn {
         conn,
         identifier: database_id,
@@ -52,7 +56,10 @@ pub async fn test_setup_holochain_orm<I: DatabaseIdentifier>(
 }
 
 /// Connect to a SQLite database using the provided connection string.
-async fn connect_database(connection_string: &str) -> Result<DatabaseConnection, DbErr> {
+async fn connect_database(
+    connection_string: &str,
+    key: Option<DbKey>,
+) -> Result<DatabaseConnection, DbErr> {
     let mut opt = ConnectOptions::new(connection_string);
 
     // Configure connection pool:
@@ -64,6 +71,29 @@ async fn connect_database(connection_string: &str) -> Result<DatabaseConnection,
         .min_connections(0)
         .idle_timeout(std::time::Duration::from_secs(30))
         .connect_timeout(std::time::Duration::from_secs(30));
+    
+    // Apply SQLCipher encryption if key is provided
+    if let Some(key) = key {
+        let pragma_string = std::sync::Arc::new(key.pragma_string());
+        // Execute PRAGMA statements after connection
+        opt.after_connect(move |conn| {
+            let pragma_string = pragma_string.clone();
+            Box::pin(async move {
+                // Execute each PRAGMA line separately
+                for line in pragma_string.lines() {
+                    let line = line.trim();
+                    if !line.is_empty() {
+                        let stmt = Statement::from_string(
+                            sea_orm::DatabaseBackend::Sqlite,
+                            line.to_string(),
+                        );
+                        conn.execute_raw(stmt).await?;
+                    }
+                }
+                Ok(())
+            })
+        });
+    }
     
     Database::connect(opt).await
 }
