@@ -9,6 +9,9 @@ num_cpus = "1.13.0"
 base64 = "0.22"
 sodoken = "0.1.0"
 tokio = { version = "1.27", features = ["full"] }
+libsqlite3-sys = { version = "*", features = [
+    "bundled-sqlcipher-vendored-openssl"
+] }
 
 [dev-dependencies]
 tempfile = "3.3"
