@@ -1,6 +1,7 @@
 use holochain_orm::{setup_holochain_orm, DatabaseIdentifier};
 use std::sync::{Arc, Mutex};
 use holochain_orm::DbKey;
+use sea_orm::{ConnectionTrait, Statement};
 
 #[derive(Debug, Clone)]
 struct TestDbId(String);
@@ -108,9 +109,17 @@ async fn test_encrypted_database_wrong_key_fails() {
     
     let result = setup_holochain_orm(&tmp_dir, db_id.clone(), Some(db_key1)).await;
     assert!(result.is_ok(), "Failed to create encrypted database");
-    drop(result.unwrap());
+    let db_conn1 = result.unwrap();
     
-    // Try to open with different key - this should fail when attempting to use the database
+    // Create a table to ensure the database is properly encrypted
+    let create_table_stmt = Statement::from_string(
+        sea_orm::DatabaseBackend::Sqlite,
+        "CREATE TABLE test_table (id INTEGER PRIMARY KEY, value TEXT);".to_string(),
+    );
+    db_conn1.conn.execute_raw(create_table_stmt).await.expect("Failed to create table");
+    drop(db_conn1);
+    
+    // Try to open with different key
     let passphrase2 = Arc::new(Mutex::new(sodoken::LockedArray::from(
         b"wrong_passphrase".to_vec(),
     )));
@@ -118,9 +127,25 @@ async fn test_encrypted_database_wrong_key_fails() {
         .await
         .expect("Failed to generate second database key");
     
-    let result = setup_holochain_orm(&tmp_dir, db_id.clone(), Some(db_key2)).await;
-    // Note: Connection may succeed but queries will fail with wrong key
-    // For now, we just verify we can attempt to open it
-    // A real test would try to execute a query and verify it fails
-    assert!(result.is_ok(), "Connection should open even with wrong key (will fail on queries)");
+    let result2 = setup_holochain_orm(&tmp_dir, db_id.clone(), Some(db_key2)).await;
+    assert!(result2.is_ok(), "Connection opens even with wrong key");
+    
+    let db_conn2 = result2.unwrap();
+    // Try to query the table - this should fail because the key is wrong
+    let query_stmt = Statement::from_string(
+        sea_orm::DatabaseBackend::Sqlite,
+        "SELECT * FROM test_table;".to_string(),
+    );
+    let query_result = db_conn2.conn.query_all_raw(query_stmt).await;
+    
+    // Verify that the query fails with the wrong encryption key
+    assert!(query_result.is_err(), "Query should fail with wrong encryption key");
+    let err = query_result.unwrap_err();
+    let err_msg = err.to_string();
+    // SQLCipher returns "file is not a database" when the wrong key is used
+    assert!(
+        err_msg.contains("not a database") || err_msg.contains("encrypted") || err_msg.contains("cipher"),
+        "Expected encryption-related error, got: {}",
+        err_msg
+    );
 }
