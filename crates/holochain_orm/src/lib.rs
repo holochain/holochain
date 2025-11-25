@@ -55,13 +55,24 @@ async fn connect_database(connection_string: &str) -> Result<DatabaseConnection,
     let mut opt = ConnectOptions::new(connection_string);
 
     // Configure connection pool similar to holochain_sqlite:
-    // - Max connections: num_read_threads * 2 + 1 (simplified to a reasonable default)
-    // - Min idle: 0 (close idle connections)
-    // - Idle timeout: 30 seconds
-    opt.max_connections(20)
+    // We want:
+    // - num_read_threads connections for standard read limit
+    // - num_read_threads for use in long running read transactions
+    // - 1 connection for writing
+    let max_cons = num_read_threads() * 2 + 1;
+    
+    opt.max_connections(max_cons as u32)
         .min_connections(0)
         .idle_timeout(std::time::Duration::from_secs(30))
         .connect_timeout(std::time::Duration::from_secs(30));
     
     Database::connect(opt).await
+}
+
+/// Calculate the number of read threads based on CPU count.
+/// Returns at least 4, or half the number of CPUs.
+fn num_read_threads() -> usize {
+    let num_cpus = num_cpus::get();
+    let num_threads = num_cpus.checked_div(2).unwrap_or(0);
+    std::cmp::max(num_threads, 4)
 }
