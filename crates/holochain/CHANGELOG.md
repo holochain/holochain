@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Removed unused `hc_demo_cli` crate.
 - Remove the unused generic type parameter `A` from `Record`, which was always `SignedActionHashed`. #5483
 
 ## 0.7.0-dev.0

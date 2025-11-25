@@ -866,17 +866,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "codespan-reporting"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af491d569909a7e4dee0ad7db7f5341fef5c614d5b8ec8cf765732aba3cff681"
-dependencies = [
- "serde",
- "termcolor",
- "unicode-width 0.2.0",
-]
-
-[[package]]
 name = "colorchoice"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1372,68 +1361,6 @@ version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f46882e17999c6cc590af592290432be3bce0428cb0d5f8b6715e4dc7b383eb3"
 dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.110",
-]
-
-[[package]]
-name = "cxx"
-version = "1.0.188"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47ac4eaf7ebe29e92f1b091ceefec7710a53a6f6154b2460afda626c113b65b9"
-dependencies = [
- "cc",
- "cxx-build",
- "cxxbridge-cmd",
- "cxxbridge-flags",
- "cxxbridge-macro",
- "foldhash 0.2.0",
- "link-cplusplus",
-]
-
-[[package]]
-name = "cxx-build"
-version = "1.0.188"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2abd4c3021eefbac5149f994c117b426852bca3a0aad227698527bca6d4ea657"
-dependencies = [
- "cc",
- "codespan-reporting",
- "indexmap 2.11.1",
- "proc-macro2",
- "quote",
- "scratch",
- "syn 2.0.110",
-]
-
-[[package]]
-name = "cxxbridge-cmd"
-version = "1.0.188"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f12fbc5888b2311f23e52a601e11ad7790d8f0dbb903ec26e2513bf5373ed70"
-dependencies = [
- "clap",
- "codespan-reporting",
- "indexmap 2.11.1",
- "proc-macro2",
- "quote",
- "syn 2.0.110",
-]
-
-[[package]]
-name = "cxxbridge-flags"
-version = "1.0.188"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83d3dd7870af06e283f3f8ce0418019c96171c9ce122cfb9c8879de3d84388fd"
-
-[[package]]
-name = "cxxbridge-macro"
-version = "1.0.188"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a26f0d82da663316786791c3d0e9f9edc7d1ee1f04bdad3d2643086a69d6256c"
-dependencies = [
- "indexmap 2.11.1",
  "proc-macro2",
  "quote",
  "syn 2.0.110",
@@ -2404,30 +2331,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7382cf6263419f2d8df38c55d7da83da5c18aef87fc7a7fc1fb1e344edfe14c1"
 dependencies = [
  "hashbrown 0.15.5",
-]
-
-[[package]]
-name = "hc_demo_cli"
-version = "0.6.0-dev.1"
-dependencies = [
- "cfg-if",
- "clap",
- "flate2",
- "hdi",
- "hdk",
- "holochain",
- "holochain_keystore",
- "holochain_serialized_bytes",
- "holochain_types",
- "rand 0.9.2",
- "rand-utf8",
- "rustls 0.23.35",
- "serde",
- "tempfile",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "wasm-opt",
 ]
 
 [[package]]
@@ -4393,15 +4296,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "840db8cf39d9ec4dd794376f38acc40d0fc65eec2a8f484f7fd375b84602becd"
 dependencies = [
  "zlib-rs",
-]
-
-[[package]]
-name = "link-cplusplus"
-version = "1.0.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f78c730aaa7d0b9336a299029ea49f9ee53b0ed06e9202e8cb7db9bae7b8c82"
-dependencies = [
- "cc",
 ]
 
 [[package]]
@@ -6689,12 +6583,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
-name = "scratch"
-version = "1.0.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d68f2ec51b097e4c1a75b681a8bec621909b5e91f15bb7b840c4f2f7b01148b2"
-
-[[package]]
 name = "sct"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7122,12 +7010,6 @@ checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 
 [[package]]
 name = "strum"
-version = "0.24.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "063e6045c0e62079840579a7e47a355ae92f60eb74daaf156fb1e84ba164e63f"
-
-[[package]]
-name = "strum"
 version = "0.26.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8fec0f0aef304996cf250b31b5a10dee7980c85da9d759361292b8bca5a18f06"
@@ -7140,19 +7022,6 @@ name = "strum"
 version = "0.27.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af23d6f6c1a224baef9d3f61e287d2761385a5b88fdab4eb4c6f11aeb54c4bcf"
-
-[[package]]
-name = "strum_macros"
-version = "0.24.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e385be0d24f186b4ce2f9982191e7101bb737312ad61c1f2f984f34bcf85d59"
-dependencies = [
- "heck 0.4.1",
- "proc-macro2",
- "quote",
- "rustversion",
- "syn 1.0.109",
-]
 
 [[package]]
 name = "strum_macros"
@@ -8378,46 +8247,6 @@ checksum = "e01164c9dda68301e34fdae536c23ed6fe90ce6d97213ccc171eebbd3d02d6b8"
 dependencies = [
  "leb128fmt",
  "wasmparser 0.241.2",
-]
-
-[[package]]
-name = "wasm-opt"
-version = "0.116.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2fd87a4c135535ffed86123b6fb0f0a5a0bc89e50416c942c5f0662c645f679c"
-dependencies = [
- "anyhow",
- "libc",
- "strum 0.24.1",
- "strum_macros 0.24.3",
- "tempfile",
- "thiserror 1.0.69",
- "wasm-opt-cxx-sys",
- "wasm-opt-sys",
-]
-
-[[package]]
-name = "wasm-opt-cxx-sys"
-version = "0.116.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c57b28207aa724318fcec6575fe74803c23f6f266fce10cbc9f3f116762f12e"
-dependencies = [
- "anyhow",
- "cxx",
- "cxx-build",
- "wasm-opt-sys",
-]
-
-[[package]]
-name = "wasm-opt-sys"
-version = "0.116.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a1cce564dc768dacbdb718fc29df2dba80bd21cb47d8f77ae7e3d95ceb98cbe"
-dependencies = [
- "anyhow",
- "cc",
- "cxx",
- "cxx-build",
 ]
 
 [[package]]
