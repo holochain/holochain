@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 sea-orm = { git = "https://github.com/ThetaSinner/sea-orm.git", rev = "c2439cef6a8c86e07d933b9e538a979bcf3ef7e6", features = ["sqlx-sqlite", "runtime-tokio-rustls", "macros"] }
+num_cpus = "1.13.0"
 
 [lints]
 workspace = true
