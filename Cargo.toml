@@ -38,7 +38,7 @@ members = [
   "crates/holochain_terminal",
 
   "crates/test_utils/wasm",
-  "crates/test_utils/wasm_common",
+  "crates/test_utils/wasm_common", "crates/holochain_orm",
 ]
 
 exclude = ["crates/release-automation"]
