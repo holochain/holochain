@@ -2,7 +2,7 @@
 //!
 //! This crate does not implement an ORM itself but provides what Holochain needs to use SeaORM.
 
-use std::path::PathBuf;
+use std::path::Path;
 use sea_orm::{ConnectOptions, Database, DatabaseConnection, DbErr, RuntimeErr};
 
 pub trait DatabaseIdentifier {
@@ -20,9 +20,10 @@ pub struct HolochainDbConn<I: DatabaseIdentifier> {
 /// # Errors
 /// Returns an error if `path` is not a directory.
 pub async fn setup_holochain_orm<I: DatabaseIdentifier>(
-    path: PathBuf,
+    path: impl AsRef<Path>,
     database_id: I,
 ) -> Result<HolochainDbConn<I>, DbErr> {
+    let path = path.as_ref();
     if !path.is_dir() {
         return Err(DbErr::Conn(RuntimeErr::Internal(
             format!("Path must be a directory: {}", path.display())
