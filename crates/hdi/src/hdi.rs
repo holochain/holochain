@@ -13,6 +13,7 @@ thread_local!(pub static HDI: RefCell<Rc<dyn HdiT>> = RefCell::new(Rc::new(ErrHd
 #[cfg(all(not(feature = "mock"), target_arch = "wasm32"))]
 thread_local!(pub static HDI: RefCell<Rc<dyn HdiT>> = RefCell::new(Rc::new(HostHdi)));
 
+/// Trait for functionality that must be provided for the HDI to function.
 pub trait HdiT: Send + Sync {
     // Ed25519
     fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool>;

@@ -17,4 +17,3 @@ hdi = { path = "../../../../hdi" }
 
 [features]
 default = []
-mock = []
