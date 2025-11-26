@@ -11,6 +11,11 @@ use sqlx::{
 mod key;
 pub use key::DbKey;
 
+/// Embedded migrations compiled into the binary.
+///
+/// This macro embeds all SQL files from the `migrations/` directory at compile time.
+static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
+
 /// SQLite synchronous level configuration.
 ///
 /// Corresponds to the `PRAGMA synchronous` pragma.
@@ -94,6 +99,9 @@ pub async fn setup_holochain_orm<I: DatabaseIdentifier>(
 
     let db_file = path.join(database_id.database_id());
     let pool = connect_database(&db_file, config).await?;
+
+    // Run migrations
+    MIGRATOR.run(&pool).await?;
 
     Ok(HolochainDbConn {
         pool,
