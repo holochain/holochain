@@ -36,7 +36,19 @@ pub async fn setup_holochain_orm<I: DatabaseIdentifier>(
     
     let db_file = path.join(database_id.database_id());
     let connection_string = format!("sqlite://{}?mode=rwc", db_file.display());
-    let conn = connect_database(&connection_string, key).await?;
+    let conn = connect_database(&connection_string, key.clone()).await?;
+    
+    // Enable WAL mode if not using encryption
+    // For encrypted databases, WAL mode causes issues with SQLCipher
+    if key.is_none() {
+        conn.execute_raw(
+            Statement::from_string(
+                sea_orm::DatabaseBackend::Sqlite,
+                "PRAGMA journal_mode = WAL;".to_string(),
+            )
+        ).await?;
+    }
+
     Ok(HolochainDbConn {
         conn,
         identifier: database_id,
