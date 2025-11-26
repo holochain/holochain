@@ -34,7 +34,7 @@
 //!
 //! Since hashes have to be exchanged over the network, their bytes are encoded
 //! before sending and decoded after reception, to avoid data corruption during
-//! transport. To convert the hashes from a byte format to a transferrable
+//! transport. To convert the hashes from a byte format to a transferable
 //! string, Holochain encodes them with the
 //! [Base64 scheme](https://developer.mozilla.org/en-US/docs/Glossary/Base64).
 //! Encoding the example public agent key in Base64 results in:
