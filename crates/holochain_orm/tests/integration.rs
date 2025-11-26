@@ -1,7 +1,7 @@
 use holochain_orm::{setup_holochain_orm, DatabaseIdentifier};
 use std::sync::{Arc, Mutex};
 use holochain_orm::DbKey;
-use sea_orm::{ConnectionTrait, Statement};
+use sqlx::Row;
 
 #[derive(Debug, Clone)]
 struct TestDbId(String);
@@ -87,22 +87,18 @@ async fn test_encrypted_database() {
     assert_eq!(db_conn.identifier.database_id(), "encrypted_test_database");
 
     // Create a table to test that encryption works
-    let create_table_stmt = Statement::from_string(
-        sea_orm::DatabaseBackend::Sqlite,
-        "CREATE TABLE test_table (id INTEGER PRIMARY KEY);".to_string(),
-    );
-    db_conn.conn.execute_raw(create_table_stmt).await.expect("Failed to create table in encrypted database");
+    sqlx::query("CREATE TABLE test_table (id INTEGER PRIMARY KEY);")
+        .execute(&db_conn.pool)
+        .await
+        .expect("Failed to create table in encrypted database");
 
     // Verify WAL mode is enabled
-    let journal_mode_stmt = Statement::from_string(
-        sea_orm::DatabaseBackend::Sqlite,
-        "PRAGMA journal_mode;".to_string(),
-    );
-    let journal_mode_result = db_conn.conn.query_one_raw(journal_mode_stmt).await.expect("Failed to query journal mode");
-    if let Some(row) = journal_mode_result {
-        let mode: String = row.try_get_by_index(0).expect("Failed to get journal mode value");
-        assert_eq!(mode.to_lowercase(), "wal", "Expected WAL mode to be enabled");
-    }
+    let row = sqlx::query("PRAGMA journal_mode;")
+        .fetch_one(&db_conn.pool)
+        .await
+        .expect("Failed to query journal mode");
+    let mode: String = row.get(0);
+    assert_eq!(mode.to_lowercase(), "wal", "Expected WAL mode to be enabled");
 
     // Verify the database file was created
     let db_file = tmp_dir.path().join("encrypted_test_database");
@@ -136,11 +132,10 @@ async fn test_encrypted_database_wrong_key_fails() {
     let db_conn1 = result.unwrap();
 
     // Create a table to ensure the database is properly encrypted
-    let create_table_stmt = Statement::from_string(
-        sea_orm::DatabaseBackend::Sqlite,
-        "CREATE TABLE test_table (id INTEGER PRIMARY KEY, value TEXT);".to_string(),
-    );
-    db_conn1.conn.execute_raw(create_table_stmt).await.expect("Failed to create table");
+    sqlx::query("CREATE TABLE test_table (id INTEGER PRIMARY KEY, value TEXT);")
+        .execute(&db_conn1.pool)
+        .await
+        .expect("Failed to create table");
     drop(db_conn1);
 
     // Try to open with different key
@@ -182,24 +177,18 @@ async fn test_pragma_configuration() {
     let db_conn = result.unwrap();
 
     // Verify synchronous level is set correctly
-    let sync_stmt = Statement::from_string(
-        sea_orm::DatabaseBackend::Sqlite,
-        "PRAGMA synchronous;".to_string(),
-    );
-    let sync_result = db_conn.conn.query_one_raw(sync_stmt).await.expect("Failed to query synchronous");
-    if let Some(row) = sync_result {
-        let sync_value: i32 = row.try_get_by_index(0).expect("Failed to get synchronous value");
-        assert_eq!(sync_value, 0, "Expected synchronous level to be 0 (Off)");
-    }
+    let row = sqlx::query("PRAGMA synchronous;")
+        .fetch_one(&db_conn.pool)
+        .await
+        .expect("Failed to query synchronous");
+    let sync_value: i32 = row.get(0);
+    assert_eq!(sync_value, 0, "Expected synchronous level to be 0 (Off)");
 
     // Verify trusted_schema is set to false
-    let trusted_stmt = Statement::from_string(
-        sea_orm::DatabaseBackend::Sqlite,
-        "PRAGMA trusted_schema;".to_string(),
-    );
-    let trusted_result = db_conn.conn.query_one_raw(trusted_stmt).await.expect("Failed to query trusted_schema");
-    if let Some(row) = trusted_result {
-        let trusted_value: i32 = row.try_get_by_index(0).expect("Failed to get trusted_schema value");
-        assert_eq!(trusted_value, 0, "Expected trusted_schema to be 0 (false)");
-    }
+    let row = sqlx::query("PRAGMA trusted_schema;")
+        .fetch_one(&db_conn.pool)
+        .await
+        .expect("Failed to query trusted_schema");
+    let trusted_value: i32 = row.get(0);
+    assert_eq!(trusted_value, 0, "Expected trusted_schema to be 0 (false)");
 }

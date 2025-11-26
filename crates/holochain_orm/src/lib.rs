@@ -1,11 +1,11 @@
 //! A wrapper around SeaORM, configured for use in Holochain.
 //!
-//! This crate does not implement an ORM itself but provides what Holochain needs to use SeaORM.
+//! This crate provides a configured SQLite connection pool for use in Holochain.
 
 use std::path::Path;
-use sea_orm::{
-    sqlx::sqlite::SqliteJournalMode, ConnectOptions, Database, DatabaseConnection, DbErr,
-    RuntimeErr,
+use sqlx::{
+    sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
+    Error as SqlxError, Pool, Sqlite,
 };
 
 mod key;
@@ -69,7 +69,7 @@ pub trait DatabaseIdentifier {
 }
 
 pub struct HolochainDbConn<I: DatabaseIdentifier> {
-    pub conn: DatabaseConnection,
+    pub pool: Pool<Sqlite>,
     pub identifier: I,
 }
 
@@ -84,20 +84,19 @@ pub async fn setup_holochain_orm<I: DatabaseIdentifier>(
     path: impl AsRef<Path>,
     database_id: I,
     config: HolochainOrmConfig,
-) -> Result<HolochainDbConn<I>, DbErr> {
+) -> Result<HolochainDbConn<I>, SqlxError> {
     let path = path.as_ref();
     if !path.is_dir() {
-        return Err(DbErr::Conn(RuntimeErr::Internal(
-            format!("Path must be a directory: {}", path.display())
-        )));
+        return Err(SqlxError::Configuration(
+            format!("Path must be a directory: {}", path.display()).into(),
+        ));
     }
 
     let db_file = path.join(database_id.database_id());
-    let connection_string = format!("sqlite://{}?mode=rwc", db_file.display());
-    let conn = connect_database(&connection_string, config).await?;
+    let pool = connect_database(&db_file, config).await?;
 
     Ok(HolochainDbConn {
-        conn,
+        pool,
         identifier: database_id,
     })
 }
@@ -105,51 +104,77 @@ pub async fn setup_holochain_orm<I: DatabaseIdentifier>(
 #[cfg(feature = "test-utils")]
 pub async fn test_setup_holochain_orm<I: DatabaseIdentifier>(
     database_id: I,
-) -> Result<HolochainDbConn<I>, DbErr> {
-    let connection_string = "sqlite::memory:".to_string();
-    let conn = connect_database(&connection_string, None).await?;
+) -> Result<HolochainDbConn<I>, SqlxError> {
+    let pool = connect_database_memory(HolochainOrmConfig::default()).await?;
     Ok(HolochainDbConn {
-        conn,
+        pool,
         identifier: database_id,
     })
 }
 
 /// Connect to a SQLite database using the provided connection string.
 async fn connect_database(
-    connection_string: &str,
+    db_path: &Path,
     config: HolochainOrmConfig,
-) -> Result<DatabaseConnection, DbErr> {
-    let mut opt = ConnectOptions::new(connection_string);
+) -> Result<Pool<Sqlite>, SqlxError> {
+    let mut opts = SqliteConnectOptions::new()
+        .filename(db_path)
+        .create_if_missing(true);
 
-    // Configure connection pool:
-    // SeaORM handles read/write connections internally, so we just need
-    // a reasonable pool size based on CPU count.
+    opts = configure_sqlite_options(opts, config)?;
+
+    create_pool(opts).await
+}
+
+/// Connect to an in-memory SQLite database for testing.
+#[cfg(feature = "test-utils")]
+async fn connect_database_memory(
+    config: HolochainOrmConfig,
+) -> Result<Pool<Sqlite>, SqlxError> {
+    let opts = SqliteConnectOptions::from_str(":memory:")?;
+    let opts = configure_sqlite_options(opts, config)?;
+
+    create_pool(opts).await
+}
+
+/// Configure SQLite-specific options including encryption and WAL mode.
+fn configure_sqlite_options(
+    mut opts: SqliteConnectOptions,
+    config: HolochainOrmConfig,
+) -> Result<SqliteConnectOptions, SqlxError> {
+    // Apply encryption pragmas if key is provided
+    if let Some(ref key) = config.key {
+        opts = key.apply_pragmas(opts);
+    }
+
+    // Always enable WAL mode for better concurrency
+    opts = opts.journal_mode(SqliteJournalMode::Wal);
+
+    // Set other pragmas
+    let sync_value = config.sync_level.as_pragma_value().to_string();
+    opts = opts
+        .pragma("trusted_schema", "false")
+        .pragma("synchronous", sync_value);
+
+    Ok(opts)
+}
+
+/// Create a connection pool with standard options.
+async fn create_pool(opts: SqliteConnectOptions) -> Result<Pool<Sqlite>, SqlxError> {
     let max_cons = num_read_threads();
-
-    opt.max_connections(max_cons as u32)
+    let pool = SqlitePoolOptions::new()
+        .max_connections(max_cons as u32)
         .min_connections(0)
         .idle_timeout(std::time::Duration::from_secs(30))
-        .connect_timeout(std::time::Duration::from_secs(30));
+        .acquire_timeout(std::time::Duration::from_secs(30))
+        .connect_with(opts)
+        .await?;
 
-    let sync_value = config.sync_level.as_pragma_value().to_string();
-
-    // Configure SQLite-specific options including encryption and WAL mode
-    opt.map_sqlx_sqlite_opts(move |mut opts| {
-        // Apply encryption pragmas if key is provided
-        if let Some(ref key) = config.key {
-            opts = key.apply_pragmas(opts);
-        }
-        // Always enable WAL mode for better concurrency and set other pragmas
-        opts.journal_mode(SqliteJournalMode::Wal)
-            .pragma("trusted_schema", "false")
-            .pragma("synchronous", sync_value.clone())
-    });
-
-    Database::connect(opt).await
+    Ok(pool)
 }
 
 /// Calculate the number of read threads based on CPU count.
-///
+/// 
 /// Returns at least 4, or the number of CPUs.
 fn num_read_threads() -> usize {
     let num_cpus = num_cpus::get();

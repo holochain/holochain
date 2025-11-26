@@ -1,5 +1,4 @@
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
-use sea_orm::sqlx;
 use std::io::Error;
 use std::sync::{Arc, Mutex};
 
