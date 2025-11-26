@@ -87,6 +87,8 @@ flowchart TB
 
 Assign people to be responsible for each stage in the release flow by replacing `@` with GitHub handles.
 
+Assign one person to be responsible for the process overall, by assigning them to the ticket.
+
 ### Stage 1
 
 Assigned to @
