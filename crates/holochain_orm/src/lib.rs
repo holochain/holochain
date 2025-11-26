@@ -5,7 +5,7 @@
 use std::path::Path;
 use sqlx::{
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
-    Error as SqlxError, Pool, Sqlite,
+    Pool, Sqlite,
 };
 
 mod key;
@@ -91,10 +91,10 @@ pub async fn setup_holochain_orm<I: DatabaseIdentifier>(
     path: impl AsRef<Path>,
     database_id: I,
     config: HolochainOrmConfig,
-) -> Result<HolochainDbConn<I>, SqlxError> {
+) -> sqlx::Result<HolochainDbConn<I>> {
     let path = path.as_ref();
     if !path.is_dir() {
-        return Err(SqlxError::Configuration(
+        return Err(sqlx::Error::Configuration(
             format!("Path must be a directory: {}", path.display()).into(),
         ));
     }
@@ -114,7 +114,7 @@ pub async fn setup_holochain_orm<I: DatabaseIdentifier>(
 #[cfg(feature = "test-utils")]
 pub async fn test_setup_holochain_orm<I: DatabaseIdentifier>(
     database_id: I,
-) -> Result<HolochainDbConn<I>, SqlxError> {
+) -> sqlx::Result<HolochainDbConn<I>> {
     let pool = connect_database_memory(HolochainOrmConfig::default()).await?;
     Ok(HolochainDbConn {
         pool,
@@ -126,7 +126,7 @@ pub async fn test_setup_holochain_orm<I: DatabaseIdentifier>(
 async fn connect_database(
     db_path: &Path,
     config: HolochainOrmConfig,
-) -> Result<Pool<Sqlite>, SqlxError> {
+) -> sqlx::Result<Pool<Sqlite>> {
     let mut opts = SqliteConnectOptions::new()
         .filename(db_path)
         .create_if_missing(true);
@@ -140,7 +140,7 @@ async fn connect_database(
 #[cfg(feature = "test-utils")]
 async fn connect_database_memory(
     config: HolochainOrmConfig,
-) -> Result<Pool<Sqlite>, SqlxError> {
+) -> sqlx::Result<Pool<Sqlite>> {
     let opts = SqliteConnectOptions::from_str(":memory:")?;
     let opts = configure_sqlite_options(opts, config)?;
 
@@ -151,7 +151,7 @@ async fn connect_database_memory(
 fn configure_sqlite_options(
     mut opts: SqliteConnectOptions,
     config: HolochainOrmConfig,
-) -> Result<SqliteConnectOptions, SqlxError> {
+) -> sqlx::Result<SqliteConnectOptions> {
     // Apply encryption pragmas if key is provided
     if let Some(ref key) = config.key {
         opts = key.apply_pragmas(opts);
@@ -170,7 +170,7 @@ fn configure_sqlite_options(
 }
 
 /// Create a connection pool with standard options.
-async fn create_pool(opts: SqliteConnectOptions) -> Result<Pool<Sqlite>, SqlxError> {
+async fn create_pool(opts: SqliteConnectOptions) -> sqlx::Result<Pool<Sqlite>> {
     let max_cons = num_read_threads();
     let pool = SqlitePoolOptions::new()
         .max_connections(max_cons as u32)
