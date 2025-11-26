@@ -11,6 +11,8 @@ use sqlx::{
 mod key;
 pub use key::DbKey;
 
+pub mod example;
+
 /// Embedded migrations compiled into the binary.
 ///
 /// This macro embeds all SQL files from the `migrations/` directory at compile time.
