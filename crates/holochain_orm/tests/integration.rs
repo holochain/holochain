@@ -82,6 +82,13 @@ async fn test_encrypted_database() {
     let db_conn = result.unwrap();
     assert_eq!(db_conn.identifier.database_id(), "encrypted_test_database");
     
+    // Create a table to test that encryption works
+    let create_table_stmt = Statement::from_string(
+        sea_orm::DatabaseBackend::Sqlite,
+        "CREATE TABLE test_table (id INTEGER PRIMARY KEY);".to_string(),
+    );
+    db_conn.conn.execute_raw(create_table_stmt).await.expect("Failed to create table in encrypted database");
+    
     // Verify the database file was created
     let db_file = tmp_dir.path().join("encrypted_test_database");
     assert!(db_file.exists(), "Encrypted database file was not created at {:?}", db_file);
@@ -128,7 +135,8 @@ async fn test_encrypted_database_wrong_key_fails() {
         .expect("Failed to generate second database key");
     
     let result2 = setup_holochain_orm(&tmp_dir, db_id.clone(), Some(db_key2)).await;
-    assert!(result2.is_ok(), "Connection opens even with wrong key");
+    // SQLCipher allows the connection to open; failure happens on first actual operation
+    assert!(result2.is_ok(), "Failed to connect (connection itself succeeds even with wrong key)");
     
     let db_conn2 = result2.unwrap();
     // Try to query the table - this should fail because the key is wrong
