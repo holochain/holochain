@@ -39,7 +39,7 @@ workspace = true
 [features]
 default = ["encoding"]
 
-mock = ["hdk_derive/mock", "mockall"]
+mock = ["dep:mockall"]
 encoding = ["holo_hash/encoding"]
 fixturators = ["holochain_zome_types/fixturators", "holo_hash/fixturators"]
 fuzzing = ["holochain_zome_types/fuzzing", "holo_hash/fuzzing"]
