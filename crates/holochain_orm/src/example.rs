@@ -19,7 +19,7 @@ pub async fn insert_sample_data(
     conn: &HolochainDbConn<impl crate::DatabaseIdentifier>,
     name: &str,
     value: Option<&str>,
-) -> Result<i64, sqlx::Error> {
+) -> sqlx::Result<i64> {
     let result = sqlx::query(
         "INSERT INTO sample_data (name, value) VALUES (?, ?)"
     )
@@ -35,7 +35,7 @@ pub async fn insert_sample_data(
 pub async fn get_sample_data_by_id(
     conn: &HolochainDbConn<impl crate::DatabaseIdentifier>,
     id: i64,
-) -> Result<Option<SampleData>, sqlx::Error> {
+) -> sqlx::Result<Option<SampleData>> {
     let result = sqlx::query_as::<_, SampleData>(
         "SELECT id, name, value, created_at FROM sample_data WHERE id = ?"
     )
@@ -49,7 +49,7 @@ pub async fn get_sample_data_by_id(
 /// Example of selecting multiple rows.
 pub async fn get_all_sample_data(
     conn: &HolochainDbConn<impl crate::DatabaseIdentifier>,
-) -> Result<Vec<SampleData>, sqlx::Error> {
+) -> sqlx::Result<Vec<SampleData>> {
     let results = sqlx::query_as::<_, SampleData>(
         "SELECT id, name, value, created_at FROM sample_data ORDER BY created_at DESC"
     )
@@ -63,7 +63,7 @@ pub async fn get_all_sample_data(
 pub async fn get_sample_data_manual(
     conn: &HolochainDbConn<impl crate::DatabaseIdentifier>,
     id: i64,
-) -> Result<Option<SampleData>, sqlx::Error> {
+) -> sqlx::Result<Option<SampleData>> {
     let row = sqlx::query(
         "SELECT id, name, value, created_at FROM sample_data WHERE id = ?"
     )
@@ -84,7 +84,7 @@ pub async fn update_sample_data(
     conn: &HolochainDbConn<impl crate::DatabaseIdentifier>,
     id: i64,
     new_value: &str,
-) -> Result<u64, sqlx::Error> {
+) -> sqlx::Result<u64> {
     let result = sqlx::query(
         "UPDATE sample_data SET value = ? WHERE id = ?"
     )
@@ -100,7 +100,7 @@ pub async fn update_sample_data(
 pub async fn delete_sample_data(
     conn: &HolochainDbConn<impl crate::DatabaseIdentifier>,
     id: i64,
-) -> Result<u64, sqlx::Error> {
+) -> sqlx::Result<u64> {
     let result = sqlx::query(
         "DELETE FROM sample_data WHERE id = ?"
     )
