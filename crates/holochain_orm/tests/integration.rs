@@ -192,3 +192,41 @@ async fn test_pragma_configuration() {
     let trusted_value: i32 = row.get(0);
     assert_eq!(trusted_value, 0, "Expected trusted_schema to be 0 (false)");
 }
+
+#[tokio::test]
+async fn test_migrations_applied() {
+    let tmp_dir = tempfile::TempDir::new().unwrap();
+    let db_id = TestDbId("migrations_test_database".to_string());
+
+    let config = holochain_orm::HolochainOrmConfig::new();
+    let result = setup_holochain_orm(&tmp_dir, db_id.clone(), config).await;
+    assert!(result.is_ok(), "Failed to create database: {:?}", result.err());
+
+    let db_conn = result.unwrap();
+
+    // Verify the sample_data table was created by migration
+    let row = sqlx::query("SELECT name FROM sqlite_master WHERE type='table' AND name='sample_data';")
+        .fetch_one(&db_conn.pool)
+        .await
+        .expect("Failed to query for sample_data table");
+    let table_name: String = row.get(0);
+    assert_eq!(table_name, "sample_data", "Expected sample_data table to exist");
+
+    // Verify we can insert and query data from the migrated table
+    sqlx::query("INSERT INTO sample_data (name, value) VALUES (?, ?)")
+        .bind("test_name")
+        .bind("test_value")
+        .execute(&db_conn.pool)
+        .await
+        .expect("Failed to insert into sample_data");
+
+    let row = sqlx::query("SELECT name, value FROM sample_data WHERE name = ?")
+        .bind("test_name")
+        .fetch_one(&db_conn.pool)
+        .await
+        .expect("Failed to query sample_data");
+    let name: String = row.get(0);
+    let value: String = row.get(1);
+    assert_eq!(name, "test_name");
+    assert_eq!(value, "test_value");
+}
