@@ -230,3 +230,74 @@ async fn test_migrations_applied() {
     assert_eq!(name, "test_name");
     assert_eq!(value, "test_value");
 }
+
+#[tokio::test]
+async fn test_example_query_patterns() {
+    use holochain_orm::example::*;
+
+    let tmp_dir = tempfile::TempDir::new().unwrap();
+    let db_id = TestDbId("example_test_database".to_string());
+
+    let config = holochain_orm::HolochainOrmConfig::new();
+    let db_conn = setup_holochain_orm(&tmp_dir, db_id, config)
+        .await
+        .expect("Failed to create database");
+
+    // Test insert
+    let id1 = insert_sample_data(&db_conn, "test_item_1", Some("value_1"))
+        .await
+        .expect("Failed to insert data");
+    assert!(id1 > 0);
+
+    let id2 = insert_sample_data(&db_conn, "test_item_2", None)
+        .await
+        .expect("Failed to insert data");
+    assert!(id2 > 0);
+
+    // Test query_as pattern (automatic struct mapping)
+    let result = get_sample_data_by_id(&db_conn, id1)
+        .await
+        .expect("Failed to query data");
+    assert!(result.is_some());
+    let data = result.unwrap();
+    assert_eq!(data.name, "test_item_1");
+    assert_eq!(data.value, Some("value_1".to_string()));
+
+    // Test manual mapping pattern
+    let result = get_sample_data_manual(&db_conn, id2)
+        .await
+        .expect("Failed to query data manually");
+    assert!(result.is_some());
+    let data = result.unwrap();
+    assert_eq!(data.name, "test_item_2");
+    assert_eq!(data.value, None);
+
+    // Test get all
+    let all_data = get_all_sample_data(&db_conn)
+        .await
+        .expect("Failed to get all data");
+    assert_eq!(all_data.len(), 2);
+
+    // Test update
+    let rows_affected = update_sample_data(&db_conn, id1, "updated_value")
+        .await
+        .expect("Failed to update data");
+    assert_eq!(rows_affected, 1);
+
+    let updated = get_sample_data_by_id(&db_conn, id1)
+        .await
+        .expect("Failed to query updated data")
+        .unwrap();
+    assert_eq!(updated.value, Some("updated_value".to_string()));
+
+    // Test delete
+    let rows_affected = delete_sample_data(&db_conn, id1)
+        .await
+        .expect("Failed to delete data");
+    assert_eq!(rows_affected, 1);
+
+    let deleted = get_sample_data_by_id(&db_conn, id1)
+        .await
+        .expect("Failed to query deleted data");
+    assert!(deleted.is_none());
+}
