@@ -30,3 +30,5 @@ test_cert
 
 *.tex.swp
 svg-inkscape/
+
+junit.xml
