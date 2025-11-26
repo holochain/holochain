@@ -3,7 +3,10 @@
 //! This crate does not implement an ORM itself but provides what Holochain needs to use SeaORM.
 
 use std::path::Path;
-use sea_orm::{ConnectOptions, Database, DatabaseConnection, DbErr, RuntimeErr, ConnectionTrait, Statement};
+use sea_orm::{
+    sqlx::sqlite::SqliteJournalMode, ConnectOptions, Database, DatabaseConnection, DbErr,
+    RuntimeErr,
+};
 
 mod key;
 pub use key::DbKey;
@@ -33,21 +36,10 @@ pub async fn setup_holochain_orm<I: DatabaseIdentifier>(
             format!("Path must be a directory: {}", path.display())
         )));
     }
-    
+
     let db_file = path.join(database_id.database_id());
     let connection_string = format!("sqlite://{}?mode=rwc", db_file.display());
     let conn = connect_database(&connection_string, key.clone()).await?;
-    
-    // Enable WAL mode if not using encryption
-    // For encrypted databases, WAL mode causes issues with SQLCipher
-    if key.is_none() {
-        conn.execute_raw(
-            Statement::from_string(
-                sea_orm::DatabaseBackend::Sqlite,
-                "PRAGMA journal_mode = WAL;".to_string(),
-            )
-        ).await?;
-    }
 
     Ok(HolochainDbConn {
         conn,
@@ -78,35 +70,22 @@ async fn connect_database(
     // SeaORM handles read/write connections internally, so we just need
     // a reasonable pool size based on CPU count.
     let max_cons = num_read_threads();
-    
+
     opt.max_connections(max_cons as u32)
         .min_connections(0)
         .idle_timeout(std::time::Duration::from_secs(30))
         .connect_timeout(std::time::Duration::from_secs(30));
-    
-    // Apply SQLCipher encryption if key is provided
-    if let Some(key) = key {
-        let pragma_string = std::sync::Arc::new(key.pragma_string());
-        // Execute PRAGMA statements after connection
-        opt.after_connect(move |conn| {
-            let pragma_string = pragma_string.clone();
-            Box::pin(async move {
-                // Execute each PRAGMA line separately
-                for line in pragma_string.lines() {
-                    let line = line.trim();
-                    if !line.is_empty() {
-                        let stmt = Statement::from_string(
-                            sea_orm::DatabaseBackend::Sqlite,
-                            line.to_string(),
-                        );
-                        conn.execute_raw(stmt).await?;
-                    }
-                }
-                Ok(())
-            })
-        });
-    }
-    
+
+    // Configure SQLite-specific options including encryption and WAL mode
+    opt.map_sqlx_sqlite_opts(move |mut opts| {
+        // Apply encryption pragmas if key is provided
+        if let Some(ref key) = key {
+            opts = key.apply_pragmas(opts);
+        }
+        // Always enable WAL mode for better concurrency
+        opts.journal_mode(SqliteJournalMode::Wal)
+    });
+
     Database::connect(opt).await
 }
 

@@ -89,6 +89,17 @@ async fn test_encrypted_database() {
     );
     db_conn.conn.execute_raw(create_table_stmt).await.expect("Failed to create table in encrypted database");
     
+    // Verify WAL mode is enabled
+    let journal_mode_stmt = Statement::from_string(
+        sea_orm::DatabaseBackend::Sqlite,
+        "PRAGMA journal_mode;".to_string(),
+    );
+    let journal_mode_result = db_conn.conn.query_one_raw(journal_mode_stmt).await.expect("Failed to query journal mode");
+    if let Some(row) = journal_mode_result {
+        let mode: String = row.try_get_by_index(0).expect("Failed to get journal mode value");
+        assert_eq!(mode.to_lowercase(), "wal", "Expected WAL mode to be enabled");
+    }
+    
     // Verify the database file was created
     let db_file = tmp_dir.path().join("encrypted_test_database");
     assert!(db_file.exists(), "Encrypted database file was not created at {:?}", db_file);
@@ -135,25 +146,17 @@ async fn test_encrypted_database_wrong_key_fails() {
         .expect("Failed to generate second database key");
     
     let result2 = setup_holochain_orm(&tmp_dir, db_id.clone(), Some(db_key2)).await;
-    // SQLCipher allows the connection to open; failure happens on first actual operation
-    assert!(result2.is_ok(), "Failed to connect (connection itself succeeds even with wrong key)");
-    
-    let db_conn2 = result2.unwrap();
-    // Try to query the table - this should fail because the key is wrong
-    let query_stmt = Statement::from_string(
-        sea_orm::DatabaseBackend::Sqlite,
-        "SELECT * FROM test_table;".to_string(),
-    );
-    let query_result = db_conn2.conn.query_all_raw(query_stmt).await;
-    
-    // Verify that the query fails with the wrong encryption key
-    assert!(query_result.is_err(), "Query should fail with wrong encryption key");
-    let err = query_result.unwrap_err();
-    let err_msg = err.to_string();
-    // SQLCipher returns "file is not a database" when the wrong key is used
-    assert!(
-        err_msg.contains("not a database") || err_msg.contains("encrypted") || err_msg.contains("cipher"),
-        "Expected encryption-related error, got: {}",
-        err_msg
-    );
+    // With WAL mode enabled, connection fails immediately with wrong key
+    // because enabling WAL requires reading the database header
+    if let Err(err) = result2 {
+        // SQLCipher returns errors related to SQL or encryption when the wrong key is used
+        let err_msg = err.to_string();
+        assert!(
+            err_msg.contains("not a database") || err_msg.contains("encrypted") || err_msg.contains("cipher") || err_msg.contains("SQL logic error"),
+            "Expected encryption-related error, got: {}",
+            err_msg
+        );
+    } else {
+        panic!("Connection should fail with wrong encryption key");
+    }
 }
