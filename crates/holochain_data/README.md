@@ -1,4 +1,4 @@
-# Holochain ORM
+# Holochain Data
 
 A wrapper around sqlx configured for Holochain's needs, providing SQLite database connections with encryption, migrations, and query patterns.
 
@@ -99,7 +99,7 @@ For compile-time query verification to work, you need to maintain prepared query
 
 ```bash
 # Initial setup (or after schema changes)
-cd crates/holochain_orm
+cd crates/holochain_data
 
 # Create/update the database schema
 DATABASE_URL=sqlite:$(pwd)/dev.db sqlx database create
@@ -119,7 +119,7 @@ In CI, queries are verified without needing a database connection:
 
 ```bash
 # Just check that queries are valid (uses committed .sqlx/ metadata)
-cargo check -p holochain_orm
+cargo check -p holochain_data
 ```
 
 When schema changes, developers must run `cargo sqlx prepare` locally and commit the updated `.sqlx/` files.
@@ -145,15 +145,15 @@ Use **manual `Row` access** (#2) only for:
 ## Example Usage
 
 ```rust
-use holochain_orm::{setup_holochain_orm, HolochainOrmConfig};
+use holochain_data::{setup_holochain_data, HolochainDataConfig};
 
 // Set up database with encryption
 let key = DbKey::generate(passphrase).await?;
-let config = HolochainOrmConfig::new()
+let config = HolochainDataConfig::new()
     .with_key(key)
     .with_sync_level(DbSyncLevel::Normal);
 
-let db = setup_holochain_orm(path, db_id, config).await?;
+let db = setup_holochain_data(path, db_id, config).await?;
 
 // Migrations run automatically
 // Now use the connection pool for queries

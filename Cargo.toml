@@ -28,6 +28,7 @@ members = [
   "crates/holochain_secure_primitive",
   "crates/holochain_conductor_config",
   "crates/timestamp",
+  "crates/holochain_data",
 
   "crates/client",
   "crates/hc_client",
@@ -38,7 +39,7 @@ members = [
   "crates/holochain_terminal",
 
   "crates/test_utils/wasm",
-  "crates/test_utils/wasm_common", "crates/holochain_orm",
+  "crates/test_utils/wasm_common",
 ]
 
 exclude = ["crates/release-automation"]

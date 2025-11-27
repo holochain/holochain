@@ -1,4 +1,4 @@
-//! A wrapper around SeaORM, configured for use in Holochain.
+//! A wrapper around sqlx, configured for use in Holochain.
 //!
 //! This crate provides a configured SQLite connection pool for use in Holochain.
 
@@ -47,14 +47,14 @@ impl DbSyncLevel {
 
 /// Configuration options for Holochain database connections.
 #[derive(Debug, Clone, Default)]
-pub struct HolochainOrmConfig {
+pub struct HolochainDataConfig {
     /// Optional encryption key for the database.
     pub key: Option<DbKey>,
     /// SQLite synchronous level.
     pub sync_level: DbSyncLevel,
 }
 
-impl HolochainOrmConfig {
+impl HolochainDataConfig {
     /// Create a new configuration with default values.
     pub fn new() -> Self {
         Self::default()
@@ -89,10 +89,10 @@ pub struct HolochainDbConn<I: DatabaseIdentifier> {
 /// # Errors
 ///
 /// Returns an error if `path` is not a directory.
-pub async fn setup_holochain_orm<I: DatabaseIdentifier>(
+pub async fn setup_holochain_data<I: DatabaseIdentifier>(
     path: impl AsRef<Path>,
     database_id: I,
-    config: HolochainOrmConfig,
+    config: HolochainDataConfig,
 ) -> sqlx::Result<HolochainDbConn<I>> {
     let path = path.as_ref();
     if !path.is_dir() {
@@ -114,10 +114,10 @@ pub async fn setup_holochain_orm<I: DatabaseIdentifier>(
 }
 
 #[cfg(feature = "test-utils")]
-pub async fn test_setup_holochain_orm<I: DatabaseIdentifier>(
+pub async fn test_setup_holochain_data<I: DatabaseIdentifier>(
     database_id: I,
 ) -> sqlx::Result<HolochainDbConn<I>> {
-    let pool = connect_database_memory(HolochainOrmConfig::default()).await?;
+    let pool = connect_database_memory(HolochainDataConfig::default()).await?;
     
     // Run migrations
     MIGRATOR.run(&pool).await?;
@@ -131,7 +131,7 @@ pub async fn test_setup_holochain_orm<I: DatabaseIdentifier>(
 /// Connect to a SQLite database using the provided connection string.
 async fn connect_database(
     db_path: &Path,
-    config: HolochainOrmConfig,
+    config: HolochainDataConfig,
 ) -> sqlx::Result<Pool<Sqlite>> {
     let mut opts = SqliteConnectOptions::new()
         .filename(db_path)
@@ -145,7 +145,7 @@ async fn connect_database(
 /// Connect to an in-memory SQLite database for testing.
 #[cfg(feature = "test-utils")]
 async fn connect_database_memory(
-    config: HolochainOrmConfig,
+    config: HolochainDataConfig,
 ) -> sqlx::Result<Pool<Sqlite>> {
     let opts = SqliteConnectOptions::from_str(":memory:")?;
     let opts = configure_sqlite_options(opts, config)?;
@@ -156,7 +156,7 @@ async fn connect_database_memory(
 /// Configure SQLite-specific options including encryption and WAL mode.
 fn configure_sqlite_options(
     mut opts: SqliteConnectOptions,
-    config: HolochainOrmConfig,
+    config: HolochainDataConfig,
 ) -> sqlx::Result<SqliteConnectOptions> {
     // Apply encryption pragmas if key is provided
     if let Some(ref key) = config.key {
@@ -214,7 +214,7 @@ mod tests {
     #[tokio::test]
     async fn test_in_memory_database_with_migrations() {
         // Set up in-memory database
-        let db = test_setup_holochain_orm(TestDbId)
+        let db = test_setup_holochain_data(TestDbId)
             .await
             .expect("Failed to set up test database");
 
