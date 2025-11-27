@@ -96,7 +96,10 @@ async fn test_encrypted_database() {
     );
 
     let db_conn = result.unwrap();
-    assert_eq!(db_conn.identifier().database_id(), "encrypted_test_database");
+    assert_eq!(
+        db_conn.identifier().database_id(),
+        "encrypted_test_database"
+    );
 
     // Create a table to test that encryption works
     sqlx::query("CREATE TABLE test_table (id INTEGER PRIMARY KEY);")
@@ -240,16 +243,12 @@ async fn test_migrations_applied() {
     let db_conn = result.unwrap();
 
     // Verify the Wasm database tables were created by migration
-    let row =
-        sqlx::query("SELECT name FROM sqlite_master WHERE type='table' AND name='Wasm';")
-            .fetch_one(db_conn.pool())
-            .await
-            .expect("Failed to query for Wasm table");
+    let row = sqlx::query("SELECT name FROM sqlite_master WHERE type='table' AND name='Wasm';")
+        .fetch_one(db_conn.pool())
+        .await
+        .expect("Failed to query for Wasm table");
     let table_name: String = row.get(0);
-    assert_eq!(
-        table_name, "Wasm",
-        "Expected Wasm table to exist"
-    );
+    assert_eq!(table_name, "Wasm", "Expected Wasm table to exist");
 
     // Verify all expected tables exist
     let tables = sqlx::query("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
@@ -375,16 +374,14 @@ async fn test_foreign_key_constraints() {
 
     // Insert a DnaDef
     let dna_hash = vec![1u8; 32];
-    sqlx::query(
-        "INSERT INTO DnaDef (hash, name, network_seed, properties) VALUES (?, ?, ?, ?)",
-    )
-    .bind(&dna_hash)
-    .bind("test_dna")
-    .bind("test_seed")
-    .bind(vec![0u8])
-    .execute(db_conn.pool())
-    .await
-    .expect("Failed to insert DnaDef");
+    sqlx::query("INSERT INTO DnaDef (hash, name, network_seed, properties) VALUES (?, ?, ?, ?)")
+        .bind(&dna_hash)
+        .bind("test_dna")
+        .bind("test_seed")
+        .bind(vec![0u8])
+        .execute(db_conn.pool())
+        .await
+        .expect("Failed to insert DnaDef");
 
     // Insert an IntegrityZome referencing the DnaDef
     sqlx::query(
@@ -418,10 +415,7 @@ async fn test_foreign_key_constraints() {
     .execute(db_conn.pool())
     .await;
 
-    assert!(
-        result.is_err(),
-        "Expected foreign key constraint violation"
-    );
+    assert!(result.is_err(), "Expected foreign key constraint violation");
     if let Err(err) = result {
         let err_msg = err.to_string();
         assert!(

@@ -6,12 +6,12 @@
 
 use holo_hash::{DnaHash, WasmHash};
 use holochain_integrity_types::{
-    AppEntryName, DnaModifiers, EntryDef, EntryDefId, EntryVisibility, zome::ZomeName,
+    zome::ZomeName, AppEntryName, DnaModifiers, EntryDef, EntryDefId, EntryVisibility,
 };
 use holochain_serialized_bytes::{SerializedBytes, UnsafeBytes};
 use holochain_zome_types::{
-    zome::{CoordinatorZomeDef, IntegrityZomeDef, WasmZome, ZomeDef},
     prelude::DnaDef,
+    zome::{CoordinatorZomeDef, IntegrityZomeDef, WasmZome, ZomeDef},
 };
 use sqlx::FromRow;
 use std::borrow::Cow;
@@ -61,12 +61,7 @@ pub struct DnaDefModel {
 
 impl DnaDefModel {
     /// Create a new DnaDefModel.
-    pub fn new(
-        hash: DnaHash,
-        name: String,
-        network_seed: String,
-        properties: Vec<u8>,
-    ) -> Self {
+    pub fn new(hash: DnaHash, name: String, network_seed: String, properties: Vec<u8>) -> Self {
         Self {
             hash: hash.get_raw_39().to_vec(),
             name,
@@ -157,7 +152,9 @@ impl IntegrityZomeModel {
 
     /// Get the WasmHash from this model, if present.
     pub fn wasm_hash(&self) -> Option<WasmHash> {
-        self.wasm_hash.as_ref().map(|bytes| WasmHash::from_raw_39(bytes.clone()))
+        self.wasm_hash
+            .as_ref()
+            .map(|bytes| WasmHash::from_raw_39(bytes.clone()))
     }
 
     /// Parse the dependencies from comma-separated string.
@@ -165,7 +162,10 @@ impl IntegrityZomeModel {
         if self.dependencies.is_empty() {
             Vec::new()
         } else {
-            self.dependencies.split(',').map(|s| s.to_string()).collect()
+            self.dependencies
+                .split(',')
+                .map(|s| s.to_string())
+                .collect()
         }
     }
 
@@ -236,7 +236,9 @@ impl CoordinatorZomeModel {
 
     /// Get the WasmHash from this model, if present.
     pub fn wasm_hash(&self) -> Option<WasmHash> {
-        self.wasm_hash.as_ref().map(|bytes| WasmHash::from_raw_39(bytes.clone()))
+        self.wasm_hash
+            .as_ref()
+            .map(|bytes| WasmHash::from_raw_39(bytes.clone()))
     }
 
     /// Parse the dependencies from comma-separated string.
@@ -244,7 +246,10 @@ impl CoordinatorZomeModel {
         if self.dependencies.is_empty() {
             Vec::new()
         } else {
-            self.dependencies.split(',').map(|s| s.to_string()).collect()
+            self.dependencies
+                .split(',')
+                .map(|s| s.to_string())
+                .collect()
         }
     }
 
@@ -336,7 +341,12 @@ impl EntryDefModel {
             "App" => EntryDefId::App(AppEntryName(self.entry_def_id.clone().into())),
             "CapClaim" => EntryDefId::CapClaim,
             "CapGrant" => EntryDefId::CapGrant,
-            _ => return Err(format!("Invalid entry_def_id_type: {}", self.entry_def_id_type)),
+            _ => {
+                return Err(format!(
+                    "Invalid entry_def_id_type: {}",
+                    self.entry_def_id_type
+                ))
+            }
         };
 
         let visibility = match self.visibility.as_str() {

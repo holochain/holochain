@@ -115,10 +115,10 @@ pub async fn test_setup_holochain_data<I: DatabaseIdentifier>(
     database_id: I,
 ) -> sqlx::Result<DbWrite<I>> {
     let pool = connect_database_memory(HolochainDataConfig::default()).await?;
-    
+
     // Run migrations
     MIGRATOR.run(&pool).await?;
-    
+
     Ok(DbWrite::new(pool, database_id))
 }
 
@@ -212,11 +212,10 @@ mod tests {
             .expect("Failed to set up test database");
 
         // Verify migrations ran by checking the sample_data table exists
-        let row =
-            sqlx::query("SELECT name FROM sqlite_master WHERE type='table' AND name='Wasm'")
-                .fetch_one(db.pool())
-                .await
-                .expect("Failed to query sqlite_master");
+        let row = sqlx::query("SELECT name FROM sqlite_master WHERE type='table' AND name='Wasm'")
+            .fetch_one(db.pool())
+            .await
+            .expect("Failed to query sqlite_master");
 
         let table_name: String = row.get(0);
         assert_eq!(table_name, "Wasm");

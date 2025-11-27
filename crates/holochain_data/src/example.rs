@@ -1,6 +1,5 @@
 //! Example demonstrating sqlx query patterns for mapping Rust types to database.
 
-
 use sqlx::{FromRow, Row};
 
 /// Example struct representing a row in the sample_data table.
