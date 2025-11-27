@@ -61,7 +61,7 @@ impl DbKey {
                 sodoken::argon2::blocking_argon2id(
                     &mut *secret.lock(),
                     &passphrase.lock().unwrap().lock(),
-                    &*salt_clone.lock().unwrap().lock(),
+                    &salt_clone.lock().unwrap().lock(),
                     sodoken::argon2::ARGON2_ID_OPSLIMIT_MODERATE,
                     sodoken::argon2::ARGON2_ID_MEMLIMIT_MODERATE,
                 )?;
@@ -113,7 +113,7 @@ impl DbKey {
                 sodoken::argon2::blocking_argon2id(
                     &mut *secret.lock(),
                     &passphrase.lock().unwrap().lock(),
-                    &*salt_clone.lock().unwrap().lock(),
+                    &salt_clone.lock().unwrap().lock(),
                     sodoken::argon2::ARGON2_ID_OPSLIMIT_MODERATE,
                     sodoken::argon2::ARGON2_ID_MEMLIMIT_MODERATE,
                 )?;

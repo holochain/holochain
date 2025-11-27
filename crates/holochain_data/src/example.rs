@@ -1,7 +1,7 @@
 //! Example demonstrating sqlx query patterns for mapping Rust types to database.
 
-use sqlx::{FromRow, Row};
 use crate::HolochainDbConn;
+use sqlx::{FromRow, Row};
 
 /// Example struct representing a row in the sample_data table.
 ///
@@ -66,12 +66,10 @@ pub async fn get_sample_data_manual(
     conn: &HolochainDbConn<impl crate::DatabaseIdentifier>,
     id: i64,
 ) -> sqlx::Result<Option<SampleData>> {
-    let row = sqlx::query(
-        "SELECT id, name, value, created_at FROM sample_data WHERE id = ?"
-    )
-    .bind(id)
-    .fetch_optional(&conn.pool)
-    .await?;
+    let row = sqlx::query("SELECT id, name, value, created_at FROM sample_data WHERE id = ?")
+        .bind(id)
+        .fetch_optional(&conn.pool)
+        .await?;
 
     Ok(row.map(|r| SampleData {
         id: r.get(0),
@@ -87,13 +85,11 @@ pub async fn update_sample_data(
     id: i64,
     new_value: &str,
 ) -> sqlx::Result<u64> {
-    let result = sqlx::query(
-        "UPDATE sample_data SET value = ? WHERE id = ?"
-    )
-    .bind(new_value)
-    .bind(id)
-    .execute(&conn.pool)
-    .await?;
+    let result = sqlx::query("UPDATE sample_data SET value = ? WHERE id = ?")
+        .bind(new_value)
+        .bind(id)
+        .execute(&conn.pool)
+        .await?;
 
     Ok(result.rows_affected())
 }
@@ -103,12 +99,10 @@ pub async fn delete_sample_data(
     conn: &HolochainDbConn<impl crate::DatabaseIdentifier>,
     id: i64,
 ) -> sqlx::Result<u64> {
-    let result = sqlx::query(
-        "DELETE FROM sample_data WHERE id = ?"
-    )
-    .bind(id)
-    .execute(&conn.pool)
-    .await?;
+    let result = sqlx::query("DELETE FROM sample_data WHERE id = ?")
+        .bind(id)
+        .execute(&conn.pool)
+        .await?;
 
     Ok(result.rows_affected())
 }
