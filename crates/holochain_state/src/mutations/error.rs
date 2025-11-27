@@ -5,6 +5,8 @@ use thiserror::Error;
 pub enum StateMutationError {
     #[error(transparent)]
     Sql(#[from] holochain_sqlite::rusqlite::Error),
+    #[error(transparent)]
+    Sqlx(#[from] sqlx::Error),
 
     #[error(transparent)]
     DatabaseError(#[from] holochain_sqlite::error::DatabaseError),
@@ -29,6 +31,9 @@ pub enum StateMutationError {
 
     #[error("The operation was not found in the cache")]
     OpNotFoundInCache,
+
+    #[error("{0}")]
+    Other(String),
 }
 
 pub type StateMutationResult<T> = Result<T, StateMutationError>;
