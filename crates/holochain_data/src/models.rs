@@ -126,7 +126,7 @@ pub struct IntegrityZomeModel {
     pub zome_name: String,
     /// The WASM hash for this zome (NULL for inline zomes).
     pub wasm_hash: Option<Vec<u8>>,
-    /// JSON array of zome dependency names.
+    /// Comma-separated list of zome dependency names.
     pub dependencies: String,
 }
 
@@ -144,8 +144,7 @@ impl IntegrityZomeModel {
             zome_index: zome_index as i64,
             zome_name,
             wasm_hash: wasm_hash.map(|h| h.get_raw_39().to_vec()),
-            dependencies: serde_json::to_string(&dependencies)
-                .unwrap_or_else(|_| "[]".to_string()),
+            dependencies: dependencies.join(","),
         }
     }
 
@@ -159,10 +158,13 @@ impl IntegrityZomeModel {
         self.wasm_hash.as_ref().map(|bytes| WasmHash::from_raw_39(bytes.clone()))
     }
 
-    /// Parse the dependencies JSON array.
-    pub fn parse_dependencies(&self) -> Result<Vec<String>, String> {
-        serde_json::from_str(&self.dependencies)
-            .map_err(|e| format!("Failed to parse dependencies: {}", e))
+    /// Parse the dependencies from comma-separated string.
+    pub fn parse_dependencies(&self) -> Vec<String> {
+        if self.dependencies.is_empty() {
+            Vec::new()
+        } else {
+            self.dependencies.split(',').map(|s| s.to_string()).collect()
+        }
     }
 
     /// Convert to a tuple suitable for DnaDef construction.
@@ -170,7 +172,7 @@ impl IntegrityZomeModel {
     /// Returns (ZomeName, IntegrityZomeDef) which can be used in the integrity_zomes Vec.
     pub fn to_zome_tuple(&self) -> Result<(ZomeName, IntegrityZomeDef), String> {
         let zome_name = ZomeName(Cow::Owned(self.zome_name.clone()));
-        let dependencies: Vec<String> = self.parse_dependencies()?;
+        let dependencies = self.parse_dependencies();
         let dependencies: Vec<ZomeName> = dependencies
             .into_iter()
             .map(|s| ZomeName(Cow::Owned(s)))
@@ -203,7 +205,7 @@ pub struct CoordinatorZomeModel {
     pub zome_name: String,
     /// The WASM hash for this zome (NULL for inline zomes).
     pub wasm_hash: Option<Vec<u8>>,
-    /// JSON array of zome dependency names.
+    /// Comma-separated list of zome dependency names.
     pub dependencies: String,
 }
 
@@ -221,8 +223,7 @@ impl CoordinatorZomeModel {
             zome_index: zome_index as i64,
             zome_name,
             wasm_hash: wasm_hash.map(|h| h.get_raw_39().to_vec()),
-            dependencies: serde_json::to_string(&dependencies)
-                .unwrap_or_else(|_| "[]".to_string()),
+            dependencies: dependencies.join(","),
         }
     }
 
@@ -236,10 +237,13 @@ impl CoordinatorZomeModel {
         self.wasm_hash.as_ref().map(|bytes| WasmHash::from_raw_39(bytes.clone()))
     }
 
-    /// Parse the dependencies JSON array.
-    pub fn parse_dependencies(&self) -> Result<Vec<String>, String> {
-        serde_json::from_str(&self.dependencies)
-            .map_err(|e| format!("Failed to parse dependencies: {}", e))
+    /// Parse the dependencies from comma-separated string.
+    pub fn parse_dependencies(&self) -> Vec<String> {
+        if self.dependencies.is_empty() {
+            Vec::new()
+        } else {
+            self.dependencies.split(',').map(|s| s.to_string()).collect()
+        }
     }
 
     /// Convert to a tuple suitable for DnaDef construction.
@@ -247,7 +251,7 @@ impl CoordinatorZomeModel {
     /// Returns (ZomeName, CoordinatorZomeDef) which can be used in the coordinator_zomes Vec.
     pub fn to_zome_tuple(&self) -> Result<(ZomeName, CoordinatorZomeDef), String> {
         let zome_name = ZomeName(Cow::Owned(self.zome_name.clone()));
-        let dependencies: Vec<String> = self.parse_dependencies()?;
+        let dependencies = self.parse_dependencies();
         let dependencies: Vec<ZomeName> = dependencies
             .into_iter()
             .map(|s| ZomeName(Cow::Owned(s)))

@@ -2927,7 +2927,6 @@ dependencies = [
  "holochain_zome_types",
  "libsqlite3-sys",
  "num_cpus",
- "serde_json",
  "sodoken",
  "sqlx",
  "tempfile",
