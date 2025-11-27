@@ -27,7 +27,7 @@ async fn test_create_database() {
     );
 
     let db_conn = result.unwrap();
-    assert_eq!(db_conn.identifier.database_id(), "test_database");
+    assert_eq!(db_conn.identifier().database_id(), "test_database");
 
     // Verify the database file was created
     let db_file = tmp_dir.path().join("test_database");
@@ -96,17 +96,17 @@ async fn test_encrypted_database() {
     );
 
     let db_conn = result.unwrap();
-    assert_eq!(db_conn.identifier.database_id(), "encrypted_test_database");
+    assert_eq!(db_conn.identifier().database_id(), "encrypted_test_database");
 
     // Create a table to test that encryption works
     sqlx::query("CREATE TABLE test_table (id INTEGER PRIMARY KEY);")
-        .execute(&db_conn.pool)
+        .execute(db_conn.pool())
         .await
         .expect("Failed to create table in encrypted database");
 
     // Verify WAL mode is enabled
     let row = sqlx::query("PRAGMA journal_mode;")
-        .fetch_one(&db_conn.pool)
+        .fetch_one(db_conn.pool())
         .await
         .expect("Failed to query journal mode");
     let mode: String = row.get(0);
@@ -157,7 +157,7 @@ async fn test_encrypted_database_wrong_key_fails() {
 
     // Create a table to ensure the database is properly encrypted
     sqlx::query("CREATE TABLE test_table (id INTEGER PRIMARY KEY, value TEXT);")
-        .execute(&db_conn1.pool)
+        .execute(db_conn1.pool())
         .await
         .expect("Failed to create table");
     drop(db_conn1);
@@ -209,7 +209,7 @@ async fn test_pragma_configuration() {
 
     // Verify synchronous level is set correctly
     let row = sqlx::query("PRAGMA synchronous;")
-        .fetch_one(&db_conn.pool)
+        .fetch_one(db_conn.pool())
         .await
         .expect("Failed to query synchronous");
     let sync_value: i32 = row.get(0);
@@ -217,7 +217,7 @@ async fn test_pragma_configuration() {
 
     // Verify trusted_schema is set to false
     let row = sqlx::query("PRAGMA trusted_schema;")
-        .fetch_one(&db_conn.pool)
+        .fetch_one(db_conn.pool())
         .await
         .expect("Failed to query trusted_schema");
     let trusted_value: i32 = row.get(0);
@@ -242,7 +242,7 @@ async fn test_migrations_applied() {
     // Verify the sample_data table was created by migration
     let row =
         sqlx::query("SELECT name FROM sqlite_master WHERE type='table' AND name='sample_data';")
-            .fetch_one(&db_conn.pool)
+            .fetch_one(db_conn.pool())
             .await
             .expect("Failed to query for sample_data table");
     let table_name: String = row.get(0);
@@ -255,13 +255,13 @@ async fn test_migrations_applied() {
     sqlx::query("INSERT INTO sample_data (name, value) VALUES (?, ?)")
         .bind("test_name")
         .bind("test_value")
-        .execute(&db_conn.pool)
+        .execute(db_conn.pool())
         .await
         .expect("Failed to insert into sample_data");
 
     let row = sqlx::query("SELECT name, value FROM sample_data WHERE name = ?")
         .bind("test_name")
-        .fetch_one(&db_conn.pool)
+        .fetch_one(db_conn.pool())
         .await
         .expect("Failed to query sample_data");
     let name: String = row.get(0);
