@@ -3,6 +3,8 @@
 //! This crate provides a configured SQLite connection pool for use in Holochain.
 
 use std::path::Path;
+#[cfg(feature = "test-utils")]
+use std::str::FromStr;
 use sqlx::{
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
     Pool, Sqlite,
@@ -116,6 +118,10 @@ pub async fn test_setup_holochain_orm<I: DatabaseIdentifier>(
     database_id: I,
 ) -> sqlx::Result<HolochainDbConn<I>> {
     let pool = connect_database_memory(HolochainOrmConfig::default()).await?;
+    
+    // Run migrations
+    MIGRATOR.run(&pool).await?;
+    
     Ok(HolochainDbConn {
         pool,
         identifier: database_id,
@@ -189,4 +195,55 @@ async fn create_pool(opts: SqliteConnectOptions) -> sqlx::Result<Pool<Sqlite>> {
 fn num_read_threads() -> usize {
     let num_cpus = num_cpus::get();
     std::cmp::max(num_cpus, 4)
+}
+
+#[cfg(all(test, feature = "test-utils"))]
+mod tests {
+    use super::*;
+    use sqlx::Row;
+
+    #[derive(Debug, Clone)]
+    struct TestDbId;
+
+    impl DatabaseIdentifier for TestDbId {
+        fn database_id(&self) -> &str {
+            "test_db"
+        }
+    }
+
+    #[tokio::test]
+    async fn test_in_memory_database_with_migrations() {
+        // Set up in-memory database
+        let db = test_setup_holochain_orm(TestDbId)
+            .await
+            .expect("Failed to set up test database");
+
+        // Verify migrations ran by checking the sample_data table exists
+        let row = sqlx::query("SELECT name FROM sqlite_master WHERE type='table' AND name='sample_data'")
+            .fetch_one(&db.pool)
+            .await
+            .expect("Failed to query sqlite_master");
+        
+        let table_name: String = row.get(0);
+        assert_eq!(table_name, "sample_data");
+
+        // Test inserting and querying data
+        sqlx::query("INSERT INTO sample_data (name, value) VALUES (?, ?)")
+            .bind("test_name")
+            .bind("test_value")
+            .execute(&db.pool)
+            .await
+            .expect("Failed to insert data");
+
+        let row = sqlx::query("SELECT name, value FROM sample_data WHERE name = ?")
+            .bind("test_name")
+            .fetch_one(&db.pool)
+            .await
+            .expect("Failed to query data");
+
+        let name: String = row.get(0);
+        let value: Option<String> = row.get(1);
+        assert_eq!(name, "test_name");
+        assert_eq!(value, Some("test_value".to_string()));
+    }
 }
