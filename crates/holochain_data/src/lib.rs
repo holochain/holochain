@@ -16,6 +16,7 @@ pub use key::DbKey;
 pub mod example;
 mod handles;
 pub use handles::{DbRead, DbWrite};
+pub mod kind;
 
 /// Embedded migrations compiled into the binary.
 ///

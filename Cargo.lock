@@ -2920,7 +2920,9 @@ name = "holochain_data"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "holo_hash",
  "holochain_data",
+ "holochain_zome_types",
  "libsqlite3-sys",
  "num_cpus",
  "sodoken",
