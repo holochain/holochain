@@ -2,13 +2,13 @@
 //!
 //! This crate provides a configured SQLite connection pool for use in Holochain.
 
-use std::path::Path;
-#[cfg(feature = "test-utils")]
-use std::str::FromStr;
 use sqlx::{
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
     Pool, Sqlite,
 };
+use std::path::Path;
+#[cfg(feature = "test-utils")]
+use std::str::FromStr;
 
 mod key;
 pub use key::DbKey;
@@ -118,10 +118,10 @@ pub async fn test_setup_holochain_data<I: DatabaseIdentifier>(
     database_id: I,
 ) -> sqlx::Result<HolochainDbConn<I>> {
     let pool = connect_database_memory(HolochainDataConfig::default()).await?;
-    
+
     // Run migrations
     MIGRATOR.run(&pool).await?;
-    
+
     Ok(HolochainDbConn {
         pool,
         identifier: database_id,
@@ -144,9 +144,7 @@ async fn connect_database(
 
 /// Connect to an in-memory SQLite database for testing.
 #[cfg(feature = "test-utils")]
-async fn connect_database_memory(
-    config: HolochainDataConfig,
-) -> sqlx::Result<Pool<Sqlite>> {
+async fn connect_database_memory(config: HolochainDataConfig) -> sqlx::Result<Pool<Sqlite>> {
     let opts = SqliteConnectOptions::from_str(":memory:")?;
     let opts = configure_sqlite_options(opts, config)?;
 
@@ -190,7 +188,7 @@ async fn create_pool(opts: SqliteConnectOptions) -> sqlx::Result<Pool<Sqlite>> {
 }
 
 /// Calculate the number of read threads based on CPU count.
-/// 
+///
 /// Returns at least 4, or the number of CPUs.
 fn num_read_threads() -> usize {
     let num_cpus = num_cpus::get();
@@ -219,11 +217,12 @@ mod tests {
             .expect("Failed to set up test database");
 
         // Verify migrations ran by checking the sample_data table exists
-        let row = sqlx::query("SELECT name FROM sqlite_master WHERE type='table' AND name='sample_data'")
-            .fetch_one(&db.pool)
-            .await
-            .expect("Failed to query sqlite_master");
-        
+        let row =
+            sqlx::query("SELECT name FROM sqlite_master WHERE type='table' AND name='sample_data'")
+                .fetch_one(&db.pool)
+                .await
+                .expect("Failed to query sqlite_master");
+
         let table_name: String = row.get(0);
         assert_eq!(table_name, "sample_data");
 

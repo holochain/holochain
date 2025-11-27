@@ -1,7 +1,7 @@
-use holochain_data::{setup_holochain_data, DatabaseIdentifier};
-use std::sync::{Arc, Mutex};
 use holochain_data::DbKey;
+use holochain_data::{setup_holochain_data, DatabaseIdentifier};
 use sqlx::Row;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone)]
 struct TestDbId(String);
@@ -20,14 +20,22 @@ async fn test_create_database() {
     let config = holochain_data::HolochainDataConfig::new();
     let result = setup_holochain_data(&tmp_dir, db_id.clone(), config).await;
 
-    assert!(result.is_ok(), "Failed to create database connection: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Failed to create database connection: {:?}",
+        result.err()
+    );
 
     let db_conn = result.unwrap();
     assert_eq!(db_conn.identifier.database_id(), "test_database");
 
     // Verify the database file was created
     let db_file = tmp_dir.path().join("test_database");
-    assert!(db_file.exists(), "Database file was not created at {:?}", db_file);
+    assert!(
+        db_file.exists(),
+        "Database file was not created at {:?}",
+        db_file
+    );
 }
 
 #[tokio::test]
@@ -69,7 +77,7 @@ async fn test_error_on_non_directory_path() {
 async fn test_encrypted_database() {
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let db_id = TestDbId("encrypted_test_database".to_string());
-    
+
     // Generate a database key with a test passphrase
     let passphrase = Arc::new(Mutex::new(sodoken::LockedArray::from(
         b"test_passphrase_for_encryption".to_vec(),
@@ -81,7 +89,11 @@ async fn test_encrypted_database() {
     // Create database with encryption
     let config = holochain_data::HolochainDataConfig::new().with_key(db_key.clone());
     let result = setup_holochain_data(&tmp_dir, db_id.clone(), config).await;
-    assert!(result.is_ok(), "Failed to create encrypted database: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Failed to create encrypted database: {:?}",
+        result.err()
+    );
 
     let db_conn = result.unwrap();
     assert_eq!(db_conn.identifier.database_id(), "encrypted_test_database");
@@ -98,11 +110,19 @@ async fn test_encrypted_database() {
         .await
         .expect("Failed to query journal mode");
     let mode: String = row.get(0);
-    assert_eq!(mode.to_lowercase(), "wal", "Expected WAL mode to be enabled");
+    assert_eq!(
+        mode.to_lowercase(),
+        "wal",
+        "Expected WAL mode to be enabled"
+    );
 
     // Verify the database file was created
     let db_file = tmp_dir.path().join("encrypted_test_database");
-    assert!(db_file.exists(), "Encrypted database file was not created at {:?}", db_file);
+    assert!(
+        db_file.exists(),
+        "Encrypted database file was not created at {:?}",
+        db_file
+    );
 
     // Drop the connection
     drop(db_conn);
@@ -110,14 +130,18 @@ async fn test_encrypted_database() {
     // Try to open the same database again with the same key
     let config_reopen = holochain_data::HolochainDataConfig::new().with_key(db_key);
     let result_reopen = setup_holochain_data(&tmp_dir, db_id.clone(), config_reopen).await;
-    assert!(result_reopen.is_ok(), "Failed to reopen encrypted database: {:?}", result_reopen.err());
+    assert!(
+        result_reopen.is_ok(),
+        "Failed to reopen encrypted database: {:?}",
+        result_reopen.err()
+    );
 }
 
 #[tokio::test]
 async fn test_encrypted_database_wrong_key_fails() {
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let db_id = TestDbId("encrypted_fail_test".to_string());
-    
+
     // Create database with first key
     let passphrase1 = Arc::new(Mutex::new(sodoken::LockedArray::from(
         b"first_passphrase".to_vec(),
@@ -154,7 +178,10 @@ async fn test_encrypted_database_wrong_key_fails() {
         // SQLCipher returns errors related to SQL or encryption when the wrong key is used
         let err_msg = err.to_string();
         assert!(
-            err_msg.contains("not a database") || err_msg.contains("encrypted") || err_msg.contains("cipher") || err_msg.contains("SQL logic error"),
+            err_msg.contains("not a database")
+                || err_msg.contains("encrypted")
+                || err_msg.contains("cipher")
+                || err_msg.contains("SQL logic error"),
             "Expected encryption-related error, got: {}",
             err_msg
         );
@@ -172,7 +199,11 @@ async fn test_pragma_configuration() {
     let config = holochain_data::HolochainDataConfig::new()
         .with_sync_level(holochain_data::DbSyncLevel::Off);
     let result = setup_holochain_data(&tmp_dir, db_id.clone(), config).await;
-    assert!(result.is_ok(), "Failed to create database: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Failed to create database: {:?}",
+        result.err()
+    );
 
     let db_conn = result.unwrap();
 
@@ -200,17 +231,25 @@ async fn test_migrations_applied() {
 
     let config = holochain_data::HolochainDataConfig::new();
     let result = setup_holochain_data(&tmp_dir, db_id.clone(), config).await;
-    assert!(result.is_ok(), "Failed to create database: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Failed to create database: {:?}",
+        result.err()
+    );
 
     let db_conn = result.unwrap();
 
     // Verify the sample_data table was created by migration
-    let row = sqlx::query("SELECT name FROM sqlite_master WHERE type='table' AND name='sample_data';")
-        .fetch_one(&db_conn.pool)
-        .await
-        .expect("Failed to query for sample_data table");
+    let row =
+        sqlx::query("SELECT name FROM sqlite_master WHERE type='table' AND name='sample_data';")
+            .fetch_one(&db_conn.pool)
+            .await
+            .expect("Failed to query for sample_data table");
     let table_name: String = row.get(0);
-    assert_eq!(table_name, "sample_data", "Expected sample_data table to exist");
+    assert_eq!(
+        table_name, "sample_data",
+        "Expected sample_data table to exist"
+    );
 
     // Verify we can insert and query data from the migrated table
     sqlx::query("INSERT INTO sample_data (name, value) VALUES (?, ?)")
