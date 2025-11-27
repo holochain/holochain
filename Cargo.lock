@@ -3077,6 +3077,7 @@ name = "holochain_orm"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "holochain_orm",
  "libsqlite3-sys",
  "num_cpus",
  "sodoken",
