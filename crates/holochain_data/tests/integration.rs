@@ -239,35 +239,57 @@ async fn test_migrations_applied() {
 
     let db_conn = result.unwrap();
 
-    // Verify the sample_data table was created by migration
+    // Verify the Wasm database tables were created by migration
     let row =
-        sqlx::query("SELECT name FROM sqlite_master WHERE type='table' AND name='sample_data';")
+        sqlx::query("SELECT name FROM sqlite_master WHERE type='table' AND name='Wasm';")
             .fetch_one(db_conn.pool())
             .await
-            .expect("Failed to query for sample_data table");
+            .expect("Failed to query for Wasm table");
     let table_name: String = row.get(0);
     assert_eq!(
-        table_name, "sample_data",
-        "Expected sample_data table to exist"
+        table_name, "Wasm",
+        "Expected Wasm table to exist"
     );
 
-    // Verify we can insert and query data from the migrated table
-    sqlx::query("INSERT INTO sample_data (name, value) VALUES (?, ?)")
-        .bind("test_name")
-        .bind("test_value")
-        .execute(db_conn.pool())
+    // Verify all expected tables exist
+    let tables = sqlx::query("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+        .fetch_all(db_conn.pool())
         .await
-        .expect("Failed to insert into sample_data");
+        .expect("Failed to query tables");
 
-    let row = sqlx::query("SELECT name, value FROM sample_data WHERE name = ?")
-        .bind("test_name")
+    let table_names: Vec<String> = tables
+        .iter()
+        .map(|row| row.get::<String, _>("name"))
+        .collect();
+
+    assert!(
+        table_names.contains(&"Wasm".to_string()),
+        "Wasm table missing"
+    );
+    assert!(
+        table_names.contains(&"DnaDef".to_string()),
+        "DnaDef table missing"
+    );
+    assert!(
+        table_names.contains(&"EntryDef".to_string()),
+        "EntryDef table missing"
+    );
+    assert!(
+        table_names.contains(&"IntegrityZome".to_string()),
+        "IntegrityZome table missing"
+    );
+    assert!(
+        table_names.contains(&"CoordinatorZome".to_string()),
+        "CoordinatorZome table missing"
+    );
+
+    // Verify foreign keys are enabled
+    let row = sqlx::query("PRAGMA foreign_keys;")
         .fetch_one(db_conn.pool())
         .await
-        .expect("Failed to query sample_data");
-    let name: String = row.get(0);
-    let value: String = row.get(1);
-    assert_eq!(name, "test_name");
-    assert_eq!(value, "test_value");
+        .expect("Failed to query foreign_keys pragma");
+    let fk_enabled: i32 = row.get(0);
+    assert_eq!(fk_enabled, 1, "Expected foreign_keys to be enabled (1)");
 }
 
 #[tokio::test]
@@ -339,4 +361,89 @@ async fn test_example_query_patterns() {
         .await
         .expect("Failed to query deleted data");
     assert!(deleted.is_none());
+}
+
+#[tokio::test]
+async fn test_foreign_key_constraints() {
+    let tmp_dir = tempfile::TempDir::new().unwrap();
+    let db_id = TestDbId("fk_test_database".to_string());
+
+    let config = holochain_data::HolochainDataConfig::new();
+    let db_conn = setup_holochain_data(&tmp_dir, db_id, config)
+        .await
+        .expect("Failed to create database");
+
+    // Insert a DnaDef
+    let dna_hash = vec![1u8; 32];
+    sqlx::query(
+        "INSERT INTO DnaDef (hash, name, network_seed, properties) VALUES (?, ?, ?, ?)",
+    )
+    .bind(&dna_hash)
+    .bind("test_dna")
+    .bind("test_seed")
+    .bind(vec![0u8])
+    .execute(db_conn.pool())
+    .await
+    .expect("Failed to insert DnaDef");
+
+    // Insert an IntegrityZome referencing the DnaDef
+    sqlx::query(
+        "INSERT INTO IntegrityZome (dna_hash, zome_index, zome_name, dependencies) VALUES (?, ?, ?, ?)",
+    )
+    .bind(&dna_hash)
+    .bind(0)
+    .bind("test_zome")
+    .bind("[]")
+    .execute(db_conn.pool())
+    .await
+    .expect("Failed to insert IntegrityZome");
+
+    // Verify the zome was inserted
+    let count: i32 = sqlx::query_scalar("SELECT COUNT(*) FROM IntegrityZome WHERE dna_hash = ?")
+        .bind(&dna_hash)
+        .fetch_one(db_conn.pool())
+        .await
+        .expect("Failed to count zomes");
+    assert_eq!(count, 1);
+
+    // Try to insert an IntegrityZome with a non-existent dna_hash (should fail)
+    let bad_dna_hash = vec![99u8; 32];
+    let result = sqlx::query(
+        "INSERT INTO IntegrityZome (dna_hash, zome_index, zome_name, dependencies) VALUES (?, ?, ?, ?)",
+    )
+    .bind(&bad_dna_hash)
+    .bind(0)
+    .bind("bad_zome")
+    .bind("[]")
+    .execute(db_conn.pool())
+    .await;
+
+    assert!(
+        result.is_err(),
+        "Expected foreign key constraint violation"
+    );
+    if let Err(err) = result {
+        let err_msg = err.to_string();
+        assert!(
+            err_msg.contains("FOREIGN KEY constraint failed")
+                || err_msg.contains("foreign key")
+                || err_msg.contains("constraint"),
+            "Expected foreign key error, got: {}",
+            err_msg
+        );
+    }
+
+    // Delete the DnaDef and verify cascading delete removes the zome
+    sqlx::query("DELETE FROM DnaDef WHERE hash = ?")
+        .bind(&dna_hash)
+        .execute(db_conn.pool())
+        .await
+        .expect("Failed to delete DnaDef");
+
+    let count: i32 = sqlx::query_scalar("SELECT COUNT(*) FROM IntegrityZome WHERE dna_hash = ?")
+        .bind(&dna_hash)
+        .fetch_one(db_conn.pool())
+        .await
+        .expect("Failed to count zomes after delete");
+    assert_eq!(count, 0, "Expected cascading delete to remove zome");
 }

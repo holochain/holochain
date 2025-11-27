@@ -17,6 +17,7 @@ pub mod example;
 mod handles;
 pub use handles::{DbRead, DbWrite};
 pub mod kind;
+pub mod models;
 
 /// Embedded migrations compiled into the binary.
 ///
@@ -160,6 +161,7 @@ fn configure_sqlite_options(
     let sync_value = config.sync_level.as_pragma_value().to_string();
     opts = opts
         .pragma("trusted_schema", "false")
+        .pragma("foreign_keys", "ON")
         .pragma("synchronous", sync_value);
 
     Ok(opts)
@@ -210,13 +212,13 @@ mod tests {
 
         // Verify migrations ran by checking the sample_data table exists
         let row =
-            sqlx::query("SELECT name FROM sqlite_master WHERE type='table' AND name='sample_data'")
+            sqlx::query("SELECT name FROM sqlite_master WHERE type='table' AND name='Wasm'")
                 .fetch_one(db.pool())
                 .await
                 .expect("Failed to query sqlite_master");
 
         let table_name: String = row.get(0);
-        assert_eq!(table_name, "sample_data");
+        assert_eq!(table_name, "Wasm");
 
         // Test inserting and querying data
         sqlx::query("INSERT INTO sample_data (name, value) VALUES (?, ?)")
