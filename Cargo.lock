@@ -2992,6 +2992,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "holochain_data"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "holochain_data",
+ "libsqlite3-sys",
+ "num_cpus",
+ "sodoken",
+ "sqlx",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "holochain_integrity_types"
 version = "0.7.0-dev.0"
 dependencies = [
@@ -3070,20 +3084,6 @@ dependencies = [
  "getrandom 0.3.4",
  "holochain_secure_primitive",
  "holochain_timestamp",
-]
-
-[[package]]
-name = "holochain_orm"
-version = "0.1.0"
-dependencies = [
- "base64 0.22.1",
- "holochain_orm",
- "libsqlite3-sys",
- "num_cpus",
- "sodoken",
- "sqlx",
- "tempfile",
- "tokio",
 ]
 
 [[package]]

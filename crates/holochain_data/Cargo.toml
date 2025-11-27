@@ -1,5 +1,5 @@
 [package]
-name = "holochain_orm"
+name = "holochain_data"
 version = "0.1.0"
 edition = "2021"
 
@@ -14,7 +14,7 @@ libsqlite3-sys = { version = "*", features = [
 ] }
 
 [dev-dependencies]
-holochain_orm = { path = ".", features = ["test-utils"] }
+holochain_data = { path = ".", features = ["test-utils"] }
 
 tempfile = "3.3"
 
