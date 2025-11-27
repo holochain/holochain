@@ -2924,6 +2924,7 @@ dependencies = [
  "holochain_data",
  "holochain_integrity_types",
  "holochain_serialized_bytes",
+ "holochain_types",
  "holochain_zome_types",
  "libsqlite3-sys",
  "num_cpus",

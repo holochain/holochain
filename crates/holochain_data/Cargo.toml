@@ -13,6 +13,7 @@ libsqlite3-sys = { version = "*", features = [
     "bundled-sqlcipher-vendored-openssl"
 ] }
 holo_hash = { version = "^0.7.0-dev.0", path = "../holo_hash" }
+holochain_types = { version = "^0.7.0-dev.0", path = "../holochain_types" }
 holochain_integrity_types = { version = "^0.7.0-dev.0", path = "../holochain_integrity_types" }
 holochain_zome_types = { version = "^0.7.0-dev.0", path = "../holochain_zome_types" }
 holochain_serialized_bytes = "=0.0.56"

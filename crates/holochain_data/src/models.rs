@@ -5,7 +5,9 @@
 //! The models are designed to be flat and easily mappable to SQL tables.
 
 use holo_hash::{DnaHash, WasmHash};
-use holochain_integrity_types::{DnaModifiers, zome::ZomeName};
+use holochain_integrity_types::{
+    AppEntryName, DnaModifiers, EntryDef, EntryDefId, EntryVisibility, zome::ZomeName,
+};
 use holochain_serialized_bytes::{SerializedBytes, UnsafeBytes};
 use holochain_zome_types::{
     zome::{CoordinatorZomeDef, IntegrityZomeDef, WasmZome, ZomeDef},
@@ -304,5 +306,56 @@ impl EntryDefModel {
             visibility,
             required_validations: required_validations as i64,
         }
+    }
+
+    /// Create an EntryDefModel from an EntryDef and key.
+    pub fn from_entry_def(key: Vec<u8>, entry_def: &EntryDef) -> Self {
+        let (entry_def_id, entry_def_id_type) = match &entry_def.id {
+            EntryDefId::App(name) => (name.0.to_string(), "App".to_string()),
+            EntryDefId::CapClaim => ("CapClaim".to_string(), "CapClaim".to_string()),
+            EntryDefId::CapGrant => ("CapGrant".to_string(), "CapGrant".to_string()),
+        };
+
+        let visibility = match entry_def.visibility {
+            EntryVisibility::Public => "Public".to_string(),
+            EntryVisibility::Private => "Private".to_string(),
+        };
+
+        Self {
+            key,
+            entry_def_id,
+            entry_def_id_type,
+            visibility,
+            required_validations: u8::from(entry_def.required_validations) as i64,
+        }
+    }
+
+    /// Convert to an EntryDef.
+    pub fn to_entry_def(&self) -> Result<EntryDef, String> {
+        let id = match self.entry_def_id_type.as_str() {
+            "App" => EntryDefId::App(AppEntryName(self.entry_def_id.clone().into())),
+            "CapClaim" => EntryDefId::CapClaim,
+            "CapGrant" => EntryDefId::CapGrant,
+            _ => return Err(format!("Invalid entry_def_id_type: {}", self.entry_def_id_type)),
+        };
+
+        let visibility = match self.visibility.as_str() {
+            "Public" => EntryVisibility::Public,
+            "Private" => EntryVisibility::Private,
+            _ => return Err(format!("Invalid visibility: {}", self.visibility)),
+        };
+
+        let required_validations_u8: u8 = self
+            .required_validations
+            .try_into()
+            .map_err(|e| format!("Invalid required_validations: {}", e))?;
+        let required_validations = required_validations_u8.into();
+
+        Ok(EntryDef {
+            id,
+            visibility,
+            required_validations,
+            cache_at_agent_activity: false, // Default value as mentioned in AGENTS.md
+        })
     }
 }

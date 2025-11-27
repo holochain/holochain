@@ -18,6 +18,7 @@ mod handles;
 pub use handles::{DbRead, DbWrite};
 pub mod kind;
 pub mod models;
+pub mod wasm;
 
 /// Embedded migrations compiled into the binary.
 ///
