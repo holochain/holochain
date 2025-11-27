@@ -1,8 +1,3 @@
-# sqlx prepare artifacts
-# Keep .sqlx/ for offline compilation (cargo sqlx prepare output)
-# Uncomment if not using offline mode:
-# .sqlx/
-
 # Development database
 *.db
 *.db-shm
