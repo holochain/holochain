@@ -583,9 +583,23 @@ mod dna_impls {
         )> {
             let db = &self.spaces.wasm_db;
 
-            // Load out all dna defs and associated wasms and entry defs from the database
-            // Get all the dna defs.
-            let dna_defs_with_cell_id = holochain_state::dna_def::get_all(db.as_ref()).await?;
+            // Get all installed cells from conductor state
+            let state = self.get_state().await?;
+            let all_cells: Vec<CellId> = state
+                .installed_apps()
+                .values()
+                .flat_map(|app| app.all_cells())
+                .collect();
+
+            // Retrieve DNA definitions from wasm database
+            let mut dna_defs_with_cell_id = Vec::new();
+            for cell_id in all_cells {
+                if let Some(cell_dna_tuple) =
+                    holochain_state::dna_def::get(db.as_ref(), &cell_id).await?
+                {
+                    dna_defs_with_cell_id.push(cell_dna_tuple);
+                }
+            }
 
             // Gather all the unique wasm hashes.
             let unique_wasm_hashes = dna_defs_with_cell_id

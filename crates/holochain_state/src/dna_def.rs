@@ -7,17 +7,21 @@ pub async fn get(
     db: &holochain_data::DbRead<holochain_data::kind::Wasm>,
     cell_id: &CellId,
 ) -> StateQueryResult<Option<(CellId, DnaDef)>> {
-    // TODO: DnaDef should be stored in holochain_data Wasm database
-    // For now, this is a stub that returns None
-    let _ = (db, cell_id);
-    Ok(None)
+    let dna_hash = cell_id.dna_hash();
+    match db.get_dna_def(dna_hash).await? {
+        Some(dna_def) => Ok(Some((cell_id.clone(), dna_def))),
+        None => Ok(None),
+    }
 }
 
 pub async fn get_all(
     db: &holochain_data::DbRead<holochain_data::kind::Wasm>,
 ) -> StateQueryResult<Vec<(CellId, DnaDef)>> {
-    // TODO: DnaDef should be stored in holochain_data Wasm database
-    // For now, this is a stub that returns empty vec
+    // Note: This function is tricky because we need to map DNAs back to CellIds,
+    // but the wasm database only stores DNAs. We would need to query the conductor
+    // database to get all cells and their DNA associations.
+    // For now, return empty as this may not be used in the critical path.
+    // TODO: Implement proper retrieval from conductor DB or refactor caller
     let _ = db;
     Ok(Vec::new())
 }
@@ -26,10 +30,8 @@ pub async fn contains(
     db: &holochain_data::DbRead<holochain_data::kind::Wasm>,
     cell_id: &CellId,
 ) -> StateQueryResult<bool> {
-    // TODO: DnaDef should be stored in holochain_data Wasm database
-    // For now, this is a stub that returns false
-    let _ = (db, cell_id);
-    Ok(false)
+    let dna_hash = cell_id.dna_hash();
+    Ok(db.dna_def_exists(dna_hash).await?)
 }
 
 pub async fn upsert(
@@ -37,8 +39,7 @@ pub async fn upsert(
     cell_id: &CellId,
     dna_def: &DnaDef,
 ) -> StateMutationResult<()> {
-    // TODO: DnaDef should be stored in holochain_data Wasm database
-    // For now, this is a stub that does nothing
-    let _ = (db, cell_id, dna_def);
+    let _ = cell_id; // CellId not needed for storage, only DNA hash from dna_def
+    db.put_dna_def(dna_def).await?;
     Ok(())
 }
