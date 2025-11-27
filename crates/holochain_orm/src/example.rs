@@ -20,11 +20,11 @@ pub async fn insert_sample_data(
     name: &str,
     value: Option<&str>,
 ) -> sqlx::Result<i64> {
-    let result = sqlx::query(
-        "INSERT INTO sample_data (name, value) VALUES (?, ?)"
+    let result = sqlx::query!(
+        "INSERT INTO sample_data (name, value) VALUES (?, ?)",
+        name,
+        value
     )
-    .bind(name)
-    .bind(value)
     .execute(&conn.pool)
     .await?;
 
@@ -36,10 +36,11 @@ pub async fn get_sample_data_by_id(
     conn: &HolochainDbConn<impl crate::DatabaseIdentifier>,
     id: i64,
 ) -> sqlx::Result<Option<SampleData>> {
-    let result = sqlx::query_as::<_, SampleData>(
-        "SELECT id, name, value, created_at FROM sample_data WHERE id = ?"
+    let result = sqlx::query_as!(
+        SampleData,
+        "SELECT id, name, value, created_at FROM sample_data WHERE id = ?",
+        id
     )
-    .bind(id)
     .fetch_optional(&conn.pool)
     .await?;
 
@@ -50,7 +51,8 @@ pub async fn get_sample_data_by_id(
 pub async fn get_all_sample_data(
     conn: &HolochainDbConn<impl crate::DatabaseIdentifier>,
 ) -> sqlx::Result<Vec<SampleData>> {
-    let results = sqlx::query_as::<_, SampleData>(
+    let results = sqlx::query_as!(
+        SampleData,
         "SELECT id, name, value, created_at FROM sample_data ORDER BY created_at DESC"
     )
     .fetch_all(&conn.pool)

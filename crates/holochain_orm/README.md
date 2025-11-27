@@ -71,10 +71,9 @@ let name: String = row.get(1);
 
 ### 3. Compile-time checked macros (`query!` / `query_as!`)
 
-**Note:** These require a database connection at compile time and a `DATABASE_URL` environment variable.
+**Recommended approach** - Provides compile-time SQL verification using offline prepared queries.
 
 ```rust
-// Requires compile-time database connection
 let data = sqlx::query_as!(
     SampleData,
     "SELECT id, name, value FROM sample_data WHERE id = ?",
@@ -88,30 +87,60 @@ let data = sqlx::query_as!(
 - Compile-time verification of queries against actual schema
 - Type inference from database
 - Catches SQL errors at compile time
+- Works offline with prepared query metadata (`.sqlx/` directory)
 
 **Cons:**
-- Requires database connection during compilation
-- More complex build setup
-- Not suitable for Holochain's use case (can't assume dev database available)
+- Requires running `cargo sqlx prepare` when schema changes
+- Additional `.sqlx/` directory must be committed to version control
+
+## Development Setup
+
+For compile-time query verification to work, you need to maintain prepared query metadata:
+
+```bash
+# Initial setup (or after schema changes)
+cd crates/holochain_orm
+
+# Create/update the database schema
+DATABASE_URL=sqlite:$(pwd)/dev.db sqlx database create
+DATABASE_URL=sqlite:$(pwd)/dev.db sqlx migrate run
+
+# Generate query metadata for offline compilation
+DATABASE_URL=sqlite:$(pwd)/dev.db cargo sqlx prepare -- --lib
+```
+
+The `.sqlx/` directory contains query metadata and should be committed to version control.
+
+**Note:** The `DATABASE_URL` environment variable must point to the development database using inline syntax as shown above.
+
+## CI Integration
+
+In CI, queries are verified without needing a database connection:
+
+```bash
+# Just check that queries are valid (uses committed .sqlx/ metadata)
+cargo check -p holochain_orm
+```
+
+When schema changes, developers must run `cargo sqlx prepare` locally and commit the updated `.sqlx/` files.
 
 ## Recommendation for Holochain
 
-Use **`query_as` with `FromRow` derive** (#1) as the default pattern:
+Use **compile-time checked macros** (#3) as the default pattern:
 
-- Provides good ergonomics without compile-time database requirements
-- Type-safe with explicit struct definitions
-- Works well with Holochain's build process
-- Easy to test and maintain
+- Catches SQL errors at compile time
+- Type inference from actual database schema
+- Works offline in CI using prepared query metadata
+- No runtime cost for query verification
 
-Use **manual `Row` access** (#2) for:
+Use **`query_as` with `FromRow` derive** (#1) for:
+- Queries that need to be constructed dynamically
+- Situations where compile-time checking isn't practical
+
+Use **manual `Row` access** (#2) only for:
 - Dynamic queries where column set isn't known
 - Simple utility queries that don't warrant a struct
 - Performance-critical code where you need fine control
-
-Avoid **compile-time macros** (#3) because:
-- Holochain builds in various environments without access to a development database
-- The embedded migrations approach already provides schema documentation
-- Runtime query validation is sufficient for our needs
 
 ## Example Usage
 
