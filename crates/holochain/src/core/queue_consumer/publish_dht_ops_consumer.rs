@@ -24,14 +24,16 @@ pub fn spawn_publish_dht_ops_consumer(
         interval.map(|i| i..i)
     };
     #[cfg(not(feature = "test_utils"))]
-    let publish_override_interval = None;
+    let publish_override_interval = Duration::from_secs(60)..Duration::from_secs(60 * 5);
 
     // Create a trigger with an exponential back off starting at 1 minute
     // and maxing out at 5 minutes.
     // The back off is reset any time the trigger is called (when new data is committed)
     let (tx, rx) = TriggerSender::new_with_loop(
-        publish_override_interval
-            .unwrap_or_else(|| Duration::from_secs(60)..Duration::from_secs(60 * 5)),
+        #[cfg(feature = "test_utils")]
+        publish_override_interval.unwrap_or(Duration::from_secs(60)..Duration::from_secs(60 * 5)),
+        #[cfg(not(feature = "test_utils"))]
+        publish_override_interval,
         true,
     );
     let sender = tx.clone();
