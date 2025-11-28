@@ -28,6 +28,7 @@ members = [
   "crates/holochain_secure_primitive",
   "crates/holochain_conductor_config",
   "crates/timestamp",
+  "crates/holochain_data",
 
   "crates/client",
   "crates/hc_client",

@@ -1,0 +1,5 @@
+# sqlx prepare artifacts
+# Development database
+*.db
+*.db-shm
+*.db-wal
