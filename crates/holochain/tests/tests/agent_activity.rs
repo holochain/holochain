@@ -25,6 +25,7 @@ async fn get_agent_activity() {
     conductor_batch[0]
         .declare_full_storage_arcs(dna.dna_hash())
         .await;
+    conductor_batch.exchange_peer_info().await;
 
     let mut created_hashes = Vec::new();
     for _ in 0..5 {
@@ -38,12 +39,6 @@ async fn get_agent_activity() {
 
         created_hashes.push(created);
     }
-
-    // Wait for gossip to have started, so we know that Bob will be able to connect to Alice
-    conductor_batch[1]
-        .require_initial_gossip_activity_for_cell(bob_cell, 1, std::time::Duration::from_secs(30))
-        .await
-        .unwrap();
 
     // TODO No way to force a network call to get the agent activity, so we have to wait for a sync
     //      first and then check the agent activity

@@ -112,7 +112,7 @@ use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::actor::GetOptions as NetworkGetOptions;
+use holochain_p2p::actor::{NetworkRequestOptions as NetworkGetOptions, NetworkRequestOptions};
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
@@ -727,7 +727,7 @@ async fn retrieve_deleted_action(
 ) -> AppValidationOutcome<SignedActionHashed> {
     let cascade = CascadeImpl::from_workspace_and_network(workspace, network.clone());
     let (deleted_action, _) = cascade
-        .retrieve_action(deletes_address.clone(), NetworkGetOptions::default())
+        .retrieve_action(deletes_address.clone(), NetworkRequestOptions::default())
         .await?
         .ok_or_else(|| Outcome::awaiting(deletes_address))?;
     Ok(deleted_action)
@@ -775,7 +775,7 @@ async fn run_validation_callback(
                 let cascade = cascade.clone();
                 async move {
                     let result = cascade
-                        .fetch_record(hash.clone(), NetworkGetOptions::must_get_options())
+                        .fetch_record(hash.clone(), NetworkRequestOptions::must_get_options())
                         .await;
                     if let Err(err) = result {
                         tracing::warn!("error fetching dependent hash {hash:?}: {err}");
@@ -806,7 +806,11 @@ async fn run_validation_callback(
                 let author = author.clone();
                 async move {
                     let result = cascade
-                        .must_get_agent_activity(author.clone(), filter)
+                        .must_get_agent_activity(
+                            author.clone(),
+                            filter,
+                            NetworkGetOptions::must_get_options(),
+                        )
                         .await;
                     if let Err(err) = result {
                         tracing::warn!("error fetching dependent chain of agent {author:?}: {err}");

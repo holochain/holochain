@@ -72,8 +72,10 @@ pub struct EntryDefs(pub Vec<EntryDef>);
     Serialize,
     Deserialize,
     SerializedBytes,
+    Default,
 )]
 pub enum EntryVisibility {
+    #[default]
     Public,
     Private,
 }
@@ -91,12 +93,6 @@ impl AppEntryName {
     /// Create a new [`AppEntryName`] from a `&'static str`.
     pub const fn from_str(s: &'static str) -> Self {
         Self(Cow::Borrowed(s))
-    }
-}
-
-impl Default for EntryVisibility {
-    fn default() -> Self {
-        Self::Public
     }
 }
 

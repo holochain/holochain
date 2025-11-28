@@ -35,9 +35,10 @@ pub struct ChainFilter<H: Eq + Ord + std::hash::Hash = ActionHash> {
 }
 
 /// Specify when to stop walking down the chain.
-#[derive(Serialize, Deserialize, Debug, Eq, Clone)]
+#[derive(Serialize, Deserialize, Debug, Eq, Clone, Default)]
 pub enum LimitConditions<H: Eq + Ord + std::hash::Hash = ActionHash> {
     /// Allow all up to genesis.
+    #[default]
     ToGenesis,
     /// Take this many actions (inclusive of the starting position).
     Take(u32),
@@ -218,12 +219,6 @@ impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
             LimitConditions::Multiple(_, _, ts) => ts,
             _ => None,
         }
-    }
-}
-
-impl<H: Eq + Ord + std::hash::Hash> Default for LimitConditions<H> {
-    fn default() -> Self {
-        Self::ToGenesis
     }
 }
 

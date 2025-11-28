@@ -95,15 +95,6 @@ pub enum HcSandboxSubcommand {
     /// Run conductor(s) from existing sandbox(es).
     Run(Run),
 
-    /// Make a call to a conductor's admin interface.
-    Call(crate::calls::Call),
-
-    /// Create and authorize credentials for making zome calls.
-    ZomeCallAuth(crate::zome_call::ZomeCallAuth),
-
-    /// Make a call to a zome function on a running app.
-    ZomeCall(crate::zome_call::ZomeCall),
-
     /// List sandboxes found in `$(pwd)/.hc`.
     List {
         /// Show more verbose information.
@@ -124,6 +115,16 @@ pub enum HcSandboxSubcommand {
         /// For example `hc sandbox remove 1 3 5` or `hc remove run 1`
         #[arg(required = true, num_args = 1..)]
         indices: Vec<usize>,
+    },
+
+    /// Get admin ports from existing sandbox(es).
+    ///
+    /// This command outputs a JSON array of admin ports to stdout,
+    /// which can be used with hc-client to connect to running conductors.
+    AdminPorts {
+        /// (flattened)
+        #[command(flatten)]
+        existing: Existing,
     },
 
     /// Create a fresh sandbox with no apps installed.
@@ -212,22 +213,6 @@ impl HcSandbox {
                 crate::save::release_ports(std::env::current_dir()?).await?;
                 return result;
             }
-            HcSandboxSubcommand::Call(call) => {
-                crate::calls::call(
-                    &self.holochain_path,
-                    call,
-                    self.force_admin_ports,
-                    self.structured,
-                )
-                .await?
-            }
-            HcSandboxSubcommand::ZomeCallAuth(auth) => {
-                crate::zome_call::zome_call_auth(auth, self.force_admin_ports.first().cloned())
-                    .await?
-            }
-            HcSandboxSubcommand::ZomeCall(call) => {
-                crate::zome_call::zome_call(call, self.force_admin_ports.first().cloned()).await?
-            }
             HcSandboxSubcommand::List { verbose } => {
                 crate::save::list(std::env::current_dir()?, verbose)?
             }
@@ -258,6 +243,15 @@ impl HcSandbox {
                     1 => msg!("1 sandbox path has been removed"),
                     _ => msg!("{} sandbox paths have been removed", removed_count),
                 }
+            }
+            HcSandboxSubcommand::AdminPorts { existing } => {
+                let paths = existing.load(std::env::current_dir()?)?;
+                if paths.is_empty() {
+                    println!("[]");
+                    return Ok(());
+                }
+                let ports = crate::ports::get_admin_ports(paths).await?;
+                println!("{}", serde_json::to_string(&ports)?);
             }
             HcSandboxSubcommand::Create(Create {
                 num_sandboxes,

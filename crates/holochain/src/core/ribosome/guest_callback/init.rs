@@ -153,7 +153,7 @@ mod test {
             )
         };
 
-        for (mut results, expected) in vec![
+        for (mut results, expected) in [
             (vec![], result_pass()),
             (vec![cb_pass()], result_pass()),
             (vec![cb_fail()], result_fail()),

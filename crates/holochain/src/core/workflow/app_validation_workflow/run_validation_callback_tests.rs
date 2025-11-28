@@ -180,7 +180,7 @@ async fn validation_callback_awaiting_deps_hashes() {
     // mock network that returns the requested create action
     let mut network = MockHolochainP2pDnaT::new();
     let action_to_return = create_action_signed_hashed.clone();
-    network.expect_get().returning(move |hash| {
+    network.expect_get().returning(move |hash, _| {
         assert_eq!(hash, action_to_return.as_hash().clone().into());
         Ok(vec![WireOps::Record(WireRecordOps {
             action: Some(Judged::new(
@@ -300,7 +300,7 @@ async fn validation_callback_awaiting_deps_agent_activity() {
         let expected_chain_top = expected_chain_top.clone();
         let create_action_signed_hashed = create_action_signed_hashed.clone();
         let delete_action_signed_hashed = delete_action_signed_hashed.clone();
-        move |author, filter| {
+        move |author, filter, _| {
             assert_eq!(author, alice);
             assert_eq!(&filter.chain_top, expected_chain_top.as_hash());
 

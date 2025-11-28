@@ -145,7 +145,7 @@ mod test {
         };
         let cb_invalid = || ValidateCallbackResult::Invalid("".into());
 
-        for (mut results, expected) in vec![
+        for (mut results, expected) in [
             (vec![], result_valid()),
             (vec![cb_valid()], result_valid()),
             (vec![cb_invalid()], result_invalid()),

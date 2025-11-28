@@ -86,7 +86,8 @@
 //!
 //! | Full Metric Name | Type | Unit (optional) | Description | Attributes |
 //! | ---------------- | ---- | --------------- | ----------- | ---------- |
-//! | `hc.holochain_p2p.request.duration` | `f64_histogram` | `s` | The time waiting for a response from a p2p request. |- `dna_hash`: The DNA hash that the request is being sent on behalf of.<br />- `tag`: The name of the host fn requested to the remote peer.<br />- `url`: The remote peer url called.<br />- `error`: Flag indicating if the request failed.|
+//! | `hc.holochain_p2p.request.duration` | `f64_histogram` | `s` | The time spent sending an outgoing p2p request awaiting the response. |- `dna_hash`: The DNA hash that the request is being sent on behalf of.<br />- `tag`: The name of the host fn requested to the remote peer.<br />- `url`: The remote peer url called.<br />- `error`: Flag indicating if the request failed.|
+//! | `hc.holochain_p2p.handle_request.duration` | `f64_histogram` | `s` | The time spent handling an incoming p2p request. |- `message_type`: The message type.<br />- `dna_hash`: The DNA hash that the request is being sent on behalf of.<br />- `to_agent`: The agent to which the request is made.<br />- `agent`: The agent for which the request is made (in case of `get_agent_activity` and `must_get_agent_activity` requests).<br />|
 //! | `hc.conductor.post_commit.duration` | `f64_histogram` | `s` | The time spent executing a post commit. |- `dna_hash`: The DNA hash that this post commit is running for.<br />- `agent`: The agent running the post commit. |
 //! | `hc.conductor.workflow.duration` | `f64_histogram` | `s` | The time spent running a workflow. |- `workflow`: The name of the workflow.<br />- `dna_hash`: The DNA hash that this workflow is running for.<br />- `agent`: (optional) The agent that this workflow is running for if the workflow is cell bound. |
 //! | `hc.cascade.duration` | `f64_histogram` | `s` | The time taken to execute a cascade query. | |

@@ -1,0 +1,10 @@
+manifest_version: '0'
+name: a dna
+integrity:
+  network_seed: 00000000-0000-0000-0000-000000000000
+  properties: null
+  zomes:
+    - name: zome1
+      path: ./zomes/test_wasm_foo.wasm
+coordinator:
+  zomes: []

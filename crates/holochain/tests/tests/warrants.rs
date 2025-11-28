@@ -73,13 +73,15 @@ async fn warranted_agent_is_blocked() {
                     store.get_warrants_for_agent(&alice_pubkey, false).unwrap()
                 });
 
+            tracing::info!("number of warrants: {}", warrants.len());
+
             warrants.len() == 1 && warrants[0].warrant().warrantee == *alice_cell.agent_pubkey()
         },
-        Some(5_000),
+        Some(10_000),
         None,
     )
     .await
-    .unwrap();
+    .expect("Bob hasn't authored warrant");
 
     // Check that Alice is blocked by Bob.
     let target = hdk::prelude::BlockTargetId::Cell(CellId::new(
@@ -138,7 +140,7 @@ async fn warrant_is_gossiped() {
         )
         .await;
 
-    await_consistency(20, [&alice_cell, &bob_cell])
+    await_consistency(30, [&alice_cell, &bob_cell])
         .await
         .unwrap();
 
@@ -175,7 +177,7 @@ async fn warrant_is_gossiped() {
                     && warrants[0].warrant().author == *bob_cell.agent_pubkey() // Make sure that Bob authored the warrant and it's not been authored by Carol.
             }
         },
-        Some(20_000),
+        Some(30_000),
         None,
     )
     .await

@@ -19,6 +19,7 @@
 // Useful to have this public when using this as a library.
 use clap::{crate_version, Parser, Subcommand};
 pub use holochain_cli_bundle as hc_bundle;
+use holochain_cli_client as hc_client;
 use holochain_cli_sandbox as hc_sandbox;
 use lazy_static::lazy_static;
 use std::process::Command;
@@ -61,7 +62,7 @@ Work with DNA, hApp and web-hApp bundle files, set up sandbox environments for t
 }
 
 fn builtin_commands() -> Vec<String> {
-    ["hc-web-app", "hc-dna", "hc-app", "hc-sandbox"]
+    ["hc-web-app", "hc-dna", "hc-app", "hc-sandbox", "hc-client"]
         .iter()
         .map(|s| s.to_string())
         .collect()
@@ -89,6 +90,8 @@ pub enum CliSubcommand {
     WebApp(hc_bundle::HcWebAppBundle),
     /// Work with sandboxed environments for testing and development.
     Sandbox(hc_sandbox::HcSandbox),
+    /// Connect to and interact with running Holochain conductors.
+    Client(hc_client::HcClient),
     /// Allow redirect of external subcommands (like `hc-scaffold` and `hc-launch`).
     #[command(external_subcommand)]
     External(Vec<String>),
@@ -102,6 +105,7 @@ impl CliSubcommand {
             CliSubcommand::Dna(cmd) => cmd.run().await?,
             CliSubcommand::WebApp(cmd) => cmd.run().await?,
             CliSubcommand::Sandbox(cmd) => cmd.run().await?,
+            CliSubcommand::Client(cmd) => cmd.run().await?,
             CliSubcommand::External(args) => {
                 let command_suffix = args.first().expect("Missing subcommand name");
                 Command::new(format!("hc-{command_suffix}"))

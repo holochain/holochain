@@ -9,20 +9,19 @@ async fn gossip_test() {
     holochain_trace::test_run();
     let config =
         SweetConductorConfig::standard().tune_network_config(|nc| nc.disable_publish = true);
-    let mut conductors = SweetConductorBatch::from_config(2, config).await;
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Anchor]).await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     let ((cell_1,), (cell_2,)) = apps.into_tuples();
-    conductors.exchange_peer_info().await;
 
     let anchor = AnchorInput("alice".to_string(), "0".to_string());
     let _: EntryHash = conductors[0]
         .call(&cell_1.zome(TestWasm::Anchor), "anchor", anchor)
         .await;
 
-    await_consistency(60, [&cell_1, &cell_2]).await.unwrap();
+    await_consistency(30, [&cell_1, &cell_2]).await.unwrap();
 
     let hashes: EntryHashes = conductors[1]
         .call(

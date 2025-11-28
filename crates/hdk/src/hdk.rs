@@ -14,6 +14,8 @@ thread_local!(pub static HDK: RefCell<Rc<dyn HdkT>> = RefCell::new(Rc::new(ErrHd
 #[cfg(all(not(feature = "mock"), target_arch = "wasm32"))]
 thread_local!(pub static HDK: RefCell<Rc<dyn HdkT>> = RefCell::new(Rc::new(HostHdk)));
 
+/// Trait for functionality that must be provided for the HDK to function.
+///
 /// When mocking is enabled the mockall crate automatically builds a MockHdkT for us.
 /// ```ignore
 /// let mut mock = MockHdkT::new();

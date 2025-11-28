@@ -132,7 +132,7 @@ mod test {
     // More complex setups.
     #[tokio::test(flavor = "multi_thread")]
     async fn block_complex_setup() {
-        for (setup, checks) in vec![
+        for (setup, checks) in [
             // simple setup to smoke test the test itself
             (
                 vec![(0, 1, true)],
@@ -505,7 +505,7 @@ mod test {
     // Unblocks reinstate pre and post blocks.
     #[tokio::test(flavor = "multi_thread")]
     async fn block_unblock_reinstates_adjacent_blocks() {
-        for (block_start, block_end, unblock_start, unblock_end, check) in vec![
+        for (block_start, block_end, unblock_start, unblock_end, check) in [
             (0, 1, 0, 0, 1),
             (0, 1, 1, 1, 0),
             (0, 2, 1, 1, 0),

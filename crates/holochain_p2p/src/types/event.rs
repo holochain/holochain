@@ -8,8 +8,8 @@ use holochain_zome_types::signature::Signature;
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct GetLinksOptions {}
 
-impl From<&actor::GetLinksOptions> for GetLinksOptions {
-    fn from(_a: &actor::GetLinksOptions) -> Self {
+impl From<&actor::GetLinksRequestOptions> for GetLinksOptions {
+    fn from(_a: &actor::GetLinksRequestOptions) -> Self {
         Self {}
     }
 }

@@ -136,11 +136,6 @@ async fn retry_countersigning_commit_on_missing_deps() {
 
     let config = SweetConductorConfig::rendezvous(true).tune_network_config(|nc| {
         nc.request_timeout_s = 10;
-        nc.advanced = Some(serde_json::json!({
-            "tx5Transport": {
-                "signalAllowPlainText": true,
-            }
-        }));
         nc.disable_publish = true;
         nc.disable_gossip = true;
     });
@@ -154,7 +149,6 @@ async fn retry_countersigning_commit_on_missing_deps() {
                     None,
                     Some(rendezvous.clone()),
                     false,
-                    true,
                 )
             })
             .take(3),

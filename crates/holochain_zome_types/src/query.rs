@@ -28,9 +28,10 @@ use std::collections::HashSet;
 // a full sequence of records/actions is provided but it would need to be
 // handled as inclusive first, to enforce the integrity of the query, then the
 // exclusiveness achieved by simply removing the final record after the fact.
-#[derive(serde::Serialize, serde::Deserialize, PartialEq, Clone, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, PartialEq, Clone, Debug, Default)]
 pub enum ChainQueryFilterRange {
     /// Do NOT apply any range filtering for this query.
+    #[default]
     Unbounded,
     /// A range over source chain sequence numbers.
     ///
@@ -44,12 +45,6 @@ pub enum ChainQueryFilterRange {
     ///
     /// N = 0 returns only the record with this `ActionHash`.
     ActionHashTerminated(ActionHash, u32),
-}
-
-impl Default for ChainQueryFilterRange {
-    fn default() -> Self {
-        Self::Unbounded
-    }
 }
 
 /// Specifies arguments to a query of the source chain, including ordering and filtering.

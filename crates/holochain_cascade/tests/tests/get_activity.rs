@@ -3,7 +3,7 @@ use holo_hash::DnaHash;
 use holochain_cascade::error::CascadeResult;
 use holochain_cascade::test_utils::*;
 use holochain_cascade::CascadeImpl;
-use holochain_p2p::actor::GetActivityOptions;
+use holochain_p2p::actor::{GetActivityOptions, NetworkRequestOptions};
 use holochain_sqlite::db::DbKindAuthored;
 use holochain_sqlite::db::DbKindCache;
 use holochain_sqlite::db::DbKindDht;
@@ -681,7 +681,7 @@ async fn test_must_get_agent_activity_inner(
         cascade = cascade.with_scratch(sync_scratch);
     }
     cascade
-        .must_get_agent_activity(author, filter)
+        .must_get_agent_activity(author, filter, NetworkRequestOptions::must_get_options())
         .await
         .unwrap()
 }

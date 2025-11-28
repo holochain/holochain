@@ -132,7 +132,7 @@ async fn get_links() {
 
     fill_db(&db.to_db(), td.store_entry_op.clone()).await;
     fill_db(&db.to_db(), td.create_link_op.clone()).await;
-    let options = actor::GetLinksOptions::default();
+    let options = actor::GetLinksRequestOptions::default();
 
     let result = handle_get_links(db.to_db().into(), td.link_key.clone(), (&options).into())
         .await

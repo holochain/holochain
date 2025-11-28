@@ -181,7 +181,7 @@ async fn test_signing_error_during_genesis() {
         ..Default::default()
     };
     let mut conductor = SweetConductor::new(
-        SweetConductor::handle_from_existing(bad_keystore, &config, &[], false).await,
+        SweetConductor::handle_from_existing(bad_keystore, &config, &[]).await,
         db_dir.into(),
         config.into(),
         None,

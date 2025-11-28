@@ -9,6 +9,7 @@ use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 use wasmer::RuntimeError;
+use holochain_p2p::actor::NetworkRequestOptions;
 
 #[cfg_attr(
     feature = "instrument",
@@ -51,7 +52,7 @@ pub fn must_get_agent_activity(
                     ),
                 };
                 let result = cascade
-                    .must_get_agent_activity(author.clone(), chain_filter.clone())
+                    .must_get_agent_activity(author.clone(), chain_filter.clone(), NetworkRequestOptions::must_get_options())
                     .await
                     .map_err(|cascade_error| -> RuntimeError {
                         wasm_error!(WasmErrorInner::Host(cascade_error.to_string())).into()

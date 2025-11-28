@@ -30,8 +30,8 @@ async fn setup_tests() -> (
     // Install two different apps on one conductor: app1 (dna1, dna2) and app2 (dna3)
     // Install another app on both conductors: app3 (dna4)
     let mut conductors =
-        SweetConductorBatch::from_config(2, SweetConductorConfig::standard()).await;
-    conductors.exchange_peer_info().await;
+        SweetConductorBatch::from_config_rendezvous(2, SweetConductorConfig::rendezvous(true))
+            .await;
 
     let app1_id: InstalledAppId = "app1".into();
     let app2_id: InstalledAppId = "app2".into();

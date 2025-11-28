@@ -31,7 +31,6 @@ macro_rules! msg {
 }
 
 pub mod bundles;
-pub mod calls;
 pub mod cli;
 #[doc(hidden)]
 pub mod cmds;
@@ -41,4 +40,3 @@ pub mod save;
 pub use cli::HcSandbox;
 
 mod ports;
-mod zome_call;

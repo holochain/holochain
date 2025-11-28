@@ -1,8 +1,8 @@
 # holochain Makefile
 
 # All default features of binaries excluding mutually exclusive features wasmer_sys & wasmer_wamr
-DEFAULT_FEATURES=slow_tests,build_wasms,sqlite-encrypted,hc_demo_cli/build_demo
-UNSTABLE_FEATURES=chc,unstable-sharding,unstable-warrants,unstable-functions,unstable-countersigning,unstable-migration,$(DEFAULT_FEATURES)
+DEFAULT_FEATURES=slow_tests,build_wasms,sqlite-encrypted
+UNSTABLE_FEATURES=chc,unstable-sharding,unstable-warrants,unstable-functions,unstable-migration,$(DEFAULT_FEATURES)
 
 # mark everything as phony because it doesn't represent a file-system output
 .PHONY: default \
@@ -101,3 +101,10 @@ test-workspace-wasmer_wamr:
 		--locked \
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_wamr
+
+clean:
+	cargo clean
+    # Remove untracked .dna files
+	git ls-files -z --others --ignored --exclude-standard -- '*.dna' | xargs -0 rm --
+    # Remove untracked .happ files
+	git ls-files -z --others --ignored --exclude-standard '*.happ' | xargs -0 rm --
