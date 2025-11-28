@@ -65,12 +65,10 @@ async fn test_error_on_non_directory_path() {
 
     let db_id = TestDbId("test_database".to_string());
     let config = holochain_data::HolochainDataConfig::new();
-    let result = setup_holochain_data(file_path, db_id, config).await;
-
-    assert!(result.is_err(), "Expected error for non-directory path");
-    if let Err(err) = result {
-        assert!(err.to_string().contains("Path must be a directory"));
-    }
+    let err = setup_holochain_data(file_path, db_id, config)
+        .await
+        .unwrap_err();
+    assert!(err.to_string().contains("Path must be a directory"));
 }
 
 #[tokio::test]
@@ -174,23 +172,21 @@ async fn test_encrypted_database_wrong_key_fails() {
         .expect("Failed to generate second database key");
 
     let config2 = holochain_data::HolochainDataConfig::new().with_key(db_key2);
-    let result2 = setup_holochain_data(&tmp_dir, db_id.clone(), config2).await;
     // With WAL mode enabled, connection fails immediately with wrong key
     // because enabling WAL requires reading the database header
-    if let Err(err) = result2 {
-        // SQLCipher returns errors related to SQL or encryption when the wrong key is used
-        let err_msg = err.to_string();
-        assert!(
-            err_msg.contains("not a database")
-                || err_msg.contains("encrypted")
-                || err_msg.contains("cipher")
-                || err_msg.contains("SQL logic error"),
-            "Expected encryption-related error, got: {}",
-            err_msg
-        );
-    } else {
-        panic!("Connection should fail with wrong encryption key");
-    }
+    let err = setup_holochain_data(&tmp_dir, db_id.clone(), config2)
+        .await
+        .unwrap_err();
+    // SQLCipher returns errors related to SQL or encryption when the wrong key is used
+    let err_msg = err.to_string();
+    assert!(
+        err_msg.contains("not a database")
+            || err_msg.contains("encrypted")
+            || err_msg.contains("cipher")
+            || err_msg.contains("SQL logic error"),
+        "Expected encryption-related error, got: {}",
+        err_msg
+    );
 }
 
 #[tokio::test]
@@ -405,7 +401,7 @@ async fn test_foreign_key_constraints() {
 
     // Try to insert an IntegrityZome with a non-existent dna_hash (should fail)
     let bad_dna_hash = vec![99u8; 32];
-    let result = sqlx::query(
+    let err = sqlx::query(
         "INSERT INTO IntegrityZome (dna_hash, zome_index, zome_name, dependencies) VALUES (?, ?, ?, ?)",
     )
     .bind(&bad_dna_hash)
@@ -413,19 +409,16 @@ async fn test_foreign_key_constraints() {
     .bind("bad_zome")
     .bind("[]")
     .execute(db_conn.pool())
-    .await;
-
-    assert!(result.is_err(), "Expected foreign key constraint violation");
-    if let Err(err) = result {
-        let err_msg = err.to_string();
-        assert!(
-            err_msg.contains("FOREIGN KEY constraint failed")
-                || err_msg.contains("foreign key")
-                || err_msg.contains("constraint"),
-            "Expected foreign key error, got: {}",
-            err_msg
-        );
-    }
+    .await
+    .unwrap_err();
+    let err_msg = err.to_string();
+    assert!(
+        err_msg.contains("FOREIGN KEY constraint failed")
+            || err_msg.contains("foreign key")
+            || err_msg.contains("constraint"),
+        "Expected foreign key error, got: {}",
+        err_msg
+    );
 
     // Delete the DnaDef and verify cascading delete removes the zome
     sqlx::query("DELETE FROM DnaDef WHERE hash = ?")
