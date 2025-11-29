@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Docs: Outline process for updating all Holochain tooling in an issue template. \#5472.
 - Refactor: Use production transport for all tests instead of in-memory implementations. \#5442
 
 ## 0.6.0
