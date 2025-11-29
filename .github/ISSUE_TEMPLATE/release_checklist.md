@@ -95,7 +95,7 @@ Assigned to @
 
 - [ ] binaries
 - [ ] wind-tunnel
-- [ ] matthme/holochain-binaries
+- [ ] matthme/holochain-binaries - Wait for hourly cronjob to run and confirm that it successfully published binaries.
 - [ ] Holonix: nix, holochain
 - [ ] hc-spin-rust-utils
 
