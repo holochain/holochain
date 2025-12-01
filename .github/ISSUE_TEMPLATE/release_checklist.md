@@ -169,9 +169,8 @@ Assigned to @
 Assigned to @
 
 - [ ] `holonix`
-    - Bump `hc-spin`.
-    - Bump `hc-scaffold`.
-    - Bump `playground`.
+    - Pin `hc-scaffold` to new release tag.
+    - Pin `playground` to new release tag.
 
 **App Tooling Complete**
 
