@@ -497,7 +497,18 @@ mod zero_arc {
                     )
                     .await;
 
-                result.is_ok()
+                if let Ok(activity) = result {
+                    // Verify that the response contains warrants for Alice
+                    if !activity.warrants.is_empty() {
+                        activity.warrants.iter().all(|warrant| {
+                            warrant.warrantee == *alice_cell.agent_pubkey()
+                        })
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
             },
             Some(90_000),
             None,
