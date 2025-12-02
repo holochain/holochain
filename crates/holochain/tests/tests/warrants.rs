@@ -550,17 +550,31 @@ mod zero_arc {
             .await
             .unwrap();
 
-        // Carol calls must_get_agent_activity on Alice and blocks the warrant authors.
-        let _: Vec<RegisterAgentActivity> = carol_conductor
-            .call(
-                &carol_cell.zome(SweetInlineZomes::COORDINATOR),
-                "must_get_agent_activity",
-                MustGetAgentActivityInput {
-                    author: alice_cell.agent_pubkey().clone(),
-                    chain_filter: ChainFilter::new(action_hash),
-                },
-            )
-            .await;
+        // Carol calls must_get_agent_activity on Alice until she successfully receives
+        // the warrant and blocks the warrant authors. This may need retries because the
+        // first attempt might fail if Carol tries to contact the now-disabled Alice.
+        retry_fn_until_timeout(
+            || async {
+                let result: Result<Vec<RegisterAgentActivity>, _> = carol_conductor
+                    .call_fallible(
+                        &carol_cell.zome(SweetInlineZomes::COORDINATOR),
+                        "must_get_agent_activity",
+                        MustGetAgentActivityInput {
+                            author: alice_cell.agent_pubkey().clone(),
+                            chain_filter: ChainFilter::new(action_hash.clone()),
+                        },
+                    )
+                    .await;
+                match result {
+                    Ok(_activity) => true,
+                    Err(_e) => false,
+                }
+            },
+            Some(70_000), // Slightly longer than the 60s timeout to allow at least one retry
+            None,
+        )
+        .await
+        .unwrap();
 
         // Check that Carol has blocked Alice.
         retry_fn_until_timeout(
