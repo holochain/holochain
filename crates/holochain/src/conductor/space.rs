@@ -22,7 +22,7 @@ use holochain_sqlite::prelude::{
     DatabaseResult, DbKey, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbSyncLevel,
     DbSyncStrategy, DbWrite, PoolConfig, ReadAccess,
 };
-use holochain_state::{host_fn_workspace::SourceChainWorkspace, mutations, prelude::*};
+use holochain_state::{host_fn_workspace::SourceChainWorkspace, prelude::*};
 use holochain_util::timed;
 use lair_keystore_api::prelude::SharedLockedArray;
 use rusqlite::OptionalExtension;
@@ -44,7 +44,10 @@ pub struct Spaces {
     pub(crate) config: Arc<ConductorConfig>,
     /// The map of running queue consumer workflows.
     pub(crate) queue_consumer_map: QueueConsumerMap,
-    pub(crate) conductor_db: DbWrite<DbKindConductor>,
+    /// Conductor database (holochain_data) for normalized ConductorState
+    pub(crate) conductor_db: holochain_data::DbWrite<holochain_data::kind::Conductor>,
+    /// Legacy conductor database (holochain_sqlite) for Nonce and BlockSpan tables
+    pub(crate) conductor_sqlite_db: DbWrite<DbKindConductor>,
     pub(crate) wasm_db: holochain_data::DbWrite<holochain_data::kind::Wasm>,
     db_key: DbKey,
 }
@@ -162,18 +165,6 @@ impl Spaces {
             DbSyncStrategy::Resilient => DbSyncLevel::Normal,
         };
 
-        let conductor_db = tokio::task::block_in_place(|| {
-            let conductor_db = DbWrite::open_with_pool_config(
-                root_db_dir.as_ref(),
-                DbKindConductor,
-                PoolConfig {
-                    synchronous_level: db_sync_level,
-                    key: db_key.clone(),
-                },
-            )?;
-            ConductorResult::Ok(conductor_db)
-        })?;
-
         let db_sync = match db_sync_level {
             DbSyncLevel::Off => holochain_data::DbSyncLevel::Off,
             DbSyncLevel::Normal => holochain_data::DbSyncLevel::Normal,
@@ -184,6 +175,29 @@ impl Spaces {
         let data_db_key = holochain_data::DbKey::load(db_key.locked.clone(), passphrase.clone())
             .await
             .map_err(ConductorError::other)?;
+
+        let conductor_sqlite_db = tokio::task::block_in_place(|| {
+            let conductor_sqlite_db = DbWrite::open_with_pool_config(
+                root_db_dir.as_ref(),
+                DbKindConductor,
+                PoolConfig {
+                    synchronous_level: db_sync_level,
+                    key: db_key.clone(),
+                },
+            )?;
+            ConductorResult::Ok(conductor_sqlite_db)
+        })?;
+
+        let conductor_db = holochain_data::setup_holochain_data(
+            root_db_dir.as_ref(),
+            holochain_data::kind::Conductor,
+            holochain_data::HolochainDataConfig {
+                key: Some(data_db_key.clone()),
+                sync_level: db_sync,
+            },
+        )
+        .await
+        .map_err(|e| std::io::Error::other(e.to_string()))?;
 
         let wasm_db = holochain_data::setup_holochain_data(
             root_db_dir.as_ref(),
@@ -202,6 +216,7 @@ impl Spaces {
             config,
             queue_consumer_map: QueueConsumerMap::new(),
             conductor_db,
+            conductor_sqlite_db,
             wasm_db,
             db_key,
         })
@@ -209,7 +224,7 @@ impl Spaces {
 
     /// Unblock some target.
     pub async fn unblock(&self, input: Block) -> DatabaseResult<()> {
-        holochain_state::block::unblock(&self.conductor_db, input).await
+        holochain_state::block::unblock(&self.conductor_sqlite_db, input).await
     }
 
     async fn node_agents_in_spaces(
@@ -290,7 +305,7 @@ impl Spaces {
             return Ok(false);
         }
 
-        self.conductor_db
+        self.conductor_sqlite_db
             .read_async(move |txn| {
                 Ok(
                     // If the target_id is directly blocked then we always return true.
@@ -317,7 +332,11 @@ impl Spaces {
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn get_state(&self) -> ConductorResult<ConductorState> {
         timed!([1, 10, 1000], "get_state", {
-            match query_conductor_state(&self.conductor_db).await? {
+            match crate::conductor::state_persistence::load_conductor_state(
+                self.conductor_db.as_ref(),
+            )
+            .await?
+            {
                 Some(state) => Ok(state),
                 // update_state will again try to read the state. It's a little
                 // inefficient in the infrequent case where we haven't saved the
@@ -347,22 +366,24 @@ impl Spaces {
         O: Send + 'static,
     {
         timed!([1, 10, 1000], "update_state_prime", {
-            self.conductor_db
-                .write_async(move |txn| {
-                    let state = txn
-                        .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
-                            row.get("blob")
-                        })
-                        .optional()?;
-                    let state = match state {
-                        Some(state) => from_blob(state)?,
-                        None => ConductorState::default(),
-                    };
-                    let (new_state, output) = f(state)?;
-                    mutations::insert_conductor_state(txn, (&new_state).try_into()?)?;
-                    Result::<_, ConductorError>::Ok((new_state, output))
-                })
-                .await
+            // Load current state from normalized tables
+            let state = crate::conductor::state_persistence::load_conductor_state(
+                self.conductor_db.as_ref(),
+            )
+            .await?
+            .unwrap_or_default();
+
+            // Apply the transformation
+            let (new_state, output) = f(state)?;
+
+            // Save new state to normalized tables
+            crate::conductor::state_persistence::save_conductor_state(
+                &self.conductor_db,
+                &new_state,
+            )
+            .await?;
+
+            Ok((new_state, output))
         })
     }
 
