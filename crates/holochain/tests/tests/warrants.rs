@@ -517,17 +517,28 @@ mod zero_arc {
         let (bob_conductor, bob_cell) = conductors_and_cells.remove(0);
         let (carol_conductor, carol_cell) = conductors_and_cells.remove(0);
 
+        tracing::info!("Test setup complete. Alice: {:?}, Bob: {:?}, Carol: {:?}",
+            alice_cell.agent_pubkey(),
+            bob_cell.agent_pubkey(),
+            carol_cell.agent_pubkey()
+        );
+
         await_consistency(10, [&alice_cell, &bob_cell])
             .await
             .unwrap();
+
+        tracing::info!("Alice and Bob reached consistency");
 
         // Ensure that Carol knows about Bob's full arc.
         bob_conductor
             .holochain_p2p()
             .test_set_full_arcs(dna_hash.to_k2_space())
             .await;
+        tracing::info!("Bob's full arc set");
+
         // Update Bob's peer info in Carol's peer store after the full storage arc declaration.
         SweetConductor::exchange_peer_info([&bob_conductor, &carol_conductor]).await;
+        tracing::info!("Peer info exchanged between Bob and Carol");
 
         // Alice creates an invalid action.
         let action_hash: ActionHash = alice_conductor
@@ -537,10 +548,12 @@ mod zero_arc {
                 "entry1".to_string(),
             )
             .await;
+        tracing::info!("Alice created invalid action: {:?}", action_hash);
 
         await_consistency(10, [&alice_cell, &bob_cell])
             .await
             .unwrap();
+        tracing::info!("Alice and Bob reached consistency after invalid action");
 
         // Bob should have issued a warrant against Alice.
 
@@ -549,8 +562,10 @@ mod zero_arc {
             .disable_app("test_app".to_string(), DisabledAppReason::User)
             .await
             .unwrap();
+        tracing::info!("Alice's app disabled");
 
         // Carol calls must_get_agent_activity on Alice and blocks the warrant authors.
+        tracing::info!("Carol calling must_get_agent_activity on Alice...");
         let _: Vec<RegisterAgentActivity> = carol_conductor
             .call(
                 &carol_cell.zome(SweetInlineZomes::COORDINATOR),
@@ -561,8 +576,10 @@ mod zero_arc {
                 },
             )
             .await;
+        tracing::info!("Carol successfully received agent activity with warrants");
 
         // Check that Carol has blocked Alice.
+        tracing::info!("Checking if Carol has blocked Alice...");
         retry_fn_until_timeout(
             || async {
                 carol_conductor

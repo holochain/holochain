@@ -51,17 +51,35 @@ pub fn must_get_agent_activity(
                         call_context.host_context.network().clone(),
                     ),
                 };
+                tracing::info!(
+                    "must_get_agent_activity: requesting activity for author={:?}, chain_filter={:?}",
+                    author,
+                    chain_filter
+                );
                 let result = cascade
                     .must_get_agent_activity(author.clone(), chain_filter.clone(), NetworkRequestOptions::must_get_options())
                     .await
                     .map_err(|cascade_error| -> RuntimeError {
+                        tracing::error!(
+                            "must_get_agent_activity: network request failed for author={:?}: {}",
+                            author,
+                            cascade_error
+                        );
                         wasm_error!(WasmErrorInner::Host(cascade_error.to_string())).into()
                     })?;
+                tracing::info!(
+                    "must_get_agent_activity: received response for author={:?}",
+                    author
+                );
 
                 use MustGetAgentActivityResponse::*;
 
                 let result: Result<_, RuntimeError> = match (result, &call_context.host_context) {
                     (Activity {activity, warrants}, _) => {
+                        tracing::info!(
+                            "must_get_agent_activity: processing activity with {} warrants",
+                            warrants.len()
+                        );
                         if !warrants.is_empty() {
                             if let Some(db) = cascade.cache() {
                                 db.write_async(|txn| {
