@@ -479,22 +479,35 @@ impl CascadeImpl {
         filter: ChainFilter,
         options: NetworkRequestOptions,
     ) -> CascadeResult<MustGetAgentActivityResponse> {
+        tracing::info!(
+            "[CASCADE] fetch_must_get_agent_activity: Starting network request for author={:?}, filter={:?}",
+            author,
+            filter
+        );
         let network = some_or_return!(
             self.network.as_ref(),
             MustGetAgentActivityResponse::IncompleteChain
         );
+        tracing::info!("[CASCADE] Network available, making request...");
         let results = match network
             .must_get_agent_activity(author, filter, options)
             .await
         {
-            Ok(response) => response,
+            Ok(response) => {
+                tracing::info!("[CASCADE] Network request succeeded, received {} responses", response.len());
+                response
+            }
             Err(e @ HolochainP2pError::NoPeersForLocation(_, _)) => {
-                tracing::debug!(?e, "No peers to fetch agent activity from");
+                tracing::warn!("[CASCADE] No peers to fetch agent activity from: {:?}", e);
                 vec![]
             }
-            Err(e) => return Err(e.into()),
+            Err(e) => {
+                tracing::error!("[CASCADE] Network request failed: {}", e);
+                return Err(e.into());
+            }
         };
 
+        tracing::info!("[CASCADE] Adding activity into cache...");
         self.add_activity_into_cache(results).await
     }
 
@@ -931,8 +944,14 @@ impl CascadeImpl {
         filter: ChainFilter,
         options: NetworkRequestOptions,
     ) -> CascadeResult<MustGetAgentActivityResponse> {
+        tracing::info!(
+            "[CASCADE] must_get_agent_activity: author={:?}, filter={:?}",
+            author,
+            filter
+        );
         // Get the available databases.
         let mut txn_guards = self.get_txn_guards().await?;
+        tracing::info!("[CASCADE] Got {} transaction guards", txn_guards.len());
         let scratch = self.scratch.clone();
 
         // For each store try to get the bounded activity.
@@ -959,6 +978,7 @@ impl CascadeImpl {
         })
             .await??;
 
+        tracing::info!("[CASCADE] Got {} results from local stores", results.len());
         let merged_response =
             holochain_types::chain::merge_bounded_agent_activity_responses(results);
         let result =
@@ -966,18 +986,23 @@ impl CascadeImpl {
                 merged_response,
             );
 
+        tracing::info!("[CASCADE] Filtered result type: {:?}", std::mem::discriminant(&result));
         // Short circuit if we have a result.
         if matches!(result, MustGetAgentActivityResponse::Activity { .. }) {
+            tracing::info!("[CASCADE] Found activity locally, returning early");
             return Ok(result);
         }
 
         // If we are the authority then don't go to the network.
         let i_am_authority = self.am_i_an_authority(author.clone().into()).await?;
+        tracing::info!("[CASCADE] Am I authority: {}", i_am_authority);
         if i_am_authority {
             // If I am an authority and I didn't get a result before
             // this point then the chain is incomplete for this request.
+            tracing::info!("[CASCADE] I am authority and chain is incomplete, returning IncompleteChain");
             Ok(MustGetAgentActivityResponse::IncompleteChain)
         } else {
+            tracing::info!("[CASCADE] Not authority, fetching from network...");
             let result = self
                 .fetch_must_get_agent_activity(author.clone(), filter, options)
                 .await?;
