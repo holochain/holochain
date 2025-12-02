@@ -414,9 +414,10 @@ mod zero_arc {
 
                 if let Ok(activity) = alice_activity {
                     if !activity.warrants.is_empty() {
-                        activity.warrants.iter().all(|warrant| {
-                            warrant.warrantee == *alice_cell.agent_pubkey()
-                        })
+                        activity
+                            .warrants
+                            .iter()
+                            .all(|warrant| warrant.warrantee == *alice_cell.agent_pubkey())
                     } else {
                         false
                     }
@@ -500,9 +501,10 @@ mod zero_arc {
                 if let Ok(activity) = result {
                     // Verify that the response contains warrants for Alice
                     if !activity.warrants.is_empty() {
-                        activity.warrants.iter().all(|warrant| {
-                            warrant.warrantee == *alice_cell.agent_pubkey()
-                        })
+                        activity
+                            .warrants
+                            .iter()
+                            .all(|warrant| warrant.warrantee == *alice_cell.agent_pubkey())
                     } else {
                         false
                     }
