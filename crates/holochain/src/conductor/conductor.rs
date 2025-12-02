@@ -934,7 +934,7 @@ mod network_impls {
             expires: Timestamp,
         ) -> ConductorResult<WitnessNonceResult> {
             Ok(witness_nonce(
-                &self.spaces.conductor_db,
+                &self.spaces.conductor_sqlite_db,
                 agent,
                 nonce,
                 Timestamp::now(),

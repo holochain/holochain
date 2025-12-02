@@ -85,6 +85,19 @@ impl ConductorState {
         &self.tag
     }
 
+    /// Create a ConductorState from its components (for persistence layer)
+    pub(crate) fn from_parts(
+        tag: ConductorStateTag,
+        installed_apps: InstalledAppMap,
+        app_interfaces: HashMap<AppInterfaceId, AppInterfaceConfig>,
+    ) -> Self {
+        Self {
+            tag,
+            installed_apps,
+            app_interfaces,
+        }
+    }
+
     /// Set the tag for this conductor
     #[cfg(test)]
     pub fn set_tag(&mut self, tag: ConductorStateTag) {

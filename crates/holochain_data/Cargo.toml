@@ -27,6 +27,7 @@ holochain_integrity_types = { version = "^0.7.0-dev.4", path = "../holochain_int
 holochain_zome_types = { version = "^0.7.0-dev.5", path = "../holochain_zome_types" }
 holochain_serialized_bytes = "=0.0.56"
 serde_json = "1.0"
+indexmap = { version = "2.6.0", features = ["serde"] }
 
 [dev-dependencies]
 holochain_data = { path = ".", features = ["test-utils", "sqlite-encrypted"] }
