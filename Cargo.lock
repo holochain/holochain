@@ -2922,6 +2922,7 @@ version = "0.7.0-dev.0"
 dependencies = [
  "base64 0.22.1",
  "holo_hash",
+ "holochain_conductor_api",
  "holochain_data",
  "holochain_integrity_types",
  "holochain_serialized_bytes",

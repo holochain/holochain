@@ -3,7 +3,9 @@
 //! This bridges between `holochain_data` operations and the `ConductorState` type.
 
 use super::error::{ConductorError, ConductorResult};
+use crate::conductor::state::{AppInterfaceConfig, AppInterfaceId};
 use crate::conductor::state::{ConductorState, ConductorStateTag};
+use holochain_conductor_api::signal_subscription::SignalSubscription;
 use holochain_types::prelude::*;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -37,8 +39,55 @@ pub async fn load_conductor_state(
     }
 
     // Get all app interfaces
-    // TODO: Implement get_all_app_interfaces in holochain_data
-    let app_interfaces = HashMap::new();
+    let interface_models = db
+        .get_all_app_interfaces()
+        .await
+        .map_err(ConductorError::other)?;
+
+    let mut app_interfaces = HashMap::new();
+    for model in interface_models {
+        // Convert model to AppInterfaceConfig
+        let driver = model.to_driver().map_err(ConductorError::other)?;
+
+        // Get signal subscriptions for this interface
+        let subs_data = db
+            .get_signal_subscriptions(model.port, model.id.as_deref())
+            .await
+            .map_err(ConductorError::other)?;
+
+        let mut signal_subscriptions = HashMap::new();
+        for (app_id, filters_blob) in subs_data {
+            let subscription: SignalSubscription =
+                serde_json::from_slice(&filters_blob).map_err(|e| {
+                    ConductorError::other(format!(
+                        "Failed to deserialize signal subscription: {}",
+                        e
+                    ))
+                })?;
+            signal_subscriptions.insert(InstalledAppId::from(app_id), subscription);
+        }
+
+        let config = AppInterfaceConfig {
+            signal_subscriptions,
+            installed_app_id: model.installed_app_id,
+            driver,
+        };
+
+        // Reconstruct AppInterfaceId
+        let interface_id = if model.port == 0 {
+            // Port 0 case - must have an ID
+            let id = model
+                .id
+                .ok_or_else(|| ConductorError::other("Port 0 interface missing ID"))?;
+            // Use private fields via a constructor we need to add
+            // For now, we'll use `new` and manually update the id
+            // This is a limitation - we may need to expose a constructor
+            AppInterfaceId::from_parts(0, Some(id))
+        } else {
+            AppInterfaceId::new(model.port as u16)
+        };
+        app_interfaces.insert(interface_id, config);
+    }
 
     Ok(Some(ConductorState::from_parts(
         tag,
@@ -65,8 +114,46 @@ pub async fn save_conductor_state(
             .map_err(ConductorError::other)?;
     }
 
-    // TODO: Save app interfaces
-    // TODO: Delete apps that are no longer in the state
+    // Save all app interfaces
+    for (interface_id, config) in &state.app_interfaces {
+        let model = holochain_data::conductor::AppInterfaceModel::from_driver(
+            &config.driver,
+            config.installed_app_id.as_ref().map(|id| id.to_string()),
+        )
+        .map_err(ConductorError::other)?;
+
+        db.put_app_interface(
+            interface_id.port() as i64,
+            interface_id.id().as_deref(),
+            &model,
+        )
+        .await
+        .map_err(ConductorError::other)?;
+
+        // Clear existing signal subscriptions for this interface
+        db.delete_signal_subscriptions(interface_id.port() as i64, interface_id.id().as_deref())
+            .await
+            .map_err(ConductorError::other)?;
+
+        // Save signal subscriptions
+        for (app_id, subscription) in &config.signal_subscriptions {
+            let filters_blob = serde_json::to_vec(subscription).map_err(|e| {
+                ConductorError::other(format!("Failed to serialize signal subscription: {}", e))
+            })?;
+            db.put_signal_subscription(
+                interface_id.port() as i64,
+                interface_id.id().as_deref(),
+                app_id.as_ref(),
+                &filters_blob,
+            )
+            .await
+            .map_err(ConductorError::other)?;
+        }
+    }
+
+    // TODO: Implement deletion of apps and interfaces that are no longer in the state
+    // This requires using a read connection to get existing data, then using the write connection to delete
+    // For now, we'll skip this step as it requires restructuring the API
 
     Ok(())
 }
