@@ -57,16 +57,38 @@ pub struct DnaDefModel {
     pub network_seed: String,
     /// Serialized application properties.
     pub properties: Vec<u8>,
+    /// DNA lineage for migration support (optional, JSON-serialized HashSet<DnaHash>)
+    #[cfg(feature = "unstable-migration")]
+    pub lineage: Option<Vec<u8>>,
 }
 
 impl DnaDefModel {
     /// Create a new DnaDefModel.
+    #[cfg(not(feature = "unstable-migration"))]
     pub fn new(hash: DnaHash, name: String, network_seed: String, properties: Vec<u8>) -> Self {
         Self {
             hash: hash.get_raw_39().to_vec(),
             name,
             network_seed,
             properties,
+        }
+    }
+
+    /// Create a new DnaDefModel with lineage support.
+    #[cfg(feature = "unstable-migration")]
+    pub fn new(
+        hash: DnaHash,
+        name: String,
+        network_seed: String,
+        properties: Vec<u8>,
+        lineage: Option<Vec<u8>>,
+    ) -> Self {
+        Self {
+            hash: hash.get_raw_39().to_vec(),
+            name,
+            network_seed,
+            properties,
+            lineage,
         }
     }
 
@@ -101,11 +123,22 @@ impl DnaDefModel {
             .collect();
         let coordinator_zomes = coordinator_zomes?;
 
+        #[cfg(feature = "unstable-migration")]
+        let lineage = self
+            .lineage
+            .as_ref()
+            .map(|bytes| serde_json::from_slice(bytes))
+            .transpose()
+            .map_err(|e: serde_json::Error| e.to_string())?
+            .unwrap_or_default();
+
         Ok(DnaDef {
             name: self.name.clone(),
             modifiers,
             integrity_zomes,
             coordinator_zomes,
+            #[cfg(feature = "unstable-migration")]
+            lineage,
         })
     }
 }

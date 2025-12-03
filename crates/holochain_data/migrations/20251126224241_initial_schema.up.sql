@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS DnaDef (
     hash            BLOB           PRIMARY KEY ON CONFLICT IGNORE,
     name            TEXT           NOT NULL,
     network_seed    TEXT           NOT NULL,
-    properties      BLOB           NOT NULL   -- SerializedBytes
+    properties      BLOB           NOT NULL,  -- SerializedBytes
+    lineage         BLOB                      -- JSON serialized HashSet<DnaHash>
 );
 
 -- IntegrityZome storage (one row per zome in a DNA)
