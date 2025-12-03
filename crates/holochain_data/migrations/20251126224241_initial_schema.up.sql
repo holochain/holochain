@@ -136,3 +136,28 @@ CREATE INDEX IF NOT EXISTS idx_installed_app_status ON InstalledApp(status);
 CREATE INDEX IF NOT EXISTS idx_app_role_dna_hash ON AppRole(dna_hash);
 CREATE INDEX IF NOT EXISTS idx_clone_cell_enabled ON CloneCell(is_enabled);
 CREATE INDEX IF NOT EXISTS idx_app_interface_app_id ON AppInterface(installed_app_id);
+
+-- Nonce witnessing table
+-- Used to prevent replay attacks by tracking witnessed nonces
+CREATE TABLE IF NOT EXISTS Nonce (
+    agent BLOB NOT NULL,
+    nonce BLOB NOT NULL,
+    expires INTEGER NOT NULL,
+    PRIMARY KEY (agent, nonce)
+) STRICT;
+
+CREATE INDEX IF NOT EXISTS idx_nonce_expires ON Nonce(expires);
+
+-- Block/unblock functionality
+-- Used to temporarily block specific targets (agents, cells, etc.)
+CREATE TABLE IF NOT EXISTS BlockSpan (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    target_id BLOB NOT NULL,
+    target_reason BLOB NOT NULL,
+    start_us INTEGER NOT NULL,
+    end_us INTEGER NOT NULL
+) STRICT;
+
+CREATE INDEX IF NOT EXISTS idx_block_span_start_us ON BlockSpan(start_us);
+CREATE INDEX IF NOT EXISTS idx_block_span_end_us ON BlockSpan(end_us);
+CREATE INDEX IF NOT EXISTS idx_block_span_target_id ON BlockSpan(target_id);
