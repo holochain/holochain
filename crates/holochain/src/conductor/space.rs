@@ -19,8 +19,8 @@ use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::DynHcP2p;
 use holochain_sqlite::prelude::{
-    DatabaseResult, DbKey, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbSyncLevel,
-    DbSyncStrategy, DbWrite, PoolConfig, ReadAccess,
+    DatabaseResult, DbKey, DbKindAuthored, DbKindCache, DbKindDht, DbSyncLevel,
+    DbSyncStrategy, DbWrite, PoolConfig,
 };
 use holochain_state::{host_fn_workspace::SourceChainWorkspace, prelude::*};
 use holochain_util::timed;
@@ -45,10 +45,8 @@ pub struct Spaces {
     /// The map of running queue consumer workflows.
     pub(crate) queue_consumer_map: QueueConsumerMap,
     /// Conductor database (holochain_data) for normalized ConductorState
-    pub(crate) conductor_db: holochain_data::DbWrite<holochain_data::kind::Conductor>,
-    /// Legacy conductor database (holochain_sqlite) for Nonce and BlockSpan tables
-    pub(crate) conductor_sqlite_db: DbWrite<DbKindConductor>,
-    pub(crate) wasm_store: holochain_state::wasm::WasmStore,
+   pub(crate) conductor_db: holochain_data::DbWrite<holochain_data::kind::Conductor>,
+   pub(crate) wasm_store: holochain_state::wasm::WasmStore,
     pub(crate) dna_def_store: holochain_state::dna_def::DnaDefStore,
     pub(crate) entry_def_store: holochain_state::entry_def::EntryDefStore,
     db_key: DbKey,
@@ -188,25 +186,13 @@ impl Spaces {
         };
 
         // Convert the DbKey from holochain_sqlite to holochain_data format
-        let data_db_key = holochain_data::DbKey::load(db_key.locked.clone(), passphrase.clone())
-            .await
-            .map_err(ConductorError::other)?;
+       let data_db_key = holochain_data::DbKey::load(db_key.locked.clone(), passphrase.clone())
+           .await
+           .map_err(ConductorError::other)?;
 
-        let conductor_sqlite_db = tokio::task::block_in_place(|| {
-            let conductor_sqlite_db = DbWrite::open_with_pool_config(
-                root_db_dir.as_ref(),
-                DbKindConductor,
-                PoolConfig {
-                    synchronous_level: db_sync_level,
-                    key: db_key.clone(),
-                },
-            )?;
-            ConductorResult::Ok(conductor_sqlite_db)
-        })?;
-
-        let conductor_db = holochain_data::setup_holochain_data(
-            root_db_dir.as_ref(),
-            holochain_data::kind::Conductor,
+       let conductor_db = holochain_data::setup_holochain_data(
+           root_db_dir.as_ref(),
+           holochain_data::kind::Conductor,
             holochain_data::HolochainDataConfig {
                 key: Some(data_db_key.clone()),
                 sync_level: db_sync,
@@ -246,9 +232,10 @@ impl Spaces {
     }
 
     /// Unblock some target.
-    pub async fn unblock(&self, input: Block) -> DatabaseResult<()> {
-        holochain_state::block::unblock(&self.conductor_sqlite_db, input).await
-    }
+   pub async fn unblock(&self, input: Block) -> DatabaseResult<()> {
+       self.conductor_db.unblock(input).await
+           .map_err(|e| DatabaseError::Other(e.into()))
+   }
 
     /// Check if some target is blocked.
     pub async fn is_blocked(
@@ -267,36 +254,37 @@ impl Spaces {
 
         // If node_agents_in_spaces is not yet initialized, we can't know anything about
         // which cells are blocked, so avoid the race condition by returning false
-        // TODO: actually fix the preflight, because this could be a loophole for someone
-        //       to evade a block in some circumstances
-        if cell_ids.is_empty() {
-            return Ok(false);
-        }
+       // TODO: actually fix the preflight, because this could be a loophole for someone
+       //       to evade a block in some circumstances
+       if cell_ids.is_empty() {
+           return Ok(false);
+       }
 
-        self.conductor_sqlite_db
-            .read_async(move |txn| {
-                Ok(
-                    // If the target_id is directly blocked then we always return true.
-                    holochain_state::block::query_is_blocked(txn, target_id, timestamp)?
-            // If there are zero unblocked cells then return true.
-            || {
-                let mut all_blocked_cell_ids = true;
-                for cell_id in cell_ids {
-                    if !holochain_state::block::query_is_blocked(
-                        txn,
-                        BlockTargetId::Cell(cell_id), timestamp)? {
-                            all_blocked_cell_ids = false;
-                            break;
-                        }
-                }
-                all_blocked_cell_ids
-            },
-                )
-            })
-            .await
-    }
+       // Check if the target_id itself is directly blocked
+       let target_blocked = self.conductor_db.as_ref()
+           .is_blocked(target_id.clone(), timestamp)
+           .await
+           .map_err(|e| ConductorError::other(e))?;
 
-    /// Get the holochain conductor state
+       if target_blocked {
+           return Ok(true);
+       }
+
+       // Check if all the cell_ids are blocked
+       let cell_targets: Vec<BlockTargetId> = cell_ids
+           .into_iter()
+           .map(BlockTargetId::Cell)
+           .collect();
+
+       let all_cells_blocked = self.conductor_db.as_ref()
+           .are_all_blocked(cell_targets, timestamp)
+           .await
+           .map_err(|e| ConductorError::other(e))?;
+
+       Ok(all_cells_blocked)
+   }
+
+   /// Get the holochain conductor state
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn get_state(&self) -> ConductorResult<ConductorState> {
         timed!([1, 10, 1000], "get_state", {

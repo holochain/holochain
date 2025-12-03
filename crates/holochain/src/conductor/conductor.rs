@@ -92,10 +92,9 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::sql::sql_cell::state_dump;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
-use holochain_state::nonce::witness_nonce;
-use holochain_state::nonce::WitnessNonceResult;
 use holochain_state::prelude::*;
 use holochain_state::source_chain;
+use holochain_data::conductor::WitnessNonceResult;
 pub use holochain_types::share;
 #[cfg(feature = "wasmer_sys")]
 use holochain_wasmer_host::module::ModuleCache;
@@ -930,18 +929,26 @@ mod network_impls {
         pub(crate) async fn witness_nonce_from_calling_agent(
             &self,
             agent: AgentPubKey,
-            nonce: Nonce256Bits,
-            expires: Timestamp,
-        ) -> ConductorResult<WitnessNonceResult> {
-            Ok(witness_nonce(
-                &self.spaces.conductor_sqlite_db,
-                agent,
-                nonce,
-                Timestamp::now(),
-                expires,
-            )
-            .await?)
-        }
+           nonce: Nonce256Bits,
+           expires: Timestamp,
+       ) -> ConductorResult<WitnessNonceResult> {
+           let result = self.spaces.conductor_db.witness_nonce(
+               agent,
+               nonce,
+               Timestamp::now(),
+               expires,
+           )
+           .await
+           .map_err(|e| ConductorError::other(e))?;
+
+           // Convert from holochain_data::WitnessNonceResult to holochain_state::WitnessNonceResult
+           Ok(match result {
+               holochain_data::conductor::WitnessNonceResult::Fresh => holochain_state::nonce::WitnessNonceResult::Fresh,
+               holochain_data::conductor::WitnessNonceResult::Duplicate => holochain_state::nonce::WitnessNonceResult::Duplicate,
+               holochain_data::conductor::WitnessNonceResult::Expired => holochain_state::nonce::WitnessNonceResult::Expired,
+               holochain_data::conductor::WitnessNonceResult::Future => holochain_state::nonce::WitnessNonceResult::Future,
+           })
+       }
 
         /// Unblock some target.
         pub async fn unblock(&self, input: Block) -> DatabaseResult<()> {

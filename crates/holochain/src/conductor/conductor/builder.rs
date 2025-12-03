@@ -208,11 +208,10 @@ impl ConductorBuilder {
         };
 
         let net_spaces1 = spaces.clone();
-        let net_spaces2 = spaces.clone();
-        let conductor_sqlite_db = spaces.conductor_sqlite_db.clone();
-        let p2p_config = holochain_p2p::HolochainP2pConfig {
-            auth_material: config
-                .network
+       let net_spaces2 = spaces.clone();
+       let p2p_config = holochain_p2p::HolochainP2pConfig {
+           auth_material: config
+               .network
                 .base64_auth_material
                 .as_ref()
                 .map(|m| {
@@ -229,8 +228,8 @@ impl ConductorBuilder {
                 Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
             }),
             get_conductor_db: Arc::new(move || {
-                let conductor_sqlite_db = conductor_sqlite_db.clone();
-                Box::pin(async move { conductor_sqlite_db })
+                // TODO: Replace with new conductor database wrapper
+                Box::pin(async move { unimplemented!("get_conductor_db needs migration to new DB") })
             }),
             target_arc_factor: config.network.target_arc_factor,
             network_config: Some(config.network.to_k2_config()?),
@@ -434,10 +433,9 @@ impl ConductorBuilder {
         };
 
         let net_spaces1 = spaces.clone();
-        let net_spaces2 = spaces.clone();
-        let conductor_sqlite_db = spaces.conductor_sqlite_db.clone();
-        let p2p_config = holochain_p2p::HolochainP2pConfig {
-            auth_material: config
+       let net_spaces2 = spaces.clone();
+       let p2p_config = holochain_p2p::HolochainP2pConfig {
+           auth_material: config
                 .network
                 .base64_auth_material
                 .as_ref()
@@ -452,13 +450,13 @@ impl ConductorBuilder {
             }),
             get_db_op_store: Arc::new(move |dna_hash| {
                 let res = net_spaces2.dht_db(&dna_hash);
-                Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
-            }),
-            get_conductor_db: Arc::new(move || {
-                let conductor_sqlite_db = conductor_sqlite_db.clone();
-                Box::pin(async move { conductor_sqlite_db })
-            }),
-            target_arc_factor: config.network.target_arc_factor,
+               Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
+           }),
+           get_conductor_db: Arc::new(move || {
+               // TODO: Replace with new conductor database wrapper
+               Box::pin(async move { unimplemented!("get_conductor_db needs migration to new DB") })
+           }),
+           target_arc_factor: config.network.target_arc_factor,
             network_config: Some(config.network.to_k2_config()?),
             report,
             compat,
