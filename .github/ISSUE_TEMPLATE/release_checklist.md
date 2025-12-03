@@ -36,9 +36,9 @@ flowchart TB
 
     %% holonix
     Holonix1 --> JSClient[holochain-client-js]
-    Holonix1 --> HttpGw[http-gw]
+    Holonix1 --> HttpGw[hc-http-gw]
 
-    %% http-gw
+    %% hc-http-gw
     HttpGw --> Complete
 
     %% holochain-client-js
@@ -102,6 +102,11 @@ Assigned to @
     - Update to use new holochain version X.
     - Create new branch `main-X` for the new holochain version X.
 
+- [ ] `hc-http-gw`
+    - Update to use new holochain version X.
+    - Bump version and update README with compatibility info.
+    - Create new branch `main-X` for the new holochain version X.
+
 - [ ] `matthme/holochain-binaries`
     - Wait for hourly cronjob to run and confirm that it successfully published binaries.
 - [ ] Holonix
@@ -121,7 +126,7 @@ Assigned to @
 - [ ] `holochain-client-js`
     - Update nix flake.
     - Update to use new holochain version X.
-    - Bump version and update README with compatability info.
+    - Bump version and update README with compatibility info.
     - Create new branch `main-X` for the new holochain version X.
     - Manually publish to npm.
     - Manually create github release with changelog description.
