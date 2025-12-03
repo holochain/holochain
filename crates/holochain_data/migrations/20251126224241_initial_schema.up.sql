@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS DnaDef (
     name            TEXT           NOT NULL,
     network_seed    TEXT           NOT NULL,
     properties      BLOB           NOT NULL,  -- SerializedBytes
-    lineage         BLOB                      -- JSON serialized HashSet<DnaHash>
+    lineage         JSON                      -- JSON HashSet<DnaHash>
 );
 
 -- IntegrityZome storage (one row per zome in a DNA)
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS IntegrityZome (
     zome_index      INTEGER        NOT NULL,
     zome_name       TEXT           NOT NULL,
     wasm_hash       BLOB,                     -- NULL for inline zomes
-    dependencies    TEXT           NOT NULL,  -- Comma-separated zome names
+    dependencies    JSON           NOT NULL,  -- JSON array of zome names
     PRIMARY KEY (dna_hash, zome_index),
     FOREIGN KEY (dna_hash) REFERENCES DnaDef(hash) ON DELETE CASCADE,
     FOREIGN KEY (wasm_hash) REFERENCES Wasm(hash)
@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS CoordinatorZome (
     zome_index      INTEGER        NOT NULL,
     zome_name       TEXT           NOT NULL,
     wasm_hash       BLOB,                     -- NULL for inline zomes
-    dependencies    TEXT           NOT NULL,  -- Comma-separated zome names
+    dependencies    JSON           NOT NULL,  -- JSON array of zome names
     PRIMARY KEY (dna_hash, zome_index),
     FOREIGN KEY (dna_hash) REFERENCES DnaDef(hash) ON DELETE CASCADE,
     FOREIGN KEY (wasm_hash) REFERENCES Wasm(hash)

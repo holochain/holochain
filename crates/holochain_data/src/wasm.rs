@@ -187,10 +187,11 @@ impl DbWrite<Wasm> {
 
         // Serialize lineage if present
         #[cfg(feature = "unstable-migration")]
-        let lineage_bytes =
-            serde_json::to_vec(&dna_def.lineage).map_err(|e| sqlx::Error::Encode(Box::new(e)))?;
+        let lineage_json = Some(sqlx::types::Json(&dna_def.lineage));
         #[cfg(not(feature = "unstable-migration"))]
-        let lineage_bytes: Option<Vec<u8>> = None;
+        let lineage_json: Option<
+            sqlx::types::Json<&std::collections::HashSet<holochain_types::dna::DnaHash>>,
+        > = None;
 
         // Insert DnaDef
         sqlx::query(
@@ -200,7 +201,7 @@ impl DbWrite<Wasm> {
             .bind(name)
             .bind(network_seed)
             .bind(properties)
-            .bind(lineage_bytes)
+            .bind(lineage_json)
             .execute(&mut *tx)
             .await?;
 
@@ -229,14 +230,12 @@ impl DbWrite<Wasm> {
             let dependencies = match zome_def.as_any_zome_def() {
                 ZomeDef::Wasm(WasmZome { dependencies, .. }) => dependencies
                     .iter()
-                    .map(|n| n.0.as_ref())
-                    .collect::<Vec<_>>()
-                    .join(","),
+                    .map(|n| n.0.as_ref().to_string())
+                    .collect::<Vec<_>>(),
                 ZomeDef::Inline { dependencies, .. } => dependencies
                     .iter()
-                    .map(|n| n.0.as_ref())
-                    .collect::<Vec<_>>()
-                    .join(","),
+                    .map(|n| n.0.as_ref().to_string())
+                    .collect::<Vec<_>>(),
             };
 
             sqlx::query(
@@ -246,7 +245,7 @@ impl DbWrite<Wasm> {
             .bind(zome_index as i64)
             .bind(&zome_name.0)
             .bind(wasm_hash_bytes)
-            .bind(dependencies)
+            .bind(sqlx::types::Json(&dependencies))
             .execute(&mut *tx)
             .await?;
         }
@@ -265,14 +264,12 @@ impl DbWrite<Wasm> {
             let dependencies = match zome_def.as_any_zome_def() {
                 ZomeDef::Wasm(WasmZome { dependencies, .. }) => dependencies
                     .iter()
-                    .map(|n| n.0.as_ref())
-                    .collect::<Vec<_>>()
-                    .join(","),
+                    .map(|n| n.0.as_ref().to_string())
+                    .collect::<Vec<_>>(),
                 ZomeDef::Inline { dependencies, .. } => dependencies
                     .iter()
-                    .map(|n| n.0.as_ref())
-                    .collect::<Vec<_>>()
-                    .join(","),
+                    .map(|n| n.0.as_ref().to_string())
+                    .collect::<Vec<_>>(),
             };
 
             sqlx::query(
@@ -282,7 +279,7 @@ impl DbWrite<Wasm> {
             .bind(zome_index as i64)
             .bind(&zome_name.0)
             .bind(wasm_hash_bytes)
-            .bind(dependencies)
+            .bind(sqlx::types::Json(&dependencies))
             .execute(&mut *tx)
             .await?;
         }
