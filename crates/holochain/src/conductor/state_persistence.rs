@@ -151,9 +151,55 @@ pub async fn save_conductor_state(
         }
     }
 
-    // TODO: Implement deletion of apps and interfaces that are no longer in the state
-    // This requires using a read connection to get existing data, then using the write connection to delete
-    // For now, we'll skip this step as it requires restructuring the API
+    // Delete apps and interfaces that are no longer in the state
+    let db_read: &holochain_data::DbRead<holochain_data::kind::Conductor> = db.as_ref();
+
+    // Get all existing app IDs from database
+    let existing_apps = db_read
+        .get_all_installed_apps()
+        .await
+        .map_err(ConductorError::other)?;
+    let existing_app_ids: Vec<String> = existing_apps
+        .into_iter()
+        .map(|(app_id, _, _)| app_id)
+        .collect();
+
+    // Delete apps that are no longer in state
+    for app_id in existing_app_ids {
+        if !state
+            .installed_apps()
+            .contains_key(&InstalledAppId::from(app_id.clone()))
+        {
+            db.delete_installed_app(&app_id)
+                .await
+                .map_err(ConductorError::other)?;
+        }
+    }
+
+    // Get all existing app interfaces from database
+    let existing_interfaces = db_read
+        .get_all_app_interfaces()
+        .await
+        .map_err(ConductorError::other)?;
+
+    // Delete interfaces that are no longer in state
+    for model in existing_interfaces {
+        let interface_id = if model.port == 0 {
+            let id = model
+                .id
+                .clone()
+                .ok_or_else(|| ConductorError::other("Port 0 interface missing ID"))?;
+            AppInterfaceId::from_parts(0, Some(id))
+        } else {
+            AppInterfaceId::new(model.port as u16)
+        };
+
+        if !state.app_interfaces.contains_key(&interface_id) {
+            db.delete_app_interface(model.port, model.id.as_deref())
+                .await
+                .map_err(ConductorError::other)?;
+        }
+    }
 
     Ok(())
 }
