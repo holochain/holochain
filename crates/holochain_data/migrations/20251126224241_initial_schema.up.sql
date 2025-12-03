@@ -126,6 +126,7 @@ CREATE TABLE IF NOT EXISTS SignalSubscription (
     interface_id TEXT,
     app_id TEXT NOT NULL,
     filters_blob BLOB,
+    PRIMARY KEY (interface_port, interface_id, app_id),
     FOREIGN KEY (interface_port, interface_id) REFERENCES AppInterface(port, id) ON DELETE CASCADE,
     FOREIGN KEY (app_id) REFERENCES InstalledApp(app_id) ON DELETE CASCADE
 ) STRICT;
