@@ -53,7 +53,11 @@ pub async fn load_conductor_state(
         let subs_data = db
             .get_signal_subscriptions(
                 model.port,
-                model.id.as_ref().filter(|s| !s.is_empty()).map(|s| s.as_str()),
+                model
+                    .id
+                    .as_ref()
+                    .filter(|s| !s.is_empty())
+                    .map(|s| s.as_str()),
             )
             .await
             .map_err(ConductorError::other)?;
@@ -79,9 +83,10 @@ pub async fn load_conductor_state(
         // Reconstruct AppInterfaceId
         let interface_id = if model.port == 0 {
             // Port 0 case - must have an ID
-            let id = model.id.filter(|s| !s.is_empty()).ok_or_else(|| {
-                ConductorError::other("Port 0 interface missing ID")
-            })?;
+            let id = model
+                .id
+                .filter(|s| !s.is_empty())
+                .ok_or_else(|| ConductorError::other("Port 0 interface missing ID"))?;
             // Use private fields via a constructor we need to add
             // For now, we'll use `new` and manually update the id
             // This is a limitation - we may need to expose a constructor
@@ -139,8 +144,8 @@ pub async fn save_conductor_state(
             interface_id.port() as i64,
             interface_id.id().as_deref().or(Some("")),
         )
-            .await
-            .map_err(ConductorError::other)?;
+        .await
+        .map_err(ConductorError::other)?;
 
         // Save signal subscriptions
         for (app_id, subscription) in &config.signal_subscriptions {

@@ -786,10 +786,9 @@ mod dna_impls {
 
 /// Network-related methods
 mod network_impls {
-   use super::*;
-   use holochain_state::nonce::WitnessNonceResult;
-   use crate::conductor::api::error::{
-       zome_call_response_to_conductor_api_result, ConductorApiError,
+    use super::*;
+    use crate::conductor::api::error::{
+        zome_call_response_to_conductor_api_result, ConductorApiError,
     };
     use futures::future::join_all;
     use holochain_conductor_api::ZomeCallParamsSigned;
@@ -797,6 +796,7 @@ mod network_impls {
     use holochain_sqlite::helpers::BytesSql;
     use holochain_sqlite::sql::sql_peer_meta_store;
     use holochain_sqlite::stats::{get_size_on_disk, get_used_size};
+    use holochain_state::nonce::WitnessNonceResult;
     use holochain_zome_types::block::Block;
     use holochain_zome_types::block::BlockTargetId;
     use kitsune2_api::Url;
@@ -929,26 +929,32 @@ mod network_impls {
         pub(crate) async fn witness_nonce_from_calling_agent(
             &self,
             agent: AgentPubKey,
-           nonce: Nonce256Bits,
-           expires: Timestamp,
-       ) -> ConductorResult<WitnessNonceResult> {
-           let result = self.spaces.conductor_db.witness_nonce(
-               agent,
-               nonce,
-               Timestamp::now(),
-               expires,
-           )
-           .await
-           .map_err(|e| ConductorError::other(e))?;
+            nonce: Nonce256Bits,
+            expires: Timestamp,
+        ) -> ConductorResult<WitnessNonceResult> {
+            let result = self
+                .spaces
+                .conductor_db
+                .witness_nonce(agent, nonce, Timestamp::now(), expires)
+                .await
+                .map_err(|e| ConductorError::other(e))?;
 
-           // Convert from holochain_data::WitnessNonceResult to holochain_state::WitnessNonceResult
-           Ok(match result {
-               holochain_data::conductor::WitnessNonceResult::Fresh => holochain_state::nonce::WitnessNonceResult::Fresh,
-               holochain_data::conductor::WitnessNonceResult::Duplicate => holochain_state::nonce::WitnessNonceResult::Duplicate,
-               holochain_data::conductor::WitnessNonceResult::Expired => holochain_state::nonce::WitnessNonceResult::Expired,
-               holochain_data::conductor::WitnessNonceResult::Future => holochain_state::nonce::WitnessNonceResult::Future,
-           })
-       }
+            // Convert from holochain_data::WitnessNonceResult to holochain_state::WitnessNonceResult
+            Ok(match result {
+                holochain_data::conductor::WitnessNonceResult::Fresh => {
+                    holochain_state::nonce::WitnessNonceResult::Fresh
+                }
+                holochain_data::conductor::WitnessNonceResult::Duplicate => {
+                    holochain_state::nonce::WitnessNonceResult::Duplicate
+                }
+                holochain_data::conductor::WitnessNonceResult::Expired => {
+                    holochain_state::nonce::WitnessNonceResult::Expired
+                }
+                holochain_data::conductor::WitnessNonceResult::Future => {
+                    holochain_state::nonce::WitnessNonceResult::Future
+                }
+            })
+        }
 
         /// Unblock some target.
         pub async fn unblock(&self, input: Block) -> DatabaseResult<()> {
