@@ -73,9 +73,20 @@ impl AppInterfaceId {
         };
         Self { port, id }
     }
+
+    /// Create an AppInterfaceId from its parts (for persistence layer)
+    pub(crate) fn from_parts(port: u16, id: Option<String>) -> Self {
+        Self { port, id }
+    }
+
     /// Get the port intended for this interface
     pub fn port(&self) -> u16 {
         self.port
+    }
+
+    /// Get the unique ID (if port is 0)
+    pub(crate) fn id(&self) -> &Option<String> {
+        &self.id
     }
 }
 
@@ -83,6 +94,19 @@ impl ConductorState {
     /// A unique identifier for this conductor
     pub fn tag(&self) -> &ConductorStateTag {
         &self.tag
+    }
+
+    /// Create a ConductorState from its components (for persistence layer)
+    pub(crate) fn from_parts(
+        tag: ConductorStateTag,
+        installed_apps: InstalledAppMap,
+        app_interfaces: HashMap<AppInterfaceId, AppInterfaceConfig>,
+    ) -> Self {
+        Self {
+            tag,
+            installed_apps,
+            app_interfaces,
+        }
     }
 
     /// Set the tag for this conductor

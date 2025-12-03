@@ -4,7 +4,7 @@
 
 use crate::handles::{DbRead, DbWrite};
 use crate::kind::Wasm;
-use crate::models::{
+use crate::models::wasm::{
     CoordinatorZomeModel, DnaDefModel, EntryDefModel, IntegrityZomeModel, WasmModel,
 };
 use holo_hash::HashableContentExtSync;
