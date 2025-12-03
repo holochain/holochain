@@ -14,6 +14,11 @@ mod key;
 pub use key::DbKey;
 
 pub mod example;
+mod handles;
+pub use handles::{DbRead, DbWrite};
+pub mod kind;
+pub mod models;
+pub mod wasm;
 
 /// Embedded migrations compiled into the binary.
 ///
@@ -73,7 +78,7 @@ impl HolochainDataConfig {
     }
 }
 
-pub trait DatabaseIdentifier {
+pub trait DatabaseIdentifier: Clone {
     fn database_id(&self) -> &str;
 }
 
@@ -94,7 +99,7 @@ pub async fn setup_holochain_data<I: DatabaseIdentifier>(
     path: impl AsRef<Path>,
     database_id: I,
     config: HolochainDataConfig,
-) -> sqlx::Result<HolochainDbConn<I>> {
+) -> sqlx::Result<DbWrite<I>> {
     let path = path.as_ref();
     if !path.is_dir() {
         return Err(sqlx::Error::Configuration(
@@ -108,25 +113,19 @@ pub async fn setup_holochain_data<I: DatabaseIdentifier>(
     // Run migrations
     MIGRATOR.run(&pool).await?;
 
-    Ok(HolochainDbConn {
-        pool,
-        identifier: database_id,
-    })
+    Ok(DbWrite::new(pool, database_id))
 }
 
 #[cfg(feature = "test-utils")]
 pub async fn test_setup_holochain_data<I: DatabaseIdentifier>(
     database_id: I,
-) -> sqlx::Result<HolochainDbConn<I>> {
+) -> sqlx::Result<DbWrite<I>> {
     let pool = connect_database_memory(HolochainDataConfig::default()).await?;
 
     // Run migrations
     MIGRATOR.run(&pool).await?;
 
-    Ok(HolochainDbConn {
-        pool,
-        identifier: database_id,
-    })
+    Ok(DbWrite::new(pool, database_id))
 }
 
 /// Connect to a SQLite database using the provided connection string.
@@ -169,6 +168,7 @@ fn configure_sqlite_options(
     let sync_value = config.sync_level.as_pragma_value().to_string();
     opts = opts
         .pragma("trusted_schema", "false")
+        .pragma("foreign_keys", "ON")
         .pragma("synchronous", sync_value);
 
     Ok(opts)
@@ -218,26 +218,25 @@ mod tests {
             .expect("Failed to set up test database");
 
         // Verify migrations ran by checking the sample_data table exists
-        let row =
-            sqlx::query("SELECT name FROM sqlite_master WHERE type='table' AND name='sample_data'")
-                .fetch_one(&db.pool)
-                .await
-                .expect("Failed to query sqlite_master");
+        let row = sqlx::query("SELECT name FROM sqlite_master WHERE type='table' AND name='Wasm'")
+            .fetch_one(db.pool())
+            .await
+            .expect("Failed to query sqlite_master");
 
         let table_name: String = row.get(0);
-        assert_eq!(table_name, "sample_data");
+        assert_eq!(table_name, "Wasm");
 
         // Test inserting and querying data
         sqlx::query("INSERT INTO sample_data (name, value) VALUES (?, ?)")
             .bind("test_name")
             .bind("test_value")
-            .execute(&db.pool)
+            .execute(db.pool())
             .await
             .expect("Failed to insert data");
 
         let row = sqlx::query("SELECT name, value FROM sample_data WHERE name = ?")
             .bind("test_name")
-            .fetch_one(&db.pool)
+            .fetch_one(db.pool())
             .await
             .expect("Failed to query data");
 
