@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- CI: Run windows test workflow on Depot.dev runners for improved performance. \#5473
+
 ## 0.7.0-dev.1
 
 - Removed unused `holochain_mock_hdi` crate that was never completed. \#5484
