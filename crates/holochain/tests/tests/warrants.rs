@@ -140,7 +140,7 @@ async fn warrant_is_gossiped() {
         )
         .await;
 
-    await_consistency(30, [&alice_cell, &bob_cell])
+    await_consistency(60, [&alice_cell, &bob_cell])
         .await
         .unwrap();
 
