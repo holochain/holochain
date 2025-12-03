@@ -165,10 +165,10 @@ host_fn_api_impls! {
 
     fn count_links(zt::query::LinkQuery) -> usize;
 
-    // Retreive a record from the DHT or short circuit.
+    // Retrieve a record from the DHT or short circuit.
     fn must_get_valid_record (zt::entry::MustGetValidRecordInput) -> Record;
 
-    // Retreive a entry from the DHT or short circuit.
+    // Retrieve a entry from the DHT or short circuit.
     fn must_get_entry (zt::entry::MustGetEntryInput) -> EntryHashed;
 
     // Retrieve an action from the DHT or short circuit.
