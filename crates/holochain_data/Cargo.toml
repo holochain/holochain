@@ -4,13 +4,19 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-sqlx = { version = "0.9.0-alpha.1", features = ["runtime-tokio", "sqlite", "migrate", "macros", "derive"] }
+sqlx = { version = "0.9.0-alpha.1", features = [
+  "runtime-tokio",
+  "sqlite",
+  "migrate",
+  "macros",
+  "derive",
+] }
 num_cpus = "1.13.0"
 base64 = "0.22"
 sodoken = "0.1.0"
 tokio = { version = "1.27", features = ["full"] }
 libsqlite3-sys = { version = "*", features = [
-    "bundled-sqlcipher-vendored-openssl"
+  "bundled-sqlcipher-vendored-openssl",
 ] }
 holo_hash = { version = "^0.7.0-dev.0", path = "../holo_hash" }
 holochain_types = { version = "^0.7.0-dev.0", path = "../holochain_types" }

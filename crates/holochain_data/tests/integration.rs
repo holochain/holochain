@@ -13,7 +13,7 @@ impl DatabaseIdentifier for TestDbId {
 }
 
 #[tokio::test]
-async fn test_create_database() {
+async fn create_database() {
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let db_id = TestDbId("test_database".to_string());
 
@@ -39,7 +39,7 @@ async fn test_create_database() {
 }
 
 #[tokio::test]
-async fn test_multiple_databases_same_directory() {
+async fn multiple_databases_same_directory() {
     let tmp_dir = tempfile::TempDir::new().unwrap();
 
     let db_id_1 = TestDbId("database_one".to_string());
@@ -58,7 +58,7 @@ async fn test_multiple_databases_same_directory() {
 }
 
 #[tokio::test]
-async fn test_error_on_non_directory_path() {
+async fn error_on_non_directory_path() {
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let file_path = tmp_dir.path().join("some_file");
     std::fs::write(&file_path, b"test").unwrap();
@@ -68,11 +68,12 @@ async fn test_error_on_non_directory_path() {
     let err = setup_holochain_data(file_path, db_id, config)
         .await
         .unwrap_err();
+
     assert!(err.to_string().contains("Path must be a directory"));
 }
 
 #[tokio::test]
-async fn test_encrypted_database() {
+async fn encrypted_database() {
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let db_id = TestDbId("encrypted_test_database".to_string());
 
@@ -139,7 +140,7 @@ async fn test_encrypted_database() {
 }
 
 #[tokio::test]
-async fn test_encrypted_database_wrong_key_fails() {
+async fn encrypted_database_wrong_key_fails() {
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let db_id = TestDbId("encrypted_fail_test".to_string());
 
@@ -190,7 +191,7 @@ async fn test_encrypted_database_wrong_key_fails() {
 }
 
 #[tokio::test]
-async fn test_pragma_configuration() {
+async fn pragma_configuration() {
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let db_id = TestDbId("pragma_test_database".to_string());
 
@@ -224,7 +225,7 @@ async fn test_pragma_configuration() {
 }
 
 #[tokio::test]
-async fn test_migrations_applied() {
+async fn migrations_applied() {
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let db_id = TestDbId("migrations_test_database".to_string());
 
@@ -288,7 +289,7 @@ async fn test_migrations_applied() {
 }
 
 #[tokio::test]
-async fn test_example_query_patterns() {
+async fn example_query_patterns() {
     use holochain_data::example::*;
 
     let tmp_dir = tempfile::TempDir::new().unwrap();

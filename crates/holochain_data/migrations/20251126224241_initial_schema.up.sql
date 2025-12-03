@@ -1,5 +1,4 @@
 -- Add up migration script here
--- Wasm database schema for Holochain
 
 -- Sample table for testing
 CREATE TABLE IF NOT EXISTS sample_data (
@@ -10,6 +9,8 @@ CREATE TABLE IF NOT EXISTS sample_data (
 );
 
 CREATE INDEX idx_sample_data_name ON sample_data(name);
+
+-- Wasm database schema for Holochain
 
 -- Wasm bytecode storage
 CREATE TABLE IF NOT EXISTS Wasm (
