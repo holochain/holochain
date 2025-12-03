@@ -203,3 +203,141 @@ pub async fn save_conductor_state(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::conductor::state::AppInterfaceConfig;
+    use holochain_data::setup_holochain_data;
+    use holochain_types::websocket::AllowedOrigins;
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_state_persistence_round_trip() {
+        // Create a temporary database
+        let tmpdir = tempfile::tempdir().unwrap();
+        let db_write = setup_holochain_data(
+            tmpdir.path(),
+            holochain_data::kind::Conductor,
+            holochain_data::HolochainDataConfig::default(),
+        )
+        .await
+        .unwrap();
+        let db_read = db_write.as_ref();
+
+        // Create a test state
+        let tag = ConductorStateTag(Arc::from("test-conductor"));
+        let installed_apps = InstalledAppMap::new();
+        let app_interfaces = HashMap::new();
+        let state = ConductorState::from_parts(tag.clone(), installed_apps, app_interfaces);
+
+        // Save the state
+        save_conductor_state(&db_write, &state).await.unwrap();
+
+        // Load the state back
+        let loaded_state = load_conductor_state(&db_read).await.unwrap().unwrap();
+
+        // Verify the tag matches
+        assert_eq!(loaded_state.tag().0.as_ref(), "test-conductor");
+        assert_eq!(loaded_state.installed_apps().len(), 0);
+        assert_eq!(loaded_state.app_interfaces.len(), 0);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_app_interface_persistence() {
+        // Create a temporary database
+        let tmpdir = tempfile::tempdir().unwrap();
+        let db_write = setup_holochain_data(
+            tmpdir.path(),
+            holochain_data::kind::Conductor,
+            holochain_data::HolochainDataConfig::default(),
+        )
+        .await
+        .unwrap();
+        let db_read = db_write.as_ref();
+
+        // Create a test state with an app interface
+        let tag = ConductorStateTag(Arc::from("test-conductor"));
+        let installed_apps = InstalledAppMap::new();
+
+        let mut app_interfaces = HashMap::new();
+        let interface_config = AppInterfaceConfig::websocket(
+            12345,
+            None,
+            AllowedOrigins::Any,
+            None,
+        );
+        let interface_id = AppInterfaceId::new(12345);
+        app_interfaces.insert(interface_id, interface_config);
+
+        let state = ConductorState::from_parts(tag, installed_apps, app_interfaces);
+
+        // Save the state
+        save_conductor_state(&db_write, &state).await.unwrap();
+
+        // Load the state back
+        let loaded_state = load_conductor_state(&db_read).await.unwrap().unwrap();
+
+        // Verify the interface was persisted
+        assert_eq!(loaded_state.app_interfaces.len(), 1);
+        let loaded_interface = loaded_state.app_interfaces.values().next().unwrap();
+        assert_eq!(loaded_interface.driver.port(), 12345);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_deletion_of_stale_interfaces() {
+        // Create a temporary database
+        let tmpdir = tempfile::tempdir().unwrap();
+        let db_write = setup_holochain_data(
+            tmpdir.path(),
+            holochain_data::kind::Conductor,
+            holochain_data::HolochainDataConfig::default(),
+        )
+        .await
+        .unwrap();
+        let db_read = db_write.as_ref();
+
+        // Create initial state with two interfaces
+        let tag = ConductorStateTag(Arc::from("test-conductor"));
+        let installed_apps = InstalledAppMap::new();
+
+        let mut app_interfaces = HashMap::new();
+        let interface1 = AppInterfaceConfig::websocket(
+            12345,
+            None,
+            AllowedOrigins::Any,
+            None,
+        );
+        let interface2 = AppInterfaceConfig::websocket(
+            12346,
+            None,
+            AllowedOrigins::Any,
+            None,
+        );
+        app_interfaces.insert(AppInterfaceId::new(12345), interface1);
+        app_interfaces.insert(AppInterfaceId::new(12346), interface2);
+
+        let state = ConductorState::from_parts(tag.clone(), installed_apps.clone(), app_interfaces);
+        save_conductor_state(&db_write, &state).await.unwrap();
+
+        // Now create a new state with only one interface
+        let mut app_interfaces = HashMap::new();
+        let interface1 = AppInterfaceConfig::websocket(
+            12345,
+            None,
+            AllowedOrigins::Any,
+            None,
+        );
+        app_interfaces.insert(AppInterfaceId::new(12345), interface1);
+        let new_state = ConductorState::from_parts(tag, installed_apps, app_interfaces);
+
+        // Save the new state (should delete interface 12346)
+        save_conductor_state(&db_write, &new_state).await.unwrap();
+
+        // Load and verify only one interface remains
+        let loaded_state = load_conductor_state(&db_read).await.unwrap().unwrap();
+        assert_eq!(loaded_state.app_interfaces.len(), 1);
+        assert!(loaded_state
+            .app_interfaces
+            .contains_key(&AppInterfaceId::new(12345)));
+    }
+}
