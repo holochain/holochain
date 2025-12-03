@@ -328,7 +328,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_wasm_roundtrip() {
+    async fn wasm_roundtrip() {
         let db = test_db().await;
 
         // Create test WASM bytecode
@@ -356,7 +356,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_dna_def_roundtrip() {
+    async fn dna_def_roundtrip() {
         let db = test_db().await;
 
         // Create test DNA definition
@@ -437,7 +437,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_entry_def_roundtrip() {
+    async fn entry_def_roundtrip() {
         let db = test_db().await;
 
         // Create test entry definitions
@@ -492,7 +492,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_dna_def_with_dependencies() {
+    async fn dna_def_with_dependencies() {
         let db = test_db().await;
 
         // Create WASM for zomes
@@ -539,7 +539,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_entry_def_all_types() {
+    async fn entry_def_all_types() {
         let db = test_db().await;
 
         // Test all EntryDefId variants
@@ -605,7 +605,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_update_dna_def_removes_orphaned_zomes() {
+    async fn update_dna_def_removes_orphaned_zomes() {
         let db = test_db().await;
 
         // Create WASM for zomes
