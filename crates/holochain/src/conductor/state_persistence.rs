@@ -260,12 +260,8 @@ mod tests {
         let installed_apps = InstalledAppMap::new();
 
         let mut app_interfaces = HashMap::new();
-        let interface_config = AppInterfaceConfig::websocket(
-            12345,
-            None,
-            AllowedOrigins::Any,
-            None,
-        );
+        let interface_config =
+            AppInterfaceConfig::websocket(12345, None, AllowedOrigins::Any, None);
         let interface_id = AppInterfaceId::new(12345);
         app_interfaces.insert(interface_id, interface_config);
 
@@ -301,18 +297,8 @@ mod tests {
         let installed_apps = InstalledAppMap::new();
 
         let mut app_interfaces = HashMap::new();
-        let interface1 = AppInterfaceConfig::websocket(
-            12345,
-            None,
-            AllowedOrigins::Any,
-            None,
-        );
-        let interface2 = AppInterfaceConfig::websocket(
-            12346,
-            None,
-            AllowedOrigins::Any,
-            None,
-        );
+        let interface1 = AppInterfaceConfig::websocket(12345, None, AllowedOrigins::Any, None);
+        let interface2 = AppInterfaceConfig::websocket(12346, None, AllowedOrigins::Any, None);
         app_interfaces.insert(AppInterfaceId::new(12345), interface1);
         app_interfaces.insert(AppInterfaceId::new(12346), interface2);
 
@@ -321,12 +307,7 @@ mod tests {
 
         // Now create a new state with only one interface
         let mut app_interfaces = HashMap::new();
-        let interface1 = AppInterfaceConfig::websocket(
-            12345,
-            None,
-            AllowedOrigins::Any,
-            None,
-        );
+        let interface1 = AppInterfaceConfig::websocket(12345, None, AllowedOrigins::Any, None);
         app_interfaces.insert(AppInterfaceId::new(12345), interface1);
         let new_state = ConductorState::from_parts(tag, installed_apps, app_interfaces);
 
