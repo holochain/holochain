@@ -19,8 +19,8 @@ use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::DynHcP2p;
 use holochain_sqlite::prelude::{
-    DatabaseResult, DbKey, DbKindAuthored, DbKindCache, DbKindDht, DbSyncLevel,
-    DbSyncStrategy, DbWrite, PoolConfig,
+    DatabaseResult, DbKey, DbKindAuthored, DbKindCache, DbKindDht, DbSyncLevel, DbSyncStrategy,
+    DbWrite, PoolConfig,
 };
 use holochain_state::{host_fn_workspace::SourceChainWorkspace, prelude::*};
 use holochain_util::timed;
@@ -45,8 +45,8 @@ pub struct Spaces {
     /// The map of running queue consumer workflows.
     pub(crate) queue_consumer_map: QueueConsumerMap,
     /// Conductor database (holochain_data) for normalized ConductorState
-   pub(crate) conductor_db: holochain_data::DbWrite<holochain_data::kind::Conductor>,
-   pub(crate) wasm_store: holochain_state::wasm::WasmStore,
+    pub(crate) conductor_db: holochain_data::DbWrite<holochain_data::kind::Conductor>,
+    pub(crate) wasm_store: holochain_state::wasm::WasmStore,
     pub(crate) dna_def_store: holochain_state::dna_def::DnaDefStore,
     pub(crate) entry_def_store: holochain_state::entry_def::EntryDefStore,
     db_key: DbKey,
@@ -186,13 +186,13 @@ impl Spaces {
         };
 
         // Convert the DbKey from holochain_sqlite to holochain_data format
-       let data_db_key = holochain_data::DbKey::load(db_key.locked.clone(), passphrase.clone())
-           .await
-           .map_err(ConductorError::other)?;
+        let data_db_key = holochain_data::DbKey::load(db_key.locked.clone(), passphrase.clone())
+            .await
+            .map_err(ConductorError::other)?;
 
-       let conductor_db = holochain_data::setup_holochain_data(
-           root_db_dir.as_ref(),
-           holochain_data::kind::Conductor,
+        let conductor_db = holochain_data::setup_holochain_data(
+            root_db_dir.as_ref(),
+            holochain_data::kind::Conductor,
             holochain_data::HolochainDataConfig {
                 key: Some(data_db_key.clone()),
                 sync_level: db_sync,
@@ -232,10 +232,20 @@ impl Spaces {
     }
 
     /// Unblock some target.
-   pub async fn unblock(&self, input: Block) -> DatabaseResult<()> {
-       self.conductor_db.unblock(input).await
-           .map_err(|e| DatabaseError::Other(e.into()))
-   }
+    pub async fn unblock(&self, input: Block) -> DatabaseResult<()> {
+        self.conductor_db
+            .unblock(input)
+            .await
+            .map_err(|e| DatabaseError::Other(e.into()))
+    }
+
+    /// Block some target.
+    pub async fn block(&self, input: Block) -> DatabaseResult<()> {
+        self.conductor_db
+            .block(input)
+            .await
+            .map_err(|e| DatabaseError::Other(e.into()))
+    }
 
     /// Check if some target is blocked.
     pub async fn is_blocked(
@@ -254,37 +264,39 @@ impl Spaces {
 
         // If node_agents_in_spaces is not yet initialized, we can't know anything about
         // which cells are blocked, so avoid the race condition by returning false
-       // TODO: actually fix the preflight, because this could be a loophole for someone
-       //       to evade a block in some circumstances
-       if cell_ids.is_empty() {
-           return Ok(false);
-       }
+        // TODO: actually fix the preflight, because this could be a loophole for someone
+        //       to evade a block in some circumstances
+        if cell_ids.is_empty() {
+            return Ok(false);
+        }
 
-       // Check if the target_id itself is directly blocked
-       let target_blocked = self.conductor_db.as_ref()
-           .is_blocked(target_id.clone(), timestamp)
-           .await
-           .map_err(|e| ConductorError::other(e))?;
+        // Check if the target_id itself is directly blocked
+        let target_blocked = self
+            .conductor_db
+            .as_ref()
+            .is_blocked(target_id.clone(), timestamp)
+            .await
+            .map_err(|e| ConductorError::other(e))?;
 
-       if target_blocked {
-           return Ok(true);
-       }
+        if target_blocked {
+            return Ok(true);
+        }
 
-       // Check if all the cell_ids are blocked
-       let cell_targets: Vec<BlockTargetId> = cell_ids
-           .into_iter()
-           .map(BlockTargetId::Cell)
-           .collect();
+        // Check if all the cell_ids are blocked
+        let cell_targets: Vec<BlockTargetId> =
+            cell_ids.into_iter().map(BlockTargetId::Cell).collect();
 
-       let all_cells_blocked = self.conductor_db.as_ref()
-           .are_all_blocked(cell_targets, timestamp)
-           .await
-           .map_err(|e| ConductorError::other(e))?;
+        let all_cells_blocked = self
+            .conductor_db
+            .as_ref()
+            .are_all_blocked(cell_targets, timestamp)
+            .await
+            .map_err(|e| ConductorError::other(e))?;
 
-       Ok(all_cells_blocked)
-   }
+        Ok(all_cells_blocked)
+    }
 
-   /// Get the holochain conductor state
+    /// Get the holochain conductor state
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn get_state(&self) -> ConductorResult<ConductorState> {
         timed!([1, 10, 1000], "get_state", {
