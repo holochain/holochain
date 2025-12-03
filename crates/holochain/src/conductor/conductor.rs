@@ -94,7 +94,6 @@ use holochain_sqlite::sql::sql_cell::state_dump;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::*;
 use holochain_state::source_chain;
-use holochain_data::conductor::WitnessNonceResult;
 pub use holochain_types::share;
 #[cfg(feature = "wasmer_sys")]
 use holochain_wasmer_host::module::ModuleCache;
@@ -787,9 +786,10 @@ mod dna_impls {
 
 /// Network-related methods
 mod network_impls {
-    use super::*;
-    use crate::conductor::api::error::{
-        zome_call_response_to_conductor_api_result, ConductorApiError,
+   use super::*;
+   use holochain_state::nonce::WitnessNonceResult;
+   use crate::conductor::api::error::{
+       zome_call_response_to_conductor_api_result, ConductorApiError,
     };
     use futures::future::join_all;
     use holochain_conductor_api::ZomeCallParamsSigned;
