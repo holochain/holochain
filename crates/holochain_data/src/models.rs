@@ -58,24 +58,11 @@ pub struct DnaDefModel {
     /// Serialized application properties.
     pub properties: Vec<u8>,
     /// DNA lineage for migration support (optional, JSON-serialized HashSet<DnaHash>)
-    #[cfg(feature = "unstable-migration")]
     pub lineage: Option<Vec<u8>>,
 }
 
 impl DnaDefModel {
     /// Create a new DnaDefModel.
-    #[cfg(not(feature = "unstable-migration"))]
-    pub fn new(hash: DnaHash, name: String, network_seed: String, properties: Vec<u8>) -> Self {
-        Self {
-            hash: hash.get_raw_39().to_vec(),
-            name,
-            network_seed,
-            properties,
-        }
-    }
-
-    /// Create a new DnaDefModel with lineage support.
-    #[cfg(feature = "unstable-migration")]
     pub fn new(
         hash: DnaHash,
         name: String,

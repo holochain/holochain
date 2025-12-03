@@ -59,17 +59,13 @@ impl DbRead<Wasm> {
     pub async fn get_dna_def(&self, hash: &DnaHash) -> sqlx::Result<Option<DnaDef>> {
         let hash_bytes = hash.get_raw_39();
 
-        #[cfg(feature = "unstable-migration")]
-        let query =
-            "SELECT hash, name, network_seed, properties, lineage FROM DnaDef WHERE hash = ?";
-        #[cfg(not(feature = "unstable-migration"))]
-        let query = "SELECT hash, name, network_seed, properties FROM DnaDef WHERE hash = ?";
-
         // Fetch the DnaDef model
-        let dna_model: Option<DnaDefModel> = sqlx::query_as(query)
-            .bind(hash_bytes)
-            .fetch_optional(self.pool())
-            .await?;
+        let dna_model: Option<DnaDefModel> = sqlx::query_as(
+            "SELECT hash, name, network_seed, properties, lineage FROM DnaDef WHERE hash = ?",
+        )
+        .bind(hash_bytes)
+        .fetch_optional(self.pool())
+        .await?;
 
         let dna_model = match dna_model {
             Some(m) => m,
@@ -189,26 +185,24 @@ impl DbWrite<Wasm> {
         let network_seed = dna_def.modifiers.network_seed.clone();
         let properties = dna_def.modifiers.properties.bytes().to_vec();
 
+        // Serialize lineage if present
         #[cfg(feature = "unstable-migration")]
         let lineage_bytes =
             serde_json::to_vec(&dna_def.lineage).map_err(|e| sqlx::Error::Encode(Box::new(e)))?;
-
-        #[cfg(feature = "unstable-migration")]
-        let insert_query = "INSERT OR REPLACE INTO DnaDef (hash, name, network_seed, properties, lineage) VALUES (?, ?, ?, ?, ?)";
         #[cfg(not(feature = "unstable-migration"))]
-        let insert_query = "INSERT OR REPLACE INTO DnaDef (hash, name, network_seed, properties) VALUES (?, ?, ?, ?)";
+        let lineage_bytes: Option<Vec<u8>> = None;
 
         // Insert DnaDef
-        let query = sqlx::query(insert_query)
+        sqlx::query(
+            "INSERT OR REPLACE INTO DnaDef (hash, name, network_seed, properties, lineage) VALUES (?, ?, ?, ?, ?)",
+        )
             .bind(hash_bytes)
             .bind(name)
             .bind(network_seed)
-            .bind(properties);
-
-        #[cfg(feature = "unstable-migration")]
-        let query = query.bind(lineage_bytes);
-
-        query.execute(&mut *tx).await?;
+            .bind(properties)
+            .bind(lineage_bytes)
+            .execute(&mut *tx)
+            .await?;
 
         // Delete existing zomes for this DNA to avoid orphans when updating
         sqlx::query("DELETE FROM IntegrityZome WHERE dna_hash = ?")
