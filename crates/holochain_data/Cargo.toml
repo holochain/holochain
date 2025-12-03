@@ -27,6 +27,8 @@ holochain_integrity_types = { version = "^0.7.0-dev.4", path = "../holochain_int
 holochain_zome_types = { version = "^0.7.0-dev.5", path = "../holochain_zome_types" }
 holochain_conductor_api = { version = "^0.7.0-dev.0", path = "../holochain_conductor_api" }
 holochain_serialized_bytes = "=0.0.56"
+holochain_nonce = { version = "^0.7.0-dev.0", path = "../holochain_nonce" }
+holochain_timestamp = { version = "^0.7.0-dev.0", path = "../timestamp" }
 serde_json = "1.0"
 indexmap = { version = "2.6.0", features = ["serde"] }
 
