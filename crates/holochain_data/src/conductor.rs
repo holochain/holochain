@@ -36,7 +36,11 @@ impl InstalledAppModel {
         let agent_bytes = app.agent_key().get_raw_36().to_vec();
         let (status_str, disabled_reason) = match status {
             AppStatus::Enabled => ("enabled".to_string(), None),
-            AppStatus::Disabled(reason) => ("disabled".to_string(), Some(format!("{:?}", reason))),
+            AppStatus::Disabled(reason) => {
+                let reason_json = serde_json::to_string(reason)
+                    .map_err(|e| format!("Failed to serialize disabled reason: {}", e))?;
+                ("disabled".to_string(), Some(reason_json))
+            }
             AppStatus::AwaitingMemproofs => ("awaiting_memproofs".to_string(), None),
         };
 
@@ -87,8 +91,9 @@ impl InstalledAppModel {
                     .disabled_reason
                     .as_ref()
                     .ok_or_else(|| "Missing disabled reason".to_string())?;
-                // For now, we'll use a generic reason since we can't fully reconstruct the enum
-                AppStatus::Disabled(DisabledAppReason::Error(reason_str.clone()))
+                let reason: DisabledAppReason = serde_json::from_str(reason_str)
+                    .map_err(|e| format!("Failed to deserialize disabled reason: {}", e))?;
+                AppStatus::Disabled(reason)
             }
             "awaiting_memproofs" => AppStatus::AwaitingMemproofs,
             _ => return Err(format!("Unknown status: {}", self.status)),
