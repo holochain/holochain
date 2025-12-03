@@ -73,9 +73,20 @@ impl AppInterfaceId {
         };
         Self { port, id }
     }
+
+    /// Create an AppInterfaceId from its parts (for persistence layer)
+    pub(crate) fn from_parts(port: u16, id: Option<String>) -> Self {
+        Self { port, id }
+    }
+
     /// Get the port intended for this interface
     pub fn port(&self) -> u16 {
         self.port
+    }
+
+    /// Get the unique ID (if port is 0)
+    pub(crate) fn id(&self) -> &Option<String> {
+        &self.id
     }
 }
 

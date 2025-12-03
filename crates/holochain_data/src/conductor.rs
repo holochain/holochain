@@ -3,7 +3,9 @@
 //! This module provides data models and database operations for the conductor database,
 //! which stores the conductor's state including installed apps, roles, and interfaces.
 
+use holochain_conductor_api::config::InterfaceDriver;
 use holochain_types::prelude::*;
+use holochain_types::websocket::AllowedOrigins;
 
 /// Model for the Conductor table (singleton)
 #[derive(Debug, Clone, sqlx::FromRow)]
@@ -140,6 +142,58 @@ pub struct AppInterfaceModel {
     pub installed_app_id: Option<String>,
 }
 
+impl AppInterfaceModel {
+    /// Create from InterfaceDriver and installed_app_id
+    pub fn from_driver(
+        driver: &InterfaceDriver,
+        installed_app_id: Option<String>,
+    ) -> Result<Self, String> {
+        match driver {
+            InterfaceDriver::Websocket {
+                port,
+                danger_bind_addr,
+                allowed_origins,
+            } => {
+                // Serialize allowed_origins
+                let allowed_origins_blob = serde_json::to_vec(allowed_origins)
+                    .map_err(|e| format!("Failed to serialize allowed_origins: {}", e))?;
+
+                Ok(Self {
+                    port: *port as i64,
+                    id: None,
+                    driver_type: "websocket".to_string(),
+                    websocket_port: Some(*port as i64),
+                    danger_bind_addr: danger_bind_addr.clone(),
+                    allowed_origins_blob: Some(allowed_origins_blob),
+                    installed_app_id,
+                })
+            }
+        }
+    }
+
+    /// Convert back to InterfaceDriver
+    pub fn to_driver(&self) -> Result<InterfaceDriver, String> {
+        if self.driver_type != "websocket" {
+            return Err(format!("Unknown driver type: {}", self.driver_type));
+        }
+
+        let port = self.websocket_port.ok_or("Missing websocket_port")? as u16;
+        let danger_bind_addr = self.danger_bind_addr.clone();
+        let allowed_origins = if let Some(ref blob) = self.allowed_origins_blob {
+            serde_json::from_slice(blob)
+                .map_err(|e| format!("Failed to deserialize allowed_origins: {}", e))?
+        } else {
+            AllowedOrigins::Any
+        };
+
+        Ok(InterfaceDriver::Websocket {
+            port,
+            danger_bind_addr,
+            allowed_origins,
+        })
+    }
+}
+
 // Database operations will be implemented here
 // These will be async functions that operate on DbRead<Conductor> and DbWrite<Conductor>
 
@@ -154,6 +208,43 @@ impl DbRead<Conductor> {
             .fetch_optional(self.pool())
             .await?;
         Ok(tag)
+    }
+
+    /// Get all app interfaces.
+    pub async fn get_all_app_interfaces(&self) -> sqlx::Result<Vec<AppInterfaceModel>> {
+        let models: Vec<AppInterfaceModel> = sqlx::query_as(
+            "SELECT port, id, driver_type, websocket_port, danger_bind_addr, allowed_origins_blob, installed_app_id FROM AppInterface",
+        )
+        .fetch_all(self.pool())
+        .await?;
+
+        Ok(models)
+    }
+
+    /// Get signal subscriptions for a specific app interface.
+    pub async fn get_signal_subscriptions(
+        &self,
+        port: i64,
+        id: Option<&str>,
+    ) -> sqlx::Result<Vec<(String, Vec<u8>)>> {
+        #[derive(sqlx::FromRow)]
+        struct Row {
+            app_id: String,
+            filters_blob: Option<Vec<u8>>,
+        }
+
+        let rows: Vec<Row> = sqlx::query_as(
+            "SELECT app_id, filters_blob FROM SignalSubscription WHERE interface_port = ? AND interface_id IS ?",
+        )
+        .bind(port)
+        .bind(id)
+        .fetch_all(self.pool())
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .filter_map(|r| r.filters_blob.map(|blob| (r.app_id, blob)))
+            .collect())
     }
 
     /// Get an installed app by ID.
@@ -210,6 +301,85 @@ impl DbWrite<Conductor> {
     pub async fn set_conductor_tag(&self, tag: &str) -> sqlx::Result<()> {
         sqlx::query("INSERT INTO Conductor (id, tag) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET tag = excluded.tag")
             .bind(tag)
+            .execute(self.pool())
+            .await?;
+        Ok(())
+    }
+
+    /// Insert or update an app interface.
+    pub async fn put_app_interface(
+        &self,
+        port: i64,
+        id: Option<&str>,
+        model: &AppInterfaceModel,
+    ) -> sqlx::Result<()> {
+        sqlx::query(
+            "INSERT INTO AppInterface (port, id, driver_type, websocket_port, danger_bind_addr, allowed_origins_blob, installed_app_id) 
+             VALUES (?, ?, ?, ?, ?, ?, ?) 
+             ON CONFLICT(port, id) DO UPDATE SET 
+                driver_type = excluded.driver_type,
+                websocket_port = excluded.websocket_port,
+                danger_bind_addr = excluded.danger_bind_addr,
+                allowed_origins_blob = excluded.allowed_origins_blob,
+                installed_app_id = excluded.installed_app_id",
+        )
+        .bind(port)
+        .bind(id)
+        .bind(&model.driver_type)
+        .bind(model.websocket_port)
+        .bind(&model.danger_bind_addr)
+        .bind(&model.allowed_origins_blob)
+        .bind(&model.installed_app_id)
+        .execute(self.pool())
+        .await?;
+        Ok(())
+    }
+
+    /// Save a signal subscription for an app interface.
+    pub async fn put_signal_subscription(
+        &self,
+        interface_port: i64,
+        interface_id: Option<&str>,
+        app_id: &str,
+        filters_blob: &[u8],
+    ) -> sqlx::Result<()> {
+        sqlx::query(
+            "INSERT INTO SignalSubscription (interface_port, interface_id, app_id, filters_blob) 
+             VALUES (?, ?, ?, ?) 
+             ON CONFLICT(interface_port, interface_id, app_id) DO UPDATE SET 
+                filters_blob = excluded.filters_blob",
+        )
+        .bind(interface_port)
+        .bind(interface_id)
+        .bind(app_id)
+        .bind(filters_blob)
+        .execute(self.pool())
+        .await?;
+        Ok(())
+    }
+
+    /// Delete all signal subscriptions for an app interface.
+    pub async fn delete_signal_subscriptions(
+        &self,
+        interface_port: i64,
+        interface_id: Option<&str>,
+    ) -> sqlx::Result<()> {
+        sqlx::query(
+            "DELETE FROM SignalSubscription WHERE interface_port = ? AND interface_id IS ?",
+        )
+        .bind(interface_port)
+        .bind(interface_id)
+        .execute(self.pool())
+        .await?;
+        Ok(())
+    }
+
+    /// Delete an app interface.
+    pub async fn delete_app_interface(&self, port: i64, id: Option<&str>) -> sqlx::Result<()> {
+        // Signal subscriptions will be deleted via CASCADE
+        sqlx::query("DELETE FROM AppInterface WHERE port = ? AND id IS ?")
+            .bind(port)
+            .bind(id)
             .execute(self.pool())
             .await?;
         Ok(())
