@@ -6,6 +6,12 @@
 use holochain_conductor_api::config::InterfaceDriver;
 use holochain_types::prelude::*;
 use holochain_types::websocket::AllowedOrigins;
+use holochain_serialized_bytes::SerializedBytes;
+use std::collections::HashSet;
+
+pub use holochain_nonce::Nonce256Bits;
+pub use holochain_zome_types::block::{Block, BlockTargetId};
+pub use holochain_timestamp::InclusiveTimestampInterval;
 
 /// Model for the Conductor table (singleton)
 #[derive(Debug, Clone, sqlx::FromRow)]
@@ -719,5 +725,322 @@ mod tests {
             .await
             .expect("Failed to count clones after delete");
         assert_eq!(clone_count, 0, "Clone cell should be cascade deleted");
+    }
+}
+
+// ============================================================================
+// Nonce Witnessing Operations
+// ============================================================================
+
+
+/// Maximum duration a nonce can be valid for
+pub const WITNESSABLE_EXPIRY_DURATION: std::time::Duration = std::time::Duration::from_secs(60 * 50);
+
+#[derive(PartialEq, Debug)]
+pub enum WitnessNonceResult {
+    Fresh,
+    Duplicate,
+    Expired,
+    Future,
+}
+
+impl DbRead<Conductor> {
+    /// Check if a nonce has already been seen
+    pub async fn nonce_already_seen(
+        &self,
+        agent: &AgentPubKey,
+        nonce: &Nonce256Bits,
+        now: Timestamp,
+    ) -> Result<bool, sqlx::Error> {
+        let agent_bytes = agent.get_raw_36();
+        let nonce_bytes = nonce.as_ref();
+        let now_micros = now.as_micros();
+
+        let count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(1) FROM Nonce WHERE agent = ? AND nonce = ? AND expires > ?",
+        )
+        .bind(agent_bytes)
+        .bind(nonce_bytes)
+        .bind(now_micros)
+        .fetch_one(self.pool())
+        .await?;
+
+        Ok(count > 0)
+    }
+}
+
+impl DbWrite<Conductor> {
+    /// Witness a nonce (check if it's fresh and record it)
+    pub async fn witness_nonce(
+        &self,
+        agent: AgentPubKey,
+        nonce: Nonce256Bits,
+        now: Timestamp,
+        expires: Timestamp,
+    ) -> Result<WitnessNonceResult, sqlx::Error> {
+        // Treat expired but also very far future expiries as stale as we cannot trust the time
+        if expires <= now {
+            return Ok(WitnessNonceResult::Expired);
+        }
+        
+        let future_limit = (now + WITNESSABLE_EXPIRY_DURATION)
+            .map_err(|_| sqlx::Error::Protocol("Timestamp overflow".to_string()))?;
+        
+        if expires > future_limit {
+            return Ok(WitnessNonceResult::Future);
+        }
+
+        // Delete expired nonces first
+        sqlx::query("DELETE FROM Nonce WHERE expires <= ?")
+            .bind(now.as_micros())
+            .execute(self.pool())
+            .await?;
+
+        // Check if already seen
+        let db_read: &DbRead<Conductor> = self.as_ref();
+        if db_read.nonce_already_seen(&agent, &nonce, now).await? {
+            return Ok(WitnessNonceResult::Duplicate);
+        }
+
+        // Insert the new nonce
+        let agent_bytes = agent.get_raw_36();
+        let nonce_bytes = nonce.as_ref();
+        
+        sqlx::query(
+            "INSERT INTO Nonce (agent, nonce, expires) VALUES (?, ?, ?) ON CONFLICT DO NOTHING",
+        )
+        .bind(agent_bytes)
+        .bind(nonce_bytes)
+        .bind(expires.as_micros())
+        .execute(self.pool())
+        .await?;
+
+        Ok(WitnessNonceResult::Fresh)
+    }
+}
+
+// ============================================================================
+// Block/Unblock Operations
+// ============================================================================
+
+
+impl DbRead<Conductor> {
+    /// Check whether a given target is blocked at the given time
+    pub async fn is_blocked(
+        &self,
+        target_id: BlockTargetId,
+        timestamp: Timestamp,
+    ) -> Result<bool, sqlx::Error> {
+        let target_bytes = SerializedBytes::try_from(target_id)
+            .map_err(|e| sqlx::Error::Protocol(format!("Serialization error: {}", e)))?
+            .bytes()
+            .to_vec();
+        let time_micros = timestamp.as_micros();
+
+        let count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(1) > 0 FROM BlockSpan WHERE target_id = ? AND start_us <= ? AND ? <= end_us",
+        )
+        .bind(&target_bytes)
+        .bind(time_micros)
+        .bind(time_micros)
+        .fetch_one(self.pool())
+        .await?;
+
+        Ok(count > 0)
+    }
+
+    /// Query whether all BlockTargetIds in the provided vector are blocked at the given timestamp
+    pub async fn are_all_blocked(
+        &self,
+        target_ids: Vec<BlockTargetId>,
+        timestamp: Timestamp,
+    ) -> Result<bool, sqlx::Error> {
+        // If no targets provided, return false
+        if target_ids.is_empty() {
+            return Ok(false);
+        }
+
+        // Deduplicate to ensure duplicates don't cause false negatives
+        let unique_ids: HashSet<BlockTargetId> = target_ids.into_iter().collect();
+        let ids_len = unique_ids.len() as i64;
+        let time_micros = timestamp.as_micros();
+
+        // For simplicity, check each target_id individually and ensure all are blocked
+        let mut all_blocked = true;
+        for target_id in unique_ids.into_iter() {
+            let target_bytes: Vec<u8> = holochain_serialized_bytes::encode(&target_id)
+                .map_err(|e| sqlx::Error::Protocol(format!("Serialization error: {}", e)))?
+                .into();
+            let count: i64 = sqlx::query_scalar(
+                "SELECT COUNT(1) > 0 FROM BlockSpan WHERE target_id = ? AND start_us <= ? AND ? <= end_us",
+            )
+            .bind(&target_bytes)
+            .bind(time_micros)
+            .bind(time_micros)
+            .fetch_one(self.pool())
+            .await?;
+            
+            if count == 0 {
+                all_blocked = false;
+                break;
+            }
+        }
+
+        Ok(all_blocked && ids_len > 0)
+    }
+}
+
+impl DbWrite<Conductor> {
+    /// Get overlapping block bounds for merging
+    async fn pluck_overlapping_block_bounds(
+        &self,
+        block: &Block,
+    ) -> Result<(Option<i64>, Option<i64>), sqlx::Error> {
+        let target_id = BlockTargetId::from(block.target().clone());
+        let target_bytes: Vec<u8> = holochain_serialized_bytes::encode(&target_id)
+            .map_err(|e| sqlx::Error::Protocol(format!("Serialization error: {}", e)))?
+            .into();
+        let start_us = block.start().as_micros();
+        let end_us = block.end().as_micros();
+
+        let result: Option<(Option<i64>, Option<i64>)> = sqlx::query_as(
+            "SELECT MIN(start_us), MAX(end_us) FROM BlockSpan \
+             WHERE target_id = ? AND start_us <= ? AND ? <= end_us",
+        )
+        .bind(&target_bytes)
+        .bind(end_us)
+        .bind(start_us)
+        .fetch_optional(self.pool())
+        .await?;
+
+        Ok(result.unwrap_or((None, None)))
+    }
+
+    /// Insert a block span into the database
+    async fn insert_block_inner(&self, block: Block) -> Result<(), sqlx::Error> {
+        let target_id = BlockTargetId::from(block.target().clone());
+        let target_id_bytes: Vec<u8> = holochain_serialized_bytes::encode(&target_id)
+            .map_err(|e| sqlx::Error::Protocol(format!("Serialization error: {}", e)))?
+            .into();
+        use holochain_zome_types::block::BlockTargetReason;
+        let target_reason = BlockTargetReason::from(block.target().clone());
+        let target_reason_bytes: Vec<u8> = holochain_serialized_bytes::encode(&target_reason)
+            .map_err(|e| sqlx::Error::Protocol(format!("Serialization error: {}", e)))?
+            .into();
+
+        sqlx::query(
+            "INSERT INTO BlockSpan (target_id, target_reason, start_us, end_us) VALUES (?, ?, ?, ?)",
+        )
+        .bind(target_id_bytes)
+        .bind(target_reason_bytes)
+        .bind(block.start().as_micros())
+        .bind(block.end().as_micros())
+        .execute(self.pool())
+        .await?;
+
+        Ok(())
+    }
+
+    /// Insert a block into the database, merging with overlapping blocks
+    pub async fn block(&self, input: Block) -> Result<(), sqlx::Error> {
+        let maybe_min_maybe_max = self.pluck_overlapping_block_bounds(&input).await?;
+
+        // Delete overlapping blocks
+        let target_id = BlockTargetId::from(input.target().clone());
+        let target_id_bytes: Vec<u8> = holochain_serialized_bytes::encode(&target_id)
+            .map_err(|e| sqlx::Error::Protocol(format!("Serialization error: {}", e)))?
+            .into();
+        
+        sqlx::query(
+            "DELETE FROM BlockSpan WHERE target_id = ? AND start_us <= ? AND ? <= end_us",
+        )
+        .bind(&target_id_bytes)
+        .bind(input.end().as_micros())
+        .bind(input.start().as_micros())
+        .execute(self.pool())
+        .await?;
+
+        // Build one new block from the extremums
+        let merged_block = Block::new(
+            input.target().clone(),
+            InclusiveTimestampInterval::try_new(
+                maybe_min_maybe_max
+                    .0
+                    .map(Timestamp)
+                    .map(|min| std::cmp::min(min, input.start()))
+                    .unwrap_or(input.start()),
+                maybe_min_maybe_max
+                    .1
+                    .map(Timestamp)
+                    .map(|max| std::cmp::max(max, input.end()))
+                    .unwrap_or(input.end()),
+            )
+            .map_err(|e| sqlx::Error::Protocol(format!("Timestamp error: {}", e)))?,
+        );
+
+        self.insert_block_inner(merged_block).await
+    }
+
+    /// Insert an unblock into the database, splitting existing blocks as needed
+    pub async fn unblock(&self, unblock: Block) -> Result<(), sqlx::Error> {
+        let maybe_min_maybe_max = self.pluck_overlapping_block_bounds(&unblock).await?;
+
+        // Delete overlapping blocks
+        let target_id = BlockTargetId::from(unblock.target().clone());
+        let target_id_bytes: Vec<u8> = holochain_serialized_bytes::encode(&target_id)
+            .map_err(|e| sqlx::Error::Protocol(format!("Serialization error: {}", e)))?
+            .into();
+        
+        sqlx::query(
+            "DELETE FROM BlockSpan WHERE target_id = ? AND start_us <= ? AND ? <= end_us",
+        )
+        .bind(&target_id_bytes)
+        .bind(unblock.end().as_micros())
+        .bind(unblock.start().as_micros())
+        .execute(self.pool())
+        .await?;
+
+        // Reinstate anything before the unblock
+        if let (Some(min), _) = maybe_min_maybe_max {
+            let preblock_start = Timestamp(min);
+            // Unblocks are inclusive so we reinstate the preblock up to but not including the unblock start
+            match unblock.start() - std::time::Duration::from_micros(1) {
+                Ok(preblock_end) => {
+                    if preblock_start <= preblock_end {
+                        self.insert_block_inner(Block::new(
+                            unblock.target().clone(),
+                            InclusiveTimestampInterval::try_new(preblock_start, preblock_end)
+                                .map_err(|e| {
+                                    sqlx::Error::Protocol(format!("Timestamp error: {}", e))
+                                })?,
+                        ))
+                        .await?;
+                    }
+                }
+                Err(_) => {} // Timestamp underflow, do nothing
+            }
+        }
+
+        // Reinstate anything after the unblock
+        if let (_, Some(max)) = maybe_min_maybe_max {
+            let postblock_end = Timestamp(max);
+            match unblock.end() + std::time::Duration::from_micros(1) {
+                Ok(postblock_start) => {
+                    if postblock_start <= postblock_end {
+                        self.insert_block_inner(Block::new(
+                            unblock.target().clone(),
+                            InclusiveTimestampInterval::try_new(postblock_start, postblock_end)
+                                .map_err(|e| {
+                                    sqlx::Error::Protocol(format!("Timestamp error: {}", e))
+                                })?,
+                        ))
+                        .await?;
+                    }
+                }
+                Err(_) => {} // Timestamp overflow, do nothing
+            }
+        }
+
+        Ok(())
     }
 }
