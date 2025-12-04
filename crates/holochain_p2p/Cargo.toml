@@ -83,7 +83,9 @@ sqlite-encrypted = [
 ]
 sqlite = ["holo_hash/sqlite", "holochain_keystore/sqlite"]
 
-transport-tx5-backend-libdatachannel = ["kitsune2/transport-tx5-backend-libdatachannel"]
+transport-tx5-backend-libdatachannel = [
+  "kitsune2/transport-tx5-backend-libdatachannel",
+]
 
 transport-tx5-backend-go-pion = ["kitsune2/transport-tx5-backend-go-pion"]
 

@@ -73,7 +73,9 @@ sqlite = [
   "holochain_zome_types/sqlite",
 ]
 
-transport-tx5-backend-libdatachannel = ["holochain_p2p/transport-tx5-backend-libdatachannel"]
+transport-tx5-backend-libdatachannel = [
+  "holochain_p2p/transport-tx5-backend-libdatachannel",
+]
 
 transport-tx5-backend-go-pion = ["holochain_p2p/transport-tx5-backend-go-pion"]
 
