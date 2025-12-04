@@ -257,7 +257,9 @@ impl TestCase {
                         "serverUrl": "https://not-used"
                     },
                     "tx5Transport": {
-                        "serverUrl": "wss://not-used"
+                        "serverUrl": "wss://not-used",
+                        "timeoutS": 30,
+                        "webrtcConnectTimeoutS": 25,
                     }
                 })),
                 ..Default::default()

@@ -35,8 +35,8 @@ holochain_types = { path = "../holochain_types", version = "^0.7.0-dev.1", featu
 holochain_util = { version = "^0.7.0-dev.0", path = "../holochain_util", features = [
   "pw",
 ] }
-kitsune2_api = "0.3.0"
-kitsune2_core = "0.3.0"
+kitsune2_api = "0.4.0-dev.0"
+kitsune2_core = "0.4.0-dev.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_yaml = "0.9"
@@ -49,7 +49,7 @@ holochain = { version = "^0.7.0-dev.1", path = "../holochain", default-features 
 [dev-dependencies]
 holochain = { version = "^0.7.0-dev.1", path = "../holochain", default-features = false, features = [
   "sweettest",
-  "datachannel-vendored",
+  "transport-tx5-datachannel-vendored",
 ] }
 tokio = { version = "1.36.0", features = ["full"] }
 serde_json = "1.0"

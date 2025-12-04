@@ -33,8 +33,7 @@ async fn create_database() {
     let db_file = tmp_dir.path().join("test_database");
     assert!(
         db_file.exists(),
-        "Database file was not created at {:?}",
-        db_file
+        "Database file was not created at {db_file:?}"
     );
 }
 
@@ -119,8 +118,7 @@ async fn encrypted_database() {
     let db_file = tmp_dir.path().join("encrypted_test_database");
     assert!(
         db_file.exists(),
-        "Encrypted database file was not created at {:?}",
-        db_file
+        "Encrypted database file was not created at {db_file:?}"
     );
 
     // Drop the connection
@@ -181,8 +179,7 @@ async fn encrypted_database_wrong_key_fails() {
                 || err_msg.contains("encrypted")
                 || err_msg.contains("cipher")
                 || err_msg.contains("SQL logic error"),
-            "Expected encryption-related error, got: {}",
-            err_msg
+            "Expected encryption-related error, got: {err_msg}"
         );
     } else {
         panic!("Connection should fail with wrong encryption key");

@@ -228,7 +228,7 @@ impl ConductorBuilder {
             network_config: Some(config.network.to_k2_config()?),
             report,
             compat,
-            request_timeout: std::time::Duration::from_secs(config.request_timeout_s),
+            request_timeout: std::time::Duration::from_secs(config.network.request_timeout_s),
             #[cfg(feature = "test_utils")]
             mem_bootstrap: config.network.mem_bootstrap,
             ..Default::default()
@@ -455,7 +455,7 @@ impl ConductorBuilder {
             network_config: Some(config.network.to_k2_config()?),
             report,
             compat,
-            request_timeout: std::time::Duration::from_secs(config.request_timeout_s),
+            request_timeout: std::time::Duration::from_secs(config.network.request_timeout_s),
             #[cfg(feature = "test_utils")]
             disable_bootstrap: config.network.disable_bootstrap,
             #[cfg(feature = "test_utils")]
