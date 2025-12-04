@@ -520,6 +520,7 @@ mod slow_tests {
         let zome = Arc::new(zome);
 
         const WORKERS: usize = 128;
+        let mut handles = vec![];
 
         for _ in 0..WORKERS {
             let conductor = conductor.clone();
