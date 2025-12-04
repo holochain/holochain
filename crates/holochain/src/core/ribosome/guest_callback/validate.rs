@@ -529,20 +529,24 @@ mod slow_tests {
         let conductors = Arc::new(conductors);
         let zome = Arc::new(zome);
 
-        const WORKERS: usize = 128;
+        const ENTRIES: usize = 1024;
+        const WORKERS: usize = 4;
         let mut handles = vec![];
 
-        for _ in 0..WORKERS {
-            let conductors = conductors.clone();
-            let zome = zome.clone();
-            let handle = tokio::spawn(async move {
-                validate_receipts(conductors, zome).await;
-            });
-            handles.push(handle);
-        }
-
-        for handle in handles {
-            handle.await.expect("task panicked");
+        let mut entries = 0;
+        while entries < ENTRIES {
+            for _ in 0..WORKERS {
+                let conductors = conductors.clone();
+                let zome = zome.clone();
+                let handle = tokio::spawn(async move {
+                    validate_receipts(conductors, zome).await;
+                });
+                handles.push(handle);
+            }
+            entries += WORKERS;
+            for handle in handles.drain(..) {
+                handle.await.expect("task panicked");
+            }
         }
     }
 
@@ -574,25 +578,5 @@ mod slow_tests {
         )
         .await
         .expect("Timed out waiting for complete validation receipts");
-    }
-
-    async fn is_action_complete(
-        conductor: Arc<SweetConductor>,
-        zome: Arc<SweetZome>,
-        action_hash: ActionHash,
-    ) -> bool {
-        let payload = GetValidationReceiptsInput {
-            action_hash: action_hash.clone(),
-        };
-        let receipts: Vec<ValidationReceiptSet> = conductor
-            .call(&zome, "get_validation_receipts", payload)
-            .await;
-
-        println!("Action {:?} has {:?} receipt sets", action_hash, receipts);
-
-        if receipts.is_empty() {
-            return false;
-        }
-        receipts.iter().all(|set| set.receipts_complete)
     }
 }
