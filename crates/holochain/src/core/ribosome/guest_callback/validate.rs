@@ -539,17 +539,31 @@ mod slow_tests {
     async fn validate_receipts(conductor: Arc<SweetConductor>, zome: Arc<SweetZome>) {
         let action_hash: ActionHash = conductor.call(&zome, "create_entry", ()).await;
 
-        let started_at = Instant::now();
-        const TIMEOUT: Duration = Duration::from_secs(60);
-        loop {
-            if is_action_complete(conductor.clone(), zome.clone(), action_hash.clone()).await {
-                break;
-            }
-            if Instant::now().duration_since(started_at) > TIMEOUT {
-                panic!("Timed out waiting for validation receipts");
-            }
-            tokio::time::sleep(Duration::from_millis(500)).await;
-        }
+        crate::test_utils::retry_fn_until_timeout(
+            || async {
+                // check for complete count of our receipts on the
+                // millisecond level
+
+                // Get the validation receipts to check that they
+                // are all complete
+                let receipt_sets: Vec<ValidationReceiptSet> = conductor
+                    .call(
+                        &zome,
+                        "get_validation_receipts",
+                        GetValidationReceiptsInput::new(action_hash.clone()),
+                    )
+                    .await;
+
+                if receipt_sets.is_empty() {
+                    return false;
+                }
+                receipt_sets.iter().all(|r| r.receipts_complete)
+            },
+            Some(60_000),
+            None,
+        )
+        .await
+        .expect("Timed out waiting for complete validation receipts");
     }
 
     async fn is_action_complete(
