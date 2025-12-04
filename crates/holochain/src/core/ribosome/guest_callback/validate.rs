@@ -531,13 +531,19 @@ mod slow_tests {
         let conductors = Arc::new(conductors);
         let zome = Arc::new(zome);
 
-        const ENTRIES: usize = 64;
-        const WORKERS: usize = 4;
+        let max_entries: usize = std::env::var("HOLOCHAIN_STRESS_TEST_ENTRIES")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(64);
+        let max_workers: usize = std::env::var("HOLOCHAIN_STRESS_TEST_WORKERS")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(8);
         let mut handles = vec![];
 
         let mut entries = 0;
-        while entries < ENTRIES {
-            for _ in 0..WORKERS {
+        while entries < max_entries {
+            for _ in 0..max_workers {
                 let conductors = conductors.clone();
                 let zome = zome.clone();
                 let handle = tokio::spawn(async move {
@@ -547,9 +553,9 @@ mod slow_tests {
                 });
                 handles.push(handle);
             }
-            entries += WORKERS;
             for handle in handles.drain(..) {
                 handle.await.expect("task panicked");
+                entries += 1;
             }
         }
     }
