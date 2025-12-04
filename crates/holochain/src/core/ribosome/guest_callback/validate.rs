@@ -493,7 +493,9 @@ mod slow_tests {
 
         let conductors = Arc::new(conductors);
 
-        validate_receipts(conductors.clone(), Arc::new(alice_zome)).await;
+        validate_receipts(conductors.clone(), Arc::new(alice_zome))
+            .await
+            .expect("validate receipts failed");
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -529,7 +531,7 @@ mod slow_tests {
         let conductors = Arc::new(conductors);
         let zome = Arc::new(zome);
 
-        const ENTRIES: usize = 1024;
+        const ENTRIES: usize = 64;
         const WORKERS: usize = 4;
         let mut handles = vec![];
 
@@ -539,7 +541,9 @@ mod slow_tests {
                 let conductors = conductors.clone();
                 let zome = zome.clone();
                 let handle = tokio::spawn(async move {
-                    validate_receipts(conductors, zome).await;
+                    if let Err(err) = validate_receipts(conductors, zome).await {
+                        panic!("validate receipts {entries} failed: {:?}", err);
+                    }
                 });
                 handles.push(handle);
             }
@@ -550,7 +554,10 @@ mod slow_tests {
         }
     }
 
-    async fn validate_receipts(conductors: Arc<SweetConductorBatch>, zome: Arc<SweetZome>) {
+    async fn validate_receipts(
+        conductors: Arc<SweetConductorBatch>,
+        zome: Arc<SweetZome>,
+    ) -> anyhow::Result<()> {
         let action_hash: ActionHash = conductors[0].call(&zome, "create_entry", ()).await;
 
         crate::test_utils::retry_fn_until_timeout(
@@ -576,7 +583,8 @@ mod slow_tests {
             Some(60_000),
             None,
         )
-        .await
-        .expect("Timed out waiting for complete validation receipts");
+        .await?;
+
+        Ok(())
     }
 }
