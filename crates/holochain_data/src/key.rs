@@ -168,7 +168,7 @@ impl DbKey {
             .unwrap()
             .lock()
             .iter()
-            .map(|b| format!("{:02X}", b))
+            .map(|b| format!("{b:02X}"))
             .collect::<String>()
     }
 
@@ -179,7 +179,7 @@ impl DbKey {
             .unwrap()
             .lock()
             .iter()
-            .map(|b| format!("{:02X}", b))
+            .map(|b| format!("{b:02X}"))
             .collect::<String>()
     }
 
