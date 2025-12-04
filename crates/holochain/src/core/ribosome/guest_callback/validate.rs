@@ -238,7 +238,7 @@ mod test {
 }
 
 #[cfg(test)]
-#[cfg(feature = "slow_tests")]
+//#[cfg(feature = "slow_tests")]
 mod slow_tests {
     use super::ValidateResult;
     use crate::conductor::api::error::ConductorApiError;
@@ -250,6 +250,9 @@ mod slow_tests {
     use crate::core::workflow::WorkflowError;
     use crate::fixt::Zomes;
     use crate::fixt::*;
+    use crate::sweettest::SweetConductorBatch;
+    use crate::sweettest::SweetConductorConfig;
+    use crate::sweettest::SweetZome;
     use crate::sweettest::{SweetConductor, SweetDnaFile};
     use crate::test_utils::RibosomeTestFixture;
     use ::fixt::prelude::*;
@@ -260,6 +263,8 @@ mod slow_tests {
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::op::Op;
     use std::sync::Arc;
+    use std::time::Duration;
+    use std::time::Instant;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_unimplemented() {
@@ -455,5 +460,114 @@ mod slow_tests {
         let invalid_output: Result<ActionHash, _> =
             conductor.call_fallible(&alice, "never_validates", ()).await;
         assert!(invalid_output.is_err());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_should_validate_receipt() {
+        holochain_trace::test_run();
+
+        let config = SweetConductorConfig::rendezvous(true).tune_conductor(|cc| {
+            cc.min_publish_interval = Some(Duration::from_secs(5));
+            cc.publish_trigger_interval = Some(Duration::from_secs(5))
+        });
+        let mut conductors = SweetConductorBatch::from_config_rendezvous(6, config).await;
+
+        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+
+        let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+
+        let cell = apps.cells_flattened().into_iter().next().unwrap();
+        let zome = cell.zome(TestWasm::Create);
+
+        for c in conductors.iter() {
+            c.declare_full_storage_arcs(cell.dna_hash()).await;
+        }
+
+        conductors.exchange_peer_info().await;
+
+        let conductor = conductors.into_iter().next().unwrap();
+        let conductor = Arc::new(conductor);
+        let zome = Arc::new(zome);
+
+        validate_receipts(conductor, zome).await;
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_stress_validate_receipts() {
+        holochain_trace::test_run();
+
+        let config = SweetConductorConfig::rendezvous(true).tune_conductor(|cc| {
+            cc.min_publish_interval = Some(Duration::from_secs(5));
+            cc.publish_trigger_interval = Some(Duration::from_secs(5))
+        });
+        let mut conductors = SweetConductorBatch::from_config_rendezvous(6, config).await;
+
+        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+
+        let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+
+        let cell = apps.cells_flattened().into_iter().next().unwrap();
+        let zome = cell.zome(TestWasm::Create);
+
+        for c in conductors.iter() {
+            c.declare_full_storage_arcs(cell.dna_hash()).await;
+        }
+
+        conductors.exchange_peer_info().await;
+
+        let conductor = conductors.into_iter().next().unwrap();
+        let conductor = Arc::new(conductor);
+        let zome = Arc::new(zome);
+
+        const WORKERS: usize = 128;
+
+        for _ in 0..WORKERS {
+            let conductor = conductor.clone();
+            let zome = zome.clone();
+            let handle = tokio::spawn(async move {
+                validate_receipts(conductor, zome).await;
+            });
+            handles.push(handle);
+        }
+
+        for handle in handles {
+            handle.await.expect("task panicked");
+        }
+    }
+
+    async fn validate_receipts(conductor: Arc<SweetConductor>, zome: Arc<SweetZome>) {
+        let action_hash: ActionHash = conductor.call(&zome, "create_entry", ()).await;
+
+        let started_at = Instant::now();
+        const TIMEOUT: Duration = Duration::from_secs(60);
+        loop {
+            if is_action_complete(conductor.clone(), zome.clone(), action_hash.clone()).await {
+                break;
+            }
+            if Instant::now().duration_since(started_at) > TIMEOUT {
+                panic!("Timed out waiting for validation receipts");
+            }
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+    }
+
+    async fn is_action_complete(
+        conductor: Arc<SweetConductor>,
+        zome: Arc<SweetZome>,
+        action_hash: ActionHash,
+    ) -> bool {
+        let payload = GetValidationReceiptsInput {
+            action_hash: action_hash.clone(),
+        };
+        let receipts: Vec<ValidationReceiptSet> = conductor
+            .call(&zome, "get_validation_receipts", payload)
+            .await;
+
+        println!("Action {:?} has {:?} receipt sets", action_hash, receipts);
+
+        if receipts.is_empty() {
+            return false;
+        }
+        receipts.iter().all(|set| set.receipts_complete)
     }
 }
