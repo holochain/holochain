@@ -57,7 +57,7 @@ pub struct DnaDefModel {
     pub network_seed: String,
     /// Serialized application properties.
     pub properties: Vec<u8>,
-    /// DNA lineage for migration support (optional, JSON HashSet<DnaHash>)
+    /// DNA lineage for migration support (optional, JSON `HashSet<DnaHash>`)
     pub lineage: Option<sqlx::types::JsonValue>,
 }
 
