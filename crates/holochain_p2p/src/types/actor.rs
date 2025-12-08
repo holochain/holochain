@@ -4,7 +4,7 @@
 use crate::*;
 use holochain_types::activity::AgentActivityResponse;
 use holochain_types::prelude::ValidationReceiptBundle;
-use kitsune2_api::{DhtArc, SpaceId, StoredOp};
+use kitsune2_api::{SpaceId, StoredOp};
 use std::collections::HashMap;
 
 /// Get options used to control how data fetching over the network is performed.
@@ -124,8 +124,8 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
                 .await
                 .unwrap()
             {
-                agent.set_cur_storage_arc(DhtArc::FULL);
-                agent.set_tgt_storage_arc_hint(DhtArc::FULL);
+                agent.set_cur_storage_arc(kitsune2_api::DhtArc::FULL);
+                agent.set_tgt_storage_arc_hint(kitsune2_api::DhtArc::FULL);
                 agent.invoke_cb();
                 updated_agents.push(agent);
             }
@@ -147,7 +147,8 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
                             .unwrap();
                         updated_agents.into_iter().all(|updated_agent| {
                             all_agents_in_peer_store.iter().any(|a| {
-                                a.agent == *updated_agent.agent() && a.storage_arc == DhtArc::FULL
+                                a.agent == *updated_agent.agent()
+                                    && a.storage_arc == kitsune2_api::DhtArc::FULL
                             })
                         })
                     }

@@ -6,7 +6,6 @@ members = [
   "crates/hdk_derive",
   "crates/holo_hash",
   "crates/hdi",
-  "crates/mock_hdi",
   "crates/mr_bundle",
 
   "crates/holochain_integrity_types",
@@ -29,12 +28,13 @@ members = [
   "crates/holochain_secure_primitive",
   "crates/holochain_conductor_config",
   "crates/timestamp",
+  "crates/holochain_data",
 
   "crates/client",
+  "crates/hc_client",
   "crates/hc",
   "crates/hc_bundle",
   "crates/hc_sandbox",
-  "crates/hc_demo_cli",
   "crates/hc_service_check",
   "crates/holochain_terminal",
 
