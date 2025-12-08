@@ -37,6 +37,6 @@ workspace = true
 [features]
 test-utils = []
 unstable-migration = [
-    "holochain_zome_types/unstable-migration",
-    "holochain_types/unstable-migration",
+  "holochain_zome_types/unstable-migration",
+  "holochain_types/unstable-migration",
 ]
