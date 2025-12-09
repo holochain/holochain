@@ -540,6 +540,8 @@ impl TestActor {
                 "tx5Transport": {
                     "serverUrl": format!("ws://{bootstrap_addr}"),
                     "signalAllowPlainText": true,
+                    "timeoutS": 30,
+                    "webrtcConnectTimeoutS": 25,
                 }
             })),
             request_timeout: Duration::from_secs(3),

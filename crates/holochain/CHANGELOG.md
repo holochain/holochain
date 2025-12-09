@@ -12,6 +12,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Fix: Limit concurrency when starting many cells at once to prevent resource exhaustion. Starting cells is now limited to 5 concurrent cell creation operations and 10 concurrent network join operations. This improves startup reliability for conductors managing large numbers of cells.
 - CI: Allow test workflow to pass when tests of the feature `wasmer_wamr` fail. WAMR is not actively used, so investigating flaky tests on WAMR is not a priority. \#5523
 - CI: Run windows test workflow on Depot.dev runners for improved performance. \#5473
+- Added feature `transport-iroh` for using Iroh as network transport backend.
+- **BREAKING CHANGE** Renamed features `backend-libdatachannel` to `transport-tx5-backend-libdatachannel`, `backend-go-pion` to `transport-tx5-backend-go-pion`, `datachannel-vendored` to `transport-tx5-datachannel-vendored`.
 
 ## 0.6.0
 

@@ -1332,17 +1332,7 @@ async fn alice_can_force_abandon_session_when_automatic_resolution_has_failed_af
             c.countersigning_resolution_retry_delay = Some(Duration::from_secs(3));
         })
         .tune_network_config(|nc| {
-            nc.advanced
-                .as_mut()
-                .unwrap()
-                .as_object_mut()
-                .unwrap()
-                .insert(
-                    "tx5Transport".to_string(),
-                    serde_json::json!({
-                        "timeoutS": 3
-                    }),
-                );
+            nc.request_timeout_s = 6;
         });
 
     let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
@@ -1511,17 +1501,7 @@ async fn alice_can_force_publish_session_when_automatic_resolution_has_failed_af
             c.countersigning_resolution_retry_delay = Some(Duration::from_secs(3));
         })
         .tune_network_config(|nc| {
-            nc.advanced
-                .as_mut()
-                .unwrap()
-                .as_object_mut()
-                .unwrap()
-                .insert(
-                    "tx5Transport".to_string(),
-                    serde_json::json!({
-                        "timeoutS": 3
-                    }),
-                );
+            nc.request_timeout_s = 6;
         });
 
     let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
