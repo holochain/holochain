@@ -1,6 +1,6 @@
 [package]
 name = "holochain_state"
-version = "0.7.0-dev.1"
+version = "0.7.0-dev.3"
 description = "Holochain persisted state datatypes and functions"
 license = "Apache-2.0"
 repository = "https://github.com/holochain/holochain"
@@ -22,10 +22,10 @@ holo_hash = { version = "^0.7.0-dev.0", path = "../holo_hash", features = [
   "full",
 ] }
 fallible-iterator = "0.3.0"
-holochain_chc = { version = "^0.4.0-dev.1", path = "../holochain_chc" }
+holochain_chc = { version = "^0.4.0-dev.3", path = "../holochain_chc" }
 holochain_keystore = { version = "^0.7.0-dev.1", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.56"
-holochain_types = { version = "^0.7.0-dev.1", path = "../holochain_types" }
+holochain_types = { version = "^0.7.0-dev.3", path = "../holochain_types" }
 holochain_zome_types = { version = "^0.7.0-dev.1", path = "../holochain_zome_types", features = [
   "full",
 ] }
@@ -42,7 +42,7 @@ tracing = "0.1.26"
 cron = "0.15"
 async-recursion = "1.1"
 
-kitsune2_api = "0.3.0"
+kitsune2_api = "0.4.0-dev.0"
 
 tempfile = { version = "3.3", optional = true }
 base64 = { version = "0.22", optional = true }

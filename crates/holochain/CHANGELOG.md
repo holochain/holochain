@@ -9,6 +9,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - CI: Run windows test workflow on Depot.dev runners for improved performance. \#5473
 
+- **BREAKING CHANGE** Refactor: The `ConductorConfig` field `request_timeout_s` has moved into the `NetworkConfig`, so is now available at the sub-field `network.request_timeout_s`.
+- **BREAKING CHANGE** Feat: The advanced network configuration field `network.advanced.transportTx5.timeoutS` is now automatically set to 1/2 of the `NetworkConfig` field `request_timeout_s`. It specifies the timeout for a single transport message (request or response).
+- **BREAKING CHANGE** Feat: The advanced network configuration field `network.advanced.transportTx5.webrtcConnectTimeoutS` is now automatically set to 3/8 of the `NetworkConfig` field `request_timeout_s`. It specifies the timeout for attempting to establish a webrtc connection before falling back to a relay connection.
+- Added feature `transport-iroh` for using Iroh as network transport backend.
+- **BREAKING CHANGE** Renamed features `backend-libdatachannel` to `transport-tx5-backend-libdatachannel`, `backend-go-pion` to `transport-tx5-backend-go-pion`, `datachannel-vendored` to `transport-tx5-datachannel-vendored`.
+
+## 0.7.0-dev.3
+
+## 0.7.0-dev.2
+
 ## 0.7.0-dev.1
 
 - Removed unused `holochain_mock_hdi` crate that was never completed. \#5484
