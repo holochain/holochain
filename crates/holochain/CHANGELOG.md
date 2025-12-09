@@ -13,6 +13,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Added feature `transport-iroh` for using Iroh as network transport backend.
 - **BREAKING CHANGE** Renamed features `backend-libdatachannel` to `transport-tx5-backend-libdatachannel`, `backend-go-pion` to `transport-tx5-backend-go-pion`, `datachannel-vendored` to `transport-tx5-datachannel-vendored`.
 
+## 0.7.0-dev.3
+
+## 0.7.0-dev.2
+
 ## 0.7.0-dev.1
 
 - Removed unused `holochain_mock_hdi` crate that was never completed. \#5484
