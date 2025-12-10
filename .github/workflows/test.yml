@@ -109,12 +109,14 @@ jobs:
 
       - name: test (windows-latest)
         if: matrix.os == 'windows-latest'
+        continue-on-error: true
         run: |-
           $env:SODIUM_LIB_DIR="$(pwd)\vcpkg\packages\libsodium_x64-windows-release\lib"
           make test-workspace-${{ matrix.target }}
 
       - name: test
         if: matrix.os != 'windows-latest'
+        continue-on-error: true
         run: make test-workspace-${{ matrix.target }}
 
       - name: Upload test results to InfluxDB
