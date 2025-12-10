@@ -34193,6 +34193,7 @@ function requireUploadTestResults () {
 	  };
 
 	  const points = [];
+	  const statuses = [];
 
 	  for (const testsuite of testsuites.testsuite) {
 	    const suiteName = testsuite.$.name;
@@ -34260,6 +34261,9 @@ function requireUploadTestResults () {
 	      point.intField('has_failure', hasFailure ? 1 : 0);
 	      point.intField('has_flaky_failure', hasFlakyFailure ? 1 : 0);
 
+	      // Track status for summary
+	      statuses.push(status);
+
 	      // Add system output
 	      if (testcase['system-out'] && testcase['system-out'][0]) {
 	        point.stringField('system_out', truncateField(testcase['system-out'][0]));
@@ -34272,7 +34276,7 @@ function requireUploadTestResults () {
 	    }
 	  }
 
-	  return { points, metadata };
+	  return { points, statuses, metadata };
 	}
 
 	async function run() {
@@ -34300,7 +34304,7 @@ function requireUploadTestResults () {
 	    const xmlContent = await fs.readFile(junitFile, 'utf8');
 
 	    core.info('Parsing JUnit XML...');
-	    const { points, metadata } = await parseJUnitXML(xmlContent);
+	    const { points, statuses, metadata } = await parseJUnitXML(xmlContent);
 
 	    // Add runner metadata to all points
 	    for (const point of points) {
@@ -34321,9 +34325,7 @@ function requireUploadTestResults () {
 
 	    // Count by status
 	    const statusCounts = {};
-	    for (const point of points) {
-	      const tags = point._tags;
-	      const status = tags.get('status') || 'unknown';
+	    for (const status of statuses) {
 	      statusCounts[status] = (statusCounts[status] || 0) + 1;
 	    }
 	    core.info(`Status breakdown: ${JSON.stringify(statusCounts)}`);
