@@ -34284,17 +34284,15 @@ function requireUploadTestResults () {
 	    const influxBucket = core.getInput('influx-bucket', { required: true });
 	    const influxToken = core.getInput('influx-token', { required: true });
 	    const runnerName = core.getInput('runner-name', { required: true });
-	    const runId = core.getInput('run-id');
-	    const testTarget = core.getInput('test-target');
-	    const extraJson = core.getInput('extra');
+	    const tagsJson = core.getInput('tags');
 
-	    // Parse extra metadata
-	    let extra = {};
-	    if (extraJson && extraJson !== '{}') {
+	    // Parse tags
+	    let tags = {};
+	    if (tagsJson && tagsJson !== '{}') {
 	      try {
-	        extra = JSON.parse(extraJson);
+	        tags = JSON.parse(tagsJson);
 	      } catch (e) {
-	        core.warning(`Failed to parse extra metadata: ${e.message}`);
+	        core.warning(`Failed to parse tags: ${e.message}`);
 	      }
 	    }
 
@@ -34307,19 +34305,13 @@ function requireUploadTestResults () {
 	    // Add runner metadata to all points
 	    for (const point of points) {
 	      point.tag('runner_name', runnerName);
-	      point.tag('run_id', runId);
 	      
-	      // Add target as a tag if provided
-	      if (testTarget) {
-	        point.tag('test_target', testTarget);
-	      }
-	      
-	      // Add extra fields
-	      for (const [key, value] of Object.entries(extra)) {
+	      // Add custom tags
+	      for (const [key, value] of Object.entries(tags)) {
 	        if (typeof value === 'string') {
-	          point.tag(`extra_${key}`, value);
-	        } else if (typeof value === 'number') {
-	          point.floatField(`extra_${key}`, value);
+	          point.tag(key, value);
+	        } else {
+	          core.warning(`Tag "${key}" has non-string value and will be skipped`);
 	        }
 	      }
 	    }

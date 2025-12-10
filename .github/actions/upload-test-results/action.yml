@@ -20,18 +20,10 @@ inputs:
   runner-name:
     description: Name of the CI runner (e.g., ubuntu-latest, self-hosted)
     required: true
-  run-id:
-    description: Unique identifier for this test run (defaults to GitHub run ID)
-    required: false
-    default: ${{ github.run_id }}
-  extra:
-    description: Additional metadata to attach (JSON string)
+  tags:
+    description: Additional tags to attach as InfluxDB tags (JSON string)
     required: false
     default: '{}'
-  test-target:
-    description: Test target identifier (e.g., wasmer_sys, wasmer_wamr)
-    required: false
-    default: ''
 
 runs:
   using: node24

@@ -33,6 +33,11 @@ jobs:
           influx-bucket: holochain-test-results
           influx-token: ${{ secrets.INFLUX_TOKEN }}
           runner-name: ${{ runner.os }}-${{ runner.arch }}
-          run-id: ${{ github.run_id }}
-          test-target: wasmer_sys
-          extra: '{ "branch": "${{ github.ref_name }}", "commit": "${{ github.sha }}", "workflow": "${{ github.workflow }}" }'
+          tags: >-
+            {
+              "run_id": "${{ github.run_id }}",
+              "test_target": "wasmer_sys",
+              "branch": "${{ github.ref_name }}",
+              "commit": "${{ github.sha }}",
+              "workflow": "${{ github.workflow }}"
+            }

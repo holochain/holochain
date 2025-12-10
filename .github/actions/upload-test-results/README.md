@@ -14,8 +14,13 @@ This GitHub Action parses JUnit XML test results and uploads them to InfluxDB fo
     influx-bucket: test-results
     influx-token: ${{ secrets.INFLUX_TOKEN }}
     runner-name: ${{ runner.os }}-${{ runner.arch }}
-    run-id: ${{ github.run_id }}
-    extra: '{ "branch": "${{ github.ref_name }}", "commit": "${{ github.sha }}" }'
+    tags: >-
+      {
+        "run_id": "${{ github.run_id }}",
+        "test_target": "wasmer_sys",
+        "branch": "${{ github.ref_name }}",
+        "commit": "${{ github.sha }}"
+      }
 ```
 
 ## Inputs
@@ -28,9 +33,7 @@ This GitHub Action parses JUnit XML test results and uploads them to InfluxDB fo
 | `influx-bucket` | InfluxDB bucket name | Yes | - |
 | `influx-token` | InfluxDB authentication token | Yes | - |
 | `runner-name` | Name of the CI runner | Yes | - |
-| `run-id` | Unique identifier for this test run | No | `${{ github.run_id }}` |
-| `extra` | Additional metadata (JSON string) | No | `'{}'` |
-| `test-target` | Test target identifier (e.g., wasmer_sys) | No | `''` |
+| `tags` | Additional tags as JSON (e.g., run_id, test_target, branch) | No | `'{}'` |
 
 ## Data Model
 
@@ -44,8 +47,7 @@ Test results are stored in InfluxDB with the following structure:
 - `class_name`: Test class name
 - `status`: Test status (passed, failed, flaky)
 - `runner_name`: CI runner identifier
-- `run_id`: Unique run identifier
-- `test_target`: Test target (e.g., wasmer_sys, wasmer_wamr) - optional
+- Additional custom tags from the `tags` input (e.g., `run_id`, `test_target`, `branch`, `commit`)
 
 **Fields**:
 - `duration`: Test execution time (float)
