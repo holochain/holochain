@@ -84,12 +84,6 @@ async function parseJUnitXML(xmlContent) {
         if (flakyFailure._) {
           point.stringField('flaky_details', truncateField(flakyFailure._));
         }
-        if (flakyFailure['system-out'] && flakyFailure['system-out'][0]) {
-          point.stringField('flaky_system_out', truncateField(flakyFailure['system-out'][0]));
-        }
-        if (flakyFailure['system-err'] && flakyFailure['system-err'][0]) {
-          point.stringField('flaky_system_err', truncateField(flakyFailure['system-err'][0]));
-        }
       }
 
       // Check for regular failure
@@ -115,14 +109,6 @@ async function parseJUnitXML(xmlContent) {
 
       // Track status for summary
       statuses.push(status);
-
-      // Add system output
-      if (testcase['system-out'] && testcase['system-out'][0]) {
-        point.stringField('system_out', truncateField(testcase['system-out'][0]));
-      }
-      if (testcase['system-err'] && testcase['system-err'][0]) {
-        point.stringField('system_err', truncateField(testcase['system-err'][0]));
-      }
 
       points.push(point);
     }
@@ -206,4 +192,10 @@ async function run() {
   }
 }
 
-run();
+// Only run if not being required as a module (for testing)
+if (require.main === module) {
+  run();
+}
+
+// Export for testing
+module.exports = { parseJUnitXML };

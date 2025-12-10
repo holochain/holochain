@@ -1,0 +1,444 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="1289" failures="0" errors="0" uuid="f444d7f5-95dd-4597-ba00-a8a81d114ad7" timestamp="2025-12-10T17:52:48.674+00:00" time="385.322">
+    <testsuite name="holochain" tests="350" disabled="0" errors="0" failures="0">
+        <testcase name="conductor::cell::gossip_test::gossip_test" classname="holochain" timestamp="2025-12-10T17:52:49.438+00:00" time="6.992">
+            <system-out>
+running 1 test
+test conductor::cell::gossip_test::gossip_test ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 6.93s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::cell::gossip_test::signature_smoke_test" classname="holochain" timestamp="2025-12-10T17:52:56.429+00:00" time="1.119">
+            <system-out>
+running 1 test
+test conductor::cell::gossip_test::signature_smoke_test ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 1.11s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::conductor::app_auth_token_store::tests::attempt_with_token_that_does_not_exist" classname="holochain" timestamp="2025-12-10T17:52:57.548+00:00" time="0.007">
+            <system-out>
+running 1 test
+test conductor::conductor::app_auth_token_store::tests::attempt_with_token_that_does_not_exist ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 0.00s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::conductor::app_auth_token_store::tests::create_token_which_does_not_expire" classname="holochain" timestamp="2025-12-10T17:52:57.555+00:00" time="0.007">
+            <system-out>
+running 1 test
+test conductor::conductor::app_auth_token_store::tests::create_token_which_does_not_expire ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 0.00s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::conductor::app_auth_token_store::tests::issue_and_use_single_use_token" classname="holochain" timestamp="2025-12-10T17:52:57.562+00:00" time="0.007">
+            <system-out>
+running 1 test
+test conductor::conductor::app_auth_token_store::tests::issue_and_use_single_use_token ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 0.00s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::conductor::app_auth_token_store::tests::issuing_new_tokens_removes_expired_tokens" classname="holochain" timestamp="2025-12-10T17:52:57.569+00:00" time="0.006">
+            <system-out>
+running 1 test
+test conductor::conductor::app_auth_token_store::tests::issuing_new_tokens_removes_expired_tokens ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 0.00s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::conductor::app_auth_token_store::tests::reuse_token" classname="holochain" timestamp="2025-12-10T17:52:57.575+00:00" time="0.006">
+            <system-out>
+running 1 test
+test conductor::conductor::app_auth_token_store::tests::reuse_token ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 0.00s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::conductor::app_auth_token_store::tests::use_expired_token" classname="holochain" timestamp="2025-12-10T17:52:57.581+00:00" time="0.005">
+            <system-out>
+running 1 test
+test conductor::conductor::app_auth_token_store::tests::use_expired_token ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 0.00s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::conductor::app_auth_token_store::tests::use_token_with_app_restriction" classname="holochain" timestamp="2025-12-10T17:52:57.587+00:00" time="0.007">
+            <system-out>
+running 1 test
+test conductor::conductor::app_auth_token_store::tests::use_token_with_app_restriction ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 0.00s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::conductor::app_auth_token_store::tests::use_token_with_app_restriction_mismatch" classname="holochain" timestamp="2025-12-10T17:52:57.594+00:00" time="0.005">
+            <system-out>
+running 1 test
+test conductor::conductor::app_auth_token_store::tests::use_token_with_app_restriction_mismatch ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 0.00s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::conductor::app_auth_token_store::tests::use_token_with_app_restriction_mismatch_multi_use" classname="holochain" timestamp="2025-12-10T17:52:57.599+00:00" time="0.007">
+            <system-out>
+running 1 test
+test conductor::conductor::app_auth_token_store::tests::use_token_with_app_restriction_mismatch_multi_use ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 0.00s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::conductor::app_broadcast::tests::clean_up_unused_senders" classname="holochain" timestamp="2025-12-10T17:52:57.607+00:00" time="0.007">
+            <system-out>
+running 1 test
+test conductor::conductor::app_broadcast::tests::clean_up_unused_senders ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 0.00s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::conductor::app_broadcast::tests::create_send_handle_and_broadcast" classname="holochain" timestamp="2025-12-10T17:52:57.614+00:00" time="0.006">
+            <system-out>
+running 1 test
+Fixturator seed: 12281831067963633171
+test conductor::conductor::app_broadcast::tests::create_send_handle_and_broadcast ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 0.00s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::conductor::app_broadcast::tests::multiple_senders_and_subscribers" classname="holochain" timestamp="2025-12-10T17:52:57.620+00:00" time="0.007">
+            <system-out>
+running 1 test
+Fixturator seed: 2035425246270960496
+test conductor::conductor::app_broadcast::tests::multiple_senders_and_subscribers ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 0.00s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::conductor::app_broadcast::tests::subscribe_and_broadcast" classname="holochain" timestamp="2025-12-10T17:52:57.628+00:00" time="0.006">
+            <system-out>
+running 1 test
+Fixturator seed: 7457144224341610868
+test conductor::conductor::app_broadcast::tests::subscribe_and_broadcast ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 0.00s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::cell::test::test_cell_handle_publish" classname="holochain" timestamp="2025-12-10T17:52:56.924+00:00" time="1.490">
+            <system-out>
+running 1 test
+
+###HOLOCHAIN_SETUP###
+###ADMIN_PORT:34403###
+###HOLOCHAIN_SETUP_END###
+test conductor::cell::test::test_cell_handle_publish ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 1.46s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::conductor::tests::app_ids_are_unique" classname="holochain" timestamp="2025-12-10T17:52:58.414+00:00" time="0.384">
+            <system-out>
+running 1 test
+Fixturator seed: 2954977754357040013
+test conductor::conductor::tests::app_ids_are_unique ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 0.38s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::conductor::tests::add_agent_infos::add_agent_infos_to_peer_store" classname="holochain" timestamp="2025-12-10T17:52:57.634+00:00" time="2.040">
+            <system-out>
+running 1 test
+test conductor::conductor::tests::add_agent_infos::add_agent_infos_to_peer_store ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 2.02s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::conductor::tests::app_state::app_status_and_cell_state" classname="holochain" timestamp="2025-12-10T17:52:58.797+00:00" time="1.656">
+            <system-out>
+running 1 test
+test conductor::conductor::tests::app_state::app_status_and_cell_state ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 1.63s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::conductor::tests::app_state::can_update_state" classname="holochain" timestamp="2025-12-10T17:53:00.453+00:00" time="0.314">
+            <system-out>
+running 1 test
+Fixturator seed: 9502804737408752237
+test conductor::conductor::tests::app_state::can_update_state ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 0.31s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::conductor::tests::app_state::app_status_filters" classname="holochain" timestamp="2025-12-10T17:52:59.674+00:00" time="1.780">
+            <system-out>
+running 1 test
+test conductor::conductor::tests::app_state::app_status_filters ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 1.77s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::conductor::tests::app_state::delete_clone_cell_deletes_cell_databases" classname="holochain" timestamp="2025-12-10T17:53:00.768+00:00" time="1.002">
+            <system-out>
+running 1 test
+test conductor::conductor::tests::app_state::delete_clone_cell_deletes_cell_databases ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 0.99s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::conductor::tests::app_state::disabled_app_cannot_be_called" classname="holochain" timestamp="2025-12-10T17:53:01.454+00:00" time="0.971">
+            <system-out>
+running 1 test
+test conductor::conductor::tests::app_state::disabled_app_cannot_be_called ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 0.96s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::conductor::tests::app_state::disabled_clone_cell_cannot_be_called" classname="holochain" timestamp="2025-12-10T17:53:01.770+00:00" time="1.586">
+            <system-out>
+running 1 test
+test conductor::conductor::tests::app_state::disabled_clone_cell_cannot_be_called ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 1.58s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::conductor::tests::app_state::enable_and_disable_app_are_idempotent" classname="holochain" timestamp="2025-12-10T17:53:02.425+00:00" time="1.009">
+            <system-out>
+running 1 test
+test conductor::conductor::tests::app_state::enable_and_disable_app_are_idempotent ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 0.98s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::conductor::tests::app_state::uninstall_app" classname="holochain" timestamp="2025-12-10T17:53:03.356+00:00" time="0.703">
+            <system-out>
+running 1 test
+test conductor::conductor::tests::app_state::uninstall_app ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 0.69s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::conductor::tests::role_names_must_be_unique" classname="holochain" timestamp="2025-12-10T17:53:04.059+00:00" time="0.009">
+            <system-out>
+running 1 test
+Fixturator seed: 15143111577528724702
+test conductor::conductor::tests::role_names_must_be_unique ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 0.00s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::conductor::tests::name_has_no_effect_on_dna_hash" classname="holochain" timestamp="2025-12-10T17:53:03.434+00:00" time="0.777">
+            <system-out>
+running 1 test
+test conductor::conductor::tests::name_has_no_effect_on_dna_hash ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 0.77s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::conductor::tests::test_app_info_cells_sorted_consistently" classname="holochain" timestamp="2025-12-10T17:53:04.212+00:00" time="0.867">
+            <system-out>
+running 1 test
+test conductor::conductor::tests::test_app_info_cells_sorted_consistently ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 0.86s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::conductor::tests::state_dump::dump_full_state" classname="holochain" timestamp="2025-12-10T17:53:04.068+00:00" time="1.616">
+            <system-out>
+running 1 test
+test conductor::conductor::tests::state_dump::dump_full_state ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 1.58s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::conductor::tests::test_bad_entry_validation_after_genesis_returns_zome_call_error" classname="holochain" timestamp="2025-12-10T17:53:05.079+00:00" time="0.745">
+            <system-out>
+running 1 test
+test conductor::conductor::tests::test_bad_entry_validation_after_genesis_returns_zome_call_error ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 0.73s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="conductor::conductor::tests::test_deferred_memproof_provisioning_uninstall" classname="holochain" timestamp="2025-12-10T17:53:05.825+00:00" time="0.828">
+            <system-out>
+running 1 test
+test conductor::conductor::tests::test_deferred_memproof_provisioning_uninstall ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 0.82s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+    </testsuite>
+    <testsuite name="holochain_zome_types" tests="10" disabled="0" errors="0" failures="0">
+        <testcase name="dna_def::tests::test_update_modifiers" classname="holochain_zome_types" timestamp="2025-12-10T17:59:13.949+00:00" time="0.003">
+            <system-out>
+running 1 test
+test dna_def::tests::test_update_modifiers ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="entry::tests::test_should_convert_get_strategy_to_get_options" classname="holochain_zome_types" timestamp="2025-12-10T17:59:13.951+00:00" time="0.003">
+            <system-out>
+running 1 test
+test entry::tests::test_should_convert_get_strategy_to_get_options ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="query::tests::filter_by_action_type" classname="holochain_zome_types" timestamp="2025-12-10T17:59:13.954+00:00" time="0.003">
+            <system-out>
+running 1 test
+Fixturator seed: 11726492586085188688
+test query::tests::filter_by_action_type ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="query::tests::filter_by_chain_sequence" classname="holochain_zome_types" timestamp="2025-12-10T17:59:13.958+00:00" time="0.003">
+            <system-out>
+running 1 test
+Fixturator seed: 11147196227058932262
+test query::tests::filter_by_chain_sequence ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="query::tests::filter_by_entry_hash" classname="holochain_zome_types" timestamp="2025-12-10T17:59:13.961+00:00" time="0.003">
+            <system-out>
+running 1 test
+Fixturator seed: 13047329116858205236
+test query::tests::filter_by_entry_hash ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="query::tests::filter_by_entry_type" classname="holochain_zome_types" timestamp="2025-12-10T17:59:13.964+00:00" time="0.003">
+            <system-out>
+running 1 test
+Fixturator seed: 2139612494953288914
+test query::tests::filter_by_entry_type ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="query::tests::filter_by_multi" classname="holochain_zome_types" timestamp="2025-12-10T17:59:13.967+00:00" time="0.003">
+            <system-out>
+running 1 test
+Fixturator seed: 4691458547798492892
+test query::tests::filter_by_multi ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="query::tests::filter_by_multiple_action_types" classname="holochain_zome_types" timestamp="2025-12-10T17:59:13.970+00:00" time="0.003">
+            <system-out>
+running 1 test
+Fixturator seed: 11323907273459669433
+test query::tests::filter_by_multiple_action_types ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="query::tests::filter_by_multiple_entry_types" classname="holochain_zome_types" timestamp="2025-12-10T17:59:13.974+00:00" time="0.003">
+            <system-out>
+running 1 test
+Fixturator seed: 14697608463889892346
+test query::tests::filter_by_multiple_entry_types ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+        <testcase name="zome::inline_zome::tests::can_create_inline_dna" classname="holochain_zome_types" timestamp="2025-12-10T17:59:13.977+00:00" time="0.003">
+            <system-out>
+running 1 test
+test zome::inline_zome::tests::can_create_inline_dna ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+</system-out>
+            <system-err></system-err>
+        </testcase>
+    </testsuite>
+</testsuites>
