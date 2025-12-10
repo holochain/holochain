@@ -75,7 +75,10 @@ flowchart TB
     %% documentation
     Documentation --> Complete
 
+    %% complete
     Complete{Upgrade Complete!}
+    Complete --> SetToLatestReleaseGH[Set to Latest Release on GitHub]
+    Complete --> Announce[Announce to community]
 
     %% styling 
     style Start fill:blue,color:white
@@ -206,6 +209,10 @@ Assigned to @
   - Selectively merge changes from upstream repo, to use version compatible with holochain version.
   - Create new branch `main-X`.
   - Add tag `vY` for new version Y.
+
+- [ ] Set to latest release on Github.
+
+- [ ] Announce new release to community.
 
 
 **Upgrade Complete**
