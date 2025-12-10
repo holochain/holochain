@@ -1,7 +1,7 @@
-import resolve from '@rollup/plugin-node-resolve';
-import commonjs from '@rollup/plugin-commonjs';
+const { default: resolve } = require('@rollup/plugin-node-resolve');
+const { default: commonjs } = require('@rollup/plugin-commonjs');
 
-export default {
+module.exports = {
   input: 'index.js',
   output: {
     file: 'dist/index.js',
