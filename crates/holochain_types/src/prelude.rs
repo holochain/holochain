@@ -7,6 +7,7 @@ pub use crate::app::*;
 pub use crate::chain::*;
 pub use crate::combinators::*;
 pub use crate::countersigning::*;
+#[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
 pub use crate::db::*;
 pub use crate::dht_op::*;
 pub use crate::dna::wasm::*;

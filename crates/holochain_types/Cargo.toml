@@ -25,7 +25,7 @@ holo_hash = { version = "^0.7.0-dev.0", path = "../holo_hash", features = [
 holochain_keystore = { version = "^0.7.0-dev.1", path = "../holochain_keystore" }
 holochain_nonce = { version = "^0.7.0-dev.0", path = "../holochain_nonce" }
 holochain_serialized_bytes = "=0.0.56"
-holochain_sqlite = { path = "../holochain_sqlite", version = "^0.7.0-dev.1" }
+holochain_sqlite = { path = "../holochain_sqlite", version = "^0.7.0-dev.1", optional = true }
 holochain_trace = { version = "^0.7.0-dev.0", path = "../holochain_trace" }
 holochain_util = { version = "^0.7.0-dev.0", path = "../holochain_util", features = [
   "backtrace",
@@ -44,7 +44,7 @@ nanoid = "0.4"
 parking_lot = "0.12"
 rand = "0.9"
 regex = "1.4"
-rusqlite = { version = "0.37" }
+rusqlite = { version = "0.37", optional = true }
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_derive = "1.0"
 serde_json = "1.0"
@@ -108,6 +108,8 @@ fuzzing = [
 instrument = []
 
 sqlite-encrypted = [
+  "dep:rusqlite",
+  "dep:holochain_sqlite",
   "rusqlite/bundled-sqlcipher-vendored-openssl",
   "holo_hash/sqlite-encrypted",
   "holochain_keystore/sqlite-encrypted",
@@ -115,6 +117,8 @@ sqlite-encrypted = [
   "holochain_zome_types/sqlite-encrypted",
 ]
 sqlite = [
+  "dep:rusqlite",
+  "dep:holochain_sqlite",
   "rusqlite/bundled",
   "holo_hash/sqlite",
   "holochain_keystore/sqlite",

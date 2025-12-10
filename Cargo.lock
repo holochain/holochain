@@ -3376,6 +3376,7 @@ dependencies = [
  "holochain_conductor_api",
  "holochain_keystore",
  "holochain_serialized_bytes",
+ "holochain_sqlite",
  "holochain_state_types",
  "holochain_trace",
  "holochain_types",

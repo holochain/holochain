@@ -7,14 +7,16 @@
 use crate::action::NewEntryAction;
 use crate::prelude::*;
 use crate::warrant::WarrantOp;
-use holo_hash::*;
+#[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
 use holochain_sqlite::rusqlite::types::FromSql;
+#[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
 use holochain_sqlite::rusqlite::ToSql;
+use std::str::FromStr;
+
 use holochain_zome_types::action;
 use holochain_zome_types::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
-use std::str::FromStr;
 
 mod error;
 pub use error::*;
@@ -212,6 +214,7 @@ pub enum DhtOpType {
     Warrant(WarrantOpType),
 }
 
+#[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
 impl ToSql for DhtOpType {
     fn to_sql(
         &self,
@@ -224,6 +227,7 @@ impl ToSql for DhtOpType {
     }
 }
 
+#[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
 impl FromSql for DhtOpType {
     fn column_result(
         value: holochain_sqlite::rusqlite::types::ValueRef<'_>,
@@ -1308,6 +1312,7 @@ impl OpOrder {
     }
 }
 
+#[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
 impl holochain_sqlite::rusqlite::ToSql for OpOrder {
     fn to_sql(
         &self,

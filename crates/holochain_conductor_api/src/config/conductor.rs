@@ -45,7 +45,7 @@
 
 use crate::conductor::process::ERROR_CODE;
 use crate::config::conductor::paths::DataRootPath;
-use holochain_types::prelude::DbSyncStrategy;
+use holochain_sqlite::db::DbSyncStrategy;
 #[cfg(feature = "schema")]
 use kitsune2_transport_tx5::WebRtcConfig;
 use schemars::JsonSchema;

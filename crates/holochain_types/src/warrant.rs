@@ -2,6 +2,7 @@
 
 use holochain_keystore::{AgentPubKeyExt, LairResult, MetaLairClient};
 use holochain_zome_types::prelude::*;
+#[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
 use std::str::FromStr;
 
 /// A Warrant DhtOp
@@ -74,6 +75,7 @@ impl HashableContent for WarrantOp {
     }
 }
 
+#[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
 impl holochain_sqlite::rusqlite::ToSql for WarrantOpType {
     fn to_sql(
         &self,
@@ -85,6 +87,7 @@ impl holochain_sqlite::rusqlite::ToSql for WarrantOpType {
     }
 }
 
+#[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
 impl holochain_sqlite::rusqlite::types::FromSql for WarrantOpType {
     fn column_result(
         value: holochain_sqlite::rusqlite::types::ValueRef<'_>,

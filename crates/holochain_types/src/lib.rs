@@ -18,6 +18,7 @@ pub mod app;
 pub mod chain;
 pub mod combinators;
 pub mod countersigning;
+#[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
 pub mod db;
 pub mod dht_op;
 pub mod dna;
@@ -30,8 +31,6 @@ pub mod record;
 pub mod report;
 pub mod share;
 pub mod signal;
-#[warn(missing_docs)]
-pub mod sql;
 pub mod validation_receipt;
 pub mod warrant;
 pub mod web_app;
@@ -48,3 +47,5 @@ pub mod test_utils;
 pub mod websocket;
 
 pub use holochain_zome_types::entry::EntryHashed;
+#[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
+pub mod sql;
