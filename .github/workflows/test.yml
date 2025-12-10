@@ -144,6 +144,28 @@ jobs:
       - name: "Common Test Teardown Actions"
         uses: ./.github/actions/common-post
 
+  test-upload-action:
+    name: test upload-test-results action
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v5
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: install dependencies
+        run: |
+          cd .github/actions/upload-test-results
+          npm install
+
+      - name: run tests
+        run: |
+          cd .github/actions/upload-test-results
+          npm test
+
   ci-pass:
     if: ${{ always() }}
     name: "All Jobs Pass"
@@ -151,6 +173,7 @@ jobs:
     needs:
       - static-job-id
       - test-job-id
+      - test-upload-action
     steps:
       - name: check status
         uses: re-actors/alls-green@release/v1
