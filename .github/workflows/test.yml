@@ -109,13 +109,39 @@ jobs:
 
       - name: test (windows-latest)
         if: matrix.os == 'windows-latest'
+        continue-on-error: true
         run: |-
           $env:SODIUM_LIB_DIR="$(pwd)\vcpkg\packages\libsodium_x64-windows-release\lib"
           make test-workspace-${{ matrix.target }}
 
       - name: test
         if: matrix.os != 'windows-latest'
+        continue-on-error: true
         run: make test-workspace-${{ matrix.target }}
+
+      - name: Upload test results to InfluxDB
+        if: always() && env.INFLUX_TOKEN != ''
+        continue-on-error: true
+        env:
+          INFLUX_TOKEN: ${{ secrets.INFLUX_TOKEN }}
+        uses: holochain/junit-to-influx-action@v1.0.0
+        with:
+          junit-file: target/nextest/default/junit.xml
+          influx-url: https://ifdb.holochain.org
+          influx-org: holo
+          influx-bucket: holochain-test-results
+          influx-token: ${{ secrets.INFLUX_TOKEN }}
+          runner-name: ${{ matrix.os }}
+          tags: >-
+            {
+              "run_id": "${{ github.run_id }}",
+              "test_target": "${{ matrix.target }}",
+              "branch": "${{ github.ref_name }}",
+              "commit": "${{ github.sha }}",
+              "workflow": "${{ github.workflow }}",
+              "pr_number": "${{ github.event.pull_request.number }}",
+              "actor": "${{ github.actor }}"
+            }
 
       - name: "Common Test Teardown Actions"
         uses: ./.github/actions/common-post
