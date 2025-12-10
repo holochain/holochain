@@ -32,3 +32,7 @@ test_cert
 svg-inkscape/
 
 junit.xml
+
+# Test metrics uploader
+scripts/node_modules/
+scripts/package-lock.json
