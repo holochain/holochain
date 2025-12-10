@@ -117,6 +117,27 @@ jobs:
         if: matrix.os != 'windows-latest'
         run: make test-workspace-${{ matrix.target }}
 
+      - name: Upload test results to InfluxDB
+        if: always()
+        uses: ./.github/actions/upload-test-results
+        with:
+          junit-file: target/nextest/default/junit.xml
+          influx-url: https://ifdb.holochain.org
+          influx-org: holochain
+          influx-bucket: holochain-test-results
+          influx-token: ${{ secrets.INFLUX_TOKEN }}
+          runner-name: ${{ matrix.os }}
+          tags: >-
+            {
+              "run_id": "${{ github.run_id }}",
+              "test_target": "${{ matrix.target }}",
+              "branch": "${{ github.ref_name }}",
+              "commit": "${{ github.sha }}",
+              "workflow": "${{ github.workflow }}",
+              "pr_number": "${{ github.event.pull_request.number }}",
+              "actor": "${{ github.actor }}"
+            }
+
       - name: "Common Test Teardown Actions"
         uses: ./.github/actions/common-post
 
