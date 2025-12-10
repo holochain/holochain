@@ -1,0 +1,38 @@
+name: Test Metrics Example
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/test-metrics-timeseries
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+
+      - name: Run tests
+        run: |
+          cargo nextest run -p holochain_cli_client --features wasmer_sys
+        continue-on-error: true
+
+      - name: Upload test results to InfluxDB
+        if: always()
+        uses: ./.github/actions/upload-test-results
+        with:
+          junit-file: junit.xml
+          influx-url: https://ifdb.holochain.org
+          influx-org: holochain
+          influx-bucket: holochain-test-results
+          influx-token: ${{ secrets.INFLUX_TOKEN }}
+          runner-name: ${{ runner.os }}-${{ runner.arch }}
+          run-id: ${{ github.run_id }}
+          test-target: wasmer_sys
+          extra: '{ "branch": "${{ github.ref_name }}", "commit": "${{ github.sha }}", "workflow": "${{ github.workflow }}" }'

@@ -1,0 +1,38 @@
+name: Upload Test Results to InfluxDB
+description: Parse JUnit XML test results and upload to InfluxDB for trend analysis
+
+inputs:
+  junit-file:
+    description: Path to JUnit XML file
+    required: true
+  influx-url:
+    description: InfluxDB URL
+    required: true
+  influx-org:
+    description: InfluxDB organization
+    required: true
+  influx-bucket:
+    description: InfluxDB bucket name
+    required: true
+  influx-token:
+    description: InfluxDB authentication token
+    required: true
+  runner-name:
+    description: Name of the CI runner (e.g., ubuntu-latest, self-hosted)
+    required: true
+  run-id:
+    description: Unique identifier for this test run (defaults to GitHub run ID)
+    required: false
+    default: ${{ github.run_id }}
+  extra:
+    description: Additional metadata to attach (JSON string)
+    required: false
+    default: '{}'
+  test-target:
+    description: Test target identifier (e.g., wasmer_sys, wasmer_wamr)
+    required: false
+    default: ''
+
+runs:
+  using: node24
+  main: dist/index.js
