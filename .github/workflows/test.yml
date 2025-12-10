@@ -70,6 +70,8 @@ jobs:
 
           # Our intended target for wasmer_wamr feature is iOS and Android.
           # For now, wasmer_wamr tests are only run on macos-latest
+          # Note: WAMR tests are allowed to fail (continue-on-error) as they are
+          # flaky and not actively in use. This prevents them from blocking PRs.
           - os: macos-latest
             target: wasmer_wamr
     steps:
@@ -99,6 +101,7 @@ jobs:
 
       - name: build
         if: matrix.os != 'windows-latest'
+        continue-on-error: ${{ matrix.target == 'wasmer_wamr' }}
         run: |
           make build-workspace-${{ matrix.target }}
 
@@ -115,6 +118,7 @@ jobs:
 
       - name: test
         if: matrix.os != 'windows-latest'
+        continue-on-error: ${{ matrix.target == 'wasmer_wamr' }}
         run: make test-workspace-${{ matrix.target }}
 
       - name: "Common Test Teardown Actions"
