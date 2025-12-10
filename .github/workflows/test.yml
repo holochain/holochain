@@ -120,8 +120,10 @@ jobs:
         run: make test-workspace-${{ matrix.target }}
 
       - name: Upload test results to InfluxDB
-        if: always() && secrets.INFLUX_TOKEN != ''
+        if: always() && env.INFLUX_TOKEN != ''
         continue-on-error: true
+        env:
+          INFLUX_TOKEN: ${{ secrets.INFLUX_TOKEN }}
         uses: ./.github/actions/upload-test-results
         with:
           junit-file: target/nextest/default/junit.xml
