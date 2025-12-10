@@ -27,7 +27,7 @@ jobs:
         if: always()
         uses: ./.github/actions/upload-test-results
         with:
-          junit-file: junit.xml
+          junit-file: target/nextest/default/junit.xml
           influx-url: https://ifdb.holochain.org
           influx-org: holochain
           influx-bucket: holochain-test-results
