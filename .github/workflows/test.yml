@@ -125,7 +125,7 @@ jobs:
         with:
           junit-file: target/nextest/default/junit.xml
           influx-url: https://ifdb.holochain.org
-          influx-org: holochain
+          influx-org: holo
           influx-bucket: holochain-test-results
           influx-token: ${{ secrets.INFLUX_TOKEN }}
           runner-name: ${{ matrix.os }}
