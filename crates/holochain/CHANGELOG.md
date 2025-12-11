@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix: `EnableCloneCell` now works consistently when called with either `CloneId` or `DnaHash` on already-enabled clones. Previously, using a `DnaHash` would fail with `CloneCellNotFound` while using a `CloneId` would succeed. #4572
+
 - CI: Run windows test workflow on Depot.dev runners for improved performance. \#5473
 
 - **BREAKING CHANGE** Refactor: The `ConductorConfig` field `request_timeout_s` has moved into the `NetworkConfig`, so is now available at the sub-field `network.request_timeout_s`.
