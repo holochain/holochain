@@ -63,7 +63,7 @@ jobs:
             target: wasmer_sys
           - os: macos-15
             target: wasmer_sys
-          - os: windows-latest
+          - os: depot-windows-2022-8
             target: wasmer_sys
           - os: ubuntu-latest
             target: wasmer_sys-unstable
@@ -101,6 +101,12 @@ jobs:
         run: |
           brew install llvm
           echo "PATH=/opt/homebrew/opt/llvm/bin:$PATH" >> "$GITHUB_ENV"
+        
+      - name: llvm & clang
+        if: matrix.os == 'depot-windows-2022-8'
+        uses: KyleMayes/install-llvm-action@v2.0.8
+        with:
+          version: "21"
 
       - name: "Common Test Actions"
         uses: ./.github/actions/common-test
