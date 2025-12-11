@@ -11,12 +11,12 @@ use crate::warrant::WarrantOp;
 use holochain_sqlite::rusqlite::types::FromSql;
 #[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
 use holochain_sqlite::rusqlite::ToSql;
-use std::str::FromStr;
 
 use holochain_zome_types::action;
 use holochain_zome_types::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
+use std::str::FromStr;
 
 mod error;
 pub use error::*;
