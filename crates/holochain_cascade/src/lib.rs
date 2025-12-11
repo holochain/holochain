@@ -975,94 +975,91 @@ impl CascadeImpl {
             .await??;
         }
 
-        let result = if let Some(chain_top_action_seq) = maybe_chain_top_action_seq {
-            // If chain top action seq was found,
-            // Get the filtered activity and warrants from each db store.
-            let mut txn_guards = self.get_txn_guards().await?;
-            let (mut activity_lists, warrants_lists) = tokio::task::spawn_blocking({
-                let author = author.clone();
-                let filter = filter.clone();
-                move || {
-                    let mut activity = Vec::with_capacity(txn_guards.len() + 1);
+        let result = match chain_top_action_seq {
+            // The chain top was not found, so we cannot query for the agent activity preceding it.
+            None => MustGetAgentActivityResponse::ChainTopNotFound(filter.chain_top.clone()),
 
-                    #[cfg(feature = "unstable-warrants")]
-                    let mut warrants = Vec::with_capacity(txn_guards.len() + 1);
-                    #[cfg(not(feature = "unstable-warrants"))]
-                    let warrants = Vec::with_capacity(txn_guards.len() + 1);
+            // The chain top was found, now we query for the preceding activity,
+            // filtered by the requested ChainFilter.
+            Some(chain_top_action_seq) => {
+                // Query for filtered activity and warrants from every database.
+                let mut txn_guards = self.get_txn_guards().await?;
+                let (mut activity_lists, warrants_lists) = tokio::task::spawn_blocking({
+                    let author = author.clone();
+                    let filter = filter.clone();
+                    move || {
+                        let mut activity = Vec::with_capacity(txn_guards.len() + 1);
+                        let mut warrants = Vec::with_capacity(txn_guards.len() + 1);
 
-                    for txn_guard in &mut txn_guards {
-                        let txn = txn_guard.transaction()?;
+                        for txn_guard in &mut txn_guards {
+                            let txn = txn_guard.transaction()?;
 
-                        let r = get_filtered_agent_activity(
-                            &txn,
-                            &author,
-                            filter.clone(),
-                            chain_top_action_seq,
-                        )?;
-                        activity.push(r);
+                            let r = get_filtered_agent_activity(
+                                &txn,
+                                &author,
+                                filter.clone(),
+                                chain_top_action_seq,
+                            )?;
+                            activity.push(r);
 
-                        #[cfg(feature = "unstable-warrants")]
-                        {
                             let w = CascadeTxnWrapper::from(&txn)
                                 .get_warrants_for_agent(&author, true)?;
                             warrants.push(w);
                         }
+
+                        CascadeResult::Ok((activity, warrants))
                     }
+                })
+                .await??;
 
-                    CascadeResult::Ok((activity, warrants))
+                // If Scratch store is available, query for filtered activity from it.
+                // Warrants are never written to Scratch.
+                if let Some(scratch) = self.scratch.clone() {
+                    let activity_list_from_scratch = scratch.apply_and_then(|scratch| {
+                        get_filtered_agent_activity_from_scratch(
+                            scratch,
+                            &author,
+                            filter.clone(),
+                            chain_top_action_seq,
+                        )
+                    })?;
+                    activity_lists.push(activity_list_from_scratch);
                 }
-            })
-            .await??;
 
-            // If Scratch store is available, get the filtered activity from it.
-            // Warrants are never written to Scratch.
-            if let Some(scratch) = self.scratch.clone() {
-                let activity_list_from_scratch = scratch.apply_and_then(|scratch| {
-                    get_filtered_agent_activity_from_scratch(
-                        scratch,
-                        &author,
-                        filter.clone(),
-                        chain_top_action_seq,
-                    )
-                })?;
-                activity_lists.push(activity_list_from_scratch);
-            }
+                // Merge and deduplicate activity from the results.
+                let mut merged_activity = merge_agent_activity(activity_lists);
 
-            // Merge and deduplicate retrieved activity lists.
-            let mut merged_activity = merge_agent_activity(activity_lists);
+                // Remove forked activity from the results.
+                exclude_forked_activity(&mut merged_activity);
 
-            // Remove forked activity from activity list
-            exclude_forked_activity(&mut merged_activity);
+                // Limit the number of activity results if ChainFilter includes a `take` limit.
+                //
+                // The take limit was already applied in each db query,
+                // but if a single db result was missing any Action sequences,
+                // then the merged result may still have a length larger than the desired take limit.
+                // Thus we must apply the limit again.
+                if let Some(take) = filter.get_take() {
+                    merged_activity.truncate(take as usize);
+                }
 
-            // Apply ChainFilter take to the merged result.
-            //
-            // The take limit was already applied in each db query,
-            // but if a db result had skipped any Action sequences,
-            // then the merged result may still have a length larger than the desired take limit.
-            if let Some(take) = filter.get_take() {
-                merged_activity.truncate(take as usize);
-            }
-
-            // Check if the activity list is incomplete.
-            // It is considered complete only if the following are both true:
-            // - There are no gaps in the sequence numbers.
-            // - Every activity's prev_hash equals the hash of the next activity in the list.
-            if !is_activity_complete_descending(&merged_activity)
-                || !is_activity_chained_descending(&merged_activity)
-            {
-                MustGetAgentActivityResponse::IncompleteChain
-            } else {
-                MustGetAgentActivityResponse::Activity {
-                    activity: merged_activity,
-                    warrants: merge_warrants(warrants_lists),
+                // Check if the activity list is complete.
+                // 
+                // The activity list is considered complete only if the following are true:
+                // - There are no gaps in the sequence numbers.
+                // - Every activity's prev_hash equals the hash of the next activity in the list.
+                if !is_activity_complete_descending(&merged_activity)
+                    || !is_activity_chained_descending(&merged_activity)
+                {
+                    MustGetAgentActivityResponse::IncompleteChain
+                } else {
+                    MustGetAgentActivityResponse::Activity {
+                        activity: merged_activity,
+                        warrants: merge_warrants(warrants_lists),
+                    }
                 }
             }
-        } else {
-            // If chain top action seq was not found, result is ChainTopNotFound.
-            MustGetAgentActivityResponse::ChainTopNotFound(filter.chain_top.clone())
-        };
+        }
 
-        // Handle the result
         if matches!(result, MustGetAgentActivityResponse::Activity { .. }) {
             // If we have a success result, return it.
             Ok(result)
