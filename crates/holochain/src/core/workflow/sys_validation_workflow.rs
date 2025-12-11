@@ -114,7 +114,6 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_sqlite::prelude::*;
 use holochain_sqlite::sql::sql_cell::ACTION_HASH_BY_PREV;
-#[cfg(feature = "unstable-warrants")]
 use holochain_state::integrate::insert_locally_validated_op;
 use holochain_state::prelude::*;
 use rusqlite::Transaction;
@@ -144,6 +143,7 @@ pub async fn sys_validation_workflow(
     workspace: Arc<SysValidationWorkspace>,
     current_validation_dependencies: SysValDeps,
     trigger_app_validation: TriggerSender,
+    trigger_integration: TriggerSender,
     trigger_publish: TriggerSender,
     trigger_self: TriggerSender,
     network: DynHolochainP2pDna,
@@ -164,7 +164,10 @@ pub async fn sys_validation_workflow(
     if outcome_summary.accepted > 0 {
         tracing::debug!("Sys validation accepted {} ops", outcome_summary.accepted);
 
+        // If a chain op was accepted
         trigger_app_validation.trigger(&"sys_validation_workflow");
+        // If a warrant op was accepted
+        trigger_integration.trigger(&"sys_validation_workflow");
     }
 
     if outcome_summary.warranted > 0 {
@@ -174,6 +177,14 @@ pub async fn sys_validation_workflow(
         );
 
         trigger_publish.trigger(&"sys_validation_workflow");
+        trigger_integration.trigger(&"sys_validation_workflow");
+    } else if outcome_summary.warrants_rejected > 0 {
+        tracing::debug!(
+            "Sys validation rejected {} warrants",
+            outcome_summary.warrants_rejected
+        );
+
+        trigger_integration.trigger(&"sys_validation_workflow");
     }
 
     // Now go to the network to try to fetch missing dependencies
@@ -286,9 +297,7 @@ async fn sys_validation_workflow_inner(
         }
     }
 
-    // Allow unused mutable, because it's mutated when feature unstable-warrants is enabled.
-    #[allow(unused_mut)]
-    let (mut summary, _invalid_ops, _forked_pairs) = workspace
+    let (mut summary, invalid_ops, _forked_pairs) = workspace
         .dht_db
         .write_async(move |txn| {
             let mut summary = OutcomeSummary {
@@ -296,7 +305,11 @@ async fn sys_validation_workflow_inner(
                 ..Default::default()
             };
             let mut invalid_ops = vec![];
-            let mut forked_pairs: Vec<(AgentPubKey, ForkedPair)> = vec![];
+
+            #[cfg(feature = "unstable-warrants")]
+            let mut forked_pairs: Vec<(AgentPubKey, ForkedPair)> = Vec::with_capacity(0);
+            #[cfg(not(feature = "unstable-warrants"))]
+            let forked_pairs: Vec<(AgentPubKey, ForkedPair)> = vec![];
 
             for (hashed_op, outcome) in validation_outcomes {
                 let (op, op_hash) = hashed_op.into_inner();
@@ -323,9 +336,7 @@ async fn sys_validation_workflow_inner(
                             DhtOpType::Chain(_) => {
                                 put_validation_limbo(txn, &op_hash, ValidationStage::SysValidated)?
                             }
-                            DhtOpType::Warrant(_) =>
-                            {
-                                #[cfg(feature = "unstable-warrants")]
+                            DhtOpType::Warrant(_) => {
                                 put_integration_limbo(txn, &op_hash, ValidationStatus::Valid)?
                             }
                         };
@@ -338,7 +349,15 @@ async fn sys_validation_workflow_inner(
                     Outcome::Rejected(_) => {
                         invalid_ops.push((op_hash.clone(), op.clone()));
 
-                        summary.rejected += 1;
+                        match op {
+                            DhtOp::ChainOp(_) => {
+                                summary.rejected += 1;
+                            }
+                            DhtOp::WarrantOp(_) => {
+                                summary.warrants_rejected += 1;
+                            }
+                        }
+
                         put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;
                     }
                 }
@@ -347,10 +366,9 @@ async fn sys_validation_workflow_inner(
         })
         .await?;
 
-    #[cfg(feature = "unstable-warrants")]
     {
         let mut warrants = vec![];
-        for (op_hash, chain_op) in _invalid_ops
+        for (op_hash, chain_op) in invalid_ops
             .into_iter()
             .filter_map(|(h, op)| op.as_chain_op().map(|op| (h, op.clone())))
         {
@@ -472,7 +490,7 @@ async fn fetch_missing_dependencies(
                 }
                 ValidationDependencyType::Warranted(chain_op_type) => {
                     match network_cascade
-                        .retrieve(hash.clone().into(), Default::default())
+                        .retrieve_public_record(hash.clone().into(), Default::default())
                         .await
                     {
                         Ok(Some((record, source))) => {
@@ -602,7 +620,19 @@ async fn retrieve_dependencies(
                         (hash, dep_type, fetched.map(|ok| ok.map(|(a, s)| (ValidationDependencyValue::Action(a), s))))
                     }
                     ValidationDependencyType::Warranted(chain_op_type) => {
-                        let fetched = cascade.retrieve_action(hash.clone(), Default::default()).await;
+                        let fetched = match chain_op_type {
+                            // These chain op types require the entry to be present.
+                            ChainOpType::StoreRecord |
+                            ChainOpType::StoreEntry |
+                            ChainOpType::RegisterUpdatedContent |
+                            ChainOpType::RegisterUpdatedRecord => {
+                                cascade.retrieve_public_record(hash.clone().into(), Default::default()).await.map(|ok|ok.map(|(a, s)|(a.signed_action, s)))
+                            }
+                            // Other top types can be constructed without an entry.
+                            _ => {
+                                cascade.retrieve_action(hash.clone(), Default::default()).await
+                            }
+                        };
                         tracing::trace!(hash = ?hash, fetched = ?fetched, "Fetched warranted record for validation");
                         (hash, dep_type, fetched.map(|ok| ok.map(|(a, s)| (ValidationDependencyValue::Warranted(WarrantedDep::Pending(a, chain_op_type)), s))))
                     }
@@ -1002,7 +1032,6 @@ async fn validate_warrant_op(
 
                 match validation_status {
                     ValidationStatus::Valid => {
-                        // TODO block the warrant author
                         return Err(SysValidationError::ValidationOutcome(
                             ValidationOutcome::InvalidWarrant(
                                 Box::new(op.warrant().clone()),
@@ -1022,7 +1051,6 @@ async fn validate_warrant_op(
                     }
                     ValidationStatus::Rejected => {
                         // This is good, the warrant is valid because we also rejected the op
-                        // TODO block the author of the op
                     }
                 }
 
@@ -1560,8 +1588,11 @@ pub fn detect_fork(
 struct OutcomeSummary {
     accepted: usize,
     missing: usize,
+    /// The number of chain ops that were rejected during sys validation
     rejected: usize,
     warranted: usize,
+    /// The number of warrant ops that were rejected during sys validation
+    warrants_rejected: usize,
     /// The number of warrant dependencies that were copied from the cache to the DHT db
     warrant_deps_copied: usize,
 }
@@ -1573,6 +1604,7 @@ impl OutcomeSummary {
             missing: 0,
             rejected: 0,
             warranted: 0,
+            warrants_rejected: 0,
             warrant_deps_copied: 0,
         }
     }

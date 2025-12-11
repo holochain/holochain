@@ -34,12 +34,11 @@ impl holochain_p2p::event::HcP2pHandler for Conductor {
     fn handle_publish(
         &self,
         dna_hash: DnaHash,
-        request_validation_receipt: bool,
         ops: Vec<holochain_types::dht_op::DhtOp>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
             self.spaces
-                .handle_publish(&dna_hash, request_validation_receipt, ops)
+                .handle_publish(&dna_hash, ops)
                 .await
                 .map_err(HolochainP2pError::other)
         })
@@ -55,21 +54,6 @@ impl holochain_p2p::event::HcP2pHandler for Conductor {
             self.cell_by_parts(&dna_hash, &to_agent)
                 .await?
                 .handle_get(dna_hash, to_agent, dht_hash)
-                .await
-        })
-    }
-
-    fn handle_get_meta(
-        &self,
-        dna_hash: DnaHash,
-        to_agent: AgentPubKey,
-        dht_hash: holo_hash::AnyDhtHash,
-        options: holochain_p2p::event::GetMetaOptions,
-    ) -> BoxFut<'_, HolochainP2pResult<MetadataSet>> {
-        Box::pin(async {
-            self.cell_by_parts(&dna_hash, &to_agent)
-                .await?
-                .handle_get_meta(dna_hash, to_agent, dht_hash, options)
                 .await
         })
     }

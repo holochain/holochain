@@ -40,6 +40,10 @@ use holochain_zome_types::timestamp::Timestamp;
 use holochain_zome_types::Action;
 use std::collections::HashSet;
 use std::sync::Arc;
+use {
+    hdk::prelude::AppEntryBytesFixturator, holo_hash::HashableContentExtSync,
+    holochain_serialized_bytes::SerializedBytes, holochain_zome_types::Entry,
+};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_op_with_no_dependency() {
@@ -47,14 +51,11 @@ async fn validate_op_with_no_dependency() {
 
     let mut test_case = TestCase::new().await;
 
-    #[cfg(feature = "unstable-warrants")]
-    {
-        let mut network = MockHolochainP2pDnaT::default();
-        network
-            .expect_target_arcs()
-            .return_once(|| Ok(vec![kitsune2_api::DhtArc::Empty]));
-        test_case.actual_network = Some(network);
-    }
+    let mut network = MockHolochainP2pDnaT::default();
+    network
+        .expect_target_arcs()
+        .return_once(|| Ok(vec![kitsune2_api::DhtArc::Empty]));
+    test_case.actual_network = Some(network);
 
     let dna_action = HdkDna {
         author: fixt!(AgentPubKey),
@@ -119,14 +120,11 @@ async fn validate_op_with_dependency_held_in_cache() {
         .await
         .unwrap();
 
-    #[cfg(feature = "unstable-warrants")]
-    {
-        let mut network = MockHolochainP2pDnaT::default();
-        network
-            .expect_target_arcs()
-            .return_once(|| Ok(vec![kitsune2_api::DhtArc::Empty]));
-        test_case.with_network_behaviour(network);
-    }
+    let mut network = MockHolochainP2pDnaT::default();
+    network
+        .expect_target_arcs()
+        .return_once(|| Ok(vec![kitsune2_api::DhtArc::Empty]));
+    test_case.with_network_behaviour(network);
 
     test_case.run().await;
 
@@ -179,7 +177,7 @@ async fn validate_op_with_dependency_not_held() {
     let response = WireOps::Record(ops);
     network
         .expect_get()
-        .return_once(move |_| Ok(vec![response]));
+        .return_once(move |_, _| Ok(vec![response]));
 
     network
         .expect_target_arcs()
@@ -242,9 +240,8 @@ async fn validate_op_with_dependency_not_found_on_the_dht() {
     let response = WireOps::Record(WireRecordOps::new());
     network
         .expect_get()
-        .return_once(move |_| Ok(vec![response]));
+        .return_once(move |_, _| Ok(vec![response]));
 
-    #[cfg(feature = "unstable-warrants")]
     network
         .expect_target_arcs()
         .return_once(|| Ok(vec![kitsune2_api::DhtArc::Empty]));
@@ -315,7 +312,6 @@ async fn validate_op_with_wrong_sequence_number_rejected_and_not_forwarded_to_ap
 
 /// Happy path test where the warranted op has already been fetched into the cache database.
 /// It will have to be copied to the DHT and validated. The warrant will then be seen as valid.
-#[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_valid_warrant_with_cached_dependency() {
     holochain_trace::test_run();
@@ -333,13 +329,20 @@ async fn validate_valid_warrant_with_cached_dependency() {
 
     // Warranted op, to be found in the cache
     let mut create = fixt!(Create);
+    let entry = Entry::App(fixt!(AppEntryBytes));
     create.author = bad_agent.clone();
+    create.entry_hash = entry.to_hash();
+    create.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     create.action_seq = 0; // Not allowed to have a 0 seq number for a Create
     let warranted_action = test_case.sign_action(Action::Create(create.clone())).await;
     let warranted_op = ChainOp::StoreRecord(
         fixt!(Signature),
         Action::Create(create),
-        crate::prelude::RecordEntry::NA,
+        crate::prelude::RecordEntry::Present(entry),
     )
     .into();
     test_case
@@ -393,7 +396,6 @@ async fn validate_valid_warrant_with_cached_dependency() {
 
 /// Happy path test where the warranted op has to be fetched from the network and cached. It will
 /// have to be copied to the DHT and validated. The warrant will then be seen as valid.
-#[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_valid_warrant_with_fetched_dependency() {
     holochain_trace::test_run();
@@ -410,15 +412,23 @@ async fn validate_valid_warrant_with_fetched_dependency() {
 
     // Warranted op, to be fetched from the network
     let mut create = fixt!(Create);
+    let entry = Entry::App(fixt!(AppEntryBytes));
     create.author = bad_agent.clone();
+    create.entry_hash = entry.to_hash();
+    create.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     create.action_seq = 0; // Not allowed to have a 0 seq number for a Create
     let warranted_action = test_case.sign_action(Action::Create(create.clone())).await;
 
     network.expect_get().return_once({
         let warranted_action = warranted_action.clone();
-        move |_hash| {
+        move |_hash, _| {
             let mut ops: WireRecordOps = WireRecordOps::new();
             ops.action = Some(Judged::valid(warranted_action.clone().into()));
+            ops.entry = Some(entry);
             let response = WireOps::Record(ops);
             Ok(vec![response])
         }
@@ -474,7 +484,6 @@ async fn validate_valid_warrant_with_fetched_dependency() {
 
 /// Invalid warrant test. A valid DHT op is put in the DHT database, then a warrant is issued for
 /// it. Once the op is judged valid, the warrant is judged invalid and rejected.
-#[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
 async fn reject_invalid_warrant() {
     holochain_trace::test_run();
@@ -492,13 +501,20 @@ async fn reject_invalid_warrant() {
 
     // Valid op, to be found in the DHT database
     let mut create = fixt!(Create);
+    let entry = Entry::app(SerializedBytes::default()).unwrap();
     create.author = good_agent.clone();
+    create.entry_hash = entry.to_hash();
+    create.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     create.action_seq = 30;
     let valid_action = test_case.sign_action(Action::Create(create.clone())).await;
     let valid_op = ChainOp::StoreRecord(
         fixt!(Signature),
         Action::Create(create),
-        crate::prelude::RecordEntry::NA,
+        crate::prelude::RecordEntry::Present(entry),
     );
     let valid_op_hash = DhtOpHashed::from_content_sync(valid_op.clone()).hash;
     test_case
@@ -578,7 +594,6 @@ async fn reject_invalid_warrant() {
 
 /// Checks that if the dependency of a warrant is available locally and has already been validated,
 /// then the warrant can be validated straight away without needing to process the dependency first.
-#[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_warrant_with_validated_dependency() {
     holochain_trace::test_run();
@@ -596,13 +611,20 @@ async fn validate_warrant_with_validated_dependency() {
 
     // Valid op, to be found in the DHT database
     let mut create = fixt!(Create);
+    let entry = Entry::App(fixt!(AppEntryBytes));
     create.author = good_agent.clone();
+    create.entry_hash = entry.to_hash();
+    create.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     create.action_seq = 30;
     let valid_action = test_case.sign_action(Action::Create(create.clone())).await;
     let valid_op = ChainOp::StoreRecord(
         fixt!(Signature),
         Action::Create(create),
-        crate::prelude::RecordEntry::NA,
+        crate::prelude::RecordEntry::Present(entry),
     );
     let valid_op_hash = DhtOpHashed::from_content_sync(valid_op.clone()).hash;
     test_case
@@ -662,7 +684,6 @@ async fn validate_warrant_with_validated_dependency() {
 }
 
 /// Checks that validating a warranted op does not result in issuing a new warrant.
-#[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
 async fn avoid_duplicate_warrant() {
     holochain_trace::test_run();
@@ -681,13 +702,20 @@ async fn avoid_duplicate_warrant() {
 
     // Invalid op
     let mut create = fixt!(Create);
+    let entry = Entry::App(fixt!(AppEntryBytes));
     create.author = bad_agent.clone();
+    create.entry_hash = entry.to_hash();
+    create.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     create.action_seq = 0; // Not allowed for a create op
     let valid_action = test_case.sign_action(Action::Create(create.clone())).await;
     let invalid_op = ChainOp::StoreRecord(
         fixt!(Signature),
         Action::Create(create),
-        crate::prelude::RecordEntry::NA,
+        crate::prelude::RecordEntry::Present(entry),
     );
     test_case
         .save_op_to_db(test_case.dht_db_handle(), invalid_op.into())
@@ -779,6 +807,7 @@ struct TestCase {
     agent: AgentPubKey,
     current_validation_dependencies: SysValDeps,
     app_validation_trigger: (TriggerSender, TriggerReceiver),
+    integration_trigger: (TriggerSender, TriggerReceiver),
     publish_trigger: (TriggerSender, TriggerReceiver),
     self_trigger: (TriggerSender, TriggerReceiver),
     actual_network: Option<MockHolochainP2pDnaT>,
@@ -801,6 +830,7 @@ impl TestCase {
             agent,
             current_validation_dependencies: SysValDeps::default(),
             app_validation_trigger: TriggerSender::new(),
+            integration_trigger: TriggerSender::new(),
             publish_trigger: TriggerSender::new(),
             self_trigger: TriggerSender::new(),
             actual_network: None,
@@ -851,7 +881,6 @@ impl TestCase {
         Ok(test_op_hash)
     }
 
-    #[cfg(feature = "unstable-warrants")]
     async fn create_and_sign_warrant(
         &self,
         warranted_action: &SignedActionHashed,
@@ -902,6 +931,7 @@ impl TestCase {
             Arc::new(workspace),
             self.current_validation_dependencies.clone(),
             self.app_validation_trigger.0.clone(),
+            self.integration_trigger.0.clone(),
             self.publish_trigger.0.clone(),
             self.self_trigger.0.clone(),
             actual_network,
@@ -956,7 +986,6 @@ impl TestCase {
         .is_some());
     }
 
-    #[cfg(feature = "unstable-warrants")]
     fn get_warrant_validation_outcome(
         &self,
         warrant_op_hash: DhtOpHash,
@@ -988,7 +1017,6 @@ impl TestCase {
         )
     }
 
-    #[cfg(feature = "unstable-warrants")]
     async fn get_authored_warrants<T: DbKindT>(
         &self,
         db: &holochain_sqlite::prelude::DbRead<T>,

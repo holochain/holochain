@@ -4,6 +4,7 @@
 
 use holo_hash::{DnaHash, WasmHash};
 use holochain_zome_types::zome::ZomeError;
+use mr_bundle::ResourceIdentifier;
 use thiserror::Error;
 
 /// Holochain DnaError type.
@@ -28,6 +29,10 @@ pub enum DnaError {
     /// ZomeFunctionNotFound
     #[error("Zome function not found: {0}")]
     ZomeFunctionNotFound(String),
+
+    /// MissingResource
+    #[error("Resource referenced in manifest must exist: {0}")]
+    MissingResource(ResourceIdentifier),
 
     /// MrBundleError
     #[error(transparent)]

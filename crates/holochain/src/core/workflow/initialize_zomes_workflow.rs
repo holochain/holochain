@@ -59,7 +59,7 @@ where
 
     // only commit if the result was successful
     if result == InitResult::Pass {
-        let flushed_actions = workspace
+        let (flushed_actions, _) = workspace
             .source_chain()
             .flush(network.target_arcs().await?, network.chc())
             .await?;

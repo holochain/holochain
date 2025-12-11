@@ -391,7 +391,6 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
     fn handle_publish(
         &self,
         _dna_hash: DnaHash,
-        _request_validation_receipt: bool,
         _ops: Vec<holochain_types::dht_op::DhtOp>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async { unimplemented!() })
@@ -423,21 +422,6 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
             }
             r.map_err(HolochainP2pError::other)
         })
-    }
-
-    /// a remote node is asking us for metadata
-    #[cfg_attr(
-        feature = "instrument",
-        tracing::instrument(skip(self, _dht_hash, _options))
-    )]
-    fn handle_get_meta(
-        &self,
-        _dna_hash: DnaHash,
-        _to_agent: AgentPubKey,
-        _dht_hash: holo_hash::AnyDhtHash,
-        _options: holochain_p2p::event::GetMetaOptions,
-    ) -> BoxFut<'_, HolochainP2pResult<MetadataSet>> {
-        Box::pin(async { unimplemented!() })
     }
 
     /// a remote node is asking us for links
@@ -772,6 +756,7 @@ impl Cell {
             keystore,
             args,
             self.queue_triggers.publish_dht_ops.clone(),
+            self.queue_triggers.sys_validation.clone(),
             self.queue_triggers.integrate_dht_ops.clone(),
             self.queue_triggers.countersigning.clone(),
         )

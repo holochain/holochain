@@ -10,8 +10,8 @@ fn main() {
     target_dir.pop();
 
     let content = format!(
-        "const TARGET: &[u8] = &{:?};",
-        target_dir.into_os_string().into_encoded_bytes(),
+        "const TARGET: &[u8] = {:?}.as_bytes();",
+        target_dir.to_string_lossy(),
     );
 
     let mut target_file = out_dir.clone();

@@ -212,8 +212,11 @@ impl crate::DhtOpHash {
 
     /// Convert a kitsune2 OpId into a DhtOpHash.
     #[cfg(feature = "hashing")]
-    pub fn from_k2_op(op: &kitsune2_api::OpId) -> Self {
-        Self::from_raw_32(op[..HOLO_HASH_CORE_LEN].to_vec())
+    pub fn try_from_k2_op(op: &kitsune2_api::OpId) -> HoloHashResult<Self> {
+        if op.len() < HOLO_HASH_CORE_LEN {
+            return Err(HoloHashError::BadSize);
+        }
+        Ok(Self::from_raw_32(op[..HOLO_HASH_CORE_LEN].to_vec()))
     }
 }
 

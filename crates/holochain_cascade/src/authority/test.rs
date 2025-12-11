@@ -1,12 +1,9 @@
 use super::*;
 use crate::test_utils::*;
-#[cfg(feature = "unstable-warrants")]
 use holo_hash::fixt::ActionHashFixturator;
-#[cfg(feature = "unstable-warrants")]
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holochain_p2p::actor;
 use holochain_state::prelude::test_dht_db;
-#[cfg(feature = "unstable-warrants")]
 use {crate::authority::handle_get_agent_activity, holochain_types::activity::ChainItems};
 
 #[tokio::test(flavor = "multi_thread")]
@@ -135,7 +132,7 @@ async fn get_links() {
 
     fill_db(&db.to_db(), td.store_entry_op.clone()).await;
     fill_db(&db.to_db(), td.create_link_op.clone()).await;
-    let options = actor::GetLinksOptions::default();
+    let options = actor::GetLinksRequestOptions::default();
 
     let result = handle_get_links(db.to_db().into(), td.link_key.clone(), (&options).into())
         .await
@@ -162,7 +159,6 @@ async fn get_links() {
     assert_eq!(result, expected);
 }
 
-#[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
 async fn get_agent_activity() {
     use ::fixt::fixt;

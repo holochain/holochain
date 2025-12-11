@@ -330,7 +330,6 @@ async fn filter_out_entries_with_chain_query() {
     assert_agent_activity_responses_eq!(expected, r);
 }
 
-#[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
 async fn get_activity_with_warrants() {
     holochain_trace::test_run();

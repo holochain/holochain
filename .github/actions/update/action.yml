@@ -19,9 +19,6 @@ inputs:
   HRA_GITHUB_TOKEN:
     description: ""
     required: true
-  CACHIX_SIGNING_KEY:
-    description: ""
-    required: true
   CACHIX_AUTH_TOKEN:
     description: ""
     required: true
@@ -30,20 +27,19 @@ runs:
   using: "composite"
   steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         ref: ${{ inputs.branch }}
     - name: Install nix
-      uses: cachix/install-nix-action@v27
+      uses: cachix/install-nix-action@v31
       with:
-        install_url: https://releases.nixos.org/nix/nix-2.23.3/install
+        install_url: https://releases.nixos.org/nix/nix-2.32.1/install
         extra_nix_config: |
           access-tokens = github.com=${{ inputs.GITHUB_TOKEN }}
     - name: Setup cachix
-      uses: cachix/cachix-action@v15
+      uses: cachix/cachix-action@v16
       with:
         name: holochain-ci
-        signingKey: "${{ inputs.CACHIX_SIGNING_KEY }}"
         authToken: "${{ inputs.CACHIX_AUTH_TOKEN }}"
     - name: set up git config
       shell: bash

@@ -20,16 +20,16 @@ use std::borrow::Borrow;
 /// a chain record containing the signed action along with the
 /// entry if the action type has one.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
-pub struct Record<A = SignedActionHashed> {
+pub struct Record {
     /// The signed action for this record
-    pub signed_action: A,
+    pub signed_action: SignedActionHashed,
     /// If there is an entry associated with this action it will be here.
     /// If not, there will be an enum variant explaining the reason.
     pub entry: RecordEntry<Entry>,
 }
 
-impl<A> AsRef<A> for Record<A> {
-    fn as_ref(&self) -> &A {
+impl AsRef<SignedActionHashed> for Record {
+    fn as_ref(&self) -> &SignedActionHashed {
         &self.signed_action
     }
 }
@@ -269,14 +269,14 @@ impl Record {
     }
 }
 
-impl<A> Record<A> {
+impl Record {
     /// Break this record into its components
-    pub fn into_inner(self) -> (A, RecordEntry) {
+    pub fn into_inner(self) -> (SignedActionHashed, RecordEntry) {
         (self.signed_action, self.entry)
     }
 
     /// The inner signed-action
-    pub fn signed_action(&self) -> &A {
+    pub fn signed_action(&self) -> &SignedActionHashed {
         &self.signed_action
     }
 }

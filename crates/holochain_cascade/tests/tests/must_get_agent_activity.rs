@@ -398,7 +398,6 @@ async fn test_must_get_agent_activity_inner(
     authored_ops_to_dht_db_without_check(hashes, authored.clone().into(), dht.clone())
         .await
         .unwrap();
-    #[cfg(feature = "unstable-warrants")]
     {
         dht.test_write(|txn| {
             for warrant in warrants {

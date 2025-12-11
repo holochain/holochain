@@ -221,11 +221,6 @@ pub fn insert_op_when(
     let signature = op.signature().clone();
     let op_order = OpOrder::new(op_type, op.timestamp());
 
-    #[cfg(not(feature = "unstable-warrants"))]
-    let create_op = true;
-    #[cfg(feature = "unstable-warrants")]
-    let mut create_op = true;
-
     match op {
         DhtOp::ChainOp(op) => {
             let action = op.action();
@@ -240,28 +235,22 @@ pub fn insert_op_when(
             insert_action(txn, &action_hashed)?;
         }
         DhtOp::WarrantOp(_warrant_op) => {
-            #[cfg(feature = "unstable-warrants")]
-            {
-                let warrant = (***_warrant_op).clone();
-                let inserted = insert_warrant(txn, warrant)?;
-                if inserted == 0 {
-                    create_op = false;
-                }
-            }
+            let warrant = (***_warrant_op).clone();
+            insert_warrant(txn, warrant)?;
         }
     }
-    if create_op {
-        insert_op_lite_when(
-            txn,
-            &op_lite,
-            hash,
-            &op_order,
-            &timestamp,
-            serialized_size,
-            transfer_data,
-            when_stored,
-        )?;
-    }
+
+    insert_op_lite_when(
+        txn,
+        &op_lite,
+        hash,
+        &op_order,
+        &timestamp,
+        serialized_size,
+        transfer_data,
+        when_stored,
+    )?;
+
     Ok(())
 }
 
@@ -344,8 +333,7 @@ pub fn insert_op_lite_when(
             })?;
         }
         DhtOpLite::Warrant(op) => {
-            let _warrant_hash = op.warrant().to_hash();
-            #[cfg(feature = "unstable-warrants")]
+            let warrant_hash = op.warrant().to_hash();
             sql_insert!(txn, DhtOp, {
                 "hash": hash,
                 "type": op_lite.get_type(),
@@ -353,7 +341,7 @@ pub fn insert_op_lite_when(
                 "authored_timestamp": authored_timestamp,
                 "when_stored": when_stored,
                 "basis_hash": basis,
-                "action_hash": _warrant_hash,
+                "action_hash": warrant_hash,
                 "transfer_source": transfer_source,
                 "transfer_method": transfer_method,
                 "transfer_time": transfer_time,
@@ -736,7 +724,6 @@ pub fn set_receipts_complete_redundantly_in_dht_db(
 }
 
 /// Insert a [`Warrant`] into the Warrant table.
-#[cfg(feature = "unstable-warrants")]
 pub fn insert_warrant(txn: &mut Transaction, warrant: SignedWarrant) -> StateMutationResult<usize> {
     let warrant_type = warrant.get_type();
     let hash = warrant.to_hash();
@@ -744,29 +731,14 @@ pub fn insert_warrant(txn: &mut Transaction, warrant: SignedWarrant) -> StateMut
     let timestamp = warrant.timestamp;
     let warrantee = warrant.warrantee.clone();
 
-    // Don't produce a warrant if one, of any kind, already exists for the warrantee.
-    // TODO: If warrants were permanent, this would relieve peers from having to store a possibly endless
-    // number of warrants for an agent. However, warrants may be redeemable at some stage, which is when
-    // there needs to be a different check performed here.
-    // TODO: Move this check to the calling function.
-    let exists = txn
-        .prepare_cached("SELECT 1 FROM Warrant WHERE warrantee = :warrantee")?
-        .exists(named_params! {
-            ":warrantee": warrantee,
-        })?;
-
-    Ok(if !exists {
-        sql_insert!(txn, Warrant, {
-            "hash": hash,
-            "author": author,
-            "timestamp": timestamp,
-            "warrantee": warrantee,
-            "type": warrant_type,
-            "blob": to_blob(&warrant)?,
-        })?
-    } else {
-        0
-    })
+    Ok(sql_insert!(txn, Warrant, {
+        "hash": hash,
+        "author": author,
+        "timestamp": timestamp,
+        "warrantee": warrantee,
+        "type": warrant_type,
+        "blob": to_blob(&warrant)?,
+    })?)
 }
 
 /// Insert a [`Action`] into the database.
@@ -813,6 +785,7 @@ pub fn insert_action(
                 "seq": action_seq,
                 "author": author,
                 "prev_hash": prev_hash,
+                "base_hash": delete_link.base_address,
                 "create_link_hash": delete_link.link_add_address,
                 "blob": to_blob(&signed_action)?,
             })?;
@@ -1203,21 +1176,18 @@ pub async fn copy_cached_op_to_dht(
                 let mut stmt = txn.prepare(
                     r#"
                         SELECT
-                          Action.blob AS action_blob,
-                          Entry.blob AS entry_blob
-                        FROM DhtOp
-                        JOIN Action ON DhtOp.action_hash = Action.hash
-                        LEFT JOIN Entry ON Action.entry_hash = Entry.hash
+                            Action.blob AS action_blob,
+                            Entry.blob AS entry_blob
+                        FROM Action
+                            LEFT JOIN Entry ON Action.entry_hash = Entry.hash
                         WHERE
-                          DhtOp.type == :dht_op_type
-                          AND DhtOp.action_hash = :action_hash
+                            Action.hash = :action_hash
                         "#
                 )?;
 
                 let maybe_action_entry = stmt
                     .query_row(
                         named_params! {
-                            ":dht_op_type": chain_op_type,
                             ":action_hash": action_hash,
                         },
                         |row: &Row| -> rusqlite::Result<(Vec<u8>, Option<Vec<u8>>)> {

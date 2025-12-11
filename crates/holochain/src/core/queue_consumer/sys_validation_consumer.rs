@@ -10,11 +10,13 @@ use holochain_keystore::MetaLairClient;
 
 /// Spawn the QueueConsumer for SysValidation workflow
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+#[allow(clippy::too_many_arguments)]
 pub fn spawn_sys_validation_consumer(
     workspace: SysValidationWorkspace,
     space: Space,
     conductor: ConductorHandle,
     trigger_app_validation: TriggerSender,
+    trigger_integration: TriggerSender,
     trigger_publish: TriggerSender,
     network: DynHolochainP2pDna,
     keystore: MetaLairClient,
@@ -39,6 +41,7 @@ pub fn spawn_sys_validation_consumer(
                     workspace.clone(),
                     current_validation_dependencies.clone(),
                     trigger_app_validation.clone(),
+                    trigger_integration.clone(),
                     trigger_publish.clone(),
                     trigger_self.clone(),
                     network.clone(),

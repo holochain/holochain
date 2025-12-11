@@ -107,7 +107,7 @@ impl OpStore for HolochainOpStore {
             self.sender
                 .get()
                 .ok_or_else(|| K2Error::other("event handler not registered"))?
-                .handle_publish(self.dna_hash.clone(), false, dht_ops)
+                .handle_publish(self.dna_hash.clone(), dht_ops)
                 .await
                 .map_err(|e| K2Error::other_src("Failed to publish incoming ops", e))?;
 
@@ -177,9 +177,12 @@ impl OpStore for HolochainOpStore {
                     let mut rows = stmt.query([Rc::new(
                         op_ids
                             .iter()
-                            .map(|id| {
-                                let hash = DhtOpHash::from_k2_op(id);
-                                Value::from(hash.into_inner())
+                            .filter_map(|id| match DhtOpHash::try_from_k2_op(id) {
+                                Ok(hash) => Some(Value::from(hash.into_inner())),
+                                Err(e) => {
+                                    tracing::warn!("Cannot retrieve op for invalid op id: {e}");
+                                    None
+                                }
                             })
                             .collect::<Vec<_>>(),
                     )])?;
@@ -211,19 +214,24 @@ impl OpStore for HolochainOpStore {
         Box::pin(async move {
             let out = db
                 .read_async(move |txn| -> StateMutationResult<Vec<OpId>> {
+                    let mut out = op_ids.clone().into_iter().collect::<HashSet<_>>();
+
                     let mut stmt = txn.prepare(CHECK_OP_IDS_PRESENT)?;
 
                     let mut rows = stmt.query([Rc::new(
                         op_ids
                             .iter()
-                            .map(|id| {
-                                let hash = DhtOpHash::from_k2_op(id);
-                                Value::from(hash.into_inner())
+                            .filter_map(|id| match DhtOpHash::try_from_k2_op(id) {
+                                Ok(hash) => Some(Value::from(hash.into_inner())),
+                                Err(e) => {
+                                    tracing::warn!("Got invalid op id: {e}");
+                                    out.remove(id);
+                                    None
+                                }
                             })
                             .collect::<Vec<_>>(),
                     )])?;
 
-                    let mut out = op_ids.into_iter().collect::<HashSet<_>>();
                     while let Some(row) = rows.next()? {
                         let op_hash: DhtOpHash = row.get(0)?;
                         let op_basis: OpBasis = row.get(1)?;

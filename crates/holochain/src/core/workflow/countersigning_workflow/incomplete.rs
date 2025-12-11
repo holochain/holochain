@@ -8,13 +8,12 @@ use crate::prelude::{Entry, PreflightRequest, RecordEntry};
 use either::Either;
 use holo_hash::AgentPubKey;
 use holochain_cascade::CascadeImpl;
-use holochain_p2p::actor::GetActivityOptions;
+use holochain_p2p::actor::{GetActivityOptions, NetworkRequestOptions};
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::prelude::{
     current_countersigning_session, CurrentCountersigningSessionOpt, SourceChainResult,
 };
 use holochain_types::activity::ChainItems;
-use holochain_zome_types::entry::GetOptions;
 use holochain_zome_types::prelude::{
     ChainQueryFilter, ChainQueryFilterRange, ChainStatus, SignedAction,
 };
@@ -79,12 +78,14 @@ pub async fn inner_countersigning_session_incomplete(
     let cascade = CascadeImpl::empty().with_network(network, space.cache_db.clone());
 
     let get_activity_options = GetActivityOptions {
+        network_req_options: NetworkRequestOptions {
+            // We're going to be potentially running quite a lot of these requests, so set the timeout reasonably low.
+            timeout_ms: Some(10_000),
+            ..Default::default()
+        },
         include_warrants: false, // TODO document that apps should consider checking for warrants before completing preflight
         include_valid_activity: true,
         include_full_records: true,
-        get_options: GetOptions::network(),
-        // We're going to be potentially running quite a lot of these requests, so set the timeout reasonably low.
-        timeout_ms: Some(10_000),
         ..Default::default()
     };
 

@@ -14,12 +14,91 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - `MustGetAgentActivityResponse::Activity` now excludes forked Actions deterministically. If multiple Actions with the same sequence number are found in stores, only the `RegisterAgentActivity` containing the `Action` with the maximum `ActionHash` is retained in the response activity list.
   - If the `ChainFilter` has a `LimitConditions::UntilHash` or `LimitConditions::Multiple` with an until hash, and the until hash was found in a store, but was removed from the final list due to being a fork, the returned value is an `MustGetAgentActivityResponse::Activity` containing the `RegisterAgentActivity` with `Action` sequence numbers ending in the until hash `Action`'s sequence number. Previously `MustGetAgentActivityResponse::IncompleteChain` was returned.
 - Refactored `must_get_agent_activity` implementation to improve code clarity and performance. \#5350
-- **BREAKING CHANGE** Replace `BTreeSet` with `HashSet` in `GrantedFunctions::Listed`. #5349
-- Add a new conductor tuning parameter `disable_self_validation` to disable self-validation of authored data. Intended only
-  for testing warrants. #5340
-- Avoid issuing duplicate warrants for invalid actions during sys validation by checking for existing warrants before creating new ones. #5337
+- CI: Run windows test workflow on Depot.dev runners for improved performance. \#5473
+
+- **BREAKING CHANGE** Refactor: The `ConductorConfig` field `request_timeout_s` has moved into the `NetworkConfig`, so is now available at the sub-field `network.request_timeout_s`.
+- **BREAKING CHANGE** Feat: The advanced network configuration field `network.advanced.transportTx5.timeoutS` is now automatically set to 1/2 of the `NetworkConfig` field `request_timeout_s`. It specifies the timeout for a single transport message (request or response).
+- **BREAKING CHANGE** Feat: The advanced network configuration field `network.advanced.transportTx5.webrtcConnectTimeoutS` is now automatically set to 3/8 of the `NetworkConfig` field `request_timeout_s`. It specifies the timeout for attempting to establish a webrtc connection before falling back to a relay connection.
+- Added feature `transport-iroh` for using Iroh as network transport backend.
+- **BREAKING CHANGE** Renamed features `backend-libdatachannel` to `transport-tx5-backend-libdatachannel`, `backend-go-pion` to `transport-tx5-backend-go-pion`, `datachannel-vendored` to `transport-tx5-datachannel-vendored`.
+
+## 0.7.0-dev.3
+
+## 0.7.0-dev.2
+
+## 0.7.0-dev.1
+
+- Removed unused `holochain_mock_hdi` crate that was never completed. \#5484
+- Removed unused `hc_demo_cli` crate.
+- Remove the unused generic type parameter `A` from `Record`, which was always `SignedActionHashed`. \#5483
+
+## 0.7.0-dev.0
+
+- *BREAKING CHANGE* Unrecognized fields in app and webapp manifests are now rejected. This helps prevent typos and stray fields that have been left behind after manifest schema changes. \#5467
+- Refactor: Use production transport for all tests instead of in-memory implementations. \#5442
+
+## 0.6.0
+
+- **BREAKING CHANGE** Remove the `hc sandbox call` functionality from the sandbox, and move it to a new `hc client call` CLI. \#5461
+- Add metrics to record incoming notify requests [\#5451](https://github.com/holochain/holochain/pull/5451)
+
+## 0.6.0-rc.2
+
+- Feat: Upgrade Kitsune2 to v0.3.2 \#5449
+- Fix panic if a DNA bundle is provided to Holochain with missing resources. \#5446
+
+## 0.6.0-rc.1
+
+- Chore: Upgrade to Kitsune2 v0.3.1 \#5440
+- Test: Test that blocks are enforced for incoming network get requests and gossip. \#5344
+
+## 0.6.0-rc.0
+
+- Update to release version of Kitsune2 v0.3.0. \#5429
+- Stabilize invalid op warrants, no longer behind the `unstable-warrants` feature flag. \#5418
+
+## 0.6.0-dev.33
+
+- **BREAKING CHANGE** Build: Upgrade to latest Kitsune2 release v0.3.0-dev.4 (changes `AdminResponse::DumpNetworkStats`) \#5353
+- **BREAKING CHANGE** `AdminRequest::DumpNetworkStats` now returns `ApiTransportStats`. Existing top-level fields are nested under `transport_stats`. \#5353
+- Fix: Make sure peers that were marked unresponsive are not marked responsive again until their agent info expiration timestamp or a new agent info is received. \#5423
+
+## 0.6.0-dev.32
+
+- Feat: Add a new cli argument `--target-arc-factor` to `hc-sandbox generate network` for overriding the generated conductor config setting `network.target_arc_factor`.
+- Fix an issue where delete links could not be found in the database unless the create link that they deleted was also present. Now, when getting links, all relevant deletes from the base are fetched and used to filter the currently available list of links. \#5421
+- Add missing `UpdateInput::new` method. The other input types have a `new` constructor method already. \#5420
+- Fix an issue where `RegisterUpdatedRecord` ops would be cached with their basis hash set to the entry hash instead of the action hash. This made it impossible for Holochain to return updates when getting record details. \#5420
+- Fix an issue where `get_details` would avoid going to the network if the requested record already existed, even if the current caller wasn’t an authority and needed to fetch updates and deletes from the network. \#5420
+- Avoid issuing duplicate warrants for invalid actions during app validation by checking for existing warrants before creating new ones. \#5352
+- Remove `get_meta` from `holochain_p2p` and related code, which was never implemented.
+
+## 0.6.0-dev.31
+
+- Feat: Warrants discovered during host function call `must_get_agent_activity` lead to blocking the warranted agent. \#5405
+- Test: Warrants discovered during host function call `get_agent_activity` lead to blocking the warranted agent. \#5377
+- Feat: Insert warrants discovered during host function `get_agent_activity` into DHT database for validation and integration. \#5387
+- Test: Warrants discovered during host function call `get_agent_activity` lead to blocking the warranted agent. \#5387
+- Refactor: `get_agent_activity` uses two queries to select actions and warrants from the database. There was a legacy query which selected both from when warrants were stored in the Action table. \#5390
+- Refactor: `retrieve` in the cascade only returns a record if it is complete. For actions with an associated entry, the entry must be included if it is public. If it is not present or private, `retrieve` returns `None`, where before it would return the record without the entry. `retrieve` is also renamed to `retrieve_public_record`. \#5385
+- Fix: Make sure that warrants in the DHT database are always queried filtered by valid status in tests. \#5389
+- Remove the restriction on using action type, entry type, and entry hash filters with bounded queries using the `query` host function. \#5384
+- Implementation and test blocking of agents who issue invalid warrants. \#5358
+
+## 0.6.0-dev.30
+
+- Remove the `request_validation_receipt` from `holochain_p2p` and related code. Validation receipts are always requested and the parameter is no longer used. \#5366
+- Implement removing a space (app network) when the last local agent leaves. This was already implemented by Kitsune2 but hadn’t yet been integrated into Holochain. \#5351
+
+## 0.6.0-dev.29
+
+- Handle op ids with invalid length gracefully in `filter_out_existing_ops` and `retrieve_ops` to address [\#5244](https://github.com/holochain/holochain/issues/5244) [\#5359](https://github.com/holochain/holochain/pull/5359)
+- Remove a check in `holochain_state` that prevented multiple warrants for the same agent being inserted. Not only are multiple warrant types allowed, but it is expected that multiple authorities will issue warrants for the same agent in parallel before discovering each other’s warrants. Failing to store those warrants would result in inconsistent views of the DHT. \#5342
+- **BREAKING CHANGE** Replace `BTreeSet` with `HashSet` in `GrantedFunctions::Listed`. \#5349
+- Add a new conductor tuning parameter `disable_self_validation` to disable self-validation of authored data. Intended only for testing warrants. \#5340
+- Avoid issuing duplicate warrants for invalid actions during sys validation by checking for existing warrants before creating new ones. \#5337
 - Test: Test that blocks are enforced for outgoing network get requests and publish.
-- Chore: remove blocks from validation receipt workflow. It's unclear why blocking was added there. Blocking now happens as part of validation. Validation receipts seem unrelated to blocking.
+- Chore: remove blocks from validation receipt workflow. It’s unclear why blocking was added there. Blocking now happens as part of validation. Validation receipts seem unrelated to blocking.
 - Feat: Block authors of invalid ops after validation in the integration workflow.
 - Test: Zero arc nodes are being served warrants for `get_agent_activity`.
 - **BREAKING CHANGE** Removed unused public SQL queries from `holochain_sqlite`:
@@ -30,6 +109,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - `FETCH_OP_REGION`
   - `FETCH_OPS_BY_REGION`
   - `FETCH_REGION_OP_HASHES`
+- Fix: The integration workflow is now triggered after a zome call capability is created or revoked via `grant_zome_call_capability` or `revoke_zome_call_capability`.
 
 ## 0.6.0-dev.28
 

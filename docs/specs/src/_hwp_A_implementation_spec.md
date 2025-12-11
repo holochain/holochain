@@ -1861,33 +1861,6 @@ publish
         }
         ```
 
-* `GetMeta`: Request all metadata stored at the given basis hash.
-
-    * **Payload**: The payload is defined as:
-
-        ```rust
-        {
-            dht_hash: AnyDhtHash,
-        }
-        ```
-
-    * **Response**: The response is defined as:
-
-        ```rust
-        struct MetadataSet {
-            // Actions that created or updated an entry. These are the actions
-            // that show the entry exists.
-            actions: BTreeSet<TimedActionHash>,
-            invalid_actions: BTreeSet<TimedActionHash>,
-            deletes: BTreeSet<TimedActionHash>,
-            updates: BTreeSet<TimedActionHash>,
-            // The status of an entry from an authority. This is simply a faster
-            // way of determining if there are any live actions on an entry.
-            // If the basis hash is not for an entry, this will be empty.
-            entry_dht_status: Option<EntryDhtStatus>,
-        }
-        ```
-
 * `GetLinks`: Request link creation and deletion actions stored at the basis hash, optionally filtered by a query predicate.
 
     * **Payload**: The payload is defined as:

@@ -65,6 +65,11 @@ pub fn test_wasm_db() -> TestDb<DbKindWasm> {
     test_db(DbKindWasm)
 }
 
+/// Create a [`TestDb`] of [`DbKindPeerMetaStore`], backed by a temp directory.
+pub fn test_peer_meta_store_db(dna_hash: DnaHash) -> TestDb<DbKindPeerMetaStore> {
+    test_db(DbKindPeerMetaStore(Arc::new(dna_hash)))
+}
+
 fn test_db<Kind: DbKindT>(kind: Kind) -> TestDb<Kind> {
     let tmpdir = tempfile::Builder::new()
         .prefix("holochain-test-environments-")

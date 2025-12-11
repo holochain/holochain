@@ -44,13 +44,8 @@ on:
         type: string
         required: false
         default: "/var/tmp/holochain_repo"
-      CACHIX_REV:
-        type: string
-        required: true
     secrets:
       HRA_GITHUB_TOKEN:
-        required: true
-      CACHIX_SIGNING_KEY:
         required: true
       CACHIX_AUTH_TOKEN:
         required: true
@@ -76,7 +71,6 @@ jobs:
   prepare:
     env:
       HOLOCHAIN_REPO: ${{ inputs.HOLOCHAIN_REPO }}
-      CACHIX_REV: ${{ inputs.CACHIX_REV }}
     runs-on: ubuntu-latest
     outputs:
       latest_holochain_release_tag: ${{ steps.write-env-and-tag.outputs.latest_holochain_release_tag }}
@@ -87,20 +81,17 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Install nix
-        uses: cachix/install-nix-action@v26
+        uses: cachix/install-nix-action@v31
       - name: Setup cachix
-        uses: cachix/cachix-action@v14
+        uses: cachix/cachix-action@v16
         with:
           name: holochain-ci
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
-          installCommand: |
-            nix-env -if https://github.com/cachix/cachix/tarball/${CACHIX_REV:?} \
-              --substituters 'https://cache.nixos.org https://cachix.cachix.org' \
-              --trusted-public-keys 'cachix.cachix.org-1:eWNHQldwUO7G2VkjpnjDbWwy4KQ/HNxht7H4SSoMckM= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY='
-      # - name: Set NIX_PATH (FIXME)
-      #   run: echo NIX_PATH=nixpkgs=$(./scripts/nix_path.sh) >> $GITHUB_ENV
+          # Avoid using the daemon to work out what paths to push, because it can't detect the `nix store --add` which
+          # is really the only useful thing to cache from this workflow!
+          useDaemon: false
 
       - name: Merge source branch (${{ inputs.HOLOCHAIN_SOURCE_BRANCH }}) into target branch (${{ inputs.HOLOCHAIN_TARGET_BRANCH }})
         env:
@@ -183,8 +174,8 @@ jobs:
           
           ./scripts/format-toml.sh
           ./scripts/ci-git-config.sh
-          git add **/*.toml
-          git commit -m "Format toml files"
+          git add **/*.toml || true # step shouldn't fail
+          git commit -m "Format toml files" || true # step shouldn't fail
           
           nix run .#scripts-ci-generate-readmes
           nix run .#cargo-sweep -- sweep -f
@@ -199,7 +190,7 @@ jobs:
         if: ${{ failure() }}
         run: sudo dmesg
 
-      - name: cache the repo and set outputs
+      - name: Cache the repo and set outputs
         id: write-env-and-tag
         env:
           HOLOCHAIN_REPO: ${{ inputs.HOLOCHAIN_REPO }}
@@ -223,14 +214,3 @@ jobs:
           echo "latest_holochain_release_version=${LATEST_HOLOCHAIN_RELEASE_VERSION}" >> $GITHUB_OUTPUT
           echo "release_branch=${RELEASE_BRANCH}" >> $GITHUB_OUTPUT
           echo "repo_nix_store_path=${STORE_PATH}" >> $GITHUB_OUTPUT
-
-      - name: Setup SSH session
-        uses: steveeJ-forks/action-upterm@main
-        if: ${{ failure() && inputs.debug == 'true' }}
-        env:
-          HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
-        with:
-          ## limits ssh access and adds the ssh public key for the user which triggered the workflow
-          limit-access-to-actor: true
-          ## limits ssh access and adds the ssh public keys of the listed GitHub users
-          limit-access-to-users: jost-s,ThetaSinner,cdunster,matthme,veeso,mattyg

@@ -1,11 +1,10 @@
-use holo_hash::{DnaHash, DnaHashB64};
 use holochain_cli_sandbox::cli::LaunchInfo;
 use holochain_client::{AdminWebsocket, AllowedOrigins};
+use holochain_conductor_api::AppResponse;
 use holochain_conductor_api::{
     AdminInterfaceConfig, AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest,
     InterfaceDriver,
 };
-use holochain_conductor_api::{AppResponse, CellInfo};
 use holochain_conductor_config::config::{read_config, write_config};
 use holochain_types::app::InstalledAppId;
 use holochain_types::prelude::{SerializedBytes, SerializedBytesError, YamlProperties};
@@ -13,20 +12,23 @@ use holochain_websocket::{
     self as ws, ConnectRequest, WebsocketConfig, WebsocketReceiver, WebsocketResult,
     WebsocketSender,
 };
-use kitsune2_api::DynLocalAgent;
-use kitsune2_core::Ed25519LocalAgent;
-use kitsune2_test_utils::agent::AgentBuilder;
-use std::collections::HashSet;
 use std::future::Future;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
-use std::process::{Output, Stdio};
+use std::process::Stdio;
 use std::sync::Arc;
-use std::time::{Duration, UNIX_EPOCH};
-use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
+use std::time::Duration;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
 
 const WEBSOCKET_TIMEOUT: Duration = Duration::from_secs(3);
+
+/// Helper function to create an `AdminWebsocket` client from sandbox launch info.
+async fn admin_client_from_launch(launch_info: &LaunchInfo) -> AdminWebsocket {
+    AdminWebsocket::connect(format!("127.0.0.1:{}", launch_info.admin_port), None)
+        .await
+        .expect("Failed to connect to admin websocket")
+}
 
 async fn new_websocket_client_for_port<D>(port: u16) -> anyhow::Result<(WebsocketSender, WsPoll)>
 where
@@ -200,61 +202,21 @@ async fn generate_sandbox_and_connect() {
 
     let launch_info = get_launch_info(&mut hc_admin).await;
 
-    // - Connect to the app interface and wait for the app to show up in AppInfo
-    get_app_info(
-        launch_info.admin_port,
-        "test-app".into(),
-        *launch_info.app_ports.first().expect("No app ports found"),
-    )
-    .await;
+    // Connect to admin interface using holochain_client
+    let admin_ws = admin_client_from_launch(&launch_info).await;
 
-    shutdown_sandbox(hc_admin).await;
-}
+    // List apps to verify connection
+    let apps = admin_ws.list_apps(None).await.expect("Failed to list apps");
+    assert!(
+        !apps.is_empty(),
+        "Expected at least one app to be installed"
+    );
 
-/// Generates a new sandbox with a single app deployed and tries to list DNA
-#[tokio::test(flavor = "multi_thread")]
-async fn generate_sandbox_and_call_list_dna() {
-    let temp_dir = tempfile::TempDir::new().unwrap();
-    package_fixture_if_not_packaged().await;
-    let app_path = std::env::current_dir()
-        .unwrap()
-        .join("tests/fixtures/my-app/");
-
-    holochain_trace::test_run();
-    let mut cmd = get_sandbox_command();
-    cmd.env("RUST_BACKTRACE", "1")
-        .arg(format!(
-            "--holochain-path={}",
-            get_holochain_bin_path().to_str().unwrap()
-        ))
-        .arg("--piped")
-        .arg("generate")
-        .arg("--in-process-lair")
-        .arg("--run=0")
-        .arg(app_path)
-        .current_dir(temp_dir.path())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .kill_on_drop(true);
-
-    let mut hc_admin = input_piped_password(&mut cmd).await;
-
-    let launch_info = get_launch_info(&mut hc_admin).await;
-
-    let mut cmd = get_sandbox_command();
-    cmd.env("RUST_BACKTRACE", "1")
-        .arg("call")
-        .arg(format!("--running={}", launch_info.admin_port))
-        .arg("list-dnas")
-        .current_dir(temp_dir.path())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::null())
-        .stderr(Stdio::inherit());
-    let mut hc_call = cmd.spawn().expect("Failed to spawn holochain");
-
-    let exit_code = hc_call.wait().await.unwrap();
-    assert!(exit_code.success());
+    // Verify the test-app exists
+    assert!(
+        apps.iter().any(|info| info.installed_app_id == "test-app"),
+        "Expected 'test-app' to be in the list of installed apps"
+    );
 
     shutdown_sandbox(hc_admin).await;
 }
@@ -291,72 +253,13 @@ async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
 
     let launch_info = get_launch_info(&mut hc_admin).await;
 
-    let mut cmd = get_sandbox_command();
-    cmd.env("RUST_BACKTRACE", "1")
-        .arg("call")
-        .arg(format!("--running={}", launch_info.admin_port))
-        .arg("list-dnas")
-        .current_dir(temp_dir.path())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::null())
-        .stderr(Stdio::inherit());
-    let mut hc_call = cmd.spawn().expect("Failed to spawn holochain");
-
-    let exit_code = hc_call.wait().await.unwrap();
-    assert!(exit_code.success());
+    // Connect to admin websocket and list DNAs
+    let admin_ws = admin_client_from_launch(&launch_info).await;
+    let dnas = admin_ws.list_dnas().await.expect("Failed to list DNAs");
+    // Just verify we can list DNAs without error
+    assert!(!dnas.is_empty(), "Expected at least one DNA");
 
     shutdown_sandbox(hc_admin).await;
-}
-
-/// Generates a new sandbox with a single app deployed and tries to list DNA
-/// This tests that the conductor gets started up and connected to propely
-/// upon calling `hc-sandbox call`
-#[tokio::test(flavor = "multi_thread")]
-async fn generate_non_running_sandbox_and_call_list_dna() {
-    let temp_dir = tempfile::TempDir::new().unwrap();
-    package_fixture_if_not_packaged().await;
-    let app_path = std::env::current_dir()
-        .unwrap()
-        .join("tests/fixtures/my-app/");
-
-    holochain_trace::test_run();
-    let mut cmd = get_sandbox_command();
-    cmd.env("RUST_BACKTRACE", "1")
-        .arg(format!(
-            "--holochain-path={}",
-            get_holochain_bin_path().to_str().unwrap()
-        ))
-        .arg("--piped")
-        .arg("generate")
-        .arg("--in-process-lair")
-        .arg(app_path)
-        .current_dir(temp_dir.path())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .kill_on_drop(true);
-
-    let hc_admin = input_piped_password(&mut cmd).await;
-    hc_admin.wait_with_output().await.unwrap();
-
-    let mut cmd = get_sandbox_command();
-    cmd.env("RUST_BACKTRACE", "1")
-        .arg("--piped")
-        .arg(format!(
-            "--holochain-path={}",
-            get_holochain_bin_path().to_str().unwrap()
-        ))
-        .arg("call")
-        .arg("list-dnas")
-        .current_dir(temp_dir.path())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::null())
-        .stderr(Stdio::inherit());
-
-    let mut hc_call = input_piped_password(&mut cmd).await;
-
-    let exit_code = hc_call.wait().await.unwrap();
-    assert!(exit_code.success());
 }
 
 /// Generates a sandbox and overwrites the conductor config with
@@ -417,46 +320,31 @@ async fn generate_sandbox_and_call_list_dna_with_origin() {
 
     write_config(config_root_path.clone().into(), &config).unwrap();
 
-    // Verify that admin call fails without specifying an origin to make sure
-    // the conductor config has properly been modified
-    let mut cmd = get_sandbox_command();
-    cmd.env("RUST_BACKTRACE", "1")
-        .arg("--piped")
-        .arg(format!(
-            "--holochain-path={}",
-            get_holochain_bin_path().to_str().unwrap()
-        ))
-        .arg("call")
-        .arg("list-dnas")
-        .current_dir(temp_dir.path())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::null())
-        .stderr(Stdio::inherit());
+    // Verify the config was written correctly
+    let reread_config = read_config(config_root_path.clone().into())
+        .expect("Failed to read config")
+        .unwrap();
 
-    let mut hc_call = input_piped_password(&mut cmd).await;
-    let exit_code = hc_call.wait().await.unwrap();
-    assert!(!exit_code.success()); // Should fail
-
-    // Verify that admin call succeeds the correct origin
-    let mut cmd = get_sandbox_command();
-    cmd.env("RUST_BACKTRACE", "1")
-        .arg("--piped")
-        .arg(format!(
-            "--holochain-path={}",
-            get_holochain_bin_path().to_str().unwrap()
-        ))
-        .arg("call")
-        .arg("--origin")
-        .arg("test-origin")
-        .arg("list-dnas")
-        .current_dir(temp_dir.path())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::null())
-        .stderr(Stdio::inherit());
-
-    let mut hc_call = input_piped_password(&mut cmd).await;
-    let exit_code = hc_call.wait().await.unwrap();
-    assert!(exit_code.success());
+    match reread_config
+        .admin_interfaces
+        .as_ref()
+        .and_then(|ai| ai.first())
+    {
+        Some(admin_interface) => match &admin_interface.driver {
+            InterfaceDriver::Websocket {
+                allowed_origins, ..
+            } => match allowed_origins {
+                AllowedOrigins::Origins(origins) => {
+                    assert!(
+                        origins.contains(&"test-origin".to_string()),
+                        "Expected test-origin in allowed origins"
+                    );
+                }
+                _ => panic!("Expected specific origins, got {allowed_origins:?}"),
+            },
+        },
+        None => panic!("No admin interface found in reread config"),
+    }
 }
 
 /// Creates a new sandbox and tries to list apps via `hc-sandbox call`
@@ -484,6 +372,7 @@ async fn create_sandbox_and_call_list_apps() {
     let exit_code = hc_create.wait().await.unwrap();
     assert!(exit_code.success());
 
+    // Start the conductor
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg("--piped")
@@ -491,17 +380,23 @@ async fn create_sandbox_and_call_list_apps() {
             "--holochain-path={}",
             get_holochain_bin_path().to_str().unwrap()
         ))
-        .arg("call")
-        .arg("list-apps")
+        .arg("run")
         .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::inherit());
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true);
 
-    let mut hc_call = input_piped_password(&mut cmd).await;
+    let mut hc_admin = input_piped_password(&mut cmd).await;
+    let launch_info = get_launch_info(&mut hc_admin).await;
 
-    let exit_code = hc_call.wait().await.unwrap();
-    assert!(exit_code.success());
+    // Connect via AdminWebsocket and list apps
+    let admin_ws = admin_client_from_launch(&launch_info).await;
+    let apps = admin_ws.list_apps(None).await.expect("Failed to list apps");
+    // Verify we can list apps (should be empty initially)
+    assert!(apps.is_empty(), "Expected no apps in fresh sandbox");
+
+    shutdown_sandbox(hc_admin).await;
 }
 
 /// Generates a new sandbox with roles settings overridden by a yaml file passed via
@@ -616,52 +511,16 @@ async fn generate_sandbox_with_roles_settings_override() {
     shutdown_sandbox(hc_admin).await;
 }
 
-/// Generates a new sandbox with a single app deployed and tries to list DNA
-/// This tests that the conductor gets started up and connected to properly
-/// upon calling `hc-sandbox call`
+/// Generates a new sandbox with target_arc_factor settings overridden to 0-arc via
+/// the --target-arc-factor argument and verifies that conductor config file has
+/// been written correctly.
 #[tokio::test(flavor = "multi_thread")]
-async fn generate_sandbox_and_add_and_list_agent() {
+async fn generate_sandbox_with_target_arc_factor_override() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     package_fixture_if_not_packaged().await;
     let app_path = std::env::current_dir()
         .unwrap()
         .join("tests/fixtures/my-app/");
-
-    // Find all values with a given key
-    fn find_values_by_key(
-        json: &serde_json::Value,
-        target_key: &str,
-        results: &mut Vec<serde_json::Value>,
-    ) {
-        match json {
-            serde_json::Value::Object(map) => {
-                for (key, value) in map {
-                    if key == target_key {
-                        results.push(value.clone());
-                    }
-                    // Recursively search nested objects/arrays
-                    find_values_by_key(value, target_key, results);
-                }
-            }
-            serde_json::Value::Array(arr) => {
-                for item in arr {
-                    find_values_by_key(item, target_key, results);
-                }
-            }
-            _ => {}
-        }
-    }
-
-    // Helper fn to parse process output for agent pub keys.
-    fn get_agent_keys_from_process_output(output: Output) -> Vec<serde_json::Value> {
-        let stdout = String::from_utf8(output.stdout).unwrap();
-        // Parse JSON
-        let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-        // Find all values with the target key
-        let mut results = Vec::new();
-        find_values_by_key(&json, "agent_pub_key", &mut results);
-        results
-    }
 
     holochain_trace::test_run();
     let mut cmd = get_sandbox_command();
@@ -673,141 +532,34 @@ async fn generate_sandbox_and_add_and_list_agent() {
         .arg("--piped")
         .arg("generate")
         .arg("--in-process-lair")
-        .arg("--run=0")
-        .arg("--network-seed")
-        .arg(format!("{}", UNIX_EPOCH.elapsed().unwrap().as_millis()))
         .arg(app_path)
+        .arg("network")
+        .arg("--target-arc-factor=0")
+        .arg("webrtc")
+        .arg("wss://signal")
         .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
         .kill_on_drop(true);
 
+    println!("@@ {cmd:?}");
+
     let mut hc_admin = input_piped_password(&mut cmd).await;
 
-    let launch_info = get_launch_info(&mut hc_admin).await;
+    // Read conductor config yaml file
+    let config_root_path = get_config_root_path(&mut hc_admin).await;
+    hc_admin.wait().await.unwrap();
+    let config = read_config(config_root_path.clone().into())
+        .expect("Failed to read config from config_root_path")
+        .unwrap();
 
-    let admin_ws = AdminWebsocket::connect(
-        format!("localhost:{}", launch_info.admin_port).as_str(),
-        None,
-    )
-    .await
-    .unwrap();
-
-    // Get all agent infos.
-    let agent_infos = admin_ws.agent_info(None).await.unwrap();
-    assert_eq!(agent_infos.len(), 2);
-
-    // List all agents over hc-sandbox CLI.
-    let mut cmd = get_sandbox_command();
-    cmd.env("RUST_BACKTRACE", "1")
-        .arg("--piped")
-        .arg("call")
-        .arg("list-agents")
-        .current_dir(temp_dir.path())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit());
-
-    let hc_call = input_piped_password(&mut cmd).await;
-
-    let output = hc_call.wait_with_output().await.unwrap();
-    let agent_keys = get_agent_keys_from_process_output(output);
-    assert_eq!(agent_keys.len(), 2);
-
-    // Get DNA hashes
-    let mut dna_hashes = admin_ws.list_dnas().await.unwrap();
-
-    // List agents of all DNA hashes over hc-sandbox CLI. Should also be two agents.
-    let mut cmd = get_sandbox_command();
-    cmd.env("RUST_BACKTRACE", "1")
-        .arg("--piped")
-        .arg("call")
-        .arg("list-agents")
-        .arg("--dna")
-        .arg(dna_hashes[0].to_string())
-        .arg("--dna")
-        .arg(dna_hashes[1].to_string())
-        .current_dir(temp_dir.path())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit());
-
-    let hc_call = input_piped_password(&mut cmd).await;
-
-    let output = hc_call.wait_with_output().await.unwrap();
-    let agent_keys = get_agent_keys_from_process_output(output);
-    assert_eq!(agent_keys.len(), 2);
-
-    // Drop one of the two DNA hashes.
-    dna_hashes.pop().unwrap();
-
-    // Get agent infos for a specific DNA.
-    let agent_infos = admin_ws.agent_info(Some(dna_hashes.clone())).await.unwrap();
-    assert_eq!(agent_infos.len(), 1);
-
-    // List agents of a specific DNA hash over hc-sandbox CLI.
-    let mut cmd = get_sandbox_command();
-    cmd.env("RUST_BACKTRACE", "1")
-        .arg("--piped")
-        .arg("call")
-        .arg("list-agents")
-        .arg("--dna")
-        .arg(dna_hashes[0].to_string())
-        .current_dir(temp_dir.path())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit());
-
-    let hc_call = input_piped_password(&mut cmd).await;
-
-    let output = hc_call.wait_with_output().await.unwrap();
-    let agent_keys = get_agent_keys_from_process_output(output);
-    assert_eq!(agent_keys.len(), 1);
-
-    let space = kitsune2_api::AgentInfoSigned::decode(
-        &kitsune2_core::Ed25519Verifier,
-        agent_infos[0].as_bytes(),
-    )
-    .unwrap()
-    .space
-    .clone();
-
-    let other_agent = AgentBuilder {
-        space_id: Some(space.clone()),
-        ..Default::default()
-    }
-    .build(Arc::new(Ed25519LocalAgent::default()) as DynLocalAgent)
-    .encode()
-    .unwrap();
-
-    let agent_infos_to_add = format!("[{other_agent}]"); // add-agents expects a JSON array
-
-    let mut cmd = get_sandbox_command();
-    cmd.env("RUST_BACKTRACE", "1")
-        .arg("--piped")
-        .arg("call")
-        .arg("add-agents")
-        .arg(agent_infos_to_add)
-        .current_dir(temp_dir.path())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::null())
-        .stderr(Stdio::inherit());
-
-    let mut hc_call = input_piped_password(&mut cmd).await;
-
-    let exit_code = hc_call.wait().await.unwrap();
-    assert!(exit_code.success());
-
-    let agent_infos = admin_ws.agent_info(None).await.unwrap();
-    assert_eq!(agent_infos.len(), 3);
-
-    shutdown_sandbox(hc_admin).await;
+    // Assert target_arc_factor has been overridden in config file
+    assert_eq!(config.network.target_arc_factor, 0);
 }
 
-/// Tests retrieval of agent meta info via `hc sandbox call peer-meta-info`
 #[tokio::test(flavor = "multi_thread")]
-async fn generate_sandbox_and_call_peer_meta_info() {
+async fn generate_sandbox_and_get_admin_ports() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     package_fixture_if_not_packaged().await;
     let app_path = std::env::current_dir()
@@ -815,8 +567,9 @@ async fn generate_sandbox_and_call_peer_meta_info() {
         .join("tests/fixtures/my-app/");
 
     holochain_trace::test_run();
-    let mut cmd = get_sandbox_command();
 
+    // Generate and run sandboxes (ports will be allocated dynamically)
+    let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
             "--holochain-path={}",
@@ -835,462 +588,45 @@ async fn generate_sandbox_and_call_peer_meta_info() {
 
     let mut hc_generate = input_piped_password(&mut cmd).await;
 
-    let launch_info = get_launch_info(&mut hc_generate).await;
+    // Wait for conductor to start and get its launch info
+    let launch_info_1 = get_launch_info(&mut hc_generate).await;
 
-    let app_info = get_app_info(
-        launch_info.admin_port,
-        "test-app".into(),
-        *launch_info.app_ports.first().expect("No app ports found"),
-    )
-    .await;
-
-    let dna_hashes = match app_info {
-        AppResponse::AppInfo(Some(info)) => {
-            let cell_ids: Vec<Vec<CellInfo>> = info
-                .cell_info
-                .into_iter()
-                .map(|(_, cell_infos)| cell_infos)
-                .collect();
-            println!("cell_ids: {cell_ids:?}");
-            let dna_hash_1 = match cell_ids[0].first().unwrap() {
-                CellInfo::Provisioned(cell) => cell.cell_id.dna_hash().clone(),
-                _ => panic!("Cell not provisioned"),
-            };
-            let dna_hash_2 = match cell_ids[1].first().unwrap() {
-                CellInfo::Provisioned(cell) => cell.cell_id.dna_hash().clone(),
-                _ => panic!("Cell not provisioned"),
-            };
-            let dna_hash_3 = match cell_ids[2].first().unwrap() {
-                CellInfo::Provisioned(cell) => cell.cell_id.dna_hash().clone(),
-                _ => panic!("Cell not provisioned"),
-            };
-            // The fixture happ contains 3 times the same dna of which 2 have the same dna hash
-            // therefore we need to deduplicate here...
-            vec![dna_hash_1, dna_hash_2, dna_hash_3]
-                .into_iter()
-                .collect::<HashSet<DnaHash>>()
-                .into_iter()
-                .collect::<Vec<DnaHash>>()
-        }
-        r => panic!("AppResponse does not contain app info: {r:?}"),
-    };
-
-    // Needs to get converted to a String (not DnaHashB64) so that the sorting will
-    // match the sorting of the JSON output from the `hc sandbox peer-meta-info` call
-    let mut dna_hashes_b64: Vec<String> = dna_hashes
-        .into_iter()
-        .map(|h| DnaHashB64::from(h).to_string())
-        .collect();
-
-    // ...and sort to get a consistent order to compare with output
-    dna_hashes_b64.sort();
-
-    // Get agent meta info for all dnas
-    let mut cmd = get_sandbox_command();
-    cmd.env("RUST_BACKTRACE", "1")
-        .arg("--piped")
-        .arg(format!(
-            "--holochain-path={}",
-            get_holochain_bin_path().to_str().unwrap()
-        ))
-        .arg("call")
-        .arg("peer-meta-info")
-        .arg("--url")
-        .arg("wss://someurl:443")
+    // Call admin-ports to get the ports
+    let mut admin_ports_cmd = get_sandbox_command();
+    admin_ports_cmd
+        .env("RUST_BACKTRACE", "1")
+        .arg("admin-ports")
+        .arg("--all")
         .current_dir(temp_dir.path())
-        .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
 
-    let mut hc_call = input_piped_password(&mut cmd).await;
+    let output = admin_ports_cmd.output().await.unwrap();
+    assert!(output.status.success(), "admin-ports command failed");
 
-    hc_call.wait().await.unwrap();
+    let ports: Vec<u16> =
+        serde_json::from_slice(&output.stdout).expect("Failed to parse admin ports JSON");
 
-    let mut output = String::new();
-    hc_call
-        .stdout
-        .take()
-        .unwrap()
-        .read_to_string(&mut output)
-        .await
-        .unwrap();
+    // Verify we got the expected number of ports
+    assert_eq!(ports.len(), 1, "Should have 1 admin port");
 
-    let expected_output = format!(
-        r#"{{"{}":{{}},"{}":{{}}}}
-"#,
-        dna_hashes_b64[0].clone(),
-        dna_hashes_b64[1].clone()
+    // Verify that the port is non-zero (valid port was allocated)
+    assert!(ports[0] > 0, "First port should be a valid port number");
+
+    // Verify the port matches the launch info we got
+    assert_eq!(
+        ports[0], launch_info_1.admin_port,
+        "Port should match launch info"
     );
-
-    assert_eq!(output, expected_output);
-
-    // Get agent meta info for a specific dna
-    let mut cmd = get_sandbox_command();
-    cmd.env("RUST_BACKTRACE", "1")
-        .arg("--piped")
-        .arg(format!(
-            "--holochain-path={}",
-            get_holochain_bin_path().to_str().unwrap()
-        ))
-        .arg("call")
-        .arg("peer-meta-info")
-        .arg("--url")
-        .arg("wss://someurl:443")
-        .arg("--dna")
-        .arg(dna_hashes_b64[0].clone())
-        .current_dir(temp_dir.path())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit());
-
-    let mut hc_call = input_piped_password(&mut cmd).await;
-
-    hc_call.wait().await.unwrap();
-
-    let mut output = String::new();
-    hc_call
-        .stdout
-        .take()
-        .unwrap()
-        .read_to_string(&mut output)
-        .await
-        .unwrap();
-
-    let expected_output = format!(
-        r#"{{"{}":{{}}}}
-"#,
-        dna_hashes_b64[0].clone(),
-    );
-
-    assert_eq!(output, expected_output);
 
     shutdown_sandbox(hc_generate).await;
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn authorize_zome_call_credentials() {
-    let temp_dir = tempfile::TempDir::new().unwrap();
-    package_fixture_if_not_packaged().await;
-    let app_path = std::env::current_dir()
-        .unwrap()
-        .join("tests/fixtures/my-app/");
-    holochain_trace::test_run();
-    let mut cmd = get_sandbox_command();
-    cmd.env("RUST_BACKTRACE", "1")
-        .arg(format!(
-            "--holochain-path={}",
-            get_holochain_bin_path().to_str().unwrap()
-        ))
-        .arg("--piped")
-        .arg("generate")
-        .arg("--in-process-lair")
-        .arg("--run=0")
-        .arg(app_path)
-        .current_dir(temp_dir.path())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit());
-
-    let mut hc_admin = input_piped_password(&mut cmd).await;
-    let launch_info = get_launch_info(&mut hc_admin).await;
-
-    // Wait for the app to be available
-    get_app_info(
-        launch_info.admin_port,
-        "test-app".into(),
-        *launch_info.app_ports.first().expect("No app ports found"),
-    )
-    .await;
-
-    // Generate signing credentials
-    let mut cmd = get_sandbox_command();
-    let mut child = cmd
-        .arg("zome-call-auth")
-        .arg("--running")
-        .arg(launch_info.admin_port.to_string())
-        .arg("--piped")
-        .arg("test-app")
-        .current_dir(temp_dir.path())
-        .kill_on_drop(true)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .spawn()
-        .unwrap();
-
-    child
-        .stdin
-        .take()
-        .unwrap()
-        .write_all(b"test-phrase\n")
-        .await
-        .unwrap();
-
-    let exit_code = child.wait().await.unwrap();
-    assert!(exit_code.success());
-
-    assert!(temp_dir.path().join(".hc_auth").exists());
-
-    shutdown_sandbox(hc_admin).await;
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn call_zome_function() {
-    let temp_dir = tempfile::TempDir::new().unwrap();
-    package_fixture_if_not_packaged().await;
-    let app_path = std::env::current_dir()
-        .unwrap()
-        .join("tests/fixtures/my-app/");
-
-    holochain_trace::test_run();
-    let mut cmd = get_sandbox_command();
-    cmd.env("RUST_BACKTRACE", "1")
-        .arg(format!(
-            "--holochain-path={}",
-            get_holochain_bin_path().to_str().unwrap()
-        ))
-        .arg("--piped")
-        .arg("generate")
-        .arg("--in-process-lair")
-        .arg("--run=0")
-        .arg(app_path)
-        .current_dir(temp_dir.path())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .kill_on_drop(true);
-
-    let mut hc_admin = input_piped_password(&mut cmd).await;
-    let launch_info = get_launch_info(&mut hc_admin).await;
-
-    println!("Got launch info: {launch_info:?}");
-
-    // Wait for the app to be available
-    let app_info = get_app_info(
-        launch_info.admin_port,
-        "test-app".into(),
-        *launch_info.app_ports.first().expect("No app ports found"),
-    )
-    .await;
-
-    let dna_hash = match app_info {
-        AppResponse::AppInfo(Some(info)) => {
-            match info.cell_info.first().unwrap().1.first().unwrap() {
-                CellInfo::Provisioned(cell) => cell.cell_id.dna_hash().clone(),
-                _ => panic!("Cell not provisioned"),
-            }
-        }
-        r => panic!("AppResponse does not contain app info: {r:?}"),
-    };
-
-    // Generate signing credentials
-    let mut cmd = get_sandbox_command();
-    let mut child = cmd
-        .arg("zome-call-auth")
-        .arg("--running")
-        .arg(launch_info.admin_port.to_string())
-        .arg("--piped")
-        .arg("test-app")
-        .current_dir(temp_dir.path())
-        .kill_on_drop(true)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .spawn()
-        .unwrap();
-
-    child
-        .stdin
-        .take()
-        .unwrap()
-        .write_all(b"test-phrase\n")
-        .await
-        .unwrap();
-
-    let exit_code = child.wait().await.unwrap();
-    assert!(exit_code.success(), "Failed with exit code {exit_code:?}");
-
-    // Make the call
-    let mut cmd = get_sandbox_command();
-    let mut child = cmd
-        .arg("zome-call")
-        .arg("--running")
-        .arg(launch_info.admin_port.to_string())
-        .arg("--piped")
-        .arg("test-app")
-        .arg(dna_hash.to_string())
-        .arg("zome1")
-        .arg("foo")
-        .arg("null")
-        .current_dir(temp_dir.path())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .spawn()
-        .unwrap();
-
-    child
-        .stdin
-        .take()
-        .unwrap()
-        .write_all(b"test-phrase\n")
-        .await
-        .unwrap();
-
-    child.wait().await.unwrap();
-
-    let mut output = String::new();
-    child
-        .stdout
-        .take()
-        .unwrap()
-        .read_to_string(&mut output)
-        .await
-        .unwrap();
-
-    assert_eq!(output, "\"foo\"\n");
-
-    shutdown_sandbox(hc_admin).await;
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn zome_function_can_return_hash() {
-    let temp_dir = tempfile::TempDir::new().unwrap();
-    package_fixture_if_not_packaged().await;
-    let app_path = std::env::current_dir()
-        .unwrap()
-        .join("tests/fixtures/my-app/");
-
-    holochain_trace::test_run();
-    let mut cmd = get_sandbox_command();
-    cmd.env("RUST_BACKTRACE", "1")
-        .arg(format!(
-            "--holochain-path={}",
-            get_holochain_bin_path().to_str().unwrap()
-        ))
-        .arg("--piped")
-        .arg("generate")
-        .arg("--in-process-lair")
-        .arg("--run=0")
-        .arg(app_path)
-        .current_dir(temp_dir.path())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .kill_on_drop(true);
-
-    let mut hc_admin = input_piped_password(&mut cmd).await;
-    let launch_info = get_launch_info(&mut hc_admin).await;
-
-    println!("Got launch info: {launch_info:?}");
-
-    // Wait for the app to be available
-    let app_info = get_app_info(
-        launch_info.admin_port,
-        "test-app".into(),
-        *launch_info.app_ports.first().expect("No app ports found"),
-    )
-    .await;
-
-    let dna_hash = match app_info {
-        AppResponse::AppInfo(Some(info)) => {
-            match info.cell_info.first().unwrap().1.first().unwrap() {
-                CellInfo::Provisioned(cell) => cell.cell_id.dna_hash().clone(),
-                _ => panic!("Cell not provisioned"),
-            }
-        }
-        r => panic!("AppResponse does not contain app info: {r:?}"),
-    };
-
-    // Generate signing credentials
-    let mut cmd = get_sandbox_command();
-    let mut child = cmd
-        .arg("zome-call-auth")
-        .arg("--running")
-        .arg(launch_info.admin_port.to_string())
-        .arg("--piped")
-        .arg("test-app")
-        .current_dir(temp_dir.path())
-        .kill_on_drop(true)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .spawn()
-        .unwrap();
-
-    child
-        .stdin
-        .take()
-        .unwrap()
-        .write_all(b"test-phrase\n")
-        .await
-        .unwrap();
-
-    let exit_code = child.wait().await.unwrap();
-    assert!(exit_code.success(), "Failed with exit code {exit_code:?}");
-
-    // Call function that returns the DNA hash
-    let mut cmd = get_sandbox_command();
-    let mut child = cmd
-        .arg("zome-call")
-        .arg("--running")
-        .arg(launch_info.admin_port.to_string())
-        .arg("--piped")
-        .arg("test-app")
-        .arg(dna_hash.to_string())
-        .arg("zome1")
-        .arg("get_dna_hash")
-        .arg("null")
-        .current_dir(temp_dir.path())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .spawn()
-        .unwrap();
-
-    child
-        .stdin
-        .take()
-        .unwrap()
-        .write_all(b"test-phrase\n")
-        .await
-        .unwrap();
-
-    child.wait().await.unwrap();
-
-    let mut output = String::new();
-    child
-        .stdout
-        .take()
-        .unwrap()
-        .read_to_string(&mut output)
-        .await
-        .unwrap();
-
-    // Convert the output string into a DNA hash by splitting the string and parsing the
-    // individual bytes.
-    let dna_hash_parsed = DnaHash::from_raw_39(
-        output
-            .split("[")
-            .last()
-            .unwrap()
-            .split("]")
-            .next()
-            .unwrap()
-            .split(",")
-            .map(|byte| byte.trim().parse().unwrap())
-            .collect::<Vec<u8>>(),
-    );
-
-    assert_eq!(dna_hash_parsed, dna_hash);
-
-    shutdown_sandbox(hc_admin).await;
 }
 
 include!(concat!(env!("OUT_DIR"), "/target.rs"));
 
 fn get_target(file: &str) -> std::path::PathBuf {
-    let target = unsafe { std::ffi::OsString::from_encoded_bytes_unchecked(TARGET.to_vec()) };
+    let target =
+        std::str::from_utf8(TARGET).expect("TARGET should be valid UTF-8 from build script");
     let mut target = std::path::PathBuf::from(target);
 
     #[cfg(not(windows))]
@@ -1388,6 +724,7 @@ impl Drop for WsPoll {
         self.0.abort();
     }
 }
+
 impl WsPoll {
     fn new<D>(mut rx: WebsocketReceiver) -> Self
     where

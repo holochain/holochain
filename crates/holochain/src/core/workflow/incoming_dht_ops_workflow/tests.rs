@@ -36,7 +36,7 @@ async fn incoming_ops_to_limbo() {
         let space = space.space.clone();
         all.push(tokio::task::spawn(async move {
             let start = std::time::Instant::now();
-            incoming_dht_ops_workflow(space, sys_validation_trigger, vec![op.into()], false)
+            incoming_dht_ops_workflow(space, sys_validation_trigger, vec![op.into()])
                 .await
                 .unwrap();
             println!("IN OP in {} s", start.elapsed().as_secs_f64());
@@ -75,7 +75,6 @@ async fn can_retry_failed_op() {
         space.space.clone(),
         sys_validation_trigger.clone(),
         vec![op],
-        true,
     )
     .await;
 
@@ -89,7 +88,7 @@ async fn can_retry_failed_op() {
     let hash = DhtOpHash::with_data_sync(&op);
 
     // Run the workflow again to simulate a re-send of the op...
-    incoming_dht_ops_workflow(space.space.clone(), sys_validation_trigger, vec![op], true)
+    incoming_dht_ops_workflow(space.space.clone(), sys_validation_trigger, vec![op])
         .await
         .unwrap();
 

@@ -3,10 +3,10 @@ mod agent_scaling;
 mod app_installation;
 mod app_interface_security;
 mod authored_test;
-mod clone_cell;
-// Countersigning HDK functions needed
 #[cfg(feature = "unstable-functions")]
 mod blocks;
+mod clone_cell;
+// Countersigning HDK functions needed
 #[cfg(feature = "unstable-countersigning")]
 mod countersigning;
 mod dna_properties;
@@ -30,9 +30,7 @@ mod signals;
 mod test_cli;
 mod test_utils;
 mod validate;
-#[cfg(feature = "unstable-warrants")]
 mod warrant_issuance;
-#[cfg(feature = "unstable-warrants")]
 mod warrants;
 mod websocket;
 mod websocket_stress;

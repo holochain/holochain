@@ -3,7 +3,7 @@ use fixt::fixt;
 use holo_hash::{AgentPubKey, AnyDhtHash, DnaHash, HasHash};
 use holochain_p2p::event::{
     CountersigningSessionNegotiationMessage, DynHcP2pHandler, GetActivityOptions, GetLinksOptions,
-    GetMetaOptions, HcP2pHandler,
+    HcP2pHandler,
 };
 use holochain_p2p::{HolochainOpStore, HolochainP2pResult};
 use holochain_serialized_bytes::SerializedBytes;
@@ -16,12 +16,12 @@ use holochain_types::activity::AgentActivityResponse;
 use holochain_types::chain::MustGetAgentActivityResponse;
 use holochain_types::dht_op::{ChainOp, DhtOpHashed, WireOps};
 use holochain_types::link::{CountLinksResponse, WireLinkKey, WireLinkOps, WireLinkQuery};
-use holochain_types::metadata::MetadataSet;
 use holochain_types::prelude::{DhtOp, ValidationReceiptBundle};
 use holochain_zome_types::fixt::{CreateFixturator, EntryFixturator, SignatureFixturator};
 use holochain_zome_types::prelude::ChainQueryFilter;
 use holochain_zome_types::Action;
 use kitsune2_api::*;
+use kitsune2_test_utils::enable_tracing;
 use std::sync::Arc;
 
 #[derive(Debug)]
@@ -43,7 +43,6 @@ impl HcP2pHandler for StubHost {
     fn handle_publish(
         &self,
         _dna_hash: DnaHash,
-        _request_validation_receipt: bool,
         ops: Vec<DhtOp>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         let db = self.db.clone();
@@ -75,16 +74,6 @@ impl HcP2pHandler for StubHost {
         _to_agent: AgentPubKey,
         _dht_hash: AnyDhtHash,
     ) -> BoxFut<'_, HolochainP2pResult<WireOps>> {
-        unimplemented!()
-    }
-
-    fn handle_get_meta(
-        &self,
-        _dna_hash: DnaHash,
-        _to_agent: AgentPubKey,
-        _dht_hash: AnyDhtHash,
-        _options: GetMetaOptions,
-    ) -> BoxFut<'_, HolochainP2pResult<MetadataSet>> {
         unimplemented!()
     }
 
@@ -204,6 +193,18 @@ async fn process_incoming_ops_and_retrieve() {
 }
 
 #[tokio::test]
+async fn retrieve_ops_does_not_panic_with_too_short_op_ids() {
+    enable_tracing();
+    let (_, op_store) = setup_test().await;
+
+    let op_id_too_short = kitsune2_api::OpId::from(bytes::Bytes::from(vec![0u8; 31]));
+    assert_eq!(op_id_too_short.len(), 31);
+
+    let retrieved_ops = op_store.retrieve_ops(vec![op_id_too_short]).await.unwrap();
+    assert_eq!(retrieved_ops.len(), 0);
+}
+
+#[tokio::test]
 async fn filter_out_existing_ops() {
     let (_, op_store) = setup_test().await;
 
@@ -230,7 +231,7 @@ async fn filter_out_existing_ops() {
 
     assert!(all_exist_filtered.is_empty());
 
-    let non_existent_op_id = OpId::from(Bytes::from_static(&[5; 32]));
+    let non_existent_op_id = OpId::from(Bytes::from_static(&[5; 36]));
     let to_check = vec![
         dht_op_1
             .as_hash()
@@ -241,6 +242,28 @@ async fn filter_out_existing_ops() {
 
     assert_eq!(1, some_exists_filtered.len());
     assert_eq!(non_existent_op_id, some_exists_filtered[0]);
+}
+
+#[tokio::test]
+async fn filter_out_existing_ops_filters_invalid_op_ids_as_well() {
+    let (_, op_store) = setup_test().await;
+    enable_tracing();
+
+    let valid_op = test_dht_op(Timestamp::now());
+    let valid_op_id = valid_op
+        .as_hash()
+        .to_located_k2_op_id(&valid_op.dht_basis());
+
+    let op_id_too_short = kitsune2_api::OpId::from(bytes::Bytes::from(vec![0u8; 31]));
+    assert_eq!(op_id_too_short.len(), 31);
+
+    let out = op_store
+        .filter_out_existing_ops(vec![op_id_too_short, valid_op_id.clone()])
+        .await
+        .unwrap();
+
+    assert_eq!(out.len(), 1);
+    assert_eq!(out[0].clone(), valid_op_id);
 }
 
 #[tokio::test]

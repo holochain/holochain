@@ -237,13 +237,13 @@ impl SourceChain {
         &self,
         storage_arcs: Vec<DhtArc>,
         chc: Option<ChcImpl>,
-    ) -> SourceChainResult<Vec<SignedActionHashed>> {
+    ) -> SourceChainResult<(Vec<SignedActionHashed>, u32)> {
         // Nothing to write
         if self.scratch.apply(|s| s.is_empty())? {
-            return Ok(Vec::new());
+            return Ok((Vec::new(), 0));
         }
 
-        let (scheduled_fns, actions, ops, entries, records) =
+        let (scheduled_fns, actions, ops, entries, records, warrants) =
             self.scratch.apply_and_then(|scratch| {
                 let records: Vec<Record> = scratch.records().collect();
 
@@ -253,7 +253,8 @@ impl SourceChain {
                 // Drain out any entries.
                 let entries = scratch.drain_entries().collect::<Vec<_>>();
                 let scheduled_fns = scratch.drain_scheduled_fns().collect::<Vec<_>>();
-                SourceChainResult::Ok((scheduled_fns, actions, ops, entries, records))
+                let warrants = scratch.drain_warrants().collect::<Vec<_>>();
+                SourceChainResult::Ok((scheduled_fns, actions, ops, entries, records, warrants))
             })?;
 
         let maybe_countersigned_entry = entries
@@ -443,7 +444,61 @@ impl SourceChain {
                     self.dht_db.clone(),
                 )
                 .await?;
-                SourceChainResult::Ok(actions)
+
+                // Insert warrants into DHT database.
+                // Check signatures first
+                let mut warrants_to_insert = Vec::new();
+                for warrant in warrants {
+                    match warrant
+                        .author
+                        .verify_signature(warrant.signature(), warrant.data())
+                        .await
+                    {
+                        Ok(true) => warrants_to_insert.push(warrant),
+                        Ok(false) => {
+                            tracing::info!(
+                        "Invalid signature of a warrant in the scratch space. Skipping warrant"
+                    );
+                            continue;
+                        }
+                        Err(err) => {
+                            tracing::warn!(?err, "Could not verify warrant signature before inserting from scratch space into DHT database. Skipping warrant");
+                            continue;
+                        }
+                    }
+                }
+
+                // Write warrants to DHT database
+                let total_inserted_warrants = self
+                    .dht_db
+                    .write_async(|txn| -> DatabaseResult<u32> {
+                        let mut inserted_warrants = 0;
+                        for warrant in warrants_to_insert {
+                            let warrant_op = DhtOpHashed::from_content_sync(DhtOp::from(
+                                WarrantOp::from(warrant),
+                            ));
+                            let serialized_size =
+                                encode(&warrant_op).unwrap_or_else(|_| vec![]).len() as u32;
+                            match insert_op_dht(txn, &warrant_op, serialized_size, None) {
+                                // TODO: This should only be increased if the op has actually been inserted.
+                                //       It's not possible to determine that, because mutations don't return
+                                //       the row count. Fix this once row count is returned.
+                                Ok(_) => inserted_warrants += 1,
+                                Err(err) => {
+                                    tracing::warn!(
+                                        ?err,
+                                        "Could not insert warrant from scratch space into DHT database"
+                                    );
+
+                                }
+                            }
+                        }
+                        Ok(inserted_warrants)
+                    })
+                    .await
+                    .unwrap(); // unwrap is safe here because no errors are returned from the closure
+
+                SourceChainResult::Ok((actions, total_inserted_warrants))
             }
             Err(e) => Err(e),
         }
@@ -740,154 +795,189 @@ where
     }
 
     /// Query Actions in the source chain.
+    ///
     /// This returns a Vec rather than an iterator because it is intended to be
-    /// used by the `query` host function, which crosses the wasm boundary
-    // FIXME: This query needs to be tested.
-    #[allow(clippy::let_and_return)] // required to drop temporary
+    /// used by the `query` host function, which crosses the wasm boundary.
     pub async fn query(&self, query: QueryFilter) -> SourceChainResult<Vec<Record>> {
-        if query.sequence_range != ChainQueryFilterRange::Unbounded
-            && (query.action_type.is_some()
-                || query.entry_type.is_some()
-                || query.entry_hashes.is_some()
-                || query.include_entries)
-        {
-            return Err(SourceChainError::UnsupportedQuery(Box::new(query)));
-        }
-        let author = self.author.clone();
         let public_only = self.public_only;
+
+        let entry_type_filters_count = query.entry_type.as_ref().map_or(0, |t| t.len());
+        let action_type_filters_count = query.action_type.as_ref().map_or(0, |t| t.len());
+
+        let (scratch_seq_start, scratch_seq_end) =
+            self.scratch.apply(|scratch| match &query.sequence_range {
+                ChainQueryFilterRange::ActionHashRange(start, end) => {
+                    let start_seq = scratch.actions().find_map(|a| {
+                        if a.as_hash() == start {
+                            Some(a.seq())
+                        } else {
+                            None
+                        }
+                    });
+                    let end_seq = scratch.actions().find_map(|a| {
+                        if a.as_hash() == end {
+                            Some(a.seq())
+                        } else {
+                            None
+                        }
+                    });
+
+                    (start_seq, end_seq)
+                }
+                ChainQueryFilterRange::ActionHashTerminated(end, _) => {
+                    let end_seq = scratch.actions().find_map(|a| {
+                        if a.as_hash() == end {
+                            Some(a.seq())
+                        } else {
+                            None
+                        }
+                    });
+                    (None, end_seq)
+                }
+                _ => (None, None),
+            })?;
+
         let mut records = self
             .vault
             .read_async({
                 let query = query.clone();
                 move |txn| {
-                    let mut sql = "
-                SELECT DISTINCT
-                Action.hash AS action_hash, Action.blob AS action_blob
-            "
-                    .to_string();
-                    if query.include_entries {
-                        sql.push_str(
-                            "
-                    , Entry.blob AS entry_blob
-                    ",
-                        );
-                    }
-                    sql.push_str(
-                        "
-                FROM Action
-                ",
+                    // This type is similar to what `named_params!` from rusqlite creates, except for the use of
+                    // boxing to allow references to be passed to the query. The reserved capacity here should
+                    // account for the number of parameters inserted below, including the variable inputs like
+                    // entry_types and actions_types.
+                    let mut args: Vec<(String, Box<dyn rusqlite::ToSql>)> = Vec::with_capacity(
+                        6 + entry_type_filters_count + action_type_filters_count,
                     );
+
+                    // Build the SELECT part of the query
+                    let mut sql =
+                        "SELECT DISTINCT Action.hash AS action_hash, Action.blob AS action_blob"
+                            .to_string();
                     if query.include_entries {
-                        sql.push_str(
-                            "
-                    LEFT JOIN Entry On Action.entry_hash = Entry.hash
-                    ",
-                        );
+                        sql.push_str(", Entry.blob AS entry_blob");
                     }
-                    sql.push_str(
-                        "
-                JOIN DhtOp On DhtOp.action_hash = Action.hash
-                WHERE
-                Action.author = :author
-                AND
-                (
-                    (:range_start IS NULL AND :range_end IS NULL AND :range_start_hash IS NULL AND :range_end_hash IS NULL AND :range_prior_count IS NULL)
-                ",
-                    );
-                    sql.push_str(match query.sequence_range {
-                        ChainQueryFilterRange::Unbounded => "",
-                        ChainQueryFilterRange::ActionSeqRange(_, _) => "
-                        OR (Action.seq BETWEEN :range_start AND :range_end)",
-                        ChainQueryFilterRange::ActionHashRange(_, _) => "
-                        OR (
-                            Action.seq BETWEEN
-                            (SELECT Action.seq from Action WHERE Action.hash = :range_start_hash)
-                            AND
-                            (SELECT Action.seq from Action WHERE Action.hash = :range_end_hash)
-                        )",
-                        ChainQueryFilterRange::ActionHashTerminated(_, _) => "
-                        OR (
-                            Action.seq BETWEEN
-                            (SELECT Action.seq from Action WHERE Action.hash = :range_end_hash) - :range_prior_count
-                            AND
-                            (SELECT Action.seq from Action WHERE Action.hash = :range_end_hash)
-                        )",
+
+                    // Build the FROM and JOIN parts of the query
+                    sql.push_str("\nFROM Action");
+                    if query.include_entries {
+                        sql.push_str("\nLEFT JOIN Entry On Action.entry_hash = Entry.hash");
+                    }
+
+                    match &query.sequence_range {
+                        ChainQueryFilterRange::Unbounded => {
+                            sql.push_str("\nWHERE 1=1");
+                        }
+                        ChainQueryFilterRange::ActionSeqRange(start, end) => {
+                            args.push((":range_start".to_string(), Box::new(start)));
+                            args.push((":range_end".to_string(), Box::new(end)));
+
+                            sql.push_str("\nWHERE Action.seq BETWEEN :range_start AND :range_end");
+                        }
+                        ChainQueryFilterRange::ActionHashRange(
+                            start_action_hash,
+                            end_action_hash,
+                        ) => {
+                            let start_seq = match scratch_seq_start {
+                                Some(scratch_start) => scratch_start,
+                                None => txn.query_row(
+                                    "SELECT seq from Action WHERE hash = :range_start_hash",
+                                    named_params! {":range_start_hash": start_action_hash.clone()},
+                                    |row| row.get::<_, u32>(0),
+                                )?,
+                            };
+                            let end_seq = match scratch_seq_end {
+                                Some(scratch_end) => scratch_end,
+                                None => txn.query_row(
+                                    "SELECT seq from Action WHERE hash = :range_end_hash",
+                                    named_params! {":range_end_hash": end_action_hash.clone()},
+                                    |row| row.get::<_, u32>(0),
+                                )?,
+                            };
+
+                            sql.push_str(&format!(
+                                "\nWHERE Action.seq BETWEEN {start_seq} AND {end_seq}"
+                            ));
+                        }
+                        ChainQueryFilterRange::ActionHashTerminated(
+                            end_action_hash,
+                            prior_count,
+                        ) => {
+                            let end_seq = match scratch_seq_end {
+                                Some(scratch_end) => scratch_end,
+                                None => txn.query_row(
+                                    "SELECT seq from Action WHERE hash = :range_end_hash",
+                                    named_params! {":range_end_hash": end_action_hash.clone()},
+                                    |row| row.get::<_, u32>(0),
+                                )?,
+                            };
+
+                            let start_seq = end_seq.saturating_sub(*prior_count);
+
+                            sql.push_str(&format!(
+                                "\nWHERE Action.seq BETWEEN {start_seq} AND {end_seq}"
+                            ));
+                        }
+                    }
+
+                    match query.sequence_range {
+                        ChainQueryFilterRange::Unbounded
+                        | ChainQueryFilterRange::ActionSeqRange(_, _) => {
+                            if let Some(action_types) = &query.action_type {
+                                if !action_types.is_empty() {
+                                    for (i, _) in action_types.iter().enumerate() {
+                                        args.push((
+                                            format!(":action_type_{i}"),
+                                            Box::new(action_types[i].as_sql()),
+                                        ));
+                                    }
+
+                                    sql.push_str(
+                                        format!(
+                                            "\nAND Action.type IN ({})",
+                                            named_param_seq("action_type", action_types.len())
+                                        )
+                                        .as_str(),
+                                    );
+                                }
+                            }
+
+                            if let Some(entry_types) = &query.entry_type {
+                                if !entry_types.is_empty() {
+                                    for (i, _) in entry_types.iter().enumerate() {
+                                        args.push((
+                                            format!(":entry_type_{i}"),
+                                            Box::new(entry_types[i].as_sql()),
+                                        ));
+                                    }
+
+                                    sql.push_str(
+                                        format!(
+                                            "\nAND Action.entry_type IN ({})",
+                                            named_param_seq("entry_type", entry_types.len())
+                                        )
+                                        .as_str(),
+                                    );
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+
+                    sql.push_str("\nORDER BY Action.seq");
+                    sql.push_str(if query.order_descending {
+                        " DESC"
+                    } else {
+                        " ASC"
                     });
-
-                    let entry_type_filters_count = query.entry_type.as_ref().map_or(0, |t| t.len());
-                    let action_type_filters_count = query.action_type.as_ref().map_or(0, |t| t.len());
-
-                    sql.push_str(
-                        format!("
-                        )
-                        AND
-                        (:entry_type IS NULL OR Action.entry_type IN ({}))
-                        AND
-                        (:action_type IS NULL OR Action.type IN ({}))
-                        ORDER BY Action.seq
-                        ", named_param_seq("entry_type", entry_type_filters_count), named_param_seq("action_type", action_type_filters_count)).as_str(),
-                    );
-                    sql.push_str(if query.order_descending {" DESC"} else {" ASC"});
                     let mut stmt = txn.prepare(&sql)?;
-
-                    // This type is similar to what `named_params!` from rusqlite creates, escept for the use of boxing to allow references to be passed to the query.
-                    // The reserved capacity here should account for the number of parameters inserted below, including the variable inputs like entry_types and actions_types.
-                    let mut args: Vec<(String, Box<dyn rusqlite::ToSql>)> = Vec::with_capacity(6 + entry_type_filters_count + action_type_filters_count);
-                    args.push((":author".to_string(), Box::new(author)));
-
-                    match &query.entry_type {
-                        None => {
-                            args.push((":entry_type".to_string(), Box::new(None::<EntryType>.as_sql())))
-                        }
-                        Some(types) => {
-                            // Value should not be 'Some' until it has at least one value
-                            args.push((":entry_type".to_string(), Box::new(types.first().unwrap().as_sql())));
-                            for i in 1..types.len() {
-                                args.push((format!(":entry_type_{i}"), Box::new(types.get(i).unwrap().as_sql())));
-                            }
-                        }
-                    }
-
-                    match &query.action_type {
-                        None => args.push((":action_type".to_string(), Box::new(None::<EntryType>.as_sql()))),
-                        Some(types) => {
-                            // Value should not be 'Some' until it has at least one value
-                            args.push((":action_type".to_string(), Box::new(types.first().as_ref().unwrap().as_sql())));
-                            for i in 1..types.len() {
-                                args.push((format!(":action_type_{i}"), Box::new(types.get(i).unwrap().as_sql())));
-                            }
-                        }
-                    }
-
-                    args.push((":range_start".to_string(), Box::new(match query.sequence_range {
-                        ChainQueryFilterRange::ActionSeqRange(start, _) => Some(start),
-                        _ => None,
-                    })));
-
-                    args.push((":range_end".to_string(), Box::new(match query.sequence_range {
-                        ChainQueryFilterRange::ActionSeqRange(_, end) => Some(end),
-                        _ => None,
-                    })));
-
-                    args.push((":range_start_hash".to_string(), Box::new(match &query.sequence_range {
-                        ChainQueryFilterRange::ActionHashRange(start_hash, _) => Some(start_hash.clone()),
-                        _ => None,
-                    })));
-
-                    args.push((":range_end_hash".to_string(), Box::new(match &query.sequence_range {
-                        ChainQueryFilterRange::ActionHashRange(_, end_hash)
-                        | ChainQueryFilterRange::ActionHashTerminated(end_hash, _) => Some(end_hash.clone()),
-                        _ => None,
-                    })));
-
-                    args.push((":range_prior_count".to_string(), Box::new(match query.sequence_range {
-                        ChainQueryFilterRange::ActionHashTerminated(_, prior_count) => Some(prior_count),
-                        _ => None,
-                    })));
 
                     let records = stmt
                         .query_and_then(
-                            args.iter().map(|a| (a.0.as_str(), a.1.as_ref())).collect::<Vec<(&str, &dyn rusqlite::ToSql)>>().as_slice(),
+                            args.iter()
+                                .map(|a| (a.0.as_str(), a.1.as_ref()))
+                                .collect::<Vec<(&str, &dyn rusqlite::ToSql)>>()
+                                .as_slice(),
                             |row| {
                                 let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
                                 let (action, signature) = action.into();
@@ -896,7 +986,7 @@ where
                                     .is_some_and(|e| *e.visibility() == EntryVisibility::Private);
                                 let hash: ActionHash = row.get("action_hash")?;
                                 let action = ActionHashed::with_pre_hashed(action, hash);
-                                let shh = SignedActionHashed::with_presigned(action, signature);
+                                let sah = SignedActionHashed::with_presigned(action, signature);
                                 let entry =
                                     if query.include_entries && (!private_entry || !public_only) {
                                         let entry: Option<Vec<u8>> = row.get("entry_blob")?;
@@ -907,7 +997,7 @@ where
                                     } else {
                                         None
                                     };
-                                StateQueryResult::Ok(Record::new(shh, entry))
+                                StateQueryResult::Ok(Record::new(sah, entry))
                             },
                         )?
                         .collect::<StateQueryResult<Vec<_>>>();
@@ -916,21 +1006,23 @@ where
             })
             .await?;
 
+        // Just take anything from the scratch for now. More filtering is possibly needed against
+        // the results returned from the database anyway.
         self.scratch.apply(|scratch| {
             let mut scratch_records: Vec<_> = scratch
                 .actions()
-                .filter_map(|shh| {
-                    let entry = match shh.action().entry_hash() {
+                .filter_map(|sah| {
+                    let entry = match sah.action().entry_hash() {
                         Some(eh) if query.include_entries => scratch.get_entry(eh).ok()?,
                         _ => None,
                     };
-                    Some(Record::new(shh.clone(), entry))
+                    Some(Record::new(sah.clone(), entry))
                 })
                 .collect();
             scratch_records.sort_unstable_by_key(|e| e.action().action_seq());
-
             records.extend(scratch_records);
         })?;
+
         Ok(query.filter_records(records))
     }
 
@@ -981,7 +1073,7 @@ fn named_param_seq(base_name: &str, repeat: usize) -> String {
     }
 
     let mut seq = format!(":{base_name}");
-    for i in 1..repeat {
+    for i in 0..repeat {
         seq.push_str(format!(", :{base_name}_{i}").as_str());
     }
 
@@ -1335,9 +1427,10 @@ mod tests {
     use super::*;
     use crate::prelude::*;
     use crate::source_chain::SourceChainResult;
+    use ::fixt::fixt;
     use ::fixt::prelude::*;
-    use holo_hash::fixt::AgentPubKeyFixturator;
     use holo_hash::fixt::DnaHashFixturator;
+    use holo_hash::fixt::{ActionHashFixturator, AgentPubKeyFixturator};
     use holochain_keystore::test_keystore;
     use holochain_zome_types::Entry;
     use matches::assert_matches;
@@ -1345,24 +1438,14 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_relaxed_ordering() -> SourceChainResult<()> {
-        let test_db = test_authored_db();
-        let dht_db = test_dht_db();
-        let keystore = test_keystore();
-        let db = test_db.to_db();
-        let alice = fixt!(AgentPubKey, Predictable, 0);
+        let TestCase {
+            chain: chain_1,
+            agent_key: alice,
+            authored: db,
+            dht: dht_db,
+            keystore,
+        } = TestCase::new().await;
 
-        source_chain::genesis(
-            db.clone(),
-            dht_db.to_db(),
-            keystore.clone(),
-            fake_dna_hash(1),
-            alice.clone(),
-            None,
-            None,
-        )
-        .await?;
-        let chain_1 =
-            SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone()).await?;
         let chain_2 =
             SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone()).await?;
         let chain_3 =
@@ -1409,26 +1492,14 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_relaxed_ordering_with_entry() -> SourceChainResult<()> {
-        let test_db = test_authored_db();
-        let dht_db = test_dht_db();
-        let keystore = test_keystore();
-        let db = test_db.to_db();
-        let alice = fixt!(AgentPubKey, Predictable, 0);
+        let TestCase {
+            chain: chain_1,
+            agent_key: alice,
+            authored: db,
+            dht: dht_db,
+            keystore,
+        } = TestCase::new().await;
 
-        source_chain::genesis(
-            db.clone(),
-            dht_db.to_db(),
-            keystore.clone(),
-            fake_dna_hash(1),
-            alice.clone(),
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-
-        let chain_1 =
-            SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone()).await?;
         let chain_2 =
             SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone()).await?;
         let chain_3 =
@@ -1521,27 +1592,8 @@ mod tests {
     // Test that a valid agent pub key can be deleted and that repeated deletes fail.
     #[tokio::test(flavor = "multi_thread")]
     async fn delete_valid_agent_pub_key() {
-        let authored_db = test_authored_db().to_db();
-        let dht_db = test_dht_db().to_db();
-        let keystore = test_keystore();
-        let agent_key = keystore.new_sign_keypair_random().await.unwrap();
+        let TestCase { chain, .. } = TestCase::new().await;
 
-        source_chain::genesis(
-            authored_db.clone(),
-            dht_db.clone(),
-            keystore.clone(),
-            fake_dna_hash(1),
-            agent_key.clone(),
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-
-        // Delete valid agent pub key should succeed.
-        let chain = SourceChain::new(authored_db, dht_db, keystore, agent_key)
-            .await
-            .unwrap();
         let result = chain.delete_valid_agent_pub_key().await;
         assert!(result.is_ok());
         chain.flush(vec![DhtArc::Empty], None).await.unwrap();
@@ -1554,10 +1606,14 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_get_cap_grant() -> SourceChainResult<()> {
-        let test_db = test_authored_db();
-        let dht_db = test_dht_db();
-        let keystore = test_keystore();
-        let db = test_db.to_db();
+        let TestCase {
+            chain,
+            agent_key: alice,
+            authored: db,
+            dht: dht_db,
+            keystore,
+        } = TestCase::new().await;
+
         let secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
         // create transferable cap grant
         #[allow(clippy::unnecessary_literal_unwrap)] // must be this type
@@ -1570,25 +1626,10 @@ mod tests {
         fns.insert(function.clone());
         let functions = GrantedFunctions::Listed(fns);
         let grant = ZomeCallCapGrant::new("tag".into(), secret_access.clone(), functions.clone());
-        let mut agents = AgentPubKeyFixturator::new(Predictable);
-        let alice = agents.next().unwrap();
-        let bob = agents.next().unwrap();
-        // predictable fixturator creates only two different agent keys
-        let carol = keystore.new_sign_keypair_random().await.unwrap();
-        source_chain::genesis(
-            db.clone(),
-            dht_db.to_db(),
-            keystore.clone(),
-            fake_dna_hash(1),
-            alice.clone(),
-            None,
-            None,
-        )
-        .await
-        .unwrap();
 
-        let chain =
-            SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone()).await?;
+        let bob = keystore.new_sign_keypair_random().await.unwrap();
+        let carol = keystore.new_sign_keypair_random().await.unwrap();
+
         // alice as chain author always has a valid cap grant; provided secrets
         // are ignored
         assert_eq!(
@@ -1963,49 +2004,6 @@ mod tests {
         Ok(())
     }
 
-    // @todo bring all this back when we want to administer cap claims better
-    // #[tokio::test(flavor = "multi_thread")]
-    // async fn test_get_cap_claim() -> SourceChainResult<()> {
-    //     let test_db = test_cell_db();
-    //     let db = test_db.db();
-    //     let db = db.conn().unwrap().await;
-    //     let secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
-    //     let agent_pubkey = fake_agent_pubkey_1().into();
-    //     let claim = CapClaim::new("tag".into(), agent_pubkey, secret.clone());
-    //     {
-    //         let mut store = SourceChainBuf::new(db.clone().into(), &db).await?;
-    //         store
-    //             .genesis(fake_dna_hash(1), fake_agent_pubkey_1(), None)
-    //             .await?;
-    //         arc.conn().unwrap().with_commit(|writer| store.flush_to_txn(writer))?;
-    //     }
-    //
-    //     {
-    //         let mut chain = SourceChain::new(db.clone().into(), &db).await?;
-    //         chain.put_cap_claim(claim.clone()).await?;
-    //
-    // // ideally the following would work, but it won't because currently
-    // // we can't get claims from the scratch space
-    // // this will be fixed once we add the capability index
-    //
-    // // assert_eq!(
-    // //     chain.get_persisted_cap_claim_by_secret(&secret)?,
-    // //     Some(claim.clone())
-    // // );
-    //
-    //         arc.conn().unwrap().with_commit(|writer| chain.flush_to_txn(writer))?;
-    //     }
-    //
-    //     {
-    //         let chain = SourceChain::new(db.clone().into(), &db).await?;
-    //         assert_eq!(
-    //             chain.get_persisted_cap_claim_by_secret(&secret).await?,
-    //             Some(claim)
-    //         );
-    //     }
-    //
-    //     Ok(())
-
     #[tokio::test(flavor = "multi_thread")]
     async fn source_chain_buffer_iter_back() -> SourceChainResult<()> {
         holochain_trace::test_run();
@@ -2111,24 +2109,14 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn source_chain_buffer_dump_entries_json() -> SourceChainResult<()> {
-        let test_db = test_authored_db();
-        let dht_db = test_dht_db();
-        let keystore = test_keystore();
-        let vault = test_db.to_db();
-        let author = keystore.new_sign_keypair_random().await.unwrap();
-        genesis(
-            vault.clone(),
-            dht_db.to_db(),
-            keystore.clone(),
-            fixt!(DnaHash),
-            author.clone(),
-            None,
-            None,
-        )
-        .await
-        .unwrap();
+        let TestCase {
+            chain: _,
+            agent_key,
+            authored,
+            ..
+        } = TestCase::new().await;
 
-        let json = dump_state(vault.clone().into(), author.clone()).await?;
+        let json = dump_state(authored.clone().into(), agent_key.clone()).await?;
         let json = serde_json::to_string_pretty(&json)?;
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
 
@@ -2148,66 +2136,102 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn source_chain_query() {
-        let test_db = test_authored_db();
-        let dht_db = test_dht_db();
-        let keystore = test_keystore();
-        let vault = test_db.to_db();
-        let alice = keystore.new_sign_keypair_random().await.unwrap();
-        let bob = keystore.new_sign_keypair_random().await.unwrap();
-        let dna_hash = fixt!(DnaHash);
+        let TestCase {
+            chain,
+            agent_key: alice,
+            keystore,
+            ..
+        } = TestCase::new().await;
 
-        genesis(
-            vault.clone(),
-            dht_db.to_db(),
-            keystore.clone(),
-            dna_hash.clone(),
-            alice.clone(),
-            None,
-            None,
-        )
-        .await
-        .unwrap();
+        let app_entry_type = EntryType::App(AppEntryDef {
+            zome_index: 0.into(),
+            entry_index: 0.into(),
+            visibility: EntryVisibility::Public,
+        });
 
-        genesis(
-            vault.clone(),
-            dht_db.to_db(),
-            keystore.clone(),
-            dna_hash.clone(),
-            bob.clone(),
-            None,
-            None,
-        )
-        .await
-        .unwrap();
+        let chain_top = chain.chain_head_nonempty().unwrap();
 
-        // test_db.dump_tmp();
+        // Add an app entry to the chain
+        let create_action = {
+            let entry = Entry::App(fixt!(AppEntryBytes));
+            let entry_hashed = EntryHashed::from_content_sync(entry);
 
-        let chain = SourceChain::new(vault, dht_db.to_db(), keystore, alice.clone())
-            .await
-            .unwrap();
+            let action = Action::Create(Create {
+                author: alice.clone(),
+                timestamp: Timestamp::now(),
+                action_seq: chain_top.seq + 1,
+                prev_action: chain_top.action.as_hash().clone(),
+                entry_type: app_entry_type.clone(),
+                entry_hash: entry_hashed.hash.clone(),
+                weight: EntryRateWeight::default(),
+            });
+            let sig = alice.sign(&keystore, &action).await.unwrap();
+            let signed_action = SignedActionHashed::from_content_sync((action.clone(), sig).into());
+
+            chain
+                .scratch()
+                .apply(move |scratch| {
+                    scratch.add_action(signed_action, ChainTopOrdering::Strict);
+                    scratch.add_entry(entry_hashed, ChainTopOrdering::Strict);
+                })
+                .unwrap();
+            chain.flush(vec![DhtArc::Empty], None).await.unwrap();
+
+            action
+        };
+
+        // Add an app entry to the scratch space
+        {
+            let chain_top = chain.chain_head_nonempty().unwrap();
+
+            let entry = Entry::App(fixt!(AppEntryBytes));
+            let entry_hashed = EntryHashed::from_content_sync(entry);
+
+            let action = Action::Update(Update {
+                author: alice.clone(),
+                timestamp: Timestamp::now(),
+                action_seq: chain_top.seq + 2,
+                prev_action: create_action.to_hash(),
+                original_action_address: create_action.to_hash(),
+                original_entry_address: create_action.entry_hash().unwrap().clone(),
+                entry_type: app_entry_type.clone(),
+                entry_hash: entry_hashed.hash.clone(),
+                weight: EntryRateWeight::default(),
+            });
+            let sig = alice.sign(&keystore, &action).await.unwrap();
+            let signed_action = SignedActionHashed::from_content_sync((action, sig).into());
+
+            chain
+                .scratch()
+                .apply(move |scratch| {
+                    scratch.add_action(signed_action, ChainTopOrdering::Strict);
+                    scratch.add_entry(entry_hashed, ChainTopOrdering::Strict);
+                })
+                .unwrap();
+        }
 
         let records = chain.query(ChainQueryFilter::default()).await.unwrap();
 
-        // All of the range queries which should return a full set of records
+        // All the range queries which should return a full set of records
         let full_ranges = [
             ChainQueryFilterRange::Unbounded,
-            ChainQueryFilterRange::ActionSeqRange(0, 2),
+            ChainQueryFilterRange::ActionSeqRange(0, 4),
             ChainQueryFilterRange::ActionHashRange(
                 records[0].action_address().clone(),
-                records[2].action_address().clone(),
+                records[4].action_address().clone(),
             ),
-            ChainQueryFilterRange::ActionHashTerminated(records[2].action_address().clone(), 2),
+            ChainQueryFilterRange::ActionHashTerminated(records[4].action_address().clone(), 4),
         ];
 
         // A variety of combinations of query parameters
         let cases = [
-            ((None, None, vec![], false), 3),
-            ((None, None, vec![], true), 3),
+            ((None, None, vec![], false), 5),
+            ((None, None, vec![], true), 5),
             ((Some(vec![ActionType::Dna]), None, vec![], false), 1),
             ((None, Some(vec![EntryType::AgentPubKey]), vec![], false), 1),
             ((None, Some(vec![EntryType::AgentPubKey]), vec![], true), 1),
-            ((Some(vec![ActionType::Create]), None, vec![], false), 1),
-            ((Some(vec![ActionType::Create]), None, vec![], true), 1),
+            ((Some(vec![ActionType::Create]), None, vec![], false), 2),
+            ((Some(vec![ActionType::Create]), None, vec![], true), 2),
             (
                 (
                     Some(vec![ActionType::Create]),
@@ -2233,17 +2257,16 @@ mod tests {
                     vec![],
                     true,
                 ),
-                2,
+                3,
             ),
             (
                 (
                     None,
-                    // Redundant but covers the code that constructs the IN query
-                    Some(vec![EntryType::AgentPubKey, EntryType::AgentPubKey]),
+                    Some(vec![EntryType::AgentPubKey, app_entry_type]),
                     vec![],
                     true,
                 ),
-                1,
+                3,
             ),
         ];
 
@@ -2264,53 +2287,21 @@ mod tests {
                     include_entries,
                     order_descending: false,
                 };
-                if sequence_range != ChainQueryFilterRange::Unbounded
-                    && (action_type.is_some()
-                        || entry_type.is_some()
-                        || entry_hashes.is_some()
-                        || include_entries)
-                {
-                    assert!(matches!(
-                        chain.query(query.clone()).await,
-                        Err(SourceChainError::UnsupportedQuery(_))
-                    ));
-                } else {
-                    let queried = chain.query(query.clone()).await.unwrap();
-                    let actual = queried.len();
-                    assert!(queried.iter().all(|e| e.action().author() == &alice));
-                    assert_eq!(
-                        num_expected, actual,
-                        "Expected {num_expected} items but got {actual} with filter {query:?}"
-                    );
-                }
+
+                let queried = chain.query(query.clone()).await.unwrap();
+                let actual = queried.len();
+                assert!(queried.iter().all(|e| e.action().author() == &alice));
+                assert_eq!(
+                    num_expected, actual,
+                    "Expected {num_expected} items but got {actual} with filter {query:?}"
+                );
             }
         }
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn source_chain_query_ordering() {
-        let test_db = test_authored_db();
-        let dht_db = test_dht_db();
-        let keystore = test_keystore();
-        let vault = test_db.to_db();
-        let alice = keystore.new_sign_keypair_random().await.unwrap();
-        let dna_hash = fixt!(DnaHash);
-
-        genesis(
-            vault.clone(),
-            dht_db.to_db(),
-            keystore.clone(),
-            dna_hash.clone(),
-            alice.clone(),
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-
-        let chain = SourceChain::new(vault, dht_db.to_db(), keystore, alice.clone())
-            .await
-            .unwrap();
+        let TestCase { chain, .. } = TestCase::new().await;
 
         let asc = chain.query(ChainQueryFilter::default()).await.unwrap();
         let desc = chain
@@ -2328,28 +2319,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn init_zomes_complete() {
-        let test_db = test_authored_db();
-        let dht_db = test_dht_db();
-        let keystore = test_keystore();
-        let vault = test_db.to_db();
-        let alice = keystore.new_sign_keypair_random().await.unwrap();
-        let dna_hash = fixt!(DnaHash);
-
-        genesis(
-            vault.clone(),
-            dht_db.to_db(),
-            keystore.clone(),
-            dna_hash.clone(),
-            alice.clone(),
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-
-        let chain = SourceChain::new(vault, dht_db.to_db(), keystore, alice.clone())
-            .await
-            .unwrap();
+        let TestCase { chain, .. } = TestCase::new().await;
 
         // zomes initialized should be false after genesis
         let zomes_initialized = chain.zomes_initialized().await.unwrap();
@@ -2370,5 +2340,219 @@ mod tests {
         // zomes initialized should be true after init zomes has run
         let zomes_initialized = chain.zomes_initialized().await.unwrap();
         assert!(zomes_initialized);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn flush_writes_warrants_to_dht_db() {
+        let TestCase {
+            chain,
+            agent_key,
+            dht,
+            keystore,
+            ..
+        } = TestCase::new().await;
+        let warrantee = fixt!(AgentPubKey);
+
+        let warrantee_clone = warrantee.clone();
+        let actual_warrants = dht.test_read(move |txn| {
+            CascadeTxnWrapper::from(txn)
+                .get_warrants_for_agent(&warrantee_clone, true)
+                .unwrap()
+        });
+        assert_eq!(actual_warrants.len(), 0);
+
+        // Create a warrant
+        let signed_warrant = create_signed_warrant(&agent_key, &warrantee, &keystore).await;
+        // Add warrant to scratch
+        chain
+            .scratch
+            .apply(|scratch| {
+                scratch.add_warrant(signed_warrant.clone());
+            })
+            .unwrap();
+
+        // Flush should write warrants to DHT database
+        let (actions, warrant_count) = chain.flush(vec![], None).await.unwrap();
+        assert!(actions.is_empty());
+        assert_eq!(warrant_count, 1);
+
+        // Check DHT database
+        let actual_warrants = dht.test_read(move |txn| {
+            CascadeTxnWrapper::from(txn)
+                .get_warrants_for_agent(&warrantee, false)
+                .unwrap()
+        });
+        assert_eq!(actual_warrants, vec![WarrantOp::from(signed_warrant)]);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn duplicate_warrants_are_not_inserted_during_flush() {
+        holochain_trace::test_run();
+        let TestCase {
+            chain,
+            agent_key,
+            dht,
+            keystore,
+            ..
+        } = TestCase::new().await;
+        let warrantee = fixt!(AgentPubKey);
+
+        // Create a warrant
+        let signed_warrant = create_signed_warrant(&agent_key, &warrantee, &keystore).await;
+        // Add warrant to scratch
+        chain
+            .scratch
+            .apply(|scratch| {
+                scratch.add_warrant(signed_warrant.clone());
+            })
+            .unwrap();
+
+        // Flush should write warrant to DHT database
+        let (actions, warrant_count) = chain.flush(vec![], None).await.unwrap();
+        assert!(actions.is_empty());
+        assert_eq!(warrant_count, 1);
+
+        // Check DHT database
+        let warrantee_clone = warrantee.clone();
+        let actual_warrants = dht.test_read(move |txn| {
+            CascadeTxnWrapper::from(txn)
+                .get_warrants_for_agent(&warrantee_clone, false)
+                .unwrap()
+        });
+        assert_eq!(
+            actual_warrants,
+            vec![WarrantOp::from(signed_warrant.clone())]
+        );
+
+        // Add same warrant to scratch again
+        chain
+            .scratch
+            .apply(|scratch| {
+                scratch.add_warrant(signed_warrant.clone());
+            })
+            .unwrap();
+
+        // Flush should not write duplicate warrant to DHT database
+        let (actions, warrant_count) = chain.flush(vec![], None).await.unwrap();
+        assert!(actions.is_empty());
+        assert_eq!(warrant_count, 1); // rejected inserts are not reported by the insertion method, so this will indicate 1
+
+        // Check DHT database again
+        let actual_warrants = dht.test_read(move |txn| {
+            CascadeTxnWrapper::from(txn)
+                .get_warrants_for_agent(&warrantee, false)
+                .unwrap()
+        });
+        assert_eq!(actual_warrants, vec![WarrantOp::from(signed_warrant)]);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn counterfeit_warrants_are_not_inserted_during_flush() {
+        let TestCase {
+            chain,
+            agent_key,
+            dht,
+            ..
+        } = TestCase::new().await;
+        let warrantee = fixt!(AgentPubKey);
+
+        // Create a counterfeit warrant
+        let warrant = Warrant::new(
+            WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+                action_author: warrantee.clone(),
+                action: (fixt!(ActionHash), fixt!(Signature)),
+                chain_op_type: ChainOpType::RegisterAgentActivity,
+            }),
+            agent_key.clone(),
+            Timestamp::now(),
+            warrantee.clone(),
+        );
+        let signed_warrant = SignedWarrant::new(warrant, fixt!(Signature));
+        // Add warrant to scratch
+        chain
+            .scratch
+            .apply(|scratch| {
+                scratch.add_warrant(signed_warrant.clone());
+            })
+            .unwrap();
+
+        // Flush should not write warrant to DHT database
+        let (actions, warrant_count) = chain.flush(vec![], None).await.unwrap();
+        assert!(actions.is_empty());
+        assert_eq!(warrant_count, 0);
+
+        // Check DHT database
+        let warrantee_clone = warrantee.clone();
+        let actual_warrants = dht.test_read(move |txn| {
+            CascadeTxnWrapper::from(txn)
+                .get_warrants_for_agent(&warrantee_clone, false)
+                .unwrap()
+        });
+        assert!(actual_warrants.is_empty());
+    }
+
+    struct TestCase {
+        chain: SourceChain,
+        agent_key: AgentPubKey,
+        authored: TestDb<DbKindAuthored>,
+        dht: TestDb<DbKindDht>,
+        keystore: MetaLairClient,
+    }
+
+    impl TestCase {
+        async fn new() -> Self {
+            let authored = test_authored_db();
+            let dht = test_dht_db();
+            let keystore = test_keystore();
+            let dna_hash = fixt!(DnaHash);
+            let agent_key = keystore.new_sign_keypair_random().await.unwrap();
+            genesis(
+                authored.to_db(),
+                dht.to_db(),
+                keystore.clone(),
+                dna_hash,
+                agent_key.clone(),
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+            let chain = SourceChain::new(
+                authored.to_db(),
+                dht.to_db(),
+                keystore.clone(),
+                agent_key.clone(),
+            )
+            .await
+            .unwrap();
+            Self {
+                chain,
+                agent_key,
+                authored,
+                dht,
+                keystore,
+            }
+        }
+    }
+
+    async fn create_signed_warrant(
+        author: &AgentPubKey,
+        warrantee: &AgentPubKey,
+        keystore: &MetaLairClient,
+    ) -> SignedWarrant {
+        let warrant = Warrant::new(
+            WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+                action_author: warrantee.clone(),
+                action: (fixt!(ActionHash), fixt!(Signature)),
+                chain_op_type: ChainOpType::RegisterAgentActivity,
+            }),
+            author.clone(),
+            Timestamp::now(),
+            warrantee.clone(),
+        );
+        SignedWarrant::new(
+            warrant.clone(),
+            author.sign(keystore, warrant).await.unwrap(),
+        )
     }
 }

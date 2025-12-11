@@ -60,6 +60,8 @@ pub async fn handle_get_agent_activity(
         .read_async(move |txn| -> CascadeResult<AgentActivityResponse> {
             let txn = CascadeTxnWrapper::from(txn);
 
+            // The activity query only selects actions from the database. Warrants have
+            // a different schema and must be fetched separately.
             let warrants = txn.get_warrants_for_agent(&agent, true)?;
 
             let mut activity_response = if options.include_full_records {
@@ -70,10 +72,7 @@ pub async fn handle_get_agent_activity(
                 GetAgentActivityHashesQuery::new(agent, query, options).run(txn)?
             };
 
-            if !warrants.is_empty() {
-                // TODO why did we retrieve warrants in the activity query if we're going to overwrite them here?
-                activity_response.warrants = warrants.into_iter().map(|w| (*w).clone()).collect();
-            }
+            activity_response.warrants = warrants.into_iter().map(|w| (*w).clone()).collect();
 
             Ok(activity_response)
         })

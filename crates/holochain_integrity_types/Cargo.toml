@@ -1,6 +1,6 @@
 [package]
 name = "holochain_integrity_types"
-version = "0.6.0-dev.17"
+version = "0.7.0-dev.1"
 description = "Holochain integrity types"
 license = "Apache-2.0"
 repository = "https://github.com/holochain/holochain"
@@ -10,18 +10,18 @@ edition = "2021"
 
 # reminder - do not use workspace deps
 [dependencies]
-holo_hash = { version = "^0.6.0-dev.16", path = "../holo_hash", features = [
+holo_hash = { version = "^0.7.0-dev.0", path = "../holo_hash", features = [
   "encoding",
 ] }
 holochain_serialized_bytes = "=0.0.56"
-holochain_util = { version = "^0.6.0-dev.5", path = "../holochain_util", default-features = false }
-holochain_secure_primitive = { version = "^0.6.0-dev.2", path = "../holochain_secure_primitive" }
+holochain_util = { version = "^0.7.0-dev.0", path = "../holochain_util", default-features = false }
+holochain_secure_primitive = { version = "^0.7.0-dev.0", path = "../holochain_secure_primitive" }
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_bytes = "0.11"
 schemars = { version = "0.9", optional = true }
 
 # Just the bare minimum timestamp with no extra features.
-holochain_timestamp = { version = "^0.6.0-dev.4", path = "../timestamp", default-features = false }
+holochain_timestamp = { version = "^0.7.0-dev.0", path = "../timestamp", default-features = false }
 
 # TODO: Figure out how to remove these dependencies.
 subtle = "2"
@@ -38,7 +38,7 @@ tracing = { version = "0.1", optional = true }
 [dev-dependencies]
 holochain_integrity_types = { path = ".", features = ["test_utils", "fuzzing"] }
 serde_json = "1.0"
-fixt = { version = "^0.6.0-dev.7", path = "../fixt" }
+fixt = { version = "^0.7.0-dev.0", path = "../fixt" }
 
 [lints]
 workspace = true

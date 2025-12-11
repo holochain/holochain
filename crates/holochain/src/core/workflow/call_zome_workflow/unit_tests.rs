@@ -17,6 +17,15 @@ use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune2_api::DhtArc;
 use std::sync::Arc;
+use {
+    hdk::prelude::{
+        ChainIntegrityWarrant, ChainOpType, SignatureFixturator, SignedWarrant, Warrant,
+        WarrantProof,
+    },
+    holo_hash::{fixt::AgentPubKeyFixturator, AgentPubKey},
+    holochain_keystore::AgentPubKeyExt,
+    holochain_timestamp::Timestamp,
+};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn trigger_integration_workflow_after_creating_ops() {
@@ -32,6 +41,7 @@ async fn trigger_integration_workflow_after_creating_ops() {
         _conductor,
     } = TestCase::new(hc_p2p, "create", ()).await;
     let (trigger_publish_dht_ops, _) = TriggerSender::new();
+    let (trigger_validate_dht_ops, mut validate_dht_ops_rx) = TriggerSender::new();
     let (trigger_integrate_dht_ops, mut integrate_dht_ops_rx) = TriggerSender::new();
     let (trigger_countersigning, _) = TriggerSender::new();
 
@@ -41,6 +51,7 @@ async fn trigger_integration_workflow_after_creating_ops() {
         keystore,
         args,
         trigger_publish_dht_ops,
+        trigger_validate_dht_ops,
         trigger_integrate_dht_ops,
         trigger_countersigning,
     )
@@ -49,10 +60,13 @@ async fn trigger_integration_workflow_after_creating_ops() {
     .unwrap();
     // Assert the integration workflow has been triggered.
     integrate_dht_ops_rx.try_recv().unwrap();
+    // Assert the validation workflow has not been triggered as no warrants have been authored.
+    assert!(validate_dht_ops_rx.try_recv().is_none());
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn integration_workflow_is_not_triggered_when_no_data_has_been_created() {
+async fn validation_and_integration_workflow_are_not_triggered_when_no_data_and_no_warrants_have_been_created(
+) {
     let mut hc_p2p = MockHcP2p::new();
     hc_p2p
         .expect_target_arcs()
@@ -69,6 +83,7 @@ async fn integration_workflow_is_not_triggered_when_no_data_has_been_created() {
         // Zome call to get action that does not exist.
     } = TestCase::new(hc_p2p, "reed", fixt!(ActionHash)).await;
     let (trigger_publish_dht_ops, _) = TriggerSender::new();
+    let (trigger_validate_dht_ops, mut validate_dht_ops_rx) = TriggerSender::new();
     let (trigger_integrate_dht_ops, mut integrate_dht_ops_rx) = TriggerSender::new();
     let (trigger_countersigning, _) = TriggerSender::new();
 
@@ -78,6 +93,7 @@ async fn integration_workflow_is_not_triggered_when_no_data_has_been_created() {
         keystore,
         args,
         trigger_publish_dht_ops,
+        trigger_validate_dht_ops,
         trigger_integrate_dht_ops,
         trigger_countersigning,
     )
@@ -85,6 +101,104 @@ async fn integration_workflow_is_not_triggered_when_no_data_has_been_created() {
     .unwrap()
     .unwrap();
     // Fail the test if the integration workflow has been triggered.
+    assert!(integrate_dht_ops_rx.try_recv().is_none());
+    // Fail the test if the validation workflow has been triggered.
+    assert!(validate_dht_ops_rx.try_recv().is_none());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn validation_workflow_triggered_after_inserting_warrants_and_actions() {
+    let mut hc_p2p = MockHcP2p::new();
+    hc_p2p
+        .expect_target_arcs()
+        .returning(|_| Box::pin(async { Ok(vec![DhtArc::FULL]) }));
+    let TestCase {
+        workspace,
+        network,
+        keystore,
+        args,
+        _conductor,
+    } = TestCase::new(hc_p2p, "create", ()).await;
+    let (trigger_publish_dht_ops, _) = TriggerSender::new();
+    let (trigger_validate_dht_ops, mut validate_dht_ops_rx) = TriggerSender::new();
+    let (trigger_integrate_dht_ops, mut integrate_dht_ops_rx) = TriggerSender::new();
+    let (trigger_countersigning, _) = TriggerSender::new();
+
+    // Create a warrant and add it to the scratch space.
+    let signed_warrant =
+        create_signed_warrant(workspace.author().unwrap().as_ref(), &keystore).await;
+    workspace
+        .source_chain()
+        .scratch()
+        .apply(|scratch| scratch.add_warrant(signed_warrant))
+        .unwrap();
+
+    let _ = call_zome_workflow(
+        workspace,
+        network,
+        keystore,
+        args,
+        trigger_publish_dht_ops,
+        trigger_validate_dht_ops,
+        trigger_integrate_dht_ops,
+        trigger_countersigning,
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    // Assert the validation workflow has been triggered.
+    validate_dht_ops_rx.try_recv().unwrap();
+    // Assert integration workflow has been triggered.
+    integrate_dht_ops_rx.try_recv().unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn trigger_validation_workflow_after_only_inserting_warrants() {
+    let mut hc_p2p = MockHcP2p::new();
+    hc_p2p
+        .expect_target_arcs()
+        .returning(|_| Box::pin(async { Ok(vec![DhtArc::FULL]) }));
+    hc_p2p
+        .expect_authority_for_hash()
+        .return_once(|_, _| Box::pin(async move { Ok(true) }));
+    let TestCase {
+        workspace,
+        network,
+        keystore,
+        args,
+        _conductor,
+    } = TestCase::new(hc_p2p, "reed", fixt!(ActionHash)).await;
+    let (trigger_publish_dht_ops, _) = TriggerSender::new();
+    let (trigger_validate_dht_ops, mut validate_dht_ops_rx) = TriggerSender::new();
+    let (trigger_integrate_dht_ops, mut integrate_dht_ops_rx) = TriggerSender::new();
+    let (trigger_countersigning, _) = TriggerSender::new();
+
+    // Create a warrant and add it to the scratch space.
+    let signed_warrant =
+        create_signed_warrant(workspace.author().unwrap().as_ref(), &keystore).await;
+    workspace
+        .source_chain()
+        .scratch()
+        .apply(|scratch| scratch.add_warrant(signed_warrant))
+        .unwrap();
+
+    // Shouldn't create actions
+    let _ = call_zome_workflow(
+        workspace,
+        network,
+        keystore,
+        args,
+        trigger_publish_dht_ops,
+        trigger_validate_dht_ops,
+        trigger_integrate_dht_ops,
+        trigger_countersigning,
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    // Assert the validation workflow has been triggered.
+    validate_dht_ops_rx.try_recv().unwrap();
+    // Assert integration workflow has not been triggered, as no actions have been authored.
     assert!(integrate_dht_ops_rx.try_recv().is_none());
 }
 
@@ -152,4 +266,21 @@ impl TestCase {
             _conductor: conductor,
         }
     }
+}
+
+async fn create_signed_warrant(author: &AgentPubKey, keystore: &MetaLairClient) -> SignedWarrant {
+    let warrant = Warrant::new(
+        WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+            action_author: fixt!(AgentPubKey),
+            action: (fixt!(ActionHash), fixt!(Signature)),
+            chain_op_type: ChainOpType::StoreEntry,
+        }),
+        (*author).clone(),
+        Timestamp::now(),
+        fixt!(AgentPubKey),
+    );
+    SignedWarrant::new(
+        warrant.clone(),
+        author.sign(keystore, warrant).await.unwrap(),
+    )
 }

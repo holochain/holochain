@@ -112,7 +112,7 @@ use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::actor::GetOptions as NetworkGetOptions;
+use holochain_p2p::actor::{NetworkRequestOptions as NetworkGetOptions, NetworkRequestOptions};
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
@@ -210,16 +210,14 @@ async fn app_validation_workflow_inner(
     let rejected_ops = Arc::new(AtomicUsize::new(0));
     let failed_ops = Arc::new(Mutex::new(HashSet::new()));
     let mut agent_activity_ops = vec![];
-    let warrant_op_hashes: Vec<(DhtOpHash, OpBasis)> = vec![];
-    #[cfg(feature = "unstable-warrants")]
-    let mut warrant_op_hashes = warrant_op_hashes;
+    let mut warrant_op_hashes: Vec<(DhtOpHash, OpBasis)> = vec![];
 
-    #[cfg(all(feature = "unstable-warrants", feature = "test_utils"))]
+    #[cfg(feature = "test_utils")]
     let disable_warrant_issuance = conductor
         .config
         .conductor_tuning_params()
         .disable_warrant_issuance;
-    #[cfg(all(feature = "unstable-warrants", not(feature = "test_utils")))]
+    #[cfg(not(feature = "test_utils"))]
     let disable_warrant_issuance = false;
 
     // Validate ops sequentially
@@ -277,20 +275,46 @@ async fn app_validation_workflow_inner(
                 let awaiting_ops = awaiting_ops.clone();
                 let rejected_ops = rejected_ops.clone();
 
-                #[cfg(feature = "unstable-warrants")]
                 if let Outcome::Rejected(_) = &outcome {
-                    let keystore = conductor.keystore();
-                    let warrant_op =
-                        crate::core::workflow::sys_validation_workflow::make_invalid_chain_warrant_op(
-                            keystore,
-                            _representative_agent.clone(),
-                            &chain_op,
+                    let issue_warrant =
+                        match holochain_state::warrant::is_action_warranted_as_invalid(
+                            &workspace.dht_db,
+                            chain_op.action().to_hash(),
+                            chain_op.author().clone(),
                         )
-                        .await?;
+                        .await
+                        {
+                            Ok(true) => {
+                                tracing::trace!(
+                                    "Op {} is already warranted, not issuing a new warrant",
+                                    dht_op_hash
+                                );
+                                false
+                            }
+                            Ok(false) => {
+                                // Not warranted yet, should issue a warrant.
+                                true
+                            }
+                            Err(e) => {
+                                tracing::error!(error = ?e, "Error checking if op is warranted");
+                                false
+                            }
+                        };
 
                     if disable_warrant_issuance {
                         tracing::warn!("Warrant issuance disabled - skipping issuing a warrant");
+                    } else if !issue_warrant {
+                        tracing::trace!("Not issuing a warrant for op {}", dht_op_hash);
                     } else {
+                        let keystore = conductor.keystore();
+                        let warrant_op =
+                            crate::core::workflow::sys_validation_workflow::make_invalid_chain_warrant_op(
+                                keystore,
+                                _representative_agent.clone(),
+                                &chain_op,
+                            )
+                            .await?;
+
                         warrant_op_hashes
                             .push((warrant_op.to_hash(), warrant_op.dht_basis().clone()));
 
@@ -355,7 +379,6 @@ async fn app_validation_workflow_inner(
     tracing::info!("{ops_validated} out of {num_ops_to_validate} validated: {accepted_ops} accepted, {awaiting_ops} awaiting deps, {rejected_ops} rejected, failed ops {failed_ops:?}.");
 
     // "self-publish" warrants, i.e. insert them into the DHT db as if they were published to us by another node
-    #[cfg(feature = "unstable-warrants")]
     if warranted_ops > 0 {
         holochain_state::integrate::authored_ops_to_dht_db(
             network.target_arcs().await?,
@@ -704,7 +727,7 @@ async fn retrieve_deleted_action(
 ) -> AppValidationOutcome<SignedActionHashed> {
     let cascade = CascadeImpl::from_workspace_and_network(workspace, network.clone());
     let (deleted_action, _) = cascade
-        .retrieve_action(deletes_address.clone(), NetworkGetOptions::default())
+        .retrieve_action(deletes_address.clone(), NetworkRequestOptions::default())
         .await?
         .ok_or_else(|| Outcome::awaiting(deletes_address))?;
     Ok(deleted_action)
@@ -752,7 +775,7 @@ async fn run_validation_callback(
                 let cascade = cascade.clone();
                 async move {
                     let result = cascade
-                        .fetch_record(hash.clone(), NetworkGetOptions::must_get_options())
+                        .fetch_record(hash.clone(), NetworkRequestOptions::must_get_options())
                         .await;
                     if let Err(err) = result {
                         tracing::warn!("error fetching dependent hash {hash:?}: {err}");
@@ -783,7 +806,11 @@ async fn run_validation_callback(
                 let author = author.clone();
                 async move {
                     let result = cascade
-                        .must_get_agent_activity(author.clone(), filter)
+                        .must_get_agent_activity(
+                            author.clone(),
+                            filter,
+                            NetworkGetOptions::must_get_options(),
+                        )
                         .await;
                     if let Err(err) = result {
                         tracing::warn!("error fetching dependent chain of agent {author:?}: {err}");

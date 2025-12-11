@@ -492,7 +492,6 @@ The following Holochain-specific message types are implemented using the precedi
 * An agent uses **CallRemote** to attempt a remote procedure call (RPC) to a zome function in another peer's cell.
 * When an authority has finished validating DHT operations as a consequence of receiving a publish message, they send a **ValidationReceipts** message to the publisher. This tells the publisher that the authority has received the data, deemed it to be valid, and is now holding it for serving to other peers. This message uses the **User** broadcast message type.
 * **Get** requests the addressable content stored at the given basis hash.
-* **GetMeta** requests all metadata stored at the given basis hash.
 * **GetLinks** requests only link metadata of a certain type at the given basis hash, optionally with a filter predicate.
 * **CountLinks** is similar to GetLinks, but only requests the count of all links matching the type and filter predicate.
 * **GetAgentActivity** requests all or a portion of the 'agent activity' metadata for the given agent ID, which includes source chain actions, chain status (whether it has been forked), and any outstanding warrants collected for that agent (see the [following section](#warrants) for a description of warrants).
