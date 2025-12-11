@@ -117,6 +117,7 @@ jobs:
 
       - name: test (depot-windows-2022-8)
         if: matrix.os == 'depot-windows-2022-8'
+        id: test-windows
         continue-on-error: true
         run: |-
           $env:SODIUM_LIB_DIR="C:\vcpkg\packages\libsodium_x64-windows\lib"
@@ -124,6 +125,7 @@ jobs:
 
       - name: test
         if: matrix.os != 'depot-windows-2022-8'
+        id: test-unix
         continue-on-error: true
         run: make test-workspace-${{ matrix.target }}
 
@@ -150,6 +152,10 @@ jobs:
               "pr_number": "${{ github.event.pull_request.number }}",
               "actor": "${{ github.actor }}"
             }
+
+      - name: Fail job if tests failed
+        if: always() && (steps.test-windows.outcome == 'failure' || steps.test-unix.outcome == 'failure')
+        run: exit 1
 
       - name: "Common Test Teardown Actions"
         uses: ./.github/actions/common-post
