@@ -183,8 +183,7 @@ async fn encrypted_database_wrong_key_fails() {
             || err_msg.contains("encrypted")
             || err_msg.contains("cipher")
             || err_msg.contains("SQL logic error"),
-        "Expected encryption-related error, got: {
-        err_msg}"
+        "Expected encryption-related error, got: {err_msg}"
     );
 }
 
