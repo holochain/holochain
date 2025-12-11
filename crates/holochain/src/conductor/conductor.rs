@@ -1751,7 +1751,7 @@ mod clone_cell_impls {
                     let clone_cell_id = payload.clone_cell_id.to_owned();
                     move |mut state| {
                         let app = state.get_app_mut(&app_id)?;
-                        let clone_id = app.get_disabled_clone_id(&clone_cell_id)?;
+                        let clone_id = app.get_clone_id(&clone_cell_id)?;
                         let (cell_id, _) = app.enable_clone_cell(&clone_id)?.into_inner();
                         let app_role = app.primary_role(&clone_id.as_base_role_name())?;
                         let original_dna_hash = app_role.dna_hash().clone();
@@ -1807,7 +1807,7 @@ mod clone_cell_impls {
                             })
                             .expect("disabled clone cell not part of this app")
                             .1;
-                        let clone_id = app.get_disabled_clone_id(&clone_cell_id)?;
+                        let clone_id = app.get_clone_id(&clone_cell_id)?;
                         app.delete_clone_cell(&clone_id)?;
                         Ok((state, cell_id))
                     }
