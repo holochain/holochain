@@ -1,12 +1,15 @@
 use holochain_serialized_bytes::prelude::*;
 use std::borrow::Borrow;
 use std::borrow::Cow;
+use ts_rs::TS;
+use export_types_config::EXPORT_TS_TYPES_FILE;
 
 const DEFAULT_REQUIRED_VALIDATIONS: u8 = 5;
 
 #[derive(
-    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize, TS,
 )]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub enum EntryDefId {
     App(AppEntryName),
     CapClaim,
@@ -16,8 +19,9 @@ pub enum EntryDefId {
 /// Identifier for an entry definition.
 /// This may be removed.
 #[derive(
-    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize, TS,
 )]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct AppEntryName(pub Cow<'static, str>);
 
 /// Trait for binding static [`EntryDef`] property access for a type.
@@ -35,13 +39,15 @@ pub trait EntryDefRegistration {
 /// The number of validations required for an entry to
 /// be considered published.
 #[derive(
-    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize, TS,
 )]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct RequiredValidations(pub u8);
 
 #[derive(
-    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize, TS,
 )]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct EntryDef {
     /// Zome-unique identifier for this entry type
     pub id: EntryDefId,
@@ -57,7 +63,8 @@ pub struct EntryDef {
 }
 
 /// All definitions for all entry types in an integrity zome.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct EntryDefs(pub Vec<EntryDef>);
 
 #[derive(
@@ -73,14 +80,17 @@ pub struct EntryDefs(pub Vec<EntryDef>);
     Deserialize,
     SerializedBytes,
     Default,
+    TS,
 )]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub enum EntryVisibility {
     #[default]
     Public,
     Private,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub enum EntryDefsCallbackResult {
     Defs(EntryDefs),
 }

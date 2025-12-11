@@ -5,8 +5,11 @@ pub mod key_ref;
 pub mod nonce;
 pub mod x25519;
 use holochain_serialized_bytes::prelude::*;
+use ts_rs::TS;
+use export_types_config::EXPORT_TS_TYPES_FILE;
 
-#[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct XSalsa20Poly1305Decrypt {
     pub key_ref: crate::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef,
     pub encrypted_data: crate::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData,
@@ -34,7 +37,8 @@ impl XSalsa20Poly1305Decrypt {
     }
 }
 
-#[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct X25519XSalsa20Poly1305Decrypt {
     pub recipient: X25519PubKey,
     pub sender: X25519PubKey,
@@ -67,7 +71,8 @@ impl X25519XSalsa20Poly1305Decrypt {
     }
 }
 
-#[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct Ed25519XSalsa20Poly1305Decrypt {
     pub recipient: AgentPubKey,
     pub sender: AgentPubKey,

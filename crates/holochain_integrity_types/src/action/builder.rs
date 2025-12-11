@@ -15,8 +15,11 @@ use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyLinkableHash;
 use holo_hash::EntryHash;
+use ts_rs::TS;
+use export_types_config::EXPORT_TS_TYPES_FILE;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct ActionBuilderCommon {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,

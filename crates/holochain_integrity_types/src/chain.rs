@@ -7,6 +7,8 @@ use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
 use holochain_timestamp::Timestamp;
 use std::collections::HashSet;
+use ts_rs::TS;
+use export_types_config::EXPORT_TS_TYPES_FILE;
 
 #[cfg(test)]
 mod test;
@@ -22,7 +24,8 @@ mod test;
 /// Timestamp newer than the provided one. In the case of multiple actions having the same
 /// Timestamp as the limit condition, the filter will stop at the action with the lowest sequence.
 /// Multiple limit conditions can be set. Whichever is the smaller set will be kept.
-#[derive(Serialize, Deserialize, SerializedBytes, Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Serialize, Deserialize, SerializedBytes, Debug, PartialEq, Eq, Hash, Clone, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct ChainFilter<H: Eq + Ord + std::hash::Hash = ActionHash> {
     /// The starting position of the filter.
     pub chain_top: H,
@@ -35,7 +38,8 @@ pub struct ChainFilter<H: Eq + Ord + std::hash::Hash = ActionHash> {
 }
 
 /// Specify when to stop walking down the chain.
-#[derive(Serialize, Deserialize, Debug, Eq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Eq, Clone, Default, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub enum LimitConditions<H: Eq + Ord + std::hash::Hash = ActionHash> {
     /// Allow all up to genesis.
     #[default]
@@ -100,7 +104,8 @@ impl<H: Eq + Ord + std::hash::Hash> core::cmp::PartialEq for LimitConditions<H> 
 }
 
 /// Input to the `must_get_agent_activity` call.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct MustGetAgentActivityInput {
     /// The author of the chain that you are requesting
     /// activity from.
@@ -223,14 +228,16 @@ impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
 }
 
 /// Input to close a chain.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct CloseChainInput {
     /// The target identifier for the chain that will be migrated to.
     pub new_target: Option<MigrationTarget>,
 }
 
 /// Input to open a chain.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct OpenChainInput {
     /// The identifier for the chain that was migrated from.
     pub prev_target: MigrationTarget,

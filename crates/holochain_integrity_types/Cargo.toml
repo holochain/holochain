@@ -19,6 +19,8 @@ holochain_secure_primitive = { version = "^0.7.0-dev.0", path = "../holochain_se
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_bytes = "0.11"
 schemars = { version = "0.9", optional = true }
+ts-rs = "11.1"
+export_types_config = { path = "../export_types_config" }
 
 # Just the bare minimum timestamp with no extra features.
 holochain_timestamp = { version = "^0.7.0-dev.0", path = "../timestamp", default-features = false }

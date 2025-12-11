@@ -8,13 +8,16 @@ use crate::FunctionName;
 use crate::LinkType;
 use holo_hash::DnaHash;
 use holochain_serialized_bytes::prelude::*;
+use ts_rs::TS;
+use export_types_config::EXPORT_TS_TYPES_FILE;
 
 #[cfg(test)]
 mod test;
 
 /// The properties of the current dna/zome being called.
 #[allow(missing_docs)]
-#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct ZomeInfo {
     pub name: ZomeName,
     /// The position of this zome in the `dna.json`
@@ -49,10 +52,12 @@ impl ZomeInfo {
 }
 
 /// Placeholder for a real network seed type. See [`DnaModifiers`].
+#[derive(TS)]
 pub type NetworkSeed = String;
 
 /// Information about the current DNA.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct DnaInfoV1 {
     /// The name of this DNA.
     pub name: String,
@@ -66,7 +71,8 @@ pub struct DnaInfoV1 {
 }
 
 /// Information about the current DNA.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct DnaInfoV2 {
     /// The name of this DNA.
     pub name: String,
@@ -80,10 +86,12 @@ pub struct DnaInfoV2 {
 }
 
 /// Convenience alias to the latest `DnaInfoN`.
+#[derive(TS)]
 pub type DnaInfo = DnaInfoV2;
 
 /// The set of [`EntryDefIndex`] and [`LinkType`]s in scope for the calling zome.
-#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Default, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct ScopedZomeTypesSet {
     /// All the entry [`EntryDefIndex`]s in scope for this zome.
     pub entries: ScopedZomeTypes<EntryDefIndex>,
@@ -92,7 +100,8 @@ pub struct ScopedZomeTypesSet {
 }
 
 /// zome types that are in scope for the calling zome.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct ScopedZomeTypes<T>(pub Vec<(ZomeIndex, Vec<T>)>);
 
 impl<T> Default for ScopedZomeTypes<T> {
@@ -102,7 +111,8 @@ impl<T> Default for ScopedZomeTypes<T> {
 }
 
 /// A key to the [`ScopedZomeTypes`] container.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct ZomeTypesKey<T>
 where
     T: U8Index + Copy,
@@ -114,16 +124,21 @@ where
 }
 
 /// A key to the [`ScopedZomeTypes<EntryDefIndex>`] container.
+#[derive(TS)]
 pub type ZomeEntryTypesKey = ZomeTypesKey<EntryDefIndex>;
 /// A key to the [`ScopedZomeTypes<LinkType>`] container.
+#[derive(TS)]
 pub type ZomeLinkTypesKey = ZomeTypesKey<LinkType>;
 
 /// The index into the [`ZomeIndex`] vec.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(TS)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct ZomeDependencyIndex(pub u8);
 
 /// A type with the zome that it is defined in.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct ScopedZomeType<T> {
     /// The zome that defines this type.
     pub zome_index: ZomeIndex,
@@ -132,8 +147,10 @@ pub struct ScopedZomeType<T> {
 }
 
 /// An [`EntryDefIndex`] within the scope of the zome where it's defined.
+#[derive(TS)]
 pub type ScopedEntryDefIndex = ScopedZomeType<EntryDefIndex>;
 /// A [`LinkType`] within the scope of the zome where it's defined.
+#[derive(TS)]
 pub type ScopedLinkType = ScopedZomeType<LinkType>;
 
 impl<T> ScopedZomeTypes<T>

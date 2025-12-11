@@ -1,9 +1,12 @@
 use super::EntryError;
 use super::ENTRY_SIZE_LIMIT;
 use holochain_serialized_bytes::prelude::*;
+use ts_rs::TS;
+use export_types_config::EXPORT_TS_TYPES_FILE;
 
 /// Newtype for the bytes comprising an App entry
-#[derive(Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq, Hash, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct AppEntryBytes(pub SerializedBytes);
 
 impl std::fmt::Debug for AppEntryBytes {

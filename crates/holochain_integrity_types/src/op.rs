@@ -7,6 +7,8 @@ use crate::{
 use holo_hash::{ActionHash, AgentPubKey, EntryHash, HasHash, HashableContent};
 use holochain_serialized_bytes::prelude::*;
 use holochain_timestamp::Timestamp;
+use ts_rs::TS;
+use export_types_config::EXPORT_TS_TYPES_FILE;
 
 /// These are the operations that can be applied to Holochain data.
 /// Every [`Action`] produces a set of operations.
@@ -78,7 +80,8 @@ use holochain_timestamp::Timestamp;
 /// storing data.
 /// Operations beginning with `Register` are concerned with registering
 /// metadata about the data.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub enum Op {
     /// Stores a new [`Record`] in the DHT.
     /// This is the act of creating a new [`Action`]
@@ -121,7 +124,8 @@ pub enum Op {
 /// This is the act of creating a new [`Action`]
 /// and publishing it to the DHT.
 /// Note that not all [`Action`]s contain an [`Entry`].
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct StoreRecord {
     /// The [`Record`] to store.
     pub record: Record,
@@ -131,7 +135,8 @@ pub struct StoreRecord {
 /// This is the act of creating a either a [`Action::Create`] or
 /// a [`Action::Update`] and publishing it to the DHT.
 /// These actions create a new instance of an [`Entry`].
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct StoreEntry {
     /// The signed and hashed [`EntryCreationAction`] that creates
     /// a new instance of the [`Entry`].
@@ -146,7 +151,8 @@ pub struct StoreEntry {
 /// Note that the [`Action::Update`] stores an new instance
 /// of an [`Entry`] and registers it as an update to the original [`Entry`].
 /// This operation is only concerned with registering the update.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct RegisterUpdate {
     /// The signed and hashed [`Action::Update`] that registers the update.
     pub update: SignedHashed<Update>,
@@ -159,7 +165,8 @@ pub struct RegisterUpdate {
 /// Registers a deletion of an instance of an [`Entry`] in the DHT.
 /// This is the act of creating a [`Action::Delete`] and
 /// publishing it to the DHT.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct RegisterDelete {
     /// The signed and hashed [`Action::Delete`] that registers the deletion.
     pub delete: SignedHashed<Delete>,
@@ -168,7 +175,8 @@ pub struct RegisterDelete {
 /// Registers a new [`Action`] on an agent source chain.
 /// This is the act of creating any [`Action`] and
 /// publishing it to the DHT.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct RegisterAgentActivity {
     /// The signed and hashed [`Action`] that is being registered.
     pub action: SignedActionHashed,
@@ -189,7 +197,8 @@ impl AsRef<SignedActionHashed> for RegisterAgentActivity {
 /// This is the act of creating a [`Action::CreateLink`] and
 /// publishing it to the DHT.
 /// The authority is the entry authority for the base [`Entry`].
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct RegisterCreateLink {
     /// The signed and hashed [`Action::CreateLink`] that registers the link.
     pub create_link: SignedHashed<CreateLink>,
@@ -199,7 +208,8 @@ pub struct RegisterCreateLink {
 /// This is the act of creating a [`Action::DeleteLink`] and
 /// publishing it to the DHT.
 /// The delete always references a specific [`Action::CreateLink`].
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct RegisterDeleteLink {
     /// The signed and hashed [`Action::DeleteLink`] that registers the deletion.
     pub delete_link: SignedHashed<DeleteLink>,
@@ -336,7 +346,8 @@ impl Op {
 
 /// Either a [`Action::Create`] or a [`Action::Update`].
 /// These actions both create a new instance of an [`Entry`].
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes, Eq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes, Eq, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub enum EntryCreationAction {
     /// A [`Action::Create`] that creates a new instance of an [`Entry`].
     Create(Create),

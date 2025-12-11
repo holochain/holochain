@@ -1,7 +1,10 @@
 use crate::Role;
+use ts_rs::TS;
+use export_types_config::EXPORT_TS_TYPES_FILE;
 
 /// Errors related to the secure primitive macro.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub enum CounterSigningError {
     /// Agent index is out of bounds for the signing session.
     AgentIndexOutOfBounds,

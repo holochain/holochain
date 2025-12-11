@@ -20,6 +20,8 @@ use holo_hash::EntryHash;
 use holo_hash::HashableContent;
 use holo_hash::HashableContentBytes;
 use holochain_serialized_bytes::prelude::*;
+use ts_rs::TS;
+use export_types_config::EXPORT_TS_TYPES_FILE;
 
 mod app_entry_bytes;
 mod error;
@@ -84,7 +86,8 @@ impl From<EntryHashed> for Entry {
 }
 
 /// Structure holding the entry portion of a chain record.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 #[serde(tag = "entry_type", content = "entry")]
 pub enum Entry {
     /// The `Agent` system entry, the third entry of every source chain,
@@ -181,7 +184,8 @@ impl HashableContent for Entry {
 }
 
 /// Zome input for must_get_valid_record.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct MustGetValidRecordInput(pub ActionHash);
 
 impl MustGetValidRecordInput {
@@ -197,7 +201,8 @@ impl MustGetValidRecordInput {
 }
 
 /// Zome input for must_get_entry.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct MustGetEntryInput(pub EntryHash);
 
 impl MustGetEntryInput {
@@ -213,7 +218,8 @@ impl MustGetEntryInput {
 }
 
 /// Zome input for must_get_action.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct MustGetActionInput(pub ActionHash);
 
 impl MustGetActionInput {

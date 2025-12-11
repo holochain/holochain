@@ -1,7 +1,10 @@
 use super::*;
+use ts_rs::TS;
+use export_types_config::EXPORT_TS_TYPES_FILE;
 
 /// Errors involving app entry creation
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub enum EntryError {
     /// The entry is too large to be created
     EntryTooLarge(usize),

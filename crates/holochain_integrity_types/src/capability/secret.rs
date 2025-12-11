@@ -1,5 +1,7 @@
 use holochain_secure_primitive::secure_primitive;
 use holochain_serialized_bytes::prelude::*;
+use ts_rs::TS;
+use export_types_config::EXPORT_TS_TYPES_FILE;
 
 /// The number of bits we want for a comfy secret.
 pub const CAP_SECRET_BITS: usize = 512;
@@ -17,7 +19,8 @@ pub type CapSecretBytes = [u8; CAP_SECRET_BYTES];
 // @todo enforce that secrets are unique across all grants in a chain.
 // The PartialEq impl by subtle *should* be compatible with default Hash impl
 #[allow(clippy::derived_hash_with_manual_eq)]
-#[derive(Clone, Copy, Hash, SerializedBytes)]
+#[derive(Clone, Copy, Hash, SerializedBytes, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct CapSecret(CapSecretBytes);
 
 // Capability secrets are not cryptographic secrets.

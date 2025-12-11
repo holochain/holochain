@@ -8,13 +8,16 @@
 use crate::DnaInfoV1;
 use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
+use ts_rs::TS;
+use export_types_config::EXPORT_TS_TYPES_FILE;
 
 /// App-specific payload for proving membership in the membrane of the app
 pub type MembraneProof = std::sync::Arc<SerializedBytes>;
 
 /// Data passed into the genesis_self_check callback for verifying the initial
 /// chain entries
-#[derive(Debug, Serialize, Deserialize, SerializedBytes)]
+#[derive(Debug, Serialize, Deserialize, SerializedBytes, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct GenesisSelfCheckDataV1 {
     /// The Dna action (1st record)
     pub dna_info: DnaInfoV1,
@@ -30,7 +33,8 @@ pub struct GenesisSelfCheckDataV1 {
 /// chain entries. DnaInfo can be read with a call to `dna_info` within the
 /// self check callback, it is elided here to minimise/stabilise the callback
 /// function signature.
-#[derive(Debug, Serialize, Deserialize, SerializedBytes)]
+#[derive(Debug, Serialize, Deserialize, SerializedBytes, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct GenesisSelfCheckDataV2 {
     /// The proof of membership that will be the AgentValidationPkg (2nd record).
     pub membrane_proof: Option<MembraneProof>,

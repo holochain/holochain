@@ -1,7 +1,11 @@
 use crate::x_salsa20_poly1305::nonce::XSalsa20Poly1305Nonce;
+use ts_rs::TS;
+use export_types_config::EXPORT_TS_TYPES_FILE;
 
-#[derive(PartialEq, Eq, serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(PartialEq, Eq, serde::Serialize, serde::Deserialize, Debug, Clone, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct XSalsa20Poly1305EncryptedData {
+    #[ts(type="Uint8Array")]
     nonce: XSalsa20Poly1305Nonce,
     #[serde(with = "serde_bytes")]
     encrypted_data: Vec<u8>,

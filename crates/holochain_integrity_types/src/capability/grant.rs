@@ -5,6 +5,8 @@ use holo_hash::*;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::{BTreeSet, HashSet};
+use ts_rs::TS;
+use export_types_config::EXPORT_TS_TYPES_FILE;
 
 /// Represents a _potentially_ valid access grant to a zome call.
 /// Zome call response will be Unauthorized without a valid grant.
@@ -15,7 +17,8 @@ use std::collections::{BTreeSet, HashSet};
 /// A `CapGrant` is valid if it matches the function, agent and secret for a given zome call.
 ///
 /// See `.is_valid()`
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 #[allow(clippy::large_enum_variant)]
 pub enum CapGrant {
     /// Grants the capability of calling every extern to the calling agent, provided the calling
@@ -40,7 +43,8 @@ impl From<holo_hash::AgentPubKey> for CapGrant {
 /// This data is committed to the callee's source chain as a private entry.
 /// The remote calling agent must provide a secret and we source their pubkey from the active
 /// network connection. This must match the strictness of the CapAccess.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct ZomeCallCapGrant {
     /// A string by which to later query for saved grants.
     /// This does not need to be unique within a source chain.
@@ -55,7 +59,8 @@ pub struct ZomeCallCapGrant {
 
 /// The outbound DTO of a ZomeCall capability grant info request.
 /// CapAccess secrets are omitted, Access types and assignees are provided under CapAccessInfo.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct DesensitizedZomeCallCapGrant {
     /// A string by which to later query for saved grants.
     /// This does not need to be unique within a source chain.
@@ -151,7 +156,8 @@ impl CapGrant {
 }
 
 /// Represents access requirements for capability grants.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum CapAccess {
     /// No restriction: callable by anyone.
@@ -213,7 +219,8 @@ impl CapAccess {
 }
 
 /// Represents access info for capability grants .
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct CapAccessInfo {
     /// The access type.
     access_type: String,
@@ -225,7 +232,8 @@ pub struct CapAccessInfo {
 pub type GrantedFunction = (ZomeName, FunctionName);
 
 /// A collection of zome/function pairs
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum GrantedFunctions {
     /// grant all zomes all functions

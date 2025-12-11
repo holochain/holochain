@@ -1,4 +1,6 @@
 use holochain_serialized_bytes::prelude::*;
+use ts_rs::TS;
+use export_types_config::EXPORT_TS_TYPES_FILE;
 
 // Every externed function that the zome developer exposes to holochain returns `ExternIO`.
 // The zome developer can expose callbacks in a "sparse" way based on names and the functions
@@ -13,10 +15,11 @@ use holochain_serialized_bytes::prelude::*;
 // - then the guest inflates the expected input or the host the expected output based on the
 //   callback flavour
 
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq, TS)]
 #[serde(transparent)]
 #[repr(transparent)]
-pub struct ExternIO(#[serde(with = "serde_bytes")] pub Vec<u8>);
+#[ts(export, export_to=EXPORT_TS_TYPES_FILE)]
+pub struct ExternIO(#[serde(with = "serde_bytes")]#[ts(type = "Uint8Array")] pub Vec<u8>);
 
 impl ExternIO {
     pub fn encode<I>(input: I) -> Result<Self, SerializedBytesError>

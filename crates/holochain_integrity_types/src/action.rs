@@ -17,6 +17,8 @@ use holochain_timestamp::Timestamp;
 use std::borrow::Borrow;
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
+use ts_rs::TS;
+use export_types_config::EXPORT_TS_TYPES_FILE;
 
 pub mod builder;
 pub mod conversions;
@@ -33,7 +35,8 @@ pub const POST_GENESIS_SEQ_THRESHOLD: u32 = 3;
 /// are then used to check the integrity of data using cryptographic hash
 /// functions.
 #[allow(missing_docs)]
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 #[serde(tag = "type")]
 pub enum Action {
     // The first action in a chain (for the DNA) doesn't have a previous action
@@ -134,7 +137,8 @@ macro_rules! write_into_action {
 
         /// A unit enum which just maps onto the different Action variants,
         /// without containing any extra data
-        #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Eq, Clone, Debug)]
+        #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Eq, Clone, Debug, TS)]
+        #[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
         pub enum ActionType {
             $($n,)*
         }
@@ -472,7 +476,9 @@ impl_hashable_content_for_ref!(Delete);
     Serialize,
     Deserialize,
     SerializedBytes,
+    TS,
 )]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct ZomeIndex(pub u8);
 
 impl ZomeIndex {
@@ -493,11 +499,14 @@ impl ZomeIndex {
     Serialize,
     Deserialize,
     SerializedBytes,
+    TS,
 )]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct EntryDefIndex(pub u8);
 
 /// The Dna Action is always the first action in a source chain
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct Dna {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -507,7 +516,8 @@ pub struct Dna {
 
 /// Action for an agent validation package, used to determine whether an agent
 /// is allowed to participate in this DNA
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct AgentValidationPkg {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -519,7 +529,8 @@ pub struct AgentValidationPkg {
 
 /// An action which declares that all zome init functions have successfully
 /// completed, and the chain is ready for commits. Contains no explicit data.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct InitZomesComplete {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -529,7 +540,8 @@ pub struct InitZomesComplete {
 
 /// Declares that a metadata Link should be made between two hashes of anything; could be data or
 /// an op or anything that can be hashed.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct CreateLink<W = RateWeight> {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -546,7 +558,8 @@ pub struct CreateLink<W = RateWeight> {
 }
 
 /// Declares that a previously made Link should be nullified and considered removed.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct DeleteLink {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -568,7 +581,8 @@ pub struct DeleteLink {
 ///
 /// When used in CloseChain, this contains the new DNA hash or Agent key.
 /// When used in OpenChain, this contains the previous DNA hash or Agent key.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub enum MigrationTarget {
     /// Represents a DNA migration, and contains the new or previous DNA hash.
     Dna(DnaHash),
@@ -595,7 +609,8 @@ impl From<AgentPubKey> for MigrationTarget {
 /// Note that if `MigrationTarget::Agent` is used, this action will be signed with
 /// that key rather than the authoring key, so that new key must be a valid keypair
 /// that you control in the keystore, so that the action can be signed.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct CloseChain {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -607,7 +622,8 @@ pub struct CloseChain {
 
 /// When migrating to a new version of a DNA, this action is committed to the
 /// new chain to declare the migration path taken.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct OpenChain {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -622,7 +638,8 @@ pub struct OpenChain {
 
 /// An action which "speaks" Entry content into being. The same content can be
 /// referenced by multiple such actions.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct Create<W = EntryRateWeight> {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -649,7 +666,8 @@ pub struct Create<W = EntryRateWeight> {
 /// then you have a loop of references. Every update introduces a new action,
 /// so there can only be a linear history of action updates, even if the entry history
 /// experiences repeats.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct Update<W = EntryRateWeight> {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -671,7 +689,8 @@ pub struct Update<W = EntryRateWeight> {
 /// Via the associated [`crate::Op`], this also has an effect on Entries: namely,
 /// that a previously published Entry will become inaccessible if all of its
 /// Actions are marked deleted.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct Delete<W = RateWeight> {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -688,7 +707,8 @@ pub struct Delete<W = RateWeight> {
 /// Allows Actions which reference Entries to know what type of Entry it is
 /// referencing. Useful for examining Actions without needing to fetch the
 /// corresponding Entries.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub enum EntryType {
     /// An AgentPubKey
     AgentPubKey,
@@ -728,7 +748,8 @@ impl std::fmt::Display for EntryType {
 }
 
 /// Information about a class of Entries provided by the DNA
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct AppEntryDef {
     /// A unique u8 identifier within a zome for this
     /// entry type.

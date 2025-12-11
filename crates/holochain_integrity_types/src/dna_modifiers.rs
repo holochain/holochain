@@ -2,11 +2,14 @@
 
 use crate::prelude::*;
 use holochain_serialized_bytes::prelude::*;
+use ts_rs::TS;
+use export_types_config::EXPORT_TS_TYPES_FILE;
 
 /// Modifiers of this DNA - the network seed, properties and origin time - as
 /// opposed to the actual DNA code. These modifiers are included in the DNA
 /// hash computation.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 #[cfg_attr(feature = "full-dna-def", derive(derive_builder::Builder))]
 pub struct DnaModifiers {
     /// The network seed of a DNA is included in the computation of the DNA hash.
@@ -33,7 +36,8 @@ impl DnaModifiers {
 }
 
 /// [`DnaModifiers`] options of which all are optional.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DnaModifiersOpt<P = SerializedBytes> {
     /// see [`DnaModifiers`]

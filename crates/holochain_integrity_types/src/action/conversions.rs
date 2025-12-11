@@ -1,4 +1,6 @@
 use super::*;
+use ts_rs::TS;
+use export_types_config::EXPORT_TS_TYPES_FILE;
 
 impl From<u8> for ZomeIndex {
     fn from(a: u8) -> Self {
@@ -24,7 +26,8 @@ impl From<u8> for EntryDefIndex {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct WrongActionError(pub String);
 
 impl std::fmt::Display for WrongActionError {

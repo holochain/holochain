@@ -1,10 +1,13 @@
 use holochain_secure_primitive::secure_primitive;
 use holochain_serialized_bytes::prelude::*;
 use std::hash::{Hash, Hasher};
+use ts_rs::TS;
+use export_types_config::EXPORT_TS_TYPES_FILE;
 
 pub const X25519_PUB_KEY_BYTES: usize = 32;
 
-#[derive(Clone, Copy, SerializedBytes)]
+#[derive(Clone, Copy, SerializedBytes, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct X25519PubKey([u8; X25519_PUB_KEY_BYTES]);
 
 secure_primitive!(X25519PubKey, X25519_PUB_KEY_BYTES);

@@ -1,5 +1,7 @@
 use crate::ZomeIndex;
 use holochain_serialized_bytes::prelude::*;
+use ts_rs::TS;
+use export_types_config::EXPORT_TS_TYPES_FILE;
 
 #[derive(
     Debug,
@@ -13,7 +15,9 @@ use holochain_serialized_bytes::prelude::*;
     serde::Serialize,
     serde::Deserialize,
     SerializedBytes,
+    TS,
 )]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct LinkType(pub u8);
 
 impl LinkType {
@@ -28,8 +32,9 @@ impl LinkType {
 /// Opaque tag for the link applied at the app layer, used to differentiate
 /// between different semantics and validation rules for different links
 #[derive(
-    Debug, PartialOrd, Ord, Clone, Hash, serde::Serialize, serde::Deserialize, PartialEq, Eq,
+    Debug, PartialOrd, Ord, Clone, Hash, serde::Serialize, serde::Deserialize, PartialEq, Eq, TS,
 )]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct LinkTag(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 impl LinkTag {
@@ -46,7 +51,8 @@ impl LinkTag {
 }
 
 /// Filter on a set of [`LinkType`]s.
-#[derive(PartialEq, Eq, Hash, Clone, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub enum LinkTypeFilter {
     /// Return links that match any of these types.
     Types(Vec<(ZomeIndex, Vec<LinkType>)>),

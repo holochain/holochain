@@ -6,6 +6,7 @@ use holochain_types::websocket::AllowedOrigins;
 use holochain_zome_types::cell::CellId;
 use kitsune2_api::Url;
 use std::collections::{BTreeMap, HashMap};
+use ts_rs::TS;
 
 /// Represents the available conductor functions to call over an admin interface.
 ///

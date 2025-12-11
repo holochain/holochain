@@ -1,10 +1,13 @@
 //! Types related to the `debug` host function
 
 use holochain_serialized_bytes::prelude::*;
+use ts_rs::TS;
+use export_types_config::EXPORT_TS_TYPES_FILE;
 
 /// Maps directly to the tracing Levels but here to define the interface.
 /// See <https://docs.rs/tracing-core/0.1.17/tracing_core/struct.Level.html>
-#[derive(PartialEq, Eq, serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(PartialEq, Eq, serde::Serialize, serde::Deserialize, Debug, Clone, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum Level {
     /// Error.
@@ -33,7 +36,8 @@ impl From<&tracing::Level> for Level {
 }
 
 /// Representation of message to be logged via the `debug` host function
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct TraceMsg {
     /// A formatted string to be forwarded to `tracing` on the host side.
     ///

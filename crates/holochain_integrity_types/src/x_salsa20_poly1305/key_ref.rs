@@ -1,10 +1,13 @@
 use holochain_serialized_bytes::prelude::*;
 use std::sync::Arc;
+use ts_rs::TS;
+use export_types_config::EXPORT_TS_TYPES_FILE;
 
 /// Key refs represent shared secrets stored in the keystore.
 /// They can either be user-specified, or auto-generated at time of
 /// secret creation, or ingestion.
-#[derive(Debug, Clone, SerializedBytes)]
+#[derive(Debug, Clone, SerializedBytes, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct XSalsa20Poly1305KeyRef(Arc<[u8]>);
 
 impl serde::Serialize for XSalsa20Poly1305KeyRef {

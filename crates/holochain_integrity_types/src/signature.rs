@@ -2,12 +2,15 @@
 use holo_hash::AgentPubKey;
 use holochain_secure_primitive::secure_primitive;
 use holochain_serialized_bytes::prelude::*;
+use ts_rs::TS;
+use export_types_config::EXPORT_TS_TYPES_FILE;
 
 /// Ed25519 signatures are always the same length, 64 bytes.
 pub const SIGNATURE_BYTES: usize = 64;
 
 /// The raw bytes of a signature.
-#[derive(Clone, PartialOrd, Hash, Ord)]
+#[derive(Clone, PartialOrd, Hash, Ord, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 // The equality is not different, it's just constant time, so we can derive a hash.
 // For an actually secure thing we wouldn't want to just assume a safe default hashing
 // But that is not what clippy is complaining about here.
@@ -26,7 +29,8 @@ secure_primitive!(Signature, SIGNATURE_BYTES);
 /// or forged because the private key no longer exists.
 /// The signatures match the input items positionally in the vector,
 /// it is up to the caller to reconstruct/align/zip them back together.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct EphemeralSignatures {
     /// The public key associated with the now-discarded private key used to sign.
     pub key: holo_hash::AgentPubKey,
@@ -35,7 +39,8 @@ pub struct EphemeralSignatures {
 }
 
 /// Mirror struct for Sign that includes a signature to verify against a key and data.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct VerifySignature {
     /// The public key associated with the private key that should be used to
     /// verify the signature.

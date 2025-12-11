@@ -31,7 +31,8 @@ Each release involves three branches:
 6. Create a tag for each crate version
 7. Create a PR from the release branch to the main branch
 8. Merge PR to main
-9. Publish crates to crates.io
+9.A Publish crates to crates.io
+9.B Publish packages to npm.org
 10. Push the tags upstream
 11. On the release branch increase the versions of all released crates to the next patch and develop version
 12. Create a tag for the workspace release

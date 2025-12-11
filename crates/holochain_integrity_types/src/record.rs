@@ -16,10 +16,13 @@ use holo_hash::HoloHashed;
 use holo_hash::PrimitiveHashType;
 use holochain_serialized_bytes::prelude::*;
 use std::borrow::Borrow;
+use ts_rs::TS;
+use export_types_config::EXPORT_TS_TYPES_FILE;
 
 /// a chain record containing the signed action along with the
 /// entry if the action type has one.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct Record {
     /// The signed action for this record
     pub signed_action: SignedActionHashed,
@@ -56,7 +59,8 @@ impl ActionSequenceAndHash for Record {
 
 /// Represents the different ways the entry_address reference within an action
 /// can be interpreted
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub enum RecordEntry<E: Borrow<Entry> = Entry> {
     /// The Action has an entry_address reference, and the Entry is accessible.
     Present(E),
@@ -174,9 +178,11 @@ impl<E: Borrow<Entry>> RecordEntry<E> {
 }
 
 /// Alias for record with ref entry
+#[derive(TS)]
 pub type RecordEntryRef<'a> = RecordEntry<&'a Entry>;
 
 /// The hashed action and the signature that signed it
+#[derive(TS)]
 pub type SignedActionHashed = SignedHashed<Action>;
 
 impl AsRef<SignedActionHashed> for SignedActionHashed {
@@ -186,7 +192,8 @@ impl AsRef<SignedActionHashed> for SignedActionHashed {
 }
 
 /// Any content that has been hashed and signed.
-#[derive(Clone, Debug, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = EXPORT_TS_TYPES_FILE)]
 pub struct SignedHashed<T>
 where
     T: HashableContent,

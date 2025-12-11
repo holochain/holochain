@@ -8,11 +8,14 @@
 
 use holochain_serialized_bytes::prelude::*;
 use std::borrow::Cow;
+use ts_rs::TS;
+use export_types_config::EXPORT_TS_TYPES_FILE;
 
 /// ZomeName as a String.
-#[derive(Clone, Debug, Serialize, Hash, Deserialize, Ord, Eq, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Serialize, Hash, Deserialize, Ord, Eq, PartialEq, PartialOrd, TS)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[repr(transparent)]
+#[ts(export, export_to=EXPORT_TS_TYPES_FILE)]
 pub struct ZomeName(pub Cow<'static, str>);
 
 impl ZomeName {
@@ -47,7 +50,8 @@ impl From<String> for ZomeName {
 
 /// A single function name.
 #[repr(transparent)]
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, PartialOrd, Ord, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, PartialOrd, Ord, Eq, Hash, TS)]
+#[ts(export, export_to=EXPORT_TS_TYPES_FILE)]
 pub struct FunctionName(pub String);
 
 impl FunctionName {
