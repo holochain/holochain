@@ -63,7 +63,7 @@ jobs:
             target: wasmer_sys
           - os: macos-15-intel
             target: wasmer_sys
-          - os: windows-latest
+          - os: depot-windows-2022-8
             target: wasmer_sys
           - os: ubuntu-latest
             target: wasmer_sys-unstable
@@ -90,15 +90,23 @@ jobs:
         run: |
           brew install llvm
           echo "PATH=/opt/homebrew/opt/llvm/bin:$PATH" >> "$GITHUB_ENV"
+        
+      - name: llvm & clang
+        if: matrix.os == 'depot-windows-2022-8'
+        uses: KyleMayes/install-llvm-action@v2.0.8
+        with:
+          version: "21"
 
-      - name: build (windows-latest)
-        if: matrix.os == 'windows-latest'
+      - name: build (depot-windows-2022-8)
+        if: matrix.os == 'depot-windows-2022-8'
         run: |-
-          $env:SODIUM_LIB_DIR="$(pwd)\vcpkg\packages\libsodium_x64-windows-release\lib"
+          vcpkg install libsodium
+          $env:SODIUM_LIB_DIR="C:\vcpkg\packages\libsodium_x64-windows\lib"
+
           make build-workspace-${{ matrix.target }}
 
       - name: build
-        if: matrix.os != 'windows-latest'
+        if: matrix.os != 'depot-windows-2022-8'
         run: |
           make build-workspace-${{ matrix.target }}
 
@@ -107,15 +115,15 @@ jobs:
         with:
           tool: cargo-nextest@0.9.96
 
-      - name: test (windows-latest)
-        if: matrix.os == 'windows-latest'
+      - name: test (depot-windows-2022-8)
+        if: matrix.os == 'depot-windows-2022-8'
         continue-on-error: true
         run: |-
-          $env:SODIUM_LIB_DIR="$(pwd)\vcpkg\packages\libsodium_x64-windows-release\lib"
+          $env:SODIUM_LIB_DIR="C:\vcpkg\packages\libsodium_x64-windows\lib"
           make test-workspace-${{ matrix.target }}
 
       - name: test
-        if: matrix.os != 'windows-latest'
+        if: matrix.os != 'depot-windows-2022-8'
         continue-on-error: true
         run: make test-workspace-${{ matrix.target }}
 
