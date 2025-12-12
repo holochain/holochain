@@ -134,7 +134,7 @@ jobs:
         continue-on-error: true
         env:
           INFLUX_TOKEN: ${{ secrets.INFLUX_TOKEN }}
-        uses: holochain/junit-to-influx-action@v1.0.0
+        uses: holochain/junit-to-influx-action@v1.1.0
         with:
           junit-file: target/nextest/default/junit.xml
           influx-url: https://ifdb.holochain.org

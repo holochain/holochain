@@ -212,7 +212,6 @@ async fn unresponsive_peers_are_removed_from_store_after_expiry() {
         vec![0x0a; 36],
     ))))
     .unwrap();
-    // Set pruning interval to 100 ms.
     let store = Arc::new(HolochainPeerMetaStore::create(db.clone()).await.unwrap());
 
     let peer_url = Url::from_str("ws://test:80/1").unwrap();
@@ -230,12 +229,17 @@ async fn unresponsive_peers_are_removed_from_store_after_expiry() {
     let when_peer_marked_unresponsive = store.get_unresponsive(peer_url.clone()).await.unwrap();
     assert_eq!(when_peer_marked_unresponsive, Some(when));
 
-    // Waiting until the next pruning, after expiry.
+    // Wait until after expiry.
     // Test has to wait at least until the next second, because the expiry is compared with the unixepoch function in SQLite which returns
     // the timestamp in full seconds.
     let micros_to_wait =
         1_000_000_u64.saturating_sub(after_set_unresponsive.as_micros() as u64 % 1_000_000);
     tokio::time::sleep(Duration::from_micros(micros_to_wait)).await;
+
+    // Manually trigger pruning by recreating the store (which prunes on startup).
+    drop(store);
+    let store = Arc::new(HolochainPeerMetaStore::create(db.clone()).await.unwrap());
+
     let when_peer_set_unresponsive = store.get_unresponsive(peer_url).await.unwrap();
     assert!(when_peer_set_unresponsive.is_none());
 }
