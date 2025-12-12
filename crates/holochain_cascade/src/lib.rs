@@ -26,7 +26,7 @@
 use crate::authority::get_agent_activity_query::must_get_agent_activity::{
     exclude_forked_activity, get_action_seq, get_action_seq_from_scratch,
     get_filtered_agent_activity, get_filtered_agent_activity_from_scratch,
-    get_warrants_for_activity_from_scratch, is_activity_chained_descending,
+    get_warrants_for_agent_from_scratch, is_activity_chained_descending,
     is_activity_complete_descending, merge_agent_activity, merge_warrants,
 };
 use crate::error::CascadeError;
@@ -1098,10 +1098,7 @@ impl CascadeImpl {
                     // Retrieve any Warrants from Scratch that apply to included activity
                     if let Some(scratch) = self.scratch.clone() {
                         let warrants_list_from_scratch = scratch.apply_and_then(|scratch| {
-                            get_warrants_for_activity_from_scratch(
-                                scratch,
-                                merged_activity.iter().collect(),
-                            )
+                            get_warrants_for_agent_from_scratch(scratch, &author)
                         })?;
                         warrants_lists.push(warrants_list_from_scratch);
                     }

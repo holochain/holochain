@@ -119,29 +119,19 @@ pub(crate) fn get_filtered_agent_activity_from_scratch(
     Ok(activity)
 }
 
-/// Get all warrants that target any RegisterAgentActivity Ops in the given list.
-pub(crate) fn get_warrants_for_activity_from_scratch(
+/// Get all warrants against an Agent from scratch
+pub(crate) fn get_warrants_for_agent_from_scratch(
     scratch: &mut Scratch,
-    activity: Vec<&RegisterAgentActivity>,
+    agent: &AgentPubKey,
 ) -> StateQueryResult<Vec<WarrantOp>> {
-    // Get list of ActionHashes of RegisterAgentActivity Ops
-    let activity_hashes: Vec<&ActionHash> =
-        activity.iter().map(|a| &a.action.hashed.hash).collect();
-
-    // Get list of warrants with the RegisterAgentActivity Op type that target any of the given Action hashes
     let warrants: Vec<WarrantOp> = scratch
         .warrants()
         .filter(|a| {
             let WarrantProof::ChainIntegrity(warrant) = a.proof.clone();
 
             match warrant {
-                ChainIntegrityWarrant::InvalidChainOp {
-                    action_author: _,
-                    action,
-                    chain_op_type,
-                } => {
-                    activity_hashes.contains(&action.0.as_hash())
-                        && chain_op_type == ChainOpType::RegisterAgentActivity
+                ChainIntegrityWarrant::InvalidChainOp { action_author, .. } => {
+                    &action_author == agent
                 }
                 ChainIntegrityWarrant::ChainFork { .. } => {
                     unimplemented!("Chain fork warrants are not implemented.");
