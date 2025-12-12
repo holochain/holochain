@@ -26,8 +26,8 @@
 use crate::authority::get_agent_activity_query::must_get_agent_activity::{
     exclude_forked_activity, get_action_seq, get_action_seq_from_scratch,
     get_filtered_agent_activity, get_filtered_agent_activity_from_scratch,
-    is_activity_chained_descending, is_activity_complete_descending, merge_agent_activity,
-    merge_warrants,
+    get_warrants_for_activity_from_scratch, is_activity_chained_descending,
+    is_activity_complete_descending, merge_agent_activity, merge_warrants,
 };
 use crate::error::CascadeError;
 use error::CascadeResult;
@@ -1027,7 +1027,7 @@ impl CascadeImpl {
             Some(chain_top_action_seq) => {
                 // Query for filtered activity and warrants from every database.
                 let mut txn_guards = self.get_txn_guards().await?;
-                let (mut activity_lists, warrants_lists) = tokio::task::spawn_blocking({
+                let (mut activity_lists, mut warrants_lists) = tokio::task::spawn_blocking({
                     let author = author.clone();
                     let filter = filter.clone();
                     move || {
@@ -1055,8 +1055,7 @@ impl CascadeImpl {
                 })
                 .await??;
 
-                // If Scratch store is available, query for filtered activity from it.
-                // Warrants are never written to Scratch.
+                // If Scratch store is available, query for filtered activity and warrants from it.
                 if let Some(scratch) = self.scratch.clone() {
                     let activity_list_from_scratch = scratch.apply_and_then(|scratch| {
                         get_filtered_agent_activity_from_scratch(
@@ -1095,6 +1094,16 @@ impl CascadeImpl {
                 {
                     MustGetAgentActivityResponse::IncompleteChain
                 } else {
+                    if let Some(scratch) = self.scratch.clone() {
+                        let warrants_list_from_scratch = scratch.apply_and_then(|scratch| {
+                            get_warrants_for_activity_from_scratch(
+                                scratch,
+                                merged_activity.iter().collect(),
+                            )
+                        })?;
+                        warrants_lists.push(warrants_list_from_scratch);
+                    }
+
                     MustGetAgentActivityResponse::Activity {
                         activity: merged_activity,
                         warrants: merge_warrants(warrants_lists),

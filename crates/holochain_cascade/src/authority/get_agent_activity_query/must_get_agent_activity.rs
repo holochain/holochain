@@ -7,6 +7,7 @@ use holochain_sqlite::sql::sql_cell::must_get_agent_activity::ACTION_HASH_TO_SEQ
 use holochain_sqlite::sql::sql_cell::must_get_agent_activity::MUST_GET_AGENT_ACTIVITY;
 use holochain_state::prelude::*;
 use holochain_state::query::StateQueryError;
+use holochain_types::prelude::WarrantOp;
 use std::cmp::Reverse;
 use std::collections::HashSet;
 
@@ -51,6 +52,23 @@ pub(crate) fn get_action_seq_from_scratch(
     }
 }
 
+/// Get the max action_seq of ChainFilter UntilHashes.
+fn get_chain_filter_limit_conditions_until_hashes_max_seq(
+    scratch: &mut Scratch,
+    filter: ChainFilter,
+) -> Option<u32> {
+    // Get the max action seq of all Actions in the set of until hashes.
+    if let Some(until_hashes) = filter.get_until_hash() {
+        scratch
+            .actions()
+            .filter(|a| until_hashes.contains(a.hashed.action_hash()))
+            .max_by_key(|a| a.seq())
+            .map(|a| a.seq())
+    } else {
+        None
+    }
+}
+
 /// Get the agent activity for a given range of actions from the Scratch.
 /// Note that Scratch actions should always be more recently created than database actions
 /// and thus will have a higher action seq than any actions in the database.
@@ -62,15 +80,7 @@ pub(crate) fn get_filtered_agent_activity_from_scratch(
 ) -> StateQueryResult<Vec<RegisterAgentActivity>> {
     // Get the max action seq of all Actions in the set of until hashes.
     let chain_filter_limit_conditions_until_hashes_max_seq =
-        if let Some(until_hashes) = filter.get_until_hash() {
-            scratch
-                .actions()
-                .filter(|a| until_hashes.contains(a.hashed.action_hash()))
-                .max_by_key(|a| a.seq())
-                .map(|a| a.seq())
-        } else {
-            None
-        };
+        get_chain_filter_limit_conditions_until_hashes_max_seq(scratch, filter.clone());
 
     // Until hash Action seq must be less than or equal to ChainFilter chain_top Action seq
     if let Some(until_action_seq) = chain_filter_limit_conditions_until_hashes_max_seq {
@@ -107,6 +117,41 @@ pub(crate) fn get_filtered_agent_activity_from_scratch(
         .collect();
 
     Ok(activity)
+}
+
+/// Get all warrants that target any RegisterAgentActivity Ops in the given list.
+pub(crate) fn get_warrants_for_activity_from_scratch(
+    scratch: &mut Scratch,
+    activity: Vec<&RegisterAgentActivity>,
+) -> StateQueryResult<Vec<WarrantOp>> {
+    // Get list of ActionHashes of RegisterAgentActivity Ops
+    let activity_hashes: Vec<&ActionHash> =
+        activity.iter().map(|a| &a.action.hashed.hash).collect();
+
+    // Get list of warrants with the RegisterAgentActivity Op type that target any of the given Action hashes
+    let warrants: Vec<WarrantOp> = scratch
+        .warrants()
+        .filter(|a| {
+            let WarrantProof::ChainIntegrity(warrant) = a.proof.clone();
+
+            match warrant {
+                ChainIntegrityWarrant::InvalidChainOp {
+                    action_author: _,
+                    action,
+                    chain_op_type,
+                } => {
+                    activity_hashes.contains(&action.0.as_hash())
+                        && chain_op_type == ChainOpType::RegisterAgentActivity
+                }
+                ChainIntegrityWarrant::ChainFork { .. } => {
+                    unimplemented!("Chain fork warrants are not implemented.");
+                }
+            }
+        })
+        .map(|s| WarrantOp::from(s.clone()))
+        .collect();
+
+    Ok(warrants)
 }
 
 /// Get the agent activity for a given range of actions from the database.
