@@ -985,9 +985,9 @@ impl CascadeImpl {
             ));
         }
 
-        // Get the seq of the ChainFilter.chain_top Action
-        // We must try every database and Scratch until it is found,
-        // because it may only be stored in one.
+        // First, we get the action_seq of the requested chain top Action
+        //
+        // We check every store until the Action is is found, because it may only be stored in one.
         let mut maybe_chain_top_action_seq = None;
 
         // Try to find chain top action in Scratch
@@ -1019,11 +1019,10 @@ impl CascadeImpl {
         }
 
         let result = match maybe_chain_top_action_seq {
-            // The chain top was not found in database or scratch, then we cannot query for the agent activity preceding it.
+            // The chain top Action was not found in database or scratch, so we cannot query for the activity preceding it.
             None => MustGetAgentActivityResponse::ChainTopNotFound(filter.chain_top.clone()),
 
-            // The chain top was found, now we can query for the preceding activity,
-            // filtered by the requested ChainFilter.
+            // The chain top was found, so we can query for the activity preceding it.
             Some(chain_top_action_seq) => {
                 // Query for filtered activity and warrants from every database.
                 let mut txn_guards = self.get_txn_guards().await?;
@@ -1055,7 +1054,7 @@ impl CascadeImpl {
                 })
                 .await??;
 
-                // If Scratch store is available, query for filtered activity and warrants from it.
+                // If Scratch store is available, query for filtered activity from it.
                 if let Some(scratch) = self.scratch.clone() {
                     let activity_list_from_scratch = scratch.apply_and_then(|scratch| {
                         get_filtered_agent_activity_from_scratch(
@@ -1087,13 +1086,16 @@ impl CascadeImpl {
                 // Check if the activity list is complete.
                 //
                 // The activity list is considered complete only if the following are true:
-                // - There are no gaps in the sequence numbers.
+                // - Every activity's action_seq is 1 greater than the action_seq of the next activity in the list.
                 // - Every activity's prev_hash equals the hash of the next activity in the list.
                 if !is_activity_complete_descending(&merged_activity)
                     || !is_activity_chained_descending(&merged_activity)
                 {
+                    // Activity list is not complete
                     MustGetAgentActivityResponse::IncompleteChain
                 } else {
+                    // Activity list is complete
+                    // Retrieve any Warrants from Scratch that apply to included activity
                     if let Some(scratch) = self.scratch.clone() {
                         let warrants_list_from_scratch = scratch.apply_and_then(|scratch| {
                             get_warrants_for_activity_from_scratch(
