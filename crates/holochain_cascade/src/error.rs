@@ -59,6 +59,12 @@ pub enum CascadeError {
 
     #[error("Network not initialized")]
     NetworkNotInitialized,
+
+    #[error("Cache database not initialized")]
+    CacheNotInitialized,
+
+    #[error("Scratch store not initialized")]
+    ScratchNotInitialized,
 }
 
 pub type CascadeResult<T> = Result<T, CascadeError>;

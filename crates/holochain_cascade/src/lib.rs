@@ -358,58 +358,64 @@ impl CascadeImpl {
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn add_activity_into_cache(
         &self,
-        responses: Vec<MustGetAgentActivityResponse>,
-    ) -> CascadeResult<MustGetAgentActivityResponse> {
-        // Choose a response from all the responses.
-        let response = if responses
-            .iter()
-            .zip(responses.iter().skip(1))
-            .all(|(a, b)| a == b)
-        {
-            // All responses are the same so we can just use the first one.
-            responses.into_iter().next()
-        } else {
-            tracing::info!(
-                "Got different must_get_agent_activity responses from different authorities"
-            );
-            // TODO: Handle conflict.
-            // For now try to find one that has got the activity
-            responses
-                .iter()
-                .find(|a| matches!(a, MustGetAgentActivityResponse::Activity { .. }))
-                .cloned()
-        };
-
-        let cache = some_or_return!(
-            self.cache.as_ref(),
-            response.unwrap_or(MustGetAgentActivityResponse::IncompleteChain)
-        );
+        response: MustGetAgentActivityResponse,
+    ) -> CascadeResult<()> {
+        let cache = self
+            .cache
+            .clone()
+            .ok_or(CascadeError::CacheNotInitialized)?;
 
         // Commit the activity to the chain.
-        match response {
-            Some(MustGetAgentActivityResponse::Activity { activity, warrants }) => {
-                // TODO: Avoid this clone by committing the ops as references to the db.
-                cache
-                    .write_async({
-                        let activity = activity.clone();
-                        let warrants = warrants.clone();
-                        move |txn| {
-                            Self::insert_activity(txn, activity)?;
-                            for warrant in warrants {
-                                let op = DhtOpHashed::from_content_sync(warrant);
-                                insert_op_cache(txn, &op)?;
-                            }
-
-                            CascadeResult::Ok(())
+        if let MustGetAgentActivityResponse::Activity { activity, warrants } = response {
+            // TODO: Avoid this clone by committing the ops as references to the db.
+            cache
+                .write_async({
+                    let activity = activity.clone();
+                    let warrants = warrants.clone();
+                    move |txn| {
+                        Self::insert_activity(txn, activity)?;
+                        for warrant in warrants {
+                            let op = DhtOpHashed::from_content_sync(warrant);
+                            insert_op_cache(txn, &op)?;
                         }
-                    })
-                    .await?;
-                Ok(MustGetAgentActivityResponse::Activity { activity, warrants })
-            }
-            Some(response) => Ok(response),
-            // Got no responses so the chain is incomplete.
-            None => Ok(MustGetAgentActivityResponse::IncompleteChain),
+
+                        CascadeResult::Ok(())
+                    }
+                })
+                .await?;
         }
+
+        Ok(())
+    }
+
+    // Add warrants received from the network to the scratch space to be written
+    // to the DHT database.
+    async fn add_warrants_into_scratch(
+        &self,
+        response: MustGetAgentActivityResponse,
+    ) -> CascadeResult<()> {
+        let scratch = self
+            .scratch
+            .clone()
+            .ok_or(CascadeError::ScratchNotInitialized)?;
+
+        if let MustGetAgentActivityResponse::Activity { warrants, .. } = &response {
+            if let Err(err) = scratch.apply(|scratch| {
+                for warrant in warrants.iter() {
+                    scratch.add_warrant(SignedWarrant::new(
+                        warrant.data().clone(),
+                        warrant.signature().clone(),
+                    ));
+                }
+            }) {
+                tracing::warn!(
+                    ?err,
+                    "Failed to add warrants from network response to scratch"
+                );
+            };
+        };
+
+        Ok(())
     }
 
     /// Fetch a Record from the network, caching and returning the results
@@ -490,16 +496,53 @@ impl CascadeImpl {
             .as_ref()
             .ok_or(CascadeError::NetworkNotInitialized)?;
 
-        let results = match network.must_get_agent_activity(author, filter, options).await {
-            Ok(response) => response,
+        let responses = match network
+            .must_get_agent_activity(author, filter, options)
+            .await
+        {
+            Ok(responses) => responses,
             Err(e @ HolochainP2pError::NoPeersForLocation(_, _)) => {
                 tracing::debug!(?e, "No peers to fetch agent activity from");
-                vec![]
+                return Err(e.into());
             }
             Err(e) => return Err(e.into()),
         };
 
-        self.add_activity_into_cache(results).await
+        // TODO: Handle conflict and/or merge the responses.
+        //
+        // For now we just pick a single response.
+        let selected_response = if responses
+            .iter()
+            .all(|r| r == responses.first().unwrap_or(r))
+        {
+            // All responses are the same, pick the first.
+            responses.first()
+        } else if let Some(response) = responses
+            .iter()
+            .find(|a| matches!(a, MustGetAgentActivityResponse::Activity { .. }))
+        {
+            // Responses are different, pick the first that contains Activity.
+            tracing::info!(
+                "Got different must_get_agent_activity responses from different authorities"
+            );
+
+            Some(response)
+        } else {
+            // Responses are different and none of them contain Activity, pick the first.
+            responses.first()
+        };
+
+        match selected_response {
+            None => Err(HolochainP2pError::Other("Received no responses".into()).into()),
+            Some(selected_response) => {
+                self.add_activity_into_cache(selected_response.clone())
+                    .await?;
+                self.add_warrants_into_scratch(selected_response.clone())
+                    .await?;
+
+                Ok(selected_response.clone())
+            }
+        }
     }
 
     /// Get transactions for available databases.
@@ -975,11 +1018,11 @@ impl CascadeImpl {
             .await??;
         }
 
-        let result = match chain_top_action_seq {
-            // The chain top was not found, so we cannot query for the agent activity preceding it.
+        let result = match maybe_chain_top_action_seq {
+            // The chain top was not found in database or scratch, then we cannot query for the agent activity preceding it.
             None => MustGetAgentActivityResponse::ChainTopNotFound(filter.chain_top.clone()),
 
-            // The chain top was found, now we query for the preceding activity,
+            // The chain top was found, now we can query for the preceding activity,
             // filtered by the requested ChainFilter.
             Some(chain_top_action_seq) => {
                 // Query for filtered activity and warrants from every database.
@@ -1043,7 +1086,7 @@ impl CascadeImpl {
                 }
 
                 // Check if the activity list is complete.
-                // 
+                //
                 // The activity list is considered complete only if the following are true:
                 // - There are no gaps in the sequence numbers.
                 // - Every activity's prev_hash equals the hash of the next activity in the list.
@@ -1058,7 +1101,7 @@ impl CascadeImpl {
                     }
                 }
             }
-        }
+        };
 
         if matches!(result, MustGetAgentActivityResponse::Activity { .. }) {
             // If we have a success result, return it.
@@ -1068,29 +1111,8 @@ impl CascadeImpl {
             return Ok(result);
         } else if self.network.is_some() {
             // If we are not an authority, try to fetch from the network
-            let result = self
-                .fetch_must_get_agent_activity(author.clone(), filter.clone())
-                .await;
-
-            // Add warrants received from the network to the scratch space to be written
-            // to the DHT database.
-            if let MustGetAgentActivityResponse::Activity { warrants, .. } = &result {
-                if let Some(scratch) = scratch {
-                    if let Err(err) = scratch.apply(|scratch| {
-                        for warrant in warrants.iter() {
-                            scratch.add_warrant(SignedWarrant::new(
-                                warrant.data().clone(),
-                                warrant.signature().clone(),
-                            ));
-                        }
-                    }) {
-                        tracing::warn!(
-                            ?err,
-                            "Failed to add warrants from network response to scratch"
-                        );
-                    }
-                }
-            }
+            self.fetch_must_get_agent_activity(author.clone(), filter.clone(), options)
+                .await
         } else {
             return Ok(result);
         }

@@ -9,6 +9,7 @@ use crate::authority::get_agent_activity_query::records::GetAgentActivityRecords
 use crate::CascadeImpl;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
+use holochain_p2p::actor::NetworkRequestOptions;
 use holochain_state::query::link::GetLinksQuery;
 use holochain_state::query::CascadeTxnWrapper;
 use holochain_state::query::{Query, Store};
@@ -90,7 +91,7 @@ pub async fn handle_must_get_agent_activity(
 ) -> CascadeResult<MustGetAgentActivityResponse> {
     CascadeImpl::empty()
         .with_dht(env)
-        .must_get_agent_activity(author, filter)
+        .must_get_agent_activity(author, filter, NetworkRequestOptions::default())
         .await
 }
 

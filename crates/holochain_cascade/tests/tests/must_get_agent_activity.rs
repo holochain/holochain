@@ -4,22 +4,22 @@ use holochain_cascade::error::CascadeError;
 use holochain_cascade::error::CascadeResult;
 use holochain_cascade::test_utils::*;
 use holochain_cascade::CascadeImpl;
+use holochain_p2p::actor::NetworkRequestOptions;
 use holochain_sqlite::db::DbKindAuthored;
 use holochain_sqlite::db::DbKindCache;
 use holochain_sqlite::db::DbKindDht;
-use holochain_state::integrate::authored_ops_to_dht_db_without_check;
 use holochain_state::prelude::*;
 use holochain_state::query::StateQueryError;
 use holochain_types::test_utils::chain::*;
 use std::sync::Arc;
 use test_case::test_case;
-#[cfg(feature = "unstable-warrants")]
 use {
     holo_hash::fixt::{ActionHashFixturator, AgentPubKeyFixturator},
-    holochain_state::integrate::insert_locally_validated_op,
+    holochain_state::integrate::{
+        authored_ops_to_dht_db_without_check, insert_locally_validated_op,
+    },
 };
 
-#[cfg(feature = "unstable-warrants")]
 fn warrant(warrantee: u8) -> WarrantOp {
     let p = WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
         action_author: ::fixt::fixt!(AgentPubKey),
@@ -324,7 +324,6 @@ async fn test_must_get_agent_activity_err(
         .unwrap_err()
 }
 
-#[cfg(feature = "unstable-warrants")]
 #[test_case(
     Data {dht: agent_chain(&[(0, 0..3)]), warrants: vec![warrant(0)], ..Default::default()},
     agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
@@ -422,5 +421,7 @@ async fn test_must_get_agent_activity_inner(
         cascade = cascade.with_scratch(sync_scratch);
     }
 
-    cascade.must_get_agent_activity(author, filter).await
+    cascade
+        .must_get_agent_activity(author, filter, NetworkRequestOptions::default())
+        .await
 }

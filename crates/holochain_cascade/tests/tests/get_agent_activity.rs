@@ -1,4 +1,3 @@
-#[cfg(feature = "unstable-warrants")]
 use holo_hash::AgentPubKey;
 use holochain_cascade::error::CascadeResult;
 use holochain_cascade::test_utils::*;
