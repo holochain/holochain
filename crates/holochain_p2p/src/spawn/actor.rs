@@ -1912,7 +1912,13 @@ impl actor::HcP2p for HolochainP2pActor {
                         .await
                     })
                 }),
-                |agent_activity| matches!(agent_activity, MustGetAgentActivityResponse::EmptyRange),
+                |agent_activity| {
+                    matches!(
+                        agent_activity,
+                        MustGetAgentActivityResponse::ChainTopNotFound(_)
+                            | MustGetAgentActivityResponse::IncompleteChain
+                    )
+                },
             )
             .await;
 
