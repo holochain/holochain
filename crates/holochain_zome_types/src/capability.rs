@@ -19,7 +19,7 @@
 //! as well as the access controls which determine who may exercise the granted
 //! functionality.
 //!
-//! Capabilites are exercised by other agents via a **`CapClaim`** which they
+//! Capabilities are exercised by other agents via a **`CapClaim`** which they
 //! commit to their source chain as a private entry. This struct contains the
 //! information needed to refer to the capability as well as the secret needed
 //! to send to the Grantor.

@@ -97,7 +97,7 @@ Access is thus mediated by Capability Grants of four types:
 
 * **Assigned**: only the specified public key holders can make the zome call, as verified by a signature on the function call payload
 
-* **Transferrable**: anybody with the given secret can make the zome call
+* **Transferable**: anybody with the given secret can make the zome call
 
 * **Unrestricted**: anybody can make the zome call (no secret nor proof of authorized key needed to use this capability)
 
