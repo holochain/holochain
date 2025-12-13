@@ -23,13 +23,13 @@ WITH ranked_actions AS (
     AND IIF(
       :chain_filter_limit_conditions_until_hashes_max_seq IS NOT NULL,
       Action.seq >= :chain_filter_limit_conditions_until_hashes_max_seq,
-      1 = 1
+      TRUE
     )
     -- Optionally, Action timestamps must be greater than or equal to the ChainFilter LimitCondition::UntilTimestamp
     AND IIF(
       :chain_filter_limit_conditions_until_timestamp IS NOT NULL,
       DhtOp.authored_timestamp >= :chain_filter_limit_conditions_until_timestamp,
-      1 = 1
+      TRUE
     )
 )
 -- Exclude forked actions, keeping only the first.
