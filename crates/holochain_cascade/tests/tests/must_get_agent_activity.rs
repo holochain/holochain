@@ -16,9 +16,9 @@ use holochain_types::test_utils::chain::*;
 use std::sync::Arc;
 use test_case::test_case;
 
-fn warrant(warrantee: u8) -> SignedWarrant {
+fn warrant(i: u8) -> SignedWarrant {
     let p = WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
-        action_author: ::fixt::fixt!(AgentPubKey),
+        action_author: agent_hash(&[i]),
         action: (::fixt::fixt!(ActionHash), ::fixt::fixt!(Signature)),
         chain_op_type: ChainOpType::StoreRecord,
     });
@@ -26,12 +26,12 @@ fn warrant(warrantee: u8) -> SignedWarrant {
         p,
         ::fixt::fixt!(AgentPubKey),
         Timestamp::now(),
-        AgentPubKey::from_raw_36(vec![warrantee; 36]),
+        agent_hash(&[i]),
     );
     SignedWarrant::new(warrant, ::fixt::fixt!(Signature))
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 struct FixtureDataStores {
     scratch: FixtureData,
     authored: FixtureData,
@@ -39,7 +39,7 @@ struct FixtureDataStores {
     dht: FixtureData,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 struct FixtureData {
     activity: Vec<(AgentPubKey, Vec<TestChainItem>)>,
     warrants: Vec<SignedWarrant>,
@@ -468,17 +468,30 @@ agent_hash(&[0]), ChainFilter::new(action_hash(&[11])).take(6).until_hash(action
     FixtureDataStores {
         dht: FixtureData {
             activity: agent_chain(&[(0, 0..10)]),
+            ..Default::default()
+        },
+        scratch: FixtureData {
+            warrants: vec![warrant(0)],
+            ..Default::default()
+        },
+        ..Default::default()
+    },
+    agent_hash(&[0]), ChainFilter::new(action_hash(&[8])).until_hash(action_hash(&[5]))
+    => matches MustGetAgentActivityResponse::Activity { warrants, .. } if warrants.len() == 1; "warrants returned from scratch")]
+#[test_case(
+    FixtureDataStores {
+        dht: FixtureData {
+            activity: agent_chain(&[(0, 0..10)]),
             warrants: vec![warrant(0)],
         },
         scratch: FixtureData {
-            warrants: vec![warrant(1)],
+            warrants: vec![warrant(0)],
             ..Default::default()
         },
         ..Default::default()
     },
     agent_hash(&[0]), ChainFilter::new(action_hash(&[8])).until_hash(action_hash(&[5]))
     => matches MustGetAgentActivityResponse::Activity { warrants, .. } if warrants.len() == 2; "warrants returned from all stores")]
-
 #[test_case(
     FixtureDataStores {
         dht: FixtureData {
@@ -607,7 +620,6 @@ async fn test_must_get_agent_activity_err(
         .unwrap_err()
 }
 
-
 async fn test_must_get_agent_activity_inner(
     data: FixtureDataStores,
     author: AgentPubKey,
@@ -671,10 +683,7 @@ async fn test_deterministically_retain_forked_action_with_max_hash() {
     // Create two forked actions with action_seq 3
     // The action from fork chain 1 has the higher hash value, so should be retained
     let author = agent_hash(&[0]);
-    let chain = vec![(
-        author.clone(),
-        forked_chain(&[0..5, 3..6]),
-    )];
+    let chain = vec![(author.clone(), forked_chain(&[0..5, 3..6]))];
 
     let data = FixtureDataStores {
         dht: FixtureData {
@@ -707,10 +716,58 @@ async fn test_deterministically_retain_forked_action_with_max_hash() {
 
         // The activity should be from fork chain 1
         assert_eq!(
-            activity_with_action_seq_3.action.hashed.hash, TestChainHash::forked(3, 1).into(),
+            activity_with_action_seq_3.action.hashed.hash,
+            TestChainHash::forked(3, 1).into(),
             "Expected fork with max hash to be retained"
         );
     }
 }
 
+// Demonstrate that a ChainFilter::UntilHash is actually used to retain actions with the action seq range from
+// the chain top Action's action_seq to the UntilHash Action's action_seq.
+//
+// So if the UntilHash Action is on a fork chain that is *not* retained,
+// we will still return the Action's on the retained chain until that same action seq.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_chain_filter_until_hash_is_converted_to_until_action_seq() {
+    holochain_trace::test_run();
+
+    // Create fork at seq 3
+    // Fork 0: seq 0,1,2,3,4 (will be excluded because lower hash)
+    // Fork 1: seq 3,4,5,6,7 (will be retained because higher hash)
+    let author = agent_hash(&[0]);
+    let chain = vec![(author.clone(), forked_chain(&[0..5, 3..8]))];
+
+    let data = FixtureDataStores {
+        dht: FixtureData {
+            activity: chain,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    // Run must_get_agent_activity with an UntilHash for an Action that is part of the *dropped* fork chain.
+    let until_hash_dropped: ActionHash = TestChainHash::forked(4, 0).into();
+    let chain_top = TestChainHash::forked(7, 1).into();
+    let res = test_must_get_agent_activity_inner(
+        data,
+        author,
+        ChainFilter::new(chain_top).until_hash(until_hash_dropped.clone()),
+    )
+    .await
+    .unwrap();
+
+    // We still receive activity from the chain top action seq to the until hash Action's action_seq,
+    // but only with Actions from the retained fork chain.
+    let activity = match res {
+        MustGetAgentActivityResponse::Activity { activity, .. } => activity,
+        other => panic!("Expected Activity response, got: {other:?}"),
+    };
+    assert!(activity.len() <= 8); // At most all actions
+    assert!(activity.iter().any(|a| a.action.seq() == 4));
+
+    // The UntilHash is not included in the results
+    assert!(!activity
+        .iter()
+        .any(|a| a.action.hashed.hash == until_hash_dropped));
 }
