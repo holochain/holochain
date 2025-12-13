@@ -160,3 +160,18 @@ let db = setup_holochain_data(path, db_id, config).await?;
 ```
 
 See `tests/integration.rs` for comprehensive examples.
+
+## Validating SQL Queries
+
+This crate uses sqlx's compile-time query checking to validate all SQL queries against the schema. The `.sqlx/` directory contains prepared query metadata that allows offline verification.
+
+To regenerate the query metadata after schema or query changes:
+
+```bash
+cd crates/holochain_data
+DATABASE_URL=sqlite:$(pwd)/dev.db sqlx database create
+DATABASE_URL=sqlite:$(pwd)/dev.db sqlx migrate run
+DATABASE_URL=sqlite:$(pwd)/dev.db cargo sqlx prepare -- --lib
+```
+
+In CI, queries are validated using the committed `.sqlx/` metadata without requiring a live database connection.

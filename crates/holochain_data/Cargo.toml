@@ -10,6 +10,7 @@ sqlx = { version = "0.9.0-alpha.1", features = [
   "migrate",
   "macros",
   "derive",
+  "json",
 ] }
 num_cpus = "1.13.0"
 base64 = "0.22"
@@ -18,6 +19,12 @@ tokio = { version = "1.27", features = ["full"] }
 libsqlite3-sys = { version = "*", features = [
   "bundled-sqlcipher-vendored-openssl",
 ] }
+holo_hash = { version = "^0.7.0-dev.0", path = "../holo_hash" }
+holochain_types = { version = "^0.7.0-dev.0", path = "../holochain_types" }
+holochain_integrity_types = { version = "^0.7.0-dev.0", path = "../holochain_integrity_types" }
+holochain_zome_types = { version = "^0.7.0-dev.0", path = "../holochain_zome_types" }
+holochain_serialized_bytes = "=0.0.56"
+serde_json = "1.0"
 
 [dev-dependencies]
 holochain_data = { path = ".", features = ["test-utils"] }
@@ -29,3 +36,7 @@ workspace = true
 
 [features]
 test-utils = []
+unstable-migration = [
+  "holochain_zome_types/unstable-migration",
+  "holochain_types/unstable-migration",
+]
