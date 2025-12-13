@@ -404,3 +404,14 @@ pub fn commit_scratch(scratch: SyncScratch, chain: Vec<(AgentPubKey, Vec<TestCha
         })
         .unwrap();
 }
+
+/// Add the warrants to the provided scratch
+pub fn add_warrants_scratch(scratch: SyncScratch, warrants: Vec<SignedWarrant>) {
+    scratch
+        .apply(|scratch| {
+            for warrant in warrants {
+                scratch.add_warrant(warrant);
+            }
+        })
+        .unwrap();
+}
