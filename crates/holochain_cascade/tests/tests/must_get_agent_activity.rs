@@ -366,6 +366,138 @@ FixtureDataStores {
 },
 agent_hash(&[0]), ChainFilter::new(action_hash(&[8]))
 => matches MustGetAgentActivityResponse::ChainTopNotFound(_); "chain top not found")]
+#[test_case(
+FixtureDataStores {
+    dht:  FixtureData {
+        activity: agent_chain(&[(0, 0..3)]),
+        ..Default::default()
+    },
+    cache:  FixtureData {
+        activity: agent_chain(&[(0, 5..8)]),
+        ..Default::default()
+    },
+    ..Default::default()
+},
+agent_hash(&[0]), ChainFilter::new(action_hash(&[7]))
+=> matches MustGetAgentActivityResponse::IncompleteChain; "multiple dbs with gaps in sequence")]
+#[test_case(
+FixtureDataStores {
+    dht:  FixtureData {
+        activity: agent_chain(&[(0, 0..5)]),
+        ..Default::default()
+    },
+    cache:  FixtureData {
+            activity: agent_chain(&[(0, 3..8)]),
+                    ..Default::default()
+    },
+    ..Default::default()
+},
+agent_hash(&[0]), ChainFilter::new(action_hash(&[7])).take(3)
+=> matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 3; "take limit re-applied after merge from multiple dbs")]
+#[test_case(
+FixtureDataStores {
+    dht:  FixtureData {
+            activity: agent_chain(&[(0, 0..10)]),
+                    ..Default::default()
+    },
+    ..Default::default()
+},
+agent_hash(&[0]), ChainFilter::new(action_hash(&[8])).until_hash(action_hash(&[3])).until_hash(action_hash(&[5])).until_hash(action_hash(&[99]))
+=> matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 4; "multiple until_hashes with one not found uses max of found")]
+#[test_case(
+FixtureDataStores {
+    dht:  FixtureData {
+        activity: agent_chain(&[(0, 5..10)]),
+        ..Default::default()
+    },
+    cache:  FixtureData {
+        activity: agent_chain(&[(0, 0..5)]),
+        ..Default::default()
+    },
+    scratch:  FixtureData {
+        activity: agent_chain(&[(0, 10..13)]),
+        ..Default::default()
+    },
+    ..Default::default()
+},
+agent_hash(&[0]), ChainFilter::new(action_hash(&[12])).take(5)
+=> matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 5; "chain top in scratch with history split across multiple dbs")]
+#[test_case(
+FixtureDataStores {
+    dht:  FixtureData {
+        activity: agent_chain(&[(0, 0..10)]),
+        ..Default::default()
+    },
+    cache:  FixtureData {
+        activity: agent_chain(&[(0, 0..10)]),
+        ..Default::default()
+    },
+    ..Default::default()
+},
+agent_hash(&[0]), ChainFilter::new(action_hash(&[9])).take(20)
+=> matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 10; "take larger than available deduplicates across dbs")]
+#[test_case(
+FixtureDataStores {
+    authored:  FixtureData {
+        activity: agent_chain(&[(0, 0..5)]),
+        ..Default::default()
+    },
+    dht:  FixtureData {
+        activity: agent_chain(&[(0, 3..8)]),
+        ..Default::default()
+    },
+    cache:  FixtureData {
+        activity: agent_chain(&[(0, 6..12)]),
+        ..Default::default()
+    },
+    ..Default::default()
+},
+agent_hash(&[0]), ChainFilter::new(action_hash(&[11])).take(6).until_hash(action_hash(&[4]))
+=> matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 6; "activity from all stores with overlaps")]
+#[test_case(
+    FixtureDataStores {
+        dht: FixtureData {
+            activity: agent_chain(&[(0, 0..10)]),
+            warrants: vec![warrant(0), warrant(0)],
+        },
+        ..Default::default()
+    },
+    agent_hash(&[0]), ChainFilter::new(action_hash(&[5])).take(3)
+    => matches MustGetAgentActivityResponse::Activity { warrants, .. } if warrants.len() == 2; "warrants returned outside filter range")]
+#[test_case(
+    FixtureDataStores {
+        dht: FixtureData {
+            activity: agent_chain(&[(0, 0..10)]),
+            warrants: vec![warrant(0)],
+        },
+        scratch: FixtureData {
+            warrants: vec![warrant(1)],
+            ..Default::default()
+        },
+        ..Default::default()
+    },
+    agent_hash(&[0]), ChainFilter::new(action_hash(&[8])).until_hash(action_hash(&[5]))
+    => matches MustGetAgentActivityResponse::Activity { warrants, .. } if warrants.len() == 2; "warrants returned from all stores")]
+
+#[test_case(
+    FixtureDataStores {
+        dht: FixtureData {
+            activity: agent_chain(&[(0, 0..3)]),
+            warrants: vec![warrant(0)],
+        },
+        ..Default::default()
+    },
+    agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
+    => matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 2; "1 to genesis with dht 0 till 2 with 1 unrelated chain warrant")]
+#[test_case(
+    FixtureDataStores {
+        dht: FixtureData {
+            activity: agent_chain(&[(0, 0..3)]),
+            warrants: vec![warrant(0)],
+        },
+        ..Default::default()},
+    agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
+    => matches MustGetAgentActivityResponse::Activity { warrants, .. } if warrants.len() == 1; "1 to genesis with dht 0 till 2 with 1 warrant")]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_must_get_agent_activity_ok(
     data: FixtureDataStores,
@@ -475,54 +607,6 @@ async fn test_must_get_agent_activity_err(
         .unwrap_err()
 }
 
-#[test_case(
-    FixtureDataStores {
-        dht: FixtureData {
-            activity: agent_chain(&[(0, 0..3)]),
-            warrants: vec![warrant(0)],
-        },
-        ..Default::default()
-    },
-    agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
-    => matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 2; "1 to genesis with dht 0 till 2 with 1 unrelated chain warrant")]
-#[test_case(
-    FixtureDataStores {
-        dht: FixtureData {
-            activity: agent_chain(&[(0, 0..3)]),
-            warrants: vec![warrant(0)],
-        },
-        ..Default::default()},
-    agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
-    => matches MustGetAgentActivityResponse::Activity { warrants, .. } if warrants.len() == 1; "1 to genesis with dht 0 till 2 with 1 warrant")]
-    => matches MustGetAgentActivityResponse::Activity { warrants, .. } if warrants.len() == 1; "1 to genesis with dht 0 till 2 with 1 chain warrant")]
-#[tokio::test(flavor = "multi_thread")]
-async fn test_must_get_agent_activity_with_warrants(
-    data: FixtureDataStores,
-    author: AgentPubKey,
-    filter: ChainFilter,
-) -> MustGetAgentActivityResponse {
-    test_must_get_agent_activity_inner(data, author, filter)
-        .await
-        .unwrap()
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn test_must_get_agent_activity_1() {
-    let res = test_must_get_agent_activity_inner(
-        Data {
-            dht: agent_chain(&[(0, 0..3)]),
-            ..Default::default()
-        },
-        agent_hash(&[0]),
-        ChainFilter::new(action_hash(&[1])),
-    )
-    .await;
-
-    assert!(matches!(
-        res,
-        Ok(MustGetAgentActivityResponse::Activity { .. })
-    ));
-}
 
 async fn test_must_get_agent_activity_inner(
     data: FixtureDataStores,
