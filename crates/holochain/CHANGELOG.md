@@ -14,8 +14,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - `MustGetAgentActivityResponse::Activity` now excludes forked Actions deterministically. If multiple Actions with the same sequence number are found in stores, only the `RegisterAgentActivity` containing the `Action` with the maximum `ActionHash` is retained in the response activity list.
   - If the `ChainFilter` has a `LimitConditions::UntilHash` or `LimitConditions::Multiple` with an until hash, and the until hash was found in a store, but was removed from the final list due to being a fork, the returned value is an `MustGetAgentActivityResponse::Activity` containing the `RegisterAgentActivity` with `Action` sequence numbers ending in the until hash `Action`'s sequence number. Previously `MustGetAgentActivityResponse::IncompleteChain` was returned.
 - Refactored `must_get_agent_activity` implementation to improve code clarity and performance. \#5350
+- Docs: Outline process for updating all Holochain tooling in an issue template. \#5472.
 - CI: Run windows test workflow on Depot.dev runners for improved performance. \#5473
-
 - **BREAKING CHANGE** Refactor: The `ConductorConfig` field `request_timeout_s` has moved into the `NetworkConfig`, so is now available at the sub-field `network.request_timeout_s`.
 - **BREAKING CHANGE** Feat: The advanced network configuration field `network.advanced.transportTx5.timeoutS` is now automatically set to 1/2 of the `NetworkConfig` field `request_timeout_s`. It specifies the timeout for a single transport message (request or response).
 - **BREAKING CHANGE** Feat: The advanced network configuration field `network.advanced.transportTx5.webrtcConnectTimeoutS` is now automatically set to 3/8 of the `NetworkConfig` field `request_timeout_s`. It specifies the timeout for attempting to establish a webrtc connection before falling back to a relay connection.
