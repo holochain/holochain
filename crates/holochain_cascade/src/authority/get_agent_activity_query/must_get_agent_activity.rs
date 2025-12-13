@@ -133,8 +133,8 @@ pub(crate) fn get_warrants_for_agent_from_scratch(
                 ChainIntegrityWarrant::InvalidChainOp { action_author, .. } => {
                     &action_author == agent
                 }
-                ChainIntegrityWarrant::ChainFork { .. } => {
-                    unimplemented!("Chain fork warrants are not implemented.");
+                ChainIntegrityWarrant::ChainFork { chain_author, .. } => {
+                    &chain_author == agent
                 }
             }
         })
