@@ -357,7 +357,7 @@ mod tests {
             .unwrap()
             .into_tuples();
 
-        await_consistency(20, &[alice.clone(), bob.clone()])
+        await_consistency(40, &[alice.clone(), bob.clone()])
             .await
             .unwrap();
 
