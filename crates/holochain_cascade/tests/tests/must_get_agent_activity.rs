@@ -663,3 +663,54 @@ async fn test_must_get_agent_activity_inner(
         .must_get_agent_activity(author, filter, NetworkRequestOptions::default())
         .await
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_deterministically_retain_forked_action_with_max_hash() {
+    holochain_trace::test_run();
+
+    // Create two forked actions with action_seq 3
+    // The action from fork chain 1 has the higher hash value, so should be retained
+    let author = agent_hash(&[0]);
+    let chain = vec![(
+        author.clone(),
+        forked_chain(&[0..5, 3..6]),
+    )];
+
+    let data = FixtureDataStores {
+        dht: FixtureData {
+            activity: chain,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    // Run multiple times to demonstrate it is deterministic
+    for _ in 0..5 {
+        // Run must_get_agent_activity using chain head of fork chain 1
+        let res = test_must_get_agent_activity_inner(
+            data.clone(),
+            author.clone(),
+            ChainFilter::new(TestChainHash::forked(5, 1).into()),
+        )
+        .await
+        .unwrap();
+
+        // Select the activity with action_seq 3
+        let activity = match res {
+            MustGetAgentActivityResponse::Activity { activity, .. } => activity,
+            _ => panic!("Expected Activity response"),
+        };
+        let activity_with_action_seq_3 = activity
+            .iter()
+            .find(|a| a.action.seq() == 3)
+            .expect("Should have action with action_seq 3");
+
+        // The activity should be from fork chain 1
+        assert_eq!(
+            activity_with_action_seq_3.action.hashed.hash, TestChainHash::forked(3, 1).into(),
+            "Expected fork with max hash to be retained"
+        );
+    }
+}
+
+}
