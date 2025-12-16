@@ -53,7 +53,7 @@ async fn space_shutdown() {
         .unwrap();
 
     let agent = keystore.new_sign_keypair_random().await.unwrap();
-    p2p.join(dna_hash.clone(), agent.clone(), None)
+    p2p.join(dna_hash.clone(), agent.clone(), None, None)
         .await
         .unwrap();
 

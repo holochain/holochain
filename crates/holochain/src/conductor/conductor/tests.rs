@@ -23,6 +23,8 @@ use std::sync::Mutex;
 
 mod add_agent_infos;
 mod app_state;
+mod cells_with_conflicting_overrides;
+mod p2p_config_override;
 mod state_dump;
 
 /// App can't be installed if another app is already installed under the
@@ -71,6 +73,8 @@ async fn app_ids_are_unique() {
             description: None,
             name: "".to_string(),
             roles: vec![],
+            bootstrap_url: None,
+            signal_url: None,
         }),
         Timestamp::now(),
     )
@@ -110,6 +114,8 @@ async fn role_names_must_be_unique() {
             description: None,
             roles: vec![],
             allow_deferred_memproofs: false,
+            bootstrap_url: None,
+            signal_url: None,
         }),
         Timestamp::now(),
     );
@@ -138,6 +144,8 @@ async fn role_names_must_be_unique() {
             description: None,
             roles: vec![],
             allow_deferred_memproofs: false,
+            bootstrap_url: None,
+            signal_url: None,
         }),
         Timestamp::now(),
     );

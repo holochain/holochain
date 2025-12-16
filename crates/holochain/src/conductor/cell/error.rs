@@ -79,6 +79,13 @@ pub enum CellError {
     StateMutationError(#[from] holochain_state::mutations::StateMutationError),
     #[error(transparent)]
     OneErr(#[from] one_err::OneErr),
+    #[error("P2P config overrides for cell {cell_id} of app {app_id:?} is conflicting with the same DNA hash cell {conflicting_cell_id} of app {conflicting_app_id:?}")]
+    P2pConfigOverridesConflict {
+        app_id: Option<Box<InstalledAppId>>,
+        cell_id: CellId,
+        conflicting_app_id: Option<Box<InstalledAppId>>,
+        conflicting_cell_id: CellId,
+    },
 }
 
 pub type CellResult<T> = Result<T, CellError>;

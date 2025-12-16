@@ -71,6 +71,8 @@ fn make_fixture_app_bundle() -> Bytes {
                 clone_limit: 10,
             },
         }],
+        bootstrap_url: None,
+        signal_url: None,
     });
 
     let app = AppBundle::new(app_manifest, vec![("test.dna".to_string(), dna_bundle)]).unwrap();
