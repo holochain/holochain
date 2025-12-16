@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- CI: Allow test workflow to pass when tests of the feature `wasmer_wamr` fail. WAMR is not actively used, so investigating flaky tests on WAMR is not a priority. \#5523
 - Docs: Outline process for updating all Holochain tooling in an issue template. \#5472.
 - CI: Run windows test workflow on Depot.dev runners for improved performance. \#5473
 - **BREAKING CHANGE** Refactor: The `ConductorConfig` field `request_timeout_s` has moved into the `NetworkConfig`, so is now available at the sub-field `network.request_timeout_s`.
