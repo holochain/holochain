@@ -1,6 +1,5 @@
 //! Example demonstrating sqlx query patterns for mapping Rust types to database.
 
-use crate::HolochainDbConn;
 use sqlx::{FromRow, Row};
 
 /// Example struct representing a row in the sample_data table.
@@ -15,8 +14,8 @@ pub struct SampleData {
 }
 
 /// Example of inserting data using sqlx::query with bind parameters.
-pub async fn insert_sample_data(
-    conn: &HolochainDbConn<impl crate::DatabaseIdentifier>,
+pub async fn insert_sample_data<I: crate::DatabaseIdentifier>(
+    conn: &crate::DbWrite<I>,
     name: &str,
     value: Option<&str>,
 ) -> sqlx::Result<i64> {
@@ -25,15 +24,15 @@ pub async fn insert_sample_data(
         name,
         value
     )
-    .execute(&conn.pool)
+    .execute(conn.pool())
     .await?;
 
     Ok(result.last_insert_rowid())
 }
 
 /// Example of selecting data using sqlx::query_as with automatic struct mapping.
-pub async fn get_sample_data_by_id(
-    conn: &HolochainDbConn<impl crate::DatabaseIdentifier>,
+pub async fn get_sample_data_by_id<I: crate::DatabaseIdentifier>(
+    conn: &impl AsRef<crate::DbRead<I>>,
     id: i64,
 ) -> sqlx::Result<Option<SampleData>> {
     let result = sqlx::query_as!(
@@ -41,34 +40,34 @@ pub async fn get_sample_data_by_id(
         "SELECT id, name, value, created_at FROM sample_data WHERE id = ?",
         id
     )
-    .fetch_optional(&conn.pool)
+    .fetch_optional(conn.as_ref().pool())
     .await?;
 
     Ok(result)
 }
 
 /// Example of selecting multiple rows.
-pub async fn get_all_sample_data(
-    conn: &HolochainDbConn<impl crate::DatabaseIdentifier>,
+pub async fn get_all_sample_data<I: crate::DatabaseIdentifier>(
+    conn: &impl AsRef<crate::DbRead<I>>,
 ) -> sqlx::Result<Vec<SampleData>> {
     let results = sqlx::query_as!(
         SampleData,
         "SELECT id, name, value, created_at FROM sample_data ORDER BY created_at DESC"
     )
-    .fetch_all(&conn.pool)
+    .fetch_all(conn.as_ref().pool())
     .await?;
 
     Ok(results)
 }
 
 /// Example of manual row mapping (useful when you need fine control).
-pub async fn get_sample_data_manual(
-    conn: &HolochainDbConn<impl crate::DatabaseIdentifier>,
+pub async fn get_sample_data_manual<I: crate::DatabaseIdentifier>(
+    conn: &impl AsRef<crate::DbRead<I>>,
     id: i64,
 ) -> sqlx::Result<Option<SampleData>> {
     let row = sqlx::query("SELECT id, name, value, created_at FROM sample_data WHERE id = ?")
         .bind(id)
-        .fetch_optional(&conn.pool)
+        .fetch_optional(conn.as_ref().pool())
         .await?;
 
     Ok(row.map(|r| SampleData {
@@ -80,28 +79,28 @@ pub async fn get_sample_data_manual(
 }
 
 /// Example of updating data.
-pub async fn update_sample_data(
-    conn: &HolochainDbConn<impl crate::DatabaseIdentifier>,
+pub async fn update_sample_data<I: crate::DatabaseIdentifier>(
+    conn: &crate::DbWrite<I>,
     id: i64,
     new_value: &str,
 ) -> sqlx::Result<u64> {
     let result = sqlx::query("UPDATE sample_data SET value = ? WHERE id = ?")
         .bind(new_value)
         .bind(id)
-        .execute(&conn.pool)
+        .execute(conn.pool())
         .await?;
 
     Ok(result.rows_affected())
 }
 
 /// Example of deleting data.
-pub async fn delete_sample_data(
-    conn: &HolochainDbConn<impl crate::DatabaseIdentifier>,
+pub async fn delete_sample_data<I: crate::DatabaseIdentifier>(
+    conn: &crate::DbWrite<I>,
     id: i64,
 ) -> sqlx::Result<u64> {
     let result = sqlx::query("DELETE FROM sample_data WHERE id = ?")
         .bind(id)
-        .execute(&conn.pool)
+        .execute(conn.pool())
         .await?;
 
     Ok(result.rows_affected())
