@@ -89,6 +89,8 @@ async fn can_update_state() {
             name: "".to_string(),
             description: None,
             roles: vec![],
+            bootstrap_url: None,
+            signal_url: None,
         }),
         Timestamp::now(),
     )

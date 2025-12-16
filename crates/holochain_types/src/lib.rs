@@ -24,6 +24,7 @@ pub mod dna;
 pub mod entry;
 pub mod link;
 mod macros;
+pub mod p2p_config_overrides;
 pub mod prelude;
 pub mod rate_limit;
 pub mod record;

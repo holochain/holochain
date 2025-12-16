@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Allow the bootstrap and signal URLs to be overridden when joining a space. [5524](https://github.com/holochain/holochain/pull/5524).
+
 ## 0.7.0-dev.4
 
 ## 0.7.0-dev.3
