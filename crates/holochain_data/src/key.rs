@@ -23,7 +23,12 @@ impl std::fmt::Debug for DbKey {
     }
 }
 
+#[cfg(feature = "test-utils")]
 impl Default for DbKey {
+    /// Creates a DbKey with zero-filled keys for testing only.
+    ///
+    /// # Warning
+    /// This MUST NOT be used for production databases as it provides no security.
     fn default() -> Self {
         Self::priv_new(
             "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABfEkbuZZnisvvyc5OIofAk1cHNw7UWbmvKbCmm3QrDjJr5Ox33KnvqRb8F7Z2fM_AAAAAAAAAAAAAAAAAAAAAA".to_string(),
@@ -163,7 +168,7 @@ impl DbKey {
             .unwrap()
             .lock()
             .iter()
-            .map(|b| format!("{:02X}", b))
+            .map(|b| format!("{b:02X}"))
             .collect::<String>()
     }
 
@@ -174,7 +179,7 @@ impl DbKey {
             .unwrap()
             .lock()
             .iter()
-            .map(|b| format!("{:02X}", b))
+            .map(|b| format!("{b:02X}"))
             .collect::<String>()
     }
 

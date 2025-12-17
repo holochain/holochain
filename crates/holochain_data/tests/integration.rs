@@ -13,7 +13,7 @@ impl DatabaseIdentifier for TestDbId {
 }
 
 #[tokio::test]
-async fn test_create_database() {
+async fn create_database() {
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let db_id = TestDbId("test_database".to_string());
 
@@ -33,13 +33,12 @@ async fn test_create_database() {
     let db_file = tmp_dir.path().join("test_database");
     assert!(
         db_file.exists(),
-        "Database file was not created at {:?}",
-        db_file
+        "Database file was not created at {db_file:?}"
     );
 }
 
 #[tokio::test]
-async fn test_multiple_databases_same_directory() {
+async fn multiple_databases_same_directory() {
     let tmp_dir = tempfile::TempDir::new().unwrap();
 
     let db_id_1 = TestDbId("database_one".to_string());
@@ -58,23 +57,22 @@ async fn test_multiple_databases_same_directory() {
 }
 
 #[tokio::test]
-async fn test_error_on_non_directory_path() {
+async fn error_on_non_directory_path() {
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let file_path = tmp_dir.path().join("some_file");
     std::fs::write(&file_path, b"test").unwrap();
 
     let db_id = TestDbId("test_database".to_string());
     let config = holochain_data::HolochainDataConfig::new();
-    let result = setup_holochain_data(file_path, db_id, config).await;
+    let err = setup_holochain_data(file_path, db_id, config)
+        .await
+        .unwrap_err();
 
-    assert!(result.is_err(), "Expected error for non-directory path");
-    if let Err(err) = result {
-        assert!(err.to_string().contains("Path must be a directory"));
-    }
+    assert!(err.to_string().contains("Path must be a directory"));
 }
 
 #[tokio::test]
-async fn test_encrypted_database() {
+async fn encrypted_database() {
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let db_id = TestDbId("encrypted_test_database".to_string());
 
@@ -123,8 +121,7 @@ async fn test_encrypted_database() {
     let db_file = tmp_dir.path().join("encrypted_test_database");
     assert!(
         db_file.exists(),
-        "Encrypted database file was not created at {:?}",
-        db_file
+        "Encrypted database file was not created at {db_file:?}"
     );
 
     // Drop the connection
@@ -141,7 +138,7 @@ async fn test_encrypted_database() {
 }
 
 #[tokio::test]
-async fn test_encrypted_database_wrong_key_fails() {
+async fn encrypted_database_wrong_key_fails() {
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let db_id = TestDbId("encrypted_fail_test".to_string());
 
@@ -174,27 +171,24 @@ async fn test_encrypted_database_wrong_key_fails() {
         .expect("Failed to generate second database key");
 
     let config2 = holochain_data::HolochainDataConfig::new().with_key(db_key2);
-    let result2 = setup_holochain_data(&tmp_dir, db_id.clone(), config2).await;
     // With WAL mode enabled, connection fails immediately with wrong key
     // because enabling WAL requires reading the database header
-    if let Err(err) = result2 {
-        // SQLCipher returns errors related to SQL or encryption when the wrong key is used
-        let err_msg = err.to_string();
-        assert!(
-            err_msg.contains("not a database")
-                || err_msg.contains("encrypted")
-                || err_msg.contains("cipher")
-                || err_msg.contains("SQL logic error"),
-            "Expected encryption-related error, got: {}",
-            err_msg
-        );
-    } else {
-        panic!("Connection should fail with wrong encryption key");
-    }
+    let err = setup_holochain_data(&tmp_dir, db_id.clone(), config2)
+        .await
+        .unwrap_err();
+    // SQLCipher returns errors related to SQL or encryption when the wrong key is used
+    let err_msg = err.to_string();
+    assert!(
+        err_msg.contains("not a database")
+            || err_msg.contains("encrypted")
+            || err_msg.contains("cipher")
+            || err_msg.contains("SQL logic error"),
+        "Expected encryption-related error, got: {err_msg}"
+    );
 }
 
 #[tokio::test]
-async fn test_pragma_configuration() {
+async fn pragma_configuration() {
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let db_id = TestDbId("pragma_test_database".to_string());
 
@@ -228,7 +222,7 @@ async fn test_pragma_configuration() {
 }
 
 #[tokio::test]
-async fn test_migrations_applied() {
+async fn migrations_applied() {
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let db_id = TestDbId("migrations_test_database".to_string());
 
@@ -292,7 +286,7 @@ async fn test_migrations_applied() {
 }
 
 #[tokio::test]
-async fn test_example_query_patterns() {
+async fn example_query_patterns() {
     use holochain_data::example::*;
 
     let tmp_dir = tempfile::TempDir::new().unwrap();
@@ -405,7 +399,7 @@ async fn test_foreign_key_constraints() {
 
     // Try to insert an IntegrityZome with a non-existent dna_hash (should fail)
     let bad_dna_hash = vec![99u8; 32];
-    let result = sqlx::query(
+    let err = sqlx::query(
         "INSERT INTO IntegrityZome (dna_hash, zome_index, zome_name, dependencies) VALUES (?, ?, ?, ?)",
     )
     .bind(&bad_dna_hash)
@@ -413,19 +407,16 @@ async fn test_foreign_key_constraints() {
     .bind("bad_zome")
     .bind("[]")
     .execute(db_conn.pool())
-    .await;
-
-    assert!(result.is_err(), "Expected foreign key constraint violation");
-    if let Err(err) = result {
-        let err_msg = err.to_string();
-        assert!(
-            err_msg.contains("FOREIGN KEY constraint failed")
-                || err_msg.contains("foreign key")
-                || err_msg.contains("constraint"),
-            "Expected foreign key error, got: {}",
-            err_msg
-        );
-    }
+    .await
+    .unwrap_err();
+    let err_msg = err.to_string();
+    assert!(
+        err_msg.contains("FOREIGN KEY constraint failed")
+            || err_msg.contains("foreign key")
+            || err_msg.contains("constraint"),
+        "Expected foreign key error, got: {}",
+        err_msg
+    );
 
     // Delete the DnaDef and verify cascading delete removes the zome
     sqlx::query("DELETE FROM DnaDef WHERE hash = ?")

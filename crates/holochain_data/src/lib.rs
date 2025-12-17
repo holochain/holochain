@@ -82,6 +82,12 @@ pub trait DatabaseIdentifier: Clone {
     fn database_id(&self) -> &str;
 }
 
+#[derive(Debug)]
+pub struct HolochainDbConn<I: DatabaseIdentifier> {
+    pub pool: Pool<Sqlite>,
+    pub identifier: I,
+}
+
 /// Open a database connection at the given directory path.
 ///
 /// The database file name is constructed from the `database_id`.
@@ -205,7 +211,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_in_memory_database_with_migrations() {
+    async fn in_memory_database_with_migrations() {
         // Set up in-memory database
         let db = test_setup_holochain_data(TestDbId)
             .await

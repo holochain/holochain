@@ -15,7 +15,7 @@ pub struct SampleData {
 
 /// Example of inserting data using sqlx::query with bind parameters.
 pub async fn insert_sample_data<I: crate::DatabaseIdentifier>(
-    conn: &impl AsRef<crate::DbRead<I>>,
+    conn: &crate::DbWrite<I>,
     name: &str,
     value: Option<&str>,
 ) -> sqlx::Result<i64> {
@@ -24,7 +24,7 @@ pub async fn insert_sample_data<I: crate::DatabaseIdentifier>(
         name,
         value
     )
-    .execute(conn.as_ref().pool())
+    .execute(conn.pool())
     .await?;
 
     Ok(result.last_insert_rowid())
@@ -80,14 +80,14 @@ pub async fn get_sample_data_manual<I: crate::DatabaseIdentifier>(
 
 /// Example of updating data.
 pub async fn update_sample_data<I: crate::DatabaseIdentifier>(
-    conn: &impl AsRef<crate::DbRead<I>>,
+    conn: &crate::DbWrite<I>,
     id: i64,
     new_value: &str,
 ) -> sqlx::Result<u64> {
     let result = sqlx::query("UPDATE sample_data SET value = ? WHERE id = ?")
         .bind(new_value)
         .bind(id)
-        .execute(conn.as_ref().pool())
+        .execute(conn.pool())
         .await?;
 
     Ok(result.rows_affected())
@@ -95,12 +95,12 @@ pub async fn update_sample_data<I: crate::DatabaseIdentifier>(
 
 /// Example of deleting data.
 pub async fn delete_sample_data<I: crate::DatabaseIdentifier>(
-    conn: &impl AsRef<crate::DbRead<I>>,
+    conn: &crate::DbWrite<I>,
     id: i64,
 ) -> sqlx::Result<u64> {
     let result = sqlx::query("DELETE FROM sample_data WHERE id = ?")
         .bind(id)
-        .execute(conn.as_ref().pool())
+        .execute(conn.pool())
         .await?;
 
     Ok(result.rows_affected())

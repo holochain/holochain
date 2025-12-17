@@ -1,5 +1,4 @@
 -- Add up migration script here
--- Wasm database schema for Holochain
 
 -- Sample table for testing
 CREATE TABLE IF NOT EXISTS sample_data (
@@ -10,6 +9,8 @@ CREATE TABLE IF NOT EXISTS sample_data (
 );
 
 CREATE INDEX idx_sample_data_name ON sample_data(name);
+
+-- Wasm database schema for Holochain
 
 -- Wasm bytecode storage
 CREATE TABLE IF NOT EXISTS Wasm (
@@ -22,7 +23,8 @@ CREATE TABLE IF NOT EXISTS DnaDef (
     hash            BLOB           PRIMARY KEY ON CONFLICT IGNORE,
     name            TEXT           NOT NULL,
     network_seed    TEXT           NOT NULL,
-    properties      BLOB           NOT NULL   -- SerializedBytes
+    properties      BLOB           NOT NULL,  -- SerializedBytes
+    lineage         JSON                      -- JSON HashSet<DnaHash>
 );
 
 -- IntegrityZome storage (one row per zome in a DNA)
@@ -31,7 +33,7 @@ CREATE TABLE IF NOT EXISTS IntegrityZome (
     zome_index      INTEGER        NOT NULL,
     zome_name       TEXT           NOT NULL,
     wasm_hash       BLOB,                     -- NULL for inline zomes
-    dependencies    TEXT           NOT NULL,  -- Comma-separated zome names
+    dependencies    JSON           NOT NULL,  -- JSON array of zome names
     PRIMARY KEY (dna_hash, zome_index),
     FOREIGN KEY (dna_hash) REFERENCES DnaDef(hash) ON DELETE CASCADE,
     FOREIGN KEY (wasm_hash) REFERENCES Wasm(hash)
@@ -43,7 +45,7 @@ CREATE TABLE IF NOT EXISTS CoordinatorZome (
     zome_index      INTEGER        NOT NULL,
     zome_name       TEXT           NOT NULL,
     wasm_hash       BLOB,                     -- NULL for inline zomes
-    dependencies    TEXT           NOT NULL,  -- Comma-separated zome names
+    dependencies    JSON           NOT NULL,  -- JSON array of zome names
     PRIMARY KEY (dna_hash, zome_index),
     FOREIGN KEY (dna_hash) REFERENCES DnaDef(hash) ON DELETE CASCADE,
     FOREIGN KEY (wasm_hash) REFERENCES Wasm(hash)

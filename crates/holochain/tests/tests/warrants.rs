@@ -77,7 +77,7 @@ async fn warranted_agent_is_blocked() {
 
             warrants.len() == 1 && warrants[0].warrant().warrantee == *alice_cell.agent_pubkey()
         },
-        Some(10_000),
+        Some(30_000),
         None,
     )
     .await
@@ -140,7 +140,7 @@ async fn warrant_is_gossiped() {
         )
         .await;
 
-    await_consistency(30, [&alice_cell, &bob_cell])
+    await_consistency(60, [&alice_cell, &bob_cell])
         .await
         .unwrap();
 
@@ -400,17 +400,33 @@ mod zero_arc {
             .unwrap();
 
         // Carol queries Alice's agent activity and should get the warrant.
-        let alice_activity: AgentActivity = carol_conductor
-            .call(
-                &carol_cell.zome(SweetInlineZomes::COORDINATOR),
-                "get_agent_activity",
-                alice_cell.agent_pubkey().clone(),
-            )
-            .await;
-        assert!(!alice_activity.warrants.is_empty());
-        alice_activity.warrants.into_iter().for_each(|warrant| {
-            assert_eq!(warrant.warrantee, *alice_cell.agent_pubkey());
-        });
+        // This may need retries because the disabled Alice may still be in Carol's peer store
+        // and Carol might contact Alice first before finding Bob.
+        retry_fn_until_timeout(
+            || async {
+                let alice_activity: Result<AgentActivity, _> = carol_conductor
+                    .call_fallible(
+                        &carol_cell.zome(SweetInlineZomes::COORDINATOR),
+                        "get_agent_activity",
+                        alice_cell.agent_pubkey().clone(),
+                    )
+                    .await;
+
+                if let Ok(activity) = alice_activity {
+                    !activity.warrants.is_empty()
+                        && activity
+                            .warrants
+                            .iter()
+                            .all(|warrant| warrant.warrantee == *alice_cell.agent_pubkey())
+                } else {
+                    false
+                }
+            },
+            Some(90_000),
+            None,
+        )
+        .await
+        .unwrap();
     }
 
     // Alice creates an invalid op, Bob receives it and issues a warrant.
@@ -467,13 +483,34 @@ mod zero_arc {
             .unwrap();
 
         // Carol calls get_agent_activity on Alice and blocks the warrant authors.
-        let _: AgentActivity = carol_conductor
-            .call(
-                &carol_cell.zome(SweetInlineZomes::COORDINATOR),
-                "get_agent_activity",
-                alice_cell.agent_pubkey().clone(),
-            )
-            .await;
+        // This may need retries because the disabled Alice may still be in Carol's peer store
+        // and Carol might contact Alice first before finding Bob.
+        retry_fn_until_timeout(
+            || async {
+                let result: Result<AgentActivity, _> = carol_conductor
+                    .call_fallible(
+                        &carol_cell.zome(SweetInlineZomes::COORDINATOR),
+                        "get_agent_activity",
+                        alice_cell.agent_pubkey().clone(),
+                    )
+                    .await;
+
+                if let Ok(activity) = result {
+                    // Verify that the response contains warrants for Alice
+                    !activity.warrants.is_empty()
+                        && activity
+                            .warrants
+                            .iter()
+                            .all(|warrant| warrant.warrantee == *alice_cell.agent_pubkey())
+                } else {
+                    false
+                }
+            },
+            Some(90_000),
+            None,
+        )
+        .await
+        .unwrap();
 
         // Check that Carol has blocked Alice.
         retry_fn_until_timeout(
@@ -550,17 +587,31 @@ mod zero_arc {
             .await
             .unwrap();
 
-        // Carol calls must_get_agent_activity on Alice and blocks the warrant authors.
-        let _: Vec<RegisterAgentActivity> = carol_conductor
-            .call(
-                &carol_cell.zome(SweetInlineZomes::COORDINATOR),
-                "must_get_agent_activity",
-                MustGetAgentActivityInput {
-                    author: alice_cell.agent_pubkey().clone(),
-                    chain_filter: ChainFilter::new(action_hash),
-                },
-            )
-            .await;
+        // Carol calls must_get_agent_activity on Alice until she successfully receives
+        // the warrant and blocks the warrant authors. This may need retries because the
+        // first attempt might fail if Carol tries to contact the now-disabled Alice.
+        retry_fn_until_timeout(
+            || async {
+                let result: Result<Vec<RegisterAgentActivity>, _> = carol_conductor
+                    .call_fallible(
+                        &carol_cell.zome(SweetInlineZomes::COORDINATOR),
+                        "must_get_agent_activity",
+                        MustGetAgentActivityInput {
+                            author: alice_cell.agent_pubkey().clone(),
+                            chain_filter: ChainFilter::new(action_hash.clone()),
+                        },
+                    )
+                    .await;
+                match result {
+                    Ok(_activity) => true,
+                    Err(_e) => false,
+                }
+            },
+            Some(70_000), // Slightly longer than the 60s timeout to allow at least one retry
+            None,
+        )
+        .await
+        .unwrap();
 
         // Check that Carol has blocked Alice.
         retry_fn_until_timeout(

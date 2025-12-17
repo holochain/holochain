@@ -622,12 +622,12 @@ impl Agent {
         let path = tmp_dir.keep();
         let environment_path = path.clone();
         let mut config = create_config(admin_port, environment_path.into());
+        config.network.request_timeout_s = 10;
         config.network.advanced = Some(serde_json::json!({
             // Allow plaintext signal for testing, and set a short timeout for network requests
             // so that shutting down a conductor won't keep tx5 busy for too long.
             "tx5Transport": {
                 "signalAllowPlainText": true,
-                "timeoutS": 5,
             },
             // Gossip faster to speed up the test.
             "k2Gossip": {
