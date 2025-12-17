@@ -77,7 +77,37 @@ impl HdkPathExt for TypedPath {
         )
     }
 
-    /// Recursively touch this and every parent that doesn't exist yet.
+    /// Ensures that this path exists by recursively creating missing parent links.
+    ///
+    /// This function checks whether the current path already exists.
+    /// If it does not, it recursively ensures that all parent paths exist and then
+    /// creates the appropriate link for this path.
+    ///
+    /// The behavior depends on whether the path is the root:
+    ///
+    /// - If the path is the root and does not exist, a link is created from the
+    ///   global root hash to this path entry.
+    /// - If the path is not the root, its parent is first ensured recursively by calling [`Self::ensure`] on it,
+    ///   and then a link is created from the parent path entry to this path entry.
+    ///
+    /// If the path already exists, this function is a no-op.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Checking for existence fails
+    /// - [`Self::ensure`] on a parent path fails
+    /// - Creating any required link fails
+    ///
+    /// # Notes
+    ///
+    /// This function does **not** create entries; it only creates links between
+    /// already-existing path entries. It assumes that the entry corresponding to
+    /// this path can be resolved to a hash via [`Path::path_entry_hash`].
+    ///
+    /// The operation is idempotent: calling [`Self::ensure`] multiple times for the same
+    /// path will not create duplicate links, given that [`Self::exists`] correctly
+    /// reflects the current state of the DHT.
     fn ensure(&self) -> ExternResult<()> {
         if !self.exists()? {
             if self.is_root() {
