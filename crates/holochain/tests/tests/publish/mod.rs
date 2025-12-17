@@ -147,11 +147,13 @@ async fn warrant_is_published() {
     );
     let dna_hash = dna_without_validation.dna_hash();
 
-    let config = SweetConductorConfig::rendezvous(true);
+    let config = SweetConductorConfig::rendezvous(true)
+        .tune_conductor(|cc| cc.publish_trigger_interval = Some(Duration::from_secs(2)));
     // Disable warrants on Carol's conductor, so that she doesn't issue warrants herself
     // but receives them from Bob.
-    let config_no_warranting = SweetConductorConfig::rendezvous(true)
-        .tune_conductor(|tc| tc.disable_warrant_issuance = true);
+    let config_no_warranting = SweetConductorConfig::rendezvous(true).tune_conductor(|tc| {
+        tc.disable_warrant_issuance = true;
+    });
     let mut conductors = SweetConductorBatch::from_configs_rendezvous([
         config.clone(),
         config,
