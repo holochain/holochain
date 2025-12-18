@@ -2,7 +2,7 @@
 
 cd "$(dirname "$0")/.."
 
-source ./src/setup_functions.sh
+source ./setup.sh
 
 # make temp file for nix conf
 nix_conf_temp=$(mktemp /tmp/nix.conf.XXXXXX)
