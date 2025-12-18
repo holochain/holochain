@@ -101,9 +101,17 @@ impl HdkPathExt for TypedPath {
     ///
     /// # Notes
     ///
-    /// This function does **not** create entries; it only creates links between
-    /// already-existing path entries. It assumes that the entry corresponding to
-    /// this path can be resolved to a hash via [`Path::path_entry_hash`].
+    /// This function does **not** create entries; it only creates links at
+    /// deterministic path hashes.
+    ///
+    /// `Path` operates on so-called *ghost entries*: no entry is ever written to
+    /// the DHT for a path itself. Instead, the hash that *would* correspond to a
+    /// path entry is deterministically derived and used as the base or target
+    /// address for links.
+    ///
+    /// In other words, [`Path::path_entry_hash`] does not require a prior
+    /// entry create; it computes a stable hash that is used purely as a link
+    /// anchor in the DHT.
     ///
     /// The operation is idempotent: calling [`Self::ensure`] multiple times for the same
     /// path will not create duplicate links, given that [`Self::exists`] correctly
