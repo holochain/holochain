@@ -41,9 +41,7 @@ workspace = true
 default = []
 test-utils = []
 unstable-migration = [
-    "holochain_zome_types/unstable-migration",
-    "holochain_types/unstable-migration",
+  "holochain_zome_types/unstable-migration",
+  "holochain_types/unstable-migration",
 ]
-sqlite-encrypted = [
-  "libsqlite3-sys/bundled-sqlcipher-vendored-openssl",
-]
+sqlite-encrypted = ["libsqlite3-sys/bundled-sqlcipher-vendored-openssl"]
