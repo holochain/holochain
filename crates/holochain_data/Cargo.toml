@@ -1,6 +1,11 @@
 [package]
 name = "holochain_data"
-version = "0.1.0"
+version = "0.7.0-dev.0"
+description = "Database abstraction layer for Holochain using sqlx"
+license = "Apache-2.0"
+repository = "https://github.com/holochain/holochain"
+documentation = "https://docs.rs/holochain_data"
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 
 [dependencies]
@@ -16,9 +21,7 @@ num_cpus = "1.13.0"
 base64 = "0.22"
 sodoken = "0.1.0"
 tokio = { version = "1.27", features = ["full"] }
-libsqlite3-sys = { version = "*", features = [
-  "bundled-sqlcipher-vendored-openssl",
-] }
+libsqlite3-sys = "0.35"
 holo_hash = { version = "^0.7.0-dev.0", path = "../holo_hash" }
 holochain_types = { version = "^0.7.0-dev.0", path = "../holochain_types" }
 holochain_integrity_types = { version = "^0.7.0-dev.0", path = "../holochain_integrity_types" }
@@ -35,8 +38,10 @@ tempfile = "3.3"
 workspace = true
 
 [features]
+default = []
 test-utils = []
 unstable-migration = [
   "holochain_zome_types/unstable-migration",
   "holochain_types/unstable-migration",
 ]
+sqlite-encrypted = ["libsqlite3-sys/bundled-sqlcipher-vendored-openssl"]
