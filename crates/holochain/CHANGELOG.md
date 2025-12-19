@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Replace the `do_callback!` private macro with a `do_callback` generic function. This change should not affect the user as the macro, now function, is only used internally in the `real_ribosome` module. #5529
 - Docs: Outline process for updating all Holochain tooling in an issue template. \#5472.
 - CI: Run windows test workflow on Depot.dev runners for improved performance. \#5473
 - **BREAKING CHANGE** Refactor: The `ConductorConfig` field `request_timeout_s` has moved into the `NetworkConfig`, so is now available at the sub-field `network.request_timeout_s`.
