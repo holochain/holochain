@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- CI: Allow test workflow to pass when tests of the feature `wasmer_wamr` fail. WAMR is not actively used, so investigating flaky tests on WAMR is not a priority.
+
 ## 0.6.0
 
 - Add metrics to record incoming notify requests [\#5451](https://github.com/holochain/holochain/pull/5451)
