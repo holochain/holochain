@@ -19,34 +19,6 @@ fn msg() -> Msg {
     Msg("hello".into())
 }
 
-#[cfg(feature = "unstable-functions")]
-#[hdk_extern]
-pub fn block_agent(target: AgentPubKey) -> ExternResult<()> {
-    HDK.with(|h| {
-        h.borrow()
-            .block_agent(holochain_zome_types::block::BlockAgentInput {
-                target,
-                reason: vec![],
-                interval: InclusiveTimestampInterval::try_new(Timestamp::MIN, Timestamp::MAX)
-                    .unwrap(),
-            })
-    })
-}
-
-#[cfg(feature = "unstable-functions")]
-#[hdk_extern]
-pub fn unblock_agent(target: AgentPubKey) -> ExternResult<()> {
-    HDK.with(|h| {
-        h.borrow()
-            .unblock_agent(holochain_zome_types::block::BlockAgentInput {
-                target,
-                reason: vec![],
-                interval: InclusiveTimestampInterval::try_new(Timestamp::MIN, Timestamp::MAX)
-                    .unwrap(),
-            })
-    })
-}
-
 #[hdk_extern]
 fn create_entry(_: ()) -> ExternResult<ActionHash> {
     let post = new_post();

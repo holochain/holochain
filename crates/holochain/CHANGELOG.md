@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE**: Removed `block_agent` and `unblock_agent` functions from the HDK. These functions were behind the `unstable-functions` feature flag and have been removed as blocking should be a system-level behavior triggered by warrants, not application-level logic. The host functions remain as no-ops for backward compatibility with existing apps. Applications using these functions should remove the calls - they will succeed but have no effect. [#5518]
+
 ## 0.7.0-dev.4
 
 - CI: Allow test workflow to pass when tests of the feature `wasmer_wamr` fail. WAMR is not actively used, so investigating flaky tests on WAMR is not a priority. \#5523
