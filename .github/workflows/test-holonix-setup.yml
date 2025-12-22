@@ -46,6 +46,8 @@ jobs:
               if command -v nix; then break; fi
           done
           set -e
+          # Persist the resolved PATH so later steps (like nix-cache-check) see the nix binary.
+          echo "PATH=$PATH" >> "$GITHUB_ENV"
           nix run --version
       - name: Check Holonix cache
         uses: holochain/nix-cache-check@v1
