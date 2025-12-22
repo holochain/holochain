@@ -29,8 +29,6 @@ use crate::core::ribosome::guest_callback::CallStream;
 #[cfg(feature = "unstable-countersigning")]
 use crate::core::ribosome::host_fn::accept_countersigning_preflight_request::accept_countersigning_preflight_request;
 use crate::core::ribosome::host_fn::agent_info::agent_info;
-#[cfg(feature = "unstable-functions")]
-use crate::core::ribosome::host_fn::block_agent::block_agent;
 use crate::core::ribosome::host_fn::call::call;
 use crate::core::ribosome::host_fn::call_info::call_info;
 use crate::core::ribosome::host_fn::capability_claims::capability_claims;
@@ -69,8 +67,6 @@ use crate::core::ribosome::host_fn::sign_ephemeral::sign_ephemeral;
 use crate::core::ribosome::host_fn::sleep::sleep;
 use crate::core::ribosome::host_fn::sys_time::sys_time;
 use crate::core::ribosome::host_fn::trace::trace;
-#[cfg(feature = "unstable-functions")]
-use crate::core::ribosome::host_fn::unblock_agent::unblock_agent;
 use crate::core::ribosome::host_fn::update::update;
 use crate::core::ribosome::host_fn::verify_signature::verify_signature;
 use crate::core::ribosome::host_fn::x_25519_x_salsa20_poly1305_decrypt::x_25519_x_salsa20_poly1305_decrypt;
@@ -618,11 +614,7 @@ impl RealRibosome {
             accept_countersigning_preflight_request,
         );
         #[cfg(feature = "unstable-functions")]
-        host_fn_builder
-            .with_host_function(&mut ns, "__hc__block_agent_1", block_agent)
-            .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
-            // TODO deprecated, remove me
-            .with_host_function(&mut ns, "__hc__sleep_1", sleep);
+        host_fn_builder.with_host_function(&mut ns, "__hc__sleep_1", sleep);
         imports.register_namespace("env", ns);
 
         (host_fn_builder.function_env, imports)
@@ -1303,8 +1295,6 @@ pub mod wasm_test {
                 #[cfg(feature = "unstable-countersigning")]
                 "__hc__accept_countersigning_preflight_request_1",
                 "__hc__agent_info_1",
-                #[cfg(feature = "unstable-functions")]
-                "__hc__block_agent_1",
                 "__hc__call_1",
                 "__hc__call_info_1",
                 "__hc__capability_claims_1",
@@ -1347,8 +1337,6 @@ pub mod wasm_test {
                 "__hc__sleep_1",
                 "__hc__sys_time_1",
                 "__hc__trace_1",
-                #[cfg(feature = "unstable-functions")]
-                "__hc__unblock_agent_1",
                 "__hc__update_1",
                 "__hc__verify_signature_1",
                 "__hc__x_25519_x_salsa20_poly1305_decrypt_1",

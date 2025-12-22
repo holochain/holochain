@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE**: Completely removed `block_agent` and `unblock_agent` host and HDK functions from Holochain. Blocking is a system-level behavior, triggered by warrants, not application-level logic. Any WASM that references these host functions will fail to instantiate. Applications must be recompiled without calls to these functions. [#5518]
+
 ## 0.7.0-dev.7
 
 - Update kitsune2 to v0.4.0-dev.2, which includes the iroh relay integration with the bootstrap server.
