@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE**: Completely removed `block_agent` and `unblock_agent` host functions from Holochain. These functions were previously converted to no-ops. Any WASM that references these host functions will fail to instantiate. Applications must be recompiled without calls to these functions. [#5518]
 - **BREAKING CHANGE**: Removed `block_agent` and `unblock_agent` functions from the HDK. These functions were behind the `unstable-functions` feature flag and have been removed as blocking should be a system-level behavior triggered by warrants, not application-level logic. The host functions remain as no-ops for backward compatibility with existing apps. Applications using these functions should remove the calls - they will succeed but have no effect. [#5518]
 
 ## 0.7.0-dev.4

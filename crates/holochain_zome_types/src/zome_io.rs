@@ -43,10 +43,6 @@ wasm_io_types! {
     // Info about the calling agent.
     fn agent_info (()) -> zt::info::AgentInfo;
 
-    // Block some agent on the same DNA.
-    #[cfg(feature = "unstable-functions")]
-    fn block_agent (zt::block::BlockAgentInput) -> ();
-
     // Info about the current DNA.
     fn dna_info_1 (()) -> zt::info::DnaInfoV1;
     fn dna_info_2 (()) -> zt::info::DnaInfoV2;
@@ -139,10 +135,6 @@ wasm_io_types! {
 
     // Same as  but also takes the ActionHash of the updated record.
     fn update (zt::entry::UpdateInput) -> holo_hash::ActionHash;
-
-    // Unblock some previously blocked agent.
-    #[cfg(feature = "unstable-functions")]
-    fn unblock_agent(zt::block::BlockAgentInput) -> ();
 
     fn verify_signature (zt::signature::VerifySignature) -> bool;
 
