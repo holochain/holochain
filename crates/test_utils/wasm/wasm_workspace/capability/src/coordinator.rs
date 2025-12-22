@@ -26,10 +26,6 @@ pub fn cap_secret(_: ()) -> ExternResult<CapSecret> {
     CapSecret::try_from_random()
 }
 
-#[cfg(feature = "unstable-functions")]
-    })
-}
-
 fn cap_grant_entry(secret: CapSecret) -> ExternResult<CapGrantEntry> {
     let mut fns = HashSet::new();
     let this_zome = zome_info()?.name;
