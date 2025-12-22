@@ -414,8 +414,7 @@ async fn test_foreign_key_constraints() {
         err_msg.contains("FOREIGN KEY constraint failed")
             || err_msg.contains("foreign key")
             || err_msg.contains("constraint"),
-        "Expected foreign key error, got: {}",
-        err_msg
+        "Expected foreign key error, got: {err_msg}"
     );
 
     // Delete the DnaDef and verify cascading delete removes the zome
