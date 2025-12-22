@@ -24,6 +24,15 @@ jobs:
         run: |
           set -xe
           bash <(curl https://raw.githubusercontent.com/holochain/holochain/${{ github.sha }}/setup.sh)
+      - name: Align Nix system features
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          # GitHub's Ubuntu runners don't actually provide the extra features that
+          # the multi-user installer adds (benchmark/kvm/uid-range/etc). Clearing the
+          # list back to the default stops Nix rejecting builds during cache checks.
+          sudo sed -i '/^system-features/d' /etc/nix/nix.conf
+          echo 'system-features = x86_64-linux' | sudo tee -a /etc/nix/nix.conf
+          sudo systemctl restart nix-daemon
       - name: Test nix command
         run: |
           set -x +e
