@@ -1843,30 +1843,35 @@ mod app_status_impls {
                         .await
                 }
             });
-            // Create cells
-            let cells = future::join_all(cells_to_create)
+            // Create cells with bounded parallelism (max 5 concurrent)
+            let cells = futures::stream::iter(cells_to_create)
+                .buffer_unordered(5)
+                .collect::<Vec<_>>()
                 .await
                 .into_iter()
                 .collect::<Result<Vec<_>, _>>()?;
 
-            // Add agents to local agent store in kitsune
-            future::join_all(cells.iter().enumerate().map(|(i, (cell, _))| {
-                let config_override = config_override.clone();
-                async move {
+            // Add agents to local agent store in kitsune with bounded parallelism (max 10 concurrent)
+            let join_futures = cells
+                .iter()
+                .enumerate()
+                .map(|(i, (cell, _))| {
+                    let config_override = config_override.clone();
                     let cell_id = cell.id().clone();
                     let agent_pubkey = cell_id.agent_pubkey().clone();
-                    if let Err(e) = cell
-                        .holochain_p2p_dna()
-                        .clone()
-                        .join(agent_pubkey, None, config_override)
-                        .await
-                    {
-                        tracing::error!(?e, ?cell_id, "Network join failed.");
+                    let holochain_p2p_dna = cell.holochain_p2p_dna().clone();
+                    async move {
+                        if let Err(e) = holochain_p2p_dna.join(agent_pubkey, None, config_override).await {
+                            tracing::error!(?e, ?cell_id, "Network join failed.");
+                        }
                     }
-                }
-                .instrument(tracing::info_span!("network join task", ?i))
-            }))
-            .await;
+                    .instrument(tracing::info_span!("network join task", ?i))
+                })
+                .collect::<Vec<_>>();
+            futures::stream::iter(join_futures)
+                .buffer_unordered(10)
+                .collect::<Vec<_>>()
+                .await;
 
             // Add cells to conductor
             self.add_and_initialize_cells(cells);
