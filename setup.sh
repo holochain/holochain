@@ -2,7 +2,7 @@
 
 set -e
 
-export NIX_INSTALLER_URL=${NIX_INSTALLER_URL:-https://releases.nixos.org/nix/nix-2.28.3/install}
+export NIX_INSTALLER_URL=${NIX_INSTALLER_URL:-https://releases.nixos.org/nix/nix-2.33.0/install}
 
 run_cmd() {
     echo "$@"
@@ -71,7 +71,7 @@ main() {
     fi
 
     echo "Setting up binary cache for all users (requires root access)"
-    run_cmd sudo --preserve-env=NIX_CONFIG,PATH "$(which nix)" run nixpkgs/nixos-25.11#cachix -- use holochain-ci -m root-nixconf
+    run_cmd sudo --preserve-env=NIX_CONFIG,PATH "$(which nix)" run nixpkgs/nixos-25.11#cachix --extra-experimental-features "nix-command flakes" -- use holochain-ci -m root-nixconf
     echo
 
     echo "Restarting Nix daemon"
