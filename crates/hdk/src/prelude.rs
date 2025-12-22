@@ -178,11 +178,6 @@ macro_rules! holochain_externs {
             accept_countersigning_preflight_request:1
         );
 
-        #[cfg(feature = "unstable-functions")]
-        holochain_wasmer_guest::host_externs!(
-            block_agent:1,
-            unblock_agent:1
-        );
     };
 }
 

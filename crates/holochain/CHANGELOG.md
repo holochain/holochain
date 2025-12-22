@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE**: Removed `block_agent` and `unblock_agent` functions from the HDK. These functions were behind the `unstable-functions` feature flag and have been removed as blocking should be a system-level behavior triggered by warrants, not application-level logic. The host functions remain as no-ops for backward compatibility with existing apps. Applications using these functions should remove the calls - they will succeed but have no effect. [#5518]
+
 ## 0.7.0-dev.6
 
 - Fix: Limit concurrency when starting many cells at once to prevent resource exhaustion. Starting cells is now limited to 5 concurrent cell creation operations and 10 concurrent network join operations. This improves startup reliability for conductors managing large numbers of cells.
