@@ -14,6 +14,69 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20251222.001720
+
+## [hcterm-0.7.0-dev.4](crates/hcterm/CHANGELOG.md#0.7.0-dev.4)
+
+## [holochain\_cli-0.7.0-dev.4](crates/holochain_cli/CHANGELOG.md#0.7.0-dev.4)
+
+## [holochain\_cli\_bundle-0.7.0-dev.4](crates/holochain_cli_bundle/CHANGELOG.md#0.7.0-dev.4)
+
+## [holochain\_cli\_client-0.7.0-dev.4](crates/holochain_cli_client/CHANGELOG.md#0.7.0-dev.4)
+
+## [holochain\_cli\_sandbox-0.7.0-dev.4](crates/holochain_cli_sandbox/CHANGELOG.md#0.7.0-dev.4)
+
+## [holochain\_client-0.9.0-dev.4](crates/holochain_client/CHANGELOG.md#0.9.0-dev.4)
+
+## [holochain-0.7.0-dev.4](crates/holochain/CHANGELOG.md#0.7.0-dev.4)
+
+- CI: Allow test workflow to pass when tests of the feature `wasmer_wamr` fail. WAMR is not actively used, so investigating flaky tests on WAMR is not a priority. \#5523
+- Docs: Outline process for updating all Holochain tooling in an issue template. \#5472.
+- CI: Run windows test workflow on Depot.dev runners for improved performance. \#5473
+- **BREAKING CHANGE** Refactor: The `ConductorConfig` field `request_timeout_s` has moved into the `NetworkConfig`, so is now available at the sub-field `network.request_timeout_s`.
+- **BREAKING CHANGE** Feat: The advanced network configuration field `network.advanced.transportTx5.timeoutS` is now automatically set to 1/2 of the `NetworkConfig` field `request_timeout_s`. It specifies the timeout for a single transport message (request or response).
+- **BREAKING CHANGE** Feat: The advanced network configuration field `network.advanced.transportTx5.webrtcConnectTimeoutS` is now automatically set to 3/8 of the `NetworkConfig` field `request_timeout_s`. It specifies the timeout for attempting to establish a webrtc connection before falling back to a relay connection.
+- Added feature `transport-iroh` for using Iroh as network transport backend.
+- **BREAKING CHANGE** Renamed features `backend-libdatachannel` to `transport-tx5-backend-libdatachannel`, `backend-go-pion` to `transport-tx5-backend-go-pion`, `datachannel-vendored` to `transport-tx5-datachannel-vendored`.
+
+## [holochain\_cascade-0.7.0-dev.4](crates/holochain_cascade/CHANGELOG.md#0.7.0-dev.4)
+
+## [holochain\_conductor\_config-0.7.0-dev.4](crates/holochain_conductor_config/CHANGELOG.md#0.7.0-dev.4)
+
+## [holochain\_test\_wasm\_common-0.7.0-dev.2](crates/holochain_test_wasm_common/CHANGELOG.md#0.7.0-dev.2)
+
+## [holochain\_wasm\_test\_utils-0.7.0-dev.4](crates/holochain_wasm_test_utils/CHANGELOG.md#0.7.0-dev.4)
+
+## [holochain\_websocket-0.7.0-dev.4](crates/holochain_websocket/CHANGELOG.md#0.7.0-dev.4)
+
+## [hdk-0.7.0-dev.2](crates/hdk/CHANGELOG.md#0.7.0-dev.2)
+
+## [holochain\_conductor\_api-0.7.0-dev.4](crates/holochain_conductor_api/CHANGELOG.md#0.7.0-dev.4)
+
+## [holochain\_p2p-0.7.0-dev.4](crates/holochain_p2p/CHANGELOG.md#0.7.0-dev.4)
+
+## [hdi-0.8.0-dev.2](crates/hdi/CHANGELOG.md#0.8.0-dev.2)
+
+## [holochain\_state-0.7.0-dev.4](crates/holochain_state/CHANGELOG.md#0.7.0-dev.4)
+
+## [hdk\_derive-0.7.0-dev.2](crates/hdk_derive/CHANGELOG.md#0.7.0-dev.2)
+
+## [holochain\_chc-0.4.0-dev.4](crates/holochain_chc/CHANGELOG.md#0.4.0-dev.4)
+
+## [holochain\_state\_types-0.7.0-dev.2](crates/holochain_state_types/CHANGELOG.md#0.7.0-dev.2)
+
+## [holochain\_types-0.7.0-dev.4](crates/holochain_types/CHANGELOG.md#0.7.0-dev.4)
+
+## [holochain\_keystore-0.7.0-dev.2](crates/holochain_keystore/CHANGELOG.md#0.7.0-dev.2)
+
+## [holochain\_sqlite-0.7.0-dev.2](crates/holochain_sqlite/CHANGELOG.md#0.7.0-dev.2)
+
+## [holochain\_zome\_types-0.7.0-dev.2](crates/holochain_zome_types/CHANGELOG.md#0.7.0-dev.2)
+
+## [holochain\_integrity\_types-0.7.0-dev.2](crates/holochain_integrity_types/CHANGELOG.md#0.7.0-dev.2)
+
+## [holo\_hash-0.7.0-dev.1](crates/holo_hash/CHANGELOG.md#0.7.0-dev.1)
+
 # 20251208.144306
 
 ## [hcterm-0.7.0-dev.3](crates/hcterm/CHANGELOG.md#0.7.0-dev.3)

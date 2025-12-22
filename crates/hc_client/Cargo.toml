@@ -1,6 +1,6 @@
 [package]
 name = "holochain_cli_client"
-version = "0.7.0-dev.3"
+version = "0.7.0-dev.4"
 edition = "2021"
 description = "CLI utilities for interacting with Holochain conductors"
 license = "Apache-2.0"
@@ -22,14 +22,14 @@ chrono = { version = "0.4.22", default-features = false, features = [
 clap = { version = "4.0", features = ["derive", "env"] }
 ed25519-dalek = "2.1"
 hc_serde_json = { version = "1", package = "hc_serde_json" }
-holo_hash = { version = "^0.7.0-dev.0", path = "../holo_hash", features = [
+holo_hash = { version = "^0.7.0-dev.1", path = "../holo_hash", features = [
   "kitsune2",
 ] }
-holochain_client = { version = "^0.9.0-dev.3", path = "../client", default-features = false }
-holochain_conductor_api = { path = "../holochain_conductor_api", version = "^0.7.0-dev.3", features = [
+holochain_client = { version = "^0.9.0-dev.4", path = "../client", default-features = false }
+holochain_conductor_api = { path = "../holochain_conductor_api", version = "^0.7.0-dev.4", features = [
   "sqlite",
 ] }
-holochain_types = { path = "../holochain_types", version = "^0.7.0-dev.3", features = [
+holochain_types = { path = "../holochain_types", version = "^0.7.0-dev.4", features = [
   "sqlite",
 ] }
 holochain_util = { version = "^0.7.0-dev.0", path = "../holochain_util", features = [
@@ -44,10 +44,10 @@ sodoken = "0.1.0"
 tokio = { version = "1.36.0", features = ["full"] }
 indexmap = "2.0"
 
-holochain = { version = "^0.7.0-dev.3", path = "../holochain", default-features = false, optional = true }
+holochain = { version = "^0.7.0-dev.4", path = "../holochain", default-features = false, optional = true }
 
 [dev-dependencies]
-holochain = { version = "^0.7.0-dev.3", path = "../holochain", default-features = false, features = [
+holochain = { version = "^0.7.0-dev.4", path = "../holochain", default-features = false, features = [
   "sweettest",
   "transport-tx5-datachannel-vendored",
 ] }
