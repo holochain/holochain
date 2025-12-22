@@ -11,7 +11,11 @@ jobs:
   test_holonix_setup:
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            platform: x86_64-linux
+          - os: macos-latest
+            platform: aarch64-darwin
     runs-on: ${{ matrix.os }}
     steps:
       - name: Call setup script
@@ -34,57 +38,9 @@ jobs:
           done
           set -e
           nix run --version
-      - name: Test configure cache
+      - name: Check Holonix cache
+        uses: holochain/nix-cache-check@v1
         env:
           NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
-        run: |
-          set -x +e
-          for file in \
-              ~/.profile \
-              /etc/profile \
-              /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh \
-              /nix/var/nix/profiles/default/etc/profile.d/nix.sh
-          do
-              source $file > /dev/null 2>&1
-              if command -v nix; then break; fi
-          done
-          set -e
-
-          nix_system=$(nix config show --json | jq -r .system.value)
-          
-          # Remove the cache config that `setup.sh` added
-          # NOTE: `remove` command requires Cachix 1.6+ which is currently only available in unstable
-          sudo --preserve-env=NIX_CONFIG,PATH "$(which nix)" run nixpkgs/nixos-25.11#cachix -- remove holochain-ci
-          
-          # Restart the Nix daemon to pick up the new config
-          if command -v systemctl &> /dev/null; then
-            sudo systemctl restart nix-daemon
-          elif command -v launchctl &> /dev/null; then
-            sudo launchctl kickstart -k system/org.nixos.nix-daemon
-          fi
-          
-          # TODO replace with nix-cache-check
-          function do_nix_build {
-            nix build -L --refresh --accept-flake-config -j0 \
-              github:holochain/holonix?ref=main-0.6#devShells.${nix_system}.default
-          }
-
-          # Try a build with no cache configured, which should fail with -j0
-          do_nix_build && {
-            echo This should not have succeeded.
-            exit 1
-          } || {
-            echo Failed as expected.
-          }
-
-          # Now actually configure the cache
-          bash <(curl https://raw.githubusercontent.com/holochain/holochain/${{ github.sha }}/configure-cache.sh) use holochain-ci
-          
-          # Give the daemon a chance to restart on macos
-          sleep 5
-          
-          # and try a build where everything is expected to be cached
-          do_nix_build
-          
-          # Clean up the cache config to check that the command at least runs
-          bash <(curl https://raw.githubusercontent.com/holochain/holochain/${{ github.sha }}/configure-cache.sh) cleanup
+        with:
+          derivation: github:holochain/holonix?ref=main-0.6#devShells.${{ matrix.platform }}.default
