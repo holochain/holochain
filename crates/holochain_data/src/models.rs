@@ -356,7 +356,7 @@ impl EntryDefModel {
         let required_validations_u8: u8 = self
             .required_validations
             .try_into()
-            .map_err(|e| format!("Invalid required_validations: {}", e))?;
+            .map_err(|e| format!("Invalid required_validations: {e}"))?;
         let required_validations = required_validations_u8.into();
 
         Ok(EntryDef {

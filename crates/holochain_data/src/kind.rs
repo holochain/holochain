@@ -60,7 +60,7 @@ impl DatabaseIdentifier for Dht {
 impl Dht {
     /// Create a new DHT database identifier for a DNA.
     pub fn new(dna_hash: Arc<DnaHash>) -> Self {
-        let id = format!("dht-{}", dna_hash);
+        let id = format!("dht-{dna_hash}");
         Self { dna_hash, id }
     }
 
@@ -117,7 +117,7 @@ impl DatabaseIdentifier for PeerMetaStore {
 impl PeerMetaStore {
     /// Create a new peer metadata database identifier for a DNA.
     pub fn new(dna_hash: Arc<DnaHash>) -> Self {
-        let id = format!("p2p-peer-meta-{}", dna_hash);
+        let id = format!("p2p-peer-meta-{dna_hash}");
         Self { dna_hash, id }
     }
 
