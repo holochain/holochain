@@ -238,7 +238,7 @@ mod test {
 }
 
 #[cfg(test)]
-#[cfg(feature = "slow_tests")]
+//#[cfg(feature = "slow_tests")]
 mod slow_tests {
     use super::ValidateResult;
     use crate::conductor::api::error::ConductorApiError;
@@ -250,6 +250,9 @@ mod slow_tests {
     use crate::core::workflow::WorkflowError;
     use crate::fixt::Zomes;
     use crate::fixt::*;
+    use crate::sweettest::SweetConductorBatch;
+    use crate::sweettest::SweetConductorConfig;
+    use crate::sweettest::SweetZome;
     use crate::sweettest::{SweetConductor, SweetDnaFile};
     use crate::test_utils::RibosomeTestFixture;
     use ::fixt::prelude::*;
@@ -260,6 +263,7 @@ mod slow_tests {
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::op::Op;
     use std::sync::Arc;
+    use std::time::Duration;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_unimplemented() {
@@ -455,5 +459,138 @@ mod slow_tests {
         let invalid_output: Result<ActionHash, _> =
             conductor.call_fallible(&alice, "never_validates", ()).await;
         assert!(invalid_output.is_err());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_should_validate_receipt() {
+        holochain_trace::test_run();
+
+        // Need DEFAULT_RECEIPT_BUNDLE_SIZE peers to send validation receipts back
+        const NUM_CONDUCTORS: usize =
+            holochain::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE
+                as usize
+                + 1;
+
+        let config = SweetConductorConfig::rendezvous(true).tune_conductor(|cc| {
+            cc.min_publish_interval = Some(Duration::from_secs(5));
+            cc.publish_trigger_interval = Some(Duration::from_secs(5))
+        });
+        let mut conductors =
+            SweetConductorBatch::from_config_rendezvous(NUM_CONDUCTORS, config).await;
+
+        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+
+        let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+
+        let alice_cell = apps.cells_flattened().into_iter().next().unwrap();
+        let alice_zome = alice_cell.zome(TestWasm::Create);
+
+        for c in conductors.iter() {
+            c.declare_full_storage_arcs(alice_cell.dna_hash()).await;
+        }
+
+        conductors.exchange_peer_info().await;
+
+        let conductors = Arc::new(conductors);
+
+        validate_receipts(conductors.clone(), Arc::new(alice_zome))
+            .await
+            .expect("validate receipts failed");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_stress_validate_receipts() {
+        holochain_trace::test_run();
+
+        // Need DEFAULT_RECEIPT_BUNDLE_SIZE peers to send validation receipts back
+        const NUM_CONDUCTORS: usize =
+            holochain::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE
+                as usize
+                + 1;
+
+        let config = SweetConductorConfig::rendezvous(true).tune_conductor(|cc| {
+            cc.min_publish_interval = Some(Duration::from_secs(5));
+            cc.publish_trigger_interval = Some(Duration::from_secs(5))
+        });
+        let mut conductors =
+            SweetConductorBatch::from_config_rendezvous(NUM_CONDUCTORS, config).await;
+
+        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+
+        let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+
+        let alice_cell = apps.cells_flattened().into_iter().next().unwrap();
+        let zome = alice_cell.zome(TestWasm::Create);
+
+        for c in conductors.iter() {
+            c.declare_full_storage_arcs(alice_cell.dna_hash()).await;
+        }
+
+        conductors.exchange_peer_info().await;
+
+        let conductors = Arc::new(conductors);
+        let zome = Arc::new(zome);
+
+        let max_entries: usize = std::env::var("HOLOCHAIN_STRESS_TEST_ENTRIES")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(64);
+        let max_workers: usize = std::env::var("HOLOCHAIN_STRESS_TEST_WORKERS")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(8);
+        let mut handles = vec![];
+
+        let mut entries = 0;
+        while entries < max_entries {
+            for _ in 0..max_workers {
+                let conductors = conductors.clone();
+                let zome = zome.clone();
+                let handle = tokio::spawn(async move {
+                    if let Err(err) = validate_receipts(conductors, zome).await {
+                        panic!("validate receipts {entries} failed: {:?}", err);
+                    }
+                });
+                handles.push(handle);
+            }
+            for handle in handles.drain(..) {
+                handle.await.expect("task panicked");
+                entries += 1;
+            }
+        }
+    }
+
+    async fn validate_receipts(
+        conductors: Arc<SweetConductorBatch>,
+        zome: Arc<SweetZome>,
+    ) -> anyhow::Result<()> {
+        let action_hash: ActionHash = conductors[0].call(&zome, "create_entry", ()).await;
+
+        crate::test_utils::retry_fn_until_timeout(
+            || async {
+                // check for complete count of our receipts on the
+                // millisecond level
+
+                // Get the validation receipts to check that they
+                // are all complete
+                let receipt_sets: Vec<ValidationReceiptSet> = conductors[0]
+                    .call(
+                        &zome,
+                        "get_validation_receipts",
+                        GetValidationReceiptsInput::new(action_hash.clone()),
+                    )
+                    .await;
+
+                if receipt_sets.is_empty() {
+                    return false;
+                }
+                receipt_sets.iter().all(|r| r.receipts_complete)
+            },
+            Some(60_000),
+            None,
+        )
+        .await?;
+
+        Ok(())
     }
 }
