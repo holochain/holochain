@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Removed the inactive `hc_stress_test` helper module, its integration test, and example binaries now that performance testing lives in the `holochain/wind-tunnel` repository.
+
 ## 0.7.0-dev.4
 
 - CI: Allow test workflow to pass when tests of the feature `wasmer_wamr` fail. WAMR is not actively used, so investigating flaky tests on WAMR is not a priority. \#5523
@@ -1445,3 +1447,4 @@ This is the first version number for the version of Holochain with a refactored 
 ## 0.0.52-alpha2
 
 *Note: Versions 0.0.52-alpha2 and older are belong to previous iterations of the Holochain architecture and are not tracked here.*
+- Removed the inactive `hc_stress_test` helper module, its integration test, and example binaries now that performance testing lives out of tree.
