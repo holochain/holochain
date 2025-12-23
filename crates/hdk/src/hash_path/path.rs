@@ -77,7 +77,45 @@ impl HdkPathExt for TypedPath {
         )
     }
 
-    /// Recursively touch this and every parent that doesn't exist yet.
+    /// Ensures that this path exists by recursively creating missing parent links.
+    ///
+    /// This function checks whether the current path already exists.
+    /// If it does not, it recursively ensures that all parent paths exist and then
+    /// creates the appropriate link for this path.
+    ///
+    /// The behavior depends on whether the path is the root:
+    ///
+    /// - If the path is the root and does not exist, a link is created from the
+    ///   global root hash to this path entry.
+    /// - If the path is not the root, its parent is first ensured recursively by calling [`Self::ensure`] on it,
+    ///   and then a link is created from the parent path entry to this path entry.
+    ///
+    /// If the path already exists, this function is a no-op.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Checking for existence fails
+    /// - [`Self::ensure`] on a parent path fails
+    /// - Creating any required link fails
+    ///
+    /// # Notes
+    ///
+    /// This function does **not** create entries; it only creates links at
+    /// deterministic path hashes.
+    ///
+    /// `Path` operates on so-called *ghost entries*: no entry is ever written to
+    /// the DHT for a path itself. Instead, the hash that *would* correspond to a
+    /// path entry is deterministically derived and used as the base or target
+    /// address for links.
+    ///
+    /// In other words, [`Path::path_entry_hash`] does not require a prior
+    /// entry create; it computes a stable hash that is used purely as a link
+    /// anchor in the DHT.
+    ///
+    /// The operation is idempotent: calling [`Self::ensure`] multiple times for the same
+    /// path will not create duplicate links, given that [`Self::exists`] correctly
+    /// reflects the current state of the DHT.
     fn ensure(&self) -> ExternResult<()> {
         if !self.exists()? {
             if self.is_root() {
