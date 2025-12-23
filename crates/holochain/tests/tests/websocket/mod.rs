@@ -200,7 +200,10 @@ async fn zome_call_with_conductor_restart() {
         fn_name,
         cap_secret,
         signing_keypair,
+        _environment: _environment_guard,
     } = TestCase::new().await;
+    // Keep the temp dir alive for the duration of the test so the config persists across restarts.
+    let _environment_guard = _environment_guard;
 
     let _app_rx = WsPollRecv::new::<AdminResponse>(app_rx);
 
@@ -237,7 +240,7 @@ async fn zome_call_with_conductor_restart() {
 
     // Call zome after restart
     info!("Restarting conductor");
-    let (_holochain, admin_port) = start_holochain(config_path).await;
+    let (_holochain, admin_port) = start_holochain(config_path.clone()).await;
     let admin_port = admin_port.await.unwrap();
 
     let (admin_tx, admin_rx) = websocket_client_by_port(admin_port).await.unwrap();
@@ -1276,6 +1279,7 @@ struct TestCase {
     admin_port: u16,
     holochain: SupervisedChild,
     config_path: PathBuf,
+    _environment: TempDir,
     zome_name: ZomeName,
     fn_name: FunctionName,
     cap_secret: CapSecret,
@@ -1288,10 +1292,9 @@ impl TestCase {
         let admin_port = 0;
 
         let tmp_dir = TempDir::new().unwrap();
-        let path = tmp_dir.keep();
-        let environment_path = path.clone();
-        let config = create_config(admin_port, environment_path.into());
-        let config_path = write_config(path, &config);
+        let environment_path = tmp_dir.path().to_path_buf();
+        let config = create_config(admin_port, environment_path.clone().into());
+        let config_path = write_config(environment_path, &config);
 
         let (holochain, admin_port) = start_holochain(config_path.clone()).await;
         let admin_port = admin_port.await.unwrap();
@@ -1363,6 +1366,7 @@ impl TestCase {
             app_rx,
             holochain,
             config_path,
+            _environment: tmp_dir,
             zome_name,
             fn_name,
             cap_secret,
