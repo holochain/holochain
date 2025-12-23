@@ -8,6 +8,21 @@ on:
   workflow_dispatch: {}
 
 jobs:
+  test_bash_scripts:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Test bash scripts
+        run: |
+          set -xe
+          for script in ./tests/*.sh; do
+            bash "$script"
+          done
   test_holonix_setup:
     strategy:
       matrix:
@@ -54,5 +69,5 @@ jobs:
         env:
           NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
         with:
-          derivation: github:holochain/holonix?ref=main-0.6#devShells.${{ matrix.platform }}.default
-          extra_build_args: --accept-flake-config
+          derivation: "github:holochain/holonix?ref=main-0.6#devShells.${{ matrix.platform }}.default"
+          extra_build_args: "--accept-flake-config"
