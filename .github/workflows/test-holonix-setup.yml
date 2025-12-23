@@ -26,7 +26,11 @@ jobs:
   test_holonix_setup:
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            platform: x86_64-linux
+          - os: macos-latest
+            platform: aarch64-darwin
     runs-on: ${{ matrix.os }}
     steps:
       - name: Call setup script
@@ -35,7 +39,16 @@ jobs:
         run: |
           set -xe
           bash <(curl https://raw.githubusercontent.com/holochain/holochain/${{ github.sha }}/setup.sh)
-      - name: Test nix command
+      - name: Clear Nix system features
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          # GitHub's Ubuntu runners don't actually provide the extra features that
+          # the multi-user installer adds (benchmark/kvm/uid-range/etc). Clearing the
+          # list back to the default stops Nix rejecting builds during cache checks.
+          sudo sed -i '/^system-features/d' /etc/nix/nix.conf
+          echo 'system-features = x86_64-linux' | sudo tee -a /etc/nix/nix.conf
+          sudo systemctl restart nix-daemon
+      - name: Make `nix` command available in PATH
         run: |
           set -x +e
           for file in \
@@ -48,4 +61,13 @@ jobs:
               if command -v nix; then break; fi
           done
           set -e
+          # Persist the resolved PATH so later steps (like nix-cache-check) see the nix binary.
+          echo "PATH=$PATH" >> "$GITHUB_ENV"
           nix run --version
+      - name: Check Holonix cache
+        uses: holochain/nix-cache-check@v1
+        env:
+          NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
+        with:
+          derivation: "github:holochain/holonix?ref=maintenance#devShells.${{ matrix.platform }}.default"
+          extra_build_args: "--accept-flake-config"
