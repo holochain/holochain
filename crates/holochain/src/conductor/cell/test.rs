@@ -8,6 +8,7 @@ use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_p2p::actor::MockHcP2p;
 use holochain_p2p::HolochainP2pDna;
 use holochain_state::prelude::*;
+use holochain_types::p2p_config_overrides::P2pConfigOverrides;
 use holochain_wasmer_host::module::ModuleCache;
 use holochain_zome_types::action;
 use std::sync::Arc;
@@ -71,6 +72,7 @@ async fn test_cell_handle_publish() {
         spaces.test_spaces[&dna].space.clone(),
         holochain_p2p_cell,
         broadcast::channel(10).0,
+        P2pConfigOverrides::default(),
     )
     .await
     .unwrap();
