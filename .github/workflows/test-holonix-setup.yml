@@ -24,7 +24,7 @@ jobs:
         run: |
           set -xe
           bash <(curl https://raw.githubusercontent.com/holochain/holochain/${{ github.sha }}/setup.sh)
-      - name: Align Nix system features
+      - name: Clear Nix system features
         if: matrix.os == 'ubuntu-latest'
         run: |
           # GitHub's Ubuntu runners don't actually provide the extra features that
@@ -33,7 +33,7 @@ jobs:
           sudo sed -i '/^system-features/d' /etc/nix/nix.conf
           echo 'system-features = x86_64-linux' | sudo tee -a /etc/nix/nix.conf
           sudo systemctl restart nix-daemon
-      - name: Test nix command
+      - name: Make `nix` command available in PATH
         run: |
           set -x +e
           for file in \
@@ -55,3 +55,4 @@ jobs:
           NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
         with:
           derivation: github:holochain/holonix?ref=main-0.6#devShells.${{ matrix.platform }}.default
+          extra_build_args: --accept-flake-config
