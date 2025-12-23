@@ -143,8 +143,8 @@ impl LocalBehavior1 {
 
         {
             let this = this.clone();
+            let network_seed = random_network_seed();
             tokio::task::spawn(async move {
-                let network_seed = random_network_seed();
                 let rendezvous = SweetLocalRendezvous::new().await;
 
                 println!("spawn 1 null node that shuts down after ~30 s");
