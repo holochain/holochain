@@ -69,5 +69,5 @@ jobs:
         env:
           NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
         with:
-          derivation: "github:holochain/holonix?ref=main-0.6#devShells.${{ matrix.platform }}.default"
+          derivation: "github:holochain/holonix?ref=maintenance#devShells.${{ matrix.platform }}.default"
           extra_build_args: "--accept-flake-config"
