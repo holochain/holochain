@@ -1,4 +1,4 @@
-//!  P2P configuration overrides module.
+//! P2P configuration overrides module.
 //!
 //! This module defines structures and functions for overriding
 //! P2P configuration settings in Holochain applications.
