@@ -13,7 +13,11 @@ use holochain_websocket::{
     self as ws, ConnectRequest, WebsocketConfig, WebsocketReceiver, WebsocketResult,
     WebsocketSender,
 };
+use kitsune2_api::DynLocalAgent;
+use kitsune2_core::Ed25519LocalAgent;
+use kitsune2_test_utils::agent::AgentBuilder;
 use serde_json::json;
+use std::collections::HashSet;
 use std::future::Future;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;

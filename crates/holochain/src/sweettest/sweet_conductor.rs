@@ -363,6 +363,54 @@ impl SweetConductor {
         Ok(agent)
     }
 
+    /// Install an app with a given manifest
+    ///
+    /// Similar to [`Self::install_app`], but accepts an [`AppManifest`] to enable
+    /// manifest-driven configuration overrides (e.g., bootstrap_url, signal_url).
+    /// Use this when you need per-app network configuration that differs from
+    /// the conductor's default settings.
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+    pub async fn install_app_with_manifest<'a>(
+        &mut self,
+        installed_app_id: &str,
+        agent: Option<AgentPubKey>,
+        dnas_with_roles: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)>,
+        flags: Option<InstallAppCommonFlags>,
+        manifest: AppManifest,
+    ) -> ConductorApiResult<AgentPubKey> {
+        let dnas_with_roles: Vec<_> = dnas_with_roles.into_iter().cloned().collect();
+        let installed_app_id = installed_app_id.to_string();
+
+        let dnas_with_proof: Vec<_> = dnas_with_roles
+            .iter()
+            .map(|dr| (dr.to_owned(), None))
+            .collect();
+
+        let agent = self
+            .raw_handle()
+            .install_app_with_manifest(
+                installed_app_id.clone(),
+                agent,
+                &dnas_with_proof,
+                flags,
+                manifest,
+            )
+            .await?;
+
+        // Add the dna files to the SweetConductor's dna files cache to be able to re-inject them
+        // when restarting the conductor since inline zomes can't otherwise be persisted across
+        // conductor restarts.
+        let dna_files = dnas_with_roles
+            .iter()
+            .map(|dr| dr.dna())
+            .collect::<Vec<_>>();
+
+        self.add_dna_files_to_sweet_conductor_cache(agent.clone(), dna_files.clone())
+            .await?;
+
+        Ok(agent)
+    }
+
     /// Install an app and enable it
     // TODO: make this take a more flexible config for specifying things like
     // membrane proofs
@@ -926,7 +974,7 @@ impl SweetConductor {
         let local_agents = self
             .holochain_p2p()
             .test_kitsune()
-            .space(dna_hash.to_k2_space())
+            .space(dna_hash.to_k2_space(), None)
             .await
             .unwrap()
             .local_agent_store()

@@ -254,7 +254,7 @@ async fn retry_countersigning_commit_on_missing_deps() {
     let space = conductors[0]
         .holochain_p2p()
         .test_kitsune()
-        .space(alice.dna_hash().to_k2_space())
+        .space(alice.dna_hash().to_k2_space(), None)
         .await
         .unwrap();
     let bob_agent_id = bob.agent_pubkey().to_k2_agent();

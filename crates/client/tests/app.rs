@@ -198,6 +198,8 @@ async fn deferred_memproof_installation() {
         description: None,
         name: "".to_string(),
         roles: original_bundle.manifest().app_roles(),
+        bootstrap_url: None,
+        signal_url: None,
     };
     let app_bundle_deferred_memproofs = AppBundle::from(
         original_bundle

@@ -75,7 +75,7 @@ async fn agent_is_removed_from_peer_store_when_blocked() {
     let TestActor { actor: alice, .. } = TestActor::new(&dna_hash, &addr).await;
     let space = alice
         .test_kitsune()
-        .space(dna_hash.to_k2_space())
+        .space(dna_hash.to_k2_space(), None)
         .await
         .unwrap();
     let peer_store = space.peer_store();
@@ -387,10 +387,10 @@ async fn get_to_blocked_agent_fails() {
     let alice_pubkey = keystore_1.new_sign_keypair_random().await.unwrap();
     let bob_pubkey = keystore_2.new_sign_keypair_random().await.unwrap();
     alice
-        .join(dna_hash.clone(), alice_pubkey.clone(), None)
+        .join(dna_hash.clone(), alice_pubkey.clone(), None, None)
         .await
         .unwrap();
-    bob.join(dna_hash.clone(), bob_pubkey.clone(), None)
+    bob.join(dna_hash.clone(), bob_pubkey.clone(), None, None)
         .await
         .unwrap();
     bob.test_set_full_arcs(dna_hash.to_k2_space()).await;
@@ -448,10 +448,10 @@ async fn get_by_blocked_agent_fails() {
     let alice_pubkey = keystore_1.new_sign_keypair_random().await.unwrap();
     let bob_pubkey = keystore_2.new_sign_keypair_random().await.unwrap();
     alice
-        .join(dna_hash.clone(), alice_pubkey.clone(), None)
+        .join(dna_hash.clone(), alice_pubkey.clone(), None, None)
         .await
         .unwrap();
-    bob.join(dna_hash.clone(), bob_pubkey.clone(), None)
+    bob.join(dna_hash.clone(), bob_pubkey.clone(), None, None)
         .await
         .unwrap();
     alice.test_set_full_arcs(dna_hash.to_k2_space()).await;
@@ -575,7 +575,7 @@ impl TestActor {
         actor.register_handler(Arc::new(handler)).await.unwrap();
         let space = actor
             .test_kitsune()
-            .space(dna_hash.to_k2_space())
+            .space(dna_hash.to_k2_space(), None)
             .await
             .unwrap();
         let blocks_module = space.blocks().clone();

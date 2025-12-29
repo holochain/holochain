@@ -2,9 +2,12 @@
 #![allow(clippy::too_many_arguments)]
 
 use crate::*;
-use holochain_types::activity::AgentActivityResponse;
 use holochain_types::prelude::ValidationReceiptBundle;
-use kitsune2_api::{SpaceId, StoredOp};
+use holochain_types::{
+    activity::AgentActivityResponse, cell_config_overrides::CellConfigOverrides,
+};
+use kitsune2_api::{DhtArc, SpaceId, StoredOp};
+use std::any::Any;
 use std::collections::HashMap;
 
 /// Get options help control how the get is processed at various levels.
@@ -135,7 +138,7 @@ impl Default for GetActivityOptions {
 
 /// Trait defining the main holochain_p2p interface.
 #[cfg_attr(feature = "test_utils", automock)]
-pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
+pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug + Any {
     /// Test access to underlying kitsune instance.
     #[cfg(feature = "test_utils")]
     fn test_kitsune(&self) -> &kitsune2_api::DynKitsune;
@@ -147,7 +150,7 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
             let mut updated_agents = Vec::new();
             for agent in self
                 .test_kitsune()
-                .space(space.clone())
+                .space(space.clone(), None)
                 .await
                 .unwrap()
                 .local_agent_store()
@@ -169,7 +172,7 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
                     async move {
                         let all_agents_in_peer_store = self
                             .test_kitsune()
-                            .space(space.clone())
+                            .space(space.clone(), None)
                             .await
                             .unwrap()
                             .peer_store()
@@ -211,6 +214,7 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
         dna_hash: DnaHash,
         agent_pub_key: AgentPubKey,
         maybe_agent_info: Option<AgentInfoSigned>,
+        config_override: Option<CellConfigOverrides>,
     ) -> BoxFut<'_, HolochainP2pResult<()>>;
 
     /// If a cell is disabled, we'll need to \"leave\" the network module as well.
