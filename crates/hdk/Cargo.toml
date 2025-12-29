@@ -1,6 +1,6 @@
 [package]
 name = "hdk"
-version = "0.7.0-dev.2"
+version = "0.7.0-dev.3"
 description = "The Holochain HDK"
 license = "CAL-1.0"
 repository = "https://github.com/holochain/holochain/tree/develop/crates/hdk"
