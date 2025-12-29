@@ -40,11 +40,11 @@ tracing = "0.1"
 tracing-appender = "0.2.3"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 
-kitsune2 = { version = "0.4.0-dev.0", default-features = false }
-kitsune2_api = "0.4.0-dev.0"
-kitsune2_core = "0.4.0-dev.0"
-kitsune2_gossip = "0.4.0-dev.0"
-kitsune2_transport_tx5 = { version = "0.4.0-dev.0", optional = true }
+kitsune2 = { version = "0.4.0-dev.1", default-features = false }
+kitsune2_api = "0.4.0-dev.1"
+kitsune2_core = "0.4.0-dev.1"
+kitsune2_gossip = "0.4.0-dev.1"
+kitsune2_transport_tx5 = { version = "0.4.0-dev.1", optional = true }
 bytes = "1.10"
 holochain_sqlite = { version = "^0.7.0-dev.3", path = "../holochain_sqlite" }
 lair_keystore_api = "=0.6.3"
@@ -58,9 +58,9 @@ holochain_sqlite = { version = "^0.7.0-dev.3", path = "../holochain_sqlite", fea
   "test_utils",
 ] }
 holochain_state = { path = "../holochain_state", features = ["test_utils"] }
-kitsune2_test_utils = "0.4.0-dev.0"
+kitsune2_test_utils = "0.4.0-dev.1"
 tempfile = "3.21.0"
-kitsune2_bootstrap_srv = { version = "0.4.0-dev.0" }
+kitsune2_bootstrap_srv = { version = "0.4.0-dev.1" }
 
 [lints]
 workspace = true
@@ -84,12 +84,17 @@ sqlite-encrypted = [
 sqlite = ["holo_hash/sqlite", "holochain_keystore/sqlite"]
 
 transport-tx5-backend-libdatachannel = [
+  "dep:kitsune2_transport_tx5",
   "kitsune2/transport-tx5-backend-libdatachannel",
 ]
 
-transport-tx5-backend-go-pion = ["kitsune2/transport-tx5-backend-go-pion"]
+transport-tx5-backend-go-pion = [
+  "dep:kitsune2_transport_tx5",
+  "kitsune2/transport-tx5-backend-go-pion",
+]
 
 transport-tx5-datachannel-vendored = [
+  "dep:kitsune2_transport_tx5",
   "transport-tx5-backend-libdatachannel",
   "kitsune2/transport-tx5-datachannel-vendored",
 ]

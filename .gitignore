@@ -30,3 +30,6 @@ test_cert
 
 *.tex.swp
 svg-inkscape/
+
+# rust rover
+.idea/
