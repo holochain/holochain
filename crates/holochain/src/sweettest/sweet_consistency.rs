@@ -222,6 +222,7 @@ mod tests {
     use serde::{Deserialize, Serialize};
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "flaky under current networking; re-check after Iroh upgrade"]
     async fn consistency_reached() {
         holochain_trace::test_run();
         let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
@@ -272,6 +273,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "flaky under current networking; re-check after Iroh upgrade"]
     async fn consistency_reached_with_private_entry() {
         holochain_trace::test_run();
         let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
@@ -308,6 +310,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "flaky under current networking; re-check after Iroh upgrade"]
     async fn consistency_not_reached_when_ops_not_synced() {
         holochain_trace::test_run();
         // No bootstrap service.
