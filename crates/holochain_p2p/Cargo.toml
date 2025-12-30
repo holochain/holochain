@@ -40,11 +40,17 @@ tracing = "0.1"
 tracing-appender = "0.2.3"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 
-kitsune2 = { version = "0.4.0-dev.1", default-features = false }
-kitsune2_api = "0.4.0-dev.1"
-kitsune2_core = "0.4.0-dev.1"
-kitsune2_gossip = "0.4.0-dev.1"
-kitsune2_transport_tx5 = { version = "0.4.0-dev.1", optional = true }
+# kitsune2 = { version = "0.4.0-dev.1", default-features = false }
+# kitsune2_api = "0.4.0-dev.1"
+# kitsune2_core = "0.4.0-dev.1"
+# kitsune2_gossip = "0.4.0-dev.1"
+# kitsune2_transport_tx5 = { version = "0.4.0-dev.1", optional = true }
+kitsune2 = { path = "../../../kitsune2/crates/kitsune2", default-features = false }
+kitsune2_api = { path = "../../../kitsune2/crates/api" }
+kitsune2_core = { path = "../../../kitsune2/crates/core" }
+kitsune2_gossip = { path = "../../../kitsune2/crates/gossip" }
+kitsune2_transport_tx5 = { path = "../../../kitsune2/crates/transport_tx5", optional = true }
+kitsune2_bootstrap_srv = { path = "../../../kitsune2/crates/bootstrap_srv", default-features = false, optional = true }
 bytes = "1.10"
 holochain_sqlite = { version = "^0.7.0-dev.4", path = "../holochain_sqlite" }
 lair_keystore_api = "=0.6.3"
@@ -53,14 +59,16 @@ holochain_state = { version = "^0.7.0-dev.6", path = "../holochain_state" }
 holochain_timestamp = { version = "^0.7.0-dev.0", path = "../timestamp" }
 
 [dev-dependencies]
-holochain_p2p = { path = ".", features = ["test_utils"] }
+holochain_p2p = { path = ".", default-features = false, features = [
+  "test_utils",
+] }
 holochain_sqlite = { version = "^0.7.0-dev.4", path = "../holochain_sqlite", features = [
   "test_utils",
 ] }
 holochain_state = { path = "../holochain_state", features = ["test_utils"] }
-kitsune2_test_utils = "0.4.0-dev.1"
 tempfile = "3.21.0"
-kitsune2_bootstrap_srv = { version = "0.4.0-dev.1" }
+# used for setting default crypto provider with iroh relay
+rustls = "0.23"
 
 [lints]
 workspace = true
@@ -72,10 +80,11 @@ test_utils = [
   "holochain_zome_types/test_utils",
   "holochain_zome_types/fixturators",
   "holochain_types/test_utils",
-  "dep:kitsune2_transport_tx5",
 ]
 
-mock_network = ["test_utils"]
+test_utils_tx5 = ["dep:kitsune2_transport_tx5"]
+
+mock_network = ["test_utils", "test_utils_tx5"]
 
 sqlite-encrypted = [
   "holo_hash/sqlite-encrypted",
@@ -83,23 +92,25 @@ sqlite-encrypted = [
 ]
 sqlite = ["holo_hash/sqlite", "holochain_keystore/sqlite"]
 
+transport-tx5-datachannel-vendored = [
+  "kitsune2/transport-tx5-datachannel-vendored",
+  "kitsune2_bootstrap_srv/sbd",
+]
+
 transport-tx5-backend-libdatachannel = [
-  "dep:kitsune2_transport_tx5",
   "kitsune2/transport-tx5-backend-libdatachannel",
+  "kitsune2_bootstrap_srv/sbd",
 ]
 
 transport-tx5-backend-go-pion = [
-  "dep:kitsune2_transport_tx5",
   "kitsune2/transport-tx5-backend-go-pion",
+  "kitsune2_bootstrap_srv/sbd",
 ]
 
-transport-tx5-datachannel-vendored = [
-  "dep:kitsune2_transport_tx5",
-  "transport-tx5-backend-libdatachannel",
-  "kitsune2/transport-tx5-datachannel-vendored",
+transport-iroh = [
+  "kitsune2/transport-iroh",
+  "kitsune2_bootstrap_srv/iroh-relay",
 ]
-
-transport-iroh = ["kitsune2/transport-iroh"]
 
 # Enables tracing instrumentation 
 # (we experience segfaults in some tests if there is too much instrumentation)

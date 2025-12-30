@@ -156,7 +156,7 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug + Any {
                         })
                     }
                 },
-                Some(10_000),
+                Some(20_000),
                 None,
             )
             .await

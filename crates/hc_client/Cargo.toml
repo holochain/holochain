@@ -35,8 +35,10 @@ holochain_types = { path = "../holochain_types", version = "^0.7.0-dev.6", featu
 holochain_util = { version = "^0.7.0-dev.0", path = "../holochain_util", features = [
   "pw",
 ] }
-kitsune2_api = "0.4.0-dev.1"
-kitsune2_core = "0.4.0-dev.1"
+# kitsune2_api = "0.4.0-dev.1"
+# kitsune2_core = "0.4.0-dev.1"
+kitsune2_api = { path = "../../../kitsune2/crates/api" }
+kitsune2_core = { path = "../../../kitsune2/crates/core" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_yaml = "0.9"

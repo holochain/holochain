@@ -30,7 +30,8 @@ thiserror = "2.0"
 tracing = "0.1"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 
-kitsune2_api = "0.4.0-dev.1"
+# kitsune2_api = "0.4.0-dev.1"
+kitsune2_api = { path = "../../../kitsune2/crates/api" }
 
 async-trait = "0.1"
 mockall = { version = "0.13", optional = true }
@@ -73,6 +74,10 @@ sqlite = [
   "holochain_zome_types/sqlite",
 ]
 
+transport-tx5-datachannel-vendored = [
+  "holochain_p2p/transport-tx5-datachannel-vendored",
+]
+
 transport-tx5-backend-libdatachannel = [
   "holochain_p2p/transport-tx5-backend-libdatachannel",
 ]
@@ -80,8 +85,3 @@ transport-tx5-backend-libdatachannel = [
 transport-tx5-backend-go-pion = ["holochain_p2p/transport-tx5-backend-go-pion"]
 
 transport-iroh = ["holochain_p2p/transport-iroh"]
-
-transport-tx5-datachannel-vendored = [
-  "transport-tx5-backend-libdatachannel",
-  "holochain_p2p/transport-tx5-datachannel-vendored",
-]

@@ -87,6 +87,13 @@ opt-level = "z"
 lto = true
 
 [patch.crates-io]
+# kitsune2_api = { git = "https://github.com/holochain/kitsune2", branch = "test/unresponsive-peers-are-tracked-with-iroh" }
+# kitsune2_core = { git = "https://github.com/holochain/kitsune2", branch = "test/unresponsive-peers-are-tracked-with-iroh" }
+# kitsune2 = { git = "https://github.com/holochain/kitsune2", branch = "test/unresponsive-peers-are-tracked-with-iroh" }
+# kitsune2_dht = { git = "https://github.com/holochain/kitsune2", branch = "test/unresponsive-peers-are-tracked-with-iroh" }
+# kitsune2_gossip = { git = "https://github.com/holochain/kitsune2", branch = "test/unresponsive-peers-are-tracked-with-iroh" }
+# kitsune2_bootstrap_srv = { git = "https://github.com/holochain/kitsune2", branch = "test/unresponsive-peers-are-tracked-with-iroh" }
+# kitsune2_bootstrap_client = { git = "https://github.com/holochain/kitsune2", branch = "test/unresponsive-peers-are-tracked-with-iroh" }
 # kitsune2_api = { path = "../kitsune2/crates/api" }
 # kitsune2_core = { path = "../kitsune2/crates/core" }
 # kitsune2 = { path = "../kitsune2/crates/kitsune2" }

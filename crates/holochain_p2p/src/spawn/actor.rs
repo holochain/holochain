@@ -893,12 +893,14 @@ impl HolochainP2pActor {
 
         #[cfg(feature = "test_utils")]
         {
+            #[cfg(feature = "test_utils_tx5")]
             builder
                 .config
                 .set_module_config(&kitsune2_transport_tx5::Tx5TransportModConfig {
                     tx5_transport: kitsune2_transport_tx5::Tx5TransportConfig {
                         signal_allow_plain_text: true,
                         timeout_s: 20,
+                        webrtc_connect_timeout_s: 15,
                         ..Default::default()
                     },
                 })?;

@@ -232,9 +232,9 @@ async fn unresponsive_peers_are_removed_from_store_after_expiry() {
 
     // Wait until after expiry.
     // Test has to wait at least until the next second, because the expiry is compared with the unixepoch function in SQLite which returns
-    // the timestamp in full seconds.
+    // the timestamp in full seconds. Add 1 ms as a safety buffer to prevent flakiness.
     let micros_to_wait =
-        1_000_000_u64.saturating_sub(after_set_unresponsive.as_micros() as u64 % 1_000_000);
+        1_000_000_u64.saturating_sub(after_set_unresponsive.as_micros() as u64 % 1_000_000) + 1000;
     tokio::time::sleep(Duration::from_micros(micros_to_wait)).await;
 
     // Manually trigger pruning by recreating the store (which prunes on startup).

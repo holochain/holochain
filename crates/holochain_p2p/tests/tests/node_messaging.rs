@@ -991,6 +991,7 @@ async fn test_must_get_agent_activity_with_unresponsive_agents() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_validation_receipts() {
+    holochain_trace::test_run();
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
     let handler = Arc::new(Handler::default());
 
@@ -1229,6 +1230,11 @@ async fn spawn_test(
                 let conductor_db = conductor_db.clone();
                 Box::pin(async move { conductor_db })
             }),
+            #[cfg(any(
+                feature = "transport-tx5-datachannel-vendored",
+                feature = "transport-tx5-backend-libdatachannel",
+                feature = "transport-tx5-backend-go-pion"
+            ))]
             network_config: Some(serde_json::json!({
                 "coreBootstrap": {
                     "serverUrl": format!("http://{bootstrap_addr}"),
@@ -1238,6 +1244,15 @@ async fn spawn_test(
                     "signalAllowPlainText": true,
                     "timeoutS": 30,
                     "webrtcConnectTimeoutS": 25,
+                }
+            })),
+            #[cfg(feature = "transport-iroh")]
+            network_config: Some(serde_json::json!({
+                "coreBootstrap": {
+                    "serverUrl": format!("http://{bootstrap_addr}"),
+                },
+                "irohTransport": {
+                    "relayUrl": format!("http://{bootstrap_addr}"),
                 }
             })),
             request_timeout: Duration::from_secs(3),
@@ -1250,7 +1265,25 @@ async fn spawn_test(
 
     hc.register_handler(handler).await.unwrap();
 
-    hc.join(dna_hash, agent.clone(), None, None).await.unwrap();
+    hc.join(dna_hash.clone(), agent.clone(), None, None)
+        .await
+        .unwrap();
+
+    // Wait for the endpoint to have a current URL.
+    retry_fn_until_timeout(
+        || async {
+            hc.test_kitsune()
+                .space(dna_hash.to_k2_space(), None)
+                .await
+                .unwrap()
+                .current_url()
+                .is_some()
+        },
+        Some(20_000),
+        None,
+    )
+    .await
+    .unwrap();
 
     (agent, hc, lair_client)
 }

@@ -56,7 +56,8 @@ getrandom = "0.3"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 schemars = "0.9"
 
-kitsune2_api = "0.4.0-dev.1"
+# kitsune2_api = "0.4.0-dev.1"
+kitsune2_api = { path = "../../../kitsune2/crates/api" }
 
 rusqlite = { version = "0.37", features = [
   "blob",      # better integration with blob types (Read, Write, etc)
