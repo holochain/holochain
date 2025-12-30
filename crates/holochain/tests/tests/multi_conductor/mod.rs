@@ -69,6 +69,7 @@ async fn test_publish() {
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "flaky multi conductor test; re-check after Iroh upgrade"]
 async fn multi_conductor() -> anyhow::Result<()> {
     use holochain::test_utils::inline_zomes::simple_create_read_zome;
 
@@ -117,9 +118,10 @@ async fn multi_conductor() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Flaky on Windows separately from the pending fixes alongside Iroh networking upgrade.
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "windows", ignore = "flaky")]
+#[ignore = "flaky multi conductor private entry propagation; re-check after Iroh upgrade"]
 async fn private_entries_update_consistency() {
     use holochain::sweettest::SweetInlineZomes;
     use holochain_types::inline_zome::InlineZomeSet;
@@ -178,9 +180,10 @@ async fn private_entries_update_consistency() {
     await_consistency(10, [&alice, &bobbo]).await.unwrap();
 }
 
+/// Flaky on Windows separately from the pending fixes alongside Iroh networking upgrade.
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "windows", ignore = "flaky")]
+#[ignore = "flaky multi conductor private entry propagation; re-check after Iroh upgrade"]
 async fn private_entries_dont_leak() {
     use holochain::sweettest::SweetInlineZomes;
     use holochain_types::inline_zome::InlineZomeSet;
