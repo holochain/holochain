@@ -46,38 +46,43 @@ pub async fn integrate_dht_ops_workflow(
                         op_id: op_hash.to_located_k2_op_id(&op_basis),
                     };
                     let validation_status = row.get::<_, ValidationStatus>(3)?;
-                    let author = row.get::<_, Option<AgentPubKey>>(4)?;
-                    let warrantee = row.get::<_, Option<AgentPubKey>>(5)?;
-                    if let Some(ref author_inner) = author {
+                    let action_author = row.get::<_, Option<AgentPubKey>>(4)?;
+                    let warrant_author = row.get::<_, Option<AgentPubKey>>(5)?;
+                    let warrantee = row.get::<_, Option<AgentPubKey>>(6)?;
+                    if let Some(ref warrantee) = warrantee {
+                        let Some(ref warrant_author) = warrant_author else {
+                            tracing::warn!(?op_hash, "Warrant missing author while integrating");
+                            return Ok((stored_op, op_hash, action_author));
+                        };
+
                         let op_clone_for_block = op_hash.clone();
-                        if let Some(warrantee) = warrantee {
-                            match validation_status {
-                                ValidationStatus::Valid => {
-                                    tracing::info!(
-                                        ?warrantee,
-                                        ?op_hash,
-                                        "Warrant op is valid, will block the warrantee"
-                                    );
-                                    block_agents.push((warrantee, op_clone_for_block.clone()));
-                                }
-                                ValidationStatus::Rejected => {
-                                    tracing::info!(
-                                        ?author_inner,
-                                        ?op_hash,
-                                        "Warrant op is invalid, will block the author"
-                                    );
-                                    block_agents.push((author_inner.clone(), op_clone_for_block));
-                                }
-                                _ => {
-                                    tracing::warn!(
-                                        ?validation_status,
-                                        ?op_hash,
-                                        "Unexpected validation status for op being integrated"
-                                    );
-                                }
+                        match validation_status {
+                            ValidationStatus::Valid => {
+                                tracing::info!(
+                                    ?warrantee,
+                                    ?op_hash,
+                                    "Warrant op is valid, will block the warrantee"
+                                );
+                                block_agents.push((warrantee.clone(), op_clone_for_block));
+                            }
+                            ValidationStatus::Rejected => {
+                                tracing::info!(
+                                    ?warrant_author,
+                                    ?op_hash,
+                                    "Warrant op is invalid, will block the author"
+                                );
+                                block_agents.push((warrant_author.clone(), op_clone_for_block));
+                            }
+                            _ => {
+                                tracing::warn!(
+                                    ?validation_status,
+                                    ?op_hash,
+                                    "Unexpected validation status for op being integrated"
+                                );
                             }
                         }
                     }
+                    let author = action_author.or(warrant_author);
                     Ok((stored_op, op_hash, author))
                 },
             )?;
