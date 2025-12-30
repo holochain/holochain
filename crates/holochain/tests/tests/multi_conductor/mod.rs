@@ -118,9 +118,9 @@ async fn multi_conductor() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Flaky on Windows separately from the pending fixes alongside Iroh networking upgrade.
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "windows", ignore = "flaky")]
 #[ignore = "flaky multi conductor private entry propagation; re-check after Iroh upgrade"]
 async fn private_entries_update_consistency() {
     use holochain::sweettest::SweetInlineZomes;
@@ -180,9 +180,9 @@ async fn private_entries_update_consistency() {
     await_consistency(10, [&alice, &bobbo]).await.unwrap();
 }
 
+/// Flaky on Windows separately from the pending fixes alongside Iroh networking upgrade.
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "windows", ignore = "flaky")]
 #[ignore = "flaky multi conductor private entry propagation; re-check after Iroh upgrade"]
 async fn private_entries_dont_leak() {
     use holochain::sweettest::SweetInlineZomes;
