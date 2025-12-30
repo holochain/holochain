@@ -1,5 +1,6 @@
 use super::*;
 use crate::core::queue_consumer::TriggerSender;
+use crate::core::workflow::authored_db_provider::MockAuthoredDbProvider;
 use ::fixt::prelude::*;
 use holo_hash::fixt::DnaHashFixturator;
 use holochain_p2p::actor::MockHcP2p;
@@ -7,6 +8,12 @@ use holochain_p2p::HolochainP2pDna;
 use holochain_state::mutations;
 use holochain_state::query::link::{GetLinksFilter, GetLinksQuery};
 use std::sync::Arc;
+
+fn mock_authored_db_provider_none() -> Arc<MockAuthoredDbProvider> {
+    let mut mock = MockAuthoredDbProvider::new();
+    mock.expect_get_authored_db().returning(|_, _, _| Ok(None));
+    Arc::new(mock)
+}
 
 #[derive(Clone)]
 struct TestData {
@@ -370,7 +377,7 @@ async fn call_workflow(env: DbWrite<DbKindDht>) {
         fixt!(DnaHash),
         None,
     ));
-    integrate_dht_ops_workflow(env, qt, mock_network)
+    integrate_dht_ops_workflow(env, qt, mock_network, mock_authored_db_provider_none())
         .await
         .unwrap();
 }
@@ -925,7 +932,9 @@ async fn inform_kitsune_about_integrated_ops() {
             });
         let hc_p2p = Arc::new(hc_p2p);
         let p2p_dna = Arc::new(HolochainP2pDna::new(hc_p2p, dna_hash, None));
-        integrate_dht_ops_workflow(env, tx, p2p_dna).await.unwrap();
+        integrate_dht_ops_workflow(env, tx, p2p_dna, mock_authored_db_provider_none())
+            .await
+            .unwrap();
     }
 }
 
@@ -944,5 +953,7 @@ async fn kitsune_not_informed_when_no_ops_integrated() {
     hc_p2p.expect_new_integrated_data().never();
     let hc_p2p = Arc::new(hc_p2p);
     let p2p_dna = Arc::new(HolochainP2pDna::new(hc_p2p, dna_hash, None));
-    integrate_dht_ops_workflow(env, tx, p2p_dna).await.unwrap();
+    integrate_dht_ops_workflow(env, tx, p2p_dna, mock_authored_db_provider_none())
+        .await
+        .unwrap();
 }
