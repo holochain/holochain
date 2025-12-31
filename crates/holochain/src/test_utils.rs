@@ -35,7 +35,6 @@ use tempfile::TempDir;
 use tokio::time::error::Elapsed;
 
 pub mod consistency;
-pub mod hc_stress_test;
 pub mod host_fn_caller;
 pub mod inline_zomes;
 
