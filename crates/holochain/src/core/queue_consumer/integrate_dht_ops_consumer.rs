@@ -15,7 +15,7 @@ pub fn spawn_integrate_dht_ops_consumer(
     tm: TaskManagerClient,
     trigger_receipt: TriggerSender,
     network: DynHolochainP2pDna,
-    conductor: Arc<crate::conductor::conductor::Conductor>,
+    conductor: crate::conductor::ConductorHandle,
 ) -> TriggerSender {
     let (tx, rx) = TriggerSender::new();
 
@@ -29,7 +29,7 @@ pub fn spawn_integrate_dht_ops_consumer(
                env.clone(),
                trigger_receipt.clone(),
                network.clone(),
-               conductor.clone(),
+                conductor.clone(),
            )
         },
     );
