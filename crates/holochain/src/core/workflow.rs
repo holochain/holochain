@@ -26,6 +26,7 @@ pub use error::*;
 
 pub mod app_validation_workflow;
 pub mod authored_db_provider;
+pub mod publish_trigger_provider;
 pub mod call_zome_workflow;
 pub mod countersigning_workflow;
 pub mod genesis_workflow;
