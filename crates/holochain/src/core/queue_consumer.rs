@@ -114,21 +114,18 @@ pub async fn spawn_queue_consumer_tasks(
         )
     });
 
-    // Integration
-  // One per space.
-  let tx_integration = queue_consumer_map.spawn_once_integration(dna_hash.clone(), || {
-       let authored_provider_conductor = conductor.clone();
-       let publish_provider_conductor = conductor.clone();
-      spawn_integrate_dht_ops_consumer(
-          dna_hash.clone(),
-          dht_db.clone(),
-          conductor.task_manager(),
-        tx_receipt.clone(),
-        network.clone(),
-           authored_provider_conductor,
-            publish_provider_conductor,
-     )
-   });
+ // Integration
+// One per space.
+let tx_integration = queue_consumer_map.spawn_once_integration(dna_hash.clone(), || {
+    spawn_integrate_dht_ops_consumer(
+        dna_hash.clone(),
+        dht_db.clone(),
+        conductor.task_manager(),
+      tx_receipt.clone(),
+      network.clone(),
+           conductor.clone(),
+   )
+ });
 
     // App validation
     // One per space.

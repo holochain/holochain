@@ -3,8 +3,6 @@
 use super::*;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
-use crate::core::workflow::authored_db_provider::AuthoredDbProvider;
-use crate::core::workflow::publish_trigger_provider::PublishTriggerProvider;
 use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_sqlite::sql::sql_cell::*;
@@ -18,14 +16,13 @@ mod tests;
 
 #[cfg_attr(
     feature = "instrument",
-    tracing::instrument(skip(vault, trigger_receipt, network, authored_db_provider, publish_trigger_provider))
+    tracing::instrument(skip(vault, trigger_receipt, network, conductor))
 )]
 pub async fn integrate_dht_ops_workflow(
     vault: DbWrite<DbKindDht>,
     trigger_receipt: TriggerSender,
     network: DynHolochainP2pDna,
-    authored_db_provider: Arc<crate::conductor::conductor::Conductor>,
-    publish_trigger_provider: Arc<crate::conductor::conductor::Conductor>,
+    conductor: Arc<crate::conductor::conductor::Conductor>,
 ) -> WorkflowResult<WorkComplete> {
     let start = std::time::Instant::now();
     let time = holochain_zome_types::prelude::Timestamp::now();
@@ -105,11 +102,10 @@ pub async fn integrate_dht_ops_workflow(
        network.new_integrated_data(stored_ops).await?;
 
        update_local_authored_status(
-           authored_db_provider.clone(),
+            conductor,
           &dna_hash,
           time,
           integrated_pairs,
-           publish_trigger_provider,
        )
        .await?;
 
@@ -145,12 +141,14 @@ pub async fn integrate_dht_ops_workflow(
 }
 
 async fn update_local_authored_status(
-    authored_db_provider: Arc<crate::conductor::conductor::Conductor>,
+    conductor: Arc<crate::conductor::conductor::Conductor>,
     dna_hash: &DnaHash,
     when_integrated: Timestamp,
     integrated_pairs: Vec<(DhtOpHash, Option<AgentPubKey>)>,
-    publish_trigger_provider: Arc<crate::conductor::conductor::Conductor>,
 ) -> WorkflowResult<()> {
+    use crate::core::workflow::authored_db_provider::AuthoredDbProvider;
+    use crate::core::workflow::publish_trigger_provider::PublishTriggerProvider;
+    
     let mut by_author: HashMap<AgentPubKey, Vec<DhtOpHash>> = HashMap::new();
 
     for (op_hash, author) in integrated_pairs {
@@ -161,11 +159,11 @@ async fn update_local_authored_status(
         by_author.entry(author).or_default().push(op_hash);
     }
 
-    for (author, op_hashes) in by_author {
-        let Some(db) = authored_db_provider
-            .get_authored_db(dna_hash, &author)
-            .await
-            .map_err(WorkflowError::from)?
+   for (author, op_hashes) in by_author {
+        let Some(db) = conductor
+           .get_authored_db(dna_hash, &author)
+           .await
+           .map_err(WorkflowError::from)?
         else {
             continue;
         };
@@ -189,18 +187,14 @@ async fn update_local_authored_status(
            "Marked integrated ops as authored"
        );
 
-        // Log availability of publish trigger for this author
-       let cell_id = CellId::new(dna_hash.clone(), author.clone());
-        if let Some(_trigger) = publish_trigger_provider.get_publish_trigger(&cell_id).await {
-           tracing::debug!(
-               ?cell_id,
-                "Publish trigger available for integrated authored ops"
-            );
-            // NOTE: We're not actually triggering publish yet, just logging availability
-            // This is as per instructions to "stop before the point of doing the triggering".
-        } else {
-            tracing::trace!(?cell_id, "No publish trigger for this cell");
-        }
+       // Log availability of publish trigger for this author
+      let cell_id = CellId::new(dna_hash.clone(), author.clone());
+        if let Some(trigger) = conductor.get_publish_trigger(&cell_id).await {
+          tracing::debug!(?cell_id, "Triggering publish for integrated authored ops");
+            trigger.trigger(&"integrate_dht_ops_workflow: authored ops marked as integrated");
+       } else {
+           tracing::trace!(?cell_id, "No publish trigger for this cell");
+       }
    }
 
    Ok(())

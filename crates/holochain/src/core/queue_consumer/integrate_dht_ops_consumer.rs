@@ -15,8 +15,7 @@ pub fn spawn_integrate_dht_ops_consumer(
     tm: TaskManagerClient,
     trigger_receipt: TriggerSender,
     network: DynHolochainP2pDna,
-    authored_db_provider: Arc<crate::conductor::conductor::Conductor>,
-    publish_trigger_provider: Arc<crate::conductor::conductor::Conductor>,
+    conductor: Arc<crate::conductor::conductor::Conductor>,
 ) -> TriggerSender {
     let (tx, rx) = TriggerSender::new();
 
@@ -26,13 +25,12 @@ pub fn spawn_integrate_dht_ops_consumer(
         tm,
         (tx.clone(), rx),
         move || {
-            integrate_dht_ops_workflow(
-                env.clone(),
-                trigger_receipt.clone(),
-                network.clone(),
-                authored_db_provider.clone(),
-                publish_trigger_provider.clone(),
-            )
+           integrate_dht_ops_workflow(
+               env.clone(),
+               trigger_receipt.clone(),
+               network.clone(),
+               conductor.clone(),
+           )
         },
     );
 
