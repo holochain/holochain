@@ -22,134 +22,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::sync::Arc;
 
-fn mock_authored_db_provider_none() -> Arc<MockAuthoredDbProvider> {
-    let mut mock = MockAuthoredDbProvider::new();
-    mock.expect_get_authored_db().returning(|_, _, _| Ok(None));
-    Arc::new(mock)
-}
-
-fn mock_authored_db_provider_with_db(
-    dna_hash: DnaHash,
-    authors: Vec<(AgentPubKey, Arc<TestDb<DbKindAuthored>>)>,
-) -> (
-    Arc<MockAuthoredDbProvider>,
-    Arc<Mutex<HashMap<AgentPubKey, Arc<TestDb<DbKindAuthored>>>>>,
-    Arc<AtomicUsize>,
-) {
-    let mut mock = MockAuthoredDbProvider::new();
-    let initial: HashMap<_, _> = authors.into_iter().collect();
-    let state = Arc::new(Mutex::new(initial));
-    let lookup_count = Arc::new(AtomicUsize::new(0));
-    let state_clone = Arc::clone(&state);
-    let count_clone = Arc::clone(&lookup_count);
-    mock.expect_get_authored_db()
-        .returning(move |requested_dna, requested_author| {
-            count_clone.fetch_add(1, Ordering::SeqCst);
-            if requested_dna != &dna_hash {
-                return Ok(None);
-            }
-            let guard = state_clone.lock().unwrap();
-            Ok(guard.get(requested_author).map(|db| db.to_db()))
-        });
-    (Arc::new(mock), state, lookup_count)
-}
-
-
-async fn insert_validated_op(env: &DbWrite<DbKindDht>, op: &DhtOpHashed) {
-    env
-        .write_async({
-            let op = op.clone();
-            move |txn| -> DatabaseResult<()> {
-                let hash = op.as_hash().clone();
-                mutations::insert_op_dht(txn, &op, 0, None)?;
-                mutations::set_validation_status(txn, &hash, ValidationStatus::Valid)?;
-                mutations::set_validation_stage(txn, &hash, ValidationStage::AwaitingIntegration)?;
-                Ok(())
-            }
-        })
-        .await
-        .unwrap();
-}
-
-fn mock_authored_db_provider_that_creates_if_missing(
-    dna_hash: DnaHash,
-) -> (
-    Arc<MockAuthoredDbProvider>,
-    Arc<Mutex<HashMap<AgentPubKey, Arc<TestDb<DbKindAuthored>>>>>,
-    Arc<AtomicUsize>,
-) {
-    let mut mock = MockAuthoredDbProvider::new();
-    let state: Arc<Mutex<HashMap<AgentPubKey, Arc<TestDb<DbKindAuthored>>>>> =
-        Arc::new(Mutex::new(HashMap::new()));
-    let creation_count = Arc::new(AtomicUsize::new(0));
-    let state_clone = Arc::clone(&state);
-    let count_clone = Arc::clone(&creation_count);
-    mock.expect_get_authored_db()
-        .returning(move |requested_dna, requested_author| {
-            if requested_dna != &dna_hash {
-                return Ok(None);
-            }
-            let mut guard = state_clone.lock().unwrap();
-            if let Some(db) = guard.get(requested_author) {
-                return Ok(Some(db.to_db()));
-            }
-            count_clone.fetch_add(1, Ordering::SeqCst);
-            let db = Arc::new(test_authored_db_with_id(253));
-            guard.insert(requested_author.clone(), Arc::clone(&db));
-            Ok(Some(db.to_db()))
-        });
-    (Arc::new(mock), state, creation_count)
-}
-
-fn make_store_entry_op(author: AgentPubKey) -> (DhtOp, DhtOpHashed) {
-    let entry = EntryFixturator::new(AppEntry).next().unwrap();
-    let mut action = fixt!(Create);
-    action.author = author;
-    action.entry_hash = EntryHashed::from_content_sync(entry.clone()).into_hash();
-    let op: DhtOp = ChainOp::StoreEntry(fixt!(Signature), action.clone().into(), entry).into();
-    let hashed = DhtOpHashed::from_content_sync(op.clone());
-    (op, hashed)
-}
-
-async fn authored_when_integrated(
-    db: &TestDb<DbKindAuthored>,
-    hash: &DhtOpHash,
-) -> Option<Timestamp> {
-    db.to_db()
-        .read_async({
-            let hash = hash.clone();
-            move |txn| -> DatabaseResult<Option<Timestamp>> {
-                txn.query_row(
-                    "SELECT when_integrated FROM DhtOp WHERE hash = :hash",
-                    named_params! { ":hash": hash },
-                    |row| row.get(0),
-                )
-                .optional()
-            }
-        })
-        .await
-        .unwrap()
-}
-
-async fn dht_when_integrated(
-    db: &DbWrite<DbKindDht>,
-    hash: &DhtOpHash,
-) -> Option<Timestamp> {
-    db.read_async({
-        let hash = hash.clone();
-        move |txn| -> DatabaseResult<Option<Timestamp>> {
-            txn.query_row(
-                "SELECT when_integrated FROM DhtOp WHERE hash = :hash",
-                named_params! { ":hash": hash },
-                |row| row.get(0),
-            )
-            .optional()
-        }
-    })
-    .await
-    .unwrap()
-}
-
 #[derive(Clone)]
 struct TestData {
     signature: Signature,
@@ -1074,6 +946,26 @@ async fn inform_kitsune_about_integrated_ops() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn kitsune_not_informed_when_no_ops_integrated() {
+    let env = test_dht_db().to_db();
+    let test_data = TestData::new();
+    let op: DhtOp =
+        ChainOp::RegisterAgentActivity(test_data.signature.clone(), fixt!(Action)).into();
+    let pre_state = vec![Db::ValidateQueue(op)];
+    Db::set(pre_state, env.clone()).await;
+
+    let (tx, _rx) = TriggerSender::new();
+    let dna_hash = fixt!(DnaHash);
+    let mut hc_p2p = MockHcP2p::new();
+    hc_p2p.expect_new_integrated_data().never();
+    let hc_p2p = Arc::new(hc_p2p);
+    let p2p_dna = Arc::new(HolochainP2pDna::new(hc_p2p, dna_hash, None));
+    integrate_dht_ops_workflow(env, tx, p2p_dna, mock_authored_db_provider_none())
+        .await
+        .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn remote_author_does_not_create_local_db() {
     holochain_trace::test_run();
     let dna_hash = fixt!(DnaHash);
@@ -1203,22 +1095,130 @@ async fn multiple_local_authors_marked_integrated() {
     assert!(dht_when_integrated(&dht_env, &hash_b).await.is_some());
 }
 
-#[tokio::test(flavor = "multi_thread")]
-async fn kitsune_not_informed_when_no_ops_integrated() {
-    let env = test_dht_db().to_db();
-    let test_data = TestData::new();
-    let op: DhtOp =
-        ChainOp::RegisterAgentActivity(test_data.signature.clone(), fixt!(Action)).into();
-    let pre_state = vec![Db::ValidateQueue(op)];
-    Db::set(pre_state, env.clone()).await;
+fn mock_authored_db_provider_none() -> Arc<MockAuthoredDbProvider> {
+    let mut mock = MockAuthoredDbProvider::new();
+    mock.expect_get_authored_db().returning(|_, _, _| Ok(None));
+    Arc::new(mock)
+}
 
-    let (tx, _rx) = TriggerSender::new();
-    let dna_hash = fixt!(DnaHash);
-    let mut hc_p2p = MockHcP2p::new();
-    hc_p2p.expect_new_integrated_data().never();
-    let hc_p2p = Arc::new(hc_p2p);
-    let p2p_dna = Arc::new(HolochainP2pDna::new(hc_p2p, dna_hash, None));
-    integrate_dht_ops_workflow(env, tx, p2p_dna, mock_authored_db_provider_none())
+fn mock_authored_db_provider_with_db(
+    dna_hash: DnaHash,
+    authors: Vec<(AgentPubKey, Arc<TestDb<DbKindAuthored>>)>,
+) -> (
+    Arc<MockAuthoredDbProvider>,
+    Arc<Mutex<HashMap<AgentPubKey, Arc<TestDb<DbKindAuthored>>>>>,
+    Arc<AtomicUsize>,
+) {
+    let mut mock = MockAuthoredDbProvider::new();
+    let initial: HashMap<_, _> = authors.into_iter().collect();
+    let state = Arc::new(Mutex::new(initial));
+    let lookup_count = Arc::new(AtomicUsize::new(0));
+    let state_clone = Arc::clone(&state);
+    let count_clone = Arc::clone(&lookup_count);
+    mock.expect_get_authored_db()
+        .returning(move |requested_dna, requested_author| {
+            count_clone.fetch_add(1, Ordering::SeqCst);
+            if requested_dna != &dna_hash {
+                return Ok(None);
+            }
+            let guard = state_clone.lock().unwrap();
+            Ok(guard.get(requested_author).map(|db| db.to_db()))
+        });
+    (Arc::new(mock), state, lookup_count)
+}
+
+
+async fn insert_validated_op(env: &DbWrite<DbKindDht>, op: &DhtOpHashed) {
+    env
+        .write_async({
+            let op = op.clone();
+            move |txn| -> DatabaseResult<()> {
+                let hash = op.as_hash().clone();
+                mutations::insert_op_dht(txn, &op, 0, None)?;
+                mutations::set_validation_status(txn, &hash, ValidationStatus::Valid)?;
+                mutations::set_validation_stage(txn, &hash, ValidationStage::AwaitingIntegration)?;
+                Ok(())
+            }
+        })
         .await
         .unwrap();
+}
+
+fn mock_authored_db_provider_that_creates_if_missing(
+    dna_hash: DnaHash,
+) -> (
+    Arc<MockAuthoredDbProvider>,
+    Arc<Mutex<HashMap<AgentPubKey, Arc<TestDb<DbKindAuthored>>>>>,
+    Arc<AtomicUsize>,
+) {
+    let mut mock = MockAuthoredDbProvider::new();
+    let state: Arc<Mutex<HashMap<AgentPubKey, Arc<TestDb<DbKindAuthored>>>>> =
+        Arc::new(Mutex::new(HashMap::new()));
+    let creation_count = Arc::new(AtomicUsize::new(0));
+    let state_clone = Arc::clone(&state);
+    let count_clone = Arc::clone(&creation_count);
+    mock.expect_get_authored_db()
+        .returning(move |requested_dna, requested_author| {
+            if requested_dna != &dna_hash {
+                return Ok(None);
+            }
+            let mut guard = state_clone.lock().unwrap();
+            if let Some(db) = guard.get(requested_author) {
+                return Ok(Some(db.to_db()));
+            }
+            count_clone.fetch_add(1, Ordering::SeqCst);
+            let db = Arc::new(test_authored_db_with_id(253));
+            guard.insert(requested_author.clone(), Arc::clone(&db));
+            Ok(Some(db.to_db()))
+        });
+    (Arc::new(mock), state, creation_count)
+}
+
+fn make_store_entry_op(author: AgentPubKey) -> (DhtOp, DhtOpHashed) {
+    let entry = EntryFixturator::new(AppEntry).next().unwrap();
+    let mut action = fixt!(Create);
+    action.author = author;
+    action.entry_hash = EntryHashed::from_content_sync(entry.clone()).into_hash();
+    let op: DhtOp = ChainOp::StoreEntry(fixt!(Signature), action.clone().into(), entry).into();
+    let hashed = DhtOpHashed::from_content_sync(op.clone());
+    (op, hashed)
+}
+
+async fn authored_when_integrated(
+    db: &TestDb<DbKindAuthored>,
+    hash: &DhtOpHash,
+) -> Option<Timestamp> {
+    db.to_db()
+        .read_async({
+            let hash = hash.clone();
+            move |txn| -> DatabaseResult<Option<Timestamp>> {
+                txn.query_row(
+                    "SELECT when_integrated FROM DhtOp WHERE hash = :hash",
+                    named_params! { ":hash": hash },
+                    |row| row.get(0),
+                )
+                .optional()
+            }
+        })
+        .await
+        .unwrap()
+}
+
+async fn dht_when_integrated(
+    db: &DbWrite<DbKindDht>,
+    hash: &DhtOpHash,
+) -> Option<Timestamp> {
+    db.read_async({
+        let hash = hash.clone();
+        move |txn| -> DatabaseResult<Option<Timestamp>> {
+            txn.query_row(
+                "SELECT when_integrated FROM DhtOp WHERE hash = :hash",
+                named_params! { ":hash": hash },
+                |row| row.get(0),
+            )
+            .optional()
+        }
+    })
+    .await
+    .unwrap()
 }
