@@ -30,10 +30,10 @@ use super::metrics::create_workflow_duration_metric;
 use super::workflow::app_validation_workflow::AppValidationWorkspace;
 use super::workflow::sys_validation_workflow::SysValidationWorkspace;
 use super::workflow::{WorkflowError, WorkflowResult};
+use crate::conductor::ConductorHandle;
 use crate::conductor::conductor::{RwShare, StopReceiver};
 use crate::conductor::manager::TaskManagerClient;
 use crate::conductor::space::Space;
-use crate::conductor::ConductorHandle;
 use crate::conductor::{error::ConductorError, manager::ManagedTaskResult};
 use derive_more::Display;
 use futures::future::Either;
@@ -115,17 +115,19 @@ pub async fn spawn_queue_consumer_tasks(
     });
 
     // Integration
-   // One per space.
-   let tx_integration = queue_consumer_map.spawn_once_integration(dna_hash.clone(), || {
-       spawn_integrate_dht_ops_consumer(
-           dna_hash.clone(),
-           dht_db.clone(),
-           conductor.task_manager(),
-           tx_receipt.clone(),
-           network.clone(),
-           conductor.clone(),
-            conductor.clone(),
-       )
+  // One per space.
+  let tx_integration = queue_consumer_map.spawn_once_integration(dna_hash.clone(), || {
+       let authored_provider_conductor = conductor.clone();
+       let publish_provider_conductor = conductor.clone();
+      spawn_integrate_dht_ops_consumer(
+          dna_hash.clone(),
+          dht_db.clone(),
+          conductor.task_manager(),
+        tx_receipt.clone(),
+        network.clone(),
+           authored_provider_conductor,
+            publish_provider_conductor,
+     )
    });
 
     // App validation

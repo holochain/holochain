@@ -7,6 +7,7 @@ use fixt::prelude::*;
 use holo_hash::fixt::{AgentPubKeyFixturator, DnaHashFixturator};
 use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
 use holochain_p2p::actor::MockHcP2p;
+use must_future::MustBoxFuture;
 use holochain_p2p::HolochainP2pDna;
 use holochain_sqlite::db::DbKindAuthored;
 use holochain_sqlite::error::DatabaseResult;
@@ -1098,7 +1099,7 @@ async fn multiple_local_authors_marked_integrated() {
 
 fn mock_authored_db_provider_none() -> Arc<MockAuthoredDbProvider> {
     let mut mock = MockAuthoredDbProvider::new();
-    mock.expect_get_authored_db().returning(|_, _, _| Ok(None));
+    mock.expect_get_authored_db().returning(|_, _| MustBoxFuture::new(async { Ok(None) }));
     Arc::new(mock)
 }
 
@@ -1119,11 +1120,15 @@ fn mock_authored_db_provider_with_db(
     mock.expect_get_authored_db()
         .returning(move |requested_dna, requested_author| {
             count_clone.fetch_add(1, Ordering::SeqCst);
-            if requested_dna != &dna_hash {
-                return Ok(None);
-            }
-            let guard = state_clone.lock().unwrap();
-            Ok(guard.get(requested_author).map(|db| db.to_db()))
+            let dna_hash_clone = dna_hash.clone();
+            let state_inner = Arc::clone(&state_clone);
+            MustBoxFuture::new(async move {
+                if requested_dna != &dna_hash_clone {
+                    return Ok(None);
+                }
+                let guard = state_inner.lock().unwrap();
+                Ok(guard.get(requested_author).map(|db| db.to_db()))
+            })
         });
     (Arc::new(mock), state, lookup_count)
 }
@@ -1160,17 +1165,22 @@ fn mock_authored_db_provider_that_creates_if_missing(
     let count_clone = Arc::clone(&creation_count);
     mock.expect_get_authored_db()
         .returning(move |requested_dna, requested_author| {
-            if requested_dna != &dna_hash {
-                return Ok(None);
-            }
-            let mut guard = state_clone.lock().unwrap();
-            if let Some(db) = guard.get(requested_author) {
-                return Ok(Some(db.to_db()));
-            }
-            count_clone.fetch_add(1, Ordering::SeqCst);
-            let db = Arc::new(test_authored_db_with_id(253));
-            guard.insert(requested_author.clone(), Arc::clone(&db));
-            Ok(Some(db.to_db()))
+            let dna_hash_clone = dna_hash.clone();
+            let state_inner = Arc::clone(&state_clone);
+            let count_inner = Arc::clone(&count_clone);
+            MustBoxFuture::new(async move {
+                if requested_dna != &dna_hash_clone {
+                    return Ok(None);
+                }
+                let mut guard = state_inner.lock().unwrap();
+                if let Some(db) = guard.get(requested_author) {
+                    return Ok(Some(db.to_db()));
+                }
+                count_inner.fetch_add(1, Ordering::SeqCst);
+                let db = Arc::new(test_authored_db_with_id(253));
+                guard.insert(requested_author.clone(), Arc::clone(&db));
+                Ok(Some(db.to_db()))
+            })
         });
     (Arc::new(mock), state, creation_count)
 }
