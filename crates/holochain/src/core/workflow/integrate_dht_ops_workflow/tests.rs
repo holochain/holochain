@@ -2,24 +2,24 @@ use super::*;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::workflow::authored_db_provider::MockAuthoredDbProvider;
 use crate::core::workflow::publish_trigger_provider::MockPublishTriggerProvider;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use ::fixt::prelude::*;
 use holo_hash::fixt::{AgentPubKeyFixturator, DnaHashFixturator};
 use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
-use must_future::MustBoxFuture;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_sqlite::db::DbKindAuthored;
-use holochain_sqlite::error::{DatabaseResult, DatabaseError};
+use holochain_sqlite::error::{DatabaseError, DatabaseResult};
 use holochain_state::mutations;
-use holochain_state::validation_db::ValidationStage;
 use holochain_state::query::link::{GetLinksFilter, GetLinksQuery};
 use holochain_state::test_utils::{
     test_authored_db_with_id, test_dht_db, test_dht_db_with_dna_hash, TestDb,
 };
+use holochain_state::validation_db::ValidationStage;
 use holochain_types::prelude::{ChainOp, DhtOp, DhtOpHashed, Signature};
 use kitsune2_api::StoredOp;
+use must_future::MustBoxFuture;
 use rusqlite::{named_params, OptionalExtension};
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 #[derive(Clone)]
@@ -380,11 +380,16 @@ async fn call_workflow(env: DbWrite<DbKindDht>, dna_hash: DnaHash) {
         .returning(move |_| Ok(()));
 
     let mock_network = Arc::new(mock_hc_p2p);
-    integrate_dht_ops_workflow(env, qt, mock_network, mock_authored_db_provider_none(), mock_publish_trigger_provider_none())
-        .await
-        .unwrap();
+    integrate_dht_ops_workflow(
+        env,
+        qt,
+        mock_network,
+        mock_authored_db_provider_none(),
+        mock_publish_trigger_provider_none(),
+    )
+    .await
+    .unwrap();
 }
-
 
 // Need to clear the data from the previous test
 async fn clear_dbs(env: DbWrite<DbKindDht>) {
@@ -891,11 +896,11 @@ async fn test_ops_state() {
 async fn publish_trigger_provider_is_called() {
     let dna_hash = fixt!(DnaHash);
     holochain_trace::test_run();
-    
+
     // Setup
     let env = test_dht_db().to_db();
     let (qt, _rx) = TriggerSender::new();
-    
+
     // Create mock network
     let mut hc_p2p = MockHolochainP2pDnaT::new();
     hc_p2p.expect_dna_hash().return_const(dna_hash.clone());
@@ -903,11 +908,11 @@ async fn publish_trigger_provider_is_called() {
         .expect_new_integrated_data()
         .return_once(move |_| Ok(()));
     let mock_network = hc_p2p;
-    
+
     // Track if publish trigger provider was called
     let called = Arc::new(AtomicBool::new(false));
     let called_clone = called.clone();
-    
+
     // Create mock publish trigger provider
     let mut publish_provider = MockPublishTriggerProvider::new();
     publish_provider
@@ -916,7 +921,7 @@ async fn publish_trigger_provider_is_called() {
             called_clone.store(true, Ordering::SeqCst);
             MustBoxFuture::new(async { None })
         });
-    
+
     // Run workflow - it should check for publish triggers even if no ops are integrated
     integrate_dht_ops_workflow(
         env,
@@ -927,7 +932,7 @@ async fn publish_trigger_provider_is_called() {
     )
     .await
     .unwrap();
-    
+
     // The workflow doesn't actually need to call get_publish_trigger in this scenario
     // since there are no local authored ops, but this shows the provider is wired up
     // properly and can be extended in future tests
@@ -981,9 +986,15 @@ async fn inform_kitsune_about_integrated_ops() {
                 Ok(())
             });
         let hc_p2p = Arc::new(hc_p2p);
-        integrate_dht_ops_workflow(env, tx, hc_p2p, mock_authored_db_provider_none(), mock_publish_trigger_provider_none())
-            .await
-            .unwrap();
+        integrate_dht_ops_workflow(
+            env,
+            tx,
+            hc_p2p,
+            mock_authored_db_provider_none(),
+            mock_publish_trigger_provider_none(),
+        )
+        .await
+        .unwrap();
     }
 }
 
@@ -1002,9 +1013,15 @@ async fn kitsune_not_informed_when_no_ops_integrated() {
     hc_p2p.expect_dna_hash().return_const(dna_hash.clone());
     hc_p2p.expect_new_integrated_data().never();
     let hc_p2p = Arc::new(hc_p2p);
-    integrate_dht_ops_workflow(env, tx, hc_p2p, mock_authored_db_provider_none(), mock_publish_trigger_provider_none())
-        .await
-        .unwrap();
+    integrate_dht_ops_workflow(
+        env,
+        tx,
+        hc_p2p,
+        mock_authored_db_provider_none(),
+        mock_publish_trigger_provider_none(),
+    )
+    .await
+    .unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -1018,9 +1035,10 @@ async fn single_local_author_marks_both_databases() {
     insert_validated_op(&dht_env, &hashed).await;
 
     let authored_db = Arc::new(test_authored_db_with_id(1));
-    
+
     // Insert the same op into the authored DB so it can be marked as integrated
-    authored_db.to_db()
+    authored_db
+        .to_db()
         .write_async({
             let hashed = hashed.clone();
             move |txn| -> DatabaseResult<()> {
@@ -1030,30 +1048,38 @@ async fn single_local_author_marks_both_databases() {
         })
         .await
         .unwrap();
-    
-    let (mock, _, _) = mock_authored_db_provider_with_db(dna_hash.clone(), vec![(author.clone(), Arc::clone(&authored_db))]);
+
+    let (mock, _, _) = mock_authored_db_provider_with_db(
+        dna_hash.clone(),
+        vec![(author.clone(), Arc::clone(&authored_db))],
+    );
 
     let (tx, _rx) = TriggerSender::new();
     let mut hc_p2p = MockHolochainP2pDnaT::new();
     hc_p2p.expect_dna_hash().return_const(dna_hash.clone());
-    hc_p2p
-        .expect_new_integrated_data()
-        .return_once(move |ops| {
-            assert_eq!(ops.len(), 1);
-            // Expecting the single op we inserted to be integrated
-            Ok(())
-        });
+    hc_p2p.expect_new_integrated_data().return_once(move |ops| {
+        assert_eq!(ops.len(), 1);
+        // Expecting the single op we inserted to be integrated
+        Ok(())
+    });
     let mock_network = Arc::new(hc_p2p);
 
-    integrate_dht_ops_workflow(dht_env.clone(), tx, mock_network, mock, mock_publish_trigger_provider_none())
-        .await
-        .unwrap();
+    integrate_dht_ops_workflow(
+        dht_env.clone(),
+        tx,
+        mock_network,
+        mock,
+        mock_publish_trigger_provider_none(),
+    )
+    .await
+    .unwrap();
 
     let hash = hashed.as_hash().clone();
     assert!(dht_when_integrated(&dht_env, &hash).await.is_some());
-    assert!(authored_when_integrated(&authored_db, &hash).await.is_some());
+    assert!(authored_when_integrated(&authored_db, &hash)
+        .await
+        .is_some());
 }
-
 
 #[tokio::test(flavor = "multi_thread")]
 async fn multiple_local_authors_marked_integrated() {
@@ -1071,9 +1097,10 @@ async fn multiple_local_authors_marked_integrated() {
 
     let authored_a = Arc::new(test_authored_db_with_id(1));
     let authored_b = Arc::new(test_authored_db_with_id(2));
-    
+
     // Insert ops into their respective authored DBs
-    authored_a.to_db()
+    authored_a
+        .to_db()
         .write_async({
             let hashed = hashed_a.clone();
             move |txn| -> DatabaseResult<()> {
@@ -1083,8 +1110,9 @@ async fn multiple_local_authors_marked_integrated() {
         })
         .await
         .unwrap();
-    
-    authored_b.to_db()
+
+    authored_b
+        .to_db()
         .write_async({
             let hashed = hashed_b.clone();
             move |txn| -> DatabaseResult<()> {
@@ -1094,7 +1122,7 @@ async fn multiple_local_authors_marked_integrated() {
         })
         .await
         .unwrap();
-    
+
     let (mock, _, _) = mock_authored_db_provider_with_db(
         dna_hash.clone(),
         vec![
@@ -1116,14 +1144,24 @@ async fn multiple_local_authors_marked_integrated() {
         });
     let mock_network = Arc::new(hc_p2p);
 
-    integrate_dht_ops_workflow(dht_env.clone(), tx, mock_network, mock, mock_publish_trigger_provider_none())
-        .await
-        .unwrap();
+    integrate_dht_ops_workflow(
+        dht_env.clone(),
+        tx,
+        mock_network,
+        mock,
+        mock_publish_trigger_provider_none(),
+    )
+    .await
+    .unwrap();
 
     let hash_a = hashed_a.as_hash().clone();
     let hash_b = hashed_b.as_hash().clone();
-    assert!(authored_when_integrated(&authored_a, &hash_a).await.is_some());
-    assert!(authored_when_integrated(&authored_b, &hash_b).await.is_some());
+    assert!(authored_when_integrated(&authored_a, &hash_a)
+        .await
+        .is_some());
+    assert!(authored_when_integrated(&authored_b, &hash_b)
+        .await
+        .is_some());
     assert!(dht_when_integrated(&dht_env, &hash_a).await.is_some());
     assert!(dht_when_integrated(&dht_env, &hash_b).await.is_some());
 }
@@ -1136,45 +1174,49 @@ async fn publish_triggered_for_integrated_local_authored_ops() {
     let author3 = fixt!(AgentPubKey);
     let cell_id1 = CellId::new(dna_hash.clone(), author1.clone());
     let cell_id2 = CellId::new(dna_hash.clone(), author2.clone());
-    
+
     // Create DHT and authored databases
     let dht_env = test_dht_db_with_dna_hash(dna_hash.clone()).to_db();
     let authored_db1 = test_authored_db_with_id(1);
     let authored_db2 = test_authored_db_with_id(2);
-    
+
     // Create ops for both authors and one remote author
     let (_op1, hashed1) = make_store_entry_op(author1.clone());
     let (_op2, hashed2) = make_store_entry_op(author2.clone());
     let (_op3, hashed3) = make_store_entry_op(author3.clone()); // This author has no local DB
-    
+
     // Insert ops into the DHT database as validated
     insert_validated_op(&dht_env, &hashed1).await;
     insert_validated_op(&dht_env, &hashed2).await;
     insert_validated_op(&dht_env, &hashed3).await;
-    
+
     // Also insert into authored databases as not yet integrated
-    authored_db1.to_db()
+    authored_db1
+        .to_db()
         .write_async({
             let hashed1 = hashed1.clone();
             move |txn| -> DatabaseResult<()> {
-                mutations::insert_op_authored(txn, &hashed1).map_err(|e| DatabaseError::Other(e.into()))?;
+                mutations::insert_op_authored(txn, &hashed1)
+                    .map_err(|e| DatabaseError::Other(e.into()))?;
                 Ok(())
             }
         })
         .await
         .unwrap();
-    
-    authored_db2.to_db()
+
+    authored_db2
+        .to_db()
         .write_async({
             let hashed2 = hashed2.clone();
             move |txn| -> DatabaseResult<()> {
-                mutations::insert_op_authored(txn, &hashed2).map_err(|e| DatabaseError::Other(e.into()))?;
+                mutations::insert_op_authored(txn, &hashed2)
+                    .map_err(|e| DatabaseError::Other(e.into()))?;
                 Ok(())
             }
         })
         .await
         .unwrap();
-    
+
     // Setup mocks
     let mut authored_mock = MockAuthoredDbProvider::new();
     let authored_db1_clone = Arc::new(authored_db1);
@@ -1187,25 +1229,32 @@ async fn publish_triggered_for_integrated_local_authored_ops() {
     let author3_clone = author3.clone();
     let db1_clone = authored_db1_clone.clone();
     let db2_clone = authored_db2_clone.clone();
-    
+
     authored_mock
         .expect_get_authored_db()
         .withf(move |dna, agent| dna == &dna_hash_for_mock1 && agent == &author1_clone)
-        .returning(move |_, _| { let db = db1_clone.clone(); MustBoxFuture::new(async move { Ok(Some(db.to_db().clone())) }) });
-    
+        .returning(move |_, _| {
+            let db = db1_clone.clone();
+            MustBoxFuture::new(async move { Ok(Some(db.to_db().clone())) })
+        });
+
     authored_mock
         .expect_get_authored_db()
         .withf(move |dna, agent| dna == &dna_hash_for_mock2 && agent == &author2_clone)
-        .returning(move |_, _| { let db = db2_clone.clone(); MustBoxFuture::new(async move { Ok(Some(db.to_db().clone())) }) });
-    
+        .returning(move |_, _| {
+            let db = db2_clone.clone();
+            MustBoxFuture::new(async move { Ok(Some(db.to_db().clone())) })
+        });
+
     authored_mock
         .expect_get_authored_db()
         .withf(move |dna, agent| dna == &dna_hash_for_mock3 && agent == &author3_clone)
         .returning(move |_, _| MustBoxFuture::new(async move { Ok(None) }));
-    
+
     // Setup publish trigger mock - only cells 1 and 2 have triggers
-    let (publish_mock, trigger_count) = mock_publish_trigger_provider_with_triggers(vec![cell_id1, cell_id2]);
-    
+    let (publish_mock, trigger_count) =
+        mock_publish_trigger_provider_with_triggers(vec![cell_id1, cell_id2]);
+
     // Setup network mock
     let mut hc_p2p = MockHolochainP2pDnaT::new();
     hc_p2p.expect_dna_hash().return_const(dna_hash.clone());
@@ -1213,10 +1262,10 @@ async fn publish_triggered_for_integrated_local_authored_ops() {
         .expect_new_integrated_data()
         .return_once(move |_| Ok(()));
     let mock_network = Arc::new(hc_p2p);
-    
+
     // Create trigger
     let (tx, _rx) = TriggerSender::new();
-    
+
     // Run workflow
     integrate_dht_ops_workflow(
         dht_env.clone(),
@@ -1227,26 +1276,34 @@ async fn publish_triggered_for_integrated_local_authored_ops() {
     )
     .await
     .unwrap();
-    
+
     // Verify publish triggers were called for the two local authors
     // The mock increments the counter each time get_publish_trigger is called for a cell with a trigger
-    assert_eq!(trigger_count.load(Ordering::SeqCst), 2, "Should trigger publish for both local authors");
+    assert_eq!(
+        trigger_count.load(Ordering::SeqCst),
+        2,
+        "Should trigger publish for both local authors"
+    );
 }
 
 fn mock_authored_db_provider_none() -> Arc<MockAuthoredDbProvider> {
     let mut mock = MockAuthoredDbProvider::new();
-    mock.expect_get_authored_db().returning(|_, _| MustBoxFuture::new(async { Ok(None) }));
+    mock.expect_get_authored_db()
+        .returning(|_, _| MustBoxFuture::new(async { Ok(None) }));
     Arc::new(mock)
 }
+
+// Type alias to simplify the complex return type
+type MockProviderWithState = (
+    Arc<dyn super::super::authored_db_provider::AuthoredDbProvider>,
+    Arc<Mutex<HashMap<AgentPubKey, Arc<TestDb<DbKindAuthored>>>>>,
+    Arc<AtomicUsize>,
+);
 
 fn mock_authored_db_provider_with_db(
     dna_hash: DnaHash,
     authors: Vec<(AgentPubKey, Arc<TestDb<DbKindAuthored>>)>,
-) -> (
-    Arc<dyn super::super::authored_db_provider::AuthoredDbProvider>,
-    Arc<Mutex<HashMap<AgentPubKey, Arc<TestDb<DbKindAuthored>>>>>,
-    Arc<AtomicUsize>,
-) {
+) -> MockProviderWithState {
     let mut mock = MockAuthoredDbProvider::new();
     let initial: HashMap<_, _> = authors.into_iter().collect();
     let state = Arc::new(Mutex::new(initial));
@@ -1272,21 +1329,22 @@ fn mock_authored_db_provider_with_db(
     (Arc::new(mock), state, lookup_count)
 }
 
-
 async fn insert_validated_op(env: &DbWrite<DbKindDht>, op: &DhtOpHashed) {
-    env
-        .write_async({
-            let op = op.clone();
-            move |txn| -> DatabaseResult<()> {
-                let hash = op.as_hash().clone();
-                mutations::insert_op_dht(txn, &op, 0, None).map_err(|e| holochain_sqlite::error::DatabaseError::Other(e.into()))?;
-                mutations::set_validation_status(txn, &hash, ValidationStatus::Valid).map_err(|e| holochain_sqlite::error::DatabaseError::Other(e.into()))?;
-                mutations::set_validation_stage(txn, &hash, ValidationStage::AwaitingIntegration).map_err(|e| holochain_sqlite::error::DatabaseError::Other(e.into()))?;
-                Ok(())
-            }
-        })
-        .await
-        .unwrap();
+    env.write_async({
+        let op = op.clone();
+        move |txn| -> DatabaseResult<()> {
+            let hash = op.as_hash().clone();
+            mutations::insert_op_dht(txn, &op, 0, None)
+                .map_err(|e| holochain_sqlite::error::DatabaseError::Other(e.into()))?;
+            mutations::set_validation_status(txn, &hash, ValidationStatus::Valid)
+                .map_err(|e| holochain_sqlite::error::DatabaseError::Other(e.into()))?;
+            mutations::set_validation_stage(txn, &hash, ValidationStage::AwaitingIntegration)
+                .map_err(|e| holochain_sqlite::error::DatabaseError::Other(e.into()))?;
+            Ok(())
+        }
+    })
+    .await
+    .unwrap();
 }
 
 fn make_store_entry_op(author: AgentPubKey) -> (DhtOp, DhtOpHashed) {
@@ -1320,10 +1378,7 @@ async fn authored_when_integrated(
         .unwrap()
 }
 
-async fn dht_when_integrated(
-    db: &DbWrite<DbKindDht>,
-    hash: &DhtOpHash,
-) -> Option<Timestamp> {
+async fn dht_when_integrated(db: &DbWrite<DbKindDht>, hash: &DhtOpHash) -> Option<Timestamp> {
     db.read_async({
         let hash = hash.clone();
         move |txn| -> DatabaseResult<Option<Timestamp>> {
@@ -1341,33 +1396,36 @@ async fn dht_when_integrated(
 }
 
 fn mock_publish_trigger_provider_none() -> Arc<MockPublishTriggerProvider> {
-   let mut mock = MockPublishTriggerProvider::new();
-    mock.expect_get_publish_trigger().returning(|_| MustBoxFuture::new(async { None }));
-   Arc::new(mock)
+    let mut mock = MockPublishTriggerProvider::new();
+    mock.expect_get_publish_trigger()
+        .returning(|_| MustBoxFuture::new(async { None }));
+    Arc::new(mock)
 }
 
 fn mock_publish_trigger_provider_with_triggers(
     cells_with_triggers: Vec<CellId>,
-) -> (Arc<dyn super::super::publish_trigger_provider::PublishTriggerProvider>, Arc<AtomicUsize>) {
+) -> (
+    Arc<dyn super::super::publish_trigger_provider::PublishTriggerProvider>,
+    Arc<AtomicUsize>,
+) {
     let mut mock = MockPublishTriggerProvider::new();
     let trigger_count = Arc::new(AtomicUsize::new(0));
     let trigger_count_clone = trigger_count.clone();
-    
-    mock.expect_get_publish_trigger()
-        .returning(move |cell_id| {
-            let has_trigger = cells_with_triggers.contains(cell_id);
-            if has_trigger {
-                let (tx, _rx) = TriggerSender::new();
-                let count = trigger_count_clone.clone();
-                // When trigger is called, increment the counter
-                // Note: In reality we'd hook into the actual trigger, 
-                // but for testing we just track that get_publish_trigger was called
-                count.fetch_add(1, Ordering::SeqCst);
-                MustBoxFuture::new(async move { Some(tx) })
-            } else {
-                MustBoxFuture::new(async { None })
-            }
-        });
-    
+
+    mock.expect_get_publish_trigger().returning(move |cell_id| {
+        let has_trigger = cells_with_triggers.contains(cell_id);
+        if has_trigger {
+            let (tx, _rx) = TriggerSender::new();
+            let count = trigger_count_clone.clone();
+            // When trigger is called, increment the counter
+            // Note: In reality we'd hook into the actual trigger,
+            // but for testing we just track that get_publish_trigger was called
+            count.fetch_add(1, Ordering::SeqCst);
+            MustBoxFuture::new(async move { Some(tx) })
+        } else {
+            MustBoxFuture::new(async { None })
+        }
+    });
+
     (Arc::new(mock), trigger_count)
 }

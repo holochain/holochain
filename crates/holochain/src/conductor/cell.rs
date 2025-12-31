@@ -891,9 +891,9 @@ impl Cell {
     }
 
     #[cfg(any(test, feature = "test_utils"))]
-   pub(crate) fn triggers(&self) -> &QueueTriggers {
-       &self.queue_triggers
-   }
+    pub(crate) fn triggers(&self) -> &QueueTriggers {
+        &self.queue_triggers
+    }
 
     pub(crate) fn publish_dht_ops_trigger(&self) -> TriggerSender {
         self.queue_triggers.publish_dht_ops.clone()

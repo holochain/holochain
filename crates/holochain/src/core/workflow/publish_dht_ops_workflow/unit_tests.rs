@@ -388,7 +388,11 @@ async fn create_op(
             move |txn| -> StateMutationResult<()> {
                 holochain_state::mutations::insert_op_authored(txn, &op)?;
                 // Mark the op as integrated so it can be published
-                holochain_state::mutations::set_when_integrated(txn, &op.as_hash(), Timestamp::now())?;
+                holochain_state::mutations::set_when_integrated(
+                    txn,
+                    op.as_hash(),
+                    Timestamp::now(),
+                )?;
                 Ok(())
             }
         })

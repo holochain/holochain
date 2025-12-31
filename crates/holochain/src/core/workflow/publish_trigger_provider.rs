@@ -1,8 +1,8 @@
 //! Provider trait for accessing publish triggers from cells.
 
 use super::super::queue_consumer::TriggerSender;
-use must_future::MustBoxFuture;
 use holochain_state::prelude::CellId;
+use must_future::MustBoxFuture;
 
 /// Provider trait for retrieving publish triggers.
 /// This abstracts away the conductor dependency from workflows.
