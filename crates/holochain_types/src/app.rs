@@ -603,21 +603,10 @@ impl InstalledAppCommon {
     }
 
     /// Get the clone id from either clone or cell id.
+    ///
+    /// Resolves a [`CloneCellId`] (which may contain either a [`CloneId`] or [`DnaHash`]) to a [`CloneId`].
+    /// When resolving from a [`DnaHash`], this searches both enabled and disabled clones.
     pub fn get_clone_id(&self, clone_cell_id: &CloneCellId) -> AppResult<CloneId> {
-        let clone_id = match clone_cell_id {
-            CloneCellId::CloneId(id) => id,
-            CloneCellId::DnaHash(id) => {
-                self.clone_cells()
-                    .find(|(_, cell_id)| cell_id.dna_hash() == id)
-                    .ok_or_else(|| AppError::CloneCellNotFound(CloneCellId::DnaHash(id.clone())))?
-                    .0
-            }
-        };
-        Ok(clone_id.clone())
-    }
-
-    /// Get the clone id from either clone or cell id.
-    pub fn get_disabled_clone_id(&self, clone_cell_id: &CloneCellId) -> AppResult<CloneId> {
         let clone_id = match clone_cell_id {
             CloneCellId::CloneId(id) => id.clone(),
             CloneCellId::DnaHash(id) => self
@@ -627,7 +616,7 @@ impl InstalledAppCommon {
                     role_assignment
                         .as_primary()
                         .into_iter()
-                        .flat_map(|r| r.disabled_clones.iter())
+                        .flat_map(|r| r.disabled_clones.iter().chain(r.clones.iter()))
                 })
                 .find(|(_, cell_id)| *cell_id == id)
                 .ok_or_else(|| AppError::CloneCellNotFound(CloneCellId::DnaHash(id.clone())))?
@@ -1045,6 +1034,60 @@ mod tests {
         app.delete_clone_cell(&clone_id_0).unwrap();
         // Assert the deleted cell cannot be enabled
         assert!(app.enable_clone_cell(&clone_id_0).is_err());
+    }
+
+    #[test]
+    fn get_clone_id_works_for_enabled_and_disabled_clones() {
+        // Test that get_clone_id works with both CloneId and DnaHash
+        // for enabled clones (not just disabled ones)
+        let base_dna_hash = fixt!(DnaHash);
+        let new_clone = || fixt!(DnaHash);
+        let clone_limit = 3;
+        let role1 = AppRolePrimary::new(base_dna_hash, false, clone_limit).into();
+        let agent = fixt!(AgentPubKey);
+        let role_name: RoleName = "role_name".into();
+        let manifest = AppManifest::V0(AppManifestV0 {
+            name: "test_app".to_string(),
+            description: None,
+            roles: vec![],
+            allow_deferred_memproofs: false,
+            bootstrap_url: None,
+            signal_url: None,
+        });
+        let mut app = InstalledAppCommon::new(
+            "app",
+            agent.clone(),
+            vec![(role_name.clone(), role1)],
+            manifest,
+            Timestamp::now(),
+        )
+        .unwrap();
+
+        // Create and enable a clone
+        let clone_dna_hash = new_clone();
+        let clone_id = app.add_clone(&role_name, &clone_dna_hash).unwrap();
+
+        // Verify get_clone_id works with CloneId for enabled clone
+        let result_by_clone_id = app.get_clone_id(&CloneCellId::CloneId(clone_id.clone()));
+        assert!(result_by_clone_id.is_ok());
+        assert_eq!(result_by_clone_id.unwrap(), clone_id);
+
+        // Verify get_clone_id works with DnaHash for enabled clone
+        let result_by_dna_hash = app.get_clone_id(&CloneCellId::DnaHash(clone_dna_hash.clone()));
+        assert!(result_by_dna_hash.is_ok());
+        assert_eq!(result_by_dna_hash.unwrap(), clone_id);
+
+        // Now disable the clone
+        app.disable_clone_cell(&clone_id).unwrap();
+
+        // Verify both still work for disabled clone
+        let result_disabled_by_id = app.get_clone_id(&CloneCellId::CloneId(clone_id.clone()));
+        assert!(result_disabled_by_id.is_ok());
+        assert_eq!(result_disabled_by_id.unwrap(), clone_id);
+
+        let result_disabled_by_hash = app.get_clone_id(&CloneCellId::DnaHash(clone_dna_hash));
+        assert!(result_disabled_by_hash.is_ok());
+        assert_eq!(result_disabled_by_hash.unwrap(), clone_id);
     }
 
     #[test]

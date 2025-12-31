@@ -16,6 +16,7 @@ use holochain_websocket::{
 use kitsune2_api::DynLocalAgent;
 use kitsune2_core::Ed25519LocalAgent;
 use kitsune2_test_utils::agent::AgentBuilder;
+use kitsune2_test_utils::retry_fn_until_timeout;
 use serde_json::json;
 use std::collections::HashSet;
 use std::future::Future;
@@ -862,9 +863,14 @@ async fn generate_sandbox_and_add_and_list_agent() {
     .await
     .unwrap();
 
-    // Get all agent infos.
-    let agent_infos = admin_ws.agent_info(None).await.unwrap();
-    assert_eq!(agent_infos.len(), 2);
+    // Agent infos should be 2.
+    retry_fn_until_timeout(
+        || async { admin_ws.agent_info(None).await.unwrap().len() == 2 },
+        Some(10_000),
+        Some(1_000),
+    )
+    .await
+    .expect("expected 2 agent infos");
 
     // List all agents over hc-sandbox CLI.
     let mut cmd = get_sandbox_command();

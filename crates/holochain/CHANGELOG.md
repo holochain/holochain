@@ -16,6 +16,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Crates `holochain_cli_client` and `holochain_client` now have features to set which network transport is compiled in (tx5 or iroh).
 - **BREAKING CHANGE** Feature `mock_network` was removed from crate `holochain_p2p`. It was only referencing `test_utils`, so instead `test_utils` should be used directly.
 - Conductor now overrides the Cell bootstrap and signal urls if specified in the app manifest.
+- Fix: `EnableCloneCell` now works consistently when called with either `CloneId` or `DnaHash` on already-enabled clones. Previously, using a `DnaHash` would fail with `CloneCellNotFound` while using a `CloneId` would succeed. #5519
+- **BREAKING CHANGE** Removed the `InstalledAppCommon` function `get_disabled_clone_id`. #5519
+- Removed the unnecessary `hc_stress_test` helper module, its integration test, and example binaries now that performance testing lives in the `holochain/wind-tunnel` repository.
+- Conductor now overrides the Cell bootstrap and signal urls if specified in the app manifest [5524](https://github.com/holochain/holochain/pull/5524).
 - Added feature `transport-iroh` for using Iroh as network transport backend.
 - **BREAKING CHANGE** Renamed features `backend-libdatachannel` to `transport-tx5-backend-libdatachannel`, `backend-go-pion` to `transport-tx5-backend-go-pion`, `datachannel-vendored` to `transport-tx5-datachannel-vendored`.
 - Removed unused `hc_demo_cli` crate.
