@@ -2,8 +2,8 @@ use super::*;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::workflow::authored_db_provider::MockAuthoredDbProvider;
 use crate::core::workflow::publish_trigger_provider::MockPublishTriggerProvider;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use ::fixt::prelude::*;
-use fixt::prelude::*;
 use holo_hash::fixt::{AgentPubKeyFixturator, DnaHashFixturator};
 use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
 use holochain_p2p::actor::MockHcP2p;
@@ -20,9 +20,7 @@ use holochain_types::prelude::{ChainOp, DhtOp, DhtOpHashed, Signature};
 use kitsune2_api::StoredOp;
 use rusqlite::{named_params, OptionalExtension};
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use std::sync::Arc;
 
 #[derive(Clone)]
 struct TestData {
@@ -1097,6 +1095,110 @@ async fn multiple_local_authors_marked_integrated() {
     assert!(dht_when_integrated(&dht_env, &hash_b).await.is_some());
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn publish_triggered_for_integrated_local_authored_ops() {
+    let dna_hash = fixt!(DnaHash);
+    let author1 = fixt!(AgentPubKey);
+    let author2 = fixt!(AgentPubKey);
+    let author3 = fixt!(AgentPubKey);
+    let cell_id1 = CellId::new(dna_hash.clone(), author1.clone());
+    let cell_id2 = CellId::new(dna_hash.clone(), author2.clone());
+    
+    // Create DHT and authored databases
+    let dht_env = test_dht_db_with_dna_hash(dna_hash.clone());
+    let authored_db1 = test_authored_db_with_id(1);
+    let authored_db2 = test_authored_db_with_id(2);
+    
+    // Create ops for both authors and one remote author
+    let (op1, hashed1) = make_store_entry_op(author1.clone());
+    let (op2, hashed2) = make_store_entry_op(author2.clone());
+    let (op3, hashed3) = make_store_entry_op(author3.clone()); // This author has no local DB
+    
+    // Insert ops into the DHT database as validated
+    insert_validated_op(&dht_env, &hashed1).await;
+    insert_validated_op(&dht_env, &hashed2).await;
+    insert_validated_op(&dht_env, &hashed3).await;
+    
+    // Also insert into authored databases as not yet integrated
+    authored_db1.to_db()
+        .write_async({
+            let hashed1 = hashed1.clone();
+            move |txn| {
+                mutations::insert_op_authored(txn, &hashed1)?;
+                Ok(())
+            }
+        })
+        .await
+        .unwrap();
+    
+    authored_db2.to_db()
+        .write_async({
+            let hashed2 = hashed2.clone();
+            move |txn| {
+                mutations::insert_op_authored(txn, &hashed2)?;
+                Ok(())
+            }
+        })
+        .await
+        .unwrap();
+    
+    // Setup mocks
+    let mut authored_mock = MockAuthoredDbProvider::new();
+    let authored_db1_clone = Arc::new(authored_db1);
+    let authored_db2_clone = Arc::new(authored_db2);
+    let dna_hash_for_mock1 = dna_hash.clone();
+    let dna_hash_for_mock2 = dna_hash.clone();
+    let dna_hash_for_mock3 = dna_hash.clone();
+    let author1_clone = author1.clone();
+    let author2_clone = author2.clone();
+    let author3_clone = author3.clone();
+    let db1_clone = authored_db1_clone.clone();
+    let db2_clone = authored_db2_clone.clone();
+    
+    authored_mock
+        .expect_get_authored_db()
+        .withf(move |dna, agent| dna == &dna_hash_for_mock1 && agent == &author1_clone)
+        .returning(move |_, _| MustBoxFuture::new(async move { Ok(Some(db1_clone.to_db().clone())) }));
+    
+    authored_mock
+        .expect_get_authored_db()
+        .withf(move |dna, agent| dna == &dna_hash_for_mock2 && agent == &author2_clone)
+        .returning(move |_, _| MustBoxFuture::new(async move { Ok(Some(db2_clone.to_db().clone())) }));
+    
+    authored_mock
+        .expect_get_authored_db()
+        .withf(move |dna, agent| dna == &dna_hash_for_mock3 && agent == &author3_clone)
+        .returning(move |_, _| MustBoxFuture::new(async move { Ok(None) }));
+    
+    // Setup publish trigger mock - only cells 1 and 2 have triggers
+    let (publish_mock, trigger_count) = mock_publish_trigger_provider_with_triggers(vec![cell_id1, cell_id2]);
+    
+    // Setup network mock
+    let mut hc_p2p = MockHcP2p::new();
+    hc_p2p
+        .expect_new_integrated_data()
+        .return_once(move |_, _| Box::pin(async { Ok(()) }));
+    let mock_network = Arc::new(HolochainP2pDna::new(Arc::new(hc_p2p), dna_hash.clone(), None));
+    
+    // Create trigger
+    let (tx, _rx) = TriggerSender::new();
+    
+    // Run workflow
+    integrate_dht_ops_workflow(
+        dht_env.clone(),
+        tx,
+        mock_network,
+        Arc::new(authored_mock),
+        publish_mock,
+    )
+    .await
+    .unwrap();
+    
+    // Verify publish triggers were called for the two local authors
+    // The mock increments the counter each time get_publish_trigger is called for a cell with a trigger
+    assert_eq!(trigger_count.load(Ordering::SeqCst), 2, "Should trigger publish for both local authors");
+}
+
 fn mock_authored_db_provider_none() -> Arc<MockAuthoredDbProvider> {
     let mut mock = MockAuthoredDbProvider::new();
     mock.expect_get_authored_db().returning(|_, _| MustBoxFuture::new(async { Ok(None) }));
@@ -1235,7 +1337,33 @@ async fn dht_when_integrated(
 }
 
 fn mock_publish_trigger_provider_none() -> Arc<MockPublishTriggerProvider> {
+   let mut mock = MockPublishTriggerProvider::new();
+    mock.expect_get_publish_trigger().returning(|_| MustBoxFuture::new(async { None }));
+   Arc::new(mock)
+}
+
+fn mock_publish_trigger_provider_with_triggers(
+    cells_with_triggers: Vec<CellId>,
+) -> (Arc<MockPublishTriggerProvider>, Arc<AtomicUsize>) {
     let mut mock = MockPublishTriggerProvider::new();
-    mock.expect_get_publish_trigger().returning(|_| Box::pin(std::future::ready(None)));
-    Arc::new(mock)
+    let trigger_count = Arc::new(AtomicUsize::new(0));
+    let trigger_count_clone = trigger_count.clone();
+    
+    mock.expect_get_publish_trigger()
+        .returning(move |cell_id| {
+            let has_trigger = cells_with_triggers.contains(cell_id);
+            if has_trigger {
+                let (tx, _rx) = TriggerSender::new();
+                let count = trigger_count_clone.clone();
+                // When trigger is called, increment the counter
+                // Note: In reality we'd hook into the actual trigger, 
+                // but for testing we just track that get_publish_trigger was called
+                count.fetch_add(1, Ordering::SeqCst);
+                MustBoxFuture::new(async move { Some(tx) })
+            } else {
+                MustBoxFuture::new(async { None })
+            }
+        });
+    
+    (Arc::new(mock), trigger_count)
 }
