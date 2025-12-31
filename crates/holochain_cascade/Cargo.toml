@@ -37,7 +37,9 @@ async-trait = "0.1"
 mockall = { version = "0.13", optional = true }
 
 [dev-dependencies]
-holochain_cascade = { path = ".", features = ["test_utils"] }
+holochain_cascade = { path = ".", default-features = false, features = [
+  "test_utils",
+] }
 
 isotest = "0"
 pretty_assertions = "1.4"

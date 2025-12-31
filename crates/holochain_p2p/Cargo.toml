@@ -49,7 +49,7 @@ kitsune2 = { path = "../../../kitsune2/crates/kitsune2", default-features = fals
 kitsune2_api = { path = "../../../kitsune2/crates/api" }
 kitsune2_core = { path = "../../../kitsune2/crates/core" }
 kitsune2_gossip = { path = "../../../kitsune2/crates/gossip" }
-kitsune2_transport_tx5 = { path = "../../../kitsune2/crates/transport_tx5", optional = true }
+kitsune2_transport_tx5 = { path = "../../../kitsune2/crates/transport_tx5", default-features = false, optional = true }
 kitsune2_bootstrap_srv = { path = "../../../kitsune2/crates/bootstrap_srv", default-features = false, optional = true }
 bytes = "1.10"
 holochain_sqlite = { version = "^0.7.0-dev.4", path = "../holochain_sqlite" }
@@ -82,10 +82,6 @@ test_utils = [
   "holochain_types/test_utils",
 ]
 
-test_utils_tx5 = ["dep:kitsune2_transport_tx5"]
-
-mock_network = ["test_utils", "test_utils_tx5"]
-
 sqlite-encrypted = [
   "holo_hash/sqlite-encrypted",
   "holochain_keystore/sqlite-encrypted",
@@ -93,16 +89,19 @@ sqlite-encrypted = [
 sqlite = ["holo_hash/sqlite", "holochain_keystore/sqlite"]
 
 transport-tx5-datachannel-vendored = [
+  "kitsune2_transport_tx5/datachannel-vendored",
   "kitsune2/transport-tx5-datachannel-vendored",
   "kitsune2_bootstrap_srv/sbd",
 ]
 
 transport-tx5-backend-libdatachannel = [
+  "kitsune2_transport_tx5/backend-libdatachannel",
   "kitsune2/transport-tx5-backend-libdatachannel",
   "kitsune2_bootstrap_srv/sbd",
 ]
 
 transport-tx5-backend-go-pion = [
+  "kitsune2_transport_tx5/backend-go-pion",
   "kitsune2/transport-tx5-backend-go-pion",
   "kitsune2_bootstrap_srv/sbd",
 ]

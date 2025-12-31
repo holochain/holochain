@@ -2030,14 +2030,7 @@ mod app_status_impls {
             match manifest {
                 AppManifest::V0(manifest) => {
                     overrides.bootstrap_url = manifest.bootstrap_url.clone();
-                    #[cfg(any(
-                        feature = "transport-tx5-backend-libdatachannel",
-                        feature = "transport-tx5-backend-go-pion",
-                        feature = "transport-tx5-datachannel-vendored"
-                    ))]
-                    {
-                        overrides.signal_url = manifest.signal_url.clone();
-                    }
+                    overrides.signal_url = manifest.signal_url.clone();
                 }
             }
             if overrides.is_overriding() {

@@ -1,7 +1,10 @@
 # holochain Makefile
 
 # All default features of binaries excluding mutually exclusive features wasmer_sys & wasmer_wamr
-DEFAULT_FEATURES=slow_tests,build_wasms,sqlite-encrypted
+# and tx5 transport and iroh transport
+COMMON_DEFAULT_FEATURES=slow_tests,build_wasms,sqlite-encrypted
+DEFAULT_FEATURES=transport-tx5-datachannel-vendored,$(COMMON_DEFAULT_FEATURES)
+DEFAULT_FEATURES_TRANSPORT_IROH=transport-iroh,$(COMMON_DEFAULT_FEATURES)
 UNSTABLE_FEATURES=chc,unstable-sharding,unstable-warrants,unstable-functions,unstable-migration,$(DEFAULT_FEATURES)
 
 # mark everything as phony because it doesn't represent a file-system output
@@ -62,6 +65,14 @@ build-workspace-wasmer_sys:
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_sys
 
+build-workspace-wasmer_sys-transport_iroh:
+	cargo build \
+		--workspace \
+		--locked \
+		--all-targets \
+		--no-default-features \
+		--features $(DEFAULT_FEATURES_TRANSPORT_IROH),wasmer_sys
+
 build-workspace-wasmer_sys-unstable:
 	cargo build \
 		--workspace \
@@ -85,6 +96,14 @@ test-workspace-wasmer_sys:
 		--locked \
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_sys
+
+# execute tests on all crates with wasmer compiler and iroh transport
+test-workspace-wasmer_sys-transport_iroh:
+	RUST_BACKTRACE=1 cargo nextest run \
+		--workspace \
+		--locked \
+		--no-default-features \
+		--features $(DEFAULT_FEATURES_TRANSPORT_IROH),wasmer_sys
 
 # executes tests on all crates with wasmer compiler
 test-workspace-wasmer_sys-unstable:

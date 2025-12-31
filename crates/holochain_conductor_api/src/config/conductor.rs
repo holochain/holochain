@@ -214,7 +214,16 @@ pub struct NetworkConfig {
     #[schemars(schema_with = "holochain_util::jsonschema::url2_schema")]
     pub bootstrap_url: url2::Url2,
 
-    /// The Kitsune2 sbd server to use for webrtc signalling.
+    /// The Kitsune2 NAT and relay server to use.
+    ///
+    /// For the tx5 transport this will be the address of an SBD server,
+    /// and in case of the iroh transport it will be an iroh relay server address.
+    #[cfg(any(
+        feature = "transport-tx5-datachannel-vendored",
+        feature = "transport-tx5-backend-libdatachannel",
+        feature = "transport-tx5-backend-go-pion",
+        feature = "transport-iroh"
+    ))]
     #[schemars(schema_with = "holochain_util::jsonschema::url2_schema")]
     pub signal_url: url2::Url2,
 
@@ -275,7 +284,15 @@ impl Default for NetworkConfig {
         Self {
             base64_auth_material: None,
             bootstrap_url: url2::Url2::parse("https://dev-test-bootstrap2.holochain.org"),
+            #[cfg(any(
+                feature = "transport-tx5-datachannel-vendored",
+                feature = "transport-tx5-backend-libdatachannel",
+                feature = "transport-tx5-backend-go-pion",
+            ))]
             signal_url: url2::Url2::parse("wss://dev-test-bootstrap2.holochain.org"),
+            // Replace with the Holochain hosted dev relay server
+            #[cfg(feature = "transport-iroh")]
+            signal_url: url2::Url2::parse("https://use1-1.relay.n0.iroh-canary.iroh.link."),
             request_timeout_s: default_request_timeout_s(),
             webrtc_config: None,
             target_arc_factor: default_target_arc_factor(),
@@ -391,52 +408,67 @@ impl NetworkConfig {
                 serde_json::Value::String(self.bootstrap_url.as_str().into()),
             )?;
 
+            #[cfg(any(
+                feature = "transport-tx5-datachannel-vendored",
+                feature = "transport-tx5-backend-libdatachannel",
+                feature = "transport-tx5-backend-go-pion",
+            ))]
+            {
+                Self::insert_module_config(
+                    module_config,
+                    "tx5Transport",
+                    "serverUrl",
+                    serde_json::Value::String(self.signal_url.as_str().into()),
+                )?;
+
+                // timeoutS is set to the floor of 1/2 of the request_timeout_s.
+                let timeout_s: serde_json::Number = (self.request_timeout_s / 2).into();
+                Self::insert_module_config(
+                    module_config,
+                    "tx5Transport",
+                    "timeoutS",
+                    serde_json::Value::Number(timeout_s),
+                )?;
+
+                // webrtcConnectTimeoutS is set to the floor of 3/8 of the request_timeout_s.
+                let webrtc_connect_timeout_s: serde_json::Number =
+                    ((self.request_timeout_s * 3) / 8).into();
+                Self::insert_module_config(
+                    module_config,
+                    "tx5Transport",
+                    "webrtcConnectTimeoutS",
+                    serde_json::Value::Number(webrtc_connect_timeout_s),
+                )?;
+
+                if let Some(webrtc_config) = &self.webrtc_config {
+                    Self::insert_module_config(
+                        module_config,
+                        "tx5Transport",
+                        "webrtcConfig",
+                        webrtc_config.clone(),
+                    )?;
+                }
+
+                if tracing::enabled!(target: "NETAUDIT", tracing::Level::WARN) {
+                    tracing::info!(
+                        "The NETAUDIT target is enabled, turning on network backend tracing"
+                    );
+                    Self::insert_module_config(
+                        module_config,
+                        "tx5Transport",
+                        "tracingEnabled",
+                        serde_json::Value::Bool(true),
+                    )?;
+                }
+            }
+
+            #[cfg(feature = "transport-iroh")]
             Self::insert_module_config(
                 module_config,
-                "tx5Transport",
-                "serverUrl",
+                "irohTransport",
+                "relayUrl",
                 serde_json::Value::String(self.signal_url.as_str().into()),
             )?;
-
-            // timeoutS is set to the floor of 1/2 of the request_timeout_s.
-            let timeout_s: serde_json::Number = (self.request_timeout_s / 2).into();
-            Self::insert_module_config(
-                module_config,
-                "tx5Transport",
-                "timeoutS",
-                serde_json::Value::Number(timeout_s),
-            )?;
-
-            // webrtcConnectTimeoutS is set to the floor of 3/8 of the request_timeout_s.
-            let webrtc_connect_timeout_s: serde_json::Number =
-                ((self.request_timeout_s * 3) / 8).into();
-            Self::insert_module_config(
-                module_config,
-                "tx5Transport",
-                "webrtcConnectTimeoutS",
-                serde_json::Value::Number(webrtc_connect_timeout_s),
-            )?;
-
-            if let Some(webrtc_config) = &self.webrtc_config {
-                Self::insert_module_config(
-                    module_config,
-                    "tx5Transport",
-                    "webrtcConfig",
-                    webrtc_config.clone(),
-                )?;
-            }
-
-            if tracing::enabled!(target: "NETAUDIT", tracing::Level::WARN) {
-                tracing::info!(
-                    "The NETAUDIT target is enabled, turning on network backend tracing"
-                );
-                Self::insert_module_config(
-                    module_config,
-                    "tx5Transport",
-                    "tracingEnabled",
-                    serde_json::Value::Bool(true),
-                )?;
-            }
         } else {
             return Err(ConductorConfigError::InvalidNetworkConfig(
                 "advanced field must be an object".to_string(),

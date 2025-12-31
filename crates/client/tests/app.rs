@@ -18,10 +18,13 @@ use holochain_zome_types::dependencies::holochain_integrity_types::ExternIO;
 use kitsune2_api::{AgentInfoSigned, Url};
 use kitsune2_core::Ed25519Verifier;
 use serde::{Deserialize, Serialize};
-use std::net::{Ipv4Addr, SocketAddr};
 use std::{
     collections::HashMap,
     sync::{Arc, Barrier},
+};
+use std::{
+    net::{Ipv4Addr, SocketAddr},
+    time::Duration,
 };
 
 mod common;
@@ -449,7 +452,15 @@ async fn dump_network_stats() {
 
     let network_stats = app_ws.dump_network_stats().await.unwrap();
 
+    #[cfg(any(
+        feature = "transport-tx5-datachannel-vendored",
+        feature = "transport-tx5-backend-libdatachannel"
+    ))]
     assert_eq!("BackendLibDataChannel", network_stats.backend);
+    #[cfg(feature = "transport-tx5-backend-go-pion")]
+    assert_eq!("BackendGoPion", network_stats.backend);
+    #[cfg(feature = "transport-iroh")]
+    assert_eq!("iroh", network_stats.backend);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -551,8 +562,17 @@ async fn agent_info() {
     .await
     .unwrap();
 
-    let agent_infos = app_ws.agent_info(None).await.unwrap();
-    assert_eq!(agent_infos.len(), 1);
+    let agent_infos = tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let agent_infos = admin_ws.agent_info(None).await.unwrap();
+            if agent_infos.len() == 1 {
+                return agent_infos;
+            }
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+    })
+    .await
+    .expect("agent info didn't make it to the peer store");
 
     let space = AgentInfoSigned::decode(&Ed25519Verifier, agent_infos[0].as_bytes())
         .unwrap()

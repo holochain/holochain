@@ -107,7 +107,7 @@ holochain_wasm_test_utils = { version = "^0.7.0-dev.6", path = "../test_utils/wa
 holochain_test_wasm_common = { version = "^0.7.0-dev.4", path = "../test_utils/wasm_common", optional = true }
 unwrap_to = { version = "0.1.0", optional = true }
 # kitsune2_bootstrap_srv = { version = "0.4.0-dev.1", optional = true }
-kitsune2_bootstrap_srv = { path = "../../../kitsune2/crates/bootstrap_srv", optional = true }
+kitsune2_bootstrap_srv = { path = "../../../kitsune2/crates/bootstrap_srv", default-features = false, optional = true }
 async-once-cell = { version = "0.5", optional = true }
 get_if_addrs = { version = "0.5.3", optional = true }
 schemars = "0.9"
@@ -209,12 +209,12 @@ test_utils = [
   "holochain_zome_types/test_utils",
   "holochain_cascade/test_utils",
   "holochain_conductor_api/test-utils",
-  "holochain_p2p/mock_network",
+  "holochain_p2p/test_utils",
   "matches",
   "holochain_test_wasm_common",
   "holochain_wasm_test_utils",
   "unwrap_to",
-  "kitsune2_bootstrap_srv",
+  "dep:kitsune2_bootstrap_srv",
   "async-once-cell",
   "get_if_addrs",
   "holo_hash/fixturators",
@@ -271,24 +271,25 @@ sqlite = [
 transport-tx5-datachannel-vendored = [
   "holochain_p2p/transport-tx5-datachannel-vendored",
   "holochain_cascade/transport-tx5-datachannel-vendored",
-  "holochain_conductor_api/schema-transport-tx5",
+  "holochain_conductor_api/transport-tx5-datachannel-vendored",
 ]
 
 transport-tx5-backend-libdatachannel = [
   "holochain_p2p/transport-tx5-backend-libdatachannel",
   "holochain_cascade/transport-tx5-backend-libdatachannel",
-  "holochain_conductor_api/schema-transport-tx5",
+  "holochain_conductor_api/transport-tx5-backend-libdatachannel",
 ]
 
 transport-tx5-backend-go-pion = [
   "holochain_p2p/transport-tx5-backend-go-pion",
   "holochain_cascade/transport-tx5-backend-go-pion",
-  "holochain_conductor_api/schema-transport-tx5",
+  "holochain_conductor_api/transport-tx5-backend-go-pion",
 ]
 
 transport-iroh = [
   "holochain_p2p/transport-iroh",
   "holochain_cascade/transport-iroh",
+  "holochain_conductor_api/transport-iroh",
 ]
 
 # Extremely verbose wasm memory read/write logging

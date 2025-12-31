@@ -11,7 +11,7 @@ edition = "2021"
 # reminder - do not use workspace deps
 [dependencies]
 # kitsune2_transport_tx5 = { version = "0.4.0-dev.1", optional = true }
-kitsune2_transport_tx5 = { path = "../../../kitsune2/crates/transport_tx5", optional = true }
+kitsune2_transport_tx5 = { path = "../../../kitsune2/crates/transport_tx5", default-features = false, optional = true }
 kitsune2_transport_iroh = { path = "../../../kitsune2/crates/transport_iroh", optional = true }
 derive_more = { version = "2.0", features = ["from"] }
 holo_hash = { version = "^0.7.0-dev.2", path = "../holo_hash", features = [
@@ -65,13 +65,30 @@ sqlite-encrypted = [
   "holochain_keystore/sqlite-encrypted",
 ]
 schema = ["kitsune2_gossip/schema", "kitsune2_core/schema"]
-schema-transport-tx5 = ["kitsune2_transport_tx5/schema"]
-schema-transport-iroh = ["kitsune2_transport_iroh/schema"]
 sqlite = [
   "holo_hash/sqlite",
   "holochain_types/sqlite",
   "holochain_zome_types/sqlite",
   "holochain_keystore/sqlite",
+]
+transport-tx5-datachannel-vendored = [
+  "dep:kitsune2_transport_tx5",
+  "kitsune2_transport_tx5/datachannel-vendored",
+  "kitsune2_transport_tx5/schema",
+]
+transport-tx5-backend-libdatachannel = [
+  "dep:kitsune2_transport_tx5",
+  "kitsune2_transport_tx5/backend-libdatachannel",
+  "kitsune2_transport_tx5/schema",
+]
+transport-tx5-backend-go-pion = [
+  "dep:kitsune2_transport_tx5",
+  "kitsune2_transport_tx5/backend-go-pion",
+  "kitsune2_transport_tx5/schema",
+]
+transport-iroh = [
+  "dep:kitsune2_transport_iroh",
+  "kitsune2_transport_iroh/schema",
 ]
 
 test-utils = []

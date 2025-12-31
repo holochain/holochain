@@ -50,12 +50,20 @@ kitsune2_test_utils = { path = "../../../kitsune2/crates/test_utils" }
 serde_yaml = "0.9"
 
 [features]
-default = ["lair_signing", "wasmer_sys"]
+default = ["lair_signing", "wasmer_sys", "transport-tx5-datachannel-vendored"]
 
 lair_signing = ["dep:lair_keystore_api"]
 
 wasmer_sys = ["holochain/wasmer_sys"]
 wasmer_wamr = ["holochain/wasmer_wamr"]
+transport-tx5-datachannel-vendored = [
+  "holochain/transport-tx5-datachannel-vendored",
+]
+transport-tx5-backend-libdatachannel = [
+  "holochain/transport-tx5-backend-libdatachannel",
+]
+transport-tx5-backend-go-pion = ["holochain/transport-tx5-backend-go-pion"]
+transport-iroh = ["holochain/transport-iroh"]
 unstable-migration = [
   "holochain_conductor_api/unstable-migration",
   "holochain_types/unstable-migration",
