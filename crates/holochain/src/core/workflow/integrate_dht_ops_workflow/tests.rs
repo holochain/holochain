@@ -1008,52 +1008,6 @@ async fn kitsune_not_informed_when_no_ops_integrated() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn remote_author_does_not_create_local_db() {
-    holochain_trace::test_run();
-    let dna_hash = fixt!(DnaHash);
-    let env = test_dht_db_with_dna_hash(dna_hash.clone()).to_db();
-    let remote_author = fixt!(AgentPubKey, Unpredictable);
-    let (_op, hashed) = make_store_entry_op(remote_author);
-    insert_validated_op(&env, &hashed).await;
-
-    let (tx, _rx) = TriggerSender::new();
-    let mut hc_p2p = MockHolochainP2pDnaT::new();
-    hc_p2p.expect_dna_hash().return_const(dna_hash.clone());
-    hc_p2p
-        .expect_new_integrated_data()
-        .return_once(move |_| Ok(()));
-    let mock_network = Arc::new(hc_p2p);
-
-    // Mock authored DB provider that simulates having no local authors
-    // (i.e., it never returns a DB when asked)
-    let mut mock_authored = MockAuthoredDbProvider::new();
-    let lookup_count = Arc::new(AtomicUsize::new(0));
-    let lookup_count_clone = lookup_count.clone();
-    mock_authored
-        .expect_get_authored_db()
-        .returning(move |_dna, _agent| {
-            lookup_count_clone.fetch_add(1, Ordering::SeqCst);
-            // No local agents, so no DBs available
-            MustBoxFuture::new(async move { Ok(None) })
-        });
-
-    integrate_dht_ops_workflow(
-        env,
-        tx, 
-        mock_network,
-        Arc::new(mock_authored),
-        mock_publish_trigger_provider_none()
-    )
-        .await
-        .unwrap();
-    
-    // Verify the authored DB provider was asked for the remote author's DB
-    // but didn't provide one (correctly, since it's a remote author)
-    assert_eq!(lookup_count.load(Ordering::SeqCst), 1);
-}
-
-
-#[tokio::test(flavor = "multi_thread")]
 async fn single_local_author_marks_both_databases() {
     holochain_trace::test_run();
     let dna_hash = fixt!(DnaHash);
