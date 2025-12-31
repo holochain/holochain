@@ -57,6 +57,8 @@ where
             AND
             DhtOp.withhold_publish IS NULL
             AND
+            DhtOp.when_integrated IS NOT NULL
+            AND
             (DhtOp.last_publish_time IS NULL OR DhtOp.last_publish_time <= :recency_threshold)
             AND
             DhtOp.receipts_complete IS NULL
@@ -78,6 +80,8 @@ where
             DhtOp ON DhtOp.action_hash = Warrant.hash
             WHERE
             Warrant.author = :author
+            AND
+            DhtOp.when_integrated IS NOT NULL
             AND
             DhtOp.last_publish_time IS NULL
 
@@ -115,6 +119,7 @@ pub fn num_still_needing_publish(txn: &Transaction, agent: AgentPubKey) -> Workf
             Action.author = :author
             AND DhtOp.withhold_publish IS NULL
             AND (DhtOp.type != :store_entry OR Action.private_entry = 0)
+            AND DhtOp.when_integrated IS NOT NULL
             AND DhtOp.receipts_complete IS NULL
         )
         +
@@ -124,6 +129,7 @@ pub fn num_still_needing_publish(txn: &Transaction, agent: AgentPubKey) -> Workf
           JOIN DhtOp ON DhtOp.action_hash = Warrant.hash
           WHERE
             Warrant.author = :author
+            AND DhtOp.when_integrated IS NOT NULL
             AND DhtOp.last_publish_time IS NULL
         )
         AS num_ops
@@ -411,6 +417,8 @@ mod tests {
             move |txn| {
                 let hash = query_state.as_hash().clone();
                 insert_op_authored(txn, &query_state).unwrap();
+                // Mark the op as integrated so it can be published
+                set_when_integrated(txn, &hash, Timestamp::now()).unwrap();
                 set_last_publish_time(txn, &hash, last_publish).unwrap();
                 set_receipts_complete(txn, &hash, facts.has_required_receipts).unwrap();
                 if facts.withold_publish {
@@ -537,7 +545,11 @@ mod tests {
             WarrantOp::from(invalid_op_warrant),
         )));
         let warrant_op = invalid_op_warrant.clone();
-        db.test_write(move |txn| insert_op_authored(txn, &invalid_op_warrant).unwrap());
+        db.test_write(move |txn| {
+            insert_op_authored(txn, &invalid_op_warrant).unwrap();
+            // Mark the warrant as integrated so it can be published
+            set_when_integrated(txn, &invalid_op_warrant.as_hash(), Timestamp::now()).unwrap();
+        });
         warrant_op
     }
 }
