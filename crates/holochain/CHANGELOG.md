@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE** Add `GetStrategy` field to `TypedPath` to allow users to specify whether path operations should use network or local-only fetching. The `GetStrategy` enum has been moved from `holochain_zome_types` to `holochain_integrity_types` and re-exported for backward compatibility. Applications can now configure paths to use local-only fetching by calling `.with_strategy(GetStrategy::Local)` on a TypedPath. #5471
 - **BREAKING CHANGE**: Removed `block_agent` and `unblock_agent` functions from the HDK. These functions were behind the `unstable-functions` feature flag and have been removed as blocking should be a system-level behavior triggered by warrants, not application-level logic. The host functions remain as no-ops for backward compatibility with existing apps. Applications using these functions should remove the calls - they will succeed but have no effect. [#5518]
 
 ## 0.7.0-dev.6
@@ -18,7 +19,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **BREAKING CHANGE** Removed the `InstalledAppCommon` function `get_disabled_clone_id`. \#5519
 - Removed the unnecessary `hc_stress_test` helper module, its integration test, and example binaries now that performance testing lives in the `holochain/wind-tunnel` repository.
 - Conductor now overrides the Cell bootstrap and signal urls if specified in the app manifest [5524](https://github.com/holochain/holochain/pull/5524).
-- **BREAKING CHANGE** Add `GetStrategy` field to `TypedPath` to allow users to specify whether path operations should use network or local-only fetching. The `GetStrategy` enum has been moved from `holochain_zome_types` to `holochain_integrity_types` and re-exported for backward compatibility. Applications can now configure paths to use local-only fetching by calling `.with_strategy(GetStrategy::Local)` on a TypedPath. [#5471](https://github.com/holochain/holochain/issues/5471)
 
 ## 0.7.0-dev.5
 
