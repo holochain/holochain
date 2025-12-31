@@ -548,7 +548,7 @@ mod tests {
         db.test_write(move |txn| {
             insert_op_authored(txn, &invalid_op_warrant).unwrap();
             // Mark the warrant as integrated so it can be published
-            set_when_integrated(txn, &invalid_op_warrant.as_hash(), Timestamp::now()).unwrap();
+            set_when_integrated(txn, invalid_op_warrant.as_hash(), Timestamp::now()).unwrap();
         });
         warrant_op
     }

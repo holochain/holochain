@@ -23,8 +23,6 @@ impl AuthoredDbProvider for std::sync::Arc<crate::conductor::conductor::Conducto
         let handle = self.clone();
         let dna_hash = dna_hash.clone();
         let author = author.clone();
-        MustBoxFuture::new(async move {
-            handle.get_authored_db_if_present(&dna_hash, &author)
-        })
+        MustBoxFuture::new(async move { handle.get_authored_db_if_present(&dna_hash, &author) })
     }
 }

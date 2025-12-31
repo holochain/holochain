@@ -66,12 +66,12 @@ pub struct Space {
     pub conductor_db: DbWrite<DbKindConductor>,
 
     /// The authored databases. These are per-agent.
-   /// There is one per unique combination of Dna and AgentPubKey.
-   pub authored_dbs: Arc<parking_lot::Mutex<HashMap<AgentPubKey, DbWrite<DbKindAuthored>>>>,
+    /// There is one per unique combination of Dna and AgentPubKey.
+    pub authored_dbs: Arc<parking_lot::Mutex<HashMap<AgentPubKey, DbWrite<DbKindAuthored>>>>,
 
-   /// The dht databases. These are shared across cells.
-   /// There is one per unique Dna.
-   pub dht_db: DbWrite<DbKindDht>,
+    /// The dht databases. These are shared across cells.
+    /// There is one per unique Dna.
+    pub dht_db: DbWrite<DbKindDht>,
 
     /// The peer meta store database. One per unique Dna.
     pub peer_meta_store_db: DbWrite<DbKindPeerMetaStore>,
@@ -496,12 +496,12 @@ impl Space {
             dht_db,
             peer_meta_store_db,
             countersigning_workspaces: Default::default(),
-           witnessing_workspace,
-           incoming_op_hashes,
-           incoming_ops_batch,
-           conductor_db,
-           root_db_dir: Arc::new(root_db_dir),
-           db_key,
+            witnessing_workspace,
+            incoming_op_hashes,
+            incoming_ops_batch,
+            conductor_db,
+            root_db_dir: Arc::new(root_db_dir),
+            db_key,
         };
         Ok(r)
     }
@@ -574,9 +574,9 @@ impl Space {
     }
 
     /// Gets authored databases for this space, for every author.
-   pub fn get_all_authored_dbs(&self) -> Vec<DbWrite<DbKindAuthored>> {
-       self.authored_dbs.lock().values().cloned().collect()
-   }
+    pub fn get_all_authored_dbs(&self) -> Vec<DbWrite<DbKindAuthored>> {
+        self.authored_dbs.lock().values().cloned().collect()
+    }
 }
 
 /// Get the holochain conductor state

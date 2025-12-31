@@ -15,9 +15,15 @@ use std::sync::Arc;
 mod tests;
 
 #[cfg_attr(
-        feature = "instrument",
-        tracing::instrument(skip(vault, trigger_receipt, network, authored_db_provider, publish_trigger_provider))
-    )]
+    feature = "instrument",
+    tracing::instrument(skip(
+        vault,
+        trigger_receipt,
+        network,
+        authored_db_provider,
+        publish_trigger_provider
+    ))
+)]
 pub async fn integrate_dht_ops_workflow(
     vault: DbWrite<DbKindDht>,
     trigger_receipt: TriggerSender,
@@ -100,16 +106,16 @@ pub async fn integrate_dht_ops_workflow(
     tracing::info!(?changed, %ops_ps, "ops integrated");
     if changed > 0 {
         let dna_hash = network.dna_hash().clone();
-       network.new_integrated_data(stored_ops).await?;
+        network.new_integrated_data(stored_ops).await?;
 
-       update_local_authored_status(
+        update_local_authored_status(
             authored_db_provider.clone(),
             publish_trigger_provider,
-          &dna_hash,
-          time,
-          integrated_pairs,
-       )
-       .await?;
+            &dna_hash,
+            time,
+            integrated_pairs,
+        )
+        .await?;
 
         // Block agents warranted for invalid ops.
         match InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::max()) {
@@ -149,7 +155,6 @@ async fn update_local_authored_status(
     when_integrated: Timestamp,
     integrated_pairs: Vec<(DhtOpHash, Option<AgentPubKey>)>,
 ) -> WorkflowResult<()> {
-    
     let mut by_author: HashMap<AgentPubKey, Vec<DhtOpHash>> = HashMap::new();
 
     for (op_hash, author) in integrated_pairs {
@@ -160,18 +165,17 @@ async fn update_local_authored_status(
         by_author.entry(author).or_default().push(op_hash);
     }
 
-   for (author, op_hashes) in by_author {
+    for (author, op_hashes) in by_author {
         let Some(db) = authored_db_provider
-           .get_authored_db(dna_hash, &author)
-           .await
-           .map_err(WorkflowError::from)?
+            .get_authored_db(dna_hash, &author)
+            .await
+            .map_err(WorkflowError::from)?
         else {
             continue;
         };
 
         db.write_async({
             let op_hashes = op_hashes.clone();
-            let when_integrated = when_integrated;
             move |txn| -> StateMutationResult<()> {
                 for hash in &op_hashes {
                     holochain_state::mutations::set_when_integrated(txn, hash, when_integrated)?;
@@ -182,21 +186,21 @@ async fn update_local_authored_status(
         .await?;
 
         tracing::debug!(
-           ?author,
-           ?dna_hash,
-           ops = ?op_hashes,
-           "Marked integrated ops as authored"
-       );
+            ?author,
+            ?dna_hash,
+            ops = ?op_hashes,
+            "Marked integrated ops as authored"
+        );
 
-       // Log availability of publish trigger for this author
-     let cell_id = CellId::new(dna_hash.clone(), author.clone());
+        // Log availability of publish trigger for this author
+        let cell_id = CellId::new(dna_hash.clone(), author.clone());
         if let Some(trigger) = publish_trigger_provider.get_publish_trigger(&cell_id).await {
-          tracing::debug!(?cell_id, "Triggering publish for integrated authored ops");
-           trigger.trigger(&"integrate_dht_ops_workflow: authored ops marked as integrated");
+            tracing::debug!(?cell_id, "Triggering publish for integrated authored ops");
+            trigger.trigger(&"integrate_dht_ops_workflow: authored ops marked as integrated");
         } else {
-           tracing::trace!(?cell_id, "No publish trigger for this cell");
+            tracing::trace!(?cell_id, "No publish trigger for this cell");
         }
-   }
+    }
 
-   Ok(())
+    Ok(())
 }
