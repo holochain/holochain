@@ -2,17 +2,152 @@ use super::*;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::workflow::authored_db_provider::MockAuthoredDbProvider;
 use ::fixt::prelude::*;
-use holo_hash::fixt::DnaHashFixturator;
+use fixt::prelude::*;
+use holo_hash::fixt::{AgentPubKeyFixturator, DnaHashFixturator};
+use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
 use holochain_p2p::actor::MockHcP2p;
 use holochain_p2p::HolochainP2pDna;
+use holochain_sqlite::db::DbKindAuthored;
+use holochain_sqlite::error::DatabaseResult;
 use holochain_state::mutations;
 use holochain_state::query::link::{GetLinksFilter, GetLinksQuery};
+use holochain_state::test_utils::{
+    test_authored_db_with_id, test_dht_db, test_dht_db_with_dna_hash, TestDb,
+};
+use holochain_types::prelude::{ChainOp, DhtOp, DhtOpHashed, Signature};
+use kitsune2_api::StoredOp;
+use rusqlite::{named_params, OptionalExtension};
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 use std::sync::Arc;
 
 fn mock_authored_db_provider_none() -> Arc<MockAuthoredDbProvider> {
     let mut mock = MockAuthoredDbProvider::new();
     mock.expect_get_authored_db().returning(|_, _, _| Ok(None));
     Arc::new(mock)
+}
+
+fn mock_authored_db_provider_with_db(
+    dna_hash: DnaHash,
+    authors: Vec<(AgentPubKey, Arc<TestDb<DbKindAuthored>>)>,
+) -> (
+    Arc<MockAuthoredDbProvider>,
+    Arc<Mutex<HashMap<AgentPubKey, Arc<TestDb<DbKindAuthored>>>>>,
+    Arc<AtomicUsize>,
+) {
+    let mut mock = MockAuthoredDbProvider::new();
+    let initial: HashMap<_, _> = authors.into_iter().collect();
+    let state = Arc::new(Mutex::new(initial));
+    let lookup_count = Arc::new(AtomicUsize::new(0));
+    let state_clone = Arc::clone(&state);
+    let count_clone = Arc::clone(&lookup_count);
+    mock.expect_get_authored_db()
+        .returning(move |requested_dna, requested_author| {
+            count_clone.fetch_add(1, Ordering::SeqCst);
+            if requested_dna != &dna_hash {
+                return Ok(None);
+            }
+            let guard = state_clone.lock().unwrap();
+            Ok(guard.get(requested_author).map(|db| db.to_db()))
+        });
+    (Arc::new(mock), state, lookup_count)
+}
+
+
+async fn insert_validated_op(env: &DbWrite<DbKindDht>, op: &DhtOpHashed) {
+    env
+        .write_async({
+            let op = op.clone();
+            move |txn| -> DatabaseResult<()> {
+                let hash = op.as_hash().clone();
+                mutations::insert_op_dht(txn, &op, 0, None)?;
+                mutations::set_validation_status(txn, &hash, ValidationStatus::Valid)?;
+                mutations::set_validation_stage(txn, &hash, ValidationStage::AwaitingIntegration)?;
+                Ok(())
+            }
+        })
+        .await
+        .unwrap();
+}
+
+fn mock_authored_db_provider_that_creates_if_missing(
+    dna_hash: DnaHash,
+) -> (
+    Arc<MockAuthoredDbProvider>,
+    Arc<Mutex<HashMap<AgentPubKey, Arc<TestDb<DbKindAuthored>>>>>,
+    Arc<AtomicUsize>,
+) {
+    let mut mock = MockAuthoredDbProvider::new();
+    let state: Arc<Mutex<HashMap<AgentPubKey, Arc<TestDb<DbKindAuthored>>>>> =
+        Arc::new(Mutex::new(HashMap::new()));
+    let creation_count = Arc::new(AtomicUsize::new(0));
+    let state_clone = Arc::clone(&state);
+    let count_clone = Arc::clone(&creation_count);
+    mock.expect_get_authored_db()
+        .returning(move |requested_dna, requested_author| {
+            if requested_dna != &dna_hash {
+                return Ok(None);
+            }
+            let mut guard = state_clone.lock().unwrap();
+            if let Some(db) = guard.get(requested_author) {
+                return Ok(Some(db.to_db()));
+            }
+            count_clone.fetch_add(1, Ordering::SeqCst);
+            let db = Arc::new(test_authored_db_with_id(253));
+            guard.insert(requested_author.clone(), Arc::clone(&db));
+            Ok(Some(db.to_db()))
+        });
+    (Arc::new(mock), state, creation_count)
+}
+
+fn make_store_entry_op(author: AgentPubKey) -> (DhtOp, DhtOpHashed) {
+    let entry = EntryFixturator::new(AppEntry).next().unwrap();
+    let mut action = fixt!(Create);
+    action.author = author;
+    action.entry_hash = EntryHashed::from_content_sync(entry.clone()).into_hash();
+    let op: DhtOp = ChainOp::StoreEntry(fixt!(Signature), action.clone().into(), entry).into();
+    let hashed = DhtOpHashed::from_content_sync(op.clone());
+    (op, hashed)
+}
+
+async fn authored_when_integrated(
+    db: &TestDb<DbKindAuthored>,
+    hash: &DhtOpHash,
+) -> Option<Timestamp> {
+    db.to_db()
+        .read_async({
+            let hash = hash.clone();
+            move |txn| -> DatabaseResult<Option<Timestamp>> {
+                txn.query_row(
+                    "SELECT when_integrated FROM DhtOp WHERE hash = :hash",
+                    named_params! { ":hash": hash },
+                    |row| row.get(0),
+                )
+                .optional()
+            }
+        })
+        .await
+        .unwrap()
+}
+
+async fn dht_when_integrated(
+    db: &DbWrite<DbKindDht>,
+    hash: &DhtOpHash,
+) -> Option<Timestamp> {
+    db.read_async({
+        let hash = hash.clone();
+        move |txn| -> DatabaseResult<Option<Timestamp>> {
+            txn.query_row(
+                "SELECT when_integrated FROM DhtOp WHERE hash = :hash",
+                named_params! { ":hash": hash },
+                |row| row.get(0),
+            )
+            .optional()
+        }
+    })
+    .await
+    .unwrap()
 }
 
 #[derive(Clone)]
@@ -936,6 +1071,136 @@ async fn inform_kitsune_about_integrated_ops() {
             .await
             .unwrap();
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn remote_author_does_not_create_local_db() {
+    holochain_trace::test_run();
+    let dna_hash = fixt!(DnaHash);
+    let env = test_dht_db_with_dna_hash(dna_hash.clone()).to_db();
+    let remote_author = fixt!(AgentPubKey, Unpredictable);
+    let (_op, hashed) = make_store_entry_op(remote_author);
+    insert_validated_op(&env, &hashed).await;
+
+    let (tx, _rx) = TriggerSender::new();
+    let mut hc_p2p = MockHcP2p::new();
+    hc_p2p
+        .expect_new_integrated_data()
+        .return_once(move |_, _| Box::pin(async move { Ok(()) }));
+    let mock_network = Arc::new(HolochainP2pDna::new(Arc::new(hc_p2p), dna_hash.clone(), None));
+
+    let (mock, created, creation_count) =
+        mock_authored_db_provider_that_creates_if_missing(dna_hash);
+    integrate_dht_ops_workflow(env, tx, mock_network, mock)
+        .await
+        .unwrap();
+    assert_eq!(creation_count.load(Ordering::SeqCst), 0);
+    assert!(created.lock().unwrap().is_empty());
+}
+
+
+#[tokio::test(flavor = "multi_thread")]
+async fn single_local_author_marks_both_databases() {
+    holochain_trace::test_run();
+    let dna_hash = fixt!(DnaHash);
+    let author = fixt!(AgentPubKey);
+    let (op, hashed) = make_store_entry_op(author.clone());
+
+    let dht_env = test_dht_db_with_dna_hash(dna_hash.clone()).to_db();
+    insert_validated_op(&dht_env, &hashed).await;
+
+    let authored_db = test_authored_db_with_id(1);
+    let (mock, _, _) = mock_authored_db_provider_with_db(dna_hash.clone(), vec![(author.clone(), authored_db.clone())]);
+
+    let (tx, _rx) = TriggerSender::new();
+    let mut hc_p2p = MockHcP2p::new();
+    hc_p2p
+        .expect_new_integrated_data()
+        .return_once(move |_, ops| {
+            assert_eq!(ops.len(), 1);
+            assert_eq!(ops[0].op_id, op.to_hash().to_located_k2_op_id(&op.dht_basis()));
+            Box::pin(async { Ok(()) })
+        });
+    let mock_network = Arc::new(HolochainP2pDna::new(Arc::new(hc_p2p), dna_hash.clone(), None));
+
+    integrate_dht_ops_workflow(dht_env.clone(), tx, mock_network, mock)
+        .await
+        .unwrap();
+
+    let hash = hashed.as_hash().clone();
+    assert!(dht_when_integrated(&dht_env, &hash).await.is_some());
+    assert!(authored_when_integrated(&authored_db, &hash).await.is_some());
+}
+
+
+#[tokio::test(flavor = "multi_thread")]
+async fn multiple_local_authors_marked_integrated() {
+    holochain_trace::test_run();
+    let dna_hash = fixt!(DnaHash);
+    let author_a = fixt!(AgentPubKey);
+    let author_b = fixt!(AgentPubKey);
+    let (op_a, hashed_a) = make_store_entry_op(author_a.clone());
+    let (op_b, hashed_b) = make_store_entry_op(author_b.clone());
+
+    let dht_env = test_dht_db_with_dna_hash(dna_hash.clone()).to_db();
+    for hashed in [&hashed_a, &hashed_b] {
+        dht_env
+            .write_async({
+                let hashed = hashed.clone();
+                move |txn| -> DatabaseResult<()> {
+                    let hash = hashed.as_hash().clone();
+                    mutations::insert_op_dht(txn, &hashed, 0, None)?;
+                    mutations::set_validation_status(txn, &hash, ValidationStatus::Valid)?;
+                    mutations::set_validation_stage(txn, &hash, ValidationStage::AwaitingIntegration)?;
+                    Ok(())
+                }
+            })
+            .await
+            .unwrap();
+    }
+
+    let authored_a = test_authored_db_with_id(1);
+    let authored_b = test_authored_db_with_id(2);
+    let (mock, _, _) = mock_authored_db_provider_with_db(
+        dna_hash.clone(),
+        vec![
+            (author_a.clone(), authored_a.clone()),
+            (author_b.clone(), authored_b.clone()),
+        ],
+    );
+
+    let (tx, _rx) = TriggerSender::new();
+    let mut hc_p2p = MockHcP2p::new();
+    hc_p2p
+        .expect_new_integrated_data()
+        .return_once(move |_, mut ops| {
+            ops.sort_by(|a, b| a.op_id.cmp(&b.op_id));
+            let mut expected = vec![
+                StoredOp {
+                    op_id: op_a.to_hash().to_located_k2_op_id(&op_a.dht_basis()),
+                    created_at: kitsune2_api::Timestamp::from_micros(op_a.timestamp().as_micros()),
+                },
+                StoredOp {
+                    op_id: op_b.to_hash().to_located_k2_op_id(&op_b.dht_basis()),
+                    created_at: kitsune2_api::Timestamp::from_micros(op_b.timestamp().as_micros()),
+                },
+            ];
+            expected.sort_by(|a, b| a.op_id.cmp(&b.op_id));
+            assert_eq!(ops, expected);
+            Box::pin(async { Ok(()) })
+        });
+    let mock_network = Arc::new(HolochainP2pDna::new(Arc::new(hc_p2p), dna_hash.clone(), None));
+
+    integrate_dht_ops_workflow(dht_env.clone(), tx, mock_network, mock)
+        .await
+        .unwrap();
+
+    let hash_a = hashed_a.as_hash().clone();
+    let hash_b = hashed_b.as_hash().clone();
+    assert!(authored_when_integrated(&authored_a, &hash_a).await.is_some());
+    assert!(authored_when_integrated(&authored_b, &hash_b).await.is_some());
+    assert!(dht_when_integrated(&dht_env, &hash_a).await.is_some());
+    assert!(dht_when_integrated(&dht_env, &hash_b).await.is_some());
 }
 
 #[tokio::test(flavor = "multi_thread")]
