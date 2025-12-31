@@ -3,12 +3,13 @@
 use super::*;
 use crate::conductor::manager::TaskManagerClient;
 use crate::core::workflow::authored_db_provider::AuthoredDbProvider;
+use crate::core::workflow::publish_trigger_provider::PublishTriggerProvider;
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_dht_ops_workflow;
 
 /// Spawn the QueueConsumer for DhtOpIntegration workflow
 #[cfg_attr(
     feature = "instrument",
-    tracing::instrument(skip(env, trigger_receipt, tm, network))
+    tracing::instrument(skip(env, trigger_receipt, tm, network, authored_db_provider, publish_trigger_provider))
 )]
 pub fn spawn_integrate_dht_ops_consumer(
     dna_hash: Arc<DnaHash>,
@@ -17,6 +18,7 @@ pub fn spawn_integrate_dht_ops_consumer(
     trigger_receipt: TriggerSender,
     network: DynHolochainP2pDna,
     authored_db_provider: Arc<dyn AuthoredDbProvider>,
+    publish_trigger_provider: Arc<dyn PublishTriggerProvider>,
 ) -> TriggerSender {
     let (tx, rx) = TriggerSender::new();
 
@@ -31,6 +33,7 @@ pub fn spawn_integrate_dht_ops_consumer(
                 trigger_receipt.clone(),
                 network.clone(),
                 authored_db_provider.clone(),
+                publish_trigger_provider.clone(),
             )
         },
     );

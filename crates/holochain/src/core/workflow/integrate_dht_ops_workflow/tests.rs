@@ -1,6 +1,7 @@
 use super::*;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::workflow::authored_db_provider::MockAuthoredDbProvider;
+use crate::core::workflow::publish_trigger_provider::MockPublishTriggerProvider;
 use ::fixt::prelude::*;
 use fixt::prelude::*;
 use holo_hash::fixt::{AgentPubKeyFixturator, DnaHashFixturator};
@@ -384,7 +385,7 @@ async fn call_workflow(env: DbWrite<DbKindDht>) {
         fixt!(DnaHash),
         None,
     ));
-    integrate_dht_ops_workflow(env, qt, mock_network, mock_authored_db_provider_none())
+    integrate_dht_ops_workflow(env, qt, mock_network, mock_authored_db_provider_none(), mock_publish_trigger_provider_none())
         .await
         .unwrap();
 }
@@ -939,7 +940,7 @@ async fn inform_kitsune_about_integrated_ops() {
             });
         let hc_p2p = Arc::new(hc_p2p);
         let p2p_dna = Arc::new(HolochainP2pDna::new(hc_p2p, dna_hash, None));
-        integrate_dht_ops_workflow(env, tx, p2p_dna, mock_authored_db_provider_none())
+        integrate_dht_ops_workflow(env, tx, p2p_dna, mock_authored_db_provider_none(), mock_publish_trigger_provider_none())
             .await
             .unwrap();
     }
@@ -960,7 +961,7 @@ async fn kitsune_not_informed_when_no_ops_integrated() {
     hc_p2p.expect_new_integrated_data().never();
     let hc_p2p = Arc::new(hc_p2p);
     let p2p_dna = Arc::new(HolochainP2pDna::new(hc_p2p, dna_hash, None));
-    integrate_dht_ops_workflow(env, tx, p2p_dna, mock_authored_db_provider_none())
+    integrate_dht_ops_workflow(env, tx, p2p_dna, mock_authored_db_provider_none(), mock_publish_trigger_provider_none())
         .await
         .unwrap();
 }
@@ -983,7 +984,7 @@ async fn remote_author_does_not_create_local_db() {
 
     let (mock, created, creation_count) =
         mock_authored_db_provider_that_creates_if_missing(dna_hash);
-    integrate_dht_ops_workflow(env, tx, mock_network, mock)
+    integrate_dht_ops_workflow(env, tx, mock_network, mock, mock_publish_trigger_provider_none())
         .await
         .unwrap();
     assert_eq!(creation_count.load(Ordering::SeqCst), 0);
@@ -1015,7 +1016,7 @@ async fn single_local_author_marks_both_databases() {
         });
     let mock_network = Arc::new(HolochainP2pDna::new(Arc::new(hc_p2p), dna_hash.clone(), None));
 
-    integrate_dht_ops_workflow(dht_env.clone(), tx, mock_network, mock)
+    integrate_dht_ops_workflow(dht_env.clone(), tx, mock_network, mock, mock_publish_trigger_provider_none())
         .await
         .unwrap();
 
@@ -1083,7 +1084,7 @@ async fn multiple_local_authors_marked_integrated() {
         });
     let mock_network = Arc::new(HolochainP2pDna::new(Arc::new(hc_p2p), dna_hash.clone(), None));
 
-    integrate_dht_ops_workflow(dht_env.clone(), tx, mock_network, mock)
+    integrate_dht_ops_workflow(dht_env.clone(), tx, mock_network, mock, mock_publish_trigger_provider_none())
         .await
         .unwrap();
 
@@ -1221,4 +1222,10 @@ async fn dht_when_integrated(
     })
     .await
     .unwrap()
+}
+
+fn mock_publish_trigger_provider_none() -> Arc<MockPublishTriggerProvider> {
+    let mut mock = MockPublishTriggerProvider::new();
+    mock.expect_get_publish_trigger().returning(|_| Box::pin(std::future::ready(None)));
+    Arc::new(mock)
 }

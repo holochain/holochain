@@ -4,6 +4,7 @@ use super::*;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use crate::core::workflow::authored_db_provider::AuthoredDbProvider;
+use crate::core::workflow::publish_trigger_provider::PublishTriggerProvider;
 use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_sqlite::sql::sql_cell::*;
@@ -17,13 +18,14 @@ mod tests;
 
 #[cfg_attr(
     feature = "instrument",
-    tracing::instrument(skip(vault, trigger_receipt, network))
+    tracing::instrument(skip(vault, trigger_receipt, network, authored_db_provider, publish_trigger_provider))
 )]
 pub async fn integrate_dht_ops_workflow(
     vault: DbWrite<DbKindDht>,
     trigger_receipt: TriggerSender,
     network: DynHolochainP2pDna,
     authored_db_provider: Arc<dyn AuthoredDbProvider>,
+    publish_trigger_provider: Arc<dyn PublishTriggerProvider>,
 ) -> WorkflowResult<WorkComplete> {
     let start = std::time::Instant::now();
     let time = holochain_zome_types::prelude::Timestamp::now();
@@ -100,15 +102,16 @@ pub async fn integrate_dht_ops_workflow(
     tracing::info!(?changed, %ops_ps, "ops integrated");
     if changed > 0 {
         let dna_hash = network.dna_hash().clone();
-        network.new_integrated_data(stored_ops).await?;
+       network.new_integrated_data(stored_ops).await?;
 
-        update_local_authored_status(
-            authored_db_provider.as_ref(),
-            &dna_hash,
-            time,
-            integrated_pairs,
-        )
-        .await?;
+       update_local_authored_status(
+           authored_db_provider.as_ref(),
+           &dna_hash,
+           time,
+           integrated_pairs,
+            publish_trigger_provider,
+       )
+       .await?;
 
         // Block agents warranted for invalid ops.
         match InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::max()) {
@@ -146,6 +149,7 @@ async fn update_local_authored_status(
     dna_hash: &DnaHash,
     when_integrated: Timestamp,
     integrated_pairs: Vec<(DhtOpHash, Option<AgentPubKey>)>,
+    publish_trigger_provider: Arc<dyn PublishTriggerProvider>,
 ) -> WorkflowResult<()> {
     let mut by_author: HashMap<AgentPubKey, Vec<DhtOpHash>> = HashMap::new();
 
@@ -178,12 +182,25 @@ async fn update_local_authored_status(
         .await?;
 
         tracing::debug!(
-            ?author,
-            ?dna_hash,
-            ops = ?op_hashes,
-            "Marked integrated ops as authored"
-        );
-    }
+           ?author,
+           ?dna_hash,
+           ops = ?op_hashes,
+           "Marked integrated ops as authored"
+       );
 
-    Ok(())
+        // Log availability of publish trigger for this author
+        let cell_id = CellId::new(dna_hash.clone(), author.clone());
+        if let Some(trigger) = publish_trigger_provider.get_publish_trigger(&cell_id).await {
+            tracing::debug!(
+                ?cell_id,
+                "Publish trigger available for integrated authored ops"
+            );
+            // NOTE: We're not actually triggering publish yet, just logging availability
+            // This is as per instructions to "stop before the point of doing the triggering".
+        } else {
+            tracing::trace!(?cell_id, "No publish trigger for this cell");
+        }
+   }
+
+   Ok(())
 }
