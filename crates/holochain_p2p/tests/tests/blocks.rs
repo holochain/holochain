@@ -583,6 +583,9 @@ impl TestActor {
                 "coreBootstrap": {
                     "serverUrl": format!("http://{bootstrap_addr}"),
                 },
+                "irohTransport": {
+                    "relayUrl": format!("http://{bootstrap_addr}"),
+                }
             })),
             request_timeout: Duration::from_secs(3),
             ..Default::default()

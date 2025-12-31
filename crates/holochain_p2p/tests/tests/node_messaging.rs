@@ -1255,7 +1255,7 @@ async fn spawn_test(
                     "relayUrl": format!("http://{bootstrap_addr}"),
                 }
             })),
-            request_timeout: Duration::from_secs(3),
+            request_timeout: Duration::from_secs(10),
             ..Default::default()
         },
         lair_client.clone(),

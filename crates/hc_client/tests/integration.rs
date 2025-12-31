@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use std::process::Command as StdCommand;
+use std::time::Duration;
 
 use anyhow::{ensure, Result};
 use holo_hash::{AgentPubKey, AgentPubKeyB64, DnaHash, DnaHashB64};
@@ -633,6 +634,23 @@ async fn list_agents() -> Result<()> {
     let admin_port_1 = conductors[1]
         .get_arbitrary_admin_websocket_port()
         .expect("admin port 1");
+
+    // Wait for agent infos to be published to the peer store.
+    // Agent infos are not immediately available after app installation - they need
+    // time to be published to the network. Without this wait, the list-agents CLI
+    // command will return empty results.
+    tokio::time::timeout(Duration::from_secs(10), async {
+        loop {
+            let ai_0 = conductors[0].get_agent_infos(None).await.unwrap();
+            let ai_1 = conductors[1].get_agent_infos(None).await.unwrap();
+            if !ai_0.is_empty() && !ai_1.is_empty() {
+                break;
+            }
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        }
+    })
+    .await
+    .expect("agent infos didn't make it to the peer store");
 
     // Test list-agents on conductor 0
     let list_agents_0 = get_hc_client_command()

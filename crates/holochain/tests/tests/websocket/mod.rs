@@ -782,6 +782,8 @@ async fn network_stats() {
         feature = "transport-tx5-backend-libdatachannel"
     ))]
     const EXPECT: &str = "BackendLibDataChannel";
+    #[cfg(feature = "transport-tx5-backend-go-pion")]
+    const EXPECT: &str = "BackendGoPion";
     #[cfg(feature = "transport-iroh")]
     const EXPECT: &str = "iroh";
 

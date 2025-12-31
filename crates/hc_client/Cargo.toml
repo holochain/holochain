@@ -57,7 +57,7 @@ serde_json = "1.0"
 tempfile = "3.0"
 
 [features]
-default = ["wasmer_sys"]
+default = ["wasmer_sys", "holochain?/transport-tx5-datachannel-vendored"]
 
 wasmer_sys = ["holochain_client/wasmer_sys", "holochain?/wasmer_sys"]
 wasmer_wamr = ["holochain_client/wasmer_wamr", "holochain?/wasmer_wamr"]

@@ -292,7 +292,7 @@ impl Default for NetworkConfig {
             signal_url: url2::Url2::parse("wss://dev-test-bootstrap2.holochain.org"),
             // Replace with the Holochain hosted dev relay server
             #[cfg(feature = "transport-iroh")]
-            signal_url: url2::Url2::parse("https://use1-1.relay.n0.iroh-canary.iroh.link."),
+            signal_url: url2::Url2::parse("https://use1-1.relay.n0.iroh-canary.iroh.link./"),
             request_timeout_s: default_request_timeout_s(),
             webrtc_config: None,
             target_arc_factor: default_target_arc_factor(),
@@ -882,6 +882,11 @@ mod tests {
 
     #[test]
     fn network_config_preserves_advanced_overrides() {
+        #[cfg(any(
+            feature = "transport-tx5-datachannel-vendored",
+            feature = "transport-tx5-backend-libdatachannel",
+            feature = "transport-tx5-backend-go-pion"
+        ))]
         let network_config = NetworkConfig {
             advanced: Some(serde_json::json!({
                 "coreBootstrap": {
@@ -897,6 +902,22 @@ mod tests {
             ..Default::default()
         };
 
+        #[cfg(feature = "transport-iroh")]
+        let network_config = NetworkConfig {
+            advanced: Some(serde_json::json!({
+                "coreBootstrap": {
+                    "backoffMinMs": "3500",
+                },
+                "irohTransport": {
+                    "relayAllowPlainText": "true"
+                },
+                "coreSpace": {
+                    "reSignFreqMs": "1000",
+                }
+            })),
+            ..Default::default()
+        };
+
         let k2_config = network_config.to_k2_config().unwrap();
 
         let builder = kitsune2_core::default_test_builder()
@@ -904,6 +925,12 @@ mod tests {
             .unwrap();
         builder.config.set_module_config(&k2_config).unwrap();
         builder.validate_config().unwrap();
+
+        #[cfg(any(
+            feature = "transport-tx5-datachannel-vendored",
+            feature = "transport-tx5-backend-libdatachannel",
+            feature = "transport-tx5-backend-go-pion"
+        ))]
         assert_eq!(
             k2_config,
             serde_json::json!({
@@ -921,11 +948,34 @@ mod tests {
                     "reSignFreqMs": "1000",
                 }
             })
-        )
+        );
+
+        #[cfg(feature = "transport-iroh")]
+        assert_eq!(
+            k2_config,
+            serde_json::json!({
+                "coreBootstrap": {
+                    "serverUrl": "https://dev-test-bootstrap2.holochain.org/",
+                    "backoffMinMs": "3500",
+                },
+                "irohTransport": {
+                    "relayUrl": "https://use1-1.relay.n0.iroh-canary.iroh.link./",
+                    "relayAllowPlainText": "true"
+                },
+                "coreSpace": {
+                    "reSignFreqMs": "1000",
+                }
+            })
+        );
     }
 
     #[test]
     fn network_config_overrides_conflicting_advanced_fields() {
+        #[cfg(any(
+            feature = "transport-tx5-datachannel-vendored",
+            feature = "transport-tx5-backend-libdatachannel",
+            feature = "transport-tx5-backend-go-pion"
+        ))]
         let network_config = NetworkConfig {
             advanced: Some(serde_json::json!({
                 "coreBootstrap": {
@@ -940,6 +990,19 @@ mod tests {
             ..Default::default()
         };
 
+        #[cfg(feature = "transport-iroh")]
+        let network_config = NetworkConfig {
+            advanced: Some(serde_json::json!({
+                "coreBootstrap": {
+                    "serverUrl": "https://something-else.net",
+                },
+                "irohTransport": {
+                    "relayUrl": "https://iroh.nowhere.net",
+                },
+            })),
+            ..Default::default()
+        };
+
         let k2_config = network_config.to_k2_config().unwrap();
 
         let builder = kitsune2_core::default_test_builder()
@@ -948,6 +1011,11 @@ mod tests {
         builder.config.set_module_config(&k2_config).unwrap();
         builder.validate_config().unwrap();
 
+        #[cfg(any(
+            feature = "transport-tx5-datachannel-vendored",
+            feature = "transport-tx5-backend-libdatachannel",
+            feature = "transport-tx5-backend-go-pion"
+        ))]
         assert_eq!(
             k2_config,
             serde_json::json!({
@@ -960,7 +1028,20 @@ mod tests {
                     "webrtcConnectTimeoutS": 22
                 },
             })
-        )
+        );
+
+        #[cfg(feature = "transport-iroh")]
+        assert_eq!(
+            k2_config,
+            serde_json::json!({
+                "coreBootstrap": {
+                    "serverUrl": "https://dev-test-bootstrap2.holochain.org/",
+                },
+                "irohTransport": {
+                    "relayUrl": "https://use1-1.relay.n0.iroh-canary.iroh.link./",
+                },
+            })
+        );
     }
 
     #[test]
@@ -979,6 +1060,11 @@ mod tests {
         builder.config.set_module_config(&k2_config).unwrap();
         builder.validate_config().unwrap();
 
+        #[cfg(any(
+            feature = "transport-tx5-datachannel-vendored",
+            feature = "transport-tx5-backend-libdatachannel",
+            feature = "transport-tx5-backend-go-pion"
+        ))]
         assert_eq!(
             k2_config,
             serde_json::json!({
@@ -997,6 +1083,25 @@ mod tests {
                     "minInitiateIntervalMs": 300,
                 }
             })
-        )
+        );
+
+        #[cfg(feature = "transport-iroh")]
+        assert_eq!(
+            k2_config,
+            serde_json::json!({
+                "coreBootstrap": {
+                    "serverUrl": "https://dev-test-bootstrap2.holochain.org/",
+                },
+                "irohTransport": {
+                    "relayUrl": "https://use1-1.relay.n0.iroh-canary.iroh.link./",
+                },
+                "k2Gossip": {
+                    "roundTimeoutMs": 100,
+                    "initiateIntervalMs": 200,
+                    "initiateJitterMs": 50,
+                    "minInitiateIntervalMs": 300,
+                }
+            })
+        );
     }
 }
