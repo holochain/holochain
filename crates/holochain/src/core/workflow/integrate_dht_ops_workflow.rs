@@ -24,8 +24,8 @@ pub async fn integrate_dht_ops_workflow(
     vault: DbWrite<DbKindDht>,
     trigger_receipt: TriggerSender,
     network: DynHolochainP2pDna,
-    authored_db_provider: Arc<dyn AuthoredDbProvider>,
-    publish_trigger_provider: Arc<dyn PublishTriggerProvider>,
+    authored_db_provider: Arc<crate::conductor::conductor::Conductor>,
+    publish_trigger_provider: Arc<crate::conductor::conductor::Conductor>,
 ) -> WorkflowResult<WorkComplete> {
     let start = std::time::Instant::now();
     let time = holochain_zome_types::prelude::Timestamp::now();
@@ -105,11 +105,11 @@ pub async fn integrate_dht_ops_workflow(
        network.new_integrated_data(stored_ops).await?;
 
        update_local_authored_status(
-           authored_db_provider.as_ref(),
-           &dna_hash,
-           time,
-           integrated_pairs,
-            publish_trigger_provider,
+           authored_db_provider.clone(),
+          &dna_hash,
+          time,
+          integrated_pairs,
+           publish_trigger_provider,
        )
        .await?;
 
@@ -145,11 +145,11 @@ pub async fn integrate_dht_ops_workflow(
 }
 
 async fn update_local_authored_status(
-    authored_db_provider: &dyn AuthoredDbProvider,
+    authored_db_provider: Arc<crate::conductor::conductor::Conductor>,
     dna_hash: &DnaHash,
     when_integrated: Timestamp,
     integrated_pairs: Vec<(DhtOpHash, Option<AgentPubKey>)>,
-    publish_trigger_provider: Arc<dyn PublishTriggerProvider>,
+    publish_trigger_provider: Arc<crate::conductor::conductor::Conductor>,
 ) -> WorkflowResult<()> {
     let mut by_author: HashMap<AgentPubKey, Vec<DhtOpHash>> = HashMap::new();
 
@@ -164,6 +164,7 @@ async fn update_local_authored_status(
     for (author, op_hashes) in by_author {
         let Some(db) = authored_db_provider
             .get_authored_db(dna_hash, &author)
+            .await
             .map_err(WorkflowError::from)?
         else {
             continue;
@@ -189,10 +190,10 @@ async fn update_local_authored_status(
        );
 
         // Log availability of publish trigger for this author
-        let cell_id = CellId::new(dna_hash.clone(), author.clone());
-        if let Some(trigger) = publish_trigger_provider.get_publish_trigger(&cell_id).await {
-            tracing::debug!(
-                ?cell_id,
+       let cell_id = CellId::new(dna_hash.clone(), author.clone());
+        if let Some(_trigger) = publish_trigger_provider.get_publish_trigger(&cell_id).await {
+           tracing::debug!(
+               ?cell_id,
                 "Publish trigger available for integrated authored ops"
             );
             // NOTE: We're not actually triggering publish yet, just logging availability

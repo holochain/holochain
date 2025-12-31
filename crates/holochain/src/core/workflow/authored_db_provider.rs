@@ -1,8 +1,9 @@
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_sqlite::{db::DbKindAuthored, error::DatabaseResult};
 use mockall::automock;
+use must_future::MustBoxFuture;
+use std::sync::Arc;
 
-use crate::conductor::ConductorHandle;
 use crate::prelude::DbWrite;
 
 #[automock]
@@ -11,20 +12,20 @@ pub trait AuthoredDbProvider: Send + Sync + 'static {
         &self,
         dna_hash: &DnaHash,
         author: &AgentPubKey,
-    ) -> DatabaseResult<Option<DbWrite<DbKindAuthored>>>;
+    ) -> MustBoxFuture<'static, DatabaseResult<Option<DbWrite<DbKindAuthored>>>>;
 }
 
-impl AuthoredDbProvider for ConductorHandle {
+impl AuthoredDbProvider for Arc<crate::conductor::conductor::Conductor> {
     fn get_authored_db(
         &self,
         dna_hash: &DnaHash,
         author: &AgentPubKey,
-    ) -> DatabaseResult<Option<DbWrite<DbKindAuthored>>> {
-        let spaces = self.get_spaces();
+    ) -> MustBoxFuture<'static, DatabaseResult<Option<DbWrite<DbKindAuthored>>>> {
+        let handle = self.clone();
         let dna_hash = dna_hash.clone();
         let author = author.clone();
-        tokio::task::block_in_place(move || {
-            spaces.get_authored_db_if_present(&dna_hash, &author)
+        MustBoxFuture::new(async move {
+            handle.get_authored_db_if_present(&dna_hash, &author)
         })
     }
 }
