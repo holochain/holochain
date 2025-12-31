@@ -13,6 +13,9 @@ use holochain_integrity_types::ScopedEntryDefIndex;
 use holochain_integrity_types::ZomeIndex;
 use holochain_serialized_bytes::prelude::*;
 
+// Re-export GetStrategy from holochain_integrity_types for backward compatibility
+pub use holochain_integrity_types::get_strategy::GetStrategy;
+
 mod app_entry_bytes;
 pub use app_entry_bytes::*;
 pub use holochain_integrity_types::entry::*;
@@ -86,22 +89,6 @@ impl From<GetStrategy> for GetOptions {
     fn from(strategy: GetStrategy) -> Self {
         Self { strategy }
     }
-}
-
-/// Set if data should be fetched from the network or only from the local
-/// databases.
-#[derive(PartialEq, Default, Debug, Clone, Copy, Serialize, Deserialize)]
-pub enum GetStrategy {
-    /// Fetch latest metadata from the network,
-    /// and otherwise fall back to locally cached metadata.
-    ///
-    /// If the current agent is an authority for this hash, this call will not
-    /// go to the network.
-    #[default]
-    Network,
-    /// Gets the action/entry and its metadata from local databases only.
-    /// No network call is made.
-    Local,
 }
 
 /// Zome input to create an entry.
