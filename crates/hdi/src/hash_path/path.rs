@@ -426,7 +426,7 @@ fn hash_path_component() {
 #[cfg(test)]
 fn hash_path_typed_path_with_strategy() {
     use holochain_integrity_types::{LinkType, ZomeIndex};
-    
+
     // Test TypedPath creation with default strategy
     let path = Path::from("test.path");
     let link_type = ScopedLinkType {
@@ -435,15 +435,14 @@ fn hash_path_typed_path_with_strategy() {
     };
     let typed_path = TypedPath::new(link_type, path.clone());
     assert_eq!(typed_path.strategy, GetStrategy::Network); // Default should be Network
-    
+
     // Test TypedPath creation with specific strategy
     let typed_path_local = typed_path.clone().with_strategy(GetStrategy::Local);
     assert_eq!(typed_path_local.strategy, GetStrategy::Local);
-    
+
     // Test that parent preserves the strategy
     let path_with_parent = Path::from("test.path.child");
-    let typed_path = TypedPath::new(link_type, path_with_parent)
-        .with_strategy(GetStrategy::Local);
+    let typed_path = TypedPath::new(link_type, path_with_parent).with_strategy(GetStrategy::Local);
     let parent = typed_path.parent().expect("should have parent");
     assert_eq!(parent.strategy, GetStrategy::Local);
 }
