@@ -47,7 +47,6 @@ pub async fn call_zome_workflow<Ribosome>(
     network: DynHolochainP2pDna,
     keystore: MetaLairClient,
     args: CallZomeWorkflowArgs<Ribosome>,
-    trigger_publish_dht_ops: TriggerSender,
     trigger_validate_dht_ops: TriggerSender,
     trigger_integrate_dht_ops: TriggerSender,
     trigger_countersigning: TriggerSender,
@@ -107,8 +106,8 @@ where
                             }
                         }
                         None => {
-                            // Newly created data must be published and integrated.
-                            trigger_publish_dht_ops.trigger(&"call_zome_workflow");
+                            // Newly created data must be integrated.
+                            // Publishing will be triggered after integration completes.
                             trigger_integrate_dht_ops.trigger(&"call_zome_workflow");
                         }
                     }
