@@ -9,20 +9,19 @@ use holochain_sqlite::sql::sql_cell::*;
 use holochain_state::prelude::*;
 use kitsune2_api::StoredOp;
 use std::collections::HashMap;
-use std::sync::Arc;
 
 #[cfg(test)]
 mod tests;
 
 #[cfg_attr(
-    feature = "instrument",
-    tracing::instrument(skip(vault, trigger_receipt, network, conductor))
-)]
+        feature = "instrument",
+        tracing::instrument(skip(vault, trigger_receipt, network, authored_db_provider, publish_trigger_provider))
+    )]
 pub async fn integrate_dht_ops_workflow(
     vault: DbWrite<DbKindDht>,
     trigger_receipt: TriggerSender,
     network: DynHolochainP2pDna,
-    conductor: Arc<crate::conductor::conductor::Conductor>,
+    conductor: crate::conductor::ConductorHandle,
 ) -> WorkflowResult<WorkComplete> {
     let start = std::time::Instant::now();
     let time = holochain_zome_types::prelude::Timestamp::now();
@@ -141,13 +140,11 @@ pub async fn integrate_dht_ops_workflow(
 }
 
 async fn update_local_authored_status(
-    conductor: Arc<crate::conductor::conductor::Conductor>,
+    conductor: crate::conductor::ConductorHandle,
     dna_hash: &DnaHash,
     when_integrated: Timestamp,
     integrated_pairs: Vec<(DhtOpHash, Option<AgentPubKey>)>,
 ) -> WorkflowResult<()> {
-    use crate::core::workflow::authored_db_provider::AuthoredDbProvider;
-    use crate::core::workflow::publish_trigger_provider::PublishTriggerProvider;
     
     let mut by_author: HashMap<AgentPubKey, Vec<DhtOpHash>> = HashMap::new();
 
@@ -161,8 +158,7 @@ async fn update_local_authored_status(
 
    for (author, op_hashes) in by_author {
         let Some(db) = conductor
-           .get_authored_db(dna_hash, &author)
-           .await
+           .get_authored_db_if_present(dna_hash, &author)
            .map_err(WorkflowError::from)?
         else {
             continue;
@@ -188,13 +184,17 @@ async fn update_local_authored_status(
        );
 
        // Log availability of publish trigger for this author
-      let cell_id = CellId::new(dna_hash.clone(), author.clone());
-        if let Some(trigger) = conductor.get_publish_trigger(&cell_id).await {
+     let cell_id = CellId::new(dna_hash.clone(), author.clone());
+        match conductor.cell_by_id(&cell_id).await {
+            Ok(cell) => {
+                let trigger = cell.publish_dht_ops_trigger();
           tracing::debug!(?cell_id, "Triggering publish for integrated authored ops");
-            trigger.trigger(&"integrate_dht_ops_workflow: authored ops marked as integrated");
-       } else {
+           trigger.trigger(&"integrate_dht_ops_workflow: authored ops marked as integrated");
+            }
+            Err(_) => {
            tracing::trace!(?cell_id, "No publish trigger for this cell");
-       }
+            }
+        }
    }
 
    Ok(())

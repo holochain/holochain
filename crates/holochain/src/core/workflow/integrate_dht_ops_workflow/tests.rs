@@ -939,7 +939,7 @@ async fn inform_kitsune_about_integrated_ops() {
             });
         let hc_p2p = Arc::new(hc_p2p);
         let p2p_dna = Arc::new(HolochainP2pDna::new(hc_p2p, dna_hash, None));
-        integrate_dht_ops_workflow(env, tx, p2p_dna, mock_authored_db_provider_none(), mock_publish_trigger_provider_none())
+        integrate_dht_ops_workflow(env, tx, p2p_dna, create_test_conductor())
             .await
             .unwrap();
     }
@@ -983,9 +983,11 @@ async fn remote_author_does_not_create_local_db() {
 
     let (mock, created, creation_count) =
         mock_authored_db_provider_that_creates_if_missing(dna_hash);
+    // For now, use the test conductor since we're not testing authored DB logic yet 
     integrate_dht_ops_workflow(env, tx, mock_network, mock, mock_publish_trigger_provider_none())
         .await
         .unwrap();
+    // Verify no authored DB was created for a remote author
     assert_eq!(creation_count.load(Ordering::SeqCst), 0);
     assert!(created.lock().unwrap().is_empty());
 }
@@ -1002,6 +1004,7 @@ async fn single_local_author_marks_both_databases() {
     insert_validated_op(&dht_env, &hashed).await;
 
     let authored_db = test_authored_db_with_id(1);
+    // For now use basic conductor - will need custom implementation for authored DB test
     let (mock, _, _) = mock_authored_db_provider_with_db(dna_hash.clone(), vec![(author.clone(), authored_db.clone())]);
 
     let (tx, _rx) = TriggerSender::new();
@@ -1209,7 +1212,7 @@ fn mock_authored_db_provider_with_db(
     dna_hash: DnaHash,
     authors: Vec<(AgentPubKey, Arc<TestDb<DbKindAuthored>>)>,
 ) -> (
-    Arc<MockAuthoredDbProvider>,
+    Arc<dyn super::super::authored_db_provider::AuthoredDbProvider>,
     Arc<Mutex<HashMap<AgentPubKey, Arc<TestDb<DbKindAuthored>>>>>,
     Arc<AtomicUsize>,
 ) {
@@ -1255,7 +1258,7 @@ async fn insert_validated_op(env: &DbWrite<DbKindDht>, op: &DhtOpHashed) {
 fn mock_authored_db_provider_that_creates_if_missing(
     dna_hash: DnaHash,
 ) -> (
-    Arc<MockAuthoredDbProvider>,
+    Arc<dyn super::super::authored_db_provider::AuthoredDbProvider>,
     Arc<Mutex<HashMap<AgentPubKey, Arc<TestDb<DbKindAuthored>>>>>,
     Arc<AtomicUsize>,
 ) {
@@ -1344,7 +1347,7 @@ fn mock_publish_trigger_provider_none() -> Arc<MockPublishTriggerProvider> {
 
 fn mock_publish_trigger_provider_with_triggers(
     cells_with_triggers: Vec<CellId>,
-) -> (Arc<MockPublishTriggerProvider>, Arc<AtomicUsize>) {
+) -> (Arc<dyn super::super::publish_trigger_provider::PublishTriggerProvider>, Arc<AtomicUsize>) {
     let mut mock = MockPublishTriggerProvider::new();
     let trigger_count = Arc::new(AtomicUsize::new(0));
     let trigger_count_clone = trigger_count.clone();
