@@ -12,11 +12,21 @@ pub trait GetOptionsExt {
 
 impl GetOptionsExt for GetOptions {
     fn to_network_options(&self) -> NetworkRequestOptions {
-        NetworkRequestOptions {
-            remote_agent_count: self.remote_agent_count().unwrap_or(3),
-            timeout_ms: self.timeout_ms(),
-            as_race: self.as_race().unwrap_or(true),
+        let mut options = NetworkRequestOptions::default();
+        
+        if let Some(count) = self.remote_agent_count() {
+            options.remote_agent_count = count;
         }
+        
+        if let Some(timeout) = self.timeout_ms() {
+            options.timeout_ms = Some(timeout);
+        }
+        
+        if let Some(race) = self.as_race() {
+            options.as_race = race;
+        }
+        
+        options
     }
 }
 
@@ -29,7 +39,7 @@ mod tests {
         let options = GetOptions::network()
             .with_remote_agent_count(7)
             .with_timeout_ms(5000)
-            .with_aggregation();
+            .with_as_race(false);
 
         let network_options = options.to_network_options();
         assert_eq!(network_options.remote_agent_count, 7);
