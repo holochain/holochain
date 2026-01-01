@@ -8,7 +8,7 @@ use holochain_serialized_bytes::prelude::SerializedBytes;
 /// Forms the entry point to all anchors so that agents can navigate down the tree from here.
 pub const ROOT: &[u8; 2] = &[0x00, 0x00];
 
-/// An anchor can only be 1 or 2 levels deep as "type" and "text".
+/// An [`Anchor`] can only be 1 or 2 levels deep as "type" and "text".
 ///
 /// The second level is optional and the Strings use the standard [`TryInto`] for path [`Component`] internally.
 ///
@@ -17,7 +17,7 @@ pub const ROOT: &[u8; 2] = &[0x00, 0x00];
 ///
 /// e.g. `entry_defs![Anchor::entry_def()]`
 ///
-/// The methods implemented on anchor follow the patterns that predate the Path module but `Path::from(&anchor)` is always possible to use the newer APIs.
+/// The methods implemented on anchor follow the patterns that predate the [`Path`] module but `Path::from(&anchor)` is always possible to use the newer APIs.
 #[derive(PartialEq, SerializedBytes, serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct Anchor {
     pub anchor_type: String,
@@ -27,7 +27,7 @@ pub struct Anchor {
 }
 
 impl Anchor {
-    /// Create a new Anchor with the given type and optional text.
+    /// Create a new [`Anchor`] with the given type and optional text.
     pub fn new(anchor_type: String, anchor_text: Option<String>) -> Self {
         Self {
             anchor_type,
@@ -36,7 +36,12 @@ impl Anchor {
         }
     }
 
-    /// Set the GetStrategy for this Anchor.
+    /// Set the [`GetStrategy`] for this [`Anchor`].
+    ///
+    /// Note: The strategy is preserved when using HDK anchor functions or the [`AnchorExt`] trait
+    /// to convert to [`TypedPath`]. However, if you convert an [`Anchor`] to a [`Path`] and then
+    /// to [`TypedPath`] manually, the strategy will be lost since [`Path`] does not carry strategy
+    /// information.
     pub fn with_strategy(mut self, strategy: GetStrategy) -> Self {
         self.strategy = strategy;
         self
@@ -59,46 +64,48 @@ impl From<&Anchor> for Path {
 }
 
 #[cfg(test)]
-#[test]
-fn hash_path_root() {
-    assert_eq!(ROOT, &[0_u8, 0]);
-}
+mod tests {
+    use super::*;
 
-#[cfg(test)]
-#[test]
-fn hash_path_anchor_path() {
-    let examples = [
-        (
-            "foo",
-            None,
-            Path::from(vec![
-                Component::from(vec![0, 0]),
-                Component::from(vec![102, 111, 111]),
-            ]),
-        ),
-        (
-            "foo",
-            Some("bar".to_string()),
-            Path::from(vec![
-                Component::from(vec![0, 0]),
-                Component::from(vec![102, 111, 111]),
-                Component::from(vec![98, 97, 114]),
-            ]),
-        ),
-    ];
-    for (atype, text, path) in examples {
-        assert_eq!(path, (&Anchor::new(atype.to_string(), text)).into(),);
+    #[test]
+    fn hash_path_root() {
+        assert_eq!(ROOT, &[0_u8, 0]);
     }
-}
 
-#[cfg(test)]
-#[test]
-fn test_anchor_with_strategy() {
-    use crate::prelude::GetStrategy;
-    // Test that Anchor can be created with a specific strategy
-    let anchor = Anchor::new("test_type".to_string(), Some("test_text".to_string()));
-    assert_eq!(anchor.strategy, GetStrategy::Network); // default
+    #[test]
+    fn hash_path_anchor_path() {
+        let examples = [
+            (
+                "foo",
+                None,
+                Path::from(vec![
+                    Component::from(vec![0, 0]),
+                    Component::from(vec![102, 111, 111]),
+                ]),
+            ),
+            (
+                "foo",
+                Some("bar".to_string()),
+                Path::from(vec![
+                    Component::from(vec![0, 0]),
+                    Component::from(vec![102, 111, 111]),
+                    Component::from(vec![98, 97, 114]),
+                ]),
+            ),
+        ];
+        for (atype, text, path) in examples {
+            assert_eq!(path, (&Anchor::new(atype.to_string(), text)).into(),);
+        }
+    }
 
-    let anchor_local = anchor.clone().with_strategy(GetStrategy::Local);
-    assert_eq!(anchor_local.strategy, GetStrategy::Local);
+    #[test]
+    fn test_anchor_with_strategy() {
+        use crate::prelude::GetStrategy;
+        // Test that Anchor can be created with a specific strategy
+        let anchor = Anchor::new("test_type".to_string(), Some("test_text".to_string()));
+        assert_eq!(anchor.strategy, GetStrategy::Network); // default
+
+        let anchor_local = anchor.clone().with_strategy(GetStrategy::Local);
+        assert_eq!(anchor_local.strategy, GetStrategy::Local);
+    }
 }

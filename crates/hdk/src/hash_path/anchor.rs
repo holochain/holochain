@@ -6,6 +6,27 @@ use hdi::hash_path::{
 };
 use holochain_zome_types::entry::GetStrategy;
 
+/// Extension trait for [`Anchor`] to convert directly to [`TypedPath`] preserving strategy.
+pub trait AnchorExt {
+    /// Convert this [`Anchor`] to a [`TypedPath`] with the given link type, preserving the anchor's strategy.
+    fn to_typed_path<T, E>(&self, link_type: T) -> Result<TypedPath, WasmError>
+    where
+        ScopedLinkType: TryFrom<T, Error = E>,
+        WasmError: From<E>;
+}
+
+impl AnchorExt for Anchor {
+    fn to_typed_path<T, E>(&self, link_type: T) -> Result<TypedPath, WasmError>
+    where
+        ScopedLinkType: TryFrom<T, Error = E>,
+        WasmError: From<E>,
+    {
+        let path: Path = self.into();
+        let typed_path = path.typed(link_type)?;
+        Ok(typed_path.with_strategy(self.strategy.clone()))
+    }
+}
+
 pub trait TryFromPath {
     fn try_from_path(path: &Path) -> Result<Anchor, WasmError>;
 }
@@ -67,7 +88,7 @@ where
     anchor_with_strategy(link_type, anchor_type, anchor_text, GetStrategy::default())
 }
 
-/// Same as `anchor` but allows specifying the GetStrategy.
+/// Same as [`anchor`] but allows specifying the [`GetStrategy`].
 pub fn anchor_with_strategy<T, E>(
     link_type: T,
     anchor_type: String,
@@ -79,9 +100,7 @@ where
     WasmError: From<E>,
 {
     let anchor = Anchor::new(anchor_type, Some(anchor_text)).with_strategy(strategy);
-    let path: Path = (&anchor).into();
-    let path = path.typed(link_type)?;
-    let path = path.with_strategy(strategy);
+    let path = anchor.to_typed_path(link_type)?;
     path.ensure()?;
     path.path_entry_hash()
 }
@@ -96,7 +115,7 @@ where
     list_anchor_type_addresses_with_strategy(link_type, GetStrategy::default())
 }
 
-/// Same as `list_anchor_type_addresses` but allows specifying the GetStrategy.
+/// Same as [`list_anchor_type_addresses`] but allows specifying the [`GetStrategy`].
 pub fn list_anchor_type_addresses_with_strategy<T, E>(
     link_type: T,
     strategy: GetStrategy,
@@ -129,7 +148,7 @@ where
     list_anchor_addresses_with_strategy(link_type, anchor_type, GetStrategy::default())
 }
 
-/// Same as `list_anchor_addresses` but allows specifying the GetStrategy.
+/// Same as [`list_anchor_addresses`] but allows specifying the [`GetStrategy`].
 pub fn list_anchor_addresses_with_strategy<T, E>(
     link_type: T,
     anchor_type: String,
@@ -140,10 +159,8 @@ where
     WasmError: From<E>,
 {
     let anchor = Anchor::new(anchor_type, None).with_strategy(strategy);
-    let path: Path = (&anchor).into();
-    let links = path
-        .typed(link_type)?
-        .with_strategy(strategy)
+    let links = anchor
+        .to_typed_path(link_type)?
         .children()?
         .into_iter()
         .map(|link| link.target)
@@ -163,7 +180,7 @@ where
     list_anchor_tags_with_strategy(link_type, anchor_type, GetStrategy::default())
 }
 
-/// Same as `list_anchor_tags` but allows specifying the GetStrategy.
+/// Same as [`list_anchor_tags`] but allows specifying the [`GetStrategy`].
 pub fn list_anchor_tags_with_strategy<T, E>(
     link_type: T,
     anchor_type: String,
@@ -174,9 +191,7 @@ where
     WasmError: From<E>,
 {
     let anchor = Anchor::new(anchor_type, None).with_strategy(strategy);
-    let path: Path = (&anchor).into();
-    let path = path.typed(link_type)?;
-    let path = path.with_strategy(strategy);
+    let path = anchor.to_typed_path(link_type)?;
     path.ensure()?;
     let hopefully_anchor_tags: Result<Vec<String>, WasmError> = path
         .children_paths()?
@@ -210,4 +225,35 @@ fn hash_path_anchor_from_path() {
         Anchor::try_from_path(&path).unwrap(),
         Anchor::new("foo".into(), Some("bar".into())),
     );
+}
+
+#[cfg(test)]
+#[test]
+fn test_anchor_ext_preserves_strategy() {
+    // Mock link type for testing
+    #[derive(Clone, Copy, Debug)]
+    struct TestLinkType;
+
+    impl TryFrom<TestLinkType> for ScopedLinkType {
+        type Error = WasmError;
+        
+        fn try_from(_: TestLinkType) -> Result<Self, Self::Error> {
+            Ok(ScopedLinkType {
+                zome_index: 0.into(),
+                zome_type: 0.into(),
+            })
+        }
+    }
+
+    // Create an anchor with Local strategy
+    let anchor = Anchor::new(
+        "test_type".to_string(),
+        Some("test_text".to_string())
+    ).with_strategy(GetStrategy::Local);
+
+    // Convert to TypedPath using the extension trait
+    let typed_path = anchor.to_typed_path(TestLinkType).expect("Should convert to TypedPath");
+    
+    // Verify the strategy was preserved
+    assert_eq!(typed_path.strategy, GetStrategy::Local);
 }
