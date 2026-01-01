@@ -23,7 +23,7 @@ impl AnchorExt for Anchor {
     {
         let path: Path = self.into();
         let typed_path = path.typed(link_type)?;
-        Ok(typed_path.with_strategy(self.strategy.clone()))
+        Ok(typed_path.with_strategy(self.strategy))
     }
 }
 
