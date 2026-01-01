@@ -65,7 +65,11 @@ impl GetLinksInputBuilder {
 
     /// Fetch links from network or local only.
     pub fn get_options(mut self, get_strategy: GetStrategy) -> Self {
-        self.0.get_options.strategy = get_strategy;
+        // Replace the entire GetOptions to maintain correct defaults
+        self.0.get_options = match get_strategy {
+            GetStrategy::Local => GetOptions::local(),
+            GetStrategy::Network => GetOptions::network(),
+        };
         self
     }
 

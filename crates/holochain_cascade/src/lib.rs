@@ -61,9 +61,12 @@ pub mod error;
 
 mod agent_activity;
 mod metrics;
+mod get_options_ext;
 
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
+
+pub use get_options_ext::GetOptionsExt;
 
 /// Get an item from an option
 /// or return early from the function
@@ -684,7 +687,7 @@ impl CascadeImpl {
             return Ok(Some(record));
         }
 
-        if options.strategy == GetStrategy::Network {
+        if options.strategy() == GetStrategy::Network {
             // If we are allowed to get the data from the network then try to retrieve the missing data.
             self.get_latest_with_query(
                 query,
@@ -713,7 +716,7 @@ impl CascadeImpl {
         O: Send + 'static,
     {
         // If we are allowed to get the data from the network then try to retrieve the latest data.
-        if options.get_options.strategy == GetStrategy::Network {
+        if options.get_options.strategy() == GetStrategy::Network {
             // If we are not in the process of authoring this hash or its
             // authority we need a network call.
             let authoring = self.am_i_authoring(&get_target)?;
@@ -822,7 +825,7 @@ impl CascadeImpl {
     ) -> CascadeResult<Vec<Link>> {
         // only fetch links from the network if I am not an authority and
         // GetStrategy is Network
-        if let GetStrategy::Network = options.get_options.strategy {
+        if let GetStrategy::Network = options.get_options.strategy() {
             let authority = self.am_i_an_authority(key.base.clone()).await?;
             if !authority {
                 match self.fetch_links(key.clone(), options).await {
@@ -862,7 +865,7 @@ impl CascadeImpl {
     ) -> CascadeResult<Vec<(SignedActionHashed, Vec<SignedActionHashed>)>> {
         // only fetch link details from network if i am not an authority and
         // GetStrategy is Network
-        if let GetStrategy::Network = options.get_options.strategy {
+        if let GetStrategy::Network = options.get_options.strategy() {
             let authority = self.am_i_an_authority(key.base.clone()).await?;
             if !authority {
                 match self.fetch_links(key.clone(), options).await {
@@ -1038,7 +1041,7 @@ impl CascadeImpl {
         // regardless of authority status.
         let authority = self.am_i_an_authority(agent.clone().into()).await?;
 
-        let merged_response = if authority && options.get_options.strategy == GetStrategy::Local {
+        let merged_response = if authority && options.get_options.strategy() == GetStrategy::Local {
             match self.dht.clone() {
                 Some(vault) => {
                     authority::handle_get_agent_activity(
