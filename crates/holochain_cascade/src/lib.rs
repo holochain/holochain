@@ -24,6 +24,7 @@
 #![warn(missing_docs)]
 
 use crate::error::CascadeError;
+use crate::get_options_ext::GetOptionsExt;
 use error::CascadeResult;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
@@ -65,8 +66,6 @@ mod get_options_ext;
 
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
-
-pub use get_options_ext::GetOptionsExt;
 
 /// Get an item from an option
 /// or return early from the function
@@ -693,7 +692,7 @@ impl CascadeImpl {
                 query,
                 get_target,
                 CascadeOptions {
-                    network_request_options: NetworkRequestOptions::default(),
+                    network_request_options: options.to_network_options(),
                     get_options: options,
                 },
             )
@@ -796,7 +795,7 @@ impl CascadeImpl {
                 .get_entry_details(
                     hash,
                     CascadeOptions {
-                        network_request_options: NetworkRequestOptions::default(),
+                        network_request_options: options.to_network_options(),
                         get_options: options,
                     },
                 )
@@ -806,7 +805,7 @@ impl CascadeImpl {
                 .get_record_details(
                     hash,
                     CascadeOptions {
-                        network_request_options: NetworkRequestOptions::default(),
+                        network_request_options: options.to_network_options(),
                         get_options: options,
                     },
                 )
