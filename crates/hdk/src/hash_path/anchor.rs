@@ -4,6 +4,7 @@ use hdi::hash_path::{
     anchor::{Anchor, ROOT},
     path::{Component, Path},
 };
+use holochain_zome_types::entry::GetStrategy;
 
 pub trait TryFromPath {
     fn try_from_path(path: &Path) -> Result<Anchor, WasmError>;
@@ -17,25 +18,21 @@ impl TryFromPath for Anchor {
         let components: Vec<Component> = path.as_ref().to_owned();
         if components.len() == 2 || components.len() == 3 {
             if components[0] == Component::new(ROOT.to_vec()) {
-                Ok(Anchor {
-                    anchor_type: std::str::from_utf8(components[1].as_ref())
+                Ok(Anchor::new(
+                    std::str::from_utf8(components[1].as_ref())
                         .map_err(|e| wasm_error!(SerializedBytesError::Deserialize(e.to_string())))?
                         .to_string(),
-                    anchor_text: {
-                        match components.get(2) {
-                            Some(component) => Some(
-                                std::str::from_utf8(component.as_ref())
-                                    .map_err(|e| {
-                                        wasm_error!(SerializedBytesError::Deserialize(
-                                            e.to_string()
-                                        ))
-                                    })?
-                                    .to_string(),
-                            ),
-                            None => None,
-                        }
+                    match components.get(2) {
+                        Some(component) => Some(
+                            std::str::from_utf8(component.as_ref())
+                                .map_err(|e| {
+                                    wasm_error!(SerializedBytesError::Deserialize(e.to_string()))
+                                })?
+                                .to_string(),
+                        ),
+                        None => None,
                     },
-                })
+                ))
             } else {
                 Err(wasm_error!(WasmErrorInner::Serialize(
                     SerializedBytesError::Deserialize(format!(
@@ -67,12 +64,24 @@ where
     ScopedLinkType: TryFrom<T, Error = E>,
     WasmError: From<E>,
 {
-    let path: Path = (&Anchor {
-        anchor_type,
-        anchor_text: Some(anchor_text),
-    })
-        .into();
+    anchor_with_strategy(link_type, anchor_type, anchor_text, GetStrategy::default())
+}
+
+/// Same as `anchor` but allows specifying the GetStrategy.
+pub fn anchor_with_strategy<T, E>(
+    link_type: T,
+    anchor_type: String,
+    anchor_text: String,
+    strategy: GetStrategy,
+) -> ExternResult<holo_hash::EntryHash>
+where
+    ScopedLinkType: TryFrom<T, Error = E>,
+    WasmError: From<E>,
+{
+    let anchor = Anchor::new(anchor_type, Some(anchor_text)).with_strategy(strategy);
+    let path: Path = (&anchor).into();
     let path = path.typed(link_type)?;
+    let path = path.with_strategy(strategy);
     path.ensure()?;
     path.path_entry_hash()
 }
@@ -84,8 +93,21 @@ where
     ScopedLinkType: TryFrom<T, Error = E>,
     WasmError: From<E>,
 {
+    list_anchor_type_addresses_with_strategy(link_type, GetStrategy::default())
+}
+
+/// Same as `list_anchor_type_addresses` but allows specifying the GetStrategy.
+pub fn list_anchor_type_addresses_with_strategy<T, E>(
+    link_type: T,
+    strategy: GetStrategy,
+) -> ExternResult<Vec<AnyLinkableHash>>
+where
+    ScopedLinkType: TryFrom<T, Error = E>,
+    WasmError: From<E>,
+{
     let links = Path::from(vec![Component::new(ROOT.to_vec())])
         .typed(link_type)?
+        .with_strategy(strategy)
         .children()?
         .into_iter()
         .map(|link| link.target)
@@ -104,13 +126,24 @@ where
     ScopedLinkType: TryFrom<T, Error = E>,
     WasmError: From<E>,
 {
-    let path: Path = (&Anchor {
-        anchor_type,
-        anchor_text: None,
-    })
-        .into();
+    list_anchor_addresses_with_strategy(link_type, anchor_type, GetStrategy::default())
+}
+
+/// Same as `list_anchor_addresses` but allows specifying the GetStrategy.
+pub fn list_anchor_addresses_with_strategy<T, E>(
+    link_type: T,
+    anchor_type: String,
+    strategy: GetStrategy,
+) -> ExternResult<Vec<AnyLinkableHash>>
+where
+    ScopedLinkType: TryFrom<T, Error = E>,
+    WasmError: From<E>,
+{
+    let anchor = Anchor::new(anchor_type, None).with_strategy(strategy);
+    let path: Path = (&anchor).into();
     let links = path
         .typed(link_type)?
+        .with_strategy(strategy)
         .children()?
         .into_iter()
         .map(|link| link.target)
@@ -127,12 +160,23 @@ where
     ScopedLinkType: TryFrom<T, Error = E>,
     WasmError: From<E>,
 {
-    let path: Path = (&Anchor {
-        anchor_type,
-        anchor_text: None,
-    })
-        .into();
+    list_anchor_tags_with_strategy(link_type, anchor_type, GetStrategy::default())
+}
+
+/// Same as `list_anchor_tags` but allows specifying the GetStrategy.
+pub fn list_anchor_tags_with_strategy<T, E>(
+    link_type: T,
+    anchor_type: String,
+    strategy: GetStrategy,
+) -> ExternResult<Vec<String>>
+where
+    ScopedLinkType: TryFrom<T, Error = E>,
+    WasmError: From<E>,
+{
+    let anchor = Anchor::new(anchor_type, None).with_strategy(strategy);
+    let path: Path = (&anchor).into();
     let path = path.typed(link_type)?;
+    let path = path.with_strategy(strategy);
     path.ensure()?;
     let hopefully_anchor_tags: Result<Vec<String>, WasmError> = path
         .children_paths()?
@@ -164,9 +208,6 @@ fn hash_path_anchor_from_path() {
 
     assert_eq!(
         Anchor::try_from_path(&path).unwrap(),
-        Anchor {
-            anchor_type: "foo".into(),
-            anchor_text: Some("bar".into()),
-        },
+        Anchor::new("foo".into(), Some("bar".into())),
     );
 }

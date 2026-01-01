@@ -1,5 +1,6 @@
 use crate::hash_path::path::Component;
 use crate::hash_path::path::Path;
+use holochain_integrity_types::prelude::GetStrategy;
 use holochain_serialized_bytes::prelude::SerializedBytes;
 
 /// This is the root of the [`Path`] tree.
@@ -21,6 +22,25 @@ pub const ROOT: &[u8; 2] = &[0x00, 0x00];
 pub struct Anchor {
     pub anchor_type: String,
     pub anchor_text: Option<String>,
+    #[serde(default)]
+    pub strategy: GetStrategy,
+}
+
+impl Anchor {
+    /// Create a new Anchor with the given type and optional text.
+    pub fn new(anchor_type: String, anchor_text: Option<String>) -> Self {
+        Self {
+            anchor_type,
+            anchor_text,
+            strategy: GetStrategy::default(),
+        }
+    }
+
+    /// Set the GetStrategy for this Anchor.
+    pub fn with_strategy(mut self, strategy: GetStrategy) -> Self {
+        self.strategy = strategy;
+        self
+    }
 }
 
 /// Anchors are just a special case of path, so we can move from anchor to path losslessly.
@@ -67,13 +87,18 @@ fn hash_path_anchor_path() {
         ),
     ];
     for (atype, text, path) in examples {
-        assert_eq!(
-            path,
-            (&Anchor {
-                anchor_type: atype.to_string(),
-                anchor_text: text,
-            })
-                .into(),
-        );
+        assert_eq!(path, (&Anchor::new(atype.to_string(), text)).into(),);
     }
+}
+
+#[cfg(test)]
+#[test]
+fn test_anchor_with_strategy() {
+    use crate::prelude::GetStrategy;
+    // Test that Anchor can be created with a specific strategy
+    let anchor = Anchor::new("test_type".to_string(), Some("test_text".to_string()));
+    assert_eq!(anchor.strategy, GetStrategy::Network); // default
+
+    let anchor_local = anchor.clone().with_strategy(GetStrategy::Local);
+    assert_eq!(anchor_local.strategy, GetStrategy::Local);
 }
