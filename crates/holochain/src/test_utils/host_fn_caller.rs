@@ -484,7 +484,7 @@ impl HostFnCaller {
         request: ActivityRequest,
     ) -> AgentActivity {
         let (ribosome, call_context, _) = self.unpack().await;
-        let input = GetAgentActivityInput::new(agent.clone(), query.clone(), request);
+        let input = GetAgentActivityInput::new(agent.clone(), query.clone(), request, GetOptions::default());
         host_fn::get_agent_activity::get_agent_activity(ribosome, call_context, input).unwrap()
     }
 

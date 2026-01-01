@@ -3,7 +3,8 @@ use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_cascade::CascadeImpl;
-use holochain_p2p::actor::GetActivityOptions;
+use holochain_cascade::get_options_ext::GetOptionsExt;
+use holochain_p2p::actor::{GetActivityOptions, NetworkRequestOptions};
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
@@ -23,18 +24,30 @@ pub fn get_agent_activity(
                 agent_pubkey,
                 chain_query_filter,
                 activity_request,
+                get_options,
             } = input;
+            // Use the network options from GetOptions if provided
+            let network_req_options = if get_options.remote_agent_count().is_some()
+                || get_options.timeout_ms().is_some()
+                || get_options.as_race().is_some()
+            {
+                get_options.to_network_options()
+            } else {
+                NetworkRequestOptions::default()
+            };
             let options = match activity_request {
                 ActivityRequest::Status => GetActivityOptions {
                     include_valid_activity: false,
                     include_rejected_activity: false,
-                    get_options: GetOptions::local(),
+                    get_options,
+                    network_req_options,
                     ..Default::default()
                 },
                 ActivityRequest::Full => GetActivityOptions {
                     include_valid_activity: true,
                     include_rejected_activity: true,
-                    get_options: GetOptions::local(),
+                    get_options,
+                    network_req_options,
                     ..Default::default()
                 },
             };

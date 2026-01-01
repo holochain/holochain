@@ -5,6 +5,7 @@ pub struct GetAgentActivityInput {
     pub agent_pubkey: holo_hash::AgentPubKey,
     pub chain_query_filter: crate::query::ChainQueryFilter,
     pub activity_request: crate::query::ActivityRequest,
+    pub get_options: crate::entry::GetOptions,
 }
 
 impl GetAgentActivityInput {
@@ -13,11 +14,13 @@ impl GetAgentActivityInput {
         agent_pubkey: holo_hash::AgentPubKey,
         chain_query_filter: crate::query::ChainQueryFilter,
         activity_request: crate::query::ActivityRequest,
+        get_options: crate::entry::GetOptions,
     ) -> Self {
         Self {
             agent_pubkey,
             chain_query_filter,
             activity_request,
+            get_options,
         }
     }
 }

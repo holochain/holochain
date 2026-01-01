@@ -62,7 +62,7 @@ pub mod error;
 
 mod agent_activity;
 mod metrics;
-mod get_options_ext;
+pub mod get_options_ext;
 
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
