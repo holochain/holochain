@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE** Add `GetStrategy` field to `TypedPath` to allow users to specify whether path operations should use network or local-only fetching. The `GetStrategy` enum has been moved from `holochain_zome_types` to `holochain_integrity_types` and re-exported for backward compatibility. Applications can now configure paths to use local-only fetching by calling `.with_strategy(GetStrategy::Local)` on a TypedPath. #5471
 - Locally authored data is now only published after it has been integrated. This resolves a race condition where remote conductors might fail to fetch published ops by id because they haven't been integrated locally yet. #5545
 - **BREAKING CHANGE**: Remove features for tx5 transport variants `datachannel-vendored` and `backend-libdatachannel`. The only supported tx5 transport is `backend-go-pion` now.
 - **BREAKING CHANGE**: Default to iroh transport for all binaries.
