@@ -62,7 +62,8 @@ pub struct GetOptions {
     /// Only used when strategy is [`GetStrategy::Network`].
     ///
     /// `None` means use the conductor's default.
-    /// A maximum of 10 is enforced when setting this value.
+    ///
+    /// A maximum of 5 is enforced for this value.
     remote_agent_count: Option<u8>,
 
     /// Timeout for network requests in milliseconds.
@@ -72,12 +73,15 @@ pub struct GetOptions {
     /// None means use conductor settings.
     timeout_ms: Option<u64>,
 
-    /// Whether to race (first response wins) mode is enabled.
+    /// Whether race mode is enabled.
     ///
-    /// Only used when strategy is [`GetStrategy::Network`].
+    /// Performing a race means that multiple requests are made in parallel and the first result is used.
+    ///
+    /// Only used when strategy is [`GetStrategy::Network`] and the remote agent count is >= 2.
     ///
     /// Note: Setting this to false is not yet implemented.
-    /// None means use the conductor's default (race mode).
+    ///
+    /// None means use the network's default (race).
     as_race: Option<bool>,
 }
 
