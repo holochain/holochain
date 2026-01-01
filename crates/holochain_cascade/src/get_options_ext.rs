@@ -13,19 +13,19 @@ pub trait GetOptionsExt {
 impl GetOptionsExt for GetOptions {
     fn to_network_options(&self) -> NetworkRequestOptions {
         let mut options = NetworkRequestOptions::default();
-        
+
         if let Some(count) = self.remote_agent_count() {
             options.remote_agent_count = count;
         }
-        
+
         if let Some(timeout) = self.timeout_ms() {
             options.timeout_ms = Some(timeout);
         }
-        
+
         if let Some(race) = self.as_race() {
             options.as_race = race;
         }
-        
+
         options
     }
 }
