@@ -1861,7 +1861,10 @@ mod app_status_impls {
                     let agent_pubkey = cell_id.agent_pubkey().clone();
                     let holochain_p2p_dna = cell.holochain_p2p_dna().clone();
                     async move {
-                        if let Err(e) = holochain_p2p_dna.join(agent_pubkey, None, config_override).await {
+                        if let Err(e) = holochain_p2p_dna
+                            .join(agent_pubkey, None, config_override)
+                            .await
+                        {
                             tracing::error!(?e, ?cell_id, "Network join failed.");
                         }
                     }
