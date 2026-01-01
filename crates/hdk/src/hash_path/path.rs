@@ -20,7 +20,7 @@ impl HdkPathExt for TypedPath {
                 self.path_entry_hash()?,
                 LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),
             ),
-            GetStrategy::default(),
+            self.strategy,
         )?;
 
         // Only need one of each hash to build the tree.
@@ -73,7 +73,7 @@ impl HdkPathExt for TypedPath {
                 LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),
             )
             .tag_prefix(holochain_zome_types::link::LinkTag::new([])),
-            GetStrategy::default(),
+            self.strategy,
         )
     }
 
@@ -153,7 +153,7 @@ impl HdkPathExt for TypedPath {
                     ),
                 )
                 .tag_prefix(self.make_tag()?),
-                GetStrategy::default(),
+                self.strategy,
             )?
             .iter()
             .any(|Link { target, .. }| *target == this_paths_hash);
@@ -172,7 +172,7 @@ impl HdkPathExt for TypedPath {
                     ),
                 )
                 .tag_prefix(self.make_tag()?),
-                GetStrategy::default(),
+                self.strategy,
             )?
             .iter()
             .any(|Link { target, .. }| *target == this_paths_hash);
