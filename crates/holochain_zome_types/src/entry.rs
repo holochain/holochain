@@ -61,7 +61,8 @@ pub struct GetOptions {
     ///
     /// Only used when strategy is [`GetStrategy::Network`].
     ///
-    /// `None` means use the default of 3, and a maximum of 5 is enforced.
+    /// `None` means use the conductor's default.
+    /// A maximum of 10 is enforced when setting this value.
     remote_agent_count: Option<u8>,
 
     /// Timeout for network requests in milliseconds.
@@ -71,11 +72,12 @@ pub struct GetOptions {
     /// None means use conductor settings.
     timeout_ms: Option<u64>,
 
-    /// Whether to race (first response) or aggregate responses.
+    /// Whether to race (first response wins) mode is enabled.
     ///
     /// Only used when strategy is [`GetStrategy::Network`].
     ///
-    /// None means use the default of `true`.
+    /// Note: Setting this to false is not yet implemented.
+    /// None means use the conductor's default (race mode).
     as_race: Option<bool>,
 }
 
@@ -98,6 +100,12 @@ impl GetOptions {
     /// Get whether to race or aggregate responses.
     pub fn as_race(&self) -> Option<bool> {
         self.as_race
+    }
+
+    /// Set the strategy while preserving other options.
+    pub fn with_strategy(mut self, strategy: GetStrategy) -> Self {
+        self.strategy = strategy;
+        self
     }
 
     /// Fetch latest metadata from the network,
@@ -139,15 +147,9 @@ impl GetOptions {
     }
 
     /// Set whether to race (true) or aggregate (false) responses.
-    /// Note: Aggregation mode is not yet implemented.
+    /// Note: Setting as_race to false is not yet implemented.
     pub fn with_as_race(mut self, race: bool) -> Self {
         self.as_race = Some(race);
-        self
-    }
-
-    /// Convenience method to set aggregation mode.
-    pub fn with_aggregation(mut self) -> Self {
-        self.as_race = Some(false);
         self
     }
 }
