@@ -236,7 +236,7 @@ fn test_anchor_ext_preserves_strategy() {
 
     impl TryFrom<TestLinkType> for ScopedLinkType {
         type Error = WasmError;
-        
+
         fn try_from(_: TestLinkType) -> Result<Self, Self::Error> {
             Ok(ScopedLinkType {
                 zome_index: 0.into(),
@@ -246,14 +246,14 @@ fn test_anchor_ext_preserves_strategy() {
     }
 
     // Create an anchor with Local strategy
-    let anchor = Anchor::new(
-        "test_type".to_string(),
-        Some("test_text".to_string())
-    ).with_strategy(GetStrategy::Local);
+    let anchor = Anchor::new("test_type".to_string(), Some("test_text".to_string()))
+        .with_strategy(GetStrategy::Local);
 
     // Convert to TypedPath using the extension trait
-    let typed_path = anchor.to_typed_path(TestLinkType).expect("Should convert to TypedPath");
-    
+    let typed_path = anchor
+        .to_typed_path(TestLinkType)
+        .expect("Should convert to TypedPath");
+
     // Verify the strategy was preserved
     assert_eq!(typed_path.strategy, GetStrategy::Local);
 }
