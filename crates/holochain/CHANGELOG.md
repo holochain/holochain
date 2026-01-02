@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix: Limit concurrency when starting many cells at once to prevent resource exhaustion. Starting cells is now limited to 5 concurrent cell creation operations and 10 concurrent network join operations. This improves startup reliability for conductors managing large numbers of cells.
 - Replace the `do_callback!` private macro with a `do_callback` generic function. This change should not affect the user as the macro, now function, is only used internally in the `real_ribosome` module. #5529
 - **BREAKING CHANGE** Add `GetStrategy` field to `TypedPath` to allow users to specify whether path operations should use network or local-only fetching. The `GetStrategy` enum has been moved from `holochain_zome_types` to `holochain_integrity_types` and re-exported for backward compatibility. Applications can now configure paths to use local-only fetching by calling `.with_strategy(GetStrategy::Local)` on a TypedPath. #5471
 - Fix: `EnableCloneCell` now works consistently when called with either `CloneId` or `DnaHash` on already-enabled clones. Previously, using a `DnaHash` would fail with `CloneCellNotFound` while using a `CloneId` would succeed. #5519
