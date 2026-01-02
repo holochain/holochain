@@ -44,13 +44,13 @@ mod tests {
         let network_options = options.to_network_options();
         assert_eq!(network_options.remote_agent_count, 7);
         assert_eq!(network_options.timeout_ms, Some(5000));
-        assert_eq!(network_options.as_race, false);
+        assert!(!network_options.as_race);
 
         // Test defaults
         let options = GetOptions::network();
         let network_options = options.to_network_options();
         assert_eq!(network_options.remote_agent_count, 3);
         assert_eq!(network_options.timeout_ms, None);
-        assert_eq!(network_options.as_race, true);
+        assert!(network_options.as_race);
     }
 }
