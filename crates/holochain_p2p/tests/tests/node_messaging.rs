@@ -1253,6 +1253,7 @@ async fn spawn_test(
                 },
                 "irohTransport": {
                     "relayUrl": format!("http://{bootstrap_addr}"),
+                    "relayAllowPlainText": true,
                 }
             })),
             request_timeout: Duration::from_secs(10),

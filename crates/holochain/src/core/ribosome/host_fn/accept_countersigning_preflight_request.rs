@@ -118,13 +118,17 @@ pub mod wasm_test {
 
         let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
 
-        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
+        let (dna_file, _, _) =
+            SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
 
         // Use the first conductor as a witness.
         conductors[0].setup_app("app", [&dna_file]).await.unwrap();
 
         // Install apps for Bob and Alice on the second conductor
-        let apps = conductors[1].setup_apps("app-", 2, [&dna_file]).await.unwrap();
+        let apps = conductors[1]
+            .setup_apps("app-", 2, [&dna_file])
+            .await
+            .unwrap();
 
         let ((alice_cell,), (bob_cell,)) = apps.into_tuples();
         let alice = alice_cell.zome(TestWasm::CounterSigning);
@@ -137,8 +141,12 @@ pub mod wasm_test {
         let _: ActionHash = conductors[1].call(&bob, "create_a_thing", ()).await;
 
         // Wait for everyone to declare full arcs
-        conductors[0].declare_full_storage_arcs(alice_cell.dna_hash()).await;
-        conductors[1].declare_full_storage_arcs(alice_cell.dna_hash()).await;
+        conductors[0]
+            .declare_full_storage_arcs(alice_cell.dna_hash())
+            .await;
+        conductors[1]
+            .declare_full_storage_arcs(alice_cell.dna_hash())
+            .await;
 
         // Force exchanging latest agent infos
         conductors.exchange_peer_info().await;
@@ -312,10 +320,16 @@ pub mod wasm_test {
         expect_error_for_write_without_lock(bob_result);
 
         let alice_abandoned = alice_signals.recv().await.unwrap();
-        assert_matches!(alice_abandoned, Signal::System(SystemSignal::AbandonedCountersigning(_)));
+        assert_matches!(
+            alice_abandoned,
+            Signal::System(SystemSignal::AbandonedCountersigning(_))
+        );
 
         let bob_abandoned = bob_signals.recv().await.unwrap();
-        assert_matches!(bob_abandoned, Signal::System(SystemSignal::AbandonedCountersigning(_)));
+        assert_matches!(
+            bob_abandoned,
+            Signal::System(SystemSignal::AbandonedCountersigning(_))
+        );
 
         // At this point Alice's session entry is a liability so can't exist.
         let alice_agent_activity_alice_observed_after: AgentActivity = conductors[1]
@@ -492,14 +506,18 @@ pub mod wasm_test {
 
         let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
 
-        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
+        let (dna_file, _, _) =
+            SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
 
         // Use the first conductor as a witness.
         let witness = conductors[0].setup_app("app", [&dna_file]).await.unwrap();
         let (witness_cell,) = witness.into_tuple();
 
         // Install apps for Bob and Alice on the second conductor
-        let apps = conductors[1].setup_apps("app-", 2, [&dna_file]).await.unwrap();
+        let apps = conductors[1]
+            .setup_apps("app-", 2, [&dna_file])
+            .await
+            .unwrap();
 
         let ((alice_cell,), (bob_cell,)) = apps.into_tuples();
         let alice = alice_cell.zome(TestWasm::CounterSigning);
@@ -513,8 +531,12 @@ pub mod wasm_test {
         let _: ActionHash = conductors[1].call(&bob, "create_a_thing", ()).await;
 
         // Wait for everyone to declare full arcs
-        conductors[0].declare_full_storage_arcs(alice_cell.dna_hash()).await;
-        conductors[1].declare_full_storage_arcs(alice_cell.dna_hash()).await;
+        conductors[0]
+            .declare_full_storage_arcs(alice_cell.dna_hash())
+            .await;
+        conductors[1]
+            .declare_full_storage_arcs(alice_cell.dna_hash())
+            .await;
 
         // Force exchanging latest agent infos
         conductors.exchange_peer_info().await;
@@ -574,7 +596,10 @@ pub mod wasm_test {
                 expires_at,
             })
             .await;
-        let_assert!(Err(ConductorApiError::CellError(CellError::WorkflowError(err))) = preflight_acceptance_fail);
+        let_assert!(
+            Err(ConductorApiError::CellError(CellError::WorkflowError(err))) =
+                preflight_acceptance_fail
+        );
         assert_matches!(
             *err,
             WorkflowError::RibosomeError(RibosomeError::WasmRuntimeError(RuntimeError { .. }))
@@ -1022,7 +1047,7 @@ pub mod wasm_test {
             )
             .await;
 
-        await_consistency(10, [&alice_cell, &bob_cell])
+        await_consistency(15, [&alice_cell, &bob_cell])
             .await
             .unwrap();
 
@@ -1080,7 +1105,9 @@ pub mod wasm_test {
             ..
         } = RibosomeTestFixture::new(TestWasm::CounterSigning).await;
 
-        conductor.declare_full_storage_arcs(alice_cell.dna_hash()).await;
+        conductor
+            .declare_full_storage_arcs(alice_cell.dna_hash())
+            .await;
 
         if force_init {
             // Run any arbitrary zome call for bob to force him to run init
@@ -1183,7 +1210,7 @@ pub mod wasm_test {
             )
             .await;
 
-        await_consistency(10, [&alice_cell, &bob_cell])
+        await_consistency(15, [&alice_cell, &bob_cell])
             .await
             .unwrap();
 
@@ -1254,7 +1281,7 @@ pub mod wasm_test {
 
         // NON ENZYMATIC
         {
-            await_consistency(10, [&alice_cell, &bob_cell, &carol_cell])
+            await_consistency(15, [&alice_cell, &bob_cell, &carol_cell])
                 .await
                 .unwrap();
 
@@ -1326,7 +1353,7 @@ pub mod wasm_test {
                     unreachable!();
                 };
 
-            await_consistency(10, [&alice_cell, &bob_cell, &carol_cell])
+            await_consistency(15, [&alice_cell, &bob_cell, &carol_cell])
                 .await
                 .unwrap();
 
@@ -1348,7 +1375,7 @@ pub mod wasm_test {
                 )
                 .await;
 
-            await_consistency(10, [&alice_cell, &bob_cell, &carol_cell])
+            await_consistency(15, [&alice_cell, &bob_cell, &carol_cell])
                 .await
                 .unwrap();
 

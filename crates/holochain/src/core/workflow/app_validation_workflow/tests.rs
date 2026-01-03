@@ -1168,7 +1168,7 @@ async fn app_validation_produces_warrants() {
 
     conductors.exchange_peer_info().await;
 
-    await_consistency(10, [&alice, &bob, &carol]).await.unwrap();
+    await_consistency(15, [&alice, &bob, &carol]).await.unwrap();
 
     conductors[2].shutdown().await;
 

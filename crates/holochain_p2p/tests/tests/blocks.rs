@@ -585,6 +585,7 @@ impl TestActor {
                 },
                 "irohTransport": {
                     "relayUrl": format!("http://{bootstrap_addr}"),
+                    "relayAllowPlainText": true,
                 }
             })),
             request_timeout: Duration::from_secs(3),

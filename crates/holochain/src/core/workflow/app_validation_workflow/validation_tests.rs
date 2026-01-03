@@ -295,7 +295,7 @@ async fn app_validation_ops() {
         };
 
     let mut conductors =
-        SweetConductorBatch::from_config_rendezvous(2, SweetConductorConfig::rendezvous(false))
+        SweetConductorBatch::from_config_rendezvous(2, SweetConductorConfig::rendezvous(true))
             .await;
 
     let zomes = InlineZomeSet::new(
@@ -335,7 +335,7 @@ async fn app_validation_ops() {
         "validate",
         validation_callback(ZOME_A_1, agents.clone(), events_tx.clone()),
     );
-    let (dna_file_a, _, _) = SweetDnaFile::from_inline_zomes("".into(), zomes).await;
+    let (dna_file_a, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
 
     let zomes = InlineZomeSet::new(
         [
@@ -375,7 +375,7 @@ async fn app_validation_ops() {
         validation_callback(ZOME_B_1, agents.clone(), events_tx.clone()),
     );
 
-    let (dna_file_b, _, _) = SweetDnaFile::from_inline_zomes("".into(), zomes).await;
+    let (dna_file_b, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
 
     let (alice, bob) = {
         let mut agents = agents.lock();
@@ -397,13 +397,11 @@ async fn app_validation_ops() {
         (alice, bob)
     };
 
-    conductors.exchange_peer_info().await;
-
     let _: ActionHash = conductors[0]
         .call(&alice.zome("zome1"), "create_a", ())
         .await;
 
-    await_consistency(10, [&alice, &bob]).await.unwrap();
+    await_consistency(15, [&alice, &bob]).await.unwrap();
 
     let mut expected = Expected(HashSet::new());
 

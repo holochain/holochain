@@ -908,6 +908,15 @@ impl HolochainP2pActor {
                         ..Default::default()
                     },
                 })?;
+            #[cfg(feature = "transport-iroh")]
+            builder
+                .config
+                .set_module_config(&kitsune2_transport_iroh::IrohTransportModConfig {
+                    iroh_transport: kitsune2_transport_iroh::IrohTransportConfig {
+                        relay_allow_plain_text: true,
+                        ..Default::default()
+                    },
+                })?;
             builder.config.set_module_config(
                 &kitsune2_core::factories::CoreBootstrapModConfig {
                     core_bootstrap: kitsune2_core::factories::CoreBootstrapConfig {

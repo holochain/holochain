@@ -670,8 +670,16 @@ fn kitsune2_config_schema(generator: &mut schemars::SchemaGenerator) -> Schema {
         mem_peer_store: Option<kitsune2_core::factories::MemPeerStoreModConfig>,
         #[serde(flatten)]
         k2_gossip: Option<kitsune2_gossip::K2GossipModConfig>,
+        #[cfg(any(
+            feature = "transport-tx5-datachannel-vendored",
+            feature = "transport-tx5-backend-libdatachannel",
+            feature = "transport-tx5-backend-go-pion",
+        ))]
         #[serde(flatten)]
         tx5_transport: Option<kitsune2_transport_tx5::Tx5TransportModConfig>,
+        #[cfg(feature = "transport-iroh")]
+        #[serde(flatten)]
+        iroh_transport: Option<kitsune2_transport_iroh::IrohTransportModConfig>,
     }
 
     let schema = schemars::schema_for!(Option<K2Config>);
