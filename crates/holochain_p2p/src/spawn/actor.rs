@@ -1067,7 +1067,6 @@ impl HolochainP2pActor {
                             } else {
                                 tracing::warn!("Cannot prune expired URLs from peer meta store for k2 space that does not exist.");
                             }
-                            
                             Ok::<_, HolochainP2pError>(())
                         }
                     });
