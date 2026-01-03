@@ -305,11 +305,7 @@ mod startup_shutdown_impls {
                 let remove_cells_task = this.remove_cells_by_id(&running_cell_ids);
 
                 tracing::info!("Sending shutdown signal to all managed tasks and removing cells.");
-                let (.., result) = futures::join!(
-                    remove_cells_task,
-                    tm.shutdown().boxed(),
-                    task,
-                );
+                let (.., result) = futures::join!(remove_cells_task, tm.shutdown().boxed(), task,);
 
                 result?
             })
@@ -1729,8 +1725,11 @@ mod clone_cell_impls {
             let state = self.get_state().await?;
             let app = state.get_app(installed_app_id)?;
             let p2p_config_override = Self::p2p_config_overrides(&app.manifest);
-            self.create_cells_and_initialize([clone_cell.cell_id.clone()].into_iter(), p2p_config_override)
-                .await?;
+            self.create_cells_and_initialize(
+                [clone_cell.cell_id.clone()].into_iter(),
+                p2p_config_override,
+            )
+            .await?;
             Ok(clone_cell)
         }
 
