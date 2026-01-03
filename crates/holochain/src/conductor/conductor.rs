@@ -289,16 +289,29 @@ mod startup_shutdown_impls {
 
         /// Broadcasts the shutdown signal to all managed tasks
         /// and returns a future to await for shutdown to complete.
-        pub fn shutdown(&self) -> JoinHandle<TaskManagerResult> {
+        pub fn shutdown(self: Arc<Self>) -> JoinHandle<TaskManagerResult> {
             self.shutting_down
                 .store(true, std::sync::atomic::Ordering::Relaxed);
 
             let mut tm = self.task_manager();
             let task = self.detach_task_management().expect("Attempting to shut down after already detaching task management or previous shutdown");
+
+            let this = Arc::clone(&self);
             tokio::task::spawn(async move {
-                tracing::info!("Sending shutdown signal to all managed tasks.");
-                let (_, r) = futures::join!(tm.shutdown().boxed(), task,);
-                r?
+                // Shutdown conductor tasks
+                let running_cell_ids: Vec<_> = this.running_cells.share_mut(|c| {
+                    c.keys().cloned().collect()
+                });
+                let remove_cells_task = this.remove_cells_by_id(&running_cell_ids);
+
+                tracing::info!("Sending shutdown signal to all managed tasks and removing cells.");
+                let (.., result) = futures::join!(
+                    remove_cells_task,
+                    tm.shutdown().boxed(),
+                    task,
+                );
+
+                result?
             })
         }
 
@@ -337,7 +350,7 @@ mod startup_shutdown_impls {
                 let config_override = Self::p2p_config_overrides(&app.manifest);
                 let cell_ids = app.all_enabled_cells();
                 self.clone()
-                    .create_cells_and_add_to_state(cell_ids, config_override)
+                    .create_cells_and_initialize(cell_ids, config_override)
                     .await?;
             }
 
@@ -669,17 +682,28 @@ mod dna_impls {
             &self.holochain_p2p
         }
 
-        /// Remove cells from the cell map in the Conductor
-        pub(crate) async fn remove_cells(&self, cell_ids: &[CellId]) {
-            let to_cleanup: Vec<_> = self.running_cells.share_mut(|cells| {
+        /// Remove cells from the cell map in the Conductor,
+        /// Then call 'cleanup' on each cell, which stops its networking tasks.
+        pub(crate) async fn remove_cells_by_id(&self, cell_ids: &[CellId]) {
+            let cells = self.running_cells.share_mut(|c| -> Vec<_> {
                 cell_ids
                     .iter()
-                    .filter_map(|cell_id| cells.remove(cell_id).map(|c| (cell_id, c)))
+                    .filter_map(|cell_id| c.remove(cell_id).map(|cell| cell.clone()))
                     .collect()
             });
-            future::join_all(to_cleanup.into_iter().map(|(cell_id, cell)| async move {
+
+            Self::cleanup_cells(cells).await
+        }
+
+        /// Call `cleanup` on a list of Cells
+        /// This will stop its networking tasks.
+        ///
+        /// This should only be called by `remove_cells` which also removes the cells from conductor state.
+        /// Otherwise conductor state will not match reality.
+        pub(crate) async fn cleanup_cells(cells: Vec<Arc<Cell>>) {
+            future::join_all(cells.into_iter().map(|cell| async move {
                 if let Err(err) = cell.cleanup().await {
-                    tracing::error!("Error cleaning up Cell: {:?}\nCellId: {}", err, cell_id);
+                    tracing::error!("Error cleaning up Cell: {:?}\nCellId: {}", err, cell.id());
                 }
             }))
             .await;
@@ -1140,6 +1164,7 @@ mod app_impls {
         // (This function constructs a bundle under the hood.)
         // This is just a convenience for testing.
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+        #[cfg(feature = "test_utils")]
         pub(crate) async fn install_app_minimal(
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
@@ -1367,7 +1392,7 @@ mod app_impls {
                 tracing::debug!(msg = "Removed app from db.", app = ?app);
 
                 // Remove the cells from conductor state.
-                self.remove_cells(&cells_to_remove).await;
+                self.remove_cells_by_id(cells_to_remove.as_slice()).await;
 
                 // Remove the app's signal broadcast from conductor.
                 let installed_app_ids = self
@@ -1704,11 +1729,8 @@ mod clone_cell_impls {
             let state = self.get_state().await?;
             let app = state.get_app(installed_app_id)?;
             let p2p_config_override = Self::p2p_config_overrides(&app.manifest);
-            self.create_cells_and_add_to_state(
-                [clone_cell.cell_id.clone()].into_iter(),
-                p2p_config_override,
-            )
-            .await?;
+            self.create_cells_and_initialize([clone_cell.cell_id.clone()].into_iter(), p2p_config_override)
+                .await?;
             Ok(clone_cell)
         }
 
@@ -1733,7 +1755,7 @@ mod clone_cell_impls {
                     }
                 })
                 .await?;
-            self.remove_cells(&[removed_cell_id]).await;
+            self.remove_cells_by_id([removed_cell_id].as_slice()).await;
             Ok(())
         }
 
@@ -1776,7 +1798,7 @@ mod clone_cell_impls {
             let app = state.get_app(installed_app_id)?;
             let p2p_config_override = Self::p2p_config_overrides(&app.manifest);
 
-            self.create_cells_and_add_to_state(
+            self.create_cells_and_initialize(
                 [enabled_cell.cell_id.clone()].into_iter(),
                 p2p_config_override,
             )
@@ -1827,8 +1849,8 @@ mod app_status_impls {
     use holochain_types::cell_config_overrides::CellConfigOverrides;
 
     impl Conductor {
-        /// Instantiate cells, join them to the network and add them to the conductor's state.
-        pub(crate) async fn create_cells_and_add_to_state(
+        /// Instantiate cells, add them to the conductor's state, then initialize them.
+        pub(crate) async fn create_cells_and_initialize(
             self: Arc<Self>,
             cell_ids: impl Iterator<Item = CellId>,
             config_override: Option<CellConfigOverrides>,
@@ -1851,11 +1873,26 @@ mod app_status_impls {
                 .into_iter()
                 .collect::<Result<Vec<_>, _>>()?;
 
+            // Add cells to state, marked as "running".
+            let (new_cells, triggers): (Vec<_>, Vec<_>) = cells.into_iter().unzip();
+            let new_cells_map: IndexMap<CellId, Arc<Cell>> = new_cells
+                .into_iter()
+                .map(|c| (c.id().clone(), Arc::new(c)))
+                .collect();
+            let new_cell_ids: HashSet<_> = new_cells_map.keys().cloned().collect();
+
+            // Add to running_cells
+            self.running_cells.share_mut(|cells| {
+                cells.extend(new_cells_map.clone());
+                tracing::debug!(?new_cell_ids, "added cells to running_cells");
+            });
+
             // Add agents to local agent store in kitsune with bounded parallelism (max 10 concurrent)
-            let join_futures = cells
-                .iter()
+            let join_futures = new_cells_map
+                .values()
+                .into_iter()
                 .enumerate()
-                .map(|(i, (cell, _))| {
+                .map(|(i, cell)| {
                     let config_override = config_override.clone();
                     let cell_id = cell.id().clone();
                     let agent_pubkey = cell_id.agent_pubkey().clone();
@@ -1876,8 +1913,9 @@ mod app_status_impls {
                 .collect::<Vec<_>>()
                 .await;
 
-            // Add cells to conductor
-            self.add_and_initialize_cells(cells);
+            for trigger in triggers {
+                trigger.initialize_workflows();
+            }
 
             Ok(())
         }
@@ -1963,7 +2001,7 @@ mod app_status_impls {
             // Determine cells to create
             let cell_ids_in_app = app.all_enabled_cells();
             self.clone()
-                .create_cells_and_add_to_state(cell_ids_in_app, config_override)
+                .create_cells_and_initialize(cell_ids_in_app, config_override)
                 .await?;
 
             // Set app status to enabled in conductor state.
@@ -1995,7 +2033,7 @@ mod app_status_impls {
 
             // Remove cells from state.
             let cell_ids_to_cleanup = app.all_cells().collect::<Vec<_>>();
-            self.remove_cells(&cell_ids_to_cleanup).await;
+            self.remove_cells_by_id(cell_ids_to_cleanup.as_slice()).await;
 
             // Set app status to disabled.
             let (_, app) = self
@@ -2949,22 +2987,6 @@ mod countersigning_impls {
 impl Conductor {
     fn add_admin_port(&self, port: u16) {
         self.admin_websocket_ports.share_mut(|p| p.push(port));
-    }
-
-    /// Add fully constructed cells to the cell map in the Conductor
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-    fn add_and_initialize_cells(&self, cells: Vec<(Cell, InitialQueueTriggers)>) {
-        let (new_cells, triggers): (Vec<_>, Vec<_>) = cells.into_iter().unzip();
-        self.running_cells.share_mut(|cells| {
-            for cell in new_cells {
-                let cell_id = cell.id().clone();
-                tracing::debug!(?cell_id, "added cell");
-                cells.insert(cell_id, Arc::new(cell));
-            }
-        });
-        for trigger in triggers {
-            trigger.initialize_workflows();
-        }
     }
 
     async fn delete_or_purge_database<Kind: DbKindT + Send + Sync + 'static>(
