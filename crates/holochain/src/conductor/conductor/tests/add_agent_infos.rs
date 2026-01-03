@@ -1,6 +1,6 @@
 use crate::{
     retry_until_timeout,
-    sweettest::{SweetConductor, SweetDnaFile},
+    sweettest::{SweetConductor, SweetConductorConfig, SweetDnaFile},
 };
 use holochain_wasm_test_utils::TestWasm;
 
@@ -56,13 +56,43 @@ async fn add_agent_infos_to_peer_store() {
     assert_eq!(agent_infos, vec![expected_agent_info.clone()]);
 
     drop(conductor);
+
     // Add agent info from first app installation to a new conductor's peer store.
-    let new_agent_info = expected_agent_info.clone().encode().unwrap();
-    let conductor = SweetConductor::from_standard_config().await;
-    conductor
-        .add_agent_infos(vec![new_agent_info.clone()])
+    let mut config = SweetConductorConfig::standard();
+    config.network.disable_bootstrap = true;
+
+    let mut conductor = SweetConductor::from_config(config).await;
+
+    // Install an app with the same DNA to create the space first
+    let _app: crate::sweettest::SweetApp = conductor
+        .setup_app("", std::slice::from_ref(&dna_file))
         .await
         .unwrap();
+
+    // Wait for the new conductor's agent to be added to peer store
+    let new_cell_id = _app.cells()[0].cell_id().clone();
+    let cell_peer_store = conductor
+        .holochain_p2p
+        .peer_store(new_cell_id.dna_hash().clone())
+        .await
+        .unwrap();
+    retry_until_timeout!({
+        if cell_peer_store
+            .get(new_cell_id.agent_pubkey().to_k2_agent())
+            .await
+            .unwrap()
+            .is_some()
+        {
+            break;
+        }
+    });
+
+    // Add the agent info from the first conductor
+    conductor
+        .add_agent_infos(vec![expected_agent_info.clone().encode().unwrap()])
+        .await
+        .unwrap();
+
     let agent_infos = conductor.get_agent_infos(None).await.unwrap();
-    assert_eq!(agent_infos, vec![expected_agent_info]);
+    assert!(agent_infos.contains(&expected_agent_info));
 }
