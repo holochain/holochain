@@ -34,8 +34,7 @@ holochain_zome_types = { path = "../holochain_zome_types", version = "^0.7.0-dev
   "full",
 ] }
 holochain_timestamp = { version = "^0.7.0-dev.0", path = "../timestamp" }
-# kitsune2_api = "0.4.0-dev.1"
-kitsune2_api = { path = "../../../kitsune2/crates/api" }
+kitsune2_api = "0.4.0-dev.2"
 itertools = { version = "0.14" }
 mr_bundle = { path = "../mr_bundle", features = [
   "fs",
@@ -72,7 +71,7 @@ contrafact = { version = "0.2.0-rc.1", optional = true }
 
 [dev-dependencies]
 holochain_types = { path = ".", features = ["test_utils", "fuzzing"] }
-kitsune2_test_utils = "0.4.0-dev.1"
+kitsune2_test_utils = "0.4.0-dev.2"
 
 isotest = { version = "0" }
 matches = "0.1"

@@ -31,12 +31,9 @@ holochain_util = { version = "^0.7.0-dev.0", path = "../holochain_util" }
 holochain_conductor_api = { version = "^0.7.0-dev.6", path = "../holochain_conductor_api" }
 holochain_types = { version = "^0.7.0-dev.6", path = "../holochain_types" }
 tokio = { version = "1.36.0", features = ["full"] }
-# kitsune2_api = "0.4.0-dev.1"
-# kitsune2_core = "0.4.0-dev.1"
-# kitsune2_bootstrap_client = "0.4.0-dev.1"
-kitsune2_api = { path = "../../../kitsune2/crates/api" }
-kitsune2_core = { path = "../../../kitsune2/crates/core" }
-kitsune2_bootstrap_client = { path = "../../../kitsune2/crates/bootstrap_client" }
+kitsune2_api = "0.4.0-dev.2"
+kitsune2_core = "0.4.0-dev.2"
+kitsune2_bootstrap_client = "0.4.0-dev.2"
 
 [lints]
 workspace = true

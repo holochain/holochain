@@ -10,9 +10,8 @@ edition = "2021"
 
 # reminder - do not use workspace deps
 [dependencies]
-# kitsune2_transport_tx5 = { version = "0.4.0-dev.1", optional = true }
-kitsune2_transport_tx5 = { path = "../../../kitsune2/crates/transport_tx5", default-features = false, optional = true }
-kitsune2_transport_iroh = { path = "../../../kitsune2/crates/transport_iroh", optional = true }
+kitsune2_transport_tx5 = { version = "0.4.0-dev.2", default-features = false, optional = true }
+kitsune2_transport_iroh = { version = "0.4.0-dev.2", optional = true }
 derive_more = { version = "2.0", features = ["from"] }
 holo_hash = { version = "^0.7.0-dev.2", path = "../holo_hash", features = [
   "full",
@@ -24,12 +23,9 @@ holochain_zome_types = { version = "^0.7.0-dev.3", path = "../holochain_zome_typ
 holochain_util = { version = "^0.7.0-dev.0", default-features = false, path = "../holochain_util", features = [
   "jsonschema",
 ] }
-# kitsune2_api = "0.4.0-dev.1"
-# kitsune2_core = { version = "0.4.0-dev.1" }
-# kitsune2_gossip = { version = "0.4.0-dev.1", optional = true }
-kitsune2_api = { path = "../../../kitsune2/crates/api" }
-kitsune2_core = { path = "../../../kitsune2/crates/core" }
-kitsune2_gossip = { path = "../../../kitsune2/crates/gossip", optional = true }
+kitsune2_api = "0.4.0-dev.2"
+kitsune2_core = { version = "0.4.0-dev.2" }
+kitsune2_gossip = { version = "0.4.0-dev.2", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"

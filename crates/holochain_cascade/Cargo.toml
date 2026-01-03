@@ -30,8 +30,7 @@ thiserror = "2.0"
 tracing = "0.1"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 
-# kitsune2_api = "0.4.0-dev.1"
-kitsune2_api = { path = "../../../kitsune2/crates/api" }
+kitsune2_api = "0.4.0-dev.2"
 
 async-trait = "0.1"
 mockall = { version = "0.13", optional = true }

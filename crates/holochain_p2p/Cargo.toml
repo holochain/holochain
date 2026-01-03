@@ -40,19 +40,13 @@ tracing = "0.1"
 tracing-appender = "0.2.3"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 
-# kitsune2 = { version = "0.4.0-dev.1", default-features = false }
-# kitsune2_api = "0.4.0-dev.1"
-# kitsune2_core = "0.4.0-dev.1"
-# kitsune2_gossip = "0.4.0-dev.1"
-# kitsune2_transport_tx5 = { version = "0.4.0-dev.1", optional = true }
-# kitsune2_transport_iroh = { version = "0.4.0-dev.1", optional = true }
-kitsune2 = { path = "../../../kitsune2/crates/kitsune2", default-features = false }
-kitsune2_api = { path = "../../../kitsune2/crates/api" }
-kitsune2_core = { path = "../../../kitsune2/crates/core" }
-kitsune2_gossip = { path = "../../../kitsune2/crates/gossip" }
-kitsune2_transport_iroh = { path = "../../../kitsune2/crates/transport_iroh", default-features = false, optional = true }
-kitsune2_transport_tx5 = { path = "../../../kitsune2/crates/transport_tx5", default-features = false, optional = true }
-kitsune2_bootstrap_srv = { path = "../../../kitsune2/crates/bootstrap_srv", default-features = false, optional = true }
+kitsune2 = { version = "0.4.0-dev.2", default-features = false }
+kitsune2_bootstrap_srv = { version = "0.4.0-dev.2", default-features = false, optional = true }
+kitsune2_api = "0.4.0-dev.2"
+kitsune2_core = "0.4.0-dev.2"
+kitsune2_gossip = "0.4.0-dev.2"
+kitsune2_transport_iroh = { version = "0.4.0-dev.2", default-features = false, optional = true }
+kitsune2_transport_tx5 = { version = "0.4.0-dev.2", default-features = false, optional = true }
 bytes = "1.10"
 holochain_sqlite = { version = "^0.7.0-dev.4", path = "../holochain_sqlite" }
 lair_keystore_api = "=0.6.3"
