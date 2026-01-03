@@ -141,7 +141,7 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug + Any {
                     async move {
                         let all_agents_in_peer_store = self
                             .test_kitsune()
-                            .space(space.clone(), None)
+                            .space_if_exists(space.clone())
                             .await
                             .unwrap()
                             .peer_store()

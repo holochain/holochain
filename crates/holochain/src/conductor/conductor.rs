@@ -1890,7 +1890,6 @@ mod app_status_impls {
             // Add agents to local agent store in kitsune with bounded parallelism (max 10 concurrent)
             let join_futures = new_cells_map
                 .values()
-                .into_iter()
                 .enumerate()
                 .map(|(i, cell)| {
                     let config_override = config_override.clone();

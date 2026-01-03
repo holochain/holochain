@@ -229,7 +229,7 @@ impl SweetConductorBatch {
             let from_local_agents = seen_conductor
                 .holochain_p2p()
                 .test_kitsune()
-                .space(dna_hash.to_k2_space(), None)
+                .space_if_exists(dna_hash.to_k2_space())
                 .await
                 .unwrap()
                 .local_agent_store()
