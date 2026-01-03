@@ -576,7 +576,7 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
 
     info!("client connect");
 
-    conductor_handle.shutdown();
+    conductor_handle.clone().shutdown().await.unwrap().unwrap();
 
     info!("shutdown");
 
