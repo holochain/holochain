@@ -21,7 +21,7 @@ event-emitter-rs = "0.1"
 holo_hash = { version = "^0.7.0-dev.2", path = "../holo_hash", features = [
   "encoding",
 ] }
-holochain_conductor_api = { version = "^0.7.0-dev.6", path = "../holochain_conductor_api" }
+holochain_conductor_api = { version = "^0.7.0-dev.6", path = "../holochain_conductor_api", default-features = false }
 holochain_nonce = { version = "^0.7.0-dev.0", path = "../holochain_nonce" }
 holochain_types = { version = "^0.7.0-dev.6", path = "../holochain_types" }
 holochain_websocket = { version = "^0.7.0-dev.6", path = "../holochain_websocket" }

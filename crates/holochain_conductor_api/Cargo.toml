@@ -50,6 +50,8 @@ pretty_assertions = "1.4"
 workspace = true
 
 [features]
+default = ["transport-tx5-datachannel-vendored"]
+
 chc = []
 unstable-migration = []
 unstable-sharding = []

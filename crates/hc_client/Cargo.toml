@@ -26,7 +26,7 @@ holo_hash = { version = "^0.7.0-dev.2", path = "../holo_hash", features = [
   "kitsune2",
 ] }
 holochain_client = { version = "^0.9.0-dev.6", path = "../client", default-features = false }
-holochain_conductor_api = { path = "../holochain_conductor_api", version = "^0.7.0-dev.6", features = [
+holochain_conductor_api = { path = "../holochain_conductor_api", version = "^0.7.0-dev.6", default-features = false, features = [
   "sqlite",
 ] }
 holochain_types = { path = "../holochain_types", version = "^0.7.0-dev.6", features = [
@@ -60,14 +60,21 @@ default = ["wasmer_sys", "transport-tx5-datachannel-vendored"]
 wasmer_sys = ["holochain_client/wasmer_sys", "holochain?/wasmer_sys"]
 wasmer_wamr = ["holochain_client/wasmer_wamr", "holochain?/wasmer_wamr"]
 
+transport-tx5-backend-go-pion = [
+  "holochain_conductor_api/transport-tx5-backend-go-pion",
+  "holochain?/transport-tx5-backend-go-pion",
+]
 transport-tx5-datachannel-vendored = [
+  "holochain_conductor_api/transport-tx5-datachannel-vendored",
   "holochain?/transport-tx5-datachannel-vendored",
 ]
 transport-tx5-backend-libdatachannel = [
+  "holochain_conductor_api/transport-tx5-backend-libdatachannel",
   "holochain?/transport-tx5-backend-libdatachannel",
 ]
-transport-tx5-backend-go-pion = ["holochain?/transport-tx5-backend-go-pion"]
-transport-transport-iroh = ["holochain?/transport-iroh"]
-
+transport-transport-iroh = [
+  "holochain_conductor_api/transport-iroh",
+  "holochain?/transport-iroh",
+]
 [lints]
 workspace = true

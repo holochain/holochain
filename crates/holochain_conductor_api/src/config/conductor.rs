@@ -649,6 +649,11 @@ impl Default for ConductorTuningParams {
     }
 }
 
+#[cfg(any(
+    feature = "transport-tx5-datachannel-vendored",
+    feature = "transport-tx5-backend-libdatachannel",
+    feature = "transport-tx5-backend-go-pion",
+))]
 #[cfg(feature = "schema")]
 fn webrtc_config_schema(_: &mut schemars::SchemaGenerator) -> Schema {
     let schema = schemars::schema_for!(Option<WebRtcConfig>);
@@ -774,6 +779,11 @@ mod tests {
     fn test_config_complete_config() {
         holochain_trace::test_run();
 
+        #[cfg(any(
+            feature = "transport-tx5-datachannel-vendored",
+            feature = "transport-tx5-backend-libdatachannel",
+            feature = "transport-tx5-backend-go-pion",
+        ))]
         let yaml = r#"---
     data_root_path: /path/to/env
     signing_service_uri: ws://localhost:9001
@@ -812,16 +822,64 @@ mod tests {
 
     db_sync_strategy: Fast
     "#;
+
+        #[cfg(feature = "transport-iroh")]
+        let yaml = r#"---
+    data_root_path: /path/to/env
+    signing_service_uri: ws://localhost:9001
+    encryption_service_uri: ws://localhost:9002
+    decryption_service_uri: ws://localhost:9003
+
+    keystore:
+      type: lair_server_in_proc
+
+    admin_interfaces:
+      - driver:
+          type: websocket
+          port: 1234
+          allowed_origins: "*"
+
+    network:
+      bootstrap_url: https://test-boot.tld
+      signal_url: wss://test-sig.tld
+      webrtc_config: {
+        "iceServers": [
+          { "urls": ["stun:test-stun.tld:443"] },
+        ]
+      }
+      request_timeout_s: 70
+      advanced: {
+        "my": {
+          "totally": {
+            "random": {
+              "advanced": {
+                "config": true
+              }
+            }
+          }
+        }
+      }
+
+    db_sync_strategy: Fast
+    "#;
+
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
         let mut network_config = NetworkConfig::default();
         network_config.bootstrap_url = url2::url2!("https://test-boot.tld");
         network_config.signal_url = url2::url2!("wss://test-sig.tld");
         network_config.request_timeout_s = 70;
-        network_config.webrtc_config = Some(serde_json::json!({
-            "iceServers": [
-                { "urls": ["stun:test-stun.tld:443"] },
-            ]
-        }));
+        #[cfg(any(
+            feature = "transport-tx5-datachannel-vendored",
+            feature = "transport-tx5-backend-libdatachannel",
+            feature = "transport-tx5-backend-go-pion",
+        ))]
+        {
+            network_config.webrtc_config = Some(serde_json::json!({
+                "iceServers": [
+                    { "urls": ["stun:test-stun.tld:443"] },
+                ]
+            }));
+        }
         network_config.advanced = Some(serde_json::json!({
             "my": {
                 "totally": {
