@@ -76,7 +76,7 @@ jobs:
       - name: "Common Test Setup Actions"
         uses: ./.github/actions/common-pre
 
-      - name: "Common Test Actions"
+      - name: "Build workspace and run tests"
         uses: ./.github/actions/common-test
         with:
           os: ${{ matrix.os }}

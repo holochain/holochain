@@ -238,6 +238,11 @@ pub struct NetworkConfig {
     pub request_timeout_s: u64,
 
     /// The Kitsune2 webrtc_config to use for connecting to peers.
+    #[cfg(any(
+        feature = "transport-tx5-datachannel-vendored",
+        feature = "transport-tx5-backend-libdatachannel",
+        feature = "transport-tx5-backend-go-pion",
+    ))]
     #[cfg_attr(feature = "schema", schemars(schema_with = "webrtc_config_schema"))]
     pub webrtc_config: Option<serde_json::Value>,
 
@@ -294,6 +299,11 @@ impl Default for NetworkConfig {
             #[cfg(feature = "transport-iroh")]
             signal_url: url2::Url2::parse("https://use1-1.relay.n0.iroh-canary.iroh.link./"),
             request_timeout_s: default_request_timeout_s(),
+            #[cfg(any(
+                feature = "transport-tx5-datachannel-vendored",
+                feature = "transport-tx5-backend-libdatachannel",
+                feature = "transport-tx5-backend-go-pion",
+            ))]
             webrtc_config: None,
             target_arc_factor: default_target_arc_factor(),
             report: Default::default(),

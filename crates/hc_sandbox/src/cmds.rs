@@ -82,18 +82,26 @@ pub struct Network {
 pub enum NetworkType {
     /// A transport that uses the local memory transport protocol.
     Mem,
-    // /// A transport that uses the QUIC protocol.
-    // Quic(Quic),
-    // /// A transport that uses the MDNS protocol.
-    // Mdns,
     /// A transport that uses the WebRTC protocol.
+    #[cfg(any(
+        feature = "transport-tx5-datachannel-vendored",
+        feature = "transport-tx5-backend-libdatachannel",
+        feature = "transport-tx5-backend-go-pion",
+    ))]
     #[command(name = "webrtc")]
     WebRTC {
-        /// URL to a holochain tx5 WebRTC signal server.
+        /// URL to a Holochain WebRTC signaling server.
         signal_url: String,
 
         /// Optional path to override webrtc peer connection config file.
         webrtc_config: Option<std::path::PathBuf>,
+    },
+    /// A transport that uses the QUIC protocol.
+    #[cfg(feature = "transport-iroh")]
+    #[command(name = "quic")]
+    QUIC {
+        /// URL to a Holochain server that serves for NAT and relaying messages.
+        relay_url: String,
     },
 }
 
@@ -203,63 +211,68 @@ Run `hc sandbox list` to see the sandboxes or `hc sandbox run --help` for more i
 
 impl Network {
     pub async fn to_kitsune(this: &Option<&Self>) -> Option<NetworkConfig> {
-        let Network {
+        if let Some(Network {
             transport,
             bootstrap,
             target_arc_factor,
-        } = match this {
-            None => {
-                return Some(NetworkConfig {
-                    advanced: Some(serde_json::json!({
+        }) = this
+        {
+            let mut network_config = NetworkConfig::default();
+            if let Some(bootstrap) = bootstrap {
+                network_config.bootstrap_url = bootstrap.to_owned();
+            }
+            if let Some(target_arc_factor) = target_arc_factor {
+                network_config.target_arc_factor = target_arc_factor.to_owned();
+            }
+
+            match transport {
+                NetworkType::Mem => (),
+                #[cfg(any(
+                    feature = "transport-tx5-datachannel-vendored",
+                    feature = "transport-tx5-backend-libdatachannel",
+                    feature = "transport-tx5-backend-go-pion",
+                ))]
+                NetworkType::WebRTC {
+                    signal_url,
+                    webrtc_config,
+                } => {
+                    let webrtc_config = match webrtc_config {
+                        Some(path) => {
+                            let content = tokio::fs::read_to_string(path)
+                                .await
+                                .expect("failed to read webrtc_config file");
+                            let parsed = serde_json::from_str(&content)
+                                .expect("failed to parse webrtc_config file content");
+                            Some(parsed)
+                        }
+                        None => None,
+                    };
+                    network_config.signal_url = url2::url2!("{}", signal_url);
+                    network_config.webrtc_config = webrtc_config;
+                    network_config.advanced = Some(serde_json::json!({
                         // Allow plaintext signal for hc sandbox to have it work with local
                         // signaling servers spawned by kitsune2-bootstrap-srv
                         "tx5Transport": {
                             "signalAllowPlainText": true,
                         }
-                    })),
-                    ..NetworkConfig::default()
-                });
+                    }));
+                }
+                #[cfg(feature = "transport-iroh")]
+                NetworkType::QUIC { relay_url } => {
+                    network_config.signal_url = url2::Url2::parse(relay_url);
+                    network_config.advanced = Some(serde_json::json!({
+                        // Allow plaintext relay for hc sandbox to have it work with local
+                        // relay server spawned by kitsune2-bootstrap-srv
+                        "irohTransport": {
+                            "relayAllowPlainText": true,
+                        }
+                    }));
+                }
             }
-            Some(n) => (*n).clone(),
-        };
-
-        let mut kit = NetworkConfig::default();
-        if let Some(bootstrap) = bootstrap {
-            kit.bootstrap_url = bootstrap;
+            Some(network_config)
+        } else {
+            None
         }
-        if let Some(target_arc_factor) = target_arc_factor {
-            kit.target_arc_factor = target_arc_factor;
-        }
-
-        match transport {
-            NetworkType::Mem => (),
-            NetworkType::WebRTC {
-                signal_url,
-                webrtc_config,
-            } => {
-                let webrtc_config = match webrtc_config {
-                    Some(path) => {
-                        let content = tokio::fs::read_to_string(path)
-                            .await
-                            .expect("failed to read webrtc_config file");
-                        let parsed = serde_json::from_str(&content)
-                            .expect("failed to parse webrtc_config file content");
-                        Some(parsed)
-                    }
-                    None => None,
-                };
-                kit.signal_url = url2::url2!("{}", signal_url);
-                kit.webrtc_config = webrtc_config;
-                kit.advanced = Some(serde_json::json!({
-                    // Allow plaintext signal for hc sandbox to have it work with local
-                    // signaling servers spawned by kitsune2-bootstrap-srv
-                    "tx5Transport": {
-                        "signalAllowPlainText": true,
-                    }
-                }));
-            }
-        }
-        Some(kit)
     }
 }
 
