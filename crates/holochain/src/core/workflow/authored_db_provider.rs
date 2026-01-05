@@ -22,7 +22,6 @@ pub trait AuthoredDbProvider: Send + Sync + 'static {
     ) -> MustBoxFuture<'_, DatabaseResult<Option<DbWrite<DbKindAuthored>>>>;
 }
 
-/// Implementation of [`AuthoredDbProvider`] for `Arc<Conductor>`.
 impl AuthoredDbProvider for std::sync::Arc<crate::conductor::conductor::Conductor> {
     fn get_authored_db(
         &self,
