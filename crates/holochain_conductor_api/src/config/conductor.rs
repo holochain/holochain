@@ -240,8 +240,11 @@ impl ConductorConfig {
 
 /// Configure Kitsune2 Reporting.
 #[derive(Clone, Default, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case", rename_all_fields = "snake_case")]
-#[serde(deny_unknown_fields)]
+#[serde(
+    rename_all = "snake_case",
+    rename_all_fields = "snake_case",
+    deny_unknown_fields
+)]
 pub enum ReportConfig {
     /// Default to no reporting.
     #[default]
@@ -259,8 +262,7 @@ pub enum ReportConfig {
 
 /// All the network config information for the conductor.
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-#[serde(deny_unknown_fields)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct NetworkConfig {
     /// Authentication material if required by sbd/signal/bootstrap services.
     /// This material should be specified as a base64 string
