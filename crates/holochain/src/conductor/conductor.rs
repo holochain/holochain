@@ -299,9 +299,9 @@ mod startup_shutdown_impls {
             let this = Arc::clone(&self);
             tokio::task::spawn(async move {
                 // Shutdown conductor tasks
-                let running_cell_ids: Vec<_> = this.running_cells.share_mut(|c| {
-                    c.keys().cloned().collect()
-                });
+                let running_cell_ids: Vec<_> = this
+                    .running_cells
+                    .share_mut(|c| c.keys().cloned().collect());
                 let remove_cells_task = this.remove_cells_by_id(&running_cell_ids);
 
                 tracing::info!("Sending shutdown signal to all managed tasks and removing cells.");
@@ -684,7 +684,7 @@ mod dna_impls {
             let cells = self.running_cells.share_mut(|c| -> Vec<_> {
                 cell_ids
                     .iter()
-                    .filter_map(|cell_id| c.remove(cell_id).map(|cell| cell.clone()))
+                    .filter_map(|cell_id| c.remove(cell_id))
                     .collect()
             });
 
@@ -2031,7 +2031,8 @@ mod app_status_impls {
 
             // Remove cells from state.
             let cell_ids_to_cleanup = app.all_cells().collect::<Vec<_>>();
-            self.remove_cells_by_id(cell_ids_to_cleanup.as_slice()).await;
+            self.remove_cells_by_id(cell_ids_to_cleanup.as_slice())
+                .await;
 
             // Set app status to disabled.
             let (_, app) = self

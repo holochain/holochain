@@ -724,7 +724,8 @@ impl SweetConductor {
     /// Attempting to use this conductor without starting it up again will cause a panic.
     pub async fn try_shutdown(&mut self) -> std::io::Result<()> {
         if let Some(handle) = self.handle.take() {
-            handle.clone()
+            handle
+                .clone()
                 .shutdown()
                 .await
                 .map_err(Error::other)?
