@@ -32,7 +32,7 @@ async fn space_removed_on_uninstall() {
     let spaces = holochain_p2p.test_kitsune().list_spaces();
     assert_eq!(spaces.len(), 1);
 
-    // Uninstall the app - this should call remove_cells_by_id
+    // Uninstall the app
     let app_id = "test_app".to_string();
     conductor
         .clone()

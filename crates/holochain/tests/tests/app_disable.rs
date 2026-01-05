@@ -33,7 +33,7 @@ async fn space_removed_on_disable() {
     let spaces = holochain_p2p.test_kitsune().list_spaces();
     assert_eq!(spaces.len(), 1);
 
-    // Disable the app - this should call remove_cells_by_id
+    // Disable the app
     let app_id = "test_app".to_string();
     conductor
         .clone()
