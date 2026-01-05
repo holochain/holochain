@@ -13,7 +13,7 @@ pub trait PublishTriggerProvider: Send + Sync {
     fn get_publish_trigger(&self, cell_id: &CellId) -> MustBoxFuture<'_, Option<TriggerSender>>;
 }
 
-/// Implementation of [`PublishTriggerProvider`] for [`ConductorHandle`].
+/// Implementation of [`PublishTriggerProvider`] for `Arc<Conductor>`.
 impl PublishTriggerProvider for std::sync::Arc<crate::conductor::conductor::Conductor> {
     fn get_publish_trigger(&self, cell_id: &CellId) -> MustBoxFuture<'_, Option<TriggerSender>> {
         let cell_id = cell_id.clone();
