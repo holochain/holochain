@@ -302,7 +302,7 @@ mod startup_shutdown_impls {
                 let running_cell_ids: Vec<_> = this
                     .running_cells
                     .share_mut(|c| c.keys().cloned().collect());
-                let remove_cells_task = this.remove_cells_by_id(&running_cell_ids);
+                let remove_cells_task = this.remove_cells(&running_cell_ids);
 
                 tracing::info!("Sending shutdown signal to all managed tasks and removing cells.");
                 let (.., result) = futures::join!(remove_cells_task, tm.shutdown().boxed(), task,);
@@ -678,9 +678,10 @@ mod dna_impls {
             &self.holochain_p2p
         }
 
-        /// Remove cells from the cell map in the Conductor,
-        /// Then call 'cleanup' on each cell, which stops its networking tasks.
-        pub(crate) async fn remove_cells_by_id(&self, cell_ids: &[CellId]) {
+        /// Remove cells from conductor state,
+        /// then call cleanup on each cell, which stops its networking tasks.
+        pub(crate) async fn remove_cells(&self, cell_ids: &[CellId]) {
+            // Remove cells from conductor state
             let cells = self.running_cells.share_mut(|c| -> Vec<_> {
                 cell_ids
                     .iter()
@@ -688,15 +689,7 @@ mod dna_impls {
                     .collect()
             });
 
-            Self::cleanup_cells(cells).await
-        }
-
-        /// Call `cleanup` on a list of Cells
-        /// This will stop its networking tasks.
-        ///
-        /// This should only be called by `remove_cells` which also removes the cells from conductor state.
-        /// Otherwise conductor state will not match reality.
-        pub(crate) async fn cleanup_cells(cells: Vec<Arc<Cell>>) {
+            // Cleanup cells
             future::join_all(cells.into_iter().map(|cell| async move {
                 if let Err(err) = cell.cleanup().await {
                     tracing::error!("Error cleaning up Cell: {:?}\nCellId: {}", err, cell.id());
@@ -1388,7 +1381,7 @@ mod app_impls {
                 tracing::debug!(msg = "Removed app from db.", app = ?app);
 
                 // Remove the cells from conductor state.
-                self.remove_cells_by_id(cells_to_remove.as_slice()).await;
+                self.remove_cells(&cells_to_remove).await;
 
                 // Remove the app's signal broadcast from conductor.
                 let installed_app_ids = self
@@ -1754,7 +1747,7 @@ mod clone_cell_impls {
                     }
                 })
                 .await?;
-            self.remove_cells_by_id([removed_cell_id].as_slice()).await;
+            self.remove_cells(&[removed_cell_id]).await;
             Ok(())
         }
 
@@ -1872,7 +1865,7 @@ mod app_status_impls {
                 .into_iter()
                 .collect::<Result<Vec<_>, _>>()?;
 
-            // Add cells to state, marked as "running".
+            // Add cells to conductor state as running cells
             let (new_cells, triggers): (Vec<_>, Vec<_>) = cells.into_iter().unzip();
             let new_cells_map: IndexMap<CellId, Arc<Cell>> = new_cells
                 .into_iter()
@@ -1880,7 +1873,6 @@ mod app_status_impls {
                 .collect();
             let new_cell_ids: HashSet<_> = new_cells_map.keys().cloned().collect();
 
-            // Add to running_cells
             self.running_cells.share_mut(|cells| {
                 cells.extend(new_cells_map.clone());
                 tracing::debug!(?new_cell_ids, "added cells to running_cells");
@@ -2031,8 +2023,7 @@ mod app_status_impls {
 
             // Remove cells from state.
             let cell_ids_to_cleanup = app.all_cells().collect::<Vec<_>>();
-            self.remove_cells_by_id(cell_ids_to_cleanup.as_slice())
-                .await;
+            self.remove_cells(&cell_ids_to_cleanup).await;
 
             // Set app status to disabled.
             let (_, app) = self
