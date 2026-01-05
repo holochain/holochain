@@ -248,9 +248,15 @@ async fn publish_loop() {
     let op = ChainOp::RegisterAgentActivity(signature, action);
     let op = DhtOpHashed::from_content_sync(op);
     let op_hash = op.to_hash();
-    db.write_async(move |txn| -> StateMutationResult<()> {
-        mutations::insert_op_authored(txn, &op)
-    })
+    db.write_async({
+    let op = op.clone();
+    move |txn| -> StateMutationResult<()> {
+        mutations::insert_op_authored(txn, &op)?;
+        // Mark the op as integrated so it can be published
+        mutations::set_when_integrated(txn, &op.to_hash(), Timestamp::now())?;
+        Ok(())
+    }
+})
     .await
     .unwrap();
     let mut dna_network = MockHolochainP2pDnaT::new();
