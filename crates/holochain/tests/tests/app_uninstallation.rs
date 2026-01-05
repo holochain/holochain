@@ -1,6 +1,8 @@
 use holo_hash::{ActionHash, AgentPubKeyB64, DnaHashB64};
 use holochain::{
-    conductor::state::{AppInterfaceId, ConductorState}, retry_until_timeout, sweettest::{SweetConductor, SweetDnaFile}
+    conductor::state::{AppInterfaceId, ConductorState},
+    retry_until_timeout,
+    sweettest::{SweetConductor, SweetDnaFile},
 };
 use holochain_wasm_test_utils::TestWasm;
 use serde::{Deserialize, Serialize};
@@ -71,7 +73,8 @@ async fn space_removed_on_uninstall() {
         conductor: ConductorSerialized,
         state: ConductorState,
     }
-    let conductor_state: ConductorDump = serde_json::from_str(conductor.dump_conductor_state().await.unwrap().as_str()).unwrap();
-    
+    let conductor_state: ConductorDump =
+        serde_json::from_str(conductor.dump_conductor_state().await.unwrap().as_str()).unwrap();
+
     assert_eq!(conductor_state.conductor.running_cells.len(), 0);
 }
