@@ -57,10 +57,6 @@ pub trait HdkT: HdiT {
     ) -> ExternResult<Vec<LinkDetails>>;
     fn count_links(&self, query: LinkQuery) -> ExternResult<usize>;
     // P2P
-    #[cfg(feature = "unstable-functions")]
-    fn block_agent(&self, block_agent_input: BlockAgentInput) -> ExternResult<()>;
-    #[cfg(feature = "unstable-functions")]
-    fn unblock_agent(&self, unblock_agent_input: BlockAgentInput) -> ExternResult<()>;
     fn call(&self, call: Vec<Call>) -> ExternResult<Vec<ZomeCallResponse>>;
     fn emit_signal(&self, app_signal: AppSignal) -> ExternResult<()>;
     fn send_remote_signal(&self, remote_signal: RemoteSignal) -> ExternResult<()>;
@@ -148,8 +144,6 @@ mockall::mock! {
         ) -> ExternResult<Vec<LinkDetails>>;
         fn count_links(&self, query: LinkQuery) -> ExternResult<usize>;
         // P2P
-        fn block_agent(&self, block_agent_input: BlockAgentInput) -> ExternResult<()>;
-        fn unblock_agent(&self, unblock_agent_input: BlockAgentInput) -> ExternResult<()>;
         fn call(&self, call: Vec<Call>) -> ExternResult<Vec<ZomeCallResponse>>;
         fn emit_signal(&self, app_signal: AppSignal) -> ExternResult<()>;
         fn send_remote_signal(&self, remote_signal: RemoteSignal) -> ExternResult<()>;
@@ -370,14 +364,6 @@ impl HdkT for ErrHdk {
         Self::err()
     }
     // P2P
-    #[cfg(feature = "unstable-functions")]
-    fn block_agent(&self, _: BlockAgentInput) -> ExternResult<()> {
-        Self::err()
-    }
-    #[cfg(feature = "unstable-functions")]
-    fn unblock_agent(&self, _: BlockAgentInput) -> ExternResult<()> {
-        Self::err()
-    }
     fn call(&self, _: Vec<Call>) -> ExternResult<Vec<ZomeCallResponse>> {
         Self::err()
     }
@@ -621,14 +607,6 @@ impl HdkT for HostHdk {
     }
     fn count_links(&self, query: LinkQuery) -> ExternResult<usize> {
         host_call::<LinkQuery, usize>(__hc__count_links_1, query)
-    }
-    #[cfg(feature = "unstable-functions")]
-    fn block_agent(&self, block_agent_input: BlockAgentInput) -> ExternResult<()> {
-        host_call::<BlockAgentInput, ()>(__hc__block_agent_1, block_agent_input)
-    }
-    #[cfg(feature = "unstable-functions")]
-    fn unblock_agent(&self, unblock_agent_input: BlockAgentInput) -> ExternResult<()> {
-        host_call::<BlockAgentInput, ()>(__hc__unblock_agent_1, unblock_agent_input)
     }
     fn call(&self, call_input: Vec<Call>) -> ExternResult<Vec<ZomeCallResponse>> {
         host_call::<Vec<Call>, Vec<ZomeCallResponse>>(__hc__call_1, call_input)
