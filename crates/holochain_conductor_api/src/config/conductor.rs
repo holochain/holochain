@@ -792,12 +792,12 @@ unknown_field: some_value
         assert_matches!(result, Err(ConductorConfigError::SerializationError(_)));
         if let Err(ConductorConfigError::SerializationError(e)) = result {
             let error_msg = e.to_string();
-            assert!(
-                error_msg.contains("unknown_field") || error_msg.contains("unknown field"),
-                "Error message should mention the unknown field: {}",
-                e
-            );
-        }
+           assert!(
+                error_msg.contains("unknown_field"),
+                "Error message should mention the unknown field name: {}",
+                error_msg
+           );
+       }
 
         // Test unrecognized field in keystore config
         let yaml = r#"---
@@ -810,13 +810,13 @@ keystore:
         assert_matches!(result, Err(ConductorConfigError::SerializationError(_)));
         if let Err(ConductorConfigError::SerializationError(e)) = result {
             let error_msg = e.to_string();
-            assert!(
-                error_msg.contains("unknown_keystore_field") || error_msg.contains("unknown field"),
-                "Error message should mention the unknown field: {}",
-                e
-            );
-        }
-    }
+           assert!(
+                error_msg.contains("unknown_keystore_field"),
+                "Error message should mention the unknown field name: {}",
+                error_msg
+           );
+       }
+   }
 
     #[test]
     fn test_admin_interface_rejects_unrecognized_fields() {
@@ -836,12 +836,12 @@ admin_interfaces:
         assert_matches!(result, Err(ConductorConfigError::SerializationError(_)));
         if let Err(ConductorConfigError::SerializationError(e)) = result {
             let error_msg = e.to_string();
-            assert!(
-                error_msg.contains("unknown_driver_field") || error_msg.contains("unknown field"),
-                "Error message should mention the unknown field: {}",
-                e
-            );
-        }
+           assert!(
+                error_msg.contains("unknown_driver_field"),
+                "Error message should mention the unknown field name: {}",
+                error_msg
+           );
+       }
 
         // Test unrecognized field at admin interface level
         let yaml = r#"---
@@ -859,13 +859,13 @@ admin_interfaces:
         assert_matches!(result, Err(ConductorConfigError::SerializationError(_)));
         if let Err(ConductorConfigError::SerializationError(e)) = result {
             let error_msg = e.to_string();
-            assert!(
-                error_msg.contains("unknown_admin_field") || error_msg.contains("unknown field"),
-                "Error message should mention the unknown field: {}",
-                e
-            );
-        }
-    }
+           assert!(
+                error_msg.contains("unknown_admin_field"),
+                "Error message should mention the unknown field name: {}",
+                error_msg
+           );
+       }
+   }
 
     #[test]
     fn test_empty_config_uses_default_values() {
