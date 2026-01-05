@@ -8,10 +8,12 @@ use must_future::MustBoxFuture;
 use crate::prelude::DbWrite;
 
 /// Provider trait for retrieving authored databases.
+///
 /// This abstracts away the conductor dependency from workflows.
 #[automock]
 pub trait AuthoredDbProvider: Send + Sync + 'static {
     /// Get the authored database for a cell if it exists.
+    ///
     /// Returns None if the cell is not running or does not have an authored database.
     fn get_authored_db(
         &self,

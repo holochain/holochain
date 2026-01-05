@@ -5,10 +5,12 @@ use holochain_state::prelude::CellId;
 use must_future::MustBoxFuture;
 
 /// Provider trait for retrieving publish triggers.
+///
 /// This abstracts away the conductor dependency from workflows.
 #[cfg_attr(test, mockall::automock)]
 pub trait PublishTriggerProvider: Send + Sync {
     /// Get the publish trigger for a cell if it exists.
+    ///
     /// Returns None if the cell is not running.
     fn get_publish_trigger(&self, cell_id: &CellId) -> MustBoxFuture<'_, Option<TriggerSender>>;
 }
