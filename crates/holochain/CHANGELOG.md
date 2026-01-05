@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **Improved configuration validation**: Added `deny_unknown_fields` to conductor configuration structs to improve UX by rejecting configurations with typos or obsolete fields. This helps catch configuration errors early. #5455
+
 ## 0.7.0-dev.6
 
 - Fix: Limit concurrency when starting many cells at once to prevent resource exhaustion. Starting cells is now limited to 5 concurrent cell creation operations and 10 concurrent network join operations. This improves startup reliability for conductors managing large numbers of cells.

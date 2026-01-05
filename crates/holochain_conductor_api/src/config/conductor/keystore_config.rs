@@ -7,6 +7,7 @@ use serde::Serialize;
 /// to collect the passphrase needed to unlock the keystore.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[serde(deny_unknown_fields)]
 pub enum KeystoreConfig {
     /// Enabling this will use a test keystore instead of lair.
     /// This generates publicly accessible private keys.
