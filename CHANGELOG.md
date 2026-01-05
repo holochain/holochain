@@ -14,6 +14,70 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20260105.001833
+
+## [hc\_service\_check-0.4.0-dev.1](crates/hc_service_check/CHANGELOG.md#0.4.0-dev.1)
+
+## [hcterm-0.7.0-dev.6](crates/hcterm/CHANGELOG.md#0.7.0-dev.6)
+
+## [holochain\_cli-0.7.0-dev.6](crates/holochain_cli/CHANGELOG.md#0.7.0-dev.6)
+
+## [holochain\_cli\_bundle-0.7.0-dev.6](crates/holochain_cli_bundle/CHANGELOG.md#0.7.0-dev.6)
+
+## [holochain\_cli\_client-0.7.0-dev.6](crates/holochain_cli_client/CHANGELOG.md#0.7.0-dev.6)
+
+## [holochain\_cli\_sandbox-0.7.0-dev.6](crates/holochain_cli_sandbox/CHANGELOG.md#0.7.0-dev.6)
+
+## [holochain\_client-0.9.0-dev.6](crates/holochain_client/CHANGELOG.md#0.9.0-dev.6)
+
+## [holochain-0.7.0-dev.6](crates/holochain/CHANGELOG.md#0.7.0-dev.6)
+
+- Fix: Limit concurrency when starting many cells at once to prevent resource exhaustion. Starting cells is now limited to 5 concurrent cell creation operations and 10 concurrent network join operations. This improves startup reliability for conductors managing large numbers of cells.
+- Replace the `do_callback!` private macro with a `do_callback` generic function. This change should not affect the user as the macro, now function, is only used internally in the `real_ribosome` module. \#5529
+- **BREAKING CHANGE** Add `GetStrategy` field to `TypedPath` to allow users to specify whether path operations should use network or local-only fetching. The `GetStrategy` enum has been moved from `holochain_zome_types` to `holochain_integrity_types` and re-exported for backward compatibility. Applications can now configure paths to use local-only fetching by calling `.with_strategy(GetStrategy::Local)` on a TypedPath. \#5471
+- Fix: `EnableCloneCell` now works consistently when called with either `CloneId` or `DnaHash` on already-enabled clones. Previously, using a `DnaHash` would fail with `CloneCellNotFound` while using a `CloneId` would succeed. \#5519
+- **BREAKING CHANGE** Removed the `InstalledAppCommon` function `get_disabled_clone_id`. \#5519
+- Removed the unnecessary `hc_stress_test` helper module, its integration test, and example binaries now that performance testing lives in the `holochain/wind-tunnel` repository.
+- Conductor now overrides the Cell bootstrap and signal urls if specified in the app manifest [5524](https://github.com/holochain/holochain/pull/5524).
+
+## [holochain\_cascade-0.7.0-dev.6](crates/holochain_cascade/CHANGELOG.md#0.7.0-dev.6)
+
+## [holochain\_conductor\_config-0.7.0-dev.6](crates/holochain_conductor_config/CHANGELOG.md#0.7.0-dev.6)
+
+## [holochain\_test\_wasm\_common-0.7.0-dev.4](crates/holochain_test_wasm_common/CHANGELOG.md#0.7.0-dev.4)
+
+## [holochain\_wasm\_test\_utils-0.7.0-dev.6](crates/holochain_wasm_test_utils/CHANGELOG.md#0.7.0-dev.6)
+
+## [holochain\_websocket-0.7.0-dev.6](crates/holochain_websocket/CHANGELOG.md#0.7.0-dev.6)
+
+## [hdk-0.7.0-dev.4](crates/hdk/CHANGELOG.md#0.7.0-dev.4)
+
+## [holochain\_conductor\_api-0.7.0-dev.6](crates/holochain_conductor_api/CHANGELOG.md#0.7.0-dev.6)
+
+## [holochain\_p2p-0.7.0-dev.6](crates/holochain_p2p/CHANGELOG.md#0.7.0-dev.6)
+
+## [hdi-0.8.0-dev.3](crates/hdi/CHANGELOG.md#0.8.0-dev.3)
+
+## [holochain\_state-0.7.0-dev.6](crates/holochain_state/CHANGELOG.md#0.7.0-dev.6)
+
+## [hdk\_derive-0.7.0-dev.3](crates/hdk_derive/CHANGELOG.md#0.7.0-dev.3)
+
+## [holochain\_chc-0.4.0-dev.6](crates/holochain_chc/CHANGELOG.md#0.4.0-dev.6)
+
+## [holochain\_state\_types-0.7.0-dev.3](crates/holochain_state_types/CHANGELOG.md#0.7.0-dev.3)
+
+## [holochain\_types-0.7.0-dev.6](crates/holochain_types/CHANGELOG.md#0.7.0-dev.6)
+
+## [holochain\_keystore-0.7.0-dev.3](crates/holochain_keystore/CHANGELOG.md#0.7.0-dev.3)
+
+## [holochain\_sqlite-0.7.0-dev.4](crates/holochain_sqlite/CHANGELOG.md#0.7.0-dev.4)
+
+## [holochain\_zome\_types-0.7.0-dev.3](crates/holochain_zome_types/CHANGELOG.md#0.7.0-dev.3)
+
+## [holochain\_integrity\_types-0.7.0-dev.3](crates/holochain_integrity_types/CHANGELOG.md#0.7.0-dev.3)
+
+## [holo\_hash-0.7.0-dev.2](crates/holo_hash/CHANGELOG.md#0.7.0-dev.2)
+
 # 20251229.001810
 
 ## [hcterm-0.7.0-dev.5](crates/hcterm/CHANGELOG.md#0.7.0-dev.5)
