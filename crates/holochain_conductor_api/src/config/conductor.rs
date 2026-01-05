@@ -780,6 +780,94 @@ mod tests {
     }
 
     #[test]
+    fn test_config_rejects_unrecognized_fields() {
+        // Test unrecognized field at top level
+        let yaml = r#"---
+data_root_path: /path/to/env
+keystore:
+  type: danger_test_keystore
+unknown_field: some_value
+   "#;
+        let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
+        assert_matches!(result, Err(ConductorConfigError::SerializationError(_)));
+        if let Err(ConductorConfigError::SerializationError(e)) = result {
+            let error_msg = e.to_string();
+            assert!(
+                error_msg.contains("unknown_field") || error_msg.contains("unknown field"),
+                "Error message should mention the unknown field: {}",
+                e
+            );
+        }
+
+        // Test unrecognized field in keystore config
+        let yaml = r#"---
+data_root_path: /path/to/env
+keystore:
+  type: danger_test_keystore
+  unknown_keystore_field: true
+   "#;
+        let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
+        assert_matches!(result, Err(ConductorConfigError::SerializationError(_)));
+        if let Err(ConductorConfigError::SerializationError(e)) = result {
+            let error_msg = e.to_string();
+            assert!(
+                error_msg.contains("unknown_keystore_field") || error_msg.contains("unknown field"),
+                "Error message should mention the unknown field: {}",
+                e
+            );
+        }
+    }
+
+    #[test]
+    fn test_admin_interface_rejects_unrecognized_fields() {
+        // Test unrecognized field in admin interface
+        let yaml = r#"---
+data_root_path: /path/to/env
+keystore:
+  type: danger_test_keystore
+admin_interfaces:
+  - driver:
+      type: websocket
+      port: 12345
+      allowed_origins: "*"
+      unknown_driver_field: test
+   "#;
+        let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
+        assert_matches!(result, Err(ConductorConfigError::SerializationError(_)));
+        if let Err(ConductorConfigError::SerializationError(e)) = result {
+            let error_msg = e.to_string();
+            assert!(
+                error_msg.contains("unknown_driver_field") || error_msg.contains("unknown field"),
+                "Error message should mention the unknown field: {}",
+                e
+            );
+        }
+
+        // Test unrecognized field at admin interface level
+        let yaml = r#"---
+data_root_path: /path/to/env
+keystore:
+  type: danger_test_keystore
+admin_interfaces:
+  - driver:
+      type: websocket
+      port: 12345
+      allowed_origins: "*"
+    unknown_admin_field: value
+   "#;
+        let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
+        assert_matches!(result, Err(ConductorConfigError::SerializationError(_)));
+        if let Err(ConductorConfigError::SerializationError(e)) = result {
+            let error_msg = e.to_string();
+            assert!(
+                error_msg.contains("unknown_admin_field") || error_msg.contains("unknown field"),
+                "Error message should mention the unknown field: {}",
+                e
+            );
+        }
+    }
+
+    #[test]
     fn test_empty_config_uses_default_values() {
         let result: ConductorConfig = config_from_yaml("").unwrap();
         pretty_assertions::assert_eq!(result, ConductorConfig::default());
