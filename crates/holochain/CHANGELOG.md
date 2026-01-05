@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **Improved configuration validation**: Added `deny_unknown_fields` to conductor configuration structs to improve UX by rejecting configurations with typos or obsolete fields. This helps catch configuration errors early. #5455
+
 ## 0.7.0-dev.10
 
 - Rename `SweetConductor::from_standard_config` to `SweetConductor::standard`.

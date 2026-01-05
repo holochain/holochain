@@ -70,6 +70,7 @@ pub use keystore_config::KeystoreConfig;
 
 /// All the config information for the conductor
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ConductorConfig {
     /// Override the environment specified tracing config.
     #[serde(default)]
@@ -240,6 +241,7 @@ impl ConductorConfig {
 /// Configure Kitsune2 Reporting.
 #[derive(Clone, Default, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case", rename_all_fields = "snake_case")]
+#[serde(deny_unknown_fields)]
 pub enum ReportConfig {
     /// Default to no reporting.
     #[default]
@@ -258,6 +260,7 @@ pub enum ReportConfig {
 /// All the network config information for the conductor.
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
+#[serde(deny_unknown_fields)]
 pub struct NetworkConfig {
     /// Authentication material if required by sbd/signal/bootstrap services.
     /// This material should be specified as a base64 string
@@ -562,6 +565,7 @@ impl NetworkConfig {
 
 /// Tuning parameters to adjust the behaviour of the conductor.
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ConductorTuningParams {
     /// The delay between retries of sys validation when there are missing dependencies waiting to be found on the DHT.
     ///
@@ -786,9 +790,6 @@ mod tests {
 
         let yaml = r#"---
     data_root_path: /path/to/env
-    signing_service_uri: ws://localhost:9001
-    encryption_service_uri: ws://localhost:9002
-    decryption_service_uri: ws://localhost:9003
 
     keystore:
       type: lair_server_in_proc
@@ -878,7 +879,6 @@ mod tests {
     fn test_config_new_lair_keystore() {
         let yaml = r#"---
     data_root_path: /path/to/env
-    keystore_path: /path/to/keystore
     keystore:
       type: lair_server
       connection_url: "unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"
