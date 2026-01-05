@@ -1,13 +1,13 @@
 use holo_hash::{ActionHash, AgentPubKeyB64, DnaHashB64};
 use holochain::{
-    conductor::state::{AppInterfaceId, ConductorState}, retry_until_timeout, sweettest::{SweetConductor, SweetDnaFile}
+    conductor::state::{AppInterfaceId, ConductorState}, prelude::DisabledAppReason, retry_until_timeout, sweettest::{SweetConductor, SweetDnaFile}
 };
 use holochain_wasm_test_utils::TestWasm;
 use serde::{Deserialize, Serialize};
 
-/// Test that space is removed and cleaned up on app uninstall
+/// Test that space is removed and cleaned up on app disable
 #[tokio::test(flavor = "multi_thread")]
-async fn space_removed_on_uninstall() {
+async fn space_removed_on_disable() {
     holochain_trace::test_run();
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
@@ -30,15 +30,15 @@ async fn space_removed_on_uninstall() {
     let spaces = holochain_p2p.test_kitsune().list_spaces();
     assert_eq!(spaces.len(), 1);
 
-    // Uninstall the app - this should call remove_cells_by_id
+    // Disable the app - this should call remove_cells_by_id
     let app_id = "test_app".to_string();
     conductor
         .clone()
-        .uninstall_app(&app_id, false)
+        .disable_app(app_id, DisabledAppReason::User)
         .await
         .unwrap();
 
-    // After uninstalling, verify that operations on this space fail
+    // After disabling, verify that operations on this space fail
     // This confirms cells were removed from conductor state
     let result = holochain_p2p
         .publish(
