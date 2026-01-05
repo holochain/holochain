@@ -38,10 +38,10 @@ impl Anchor {
 
     /// Set the [`GetStrategy`] for this [`Anchor`].
     ///
-    /// Note: The strategy is preserved when using HDK anchor functions or the [`AnchorExt`] trait
-    /// to convert to [`TypedPath`]. However, if you convert an [`Anchor`] to a [`Path`] and then
-    /// to [`TypedPath`] manually, the strategy will be lost since [`Path`] does not carry strategy
-    /// information.
+    /// Note: The strategy is preserved when using HDK anchor functions or the `AnchorExt` trait
+    /// to convert to [`TypedPath`](crate::hash_path::path::TypedPath). However, if you convert an
+    /// [`Anchor`] to a [`Path`] and then to [`TypedPath`](crate::hash_path::path::TypedPath)
+    /// manually, the strategy will be lost since [`Path`] does not carry strategy information.
     pub fn with_strategy(mut self, strategy: GetStrategy) -> Self {
         self.strategy = strategy;
         self
