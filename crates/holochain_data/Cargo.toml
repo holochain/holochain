@@ -22,10 +22,10 @@ base64 = "0.22"
 sodoken = "0.1.0"
 tokio = { version = "1.27", features = ["full"] }
 libsqlite3-sys = "0.35"
-holo_hash = { version = "^0.7.0-dev.1", path = "../holo_hash" }
-holochain_types = { version = "^0.7.0-dev.5", path = "../holochain_types" }
-holochain_integrity_types = { version = "^0.7.0-dev.2", path = "../holochain_integrity_types" }
-holochain_zome_types = { version = "^0.7.0-dev.2", path = "../holochain_zome_types" }
+holo_hash = { version = "^0.7.0-dev.2", path = "../holo_hash" }
+holochain_types = { version = "^0.7.0-dev.6", path = "../holochain_types" }
+holochain_integrity_types = { version = "^0.7.0-dev.3", path = "../holochain_integrity_types" }
+holochain_zome_types = { version = "^0.7.0-dev.3", path = "../holochain_zome_types" }
 holochain_serialized_bytes = "=0.0.56"
 serde_json = "1.0"
 

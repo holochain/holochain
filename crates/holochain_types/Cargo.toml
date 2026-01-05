@@ -1,6 +1,6 @@
 [package]
 name = "holochain_types"
-version = "0.7.0-dev.5"
+version = "0.7.0-dev.6"
 description = "Holochain common types"
 license = "Apache-2.0"
 repository = "https://github.com/holochain/holochain"
@@ -18,19 +18,19 @@ base64 = "0.22"
 derive_builder = "0.20"
 derive_more = { version = "2.0", features = ["constructor", "into_iterator"] }
 futures = "0.3"
-holo_hash = { version = "^0.7.0-dev.1", path = "../holo_hash", features = [
+holo_hash = { version = "^0.7.0-dev.2", path = "../holo_hash", features = [
   "encoding",
   "schema",
 ] }
-holochain_keystore = { version = "^0.7.0-dev.2", path = "../holochain_keystore" }
+holochain_keystore = { version = "^0.7.0-dev.3", path = "../holochain_keystore" }
 holochain_nonce = { version = "^0.7.0-dev.0", path = "../holochain_nonce" }
 holochain_serialized_bytes = "=0.0.56"
-holochain_sqlite = { path = "../holochain_sqlite", version = "^0.7.0-dev.3" }
+holochain_sqlite = { path = "../holochain_sqlite", version = "^0.7.0-dev.4" }
 holochain_trace = { version = "^0.7.0-dev.0", path = "../holochain_trace" }
 holochain_util = { version = "^0.7.0-dev.0", path = "../holochain_util", features = [
   "backtrace",
 ] }
-holochain_zome_types = { path = "../holochain_zome_types", version = "^0.7.0-dev.2", features = [
+holochain_zome_types = { path = "../holochain_zome_types", version = "^0.7.0-dev.3", features = [
   "full",
 ] }
 holochain_timestamp = { version = "^0.7.0-dev.0", path = "../timestamp" }
