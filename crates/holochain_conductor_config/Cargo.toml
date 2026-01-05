@@ -14,7 +14,7 @@ license = "Apache-2.0"
 [dependencies]
 anyhow = "1.0"
 ansi_term = "0.12"
-holochain_conductor_api = { version = "^0.7.0-dev.6", path = "../holochain_conductor_api", features = [
+holochain_conductor_api = { version = "^0.7.0-dev.6", path = "../holochain_conductor_api", default-features = false, features = [
   "sqlite",
 ] }
 holochain_types = { version = "^0.7.0-dev.6", path = "../holochain_types", features = [
@@ -33,9 +33,20 @@ url2 = "0.0.6"
 tempfile = "3.15"
 
 [features]
-default = []
+default = ["transport-tx5-datachannel-vendored"]
 
 chc = ["holochain_conductor_api/chc"]
+
+transport-tx5-backend-go-pion = [
+  "holochain_conductor_api/transport-tx5-backend-go-pion",
+]
+transport-tx5-datachannel-vendored = [
+  "holochain_conductor_api/transport-tx5-datachannel-vendored",
+]
+transport-tx5-backend-libdatachannel = [
+  "holochain_conductor_api/transport-tx5-backend-libdatachannel",
+]
+transport-iroh = ["holochain_conductor_api/transport-iroh"]
 
 [lints]
 workspace = true

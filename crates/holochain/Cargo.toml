@@ -29,7 +29,7 @@ holo_hash = { version = "^0.7.0-dev.2", path = "../holo_hash", features = [
 ] }
 holochain_cascade = { version = "^0.7.0-dev.6", default-features = false, path = "../holochain_cascade" }
 holochain_chc = { version = "^0.4.0-dev.6", path = "../holochain_chc", default-features = false }
-holochain_conductor_api = { version = "^0.7.0-dev.6", path = "../holochain_conductor_api" }
+holochain_conductor_api = { version = "^0.7.0-dev.6", path = "../holochain_conductor_api", default-features = false }
 holochain_keystore = { version = "^0.7.0-dev.3", path = "../holochain_keystore", default-features = false }
 holochain_p2p = { version = "^0.7.0-dev.6", default-features = false, path = "../holochain_p2p" }
 holochain_sqlite = { version = "^0.7.0-dev.4", path = "../holochain_sqlite" }
@@ -46,7 +46,7 @@ holochain_zome_types = { version = "^0.7.0-dev.3", path = "../holochain_zome_typ
 ] }
 holochain_nonce = { version = "^0.7.0-dev.0", path = "../holochain_nonce" }
 holochain_secure_primitive = { version = "^0.7.0-dev.0", path = "../holochain_secure_primitive" }
-holochain_conductor_config = { version = "^0.7.0-dev.6", path = "../holochain_conductor_config" }
+holochain_conductor_config = { version = "^0.7.0-dev.6", path = "../holochain_conductor_config", default-features = false }
 holochain_timestamp = { version = "^0.7.0-dev.0", path = "../timestamp" }
 human-panic = "2.0"
 itertools = { version = "0.14" }
@@ -268,24 +268,28 @@ transport-tx5-datachannel-vendored = [
   "holochain_p2p/transport-tx5-datachannel-vendored",
   "holochain_cascade/transport-tx5-datachannel-vendored",
   "holochain_conductor_api/transport-tx5-datachannel-vendored",
+  "holochain_conductor_config/transport-tx5-datachannel-vendored",
 ]
 
 transport-tx5-backend-libdatachannel = [
   "holochain_p2p/transport-tx5-backend-libdatachannel",
   "holochain_cascade/transport-tx5-backend-libdatachannel",
   "holochain_conductor_api/transport-tx5-backend-libdatachannel",
+  "holochain_conductor_config/transport-tx5-backend-libdatachannel",
 ]
 
 transport-tx5-backend-go-pion = [
   "holochain_p2p/transport-tx5-backend-go-pion",
   "holochain_cascade/transport-tx5-backend-go-pion",
   "holochain_conductor_api/transport-tx5-backend-go-pion",
+  "holochain_conductor_config/transport-tx5-backend-go-pion",
 ]
 
 transport-iroh = [
   "holochain_p2p/transport-iroh",
   "holochain_cascade/transport-iroh",
   "holochain_conductor_api/transport-iroh",
+  "holochain_conductor_config/transport-iroh",
 ]
 
 # Extremely verbose wasm memory read/write logging

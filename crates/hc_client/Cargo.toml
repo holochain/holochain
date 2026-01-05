@@ -72,7 +72,7 @@ transport-tx5-backend-libdatachannel = [
   "holochain_conductor_api/transport-tx5-backend-libdatachannel",
   "holochain?/transport-tx5-backend-libdatachannel",
 ]
-transport-transport-iroh = [
+transport-iroh = [
   "holochain_conductor_api/transport-iroh",
   "holochain?/transport-iroh",
 ]

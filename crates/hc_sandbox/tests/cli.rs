@@ -618,7 +618,7 @@ async fn generate_sandbox_with_iroh_network_type() {
         .expect("Failed to read config from config_root_path")
         .unwrap();
 
-    // Assert target_arc_factor has been overridden in config file
+    // Assert signal url has been overridden in config file
     assert_eq!(config.network.signal_url, url2::Url2::parse(relay_url));
     assert_eq!(
         config.network.advanced.unwrap(),
@@ -646,7 +646,7 @@ async fn generate_sandbox_with_target_arc_factor_override() {
     ))]
     let (network_type, relay_url) = ("webrtc", "wss://signal");
     #[cfg(feature = "transport-iroh")]
-    let (network_type, relay_url) = ("quic", "wss://iroh-relay");
+    let (network_type, relay_url) = ("quic", "https://iroh-relay");
 
     holochain_trace::test_run();
     let mut cmd = get_sandbox_command();
