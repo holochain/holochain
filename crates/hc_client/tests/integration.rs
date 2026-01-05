@@ -641,9 +641,9 @@ async fn list_agents() -> Result<()> {
     // command will return empty results.
     tokio::time::timeout(Duration::from_secs(10), async {
         loop {
-            let ai_0 = conductors[0].get_agent_infos(None).await.unwrap();
-            let ai_1 = conductors[1].get_agent_infos(None).await.unwrap();
-            if !ai_0.is_empty() && !ai_1.is_empty() {
+            let agent_infos_0 = conductors[0].get_agent_infos(None).await.unwrap();
+            let agent_infos_1 = conductors[1].get_agent_infos(None).await.unwrap();
+            if !agent_infos_0.is_empty() && !agent_infos_1.is_empty() {
                 break;
             }
             tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;

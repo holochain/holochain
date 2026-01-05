@@ -104,7 +104,7 @@ jobs:
           brew install llvm
           echo "PATH=/opt/homebrew/opt/llvm/bin:$PATH" >> "$GITHUB_ENV"
 
-      - name: "Common Test Actions"
+      - name: "Build workspace and run tests"
         uses: ./.github/actions/common-test
         with:
           os: "macos-latest"

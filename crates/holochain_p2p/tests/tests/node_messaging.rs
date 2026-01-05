@@ -991,7 +991,8 @@ async fn test_must_get_agent_activity_with_unresponsive_agents() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_validation_receipts() {
-    holochain_trace::test_run();
+    test_run();
+
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
     let handler = Arc::new(Handler::default());
 
