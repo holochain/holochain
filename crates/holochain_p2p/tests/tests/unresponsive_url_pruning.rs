@@ -273,7 +273,7 @@ impl TestCase {
             .unwrap();
         let peer_meta_store = p2p
             .test_kitsune()
-            .space_if_exists(space_id.clone())
+            .space(space_id.clone(), None)
             .await
             .unwrap()
             .peer_meta_store()
