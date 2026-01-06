@@ -1065,7 +1065,7 @@ impl HolochainP2pActor {
                                 .await
                                 .map_err(HolochainP2pError::other)?;
                             } else {
-                                tracing::warn!("Cannot prune expired URLs from peer meta store for k2 space that does not exist.");
+                                tracing::warn!("Cannot prune expired URLs from peer meta store for k2 space that does not exist with space id {space_id}");
                             }
                             Ok::<_, HolochainP2pError>(())
                         }
@@ -1464,7 +1464,7 @@ impl actor::HcP2p for HolochainP2pActor {
                     }
                 }
             } else {
-                tracing::warn!("Cannot leave space that does not exist.");
+                tracing::warn!("Cannot leave space that does not exist with space id {space_id}.");
             }
 
             Ok(())
@@ -2244,6 +2244,8 @@ impl actor::HcP2p for HolochainP2pActor {
                     for space_id in all_space_ids {
                         if let Some(space) = self.kitsune.space_if_exists(space_id.clone()).await {
                             spaces.push((space_id.clone(), space));
+                        } else {
+                            tracing::warn!("Cannot dump network metrics for space that does not exist with space id {space_id}.");
                         }
                     }
 
