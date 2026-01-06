@@ -62,9 +62,15 @@ default = ["wasmer_sys", "transport-tx5-datachannel-vendored"]
 wasmer_sys = ["holochain_client/wasmer_sys"]
 wasmer_wamr = ["holochain_client/wasmer_wamr"]
 
-transport-tx5-datachannel-vendored = []
-transport-tx5-backend-libdatachannel = []
-transport-tx5-backend-go-pion = []
-transport-iroh = []
+transport-tx5-datachannel-vendored = [
+  "holochain_client/transport-tx5-datachannel-vendored",
+]
+transport-tx5-backend-libdatachannel = [
+  "holochain_client/transport-tx5-backend-libdatachannel",
+]
+transport-tx5-backend-go-pion = [
+  "holochain_client/transport-tx5-backend-go-pion",
+]
+transport-iroh = ["holochain_client/transport-iroh"]
 
 chc = ["holochain_conductor_api/chc", "holochain_conductor_config/chc"]
