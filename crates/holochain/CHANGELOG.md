@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE** Add `GetStrategy` field to [`Anchor`] struct to allow users to specify whether anchor operations should use network or local-only fetching. The [`Anchor`] struct now has a `strategy` field with serde default, and a `with_strategy()` builder method. New functions `anchor_with_strategy()`, `list_anchor_type_addresses_with_strategy()`, `list_anchor_addresses_with_strategy()`, and `list_anchor_tags_with_strategy()` have been added to the HDK to support this functionality. Additionally, an `AnchorExt` trait has been added to convert [`Anchor`] directly to [`TypedPath`] while preserving the strategy. Applications can now configure anchors to use local-only fetching by calling `.with_strategy(GetStrategy::Local)` on an [`Anchor`]. This complements the similar change to [`TypedPath`]. #5471
 - **BREAKING CHANGE**: Remove features for tx5 transport variants `datachannel-vendored` and `backend-libdatachannel`. The only supported tx5 transport is `backend-go-pion` now.
 - **BREAKING CHANGE**: Default to iroh transport for all binaries.
 - Revert to iroh's public relay server URL `https://use1-1.relay.n0.iroh-canary.iroh.link./` in the conductor config.
