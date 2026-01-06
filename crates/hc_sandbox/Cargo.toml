@@ -48,8 +48,8 @@ holochain_trace = { version = "^0.6.0", path = "../holochain_trace" }
 holo_hash = { version = "^0.6.0", path = "../holo_hash", features = [
   "kitsune2",
 ] }
-kitsune2_api = "=0.4.0-dev.0"
-kitsune2_core = "=0.4.0-dev.0"
+kitsune2_api = "0.4.0-dev.2"
+kitsune2_core = "0.4.0-dev.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 serde_json = "1.0"
@@ -62,7 +62,7 @@ walkdir = "2"
 ed25519-dalek = "2.1"
 
 [dev-dependencies]
-kitsune2_test_utils = "=0.4.0-dev.0"
+kitsune2_test_utils = "0.4.0-dev.2"
 fixt = { version = "^0.6.0", path = "../fixt" }
 indexmap = { version = "2.6.0", features = ["serde"] }
 tempfile = "3.20.0"
@@ -74,10 +74,21 @@ nix = { version = "0.30", features = ["process", "signal"] }
 workspace = true
 
 [features]
-default = ["wasmer_sys"]
+default = ["wasmer_sys", "transport-tx5-datachannel-vendored"]
 
 wasmer_sys = ["holochain_client/wasmer_sys"]
 wasmer_wamr = ["holochain_client/wasmer_wamr"]
+
+transport-tx5-datachannel-vendored = [
+  "holochain_client/transport-tx5-datachannel-vendored",
+]
+transport-tx5-backend-libdatachannel = [
+  "holochain_client/transport-tx5-backend-libdatachannel",
+]
+transport-tx5-backend-go-pion = [
+  "holochain_client/transport-tx5-backend-go-pion",
+]
+transport-iroh = ["holochain_client/transport-iroh"]
 
 chc = [
   "dep:holochain_chc",

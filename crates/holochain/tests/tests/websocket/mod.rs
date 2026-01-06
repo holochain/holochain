@@ -774,7 +774,15 @@ async fn network_stats() {
         .admin_ws_client::<AdminResponse>()
         .await;
 
+    #[cfg(any(
+        feature = "transport-tx5-datachannel-vendored",
+        feature = "transport-tx5-backend-libdatachannel"
+    ))]
     const EXPECT: &str = "BackendLibDataChannel";
+    #[cfg(feature = "transport-tx5-backend-go-pion")]
+    const EXPECT: &str = "BackendGoPion";
+    #[cfg(feature = "transport-iroh")]
+    const EXPECT: &str = "iroh";
 
     let req = AdminRequest::DumpNetworkStats;
     let res: AdminResponse = client.request(req).await.unwrap();

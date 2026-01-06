@@ -1954,6 +1954,41 @@ mod app_status_impls {
                 .await?;
             Ok(disabled_app)
         }
+
+        /// Get from [`AppManifest`] the [`CellConfigOverrides`] to apply when creating cells for the app.
+        pub(crate) fn p2p_config_overrides(manifest: &AppManifest) -> Option<CellConfigOverrides> {
+            let mut overrides = CellConfigOverrides::default();
+            match manifest {
+                AppManifest::V0(manifest) => {
+                    overrides.bootstrap_url = manifest.bootstrap_url.clone();
+                    overrides.signal_url = manifest.signal_url.clone();
+                }
+            }
+            if overrides.is_overriding() {
+                Some(overrides)
+            } else {
+                None
+            }
+        }
+
+        /// Check whether there is any already installed app with conflicting P2P overrides.
+        ///
+        /// If there is a conflicting app, return its [`CellId`].
+        pub(crate) fn check_p2p_overrides_conflicting(
+            &self,
+            dna_hash: &DnaHash,
+            overrides: &CellConfigOverrides,
+        ) -> Option<CellId> {
+            self.running_cells.share_ref(|c| {
+                c.values().find_map(|cell| {
+                    if cell.id().dna_hash() == dna_hash && cell.overrides() != overrides {
+                        Some(cell.id().clone())
+                    } else {
+                        None
+                    }
+                })
+            })
+        }
     }
 }
 

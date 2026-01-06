@@ -4,7 +4,7 @@ use ::fixt::prelude::*;
 use holo_hash::fixt::ActionHashFixturator;
 use holo_hash::*;
 use holochain_trace;
-use holochain_types::prelude::fixt::*;
+use crate::prelude::fixt::*;
 use tracing::*;
 
 struct RecordTest {

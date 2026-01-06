@@ -171,8 +171,9 @@ mod tests {
 
         let num_signals = Arc::new(AtomicUsize::new(0));
 
-        let config = SweetConductorConfig::standard();
-        let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
+        let config = SweetConductorConfig::rendezvous(true);
+        let mut conductors =
+            SweetConductorBatch::from_config_rendezvous(NUM_CONDUCTORS, config).await;
 
         let agents =
             future::join_all(conductors.iter().map(|c| SweetAgents::one(c.keystore()))).await;

@@ -549,11 +549,7 @@ impl ChainFilterRange {
 
 #[cfg(test)]
 mod tests {
-    use super::BoundedMustGetAgentActivityResponse;
-    use super::ChainBottomType;
-    use super::ChainFilter;
-    use super::ChainFilterRange;
-    use holochain_types::prelude::*;
+    use super::*;
     use test_case::test_case;
 
     /// If both sides are not activity then the acc should be returned.

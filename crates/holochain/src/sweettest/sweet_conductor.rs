@@ -10,6 +10,8 @@ use crate::conductor::{
     ConductorBuilder,
 };
 use crate::retry_until_timeout;
+#[cfg(feature = "transport-iroh")]
+use crate::test_utils::retry_fn_until_timeout;
 use ::fixt::prelude::StdRng;
 use hdk::prelude::*;
 use holochain_conductor_api::{
@@ -378,6 +380,30 @@ impl SweetConductor {
         self.raw_handle()
             .enable_app(installed_app_id.to_string())
             .await?;
+        // While it takes ~ 3 seconds to receive a URL from the home relay, await the agent
+        // info of each DNA of the just installed app's agent to show up in the peer stores.
+        #[cfg(feature = "transport-iroh")]
+        for dna_with_role in dnas_with_roles {
+            let dna_hash = dna_with_role.dna().dna_hash();
+            retry_fn_until_timeout(
+                || async {
+                    self.holochain_p2p()
+                        .test_kitsune()
+                        .space(dna_hash.to_k2_space(), None)
+                        .await
+                        .unwrap()
+                        .peer_store()
+                        .get(agent.to_k2_agent())
+                        .await
+                        .unwrap()
+                        .is_some()
+                },
+                None,
+                None,
+            )
+            .await
+            .expect("agent info didn't make it to the peer store");
+        }
         Ok(agent)
     }
 

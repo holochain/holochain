@@ -13,6 +13,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - CI: Allow test workflow to pass when tests of the feature `wasmer_wamr` fail. WAMR is not actively used, so investigating flaky tests on WAMR is not a priority. \#5523
 - CI: Run windows test workflow on Depot.dev runners for improved performance. \#5473
 - Refactor: Use production transport for all tests instead of in-memory implementations.
+- Update kitsune2 to v0.4.0-dev.2, which includes the iroh relay integration with the bootstrap server.
+- Crates `holochain_cli_client` and `holochain_client` now have features to set which network transport is compiled in (tx5 or iroh).
+- **BREAKING CHANGE** Feature `mock_network` was removed from crate `holochain_p2p`. It was only referencing `test_utils`, so instead `test_utils` should be used directly.
 - Added feature `transport-iroh` for using Iroh as network transport backend.
 - **BREAKING CHANGE** Renamed features `backend-libdatachannel` to `transport-tx5-backend-libdatachannel`, `backend-go-pion` to `transport-tx5-backend-go-pion`, `datachannel-vendored` to `transport-tx5-datachannel-vendored`.
 

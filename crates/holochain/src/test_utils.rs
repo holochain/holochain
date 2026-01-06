@@ -7,6 +7,8 @@ use crate::conductor::ConductorBuilder;
 use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::ZomeCallInvocation;
+use crate::sweettest::SweetConductorConfig;
+use crate::sweettest::SweetLocalRendezvous;
 use ::fixt::prelude::*;
 use hdk::prelude::ZomeName;
 use holo_hash::*;
@@ -578,7 +580,9 @@ impl RibosomeTestFixture {
     pub async fn new(test_wasm: TestWasm) -> Self {
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![test_wasm]).await;
 
-        let mut conductor = SweetConductor::from_standard_config().await;
+        let config = SweetConductorConfig::rendezvous(true);
+        let mut conductor =
+            SweetConductor::from_config_rendezvous(config, SweetLocalRendezvous::new().await).await;
 
         let apps = conductor.setup_apps("app-", 2, [&dna_file]).await.unwrap();
 
@@ -605,6 +609,14 @@ impl RibosomeTestFixture {
 
         let alice_pubkey = alice_cell.agent_pubkey().clone();
         let bob_pubkey = bob_cell.agent_pubkey().clone();
+
+        retry_fn_until_timeout(
+            || async { conductor.get_agent_infos(None).await.unwrap().len() == 2 },
+            Some(10000),
+            None,
+        )
+        .await
+        .expect("agent infos didn't make it to the peer store");
 
         Self {
             conductor,
