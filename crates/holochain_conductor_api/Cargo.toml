@@ -60,7 +60,12 @@ sqlite-encrypted = [
   "holochain_zome_types/sqlite-encrypted",
   "holochain_keystore/sqlite-encrypted",
 ]
-schema = ["kitsune2_gossip/schema", "kitsune2_core/schema", "kitsune2_transport_tx5/schema", "kitsune2_transport_iroh/schema"]
+schema = [
+  "kitsune2_gossip/schema",
+  "kitsune2_core/schema",
+  "kitsune2_transport_tx5/schema",
+  "kitsune2_transport_iroh/schema",
+]
 sqlite = [
   "holo_hash/sqlite",
   "holochain_types/sqlite",
