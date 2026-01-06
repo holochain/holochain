@@ -619,7 +619,7 @@ async fn generate_sandbox_with_iroh_network_type() {
         .unwrap();
 
     // Assert signal url has been overridden in config file
-    assert_eq!(config.network.signal_url, url2::Url2::parse(relay_url));
+    assert_eq!(config.network.relay_url, url2::Url2::parse(relay_url));
     assert_eq!(
         config.network.advanced.unwrap(),
         json!({"irohTransport": {
