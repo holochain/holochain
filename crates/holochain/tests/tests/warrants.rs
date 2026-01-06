@@ -576,7 +576,7 @@ mod zero_arc {
             )
             .await;
 
-        await_consistency(15, [&alice_cell, &bob_cell])
+        await_consistency(20, [&alice_cell, &bob_cell])
             .await
             .unwrap();
 

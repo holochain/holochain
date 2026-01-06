@@ -214,18 +214,13 @@ pub struct NetworkConfig {
     #[schemars(schema_with = "holochain_util::jsonschema::url2_schema")]
     pub bootstrap_url: url2::Url2,
 
-    /// The Kitsune2 NAT and relay server to use.
-    ///
-    /// For the tx5 transport this will be the address of an SBD server,
-    /// and in case of the iroh transport it will be an iroh relay server address.
-    #[cfg(any(
-        feature = "transport-tx5-datachannel-vendored",
-        feature = "transport-tx5-backend-libdatachannel",
-        feature = "transport-tx5-backend-go-pion",
-        feature = "transport-iroh"
-    ))]
+    /// The Kitsune2 signaling server for WebRTC connections to use.
     #[schemars(schema_with = "holochain_util::jsonschema::url2_schema")]
     pub signal_url: url2::Url2,
+
+    /// The iroh relay server address used with the iroh transport.
+    #[schemars(schema_with = "holochain_util::jsonschema::url2_schema")]
+    pub relay_url: url2::Url2,
 
     /// The amount of time, in seconds, to elapse before a request-response roundtrip times out.
     ///
@@ -238,11 +233,6 @@ pub struct NetworkConfig {
     pub request_timeout_s: u64,
 
     /// The Kitsune2 webrtc_config to use for connecting to peers.
-    #[cfg(any(
-        feature = "transport-tx5-datachannel-vendored",
-        feature = "transport-tx5-backend-libdatachannel",
-        feature = "transport-tx5-backend-go-pion",
-    ))]
     #[cfg_attr(feature = "schema", schemars(schema_with = "webrtc_config_schema"))]
     pub webrtc_config: Option<serde_json::Value>,
 
@@ -289,21 +279,10 @@ impl Default for NetworkConfig {
         Self {
             base64_auth_material: None,
             bootstrap_url: url2::Url2::parse("https://dev-test-bootstrap2.holochain.org"),
-            #[cfg(any(
-                feature = "transport-tx5-datachannel-vendored",
-                feature = "transport-tx5-backend-libdatachannel",
-                feature = "transport-tx5-backend-go-pion",
-            ))]
             signal_url: url2::Url2::parse("wss://dev-test-bootstrap2.holochain.org"),
             // Replace with the Holochain hosted dev relay server
-            #[cfg(feature = "transport-iroh")]
-            signal_url: url2::Url2::parse("https://use1-1.relay.n0.iroh-canary.iroh.link./"),
+            relay_url: url2::Url2::parse("https://use1-1.relay.n0.iroh-canary.iroh.link./"),
             request_timeout_s: default_request_timeout_s(),
-            #[cfg(any(
-                feature = "transport-tx5-datachannel-vendored",
-                feature = "transport-tx5-backend-libdatachannel",
-                feature = "transport-tx5-backend-go-pion",
-            ))]
             webrtc_config: None,
             target_arc_factor: default_target_arc_factor(),
             report: Default::default(),
@@ -417,67 +396,58 @@ impl NetworkConfig {
                 "serverUrl",
                 serde_json::Value::String(self.bootstrap_url.as_str().into()),
             )?;
+            Self::insert_module_config(
+                module_config,
+                "tx5Transport",
+                "serverUrl",
+                serde_json::Value::String(self.signal_url.as_str().into()),
+            )?;
 
-            #[cfg(any(
-                feature = "transport-tx5-datachannel-vendored",
-                feature = "transport-tx5-backend-libdatachannel",
-                feature = "transport-tx5-backend-go-pion",
-            ))]
-            {
+            // timeoutS is set to the floor of 1/2 of the request_timeout_s.
+            let timeout_s: serde_json::Number = (self.request_timeout_s / 2).into();
+            Self::insert_module_config(
+                module_config,
+                "tx5Transport",
+                "timeoutS",
+                serde_json::Value::Number(timeout_s),
+            )?;
+
+            // webrtcConnectTimeoutS is set to the floor of 3/8 of the request_timeout_s.
+            let webrtc_connect_timeout_s: serde_json::Number =
+                ((self.request_timeout_s * 3) / 8).into();
+            Self::insert_module_config(
+                module_config,
+                "tx5Transport",
+                "webrtcConnectTimeoutS",
+                serde_json::Value::Number(webrtc_connect_timeout_s),
+            )?;
+
+            if let Some(webrtc_config) = &self.webrtc_config {
                 Self::insert_module_config(
                     module_config,
                     "tx5Transport",
-                    "serverUrl",
-                    serde_json::Value::String(self.signal_url.as_str().into()),
+                    "webrtcConfig",
+                    webrtc_config.clone(),
                 )?;
-
-                // timeoutS is set to the floor of 1/2 of the request_timeout_s.
-                let timeout_s: serde_json::Number = (self.request_timeout_s / 2).into();
-                Self::insert_module_config(
-                    module_config,
-                    "tx5Transport",
-                    "timeoutS",
-                    serde_json::Value::Number(timeout_s),
-                )?;
-
-                // webrtcConnectTimeoutS is set to the floor of 3/8 of the request_timeout_s.
-                let webrtc_connect_timeout_s: serde_json::Number =
-                    ((self.request_timeout_s * 3) / 8).into();
-                Self::insert_module_config(
-                    module_config,
-                    "tx5Transport",
-                    "webrtcConnectTimeoutS",
-                    serde_json::Value::Number(webrtc_connect_timeout_s),
-                )?;
-
-                if let Some(webrtc_config) = &self.webrtc_config {
-                    Self::insert_module_config(
-                        module_config,
-                        "tx5Transport",
-                        "webrtcConfig",
-                        webrtc_config.clone(),
-                    )?;
-                }
-
-                if tracing::enabled!(target: "NETAUDIT", tracing::Level::WARN) {
-                    tracing::info!(
-                        "The NETAUDIT target is enabled, turning on network backend tracing"
-                    );
-                    Self::insert_module_config(
-                        module_config,
-                        "tx5Transport",
-                        "tracingEnabled",
-                        serde_json::Value::Bool(true),
-                    )?;
-                }
             }
 
-            #[cfg(feature = "transport-iroh")]
+            if tracing::enabled!(target: "NETAUDIT", tracing::Level::WARN) {
+                tracing::info!(
+                    "The NETAUDIT target is enabled, turning on network backend tracing"
+                );
+                Self::insert_module_config(
+                    module_config,
+                    "tx5Transport",
+                    "tracingEnabled",
+                    serde_json::Value::Bool(true),
+                )?;
+            }
+
             Self::insert_module_config(
                 module_config,
                 "irohTransport",
                 "relayUrl",
-                serde_json::Value::String(self.signal_url.as_str().into()),
+                serde_json::Value::String(self.relay_url.as_str().into()),
             )?;
         } else {
             return Err(ConductorConfigError::InvalidNetworkConfig(
@@ -649,11 +619,6 @@ impl Default for ConductorTuningParams {
     }
 }
 
-#[cfg(any(
-    feature = "transport-tx5-datachannel-vendored",
-    feature = "transport-tx5-backend-libdatachannel",
-    feature = "transport-tx5-backend-go-pion",
-))]
 #[cfg(feature = "schema")]
 fn webrtc_config_schema(_: &mut schemars::SchemaGenerator) -> Schema {
     let schema = schemars::schema_for!(Option<WebRtcConfig>);
@@ -685,14 +650,8 @@ fn kitsune2_config_schema(generator: &mut schemars::SchemaGenerator) -> Schema {
         mem_peer_store: Option<kitsune2_core::factories::MemPeerStoreModConfig>,
         #[serde(flatten)]
         k2_gossip: Option<kitsune2_gossip::K2GossipModConfig>,
-        #[cfg(any(
-            feature = "transport-tx5-datachannel-vendored",
-            feature = "transport-tx5-backend-libdatachannel",
-            feature = "transport-tx5-backend-go-pion",
-        ))]
         #[serde(flatten)]
         tx5_transport: Option<kitsune2_transport_tx5::Tx5TransportModConfig>,
-        #[cfg(feature = "transport-iroh")]
         #[serde(flatten)]
         iroh_transport: Option<kitsune2_transport_iroh::IrohTransportModConfig>,
     }
@@ -779,11 +738,6 @@ mod tests {
     fn test_config_complete_config() {
         holochain_trace::test_run();
 
-        #[cfg(any(
-            feature = "transport-tx5-datachannel-vendored",
-            feature = "transport-tx5-backend-libdatachannel",
-            feature = "transport-tx5-backend-go-pion",
-        ))]
         let yaml = r#"---
     data_root_path: /path/to/env
     signing_service_uri: ws://localhost:9001
@@ -802,46 +756,7 @@ mod tests {
     network:
       bootstrap_url: https://test-boot.tld
       signal_url: wss://test-sig.tld
-      webrtc_config: {
-        "iceServers": [
-          { "urls": ["stun:test-stun.tld:443"] },
-        ]
-      }
-      request_timeout_s: 70
-      advanced: {
-        "my": {
-          "totally": {
-            "random": {
-              "advanced": {
-                "config": true
-              }
-            }
-          }
-        }
-      }
-
-    db_sync_strategy: Fast
-    "#;
-
-        #[cfg(feature = "transport-iroh")]
-        let yaml = r#"---
-    data_root_path: /path/to/env
-    signing_service_uri: ws://localhost:9001
-    encryption_service_uri: ws://localhost:9002
-    decryption_service_uri: ws://localhost:9003
-
-    keystore:
-      type: lair_server_in_proc
-
-    admin_interfaces:
-      - driver:
-          type: websocket
-          port: 1234
-          allowed_origins: "*"
-
-    network:
-      bootstrap_url: https://test-boot.tld
-      signal_url: wss://test-sig.tld
+      relay_url: https://relay.tld
       webrtc_config: {
         "iceServers": [
           { "urls": ["stun:test-stun.tld:443"] },
@@ -867,19 +782,13 @@ mod tests {
         let mut network_config = NetworkConfig::default();
         network_config.bootstrap_url = url2::url2!("https://test-boot.tld");
         network_config.signal_url = url2::url2!("wss://test-sig.tld");
+        network_config.relay_url = url2::url2!("https://relay.tld");
         network_config.request_timeout_s = 70;
-        #[cfg(any(
-            feature = "transport-tx5-datachannel-vendored",
-            feature = "transport-tx5-backend-libdatachannel",
-            feature = "transport-tx5-backend-go-pion",
-        ))]
-        {
-            network_config.webrtc_config = Some(serde_json::json!({
-                "iceServers": [
-                    { "urls": ["stun:test-stun.tld:443"] },
-                ]
-            }));
-        }
+        network_config.webrtc_config = Some(serde_json::json!({
+            "iceServers": [
+                { "urls": ["stun:test-stun.tld:443"] },
+            ]
+        }));
         network_config.advanced = Some(serde_json::json!({
             "my": {
                 "totally": {
@@ -958,11 +867,6 @@ mod tests {
 
     #[test]
     fn network_config_preserves_advanced_overrides() {
-        #[cfg(any(
-            feature = "transport-tx5-datachannel-vendored",
-            feature = "transport-tx5-backend-libdatachannel",
-            feature = "transport-tx5-backend-go-pion"
-        ))]
         let network_config = NetworkConfig {
             advanced: Some(serde_json::json!({
                 "coreBootstrap": {
@@ -970,19 +874,6 @@ mod tests {
                 },
                 "tx5Transport": {
                     "signalAllowPlainText": "true"
-                },
-                "coreSpace": {
-                    "reSignFreqMs": "1000",
-                }
-            })),
-            ..Default::default()
-        };
-
-        #[cfg(feature = "transport-iroh")]
-        let network_config = NetworkConfig {
-            advanced: Some(serde_json::json!({
-                "coreBootstrap": {
-                    "backoffMinMs": "3500",
                 },
                 "irohTransport": {
                     "relayAllowPlainText": "true"
@@ -1002,11 +893,6 @@ mod tests {
         builder.config.set_module_config(&k2_config).unwrap();
         builder.validate_config().unwrap();
 
-        #[cfg(any(
-            feature = "transport-tx5-datachannel-vendored",
-            feature = "transport-tx5-backend-libdatachannel",
-            feature = "transport-tx5-backend-go-pion"
-        ))]
         assert_eq!(
             k2_config,
             serde_json::json!({
@@ -1019,20 +905,6 @@ mod tests {
                     "timeoutS": 30,
                     "webrtcConnectTimeoutS": 22,
                     "signalAllowPlainText": "true"
-                },
-                "coreSpace": {
-                    "reSignFreqMs": "1000",
-                }
-            })
-        );
-
-        #[cfg(feature = "transport-iroh")]
-        assert_eq!(
-            k2_config,
-            serde_json::json!({
-                "coreBootstrap": {
-                    "serverUrl": "https://dev-test-bootstrap2.holochain.org/",
-                    "backoffMinMs": "3500",
                 },
                 "irohTransport": {
                     "relayUrl": "https://use1-1.relay.n0.iroh-canary.iroh.link./",
@@ -1047,11 +919,6 @@ mod tests {
 
     #[test]
     fn network_config_overrides_conflicting_advanced_fields() {
-        #[cfg(any(
-            feature = "transport-tx5-datachannel-vendored",
-            feature = "transport-tx5-backend-libdatachannel",
-            feature = "transport-tx5-backend-go-pion"
-        ))]
         let network_config = NetworkConfig {
             advanced: Some(serde_json::json!({
                 "coreBootstrap": {
@@ -1061,16 +928,6 @@ mod tests {
                     "serverUrl": "wss://sbd.nowhere.net",
                     "timeoutS": 10,
                     "webrtcConnectTimeoutS": 10
-                },
-            })),
-            ..Default::default()
-        };
-
-        #[cfg(feature = "transport-iroh")]
-        let network_config = NetworkConfig {
-            advanced: Some(serde_json::json!({
-                "coreBootstrap": {
-                    "serverUrl": "https://something-else.net",
                 },
                 "irohTransport": {
                     "relayUrl": "https://iroh.nowhere.net",
@@ -1087,11 +944,6 @@ mod tests {
         builder.config.set_module_config(&k2_config).unwrap();
         builder.validate_config().unwrap();
 
-        #[cfg(any(
-            feature = "transport-tx5-datachannel-vendored",
-            feature = "transport-tx5-backend-libdatachannel",
-            feature = "transport-tx5-backend-go-pion"
-        ))]
         assert_eq!(
             k2_config,
             serde_json::json!({
@@ -1102,16 +954,6 @@ mod tests {
                     "serverUrl": "wss://dev-test-bootstrap2.holochain.org/",
                     "timeoutS": 30,
                     "webrtcConnectTimeoutS": 22
-                },
-            })
-        );
-
-        #[cfg(feature = "transport-iroh")]
-        assert_eq!(
-            k2_config,
-            serde_json::json!({
-                "coreBootstrap": {
-                    "serverUrl": "https://dev-test-bootstrap2.holochain.org/",
                 },
                 "irohTransport": {
                     "relayUrl": "https://use1-1.relay.n0.iroh-canary.iroh.link./",
@@ -1136,11 +978,6 @@ mod tests {
         builder.config.set_module_config(&k2_config).unwrap();
         builder.validate_config().unwrap();
 
-        #[cfg(any(
-            feature = "transport-tx5-datachannel-vendored",
-            feature = "transport-tx5-backend-libdatachannel",
-            feature = "transport-tx5-backend-go-pion"
-        ))]
         assert_eq!(
             k2_config,
             serde_json::json!({
@@ -1151,22 +988,6 @@ mod tests {
                     "serverUrl": "wss://dev-test-bootstrap2.holochain.org/",
                     "timeoutS": 30,
                     "webrtcConnectTimeoutS": 22
-                },
-                "k2Gossip": {
-                    "roundTimeoutMs": 100,
-                    "initiateIntervalMs": 200,
-                    "initiateJitterMs": 50,
-                    "minInitiateIntervalMs": 300,
-                }
-            })
-        );
-
-        #[cfg(feature = "transport-iroh")]
-        assert_eq!(
-            k2_config,
-            serde_json::json!({
-                "coreBootstrap": {
-                    "serverUrl": "https://dev-test-bootstrap2.holochain.org/",
                 },
                 "irohTransport": {
                     "relayUrl": "https://use1-1.relay.n0.iroh-canary.iroh.link./",

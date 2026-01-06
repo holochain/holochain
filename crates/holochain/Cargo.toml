@@ -267,29 +267,21 @@ sqlite = [
 transport-tx5-datachannel-vendored = [
   "holochain_p2p/transport-tx5-datachannel-vendored",
   "holochain_cascade/transport-tx5-datachannel-vendored",
-  "holochain_conductor_api/transport-tx5-datachannel-vendored",
-  "holochain_conductor_config/transport-tx5-datachannel-vendored",
 ]
 
 transport-tx5-backend-libdatachannel = [
   "holochain_p2p/transport-tx5-backend-libdatachannel",
   "holochain_cascade/transport-tx5-backend-libdatachannel",
-  "holochain_conductor_api/transport-tx5-backend-libdatachannel",
-  "holochain_conductor_config/transport-tx5-backend-libdatachannel",
 ]
 
 transport-tx5-backend-go-pion = [
   "holochain_p2p/transport-tx5-backend-go-pion",
   "holochain_cascade/transport-tx5-backend-go-pion",
-  "holochain_conductor_api/transport-tx5-backend-go-pion",
-  "holochain_conductor_config/transport-tx5-backend-go-pion",
 ]
 
 transport-iroh = [
   "holochain_p2p/transport-iroh",
   "holochain_cascade/transport-iroh",
-  "holochain_conductor_api/transport-iroh",
-  "holochain_conductor_config/transport-iroh",
 ]
 
 # Extremely verbose wasm memory read/write logging
