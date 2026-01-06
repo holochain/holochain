@@ -1865,18 +1865,12 @@ mod app_status_impls {
                 .into_iter()
                 .collect::<Result<Vec<_>, _>>()?;
 
-            // Add cells to conductor state as running cells
             let (new_cells, triggers): (Vec<_>, Vec<_>) = cells.into_iter().unzip();
             let new_cells_map: IndexMap<CellId, Arc<Cell>> = new_cells
                 .into_iter()
                 .map(|c| (c.id().clone(), Arc::new(c)))
                 .collect();
             let new_cell_ids: HashSet<_> = new_cells_map.keys().cloned().collect();
-
-            self.running_cells.share_mut(|cells| {
-                cells.extend(new_cells_map.clone());
-                tracing::debug!(?new_cell_ids, "added cells to running_cells");
-            });
 
             // Add agents to local agent store in kitsune with bounded parallelism (max 10 concurrent)
             let join_futures = new_cells_map
@@ -1903,6 +1897,13 @@ mod app_status_impls {
                 .collect::<Vec<_>>()
                 .await;
 
+            // Add cells to conductor state as running cells
+            self.running_cells.share_mut(|cells| {
+                cells.extend(new_cells_map.clone());
+                tracing::debug!(?new_cell_ids, "added cells to running_cells");
+            });
+
+            // Trigger cell workflows
             for trigger in triggers {
                 trigger.initialize_workflows();
             }
