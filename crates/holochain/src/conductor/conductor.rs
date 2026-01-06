@@ -2205,6 +2205,7 @@ mod scheduler_impls {
 mod misc_impls {
     use super::{state_dump_helpers::peer_store_dump, *};
     use holochain_conductor_api::JsonDump;
+    use holochain_p2p::HolochainP2pError;
     use holochain_zome_types::{action::builder, Entry};
     use kitsune2_api::{SpaceId, TransportStats};
     use std::sync::atomic::Ordering;
@@ -2481,7 +2482,8 @@ mod misc_impls {
             Ok(out)
         }
 
-        /// Create a comprehensive structured dump of a cell's state
+        /// Create a comprehensive structured dump of a cell's state.
+        /// The cell's peer store state is only included when the cell is enabled.
         pub async fn dump_full_cell_state(
             &self,
             cell_id: &CellId,
@@ -2490,10 +2492,22 @@ mod misc_impls {
             let authored_db =
                 self.get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())?;
             let dht_db = self.get_or_create_dht_db(cell_id.dna_hash())?;
-            let peer_dump = peer_store_dump(self, cell_id).await?;
             let source_chain_dump =
                 source_chain::dump_state(authored_db.into(), cell_id.agent_pubkey().clone())
                     .await?;
+
+            // We only have a peer store for enabled cells with a k2 space,
+            // so if k2 space is not found, log warning and ignore.
+            let peer_dump = match peer_store_dump(self, cell_id).await {
+                Err(ConductorApiError::CellError(CellError::HolochainP2pError(
+                    HolochainP2pError::K2SpaceNotFound(space_id),
+                ))) => {
+                    tracing::warn!("Cannot dump peer store for k2 space that does not exist with space id {space_id}");
+                    Ok(None)
+                }
+                Ok(p) => Ok(Some(p)),
+                Err(e) => Err(e),
+            }?;
 
             let out = FullStateDump {
                 peer_dump,
