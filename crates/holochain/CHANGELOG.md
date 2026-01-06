@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE**: `Conductor` function `install_app_with_manifest` is now behind the `test_utils` feature, as it was intended only for use by tests.
 - Fix: Conductor `shutdown` function now removes all running cells.
 - Fix: Ensure that only the `holochain_p2p` function `join` creates a kitsune2 space. Previously all `holochain_p2p` requests would create a kitsune2 space if it did not exist, which caused a race where workflows could recreate a removed kitsune space after Conductor shutdown.
 - CI: Run windows test workflow on windows 2025 runners. \#5594
