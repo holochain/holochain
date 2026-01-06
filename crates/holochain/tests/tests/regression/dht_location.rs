@@ -48,7 +48,7 @@ async fn dht_location_consistency() {
         .call::<_, ActionHash>(&alice_zome, "create_string", "alright guv'nor".to_string())
         .await;
 
-    await_consistency(30, &[alice.clone(), bob.clone()])
+    await_consistency(&[alice.clone(), bob.clone()])
         .await
         .unwrap();
 

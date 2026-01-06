@@ -11,7 +11,7 @@ use rand::{rng, Rng};
 #[cfg(feature = "slow_tests")]
 #[cfg_attr(target_os = "windows", ignore = "flaky")]
 async fn must_get_agent_activity_saturation() {
-    use holochain::sweettest::await_consistency;
+    use holochain::sweettest::await_consistency_s;
 
     holochain_trace::test_run();
 
@@ -43,7 +43,7 @@ async fn must_get_agent_activity_saturation() {
     }
 
     // let conductors catch up
-    await_consistency(120, [alice_cell, bob_cell])
+    await_consistency_s(120, [alice_cell, bob_cell])
         .await
         .unwrap();
 

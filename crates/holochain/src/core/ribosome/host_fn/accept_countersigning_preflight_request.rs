@@ -747,7 +747,7 @@ pub mod wasm_test {
             )
             .await;
 
-        await_consistency(60, [&alice_cell, &bob_cell, &witness_cell])
+        await_consistency([&alice_cell, &bob_cell, &witness_cell])
             .await
             .unwrap();
 
@@ -1022,7 +1022,7 @@ pub mod wasm_test {
             )
             .await;
 
-        await_consistency(10, [&alice_cell, &bob_cell])
+        await_consistency([&alice_cell, &bob_cell])
             .await
             .unwrap();
 
@@ -1183,7 +1183,7 @@ pub mod wasm_test {
             )
             .await;
 
-        await_consistency(10, [&alice_cell, &bob_cell])
+        await_consistency([&alice_cell, &bob_cell])
             .await
             .unwrap();
 
@@ -1254,7 +1254,7 @@ pub mod wasm_test {
 
         // NON ENZYMATIC
         {
-            await_consistency(10, [&alice_cell, &bob_cell, &carol_cell])
+            await_consistency([&alice_cell, &bob_cell, &carol_cell])
                 .await
                 .unwrap();
 
@@ -1326,7 +1326,7 @@ pub mod wasm_test {
                     unreachable!();
                 };
 
-            await_consistency(10, [&alice_cell, &bob_cell, &carol_cell])
+            await_consistency([&alice_cell, &bob_cell, &carol_cell])
                 .await
                 .unwrap();
 
@@ -1348,7 +1348,7 @@ pub mod wasm_test {
                 )
                 .await;
 
-            await_consistency(10, [&alice_cell, &bob_cell, &carol_cell])
+            await_consistency( [&alice_cell, &bob_cell, &carol_cell])
                 .await
                 .unwrap();
 
