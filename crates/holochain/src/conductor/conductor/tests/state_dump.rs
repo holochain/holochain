@@ -51,7 +51,7 @@ async fn dump_full_state() {
             .await
             .unwrap();
     let expected_state_dump = FullStateDump {
-        peer_dump,
+        peer_dump: Some(peer_dump),
         source_chain_dump,
         integration_dump: full_integration_dump(&dht_db, None).await.unwrap(),
     };
