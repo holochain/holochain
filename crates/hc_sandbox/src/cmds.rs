@@ -91,7 +91,8 @@ pub enum NetworkType {
     #[command(name = "webrtc")]
     WebRTC {
         /// URL to a Holochain WebRTC signaling server.
-        signal_url: String,
+        #[arg(value_parser = try_parse_url2)]
+        signal_url: Url2,
 
         /// Optional path to override webrtc peer connection config file.
         webrtc_config: Option<std::path::PathBuf>,
@@ -101,7 +102,8 @@ pub enum NetworkType {
     #[command(name = "quic")]
     QUIC {
         /// URL to a Holochain server that serves for NAT and relaying messages.
-        relay_url: String,
+        #[arg(value_parser = try_parse_url2)]
+        relay_url: Url2,
     },
 }
 
@@ -264,7 +266,7 @@ impl Network {
                     }
                     None => None,
                 };
-                network_config.signal_url = url2::url2!("{}", signal_url);
+                network_config.signal_url = signal_url;
                 network_config.webrtc_config = webrtc_config;
                 network_config.advanced = Some(serde_json::json!({
                     // Allow plaintext signal for hc sandbox to have it work with local
@@ -276,7 +278,7 @@ impl Network {
             }
             #[cfg(feature = "transport-iroh")]
             NetworkType::QUIC { relay_url } => {
-                network_config.relay_url = url2::Url2::parse(relay_url);
+                network_config.relay_url = relay_url;
                 network_config.advanced = Some(serde_json::json!({
                     // Allow plaintext relay for hc sandbox to have it work with local
                     // relay server spawned by kitsune2-bootstrap-srv
