@@ -1173,6 +1173,7 @@ mod app_impls {
         ///
         // This is just a convenience for testing.
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+        #[cfg(feature = "test_utils")]
         pub(crate) async fn install_app_with_manifest(
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
