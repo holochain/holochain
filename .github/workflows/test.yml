@@ -67,6 +67,8 @@ jobs:
             target: wasmer_sys
           - os: ubuntu-latest
             target: wasmer_sys-unstable
+          - os: ubuntu-latest
+            target: wasmer_sys-transport_iroh
     steps:
       - name: checkout
         uses: actions/checkout@v5
@@ -74,7 +76,7 @@ jobs:
       - name: "Common Test Setup Actions"
         uses: ./.github/actions/common-pre
 
-      - name: "Common Test Actions"
+      - name: "Build workspace and run tests"
         uses: ./.github/actions/common-test
         with:
           os: ${{ matrix.os }}
@@ -102,7 +104,7 @@ jobs:
           brew install llvm
           echo "PATH=/opt/homebrew/opt/llvm/bin:$PATH" >> "$GITHUB_ENV"
 
-      - name: "Common Test Actions"
+      - name: "Build workspace and run tests"
         uses: ./.github/actions/common-test
         with:
           os: "macos-latest"

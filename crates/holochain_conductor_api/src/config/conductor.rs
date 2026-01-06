@@ -214,9 +214,13 @@ pub struct NetworkConfig {
     #[schemars(schema_with = "holochain_util::jsonschema::url2_schema")]
     pub bootstrap_url: url2::Url2,
 
-    /// The Kitsune2 sbd server to use for webrtc signalling.
+    /// The Kitsune2 signaling server for WebRTC connections to use.
     #[schemars(schema_with = "holochain_util::jsonschema::url2_schema")]
     pub signal_url: url2::Url2,
+
+    /// The iroh relay server address used with the iroh transport.
+    #[schemars(schema_with = "holochain_util::jsonschema::url2_schema")]
+    pub relay_url: url2::Url2,
 
     /// The amount of time, in seconds, to elapse before a request-response roundtrip times out.
     ///
@@ -276,6 +280,8 @@ impl Default for NetworkConfig {
             base64_auth_material: None,
             bootstrap_url: url2::Url2::parse("https://dev-test-bootstrap2.holochain.org"),
             signal_url: url2::Url2::parse("wss://dev-test-bootstrap2.holochain.org"),
+            // Replace with the Holochain hosted dev relay server
+            relay_url: url2::Url2::parse("https://use1-1.relay.n0.iroh-canary.iroh.link./"),
             request_timeout_s: default_request_timeout_s(),
             webrtc_config: None,
             target_arc_factor: default_target_arc_factor(),
@@ -390,7 +396,6 @@ impl NetworkConfig {
                 "serverUrl",
                 serde_json::Value::String(self.bootstrap_url.as_str().into()),
             )?;
-
             Self::insert_module_config(
                 module_config,
                 "tx5Transport",
@@ -437,6 +442,13 @@ impl NetworkConfig {
                     serde_json::Value::Bool(true),
                 )?;
             }
+
+            Self::insert_module_config(
+                module_config,
+                "irohTransport",
+                "relayUrl",
+                serde_json::Value::String(self.relay_url.as_str().into()),
+            )?;
         } else {
             return Err(ConductorConfigError::InvalidNetworkConfig(
                 "advanced field must be an object".to_string(),
@@ -640,6 +652,8 @@ fn kitsune2_config_schema(generator: &mut schemars::SchemaGenerator) -> Schema {
         k2_gossip: Option<kitsune2_gossip::K2GossipModConfig>,
         #[serde(flatten)]
         tx5_transport: Option<kitsune2_transport_tx5::Tx5TransportModConfig>,
+        #[serde(flatten)]
+        iroh_transport: Option<kitsune2_transport_iroh::IrohTransportModConfig>,
     }
 
     let schema = schemars::schema_for!(Option<K2Config>);
@@ -742,6 +756,7 @@ mod tests {
     network:
       bootstrap_url: https://test-boot.tld
       signal_url: wss://test-sig.tld
+      relay_url: https://relay.tld
       webrtc_config: {
         "iceServers": [
           { "urls": ["stun:test-stun.tld:443"] },
@@ -762,10 +777,12 @@ mod tests {
 
     db_sync_strategy: Fast
     "#;
+
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
         let mut network_config = NetworkConfig::default();
         network_config.bootstrap_url = url2::url2!("https://test-boot.tld");
         network_config.signal_url = url2::url2!("wss://test-sig.tld");
+        network_config.relay_url = url2::url2!("https://relay.tld");
         network_config.request_timeout_s = 70;
         network_config.webrtc_config = Some(serde_json::json!({
             "iceServers": [
@@ -858,6 +875,9 @@ mod tests {
                 "tx5Transport": {
                     "signalAllowPlainText": "true"
                 },
+                "irohTransport": {
+                    "relayAllowPlainText": "true"
+                },
                 "coreSpace": {
                     "reSignFreqMs": "1000",
                 }
@@ -872,6 +892,7 @@ mod tests {
             .unwrap();
         builder.config.set_module_config(&k2_config).unwrap();
         builder.validate_config().unwrap();
+
         assert_eq!(
             k2_config,
             serde_json::json!({
@@ -885,11 +906,15 @@ mod tests {
                     "webrtcConnectTimeoutS": 22,
                     "signalAllowPlainText": "true"
                 },
+                "irohTransport": {
+                    "relayUrl": "https://use1-1.relay.n0.iroh-canary.iroh.link./",
+                    "relayAllowPlainText": "true"
+                },
                 "coreSpace": {
                     "reSignFreqMs": "1000",
                 }
             })
-        )
+        );
     }
 
     #[test]
@@ -903,6 +928,9 @@ mod tests {
                     "serverUrl": "wss://sbd.nowhere.net",
                     "timeoutS": 10,
                     "webrtcConnectTimeoutS": 10
+                },
+                "irohTransport": {
+                    "relayUrl": "https://iroh.nowhere.net",
                 },
             })),
             ..Default::default()
@@ -927,8 +955,11 @@ mod tests {
                     "timeoutS": 30,
                     "webrtcConnectTimeoutS": 22
                 },
+                "irohTransport": {
+                    "relayUrl": "https://use1-1.relay.n0.iroh-canary.iroh.link./",
+                },
             })
-        )
+        );
     }
 
     #[test]
@@ -958,6 +989,9 @@ mod tests {
                     "timeoutS": 30,
                     "webrtcConnectTimeoutS": 22
                 },
+                "irohTransport": {
+                    "relayUrl": "https://use1-1.relay.n0.iroh-canary.iroh.link./",
+                },
                 "k2Gossip": {
                     "roundTimeoutMs": 100,
                     "initiateIntervalMs": 200,
@@ -965,6 +999,6 @@ mod tests {
                     "minInitiateIntervalMs": 300,
                 }
             })
-        )
+        );
     }
 }

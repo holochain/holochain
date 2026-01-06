@@ -893,12 +893,27 @@ impl HolochainP2pActor {
 
         #[cfg(feature = "test_utils")]
         {
+            #[cfg(any(
+                feature = "transport-tx5-datachannel-vendored",
+                feature = "transport-tx5-backend-libdatachannel",
+                feature = "transport-tx5-backend-go-pion",
+            ))]
             builder
                 .config
                 .set_module_config(&kitsune2_transport_tx5::Tx5TransportModConfig {
                     tx5_transport: kitsune2_transport_tx5::Tx5TransportConfig {
                         signal_allow_plain_text: true,
                         timeout_s: 20,
+                        webrtc_connect_timeout_s: 15,
+                        ..Default::default()
+                    },
+                })?;
+            #[cfg(feature = "transport-iroh")]
+            builder
+                .config
+                .set_module_config(&kitsune2_transport_iroh::IrohTransportModConfig {
+                    iroh_transport: kitsune2_transport_iroh::IrohTransportConfig {
+                        relay_allow_plain_text: true,
                         ..Default::default()
                     },
                 })?;
@@ -973,9 +988,9 @@ impl HolochainP2pActor {
 
         // get `tx5_transport` from config
         #[cfg(any(
+            feature = "transport-tx5-datachannel-vendored",
             feature = "transport-tx5-backend-libdatachannel",
             feature = "transport-tx5-backend-go-pion",
-            feature = "transport-tx5-datachannel-vendored"
         ))]
         if let Ok(tx5_transport_config) =
             serde_json::from_value::<kitsune2_transport_tx5::Tx5TransportModConfig>(value)
@@ -2315,9 +2330,13 @@ impl actor::HcP2p for HolochainP2pActor {
 
 #[cfg(test)]
 mod tests {
-    use crate::actor::HcP2p;
-
     use super::*;
+    #[cfg(any(
+        feature = "transport-tx5-backend-libdatachannel",
+        feature = "transport-tx5-backend-go-pion",
+        feature = "transport-tx5-datachannel-vendored"
+    ))]
+    use crate::actor::HcP2p;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn correct_id_loc_calc() {

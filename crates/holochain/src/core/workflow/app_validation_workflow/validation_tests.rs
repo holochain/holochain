@@ -295,9 +295,10 @@ async fn app_validation_ops() {
         };
 
     let mut conductors =
-        SweetConductorBatch::from_config(2, SweetConductorConfig::standard()).await;
+        SweetConductorBatch::from_config_rendezvous(2, SweetConductorConfig::rendezvous(true))
+            .await;
 
-    let zomes = InlineZomeSet::new(
+    let common_zomes = InlineZomeSet::new(
         [
             (
                 "integrity_zome1",
@@ -322,59 +323,37 @@ async fn app_validation_ops() {
     .with_dependency("zome2", "integrity_zome2")
     .function("zome1", "create_a", call_back_a("integrity_zome1"))
     .function("zome1", "create_b", call_back_b("integrity_zome1"))
-    .function(
-        "integrity_zome1",
-        "validate",
-        validation_callback(ZOME_A_0, agents.clone(), events_tx.clone()),
-    )
     .function("zome2", "create_a", call_back_a("integrity_zome2"))
-    .function("zome2", "create_b", call_back_b("integrity_zome2"))
-    .function(
-        "integrity_zome2",
-        "validate",
-        validation_callback(ZOME_A_1, agents.clone(), events_tx.clone()),
-    );
-    let (dna_file_a, _, _) = SweetDnaFile::from_inline_zomes("".into(), zomes).await;
+    .function("zome2", "create_b", call_back_b("integrity_zome2"));
 
-    let zomes = InlineZomeSet::new(
-        [
-            (
-                "integrity_zome1",
-                "integrity_a".to_string(),
-                vec![entry_def_a.clone(), entry_def_b.clone()],
-                0,
-            ),
-            (
-                "integrity_zome2",
-                "integrity_b".to_string(),
-                vec![entry_def_a.clone(), entry_def_b.clone()],
-                0,
-            ),
-        ],
-        [("zome1", "a".to_string()), ("zome2", "b".to_string())],
-        [
-            ("zome1".into(), "integrity_zome1".into()),
-            ("zome2".into(), "integrity_zome2".into()),
-        ],
-    )
-    .with_dependency("zome1", "integrity_zome1")
-    .with_dependency("zome2", "integrity_zome2")
-    .function("zome1", "create_a", call_back_a("integrity_zome1"))
-    .function("zome1", "create_b", call_back_b("integrity_zome2"))
-    .function(
-        "integrity_zome1",
-        "validate",
-        validation_callback(ZOME_B_0, agents.clone(), events_tx.clone()),
-    )
-    .function("zome2", "create_a", call_back_a("integrity_zome2"))
-    .function("zome2", "create_b", call_back_b("integrity_zome2"))
-    .function(
-        "integrity_zome2",
-        "validate",
-        validation_callback(ZOME_B_1, agents.clone(), events_tx.clone()),
-    );
+    let network_seed = random_network_seed();
+    let zomes = common_zomes
+        .clone()
+        .function(
+            "integrity_zome1",
+            "validate",
+            validation_callback(ZOME_A_0, agents.clone(), events_tx.clone()),
+        )
+        .function(
+            "integrity_zome2",
+            "validate",
+            validation_callback(ZOME_A_1, agents.clone(), events_tx.clone()),
+        );
+    let (dna_file_a, _, _) = SweetDnaFile::from_inline_zomes(network_seed.clone(), zomes).await;
 
-    let (dna_file_b, _, _) = SweetDnaFile::from_inline_zomes("".into(), zomes).await;
+    let zomes = common_zomes
+        .function(
+            "integrity_zome1",
+            "validate",
+            validation_callback(ZOME_B_0, agents.clone(), events_tx.clone()),
+        )
+        .function(
+            "integrity_zome2",
+            "validate",
+            validation_callback(ZOME_B_1, agents.clone(), events_tx.clone()),
+        );
+
+    let (dna_file_b, _, _) = SweetDnaFile::from_inline_zomes(network_seed, zomes).await;
 
     let (alice, bob) = {
         let mut agents = agents.lock();
@@ -396,13 +375,11 @@ async fn app_validation_ops() {
         (alice, bob)
     };
 
-    conductors.exchange_peer_info().await;
-
     let _: ActionHash = conductors[0]
         .call(&alice.zome("zome1"), "create_a", ())
         .await;
 
-    await_consistency(10, [&alice, &bob]).await.unwrap();
+    await_consistency(15, [&alice, &bob]).await.unwrap();
 
     let mut expected = Expected(HashSet::new());
 

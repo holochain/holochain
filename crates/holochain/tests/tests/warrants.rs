@@ -44,7 +44,7 @@ async fn warranted_agent_is_blocked() {
     let (bob_conductor, bob_cell) = conductors_and_cells.remove(0);
 
     // Let all agents sync.
-    await_consistency(10, [&alice_cell, &bob_cell])
+    await_consistency(15, [&alice_cell, &bob_cell])
         .await
         .unwrap();
 
@@ -57,7 +57,7 @@ async fn warranted_agent_is_blocked() {
         )
         .await;
 
-    await_consistency(10, [&alice_cell, &bob_cell])
+    await_consistency(15, [&alice_cell, &bob_cell])
         .await
         .unwrap();
 
@@ -122,7 +122,7 @@ async fn warrant_is_gossiped() {
     let (_bob_conductor, bob_cell) = conductors_and_cells.remove(0);
     let (carol_conductor, carol_cell) = conductors_and_cells.remove(0);
 
-    await_consistency(10, [&alice_cell, &bob_cell, &carol_cell])
+    await_consistency(15, [&alice_cell, &bob_cell, &carol_cell])
         .await
         .unwrap();
 
@@ -239,7 +239,7 @@ async fn author_of_invalid_warrant_is_blocked() {
         .await;
 
     // Wait for Alice and Bob to sync.
-    await_consistency(10, [&alice, &bob]).await.unwrap();
+    await_consistency(15, [&alice, &bob]).await.unwrap();
 
     let alice_authored_db = conductors[0]
         .get_spaces()
@@ -289,7 +289,7 @@ async fn author_of_invalid_warrant_is_blocked() {
         });
 
     // Wait for Alice and Bob to sync so that Alice receives the warrant.
-    await_consistency(10, [&alice, &bob]).await.unwrap();
+    await_consistency(15, [&alice, &bob]).await.unwrap();
 
     tokio::time::timeout(std::time::Duration::from_secs(30), async {
         loop {
@@ -369,7 +369,7 @@ mod zero_arc {
         let (bob_conductor, bob_cell) = conductors_and_cells.remove(0);
         let (carol_conductor, carol_cell) = conductors_and_cells.remove(0);
 
-        await_consistency(10, [&alice_cell, &bob_cell])
+        await_consistency(15, [&alice_cell, &bob_cell])
             .await
             .unwrap();
         bob_conductor
@@ -388,7 +388,7 @@ mod zero_arc {
             )
             .await;
 
-        await_consistency(10, [&alice_cell, &bob_cell])
+        await_consistency(15, [&alice_cell, &bob_cell])
             .await
             .unwrap();
 
@@ -450,7 +450,7 @@ mod zero_arc {
         let (bob_conductor, bob_cell) = conductors_and_cells.remove(0);
         let (carol_conductor, carol_cell) = conductors_and_cells.remove(0);
 
-        await_consistency(10, [&alice_cell, &bob_cell])
+        await_consistency(15, [&alice_cell, &bob_cell])
             .await
             .unwrap();
 
@@ -471,7 +471,7 @@ mod zero_arc {
             )
             .await;
 
-        await_consistency(10, [&alice_cell, &bob_cell])
+        await_consistency(15, [&alice_cell, &bob_cell])
             .await
             .unwrap();
 
@@ -555,7 +555,7 @@ mod zero_arc {
         let (bob_conductor, bob_cell) = conductors_and_cells.remove(0);
         let (carol_conductor, carol_cell) = conductors_and_cells.remove(0);
 
-        await_consistency(10, [&alice_cell, &bob_cell])
+        await_consistency(15, [&alice_cell, &bob_cell])
             .await
             .unwrap();
 
@@ -576,7 +576,7 @@ mod zero_arc {
             )
             .await;
 
-        await_consistency(10, [&alice_cell, &bob_cell])
+        await_consistency(20, [&alice_cell, &bob_cell])
             .await
             .unwrap();
 

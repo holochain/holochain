@@ -35,8 +35,8 @@ holochain_types = { path = "../holochain_types", version = "^0.7.0-dev.6", featu
 holochain_util = { version = "^0.7.0-dev.0", path = "../holochain_util", features = [
   "pw",
 ] }
-kitsune2_api = "0.4.0-dev.1"
-kitsune2_core = "0.4.0-dev.1"
+kitsune2_api = "0.4.0-dev.2"
+kitsune2_core = "0.4.0-dev.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_yaml = "0.9"
@@ -49,17 +49,25 @@ holochain = { version = "^0.7.0-dev.6", path = "../holochain", default-features 
 [dev-dependencies]
 holochain = { version = "^0.7.0-dev.6", path = "../holochain", default-features = false, features = [
   "sweettest",
-  "transport-tx5-datachannel-vendored",
 ] }
 tokio = { version = "1.36.0", features = ["full"] }
 serde_json = "1.0"
 tempfile = "3.0"
 
 [features]
-default = ["wasmer_sys"]
+default = ["wasmer_sys", "transport-tx5-datachannel-vendored"]
 
 wasmer_sys = ["holochain_client/wasmer_sys", "holochain?/wasmer_sys"]
 wasmer_wamr = ["holochain_client/wasmer_wamr", "holochain?/wasmer_wamr"]
+
+transport-tx5-backend-go-pion = ["holochain?/transport-tx5-backend-go-pion"]
+transport-tx5-datachannel-vendored = [
+  "holochain?/transport-tx5-datachannel-vendored",
+]
+transport-tx5-backend-libdatachannel = [
+  "holochain?/transport-tx5-backend-libdatachannel",
+]
+transport-iroh = ["holochain?/transport-iroh"]
 
 [lints]
 workspace = true

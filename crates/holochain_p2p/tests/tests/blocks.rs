@@ -376,6 +376,7 @@ mod blocks_impl {
 // Alice blocks Bob and makes a get request that fails.
 #[tokio::test(flavor = "multi_thread")]
 async fn get_to_blocked_agent_fails() {
+    holochain_trace::test_run();
     let dna_hash = DnaHash::from_raw_32(vec![0xaa; 32]);
     let keystore_1 = test_keystore();
     let keystore_2 = test_keystore();
@@ -448,6 +449,7 @@ async fn get_to_blocked_agent_fails() {
 // Alice blocks Bob and Bob makes a get request that fails.
 #[tokio::test(flavor = "multi_thread")]
 async fn get_by_blocked_agent_fails() {
+    holochain_trace::test_run();
     let dna_hash = DnaHash::from_raw_32(vec![0xaa; 32]);
     let keystore_1 = test_keystore();
     let keystore_2 = test_keystore();
@@ -478,7 +480,10 @@ async fn get_by_blocked_agent_fails() {
             NetworkRequestOptions::default(),
         )
         .await;
-    assert!(response.is_ok());
+    assert!(
+        response.is_ok(),
+        "expected response ok but got {response:?}"
+    );
 
     alice
         .block(Block::new(
@@ -557,6 +562,11 @@ impl TestActor {
                 let peer_meta_db = peer_meta_db.clone();
                 Box::pin(async move { Ok(peer_meta_db) })
             }),
+            #[cfg(any(
+                feature = "transport-tx5-datachannel-vendored",
+                feature = "transport-tx5-backend-libdatachannel",
+                feature = "transport-tx5-backend-go-pion"
+            ))]
             network_config: Some(serde_json::json!({
                 "coreBootstrap": {
                     "serverUrl": format!("http://{bootstrap_addr}"),
@@ -566,6 +576,16 @@ impl TestActor {
                     "signalAllowPlainText": true,
                     "timeoutS": 30,
                     "webrtcConnectTimeoutS": 25,
+                }
+            })),
+            #[cfg(feature = "transport-iroh")]
+            network_config: Some(serde_json::json!({
+                "coreBootstrap": {
+                    "serverUrl": format!("http://{bootstrap_addr}"),
+                },
+                "irohTransport": {
+                    "relayUrl": format!("http://{bootstrap_addr}"),
+                    "relayAllowPlainText": true,
                 }
             })),
             request_timeout: Duration::from_secs(3),
