@@ -5,6 +5,7 @@
 //! The models are designed to be flat and easily mappable to SQL tables.
 
 use holo_hash::{DnaHash, WasmHash};
+use holochain_types::prelude::CellId;
 use holochain_integrity_types::{
     zome::ZomeName, AppEntryName, DnaModifiers, EntryDef, EntryDefId, EntryVisibility,
 };
@@ -49,8 +50,10 @@ impl WasmModel {
 /// in separate tables.
 #[derive(Debug, Clone, FromRow)]
 pub struct DnaDefModel {
+    /// The cell ID (dna_hash + agent_key) that owns this DNA definition.
+    pub cell_id: Vec<u8>,
     /// The hash of the DNA definition.
-    pub hash: Vec<u8>,
+    pub dna_hash: Vec<u8>,
     /// The friendly name of the DNA.
     pub name: String,
     /// The network seed for DHT partitioning.
@@ -64,14 +67,22 @@ pub struct DnaDefModel {
 impl DnaDefModel {
     /// Create a new DnaDefModel.
     pub fn new(
-        hash: DnaHash,
+        cell_id: &CellId,
         name: String,
         network_seed: String,
         properties: Vec<u8>,
         lineage: Option<sqlx::types::JsonValue>,
     ) -> Self {
+        // Combine DNA hash and agent pubkey into a single byte array for the cell_id key
+        let dna_hash_bytes = cell_id.dna_hash().get_raw_39();
+        let agent_pubkey_bytes = cell_id.agent_pubkey().get_raw_36();
+        let mut cell_id_bytes = Vec::with_capacity(39 + 36);
+        cell_id_bytes.extend_from_slice(dna_hash_bytes);
+        cell_id_bytes.extend_from_slice(agent_pubkey_bytes);
+        
         Self {
-            hash: hash.get_raw_39().to_vec(),
+            cell_id: cell_id_bytes,
+            dna_hash: cell_id.dna_hash().get_raw_39().to_vec(),
             name,
             network_seed,
             properties,
@@ -81,7 +92,7 @@ impl DnaDefModel {
 
     /// Get the DnaHash from this model.
     pub fn dna_hash(&self) -> DnaHash {
-        DnaHash::from_raw_39(self.hash.clone())
+        DnaHash::from_raw_39(self.dna_hash.clone())
     }
 
     /// Convert to a DnaDef given the associated zomes.
@@ -135,8 +146,8 @@ impl DnaDefModel {
 /// Maps to the `IntegrityZome` table.
 #[derive(Debug, Clone, FromRow)]
 pub struct IntegrityZomeModel {
-    /// The DNA hash this zome belongs to.
-    pub dna_hash: Vec<u8>,
+    /// The cell ID this zome belongs to.
+    pub cell_id: Vec<u8>,
     /// The index/position of this zome in the DNA.
     pub zome_index: i64,
     /// The name of the zome.
@@ -150,24 +161,26 @@ pub struct IntegrityZomeModel {
 impl IntegrityZomeModel {
     /// Create a new IntegrityZomeModel.
     pub fn new(
-        dna_hash: DnaHash,
+        cell_id: &CellId,
         zome_index: usize,
         zome_name: String,
         wasm_hash: Option<WasmHash>,
         dependencies: Vec<String>,
     ) -> Self {
+        // Combine DNA hash and agent pubkey into a single byte array for the cell_id key
+        let dna_hash_bytes = cell_id.dna_hash().get_raw_39();
+        let agent_pubkey_bytes = cell_id.agent_pubkey().get_raw_36();
+        let mut cell_id_bytes = Vec::with_capacity(39 + 36);
+        cell_id_bytes.extend_from_slice(dna_hash_bytes);
+        cell_id_bytes.extend_from_slice(agent_pubkey_bytes);
+        
         Self {
-            dna_hash: dna_hash.get_raw_39().to_vec(),
+            cell_id: cell_id_bytes,
             zome_index: zome_index as i64,
             zome_name,
             wasm_hash: wasm_hash.map(|h| h.get_raw_39().to_vec()),
             dependencies: sqlx::types::Json(dependencies),
         }
-    }
-
-    /// Get the DnaHash from this model.
-    pub fn dna_hash(&self) -> DnaHash {
-        DnaHash::from_raw_39(self.dna_hash.clone())
     }
 
     /// Get the WasmHash from this model, if present.
@@ -208,8 +221,8 @@ impl IntegrityZomeModel {
 /// Maps to the `CoordinatorZome` table.
 #[derive(Debug, Clone, FromRow)]
 pub struct CoordinatorZomeModel {
-    /// The DNA hash this zome belongs to.
-    pub dna_hash: Vec<u8>,
+    /// The cell ID this zome belongs to.
+    pub cell_id: Vec<u8>,
     /// The index/position of this zome in the DNA.
     pub zome_index: i64,
     /// The name of the zome.
@@ -223,24 +236,26 @@ pub struct CoordinatorZomeModel {
 impl CoordinatorZomeModel {
     /// Create a new CoordinatorZomeModel.
     pub fn new(
-        dna_hash: DnaHash,
+        cell_id: &CellId,
         zome_index: usize,
         zome_name: String,
         wasm_hash: Option<WasmHash>,
         dependencies: Vec<String>,
     ) -> Self {
+        // Combine DNA hash and agent pubkey into a single byte array for the cell_id key
+        let dna_hash_bytes = cell_id.dna_hash().get_raw_39();
+        let agent_pubkey_bytes = cell_id.agent_pubkey().get_raw_36();
+        let mut cell_id_bytes = Vec::with_capacity(39 + 36);
+        cell_id_bytes.extend_from_slice(dna_hash_bytes);
+        cell_id_bytes.extend_from_slice(agent_pubkey_bytes);
+        
         Self {
-            dna_hash: dna_hash.get_raw_39().to_vec(),
+            cell_id: cell_id_bytes,
             zome_index: zome_index as i64,
             zome_name,
             wasm_hash: wasm_hash.map(|h| h.get_raw_39().to_vec()),
             dependencies: sqlx::types::Json(dependencies),
         }
-    }
-
-    /// Get the DnaHash from this model.
-    pub fn dna_hash(&self) -> DnaHash {
-        DnaHash::from_raw_39(self.dna_hash.clone())
     }
 
     /// Get the WasmHash from this model, if present.
