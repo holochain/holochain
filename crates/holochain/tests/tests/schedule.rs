@@ -1,5 +1,7 @@
 use hdk::prelude::{BoxApi, ExternIO, InlineZomeResult};
-use holochain::sweettest::{SweetCell, SweetConductor, SweetDnaFile};
+use holochain::sweettest::{
+    SweetCell, SweetConductor, SweetConductorConfig, SweetDnaFile, SweetLocalRendezvous,
+};
 use holochain::test_utils::{host_fn_caller::HostFnCaller, RibosomeTestFixture};
 use holochain_sqlite::error::DatabaseError;
 use holochain_state::mutations::schedule_fn;
@@ -477,7 +479,11 @@ async fn schedule_persisted_expired() {
     });
 
     let dna = SweetDnaFile::unique_from_inline_zomes(zome).await;
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        SweetLocalRendezvous::new().await,
+    )
+    .await;
     let app = conductor
         .setup_app("app", std::slice::from_ref(&dna.0))
         .await

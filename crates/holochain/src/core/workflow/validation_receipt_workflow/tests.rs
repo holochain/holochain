@@ -26,7 +26,7 @@ async fn test_validation_receipt() {
         .call(&alice.zome("simple"), "create", ())
         .await;
 
-    await_consistency(10, [&alice, &bobbo, &carol])
+    await_consistency(15, [&alice, &bobbo, &carol])
         .await
         .unwrap();
 

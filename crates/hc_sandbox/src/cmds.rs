@@ -82,18 +82,28 @@ pub struct Network {
 pub enum NetworkType {
     /// A transport that uses the local memory transport protocol.
     Mem,
-    // /// A transport that uses the QUIC protocol.
-    // Quic(Quic),
-    // /// A transport that uses the MDNS protocol.
-    // Mdns,
     /// A transport that uses the WebRTC protocol.
+    #[cfg(any(
+        feature = "transport-tx5-datachannel-vendored",
+        feature = "transport-tx5-backend-libdatachannel",
+        feature = "transport-tx5-backend-go-pion",
+    ))]
     #[command(name = "webrtc")]
     WebRTC {
-        /// URL to a holochain tx5 WebRTC signal server.
-        signal_url: String,
+        /// URL to a Holochain WebRTC signaling server.
+        #[arg(value_parser = try_parse_url2)]
+        signal_url: Url2,
 
         /// Optional path to override webrtc peer connection config file.
         webrtc_config: Option<std::path::PathBuf>,
+    },
+    /// A transport that uses the QUIC protocol.
+    #[cfg(feature = "transport-iroh")]
+    #[command(name = "quic")]
+    QUIC {
+        /// URL to a Holochain server that serves for NAT and relaying messages.
+        #[arg(value_parser = try_parse_url2)]
+        relay_url: Url2,
     },
 }
 
@@ -215,6 +225,9 @@ impl Network {
                         // signaling servers spawned by kitsune2-bootstrap-srv
                         "tx5Transport": {
                             "signalAllowPlainText": true,
+                        },
+                        "irohTransport": {
+                            "relayAllowPlainText": true,
                         }
                     })),
                     ..NetworkConfig::default()
@@ -223,16 +236,21 @@ impl Network {
             Some(n) => (*n).clone(),
         };
 
-        let mut kit = NetworkConfig::default();
+        let mut network_config = NetworkConfig::default();
         if let Some(bootstrap) = bootstrap {
-            kit.bootstrap_url = bootstrap;
+            network_config.bootstrap_url = bootstrap.to_owned();
         }
         if let Some(target_arc_factor) = target_arc_factor {
-            kit.target_arc_factor = target_arc_factor;
+            network_config.target_arc_factor = target_arc_factor.to_owned();
         }
 
         match transport {
             NetworkType::Mem => (),
+            #[cfg(any(
+                feature = "transport-tx5-datachannel-vendored",
+                feature = "transport-tx5-backend-libdatachannel",
+                feature = "transport-tx5-backend-go-pion",
+            ))]
             NetworkType::WebRTC {
                 signal_url,
                 webrtc_config,
@@ -248,9 +266,9 @@ impl Network {
                     }
                     None => None,
                 };
-                kit.signal_url = url2::url2!("{}", signal_url);
-                kit.webrtc_config = webrtc_config;
-                kit.advanced = Some(serde_json::json!({
+                network_config.signal_url = signal_url;
+                network_config.webrtc_config = webrtc_config;
+                network_config.advanced = Some(serde_json::json!({
                     // Allow plaintext signal for hc sandbox to have it work with local
                     // signaling servers spawned by kitsune2-bootstrap-srv
                     "tx5Transport": {
@@ -258,8 +276,19 @@ impl Network {
                     }
                 }));
             }
+            #[cfg(feature = "transport-iroh")]
+            NetworkType::QUIC { relay_url } => {
+                network_config.relay_url = relay_url;
+                network_config.advanced = Some(serde_json::json!({
+                    // Allow plaintext relay for hc sandbox to have it work with local
+                    // relay server spawned by kitsune2-bootstrap-srv
+                    "irohTransport": {
+                        "relayAllowPlainText": true,
+                    }
+                }));
+            }
         }
-        Some(kit)
+        Some(network_config)
     }
 }
 

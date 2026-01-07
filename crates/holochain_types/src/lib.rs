@@ -15,6 +15,7 @@ pub mod access;
 pub mod action;
 pub mod activity;
 pub mod app;
+pub mod cell_config_overrides;
 pub mod chain;
 pub mod combinators;
 pub mod countersigning;

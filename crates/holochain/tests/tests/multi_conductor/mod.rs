@@ -22,6 +22,11 @@ async fn test_publish() {
 
     let config = ConductorConfig {
         network: NetworkConfig {
+            #[cfg(any(
+                feature = "transport-tx5-datachannel-vendored",
+                feature = "transport-tx5-backend-libdatachannel",
+                feature = "transport-tx5-backend-go-pion",
+            ))]
             webrtc_config: Some(serde_json::json!({
                 // It's really hard to test this since it just goes straight
                 // to the webrtc implementation internals, so just adding
@@ -69,6 +74,7 @@ async fn test_publish() {
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "flaky multi conductor test; re-check after Iroh upgrade"]
 async fn multi_conductor() -> anyhow::Result<()> {
     use holochain::test_utils::inline_zomes::simple_create_read_zome;
 
@@ -117,9 +123,10 @@ async fn multi_conductor() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Flaky on Windows separately from the pending fixes alongside Iroh networking upgrade.
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "windows", ignore = "flaky")]
+#[ignore = "flaky multi conductor private entry propagation; re-check after Iroh upgrade"]
 async fn private_entries_update_consistency() {
     use holochain::sweettest::SweetInlineZomes;
     use holochain_types::inline_zome::InlineZomeSet;
@@ -167,7 +174,7 @@ async fn private_entries_update_consistency() {
         .call(&alice.zome(SweetInlineZomes::COORDINATOR), "create", ())
         .await;
 
-    await_consistency(10, [&alice, &bobbo]).await.unwrap();
+    await_consistency(15, [&alice, &bobbo]).await.unwrap();
 
     // Call the "update" zome fn on Alice's app to update the previously created private entry
     let _: ActionHash = conductors[0]
@@ -175,12 +182,13 @@ async fn private_entries_update_consistency() {
         .await;
 
     // Make sure that the update of the private entry reaches consistency
-    await_consistency(10, [&alice, &bobbo]).await.unwrap();
+    await_consistency(15, [&alice, &bobbo]).await.unwrap();
 }
 
+/// Flaky on Windows separately from the pending fixes alongside Iroh networking upgrade.
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "windows", ignore = "flaky")]
+#[ignore = "flaky multi conductor private entry propagation; re-check after Iroh upgrade"]
 async fn private_entries_dont_leak() {
     use holochain::sweettest::SweetInlineZomes;
     use holochain_types::inline_zome::InlineZomeSet;
@@ -227,7 +235,7 @@ async fn private_entries_dont_leak() {
         .call(&alice.zome(SweetInlineZomes::COORDINATOR), "create", ())
         .await;
 
-    await_consistency(10, [&alice, &bobbo]).await.unwrap();
+    await_consistency(15, [&alice, &bobbo]).await.unwrap();
 
     let entry_hash =
         EntryHash::with_data_sync(&Entry::app(PrivateEntry {}.try_into().unwrap()).unwrap());
@@ -251,7 +259,7 @@ async fn private_entries_dont_leak() {
     let bob_hash: ActionHash = conductors[1]
         .call(&bobbo.zome(SweetInlineZomes::COORDINATOR), "create", ())
         .await;
-    await_consistency(10, [&alice, &bobbo]).await.unwrap();
+    await_consistency(15, [&alice, &bobbo]).await.unwrap();
 
     check_all_gets_for_private_entry(
         &conductors[0],

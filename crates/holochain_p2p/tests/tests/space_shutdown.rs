@@ -24,7 +24,9 @@ async fn space_shutdown() {
                     "serverUrl": "https://not_a_host"
                 },
                 "tx5Transport": {
-                    "serverUrl": "wss://not_a_host"
+                    "serverUrl": "wss://not_a_host",
+                    "timeoutS": 30,
+                    "webrtcConnectTimeoutS": 25,
                 }
             })),
             get_db_op_store: Arc::new(move |_space| {
@@ -51,7 +53,7 @@ async fn space_shutdown() {
         .unwrap();
 
     let agent = keystore.new_sign_keypair_random().await.unwrap();
-    p2p.join(dna_hash.clone(), agent.clone(), None)
+    p2p.join(dna_hash.clone(), agent.clone(), None, None)
         .await
         .unwrap();
 

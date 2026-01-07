@@ -4,6 +4,7 @@
 use holo_hash::*;
 use holochain_chc::ChcImpl;
 use holochain_serialized_bytes::prelude::*;
+use holochain_types::cell_config_overrides::CellConfigOverrides;
 use holochain_types::prelude::*;
 use kitsune2_api::{AgentInfoSigned, BoxFut};
 use kitsune2_api::{SpaceId, StoredOp};
@@ -104,6 +105,7 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
         &self,
         agent: AgentPubKey,
         maybe_agent_info: Option<AgentInfoSigned>,
+        config_override: Option<CellConfigOverrides>,
     ) -> HolochainP2pResult<()>;
 
     /// If a cell is disabled, we'll need to \"leave\" the network module as well.
@@ -245,9 +247,10 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         &self,
         agent: AgentPubKey,
         maybe_agent_info: Option<AgentInfoSigned>,
+        config_override: Option<CellConfigOverrides>,
     ) -> HolochainP2pResult<()> {
         self.sender
-            .join(self.dna_hash(), agent, maybe_agent_info)
+            .join(self.dna_hash(), agent, maybe_agent_info, config_override)
             .await
     }
 

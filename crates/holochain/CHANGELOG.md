@@ -7,9 +7,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Removed unused `holochain_mock_hdi` crate that was never completed. #5484
+- Update kitsune2 to v0.4.0-dev.2, which includes the iroh relay integration with the bootstrap server.
+- Crates `holochain_cli_client` and `holochain_client` now have features to set which network transport is compiled in (tx5 or iroh).
+- **BREAKING CHANGE** Feature `mock_network` was removed from crate `holochain_p2p`. It was only referencing `test_utils`, so instead `test_utils` should be used directly.
+- **BREAKING CHANGE** Add `GetStrategy` field to [`Anchor`] struct to allow users to specify whether anchor operations should use network or local-only fetching. The [`Anchor`] struct now has a `strategy` field with serde default, and a `with_strategy()` builder method. New functions `anchor_with_strategy()`, `list_anchor_type_addresses_with_strategy()`, `list_anchor_addresses_with_strategy()`, and `list_anchor_tags_with_strategy()` have been added to the HDK to support this functionality. Additionally, an `AnchorExt` trait has been added to convert [`Anchor`] directly to [`TypedPath`] while preserving the strategy. Applications can now configure anchors to use local-only fetching by calling `.with_strategy(GetStrategy::Local)` on an [`Anchor`]. This complements the similar change to [`TypedPath`]. #5471
+- **BREAKING CHANGE** Add `GetStrategy` field to `TypedPath` to allow users to specify whether path operations should use network or local-only fetching. The `GetStrategy` enum has been moved from `holochain_zome_types` to `holochain_integrity_types` and re-exported for backward compatibility. Applications can now configure paths to use local-only fetching by calling `.with_strategy(GetStrategy::Local)` on a TypedPath. #5471
+- **BREAKING CHANGE**: Removed `block_agent` and `unblock_agent` functions from the HDK. These functions were behind the `unstable-functions` feature flag and have been removed as blocking should be a system-level behavior triggered by warrants, not application-level logic. The host functions remain as no-ops for backward compatibility with existing apps. Applications using these functions should remove the calls - they will succeed but have no effect. [#5518]
+
+## 0.7.0-dev.6
+
+- Fix: Limit concurrency when starting many cells at once to prevent resource exhaustion. Starting cells is now limited to 5 concurrent cell creation operations and 10 concurrent network join operations. This improves startup reliability for conductors managing large numbers of cells.
+- Replace the `do_callback!` private macro with a `do_callback` generic function. This change should not affect the user as the macro, now function, is only used internally in the `real_ribosome` module. \#5529
+- **BREAKING CHANGE** Add `GetStrategy` field to `TypedPath` to allow users to specify whether path operations should use network or local-only fetching. The `GetStrategy` enum has been moved from `holochain_zome_types` to `holochain_integrity_types` and re-exported for backward compatibility. Applications can now configure paths to use local-only fetching by calling `.with_strategy(GetStrategy::Local)` on a TypedPath. \#5471
+- Fix: `EnableCloneCell` now works consistently when called with either `CloneId` or `DnaHash` on already-enabled clones. Previously, using a `DnaHash` would fail with `CloneCellNotFound` while using a `CloneId` would succeed. \#5519
+- **BREAKING CHANGE** Removed the `InstalledAppCommon` function `get_disabled_clone_id`. \#5519
+- Removed the unnecessary `hc_stress_test` helper module, its integration test, and example binaries now that performance testing lives in the `holochain/wind-tunnel` repository.
+- Conductor now overrides the Cell bootstrap and signal urls if specified in the app manifest [5524](https://github.com/holochain/holochain/pull/5524).
+
+## 0.7.0-dev.5
+
+## 0.7.0-dev.4
+
+- CI: Allow test workflow to pass when tests of the feature `wasmer_wamr` fail. WAMR is not actively used, so investigating flaky tests on WAMR is not a priority. \#5523
+- Docs: Outline process for updating all Holochain tooling in an issue template. \#5472.
+- CI: Run windows test workflow on Depot.dev runners for improved performance. \#5473
+- **BREAKING CHANGE** Refactor: The `ConductorConfig` field `request_timeout_s` has moved into the `NetworkConfig`, so is now available at the sub-field `network.request_timeout_s`.
+- **BREAKING CHANGE** Feat: The advanced network configuration field `network.advanced.transportTx5.timeoutS` is now automatically set to 1/2 of the `NetworkConfig` field `request_timeout_s`. It specifies the timeout for a single transport message (request or response).
+- **BREAKING CHANGE** Feat: The advanced network configuration field `network.advanced.transportTx5.webrtcConnectTimeoutS` is now automatically set to 3/8 of the `NetworkConfig` field `request_timeout_s`. It specifies the timeout for attempting to establish a webrtc connection before falling back to a relay connection.
+- Added feature `transport-iroh` for using Iroh as network transport backend.
+- **BREAKING CHANGE** Renamed features `backend-libdatachannel` to `transport-tx5-backend-libdatachannel`, `backend-go-pion` to `transport-tx5-backend-go-pion`, `datachannel-vendored` to `transport-tx5-datachannel-vendored`.
+
+## 0.7.0-dev.3
+
+## 0.7.0-dev.2
+
+## 0.7.0-dev.1
+
+- Removed unused `holochain_mock_hdi` crate that was never completed. \#5484
 - Removed unused `hc_demo_cli` crate.
-- Remove the unused generic type parameter `A` from `Record`, which was always `SignedActionHashed`. #5483
+- Remove the unused generic type parameter `A` from `Record`, which was always `SignedActionHashed`. \#5483
 
 ## 0.7.0-dev.0
 

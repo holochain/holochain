@@ -9,6 +9,7 @@ pub use crate::dna_modifiers::*;
 pub use crate::entry::*;
 pub use crate::entry_def::*;
 pub use crate::genesis::*;
+pub use crate::get_strategy::*;
 pub use crate::info::*;
 pub use crate::link::*;
 pub use crate::op::*;

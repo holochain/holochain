@@ -1,6 +1,6 @@
 [package]
 name = "holochain_types"
-version = "0.7.0-dev.0"
+version = "0.7.0-dev.6"
 description = "Holochain common types"
 license = "Apache-2.0"
 repository = "https://github.com/holochain/holochain"
@@ -18,23 +18,23 @@ base64 = "0.22"
 derive_builder = "0.20"
 derive_more = { version = "2.0", features = ["constructor", "into_iterator"] }
 futures = "0.3"
-holo_hash = { version = "^0.7.0-dev.0", path = "../holo_hash", features = [
+holo_hash = { version = "^0.7.0-dev.2", path = "../holo_hash", features = [
   "encoding",
   "schema",
 ] }
-holochain_keystore = { version = "^0.7.0-dev.0", path = "../holochain_keystore" }
+holochain_keystore = { version = "^0.7.0-dev.3", path = "../holochain_keystore" }
 holochain_nonce = { version = "^0.7.0-dev.0", path = "../holochain_nonce" }
 holochain_serialized_bytes = "=0.0.56"
-holochain_sqlite = { path = "../holochain_sqlite", version = "^0.7.0-dev.0" }
+holochain_sqlite = { path = "../holochain_sqlite", version = "^0.7.0-dev.4" }
 holochain_trace = { version = "^0.7.0-dev.0", path = "../holochain_trace" }
 holochain_util = { version = "^0.7.0-dev.0", path = "../holochain_util", features = [
   "backtrace",
 ] }
-holochain_zome_types = { path = "../holochain_zome_types", version = "^0.7.0-dev.0", features = [
+holochain_zome_types = { path = "../holochain_zome_types", version = "^0.7.0-dev.3", features = [
   "full",
 ] }
 holochain_timestamp = { version = "^0.7.0-dev.0", path = "../timestamp" }
-kitsune2_api = "0.3.0"
+kitsune2_api = "0.4.0-dev.2"
 itertools = { version = "0.14" }
 mr_bundle = { path = "../mr_bundle", features = [
   "fs",
@@ -71,6 +71,7 @@ contrafact = { version = "0.2.0-rc.1", optional = true }
 
 [dev-dependencies]
 holochain_types = { path = ".", features = ["test_utils", "fuzzing"] }
+kitsune2_test_utils = "0.4.0-dev.2"
 
 isotest = { version = "0" }
 matches = "0.1"

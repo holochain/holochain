@@ -5,7 +5,7 @@
 //! connections in tooling.
 
 use anyhow::anyhow;
-use chrono::{DateTime, Duration, NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
 use clap::{Args, Parser, Subcommand};
 use holo_hash::{ActionHash, AgentPubKeyB64, DnaHashB64};
 use holochain_client::AdminWebsocket;
@@ -466,20 +466,10 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
             for info in agent_infos {
                 let this_agent = agents.iter().find(|a| info.agent == a.1);
                 let this_dna = dnas.iter().find(|d| info.space == d.1).unwrap();
-                let duration = Duration::try_milliseconds(info.created_at.as_micros() / 1000)
-                    .ok_or_else(|| anyhow!("Agent info timestamp out of range"))?;
-                let s = duration.num_seconds();
-                let n = duration.clone().to_std().unwrap().subsec_nanos();
-                // TODO FIXME
-                #[allow(deprecated)]
-                let dt = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(s, n), Utc);
-                let duration = Duration::try_milliseconds(info.expires_at.as_micros() / 1000)
-                    .ok_or_else(|| anyhow!("Agent info timestamp out of range"))?;
-                let s = duration.num_seconds();
-                let n = duration.clone().to_std().unwrap().subsec_nanos();
-                // TODO FIXME
-                #[allow(deprecated)]
-                let exp = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(s, n), Utc);
+                let dt = DateTime::from_timestamp_micros(info.created_at.as_micros())
+                    .ok_or_else(|| anyhow!("Agent info created_at timestamp out of range"))?;
+                let exp = DateTime::from_timestamp_micros(info.expires_at.as_micros())
+                    .ok_or_else(|| anyhow!("Agent info expires_at timestamp out of range"))?;
 
                 out.push(AgentResponse {
                     agent_pub_key: this_agent.map(|a| a.0.clone().into()),

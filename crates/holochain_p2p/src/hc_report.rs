@@ -552,6 +552,7 @@ mod test {
                 fn create_space(
                     &self,
                     _space_id: SpaceId,
+                    _config: Option<&kitsune2_api::Config>,
                 ) -> BoxFut<'_, K2Result<DynSpaceHandler>> {
                     let s: DynSpaceHandler = Arc::new(S);
                     Box::pin(async move { Ok(s) })
@@ -563,7 +564,7 @@ mod test {
             kitsune.register_handler(Arc::new(K)).await.unwrap();
 
             // get the space
-            let space = kitsune.space(TEST_SPACE_ID).await.unwrap();
+            let space = kitsune.space(TEST_SPACE_ID, None).await.unwrap();
 
             let agent = keystore.new_sign_keypair_random().await.unwrap();
             let agent = crate::HolochainP2pLocalAgent::new(agent, DhtArc::FULL, 1, keystore);

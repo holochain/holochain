@@ -38,6 +38,7 @@ use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::*;
 use holochain_state::schedule::live_scheduled_fns;
+use holochain_types::cell_config_overrides::CellConfigOverrides;
 use kitsune2_api::BoxFut;
 use rusqlite::OptionalExtension;
 use std::hash::Hash;
@@ -103,6 +104,9 @@ pub struct Cell {
     queue_triggers: QueueTriggers,
     signal_tx: broadcast::Sender<Signal>,
     init_mutex: tokio::sync::Mutex<()>,
+    /// We store the P2P config overrides used to create this cell here
+    /// so we can later check for conflicts if we try to install a cell with the same dna
+    overrides: CellConfigOverrides,
 }
 
 impl Cell {
@@ -113,6 +117,7 @@ impl Cell {
         space: Space,
         holochain_p2p_cell: HolochainP2pDna,
         signal_tx: broadcast::Sender<Signal>,
+        overrides: CellConfigOverrides,
     ) -> CellResult<(Self, InitialQueueTriggers)> {
         let conductor_api = Arc::new(CellConductorApi::new(conductor_handle.clone(), id.clone()));
         let authored_db = space.get_or_create_authored_db(id.agent_pubkey().clone())?;
@@ -144,6 +149,7 @@ impl Cell {
                     holochain_p2p_cell,
                     queue_triggers,
                     signal_tx,
+                    overrides,
                     init_mutex: Default::default(),
                 },
                 initial_queue_triggers,
@@ -210,6 +216,11 @@ impl Cell {
     /// Accessor
     pub fn id(&self) -> &CellId {
         &self.id
+    }
+
+    /// Accessor for [`CellConfigOverrides`]
+    pub fn overrides(&self) -> &CellConfigOverrides {
+        &self.overrides
     }
 
     /// Access a network sender that is partially applied to this cell's DnaHash/AgentPubKey

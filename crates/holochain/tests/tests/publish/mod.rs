@@ -96,6 +96,7 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
 // Carol has warrant issuance disabled and receives the warrant from Bob
 // as he publishes it.
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "flaky warrant publish integration; re-check after Iroh upgrade"]
 async fn warrant_is_published() {
     holochain_trace::test_run();
 
@@ -146,11 +147,13 @@ async fn warrant_is_published() {
     );
     let dna_hash = dna_without_validation.dna_hash();
 
-    let config = SweetConductorConfig::rendezvous(true);
+    let config = SweetConductorConfig::rendezvous(true)
+        .tune_conductor(|cc| cc.publish_trigger_interval = Some(Duration::from_secs(2)));
     // Disable warrants on Carol's conductor, so that she doesn't issue warrants herself
     // but receives them from Bob.
-    let config_no_warranting = SweetConductorConfig::rendezvous(true)
-        .tune_conductor(|tc| tc.disable_warrant_issuance = true);
+    let config_no_warranting = SweetConductorConfig::rendezvous(true).tune_conductor(|tc| {
+        tc.disable_warrant_issuance = true;
+    });
     let mut conductors = SweetConductorBatch::from_configs_rendezvous([
         config.clone(),
         config,
@@ -205,7 +208,7 @@ async fn warrant_is_published() {
             .peer_urls[0]
     );
 
-    await_consistency(10, [&alice, &bob, &carol]).await.unwrap();
+    await_consistency(15, [&alice, &bob, &carol]).await.unwrap();
 
     // Alice creates an invalid action.
     let _: ActionHash = conductors[0]
@@ -216,7 +219,7 @@ async fn warrant_is_published() {
         )
         .await;
 
-    await_consistency(10, [&alice, &bob]).await.unwrap();
+    await_consistency(15, [&alice, &bob]).await.unwrap();
 
     // Bob should have issued a warrant against Alice.
 

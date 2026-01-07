@@ -76,7 +76,7 @@ async fn agent_is_removed_from_peer_store_when_blocked() {
     let TestActor { actor: alice, .. } = TestActor::new(&dna_hash, &addr).await;
     let space = alice
         .test_kitsune()
-        .space(dna_hash.to_k2_space())
+        .space(dna_hash.to_k2_space(), None)
         .await
         .unwrap();
     let peer_store = space.peer_store();
@@ -376,6 +376,7 @@ mod blocks_impl {
 // Alice blocks Bob and makes a get request that fails.
 #[tokio::test(flavor = "multi_thread")]
 async fn get_to_blocked_agent_fails() {
+    holochain_trace::test_run();
     let dna_hash = DnaHash::from_raw_32(vec![0xaa; 32]);
     let keystore_1 = test_keystore();
     let keystore_2 = test_keystore();
@@ -387,10 +388,10 @@ async fn get_to_blocked_agent_fails() {
     let alice_pubkey = keystore_1.new_sign_keypair_random().await.unwrap();
     let bob_pubkey = keystore_2.new_sign_keypair_random().await.unwrap();
     alice
-        .join(dna_hash.clone(), alice_pubkey.clone(), None)
+        .join(dna_hash.clone(), alice_pubkey.clone(), None, None)
         .await
         .unwrap();
-    bob.join(dna_hash.clone(), bob_pubkey.clone(), None)
+    bob.join(dna_hash.clone(), bob_pubkey.clone(), None, None)
         .await
         .unwrap();
     bob.test_set_full_arcs(dna_hash.to_k2_space()).await;
@@ -448,6 +449,7 @@ async fn get_to_blocked_agent_fails() {
 // Alice blocks Bob and Bob makes a get request that fails.
 #[tokio::test(flavor = "multi_thread")]
 async fn get_by_blocked_agent_fails() {
+    holochain_trace::test_run();
     let dna_hash = DnaHash::from_raw_32(vec![0xaa; 32]);
     let keystore_1 = test_keystore();
     let keystore_2 = test_keystore();
@@ -459,10 +461,10 @@ async fn get_by_blocked_agent_fails() {
     let alice_pubkey = keystore_1.new_sign_keypair_random().await.unwrap();
     let bob_pubkey = keystore_2.new_sign_keypair_random().await.unwrap();
     alice
-        .join(dna_hash.clone(), alice_pubkey.clone(), None)
+        .join(dna_hash.clone(), alice_pubkey.clone(), None, None)
         .await
         .unwrap();
-    bob.join(dna_hash.clone(), bob_pubkey.clone(), None)
+    bob.join(dna_hash.clone(), bob_pubkey.clone(), None, None)
         .await
         .unwrap();
     alice.test_set_full_arcs(dna_hash.to_k2_space()).await;
@@ -478,7 +480,10 @@ async fn get_by_blocked_agent_fails() {
             NetworkRequestOptions::default(),
         )
         .await;
-    assert!(response.is_ok());
+    assert!(
+        response.is_ok(),
+        "expected response ok but got {response:?}"
+    );
 
     alice
         .block(Block::new(
@@ -557,6 +562,11 @@ impl TestActor {
                 let peer_meta_db = peer_meta_db.clone();
                 Box::pin(async move { Ok(peer_meta_db) })
             }),
+            #[cfg(any(
+                feature = "transport-tx5-datachannel-vendored",
+                feature = "transport-tx5-backend-libdatachannel",
+                feature = "transport-tx5-backend-go-pion"
+            ))]
             network_config: Some(serde_json::json!({
                 "coreBootstrap": {
                     "serverUrl": format!("http://{bootstrap_addr}"),
@@ -564,6 +574,18 @@ impl TestActor {
                 "tx5Transport": {
                     "serverUrl": format!("ws://{bootstrap_addr}"),
                     "signalAllowPlainText": true,
+                    "timeoutS": 30,
+                    "webrtcConnectTimeoutS": 25,
+                }
+            })),
+            #[cfg(feature = "transport-iroh")]
+            network_config: Some(serde_json::json!({
+                "coreBootstrap": {
+                    "serverUrl": format!("http://{bootstrap_addr}"),
+                },
+                "irohTransport": {
+                    "relayUrl": format!("http://{bootstrap_addr}"),
+                    "relayAllowPlainText": true,
                 }
             })),
             request_timeout: Duration::from_secs(3),
@@ -581,7 +603,7 @@ impl TestActor {
         actor.register_handler(Arc::new(handler)).await.unwrap();
         let space = actor
             .test_kitsune()
-            .space(dna_hash.to_k2_space())
+            .space(dna_hash.to_k2_space(), None)
             .await
             .unwrap();
         let blocks_module = space.blocks().clone();

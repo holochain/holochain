@@ -27,8 +27,8 @@ struct FoundLocationInfo {
 async fn dht_location_consistency() {
     holochain_trace::test_run();
 
-    // Set up two conductors with standard configuration
-    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    // Set up two conductors with rendezvous configuration
+    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
     let apps = conductors.setup_app("app", [&dna_file]).await.unwrap();

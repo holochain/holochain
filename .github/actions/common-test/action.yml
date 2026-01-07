@@ -1,0 +1,92 @@
+name: 'Common Test Running Actions'
+
+inputs:
+  os:
+    required: true
+  target:
+    required: true
+  influx-token:
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    # we cannot use cmake 4 until openssl-src is updated
+    - name: cmake
+      uses: jwlawson/actions-setup-cmake@v2
+      with:
+        cmake-version: "3.31.x"
+
+    - name: llvm & clang
+      if: inputs.os == 'depot-windows-2022-8'
+      uses: KyleMayes/install-llvm-action@v2.0.8
+      with:
+        version: "21"
+
+    - name: build (depot-windows-2022-8)
+      if: inputs.os == 'depot-windows-2022-8'
+      shell: pwsh
+      run: |-
+        vcpkg install libsodium
+        $env:SODIUM_LIB_DIR="C:\vcpkg\packages\libsodium_x64-windows\lib"
+
+        make build-workspace-${{ inputs.target }}
+
+    - name: build
+      if: inputs.os != 'depot-windows-2022-8'
+      shell: bash
+      run: |
+        make build-workspace-${{ inputs.target }}
+
+    - name: install nextest
+      uses: taiki-e/install-action@v2
+      with:
+        tool: cargo-nextest@0.9.96
+
+    - name: test (depot-windows-2022-8)
+      if: inputs.os == 'depot-windows-2022-8'
+      id: test-windows
+      continue-on-error: true
+      shell: pwsh
+      run: |-
+        $env:SODIUM_LIB_DIR="C:\vcpkg\packages\libsodium_x64-windows\lib"
+        make test-workspace-${{ inputs.target }}
+
+    - name: test
+      if: inputs.os != 'depot-windows-2022-8'
+      id: test-unix
+      continue-on-error: true
+      shell: bash
+      run: make test-workspace-${{ inputs.target }}
+
+    - name: Upload test results to InfluxDB
+      if: always() && env.INFLUX_TOKEN != ''
+      continue-on-error: true
+      env:
+        INFLUX_TOKEN: ${{ inputs.influx-token }}
+      uses: holochain/junit-to-influx-action@v1.1.0
+      with:
+        junit-file: target/nextest/default/junit.xml
+        influx-url: https://ifdb.holochain.org
+        influx-org: holo
+        influx-bucket: holochain-test-results
+        influx-token: ${{ inputs.influx-token }}
+        runner-name: ${{ inputs.os }}
+        tags: >-
+          {
+            "run_id": "${{ github.run_id }}",
+            "test_target": "${{ inputs.target }}",
+            "branch": "${{ github.ref_name }}",
+            "commit": "${{ github.sha }}",
+            "workflow": "${{ github.workflow }}",
+            "pr_number": "${{ github.event.pull_request.number }}",
+            "actor": "${{ github.actor }}"
+          }
+
+    - name: Fail job if tests failed
+      if: always() && (steps.test-windows.outcome == 'failure' || steps.test-unix.outcome == 'failure')
+      shell: bash
+      run: exit 1
+
+    - name: "Common Test Teardown Actions"
+      uses: ./.github/actions/common-post

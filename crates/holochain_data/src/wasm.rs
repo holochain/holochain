@@ -61,7 +61,7 @@ impl DbRead<Wasm> {
 
         // Fetch the DnaDef model
         let dna_model: Option<DnaDefModel> = sqlx::query_as(
-            "SELECT hash, name, network_seed, properties FROM DnaDef WHERE hash = ?",
+            "SELECT hash, name, network_seed, properties, lineage FROM DnaDef WHERE hash = ?",
         )
         .bind(hash_bytes)
         .fetch_optional(self.pool())
@@ -185,16 +185,36 @@ impl DbWrite<Wasm> {
         let network_seed = dna_def.modifiers.network_seed.clone();
         let properties = dna_def.modifiers.properties.bytes().to_vec();
 
+        // Serialize lineage if present
+        #[cfg(feature = "unstable-migration")]
+        let lineage_json = Some(sqlx::types::Json(&dna_def.lineage));
+        #[cfg(not(feature = "unstable-migration"))]
+        let lineage_json: Option<
+            sqlx::types::Json<&std::collections::HashSet<holochain_types::dna::DnaHash>>,
+        > = None;
+
         // Insert DnaDef
         sqlx::query(
-            "INSERT OR REPLACE INTO DnaDef (hash, name, network_seed, properties) VALUES (?, ?, ?, ?)",
+            "INSERT OR REPLACE INTO DnaDef (hash, name, network_seed, properties, lineage) VALUES (?, ?, ?, ?, ?)",
         )
-        .bind(hash_bytes)
-        .bind(name)
-        .bind(network_seed)
-        .bind(properties)
-        .execute(&mut *tx)
-        .await?;
+            .bind(hash_bytes)
+            .bind(name)
+            .bind(network_seed)
+            .bind(properties)
+            .bind(lineage_json)
+            .execute(&mut *tx)
+            .await?;
+
+        // Delete existing zomes for this DNA to avoid orphans when updating
+        sqlx::query("DELETE FROM IntegrityZome WHERE dna_hash = ?")
+            .bind(hash_bytes)
+            .execute(&mut *tx)
+            .await?;
+
+        sqlx::query("DELETE FROM CoordinatorZome WHERE dna_hash = ?")
+            .bind(hash_bytes)
+            .execute(&mut *tx)
+            .await?;
 
         // Insert integrity zomes
         for (zome_index, (zome_name, zome_def)) in dna_def.integrity_zomes.iter().enumerate() {
@@ -210,14 +230,12 @@ impl DbWrite<Wasm> {
             let dependencies = match zome_def.as_any_zome_def() {
                 ZomeDef::Wasm(WasmZome { dependencies, .. }) => dependencies
                     .iter()
-                    .map(|n| n.0.as_ref())
-                    .collect::<Vec<_>>()
-                    .join(","),
+                    .map(|n| n.0.as_ref().to_string())
+                    .collect::<Vec<_>>(),
                 ZomeDef::Inline { dependencies, .. } => dependencies
                     .iter()
-                    .map(|n| n.0.as_ref())
-                    .collect::<Vec<_>>()
-                    .join(","),
+                    .map(|n| n.0.as_ref().to_string())
+                    .collect::<Vec<_>>(),
             };
 
             sqlx::query(
@@ -227,7 +245,7 @@ impl DbWrite<Wasm> {
             .bind(zome_index as i64)
             .bind(&zome_name.0)
             .bind(wasm_hash_bytes)
-            .bind(dependencies)
+            .bind(sqlx::types::Json(&dependencies))
             .execute(&mut *tx)
             .await?;
         }
@@ -246,14 +264,12 @@ impl DbWrite<Wasm> {
             let dependencies = match zome_def.as_any_zome_def() {
                 ZomeDef::Wasm(WasmZome { dependencies, .. }) => dependencies
                     .iter()
-                    .map(|n| n.0.as_ref())
-                    .collect::<Vec<_>>()
-                    .join(","),
+                    .map(|n| n.0.as_ref().to_string())
+                    .collect::<Vec<_>>(),
                 ZomeDef::Inline { dependencies, .. } => dependencies
                     .iter()
-                    .map(|n| n.0.as_ref())
-                    .collect::<Vec<_>>()
-                    .join(","),
+                    .map(|n| n.0.as_ref().to_string())
+                    .collect::<Vec<_>>(),
             };
 
             sqlx::query(
@@ -263,7 +279,7 @@ impl DbWrite<Wasm> {
             .bind(zome_index as i64)
             .bind(&zome_name.0)
             .bind(wasm_hash_bytes)
-            .bind(dependencies)
+            .bind(sqlx::types::Json(&dependencies))
             .execute(&mut *tx)
             .await?;
         }
@@ -309,7 +325,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_wasm_roundtrip() {
+    async fn wasm_roundtrip() {
         let db = test_db().await;
 
         // Create test WASM bytecode
@@ -337,7 +353,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_dna_def_roundtrip() {
+    async fn dna_def_roundtrip() {
         let db = test_db().await;
 
         // Create test DNA definition
@@ -383,6 +399,8 @@ mod tests {
             },
             integrity_zomes,
             coordinator_zomes,
+            #[cfg(feature = "unstable-migration")]
+            lineage: std::collections::HashSet::new(),
         };
 
         let hash = dna_def.to_hash();
@@ -416,7 +434,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_entry_def_roundtrip() {
+    async fn entry_def_roundtrip() {
         let db = test_db().await;
 
         // Create test entry definitions
@@ -471,7 +489,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_dna_def_with_dependencies() {
+    async fn dna_def_with_dependencies() {
         let db = test_db().await;
 
         // Create WASM for zomes
@@ -501,6 +519,8 @@ mod tests {
             },
             integrity_zomes,
             coordinator_zomes,
+            #[cfg(feature = "unstable-migration")]
+            lineage: std::collections::HashSet::new(),
         };
 
         let hash = dna_def.to_hash();
@@ -516,7 +536,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_entry_def_all_types() {
+    async fn entry_def_all_types() {
         let db = test_db().await;
 
         // Test all EntryDefId variants
@@ -579,5 +599,169 @@ mod tests {
         // Verify all are in get_all
         let all = db.as_ref().get_all_entry_defs().await.unwrap();
         assert_eq!(all.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn update_dna_def_removes_orphaned_zomes() {
+        let db = test_db().await;
+
+        // Create WASM for zomes
+        let wasm_code = vec![0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00];
+        let wasm = DnaWasm {
+            code: wasm_code.into(),
+        };
+        let wasm_hash = wasm.to_hash().await;
+        let wasm_hashed = DnaWasmHashed::with_pre_hashed(wasm, wasm_hash.clone());
+        db.put_wasm(wasm_hashed).await.unwrap();
+
+        // Create initial DNA with 3 integrity zomes and 2 coordinator zomes
+        let integrity_zomes = vec![
+            (
+                ZomeName::from("integrity1"),
+                IntegrityZomeDef::from_hash(wasm_hash.clone()),
+            ),
+            (
+                ZomeName::from("integrity2"),
+                IntegrityZomeDef::from_hash(wasm_hash.clone()),
+            ),
+            (
+                ZomeName::from("integrity3"),
+                IntegrityZomeDef::from_hash(wasm_hash.clone()),
+            ),
+        ];
+
+        let coordinator_zomes = vec![
+            (
+                ZomeName::from("coordinator1"),
+                CoordinatorZomeDef::from_hash(wasm_hash.clone()),
+            ),
+            (
+                ZomeName::from("coordinator2"),
+                CoordinatorZomeDef::from_hash(wasm_hash.clone()),
+            ),
+        ];
+
+        let dna_def_v1 = DnaDef {
+            name: "test_update".to_string(),
+            modifiers: DnaModifiers {
+                network_seed: "seed".to_string(),
+                properties: SerializedBytes::default(),
+            },
+            integrity_zomes,
+            coordinator_zomes,
+            #[cfg(feature = "unstable-migration")]
+            lineage: std::collections::HashSet::new(),
+        };
+
+        let hash = dna_def_v1.to_hash();
+        db.put_dna_def(&dna_def_v1).await.unwrap();
+
+        // Verify initial state
+        let retrieved_v1 = db.as_ref().get_dna_def(&hash).await.unwrap().unwrap();
+        assert_eq!(retrieved_v1.integrity_zomes.len(), 3);
+        assert_eq!(retrieved_v1.coordinator_zomes.len(), 2);
+
+        // Count zomes directly in the database
+        let integrity_count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM IntegrityZome WHERE dna_hash = ?")
+                .bind(hash.get_raw_39())
+                .fetch_one(db.pool())
+                .await
+                .unwrap();
+        assert_eq!(integrity_count, 3);
+
+        let coordinator_count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM CoordinatorZome WHERE dna_hash = ?")
+                .bind(hash.get_raw_39())
+                .fetch_one(db.pool())
+                .await
+                .unwrap();
+        assert_eq!(coordinator_count, 2);
+
+        // Update DNA with fewer zomes (1 integrity, 1 coordinator)
+        let integrity_zomes_v2 = vec![(
+            ZomeName::from("integrity1"),
+            IntegrityZomeDef::from_hash(wasm_hash.clone()),
+        )];
+
+        let coordinator_zomes_v2 = vec![(
+            ZomeName::from("coordinator1"),
+            CoordinatorZomeDef::from_hash(wasm_hash.clone()),
+        )];
+
+        let dna_def_v2 = DnaDef {
+            name: "test_update_v2".to_string(),
+            modifiers: DnaModifiers {
+                network_seed: "seed_v2".to_string(),
+                properties: SerializedBytes::default(),
+            },
+            integrity_zomes: integrity_zomes_v2,
+            coordinator_zomes: coordinator_zomes_v2,
+            #[cfg(feature = "unstable-migration")]
+            lineage: std::collections::HashSet::new(),
+        };
+
+        // Different hash since zomes changed
+        let hash_v2 = dna_def_v2.to_hash();
+        assert_ne!(hash, hash_v2, "Hash should change when zomes change");
+
+        // Update the DNA definition
+        db.put_dna_def(&dna_def_v2).await.unwrap();
+
+        // Verify old DNA still has original zomes
+        let retrieved_v1 = db.as_ref().get_dna_def(&hash).await.unwrap().unwrap();
+        assert_eq!(retrieved_v1.integrity_zomes.len(), 3);
+        assert_eq!(retrieved_v1.coordinator_zomes.len(), 2);
+
+        // Verify new DNA has new zomes
+        let retrieved_v2 = db.as_ref().get_dna_def(&hash_v2).await.unwrap().unwrap();
+        assert_eq!(retrieved_v2.integrity_zomes.len(), 1);
+        assert_eq!(retrieved_v2.coordinator_zomes.len(), 1);
+
+        // Verify no orphaned zomes remain for the old DNA hash
+        let integrity_count_after: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM IntegrityZome WHERE dna_hash = ?")
+                .bind(hash.get_raw_39())
+                .fetch_one(db.pool())
+                .await
+                .unwrap();
+        assert_eq!(
+            integrity_count_after, 3,
+            "Original DNA should still have 3 integrity zomes"
+        );
+
+        let coordinator_count_after: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM CoordinatorZome WHERE dna_hash = ?")
+                .bind(hash.get_raw_39())
+                .fetch_one(db.pool())
+                .await
+                .unwrap();
+        assert_eq!(
+            coordinator_count_after, 2,
+            "Original DNA should still have 2 coordinator zomes"
+        );
+
+        // Verify new DNA has correct counts
+        let new_integrity_count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM IntegrityZome WHERE dna_hash = ?")
+                .bind(hash_v2.get_raw_39())
+                .fetch_one(db.pool())
+                .await
+                .unwrap();
+        assert_eq!(
+            new_integrity_count, 1,
+            "New DNA should have 1 integrity zome"
+        );
+
+        let new_coordinator_count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM CoordinatorZome WHERE dna_hash = ?")
+                .bind(hash_v2.get_raw_39())
+                .fetch_one(db.pool())
+                .await
+                .unwrap();
+        assert_eq!(
+            new_coordinator_count, 1,
+            "New DNA should have 1 coordinator zome"
+        );
     }
 }

@@ -332,11 +332,14 @@ mod startup_shutdown_impls {
 
             // Determine cells to create
             let state = self.get_state().await?;
-            let all_enabled_cell_ids = state
-                .enabled_apps()
-                .flat_map(|(_, app)| app.all_enabled_cells().collect::<Vec<_>>());
-            self.create_cells_and_add_to_state(all_enabled_cell_ids)
-                .await?;
+            // create cells with their config override
+            for (_, app) in state.enabled_apps() {
+                let config_override = Self::p2p_config_overrides(&app.manifest);
+                let cell_ids = app.all_enabled_cells();
+                self.clone()
+                    .create_cells_and_add_to_state(cell_ids, config_override)
+                    .await?;
+            }
 
             info!("Conductor startup: apps enabled.");
 
@@ -1149,6 +1152,22 @@ mod app_impls {
             let dnas_with_roles: Vec<_> = data.iter().map(|(dr, _)| dr).cloned().collect();
             let manifest = app_manifest_from_dnas(&dnas_with_roles, 255, false, network_seed);
 
+            self.install_app_with_manifest(installed_app_id, agent, data, flags, manifest)
+                .await
+        }
+
+        /// Like [`Self::install_app_minimal`] but with a custom manifest.
+        ///
+        // This is just a convenience for testing.
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+        pub(crate) async fn install_app_with_manifest(
+            self: Arc<Self>,
+            installed_app_id: InstalledAppId,
+            agent: Option<AgentPubKey>,
+            data: &[(impl DnaWithRole, Option<MembraneProof>)],
+            flags: Option<InstallAppCommonFlags>,
+            manifest: AppManifest,
+        ) -> ConductorResult<AgentPubKey> {
             let (dnas_to_register, role_assignments): (Vec<_>, Vec<_>) = data
                 .iter()
                 .map(|(dr, mp)| {
@@ -1683,8 +1702,14 @@ mod clone_cell_impls {
             // run genesis on cloned cell
             let cells = vec![(clone_cell.cell_id.clone(), membrane_proof)];
             crate::conductor::conductor::genesis_cells(self.clone(), cells).await?;
-            self.create_cells_and_add_to_state([clone_cell.cell_id.clone()].into_iter())
-                .await?;
+            let state = self.get_state().await?;
+            let app = state.get_app(installed_app_id)?;
+            let p2p_config_override = Self::p2p_config_overrides(&app.manifest);
+            self.create_cells_and_add_to_state(
+                [clone_cell.cell_id.clone()].into_iter(),
+                p2p_config_override,
+            )
+            .await?;
             Ok(clone_cell)
         }
 
@@ -1727,7 +1752,7 @@ mod clone_cell_impls {
                     let clone_cell_id = payload.clone_cell_id.to_owned();
                     move |mut state| {
                         let app = state.get_app_mut(&app_id)?;
-                        let clone_id = app.get_disabled_clone_id(&clone_cell_id)?;
+                        let clone_id = app.get_clone_id(&clone_cell_id)?;
                         let (cell_id, _) = app.enable_clone_cell(&clone_id)?.into_inner();
                         let app_role = app.primary_role(&clone_id.as_base_role_name())?;
                         let original_dna_hash = app_role.dna_hash().clone();
@@ -1748,8 +1773,15 @@ mod clone_cell_impls {
                 })
                 .await?;
 
-            self.create_cells_and_add_to_state([enabled_cell.cell_id.clone()].into_iter())
-                .await?;
+            let state = self.get_state().await?;
+            let app = state.get_app(installed_app_id)?;
+            let p2p_config_override = Self::p2p_config_overrides(&app.manifest);
+
+            self.create_cells_and_add_to_state(
+                [enabled_cell.cell_id.clone()].into_iter(),
+                p2p_config_override,
+            )
+            .await?;
             Ok(enabled_cell)
         }
 
@@ -1776,7 +1808,7 @@ mod clone_cell_impls {
                             })
                             .expect("disabled clone cell not part of this app")
                             .1;
-                        let clone_id = app.get_disabled_clone_id(&clone_cell_id)?;
+                        let clone_id = app.get_clone_id(&clone_cell_id)?;
                         app.delete_clone_cell(&clone_id)?;
                         Ok((state, cell_id))
                     }
@@ -1793,45 +1825,57 @@ mod app_status_impls {
     use super::*;
     use crate::conductor::cell::error::CellResult;
     use holochain_chc::ChcImpl;
+    use holochain_types::cell_config_overrides::CellConfigOverrides;
 
     impl Conductor {
         /// Instantiate cells, join them to the network and add them to the conductor's state.
         pub(crate) async fn create_cells_and_add_to_state(
             self: Arc<Self>,
             cell_ids: impl Iterator<Item = CellId>,
+            config_override: Option<CellConfigOverrides>,
         ) -> ConductorResult<()> {
             let cells_to_create = cell_ids.map(|cell_id| {
                 let handle = self.clone();
+                let overrides = config_override.clone();
                 async move {
                     handle
                         .clone()
-                        .create_cell(&cell_id, handle.get_chc(&cell_id))
+                        .create_cell(&cell_id, handle.get_chc(&cell_id), overrides)
                         .await
                 }
             });
-            // Create cells
-            let cells = future::join_all(cells_to_create)
+            // Create cells with bounded parallelism (max 5 concurrent)
+            let cells = futures::stream::iter(cells_to_create)
+                .buffer_unordered(5)
+                .collect::<Vec<_>>()
                 .await
                 .into_iter()
                 .collect::<Result<Vec<_>, _>>()?;
 
-            // Add agents to local agent store in kitsune
-            future::join_all(cells.iter().enumerate().map(|(i, (cell, _))| {
-                async move {
+            // Add agents to local agent store in kitsune with bounded parallelism (max 10 concurrent)
+            let join_futures = cells
+                .iter()
+                .enumerate()
+                .map(|(i, (cell, _))| {
+                    let config_override = config_override.clone();
                     let cell_id = cell.id().clone();
                     let agent_pubkey = cell_id.agent_pubkey().clone();
-                    if let Err(e) = cell
-                        .holochain_p2p_dna()
-                        .clone()
-                        .join(agent_pubkey, None)
-                        .await
-                    {
-                        tracing::error!(?e, ?cell_id, "Network join failed.");
+                    let holochain_p2p_dna = cell.holochain_p2p_dna().clone();
+                    async move {
+                        if let Err(e) = holochain_p2p_dna
+                            .join(agent_pubkey, None, config_override)
+                            .await
+                        {
+                            tracing::error!(?e, ?cell_id, "Network join failed.");
+                        }
                     }
-                }
-                .instrument(tracing::info_span!("network join task", ?i))
-            }))
-            .await;
+                    .instrument(tracing::info_span!("network join task", ?i))
+                })
+                .collect::<Vec<_>>();
+            futures::stream::iter(join_futures)
+                .buffer_unordered(10)
+                .collect::<Vec<_>>()
+                .await;
 
             // Add cells to conductor
             self.add_and_initialize_cells(cells);
@@ -1844,7 +1888,33 @@ mod app_status_impls {
             self: Arc<Self>,
             cell_id: &CellId,
             chc: Option<ChcImpl>,
+            overrides: Option<CellConfigOverrides>,
         ) -> CellResult<(Cell, InitialQueueTriggers)> {
+            // check if there are any cell with the same DNA with a different overrides' config.
+            let overrides = overrides.unwrap_or_default();
+            if let Some(conflicting_cell_id) =
+                self.check_p2p_overrides_conflicting(cell_id.dna_hash(), &overrides)
+            {
+                let conflicting_app_id = self
+                    .find_app_containing_cell(&conflicting_cell_id)
+                    .await
+                    .ok()
+                    .flatten()
+                    .map(|app| Box::new(app.installed_app_id.clone()));
+                let app_id = self
+                    .find_app_containing_cell(cell_id)
+                    .await
+                    .ok()
+                    .flatten()
+                    .map(|app| Box::new(app.installed_app_id.clone()));
+                return Err(CellError::P2pConfigOverridesConflict {
+                    app_id,
+                    cell_id: cell_id.clone(),
+                    conflicting_app_id,
+                    conflicting_cell_id,
+                });
+            }
+
             let holochain_p2p_cell = holochain_p2p::HolochainP2pDna::new(
                 self.holochain_p2p.clone(),
                 cell_id.dna_hash().clone(),
@@ -1864,6 +1934,7 @@ mod app_status_impls {
                 space,
                 holochain_p2p_cell,
                 signal_tx,
+                overrides,
             )
             .await
         }
@@ -1887,10 +1958,13 @@ mod app_status_impls {
                 return Ok(app.clone());
             }
 
+            // Prepare module config overrides from app manifest
+            let config_override = Self::p2p_config_overrides(&app.manifest);
+
             // Determine cells to create
             let cell_ids_in_app = app.all_enabled_cells();
             self.clone()
-                .create_cells_and_add_to_state(cell_ids_in_app)
+                .create_cells_and_add_to_state(cell_ids_in_app, config_override)
                 .await?;
 
             // Set app status to enabled in conductor state.
@@ -1949,6 +2023,41 @@ mod app_status_impls {
                 })
                 .await?;
             Ok(disabled_app)
+        }
+
+        /// Get from [`AppManifest`] the [`CellConfigOverrides`] to apply when creating cells for the app.
+        pub(crate) fn p2p_config_overrides(manifest: &AppManifest) -> Option<CellConfigOverrides> {
+            let mut overrides = CellConfigOverrides::default();
+            match manifest {
+                AppManifest::V0(manifest) => {
+                    overrides.bootstrap_url = manifest.bootstrap_url.clone();
+                    overrides.signal_url = manifest.signal_url.clone();
+                }
+            }
+            if overrides.is_overriding() {
+                Some(overrides)
+            } else {
+                None
+            }
+        }
+
+        /// Check whether there is any already installed app with conflicting P2P overrides.
+        ///
+        /// If there is a conflicting app, return its [`CellId`].
+        pub(crate) fn check_p2p_overrides_conflicting(
+            &self,
+            dna_hash: &DnaHash,
+            overrides: &CellConfigOverrides,
+        ) -> Option<CellId> {
+            self.running_cells.share_ref(|c| {
+                c.values().find_map(|cell| {
+                    if cell.id().dna_hash() == dna_hash && cell.overrides() != overrides {
+                        Some(cell.id().clone())
+                    } else {
+                        None
+                    }
+                })
+            })
         }
     }
 }

@@ -21,7 +21,6 @@ use holochain_zome_types::fixt::{CreateFixturator, EntryFixturator, SignatureFix
 use holochain_zome_types::prelude::ChainQueryFilter;
 use holochain_zome_types::Action;
 use kitsune2_api::*;
-use kitsune2_test_utils::enable_tracing;
 use std::sync::Arc;
 
 #[derive(Debug)]
@@ -194,7 +193,6 @@ async fn process_incoming_ops_and_retrieve() {
 
 #[tokio::test]
 async fn retrieve_ops_does_not_panic_with_too_short_op_ids() {
-    enable_tracing();
     let (_, op_store) = setup_test().await;
 
     let op_id_too_short = kitsune2_api::OpId::from(bytes::Bytes::from(vec![0u8; 31]));
@@ -247,7 +245,6 @@ async fn filter_out_existing_ops() {
 #[tokio::test]
 async fn filter_out_existing_ops_filters_invalid_op_ids_as_well() {
     let (_, op_store) = setup_test().await;
-    enable_tracing();
 
     let valid_op = test_dht_op(Timestamp::now());
     let valid_op_id = valid_op

@@ -8,7 +8,7 @@ use holochain_wasm_test_utils::TestWasm;
 async fn gossip_test() {
     holochain_trace::test_run();
     let config =
-        SweetConductorConfig::standard().tune_network_config(|nc| nc.disable_publish = true);
+        SweetConductorConfig::rendezvous(true).tune_network_config(|nc| nc.disable_publish = true);
     let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Anchor]).await;
