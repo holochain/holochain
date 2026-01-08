@@ -85,6 +85,19 @@ CREATE TABLE AuthoredOp (
     
     FOREIGN KEY(action_hash) REFERENCES Action(hash)
 );
+
+-- Validation receipts for authored ops
+-- Validation receipts for authored ops
+-- These track that other agents have validated our authored ops
+CREATE TABLE ValidationReceipt (
+    hash BLOB PRIMARY KEY,
+    op_hash BLOB NOT NULL,
+    validator BLOB NOT NULL,
+    signature BLOB NOT NULL,
+    when_received INTEGER NOT NULL,
+    
+    FOREIGN KEY(op_hash) REFERENCES AuthoredOp(hash)
+);
 ```
 
 #### 2. DHT Database with Limbo Tables
@@ -118,16 +131,6 @@ CREATE TABLE LimboOp (
 );
 
 -- Track validation receipts
-CREATE TABLE ValidationReceipt (
-    hash BLOB PRIMARY KEY,
-    op_hash BLOB NOT NULL,
-    validator BLOB NOT NULL,
-    signature BLOB NOT NULL,
-    when_received INTEGER NOT NULL,
-    
-    FOREIGN KEY(op_hash) REFERENCES LimboOp(hash) ON DELETE CASCADE
-);
-
 -- Validated tables in DHT database
 CREATE TABLE DhtAction (
     hash BLOB PRIMARY KEY,
@@ -300,7 +303,7 @@ Moves validated ops from LimboOp to DhtOp, updates record validity in DhtAction
 Queries AuthoredOp from the authored database for unpublished or recently published ops, tracking publish attempts and timing
 
 ### Validation Receipt Workflow
-Inserts receipts linked to LimboOp, updates receipts_complete when moved to DhtOp
+Tracks validation receipts for authored ops. When sufficient receipts are received for an authored op, updates receipts_complete flag in AuthoredOp table to prevent unnecessary republishing
 
 ## Unified Storage with Arc Coverage
 
