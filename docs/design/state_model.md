@@ -353,14 +353,12 @@ The system maintains these invariants:
 
 ## Optimized Action Storage Design
 
-### Rationale
+Actions are stored with common fields in the main table and action-specific data as a serialized BLOB. Where action-specific fields need to be queried, separate index tables provide efficient access.
 
-Action storage can be optimized to avoid redundancy where fields like `author`, `timestamp`, `seq`, and `prev_action` are repeated across every variant. Two approaches are possible:
+### Database Schema
 
-### Option 1: Separated Header with BLOB Data
-
-**Database Schema:**
 ```sql
+-- Main action storage
 CREATE TABLE Action (
     hash BLOB PRIMARY KEY,
     author BLOB NOT NULL,
@@ -370,10 +368,38 @@ CREATE TABLE Action (
     action_type TEXT NOT NULL,
     action_data BLOB -- Serialized ActionData enum
 );
+
+-- Index tables for queryable action-specific fields
+
+-- For efficient capability grant/claim queries
+CREATE TABLE CapabilityGrant (
+    action_hash BLOB PRIMARY KEY,
+    grantor BLOB NOT NULL,
+    grantee BLOB NOT NULL,
+    cap_secret BLOB,
+    FOREIGN KEY(action_hash) REFERENCES Action(hash)
+);
+
+CREATE TABLE CapabilityClaim (
+    action_hash BLOB PRIMARY KEY,
+    grantor BLOB NOT NULL,
+    cap_secret BLOB NOT NULL,
+    FOREIGN KEY(action_hash) REFERENCES Action(hash)
+);
+
+-- For entry-related queries
+CREATE TABLE ActionEntry (
+    action_hash BLOB PRIMARY KEY,
+    entry_hash BLOB NOT NULL,
+    entry_type TEXT,
+    FOREIGN KEY(action_hash) REFERENCES Action(hash)
+);
+
+-- For link queries (already separate in LinkOp tables)
+-- Links are typically queried through dedicated link tables
 ```
 
-**Rust Structure:**
-
+### Rust Structure
 ```rust
 /// Common action header stored for all action types
 pub struct ActionHeader {
@@ -464,81 +490,36 @@ pub struct OpenChainData {
 }
 ```
 
-**Benefits:**
-- Common fields stored once, reducing redundancy
-- Simple schema with single table
-- Action type can be indexed for efficient filtering
-- Chain traversal doesn't require deserializing action_data BLOB
+### Query Patterns
 
-**Drawbacks:**
-- Requires deserialization to access action-specific fields
-- Cannot query/index action-specific fields directly (e.g., entry_hash)
-
-### Option 2: Fully Normalized Tables
-
-**Database Schema:**
 ```sql
-CREATE TABLE Action (
-    hash BLOB PRIMARY KEY,
-    author BLOB NOT NULL,
-    seq INTEGER NOT NULL,
-    prev_hash BLOB,
-    timestamp INTEGER NOT NULL,
-    action_type TEXT NOT NULL
-);
+-- Chain traversal (no BLOB deserialization needed)
+SELECT hash, seq, prev_hash, timestamp 
+FROM Action 
+WHERE author = ? 
+ORDER BY seq;
 
-CREATE TABLE ActionEntry (
-    action_hash BLOB PRIMARY KEY,
-    entry_hash BLOB NOT NULL,
-    entry_type TEXT NOT NULL
-);
+-- Find capability grants for an agent
+SELECT a.*, cg.* 
+FROM Action a
+JOIN CapabilityGrant cg ON a.hash = cg.action_hash
+WHERE cg.grantee = ?;
 
-CREATE TABLE ActionLink (
-    action_hash BLOB PRIMARY KEY,
-    base_address BLOB NOT NULL,
-    target_address BLOB NOT NULL,
-    zome_index INTEGER NOT NULL,
-    link_type INTEGER NOT NULL,
-    tag BLOB
-);
--- ... additional tables for each action type
+-- Get entries by type (using index table)
+SELECT a.*, ae.entry_hash
+FROM Action a
+JOIN ActionEntry ae ON a.hash = ae.action_hash
+WHERE ae.entry_type = ? AND a.author = ?;
+
+-- Full action retrieval (deserialize BLOB for complete data)
+SELECT * FROM Action WHERE hash = ?;
+-- Then deserialize action_data BLOB in application layer
 ```
 
-**Benefits:**
-- All fields queryable and indexable
-- No deserialization needed for queries
-- Maximum query flexibility
+### Benefits of This Approach
 
-**Drawbacks:**
-- Complex schema with many tables
-- Requires joins for complete action data
-- More complex write operations
-
-### Option 3: Hybrid Approach
-
-**Database Schema:**
-```sql
-CREATE TABLE Action (
-    hash BLOB PRIMARY KEY,
-    author BLOB NOT NULL,
-    seq INTEGER NOT NULL,
-    prev_hash BLOB,
-    timestamp INTEGER NOT NULL,
-    action_type TEXT NOT NULL,
-    action_data BLOB, -- Serialized ActionData
-    
-    -- Denormalized frequently-queried fields
-    entry_hash BLOB,      -- NULL for non-entry actions
-    base_address BLOB,    -- NULL for non-link actions
-    target_address BLOB   -- NULL for non-link actions
-);
-```
-
-**Benefits:**
-- Balance between query flexibility and schema simplicity
-- Common query patterns optimized without joins
-- Less storage overhead than full denormalization
-
-**Drawbacks:**
-- Some redundancy between BLOB and denormalized fields
-- Schema has nullable fields not applicable to all action types
+1. **Minimal redundancy** - Common fields stored once
+2. **Simple core schema** - Main table remains clean
+3. **Selective indexing** - Only queryable fields get index tables
+4. **Efficient chain operations** - No BLOB deserialization for traversal
+5. **Flexible querying** - Index tables enable specific queries without full scans
