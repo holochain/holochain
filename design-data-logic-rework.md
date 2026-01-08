@@ -5,9 +5,9 @@
 The Holochain data storage and validation architecture provides:
 
 1. Ops as the unit of validation with aggregated validity status for records
-2. A validation staging area to separate pending data from validated data
+2. Validation staging tables to separate pending data from validated data
 3. Unified data querying without separate cache database
-4. Distinct schemas for authored, DHT, and validation staging databases
+4. Distinct schemas for authored and DHT databases, with staging tables in DHT
 5. Direct data queries without complex joins
 
 ## Architecture
@@ -16,8 +16,8 @@ The Holochain data storage and validation architecture provides:
 
 1. **Ops are the unit of validation**: All validation happens at the op level
 2. **Records aggregate op validity**: A record's validity is derived from its constituent ops
-3. **Validation staging isolates pending data**: Unvalidated ops stay in staging until validated
-4. **Distinct schemas per database type**: Each database has only the fields it needs
+3. **Validation staging isolates pending data**: Unvalidated ops stay in staging tables until validated
+4. **Distinct schemas per database type**: Authored and DHT databases have schemas tailored to their needs
 5. **Unified data storage**: DHT database serves both obligated and cached data, distinguished by arc coverage
 6. **Clear state transitions**: Data moves through well-defined states with no ambiguity
 
@@ -63,11 +63,11 @@ CREATE TABLE AuthoredOp (
 );
 ```
 
-#### 2. Validation Staging Database
-**Purpose**: Hold ops during validation process
+#### 2. DHT Database with Staging Tables
+**Purpose**: Store validated DHT data and ops pending validation
 
 ```sql
--- Staging area for ops being validated
+-- Staging tables for ops being validated
 CREATE TABLE StagingOp (
     hash BLOB PRIMARY KEY,
     op_type TEXT NOT NULL,
@@ -105,11 +105,7 @@ CREATE TABLE ValidationReceipt (
 );
 ```
 
-#### 3. DHT Database
-**Purpose**: Store validated DHT data
-
-```sql
--- Validated Actions in DHT
+-- Validated tables in DHT database
 CREATE TABLE DhtAction (
     hash BLOB PRIMARY KEY,
     author BLOB NOT NULL,
