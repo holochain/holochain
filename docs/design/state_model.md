@@ -6,9 +6,9 @@
 The Holochain data storage and validation architecture provides:
 
 1. Ops as the unit of validation with aggregated validity status for records
-2. Validation staging tables to separate pending data from validated data
+2. Validation limbo tables to separate pending data from validated data
 3. Unified data querying without separate cache database
-4. Distinct schemas for authored and DHT databases, with staging tables in DHT
+4. Distinct schemas for authored and DHT databases, with limbo tables in DHT
 5. Direct data queries without complex joins
 
 ## Architecture
@@ -17,7 +17,7 @@ The Holochain data storage and validation architecture provides:
 
 1. **Ops are the unit of validation**: All validation happens at the op level
 2. **Records aggregate op validity**: A record's validity is derived from its constituent ops
-3. **Validation staging isolates pending data**: Unvalidated ops stay in staging tables until validated
+3. **Validation limbo isolates pending data**: Unvalidated ops stay in limbo tables until validated
 4. **Distinct schemas per database type**: Authored and DHT databases have schemas tailored to their needs
 5. **Unified data storage**: DHT database serves both obligated and cached data, distinguished by arc coverage
 6. **Clear state transitions**: Data moves through well-defined states with no ambiguity
@@ -39,19 +39,36 @@ CREATE TABLE Action (
     action_data BLOB -- Serialized ActionData enum
 );
 
--- Index tables for queryable action-specific fields
-CREATE TABLE ActionEntry (
-    action_hash BLOB PRIMARY KEY,
-    entry_hash BLOB NOT NULL,
-    entry_type TEXT,
-    FOREIGN KEY(action_hash) REFERENCES Action(hash)
-);
-
 -- Authored Entries
 CREATE TABLE Entry (
     hash BLOB PRIMARY KEY,
-    blob BLOB NOT NULL,
-    -- Entry-specific fields for CapClaim/CapGrant
+    blob BLOB NOT NULL
+);
+
+-- Direct lookup tables for queryable entry types
+
+-- Capability grants indexed by secret and access type
+CREATE TABLE CapGrant (
+    entry_hash BLOB PRIMARY KEY,
+    action_hash BLOB NOT NULL,
+    author BLOB NOT NULL,
+    cap_secret BLOB,           -- NULL for unrestricted grants
+    cap_access TEXT NOT NULL,  -- 'unrestricted', 'transferable', 'assigned'
+    functions BLOB,            -- Serialized list of allowed functions
+    assignees BLOB,            -- Serialized list of assignees
+    FOREIGN KEY(entry_hash) REFERENCES Entry(hash),
+    FOREIGN KEY(action_hash) REFERENCES Action(hash)
+);
+
+-- Capability claims indexed by secret
+CREATE TABLE CapClaim (
+    entry_hash BLOB PRIMARY KEY,
+    action_hash BLOB NOT NULL,
+    author BLOB NOT NULL,
+    cap_secret BLOB NOT NULL,
+    grantor BLOB NOT NULL,
+    FOREIGN KEY(entry_hash) REFERENCES Entry(hash),
+    FOREIGN KEY(action_hash) REFERENCES Action(hash)
 );
 
 -- Authored Ops (for publishing)
@@ -61,19 +78,21 @@ CREATE TABLE AuthoredOp (
     op_type TEXT NOT NULL,
     basis_hash BLOB NOT NULL,
     
-    when_published INTEGER,
-    publish_attempts INTEGER DEFAULT 0,
+    -- Publishing state
+    last_publish_time INTEGER,
+    receipts_complete BOOLEAN,
+    withhold_publish BOOLEAN,  -- For countersigning ops
     
     FOREIGN KEY(action_hash) REFERENCES Action(hash)
 );
 ```
 
-#### 2. DHT Database with Staging Tables
+#### 2. DHT Database with Limbo Tables
 **Purpose**: Store validated DHT data and ops pending validation
 
 ```sql
--- Staging tables for ops being validated
-CREATE TABLE StagingOp (
+-- Limbo tables for ops being validated
+CREATE TABLE LimboOp (
     hash BLOB PRIMARY KEY,
     op_type TEXT NOT NULL,
     action_hash BLOB NOT NULL,
@@ -106,37 +125,45 @@ CREATE TABLE ValidationReceipt (
     signature BLOB NOT NULL,
     when_received INTEGER NOT NULL,
     
-    FOREIGN KEY(op_hash) REFERENCES StagingOp(hash) ON DELETE CASCADE
+    FOREIGN KEY(op_hash) REFERENCES LimboOp(hash) ON DELETE CASCADE
 );
-```
 
 -- Validated tables in DHT database
 CREATE TABLE DhtAction (
     hash BLOB PRIMARY KEY,
     author BLOB NOT NULL,
+    seq INTEGER,          -- NULL for actions not in agent activity
+    prev_hash BLOB,       -- NULL for actions not in agent activity
     timestamp INTEGER NOT NULL,
     action_type TEXT NOT NULL,
     action_data BLOB NOT NULL, -- Serialized ActionData enum
+    entry_hash BLOB,      -- NULL for non-entry actions
     
-    -- Record validity (aggregated from ops)
-    record_validity TEXT NOT NULL -- 'valid', 'rejected', 'abandoned'
+    -- Record validity (aggregated from all ops for this record)
+    -- A record is the combination of action + entry (if applicable)
+    record_validity TEXT NOT NULL -- 'valid', 'rejected'
 );
 
--- Index table for DHT action queries
-CREATE TABLE DhtActionEntry (
-    action_hash BLOB PRIMARY KEY,
-    entry_hash BLOB NOT NULL,
-    entry_type TEXT,
-    FOREIGN KEY(action_hash) REFERENCES DhtAction(hash)
-);
-
--- Validated Entries in DHT  
+-- Entries stored in DHT (entry authorities always have the action too)
 CREATE TABLE DhtEntry (
     hash BLOB PRIMARY KEY,
-    blob BLOB NOT NULL,
-    
-    -- Entry validity (aggregated from ops)
-    validity TEXT NOT NULL -- 'valid', 'rejected', 'abandoned'
+    blob BLOB NOT NULL
+);
+
+-- Direct lookup tables for DHT queryable entries
+-- Direct lookup table for queryable entries
+-- Note: CapClaim entries are not included here as they are always Private
+-- and only used locally by the claimant agent
+CREATE TABLE DhtCapGrant (
+    entry_hash BLOB PRIMARY KEY,
+    action_hash BLOB NOT NULL,
+    author BLOB NOT NULL,
+    cap_secret BLOB,
+    cap_access TEXT NOT NULL,
+    functions BLOB,
+    assignees BLOB,
+    FOREIGN KEY(entry_hash) REFERENCES DhtEntry(hash),
+    FOREIGN KEY(action_hash) REFERENCES DhtAction(hash)
 );
 
 -- Validated Ops in DHT
@@ -148,7 +175,7 @@ CREATE TABLE DhtOp (
     storage_center_loc INTEGER NOT NULL,
     
     -- Final validation result
-    validation_status TEXT NOT NULL, -- 'valid', 'rejected', 'abandoned'
+    validation_status TEXT NOT NULL, -- 'valid', 'rejected'
     
     -- Integration tracking
     when_integrated INTEGER NOT NULL,
@@ -182,30 +209,30 @@ CREATE TABLE DhtLink (
 
 ```
 1. Op arrives (from author or network)
-   └─> Insert into StagingOp
+   └─> Insert into LimboOp
 
 2. Sys Validation Workflow
    ├─> Check dependencies in DhtAction/DhtEntry
    ├─> Perform sys validation checks
-   └─> Update sys_validation_status in StagingOp
+   └─> Update sys_validation_status in LimboOp
 
 3. App Validation Workflow (if sys valid)
    ├─> Run WASM validation
-   └─> Update app_validation_status in StagingOp
+   └─> Update app_validation_status in LimboOp
 
-4. Integration Workflow (if all valid)
-   ├─> Move op from StagingOp to DhtOp
+4. Integration Workflow (if both valid)
+   ├─> Move op from LimboOp to DhtOp
    ├─> Insert/update DhtAction with aggregated validity
-   ├─> Insert/update DhtEntry with aggregated validity
-   └─> Delete from StagingOp
+   ├─> Insert DhtEntry (if applicable and not already present)
+   └─> Delete from LimboOp
 ```
 
 ### Record Validity Aggregation
 
 **Rules:**
-1. A record is **INVALID** if ANY known ops are rejected
-2. A record is **VALID** if at least one known op is valid and no known ops are rejected
-3. A record is **ABANDONED** if all known ops are abandoned
+1. A record is **INVALID** if ANY known ops for it are rejected
+2. A record is **VALID** if at least one known op for it is valid and no known ops are rejected
+3. Abandoned ops never leave the limbo state, so records in DHT only have 'valid' or 'rejected' status
 4. A record's validity is computed on integration, not on query
 5. Validators may have partial views due to sharding - validity is based only on known ops
 
@@ -229,9 +256,12 @@ WHERE Action.hash = ?
 ### Get Entry by Hash
 
 ```sql
-SELECT * FROM DhtEntry
+-- Entry authorities always have the action, so we can check validity
+SELECT Entry.*, Action.record_validity
+FROM DhtEntry AS Entry
+JOIN DhtAction AS Action ON Action.entry_hash = Entry.hash
 WHERE hash = ?
-  AND validity = 'valid'
+  AND Action.record_validity = 'valid'
 ```
 
 ### Get Links
@@ -255,22 +285,22 @@ ORDER BY seq
 ## Workflow Specifications
 
 ### Incoming DHT Ops Workflow
-Ops are inserted into StagingOp table with validation_stage='pending_sys'
+Ops are inserted into LimboOp table with validation_stage='pending_sys'
 
 ### Sys Validation Workflow  
-Updates sys_validation_status in StagingOp, triggers app validation or abandonment
+Updates sys_validation_status in LimboOp, triggers app validation or abandonment
 
 ### App Validation Workflow
-Updates app_validation_status in StagingOp, triggers integration if valid
+Updates app_validation_status in LimboOp, triggers integration if valid
 
 ### Integration Workflow
-Moves validated ops from StagingOp to DhtOp, updates record validity in DhtAction/DhtEntry
+Moves validated ops from LimboOp to DhtOp, updates record validity in DhtAction
 
 ### Publish DHT Ops Workflow
-Queries DhtOp for ops to publish (all ops in DhtOp are integrated)
+Queries AuthoredOp from the authored database for unpublished or recently published ops, tracking publish attempts and timing
 
 ### Validation Receipt Workflow
-Inserts receipts linked to StagingOp, updates receipts_complete when moved to DhtOp
+Inserts receipts linked to LimboOp, updates receipts_complete when moved to DhtOp
 
 ## Unified Storage with Arc Coverage
 
@@ -314,21 +344,21 @@ When storage pressure occurs:
 Warrants require special consideration:
 
 1. **ChainIntegrityWarrant**: Proves an author broke chain rules
-   - Stays in StagingOp until warranted action is fetched and validated
+   - Stays in LimboOp until warranted action is fetched and validated
    - If warranted action is rejected, warrant moves to DhtOp as valid
    - If warranted action is valid, warrant is rejected
 
 2. **Warrant Validation Dependencies**: 
    - Warrants can have up to 2 dependencies (the actions being warranted)
    - These must be resolved before warrant validation can complete
-   - Dependencies tracked in dependency1 and dependency2 fields of StagingOp
+   - Dependencies tracked in dependency1 and dependency2 fields of LimboOp
 
 ## Key Operations
 
 ### Mutations
 
 1. **insert_network_op** (from network)
-   - Insert into StagingOp with validation_stage='pending_sys'
+   - Insert into LimboOp with validation_stage='pending_sys'
 
 2. **author_action** (local authoring)
    - Insert into authored Action/Entry tables
@@ -341,11 +371,12 @@ Warrants require special consideration:
    - Op enters network propagation
 
 4. **set_validation_status** (after validation)
-   - Update StagingOp.sys/app_validation_status
+   - Update LimboOp.sys/app_validation_status
 
 5. **set_when_integrated** (after all validation)
-   - Move from StagingOp to DhtOp
-   - Update record validity in DhtAction/DhtEntry
+   - Move from LimboOp to DhtOp
+   - Update record validity in DhtAction
+   - Insert DhtEntry if applicable
 
 6. **set_receipts_complete** (after enough receipts)
    - Update DhtOp.receipts_complete
@@ -353,19 +384,19 @@ Warrants require special consideration:
 ### Queries
 
 1. **get_record** - Query DhtAction + DhtEntry by record_validity
-2. **get_entry** - Direct query of DhtEntry by validity
+2. **get_entry** - Query DhtEntry joined with DhtAction for record_validity
 3. **get_links** - Direct query of DhtLink table
 4. **agent_activity** - Query DhtAction by author and record_validity
-5. **validation_limbo** - Query StagingOp by validation_stage
+5. **validation_limbo** - Query LimboOp by validation_stage
 
 ## Data Integrity Invariants
 
 The system maintains these invariants:
 
-1. **No op exists in both StagingOp and DhtOp simultaneously**
+1. **No op exists in both LimboOp and DhtOp simultaneously**
 2. **Every DhtOp has a definite validation_status (never NULL)**
 3. **Every DhtAction has a computed record_validity**
-4. **Ops move from staging to DHT atomically with record updates**
+4. **Ops move from limbo to DHT atomically with record updates**
 5. **Rejected ops in DhtOp cause their records to be marked invalid**
 6. **Dependencies are resolved before validation proceeds**
 7. **Authored ops remain in authored database until locally validated**
@@ -388,36 +419,9 @@ CREATE TABLE Action (
     action_type TEXT NOT NULL,
     action_data BLOB -- Serialized ActionData enum
 );
-
--- Index tables for queryable action-specific fields
-
--- For efficient capability grant/claim queries
-CREATE TABLE CapabilityGrant (
-    action_hash BLOB PRIMARY KEY,
-    grantor BLOB NOT NULL,
-    grantee BLOB NOT NULL,
-    cap_secret BLOB,
-    FOREIGN KEY(action_hash) REFERENCES Action(hash)
-);
-
-CREATE TABLE CapabilityClaim (
-    action_hash BLOB PRIMARY KEY,
-    grantor BLOB NOT NULL,
-    cap_secret BLOB NOT NULL,
-    FOREIGN KEY(action_hash) REFERENCES Action(hash)
-);
-
--- For entry-related queries
-CREATE TABLE ActionEntry (
-    action_hash BLOB PRIMARY KEY,
-    entry_hash BLOB NOT NULL,
-    entry_type TEXT,
-    FOREIGN KEY(action_hash) REFERENCES Action(hash)
-);
-
--- For link queries (already separate in LinkOp tables)
--- Links are typically queried through dedicated link tables
 ```
+
+Note: Queryable entry types (CapGrant, CapClaim) have dedicated tables in the Entry section for direct lookup without requiring full chain scans.
 
 ### Rust Structure
 ```rust
@@ -512,28 +516,51 @@ pub struct OpenChainData {
 
 ### Query Patterns
 
-```sql
--- Chain traversal (no BLOB deserialization needed)
-SELECT hash, seq, prev_hash, timestamp 
-FROM Action 
-WHERE author = ? 
+Cap grant/claim lookups use dedicated tables for direct access without chain scans:
+
+```sql  
+-- Find cap grant by secret (direct lookup)
+SELECT cg.*, Action.*, Entry.*
+FROM CapGrant cg
+JOIN Action ON cg.action_hash = Action.hash  
+JOIN Entry ON cg.entry_hash = Entry.hash
+WHERE cg.cap_secret = ?;
+
+-- Find all unrestricted grants by an author
+SELECT cg.*, Action.*
+FROM CapGrant cg
+JOIN Action ON cg.action_hash = Action.hash
+WHERE cg.author = ? 
+  AND cg.cap_access = 'unrestricted';
+
+-- Find transferable grants with specific functions
+SELECT cg.*
+FROM CapGrant cg  
+WHERE cg.cap_access = 'transferable'
+  AND cg.functions LIKE '%' || ? || '%';
+
+-- Find cap claims by grantor (direct lookup)
+SELECT cc.*, Action.*, Entry.*
+FROM CapClaim cc
+JOIN Action ON cc.action_hash = Action.hash
+JOIN Entry ON cc.entry_hash = Entry.hash
+WHERE cc.grantor = ?;
+
+-- Verify claim chain - match claim to grant
+SELECT grant.cap_access, grant.functions, grant.assignees
+FROM CapClaim claim
+JOIN CapGrant grant ON claim.cap_secret = grant.cap_secret
+WHERE claim.entry_hash = ?;
+
+-- Chain traversal (no BLOB deserialization needed)  
+SELECT hash, seq, prev_hash, timestamp, action_type
+FROM Action
+WHERE author = ?
 ORDER BY seq;
 
--- Find capability grants for an agent
-SELECT a.*, cg.* 
-FROM Action a
-JOIN CapabilityGrant cg ON a.hash = cg.action_hash
-WHERE cg.grantee = ?;
-
--- Get entries by type (using index table)
-SELECT a.*, ae.entry_hash
-FROM Action a
-JOIN ActionEntry ae ON a.hash = ae.action_hash
-WHERE ae.entry_type = ? AND a.author = ?;
-
--- Full action retrieval (deserialize BLOB for complete data)
+-- Full action retrieval (deserialize BLOB for details)
 SELECT * FROM Action WHERE hash = ?;
--- Then deserialize action_data BLOB in application layer
+-- Then deserialize action_data BLOB in application
 ```
 
 ### Benefits of This Approach
