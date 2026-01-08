@@ -203,13 +203,16 @@ CREATE TABLE DhtLink (
 ### Record Validity Aggregation
 
 **Rules:**
-1. A record is **INVALID** if ANY of its ops are rejected
-2. A record is **VALID** if ALL known ops are valid
-3. A record is **PENDING** if some ops are pending validation
-4. A record is **ABANDONED** if all ops are abandoned
-5. A record's validity is computed on integration, not on query
+1. A record is **INVALID** if ANY known ops are rejected
+2. A record is **VALID** if at least one known op is valid and no known ops are rejected
+3. A record is **ABANDONED** if all known ops are abandoned
+4. A record's validity is computed on integration, not on query
+5. Validators may have partial views due to sharding - validity is based only on known ops
 
-The record validity is determined at the time of integration by examining all ops associated with the record. This aggregated status is stored with the record itself, eliminating the need for complex joins during queries.
+The record validity is determined at the time of integration by examining all known ops associated with the record. Due to the sharding model, a validator may not have all ops for a record - they hold specific op types over specific ranges. This aggregated status is stored with the record itself, eliminating the need for complex joins during queries.
+
+**Note on Partial Views:**
+Since validators hold shards (specific op types over specific ranges), they make validity decisions based on the ops they know about. A record is considered valid if any of its known ops are valid and none are known to be invalid. The absence of some ops does not make a record pending or invalid.
 
 ## Query Patterns
 
