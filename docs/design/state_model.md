@@ -324,17 +324,27 @@ Warrants require special consideration:
 
 ### Mutations
 
-1. **insert_op** (from network or author)
+1. **insert_network_op** (from network)
    - Insert into StagingOp with validation_stage='pending_sys'
 
-2. **set_validation_status** (after validation)
+2. **author_action** (local authoring)
+   - Insert into authored Action/Entry tables
+   - Create AuthoredOp records
+   - Validate locally before committing
+   - On validation failure, rollback without affecting chain
+
+3. **publish_authored_op** (after local validation)
+   - Mark AuthoredOp as published (set when_published)
+   - Op enters network propagation
+
+4. **set_validation_status** (after validation)
    - Update StagingOp.sys/app_validation_status
 
-3. **set_when_integrated** (after all validation)
+5. **set_when_integrated** (after all validation)
    - Move from StagingOp to DhtOp
    - Update record validity in DhtAction/DhtEntry
 
-4. **set_receipts_complete** (after enough receipts)
+6. **set_receipts_complete** (after enough receipts)
    - Update DhtOp.receipts_complete
 
 ### Queries
@@ -355,7 +365,8 @@ The system maintains these invariants:
 4. **Ops move from staging to DHT atomically with record updates**
 5. **Rejected ops in DhtOp cause their records to be marked invalid**
 6. **Dependencies are resolved before validation proceeds**
-7. **Authored ops exist in both AuthoredOp and appropriate validation stage**
+7. **Authored ops remain in authored database until locally validated**
+8. **Failed local validation can be rolled back without affecting the chain**
 
 ## Optimized Action Storage Design
 
