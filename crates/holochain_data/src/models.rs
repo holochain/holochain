@@ -5,11 +5,11 @@
 //! The models are designed to be flat and easily mappable to SQL tables.
 
 use holo_hash::{DnaHash, WasmHash};
-use holochain_types::prelude::CellId;
 use holochain_integrity_types::{
     zome::ZomeName, AppEntryName, DnaModifiers, EntryDef, EntryDefId, EntryVisibility,
 };
 use holochain_serialized_bytes::{SerializedBytes, UnsafeBytes};
+use holochain_types::prelude::CellId;
 use holochain_zome_types::{
     prelude::DnaDef,
     zome::{CoordinatorZomeDef, IntegrityZomeDef, WasmZome, ZomeDef},

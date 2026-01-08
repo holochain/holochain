@@ -9,8 +9,8 @@ use crate::models::{
 };
 use holo_hash::HashableContentExtSync;
 use holo_hash::WasmHash;
-use holochain_types::prelude::CellId;
 use holochain_integrity_types::prelude::EntryDef;
+use holochain_types::prelude::CellId;
 use holochain_types::prelude::{DnaDef, DnaWasmHashed};
 use holochain_zome_types::zome::{WasmZome, ZomeDef};
 
@@ -50,12 +50,13 @@ impl DbRead<Wasm> {
     pub async fn dna_def_exists(&self, cell_id: &CellId) -> sqlx::Result<bool> {
         let hash_bytes = cell_id.dna_hash().get_raw_32();
         let agent_bytes = cell_id.agent_pubkey().get_raw_32();
-        
-        let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM DnaDef WHERE hash = ? AND agent = ?)")
-            .bind(hash_bytes)
-            .bind(agent_bytes)
-            .fetch_one(self.pool())
-            .await?;
+
+        let exists: bool =
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM DnaDef WHERE hash = ? AND agent = ?)")
+                .bind(hash_bytes)
+                .bind(agent_bytes)
+                .fetch_one(self.pool())
+                .await?;
         Ok(exists)
     }
 
@@ -68,8 +69,8 @@ impl DbRead<Wasm> {
         let dna_model: Option<DnaDefModel> = sqlx::query_as(
             "SELECT hash, agent, name, network_seed, properties, lineage FROM DnaDef WHERE hash = ? AND agent = ?",
         )
-        .bind(&hash_bytes)
-        .bind(&agent_bytes)
+        .bind(hash_bytes)
+        .bind(agent_bytes)
         .fetch_optional(self.pool())
         .await?;
 
@@ -82,8 +83,8 @@ impl DbRead<Wasm> {
         let integrity_zomes: Vec<IntegrityZomeModel> = sqlx::query_as(
             "SELECT dna_hash, agent, zome_index, zome_name, wasm_hash, dependencies FROM IntegrityZome WHERE dna_hash = ? AND agent = ? ORDER BY zome_index",
         )
-        .bind(&hash_bytes)
-        .bind(&agent_bytes)
+        .bind(hash_bytes)
+        .bind(agent_bytes)
         .fetch_all(self.pool())
         .await?;
 
@@ -91,8 +92,8 @@ impl DbRead<Wasm> {
         let coordinator_zomes: Vec<CoordinatorZomeModel> = sqlx::query_as(
             "SELECT dna_hash, agent, zome_index, zome_name, wasm_hash, dependencies FROM CoordinatorZome WHERE dna_hash = ? AND agent = ? ORDER BY zome_index",
         )
-        .bind(&hash_bytes)
-        .bind(&agent_bytes)
+        .bind(hash_bytes)
+        .bind(agent_bytes)
         .fetch_all(self.pool())
         .await?;
 
@@ -206,8 +207,8 @@ impl DbWrite<Wasm> {
         sqlx::query(
             "INSERT OR REPLACE INTO DnaDef (hash, agent, name, network_seed, properties, lineage) VALUES (?, ?, ?, ?, ?, ?)",
         )
-            .bind(&hash_bytes)
-            .bind(&agent_bytes)
+            .bind(hash_bytes)
+            .bind(agent_bytes)
             .bind(name)
             .bind(network_seed)
             .bind(properties)
@@ -217,14 +218,14 @@ impl DbWrite<Wasm> {
 
         // Delete existing zomes for this DNA to avoid orphans when updating
         sqlx::query("DELETE FROM IntegrityZome WHERE dna_hash = ? AND agent = ?")
-            .bind(&hash_bytes)
-            .bind(&agent_bytes)
+            .bind(hash_bytes)
+            .bind(agent_bytes)
             .execute(&mut *tx)
             .await?;
 
         sqlx::query("DELETE FROM CoordinatorZome WHERE dna_hash = ? AND agent = ?")
-            .bind(&hash_bytes)
-            .bind(&agent_bytes)
+            .bind(hash_bytes)
+            .bind(agent_bytes)
             .execute(&mut *tx)
             .await?;
 
@@ -253,8 +254,8 @@ impl DbWrite<Wasm> {
             sqlx::query(
                 "INSERT OR REPLACE INTO IntegrityZome (dna_hash, agent, zome_index, zome_name, wasm_hash, dependencies) VALUES (?, ?, ?, ?, ?, ?)",
             )
-            .bind(&hash_bytes)
-            .bind(&agent_bytes)
+            .bind(hash_bytes)
+            .bind(agent_bytes)
             .bind(zome_index as i64)
             .bind(&zome_name.0)
             .bind(wasm_hash_bytes)
@@ -288,8 +289,8 @@ impl DbWrite<Wasm> {
             sqlx::query(
                 "INSERT OR REPLACE INTO CoordinatorZome (dna_hash, agent, zome_index, zome_name, wasm_hash, dependencies) VALUES (?, ?, ?, ?, ?, ?)",
             )
-            .bind(&hash_bytes)
-            .bind(&agent_bytes)
+            .bind(hash_bytes)
+            .bind(agent_bytes)
             .bind(zome_index as i64)
             .bind(&zome_name.0)
             .bind(wasm_hash_bytes)
