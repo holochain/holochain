@@ -28,9 +28,7 @@ The Holochain data storage and validation architecture provides:
 **Purpose**: Store an agent's own authored chain data
 
 ```sql
--- Authored Actions (simplified, chain-focused)
--- Authored Actions (normalized storage)
--- Authored Actions (simplified, chain-focused)
+-- Authored Actions
 CREATE TABLE Action (
     hash BLOB PRIMARY KEY,
     author BLOB NOT NULL,
@@ -38,11 +36,15 @@ CREATE TABLE Action (
     prev_hash BLOB,
     timestamp INTEGER NOT NULL,
     action_type TEXT NOT NULL,
-    
-    -- Action-specific fields
-    entry_hash BLOB,
+    action_data BLOB -- Serialized ActionData enum
+);
+
+-- Index tables for queryable action-specific fields
+CREATE TABLE ActionEntry (
+    action_hash BLOB PRIMARY KEY,
+    entry_hash BLOB NOT NULL,
     entry_type TEXT,
-    -- ... other action-specific fields
+    FOREIGN KEY(action_hash) REFERENCES Action(hash)
 );
 
 -- Authored Entries
@@ -114,14 +116,18 @@ CREATE TABLE DhtAction (
     author BLOB NOT NULL,
     timestamp INTEGER NOT NULL,
     action_type TEXT NOT NULL,
-    blob BLOB NOT NULL,
+    action_data BLOB NOT NULL, -- Serialized ActionData enum
     
     -- Record validity (aggregated from ops)
-    record_validity TEXT NOT NULL, -- 'valid', 'rejected', 'abandoned'
-    
-    -- Action-specific fields
-    entry_hash BLOB,
-    -- ... other fields
+    record_validity TEXT NOT NULL -- 'valid', 'rejected', 'abandoned'
+);
+
+-- Index table for DHT action queries
+CREATE TABLE DhtActionEntry (
+    action_hash BLOB PRIMARY KEY,
+    entry_hash BLOB NOT NULL,
+    entry_type TEXT,
+    FOREIGN KEY(action_hash) REFERENCES DhtAction(hash)
 );
 
 -- Validated Entries in DHT  
