@@ -1,38 +1,16 @@
-# Data Logic Rework Design Document
+# Data Logic Design Reference
 
-## Executive Summary
+## Overview
 
-This document outlines a major refactoring of the Holochain data storage and validation logic to address fundamental issues with the current implementation. The key goals are:
+The Holochain data storage and validation architecture provides:
 
-1. Establish ops as the unit of validation with aggregated validity status for records
-2. Introduce a validation staging area to separate pending data from validated data
-3. Eliminate the separate cache database (redundant with DHT + arc tracking)
-4. Create distinct schemas for authored, DHT, and validation staging databases
-5. Simplify and correct data queries throughout the system
+1. Ops as the unit of validation with aggregated validity status for records
+2. A validation staging area to separate pending data from validated data
+3. Unified data querying without separate cache database
+4. Distinct schemas for authored, DHT, and validation staging databases
+5. Direct data queries without complex joins
 
-## Current Problems
-
-### Mixed Validation Model
-- **Issue**: Validation status is tracked on individual ops but queries join on DhtOp to determine record validity
-- **Impact**: Endless inconsistencies where records appear valid/invalid based on which op type is queried
-- **Example**: A record with multiple ops (StoreRecord, StoreEntry, RegisterAgentActivity) may have different validation status for each, leading to inconsistent results
-
-### Schema Confusion
-- **Issue**: Single schema shared between authored, DHT, and cache databases despite different requirements
-- **Impact**: Many unused fields in each database context, leading to confusion and bugs
-- **Example**: `validation_status`, `when_integrated` fields are meaningless in authored DB but present anyway
-
-### No Validation Staging
-- **Issue**: Pending validation data sits in main DHT tables requiring complex filtering
-- **Impact**: Performance degradation, complex queries, risk of serving unvalidated data
-- **Example**: Every DHT query must filter on validation_status IS NOT NULL
-
-### Redundant Cache Database
-- **Issue**: Separate cache database duplicates DHT data
-- **Impact**: Unnecessary storage overhead and synchronization complexity
-- **Solution**: Track cached content via agent arc coverage instead
-
-## New Architecture
+## Architecture
 
 ### Core Principles
 
@@ -40,7 +18,7 @@ This document outlines a major refactoring of the Holochain data storage and val
 2. **Records aggregate op validity**: A record's validity is derived from its constituent ops
 3. **Validation staging isolates pending data**: Unvalidated ops stay in staging until validated
 4. **Distinct schemas per database type**: Each database has only the fields it needs
-5. **No separate cache**: Cached content determined by arc coverage
+5. **Unified data storage**: DHT database serves both obligated and cached data, distinguished by arc coverage
 6. **Clear state transitions**: Data moves through well-defined states with no ambiguity
 
 ### Database Structure
@@ -226,60 +204,12 @@ CREATE TABLE DhtLink (
 4. A record is **ABANDONED** if all ops are abandoned
 5. A record's validity is computed on integration, not on query
 
-**Implementation:**
-```sql
--- When integrating an op, update record validity
-UPDATE DhtAction 
-SET record_validity = CASE
-    WHEN EXISTS (SELECT 1 FROM DhtOp WHERE action_hash = ? AND validation_status = 'rejected') 
-        THEN 'rejected'
-    WHEN EXISTS (SELECT 1 FROM StagingOp WHERE action_hash = ?)
-        THEN 'pending'
-    WHEN NOT EXISTS (SELECT 1 FROM DhtOp WHERE action_hash = ? AND validation_status != 'valid')
-        THEN 'valid'
-    ELSE 'unknown'
-END
-WHERE hash = ?;
-```
+The record validity is determined at the time of integration by examining all ops associated with the record. This aggregated status is stored with the record itself, eliminating the need for complex joins during queries.
 
-## Migration Path
+## Query Patterns
 
-### Phase 1: Create New Schema
-1. Create validation staging database alongside existing databases
-2. Create new DHT tables with proper structure
-3. Implement data migration scripts
+### Get Record by Hash
 
-### Phase 2: Update Workflows
-1. Modify validation workflows to use staging database
-2. Update integration workflow to move data from staging to DHT
-3. Implement record validity aggregation
-
-### Phase 3: Update Queries
-1. Rewrite all record queries to use DhtAction/DhtEntry directly
-2. Remove joins on DhtOp for validity checks
-3. Update cascade to query from appropriate database
-
-### Phase 4: Cleanup
-1. Remove cache database
-2. Remove old DHT tables
-3. Clean up unused code paths
-
-## Query Transformations
-
-### Example: Get Record by Hash
-
-**Current (problematic):**
-```sql
-SELECT Action.*, Entry.*, DhtOp.validation_status
-FROM Action
-LEFT JOIN Entry ON Action.entry_hash = Entry.hash  
-INNER JOIN DhtOp ON DhtOp.action_hash = Action.hash
-WHERE Action.hash = ? 
-  AND DhtOp.type = 'StoreRecord'
-  AND DhtOp.validation_status IS NOT NULL
-```
-
-**New (simplified):**
 ```sql
 SELECT Action.*, Entry.*
 FROM DhtAction AS Action
@@ -288,19 +218,16 @@ WHERE Action.hash = ?
   AND Action.record_validity = 'valid'
 ```
 
-### Example: Get Links
+### Get Entry by Hash
 
-**Current:**
 ```sql
-SELECT Action.*, DhtOp.validation_status
-FROM Action
-INNER JOIN DhtOp ON DhtOp.action_hash = Action.hash  
-WHERE DhtOp.type = 'RegisterAddLink'
-  AND DhtOp.basis_hash = ?
-  AND DhtOp.validation_status = 0
+SELECT * FROM DhtEntry
+WHERE hash = ?
+  AND validity = 'valid'
 ```
 
-**New:**
+### Get Links
+
 ```sql
 SELECT *
 FROM DhtLink
@@ -308,81 +235,44 @@ WHERE base_hash = ?
   AND is_deleted = FALSE
 ```
 
-## Benefits
+### Agent Activity
 
-1. **Correctness**: Record validity properly aggregated from all ops
-2. **Performance**: No complex joins for basic queries
-3. **Clarity**: Each database has clear purpose and schema
-4. **Safety**: Unvalidated data isolated in staging
-5. **Simplicity**: No redundant cache database
-6. **Maintainability**: Cleaner separation of concerns
+```sql
+SELECT * FROM DhtAction
+WHERE author = ?
+  AND record_validity = 'valid'
+ORDER BY seq
+```
 
-## Implementation Considerations
-
-### Performance
-- Index strategy for new tables needs careful planning
-- Migration of existing data must be batched
-- Staging database should use WAL mode for concurrent access
-
-### Backwards Compatibility
-- Need compatibility layer during migration
-- Existing hApp code should continue working
-- Network protocol changes may be needed
-
-### Testing
-- Comprehensive test suite for data migration
-- Validation of record aggregation logic
-- Performance benchmarks before/after
-
-## Open Questions
-
-1. Should we keep historical validation attempts in staging or purge after integration?
-2. How to handle partial record visibility during validation?
-3. Should rejected ops be kept indefinitely or pruned?
-4. Network protocol changes needed for validation receipts?
-5. How to handle warrant ops in the new model?
-
-## Next Steps
-
-1. Review and refine this design with team
-2. Create detailed migration plan
-3. Implement proof-of-concept for staging database
-4. Benchmark performance implications
-5. Plan phased rollout strategy
-
-## Appendix A: Workflow Changes
+## Workflow Specifications
 
 ### Incoming DHT Ops Workflow
-**Current**: Ops inserted directly into main DHT database with NULL validation_status
-**New**: Ops inserted into StagingOp table with validation_stage='pending_sys'
+Ops are inserted into StagingOp table with validation_stage='pending_sys'
 
 ### Sys Validation Workflow  
-**Current**: Updates validation_status in DhtOp table
-**New**: Updates sys_validation_status in StagingOp, triggers app validation or abandonment
+Updates sys_validation_status in StagingOp, triggers app validation or abandonment
 
 ### App Validation Workflow
-**Current**: Updates validation_status and when_app_validated in DhtOp
-**New**: Updates app_validation_status in StagingOp, triggers integration if valid
+Updates app_validation_status in StagingOp, triggers integration if valid
 
 ### Integration Workflow
-**Current**: Sets when_integrated timestamp on DhtOp
-**New**: Moves validated ops from StagingOp to DhtOp, updates record validity in DhtAction/DhtEntry
+Moves validated ops from StagingOp to DhtOp, updates record validity in DhtAction/DhtEntry
 
 ### Publish DHT Ops Workflow
-**Current**: Queries DhtOp for ops to publish based on when_integrated
-**New**: Queries DhtOp for ops to publish (all ops in DhtOp are integrated)
+Queries DhtOp for ops to publish (all ops in DhtOp are integrated)
 
 ### Validation Receipt Workflow
-**Current**: Inserts receipts linked to DhtOp
-**New**: Inserts receipts linked to StagingOp, updates receipts_complete when moved to DhtOp
+Inserts receipts linked to StagingOp, updates receipts_complete when moved to DhtOp
 
-## Appendix B: Arc and Caching Strategy
+## Unified Storage with Arc Coverage
 
-Without a separate cache database, the system needs to track what data is "cached" (held for others) versus what is "authored" (our own data). This is accomplished through:
+The DHT database stores all validated data, with arc coverage determining storage obligations. This eliminates the need for a separate cache database and the associated query complexity of merging results from two sources.
 
-1. **Arc Coverage Tracking**: Each node tracks its coverage of the DHT address space
-2. **Storage Obligations**: Data within our arc is obligated storage
-3. **Cached Data**: Data outside our arc but held temporarily
+**Key aspects:**
+1. **Single query path**: All data queries go to the DHT database
+2. **Arc coverage tracking**: Determines which data is obligated vs cached
+3. **Retention policy**: Data outside arc can be pruned under storage pressure
+4. **No result merging**: Eliminates complex logic combining DHT and cache results
 
 ```sql
 -- Arc coverage table (in conductor database)
@@ -395,23 +285,25 @@ CREATE TABLE ArcCoverage (
     
     PRIMARY KEY (dna_hash, agent_hash)
 );
-
--- In DhtOp table, use storage_center_loc to determine if within arc
--- If within arc: obligated storage
--- If outside arc: cached (can be pruned)
 ```
+
+Data classification:
+- **Within arc**: Obligated storage (storage_center_loc in [arc_start, arc_end])
+- **Outside arc**: Cached data, eligible for pruning
+- **Authored**: Always retained regardless of arc
 
 ### Cache Pruning Strategy
 
 When storage pressure occurs:
 1. Identify ops outside current arc (storage_center_loc not in [arc_start, arc_end])
-2. Sort by last_access_time (new field needed)
+2. Sort by last_access_time (tracked separately)
 3. Prune oldest first until storage target met
 4. Never prune authored ops or ops within arc
+5. Consider keeping frequently accessed data even if outside arc
 
-## Appendix C: Warrant Handling
+## Warrant Handling
 
-Warrants require special consideration in the new model:
+Warrants require special consideration:
 
 1. **ChainIntegrityWarrant**: Proves an author broke chain rules
    - Stays in StagingOp until warranted action is fetched and validated
@@ -419,59 +311,38 @@ Warrants require special consideration in the new model:
    - If warranted action is valid, warrant is rejected
 
 2. **Warrant Validation Dependencies**: 
-   - Warrants can have up to 2 dependencies (the two actions being warranted)
+   - Warrants can have up to 2 dependencies (the actions being warranted)
    - These must be resolved before warrant validation can complete
+   - Dependencies tracked in dependency1 and dependency2 fields of StagingOp
 
-```sql
--- In StagingOp, warrants use dependency1 and dependency2 fields
--- to track the actions they're warranting
-```
+## Key Operations
 
-## Appendix D: Critical Mutations and Queries
-
-### Key Mutations
+### Mutations
 
 1. **insert_op** (from network or author)
-   - Old: Insert into DhtOp with validation_status NULL
-   - New: Insert into StagingOp with validation_stage='pending_sys'
+   - Insert into StagingOp with validation_stage='pending_sys'
 
 2. **set_validation_status** (after validation)
-   - Old: Update DhtOp.validation_status
-   - New: Update StagingOp.sys/app_validation_status
+   - Update StagingOp.sys/app_validation_status
 
 3. **set_when_integrated** (after all validation)
-   - Old: Update DhtOp.when_integrated timestamp
-   - New: Move from StagingOp to DhtOp, update record validity
+   - Move from StagingOp to DhtOp
+   - Update record validity in DhtAction/DhtEntry
 
 4. **set_receipts_complete** (after enough receipts)
-   - Old: Update DhtOp.receipts_complete
-   - New: Update DhtOp.receipts_complete (same, but only for integrated ops)
+   - Update DhtOp.receipts_complete
 
-### Key Queries
+### Queries
 
-1. **get_record** (by action hash)
-   - Old: Complex join of Action + Entry + DhtOp filtered by validation
-   - New: Simple query of DhtAction + DhtEntry by record_validity
+1. **get_record** - Query DhtAction + DhtEntry by record_validity
+2. **get_entry** - Direct query of DhtEntry by validity
+3. **get_links** - Direct query of DhtLink table
+4. **agent_activity** - Query DhtAction by author and record_validity
+5. **validation_limbo** - Query StagingOp by validation_stage
 
-2. **get_entry** (by entry hash)  
-   - Old: Join Entry + Action + DhtOp, check multiple op types
-   - New: Direct query of DhtEntry by validity
+## Data Integrity Invariants
 
-3. **get_links** (by base hash)
-   - Old: Join Action + DhtOp filtered by RegisterAddLink ops
-   - New: Direct query of DhtLink table
-
-4. **agent_activity** (by agent)
-   - Old: Complex query with multiple validation checks
-   - New: Query DhtAction by author and record_validity
-
-5. **validation_limbo** (ops awaiting validation)
-   - Old: Query DhtOp where validation_status IS NULL
-   - New: Query StagingOp by validation_stage
-
-## Appendix E: Data Integrity Invariants
-
-The new system must maintain these invariants:
+The system maintains these invariants:
 
 1. **No op exists in both StagingOp and DhtOp simultaneously**
 2. **Every DhtOp has a definite validation_status (never NULL)**
