@@ -280,7 +280,6 @@ impl Default for NetworkConfig {
             base64_auth_material: None,
             bootstrap_url: url2::Url2::parse("https://dev-test-bootstrap2.holochain.org"),
             signal_url: url2::Url2::parse("wss://dev-test-bootstrap2.holochain.org"),
-            // Replace with the Holochain hosted dev relay server
             relay_url: url2::Url2::parse("https://dev-test-bootstrap2-iroh-relay.holochain.org./"),
             request_timeout_s: default_request_timeout_s(),
             webrtc_config: None,
