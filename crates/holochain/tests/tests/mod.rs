@@ -1,7 +1,9 @@
 mod agent_activity;
 mod agent_scaling;
+mod app_disable;
 mod app_installation;
 mod app_interface_security;
+mod app_uninstallation;
 mod authored_test;
 mod clone_cell;
 // Countersigning HDK functions needed
@@ -23,6 +25,7 @@ mod regression;
 mod schedule;
 mod send_signal;
 mod ser_regression;
+mod shutdown;
 mod signals;
 mod test_cli;
 mod test_utils;

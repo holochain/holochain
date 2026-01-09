@@ -822,7 +822,7 @@ mod test {
         test_handle_incoming_admin_message(msg, respond, admin_api)
             .await
             .unwrap();
-        conductor_handle.shutdown();
+        conductor_handle.shutdown().await.unwrap().unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]

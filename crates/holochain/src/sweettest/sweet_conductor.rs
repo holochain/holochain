@@ -725,6 +725,7 @@ impl SweetConductor {
     pub async fn try_shutdown(&mut self) -> std::io::Result<()> {
         if let Some(handle) = self.handle.take() {
             handle
+                .clone()
                 .shutdown()
                 .await
                 .map_err(Error::other)?
@@ -1199,7 +1200,7 @@ pub async fn authenticate_app_ws_client(
 impl Drop for SweetConductor {
     fn drop(&mut self) {
         if let Some(handle) = self.handle.take() {
-            tokio::task::spawn(handle.shutdown());
+            tokio::task::spawn(handle.clone().shutdown());
         }
     }
 }
