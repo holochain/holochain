@@ -329,7 +329,7 @@ mod tests {
     use holo_hash::HashableContentExtAsync;
     use holochain_integrity_types::{zome::ZomeName, EntryDefId, EntryVisibility};
     use holochain_serialized_bytes::SerializedBytes;
-    use holochain_types::prelude::{AgentPubKey, DnaModifiers, DnaWasm};
+    use holochain_types::prelude::{AgentPubKey, DnaHash, DnaModifiers, DnaWasm};
     use holochain_zome_types::zome::{CoordinatorZomeDef, IntegrityZomeDef};
 
     /// Helper to create a test database
