@@ -27,16 +27,26 @@ impl DurationOrSeconds {
     }
 }
 
-/// Wait 20 s for all cells to reach consistency.
-pub async fn await_consistency_20_s<'a, I: IntoIterator<Item = &'a SweetCell>>(
+/// Wait 60s for all cells to reach consistency.
+///
+/// This should be used as the default, unless your test case specifically requires a longer duration,
+/// or requires immediate consistency
+pub async fn await_consistency<'a, I: IntoIterator<Item = &'a SweetCell>>(
     cells: I,
 ) -> Result<(), String> {
-    await_consistency(20, cells).await
+    await_consistency_s(60, cells).await
+}
+
+/// Check cell consistency.
+pub async fn check_consistency<'a, I: IntoIterator<Item = &'a SweetCell>>(
+    cells: I,
+) -> Result<(), String> {
+    await_consistency_s(Duration::ZERO, cells).await
 }
 
 /// Wait for all cells to reach consistency
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-pub async fn await_consistency<'a, I: IntoIterator<Item = &'a SweetCell>>(
+pub async fn await_consistency_s<'a, I: IntoIterator<Item = &'a SweetCell>>(
     timeout: impl Into<DurationOrSeconds>,
     cells: I,
 ) -> Result<(), String> {
@@ -69,7 +79,6 @@ async fn await_op_integration(
     let mut rows_per_db = Vec::new();
     let result = tokio::time::timeout(timeout, async {
         'compare_dbs_loop: loop {
-            tokio::time::sleep(Duration::from_millis(500)).await;
             // Create query for each DHT DB.
             let queries = cells.iter().map(|(_, dht_db)| {
                 dht_db.read_async(|txn| {
@@ -145,6 +154,8 @@ async fn await_op_integration(
                 // Otherwise some ops haven't made it to all agents yet.
                 tracing::debug!("Not all op hashes were found in all DHT DBs after {:?}.", start.elapsed());
             }
+
+            tokio::time::sleep(Duration::from_millis(500)).await;
         }
     })
     .await;
@@ -188,7 +199,7 @@ async fn await_op_integration(
 mod tests {
     use crate::{
         prelude::holochain_serial,
-        sweettest::{await_consistency, SweetConductorBatch, SweetDnaFile},
+        sweettest::{await_consistency, check_consistency, SweetConductorBatch, SweetDnaFile},
         test_utils::retry_fn_until_timeout,
     };
     use ::fixt::fixt;
@@ -207,7 +218,6 @@ mod tests {
         Entry,
     };
     use serde::{Deserialize, Serialize};
-    use std::time::Duration;
 
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "flaky under current networking; re-check after Iroh upgrade"]
@@ -245,7 +255,7 @@ mod tests {
             .unwrap()
             .into_tuples();
 
-        await_consistency(15, &[alice.clone(), bob.clone()])
+        await_consistency(&[alice.clone(), bob.clone()])
             .await
             .unwrap();
 
@@ -257,7 +267,7 @@ mod tests {
             .call::<_, ()>(&bob.zome("integrity"), "make_some_noise", ())
             .await;
 
-        await_consistency(5, &[alice, bob]).await.unwrap();
+        await_consistency(&[alice, bob]).await.unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -274,7 +284,7 @@ mod tests {
             .unwrap()
             .into_tuples();
 
-        await_consistency(15, &[alice.clone(), bob.clone()])
+        await_consistency(&[alice.clone(), bob.clone()])
             .await
             .unwrap();
 
@@ -294,7 +304,7 @@ mod tests {
             )
             .await;
 
-        await_consistency(5, &[alice, bob]).await.unwrap();
+        await_consistency(&[alice, bob]).await.unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -339,9 +349,7 @@ mod tests {
         .unwrap();
 
         // Genesis actions will be integrated but not gossiped. Consistency cannot be reached.
-        await_consistency(Duration::from_micros(1), &[alice, bob])
-            .await
-            .unwrap_err();
+        await_consistency(&[alice, bob]).await.unwrap_err();
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -360,7 +368,7 @@ mod tests {
             .unwrap()
             .into_tuples();
 
-        await_consistency(40, &[alice.clone(), bob.clone()])
+        await_consistency(&[alice.clone(), bob.clone()])
             .await
             .unwrap();
 
@@ -373,8 +381,6 @@ mod tests {
             .unwrap();
 
         // Unintegrated op will prevent consistency.
-        await_consistency(Duration::from_micros(1), &[alice, bob])
-            .await
-            .unwrap_err();
+        check_consistency(&[alice, bob]).await.unwrap_err();
     }
 }

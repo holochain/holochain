@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE** Test utility `await_consistency` has been renamed to `await_consistency_s`. The function `await_consistency` now has a hard-coded 60 second timeout and should always be used by default to reduce test flakiness.
+- Add a test utility `check_consistency` to immediately check dht consistency between cells without waiting.
 - Update kitsune2 to v0.4.0-dev.2, which includes the iroh relay integration with the bootstrap server.
 - Crates `holochain_cli_client` and `holochain_client` now have features to set which network transport is compiled in (tx5 or iroh).
 - **BREAKING CHANGE** Feature `mock_network` was removed from crate `holochain_p2p`. It was only referencing `test_utils`, so instead `test_utils` should be used directly.

@@ -368,7 +368,7 @@ pub mod slow_tests {
             .call(&bob, "create_tagged_link", "b.a".to_string())
             .await;
 
-        await_consistency(30, [&alice_cell, &bob_cell])
+        await_consistency([&alice_cell, &bob_cell])
             .await
             .unwrap();
 
@@ -476,7 +476,7 @@ pub mod slow_tests {
             .call(&bob, "create_tagged_link", "d".to_string())
             .await;
 
-        await_consistency(30, [&alice_cell, &bob_cell])
+        await_consistency([&alice_cell, &bob_cell])
             .await
             .unwrap();
 

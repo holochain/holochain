@@ -208,7 +208,7 @@ async fn warrant_is_published() {
             .peer_urls[0]
     );
 
-    await_consistency(15, [&alice, &bob, &carol]).await.unwrap();
+    await_consistency([&alice, &bob, &carol]).await.unwrap();
 
     // Alice creates an invalid action.
     let _: ActionHash = conductors[0]
@@ -219,7 +219,7 @@ async fn warrant_is_published() {
         )
         .await;
 
-    await_consistency(15, [&alice, &bob]).await.unwrap();
+    await_consistency([&alice, &bob]).await.unwrap();
 
     // Bob should have issued a warrant against Alice.
 

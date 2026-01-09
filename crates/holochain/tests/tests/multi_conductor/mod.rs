@@ -103,9 +103,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
         .await;
 
     // Wait long enough for Bob to receive gossip
-    await_consistency(20, [&alice, &bobbo, &carol])
-        .await
-        .unwrap();
+    await_consistency([&alice, &bobbo, &carol]).await.unwrap();
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
     let record: Option<Record> = conductors[1]
@@ -167,14 +165,14 @@ async fn private_entries_update_consistency() {
     let apps = conductors.setup_app("app", &dnas).await.unwrap();
     let ((alice,), (bobbo,)) = apps.into_tuples();
 
-    await_consistency(20, [&alice, &bobbo]).await.unwrap();
+    await_consistency([&alice, &bobbo]).await.unwrap();
 
     // Call the "create" zome fn on Alice's app
     let hash: ActionHash = conductors[0]
         .call(&alice.zome(SweetInlineZomes::COORDINATOR), "create", ())
         .await;
 
-    await_consistency(15, [&alice, &bobbo]).await.unwrap();
+    await_consistency([&alice, &bobbo]).await.unwrap();
 
     // Call the "update" zome fn on Alice's app to update the previously created private entry
     let _: ActionHash = conductors[0]
@@ -182,7 +180,7 @@ async fn private_entries_update_consistency() {
         .await;
 
     // Make sure that the update of the private entry reaches consistency
-    await_consistency(15, [&alice, &bobbo]).await.unwrap();
+    await_consistency([&alice, &bobbo]).await.unwrap();
 }
 
 /// Flaky on Windows separately from the pending fixes alongside Iroh networking upgrade.
@@ -228,14 +226,14 @@ async fn private_entries_dont_leak() {
     let apps = conductors.setup_app("app", &dnas).await.unwrap();
     let ((alice,), (bobbo,)) = apps.into_tuples();
 
-    await_consistency(20, [&alice, &bobbo]).await.unwrap();
+    await_consistency([&alice, &bobbo]).await.unwrap();
 
     // Call the "create" zome fn on Alice's app
     let hash: ActionHash = conductors[0]
         .call(&alice.zome(SweetInlineZomes::COORDINATOR), "create", ())
         .await;
 
-    await_consistency(15, [&alice, &bobbo]).await.unwrap();
+    await_consistency([&alice, &bobbo]).await.unwrap();
 
     let entry_hash =
         EntryHash::with_data_sync(&Entry::app(PrivateEntry {}.try_into().unwrap()).unwrap());
@@ -259,7 +257,7 @@ async fn private_entries_dont_leak() {
     let bob_hash: ActionHash = conductors[1]
         .call(&bobbo.zome(SweetInlineZomes::COORDINATOR), "create", ())
         .await;
-    await_consistency(15, [&alice, &bobbo]).await.unwrap();
+    await_consistency([&alice, &bobbo]).await.unwrap();
 
     check_all_gets_for_private_entry(
         &conductors[0],

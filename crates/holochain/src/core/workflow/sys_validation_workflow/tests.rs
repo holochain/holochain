@@ -164,7 +164,7 @@ async fn sys_validation_produces_forked_chain_warrant() {
         .test_write(move |txn| detect_fork(txn, &action).unwrap());
     assert!(maybe_fork.is_some());
 
-    await_consistency(30, [&alice, &bob]).await.unwrap();
+    await_consistency([&alice, &bob]).await.unwrap();
 
     //- Inject the forked op directly into bob's DHT db
     let forked_op = DhtOpHashed::from_content_sync(forked_op);

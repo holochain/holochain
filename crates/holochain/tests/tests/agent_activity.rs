@@ -1,5 +1,5 @@
 use holo_hash::ActionHash;
-use holochain::sweettest::{await_consistency, SweetConductorBatch, SweetDnaFile};
+use holochain::sweettest::{await_consistency_s, SweetConductorBatch, SweetDnaFile};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::prelude::AgentActivity;
 use holochain_zome_types::query::ChainStatus;
@@ -42,7 +42,7 @@ async fn get_agent_activity() {
 
     // TODO No way to force a network call to get the agent activity, so we have to wait for a sync
     //      first and then check the agent activity
-    await_consistency(std::time::Duration::from_secs(60), [alice_cell, bob_cell])
+    await_consistency_s(std::time::Duration::from_secs(60), [alice_cell, bob_cell])
         .await
         .unwrap();
 
