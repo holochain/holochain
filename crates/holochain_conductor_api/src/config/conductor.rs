@@ -281,7 +281,7 @@ impl Default for NetworkConfig {
             bootstrap_url: url2::Url2::parse("https://dev-test-bootstrap2.holochain.org"),
             signal_url: url2::Url2::parse("wss://dev-test-bootstrap2.holochain.org"),
             // Replace with the Holochain hosted dev relay server
-            relay_url: url2::Url2::parse("https://use1-1.relay.n0.iroh-canary.iroh.link./"),
+            relay_url: url2::Url2::parse("https://dev-test-bootstrap2-iroh-relay.holochain.org./"),
             request_timeout_s: default_request_timeout_s(),
             webrtc_config: None,
             target_arc_factor: default_target_arc_factor(),
@@ -907,7 +907,7 @@ mod tests {
                     "signalAllowPlainText": "true"
                 },
                 "irohTransport": {
-                    "relayUrl": "https://use1-1.relay.n0.iroh-canary.iroh.link./",
+                    "relayUrl": "https://dev-test-bootstrap2-iroh-relay.holochain.org./",
                     "relayAllowPlainText": "true"
                 },
                 "coreSpace": {
@@ -956,7 +956,7 @@ mod tests {
                     "webrtcConnectTimeoutS": 22
                 },
                 "irohTransport": {
-                    "relayUrl": "https://use1-1.relay.n0.iroh-canary.iroh.link./",
+                    "relayUrl": "https://dev-test-bootstrap2-iroh-relay.holochain.org./",
                 },
             })
         );
@@ -990,7 +990,7 @@ mod tests {
                     "webrtcConnectTimeoutS": 22
                 },
                 "irohTransport": {
-                    "relayUrl": "https://use1-1.relay.n0.iroh-canary.iroh.link./",
+                    "relayUrl": "https://dev-test-bootstrap2-iroh-relay.holochain.org./",
                 },
                 "k2Gossip": {
                     "roundTimeoutMs": 100,
