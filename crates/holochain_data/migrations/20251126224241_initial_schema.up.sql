@@ -20,34 +20,38 @@ CREATE TABLE IF NOT EXISTS Wasm (
 
 -- DnaDef storage (flattened from DnaDef struct)
 CREATE TABLE IF NOT EXISTS DnaDef (
-    hash            BLOB           PRIMARY KEY ON CONFLICT IGNORE,
+    hash            BLOB           NOT NULL,
+    agent           BLOB           NOT NULL,  -- Agent public key (32 bytes)
     name            TEXT           NOT NULL,
     network_seed    TEXT           NOT NULL,
     properties      BLOB           NOT NULL,  -- SerializedBytes
-    lineage         JSON                      -- JSON HashSet<DnaHash>
+    lineage         JSON,                     -- JSON HashSet<DnaHash>
+    PRIMARY KEY (hash, agent)
 );
 
 -- IntegrityZome storage (one row per zome in a DNA)
 CREATE TABLE IF NOT EXISTS IntegrityZome (
     dna_hash        BLOB           NOT NULL,
+    agent           BLOB           NOT NULL,
     zome_index      INTEGER        NOT NULL,
     zome_name       TEXT           NOT NULL,
     wasm_hash       BLOB,                     -- NULL for inline zomes
     dependencies    JSON           NOT NULL,  -- JSON array of zome names
-    PRIMARY KEY (dna_hash, zome_index),
-    FOREIGN KEY (dna_hash) REFERENCES DnaDef(hash) ON DELETE CASCADE,
+    PRIMARY KEY (dna_hash, agent, zome_index),
+    FOREIGN KEY (dna_hash, agent) REFERENCES DnaDef(hash, agent) ON DELETE CASCADE,
     FOREIGN KEY (wasm_hash) REFERENCES Wasm(hash)
 );
 
 -- CoordinatorZome storage (one row per zome in a DNA)
 CREATE TABLE IF NOT EXISTS CoordinatorZome (
     dna_hash        BLOB           NOT NULL,
+    agent           BLOB           NOT NULL,
     zome_index      INTEGER        NOT NULL,
     zome_name       TEXT           NOT NULL,
     wasm_hash       BLOB,                     -- NULL for inline zomes
     dependencies    JSON           NOT NULL,  -- JSON array of zome names
-    PRIMARY KEY (dna_hash, zome_index),
-    FOREIGN KEY (dna_hash) REFERENCES DnaDef(hash) ON DELETE CASCADE,
+    PRIMARY KEY (dna_hash, agent, zome_index),
+    FOREIGN KEY (dna_hash, agent) REFERENCES DnaDef(hash, agent) ON DELETE CASCADE,
     FOREIGN KEY (wasm_hash) REFERENCES Wasm(hash)
 );
 

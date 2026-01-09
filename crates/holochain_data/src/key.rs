@@ -41,6 +41,7 @@ impl Default for DbKey {
 }
 
 impl DbKey {
+    #[allow(dead_code)]
     fn priv_new(
         locked: String,
         key: sodoken::SizedLockedArray<32>,
