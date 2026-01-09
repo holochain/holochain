@@ -1110,7 +1110,7 @@ async fn app_validation_produces_warrants() {
                 agent_pubkey,
                 chain_query_filter: Default::default(),
                 activity_request: ActivityRequest::Full,
-                get_options: Default::default(),
+                get_options: GetOptions::default(),
             })?)
         });
 
@@ -1282,6 +1282,7 @@ async fn skip_issuing_warrant_if_one_found() {
                 agent_pubkey,
                 chain_query_filter: Default::default(),
                 activity_request: ActivityRequest::Full,
+                get_options: GetOptions::default(),
             })?)
         })
         .integrity_function("validate", move |_api, op: Op| {

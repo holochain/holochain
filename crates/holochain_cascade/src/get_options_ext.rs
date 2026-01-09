@@ -37,12 +37,12 @@ mod tests {
     #[test]
     fn test_to_network_options() {
         let options = GetOptions::network()
-            .with_remote_agent_count(7)
+            .with_remote_agent_count(3)
             .with_timeout_ms(5000)
             .with_as_race(false);
 
         let network_options = options.to_network_options();
-        assert_eq!(network_options.remote_agent_count, 7);
+        assert_eq!(network_options.remote_agent_count, 3);
         assert_eq!(network_options.timeout_ms, Some(5000));
         assert!(!network_options.as_race);
 
