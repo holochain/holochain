@@ -91,6 +91,7 @@ pub struct Space {
 
     root_db_dir: Arc<PathBuf>,
     db_key: DbKey,
+    db_max_readers: u16,
 }
 
 /// Test spaces
@@ -169,6 +170,7 @@ impl Spaces {
                 PoolConfig {
                     synchronous_level: db_sync_level,
                     key: db_key.clone(),
+                    max_readers: config.db_max_readers,
                 },
             )?;
             let wasm_db = DbWrite::open_with_pool_config(
@@ -177,6 +179,7 @@ impl Spaces {
                 PoolConfig {
                     synchronous_level: db_sync_level,
                     key: db_key.clone(),
+                    max_readers: config.db_max_readers,
                 },
             )?;
             ConductorResult::Ok((conductor_db, wasm_db))
@@ -379,6 +382,7 @@ impl Spaces {
                             self.db_dir.to_path_buf(),
                             self.config.db_sync_strategy,
                             self.db_key.clone(),
+                            self.config.db_max_readers,
                         )?;
 
                         let r = f(&space);
@@ -486,6 +490,7 @@ impl Space {
         root_db_dir: PathBuf,
         db_sync_strategy: DbSyncStrategy,
         db_key: DbKey,
+        db_max_readers: u16,
     ) -> DatabaseResult<Self> {
         let db_sync_level = match db_sync_strategy {
             DbSyncStrategy::Fast => DbSyncLevel::Off,
@@ -500,6 +505,7 @@ impl Space {
                     PoolConfig {
                         synchronous_level: db_sync_level,
                         key: db_key.clone(),
+                        max_readers: db_max_readers,
                     },
                 )?;
                 let dht_db = DbWrite::open_with_pool_config(
@@ -508,6 +514,7 @@ impl Space {
                     PoolConfig {
                         synchronous_level: db_sync_level,
                         key: db_key.clone(),
+                        max_readers: db_max_readers,
                     },
                 )?;
                 let peer_meta_store_db = DbWrite::open_with_pool_config(
@@ -516,6 +523,7 @@ impl Space {
                     PoolConfig {
                         synchronous_level: db_sync_level,
                         key: db_key.clone(),
+                        max_readers: db_max_readers,
                     },
                 )?;
                 let conductor_db: DbWrite<DbKindConductor> = DbWrite::open_with_pool_config(
@@ -524,6 +532,7 @@ impl Space {
                     PoolConfig {
                         synchronous_level: db_sync_level,
                         key: db_key.clone(),
+                        max_readers: db_max_readers,
                     },
                 )?;
                 DatabaseResult::Ok((cache, dht_db, peer_meta_store_db, conductor_db))
@@ -545,6 +554,7 @@ impl Space {
             conductor_db,
             root_db_dir: Arc::new(root_db_dir),
             db_key,
+            db_max_readers,
         };
         Ok(r)
     }
@@ -595,6 +605,7 @@ impl Space {
                         PoolConfig {
                             synchronous_level: DbSyncLevel::Normal,
                             key: self.db_key.clone(),
+                            max_readers: self.db_max_readers,
                         },
                     )
                 })?;
@@ -693,6 +704,7 @@ impl TestSpace {
                 temp_dir.path().to_path_buf(),
                 Default::default(),
                 Default::default(),
+                9,
             )
             .unwrap(),
             _temp_dir: temp_dir,

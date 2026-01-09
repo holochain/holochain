@@ -1,6 +1,8 @@
-use super::pool::num_read_threads;
 use super::DbWrite;
-use crate::prelude::{DatabaseResult, DbKindWasm};
+use crate::{
+    db::pool::default_max_readers,
+    prelude::{DatabaseResult, DbKindWasm},
+};
 use tempfile::TempDir;
 
 /// This test does prove that making all transactions
@@ -11,7 +13,7 @@ use tempfile::TempDir;
 async fn db_connection_doesnt_timeout() {
     let td = TempDir::new().unwrap();
     let db = DbWrite::test(td.path(), DbKindWasm).unwrap();
-    let num_readers = num_read_threads() * 2;
+    let num_readers = default_max_readers();
     let mut jhs = Vec::new();
 
     for _ in 0..num_readers {
