@@ -1140,6 +1140,7 @@ mod app_impls {
         // (This function constructs a bundle under the hood.)
         // This is just a convenience for testing.
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+        #[allow(dead_code)]
         pub(crate) async fn install_app_minimal(
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
@@ -1159,6 +1160,7 @@ mod app_impls {
         ///
         // This is just a convenience for testing.
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+        #[allow(dead_code)]
         pub(crate) async fn install_app_with_manifest(
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
