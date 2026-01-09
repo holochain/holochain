@@ -67,7 +67,7 @@ pub struct GetOptions {
     ///
     /// `None` means use the conductor's default.
     ///
-    /// A maximum of [`MAX_REMOTE_AGENT_COUNT`] (5) is enforced for this value.
+    /// A maximum of [`MAX_REMOTE_AGENT_COUNT`] is enforced for this value.
     remote_agent_count: Option<u8>,
 
     /// Timeout for network requests in milliseconds.
@@ -143,7 +143,7 @@ impl GetOptions {
 
     /// Set the number of remote agents to query.
     ///
-    /// The count will be capped at [`MAX_REMOTE_AGENT_COUNT`] (5) to prevent abuse
+    /// The count will be capped at [`MAX_REMOTE_AGENT_COUNT`] to prevent abuse
     /// and excessive network load.
     pub fn with_remote_agent_count(mut self, count: u8) -> Self {
         self.remote_agent_count = Some(count.min(MAX_REMOTE_AGENT_COUNT));
