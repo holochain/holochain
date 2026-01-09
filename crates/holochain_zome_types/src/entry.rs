@@ -18,7 +18,7 @@ pub use holochain_integrity_types::get_strategy::GetStrategy;
 
 /// Maximum number of remote agents that can be queried in parallel.
 /// This limit prevents abuse and excessive network load.
-const MAX_REMOTE_AGENT_COUNT: u8 = 5;
+pub const MAX_REMOTE_AGENT_COUNT: u8 = 5;
 
 mod app_entry_bytes;
 pub use app_entry_bytes::*;
