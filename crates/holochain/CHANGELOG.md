@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE** `ConductorConfig` now includes a field `incoming_authority_request_concurrency_limit` for specifying the number of incoming authority requests that will be handled concurrently. Additional requests will be dropped. This limit only applies to incoming requests to `get`, `get_links`, `count_links`, `get_agent_activity`, `must_get_agent_activity`.
 - **BREAKING CHANGE** `ConductorConfig` now includes an optional field `db_max_readers` for overriding the maximum number of read connections per database.
 - Update kitsune2 to v0.4.0-dev.2, which includes the iroh relay integration with the bootstrap server.
 - Crates `holochain_cli_client` and `holochain_client` now have features to set which network transport is compiled in (tx5 or iroh).

@@ -229,6 +229,8 @@ impl ConductorBuilder {
             report,
             compat,
             request_timeout: std::time::Duration::from_secs(config.network.request_timeout_s),
+            incoming_authority_request_concurrency_limit: config
+                .incoming_authority_request_concurrency_limit,
             #[cfg(feature = "test_utils")]
             mem_bootstrap: config.network.mem_bootstrap,
             ..Default::default()

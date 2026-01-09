@@ -86,6 +86,13 @@ pub struct HolochainP2pConfig {
     /// If `None`, will not report.
     pub report: ReportConfig,
 
+    /// The maximum number of incoming requests that will be handled concurrently.
+    ///
+    /// Additional incoming requests over this limit are ignored.
+    /// This is only applied to incoming authority requests, i.e.
+    /// `get`, `get_links`, `count_links`, `get_agent_activity`, and `must_get_agent_activity`.
+    pub incoming_authority_request_concurrency_limit: u16,
+
     /// If true, will disable the default bootstrap module.
     ///
     /// This flag is only used in tests.
@@ -133,6 +140,18 @@ impl std::fmt::Debug for HolochainP2pConfig {
     }
 }
 
+/// Default value is either 1 or the following calculated value, whichever is greater:
+/// - The default number of readers in database pool.
+/// - Divided by 2, to get the number of readers in database pool allocated for shorter-held locks.
+/// - Minus 3, for readers that may be needed by concurrently running workflows.
+///
+/// Note this is a duplicate implementation identical to `holochain_conductor_api`'s `ConductorConfig::default_incoming_authority_request_concurrency_limit`.
+/// It is duplicated here to avoid refactoring the crate layout.
+fn default_incoming_authority_request_concurrency_limit() -> u16 {
+    let default_db_max_readers = std::cmp::max(num_cpus::get() as u16 * 2, 8);
+    std::cmp::max((default_db_max_readers / 2) - 3, 1)
+}
+
 impl Default for HolochainP2pConfig {
     fn default() -> Self {
         Self {
@@ -146,6 +165,8 @@ impl Default for HolochainP2pConfig {
             compat: Default::default(),
             request_timeout: Duration::from_secs(60),
             report: ReportConfig::default(),
+            incoming_authority_request_concurrency_limit:
+                default_incoming_authority_request_concurrency_limit(),
             #[cfg(feature = "test_utils")]
             disable_bootstrap: false,
             #[cfg(feature = "test_utils")]
