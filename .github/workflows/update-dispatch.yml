@@ -33,10 +33,6 @@ jobs:
         update:
           # - source: "versions/weekly"
           #   cmd: "nix run .#scripts-repo-flake-update weekly"
-          - source: "rust-overlay"
-            cmd: "nix flake lock --update-input rust-overlay"
-          - source: "nixpkgs"
-            cmd: "nix flake lock --update-input nixpkgs"
           - source: "crates-io"
             cmd: "nix develop .#coreDev --command scripts-cargo-update"
 
