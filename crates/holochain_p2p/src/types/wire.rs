@@ -171,6 +171,33 @@ impl WireMessage {
         }
     }
 
+    /// Get a string label of the message type
+    pub fn get_msg_type_string(&self) -> String {
+        match self {
+            WireMessage::ErrorRes { .. } => "error_res",
+            WireMessage::CallRemoteReq { .. } => "call_remote_req",
+            WireMessage::CallRemoteRes { .. } => "call_remote_res",
+            WireMessage::GetReq { .. } => "get_req",
+            WireMessage::GetRes { .. } => "get_res",
+            WireMessage::GetLinksReq { .. } => "get_links_req",
+            WireMessage::GetLinksRes { .. } => "get_links_res",
+            WireMessage::CountLinksReq { .. } => "count_links_req",
+            WireMessage::CountLinksRes { .. } => "count_links_res",
+            WireMessage::GetAgentActivityReq { .. } => "get_agent_activity_req",
+            WireMessage::GetAgentActivityRes { .. } => "get_agent_activity_res",
+            WireMessage::MustGetAgentActivityReq { .. } => "must_get_agent_activity_req",
+            WireMessage::MustGetAgentActivityRes { .. } => "must_get_agent_activity_res",
+            WireMessage::SendValidationReceiptsReq { .. } => "send_validation_receipts_req",
+            WireMessage::SendValidationReceiptsRes { .. } => "send_validation_receipts_res",
+            WireMessage::RemoteSignalEvt { .. } => "remote_signal_evt",
+            WireMessage::PublishCountersignEvt { .. } => "publish_countersigning_evt",
+            WireMessage::CountersigningSessionNegotiationEvt { .. } => {
+                "countersigning_session_negotiation_evt"
+            }
+        }
+        .to_string()
+    }
+
     /// Outgoing "CallRemote" request.
     pub fn call_remote_req(
         to_agent: holo_hash::AgentPubKey,
