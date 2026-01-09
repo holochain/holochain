@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE** `ConductorConfig` now includes an optional field `db_max_readers` for overriding the maximum number of read connections per database.
 - Update kitsune2 to v0.4.0-dev.2, which includes the iroh relay integration with the bootstrap server.
 - Crates `holochain_cli_client` and `holochain_client` now have features to set which network transport is compiled in (tx5 or iroh).
 - **BREAKING CHANGE** Feature `mock_network` was removed from crate `holochain_p2p`. It was only referencing `test_utils`, so instead `test_utils` should be used directly.

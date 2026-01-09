@@ -3,9 +3,7 @@ use crate::db::conn::PConn;
 use crate::db::databases::DATABASE_HANDLES;
 use crate::db::guard::{PConnGuard, PTxnGuard};
 use crate::db::kind::{DbKind, DbKindT};
-use crate::db::pool::{
-    initialize_connection, new_connection_pool, num_read_threads, ConnectionPool, PoolConfig,
-};
+use crate::db::pool::{initialize_connection, new_connection_pool, ConnectionPool, PoolConfig};
 use crate::error::{DatabaseError, DatabaseResult};
 use derive_more::Into;
 use holochain_util::log_elapsed;
@@ -308,6 +306,13 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
             None => None,
         };
 
+        // Split the max readers into 2 sets allocated between the `read_semaphore` and `long_read_sempahore`.
+        // This allocates some permits for db queries that we expect to be slow,
+        // without blocking other db queries that we expect to be fast.
+        let max_readers = pool_config.max_readers as usize;
+        let max_short_readers = (pool_config.max_readers / 2) as usize;
+        let max_long_readers = max_readers - max_short_readers;
+
         // Now we know the database file is valid we can open a connection pool.
         let pool = new_connection_pool(path.as_ref().map(|p| p.as_ref()), pool_config);
         let mut conn = pool.get()?;
@@ -319,9 +324,9 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
 
         let db_read = DbRead {
             write_semaphore: Self::get_write_semaphore(kind.kind()),
-            read_semaphore: Self::get_read_semaphore(kind.kind()),
-            long_read_semaphore: Self::get_long_read_semaphore(kind.kind()),
-            max_readers: num_read_threads() * 2,
+            read_semaphore: Self::get_read_semaphore(kind.kind(), max_short_readers),
+            long_read_semaphore: Self::get_long_read_semaphore(kind.kind(), max_long_readers),
+            max_readers,
             num_readers: Arc::new(AtomicUsize::new(0)),
             kind: kind.clone(),
             path: path.unwrap_or_default(),
@@ -411,21 +416,21 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
             .clone()
     }
 
-    fn get_read_semaphore(kind: DbKind) -> Arc<Semaphore> {
+    fn get_read_semaphore(kind: DbKind, num_permits: usize) -> Arc<Semaphore> {
         static MAP: once_cell::sync::Lazy<Mutex<HashMap<DbKind, Arc<Semaphore>>>> =
             once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
         MAP.lock()
             .entry(kind)
-            .or_insert_with(|| Arc::new(Semaphore::new(num_read_threads())))
+            .or_insert_with(|| Arc::new(Semaphore::new(num_permits)))
             .clone()
     }
 
-    fn get_long_read_semaphore(kind: DbKind) -> Arc<Semaphore> {
+    fn get_long_read_semaphore(kind: DbKind, num_permits: usize) -> Arc<Semaphore> {
         static MAP: once_cell::sync::Lazy<Mutex<HashMap<DbKind, Arc<Semaphore>>>> =
             once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
         MAP.lock()
             .entry(kind)
-            .or_insert_with(|| Arc::new(Semaphore::new(num_read_threads())))
+            .or_insert_with(|| Arc::new(Semaphore::new(num_permits)))
             .clone()
     }
 
