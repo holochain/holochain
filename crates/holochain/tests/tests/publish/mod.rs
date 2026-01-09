@@ -96,7 +96,10 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
 // Carol has warrant issuance disabled and receives the warrant from Bob
 // as he publishes it.
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "flaky warrant publish integration; re-check after Iroh upgrade"]
+#[cfg_attr(
+    not(feature = "transport-iroh"),
+    ignore = "requires Iroh transport for stability"
+)]
 async fn warrant_is_published() {
     holochain_trace::test_run();
 
