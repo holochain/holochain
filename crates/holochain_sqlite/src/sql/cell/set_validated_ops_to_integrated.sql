@@ -11,6 +11,17 @@ RETURNING
   basis_hash,
   authored_timestamp,
   validation_status,
+  -- Return the action author when the op is an action.
+  (
+    SELECT
+      author
+    FROM
+      Action
+    WHERE
+      Action.hash = DhtOp.action_hash
+    LIMIT
+      1
+  ),
   -- Return author from the Warrant table for warrant ops.
   (
     SELECT
