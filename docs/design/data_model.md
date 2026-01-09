@@ -8,13 +8,13 @@ This document describes the data model used by Holochain for representing and pe
 
 ### Agent
 
-An _Agent_ is any entity which can exercise the property of agency within a Holochain network. In practice, this refers to a participant in a distributed application who can author data, validate the actions of others, and participate in the peer-to-peer network.
+An _Agent_ is any entity which can exercise the property of agency within a Holochain network. In practice, this refers to a participant in a distributed application who can perform actions, validate the actions of others, and participate in the peer-to-peer network.
 
-Each agent is identified by an _AgentPubKey_, which is the public half of a cryptographic signing key pair. While called a "key", it functions as an identity hash within the system.
+Each agent is identified by an _AgentPubKey_, which is the public half of a cryptographic signing key pair. While called a "key", it functions as an identity hash within the system. The agent signs any actions they take to demonstrate the origin and authenticity of those actions. 
 
 ### Action
 
-An _Action_ is the fundamental unit of authorship in Holochain. Actions form a hash chain (a.k.a "source chain") that provides an immutable, tamper-evident record of everything an agent has done. Actions come in several types, each of which carries semantic meaning.
+An _Action_ is the fundamental unit of authorship in Holochain. Actions authored by a single agent form a hash chain (a.k.a "source chain") that provides an immutable, tamper-evident record of everything an agent has done. Actions come in several types, each of which carries semantic meaning.
 
 ### Entry
 
@@ -23,13 +23,13 @@ describe how the entry data should be interpreted.
 
 ### Record
 
-A _Record_ is the combination of an action, signed by the agent who authored it, together with its associated entry if applicable. Records are the primary unit of data that applications query and work with.
+A _Record_ is the combination of an _Action_, signed by the agent who authored it, together with its associated entry if applicable. Records are the primary unit of data that applications query and work with.
 
-The entry part of a record exists in one of multiple states. An entry may be _present_ when the entry data is included with the action. It may be _hidden_ when the entry exists but is marked as private and therefore not shared. Some action types don't permit an entry at all, in which case the entry is _not applicable_. Finally, an action may be stored without its entry by agents other than the author, resulting in a _not stored_ state.
+The _Entry_ part of a _Record_ exists in one of multiple states. An _Entry_ may be _present_ when the entry data is included with the _Action_. It may be _hidden_ when the _Entry_ exists but is marked as private and therefore not shared. Some action types don't permit an _Entry_ at all, in which case the _Entry_ is _not applicable_. Finally, an _Action_ may be stored without its entry by agents other than the author, resulting in a _not stored_ state.
 
 ### Chain DHT Operations
 
-Represent chain data being shared with the network. Each action generates a specific set of chain operations (such as _StoreRecord_, _RegisterAgentActivity_, _StoreEntry_, etc.) that enable different authorities to store and index the data for efficient queries.
+Represent chain data, along with a signature, being shared with the network. Each _Action_ generates a specific set of chain operations (such as _StoreRecord_, _RegisterAgentActivity_, _StoreEntry_, etc.) that enable different authorities to store and index the data for efficient queries.
 
 ### Warrant Operations
 
@@ -37,7 +37,7 @@ Represent evidence of invalid behavior by an agent. When an agent detects that a
 
 ### Location
 
-A location is a derived property of a hash. The exact algorithm is not important, as long as it preserves the uniqueness of its hash and all peers are using the same algorithm. The location value is an unsigned 32-bit number.
+A location is an unsigned 32-bit number that is derived from a hash. The exact algorithm is not important, as long as it produces a value that is well distributed and all peers are using the same algorithm.
 
 ## Actions taken by an agent
 
@@ -53,18 +53,18 @@ The genesis actions are:
 
 1. _Dna_ (sequence 0) - Records the DNA hash of the application this agent is joining.
 2. _AgentValidationPkg_ (sequence 1) - Contains the agent's public key and optional membrane proof for network validation.
-3. _Create_ (sequence 2) - Creates an _Agent_ typed entry, containing the agent's public key.
+3. _Create_ (sequence 2) - Creates an _Agent_-typed entry, containing the agent's public key.
 
-These three genesis actions are created automatically by the system during the genesis workflow. The _Dna_ and _AgentValidationPkg_ actions cannot be created through application code, only queried. The _Create_ action with an _Agent_ typed entry can be created by an application but has special meaning in this location.
+These three genesis actions are created automatically by the system during the genesis workflow. The _Dna_ and _AgentValidationPkg_ actions cannot be created through application code, only queried. The _Create_ action with an _Agent_-typed entry can be created by an application but has special meaning in this location.
 
-The _Dna_ action declares what application data model and validation rules the agent is using. The _AgentValidationPkg_ and _Create_ actions "announce" the agent to
+The _Dna_ action declares what application data model and validation rules the agent is using. It is permitted to include other content when computing a DNA hash but it always includes the hash of the code for the data model and validation rules. The _AgentValidationPkg_ and _Create_ actions "announce" the agent to
 the network and set up the expectation that all further actions on this chain will be signed by this agent.
 
-#### Initialisation
+#### Initialization
 
 After genesis completes successfully, an application is allowed to perform initialization steps. This may optionally choose to create actions of other types, to be described below. Once initialization is complete, an _InitZomesComplete_ action is appended to signal that the agent is ready to participate in the network.
 
-The _InitZomesComplete_ is required to guarantee that the application's initialisation steps are only run once. This is because, to Holochain, initialisation actions are
+The _InitZomesComplete_ is required to guarantee that the application's initialization steps are only run once. This is because, to Holochain, initialization actions are
 indistinguishable from agent actions taken at any other time.
 
 #### Creating, updating and deleting data
@@ -77,7 +77,7 @@ The _Create_ action introduces new entry data. The type of that entry data defin
 
 ##### Update
 
-The _Update_ action declares that a new entry should semantically replace a previous entry. Updates do not modify the original entry or action — they create a new entry and an action that references the original.
+The _Update_ action declares that a new entry should semantically replace a previous entry. Updates do not modify the original _Entry_ or _Action_ — they create a new _Entry_ and an _Action_ that references the original _Create_ action.
 
 Updates establish a relationship between the old and new versions of data. Applications can query for all updates to a given _Create_ action, allowing them to construct update histories or assign meaning to the "current" version of that data.
 
@@ -97,15 +97,17 @@ The _CreateLink_ and _DeleteLink_ actions provide a mechanism for creating direc
 
 ##### _CreateLink_
 
-The _CreateLink_ action creates a directed link from a base hash to a target hash. These hashes may be of any type, including hashes of actions, entries, agent public keys or even custom hashes. Links are first-class data in Holochain, stored on the agent's source chain as an action.
+The _CreateLink_ action creates a directed link from a base hash to a target hash. These hashes may be of any type, including hashes of actions, entries, agent public keys or even custom hashes. Links are stored on the agent's source chain as an action.
 
 The base hash is how links are grouped, so that all links from the same base hash, with the same type, are considered a set.
+
+Links are typed by the application, and may have a tag which permits arbitrary content. The type and tag may be used to filter tags that belong to the same set.
 
 ##### _DeleteLink_
 
 The _DeleteLink_ action marks a previously created link as deleted. Like entry deletes, link deletes do not remove the original _CreateLink_ action — they add metadata indicating the link should no longer be considered active.
 
-Unlike for entries, Holochain should automatically consider *DeleteLink_s when fetching links. It should still be possible to retrieve the set of create and delete link actions so that the application can decide what the current set should be.
+Unlike for entries, Holochain should automatically consider _DeleteLink_s when fetching links, by filter the active set to those which haven't been deleted. It should still be possible to retrieve the set of create and delete link actions so that the application can decide what the current set should be.
 
 ### Action properties
 
