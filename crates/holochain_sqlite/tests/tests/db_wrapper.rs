@@ -17,14 +17,15 @@ async fn async_read_respects_reader_permit_limits() {
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let db_handle = DbWrite::test(tmp_dir.path(), TestDatabaseKind::new()).unwrap();
 
-    let num_readers = num_read_threads();
+    // Number of readers available for short held permits
+    let num_short_readers = PoolConfig::default().max_readers / 2;
 
     let readers_spawned = Arc::new(AtomicUsize::new(0));
     let spawn_task_readers_spawned = readers_spawned.clone();
     let my_db_handle = db_handle.clone();
     let readers_task = tokio::spawn(async move {
-        let mut reader_tasks = Vec::with_capacity(num_readers);
-        for _ in 0..num_readers {
+        let mut reader_tasks = Vec::with_capacity(num_short_readers as usize);
+        for _ in 0..num_short_readers {
             let my_spawn_task_readers_spawned = spawn_task_readers_spawned.clone();
             let c = my_db_handle.read_async(move |_| -> Result<(), DatabaseError> {
                 my_spawn_task_readers_spawned.fetch_add(1, Ordering::SeqCst);
@@ -43,7 +44,7 @@ async fn async_read_respects_reader_permit_limits() {
     let check_task = tokio::spawn(async move {
         // Ensure all `async_reader` tasks have actually started
         tokio::time::timeout(std::time::Duration::from_secs(1), async move {
-            while readers_spawned.load(Ordering::SeqCst) < num_readers {
+            while readers_spawned.load(Ordering::SeqCst) < num_short_readers as usize {
                 tokio::time::sleep(std::time::Duration::from_millis(5)).await;
             }
         })
@@ -89,14 +90,16 @@ async fn get_read_txn_respects_reader_permit_limits() {
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let db_handle = DbWrite::test(tmp_dir.path(), TestDatabaseKind::new()).unwrap();
 
-    let num_readers = num_read_threads();
+    // Number of readers available for long held permits
+    let default_max_readers = PoolConfig::default().max_readers;
+    let num_long_readers = default_max_readers - (default_max_readers / 2);
 
     let read_txns_spawned = Arc::new(AtomicUsize::new(0));
     let spawn_task_read_txns_spawned = read_txns_spawned.clone();
     let my_db_handle = db_handle.clone();
     let readers_task = tokio::spawn(async move {
-        let mut txn_guards = Vec::with_capacity(num_readers);
-        for _ in 0..num_readers {
+        let mut txn_guards = Vec::with_capacity(num_long_readers as usize);
+        for _ in 0..num_long_readers {
             let my_db_handle = my_db_handle.clone();
             let my_spawn_task_read_txns_spawned = spawn_task_read_txns_spawned.clone();
             let txn_guard = || async move {
@@ -119,7 +122,7 @@ async fn get_read_txn_respects_reader_permit_limits() {
     let check_task = tokio::spawn(async move {
         // Ensure all read txn tasks have actually started
         tokio::time::timeout(std::time::Duration::from_secs(1), async move {
-            while read_txns_spawned.load(Ordering::SeqCst) < num_readers {
+            while read_txns_spawned.load(Ordering::SeqCst) < num_long_readers as usize {
                 tokio::time::sleep(std::time::Duration::from_millis(5)).await;
             }
         })
@@ -160,7 +163,8 @@ async fn read_async_releases_permits() {
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let db_handle = DbWrite::test(tmp_dir.path(), TestDatabaseKind::new()).unwrap();
 
-    let num_readers = num_read_threads();
+    // Number of readers available for short held permits
+    let num_short_readers = PoolConfig::default().max_readers / 2;
 
     // Run 'read' operations using the connection pool
     let read_operations_completed = Arc::new(AtomicUsize::new(0));
@@ -176,7 +180,10 @@ async fn read_async_releases_permits() {
             .unwrap();
     }
 
-    assert_eq!(num_readers, db_handle.available_reader_count());
+    assert_eq!(
+        num_short_readers as usize,
+        db_handle.available_short_reader_count()
+    );
     assert_eq!(100, read_operations_completed.load(Ordering::Acquire));
 }
 

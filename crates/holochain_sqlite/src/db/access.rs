@@ -3,9 +3,7 @@ use crate::db::conn::PConn;
 use crate::db::databases::DATABASE_HANDLES;
 use crate::db::guard::{PConnGuard, PTxnGuard};
 use crate::db::kind::{DbKind, DbKindT};
-use crate::db::pool::{
-    initialize_connection, new_connection_pool, num_read_threads, ConnectionPool, PoolConfig,
-};
+use crate::db::pool::{initialize_connection, new_connection_pool, ConnectionPool, PoolConfig};
 use crate::error::{DatabaseError, DatabaseResult};
 use derive_more::Into;
 use holochain_util::log_elapsed;
@@ -308,6 +306,16 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
             None => None,
         };
 
+        // Split the max readers into 2 sets allocated between the `read_semaphore` and `long_read_semaphore`.
+        //
+        // This allocates some permits for db queries that we expect to be slow,
+        // without blocking other db queries that we expect to be fast.
+        //
+        // We must have at least 1 short reader and 1 long reader or some db queries will never execute.
+        let max_readers = pool_config.max_readers as usize;
+        let max_short_readers = std::cmp::max((pool_config.max_readers / 2) as usize, 1);
+        let max_long_readers = std::cmp::max(max_readers.saturating_sub(max_short_readers), 1);
+
         // Now we know the database file is valid we can open a connection pool.
         let pool = new_connection_pool(path.as_ref().map(|p| p.as_ref()), pool_config);
         let mut conn = pool.get()?;
@@ -319,9 +327,9 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
 
         let db_read = DbRead {
             write_semaphore: Self::get_write_semaphore(kind.kind()),
-            read_semaphore: Self::get_read_semaphore(kind.kind()),
-            long_read_semaphore: Self::get_long_read_semaphore(kind.kind()),
-            max_readers: num_read_threads() * 2,
+            read_semaphore: Self::get_read_semaphore(kind.kind(), max_short_readers),
+            long_read_semaphore: Self::get_long_read_semaphore(kind.kind(), max_long_readers),
+            max_readers,
             num_readers: Arc::new(AtomicUsize::new(0)),
             kind: kind.clone(),
             path: path.unwrap_or_default(),
@@ -394,14 +402,6 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         acquire_semaphore_permit(self.0.write_semaphore.clone()).await
     }
 
-    pub fn available_writer_count(&self) -> usize {
-        self.write_semaphore.available_permits()
-    }
-
-    pub fn available_reader_count(&self) -> usize {
-        self.read_semaphore.available_permits()
-    }
-
     fn get_write_semaphore(kind: DbKind) -> Arc<Semaphore> {
         static MAP: once_cell::sync::Lazy<Mutex<HashMap<DbKind, Arc<Semaphore>>>> =
             once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
@@ -411,21 +411,21 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
             .clone()
     }
 
-    fn get_read_semaphore(kind: DbKind) -> Arc<Semaphore> {
+    fn get_read_semaphore(kind: DbKind, num_permits: usize) -> Arc<Semaphore> {
         static MAP: once_cell::sync::Lazy<Mutex<HashMap<DbKind, Arc<Semaphore>>>> =
             once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
         MAP.lock()
             .entry(kind)
-            .or_insert_with(|| Arc::new(Semaphore::new(num_read_threads())))
+            .or_insert_with(|| Arc::new(Semaphore::new(num_permits)))
             .clone()
     }
 
-    fn get_long_read_semaphore(kind: DbKind) -> Arc<Semaphore> {
+    fn get_long_read_semaphore(kind: DbKind, num_permits: usize) -> Arc<Semaphore> {
         static MAP: once_cell::sync::Lazy<Mutex<HashMap<DbKind, Arc<Semaphore>>>> =
             once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
         MAP.lock()
             .entry(kind)
-            .or_insert_with(|| Arc::new(Semaphore::new(num_read_threads())))
+            .or_insert_with(|| Arc::new(Semaphore::new(num_permits)))
             .clone()
     }
 
@@ -479,6 +479,21 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
                 .await
                 .unwrap()
         })
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    pub fn connection_pool_max_size(&self) -> u32 {
+        self.0.connection_pool.max_size()
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    pub fn available_short_reader_count(&self) -> usize {
+        self.read_semaphore.available_permits()
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    pub fn available_long_reader_count(&self) -> usize {
+        self.0.long_read_semaphore.available_permits()
     }
 }
 

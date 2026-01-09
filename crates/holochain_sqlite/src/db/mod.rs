@@ -22,5 +22,5 @@ pub use kind::{
     DbKindT, DbKindWasm,
 };
 #[cfg(feature = "test_utils")]
-pub use pool::{num_read_threads, set_connection_timeout};
+pub use pool::set_connection_timeout;
 pub use pool::{DbSyncLevel, DbSyncStrategy, PoolConfig};
