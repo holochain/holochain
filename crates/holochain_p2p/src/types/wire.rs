@@ -1,4 +1,5 @@
 use crate::*;
+use strum_macros::AsRefStr;
 
 /// Struct for encoding DhtOp as bytes.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -44,7 +45,7 @@ impl WirePreflightMessage {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, AsRefStr)]
 #[serde(tag = "type", content = "content")]
 #[allow(missing_docs)]
 pub enum WireMessage {
