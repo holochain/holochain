@@ -93,9 +93,7 @@ pub mod wasm_test {
                         let countree = CounTree::try_from(eb.clone().into_sb()).unwrap();
                         assert_eq!(countree, CounTree(count));
                     }
-                    _ => panic!(
-                        "failed to deserialize {details:?}, {count}, {update}, {delete}"
-                    ),
+                    _ => panic!("failed to deserialize {details:?}, {count}, {update}, {delete}"),
                 }
                 assert_eq!(entry_details.updates.len(), update, "{line}");
                 assert_eq!(entry_details.deletes.len(), delete, "{line}");
@@ -227,7 +225,7 @@ pub mod slow_tests {
         let local_entries_with_details: Vec<Option<Details>> = conductors[0]
             .call(
                 &zome_alice,
-                "action_details",
+                "action_details_local_only",
                 vec![entry_action_hash.clone()],
             )
             .await;
@@ -235,25 +233,33 @@ pub mod slow_tests {
         assert_eq!(local_entries_with_details.len(), 1);
         assert!(local_entries_with_details[0].is_some());
 
+        // alice becomes authority for the record
+        conductors[0]
+            .declare_full_storage_arcs(dna_file.dna_hash())
+            .await;
+
         // now make both agents aware of each other
         conductors.exchange_peer_info().await;
-
-        // bob gets details by action hash from local databases
-        let zome_bob = apps[1].cells()[0].zome(TestWasm::Crud.coordinator_zome_name());
-        let local_entries_with_details: Vec<Option<Details>> = conductors[1]
-            .call(&zome_bob, "action_details", vec![entry_action_hash])
-            .await;
-        // entry should be none
-        assert_eq!(local_entries_with_details.len(), 1);
-        assert!(local_entries_with_details[0].is_none());
 
         // bob gets details by entry hash from local databases
         let zome_bob = apps[1].cells()[0].zome(TestWasm::Crud.coordinator_zome_name());
         let local_entries_with_details: Vec<Option<Details>> = conductors[1]
-            .call(&zome_bob, "entry_details_local_only", ())
+            .call(
+                &zome_bob,
+                "action_details_local_only",
+                vec![entry_action_hash.clone()],
+            )
             .await;
         // entry should be none
         assert_eq!(local_entries_with_details.len(), 1);
         assert!(local_entries_with_details[0].is_none());
+
+        // bob gets details by action hash from network
+        let local_entries_with_details: Vec<Option<Details>> = conductors[1]
+            .call(&zome_bob, "action_details", vec![entry_action_hash])
+            .await;
+        // entry should be some
+        assert_eq!(local_entries_with_details.len(), 1);
+        assert!(local_entries_with_details[0].is_some());
     }
 }

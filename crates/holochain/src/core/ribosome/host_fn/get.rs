@@ -105,6 +105,11 @@ pub mod slow_tests {
         // alice can get the record
         assert!(local_record_by_action_hash.is_some());
 
+        // alice becomes authority for the record
+        conductors[0]
+            .declare_full_storage_arcs(dna_file.dna_hash())
+            .await;
+
         // now make both agents aware of each other
         conductors.exchange_peer_info().await;
 
@@ -117,7 +122,6 @@ pub mod slow_tests {
         assert!(local_record_by_action_hash.is_none());
 
         // bob gets record by entry hash from local databases
-        let zome_bob = apps[1].cells()[0].zome(TestWasm::Create.coordinator_zome_name());
         let local_record_by_entry_hash: Option<Record> =
             conductors[1].call(&zome_bob, "get_entry", ()).await;
         // record should be none
