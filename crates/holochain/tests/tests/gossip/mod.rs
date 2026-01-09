@@ -9,8 +9,6 @@ use holochain::sweettest::SweetConductorConfig;
 use holochain::sweettest::SweetInlineZomes;
 use holochain::sweettest::{await_consistency, SweetConductor, SweetDnaFile};
 use holochain::test_utils::inline_zomes::simple_crud_zome;
-use holochain_conductor_api::conductor::ConductorConfig;
-use holochain_conductor_api::conductor::NetworkConfig;
 use holochain_zome_types::record::Record;
 
 /// Test that conductors with arcs clamped to zero do not gossip.
@@ -65,19 +63,9 @@ async fn get_with_zero_arc_2_way() {
 #[tokio::test(flavor = "multi_thread")]
 async fn gossip_resumes_after_restart() {
     holochain_trace::test_run();
-    let mut conductors = SweetConductorBatch::from_config(
-        2,
-        ConductorConfig {
-            network: NetworkConfig {
-                mem_bootstrap: false,
-                ..Default::default()
-            }
-            .with_gossip_initiate_interval_ms(1_000)
-            .with_gossip_min_initiate_interval_ms(750),
-            ..Default::default()
-        },
-    )
-    .await;
+    let config = SweetConductorConfig::rendezvous(false)
+        .tune_network_config(|nc| nc.disable_bootstrap = true);
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 
@@ -100,7 +88,7 @@ async fn gossip_resumes_after_restart() {
     conductors.exchange_peer_info().await;
 
     // Ensure that gossip loops resume upon startup.
-    await_consistency(60, [&cell_0, &cell_1]).await.unwrap();
+    await_consistency(30, [&cell_0, &cell_1]).await.unwrap();
     let record: Option<Record> = conductors[1].call(&zome_1, "read", hash.clone()).await;
     assert_eq!(record.unwrap().action_address(), &hash);
 }
