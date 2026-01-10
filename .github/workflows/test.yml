@@ -60,11 +60,11 @@ jobs:
           - os: ubuntu-latest
             target: wasmer_sys
           - os: macos-latest
-            target: wasmer_sys
+            target: wasmer_sys-transport_iroh
           - os: macos-15-intel
-            target: wasmer_sys
+            target: wasmer_sys-transport_iroh
           - os: depot-windows-2022-8
-            target: wasmer_sys
+            target: wasmer_sys-transport_iroh
           - os: ubuntu-latest
             target: wasmer_sys-unstable
           - os: ubuntu-latest

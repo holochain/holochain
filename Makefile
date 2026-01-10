@@ -5,7 +5,7 @@
 COMMON_DEFAULT_FEATURES=slow_tests,build_wasms,sqlite-encrypted
 DEFAULT_FEATURES=transport-tx5-datachannel-vendored,$(COMMON_DEFAULT_FEATURES)
 DEFAULT_FEATURES_TRANSPORT_IROH=transport-iroh,$(COMMON_DEFAULT_FEATURES)
-UNSTABLE_FEATURES=chc,unstable-sharding,unstable-warrants,unstable-functions,unstable-migration,$(DEFAULT_FEATURES)
+UNSTABLE_FEATURES=chc,unstable-sharding,unstable-warrants,unstable-functions,unstable-migration,$(DEFAULT_FEATURES_TRANSPORT_IROH)
 
 # mark everything as phony because it doesn't represent a file-system output
 .PHONY: default \
@@ -87,9 +87,9 @@ build-workspace-wasmer_wamr:
 		--locked \
 		--all-targets \
 		--no-default-features \
-		--features $(DEFAULT_FEATURES),wasmer_wamr
+		--features $(DEFAULT_FEATURES_TRANSPORT_IROH),wasmer_wamr
 
-# execute tests on all crates with wasmer compiler
+# execute tests on all crates with wasmer compiler and tx5 transport
 test-workspace-wasmer_sys:
 	RUST_BACKTRACE=1 cargo nextest run \
 		--workspace \
@@ -119,7 +119,7 @@ test-workspace-wasmer_wamr:
 		--workspace \
 		--locked \
 		--no-default-features \
-		--features $(DEFAULT_FEATURES),wasmer_wamr
+		--features $(DEFAULT_FEATURES_TRANSPORT_IROH),wasmer_wamr
 
 clean:
 	cargo clean
