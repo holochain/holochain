@@ -90,14 +90,21 @@ impl SweetLocalRendezvous {
 
         Arc::new(Self {
             bs_addr: format!("http://{bootstrap_addr}"),
-            #[cfg(feature = "transport-iroh")]
-            sig_addr: format!("http://{bootstrap_addr}"),
             #[cfg(any(
                 feature = "transport-tx5-datachannel-vendored",
                 feature = "transport-tx5-backend-libdatachannel",
                 feature = "transport-tx5-backend-go-pion"
             ))]
             sig_addr: format!("ws://{bootstrap_addr}"),
+            #[cfg(all(
+                feature = "transport-iroh",
+                not(any(
+                    feature = "transport-tx5-datachannel-vendored",
+                    feature = "transport-tx5-backend-libdatachannel",
+                    feature = "transport-tx5-backend-go-pion"
+                ))
+            ))]
+            sig_addr: format!("http://{bootstrap_addr}"),
             bootstrap_hnd,
             bootstrap_addr,
         })
