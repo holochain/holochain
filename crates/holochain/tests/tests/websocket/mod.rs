@@ -784,7 +784,15 @@ async fn network_stats() {
     const EXPECT: &str = "BackendLibDataChannel";
     #[cfg(feature = "transport-tx5-backend-go-pion")]
     const EXPECT: &str = "BackendGoPion";
-    #[cfg(feature = "transport-iroh")]
+    #[cfg(all(
+        feature = "transport-iroh",
+        not(any(
+            feature = "transport-tx5-datachannel-vendored",
+            feature = "transport-tx5-backend-libdatachannel",
+            feature = "transport-tx5-backend-go-pion"
+        ))
+    ))]
+
     const EXPECT: &str = "iroh";
 
     let req = AdminRequest::DumpNetworkStats;
