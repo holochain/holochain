@@ -14,6 +14,69 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20260112.002450
+
+## [hc\_service\_check-0.4.0-dev.2](crates/hc_service_check/CHANGELOG.md#0.4.0-dev.2)
+
+## [hcterm-0.7.0-dev.7](crates/hcterm/CHANGELOG.md#0.7.0-dev.7)
+
+## [holochain\_cli-0.7.0-dev.7](crates/holochain_cli/CHANGELOG.md#0.7.0-dev.7)
+
+## [holochain\_cli\_bundle-0.7.0-dev.7](crates/holochain_cli_bundle/CHANGELOG.md#0.7.0-dev.7)
+
+## [holochain\_cli\_client-0.7.0-dev.7](crates/holochain_cli_client/CHANGELOG.md#0.7.0-dev.7)
+
+## [holochain\_cli\_sandbox-0.7.0-dev.7](crates/holochain_cli_sandbox/CHANGELOG.md#0.7.0-dev.7)
+
+## [holochain\_client-0.9.0-dev.7](crates/holochain_client/CHANGELOG.md#0.9.0-dev.7)
+
+## [holochain-0.7.0-dev.7](crates/holochain/CHANGELOG.md#0.7.0-dev.7)
+
+- Update kitsune2 to v0.4.0-dev.2, which includes the iroh relay integration with the bootstrap server.
+- Crates `holochain_cli_client` and `holochain_client` now have features to set which network transport is compiled in (tx5 or iroh).
+- **BREAKING CHANGE** Feature `mock_network` was removed from crate `holochain_p2p`. It was only referencing `test_utils`, so instead `test_utils` should be used directly.
+- **BREAKING CHANGE** Add `GetStrategy` field to \[`Anchor`\] struct to allow users to specify whether anchor operations should use network or local-only fetching. The \[`Anchor`\] struct now has a `strategy` field with serde default, and a `with_strategy()` builder method. New functions `anchor_with_strategy()`, `list_anchor_type_addresses_with_strategy()`, `list_anchor_addresses_with_strategy()`, and `list_anchor_tags_with_strategy()` have been added to the HDK to support this functionality. Additionally, an `AnchorExt` trait has been added to convert \[`Anchor`\] directly to \[`TypedPath`\] while preserving the strategy. Applications can now configure anchors to use local-only fetching by calling `.with_strategy(GetStrategy::Local)` on an \[`Anchor`\]. This complements the similar change to \[`TypedPath`\]. \#5471
+- **BREAKING CHANGE** Add `GetStrategy` field to `TypedPath` to allow users to specify whether path operations should use network or local-only fetching. The `GetStrategy` enum has been moved from `holochain_zome_types` to `holochain_integrity_types` and re-exported for backward compatibility. Applications can now configure paths to use local-only fetching by calling `.with_strategy(GetStrategy::Local)` on a TypedPath. \#5471
+- **BREAKING CHANGE**: Removed `block_agent` and `unblock_agent` functions from the HDK. These functions were behind the `unstable-functions` feature flag and have been removed as blocking should be a system-level behavior triggered by warrants, not application-level logic. The host functions remain as no-ops for backward compatibility with existing apps. Applications using these functions should remove the calls - they will succeed but have no effect. \[\#5518\]
+
+## [holochain\_cascade-0.7.0-dev.7](crates/holochain_cascade/CHANGELOG.md#0.7.0-dev.7)
+
+## [holochain\_conductor\_config-0.7.0-dev.7](crates/holochain_conductor_config/CHANGELOG.md#0.7.0-dev.7)
+
+## [holochain\_test\_wasm\_common-0.7.0-dev.5](crates/holochain_test_wasm_common/CHANGELOG.md#0.7.0-dev.5)
+
+## [holochain\_wasm\_test\_utils-0.7.0-dev.7](crates/holochain_wasm_test_utils/CHANGELOG.md#0.7.0-dev.7)
+
+## [holochain\_websocket-0.7.0-dev.7](crates/holochain_websocket/CHANGELOG.md#0.7.0-dev.7)
+
+## [hdk-0.7.0-dev.5](crates/hdk/CHANGELOG.md#0.7.0-dev.5)
+
+## [holochain\_conductor\_api-0.7.0-dev.7](crates/holochain_conductor_api/CHANGELOG.md#0.7.0-dev.7)
+
+## [holochain\_p2p-0.7.0-dev.7](crates/holochain_p2p/CHANGELOG.md#0.7.0-dev.7)
+
+## [hdi-0.8.0-dev.4](crates/hdi/CHANGELOG.md#0.8.0-dev.4)
+
+## [holochain\_state-0.7.0-dev.7](crates/holochain_state/CHANGELOG.md#0.7.0-dev.7)
+
+## [hdk\_derive-0.7.0-dev.4](crates/hdk_derive/CHANGELOG.md#0.7.0-dev.4)
+
+## [holochain\_chc-0.4.0-dev.7](crates/holochain_chc/CHANGELOG.md#0.4.0-dev.7)
+
+## [holochain\_state\_types-0.7.0-dev.4](crates/holochain_state_types/CHANGELOG.md#0.7.0-dev.4)
+
+## [holochain\_types-0.7.0-dev.7](crates/holochain_types/CHANGELOG.md#0.7.0-dev.7)
+
+## [holochain\_keystore-0.7.0-dev.4](crates/holochain_keystore/CHANGELOG.md#0.7.0-dev.4)
+
+## [holochain\_sqlite-0.7.0-dev.5](crates/holochain_sqlite/CHANGELOG.md#0.7.0-dev.5)
+
+## [holochain\_zome\_types-0.7.0-dev.4](crates/holochain_zome_types/CHANGELOG.md#0.7.0-dev.4)
+
+## [holochain\_integrity\_types-0.7.0-dev.4](crates/holochain_integrity_types/CHANGELOG.md#0.7.0-dev.4)
+
+## [holo\_hash-0.7.0-dev.3](crates/holo_hash/CHANGELOG.md#0.7.0-dev.3)
+
 # 20260105.001833
 
 ## [hc\_service\_check-0.4.0-dev.1](crates/hc_service_check/CHANGELOG.md#0.4.0-dev.1)
