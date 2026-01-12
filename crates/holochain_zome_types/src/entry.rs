@@ -146,20 +146,13 @@ impl GetOptions {
     /// The count will be capped at [`MAX_REMOTE_AGENT_COUNT`] to prevent abuse
     /// and excessive network load.
     pub fn with_remote_agent_count(mut self, count: u8) -> Self {
-        self.remote_agent_count = Some(count.min(MAX_REMOTE_AGENT_COUNT));
+        self.remote_agent_count = Some(count.clamp(1, MAX_REMOTE_AGENT_COUNT));
         self
     }
 
     /// Set the timeout for network requests in milliseconds.
     pub fn with_timeout_ms(mut self, timeout: u64) -> Self {
         self.timeout_ms = Some(timeout);
-        self
-    }
-
-    /// Set whether to race (true) or aggregate (false) responses.
-    /// Note: Setting as_race to false is not yet implemented.
-    pub fn with_as_race(mut self, race: bool) -> Self {
-        self.as_race = Some(race);
         self
     }
 }
@@ -363,13 +356,12 @@ mod tests {
     fn test_get_options_builder() {
         let options = GetOptions::network()
             .with_remote_agent_count(5)
-            .with_timeout_ms(2000)
-            .with_as_race(true);
+            .with_timeout_ms(2000);
 
         assert_eq!(options.strategy(), GetStrategy::Network);
         assert_eq!(options.remote_agent_count(), Some(5));
         assert_eq!(options.timeout_ms(), Some(2000));
-        assert_eq!(options.as_race(), Some(true));
+        assert_eq!(options.as_race(), None);
 
         // Test capping of remote_agent_count
         let options = GetOptions::network().with_remote_agent_count(20);
