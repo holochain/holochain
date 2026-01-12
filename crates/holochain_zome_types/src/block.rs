@@ -2,7 +2,6 @@
 #![allow(deprecated)]
 
 use crate::prelude::*;
-use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
 use holochain_integrity_types::Timestamp;
@@ -13,17 +12,6 @@ use rusqlite::types::FromSql;
 use rusqlite::types::ToSqlOutput;
 #[cfg(feature = "rusqlite")]
 use rusqlite::ToSql;
-
-/// Everything required for a coordinator to block some agent on the same DNA.
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
-pub struct BlockAgentInput {
-    pub target: AgentPubKey,
-    /// Reason is literally whatever you want it to be.
-    /// But unblock must be an exact match.
-    #[serde(with = "serde_bytes")]
-    pub reason: Vec<u8>,
-    pub interval: InclusiveTimestampInterval,
-}
 
 /// Reason why we might want to block a cell.
 #[derive(Clone, serde::Serialize, serde::Deserialize, Debug, Eq, PartialEq)]
