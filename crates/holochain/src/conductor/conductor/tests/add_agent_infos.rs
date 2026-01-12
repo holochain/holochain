@@ -58,8 +58,9 @@ async fn add_agent_infos_to_peer_store() {
     drop(conductor);
 
     // Add agent info from first app installation to a new conductor's peer store.
-    let mut config = SweetConductorConfig::standard();
-    config.network.disable_bootstrap = true;
+    let config = SweetConductorConfig::standard().tune_network_config(|nc| {
+        nc.disable_bootstrap = true;
+    });
 
     let mut conductor = SweetConductor::from_config(config).await;
 

@@ -296,13 +296,13 @@ mod startup_shutdown_impls {
             let mut tm = self.task_manager();
             let task = self.detach_task_management().expect("Attempting to shut down after already detaching task management or previous shutdown");
 
-            let this = Arc::clone(&self);
+            let self2 = self.clone();
             tokio::task::spawn(async move {
                 // Shutdown conductor tasks
-                let running_cell_ids: Vec<_> = this
+                let running_cell_ids: Vec<_> = self2
                     .running_cells
                     .share_mut(|c| c.keys().cloned().collect());
-                let remove_cells_task = this.remove_cells(&running_cell_ids);
+                let remove_cells_task = self2.remove_cells(&running_cell_ids);
 
                 tracing::info!("Sending shutdown signal to all managed tasks and removing cells.");
                 let (.., result) = futures::join!(remove_cells_task, tm.shutdown().boxed(), task,);
@@ -2485,6 +2485,7 @@ mod misc_impls {
         }
 
         /// Create a comprehensive structured dump of a cell's state.
+        ///
         /// The cell's peer store state is only included when the cell is enabled.
         pub async fn dump_full_cell_state(
             &self,
@@ -2504,7 +2505,7 @@ mod misc_impls {
                 Err(ConductorApiError::CellError(CellError::HolochainP2pError(
                     HolochainP2pError::K2SpaceNotFound(space_id),
                 ))) => {
-                    tracing::warn!("Cannot dump peer store for k2 space that does not exist with space id {space_id}");
+                    tracing::debug!("Cannot dump peer store for k2 space that does not exist with space id {space_id}");
                     Ok(None)
                 }
                 Ok(p) => Ok(Some(p)),
