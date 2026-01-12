@@ -7,6 +7,7 @@ use holochain_wasm_test_utils::TestWasm;
 mod dht_location;
 mod enable_clone_cell_by_dna_hash;
 pub mod must_get_agent_activity_saturation;
+mod shutdown;
 mod two_apps_same_dna_hash_different_coordinators;
 mod zome_call_atomic;
 

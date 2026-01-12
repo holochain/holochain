@@ -27,7 +27,6 @@ mod regression;
 mod schedule;
 mod send_signal;
 mod ser_regression;
-mod shutdown;
 mod signals;
 mod test_cli;
 mod test_utils;
