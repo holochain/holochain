@@ -10,7 +10,7 @@ This document describes the data model used by Holochain for representing and pe
 
 An _Agent_ is any entity which can exercise the property of agency within a Holochain network. In practice, this refers to a participant in a distributed application who can perform actions, validate the actions of others, and participate in the peer-to-peer network.
 
-Each agent is identified by an _AgentPubKey_, which is the public half of a cryptographic signing key pair. While called a "key", it functions as an identity hash within the system. The agent signs any actions they take to demonstrate the origin and authenticity of those actions. 
+Each agent is identified by an _AgentPubKey_, which is the public half of a cryptographic signing key pair. While called a "key", it functions as a unique identifier within the system. The agent signs any actions they take to demonstrate the origin and authenticity of those actions. 
 
 ### Action
 
@@ -29,7 +29,7 @@ The _Entry_ part of a _Record_ exists in one of multiple states. An _Entry_ may 
 
 ### Chain DHT Operations
 
-Represent chain data, along with a signature, being shared with the network. Each _Action_ generates a specific set of chain operations (such as _StoreRecord_, _RegisterAgentActivity_, _StoreEntry_, etc.) that enable different authorities to store and index the data for efficient queries.
+Represent chain data, along with a signature, being shared with the network. Each _Action_ generates a specific set of chain operations (such as _CreateRecord_, _AgentActivity_, _CreateEntry_, etc.) that enable different authorities to store and index the data for efficient queries.
 
 ### Warrant Operations
 
@@ -99,7 +99,7 @@ The _CreateLink_ and _DeleteLink_ actions provide a mechanism for creating direc
 
 The _CreateLink_ action creates a directed link from a base hash to a target hash. These hashes may be of any type, including hashes of actions, entries, agent public keys or even custom hashes. Links are stored on the agent's source chain as an action.
 
-The base hash is how links are grouped, so that all links from the same base hash, with the same type, are considered a set.
+Links are grouped by base hash, so that all links from the same base hash, with the same type, are considered a set.
 
 Links are typed by the application, and may have a tag which permits arbitrary content. The type and tag may be used to filter tags that belong to the same set.
 
@@ -107,7 +107,7 @@ Links are typed by the application, and may have a tag which permits arbitrary c
 
 The _DeleteLink_ action marks a previously created link as deleted. Like entry deletes, link deletes do not remove the original _CreateLink_ action — they add metadata indicating the link should no longer be considered active.
 
-Unlike for entries, Holochain should automatically consider _DeleteLink_s when fetching links, by filter the active set to those which haven't been deleted. It should still be possible to retrieve the set of create and delete link actions so that the application can decide what the current set should be.
+Unlike for entries, Holochain should automatically consider _DeleteLink_s when fetching links, by filtering the active set to those which haven't been deleted. It should still be possible to retrieve the set of create and delete link actions so that the application can decide what the current set should be.
 
 ### Action properties
 
@@ -154,7 +154,7 @@ _App_ entry types must be uniquely identifiable within a DNA to enable correct d
 - _Zome index_: An 8-bit index identifying which integrity zome defines this entry type
 - _Entry definition index_: An 8-bit index identifying which entry type within that zome
 
-Together, these two indices form a unique key for each entry type in the DNA. This indexing strategy ensures that entry data can be correctly deserialized to its original type even when accessed in the future. The indices are stable identifiers — once assigned to an entry definition, they must remain consistent for the lifetime of the DNA to maintain data readability.
+Together, these two indices form a unique key for each entry type in the DNA. This indexing strategy ensures that entry data can be correctly deserialized to its original type. The indices are stable identifiers — once assigned to an entry definition, they must remain consistent for the lifetime of the DNA.
 
 #### Update
 
@@ -182,11 +182,11 @@ The _deletes address_ allows _Delete_ actions to be grouped with the _Create_ ac
 |----------|-----------|-------------|
 | _base address_ | `AnyLinkableHash` | The base address of the link, its "from" address |
 | _target address_ | `AnyLinkableHash` | The target address of the link, its "to" address. |
-| _zome index_ | `ZomeIndex` | Which integrity zome defines this link type. | <!-- TODO implementation leak, should be contained within a "link type" but the link type is user defined... seems like it could be merged together with a little care -->
+| _zome index_ | `ZomeIndex` | Which integrity zome defines this link type. <!-- TODO implementation leak, should be contained within a "link type" but the link type is user defined... seems like it could be merged together with a little care --> |
 | _link type_ | `LinkType` | Application-defined link type identifier. |
-| _tag_ | `LinkTag` | Arbitrary bytes for link metadata or filtering. |
+| _tag_ | `LinkTag` | Arbitrary bytes for application-defined link metadata. |
 
-Link tags have a maximum size of 1000 bytes. This limit is enforced during validation to ensure tags can be efficiently stored and used for filtering queries.
+Link tags have a maximum size of 1 KB (1,000 bytes). This limit is enforced during validation to ensure tags can be efficiently stored and used for filtering queries.
 
 #### _DeleteLink_
 
@@ -195,13 +195,13 @@ Link tags have a maximum size of 1000 bytes. This limit is enforced during valid
 | _base address_ | `AnyLinkableHash` | The base from the _CreateLink_ being deleted. |
 | _link add address_ | `ActionHash` | The address of the _CreateLink_ action being deleted. |
 
-The _base address_ allows _DeleteLink_ actions to be grouped with _CreateLink_ actions from the same base. The link add address ties the _DeleteLink_ action to a specific _CreateLink_ action.
+The _base address_ allows _DeleteLink_ actions to be grouped with _CreateLink_ actions from the same base. The link add address associates the _DeleteLink_ action with a specific _CreateLink_ action.
 
 ### Entry Types
 
 Holochain defines four entry types that serve different purposes in the system. Entries represent the actual data content stored in a record.
 
-##### Agent
+#### Agent
 
 The _Agent_ entry type contains an agent's public key. An action with this entry type is created automatically during genesis as the third action on every source chain. Further _Agent_ entries are permitted to be created, if that has some meaning assigned by the application.
 
@@ -211,7 +211,7 @@ The _App_ entry type represents serialized, application-defined data. This is th
 
 Applications create _App_ entries using _Create_ actions and can update or delete them using _Update_ and _Delete_ actions. The content and structure of _App_ entries is entirely determined by the application.
 
-*Size limitation:* _App_ entries have a maximum size of 4 MB (4,000,000 bytes). This limit is enforced automatically by Holochain. Should an application need to store larger pieces of data, they may consider splitting it across multiple entries or storing references to external content.
+_Size limitation:_ _App_ entries have a maximum size of 4 MB (4,000,000 bytes). This limit is enforced automatically by Holochain. Should an application need to store larger pieces of data, they may consider splitting it across multiple entries or storing references to external content.
 
 ##### CapGrant
 
@@ -229,38 +229,27 @@ Access levels:
 - _Transferable_: A secret must be provided, but any agent with the secret can use it.
 - _Assigned_: Requires both a secret and authorization, defined by the calling agent being in the assignees list.
 
-##### CapClaim
+## Distributed Hash Table Operations (DHT Ops)
 
-The _CapClaim_ entry type is for claiming capabilities that have been granted. When an agent receives a capability granted by another agent, they may create a _CapClaim_ entry on their chain.
+Holochain also has a distributed data model, of DHT Operations (ops) that form each DNA's Distributed Hash Table (DHT). These are what get shared on the network and validated. An op is one of two possible kinds, chain ops and warrant ops.
 
-A _CapClaim_ entry contains:
-- _Tag_: A string identifier for this capability claim.
-- _Grantor_: The agent public key of the agent who issued the grant.
-- _Secret_: The secret required to exercise the capability.
-
-_CapClaim_ entries are private since they may contain secrets. They serve as a record that the agent possesses a particular capability and provide the information needed to exercise it when making zome calls.
-
-## DHT Operations
-
-Holochain also has a distributed data model, of DHT Operations (ops) that form each DNA's Distributed Hash Table (DHT). These are what get shared on the network and validated. Ops come in two different groups, chain ops and warrant ops.
-
-When an agent creates a record on their source chain, that data is then made available on the DNA's Distributed Hash Table (DHT) as DHT chain operations (ops). Holochain's primary data model of actions, entries and records is already content addressible, and the op model adds metadata to describe Holochain's sharding model. Sharding works by distributing data across peers in the network, with enough structure to enable efficient data retrieval.
+When an agent creates a record on their source chain, that data is then made available on the DNA's Distributed Hash Table (DHT) as DHT chain operations (ops). Holochain's primary data model of actions, entries and records is already content addressable, and the op model adds metadata to describe Holochain's sharding model. Sharding works by distributing data across peers in the network, with enough structure to enable efficient data retrieval.
 
 ### Op locations
 
 A location is computed for each `AgentPubKey`. That location is the agent's location on the network. Each agent stores some number of data locations, starting from their location, up to the maximum size of a location.
 
 | Op group | Op type | Authority | Location source |
-|----------|---------|-----------|----------|
-| Chain | _RegisterAgentActivity_ | Agent | Agent address |
-| | _StoreRecord_ | Record | Action address |
-| | _RegisterUpdateRecord_ | Record | Original action address |
-| | _RegisterDeleteRecord_ | Record | Original action address |
-| | _StoreEntry_ | Entry | Entry address |
-| | _RegisterUpdateEntry_ | Entry | Original entry address |
-| | _RegisterDeleteEntry_ | Entry | Original entry address |
-| | _RegisterLink_ | Link | Action address, from the link's base |
-| | _RegisterDeleteLink_ | Link | Action address, from the deleted link's base |
+|----------|---------|-----------|-----------------|
+| Chain | _AgentActivity_ | Agent | Agent address |
+| | _CreateRecord_ | Record | Action address |
+| | _UpdateRecord_ | Record | Original action address |
+| | _DeleteRecord_ | Record | Original action address |
+| | _CreateEntry_ | Entry | Entry address |
+| | _UpdateEntry_ | Entry | Original entry address |
+| | _DeleteEntry_ | Entry | Original entry address |
+| | _CreateLink_ | Link | Link base address |
+| | _DeleteLink_ | Link | Deleted link's base |
 | Warrant | _InvalidChainOp_ | Agent | Agent address of the agent who authored invalid data |
 | | _ChainFork_ | Agent | Agent address of the agent who forked their chain |
 
@@ -272,101 +261,101 @@ The transformation from source chain actions to DHT operations serves several pu
 
 ### Chain ops
 
-Each action type is mapped to a specific set of DHT operations. This happens after committing to a source chain but the mapping can be done at any later point and still be valid. The following table shows which operations are generated for each action:
+Each action type is mapped to a specific set of DHT operations. Records are mapped after committing to a source chain, but the mapping can be done at any later point, by any agent, and still be valid. The following table shows which operations are generated for each action:
 
 | Action Type | Ops Produced |
 |-------------|---------------------|
-| **Dna** | _StoreRecord_, _RegisterAgentActivity_ |
-| **AgentValidationPkg** | _StoreRecord_, _RegisterAgentActivity_ |
-| **InitZomesComplete** | _StoreRecord_, _RegisterAgentActivity_ |
-| **Create** | _StoreRecord_, _RegisterAgentActivity_, _StoreEntry_ |
-| **Update** | _StoreRecord_, _RegisterAgentActivity_, _StoreEntry_, _RegisterUpdateRecord_, _RegisterUpdateEntry_ |
-| **Delete** | _StoreRecord_, _RegisterAgentActivity_, _RegisterDeleteRecord_, _RegisterDeleteEntry_ |
-| **CreateLink** | _StoreRecord_, _RegisterAgentActivity_, _RegisterLink_ |
-| **DeleteLink** | _StoreRecord_, _RegisterAgentActivity_, _RegisterDeleteLink_ |
+| **Dna** | _CreateRecord_, _AgentActivity_ |
+| **AgentValidationPkg** | _CreateRecord_, _AgentActivity_ |
+| **InitZomesComplete** | _CreateRecord_, _AgentActivity_ |
+| **Create** | _CreateRecord_, _AgentActivity_, _CreateEntry_ |
+| **Update** | _CreateRecord_, _AgentActivity_, _CreateEntry_, _UpdateRecord_, _UpdateEntry_ |
+| **Delete** | _CreateRecord_, _AgentActivity_, _DeleteRecord_, _DeleteEntry_ |
+| **CreateLink** | _CreateRecord_, _AgentActivity_, _CreateLink_ |
+| **DeleteLink** | _CreateRecord_, _AgentActivity_, _DeleteLink_ |
 
 Note that every action produces a:
-- _StoreRecord_ op meaning that every action is content addressible by its own action hash, and
-- _RegisterAgentActivity_, which meaning that every action is sent to the author's authorities.
+- _CreateRecord_ op meaning that every action is content addressable by its own action hash, and
+- _AgentActivity_, which means that every action is sent to the author's authorities.
 
-Each chain op contains the source action, and a signature of that action by its author. Note that the entry data is not signed, but entries are always referenced by their hash by an action so the signature of the action covers the entry data as long as the entry hash is checked.
+Each chain op contains the source action, and a signature of that action by its author. Note that the entry data is not signed, but entries are always referenced by their hash in an action so the signature of the action covers the entry data as long as the entry hash is checked.
 
-Whether an entry is included in an op depends on the type of action, content of the action and the type of op. As described for actions and records above, some actions do not have an associated entry and entries may also be hidden. The _RegisterAgentActivity_ op never carries an entry, and neither do the _RegisterDeleteRecord_ or _RegisterDeleteEntry_ types.
+Whether an entry is included in an op depends on the type of action, content of the action and the type of op. As described for _Action_s and _Record_s above, some _Action_s do not have an associated entry and entries may also be hidden. The _AgentActivity_ op never carries an entry, and neither do the _DeleteRecord_, _DeleteEntry_, _CreateLink_ or _DeleteLink_ op types.
 
 ### Chain Operations
 
 There are nine types of chain operations, each serving a specific purpose in the distributed data model:
 
-#### RegisterAgentActivity
+#### AgentActivity
 
-The _RegisterAgentActivity_ operation is sent to the agent activity authority (agents near the agent's public key) for every action an agent commits.
+The _AgentActivity_ operation is sent to the agent activity authority (agents near the agent's public key) for every action an agent commits.
 
 **Purpose:**
-- Maintain a complete activity log for each agent.
+- Maintain a complete activity history for each agent.
 - Enable queries for all actions by a specific agent.
 - Allows chain forks to be detected by agent authorities.
 
-#### StoreRecord
+#### CreateRecord
 
-The _StoreRecord_ operation is sent to the action authority (agents near the action hash) to store the complete record.
+The _CreateRecord_ operation is sent to the action authority (agents near the action hash) to store the complete record.
 
 **Purpose:**
-- Store the authoritative record for this action.
+- Store the record for this action.
 - Enable queries for the record by its action hash.
 - Collect changes to content (updates, deletes).
 
-#### RegisterUpdateRecord
+#### UpdateRecord
 
-The _RegisterUpdateRecord_ operation is sent to the action authority when a record is updated.
+The _UpdateRecord_ operation is sent to the action authority when a record is updated.
 
 **Purpose:**
 - Index updates with the record being updated.
 - Enable queries for all updates to a specific record.
 
-#### RegisterDeleteRecord
+#### DeleteRecord
 
-The **RegisterDeleteRecord** operation is sent to the action authority when an action is deleted.
+The **DeleteRecord** operation is sent to the action authority when an action is deleted.
 
 **Purpose:**
 - Index deletions for the action being deleted.
-- Enable queries to discover if a record has been deleted.
+- Enable queries for deletes to a specific record.
 
-#### StoreEntry
+#### CreateEntry
 
-The _StoreEntry_ operation is sent to the entry authority (agents near the entry hash) when a new entry is created.
+The _CreateEntry_ operation is sent to the entry authority (agents near the entry hash) when a new entry is created.
 
 **Purpose:**
 - Store the entry content at its content-addressed location.
 - Enable queries for the entry by its hash.
 
-#### RegisterUpdateEntry
+#### UpdateEntry
 
-The **RegisterUpdateEntry** operation is sent to the entry authority when an entry is updated.
+The **UpdateEntry** operation is sent to the entry authority when an entry is updated.
 
 **Purpose:**
 - Index updates for the entry being updated.
 - Enable queries for all updates to a specific entry.
 
-#### RegisterDeleteEntry
+#### DeleteEntry
 
-The **RegisterDeleteEntry** operation is sent to the entry authority when an action with an entry is deleted.
+The **DeleteEntry** operation is sent to the entry authority when an action with an entry is deleted.
 
 **Purpose:**
 - Index deletions with the entry being deleted.
 - Enable queries to discover if _Create_ or _Update_ entries have been deleted.
 
-#### RegisterLink
+#### CreateLink
 
-The _RegisterLink_ operation is sent to the link base authority when a link is created.
+The _CreateLink_ operation is sent to the link base authority when a link is created.
 
 **Purpose:**
 - Index links grouped by their base.
 - Enable efficient queries for all links from a specific base
 - Provide the foundation for graph traversal and relationship queries
 
-#### RegisterDeleteLink
+#### DeleteLink
 
-The _RegisterDeleteLink_ operation is sent to the link base authority when a link is deleted.
+The _DeleteLink_ operation is sent to the link base authority when a link is deleted.
 
 **Purpose:**
 - Index link deletions at the base.
