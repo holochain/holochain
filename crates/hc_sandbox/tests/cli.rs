@@ -744,7 +744,14 @@ async fn generate_sandbox_with_target_arc_factor_override() {
         .unwrap()
         .join("tests/fixtures/my-app/");
 
-    #[cfg(feature = "transport-iroh")]
+    #[cfg(all(
+        feature = "transport-iroh",
+        not(any(
+            feature = "transport-tx5-datachannel-vendored",
+            feature = "transport-tx5-backend-libdatachannel",
+            feature = "transport-tx5-backend-go-pion"
+        ))
+    ))]
     let (network_type, relay_url) = ("quic", "https://iroh-relay");
     #[cfg(any(
         feature = "transport-tx5-datachannel-vendored",
