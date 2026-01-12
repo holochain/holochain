@@ -346,7 +346,7 @@ mod startup_shutdown_impls {
                 let config_override = Self::p2p_config_overrides(&app.manifest);
                 let cell_ids = app.all_enabled_cells();
                 self.clone()
-                    .create_cells_and_initialize(cell_ids, config_override)
+                    .create_cells_and_startup(cell_ids, config_override)
                     .await?;
             }
 
@@ -1719,7 +1719,7 @@ mod clone_cell_impls {
             let state = self.get_state().await?;
             let app = state.get_app(installed_app_id)?;
             let p2p_config_override = Self::p2p_config_overrides(&app.manifest);
-            self.create_cells_and_initialize(
+            self.create_cells_and_startup(
                 [clone_cell.cell_id.clone()].into_iter(),
                 p2p_config_override,
             )
@@ -1791,7 +1791,7 @@ mod clone_cell_impls {
             let app = state.get_app(installed_app_id)?;
             let p2p_config_override = Self::p2p_config_overrides(&app.manifest);
 
-            self.create_cells_and_initialize(
+            self.create_cells_and_startup(
                 [enabled_cell.cell_id.clone()].into_iter(),
                 p2p_config_override,
             )
@@ -1843,7 +1843,7 @@ mod app_status_impls {
 
     impl Conductor {
         /// Instantiate cells, add them to the conductor's state, then initialize them.
-        pub(crate) async fn create_cells_and_initialize(
+        pub(crate) async fn create_cells_and_startup(
             self: Arc<Self>,
             cell_ids: impl Iterator<Item = CellId>,
             config_override: Option<CellConfigOverrides>,
@@ -1993,7 +1993,7 @@ mod app_status_impls {
             // Determine cells to create
             let cell_ids_in_app = app.all_enabled_cells();
             self.clone()
-                .create_cells_and_initialize(cell_ids_in_app, config_override)
+                .create_cells_and_startup(cell_ids_in_app, config_override)
                 .await?;
 
             // Set app status to enabled in conductor state.
