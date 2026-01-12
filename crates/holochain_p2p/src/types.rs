@@ -37,7 +37,7 @@ pub enum HolochainP2pError {
 
     /// K2 Space Not Found
     ///
-    /// This error is returned when a p2p request tries to get a k2 space,
+    /// This error is returned when a p2p request tries to use a k2 space,
     /// but it does not exist.
     #[error("The K2 Space {0} does not exist")]
     K2SpaceNotFound(kitsune2_api::SpaceId),
