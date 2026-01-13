@@ -199,7 +199,7 @@ The _base address_ allows _DeleteLink_ actions to be grouped with _CreateLink_ a
 
 ### Entry Types
 
-Holochain defines four entry types that serve different purposes in the system. Entries represent the actual data content stored in a record.
+Holochain defines three entry types that serve different purposes in the system. Entries represent the actual data content stored in a record.
 
 #### Agent
 
@@ -237,7 +237,7 @@ When an agent creates a record on their source chain, that data is then made ava
 
 ### Op locations
 
-A location is computed for each `AgentPubKey`. That location is the agent's location on the network. Each agent stores some number of data locations, starting from their location, up to the maximum size of a location.
+A location is included in each `AgentPubKey`. That location is the agent's location on the network. Each agent stores some number of data locations, starting from their location, up to the maximum size of a location.
 
 | Op group | Op type | Authority | Location source |
 |----------|---------|-----------|-----------------|
@@ -278,7 +278,7 @@ Note that every action produces a:
 - _CreateRecord_ op meaning that every action is content addressable by its own action hash, and
 - _AgentActivity_, which means that every action is sent to the author's authorities.
 
-Each chain op contains the source action, and a signature of that action by its author. Note that the entry data is not signed, but entries are always referenced by their hash in an action so the signature of the action covers the entry data as long as the entry hash is checked.
+Each chain op contains the source action, and a signature of that action by its author. The _CreateRecord_, _UpdateRecord_, _CreateEntry_, and `_UpdateEntry_ op also contain entry data. Note that the entry data is not signed, but entries are always referenced by their hash in an action so the signature of the action covers the entry data as long as the entry hash is checked.
 
 Whether an entry is included in an op depends on the type of action, content of the action and the type of op. As described for _Action_s and _Record_s above, some _Action_s do not have an associated entry and entries may also be hidden. The _AgentActivity_ op never carries an entry, and neither do the _DeleteRecord_, _DeleteEntry_, _CreateLink_ or _DeleteLink_ op types.
 
