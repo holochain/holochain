@@ -28,8 +28,10 @@ pub async fn integrate_dht_ops_workflow(
     vault: DbWrite<DbKindDht>,
     trigger_receipt: TriggerSender,
     network: DynHolochainP2pDna,
-    authored_db_provider: Arc<dyn super::authored_db_provider::AuthoredDbProvider>,
-    publish_trigger_provider: Arc<dyn super::publish_trigger_provider::PublishTriggerProvider>,
+    authored_db_provider: Arc<dyn super::provider::authored_db_provider::AuthoredDbProvider>,
+    publish_trigger_provider: Arc<
+        dyn super::provider::publish_trigger_provider::PublishTriggerProvider,
+    >,
 ) -> WorkflowResult<WorkComplete> {
     let start = std::time::Instant::now();
     let time = holochain_zome_types::prelude::Timestamp::now();
@@ -88,8 +90,8 @@ pub async fn integrate_dht_ops_workflow(
                             }
                         }
                     }
-                    let author = action_author.or(warrant_author);
-                    Ok((stored_op, op_hash, author))
+
+                    Ok((stored_op, op_hash, action_author))
                 },
             )?;
             for integrated_op in integrated_ops {
@@ -149,8 +151,10 @@ pub async fn integrate_dht_ops_workflow(
 }
 
 async fn update_local_authored_status(
-    authored_db_provider: Arc<dyn super::authored_db_provider::AuthoredDbProvider>,
-    publish_trigger_provider: Arc<dyn super::publish_trigger_provider::PublishTriggerProvider>,
+    authored_db_provider: Arc<dyn super::provider::authored_db_provider::AuthoredDbProvider>,
+    publish_trigger_provider: Arc<
+        dyn super::provider::publish_trigger_provider::PublishTriggerProvider,
+    >,
     dna_hash: &DnaHash,
     when_integrated: Timestamp,
     integrated_pairs: Vec<(DhtOpHash, Option<AgentPubKey>)>,
@@ -192,7 +196,6 @@ async fn update_local_authored_status(
             "Marked integrated ops as authored"
         );
 
-        // Log availability of publish trigger for this author
         let cell_id = CellId::new(dna_hash.clone(), author.clone());
         if let Some(trigger) = publish_trigger_provider.get_publish_trigger(&cell_id).await {
             tracing::debug!(?cell_id, "Triggering publish for integrated authored ops");

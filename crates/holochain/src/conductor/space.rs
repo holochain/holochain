@@ -548,10 +548,7 @@ impl Space {
                 let db = tokio::task::block_in_place(|| {
                     DbWrite::open_with_pool_config(
                         self.root_db_dir.as_ref(),
-                        DbKindAuthored(Arc::new(CellId::new(
-                            (*self.dna_hash).clone(),
-                            author.clone(),
-                        ))),
+                        DbKindAuthored(Arc::new(CellId::new((*self.dna_hash).clone(), author))),
                         PoolConfig {
                             synchronous_level: DbSyncLevel::Normal,
                             key: self.db_key.clone(),

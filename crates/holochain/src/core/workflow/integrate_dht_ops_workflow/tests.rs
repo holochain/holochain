@@ -1,7 +1,7 @@
 use super::*;
 use crate::core::queue_consumer::TriggerSender;
-use crate::core::workflow::authored_db_provider::MockAuthoredDbProvider;
-use crate::core::workflow::publish_trigger_provider::MockPublishTriggerProvider;
+use crate::core::workflow::provider::authored_db_provider::MockAuthoredDbProvider;
+use crate::core::workflow::provider::publish_trigger_provider::MockPublishTriggerProvider;
 use ::fixt::prelude::*;
 use holo_hash::fixt::{AgentPubKeyFixturator, DnaHashFixturator};
 use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
@@ -19,7 +19,7 @@ use kitsune2_api::StoredOp;
 use must_future::MustBoxFuture;
 use rusqlite::{named_params, OptionalExtension};
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 #[derive(Clone)]
@@ -370,6 +370,7 @@ impl Db {
         .unwrap();
     }
 }
+
 async fn call_workflow(env: DbWrite<DbKindDht>, dna_hash: DnaHash) {
     let (qt, _rx) = TriggerSender::new();
 
@@ -894,48 +895,82 @@ async fn test_ops_state() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn publish_trigger_provider_is_called() {
-    let dna_hash = fixt!(DnaHash);
     holochain_trace::test_run();
+    let dna_hash = fixt!(DnaHash);
+    let author = fixt!(AgentPubKey);
+    let cell_id = CellId::new(dna_hash.clone(), author.clone());
 
-    // Setup
-    let env = test_dht_db().to_db();
+    // Create databases
+    let dht_env = test_dht_db_with_dna_hash(dna_hash.clone()).to_db();
+    let authored_db = Arc::new(test_authored_db_with_id(1));
+
+    // Create an op for the local author
+    let (_op, hashed) = make_store_entry_op(author.clone());
+
+    // Insert the op into the DHT database as validated and ready to integrate
+    insert_validated_op(&dht_env, &hashed).await;
+
+    // Also insert into the authored DB so we can mark it as integrated there
+    authored_db
+        .to_db()
+        .write_async({
+            let hashed = hashed.clone();
+            move |txn| -> DatabaseResult<()> {
+                mutations::insert_op_authored(txn, &hashed)
+                    .map_err(|e| DatabaseError::Other(e.into()))
+            }
+        })
+        .await
+        .unwrap();
+
+    // Set up the authored db provider mock to return our authored DB
+    let (authored_mock, _, _) = mock_authored_db_provider_with_db(
+        dna_hash.clone(),
+        vec![(author.clone(), Arc::clone(&authored_db))],
+    );
+
+    // Set up publish trigger provider that tracks whether it was called
+    let (publish_mock, trigger_count) = mock_publish_trigger_provider_with_triggers(vec![cell_id]);
+
+    // Set up network mock
     let (qt, _rx) = TriggerSender::new();
-
-    // Create mock network
     let mut hc_p2p = MockHolochainP2pDnaT::new();
     hc_p2p.expect_dna_hash().return_const(dna_hash.clone());
     hc_p2p
         .expect_new_integrated_data()
         .return_once(move |_| Ok(()));
-    let mock_network = hc_p2p;
+    let mock_network = Arc::new(hc_p2p);
 
-    // Track if publish trigger provider was called
-    let called = Arc::new(AtomicBool::new(false));
-    let called_clone = called.clone();
-
-    // Create mock publish trigger provider
-    let mut publish_provider = MockPublishTriggerProvider::new();
-    publish_provider
-        .expect_get_publish_trigger()
-        .returning(move |_cell_id| {
-            called_clone.store(true, Ordering::SeqCst);
-            MustBoxFuture::new(async { None })
-        });
-
-    // Run workflow - it should check for publish triggers even if no ops are integrated
+    // Run the workflow
     integrate_dht_ops_workflow(
-        env,
+        dht_env.clone(),
         qt,
-        Arc::new(mock_network),
-        mock_authored_db_provider_none(),
-        Arc::new(publish_provider),
+        mock_network,
+        authored_mock,
+        publish_mock,
     )
     .await
     .unwrap();
 
-    // The workflow doesn't actually need to call get_publish_trigger in this scenario
-    // since there are no local authored ops, but this shows the provider is wired up
-    // properly and can be extended in future tests
+    // Verify that the publish trigger provider was called for the local author
+    assert_eq!(
+        trigger_count.load(Ordering::SeqCst),
+        1,
+        "Publish trigger should be called once for the local author"
+    );
+
+    // Also verify the op was marked as integrated in both databases
+    let hash = hashed.as_hash().clone();
+    assert!(
+        dht_when_integrated(&dht_env, &hash).await.is_some(),
+        "Op should be marked as integrated in DHT database"
+    );
+    assert!(
+        authored_when_integrated(&authored_db, &hash)
+            .await
+            .is_some(),
+        "Op should be marked as integrated in authored database"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -1295,7 +1330,7 @@ fn mock_authored_db_provider_none() -> Arc<MockAuthoredDbProvider> {
 
 // Type alias to simplify the complex return type
 type MockProviderWithState = (
-    Arc<dyn super::super::authored_db_provider::AuthoredDbProvider>,
+    Arc<dyn super::provider::authored_db_provider::AuthoredDbProvider>,
     Arc<Mutex<HashMap<AgentPubKey, Arc<TestDb<DbKindAuthored>>>>>,
     Arc<AtomicUsize>,
 );
@@ -1405,7 +1440,7 @@ fn mock_publish_trigger_provider_none() -> Arc<MockPublishTriggerProvider> {
 fn mock_publish_trigger_provider_with_triggers(
     cells_with_triggers: Vec<CellId>,
 ) -> (
-    Arc<dyn super::super::publish_trigger_provider::PublishTriggerProvider>,
+    Arc<dyn super::provider::publish_trigger_provider::PublishTriggerProvider>,
     Arc<AtomicUsize>,
 ) {
     let mut mock = MockPublishTriggerProvider::new();

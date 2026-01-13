@@ -25,15 +25,14 @@ mod error;
 pub use error::*;
 
 pub mod app_validation_workflow;
-pub mod authored_db_provider;
 pub mod call_zome_workflow;
 pub mod countersigning_workflow;
 pub mod genesis_workflow;
 pub mod incoming_dht_ops_workflow;
 pub mod initialize_zomes_workflow;
 pub mod integrate_dht_ops_workflow;
+pub mod provider;
 pub mod publish_dht_ops_workflow;
-pub mod publish_trigger_provider;
 pub mod sys_validation_workflow;
 pub mod validation_receipt_workflow;
 pub mod witnessing_workflow;
