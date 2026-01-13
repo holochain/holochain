@@ -43,9 +43,7 @@ async fn warranted_agent_is_blocked() {
     let (bob_conductor, bob_cell) = conductors_and_cells.remove(0);
 
     // Let all agents sync.
-    await_consistency(15, [&alice_cell, &bob_cell])
-        .await
-        .unwrap();
+    await_consistency([&alice_cell, &bob_cell]).await.unwrap();
 
     // Alice creates an invalid action.
     let _: ActionHash = alice_conductor
@@ -56,9 +54,7 @@ async fn warranted_agent_is_blocked() {
         )
         .await;
 
-    await_consistency(15, [&alice_cell, &bob_cell])
-        .await
-        .unwrap();
+    await_consistency([&alice_cell, &bob_cell]).await.unwrap();
 
     // The warrant against Alice and the warrant op should have been written to Bob's authored database.
     retry_fn_until_timeout(
@@ -121,7 +117,7 @@ async fn warrant_is_gossiped() {
     let (_bob_conductor, bob_cell) = conductors_and_cells.remove(0);
     let (carol_conductor, carol_cell) = conductors_and_cells.remove(0);
 
-    await_consistency(15, [&alice_cell, &bob_cell, &carol_cell])
+    await_consistency([&alice_cell, &bob_cell, &carol_cell])
         .await
         .unwrap();
 
@@ -140,9 +136,7 @@ async fn warrant_is_gossiped() {
         )
         .await;
 
-    await_consistency(30, [&alice_cell, &bob_cell])
-        .await
-        .unwrap();
+    await_consistency([&alice_cell, &bob_cell]).await.unwrap();
 
     // Bob should have issued a warrant against Alice.
 
@@ -238,7 +232,7 @@ async fn author_of_invalid_warrant_is_blocked() {
         .await;
 
     // Wait for Alice and Bob to sync.
-    await_consistency(15, [&alice, &bob]).await.unwrap();
+    await_consistency([&alice, &bob]).await.unwrap();
 
     let alice_authored_db = conductors[0]
         .get_spaces()
@@ -288,7 +282,7 @@ async fn author_of_invalid_warrant_is_blocked() {
         });
 
     // Wait for Alice and Bob to sync so that Alice receives the warrant.
-    await_consistency(15, [&alice, &bob]).await.unwrap();
+    await_consistency([&alice, &bob]).await.unwrap();
 
     tokio::time::timeout(std::time::Duration::from_secs(30), async {
         loop {
@@ -368,9 +362,7 @@ mod zero_arc {
         let (bob_conductor, bob_cell) = conductors_and_cells.remove(0);
         let (carol_conductor, carol_cell) = conductors_and_cells.remove(0);
 
-        await_consistency(15, [&alice_cell, &bob_cell])
-            .await
-            .unwrap();
+        await_consistency([&alice_cell, &bob_cell]).await.unwrap();
         bob_conductor
             .holochain_p2p()
             .test_set_full_arcs(dna_hash.to_k2_space())
@@ -387,9 +379,7 @@ mod zero_arc {
             )
             .await;
 
-        await_consistency(15, [&alice_cell, &bob_cell])
-            .await
-            .unwrap();
+        await_consistency([&alice_cell, &bob_cell]).await.unwrap();
 
         // Bob should have issued a warrant against Alice.
 
@@ -433,9 +423,7 @@ mod zero_arc {
         let (bob_conductor, bob_cell) = conductors_and_cells.remove(0);
         let (carol_conductor, carol_cell) = conductors_and_cells.remove(0);
 
-        await_consistency(15, [&alice_cell, &bob_cell])
-            .await
-            .unwrap();
+        await_consistency([&alice_cell, &bob_cell]).await.unwrap();
 
         // Ensure that Carol knows about Bob's full arc.
         bob_conductor
@@ -454,9 +442,7 @@ mod zero_arc {
             )
             .await;
 
-        await_consistency(15, [&alice_cell, &bob_cell])
-            .await
-            .unwrap();
+        await_consistency([&alice_cell, &bob_cell]).await.unwrap();
 
         // Bob should have issued a warrant against Alice.
 
@@ -517,9 +503,7 @@ mod zero_arc {
         let (bob_conductor, bob_cell) = conductors_and_cells.remove(0);
         let (carol_conductor, carol_cell) = conductors_and_cells.remove(0);
 
-        await_consistency(15, [&alice_cell, &bob_cell])
-            .await
-            .unwrap();
+        await_consistency([&alice_cell, &bob_cell]).await.unwrap();
 
         // Ensure that Carol knows about Bob's full arc.
         bob_conductor
@@ -538,9 +522,7 @@ mod zero_arc {
             )
             .await;
 
-        await_consistency(20, [&alice_cell, &bob_cell])
-            .await
-            .unwrap();
+        await_consistency([&alice_cell, &bob_cell]).await.unwrap();
 
         // Bob should have issued a warrant against Alice.
 
