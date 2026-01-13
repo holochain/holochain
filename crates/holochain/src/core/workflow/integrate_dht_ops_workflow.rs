@@ -193,7 +193,7 @@ async fn update_local_authored_status(
             ?author,
             ?dna_hash,
             ops = ?op_hashes,
-            "Marked integrated ops as authored"
+            "Marked authored ops as integrated"
         );
 
         let cell_id = CellId::new(dna_hash.clone(), author.clone());

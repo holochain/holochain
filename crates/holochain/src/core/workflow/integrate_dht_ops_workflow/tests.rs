@@ -1006,7 +1006,6 @@ async fn inform_kitsune_about_integrated_ops() {
 
         let (tx, _rx) = TriggerSender::new();
         let dna_hash = fixt!(DnaHash);
-        let _dna_hash2 = dna_hash.clone();
         let mut hc_p2p = MockHolochainP2pDnaT::new();
         hc_p2p.expect_dna_hash().return_const(dna_hash.clone());
         hc_p2p
