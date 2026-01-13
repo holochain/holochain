@@ -15,7 +15,7 @@ pub struct JsonDump {
 
 #[derive(Serialize, Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct FullStateDump {
-    pub peer_dump: Option<P2pAgentsDump>,
+    pub peer_dump: P2pAgentsDump,
     pub source_chain_dump: SourceChainDump,
     pub integration_dump: FullIntegrationStateDump,
 }

@@ -81,6 +81,7 @@ mod tests {
     use holochain_conductor_api::conductor::ConductorConfig;
     use holochain_keystore::MetaLairClient;
     use holochain_state::prelude::SourceChainError;
+    use holochain_state::source_chain;
     use holochain_types::record::SignedActionHashedExt;
     use holochain_wasm_test_utils::TestWasm;
     use std::sync::atomic::Ordering::SeqCst;
@@ -371,12 +372,16 @@ mod tests {
             Err(ConductorApiError::ConductorError(ConductorError::CellMissing(id))) if id == *cell_id
         ));
 
-        let dump1 = conductors[1]
-            .dump_full_cell_state(cell_id, None)
-            .await
+        let authored_db = conductors[1]
+            .raw_handle()
+            .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())
             .unwrap();
+        let source_chain_dump =
+            source_chain::dump_state(authored_db.into(), cell_id.agent_pubkey().clone())
+                .await
+                .unwrap();
 
-        assert_eq!(dump1.source_chain_dump.records.len(), 3);
+        assert_eq!(source_chain_dump.records.len(), 3);
 
         let c1: SweetCell = conductors[1].get_sweet_cell(cell_id.clone()).unwrap();
         let c2: SweetCell = conductors[2].get_sweet_cell(cell_id.clone()).unwrap();
