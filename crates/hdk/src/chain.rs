@@ -30,10 +30,11 @@ pub fn get_agent_activity(
     agent: AgentPubKey,
     query: ChainQueryFilter,
     request: ActivityRequest,
+    options: GetOptions,
 ) -> ExternResult<AgentActivity> {
     HDK.with(|h| {
         h.borrow()
-            .get_agent_activity(GetAgentActivityInput::new(agent, query, request))
+            .get_agent_activity(GetAgentActivityInput::new(agent, query, request, options))
     })
 }
 
