@@ -128,6 +128,7 @@ mod test {
     use crate::prelude::*;
     use crate::test_utils::test_conductor_db;
     use ::fixt::fixt;
+    use holo_hash::fixt::DhtOpHashFixturator;
 
     // More complex setups.
     #[tokio::test(flavor = "multi_thread")]
@@ -445,7 +446,7 @@ mod test {
 
         let cell_id = fixt!(CellId);
         let target0 = BlockTarget::Cell(cell_id.clone(), CellBlockReason::BadCrypto);
-        let target1 = BlockTarget::Cell(cell_id, CellBlockReason::App(vec![1, 2, 3]));
+        let target1 = BlockTarget::Cell(cell_id, CellBlockReason::InvalidOp(fixt!(DhtOpHash)));
 
         let target00 = target0.clone();
         super::block(

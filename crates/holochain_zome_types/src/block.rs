@@ -16,9 +16,6 @@ use rusqlite::ToSql;
 /// Reason why we might want to block a cell.
 #[derive(Clone, serde::Serialize, serde::Deserialize, Debug, Eq, PartialEq)]
 pub enum CellBlockReason {
-    /// We don't know the reason but the happ does.
-    #[serde(with = "serde_bytes")]
-    App(Vec<u8>),
     /// Invalid validation result.
     InvalidOp(DhtOpHash),
     /// Some bad cryptography.
