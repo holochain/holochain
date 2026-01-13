@@ -1,6 +1,5 @@
 use holochain::sweettest::{await_consistency, SweetConductor, SweetConductorBatch, SweetDnaFile};
 use holochain_wasm_test_utils::TestWasm;
-use std::time::Duration;
 
 #[derive(Debug, PartialEq, Eq, serde::Deserialize)]
 pub struct BookEntry {
@@ -30,9 +29,7 @@ async fn agents_can_find_entries_at_paths() {
         .await;
     conductor_batch.exchange_peer_info().await;
 
-    await_consistency(Duration::from_secs(30), [&alice_cell, &bob_cell])
-        .await
-        .unwrap();
+    await_consistency([&alice_cell, &bob_cell]).await.unwrap();
 
     // There should be no books created yet.
     let books: Vec<BookEntry> = conductor_batch[0]
@@ -77,9 +74,7 @@ async fn agents_can_find_entries_at_paths() {
         }]
     );
 
-    await_consistency(Duration::from_secs(60), [&alice_cell, &bob_cell])
-        .await
-        .unwrap();
+    await_consistency([&alice_cell, &bob_cell]).await.unwrap();
 
     // After consistency, Bob should see Alice's entry.
     let books: Vec<BookEntry> = conductor_batch[1]
@@ -120,9 +115,7 @@ async fn agents_can_find_multiple_entries_at_same_path() {
         .await;
     conductor_batch.exchange_peer_info().await;
 
-    await_consistency(Duration::from_secs(30), [&alice_cell, &bob_cell])
-        .await
-        .unwrap();
+    await_consistency([&alice_cell, &bob_cell]).await.unwrap();
 
     // There should be no books created yet.
     let books: Vec<BookEntry> = conductor_batch[0]
@@ -185,9 +178,7 @@ async fn agents_can_find_multiple_entries_at_same_path() {
         name: "Strange Case of Dr Jekyll and Mr Hyde".to_string()
     }));
 
-    await_consistency(Duration::from_secs(60), [&alice_cell, &bob_cell])
-        .await
-        .unwrap();
+    await_consistency([&alice_cell, &bob_cell]).await.unwrap();
 
     // After consistency, both should see each other's entries.
     let books: Vec<BookEntry> = conductor_batch[0]
@@ -251,9 +242,7 @@ async fn agents_can_find_entries_with_partial_path() {
         .await;
     conductor_batch.exchange_peer_info().await;
 
-    await_consistency(Duration::from_secs(30), [&alice_cell, &bob_cell])
-        .await
-        .unwrap();
+    await_consistency([&alice_cell, &bob_cell]).await.unwrap();
 
     // There should be no books created yet.
     let books: Vec<BookEntry> = conductor_batch[0]
@@ -292,9 +281,7 @@ async fn agents_can_find_entries_with_partial_path() {
         )
         .await;
 
-    await_consistency(Duration::from_secs(60), [&alice_cell, &bob_cell])
-        .await
-        .unwrap();
+    await_consistency([&alice_cell, &bob_cell]).await.unwrap();
 
     // After consistency, both should see each other's entries.
     let books: Vec<BookEntry> = conductor_batch[0]
@@ -425,9 +412,7 @@ async fn paths_can_be_created_fully_or_with_path_sharding() {
         .await;
     conductor_batch.exchange_peer_info().await;
 
-    await_consistency(Duration::from_secs(30), [&alice_cell, &bob_cell])
-        .await
-        .unwrap();
+    await_consistency([&alice_cell, &bob_cell]).await.unwrap();
 
     // Alice adds a book entry.
     let () = conductor_batch[0]
@@ -438,9 +423,7 @@ async fn paths_can_be_created_fully_or_with_path_sharding() {
         )
         .await;
 
-    await_consistency(Duration::from_secs(60), [&alice_cell, &bob_cell])
-        .await
-        .unwrap();
+    await_consistency([&alice_cell, &bob_cell]).await.unwrap();
 
     // Can find book using path-sharding.
     let books: Vec<BookEntry> = conductor_batch[0]
