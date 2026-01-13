@@ -552,7 +552,7 @@ async fn multi_create_link_validation() {
         .call(&alice_zome, "create_post", post.clone())
         .await;
 
-    await_consistency(Duration::from_secs(20), [&alice, &bobbo])
+    await_consistency([&alice, &bobbo])
         .await
         .expect("Timed out waiting for consistency");
 
@@ -805,7 +805,7 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
         .call(&alice.zome("coordinator"), "create", ())
         .await;
 
-    await_consistency(30, [&alice, &bob]).await.unwrap();
+    await_consistency([&alice, &bob]).await.unwrap();
 
     {
         let vfs = validation_failures.lock();
@@ -1110,6 +1110,7 @@ async fn app_validation_produces_warrants() {
                 agent_pubkey,
                 chain_query_filter: Default::default(),
                 activity_request: ActivityRequest::Full,
+                get_options: GetOptions::default(),
             })?)
         });
 
@@ -1168,7 +1169,7 @@ async fn app_validation_produces_warrants() {
 
     conductors.exchange_peer_info().await;
 
-    await_consistency(15, [&alice, &bob, &carol]).await.unwrap();
+    await_consistency([&alice, &bob, &carol]).await.unwrap();
 
     conductors[2].shutdown().await;
 
@@ -1281,6 +1282,7 @@ async fn skip_issuing_warrant_if_one_found() {
                 agent_pubkey,
                 chain_query_filter: Default::default(),
                 activity_request: ActivityRequest::Full,
+                get_options: GetOptions::default(),
             })?)
         })
         .integrity_function("validate", move |_api, op: Op| {
