@@ -3,6 +3,7 @@ use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_cascade::CascadeImpl;
+use holochain_cascade::get_options_ext::GetOptionsExt;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
@@ -23,18 +24,22 @@ pub fn get_agent_activity(
                 agent_pubkey,
                 chain_query_filter,
                 activity_request,
+                get_options,
             } = input;
+            let network_req_options = get_options.to_network_options();
             let options = match activity_request {
                 ActivityRequest::Status => GetActivityOptions {
                     include_valid_activity: false,
                     include_rejected_activity: false,
-                    get_options: GetOptions::local(),
+                    get_options,
+                    network_req_options,
                     ..Default::default()
                 },
                 ActivityRequest::Full => GetActivityOptions {
                     include_valid_activity: true,
                     include_rejected_activity: true,
-                    get_options: GetOptions::local(),
+                    get_options,
+                    network_req_options,
                     ..Default::default()
                 },
             };

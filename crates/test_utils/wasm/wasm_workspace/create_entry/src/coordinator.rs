@@ -118,7 +118,7 @@ fn create_priv_msg(_: ()) -> ExternResult<ActionHash> {
 fn get_activity(
     input: holochain_test_wasm_common::AgentActivitySearch,
 ) -> ExternResult<AgentActivity> {
-    get_agent_activity(input.agent, input.query, input.request)
+    get_agent_activity(input.agent, input.query, input.request, GetOptions::default())
 }
 
 #[hdk_extern]

@@ -24,6 +24,7 @@
 #![warn(missing_docs)]
 
 use crate::error::CascadeError;
+use crate::get_options_ext::GetOptionsExt;
 use error::CascadeResult;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
@@ -61,6 +62,7 @@ pub mod authority;
 pub mod error;
 
 mod agent_activity;
+pub mod get_options_ext;
 mod metrics;
 
 #[cfg(feature = "test_utils")]
@@ -671,9 +673,17 @@ impl CascadeImpl {
             return Ok(Some(record));
         }
 
-        if options.strategy == GetStrategy::Network {
+        if options.strategy() == GetStrategy::Network {
             // If we are allowed to get the data from the network then try to retrieve the missing data.
-            self.get_latest_with_query(query, get_target, options).await
+            self.get_latest_with_query(
+                query,
+                get_target,
+                CascadeOptions {
+                    network_request_options: options.to_network_options(),
+                    get_options: options,
+                },
+            )
+            .await
         } else {
             // We're not allowed to get the data from the network, and it's not stored locally so
             // just return None.
@@ -692,7 +702,7 @@ impl CascadeImpl {
         O: Send + 'static,
     {
         // If we are allowed to get the data from the network then try to retrieve the latest data.
-        if options.strategy == GetStrategy::Network {
+        if options.get_options.strategy() == GetStrategy::Network {
             // If we are not in the process of authoring this hash or its
             // authority we need a network call.
             let authoring = self.am_i_authoring(&get_target)?;
@@ -766,11 +776,23 @@ impl CascadeImpl {
     ) -> CascadeResult<Option<Details>> {
         match hash.into_primitive() {
             AnyDhtHashPrimitive::Entry(hash) => Ok(self
-                .get_entry_details(hash, options)
+                .get_entry_details(
+                    hash,
+                    CascadeOptions {
+                        network_request_options: options.to_network_options(),
+                        get_options: options,
+                    },
+                )
                 .await?
                 .map(Details::Entry)),
             AnyDhtHashPrimitive::Action(hash) => Ok(self
-                .get_record_details(hash, options)
+                .get_record_details(
+                    hash,
+                    CascadeOptions {
+                        network_request_options: options.to_network_options(),
+                        get_options: options,
+                    },
+                )
                 .await?
                 .map(Details::Record)),
         }
@@ -786,7 +808,7 @@ impl CascadeImpl {
     ) -> CascadeResult<Vec<Link>> {
         // only fetch links from the network if I am not an authority and
         // GetStrategy is Network
-        if let GetStrategy::Network = options.get_options.strategy {
+        if let GetStrategy::Network = options.get_options.strategy() {
             let authority = self.am_i_an_authority(key.base.clone()).await?;
             if !authority {
                 match self.fetch_links(key.clone(), options).await {
@@ -826,7 +848,7 @@ impl CascadeImpl {
     ) -> CascadeResult<Vec<(SignedActionHashed, Vec<SignedActionHashed>)>> {
         // only fetch link details from network if i am not an authority and
         // GetStrategy is Network
-        if let GetStrategy::Network = options.get_options.strategy {
+        if let GetStrategy::Network = options.get_options.strategy() {
             let authority = self.am_i_an_authority(key.base.clone()).await?;
             if !authority {
                 match self.fetch_links(key.clone(), options).await {
@@ -998,7 +1020,7 @@ impl CascadeImpl {
         // regardless of authority status.
         let authority = self.am_i_an_authority(agent.clone().into()).await?;
 
-        let merged_response = if authority && options.get_options.strategy == GetStrategy::Local {
+        let merged_response = if authority && options.get_options.strategy() == GetStrategy::Local {
             match self.dht.clone() {
                 Some(vault) => {
                     authority::handle_get_agent_activity(

@@ -13,6 +13,13 @@ use holochain_integrity_types::ScopedEntryDefIndex;
 use holochain_integrity_types::ZomeIndex;
 use holochain_serialized_bytes::prelude::*;
 
+// Re-export GetStrategy from holochain_integrity_types for backward compatibility
+pub use holochain_integrity_types::get_strategy::GetStrategy;
+
+/// Maximum number of remote agents that can be queried in parallel.
+/// This limit prevents abuse and excessive network load.
+pub const MAX_REMOTE_AGENT_COUNT: u8 = 5;
+
 mod app_entry_bytes;
 pub use app_entry_bytes::*;
 pub use holochain_integrity_types::entry::*;
@@ -51,12 +58,64 @@ pub struct AppEntryDefLocation {
 /// Options for controlling how get is executed.
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub struct GetOptions {
-    /// Configure whether data should be fetched from the network or only from the local
-    /// databases.
-    pub strategy: GetStrategy,
+    /// Configure whether data should be fetched from the network or only from the local databases.
+    strategy: GetStrategy,
+
+    /// Number of remote agents to query in parallel.
+    ///
+    /// Only used when strategy is [`GetStrategy::Network`].
+    ///
+    /// `None` means use the conductor's default.
+    ///
+    /// A maximum of [`MAX_REMOTE_AGENT_COUNT`] is enforced for this value.
+    remote_agent_count: Option<u8>,
+
+    /// Timeout for network requests in milliseconds.
+    ///
+    /// Only used when strategy is [`GetStrategy::Network`].
+    ///
+    /// None means use conductor settings.
+    timeout_ms: Option<u64>,
+
+    /// Whether race mode is enabled.
+    ///
+    /// Performing a race means that multiple requests are made in parallel and the first result is used.
+    ///
+    /// Only used when strategy is [`GetStrategy::Network`] and the remote agent count is >= 2.
+    ///
+    /// Note: Setting this to false is not yet implemented.
+    ///
+    /// None means use the network's default (race).
+    as_race: Option<bool>,
 }
 
 impl GetOptions {
+    /// Get the strategy for this request.
+    pub fn strategy(&self) -> GetStrategy {
+        self.strategy
+    }
+
+    /// Get the number of remote agents to query.
+    pub fn remote_agent_count(&self) -> Option<u8> {
+        self.remote_agent_count
+    }
+
+    /// Get the timeout in milliseconds.
+    pub fn timeout_ms(&self) -> Option<u64> {
+        self.timeout_ms
+    }
+
+    /// Get whether to race or aggregate responses.
+    pub fn as_race(&self) -> Option<bool> {
+        self.as_race
+    }
+
+    /// Set the strategy while preserving other options.
+    pub fn with_strategy(mut self, strategy: GetStrategy) -> Self {
+        self.strategy = strategy;
+        self
+    }
+
     /// Fetch latest metadata from the network,
     /// and otherwise fall back to locally cached metadata.
     ///
@@ -65,14 +124,36 @@ impl GetOptions {
     pub fn network() -> Self {
         Self {
             strategy: GetStrategy::Network,
+            remote_agent_count: None,
+            timeout_ms: None,
+            as_race: None,
         }
     }
+
     /// Gets the action/entry and its metadata from local databases only.
     /// No network call is made.
     pub fn local() -> Self {
         Self {
             strategy: GetStrategy::Local,
+            remote_agent_count: None,
+            timeout_ms: None,
+            as_race: None,
         }
+    }
+
+    /// Set the number of remote agents to query.
+    ///
+    /// The count will be capped at [`MAX_REMOTE_AGENT_COUNT`] to prevent abuse
+    /// and excessive network load.
+    pub fn with_remote_agent_count(mut self, count: u8) -> Self {
+        self.remote_agent_count = Some(count.clamp(1, MAX_REMOTE_AGENT_COUNT));
+        self
+    }
+
+    /// Set the timeout for network requests in milliseconds.
+    pub fn with_timeout_ms(mut self, timeout: u64) -> Self {
+        self.timeout_ms = Some(timeout);
+        self
     }
 }
 
@@ -84,7 +165,12 @@ impl Default for GetOptions {
 
 impl From<GetStrategy> for GetOptions {
     fn from(strategy: GetStrategy) -> Self {
-        Self { strategy }
+        Self {
+            strategy,
+            remote_agent_count: None,
+            timeout_ms: None,
+            as_race: None,
+        }
     }
 }
 
@@ -276,9 +362,32 @@ mod tests {
     #[test]
     fn test_should_convert_get_strategy_to_get_options() {
         let get_options = GetOptions::from(GetStrategy::Network);
-        assert_eq!(get_options.strategy, GetStrategy::Network);
+        assert_eq!(get_options.strategy(), GetStrategy::Network);
 
         let get_options = GetOptions::from(GetStrategy::Local);
-        assert_eq!(get_options.strategy, GetStrategy::Local);
+        assert_eq!(get_options.strategy(), GetStrategy::Local);
+    }
+
+    #[test]
+    fn test_get_options_builder() {
+        let options = GetOptions::network()
+            .with_remote_agent_count(5)
+            .with_timeout_ms(2000);
+
+        assert_eq!(options.strategy(), GetStrategy::Network);
+        assert_eq!(options.remote_agent_count(), Some(5));
+        assert_eq!(options.timeout_ms(), Some(2000));
+        assert_eq!(options.as_race(), None);
+
+        // Test capping of remote_agent_count
+        let options = GetOptions::network().with_remote_agent_count(20);
+        assert_eq!(options.remote_agent_count(), Some(5)); // Capped at MAX_REMOTE_AGENT_COUNT
+
+        // Test that values at or below the max are preserved
+        let options = GetOptions::network().with_remote_agent_count(5);
+        assert_eq!(options.remote_agent_count(), Some(5));
+
+        let options = GetOptions::network().with_remote_agent_count(3);
+        assert_eq!(options.remote_agent_count(), Some(3));
     }
 }
