@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Reinstate tests that ensure publish and gossip doesn't contact blocked nodes.
 - Expanded `GetOptions` with network control fields (`remote_agent_count`, `timeout_ms`) to give developers finer-grained control over network requests. The cascade now respects these options when making network calls. #5422
 - **BREAKING CHANGE**: `GetOptions` fields are now private with getter methods. Code that accessed `options.strategy` directly must now use `options.strategy()`. #5422
 - **BREAKING CHANGE**: `get_agent_activity` function now requires a fourth parameter `GetOptions`. #5422
