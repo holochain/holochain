@@ -645,6 +645,7 @@ impl TestCase {
                     agent_pubkey,
                     chain_query_filter: Default::default(),
                     activity_request: ActivityRequest::Full,
+                    get_options: Default::default(),
                 })?)
             })
             .function(
