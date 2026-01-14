@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Delete deprecated block targets to block a node by its ID or a DNA of a node.
 - Remove unusable block variant `CellBlockReason::App`.
 - Reinstate tests that ensure publish and gossip doesn't contact blocked nodes.
 - Expanded `GetOptions` with network control fields (`remote_agent_count`, `timeout_ms`) to give developers finer-grained control over network requests. The cascade now respects these options when making network calls. #5422

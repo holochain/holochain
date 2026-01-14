@@ -198,70 +198,15 @@ impl Spaces {
         holochain_state::block::unblock(&self.conductor_db, input).await
     }
 
-    async fn node_agents_in_spaces(
-        &self,
-        node_id: &str,
-        dnas: Vec<DnaHash>,
-        holochain_p2p: DynHcP2p,
-    ) -> ConductorResult<Vec<CellId>> {
-        let mut agents = Vec::new();
-        for dna in dnas {
-            let dna_agents = holochain_p2p
-                .peer_store(dna)
-                .await?
-                .get_all()
-                .await
-                .map_err(ConductorError::other)?;
-
-            agents.extend(dna_agents);
-        }
-
-        Ok(agents
-            .into_iter()
-            .filter_map(|agent| {
-                let is_matching_node_id = agent
-                    .url
-                    .as_ref()
-                    .and_then(|url| url.peer_id())
-                    .map(|peer_id| peer_id == node_id)
-                    .unwrap_or_default();
-
-                if is_matching_node_id {
-                    Some(CellId::new(
-                        DnaHash::from_k2_space(&agent.space),
-                        AgentPubKey::from_k2_agent(&agent.agent),
-                    ))
-                } else {
-                    None
-                }
-            })
-            .collect())
-    }
-
     /// Check if some target is blocked.
     pub async fn is_blocked(
         &self,
         target_id: BlockTargetId,
         timestamp: Timestamp,
-        holochain_p2p: DynHcP2p,
+        _holochain_p2p: DynHcP2p,
     ) -> ConductorResult<bool> {
         let cell_ids = match &target_id {
             BlockTargetId::Cell(cell_id) => vec![cell_id.to_owned()],
-            #[allow(deprecated)]
-            BlockTargetId::NodeDna(node_id, dna_hash) => {
-                self.node_agents_in_spaces(node_id, vec![dna_hash.clone()], holochain_p2p)
-                    .await?
-            }
-            #[allow(deprecated)]
-            BlockTargetId::Node(node_id) => {
-                self.node_agents_in_spaces(
-                    node_id,
-                    self.map
-                        .share_ref(|m| m.keys().cloned().collect::<Vec<DnaHash>>()),
-                    holochain_p2p,
-                )
-                .await?
-            }
             // @todo
             BlockTargetId::Ip(_) => {
                 vec![]

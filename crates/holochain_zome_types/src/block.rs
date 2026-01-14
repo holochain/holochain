@@ -3,15 +3,13 @@
 
 use crate::prelude::*;
 use holo_hash::DhtOpHash;
-use holo_hash::DnaHash;
 use holochain_integrity_types::Timestamp;
 use holochain_timestamp::InclusiveTimestampInterval;
 #[cfg(feature = "rusqlite")]
-use rusqlite::types::FromSql;
-#[cfg(feature = "rusqlite")]
-use rusqlite::types::ToSqlOutput;
-#[cfg(feature = "rusqlite")]
-use rusqlite::ToSql;
+use rusqlite::{
+    types::{FromSql, ToSqlOutput},
+    ToSql,
+};
 
 /// Reason why we might want to block a cell.
 #[derive(Clone, serde::Serialize, serde::Deserialize, Debug, Eq, PartialEq)]
@@ -20,24 +18,6 @@ pub enum CellBlockReason {
     InvalidOp(DhtOpHash),
     /// Some bad cryptography.
     BadCrypto,
-}
-
-/// Reason why we might want to block a node.
-#[deprecated(since = "0.6.0")]
-#[derive(Clone, serde::Serialize, serde::Deserialize, Debug)]
-pub enum NodeBlockReason {
-    /// The node did some bad cryptography.
-    BadCrypto,
-    /// Dos attack.
-    DoS,
-}
-
-/// Reason for a Node/Space Block.
-#[deprecated(since = "0.6.0")]
-#[derive(Clone, serde::Serialize, serde::Deserialize, Debug, Eq, PartialEq, Hash)]
-pub enum NodeSpaceBlockReason {
-    /// Bad message encoding.
-    BadWire,
 }
 
 /// Reason why we might want to block an IP.
@@ -50,21 +30,12 @@ pub enum IpBlockReason {
 /// The type to use for identifying blocking ipv4 addresses.
 type IpV4 = std::net::Ipv4Addr;
 
-/// An ID to identify a Node by.
-#[deprecated(since = "0.6.0")]
-pub type NodeId = String;
-
 /// Target of a block.
 /// Each target type has an ID and associated reason.
 #[derive(Clone, Debug)]
 pub enum BlockTarget {
     /// Block an agent for a DNA, encoded in a cell ID.
     Cell(CellId, CellBlockReason),
-    #[deprecated(since = "0.6.0", note = "not respected, use cell instead")]
-    NodeDna(NodeId, DnaHash, NodeSpaceBlockReason),
-    /// Some node is playing silly buggers.
-    #[deprecated(since = "0.6.0", note = "not respected")]
-    Node(NodeId, NodeBlockReason),
     /// Currently not supported
     Ip(IpV4, IpBlockReason),
 }
@@ -74,10 +45,6 @@ pub enum BlockTarget {
 )]
 pub enum BlockTargetId {
     Cell(CellId),
-    #[deprecated(since = "0.6.0", note = "not respected, use cell instead")]
-    NodeDna(NodeId, DnaHash),
-    #[deprecated(since = "0.6.0", note = "not respected")]
-    Node(NodeId),
     Ip(IpV4),
 }
 
@@ -85,8 +52,6 @@ impl From<BlockTarget> for BlockTargetId {
     fn from(block_target: BlockTarget) -> Self {
         match block_target {
             BlockTarget::Cell(id, _) => Self::Cell(id),
-            BlockTarget::NodeDna(node_id, dna, _) => Self::NodeDna(node_id, dna),
-            BlockTarget::Node(id, _) => Self::Node(id),
             BlockTarget::Ip(id, _) => Self::Ip(id),
         }
     }
@@ -125,10 +90,6 @@ impl FromSql for BlockTargetId {
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub enum BlockTargetReason {
     Cell(CellBlockReason),
-    #[deprecated(since = "0.6.0", note = "not respected, use cell instead")]
-    NodeDna(NodeSpaceBlockReason),
-    #[deprecated(since = "0.6.0", note = "not respected")]
-    Node(NodeBlockReason),
     Ip(IpBlockReason),
 }
 
@@ -166,8 +127,6 @@ impl From<BlockTarget> for BlockTargetReason {
     fn from(block_target: BlockTarget) -> Self {
         match block_target {
             BlockTarget::Cell(_, reason) => BlockTargetReason::Cell(reason),
-            BlockTarget::NodeDna(_, _, reason) => BlockTargetReason::NodeDna(reason),
-            BlockTarget::Node(_, reason) => BlockTargetReason::Node(reason),
             BlockTarget::Ip(_, reason) => BlockTargetReason::Ip(reason),
         }
     }
