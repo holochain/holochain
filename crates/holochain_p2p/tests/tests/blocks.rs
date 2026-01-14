@@ -298,7 +298,7 @@ mod blocks_impl {
         // Second block should not error.
         actor
             .block(Block::new(
-                BlockTarget::Cell(cell_id, CellBlockReason::App(vec![])),
+                BlockTarget::Cell(cell_id, CellBlockReason::InvalidOp(fixt!(DhtOpHash))),
                 InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::max()).unwrap(),
             ))
             .await
