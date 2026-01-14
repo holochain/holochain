@@ -70,7 +70,7 @@ rustls = "0.23"
 workspace = true
 
 [features]
-default = ["transport-tx5-datachannel-vendored"]
+default = ["transport-iroh"]
 
 test_utils = [
   "holochain_zome_types/test_utils",
@@ -83,6 +83,12 @@ sqlite-encrypted = [
   "holochain_keystore/sqlite-encrypted",
 ]
 sqlite = ["holo_hash/sqlite", "holochain_keystore/sqlite"]
+
+transport-iroh = [
+  "kitsune2_transport_iroh",
+  "kitsune2/transport-iroh",
+  "kitsune2_bootstrap_srv/iroh-relay",
+]
 
 transport-tx5-datachannel-vendored = [
   "kitsune2_transport_tx5/datachannel-vendored",
@@ -100,12 +106,6 @@ transport-tx5-backend-go-pion = [
   "kitsune2_transport_tx5/backend-go-pion",
   "kitsune2/transport-tx5-backend-go-pion",
   "kitsune2_bootstrap_srv/sbd",
-]
-
-transport-iroh = [
-  "kitsune2_transport_iroh",
-  "kitsune2/transport-iroh",
-  "kitsune2_bootstrap_srv/iroh-relay",
 ]
 
 # Enables tracing instrumentation 

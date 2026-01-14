@@ -3,9 +3,9 @@
 # All default features of binaries excluding mutually exclusive features wasmer_sys & wasmer_wamr
 # and tx5 transport and iroh transport
 COMMON_DEFAULT_FEATURES=slow_tests,build_wasms,sqlite-encrypted
-DEFAULT_FEATURES=transport-tx5-datachannel-vendored,$(COMMON_DEFAULT_FEATURES)
-DEFAULT_FEATURES_TRANSPORT_IROH=transport-iroh,$(COMMON_DEFAULT_FEATURES)
-UNSTABLE_FEATURES_TRANSPORT_IROH=chc,unstable-sharding,unstable-warrants,unstable-functions,unstable-migration,$(DEFAULT_FEATURES_TRANSPORT_IROH)
+DEFAULT_FEATURES=transport-iroh,$(COMMON_DEFAULT_FEATURES)
+DEFAULT_FEATURES_TRANSPORT_TX5=transport-tx5-backend-go-pion,$(COMMON_DEFAULT_FEATURES)
+UNSTABLE_FEATURES=chc,unstable-sharding,unstable-warrants,unstable-functions,unstable-migration,$(DEFAULT_FEATURES)
 
 # mark everything as phony because it doesn't represent a file-system output
 .PHONY: default \
@@ -46,7 +46,7 @@ static-clippy:
 	CHK_SQL_FMT=1 cargo clippy --all-targets --features $(DEFAULT_FEATURES)
 
 static-clippy-unstable:
-	CHK_SQL_FMT=1 cargo clippy --all-targets --features $(UNSTABLE_FEATURES_TRANSPORT_IROH)
+	CHK_SQL_FMT=1 cargo clippy --all-targets --features $(UNSTABLE_FEATURES)
 
 # ensure we can build the docs
 static-doc:
@@ -65,21 +65,13 @@ build-workspace-wasmer_sys:
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_sys
 
-build-workspace-wasmer_sys-transport_iroh:
+build-workspace-wasmer_sys-unstable:
 	cargo build \
 		--workspace \
 		--locked \
 		--all-targets \
 		--no-default-features \
-		--features $(DEFAULT_FEATURES_TRANSPORT_IROH),wasmer_sys
-
-build-workspace-wasmer_sys-unstable-transport_iroh:
-	cargo build \
-		--workspace \
-		--locked \
-		--all-targets \
-		--no-default-features \
-		--features $(UNSTABLE_FEATURES_TRANSPORT_IROH),wasmer_sys
+		--features $(UNSTABLE_FEATURES),wasmer_sys
 
 build-workspace-wasmer_wamr:
 	cargo build \
@@ -87,9 +79,17 @@ build-workspace-wasmer_wamr:
 		--locked \
 		--all-targets \
 		--no-default-features \
-		--features $(DEFAULT_FEATURES_TRANSPORT_IROH),wasmer_wamr
+		--features $(DEFAULT_FEATURES),wasmer_wamr
 
-# execute tests on all crates with wasmer compiler and tx5 transport
+build-workspace-wasmer_sys-transport_tx5:
+	cargo build \
+		--workspace \
+		--locked \
+		--all-targets \
+		--no-default-features \
+		--features $(DEFAULT_FEATURES_TRANSPORT_TX5),wasmer_sys
+
+# execute tests on all crates with wasmer compiler and iroh transport
 test-workspace-wasmer_sys:
 	RUST_BACKTRACE=1 cargo nextest run \
 		--workspace \
@@ -97,21 +97,13 @@ test-workspace-wasmer_sys:
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_sys
 
-# execute tests on all crates with wasmer compiler and iroh transport
-test-workspace-wasmer_sys-transport_iroh:
-	RUST_BACKTRACE=1 cargo nextest run \
-		--workspace \
-		--locked \
-		--no-default-features \
-		--features $(DEFAULT_FEATURES_TRANSPORT_IROH),wasmer_sys
-
 # executes tests on all crates with wasmer compiler
 test-workspace-wasmer_sys-unstable-transport_iroh:
 	RUST_BACKTRACE=1 cargo nextest run \
 		--workspace \
 		--locked \
 		--no-default-features \
-		--features $(UNSTABLE_FEATURES_TRANSPORT_IROH),wasmer_sys
+		--features $(UNSTABLE_FEATURES),wasmer_sys
 
 # execute tests on all crates with wasmer interpreter
 test-workspace-wasmer_wamr:
@@ -119,7 +111,15 @@ test-workspace-wasmer_wamr:
 		--workspace \
 		--locked \
 		--no-default-features \
-		--features $(DEFAULT_FEATURES_TRANSPORT_IROH),wasmer_wamr
+		--features $(DEFAULT_FEATURES),wasmer_wamr
+
+# execute tests on all crates with wasmer compiler and tx5 transport
+test-workspace-wasmer_sys-transport_tx5:
+	RUST_BACKTRACE=1 cargo nextest run \
+		--workspace \
+		--locked \
+		--no-default-features \
+		--features $(DEFAULT_FEATURES_TRANSPORT_TX5),wasmer_sys
 
 clean:
 	cargo clean

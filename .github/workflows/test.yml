@@ -60,15 +60,15 @@ jobs:
           - os: ubuntu-latest
             target: wasmer_sys
           - os: ubuntu-latest
-            target: wasmer_sys-unstable-transport_iroh
+            target: wasmer_sys-unstable
           - os: ubuntu-latest
-            target: wasmer_sys-transport_iroh
+            target: wasmer_sys-transport_tx5
           - os: macos-latest
-            target: wasmer_sys-transport_iroh
+            target: wasmer_sys
           - os: macos-15-intel
-            target: wasmer_sys-transport_iroh
+            target: wasmer_sys
           - os: depot-windows-2022-8
-            target: wasmer_sys-transport_iroh
+            target: wasmer_sys
     steps:
       - name: checkout
         uses: actions/checkout@v5
