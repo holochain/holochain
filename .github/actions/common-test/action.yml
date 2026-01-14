@@ -18,13 +18,13 @@ runs:
         cmake-version: "3.31.x"
 
     - name: llvm & clang
-      if: inputs.os == 'depot-windows-2022-8'
+      if: inputs.os == 'depot-windows-2025-8'
       uses: KyleMayes/install-llvm-action@v2.0.8
       with:
         version: "21"
 
-    - name: build (depot-windows-2022-8)
-      if: inputs.os == 'depot-windows-2022-8'
+    - name: build (depot-windows-2025-8)
+      if: inputs.os == 'depot-windows-2025-8'
       shell: pwsh
       run: |-
         vcpkg install libsodium
@@ -33,7 +33,7 @@ runs:
         make build-workspace-${{ inputs.target }}
 
     - name: build
-      if: inputs.os != 'depot-windows-2022-8'
+      if: inputs.os != 'depot-windows-2025-8'
       shell: bash
       run: |
         make build-workspace-${{ inputs.target }}
@@ -43,8 +43,8 @@ runs:
       with:
         tool: cargo-nextest@0.9.96
 
-    - name: test (depot-windows-2022-8)
-      if: inputs.os == 'depot-windows-2022-8'
+    - name: test (depot-windows-2025-8)
+      if: inputs.os == 'depot-windows-2025-8'
       id: test-windows
       continue-on-error: true
       shell: pwsh
@@ -53,7 +53,7 @@ runs:
         make test-workspace-${{ inputs.target }}
 
     - name: test
-      if: inputs.os != 'depot-windows-2022-8'
+      if: inputs.os != 'depot-windows-2025-8'
       id: test-unix
       continue-on-error: true
       shell: bash
