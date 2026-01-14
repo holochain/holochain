@@ -1,8 +1,3 @@
-# Scheduled action to update:
-# - flake inputs of ./versions/
-# - rust-overlay flake input
-# - nixpkgs flake input
-
 name: "trigger source updates"
 on:
   schedule:
@@ -31,8 +26,6 @@ jobs:
           - name: ${{ github.ref_name }}
             skip: true
         update:
-          # - source: "versions/weekly"
-          #   cmd: "nix run .#scripts-repo-flake-update weekly"
           - source: "crates-io"
             cmd: "nix develop .#coreDev --command scripts-cargo-update"
 
