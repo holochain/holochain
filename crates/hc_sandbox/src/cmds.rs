@@ -83,11 +83,7 @@ pub enum NetworkType {
     /// A transport that uses the local memory transport protocol.
     Mem,
     /// A transport that uses the WebRTC protocol.
-    #[cfg(any(
-        feature = "transport-tx5-datachannel-vendored",
-        feature = "transport-tx5-backend-libdatachannel",
-        feature = "transport-tx5-backend-go-pion",
-    ))]
+    #[cfg(feature = "transport-tx5-backend-go-pion")]
     #[command(name = "webrtc")]
     WebRTC {
         /// URL to a Holochain WebRTC signaling server.
@@ -246,11 +242,7 @@ impl Network {
 
         match transport {
             NetworkType::Mem => (),
-            #[cfg(any(
-                feature = "transport-tx5-datachannel-vendored",
-                feature = "transport-tx5-backend-libdatachannel",
-                feature = "transport-tx5-backend-go-pion",
-            ))]
+            #[cfg(feature = "transport-tx5-backend-go-pion")]
             NetworkType::WebRTC {
                 signal_url,
                 webrtc_config,

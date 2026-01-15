@@ -893,11 +893,7 @@ impl HolochainP2pActor {
 
         #[cfg(feature = "test_utils")]
         {
-            #[cfg(any(
-                feature = "transport-tx5-datachannel-vendored",
-                feature = "transport-tx5-backend-libdatachannel",
-                feature = "transport-tx5-backend-go-pion",
-            ))]
+            #[cfg(feature = "transport-tx5-backend-go-pion")]
             builder
                 .config
                 .set_module_config(&kitsune2_transport_tx5::Tx5TransportModConfig {
@@ -987,11 +983,7 @@ impl HolochainP2pActor {
         }
 
         // get `tx5_transport` from config
-        #[cfg(any(
-            feature = "transport-tx5-datachannel-vendored",
-            feature = "transport-tx5-backend-libdatachannel",
-            feature = "transport-tx5-backend-go-pion",
-        ))]
+        #[cfg(feature = "transport-tx5-backend-go-pion")]
         if let Ok(tx5_transport_config) =
             serde_json::from_value::<kitsune2_transport_tx5::Tx5TransportModConfig>(value)
         {
@@ -1286,11 +1278,7 @@ impl HolochainP2pActor {
             config.set_module_config(&core_bootstrap_config)?;
             override_needed = true;
         }
-        #[cfg(any(
-            feature = "transport-tx5-backend-libdatachannel",
-            feature = "transport-tx5-backend-go-pion",
-            feature = "transport-tx5-datachannel-vendored"
-        ))]
+        #[cfg(feature = "transport-tx5-backend-go-pion")]
         if let Some(signal_url) = space_overrides.signal_url.as_ref() {
             // get current tx5 transport config and override server_url
             let mut tx5_transport_config: kitsune2_transport_tx5::Tx5TransportModConfig =
@@ -2331,11 +2319,7 @@ impl actor::HcP2p for HolochainP2pActor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(any(
-        feature = "transport-tx5-backend-libdatachannel",
-        feature = "transport-tx5-backend-go-pion",
-        feature = "transport-tx5-datachannel-vendored"
-    ))]
+    #[cfg(feature = "transport-tx5-backend-go-pion")]
     use crate::actor::HcP2p;
 
     #[tokio::test(flavor = "multi_thread")]
@@ -2387,11 +2371,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[cfg(any(
-        feature = "transport-tx5-backend-libdatachannel",
-        feature = "transport-tx5-backend-go-pion",
-        feature = "transport-tx5-datachannel-vendored"
-    ))]
+    #[cfg(feature = "transport-tx5-backend-go-pion")]
     async fn should_set_kitsune2_config() {
         let actor = test_p2p_actor().await;
 
@@ -2428,11 +2408,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[cfg(any(
-        feature = "transport-tx5-backend-libdatachannel",
-        feature = "transport-tx5-backend-go-pion",
-        feature = "transport-tx5-datachannel-vendored"
-    ))]
+    #[cfg(feature = "transport-tx5-backend-go-pion")]
     async fn should_get_no_overrides_for_space_if_default() {
         let actor = test_p2p_actor().await;
         let actor_p2p: Arc<HolochainP2pActor> =
@@ -2447,11 +2423,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[cfg(any(
-        feature = "transport-tx5-backend-libdatachannel",
-        feature = "transport-tx5-backend-go-pion",
-        feature = "transport-tx5-datachannel-vendored"
-    ))]
+    #[cfg(feature = "transport-tx5-backend-go-pion")]
     async fn should_get_overrides_for_space_if_provided() {
         let actor = test_p2p_actor().await;
         let actor_p2p: Arc<HolochainP2pActor> =
@@ -2484,11 +2456,7 @@ mod tests {
         );
     }
 
-    #[cfg(any(
-        feature = "transport-tx5-backend-libdatachannel",
-        feature = "transport-tx5-backend-go-pion",
-        feature = "transport-tx5-datachannel-vendored"
-    ))]
+    #[cfg(feature = "transport-tx5-backend-go-pion")]
     async fn test_p2p_actor() -> Arc<dyn HcP2p> {
         use kitsune2_core::factories::{CoreBootstrapConfig, CoreBootstrapModConfig};
 

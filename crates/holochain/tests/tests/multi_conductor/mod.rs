@@ -22,11 +22,7 @@ async fn test_publish() {
 
     let config = ConductorConfig {
         network: NetworkConfig {
-            #[cfg(any(
-                feature = "transport-tx5-datachannel-vendored",
-                feature = "transport-tx5-backend-libdatachannel",
-                feature = "transport-tx5-backend-go-pion",
-            ))]
+            #[cfg(feature = "transport-tx5-backend-go-pion")]
             webrtc_config: Some(serde_json::json!({
                 // It's really hard to test this since it just goes straight
                 // to the webrtc implementation internals, so just adding

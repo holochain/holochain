@@ -57,20 +57,14 @@ nix = { version = "0.30", features = ["process", "signal"] }
 workspace = true
 
 [features]
-default = ["wasmer_sys", "transport-tx5-datachannel-vendored"]
+default = ["wasmer_sys", "transport-iroh"]
 
 wasmer_sys = ["holochain_client/wasmer_sys"]
 wasmer_wamr = ["holochain_client/wasmer_wamr"]
 
-transport-tx5-datachannel-vendored = [
-  "holochain_client/transport-tx5-datachannel-vendored",
-]
-transport-tx5-backend-libdatachannel = [
-  "holochain_client/transport-tx5-backend-libdatachannel",
-]
+transport-iroh = ["holochain_client/transport-iroh"]
 transport-tx5-backend-go-pion = [
   "holochain_client/transport-tx5-backend-go-pion",
 ]
-transport-iroh = ["holochain_client/transport-iroh"]
 
 chc = ["holochain_conductor_api/chc", "holochain_conductor_config/chc"]
