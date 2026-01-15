@@ -201,7 +201,7 @@ async fn update_local_authored_status(
             tracing::debug!(?cell_id, "Triggering publish for integrated authored ops");
             trigger.trigger(&"integrate_dht_ops_workflow: authored ops marked as integrated");
         } else {
-            tracing::trace!(?cell_id, "No publish trigger for this cell");
+            tracing::error!(?cell_id, "No publish trigger for this cell");
         }
     }
 
