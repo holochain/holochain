@@ -17,12 +17,7 @@ pub type DynSweetRendezvous = Arc<dyn SweetRendezvous>;
 /// Local rendezvous infrastructure for unit testing.
 pub struct SweetLocalRendezvous {
     bs_addr: String,
-    #[cfg(any(
-        feature = "transport-tx5-datachannel-vendored",
-        feature = "transport-tx5-backend-libdatachannel",
-        feature = "transport-tx5-backend-go-pion",
-        feature = "transport-iroh"
-    ))]
+    #[cfg(any(feature = "transport-tx5-backend-go-pion", feature = "transport-iroh"))]
     sig_addr: String,
     bootstrap_hnd: Mutex<Option<kitsune2_bootstrap_srv::BootstrapSrv>>,
     bootstrap_addr: SocketAddr,
@@ -48,11 +43,7 @@ async fn spawn_test_bootstrap(
     let _ = rustls::crypto::ring::default_provider().install_default();
 
     let mut config = kitsune2_bootstrap_srv::Config::testing();
-    #[cfg(any(
-        feature = "transport-tx5-datachannel-vendored",
-        feature = "transport-tx5-backend-libdatachannel",
-        feature = "transport-tx5-backend-go-pion"
-    ))]
+    #[cfg(feature = "transport-tx5-backend-go-pion")]
     {
         config.sbd.limit_clients = 100;
         config.sbd.disable_rate_limiting = true;
@@ -90,19 +81,11 @@ impl SweetLocalRendezvous {
 
         Arc::new(Self {
             bs_addr: format!("http://{bootstrap_addr}"),
-            #[cfg(any(
-                feature = "transport-tx5-datachannel-vendored",
-                feature = "transport-tx5-backend-libdatachannel",
-                feature = "transport-tx5-backend-go-pion"
-            ))]
+            #[cfg(feature = "transport-tx5-backend-go-pion")]
             sig_addr: format!("ws://{bootstrap_addr}"),
             #[cfg(all(
                 feature = "transport-iroh",
-                not(any(
-                    feature = "transport-tx5-datachannel-vendored",
-                    feature = "transport-tx5-backend-libdatachannel",
-                    feature = "transport-tx5-backend-go-pion"
-                ))
+                not(feature = "transport-tx5-backend-go-pion")
             ))]
             sig_addr: format!("http://{bootstrap_addr}"),
             bootstrap_hnd,

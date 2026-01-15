@@ -620,11 +620,7 @@ async fn generate_sandbox_with_roles_settings_override() {
 /// Generates a new sandbox, setting the webrtc signaling server URL via
 /// the webrtc argument and verifies that conductor config file has
 /// been written correctly.
-#[cfg(any(
-    feature = "transport-tx5-datachannel-vendored",
-    feature = "transport-tx5-backend-libdatachannel",
-    feature = "transport-tx5-backend-go-pion",
-))]
+#[cfg(feature = "transport-tx5-backend-go-pion")]
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_with_tx5_network_type() {
     use serde_json::json;
@@ -746,18 +742,10 @@ async fn generate_sandbox_with_target_arc_factor_override() {
 
     #[cfg(all(
         feature = "transport-iroh",
-        not(any(
-            feature = "transport-tx5-datachannel-vendored",
-            feature = "transport-tx5-backend-libdatachannel",
-            feature = "transport-tx5-backend-go-pion"
-        ))
+        not(feature = "transport-tx5-backend-go-pion")
     ))]
     let (network_type, relay_url) = ("quic", "https://iroh-relay");
-    #[cfg(any(
-        feature = "transport-tx5-datachannel-vendored",
-        feature = "transport-tx5-backend-libdatachannel",
-        feature = "transport-tx5-backend-go-pion",
-    ))]
+    #[cfg(feature = "transport-tx5-backend-go-pion")]
     let (network_type, relay_url) = ("webrtc", "wss://signal");
 
     holochain_trace::test_run();

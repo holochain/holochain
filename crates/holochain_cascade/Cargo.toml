@@ -46,7 +46,7 @@ test-case = "3.3"
 workspace = true
 
 [features]
-default = ["transport-tx5-datachannel-vendored"]
+default = ["transport-iroh"]
 
 test_utils = [
   "mockall",
@@ -73,14 +73,6 @@ sqlite = [
   "holochain_zome_types/sqlite",
 ]
 
-transport-tx5-datachannel-vendored = [
-  "holochain_p2p/transport-tx5-datachannel-vendored",
-]
-
-transport-tx5-backend-libdatachannel = [
-  "holochain_p2p/transport-tx5-backend-libdatachannel",
-]
+transport-iroh = ["holochain_p2p/transport-iroh"]
 
 transport-tx5-backend-go-pion = ["holochain_p2p/transport-tx5-backend-go-pion"]
-
-transport-iroh = ["holochain_p2p/transport-iroh"]

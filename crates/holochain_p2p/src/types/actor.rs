@@ -6,7 +6,7 @@ use holochain_types::prelude::ValidationReceiptBundle;
 use holochain_types::{
     activity::AgentActivityResponse, cell_config_overrides::CellConfigOverrides,
 };
-use kitsune2_api::{DhtArc, SpaceId, StoredOp};
+use kitsune2_api::{SpaceId, StoredOp};
 use std::any::Any;
 use std::collections::HashMap;
 

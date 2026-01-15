@@ -181,7 +181,7 @@ default = [
   "metrics_influxive",
   "schema",
   "wasmer_sys",
-  "transport-tx5-datachannel-vendored",
+  "transport-iroh",
 ]
 
 # Use the "Influxive" opentelemetry metrics binding to write metrics
@@ -260,24 +260,14 @@ sqlite = [
   "holochain_zome_types/sqlite",
 ]
 
-transport-tx5-datachannel-vendored = [
-  "holochain_p2p/transport-tx5-datachannel-vendored",
-  "holochain_cascade/transport-tx5-datachannel-vendored",
-]
-
-transport-tx5-backend-libdatachannel = [
-  "holochain_p2p/transport-tx5-backend-libdatachannel",
-  "holochain_cascade/transport-tx5-backend-libdatachannel",
+transport-iroh = [
+  "holochain_p2p/transport-iroh",
+  "holochain_cascade/transport-iroh",
 ]
 
 transport-tx5-backend-go-pion = [
   "holochain_p2p/transport-tx5-backend-go-pion",
   "holochain_cascade/transport-tx5-backend-go-pion",
-]
-
-transport-iroh = [
-  "holochain_p2p/transport-iroh",
-  "holochain_cascade/transport-iroh",
 ]
 
 # Extremely verbose wasm memory read/write logging

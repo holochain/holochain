@@ -1221,11 +1221,7 @@ async fn spawn_test(
                 let conductor_db = conductor_db.clone();
                 Box::pin(async move { conductor_db })
             }),
-            #[cfg(any(
-                feature = "transport-tx5-datachannel-vendored",
-                feature = "transport-tx5-backend-libdatachannel",
-                feature = "transport-tx5-backend-go-pion"
-            ))]
+            #[cfg(feature = "transport-tx5-backend-go-pion")]
             network_config: Some(serde_json::json!({
                 "coreBootstrap": {
                     "serverUrl": format!("http://{bootstrap_addr}"),
@@ -1239,11 +1235,7 @@ async fn spawn_test(
             })),
             #[cfg(all(
                 feature = "transport-iroh",
-                not(any(
-                    feature = "transport-tx5-datachannel-vendored",
-                    feature = "transport-tx5-backend-libdatachannel",
-                    feature = "transport-tx5-backend-go-pion"
-                ))
+                not(feature = "transport-tx5-backend-go-pion")
             ))]
             network_config: Some(serde_json::json!({
                 "coreBootstrap": {
