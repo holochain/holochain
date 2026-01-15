@@ -1011,7 +1011,11 @@ impl HolochainP2pActor {
                         let db_getter = db_getter.clone();
                         let kitsune2 = kitsune2.clone();
                         async move {
-                            let space = kitsune2.clone().space(space_id.clone(), None).await?;
+                            let Some(space) = kitsune2.clone().space_if_exists(space_id.clone()).await else {
+                                tracing::warn!("Cannot prune expired URLs from peer meta store for k2 space that does not exist with space id {space_id}");
+                                return Ok::<_, HolochainP2pError>(());
+                            };
+
                             let peer_store = space.peer_store().clone();
                             let db = db_getter(DnaHash::from_k2_space(&space_id)).await?;
                             // Prune any expired entries.
@@ -1255,8 +1259,9 @@ impl HolochainP2pActor {
         ops: Vec<StoredOp>,
     ) -> HolochainP2pResult<()> {
         self.kitsune
-            .space(space_id, None)
-            .await?
+            .space_if_exists(space_id.clone())
+            .await
+            .ok_or(HolochainP2pError::K2SpaceNotFound(space_id))?
             .inform_ops_stored(ops)
             .await
             .map_err(HolochainP2pError::K2Error)
@@ -1372,10 +1377,12 @@ impl actor::HcP2p for HolochainP2pActor {
 
     fn peer_store(&self, dna_hash: DnaHash) -> BoxFut<'_, HolochainP2pResult<DynPeerStore>> {
         Box::pin(async move {
+            let space_id = dna_hash.to_k2_space();
             Ok(self
                 .kitsune
-                .space(dna_hash.to_k2_space(), None)
-                .await?
+                .space_if_exists(space_id.clone())
+                .await
+                .ok_or(HolochainP2pError::K2SpaceNotFound(space_id))?
                 .peer_store()
                 .clone())
         })
@@ -1414,6 +1421,11 @@ impl actor::HcP2p for HolochainP2pActor {
                 Some(overrides) => self.space_config_override(overrides)?,
                 None => None,
             };
+
+            // Create k2 space with config override.
+            //
+            // This is the only time the space is created,
+            // all other calls to get a space should use `space_if_exists`.
             let space = self
                 .kitsune
                 .space(dna_hash.to_k2_space(), config_override)
@@ -1438,21 +1450,23 @@ impl actor::HcP2p for HolochainP2pActor {
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
             let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id.clone(), None).await?;
+            if let Some(space) = self.kitsune.space_if_exists(space_id.clone()).await {
+                space.local_agent_leave(agent_pub_key.to_k2_agent()).await;
 
-            space.local_agent_leave(agent_pub_key.to_k2_agent()).await;
-
-            // If there are no more local agents in this space, then the space can be removed.
-            if space
-                .local_agent_store()
-                .get_all()
-                .await
-                .is_ok_and(|agents| agents.is_empty())
-            {
-                drop(space);
-                if let Err(err) = self.kitsune.remove_space(space_id).await {
-                    tracing::warn!(?err, "Failed to remove space after last agent left");
+                // If there are no more local agents in this space, then the space can be removed.
+                if space
+                    .local_agent_store()
+                    .get_all()
+                    .await
+                    .is_ok_and(|agents| agents.is_empty())
+                {
+                    drop(space);
+                    if let Err(err) = self.kitsune.remove_space(space_id).await {
+                        tracing::warn!(?err, "Failed to remove space after last agent left");
+                    }
                 }
+            } else {
+                tracing::warn!("Cannot leave space that does not exist with space id {space_id}.");
             }
 
             Ok(())
@@ -1476,7 +1490,11 @@ impl actor::HcP2p for HolochainP2pActor {
     ) -> BoxFut<'_, HolochainP2pResult<SerializedBytes>> {
         Box::pin(async move {
             let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id.clone(), None).await?;
+            let space = self
+                .kitsune
+                .space_if_exists(space_id.clone())
+                .await
+                .ok_or(HolochainP2pError::K2SpaceNotFound(space_id))?;
 
             let byte_count = zome_call_params_serialized.0.len();
 
@@ -1523,7 +1541,11 @@ impl actor::HcP2p for HolochainP2pActor {
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
             let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id.clone(), None).await?;
+            let space = self
+                .kitsune
+                .space_if_exists(space_id.clone())
+                .await
+                .ok_or(HolochainP2pError::K2SpaceNotFound(space_id.clone()))?;
 
             let byte_count: usize = target_payload_list.iter().map(|(_, p, _)| p.0.len()).sum();
 
@@ -1593,9 +1615,13 @@ impl actor::HcP2p for HolochainP2pActor {
                     .await?;
             }
 
-            let space = dna_hash.to_k2_space();
+            let space_id = dna_hash.to_k2_space();
 
-            let space = self.kitsune.space(space, None).await?;
+            let space = self
+                .kitsune
+                .space_if_exists(space_id.clone())
+                .await
+                .ok_or(HolochainP2pError::K2SpaceNotFound(space_id))?;
 
             // -- actually publish the op hashes -- //
 
@@ -1640,7 +1666,11 @@ impl actor::HcP2p for HolochainP2pActor {
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
             let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id.clone(), None).await?;
+            let space = self
+                .kitsune
+                .space_if_exists(space_id.clone())
+                .await
+                .ok_or(HolochainP2pError::K2SpaceNotFound(space_id))?;
 
             let peers = self
                 .get_peers_for_location(&space, basis_hash.get_loc())
@@ -1691,7 +1721,12 @@ impl actor::HcP2p for HolochainP2pActor {
     ) -> BoxFut<'_, HolochainP2pResult<Vec<WireOps>>> {
         Box::pin(async move {
             let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id.clone(), None).await?;
+            let space = self
+                .kitsune
+                .space_if_exists(space_id.clone())
+                .await
+                .ok_or(HolochainP2pError::K2SpaceNotFound(space_id.clone()))?;
+
             let loc = dht_hash.get_loc();
             let agents = self
                 .get_random_peers_for_location("get", &space, loc, &options)
@@ -1765,7 +1800,11 @@ impl actor::HcP2p for HolochainP2pActor {
     ) -> BoxFut<'_, HolochainP2pResult<Vec<WireLinkOps>>> {
         Box::pin(async move {
             let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id.clone(), None).await?;
+            let space = self
+                .kitsune
+                .space_if_exists(space_id.clone())
+                .await
+                .ok_or(HolochainP2pError::K2SpaceNotFound(space_id))?;
             let loc = link_key.base.get_loc();
             let agents = self
                 .get_random_peers_for_location(
@@ -1827,7 +1866,11 @@ impl actor::HcP2p for HolochainP2pActor {
     ) -> BoxFut<'_, HolochainP2pResult<CountLinksResponse>> {
         Box::pin(async move {
             let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id.clone(), None).await?;
+            let space = self
+                .kitsune
+                .space_if_exists(space_id.clone())
+                .await
+                .ok_or(HolochainP2pError::K2SpaceNotFound(space_id))?;
             let loc = query.base.get_loc();
             let agents = self
                 .get_random_peers_for_location("count_links", &space, loc, &options)
@@ -1879,7 +1922,11 @@ impl actor::HcP2p for HolochainP2pActor {
     ) -> BoxFut<'_, HolochainP2pResult<Vec<AgentActivityResponse>>> {
         Box::pin(async move {
             let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id.clone(), None).await?;
+            let space = self
+                .kitsune
+                .space_if_exists(space_id.clone())
+                .await
+                .ok_or(HolochainP2pError::K2SpaceNotFound(space_id))?;
             let loc = agent.get_loc();
             let agents = self
                 .get_random_peers_for_location(
@@ -1953,7 +2000,11 @@ impl actor::HcP2p for HolochainP2pActor {
     ) -> BoxFut<'_, HolochainP2pResult<Vec<MustGetAgentActivityResponse>>> {
         Box::pin(async move {
             let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id.clone(), None).await?;
+            let space = self
+                .kitsune
+                .space_if_exists(space_id.clone())
+                .await
+                .ok_or(HolochainP2pError::K2SpaceNotFound(space_id))?;
             let loc = author.get_loc();
             let agents = self
                 .get_random_peers_for_location("must_get_agent_activity", &space, loc, &options)
@@ -2009,7 +2060,11 @@ impl actor::HcP2p for HolochainP2pActor {
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
             let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id.clone(), None).await?;
+            let space = self
+                .kitsune
+                .space_if_exists(space_id.clone())
+                .await
+                .ok_or(HolochainP2pError::K2SpaceNotFound(space_id))?;
 
             let agent_id = to_agent.to_k2_agent();
 
@@ -2071,7 +2126,11 @@ impl actor::HcP2p for HolochainP2pActor {
         Box::pin(async move {
             let loc = basis.get_loc();
             let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id.clone(), None).await?;
+            let space = self
+                .kitsune
+                .space_if_exists(space_id.clone())
+                .await
+                .ok_or(HolochainP2pError::K2SpaceNotFound(space_id))?;
 
             for agent in space.local_agent_store().get_all().await? {
                 if agent.get_cur_storage_arc().contains(loc) {
@@ -2091,7 +2150,11 @@ impl actor::HcP2p for HolochainP2pActor {
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
             let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id.clone(), None).await?;
+            let space = self
+                .kitsune
+                .space_if_exists(space_id.clone())
+                .await
+                .ok_or(HolochainP2pError::K2SpaceNotFound(space_id.clone()))?;
 
             let mut peer_urls = Vec::with_capacity(agents.len());
             for agent in agents {
@@ -2181,7 +2244,13 @@ impl actor::HcP2p for HolochainP2pActor {
                     let all_space_ids = self.kitsune.list_spaces();
                     let mut spaces = Vec::with_capacity(all_space_ids.len());
                     for space_id in all_space_ids {
-                        spaces.push((space_id.clone(), self.kitsune.space(space_id, None).await?));
+                        let Some(space) = self.kitsune.space_if_exists(space_id.clone()).await
+                        else {
+                            tracing::debug!("Cannot dump network metrics for space that does not exist with space id {space_id}.");
+                            continue;
+                        };
+
+                        spaces.push((space_id.clone(), space));
                     }
 
                     spaces
@@ -2238,7 +2307,11 @@ impl actor::HcP2p for HolochainP2pActor {
     ) -> BoxFut<'_, HolochainP2pResult<Vec<kitsune2_api::DhtArc>>> {
         Box::pin(async move {
             let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id, None).await?;
+            let space = self
+                .kitsune
+                .space_if_exists(space_id.clone())
+                .await
+                .ok_or(HolochainP2pError::K2SpaceNotFound(space_id))?;
 
             Ok(space
                 .local_agent_store()

@@ -35,6 +35,13 @@ pub enum HolochainP2pError {
     #[error("{0}: No peers available for DHT location: {1}")]
     NoPeersForLocation(String, u32),
 
+    /// K2 Space Not Found
+    ///
+    /// This error is returned when a p2p request tries to use a k2 space,
+    /// but it does not exist.
+    #[error("The K2 Space {0} does not exist")]
+    K2SpaceNotFound(kitsune2_api::SpaceId),
+
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),

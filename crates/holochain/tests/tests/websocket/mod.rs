@@ -499,7 +499,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     let response = client.request(request).await.unwrap();
     assert_matches!(response, AdminResponse::AppsListed(_));
 
-    conductor_handle.shutdown();
+    conductor_handle.shutdown().await.unwrap().unwrap();
 
     Ok(())
 }
@@ -576,7 +576,7 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
 
     info!("client connect");
 
-    conductor_handle.shutdown();
+    conductor_handle.clone().shutdown().await.unwrap().unwrap();
 
     info!("shutdown");
 
@@ -688,7 +688,7 @@ async fn connection_limit_is_respected() {
         handles.push((sender, rx));
     }
 
-    conductor_handle.shutdown();
+    conductor_handle.shutdown().await.unwrap().unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]
