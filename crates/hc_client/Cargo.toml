@@ -62,12 +62,6 @@ wasmer_wamr = ["holochain_client/wasmer_wamr", "holochain?/wasmer_wamr"]
 
 transport-iroh = ["holochain?/transport-iroh"]
 transport-tx5-backend-go-pion = ["holochain?/transport-tx5-backend-go-pion"]
-transport-tx5-datachannel-vendored = [
-  "holochain?/transport-tx5-datachannel-vendored",
-]
-transport-tx5-backend-libdatachannel = [
-  "holochain?/transport-tx5-backend-libdatachannel",
-]
 
 [lints]
 workspace = true

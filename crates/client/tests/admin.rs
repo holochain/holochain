@@ -171,14 +171,6 @@ async fn dump_network_stats() {
 
     let network_stats = admin_ws.dump_network_stats().await.unwrap();
 
-    #[cfg(any(
-        feature = "transport-tx5-datachannel-vendored",
-        feature = "transport-tx5-backend-libdatachannel"
-    ))]
-    assert_eq!(
-        "BackendLibDataChannel",
-        network_stats.transport_stats.backend
-    );
     #[cfg(feature = "transport-tx5-backend-go-pion")]
     assert_eq!("BackendGoPion", network_stats.transport_stats.backend);
     #[cfg(feature = "transport-iroh")]

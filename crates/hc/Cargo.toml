@@ -50,15 +50,8 @@ wasmer_wamr = [
 ]
 
 transport-iroh = ["holochain_cli_sandbox/transport-iroh"]
-transport-tx5-datachannel-vendored = [
-  "holochain_cli_sandbox/transport-tx5-datachannel-vendored",
-]
-transport-tx5-backend-libdatachannel = [
-  "holochain_cli_sandbox/transport-tx5-backend-libdatachannel",
-]
 transport-tx5-backend-go-pion = [
   "holochain_cli_sandbox/transport-tx5-backend-go-pion",
 ]
-
 
 chc = ["holochain_cli_sandbox/chc"]

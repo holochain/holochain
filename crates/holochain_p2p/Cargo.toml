@@ -90,24 +90,12 @@ transport-iroh = [
   "kitsune2_bootstrap_srv/iroh-relay",
 ]
 
-transport-tx5-datachannel-vendored = [
-  "kitsune2_transport_tx5/datachannel-vendored",
-  "kitsune2/transport-tx5-datachannel-vendored",
-  "kitsune2_bootstrap_srv/sbd",
-]
-
-transport-tx5-backend-libdatachannel = [
-  "kitsune2_transport_tx5/backend-libdatachannel",
-  "kitsune2/transport-tx5-backend-libdatachannel",
-  "kitsune2_bootstrap_srv/sbd",
-]
-
 transport-tx5-backend-go-pion = [
   "kitsune2_transport_tx5/backend-go-pion",
   "kitsune2/transport-tx5-backend-go-pion",
   "kitsune2_bootstrap_srv/sbd",
 ]
 
-# Enables tracing instrumentation 
+# Enables tracing instrumentation
 # (we experience segfaults in some tests if there is too much instrumentation)
 instrument = []

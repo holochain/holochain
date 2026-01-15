@@ -269,16 +269,6 @@ transport-iroh = [
   "holochain_cascade/transport-iroh",
 ]
 
-transport-tx5-datachannel-vendored = [
-  "holochain_p2p/transport-tx5-datachannel-vendored",
-  "holochain_cascade/transport-tx5-datachannel-vendored",
-]
-
-transport-tx5-backend-libdatachannel = [
-  "holochain_p2p/transport-tx5-backend-libdatachannel",
-  "holochain_cascade/transport-tx5-backend-libdatachannel",
-]
-
 transport-tx5-backend-go-pion = [
   "holochain_p2p/transport-tx5-backend-go-pion",
   "holochain_cascade/transport-tx5-backend-go-pion",
