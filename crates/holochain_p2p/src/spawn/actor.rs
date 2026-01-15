@@ -2,7 +2,8 @@
 
 use crate::actor::{GetLinksRequestOptions, NetworkRequestOptions};
 use crate::metrics::{
-    create_p2p_handle_incoming_request_duration_metric, create_p2p_outgoing_request_duration_metric,
+    create_p2p_handle_incoming_request_duration_metric,
+    create_p2p_handle_incoming_request_ignored_metric, create_p2p_outgoing_request_duration_metric,
 };
 use crate::*;
 use holochain_sqlite::error::{DatabaseError, DatabaseResult};
@@ -247,6 +248,7 @@ pub(crate) struct HolochainP2pActor {
     pending: Arc<Mutex<Pending>>,
     outgoing_request_duration_metric: metrics::P2pRequestDurationMetric,
     incoming_request_duration_metric: metrics::P2pRequestDurationMetric,
+    incoming_request_ignored_metric: metrics::P2pRequestIgnoredMetric,
     pruning_task_abort_handle: AbortHandle,
     request_timeout: Duration,
     incoming_request_concurrency_limit_semaphore: Arc<Semaphore>,
@@ -287,10 +289,7 @@ impl SpaceHandler for HolochainP2pActor {
                     // Record opentelemetry metric that request was ignored.
                     let dna_hash = DnaHash::from_k2_space(&space);
                     let attributes = vec![
-                        opentelemetry_api::KeyValue::new(
-                            "message_type",
-                            msg.as_ref().to_string(),
-                        ),
+                        opentelemetry_api::KeyValue::new("message_type", msg.as_ref().to_string()),
                         opentelemetry_api::KeyValue::new("dna_hash", format!("{dna_hash:?}")),
                     ];
                     self.incoming_request_ignored_metric.add(1, &attributes);
@@ -635,6 +634,7 @@ impl HolochainP2pActor {
             kitsune2_config,
             outgoing_request_duration_metric: create_p2p_outgoing_request_duration_metric(),
             incoming_request_duration_metric: create_p2p_handle_incoming_request_duration_metric(),
+            incoming_request_ignored_metric: create_p2p_handle_incoming_request_ignored_metric(),
             pruning_task_abort_handle,
             request_timeout: config.request_timeout,
             incoming_request_concurrency_limit_semaphore: Arc::new(Semaphore::new(
@@ -991,10 +991,10 @@ impl HolochainP2pActor {
         tokio::task::spawn(async move {
             use crate::event::HcP2pHandler;
             use crate::wire::WireMessage::*;
-            
+
             // Ensure permit is dropped when this thread is dropped.
             let _permit = permit;
-            
+
             let start = std::time::Instant::now();
             let dna_hash = DnaHash::from_k2_space(&space_id);
             let dna_hash_cloned = dna_hash.clone();
@@ -1024,7 +1024,7 @@ impl HolochainP2pActor {
                     if let Some(resp) = pending.lock().unwrap().respond(msg_id) {
                         let _ = resp.send(msg);
                     }
-                    record_metric("response".into(), &[]);
+                    record_metric(&[]);
                 }
                 CallRemoteReq {
                     msg_id,
@@ -1060,13 +1060,10 @@ impl HolochainP2pActor {
                     } else {
                         tracing::debug!("HolochainP2pActor has been dropped");
                     }
-                    record_metric(
-                        "call_remote".into(),
-                        &[opentelemetry_api::KeyValue::new(
-                            "to_agent",
-                            format!("{to_agent:?}"),
-                        )],
-                    );
+                    record_metric(&[opentelemetry_api::KeyValue::new(
+                        "to_agent",
+                        format!("{to_agent:?}"),
+                    )]);
                 }
                 GetReq {
                     msg_id,
@@ -1095,13 +1092,10 @@ impl HolochainP2pActor {
                     {
                         tracing::debug!(?err, "Error sending get response");
                     }
-                    record_metric(
-                        "get".into(),
-                        &[opentelemetry_api::KeyValue::new(
-                            "to_agent",
-                            format!("{to_agent:?}"),
-                        )],
-                    );
+                    record_metric(&[opentelemetry_api::KeyValue::new(
+                        "to_agent",
+                        format!("{to_agent:?}"),
+                    )]);
                 }
                 GetLinksReq {
                     msg_id,
@@ -1131,13 +1125,10 @@ impl HolochainP2pActor {
                     {
                         tracing::debug!(?err, "Error sending get_links response");
                     }
-                    record_metric(
-                        "get_links".into(),
-                        &[opentelemetry_api::KeyValue::new(
-                            "to_agent",
-                            format!("{to_agent:?}"),
-                        )],
-                    );
+                    record_metric(&[opentelemetry_api::KeyValue::new(
+                        "to_agent",
+                        format!("{to_agent:?}"),
+                    )]);
                 }
                 CountLinksReq {
                     msg_id,
@@ -1166,13 +1157,10 @@ impl HolochainP2pActor {
                     {
                         tracing::debug!(?err, "Error sending count_links response");
                     }
-                    record_metric(
-                        "count_links".into(),
-                        &[opentelemetry_api::KeyValue::new(
-                            "to_agent",
-                            format!("{to_agent:?}"),
-                        )],
-                    );
+                    record_metric(&[opentelemetry_api::KeyValue::new(
+                        "to_agent",
+                        format!("{to_agent:?}"),
+                    )]);
                 }
                 GetAgentActivityReq {
                     msg_id,
@@ -1209,13 +1197,10 @@ impl HolochainP2pActor {
                     {
                         tracing::debug!(?err, "Error sending get_agent_activity response");
                     }
-                    record_metric(
-                        "get_agent_activity".into(),
-                        &[
-                            opentelemetry_api::KeyValue::new("to_agent", format!("{to_agent:?}")),
-                            opentelemetry_api::KeyValue::new("agent", format!("{agent:?}")),
-                        ],
-                    );
+                    record_metric(&[
+                        opentelemetry_api::KeyValue::new("to_agent", format!("{to_agent:?}")),
+                        opentelemetry_api::KeyValue::new("agent", format!("{agent:?}")),
+                    ]);
                 }
                 MustGetAgentActivityReq {
                     msg_id,
@@ -1250,13 +1235,10 @@ impl HolochainP2pActor {
                     {
                         tracing::debug!(?err, "Error sending must_get_agent_activity response");
                     }
-                    record_metric(
-                        "must_get_agent_activity".into(),
-                        &[
-                            opentelemetry_api::KeyValue::new("to_agent", format!("{to_agent:?}")),
-                            opentelemetry_api::KeyValue::new("agent", format!("{agent:?}")),
-                        ],
-                    );
+                    record_metric(&[
+                        opentelemetry_api::KeyValue::new("to_agent", format!("{to_agent:?}")),
+                        opentelemetry_api::KeyValue::new("agent", format!("{agent:?}")),
+                    ]);
                 }
                 SendValidationReceiptsReq {
                     msg_id,
@@ -1285,13 +1267,10 @@ impl HolochainP2pActor {
                     {
                         tracing::debug!(?err, "Error sending send_validation_receipts response");
                     }
-                    record_metric(
-                        "send_validation_receipts".into(),
-                        &[opentelemetry_api::KeyValue::new(
-                            "to_agent",
-                            format!("{to_agent:?}"),
-                        )],
-                    );
+                    record_metric(&[opentelemetry_api::KeyValue::new(
+                        "to_agent",
+                        format!("{to_agent:?}"),
+                    )]);
                 }
                 RemoteSignalEvt {
                     to_agent,
@@ -1310,13 +1289,10 @@ impl HolochainP2pActor {
                             signature,
                         )
                         .await;
-                    record_metric(
-                        "remote_signal".into(),
-                        &[opentelemetry_api::KeyValue::new(
-                            "to_agent",
-                            format!("{to_agent:?}"),
-                        )],
-                    );
+                    record_metric(&[opentelemetry_api::KeyValue::new(
+                        "to_agent",
+                        format!("{to_agent:?}"),
+                    )]);
                 }
                 PublishCountersignEvt { op } => {
                     evt_sender
@@ -1324,7 +1300,7 @@ impl HolochainP2pActor {
                         .ok_or_else(|| HolochainP2pError::other(EVT_REG_ERR))?
                         .handle_publish_countersign(dna_hash, op)
                         .await?;
-                    record_metric("publish_counter_sign".into(), &[]);
+                    record_metric(&[]);
                 }
                 CountersigningSessionNegotiationEvt { to_agent, message } => {
                     evt_sender
@@ -1336,13 +1312,10 @@ impl HolochainP2pActor {
                             message,
                         )
                         .await?;
-                    record_metric(
-                        "countersigning_session_negotiation".into(),
-                        &[opentelemetry_api::KeyValue::new(
-                            "to_agent",
-                            format!("{to_agent:?}"),
-                        )],
-                    );
+                    record_metric(&[opentelemetry_api::KeyValue::new(
+                        "to_agent",
+                        format!("{to_agent:?}"),
+                    )]);
                 }
             }
 
