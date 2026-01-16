@@ -40,7 +40,6 @@ async fn trigger_integration_workflow_after_creating_ops() {
         args,
         _conductor,
     } = TestCase::new(hc_p2p, "create", ()).await;
-    let (trigger_publish_dht_ops, _) = TriggerSender::new();
     let (trigger_validate_dht_ops, mut validate_dht_ops_rx) = TriggerSender::new();
     let (trigger_integrate_dht_ops, mut integrate_dht_ops_rx) = TriggerSender::new();
     let (trigger_countersigning, _) = TriggerSender::new();
@@ -50,7 +49,6 @@ async fn trigger_integration_workflow_after_creating_ops() {
         network,
         keystore,
         args,
-        trigger_publish_dht_ops,
         trigger_validate_dht_ops,
         trigger_integrate_dht_ops,
         trigger_countersigning,
@@ -82,7 +80,6 @@ async fn validation_and_integration_workflow_are_not_triggered_when_no_data_and_
         _conductor,
         // Zome call to get action that does not exist.
     } = TestCase::new(hc_p2p, "reed", fixt!(ActionHash)).await;
-    let (trigger_publish_dht_ops, _) = TriggerSender::new();
     let (trigger_validate_dht_ops, mut validate_dht_ops_rx) = TriggerSender::new();
     let (trigger_integrate_dht_ops, mut integrate_dht_ops_rx) = TriggerSender::new();
     let (trigger_countersigning, _) = TriggerSender::new();
@@ -92,7 +89,6 @@ async fn validation_and_integration_workflow_are_not_triggered_when_no_data_and_
         network,
         keystore,
         args,
-        trigger_publish_dht_ops,
         trigger_validate_dht_ops,
         trigger_integrate_dht_ops,
         trigger_countersigning,
@@ -119,7 +115,6 @@ async fn validation_workflow_triggered_after_inserting_warrants_and_actions() {
         args,
         _conductor,
     } = TestCase::new(hc_p2p, "create", ()).await;
-    let (trigger_publish_dht_ops, _) = TriggerSender::new();
     let (trigger_validate_dht_ops, mut validate_dht_ops_rx) = TriggerSender::new();
     let (trigger_integrate_dht_ops, mut integrate_dht_ops_rx) = TriggerSender::new();
     let (trigger_countersigning, _) = TriggerSender::new();
@@ -138,7 +133,6 @@ async fn validation_workflow_triggered_after_inserting_warrants_and_actions() {
         network,
         keystore,
         args,
-        trigger_publish_dht_ops,
         trigger_validate_dht_ops,
         trigger_integrate_dht_ops,
         trigger_countersigning,
@@ -168,7 +162,6 @@ async fn trigger_validation_workflow_after_only_inserting_warrants() {
         args,
         _conductor,
     } = TestCase::new(hc_p2p, "reed", fixt!(ActionHash)).await;
-    let (trigger_publish_dht_ops, _) = TriggerSender::new();
     let (trigger_validate_dht_ops, mut validate_dht_ops_rx) = TriggerSender::new();
     let (trigger_integrate_dht_ops, mut integrate_dht_ops_rx) = TriggerSender::new();
     let (trigger_countersigning, _) = TriggerSender::new();
@@ -188,7 +181,6 @@ async fn trigger_validation_workflow_after_only_inserting_warrants() {
         network,
         keystore,
         args,
-        trigger_publish_dht_ops,
         trigger_validate_dht_ops,
         trigger_integrate_dht_ops,
         trigger_countersigning,

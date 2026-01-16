@@ -358,6 +358,18 @@ impl Spaces {
         self.get_or_create_space_ref(dna_hash, |space| space.get_all_authored_dbs())
     }
 
+    /// Get the authored database for this author if it already exists.
+    pub fn get_authored_db_if_present(
+        &self,
+        dna_hash: &DnaHash,
+        author: &AgentPubKey,
+    ) -> DatabaseResult<Option<DbWrite<DbKindAuthored>>> {
+        match self.map.share_ref(|spaces| spaces.get(dna_hash).cloned()) {
+            Some(space) => space.get_authored_db_if_present(author),
+            None => Ok(None),
+        }
+    }
+
     /// Get the dht database (this will create the space if it doesn't already exist).
     pub fn dht_db(&self, dna_hash: &DnaHash) -> DatabaseResult<DbWrite<DbKindDht>> {
         self.get_or_create_space_ref(dna_hash, |space| space.dht_db.clone())
@@ -548,6 +560,14 @@ impl Space {
                 Ok(db)
             }
         }
+    }
+
+    /// Get the authored database for an agent if it exists.
+    pub fn get_authored_db_if_present(
+        &self,
+        author: &AgentPubKey,
+    ) -> DatabaseResult<Option<DbWrite<DbKindAuthored>>> {
+        Ok(self.authored_dbs.lock().get(author).cloned())
     }
 
     /// Gets authored databases for this space, for every author.

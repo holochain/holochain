@@ -13,6 +13,7 @@ use crate::conductor::cell::error::CellResult;
 use crate::core::queue_consumer::spawn_queue_consumer_tasks;
 use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::core::queue_consumer::QueueTriggers;
+use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::ZomeCallInvocation;
@@ -49,7 +50,6 @@ use tracing::*;
 use tracing_futures::Instrument;
 #[cfg(feature = "unstable-countersigning")]
 use {
-    crate::core::queue_consumer::TriggerSender,
     crate::core::workflow::countersigning_workflow::countersigning_success,
     crate::core::workflow::witnessing_workflow::receive_incoming_countersigning_ops,
 };
@@ -766,7 +766,6 @@ impl Cell {
             Arc::new(self.holochain_p2p_cell.clone()),
             keystore,
             args,
-            self.queue_triggers.publish_dht_ops.clone(),
             self.queue_triggers.sys_validation.clone(),
             self.queue_triggers.integrate_dht_ops.clone(),
             self.queue_triggers.countersigning.clone(),
@@ -893,6 +892,10 @@ impl Cell {
     #[cfg(any(test, feature = "test_utils"))]
     pub(crate) fn triggers(&self) -> &QueueTriggers {
         &self.queue_triggers
+    }
+
+    pub(crate) fn publish_dht_ops_trigger(&self) -> TriggerSender {
+        self.queue_triggers.publish_dht_ops.clone()
     }
 }
 

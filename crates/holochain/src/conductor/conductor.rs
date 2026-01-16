@@ -2770,6 +2770,17 @@ mod accessor_impls {
             self.spaces.get_or_create_authored_db(dna_hash, author)
         }
 
+        pub(crate) fn get_authored_db_if_present(
+            &self,
+            dna_hash: &DnaHash,
+            author: &AgentPubKey,
+        ) -> DatabaseResult<Option<DbWrite<DbKindAuthored>>> {
+            match self.spaces.get_authored_db_if_present(dna_hash, author)? {
+                Some(db) => Ok(Some(db.clone())),
+                None => Ok(None),
+            }
+        }
+
         pub(crate) fn get_or_create_dht_db(
             &self,
             dna_hash: &DnaHash,
