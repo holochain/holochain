@@ -10,6 +10,8 @@ use crate::conductor::{
     ConductorBuilder,
 };
 use crate::retry_until_timeout;
+#[cfg(feature = "transport-iroh")]
+use crate::test_utils::retry_fn_until_timeout;
 use ::fixt::prelude::StdRng;
 use hdk::prelude::*;
 use holochain_conductor_api::{
@@ -139,7 +141,7 @@ impl SweetConductor {
         C: Into<SweetConductorConfig>,
         R: Into<DynSweetRendezvous> + Clone,
     {
-        Self::create_with_defaults_and_metrics(config, keystore, rendezvous, false, false).await
+        Self::create_with_defaults_and_metrics(config, keystore, rendezvous, false).await
     }
 
     /// Create a SweetConductor with a new set of TestEnvs from the given config
@@ -149,7 +151,6 @@ impl SweetConductor {
         keystore: Option<MetaLairClient>,
         rendezvous: Option<R>,
         with_metrics: bool,
-        test_builder_uses_production_k2_builder: bool,
     ) -> SweetConductor
     where
         C: Into<SweetConductorConfig>,
@@ -211,13 +212,7 @@ impl SweetConductor {
 
         let keystore = keystore.unwrap_or_else(holochain_keystore::test_keystore);
 
-        let handle = Self::handle_from_existing(
-            keystore,
-            &config,
-            &[],
-            test_builder_uses_production_k2_builder,
-        )
-        .await;
+        let handle = Self::handle_from_existing(keystore, &config, &[]).await;
 
         tracing::info!("Starting with config: {:?}", config);
 
@@ -253,7 +248,6 @@ impl SweetConductor {
         keystore: MetaLairClient,
         config: &ConductorConfig,
         extra_dna_files: &[(CellId, DnaFile)],
-        test_builder_uses_production_k2_builder: bool,
     ) -> ConductorHandle {
         NUM_CREATED.fetch_add(1, Ordering::SeqCst);
 
@@ -261,7 +255,6 @@ impl SweetConductor {
             .config(config.clone())
             .with_keystore(keystore)
             .no_print_setup()
-            .test_builder_uses_production_k2_builder(test_builder_uses_production_k2_builder)
             .test(extra_dna_files)
             .await
             .unwrap()
@@ -370,6 +363,54 @@ impl SweetConductor {
         Ok(agent)
     }
 
+    /// Install an app with a given manifest
+    ///
+    /// Similar to [`Self::install_app`], but accepts an [`AppManifest`] to enable
+    /// manifest-driven configuration overrides (e.g., bootstrap_url, signal_url).
+    /// Use this when you need per-app network configuration that differs from
+    /// the conductor's default settings.
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+    pub async fn install_app_with_manifest<'a>(
+        &mut self,
+        installed_app_id: &str,
+        agent: Option<AgentPubKey>,
+        dnas_with_roles: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)>,
+        flags: Option<InstallAppCommonFlags>,
+        manifest: AppManifest,
+    ) -> ConductorApiResult<AgentPubKey> {
+        let dnas_with_roles: Vec<_> = dnas_with_roles.into_iter().cloned().collect();
+        let installed_app_id = installed_app_id.to_string();
+
+        let dnas_with_proof: Vec<_> = dnas_with_roles
+            .iter()
+            .map(|dr| (dr.to_owned(), None))
+            .collect();
+
+        let agent = self
+            .raw_handle()
+            .install_app_with_manifest(
+                installed_app_id.clone(),
+                agent,
+                &dnas_with_proof,
+                flags,
+                manifest,
+            )
+            .await?;
+
+        // Add the dna files to the SweetConductor's dna files cache to be able to re-inject them
+        // when restarting the conductor since inline zomes can't otherwise be persisted across
+        // conductor restarts.
+        let dna_files = dnas_with_roles
+            .iter()
+            .map(|dr| dr.dna())
+            .collect::<Vec<_>>();
+
+        self.add_dna_files_to_sweet_conductor_cache(agent.clone(), dna_files.clone())
+            .await?;
+
+        Ok(agent)
+    }
+
     /// Install an app and enable it
     // TODO: make this take a more flexible config for specifying things like
     // membrane proofs
@@ -387,6 +428,30 @@ impl SweetConductor {
         self.raw_handle()
             .enable_app(installed_app_id.to_string())
             .await?;
+        // While it takes ~ 3 seconds to receive a URL from the home relay, await the agent
+        // info of each DNA of the just installed app's agent to show up in the peer stores.
+        #[cfg(feature = "transport-iroh")]
+        for dna_with_role in dnas_with_roles {
+            let dna_hash = dna_with_role.dna().dna_hash();
+            retry_fn_until_timeout(
+                || async {
+                    self.holochain_p2p()
+                        .test_kitsune()
+                        .space(dna_hash.to_k2_space(), None)
+                        .await
+                        .unwrap()
+                        .peer_store()
+                        .get(agent.to_k2_agent())
+                        .await
+                        .unwrap()
+                        .is_some()
+                },
+                None,
+                None,
+            )
+            .await
+            .expect("agent info didn't make it to the peer store");
+        }
         Ok(agent)
     }
 
@@ -700,13 +765,8 @@ impl SweetConductor {
                 false => self.dna_files.clone().into_iter().collect::<Vec<_>>(),
             };
             self.handle = Some(SweetConductorHandle(
-                Self::handle_from_existing(
-                    self.keystore.clone(),
-                    &self.config,
-                    &extra_dna_files,
-                    false,
-                )
-                .await,
+                Self::handle_from_existing(self.keystore.clone(), &self.config, &extra_dna_files)
+                    .await,
             ));
         } else {
             panic!("Attempted to start conductor which was already started");
@@ -914,7 +974,7 @@ impl SweetConductor {
         let local_agents = self
             .holochain_p2p()
             .test_kitsune()
-            .space(dna_hash.to_k2_space())
+            .space(dna_hash.to_k2_space(), None)
             .await
             .unwrap()
             .local_agent_store()

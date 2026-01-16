@@ -1,8 +1,11 @@
 # holochain Makefile
 
 # All default features of binaries excluding mutually exclusive features wasmer_sys & wasmer_wamr
-DEFAULT_FEATURES=slow_tests,build_wasms,sqlite-encrypted
-UNSTABLE_FEATURES=chc,unstable-sharding,unstable-warrants,unstable-functions,unstable-countersigning,unstable-migration,$(DEFAULT_FEATURES)
+# and tx5 transport and iroh transport
+COMMON_DEFAULT_FEATURES=slow_tests,build_wasms,sqlite-encrypted
+DEFAULT_FEATURES=transport-iroh,$(COMMON_DEFAULT_FEATURES)
+DEFAULT_FEATURES_TRANSPORT_TX5=transport-tx5-backend-go-pion,$(COMMON_DEFAULT_FEATURES)
+UNSTABLE_FEATURES=chc,unstable-sharding,unstable-warrants,unstable-functions,unstable-migration,$(DEFAULT_FEATURES)
 
 # mark everything as phony because it doesn't represent a file-system output
 .PHONY: default \
@@ -78,7 +81,15 @@ build-workspace-wasmer_wamr:
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_wamr
 
-# execute tests on all crates with wasmer compiler
+build-workspace-wasmer_sys-transport_tx5:
+	cargo build \
+		--workspace \
+		--locked \
+		--all-targets \
+		--no-default-features \
+		--features $(DEFAULT_FEATURES_TRANSPORT_TX5),wasmer_sys
+
+# execute tests on all crates with wasmer compiler and iroh transport
 test-workspace-wasmer_sys:
 	RUST_BACKTRACE=1 cargo nextest run \
 		--workspace \
@@ -101,3 +112,18 @@ test-workspace-wasmer_wamr:
 		--locked \
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_wamr
+
+# execute tests on all crates with wasmer compiler and tx5 transport
+test-workspace-wasmer_sys-transport_tx5:
+	RUST_BACKTRACE=1 cargo nextest run \
+		--workspace \
+		--locked \
+		--no-default-features \
+		--features $(DEFAULT_FEATURES_TRANSPORT_TX5),wasmer_sys
+
+clean:
+	cargo clean
+    # Remove untracked .dna files
+	git ls-files -z --others --ignored --exclude-standard -- '*.dna' | xargs -0 rm --
+    # Remove untracked .happ files
+	git ls-files -z --others --ignored --exclude-standard '*.happ' | xargs -0 rm --

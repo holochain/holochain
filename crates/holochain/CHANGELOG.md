@@ -7,11 +7,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE**: Remove features for tx5 transport variants `datachannel-vendored` and `backend-libdatachannel`. The only supported tx5 transport is `backend-go-pion` now.
+- **BREAKING CHANGE**: Default to iroh transport for all binaries.
+- Revert to iroh's public relay server URL `https://use1-1.relay.n0.iroh-canary.iroh.link./` in the conductor config.
+- Set default iroh relay server to `dev-test-bootstrap2-iroh-relay.holochain.org`.
+- Run test workflow for all platforms with iroh transport. One job to test tx5 on Ubuntu is kept in the workflow.
+- Update kitsune2 to v0.4.0-dev.2, which includes the iroh relay integration with the bootstrap server.
+- Crates `holochain_cli_client` and `holochain_client` now have features to set which network transport is compiled in (tx5 or iroh).
+- **BREAKING CHANGE** Feature `mock_network` was removed from crate `holochain_p2p`. It was only referencing `test_utils`, so instead `test_utils` should be used directly.
+- Conductor now overrides the Cell bootstrap and signal urls if specified in the app manifest.
+- Fix: `EnableCloneCell` now works consistently when called with either `CloneId` or `DnaHash` on already-enabled clones. Previously, using a `DnaHash` would fail with `CloneCellNotFound` while using a `CloneId` would succeed. #5519
+- **BREAKING CHANGE** Removed the `InstalledAppCommon` function `get_disabled_clone_id`. #5519
+- Removed the unnecessary `hc_stress_test` helper module, its integration test, and example binaries now that performance testing lives in the `holochain/wind-tunnel` repository.
+- Conductor now overrides the Cell bootstrap and signal urls if specified in the app manifest [5524](https://github.com/holochain/holochain/pull/5524).
+- Added feature `transport-iroh` for using Iroh as network transport backend.
+- **BREAKING CHANGE** Renamed features `backend-libdatachannel` to `transport-tx5-backend-libdatachannel`, `backend-go-pion` to `transport-tx5-backend-go-pion`, `datachannel-vendored` to `transport-tx5-datachannel-vendored`.
 - Removed unused `hc_demo_cli` crate.
 - Removed the unnecessary `hc_stress_test` helper module, its integration test, and example binaries now that performance testing lives in the `holochain/wind-tunnel` repository.
 - Fix: Limit concurrency when starting many cells at once to prevent resource exhaustion. Starting cells is now limited to 5 concurrent cell creation operations and 10 concurrent network join operations. This improves startup reliability for conductors managing large numbers of cells.
 - CI: Allow test workflow to pass when tests of the feature `wasmer_wamr` fail. WAMR is not actively used, so investigating flaky tests on WAMR is not a priority. \#5523
 - CI: Run windows test workflow on Depot.dev runners for improved performance. \#5473
+- Refactor: Use production transport for all tests instead of in-memory implementations.
 
 ## 0.6.0
 

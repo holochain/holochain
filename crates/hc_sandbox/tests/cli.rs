@@ -16,6 +16,8 @@ use holochain_websocket::{
 use kitsune2_api::DynLocalAgent;
 use kitsune2_core::Ed25519LocalAgent;
 use kitsune2_test_utils::agent::AgentBuilder;
+use kitsune2_test_utils::retry_fn_until_timeout;
+use serde_json::json;
 use std::collections::HashSet;
 use std::future::Future;
 use std::net::ToSocketAddrs;
@@ -616,6 +618,118 @@ async fn generate_sandbox_with_roles_settings_override() {
     shutdown_sandbox(hc_admin).await;
 }
 
+/// Generates a new sandbox, setting the webrtc signaling server URL via
+/// the webrtc argument and verifies that conductor config file has
+/// been written correctly.
+#[cfg(feature = "transport-tx5-backend-go-pion")]
+#[tokio::test(flavor = "multi_thread")]
+async fn generate_sandbox_with_tx5_network_type() {
+    use serde_json::json;
+
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    package_fixture_if_not_packaged().await;
+    let app_path = std::env::current_dir()
+        .unwrap()
+        .join("tests/fixtures/my-app/");
+
+    let relay_url = "wss://signal";
+
+    holochain_trace::test_run();
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg(format!(
+            "--holochain-path={}",
+            get_holochain_bin_path().to_str().unwrap()
+        ))
+        .arg("--piped")
+        .arg("generate")
+        .arg("--in-process-lair")
+        .arg(app_path)
+        .arg("network")
+        .arg("webrtc")
+        .arg(relay_url)
+        .current_dir(temp_dir.path())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true);
+
+    println!("@@ {cmd:?}");
+
+    let mut hc_admin = input_piped_password(&mut cmd).await;
+
+    // Read conductor config yaml file
+    let config_root_path = get_config_root_path(&mut hc_admin).await;
+    hc_admin.wait().await.unwrap();
+    let config = read_config(config_root_path.clone().into())
+        .expect("Failed to read config from config_root_path")
+        .unwrap();
+
+    // Assert signal url has been set in config file
+    assert_eq!(config.network.signal_url, url2::Url2::parse(relay_url));
+    assert_eq!(
+        config.network.advanced.unwrap(),
+        json!({"tx5Transport": {
+            "signalAllowPlainText": true
+        }})
+    );
+}
+
+/// Generates a new sandbox, setting the iroh relay URL via
+/// the quic argument and verifies that conductor config file has
+/// been written correctly.
+#[cfg(feature = "transport-iroh")]
+#[tokio::test(flavor = "multi_thread")]
+async fn generate_sandbox_with_iroh_network_type() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    package_fixture_if_not_packaged().await;
+    let app_path = std::env::current_dir()
+        .unwrap()
+        .join("tests/fixtures/my-app/");
+
+    let relay_url = "https://iroh-relay";
+
+    holochain_trace::test_run();
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg(format!(
+            "--holochain-path={}",
+            get_holochain_bin_path().to_str().unwrap()
+        ))
+        .arg("--piped")
+        .arg("generate")
+        .arg("--in-process-lair")
+        .arg(app_path)
+        .arg("network")
+        .arg("quic")
+        .arg(relay_url)
+        .current_dir(temp_dir.path())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true);
+
+    println!("@@ {cmd:?}");
+
+    let mut hc_admin = input_piped_password(&mut cmd).await;
+
+    // Read conductor config yaml file
+    let config_root_path = get_config_root_path(&mut hc_admin).await;
+    hc_admin.wait().await.unwrap();
+    let config = read_config(config_root_path.clone().into())
+        .expect("Failed to read config from config_root_path")
+        .unwrap();
+
+    // Assert signal url has been overridden in config file
+    assert_eq!(config.network.relay_url, url2::Url2::parse(relay_url));
+    assert_eq!(
+        config.network.advanced.unwrap(),
+        json!({"irohTransport": {
+            "relayAllowPlainText": true
+        }})
+    );
+}
+
 /// Generates a new sandbox with target_arc_factor settings overridden to 0-arc via
 /// the --target-arc-factor argument and verifies that conductor config file has
 /// been written correctly.
@@ -626,6 +740,14 @@ async fn generate_sandbox_with_target_arc_factor_override() {
     let app_path = std::env::current_dir()
         .unwrap()
         .join("tests/fixtures/my-app/");
+
+    #[cfg(all(
+        feature = "transport-iroh",
+        not(feature = "transport-tx5-backend-go-pion")
+    ))]
+    let (network_type, relay_url) = ("quic", "https://iroh-relay");
+    #[cfg(feature = "transport-tx5-backend-go-pion")]
+    let (network_type, relay_url) = ("webrtc", "wss://signal");
 
     holochain_trace::test_run();
     let mut cmd = get_sandbox_command();
@@ -640,8 +762,8 @@ async fn generate_sandbox_with_target_arc_factor_override() {
         .arg(app_path)
         .arg("network")
         .arg("--target-arc-factor=0")
-        .arg("webrtc")
-        .arg("wss://signal")
+        .arg(network_type)
+        .arg(relay_url)
         .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -741,9 +863,14 @@ async fn generate_sandbox_and_add_and_list_agent() {
     .await
     .unwrap();
 
-    // Get all agent infos.
-    let agent_infos = admin_ws.agent_info(None).await.unwrap();
-    assert_eq!(agent_infos.len(), 2);
+    // Agent infos should be 2.
+    retry_fn_until_timeout(
+        || async { admin_ws.agent_info(None).await.unwrap().len() == 2 },
+        Some(10_000),
+        Some(1_000),
+    )
+    .await
+    .expect("expected 2 agent infos");
 
     // List all agents over hc-sandbox CLI.
     let mut cmd = get_sandbox_command();

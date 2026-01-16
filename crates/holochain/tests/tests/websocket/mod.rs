@@ -88,7 +88,7 @@ how_many: 42
         fake_dna_path,
         Some(properties.clone()),
         "role_name".into(),
-        10000,
+        20000,
     )
     .await
     .unwrap();
@@ -774,7 +774,13 @@ async fn network_stats() {
         .admin_ws_client::<AdminResponse>()
         .await;
 
-    const EXPECT: &str = "kitsune2-core-mem";
+    #[cfg(feature = "transport-tx5-backend-go-pion")]
+    const EXPECT: &str = "BackendGoPion";
+    #[cfg(all(
+        feature = "transport-iroh",
+        not(feature = "transport-tx5-backend-go-pion")
+    ))]
+    const EXPECT: &str = "iroh";
 
     let req = AdminRequest::DumpNetworkStats;
     let res: AdminResponse = client.request(req).await.unwrap();

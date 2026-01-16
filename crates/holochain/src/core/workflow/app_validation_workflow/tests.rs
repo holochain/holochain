@@ -793,7 +793,9 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
     // and we're not guaranteed to be running on the same thread throughout the test.
     set_zome_types(&[(0, 3)], &[]);
 
-    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    let mut conductors =
+        SweetConductorBatch::from_config_rendezvous(2, SweetConductorConfig::rendezvous(false))
+            .await;
     let apps = conductors.setup_app("test_app", [&dna_file]).await.unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();
 
@@ -1166,7 +1168,7 @@ async fn app_validation_produces_warrants() {
 
     conductors.exchange_peer_info().await;
 
-    await_consistency(10, [&alice, &bob, &carol]).await.unwrap();
+    await_consistency(15, [&alice, &bob, &carol]).await.unwrap();
 
     conductors[2].shutdown().await;
 

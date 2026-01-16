@@ -28,13 +28,15 @@ thiserror = "2.0"
 tracing = "0.1"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 
-kitsune2_api = "0.3.0"
+kitsune2_api = "0.4.0-dev.2"
 
 async-trait = "0.1"
 mockall = { version = "0.13", optional = true }
 
 [dev-dependencies]
-holochain_cascade = { path = ".", features = ["test_utils"] }
+holochain_cascade = { path = ".", default-features = false, features = [
+  "test_utils",
+] }
 
 isotest = "0"
 pretty_assertions = "1.4"
@@ -44,7 +46,7 @@ test-case = "3.3"
 workspace = true
 
 [features]
-default = ["datachannel-vendored"]
+default = ["transport-iroh"]
 
 test_utils = [
   "mockall",
@@ -71,11 +73,6 @@ sqlite = [
   "holochain_zome_types/sqlite",
 ]
 
-backend-libdatachannel = ["holochain_p2p/backend-libdatachannel"]
+transport-iroh = ["holochain_p2p/transport-iroh"]
 
-backend-go-pion = ["holochain_p2p/backend-go-pion"]
-
-datachannel-vendored = [
-  "backend-libdatachannel",
-  "holochain_p2p/datachannel-vendored",
-]
+transport-tx5-backend-go-pion = ["holochain_p2p/transport-tx5-backend-go-pion"]

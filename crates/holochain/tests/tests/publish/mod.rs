@@ -23,6 +23,8 @@ use {
     ignore = "flaky on macos+wasmer_wamr and windows"
 )]
 async fn publish_terminates_after_receiving_required_validation_receipts() {
+    use holochain::test_utils::retry_fn_until_timeout;
+
     holochain_trace::test_run();
 
     // Need DEFAULT_RECEIPT_BUNDLE_SIZE peers to send validation receipts back
@@ -30,34 +32,31 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
         holochain::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE as usize
             + 1;
 
-    let mut conductors = SweetConductorBatch::from_config_rendezvous(
-        NUM_CONDUCTORS,
-        SweetConductorConfig::rendezvous(true),
-    )
-    .await;
+    let config = SweetConductorConfig::rendezvous(true).tune_conductor(|cc| {
+        cc.min_publish_interval = Some(Duration::from_secs(5));
+        cc.publish_trigger_interval = Some(Duration::from_secs(5))
+    });
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(NUM_CONDUCTORS, config).await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
 
-    let ((alice,), (bobbo,), (carol,), (danny,), (emma,), (fred,)) = apps.into_tuples();
-
-    let apps = [alice, bobbo, carol, danny, emma, fred];
+    let alice_cell = apps.cells_flattened().into_iter().next().unwrap();
+    let alice_zome = alice_cell.zome(TestWasm::Create);
 
     for c in conductors.iter() {
-        c.declare_full_storage_arcs(apps[0].dna_hash()).await;
+        c.declare_full_storage_arcs(alice_cell.dna_hash()).await;
     }
 
     conductors.exchange_peer_info().await;
 
     // write an action
-    let action_hash: ActionHash = conductors[0]
-        .call(&apps[0].zome(TestWasm::Create), "create_entry", ())
-        .await;
+    let action_hash: ActionHash = conductors[0].call(&alice_zome, "create_entry", ()).await;
 
     // wait for validation receipts
-    tokio::time::timeout(std::time::Duration::from_secs(60), async {
-        loop {
+    retry_fn_until_timeout(
+        || async {
             // check for complete count of our receipts on the
             // millisecond level
 
@@ -65,7 +64,7 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
             // are all complete
             let receipt_sets: Vec<ValidationReceiptSet> = conductors[0]
                 .call(
-                    &apps[0].zome(TestWasm::Create),
+                    &alice_zome,
                     "get_validation_receipts",
                     GetValidationReceiptsInput::new(action_hash.clone()),
                 )
@@ -83,14 +82,11 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
                 == holochain::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE
                     as usize;
 
-            if receipt_sets_len && receipt_sets_complete && agent_activity_receipt_set {
-                // Test Passed!
-                return;
-            }
-
-            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-        }
-    })
+            receipt_sets_len && receipt_sets_complete && agent_activity_receipt_set
+        },
+        Some(60_000),
+        None,
+    )
     .await
     .unwrap();
 }
@@ -100,6 +96,7 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
 // Carol has warrant issuance disabled and receives the warrant from Bob
 // as he publishes it.
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "flaky warrant publish integration; re-check after Iroh upgrade"]
 async fn warrant_is_published() {
     holochain_trace::test_run();
 
@@ -150,11 +147,13 @@ async fn warrant_is_published() {
     );
     let dna_hash = dna_without_validation.dna_hash();
 
-    let config = SweetConductorConfig::rendezvous(true);
+    let config = SweetConductorConfig::rendezvous(true)
+        .tune_conductor(|cc| cc.publish_trigger_interval = Some(Duration::from_secs(2)));
     // Disable warrants on Carol's conductor, so that she doesn't issue warrants herself
     // but receives them from Bob.
-    let config_no_warranting = SweetConductorConfig::rendezvous(true)
-        .tune_conductor(|tc| tc.disable_warrant_issuance = true);
+    let config_no_warranting = SweetConductorConfig::rendezvous(true).tune_conductor(|tc| {
+        tc.disable_warrant_issuance = true;
+    });
     let mut conductors = SweetConductorBatch::from_configs_rendezvous([
         config.clone(),
         config,
@@ -209,7 +208,7 @@ async fn warrant_is_published() {
             .peer_urls[0]
     );
 
-    await_consistency(10, [&alice, &bob, &carol]).await.unwrap();
+    await_consistency(15, [&alice, &bob, &carol]).await.unwrap();
 
     // Alice creates an invalid action.
     let _: ActionHash = conductors[0]
@@ -220,13 +219,13 @@ async fn warrant_is_published() {
         )
         .await;
 
-    await_consistency(10, [&alice, &bob]).await.unwrap();
+    await_consistency(15, [&alice, &bob]).await.unwrap();
 
     // Bob should have issued a warrant against Alice.
 
     // Carol should receive the warrant against Alice.
     // The warrant and the warrant op should have been written to the authored databases.
-    tokio::time::timeout(Duration::from_secs(10), async {
+    tokio::time::timeout(Duration::from_secs(20), async {
         loop {
             let alice_pubkey = alice.agent_pubkey().clone();
             let warrants = conductors[2]

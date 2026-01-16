@@ -9,6 +9,7 @@ use holochain_sqlite::helpers::BytesSql;
 use holochain_sqlite::rusqlite::types::Value;
 use holochain_sqlite::sql::sql_peer_meta_store;
 use holochain_state::prelude::named_params;
+use holochain_types::cell_config_overrides::CellConfigOverrides;
 use kitsune2_api::*;
 use kitsune2_core::get_responsive_remote_agents_near_location;
 use rand::prelude::IndexedRandom;
@@ -242,6 +243,7 @@ pub(crate) struct HolochainP2pActor {
     evt_sender: Arc<std::sync::OnceLock<WrapEvtSender>>,
     lair_client: holochain_keystore::MetaLairClient,
     kitsune: DynKitsune,
+    kitsune2_config: Config,
     blocks_db_getter: GetDbConductor,
     pending: Arc<Mutex<Pending>>,
     outgoing_request_duration_metric: metrics::P2pRequestDurationMetric,
@@ -651,6 +653,7 @@ impl kitsune2_api::KitsuneHandler for HolochainP2pActor {
     fn create_space(
         &self,
         _space: kitsune2_api::SpaceId,
+        _config: Option<&Config>,
     ) -> BoxFut<'_, kitsune2_api::K2Result<kitsune2_api::DynSpaceHandler>> {
         Box::pin(async move {
             let this: Weak<dyn kitsune2_api::SpaceHandler> = self.this.clone();
@@ -833,40 +836,26 @@ impl HolochainP2pActor {
     ) -> HolochainP2pResult<actor::DynHcP2p> {
         check_k2_init();
 
-        #[cfg(feature = "test_utils")]
-        let mut builder = if config.k2_test_builder {
-            let mut builder = kitsune2_core::default_test_builder();
+        let mut builder = kitsune2::default_builder();
 
+        // The following are flags only used in tests
+        #[cfg(feature = "test_utils")]
+        {
             if config.disable_bootstrap {
                 builder.bootstrap = Arc::new(test::NoopBootstrapFactory);
+            } else if config.mem_bootstrap {
+                tracing::info!("Running with mem bootstrap");
+                builder.bootstrap = kitsune2_core::factories::MemBootstrapFactory::create();
             }
-
-            // Make it possible to disable the gossip module for testing.
-            if !config.disable_gossip {
-                // Still want the real gossip module to be used. The test builder comes with a stub
-                // gossip module fur use in K2 testing.
-                builder.gossip = kitsune2_gossip::K2GossipFactory::create();
-            } else {
+            if config.disable_gossip {
                 tracing::info!("Running with gossip disabled");
+                builder.gossip = Arc::new(test::NoopGossipFactory);
             }
-
             if config.disable_publish {
                 tracing::info!("Running with publish disabled");
                 builder.publish = Arc::new(test::NoopPublishFactory);
             }
-
-            if !config.mem_bootstrap {
-                tracing::info!("Running with core bootstrap");
-                builder.bootstrap = kitsune2_core::factories::CoreBootstrapFactory::create();
-            }
-
-            builder
-        } else {
-            kitsune2::default_builder()
-        };
-
-        #[cfg(not(feature = "test_utils"))]
-        let mut builder = kitsune2::default_builder();
+        }
 
         builder.auth_material = config.auth_material;
 
@@ -904,15 +893,49 @@ impl HolochainP2pActor {
         // Load default configuration provided by the module factories.
         let builder = builder.with_default_config()?;
 
+        #[cfg(feature = "test_utils")]
+        {
+            #[cfg(feature = "transport-tx5-backend-go-pion")]
+            builder
+                .config
+                .set_module_config(&kitsune2_transport_tx5::Tx5TransportModConfig {
+                    tx5_transport: kitsune2_transport_tx5::Tx5TransportConfig {
+                        signal_allow_plain_text: true,
+                        timeout_s: 20,
+                        webrtc_connect_timeout_s: 15,
+                        ..Default::default()
+                    },
+                })?;
+            #[cfg(feature = "transport-iroh")]
+            builder
+                .config
+                .set_module_config(&kitsune2_transport_iroh::IrohTransportModConfig {
+                    iroh_transport: kitsune2_transport_iroh::IrohTransportConfig {
+                        relay_allow_plain_text: true,
+                        ..Default::default()
+                    },
+                })?;
+            builder.config.set_module_config(
+                &kitsune2_core::factories::CoreBootstrapModConfig {
+                    core_bootstrap: kitsune2_core::factories::CoreBootstrapConfig {
+                        backoff_min_ms: 1_000,
+                        ..Default::default()
+                    },
+                },
+            )?;
+        }
+
         if let ReportConfig::JsonLines(hc_report) = config.report {
             builder
                 .config
                 .set_module_config(&hc_report::HcReportModConfig { hc_report })?;
         }
 
-        // Then override any configuration values provided by the user.
+        // Then override any configuration values provided by the user and set kitsune2_config if `network_config` is `Some`.
+        let mut kitsune2_config = Config::default();
         if let Some(network_config) = config.network_config {
             builder.config.set_module_config(&network_config)?;
+            kitsune2_config = Self::kitsune2_params_from_value(network_config)?;
         }
 
         let pending = Arc::new_cyclic(|this| {
@@ -942,11 +965,34 @@ impl HolochainP2pActor {
             kitsune,
             blocks_db_getter: config.get_conductor_db.clone(),
             pending,
+            kitsune2_config,
             outgoing_request_duration_metric: create_p2p_outgoing_request_duration_metric(),
             incoming_request_duration_metric: create_p2p_handle_incoming_request_duration_metric(),
             pruning_task_abort_handle,
             request_timeout: config.request_timeout,
         }))
+    }
+
+    /// Extract Kitsune2 [`Config`] from a [`serde_json::Value`].
+    fn kitsune2_params_from_value(value: serde_json::Value) -> HolochainP2pResult<Config> {
+        let config = Config::default();
+        // get `core_bootstrap` from config
+        if let Ok(core_bootstrap_config) = serde_json::from_value::<
+            kitsune2_core::factories::CoreBootstrapModConfig,
+        >(value.clone())
+        {
+            config.set_module_config(&core_bootstrap_config)?;
+        }
+
+        // get `tx5_transport` from config
+        #[cfg(feature = "transport-tx5-backend-go-pion")]
+        if let Ok(tx5_transport_config) =
+            serde_json::from_value::<kitsune2_transport_tx5::Tx5TransportModConfig>(value)
+        {
+            config.set_module_config(&tx5_transport_config)?;
+        }
+
+        Ok(config)
     }
 
     // Prunes expired URLs at an interval and checks the peer store for agent infos of unresponsive
@@ -967,7 +1013,7 @@ impl HolochainP2pActor {
                         let db_getter = db_getter.clone();
                         let kitsune2 = kitsune2.clone();
                         async move {
-                            let space = kitsune2.clone().space(space_id.clone()).await?;
+                            let space = kitsune2.clone().space(space_id.clone(), None).await?;
                             let peer_store = space.peer_store().clone();
                             let db = db_getter(DnaHash::from_k2_space(&space_id)).await?;
                             // Prune any expired entries.
@@ -1207,11 +1253,43 @@ impl HolochainP2pActor {
         ops: Vec<StoredOp>,
     ) -> HolochainP2pResult<()> {
         self.kitsune
-            .space(space_id)
+            .space(space_id, None)
             .await?
             .inform_ops_stored(ops)
             .await
             .map_err(HolochainP2pError::K2Error)
+    }
+
+    /// Apply [`CellConfigOverrides`] to the current Kitsune2 [`Config`], returning
+    /// a new [`Config`] with the overrides applied, if any overrides were needed.
+    fn space_config_override(
+        &self,
+        space_overrides: CellConfigOverrides,
+    ) -> HolochainP2pResult<Option<Config>> {
+        let mut override_needed = false;
+        let config = self.kitsune2_config.clone();
+        if let Some(bootstrap_url) = space_overrides.bootstrap_url.as_ref() {
+            // get current bootstrap config and override server_url
+            let mut core_bootstrap_config: kitsune2_core::factories::CoreBootstrapModConfig =
+                config.get_module_config().unwrap_or_default();
+            core_bootstrap_config.core_bootstrap.server_url = Some(bootstrap_url.clone());
+            config.set_module_config(&core_bootstrap_config)?;
+            override_needed = true;
+        }
+        #[cfg(feature = "transport-tx5-backend-go-pion")]
+        if let Some(signal_url) = space_overrides.signal_url.as_ref() {
+            // get current tx5 transport config and override server_url
+            let mut tx5_transport_config: kitsune2_transport_tx5::Tx5TransportModConfig =
+                config.get_module_config().unwrap_or_default();
+            tx5_transport_config.tx5_transport.server_url = signal_url.clone();
+            config.set_module_config(&tx5_transport_config)?;
+            override_needed = true;
+        }
+        if override_needed {
+            Ok(Some(config))
+        } else {
+            Ok(None)
+        }
     }
 }
 
@@ -1294,7 +1372,7 @@ impl actor::HcP2p for HolochainP2pActor {
         Box::pin(async move {
             Ok(self
                 .kitsune
-                .space(dna_hash.to_k2_space())
+                .space(dna_hash.to_k2_space(), None)
                 .await?
                 .peer_store()
                 .clone())
@@ -1327,9 +1405,17 @@ impl actor::HcP2p for HolochainP2pActor {
         dna_hash: DnaHash,
         agent_pub_key: AgentPubKey,
         _maybe_agent_info: Option<AgentInfoSigned>,
+        config_override: Option<CellConfigOverrides>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
-            let space = self.kitsune.space(dna_hash.to_k2_space()).await?;
+            let config_override = match config_override {
+                Some(overrides) => self.space_config_override(overrides)?,
+                None => None,
+            };
+            let space = self
+                .kitsune
+                .space(dna_hash.to_k2_space(), config_override)
+                .await?;
 
             let local_agent: DynLocalAgent = Arc::new(HolochainP2pLocalAgent::new(
                 agent_pub_key,
@@ -1350,7 +1436,7 @@ impl actor::HcP2p for HolochainP2pActor {
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
             let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id.clone()).await?;
+            let space = self.kitsune.space(space_id.clone(), None).await?;
 
             space.local_agent_leave(agent_pub_key.to_k2_agent()).await;
 
@@ -1388,7 +1474,7 @@ impl actor::HcP2p for HolochainP2pActor {
     ) -> BoxFut<'_, HolochainP2pResult<SerializedBytes>> {
         Box::pin(async move {
             let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id.clone()).await?;
+            let space = self.kitsune.space(space_id.clone(), None).await?;
 
             let byte_count = zome_call_params_serialized.0.len();
 
@@ -1434,7 +1520,7 @@ impl actor::HcP2p for HolochainP2pActor {
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
             let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id.clone()).await?;
+            let space = self.kitsune.space(space_id.clone(), None).await?;
 
             let byte_count: usize = target_payload_list.iter().map(|(_, p, _)| p.0.len()).sum();
 
@@ -1506,7 +1592,7 @@ impl actor::HcP2p for HolochainP2pActor {
 
             let space = dna_hash.to_k2_space();
 
-            let space = self.kitsune.space(space).await?;
+            let space = self.kitsune.space(space, None).await?;
 
             // -- actually publish the op hashes -- //
 
@@ -1551,7 +1637,7 @@ impl actor::HcP2p for HolochainP2pActor {
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
             let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id.clone()).await?;
+            let space = self.kitsune.space(space_id.clone(), None).await?;
 
             let peers = self
                 .get_peers_for_location(&space, basis_hash.get_loc())
@@ -1601,7 +1687,7 @@ impl actor::HcP2p for HolochainP2pActor {
     ) -> BoxFut<'_, HolochainP2pResult<Vec<WireOps>>> {
         Box::pin(async move {
             let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id.clone()).await?;
+            let space = self.kitsune.space(space_id.clone(), None).await?;
             let loc = dht_hash.get_loc();
             let agents = self
                 .get_random_peers_for_location("get", &space, loc)
@@ -1675,7 +1761,7 @@ impl actor::HcP2p for HolochainP2pActor {
     ) -> BoxFut<'_, HolochainP2pResult<Vec<WireLinkOps>>> {
         Box::pin(async move {
             let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id.clone()).await?;
+            let space = self.kitsune.space(space_id.clone(), None).await?;
             let loc = link_key.base.get_loc();
             let agents = self
                 .get_random_peers_for_location("get_links", &space, loc)
@@ -1730,7 +1816,7 @@ impl actor::HcP2p for HolochainP2pActor {
     ) -> BoxFut<'_, HolochainP2pResult<CountLinksResponse>> {
         Box::pin(async move {
             let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id.clone()).await?;
+            let space = self.kitsune.space(space_id.clone(), None).await?;
             let loc = query.base.get_loc();
             let agents = self
                 .get_random_peers_for_location("count_links", &space, loc)
@@ -1782,7 +1868,7 @@ impl actor::HcP2p for HolochainP2pActor {
     ) -> BoxFut<'_, HolochainP2pResult<Vec<AgentActivityResponse>>> {
         Box::pin(async move {
             let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id.clone()).await?;
+            let space = self.kitsune.space(space_id.clone(), None).await?;
             let loc = agent.get_loc();
             let agents = self
                 .get_random_peers_for_location("get_agent_activity", &space, loc)
@@ -1851,7 +1937,7 @@ impl actor::HcP2p for HolochainP2pActor {
     ) -> BoxFut<'_, HolochainP2pResult<Vec<MustGetAgentActivityResponse>>> {
         Box::pin(async move {
             let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id.clone()).await?;
+            let space = self.kitsune.space(space_id.clone(), None).await?;
             let loc = author.get_loc();
             let agents = self
                 .get_random_peers_for_location("must_get_agent_activity", &space, loc)
@@ -1906,7 +1992,7 @@ impl actor::HcP2p for HolochainP2pActor {
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
             let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id.clone()).await?;
+            let space = self.kitsune.space(space_id.clone(), None).await?;
 
             let agent_id = to_agent.to_k2_agent();
 
@@ -1967,7 +2053,7 @@ impl actor::HcP2p for HolochainP2pActor {
         Box::pin(async move {
             let loc = basis.get_loc();
             let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id.clone()).await?;
+            let space = self.kitsune.space(space_id.clone(), None).await?;
 
             for agent in space.local_agent_store().get_all().await? {
                 if agent.get_cur_storage_arc().contains(loc) {
@@ -1987,7 +2073,7 @@ impl actor::HcP2p for HolochainP2pActor {
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
             let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id.clone()).await?;
+            let space = self.kitsune.space(space_id.clone(), None).await?;
 
             let mut peer_urls = Vec::with_capacity(agents.len());
             for agent in agents {
@@ -2077,7 +2163,7 @@ impl actor::HcP2p for HolochainP2pActor {
                     let all_space_ids = self.kitsune.list_spaces();
                     let mut spaces = Vec::with_capacity(all_space_ids.len());
                     for space_id in all_space_ids {
-                        spaces.push((space_id.clone(), self.kitsune.space(space_id).await?));
+                        spaces.push((space_id.clone(), self.kitsune.space(space_id, None).await?));
                     }
 
                     spaces
@@ -2134,7 +2220,7 @@ impl actor::HcP2p for HolochainP2pActor {
     ) -> BoxFut<'_, HolochainP2pResult<Vec<kitsune2_api::DhtArc>>> {
         Box::pin(async move {
             let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id).await?;
+            let space = self.kitsune.space(space_id, None).await?;
 
             Ok(space
                 .local_agent_store()
@@ -2215,6 +2301,8 @@ impl actor::HcP2p for HolochainP2pActor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "transport-tx5-backend-go-pion")]
+    use crate::actor::HcP2p;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn correct_id_loc_calc() {
@@ -2262,5 +2350,131 @@ mod tests {
         ));
 
         assert_eq!(h_op.to_string(), k_op.to_string());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[cfg(feature = "transport-tx5-backend-go-pion")]
+    async fn should_set_kitsune2_config() {
+        let actor = test_p2p_actor().await;
+
+        let actor_p2p: Arc<HolochainP2pActor> =
+            Arc::downcast(actor).expect("failed to downcast actor");
+
+        // convert back to kitsune config
+        let retrieved_kitsune_config = actor_p2p.kitsune2_config.clone();
+        let bootstrap_config: kitsune2_core::factories::CoreBootstrapModConfig =
+            retrieved_kitsune_config
+                .get_module_config()
+                .expect("failed to get bootstrap config");
+        assert_eq!(
+            bootstrap_config.core_bootstrap.backoff_max_ms, 5_000,
+            "backoff_max_ms should match"
+        );
+        assert_eq!(
+            bootstrap_config.core_bootstrap.backoff_min_ms, 100,
+            "backoff_min_ms should match"
+        );
+        // get tx5 transport module config
+        let tx5_transport_config: kitsune2_transport_tx5::Tx5TransportModConfig =
+            retrieved_kitsune_config
+                .get_module_config()
+                .expect("failed to get tx5 transport config");
+        assert_eq!(
+            tx5_transport_config.tx5_transport.server_url, "wss://localhost:9999",
+            "server_url should match"
+        );
+        assert_eq!(
+            tx5_transport_config.tx5_transport.timeout_s, 300,
+            "timeout_s should match"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[cfg(feature = "transport-tx5-backend-go-pion")]
+    async fn should_get_no_overrides_for_space_if_default() {
+        let actor = test_p2p_actor().await;
+        let actor_p2p: Arc<HolochainP2pActor> =
+            Arc::downcast(actor).expect("failed to downcast actor");
+
+        // should not override if default
+        let space_overrides = CellConfigOverrides::default();
+        let overrides = actor_p2p
+            .space_config_override(space_overrides)
+            .expect("failed to get overrides");
+        assert!(overrides.is_none(), "overrides should be none");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[cfg(feature = "transport-tx5-backend-go-pion")]
+    async fn should_get_overrides_for_space_if_provided() {
+        let actor = test_p2p_actor().await;
+        let actor_p2p: Arc<HolochainP2pActor> =
+            Arc::downcast(actor).expect("failed to downcast actor");
+        // should not override if default
+        let space_overrides = CellConfigOverrides {
+            bootstrap_url: Some("http://override:1234".to_string()),
+            signal_url: Some("wss://override:5678".to_string()),
+        };
+        let overrides = actor_p2p
+            .space_config_override(space_overrides)
+            .expect("failed to get overrides")
+            .expect("overrides should be some");
+
+        // convert back to kitsune config to check values
+        let bootstrap_config: kitsune2_core::factories::CoreBootstrapModConfig = overrides
+            .get_module_config()
+            .expect("failed to get bootstrap config");
+        assert_eq!(
+            bootstrap_config.core_bootstrap.server_url,
+            Some("http://override:1234".to_string()),
+            "bootstrap_url should match"
+        );
+        let tx5_transport_config: kitsune2_transport_tx5::Tx5TransportModConfig = overrides
+            .get_module_config()
+            .expect("failed to get tx5 transport config");
+        assert_eq!(
+            tx5_transport_config.tx5_transport.server_url, "wss://override:5678",
+            "signal_url should match"
+        );
+    }
+
+    #[cfg(feature = "transport-tx5-backend-go-pion")]
+    async fn test_p2p_actor() -> Arc<dyn HcP2p> {
+        use kitsune2_core::factories::{CoreBootstrapConfig, CoreBootstrapModConfig};
+
+        // prepare a kitsune config json
+        let bootstrap = CoreBootstrapModConfig {
+            core_bootstrap: CoreBootstrapConfig {
+                server_url: None,
+                backoff_max_ms: 5_000,
+                backoff_min_ms: 100,
+            },
+        };
+        let tx_config = kitsune2_transport_tx5::Tx5TransportModConfig {
+            tx5_transport: kitsune2_transport_tx5::Tx5TransportConfig {
+                server_url: "wss://localhost:9999".to_string(),
+                timeout_s: 300,
+                ..Default::default()
+            },
+        };
+        let kitsune_config = Config::default();
+        kitsune_config
+            .set_module_config(&bootstrap)
+            .expect("failed to set config");
+        kitsune_config
+            .set_module_config(&tx_config)
+            .expect("failed to set config");
+
+        let kitsune_config_json =
+            serde_json::to_value(&kitsune_config).expect("failed to serialize kitsune config");
+
+        let config = HolochainP2pConfig {
+            network_config: Some(kitsune_config_json),
+            ..Default::default()
+        };
+
+        HolochainP2pActor::create(config, holochain_keystore::test_keystore())
+            .await
+            .expect("failed to create actor")
     }
 }

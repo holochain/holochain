@@ -122,7 +122,7 @@ async fn urls_are_pruned_when_updated_agent_info_available() {
     .await
     .unwrap();
     p2p.test_kitsune()
-        .space(space_id.clone())
+        .space(space_id.clone(), None)
         .await
         .unwrap()
         .peer_store()
@@ -182,7 +182,7 @@ async fn urls_are_pruned_when_updated_agent_info_available() {
     .await
     .unwrap();
     p2p.test_kitsune()
-        .space(space_id)
+        .space(space_id, None)
         .await
         .unwrap()
         .peer_store()
@@ -252,7 +252,14 @@ impl TestCase {
                     let db_conductor = db_conductor.clone();
                     Box::pin(async move { db_conductor })
                 }),
-                k2_test_builder: true,
+                network_config: Some(serde_json::json!({
+                    "coreBootstrap": {
+                        "serverUrl": "https://not-used"
+                    },
+                    "tx5Transport": {
+                        "serverUrl": "wss://not-used"
+                    }
+                })),
                 ..Default::default()
             },
             lair_client.clone(),
@@ -264,7 +271,7 @@ impl TestCase {
             .unwrap();
         let peer_meta_store = p2p
             .test_kitsune()
-            .space(space_id.clone())
+            .space(space_id.clone(), None)
             .await
             .unwrap()
             .peer_meta_store()

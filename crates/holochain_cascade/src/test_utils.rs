@@ -18,6 +18,7 @@ use holochain_p2p::HolochainP2pError;
 use holochain_p2p::HolochainP2pResult;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_state::prelude::*;
+use holochain_types::cell_config_overrides::CellConfigOverrides;
 use holochain_types::test_utils::chain::chain_to_ops;
 use holochain_types::test_utils::chain::entry_hash;
 use holochain_types::test_utils::chain::TestChainItem;
@@ -213,6 +214,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         &self,
         _agent: AgentPubKey,
         _maybe_agent_info: Option<AgentInfoSigned>,
+        _config_override: Option<CellConfigOverrides>,
     ) -> HolochainP2pResult<()> {
         todo!()
     }

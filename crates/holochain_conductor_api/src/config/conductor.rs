@@ -69,7 +69,7 @@ pub use error::*;
 pub use keystore_config::KeystoreConfig;
 
 /// All the config information for the conductor
-#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema, Default)]
 pub struct ConductorConfig {
     /// Override the environment specified tracing config.
     #[serde(default)]
@@ -91,12 +91,6 @@ pub struct ConductorConfig {
     /// Optional config for the network module.
     #[serde(default)]
     pub network: NetworkConfig,
-
-    /// The amount of time, in seconds, to elapse before a request times out.
-    ///
-    /// Defaults to 60 seconds.
-    #[serde(default = "default_request_timeout_s")]
-    pub request_timeout_s: u64,
 
     /// Optional specification of Chain Head Coordination service URL.
     /// If set, each cell's commit workflow will include synchronizing with the specified CHC service.
@@ -122,24 +116,6 @@ pub struct ConductorConfig {
 
     /// Tracing scope.
     pub tracing_scope: Option<String>,
-}
-
-impl Default for ConductorConfig {
-    fn default() -> Self {
-        Self {
-            tracing_override: Default::default(),
-            data_root_path: Default::default(),
-            keystore: Default::default(),
-            admin_interfaces: Default::default(),
-            network: Default::default(),
-            request_timeout_s: default_request_timeout_s(),
-            #[cfg(feature = "chc")]
-            chc_url: Default::default(),
-            db_sync_strategy: Default::default(),
-            tuning_params: Default::default(),
-            tracing_scope: Default::default(),
-        }
-    }
 }
 
 /// Helper function to load a config from a YAML string.
@@ -202,15 +178,6 @@ impl ConductorConfig {
     }
 }
 
-const fn default_request_timeout_s() -> u64 {
-    60
-}
-
-#[inline(always)]
-fn one() -> u32 {
-    1
-}
-
 #[cfg(feature = "test-utils")]
 fn default_mem_bootstrap() -> bool {
     true
@@ -247,9 +214,23 @@ pub struct NetworkConfig {
     #[schemars(schema_with = "holochain_util::jsonschema::url2_schema")]
     pub bootstrap_url: url2::Url2,
 
-    /// The Kitsune2 sbd server to use for webrtc signalling.
+    /// The Kitsune2 signaling server for WebRTC connections to use.
     #[schemars(schema_with = "holochain_util::jsonschema::url2_schema")]
     pub signal_url: url2::Url2,
+
+    /// The iroh relay server address used with the iroh transport.
+    #[schemars(schema_with = "holochain_util::jsonschema::url2_schema")]
+    pub relay_url: url2::Url2,
+
+    /// The amount of time, in seconds, to elapse before a request-response roundtrip times out.
+    ///
+    /// This value defaults to 60 seconds.
+    ///
+    /// This additionally sets two related timestamps:
+    /// - The time to elapse before a single transport message times out (i.e. a request or response). Set to the floor of 1/2 of this value, so defaults to 30 seconds.
+    /// - The time to elapse while attempting to establish a webrtc connection, before falling back to a relay connection. Set to the floor of 3/8 of this value, so defaults to 22 seconds.
+    #[serde(default = "default_request_timeout_s")]
+    pub request_timeout_s: u64,
 
     /// The Kitsune2 webrtc_config to use for connecting to peers.
     #[cfg_attr(feature = "schema", schemars(schema_with = "webrtc_config_schema"))]
@@ -258,7 +239,7 @@ pub struct NetworkConfig {
     /// The target arc factor to apply when receiving hints from kitsune2.
     /// In normal operation, leave this as the default 1.
     /// For leacher nodes that do not contribute to gossip, set to zero.
-    #[serde(default = "one")]
+    #[serde(default = "default_target_arc_factor")]
     pub target_arc_factor: u32,
 
     /// Configure Kitsune2 Reporting.
@@ -299,8 +280,10 @@ impl Default for NetworkConfig {
             base64_auth_material: None,
             bootstrap_url: url2::Url2::parse("https://dev-test-bootstrap2.holochain.org"),
             signal_url: url2::Url2::parse("wss://dev-test-bootstrap2.holochain.org"),
+            relay_url: url2::Url2::parse("https://use1-1.relay.n0.iroh-canary.iroh.link./"),
+            request_timeout_s: default_request_timeout_s(),
             webrtc_config: None,
-            target_arc_factor: 1,
+            target_arc_factor: default_target_arc_factor(),
             report: Default::default(),
             advanced: None,
             #[cfg(feature = "test-utils")]
@@ -313,6 +296,14 @@ impl Default for NetworkConfig {
             mem_bootstrap: true,
         }
     }
+}
+
+const fn default_request_timeout_s() -> u64 {
+    60
+}
+
+const fn default_target_arc_factor() -> u32 {
+    1
 }
 
 impl NetworkConfig {
@@ -404,12 +395,30 @@ impl NetworkConfig {
                 "serverUrl",
                 serde_json::Value::String(self.bootstrap_url.as_str().into()),
             )?;
-
             Self::insert_module_config(
                 module_config,
                 "tx5Transport",
                 "serverUrl",
                 serde_json::Value::String(self.signal_url.as_str().into()),
+            )?;
+
+            // timeoutS is set to the floor of 1/2 of the request_timeout_s.
+            let timeout_s: serde_json::Number = (self.request_timeout_s / 2).into();
+            Self::insert_module_config(
+                module_config,
+                "tx5Transport",
+                "timeoutS",
+                serde_json::Value::Number(timeout_s),
+            )?;
+
+            // webrtcConnectTimeoutS is set to the floor of 3/8 of the request_timeout_s.
+            let webrtc_connect_timeout_s: serde_json::Number =
+                ((self.request_timeout_s * 3) / 8).into();
+            Self::insert_module_config(
+                module_config,
+                "tx5Transport",
+                "webrtcConnectTimeoutS",
+                serde_json::Value::Number(webrtc_connect_timeout_s),
             )?;
 
             if let Some(webrtc_config) = &self.webrtc_config {
@@ -432,6 +441,13 @@ impl NetworkConfig {
                     serde_json::Value::Bool(true),
                 )?;
             }
+
+            Self::insert_module_config(
+                module_config,
+                "irohTransport",
+                "relayUrl",
+                serde_json::Value::String(self.relay_url.as_str().into()),
+            )?;
         } else {
             return Err(ConductorConfigError::InvalidNetworkConfig(
                 "advanced field must be an object".to_string(),
@@ -635,6 +651,8 @@ fn kitsune2_config_schema(generator: &mut schemars::SchemaGenerator) -> Schema {
         k2_gossip: Option<kitsune2_gossip::K2GossipModConfig>,
         #[serde(flatten)]
         tx5_transport: Option<kitsune2_transport_tx5::Tx5TransportModConfig>,
+        #[serde(flatten)]
+        iroh_transport: Option<kitsune2_transport_iroh::IrohTransportModConfig>,
     }
 
     let schema = schemars::schema_for!(Option<K2Config>);
@@ -697,7 +715,6 @@ mod tests {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 network: NetworkConfig::default(),
-                request_timeout_s: 60,
                 keystore: KeystoreConfig::DangerTestKeystore,
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::default(),
@@ -738,11 +755,13 @@ mod tests {
     network:
       bootstrap_url: https://test-boot.tld
       signal_url: wss://test-sig.tld
+      relay_url: https://relay.tld
       webrtc_config: {
         "iceServers": [
           { "urls": ["stun:test-stun.tld:443"] },
         ]
       }
+      request_timeout_s: 70
       advanced: {
         "my": {
           "totally": {
@@ -755,14 +774,15 @@ mod tests {
         }
       }
 
-    request_timeout_s: 70
-
     db_sync_strategy: Fast
     "#;
+
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
         let mut network_config = NetworkConfig::default();
         network_config.bootstrap_url = url2::url2!("https://test-boot.tld");
         network_config.signal_url = url2::url2!("wss://test-sig.tld");
+        network_config.relay_url = url2::url2!("https://relay.tld");
+        network_config.request_timeout_s = 70;
         network_config.webrtc_config = Some(serde_json::json!({
             "iceServers": [
                 { "urls": ["stun:test-stun.tld:443"] },
@@ -794,7 +814,6 @@ mod tests {
                     }
                 }]),
                 network: network_config,
-                request_timeout_s: 70,
                 db_sync_strategy: DbSyncStrategy::Fast,
                 #[cfg(feature = "chc")]
                 chc_url: None,
@@ -820,7 +839,6 @@ mod tests {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 network: NetworkConfig::default(),
-                request_timeout_s: default_request_timeout_s(),
                 keystore: KeystoreConfig::LairServer {
                     connection_url: url2::url2!("unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"),
                 },
@@ -854,7 +872,10 @@ mod tests {
                     "backoffMinMs": "3500",
                 },
                 "tx5Transport": {
-                    "timeoutS": "10",
+                    "signalAllowPlainText": "true"
+                },
+                "irohTransport": {
+                    "relayAllowPlainText": "true"
                 },
                 "coreSpace": {
                     "reSignFreqMs": "1000",
@@ -870,6 +891,7 @@ mod tests {
             .unwrap();
         builder.config.set_module_config(&k2_config).unwrap();
         builder.validate_config().unwrap();
+
         assert_eq!(
             k2_config,
             serde_json::json!({
@@ -879,13 +901,19 @@ mod tests {
                 },
                 "tx5Transport": {
                     "serverUrl": "wss://dev-test-bootstrap2.holochain.org/",
-                    "timeoutS": "10",
+                    "timeoutS": 30,
+                    "webrtcConnectTimeoutS": 22,
+                    "signalAllowPlainText": "true"
+                },
+                "irohTransport": {
+                    "relayUrl": "https://use1-1.relay.n0.iroh-canary.iroh.link./",
+                    "relayAllowPlainText": "true"
                 },
                 "coreSpace": {
                     "reSignFreqMs": "1000",
                 }
             })
-        )
+        );
     }
 
     #[test]
@@ -897,6 +925,11 @@ mod tests {
                 },
                 "tx5Transport": {
                     "serverUrl": "wss://sbd.nowhere.net",
+                    "timeoutS": 10,
+                    "webrtcConnectTimeoutS": 10
+                },
+                "irohTransport": {
+                    "relayUrl": "https://iroh.nowhere.net",
                 },
             })),
             ..Default::default()
@@ -918,9 +951,14 @@ mod tests {
                 },
                 "tx5Transport": {
                     "serverUrl": "wss://dev-test-bootstrap2.holochain.org/",
+                    "timeoutS": 30,
+                    "webrtcConnectTimeoutS": 22
+                },
+                "irohTransport": {
+                    "relayUrl": "https://use1-1.relay.n0.iroh-canary.iroh.link./",
                 },
             })
-        )
+        );
     }
 
     #[test]
@@ -947,6 +985,11 @@ mod tests {
                 },
                 "tx5Transport": {
                     "serverUrl": "wss://dev-test-bootstrap2.holochain.org/",
+                    "timeoutS": 30,
+                    "webrtcConnectTimeoutS": 22
+                },
+                "irohTransport": {
+                    "relayUrl": "https://use1-1.relay.n0.iroh-canary.iroh.link./",
                 },
                 "k2Gossip": {
                     "roundTimeoutMs": 100,
@@ -955,6 +998,6 @@ mod tests {
                     "minInitiateIntervalMs": 300,
                 }
             })
-        )
+        );
     }
 }

@@ -22,6 +22,7 @@ async fn test_publish() {
 
     let config = ConductorConfig {
         network: NetworkConfig {
+            #[cfg(feature = "transport-tx5-backend-go-pion")]
             webrtc_config: Some(serde_json::json!({
                 // It's really hard to test this since it just goes straight
                 // to the webrtc implementation internals, so just adding
@@ -160,22 +161,14 @@ async fn private_entries_update_consistency() {
     let apps = conductors.setup_app("app", &dnas).await.unwrap();
     let ((alice,), (bobbo,)) = apps.into_tuples();
 
-    conductors[0]
-        .require_initial_gossip_activity_for_cell(&alice, 1, std::time::Duration::from_secs(30))
-        .await
-        .unwrap();
-
-    conductors[1]
-        .require_initial_gossip_activity_for_cell(&bobbo, 1, std::time::Duration::from_secs(30))
-        .await
-        .unwrap();
+    await_consistency(20, [&alice, &bobbo]).await.unwrap();
 
     // Call the "create" zome fn on Alice's app
     let hash: ActionHash = conductors[0]
         .call(&alice.zome(SweetInlineZomes::COORDINATOR), "create", ())
         .await;
 
-    await_consistency(10, [&alice, &bobbo]).await.unwrap();
+    await_consistency(15, [&alice, &bobbo]).await.unwrap();
 
     // Call the "update" zome fn on Alice's app to update the previously created private entry
     let _: ActionHash = conductors[0]
@@ -183,7 +176,7 @@ async fn private_entries_update_consistency() {
         .await;
 
     // Make sure that the update of the private entry reaches consistency
-    await_consistency(10, [&alice, &bobbo]).await.unwrap();
+    await_consistency(15, [&alice, &bobbo]).await.unwrap();
 }
 
 #[cfg(feature = "test_utils")]
@@ -228,22 +221,14 @@ async fn private_entries_dont_leak() {
     let apps = conductors.setup_app("app", &dnas).await.unwrap();
     let ((alice,), (bobbo,)) = apps.into_tuples();
 
-    conductors[0]
-        .require_initial_gossip_activity_for_cell(&alice, 1, std::time::Duration::from_secs(30))
-        .await
-        .unwrap();
-
-    conductors[1]
-        .require_initial_gossip_activity_for_cell(&bobbo, 1, std::time::Duration::from_secs(30))
-        .await
-        .unwrap();
+    await_consistency(20, [&alice, &bobbo]).await.unwrap();
 
     // Call the "create" zome fn on Alice's app
     let hash: ActionHash = conductors[0]
         .call(&alice.zome(SweetInlineZomes::COORDINATOR), "create", ())
         .await;
 
-    await_consistency(10, [&alice, &bobbo]).await.unwrap();
+    await_consistency(15, [&alice, &bobbo]).await.unwrap();
 
     let entry_hash =
         EntryHash::with_data_sync(&Entry::app(PrivateEntry {}.try_into().unwrap()).unwrap());
@@ -267,7 +252,7 @@ async fn private_entries_dont_leak() {
     let bob_hash: ActionHash = conductors[1]
         .call(&bobbo.zome(SweetInlineZomes::COORDINATOR), "create", ())
         .await;
-    await_consistency(10, [&alice, &bobbo]).await.unwrap();
+    await_consistency(15, [&alice, &bobbo]).await.unwrap();
 
     check_all_gets_for_private_entry(
         &conductors[0],

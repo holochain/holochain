@@ -137,7 +137,6 @@ async fn retry_countersigning_commit_on_missing_deps() {
     let config = SweetConductorConfig::rendezvous(true).tune_network_config(|nc| {
         nc.advanced = Some(serde_json::json!({
             "tx5Transport": {
-                "signalAllowPlainText": true,
                 "timeoutS": 5,
             }
         }));
@@ -154,7 +153,6 @@ async fn retry_countersigning_commit_on_missing_deps() {
                     None,
                     Some(rendezvous.clone()),
                     false,
-                    true,
                 )
             })
             .take(3),
@@ -256,7 +254,7 @@ async fn retry_countersigning_commit_on_missing_deps() {
     let space = conductors[0]
         .holochain_p2p()
         .test_kitsune()
-        .space(alice.dna_hash().to_k2_space())
+        .space(alice.dna_hash().to_k2_space(), None)
         .await
         .unwrap();
     let bob_agent_id = bob.agent_pubkey().to_k2_agent();
@@ -1332,17 +1330,7 @@ async fn alice_can_force_abandon_session_when_automatic_resolution_has_failed_af
             c.countersigning_resolution_retry_delay = Some(Duration::from_secs(3));
         })
         .tune_network_config(|nc| {
-            nc.advanced
-                .as_mut()
-                .unwrap()
-                .as_object_mut()
-                .unwrap()
-                .insert(
-                    "tx5Transport".to_string(),
-                    serde_json::json!({
-                        "timeoutS": 3
-                    }),
-                );
+            nc.request_timeout_s = 6;
         });
 
     let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
@@ -1511,17 +1499,7 @@ async fn alice_can_force_publish_session_when_automatic_resolution_has_failed_af
             c.countersigning_resolution_retry_delay = Some(Duration::from_secs(3));
         })
         .tune_network_config(|nc| {
-            nc.advanced
-                .as_mut()
-                .unwrap()
-                .as_object_mut()
-                .unwrap()
-                .insert(
-                    "tx5Transport".to_string(),
-                    serde_json::json!({
-                        "timeoutS": 3
-                    }),
-                );
+            nc.request_timeout_s = 6;
         });
 
     let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;

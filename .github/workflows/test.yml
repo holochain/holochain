@@ -59,14 +59,16 @@ jobs:
         include:
           - os: ubuntu-latest
             target: wasmer_sys
+          - os: ubuntu-latest
+            target: wasmer_sys-unstable
+          - os: ubuntu-latest
+            target: wasmer_sys-transport_tx5
           - os: macos-latest
             target: wasmer_sys
-          - os: macos-15
+          - os: macos-15-intel
             target: wasmer_sys
           - os: depot-windows-2022-8
             target: wasmer_sys
-          - os: ubuntu-latest
-            target: wasmer_sys-unstable
     steps:
       - name: checkout
         uses: actions/checkout@v5
@@ -74,7 +76,7 @@ jobs:
       - name: "Common Test Setup Actions"
         uses: ./.github/actions/common-pre
 
-      - name: "Common Test Actions"
+      - name: "Build workspace and run tests"
         uses: ./.github/actions/common-test
         with:
           os: ${{ matrix.os }}

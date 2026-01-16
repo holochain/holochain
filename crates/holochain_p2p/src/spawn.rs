@@ -86,30 +86,28 @@ pub struct HolochainP2pConfig {
     /// If `None`, will not report.
     pub report: ReportConfig,
 
-    /// If true, will use kitsune core test bootstrap / transport / etc.
-    #[cfg(feature = "test_utils")]
-    pub k2_test_builder: bool,
-
     /// If true, will disable the default bootstrap module.
     ///
-    /// This flag is only used when [HolochainP2pConfig::k2_test_builder] is true.
+    /// This flag is only used in tests.
     #[cfg(feature = "test_utils")]
     pub disable_bootstrap: bool,
 
     /// If true, will replace the default publish module with a no-op module.
     ///
-    /// This flag is only used when [HolochainP2pConfig::k2_test_builder] is true.
+    /// This flag is only used in tests.
     #[cfg(feature = "test_utils")]
     pub disable_publish: bool,
 
     /// If true, will leave the default no-op gossip module in place rather than replacing it with
     /// the real gossip module.
     ///
-    /// This flag is only used when [HolochainP2pConfig::k2_test_builder] is true.
+    /// This flag is only used in tests.
     #[cfg(feature = "test_utils")]
     pub disable_gossip: bool,
 
     /// Request using the in-memory bootstrap module instead of the real one.
+    ///
+    /// This flag is only used in tests.
     #[cfg(feature = "test_utils")]
     pub mem_bootstrap: bool,
 }
@@ -125,8 +123,8 @@ impl std::fmt::Debug for HolochainP2pConfig {
 
         #[cfg(feature = "test_utils")]
         {
-            dbg.field("k2_test_builder", &self.k2_test_builder)
-                .field("disable_bootstrap", &self.disable_bootstrap)
+            dbg.field("disable_bootstrap", &self.disable_bootstrap)
+                .field("mem_bootstrap", &self.mem_bootstrap)
                 .field("disable_publish", &self.disable_publish)
                 .field("disable_gossip", &self.disable_gossip);
         }
@@ -148,8 +146,6 @@ impl Default for HolochainP2pConfig {
             compat: Default::default(),
             request_timeout: Duration::from_secs(60),
             report: ReportConfig::default(),
-            #[cfg(feature = "test_utils")]
-            k2_test_builder: false,
             #[cfg(feature = "test_utils")]
             disable_bootstrap: false,
             #[cfg(feature = "test_utils")]

@@ -10,7 +10,8 @@ edition = "2021"
 
 # reminder - do not use workspace deps
 [dependencies]
-kitsune2_transport_tx5 = { version = "0.3.0", optional = true }
+kitsune2_transport_tx5 = { version = "0.4.0-dev.2", optional = true }
+kitsune2_transport_iroh = { version = "0.4.0-dev.2", optional = true }
 derive_more = { version = "2.0", features = ["from"] }
 holo_hash = { version = "^0.6.0", path = "../holo_hash", features = ["full"] }
 holochain_state_types = { version = "^0.6.0", path = "../holochain_state_types" }
@@ -20,9 +21,9 @@ holochain_zome_types = { version = "^0.6.0", path = "../holochain_zome_types" }
 holochain_util = { version = "^0.6.0", default-features = false, path = "../holochain_util", features = [
   "jsonschema",
 ] }
-kitsune2_api = "0.3.0"
-kitsune2_core = { version = "0.3.0" }
-kitsune2_gossip = { version = "0.3.0", optional = true }
+kitsune2_api = "0.4.0-dev.2"
+kitsune2_core = { version = "0.4.0-dev.2" }
+kitsune2_gossip = { version = "0.4.0-dev.2", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"
@@ -59,8 +60,9 @@ sqlite-encrypted = [
 ]
 schema = [
   "kitsune2_gossip/schema",
-  "kitsune2_transport_tx5/schema",
   "kitsune2_core/schema",
+  "kitsune2_transport_tx5/schema",
+  "kitsune2_transport_iroh/schema",
 ]
 sqlite = [
   "holo_hash/sqlite",

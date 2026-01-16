@@ -17,6 +17,7 @@ pub type DynSweetRendezvous = Arc<dyn SweetRendezvous>;
 /// Local rendezvous infrastructure for unit testing.
 pub struct SweetLocalRendezvous {
     bs_addr: String,
+    #[cfg(any(feature = "transport-tx5-backend-go-pion", feature = "transport-iroh"))]
     sig_addr: String,
     bootstrap_hnd: Mutex<Option<kitsune2_bootstrap_srv::BootstrapSrv>>,
     bootstrap_addr: SocketAddr,
@@ -35,9 +36,18 @@ impl Drop for SweetLocalRendezvous {
 async fn spawn_test_bootstrap(
     bind_addr: Option<SocketAddr>,
 ) -> std::io::Result<(kitsune2_bootstrap_srv::BootstrapSrv, SocketAddr)> {
+    // We have mixed features between ring and aws_lc so the "lookup by crate features" doesn't
+    // return a default.
+    // If this is called twice due to parallel tests, ignore result, because it'll fail.
+    #[cfg(feature = "transport-iroh")]
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
     let mut config = kitsune2_bootstrap_srv::Config::testing();
-    config.sbd.limit_clients = 100;
-    config.sbd.disable_rate_limiting = true;
+    #[cfg(feature = "transport-tx5-backend-go-pion")]
+    {
+        config.sbd.limit_clients = 100;
+        config.sbd.disable_rate_limiting = true;
+    }
 
     if let Some(bind_addr) = bind_addr {
         config.listen_address_list = vec![bind_addr];
@@ -71,7 +81,13 @@ impl SweetLocalRendezvous {
 
         Arc::new(Self {
             bs_addr: format!("http://{bootstrap_addr}"),
+            #[cfg(feature = "transport-tx5-backend-go-pion")]
             sig_addr: format!("ws://{bootstrap_addr}"),
+            #[cfg(all(
+                feature = "transport-iroh",
+                not(feature = "transport-tx5-backend-go-pion")
+            ))]
+            sig_addr: format!("http://{bootstrap_addr}"),
             bootstrap_hnd,
             bootstrap_addr,
         })
