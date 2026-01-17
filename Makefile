@@ -98,7 +98,7 @@ test-workspace-wasmer_sys:
 		--features $(DEFAULT_FEATURES),wasmer_sys
 
 # executes tests on all crates with wasmer compiler
-test-workspace-wasmer_sys-unstable-transport_iroh:
+test-workspace-wasmer_sys-unstable:
 	RUST_BACKTRACE=1 cargo nextest run \
 		--workspace \
 		--locked \
