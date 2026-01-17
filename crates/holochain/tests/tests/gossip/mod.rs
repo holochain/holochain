@@ -100,7 +100,7 @@ async fn new_conductor_reaches_consistency_with_existing_conductor() {
     holochain_trace::test_run();
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
     let mk_conductor = || async {
-        let mut conductor = SweetConductor::from_standard_config().await;
+        let mut conductor = SweetConductor::standard().await;
         let app = conductor.setup_app("app", [&dna_file]).await.unwrap();
         let cell = app.into_cells().pop().unwrap();
         let zome = cell.zome(SweetInlineZomes::COORDINATOR);

@@ -42,7 +42,7 @@ async fn can_install_two_apps_with_the_same_dna_hash_but_different_coordinators(
     assert_eq!(dna_file_1.dna_hash(), dna_file_2.dna_hash());
 
     // Install the first app and write an entry to the DHT
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
 
     let cells_1 = conductor
         .setup_app("app_1", [&dna_file_1])

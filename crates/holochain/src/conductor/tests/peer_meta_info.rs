@@ -28,7 +28,7 @@ async fn peer_meta_info() {
         Default::default(),
     )
     .await;
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
     let app_id: InstalledAppId = "app".into();
     conductor
         .setup_app(&app_id, &[dna1.clone(), dna2.clone()])
@@ -152,7 +152,7 @@ async fn app_peer_meta_info() {
     let (dna1, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let (dna2, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
     let app_id1: InstalledAppId = "app1".into();
     conductor
         .setup_app(&app_id1, std::slice::from_ref(&dna1))

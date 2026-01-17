@@ -122,6 +122,15 @@ impl SweetConductor {
         Self::create_with_defaults(config, None, vous).await
     }
 
+    /// Create a SweetConductor with a local rendezvous server.
+    pub async fn standard() -> SweetConductor {
+        SweetConductor::from_config_rendezvous(
+            SweetConductorConfig::rendezvous(false),
+            SweetLocalRendezvous::new().await,
+        )
+        .await
+    }
+
     /// Create a SweetConductor with a new set of TestEnvs from the given config
     pub async fn from_config_rendezvous<C, R>(config: C, rendezvous: R) -> SweetConductor
     where
@@ -258,11 +267,6 @@ impl SweetConductor {
             .test(extra_dna_files)
             .await
             .unwrap()
-    }
-
-    /// Create a SweetConductor with a new set of TestEnvs from the given config
-    pub async fn from_standard_config() -> SweetConductor {
-        Self::from_config(SweetConductorConfig::standard()).await
     }
 
     /// Get the rendezvous config that this conductor is using, if any

@@ -95,6 +95,8 @@ impl SweetConductorConfig {
 
         if bootstrap {
             config.network.bootstrap_url = url2::url2!("rendezvous:");
+        } else {
+            // config.network.disable_bootstrap = true;
         }
 
         config.network.signal_url = url2::url2!("rendezvous:");

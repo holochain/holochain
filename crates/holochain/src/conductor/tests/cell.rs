@@ -7,7 +7,7 @@ use holochain_wasm_test_utils::TestWasm;
 async fn check_or_run_zome_init_triggers_zome_initialization() {
     let zome = TestWasm::InitPass;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
     let app = conductor.setup_app("app", [&dna]).await.unwrap();
     let cell_id = app.cells()[0].cell_id();
 
@@ -66,7 +66,7 @@ async fn check_or_run_zome_init_triggers_zome_initialization() {
 async fn check_or_run_zome_init_does_nothing_if_already_initialized() {
     let zome = TestWasm::InitPass;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
     let app = conductor.setup_app("app", [&dna]).await.unwrap();
     let cell_id = app.cells()[0].cell_id();
     let sweet_zome = app.cells()[0].zome(TestWasm::InitPass);

@@ -47,7 +47,7 @@ async fn schedule_ephemeral_ok() {
     });
 
     let dna = SweetDnaFile::unique_from_inline_zomes(zome).await;
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
     let app = conductor
         .setup_app("app", std::slice::from_ref(&dna.0))
         .await
@@ -98,7 +98,7 @@ async fn schedule_ephemeral_error() {
     });
 
     let dna = SweetDnaFile::unique_from_inline_zomes(zome).await;
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
     let app = conductor
         .setup_app("app", std::slice::from_ref(&dna.0))
         .await
@@ -149,7 +149,7 @@ async fn schedule_persisted_fn_then_unschedule() {
     });
 
     let dna = SweetDnaFile::unique_from_inline_zomes(zome).await;
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
     let app = conductor
         .setup_app("app", std::slice::from_ref(&dna.0))
         .await
@@ -194,7 +194,7 @@ async fn schedule_same_agent() {
     });
     let dna_0 = SweetDnaFile::unique_from_inline_zomes(zome.clone()).await;
     let dna_1 = SweetDnaFile::unique_from_inline_zomes(zome).await;
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
     // Set up 1 app with two different dnas but same agent pub key
     let app = conductor
         .setup_app("app", &[dna_0.0.clone(), dna_1.0.clone()])
@@ -272,7 +272,7 @@ async fn schedule_same_dna() {
         ))))
     });
     let dna_0 = SweetDnaFile::unique_from_inline_zomes(zome.clone()).await;
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
     // Set up 2 apps each using the same dna but with different agent pub key
     let app0 = conductor
         .setup_app("app0", std::slice::from_ref(&dna_0.0))
@@ -359,7 +359,7 @@ async fn schedule_persisted_fn_with_bad_crontab() {
     });
 
     let dna = SweetDnaFile::unique_from_inline_zomes(zome).await;
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
     let app = conductor
         .setup_app("app", std::slice::from_ref(&dna.0))
         .await
@@ -402,7 +402,7 @@ async fn schedule_persisted_fn_that_errors() {
     });
 
     let dna = SweetDnaFile::unique_from_inline_zomes(zome).await;
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
     let app = conductor
         .setup_app("app", std::slice::from_ref(&dna.0))
         .await
@@ -445,7 +445,7 @@ async fn schedule_persisted_crontab_end() {
     });
 
     let dna = SweetDnaFile::unique_from_inline_zomes(zome).await;
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
     let app = conductor
         .setup_app("app", std::slice::from_ref(&dna.0))
         .await

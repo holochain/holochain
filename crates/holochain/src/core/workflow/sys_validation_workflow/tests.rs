@@ -41,7 +41,7 @@ async fn sys_validation_produces_invalid_chain_op_warrant() {
     let zome = SweetInlineZomes::new(vec![], 0);
     let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zome).await;
 
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
     let alice = conductor.setup_app("app", [&dna]).await.unwrap();
 
     // - Create an invalid op

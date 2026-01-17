@@ -326,7 +326,7 @@ async fn agents_can_find_entries_with_partial_path() {
 async fn paths_are_case_sensitive() {
     holochain_trace::test_run();
 
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Paths]).await;
 

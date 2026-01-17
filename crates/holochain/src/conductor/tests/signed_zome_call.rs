@@ -15,7 +15,7 @@ use std::collections::{BTreeSet, HashSet};
 async fn signed_zome_call() {
     let zome = TestWasm::Create;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
     let app = conductor.setup_app("app", [&dna]).await.unwrap();
     let cell_id = app.cells()[0].cell_id();
     let agent_pub_key = cell_id.agent_pubkey().clone();
@@ -147,7 +147,7 @@ async fn signed_zome_call() {
 async fn signed_zome_call_wildcard() {
     let zome = TestWasm::Create;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
     let app = conductor.setup_app("app", [&dna]).await.unwrap();
     let cell_id = app.cells()[0].cell_id();
     let agent_pub_key = app.agent().clone();
@@ -241,7 +241,7 @@ async fn cap_grant_info_call() {
 
     let zome = TestWasm::Create;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
     let app = conductor.setup_app("app", [&dna]).await.unwrap();
     let cell_id = app.cells()[0].cell_id();
     let agent_pub_key = cell_id.agent_pubkey().clone();
@@ -352,7 +352,7 @@ async fn cap_grant_info_call() {
 async fn grant_zome_call_capability_call() {
     let zome = TestWasm::Create;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
     let app = conductor.setup_app("app", [&dna]).await.unwrap();
     let cell_id = app.cells()[0].cell_id();
 
@@ -458,7 +458,7 @@ async fn grant_zome_call_capability_call() {
 async fn grant_zome_call_capability_call_ensures_zome_initialization() {
     let zome = TestWasm::InitPass;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
     let app = conductor.setup_app("app", [&dna]).await.unwrap();
     let cell_id = app.cells()[0].cell_id();
 
@@ -542,7 +542,7 @@ async fn revoke_zome_call_capability_call() {
 
     let zome = TestWasm::Create;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
     let app = conductor.setup_app("app", [&dna]).await.unwrap();
     let cell_id = app.cells()[0].cell_id();
 
@@ -674,7 +674,7 @@ async fn revoke_zome_call_capability_call_ensures_zome_initialization() {
 
     let zome = TestWasm::InitPass;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
     let app = conductor.setup_app("app", [&dna]).await.unwrap();
     let cell_id = app.cells()[0].cell_id();
 

@@ -123,10 +123,9 @@ pub mod wasm_test {
     /// we can get an entry hash out of the fn directly
     #[tokio::test(flavor = "multi_thread")]
     async fn create_entry_test() {
-        let ribosome =
-            RealRibosomeFixturator::new(crate::fixt::Zomes(vec![TestWasm::Create]))
-                .next()
-                .unwrap();
+        let ribosome = RealRibosomeFixturator::new(crate::fixt::Zomes(vec![TestWasm::Create]))
+            .next()
+            .unwrap();
         let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
         call_context.zome = TestWasmPair::<IntegrityZome, CoordinatorZome>::from(TestWasm::Create)
             .coordinator
@@ -202,7 +201,7 @@ pub mod wasm_test {
         const N: u32 = 50;
 
         holochain_trace::test_run();
-        let mut conductor = SweetConductor::from_standard_config().await;
+        let mut conductor = SweetConductor::standard().await;
         let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::MultipleCalls]).await;
 
         let app = conductor.setup_app("app", [&dna]).await.unwrap();

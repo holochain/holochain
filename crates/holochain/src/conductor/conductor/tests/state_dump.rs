@@ -10,7 +10,7 @@ use holochain_wasm_test_utils::TestWasm;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn dump_full_state() {
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Crd])
         .await
         .0;
