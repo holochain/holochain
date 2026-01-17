@@ -112,7 +112,7 @@ async fn sys_validation_produces_forked_chain_warrant() {
         SweetDnaFile::unique_from_inline_zomes(crate::test_utils::inline_zomes::simple_crud_zome())
             .await;
 
-    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    let mut conductors = SweetConductorBatch::standard(2).await;
     let ((alice,), (bob,)) = conductors
         .setup_app("app", [&dna])
         .await
