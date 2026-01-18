@@ -2,12 +2,14 @@ use crate::conductor::space::TestSpaces;
 use crate::conductor::Conductor;
 use crate::core::ribosome::real_ribosome::{ModuleCacheLock, RealRibosome};
 use crate::core::workflow::incoming_dht_ops_workflow::op_exists;
+use crate::sweettest::SweetConductorConfig;
 use crate::test_utils::fake_valid_dna_file;
 use holo_hash::HasHash;
 use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_p2p::actor::MockHcP2p;
 use holochain_p2p::HolochainP2pDna;
 use holochain_state::prelude::*;
+use holochain_trace::test_run;
 use holochain_types::cell_config_overrides::CellConfigOverrides;
 use holochain_wasmer_host::module::ModuleCache;
 use holochain_zome_types::action;
@@ -16,6 +18,7 @@ use tokio::sync::broadcast;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_cell_handle_publish() {
+    test_run();
     let keystore = holochain_keystore::test_keystore();
 
     let agent_key = keystore.new_sign_keypair_random().await.unwrap();
@@ -35,8 +38,10 @@ async fn test_cell_handle_publish() {
 
     let db_dir = test_db_dir().path().to_path_buf();
     let data_root_path: DataRootPath = db_dir.clone().into();
+    let config =
+        SweetConductorConfig::standard().tune_network_config(|nc| nc.disable_bootstrap = true);
     let handle = Conductor::builder()
-        .config(crate::sweettest::SweetConductorConfig::standard().into())
+        .config(config.into())
         .with_keystore(keystore.clone())
         .with_data_root_path(data_root_path.clone())
         .test(&[])

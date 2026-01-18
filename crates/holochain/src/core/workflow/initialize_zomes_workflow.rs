@@ -203,8 +203,10 @@ mod tests {
             .return_const(dna_def_hashed.clone());
 
         let db_dir = test_db_dir();
+        let config =
+            SweetConductorConfig::standard().tune_network_config(|nc| nc.disable_bootstrap = true);
         let conductor_handle = Conductor::builder()
-            .config(SweetConductorConfig::standard().into())
+            .config(config.into())
             .with_data_root_path(db_dir.path().to_path_buf().into())
             .test(&[])
             .await

@@ -1257,7 +1257,6 @@ async fn app_validation_produces_warrants() {
 
 /// Alice creates an invalid op, Bob authors a warrant, and Carol validates the warrant+op but does
 /// not issue a second warrant.
-#[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
 async fn skip_issuing_warrant_if_one_found() {
     holochain_trace::test_run();
@@ -1306,9 +1305,12 @@ async fn skip_issuing_warrant_if_one_found() {
         nc.disable_gossip = true;
     });
 
-    let mut conductors =
-        SweetConductorBatch::from_configs([no_validate_config, other_config.clone(), other_config])
-            .await;
+    let mut conductors = SweetConductorBatch::from_configs_rendezvous([
+        no_validate_config,
+        other_config.clone(),
+        other_config,
+    ])
+    .await;
 
     let ((alice,), (_bob,), (carol,)) = conductors
         .setup_app("test_app", [&dna_file])

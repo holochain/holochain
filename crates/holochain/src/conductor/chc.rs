@@ -259,7 +259,7 @@ mod tests {
 
         let mut config = SweetConductorConfig::standard();
         config.chc_url = Some(url2::Url2::parse(CHC_LOCAL_MAGIC_URL));
-        let mut conductors = SweetConductorBatch::from_config(4, config).await;
+        let mut conductors = SweetConductorBatch::from_config_rendezvous(4, config).await;
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
