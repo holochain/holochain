@@ -80,7 +80,9 @@ impl SweetConductorBatch {
         Self::from_configs_rendezvous(std::iter::repeat_n(config, num)).await
     }
 
-    /// Create the given number of new SweetConductors, each with its own new TestEnvironments
+    /// Create the given number of new SweetConductors, each with its own new TestEnvironments.
+    ///
+    /// Bootstrapping is enabled by default, and all conductors will use the same rendezvous server.
     pub async fn standard(num: usize) -> SweetConductorBatch {
         Self::from_config_rendezvous(num, SweetConductorConfig::rendezvous(true)).await
     }

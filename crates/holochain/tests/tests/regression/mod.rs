@@ -251,7 +251,7 @@ async fn zero_arc_can_delete_link() {
 
     let other_config = SweetConductorConfig::standard();
     let mut conductors =
-        SweetConductorBatch::from_configs(vec![other_config, empty_arc_conductor_config]).await;
+        SweetConductorBatch::from_configs_rendezvous(vec![other_config, empty_arc_conductor_config]).await;
 
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Link])
         .await

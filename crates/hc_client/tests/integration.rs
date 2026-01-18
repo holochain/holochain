@@ -699,7 +699,8 @@ async fn list_dnas_with_origin() -> Result<()> {
         },
     }]);
 
-    let mut conductor = SweetConductor::from_config(config).await;
+    let mut conductor =
+        SweetConductor::from_config_rendezvous(config, SweetLocalRendezvous::new().await).await;
     let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
     let expected_hash = dna.dna_hash().to_string();
 

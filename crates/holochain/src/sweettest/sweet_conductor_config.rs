@@ -76,10 +76,7 @@ impl SweetConductorConfig {
         self
     }
 
-    /// Standard config for SweetConductors.
-    ///
-    /// Assumes bootstrapping is enabled and configures networking to
-    /// spawn a local rendezvous server.
+    /// Standard config for SweetConductors, disabling bootstrapping.
     pub fn standard() -> Self {
         let mut network_config = NetworkConfig::default()
             .with_gossip_initiate_interval_ms(1000)
@@ -90,6 +87,7 @@ impl SweetConductorConfig {
         network_config.bootstrap_url = url2::url2!("rendezvous:");
         network_config.signal_url = url2::url2!("rendezvous:");
         network_config.relay_url = url2::url2!("rendezvous:");
+        network_config.disable_bootstrap = true;
 
         SweetConductorConfig::from(network_config).tune_conductor(|tune| {
             tune.sys_validation_retry_delay = Some(std::time::Duration::from_secs(1));
@@ -100,10 +98,10 @@ impl SweetConductorConfig {
     pub fn rendezvous(bootstrap: bool) -> Self {
         let mut config = Self::standard();
 
-        if !bootstrap {
-            config.network.disable_bootstrap = true;
+        if bootstrap {
+            config.network.disable_bootstrap = false;
         }
-        
+
         config
     }
 

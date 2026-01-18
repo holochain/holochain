@@ -123,6 +123,8 @@ impl SweetConductor {
     }
 
     /// Create a SweetConductor with a local rendezvous server.
+    ///
+    /// Bootstrapping is disabled by default.
     pub async fn standard() -> SweetConductor {
         SweetConductor::from_config_rendezvous(
             SweetConductorConfig::rendezvous(false),
@@ -199,7 +201,10 @@ impl SweetConductor {
                 .as_str()
                 .starts_with("rendezvous:")
             {
-                panic!("Must use rendezvous SweetConductor if rendezvous: is specified in config.network.transport_pool[].signal_url");
+                panic!("Must use rendezvous SweetConductor if rendezvous: is specified in config.network.signal_url");
+            }
+            if config.network.relay_url.as_str().starts_with("rendezvous:") {
+                panic!("Must use rendezvous SweetConductor if rendezvous: is specified in config.network.relay_url");
             }
             config.into()
         };
