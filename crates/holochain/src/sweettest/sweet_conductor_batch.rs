@@ -31,25 +31,13 @@ impl SweetConductorBatch {
         Self(conductors)
     }
 
-    /// Map the given ConductorConfigs into SweetConductors, each with its own new TestEnvironments
-    #[allow(clippy::let_and_return)]
-    pub async fn from_configs<C, I>(configs: I) -> SweetConductorBatch
+    /// Create a number of SweetConductors from the given ConductorConfig, each with its own new TestEnvironments.
+    /// using a "rendezvous" bootstrap server for peer discovery.
+    pub async fn from_config_rendezvous<C>(num: usize, config: C) -> SweetConductorBatch
     where
-        C: Into<SweetConductorConfig>,
-        I: IntoIterator<Item = C>,
+        C: Into<SweetConductorConfig> + Clone,
     {
-        Self::new(
-            future::join_all(configs.into_iter().map(|c| SweetConductor::from_config(c))).await,
-        )
-    }
-
-    /// Create the given number of new SweetConductors, each with its own new TestEnvironments
-    pub async fn from_config<C: Clone + Into<SweetConductorConfig>>(
-        num: usize,
-        config: C,
-    ) -> SweetConductorBatch {
-        let config = config.into();
-        Self::from_configs(std::iter::repeat_n(config, num)).await
+        Self::from_configs_rendezvous(std::iter::repeat_n(config, num)).await
     }
 
     /// Create SweetConductors from the given ConductorConfigs, each with its own new TestEnvironments,
@@ -69,15 +57,6 @@ impl SweetConductorBatch {
             )
             .await,
         )
-    }
-
-    /// Create a number of SweetConductors from the given ConductorConfig, each with its own new TestEnvironments.
-    /// using a "rendezvous" bootstrap server for peer discovery.
-    pub async fn from_config_rendezvous<C>(num: usize, config: C) -> SweetConductorBatch
-    where
-        C: Into<SweetConductorConfig> + Clone,
-    {
-        Self::from_configs_rendezvous(std::iter::repeat_n(config, num)).await
     }
 
     /// Create the given number of new SweetConductors, each with its own new TestEnvironments.
