@@ -258,7 +258,6 @@ mod tests {
         holochain_trace::test_run();
 
         let mut config = SweetConductorConfig::standard();
-        // config.chc_url = Some(url2::Url2::parse("http://127.0.0.1:40845/"));
         config.chc_url = Some(url2::Url2::parse(CHC_LOCAL_MAGIC_URL));
         let mut conductors = SweetConductorBatch::from_config(4, config).await;
 

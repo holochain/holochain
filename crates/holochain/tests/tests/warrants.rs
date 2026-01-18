@@ -206,9 +206,7 @@ async fn author_of_invalid_warrant_is_blocked() {
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(inline_zome).await;
 
-    let config = SweetConductorConfig::standard();
-
-    let mut conductors = SweetConductorBatch::from_configs([config.clone(), config]).await;
+    let mut conductors = SweetConductorBatch::standard(2).await;
 
     let apps = conductors.setup_app("app", [&dna_file]).await.unwrap();
 

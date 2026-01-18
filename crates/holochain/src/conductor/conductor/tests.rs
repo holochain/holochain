@@ -359,7 +359,7 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
                 Ok(hash)
             });
 
-    let mut conductor = SweetConductorConfig::standard().build_conductor().await;
+    let mut conductor = SweetConductor::standard().await;
     let app = common_genesis_test_app(&mut conductor, bad_zome)
         .await
         .unwrap();
