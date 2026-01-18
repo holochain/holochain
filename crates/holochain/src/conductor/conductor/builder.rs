@@ -229,8 +229,6 @@ impl ConductorBuilder {
             report,
             compat,
             request_timeout: std::time::Duration::from_secs(config.network.request_timeout_s),
-            #[cfg(feature = "test_utils")]
-            mem_bootstrap: config.network.mem_bootstrap,
             ..Default::default()
         };
 
@@ -462,8 +460,6 @@ impl ConductorBuilder {
             disable_publish: config.network.disable_publish,
             #[cfg(feature = "test_utils")]
             disable_gossip: config.network.disable_gossip,
-            #[cfg(feature = "test_utils")]
-            mem_bootstrap: config.network.mem_bootstrap,
             ..Default::default()
         };
 

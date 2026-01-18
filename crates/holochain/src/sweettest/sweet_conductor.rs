@@ -183,10 +183,7 @@ impl SweetConductor {
 
         let config: SweetConductorConfig = config.into();
         let mut config: ConductorConfig = if let Some(r) = rendezvous.clone() {
-            config
-                .tune_network_config(|nc| nc.mem_bootstrap = false)
-                .apply_rendezvous(&r)
-                .into()
+            config.apply_rendezvous(&r).into()
         } else {
             if config
                 .network
@@ -450,7 +447,7 @@ impl SweetConductor {
                         .unwrap()
                         .is_some()
                 },
-                None,
+                Some(10_000),
                 None,
             )
             .await
@@ -813,12 +810,6 @@ impl SweetConductor {
 
         // Collect all the agent infos across the spaces on these conductors.
         for c in conductors.clone().into_iter() {
-            if c.get_config().has_rendezvous_bootstrap() {
-                panic!(
-                    "exchange_peer_info cannot reliably be used with rendezvous bootstrap servers"
-                );
-            }
-
             for dna_hash in c.spaces.get_from_spaces(|s| s.dna_hash.clone()) {
                 let agent_infos = c
                     .holochain_p2p()

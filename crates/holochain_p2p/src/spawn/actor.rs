@@ -840,10 +840,8 @@ impl HolochainP2pActor {
         #[cfg(feature = "test_utils")]
         {
             if config.disable_bootstrap {
+                tracing::info!("Running with bootstrap disabled");
                 builder.bootstrap = Arc::new(test::NoopBootstrapFactory);
-            } else if config.mem_bootstrap {
-                tracing::info!("Running with mem bootstrap");
-                builder.bootstrap = kitsune2_core::factories::MemBootstrapFactory::create();
             }
             if config.disable_gossip {
                 tracing::info!("Running with gossip disabled");

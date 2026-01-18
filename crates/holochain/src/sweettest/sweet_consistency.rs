@@ -196,6 +196,7 @@ async fn await_op_integration(
 
 #[cfg(test)]
 mod tests {
+    use crate::sweettest::SweetConductorConfig;
     use crate::{
         prelude::holochain_serial,
         sweettest::{await_consistency, check_consistency, SweetConductorBatch, SweetDnaFile},
@@ -204,7 +205,6 @@ mod tests {
     use ::fixt::fixt;
     use hdk::prelude::{ActionFixturator, SignatureFixturator};
     use holo_hash::ActionHash;
-    use holochain_conductor_api::conductor::{ConductorConfig, NetworkConfig};
     use holochain_serialized_bytes::SerializedBytes;
     use holochain_state::prelude::insert_op_dht;
     use holochain_types::dht_op::{ChainOp, DhtOpHashed};
@@ -311,14 +311,9 @@ mod tests {
     async fn consistency_not_reached_when_ops_not_synced() {
         holochain_trace::test_run();
         // No bootstrap service.
-        let config = ConductorConfig {
-            network: NetworkConfig {
-                mem_bootstrap: false,
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-        let mut conductors = SweetConductorBatch::from_config(2, config).await;
+        let mut config = SweetConductorConfig::rendezvous(false);
+        config.network.disable_bootstrap = true;
+        let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
         let dna_file = SweetDnaFile::unique_from_inline_zomes((
             "integrity",
             InlineIntegrityZome::new_unique(vec![], 0),
@@ -348,7 +343,7 @@ mod tests {
         .unwrap();
 
         // Genesis actions will be integrated but not gossiped. Consistency cannot be reached.
-        await_consistency(&[alice, bob]).await.unwrap_err();
+        check_consistency(&[alice, bob]).await.unwrap_err();
     }
 
     #[tokio::test(flavor = "multi_thread")]

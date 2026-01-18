@@ -21,14 +21,11 @@ async fn sys_validation_workflow_test() {
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
-    let config = SweetConductorConfig::standard();
-    let mut conductors = SweetConductorBatch::from_config(2, config).await;
+    let mut conductors = SweetConductorBatch::standard(2).await;
     let apps = conductors.setup_app("test_app", [&dna_file]).await.unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();
     let alice_cell_id = alice.cell_id().clone();
     let bob_cell_id = bob.cell_id().clone();
-
-    conductors.exchange_peer_info().await;
 
     run_test(alice_cell_id, bob_cell_id, conductors, dna_file).await;
 }
