@@ -196,7 +196,7 @@ async fn await_op_integration(
 
 #[cfg(test)]
 mod tests {
-    use crate::sweettest::SweetConductorConfig;
+    use crate::sweettest::{await_consistency_s, SweetConductorConfig};
     use crate::{
         prelude::holochain_serial,
         sweettest::{await_consistency, check_consistency, SweetConductorBatch, SweetDnaFile},
@@ -343,7 +343,7 @@ mod tests {
         .unwrap();
 
         // Genesis actions will be integrated but not gossiped. Consistency cannot be reached.
-        check_consistency(&[alice, bob]).await.unwrap_err();
+        await_consistency_s(10, &[alice, bob]).await.unwrap_err();
     }
 
     #[tokio::test(flavor = "multi_thread")]

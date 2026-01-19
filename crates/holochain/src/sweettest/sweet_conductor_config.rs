@@ -10,22 +10,16 @@ pub(crate) static NUM_CREATED: AtomicUsize = AtomicUsize::new(0);
 
 /// Wrapper around ConductorConfig with some helpful builder methods
 #[derive(Clone, derive_more::Deref, derive_more::DerefMut, derive_more::Into)]
-pub struct SweetConductorConfig {
+pub struct SweetConductorConfig(
     #[deref]
     #[deref_mut]
     #[into]
-    config: ConductorConfig,
-
-    // Helps to keep owned references alive
-    rendezvous: Option<DynSweetRendezvous>,
-}
+    ConductorConfig,
+);
 
 impl From<ConductorConfig> for SweetConductorConfig {
     fn from(config: ConductorConfig) -> Self {
-        Self {
-            config,
-            rendezvous: None,
-        }
+        Self(config)
     }
 }
 
@@ -85,7 +79,6 @@ impl SweetConductorConfig {
     }
     /// Rewrite the config to point to the given rendezvous server
     pub fn apply_rendezvous(mut self, rendezvous: &DynSweetRendezvous) -> Self {
-        self.rendezvous = Some(rendezvous.clone());
         let network = &mut self.network;
 
         if network.bootstrap_url.as_str() == "rendezvous:" {
@@ -101,11 +94,6 @@ impl SweetConductorConfig {
         }
 
         self
-    }
-
-    /// Getter
-    pub fn get_rendezvous(&self) -> Option<DynSweetRendezvous> {
-        self.rendezvous.clone()
     }
 
     /// Apply a function to the conductor's tuning parameters to customise them.
