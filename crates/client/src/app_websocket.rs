@@ -11,6 +11,7 @@ use holochain_nonce::fresh_nonce;
 use holochain_types::app::{
     CreateCloneCellPayload, DisableCloneCellPayload, EnableCloneCellPayload, MemproofMap,
 };
+use holochain_types::network::HolochainTransportStats;
 use holochain_types::prelude::{CloneId, Signal};
 use holochain_websocket::{ConnectRequest, WebsocketConfig};
 use holochain_zome_types::{
@@ -398,7 +399,7 @@ impl AppWebsocket {
         }
     }
 
-    pub async fn dump_network_stats(&self) -> ConductorApiResult<kitsune2_api::TransportStats> {
+    pub async fn dump_network_stats(&self) -> ConductorApiResult<HolochainTransportStats> {
         let msg = AppRequest::DumpNetworkStats;
         let response = self.inner.send(msg).await?;
         match response {

@@ -315,7 +315,7 @@ pub enum AppResponse {
     NetworkMetricsDumped(HashMap<DnaHash, Kitsune2NetworkMetrics>),
 
     /// The successful result of a call to [`AppRequest::DumpNetworkStats`].
-    NetworkStatsDumped(kitsune2_api::TransportStats),
+    NetworkStatsDumped(HolochainTransportStats),
 
     /// All the wasm host functions supported by this conductor.
     ListWasmHostFunctions(Vec<String>),

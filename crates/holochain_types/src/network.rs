@@ -2,6 +2,7 @@
 
 use holo_hash::DnaHash;
 use serde_derive::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Request network metrics from Kitsune2.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -50,4 +51,17 @@ pub struct LocalAgentSummary {
     /// ops in the target arc. Once the DHT state appears to be in sync with the target arc, the
     /// storage arc can be updated towards the target arc.
     pub target_arc: kitsune2_api::DhtArc,
+}
+
+/// Similar struct to [`AppApiTransportStats`](Kitsune2Api::AppApiTransportStats) but with Holochain types.
+///
+/// There is a [`DnaHash`] instead of a [`Space`] in the `blocked_message_counts` field.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HolochainTransportStats {
+    /// Stats for a transport connection.
+    pub transport_stats: kitsune2_api::TransportStats,
+
+    /// Blocked message counts.
+    pub blocked_message_counts:
+        HashMap<kitsune2_api::Url, HashMap<DnaHash, kitsune2_api::MessageBlockCount>>,
 }

@@ -6,6 +6,7 @@ use holochain_conductor_api::{
     AppAuthenticationTokenIssued, AppInfo, AppInterfaceInfo, AppStatusFilter, FullStateDump,
     IssueAppAuthenticationTokenPayload, PeerMetaInfo, StorageInfo,
 };
+use holochain_types::network::HolochainTransportStats;
 use holochain_types::websocket::AllowedOrigins;
 use holochain_types::{
     dna::AgentPubKey,
@@ -439,7 +440,7 @@ impl AdminWebsocket {
         }
     }
 
-    pub async fn dump_network_stats(&self) -> ConductorApiResult<kitsune2_api::ApiTransportStats> {
+    pub async fn dump_network_stats(&self) -> ConductorApiResult<HolochainTransportStats> {
         let msg = AdminRequest::DumpNetworkStats;
         let response = self.send(msg).await?;
         match response {

@@ -455,7 +455,7 @@ async fn dump_network_stats() {
     #[cfg(feature = "transport-tx5-backend-go-pion")]
     assert_eq!("BackendGoPion", network_stats.backend);
     #[cfg(feature = "transport-iroh")]
-    assert_eq!("iroh", network_stats.backend);
+    assert_eq!("iroh", network_stats.transport_stats.backend);
 }
 
 #[tokio::test(flavor = "multi_thread")]
