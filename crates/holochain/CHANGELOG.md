@@ -7,24 +7,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Locally authored data is now only published after it has been integrated. This resolves a race condition where remote conductors might fail to fetch published ops by id because they haven't been integrated locally yet. #5545
+## 0.7.0-dev.8
+
+- Locally authored data is now only published after it has been integrated. This resolves a race condition where remote conductors might fail to fetch published ops by id because they haven’t been integrated locally yet. \#5545
 - **BREAKING CHANGE**: `Conductor` function `install_app_with_manifest` is now behind the `test_utils` feature, as it was intended only for use by tests.
 - Fix: Conductor `shutdown` function now removes all running cells.
 - Fix: Ensure that only the `holochain_p2p` function `join` creates a kitsune2 space. Previously all `holochain_p2p` requests would create a kitsune2 space if it did not exist, which caused a race where workflows could recreate a removed kitsune space after Conductor shutdown.
 - CI: Run windows test workflow on windows 2025 runners. \#5594
 - **BREAKING CHANGE**: Remove features for tx5 transport variants `datachannel-vendored` and `backend-libdatachannel`. The only supported tx5 transport is `backend-go-pion` now.
 - **BREAKING CHANGE**: Default to iroh transport for all binaries.
-- Revert to iroh's public relay server URL `https://use1-1.relay.n0.iroh-canary.iroh.link./` in the conductor config.
+- Revert to iroh’s public relay server URL `https://use1-1.relay.n0.iroh-canary.iroh.link./` in the conductor config.
 - Delete deprecated block targets to block a node by its ID or a DNA of a node.
 - Remove unusable block variant `CellBlockReason::App`.
-- Reinstate tests that ensure publish and gossip doesn't contact blocked nodes.
-- Expanded `GetOptions` with network control fields (`remote_agent_count`, `timeout_ms`) to give developers finer-grained control over network requests. The cascade now respects these options when making network calls. #5422
-- **BREAKING CHANGE**: `GetOptions` fields are now private with getter methods. Code that accessed `options.strategy` directly must now use `options.strategy()`. #5422
-- **BREAKING CHANGE**: `get_agent_activity` function now requires a fourth parameter `GetOptions`. #5422
+- Reinstate tests that ensure publish and gossip doesn’t contact blocked nodes.
+- Expanded `GetOptions` with network control fields (`remote_agent_count`, `timeout_ms`) to give developers finer-grained control over network requests. The cascade now respects these options when making network calls. \#5422
+- **BREAKING CHANGE**: `GetOptions` fields are now private with getter methods. Code that accessed `options.strategy` directly must now use `options.strategy()`. \#5422
+- **BREAKING CHANGE**: `get_agent_activity` function now requires a fourth parameter `GetOptions`. \#5422
 - **BREAKING CHANGE** Test utility `await_consistency` has been renamed to `await_consistency_s`. The function `await_consistency` now has a hard-coded 60 second timeout and should always be used by default to reduce test flakiness.
 - Set default iroh relay server to `dev-test-bootstrap2-iroh-relay.holochain.org`.
 - Run test workflow for all platforms with iroh transport. One job to test tx5 on Ubuntu is kept in the workflow.
-- **BREAKING CHANGE**: Completely removed `block_agent` and `unblock_agent` host and HDK functions from Holochain. Blocking is a system-level behavior, triggered by warrants, not application-level logic. Any WASM that references these host functions will fail to instantiate. Applications must be recompiled without calls to these functions. [#5518]
+- **BREAKING CHANGE**: Completely removed `block_agent` and `unblock_agent` host and HDK functions from Holochain. Blocking is a system-level behavior, triggered by warrants, not application-level logic. Any WASM that references these host functions will fail to instantiate. Applications must be recompiled without calls to these functions. \[\#5518\]
 
 ## 0.7.0-dev.7
 
