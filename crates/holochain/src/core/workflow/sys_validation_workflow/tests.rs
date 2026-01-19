@@ -21,7 +21,7 @@ async fn sys_validation_workflow_test() {
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
-    let mut conductors = SweetConductorBatch::standard(2).await;
+    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
     let apps = conductors.setup_app("test_app", [&dna_file]).await.unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();
     let alice_cell_id = alice.cell_id().clone();
@@ -38,7 +38,7 @@ async fn sys_validation_produces_invalid_chain_op_warrant() {
     let zome = SweetInlineZomes::new(vec![], 0);
     let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zome).await;
 
-    let mut conductor = SweetConductor::standard().await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let alice = conductor.setup_app("app", [&dna]).await.unwrap();
 
     // - Create an invalid op
@@ -109,7 +109,7 @@ async fn sys_validation_produces_forked_chain_warrant() {
         SweetDnaFile::unique_from_inline_zomes(crate::test_utils::inline_zomes::simple_crud_zome())
             .await;
 
-    let mut conductors = SweetConductorBatch::standard(2).await;
+    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
     let ((alice,), (bob,)) = conductors
         .setup_app("app", [&dna])
         .await

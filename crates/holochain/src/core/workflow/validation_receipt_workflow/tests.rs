@@ -11,7 +11,7 @@ async fn test_validation_receipt() {
     holochain_trace::test_run();
     const NUM_CONDUCTORS: usize = 3;
 
-    let mut conductors = SweetConductorBatch::standard(NUM_CONDUCTORS).await;
+    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(NUM_CONDUCTORS).await;
 
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;

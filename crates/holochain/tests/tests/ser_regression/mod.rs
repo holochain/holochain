@@ -64,7 +64,7 @@ async fn ser_regression_test() {
     // END DNA
     // //////////
 
-    let mut conductors = SweetConductorBatch::standard(2).await;
+    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
     let ((alice,), (_bob,)) = conductors
         .setup_app("app", vec![&dna_file])
         .await

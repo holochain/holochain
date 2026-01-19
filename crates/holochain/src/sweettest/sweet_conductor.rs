@@ -107,7 +107,7 @@ impl SweetConductor {
     /// Create a SweetConductor with a local rendezvous server.
     ///
     /// Bootstrapping is enabled by default.
-    pub async fn standard() -> SweetConductor {
+    pub async fn from_standard_config() -> SweetConductor {
         SweetConductor::from_config_rendezvous(
             SweetConductorConfig::rendezvous(true),
             SweetLocalRendezvous::new().await,

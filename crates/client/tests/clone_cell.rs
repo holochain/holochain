@@ -17,7 +17,7 @@ mod fixture;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn clone_cell_management() {
-    let conductor = SweetConductor::standard().await;
+    let conductor = SweetConductor::from_standard_config().await;
 
     // Connect admin client
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
@@ -168,7 +168,7 @@ async fn clone_cell_management() {
 // Check that app info can be refreshed to allow zome calls to a clone cell identified by its clone cell id
 #[tokio::test(flavor = "multi_thread")]
 pub async fn app_info_refresh() {
-    let conductor = SweetConductor::standard().await;
+    let conductor = SweetConductor::from_standard_config().await;
 
     // Connect admin client
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();

@@ -24,7 +24,7 @@ async fn migrate_dna_with_second_app_install() {
         amount: u32,
     }
 
-    let mut conductor = SweetConductor::standard().await;
+    let mut conductor = SweetConductor::from_standard_config().await;
 
     let alice = SweetAgents::one(conductor.keystore()).await;
 

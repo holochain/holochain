@@ -13,7 +13,7 @@ use holochain_wasm_test_utils::TestWasm;
 async fn enable_clone_cell_by_dna_hash_on_active_clone() {
     holochain_trace::test_run();
 
-    let mut conductor = SweetConductor::standard().await;
+    let mut conductor = SweetConductor::from_standard_config().await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Clone]).await;
 

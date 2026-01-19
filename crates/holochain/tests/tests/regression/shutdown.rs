@@ -15,7 +15,7 @@ async fn space_not_recreated_after_shutdown() {
     holochain_trace::test_run();
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
-    let mut conductor = SweetConductor::standard().await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor.setup_app("create", [&dna_file]).await.unwrap();
     let cells = app.into_cells();
     let cell = &cells[0];

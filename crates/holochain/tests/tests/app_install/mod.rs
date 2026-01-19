@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_install_app_with_custom_modifiers_overridden_correctly() {
-    let conductor = SweetConductor::standard().await;
+    let conductor = SweetConductor::from_standard_config().await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let path = format!("{}", dna.dna_hash());
@@ -185,7 +185,7 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn install_app_with_custom_modifier_fields_none_does_not_override_existing_fields() {
-    let conductor = SweetConductor::standard().await;
+    let conductor = SweetConductor::from_standard_config().await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let path = format!("{}", dna.dna_hash());
@@ -276,7 +276,7 @@ async fn install_app_with_custom_modifier_fields_none_does_not_override_existing
 
 #[tokio::test(flavor = "multi_thread")]
 async fn installing_with_modifiers_for_non_existing_role_fails() {
-    let conductor = SweetConductor::standard().await;
+    let conductor = SweetConductor::from_standard_config().await;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let bundle = app_bundle_from_dnas(&[("role-name".into(), dna)], false, None).await;
 
@@ -310,7 +310,7 @@ async fn providing_membrane_proof_overrides_deferred_provisioning() {
     //- Check that if providing a membrane proof in the role settings for an app with `allow_deferred_memproofs`
     //  set to `true` in the app manifest, membrane proofs are not deferred and the app has
     //  AppStatus::Disabled after installation
-    let conductor = SweetConductor::standard().await;
+    let conductor = SweetConductor::from_standard_config().await;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Foo]).await;
     let app_id = "app-id".to_string();
     let role_name = "role".to_string();

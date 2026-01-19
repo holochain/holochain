@@ -333,7 +333,7 @@ mod slow_tests {
         });
 
         let dnas = [SweetDnaFile::unique_from_inline_zomes(zome).await.0];
-        let mut conductor = SweetConductor::standard().await;
+        let mut conductor = SweetConductor::from_standard_config().await;
         let app = conductor.setup_app("app", &dnas).await.unwrap();
         let conductor = Arc::new(conductor);
         let (cell,) = app.into_tuple();
