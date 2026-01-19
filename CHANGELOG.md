@@ -14,6 +14,69 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20260119.001810
+
+## [hcterm-0.7.0-dev.8](crates/hcterm/CHANGELOG.md#0.7.0-dev.8)
+
+## [holochain\_cli-0.7.0-dev.8](crates/holochain_cli/CHANGELOG.md#0.7.0-dev.8)
+
+## [holochain\_cli\_bundle-0.7.0-dev.8](crates/holochain_cli_bundle/CHANGELOG.md#0.7.0-dev.8)
+
+## [holochain\_cli\_client-0.7.0-dev.8](crates/holochain_cli_client/CHANGELOG.md#0.7.0-dev.8)
+
+## [holochain\_cli\_sandbox-0.7.0-dev.8](crates/holochain_cli_sandbox/CHANGELOG.md#0.7.0-dev.8)
+
+## [holochain\_client-0.9.0-dev.8](crates/holochain_client/CHANGELOG.md#0.9.0-dev.8)
+
+## [holochain-0.7.0-dev.8](crates/holochain/CHANGELOG.md#0.7.0-dev.8)
+
+- Locally authored data is now only published after it has been integrated. This resolves a race condition where remote conductors might fail to fetch published ops by id because they haven’t been integrated locally yet. \#5545
+- **BREAKING CHANGE**: `Conductor` function `install_app_with_manifest` is now behind the `test_utils` feature, as it was intended only for use by tests.
+- Fix: Conductor `shutdown` function now removes all running cells.
+- Fix: Ensure that only the `holochain_p2p` function `join` creates a kitsune2 space. Previously all `holochain_p2p` requests would create a kitsune2 space if it did not exist, which caused a race where workflows could recreate a removed kitsune space after Conductor shutdown.
+- CI: Run windows test workflow on windows 2025 runners. \#5594
+- **BREAKING CHANGE**: Remove features for tx5 transport variants `datachannel-vendored` and `backend-libdatachannel`. The only supported tx5 transport is `backend-go-pion` now.
+- **BREAKING CHANGE**: Default to iroh transport for all binaries.
+- Revert to iroh’s public relay server URL `https://use1-1.relay.n0.iroh-canary.iroh.link./` in the conductor config.
+- Delete deprecated block targets to block a node by its ID or a DNA of a node.
+- Remove unusable block variant `CellBlockReason::App`.
+- Reinstate tests that ensure publish and gossip doesn’t contact blocked nodes.
+- Expanded `GetOptions` with network control fields (`remote_agent_count`, `timeout_ms`) to give developers finer-grained control over network requests. The cascade now respects these options when making network calls. \#5422
+- **BREAKING CHANGE**: `GetOptions` fields are now private with getter methods. Code that accessed `options.strategy` directly must now use `options.strategy()`. \#5422
+- **BREAKING CHANGE**: `get_agent_activity` function now requires a fourth parameter `GetOptions`. \#5422
+- **BREAKING CHANGE** Test utility `await_consistency` has been renamed to `await_consistency_s`. The function `await_consistency` now has a hard-coded 60 second timeout and should always be used by default to reduce test flakiness.
+- Set default iroh relay server to `dev-test-bootstrap2-iroh-relay.holochain.org`.
+- Run test workflow for all platforms with iroh transport. One job to test tx5 on Ubuntu is kept in the workflow.
+- **BREAKING CHANGE**: Completely removed `block_agent` and `unblock_agent` host and HDK functions from Holochain. Blocking is a system-level behavior, triggered by warrants, not application-level logic. Any WASM that references these host functions will fail to instantiate. Applications must be recompiled without calls to these functions. \[\#5518\]
+
+## [holochain\_cascade-0.7.0-dev.8](crates/holochain_cascade/CHANGELOG.md#0.7.0-dev.8)
+
+## [holochain\_conductor\_config-0.7.0-dev.8](crates/holochain_conductor_config/CHANGELOG.md#0.7.0-dev.8)
+
+## [holochain\_test\_wasm\_common-0.7.0-dev.6](crates/holochain_test_wasm_common/CHANGELOG.md#0.7.0-dev.6)
+
+## [holochain\_wasm\_test\_utils-0.7.0-dev.8](crates/holochain_wasm_test_utils/CHANGELOG.md#0.7.0-dev.8)
+
+## [holochain\_websocket-0.7.0-dev.8](crates/holochain_websocket/CHANGELOG.md#0.7.0-dev.8)
+
+## [hdk-0.7.0-dev.6](crates/hdk/CHANGELOG.md#0.7.0-dev.6)
+
+## [holochain\_conductor\_api-0.7.0-dev.8](crates/holochain_conductor_api/CHANGELOG.md#0.7.0-dev.8)
+
+## [holochain\_p2p-0.7.0-dev.8](crates/holochain_p2p/CHANGELOG.md#0.7.0-dev.8)
+
+## [holochain\_state-0.7.0-dev.8](crates/holochain_state/CHANGELOG.md#0.7.0-dev.8)
+
+## [holochain\_chc-0.4.0-dev.8](crates/holochain_chc/CHANGELOG.md#0.4.0-dev.8)
+
+## [holochain\_types-0.7.0-dev.8](crates/holochain_types/CHANGELOG.md#0.7.0-dev.8)
+
+## [holochain\_keystore-0.7.0-dev.5](crates/holochain_keystore/CHANGELOG.md#0.7.0-dev.5)
+
+## [holochain\_sqlite-0.7.0-dev.6](crates/holochain_sqlite/CHANGELOG.md#0.7.0-dev.6)
+
+## [holochain\_zome\_types-0.7.0-dev.5](crates/holochain_zome_types/CHANGELOG.md#0.7.0-dev.5)
+
 # 20260112.002450
 
 ## [hc\_service\_check-0.4.0-dev.2](crates/hc_service_check/CHANGELOG.md#0.4.0-dev.2)
