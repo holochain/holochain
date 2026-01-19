@@ -8,7 +8,8 @@ use std::sync::atomic::AtomicUsize;
 
 pub(crate) static NUM_CREATED: AtomicUsize = AtomicUsize::new(0);
 
-/// Wrapper around ConductorConfig with some helpful builder methods
+/// Wrapper around [`ConductorConfig`] with some helpful builder methods, setting
+/// default values for testing.
 #[derive(Clone, derive_more::Deref, derive_more::DerefMut, derive_more::Into)]
 pub struct SweetConductorConfig(
     #[deref]
@@ -50,7 +51,10 @@ impl From<NetworkConfig> for SweetConductorConfig {
 }
 
 impl SweetConductorConfig {
-    /// Standard config for SweetConductors, disabling bootstrapping.
+    /// Standard config for SweetConductors.
+    ///
+    /// Bootstrapping as well as infrastructure to establish direct connections is
+    /// configured to be pointed to a locally running rendezvous server.
     pub fn standard() -> Self {
         let mut network_config = NetworkConfig::default()
             .with_gossip_initiate_interval_ms(1000)
@@ -67,7 +71,8 @@ impl SweetConductorConfig {
         })
     }
 
-    /// Rendezvous config for SweetConductors
+    /// Config for SweetConductors with a bootstrap parameter to enable or disable
+    /// bootstrapping.
     pub fn rendezvous(bootstrap: bool) -> Self {
         let mut config = Self::standard();
 
@@ -77,7 +82,9 @@ impl SweetConductorConfig {
 
         config
     }
-    /// Rewrite the config to point to the given rendezvous server
+
+    /// Rewrite the config to point to the given rendezvous server's bootstrap,
+    /// signal and relay URLs.
     pub fn apply_rendezvous(mut self, rendezvous: &DynSweetRendezvous) -> Self {
         let network = &mut self.network;
 

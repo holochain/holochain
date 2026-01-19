@@ -106,7 +106,10 @@ impl SweetConductor {
 
     /// Create a SweetConductor with a local rendezvous server.
     ///
-    /// Bootstrapping is enabled by default.
+    /// This is the default way of constructing a sweet conductor for testing,
+    /// with bootstrapping enabled by default. A local rendezvous server
+    /// is spawned and referenced in the conductor config for bootstrapping
+    /// and direct connection establishment.
     pub async fn from_standard_config() -> SweetConductor {
         SweetConductor::from_config_rendezvous(
             SweetConductorConfig::rendezvous(true),
@@ -115,7 +118,9 @@ impl SweetConductor {
         .await
     }
 
-    /// Create a SweetConductor with a new set of TestEnvs from the given config
+    /// Create a SweetConductor with a local rendezvous server and a custom
+    /// configuration. URLs for bootstrapping and direct connection establishment
+    /// are updated in the passed in conductor configuration anyway.
     pub async fn from_config_rendezvous<C, R>(config: C, rendezvous: R) -> SweetConductor
     where
         C: Into<SweetConductorConfig>,
