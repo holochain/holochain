@@ -1,4 +1,4 @@
-use super::{DynSweetRendezvous, SweetConductor};
+use super::DynSweetRendezvous;
 use holochain_conductor_api::{
     conductor::{ConductorConfig, ConductorTuningParams, NetworkConfig},
     AdminInterfaceConfig, InterfaceDriver,
@@ -106,11 +106,6 @@ impl SweetConductorConfig {
     /// Getter
     pub fn get_rendezvous(&self) -> Option<DynSweetRendezvous> {
         self.rendezvous.clone()
-    }
-
-    /// Build a SweetConductor from this config
-    pub async fn build_conductor(self) -> SweetConductor {
-        SweetConductor::from_config(self).await
     }
 
     /// Apply a function to the conductor's tuning parameters to customise them.

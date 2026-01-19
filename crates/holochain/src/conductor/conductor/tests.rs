@@ -182,20 +182,12 @@ async fn common_genesis_test_app(
 async fn test_signing_error_during_genesis() {
     holochain_trace::test_run();
     let bad_keystore = spawn_crude_mock_keystore(|| "spawn_crude_mock_keystore error".into()).await;
-
-    let db_dir = test_db_dir();
-    let config = ConductorConfig {
-        data_root_path: Some(db_dir.path().to_path_buf().into()),
-        ..Default::default()
-    };
-    let mut conductor = SweetConductor::new(
-        SweetConductor::handle_from_existing(bad_keystore, &config, &[]).await,
-        db_dir.into(),
-        config.into(),
-        None,
+    let mut conductor = SweetConductor::create_with_defaults(
+        SweetConductorConfig::standard(),
+        Some(bad_keystore),
+        Some(SweetLocalRendezvous::new().await),
     )
     .await;
-
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Sign]).await;
 
     let result = conductor

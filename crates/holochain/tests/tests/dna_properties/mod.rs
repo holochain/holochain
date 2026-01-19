@@ -1,7 +1,6 @@
 use hdk::prelude::*;
 use holochain::sweettest::SweetConductor;
 use holochain::sweettest::SweetDnaFile;
-use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_test_wasm_common::MyValidDnaProperties;
 use holochain_types::prelude::DnaModifiersOpt;
 use holochain_wasm_test_utils::TestWasm;
@@ -26,7 +25,7 @@ async fn test_dna_properties_macro() {
     })];
 
     // Create a Conductor
-    let mut conductor = SweetConductor::from_config(ConductorConfig::default()).await;
+    let mut conductor = SweetConductor::standard().await;
     let app = conductor.setup_app("app", dnas).await.unwrap();
     let alice_zome = app.cells()[0].zome(TestWasm::DnaProperties);
 
@@ -58,7 +57,7 @@ async fn test_dna_properties_fails_with_invalid_properties() {
     let dnas = &[dna_file.update_modifiers(modifiers)];
 
     // Create a Conductor
-    let mut conductor = SweetConductor::from_config(ConductorConfig::default()).await;
+    let mut conductor = SweetConductor::standard().await;
     let app = conductor.setup_app("app", dnas).await.unwrap();
     let alice_zome = app.cells()[0].zome(TestWasm::DnaProperties);
 

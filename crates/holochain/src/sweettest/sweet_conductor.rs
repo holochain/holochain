@@ -94,7 +94,7 @@ impl SweetConductor {
     /// RibosomeStore
     /// The conductor will be supplied with a single test AppInterface named
     /// "sweet-interface" so that signals may be emitted
-    pub async fn new(
+    async fn new(
         handle: ConductorHandle,
         env_dir: TestDir,
         config: Arc<ConductorConfig>,
@@ -110,16 +110,6 @@ impl SweetConductor {
             dna_files: HashMap::new(),
             rendezvous,
         }
-    }
-
-    /// Create a SweetConductor with a new set of TestEnvs from the given config
-    pub async fn from_config<C>(config: C) -> SweetConductor
-    where
-        C: Into<SweetConductorConfig>,
-    {
-        let config: SweetConductorConfig = config.into();
-        let vous = config.get_rendezvous();
-        Self::create_with_defaults(config, None, vous).await
     }
 
     /// Create a SweetConductor with a local rendezvous server.
@@ -225,7 +215,7 @@ impl SweetConductor {
 
         let handle = Self::handle_from_existing(keystore, &config, &[]).await;
 
-        tracing::info!("Starting with config: {:?}", config);
+        info!("Starting with config: {:?}", config);
 
         Self::new(handle, dir, Arc::new(config), rendezvous).await
     }
