@@ -1,83 +1,69 @@
-use crate::mutations;
+use crate::prelude::StateMutationError;
 use crate::prelude::StateMutationResult;
 use crate::prelude::StateQueryResult;
+use crate::query::StateQueryError;
 use holo_hash::WasmHash;
-use holochain_sqlite::rusqlite::named_params;
-use holochain_sqlite::rusqlite::OptionalExtension;
-use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::prelude::*;
 
-pub fn get(txn: &Transaction<'_>, hash: &WasmHash) -> StateQueryResult<Option<DnaWasmHashed>> {
-    let item = txn
-        .query_row(
-            "SELECT hash, blob FROM Wasm WHERE hash = :hash",
-            named_params! {
-                ":hash": hash
-            },
-            |row| {
-                let hash: WasmHash = row.get("hash")?;
-                let wasm: Vec<u8> = row.get("blob")?;
-                Ok((hash, wasm))
-            },
-        )
-        .optional()?;
-    match item {
-        Some((hash, wasm)) => Ok(Some(DnaWasmHashed::with_pre_hashed(wasm.into(), hash))),
-        None => Ok(None),
+pub async fn get(
+    db: &holochain_data::DbRead<holochain_data::kind::Wasm>,
+    hash: &WasmHash,
+) -> StateQueryResult<Option<DnaWasmHashed>> {
+    match db.get_wasm(hash).await {
+        Ok(Some(wasm_hashed)) => Ok(Some(wasm_hashed)),
+        Ok(None) => Ok(None),
+        Err(e) => Err(StateQueryError::from(e)),
     }
 }
 
-pub fn contains(txn: &Transaction<'_>, hash: &WasmHash) -> StateQueryResult<bool> {
-    Ok(txn.query_row(
-        "SELECT EXISTS(SELECT 1 FROM Wasm WHERE hash = :hash)",
-        named_params! {
-            ":hash": hash
-        },
-        |row| row.get(0),
-    )?)
+pub async fn contains(
+    db: &holochain_data::DbRead<holochain_data::kind::Wasm>,
+    hash: &WasmHash,
+) -> StateQueryResult<bool> {
+    db.wasm_exists(hash).await.map_err(StateQueryError::from)
 }
 
-pub fn put(txn: &mut Transaction, wasm: DnaWasmHashed) -> StateMutationResult<()> {
-    mutations::insert_wasm(txn, wasm)
+pub async fn put(
+    db: &holochain_data::DbWrite<holochain_data::kind::Wasm>,
+    wasm: DnaWasmHashed,
+) -> StateMutationResult<()> {
+    db.put_wasm(wasm).await.map_err(StateMutationError::from)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use holochain_sqlite::prelude::DatabaseResult;
     use holochain_types::dna::wasm::DnaWasm;
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn wasm_store_round_trip() -> DatabaseResult<()> {
+    async fn wasm_store_round_trip() -> StateQueryResult<()> {
         holochain_trace::test_run();
 
-        // all the stuff needed to have a WasmBuf
-        let db = crate::test_utils::test_wasm_db();
+        // Create test database
+        let tempdir = tempfile::tempdir().unwrap();
+        let db = holochain_data::setup_holochain_data(
+            tempdir.path(),
+            holochain_data::kind::Wasm,
+            holochain_data::HolochainDataConfig {
+                key: None,
+                sync_level: holochain_data::DbSyncLevel::Off,
+            },
+        )
+        .await
+        .map_err(StateQueryError::from)?;
 
         // a wasm
         let wasm =
             DnaWasmHashed::from_content(DnaWasm::from(holochain_wasm_test_utils::TestWasm::Foo))
                 .await;
 
-        // Put wasm
-        db.write_async({
-            let put_wasm = wasm.clone();
-
-            move |txn| put(txn, put_wasm.clone())
-        })
-        .await
-        .unwrap();
-        db.read_async(move |txn| -> DatabaseResult<()> {
-            assert!(contains(txn, wasm.as_hash()).unwrap());
-            // a wasm from the WasmBuf
-            let ret = get(txn, wasm.as_hash()).unwrap().unwrap();
-
-            // assert the round trip
-            assert_eq!(ret, wasm);
-
-            Ok(())
-        })
-        .await?;
+        // Put wasm and check retrieval
+        put(&db, wasm.clone())
+            .await
+            .map_err(|e| StateQueryError::Other(e.to_string()))?;
+        assert!(contains(db.as_ref(), wasm.as_hash()).await?);
+        let ret = get(db.as_ref(), wasm.as_hash()).await?.unwrap();
+        assert_eq!(ret, wasm);
 
         Ok(())
     }

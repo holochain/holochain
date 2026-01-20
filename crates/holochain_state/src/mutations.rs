@@ -1,4 +1,3 @@
-use crate::entry_def::EntryDefStoreKey;
 use crate::query::from_blob;
 use crate::query::to_blob;
 use crate::schedule::fn_is_scheduled;
@@ -412,15 +411,11 @@ pub fn upsert_dna_def(
 
 /// Insert a [`EntryDef`] into the database.
 pub fn insert_entry_def(
-    txn: &mut Transaction,
-    key: EntryDefStoreKey,
-    entry_def: &EntryDef,
+    _db: &holochain_data::DbWrite<holochain_data::kind::Wasm>,
+    _key: Vec<u8>,
+    _entry_def: &EntryDef,
 ) -> StateMutationResult<()> {
-    sql_insert!(txn, EntryDef, {
-        "key": key,
-        "blob": to_blob(entry_def)?,
-    })?;
-    Ok(())
+    todo!("insert_entry_def needs async update")
 }
 
 /// Insert [`ConductorState`](https://docs.rs/holochain/latest/holochain/conductor/state/struct.ConductorState.html)

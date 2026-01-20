@@ -595,51 +595,58 @@ mod dna_impls {
         )> {
             let db = &self.spaces.wasm_db;
 
-            // Load out all dna defs and associated wasms and entry defs from the database
-            let (dna_defs_with_wasms, entry_defs) = db
-                .read_async(move |txn| {
-                    // Get all the dna defs.
-                    let dna_defs_with_cell_id = holochain_state::dna_def::get_all(txn)?;
+            // Get all installed cells from conductor state
+            let state = self.get_state().await?;
+            let all_cells: Vec<CellId> = state
+                .installed_apps()
+                .values()
+                .flat_map(|app| app.all_cells())
+                .collect();
 
-                    // Gather all the unique wasm hashes.
-                    let unique_wasm_hashes = dna_defs_with_cell_id
-                        .iter()
-                        .flat_map(|(_cell_id, dna_def)| {
-                            dna_def
-                                .all_zomes()
-                                .map(|(zome_name, zome)| Ok(zome.wasm_hash(zome_name)?))
-                        })
-                        .collect::<ConductorResult<HashSet<_>>>()?;
+            // Retrieve DNA definitions from wasm database
+            let mut dna_defs_with_cell_id = Vec::new();
+            for cell_id in all_cells {
+                if let Some(cell_dna_tuple) =
+                    holochain_state::dna_def::get(db.as_ref(), &cell_id).await?
+                {
+                    dna_defs_with_cell_id.push(cell_dna_tuple);
+                }
+            }
 
-                    // Get the code for each unique wasm.
-                    let wasms_and_hashes = unique_wasm_hashes
-                        .into_iter()
-                        .map(|wasm_hash| {
-                            holochain_state::wasm::get(txn, &wasm_hash)?
-                                .map(|hashed| hashed.into_content())
-                                .ok_or(ConductorError::WasmMissing)
-                                .map(|wasm| (wasm_hash, wasm))
-                        })
-                        .collect::<ConductorResult<HashMap<_, _>>>()?;
-
-                    let dna_defs_with_wasms = dna_defs_with_cell_id
-                        .into_iter()
-                        .map(|(cell_id, dna_def)| {
-                            // Load all wasms for each dna_def from the wasm db into memory
-                            let wasms = dna_def.all_zomes().filter_map(|(zome_name, zome)| {
-                                let wasm_hash = zome.wasm_hash(zome_name).ok()?;
-                                // Note this is a cheap arc clone.
-                                wasms_and_hashes.get(&wasm_hash).cloned()
-                            });
-                            let wasms = wasms.collect::<Vec<_>>();
-                            ((cell_id, dna_def), wasms)
-                        })
-                        // This needs to happen due to the environment not being Send
-                        .collect::<Vec<_>>();
-                    let entry_defs = holochain_state::entry_def::get_all(txn)?;
-                    ConductorResult::Ok((dna_defs_with_wasms, entry_defs))
+            // Gather all the unique wasm hashes.
+            let unique_wasm_hashes = dna_defs_with_cell_id
+                .iter()
+                .flat_map(|(_cell_id, dna_def)| {
+                    dna_def
+                        .all_zomes()
+                        .map(|(zome_name, zome)| Ok(zome.wasm_hash(zome_name)?))
                 })
-                .await?;
+                .collect::<ConductorResult<HashSet<_>>>()?;
+
+            // Get the code for each unique wasm.
+            let mut wasms_and_hashes = HashMap::new();
+            for wasm_hash in unique_wasm_hashes {
+                let wasm_hashed = holochain_state::wasm::get(db.as_ref(), &wasm_hash)
+                    .await?
+                    .ok_or(ConductorError::WasmMissing)?;
+                wasms_and_hashes.insert(wasm_hash, wasm_hashed.into_content());
+            }
+
+            let dna_defs_with_wasms = dna_defs_with_cell_id
+                .into_iter()
+                .map(|(cell_id, dna_def)| {
+                    // Load all wasms for each dna_def from the wasm db into memory
+                    let wasms = dna_def.all_zomes().filter_map(|(zome_name, zome)| {
+                        let wasm_hash = zome.wasm_hash(zome_name).ok()?;
+                        // Note this is a cheap arc clone.
+                        wasms_and_hashes.get(&wasm_hash).cloned()
+                    });
+                    let wasms = wasms.collect::<Vec<_>>();
+                    ((cell_id, dna_def), wasms)
+                })
+                // This needs to happen due to the environment not being Send
+                .collect::<Vec<_>>();
+            let entry_defs = holochain_state::entry_def::get_all(db.as_ref()).await?;
 
             // try to join all the tasks and return the list of dna files
             let ribosomes_with_cell_id_future =
@@ -721,31 +728,24 @@ mod dna_impls {
             // TODO: PERF: This loop might be slow
             let wasms = futures::future::join_all(code.map(DnaWasmHashed::from_content)).await;
 
-            self.spaces
-                .wasm_db
-                .write_async({
-                    let zome_defs = zome_defs.clone();
-                    move |txn| {
-                        for wasm in wasms {
-                            if !holochain_state::wasm::contains(txn, wasm.as_hash())? {
-                                holochain_state::wasm::put(txn, wasm)?;
-                            }
-                        }
+            for wasm in wasms {
+                if !holochain_state::wasm::contains(self.spaces.wasm_db.as_ref(), wasm.as_hash())
+                    .await?
+                {
+                    holochain_state::wasm::put(&self.spaces.wasm_db, wasm).await?;
+                }
+            }
 
-                        for (key, entry_def) in zome_defs.clone() {
-                            holochain_state::entry_def::put(txn, key, &entry_def)?;
-                        }
+            for (key, entry_def) in zome_defs.clone() {
+                holochain_state::entry_def::put(&self.spaces.wasm_db, key, &entry_def).await?;
+            }
 
-                        holochain_state::dna_def::upsert(
-                            txn,
-                            &cell_id,
-                            &dna_def_hashed.into_content(),
-                        )?;
-
-                        StateMutationResult::Ok(())
-                    }
-                })
-                .await?;
+            holochain_state::dna_def::upsert(
+                &self.spaces.wasm_db,
+                &cell_id,
+                &dna_def_hashed.into_content(),
+            )
+            .await?;
 
             Ok(zome_defs)
         }
