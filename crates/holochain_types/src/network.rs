@@ -53,7 +53,7 @@ pub struct LocalAgentSummary {
     pub target_arc: kitsune2_api::DhtArc,
 }
 
-/// Similar struct to [`AppApiTransportStats`](kitsune2_api::ApiTransportStats) but with Holochain types.
+/// Similar struct to [`ApiTransportStats`](kitsune2_api::ApiTransportStats) but with Holochain types.
 ///
 /// There is a [`DnaHash`] instead of a [`Space`](kitsune2_api::Space) in the `blocked_message_counts` field.
 #[derive(Debug, Clone, Serialize, Deserialize)]

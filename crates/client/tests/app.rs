@@ -453,7 +453,7 @@ async fn dump_network_stats() {
     let network_stats = app_ws.dump_network_stats().await.unwrap();
 
     #[cfg(feature = "transport-tx5-backend-go-pion")]
-    assert_eq!("BackendGoPion", network_stats.backend);
+    assert_eq!("BackendGoPion", network_stats.transport_stats.backend);
     #[cfg(feature = "transport-iroh")]
     assert_eq!("iroh", network_stats.transport_stats.backend);
 }
