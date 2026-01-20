@@ -398,6 +398,6 @@ The _ChainIntegrityWarrant_ is currently the only type of warrant operation. It 
    - Example: An _Create_ action with an entry that contains an application-defined `user_name` field that is supposed to be restricted to 30 characters, but is actually 70.
 
 2. **ChainFork**
-   - Contains: Two actions with the same sequence number (both with hashes and signatures) and their author.
+   - Contains: Two actions with the same previous hash (both with hashes and signatures) and their author.
    - Proves: An agent created a fork in their source chain by committing two different actions at the same sequence position.
    - Example: Two different _Create_ actions both claiming to be sequence number 15.
