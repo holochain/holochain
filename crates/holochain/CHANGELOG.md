@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Remove `mem_bootstrap` from `HolochainP2pConfig`. Either a locally spawned bootstrap server or no bootstrap service at all should be used for testing.
+- Remove `SweetConductor::from_standard_config`. It used a WAN bootstrap and relay service. A locally spawned server is used instead. The new default for `SweetConductor` is `standard()`. 
 - **BREAKING** Dumping network stats with the admin and app APIs now returns a consistent response type of `HolochainTransportStats` where previously they returned `ApiTransportStats` and `TransportStats` respectively. The app response was missing blocked message counts. The Holochain type also converts `Space` values into `DnaHash` values for easier use in app code. #5611 
 
 ## 0.7.0-dev.8

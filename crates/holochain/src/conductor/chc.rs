@@ -132,7 +132,8 @@ mod tests {
             chc_url: Some(url2::Url2::parse(CHC_LOCAL_MAGIC_URL)),
             ..Default::default()
         };
-        let mut conductor = SweetConductor::from_config(config).await;
+        let mut conductor =
+            SweetConductor::from_config_rendezvous(config, SweetLocalRendezvous::new().await).await;
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 
@@ -200,7 +201,8 @@ mod tests {
             chc_url: Some(url2::Url2::parse(CHC_LOCAL_MAGIC_URL)),
             ..Default::default()
         };
-        let mut conductor = SweetConductor::from_config(config).await;
+        let mut conductor =
+            SweetConductor::from_config_rendezvous(config, SweetLocalRendezvous::new().await).await;
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
         let agent = SweetAgents::alice();
@@ -258,9 +260,8 @@ mod tests {
         holochain_trace::test_run();
 
         let mut config = SweetConductorConfig::standard();
-        // config.chc_url = Some(url2::Url2::parse("http://127.0.0.1:40845/"));
         config.chc_url = Some(url2::Url2::parse(CHC_LOCAL_MAGIC_URL));
-        let mut conductors = SweetConductorBatch::from_config(4, config).await;
+        let mut conductors = SweetConductorBatch::from_config_rendezvous(4, config).await;
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 

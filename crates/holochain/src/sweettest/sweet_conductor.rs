@@ -7,7 +7,6 @@ use crate::conductor::conductor::InstallAppCommonFlags;
 use crate::conductor::ConductorHandle;
 use crate::conductor::{
     api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult, Conductor,
-    ConductorBuilder,
 };
 use crate::retry_until_timeout;
 #[cfg(feature = "transport-iroh")]
@@ -82,19 +81,11 @@ impl SweetConductor {
             .expect("SweetConductor must have a tracing scope set")
     }
 
-    /// Update the config if the conductor is shut down
-    pub fn update_config(&mut self, f: impl FnOnce(ConductorConfig) -> ConductorConfig) {
-        if self.is_running() {
-            panic!("Cannot update config while conductor is running");
-        }
-        self.config = Arc::from(f((*self.config).clone()));
-    }
-
     /// Create a SweetConductor from an already-built ConductorHandle and environments
     /// RibosomeStore
     /// The conductor will be supplied with a single test AppInterface named
     /// "sweet-interface" so that signals may be emitted
-    pub async fn new(
+    async fn new(
         handle: ConductorHandle,
         env_dir: TestDir,
         config: Arc<ConductorConfig>,
@@ -112,17 +103,23 @@ impl SweetConductor {
         }
     }
 
-    /// Create a SweetConductor with a new set of TestEnvs from the given config
-    pub async fn from_config<C>(config: C) -> SweetConductor
-    where
-        C: Into<SweetConductorConfig>,
-    {
-        let config: SweetConductorConfig = config.into();
-        let vous = config.get_rendezvous();
-        Self::create_with_defaults(config, None, vous).await
+    /// Create a SweetConductor with a local rendezvous server.
+    ///
+    /// This is the default way of constructing a sweet conductor for testing,
+    /// with bootstrapping enabled by default. A local rendezvous server
+    /// is spawned and referenced in the conductor config for bootstrapping
+    /// and direct connection establishment.
+    pub async fn from_standard_config() -> SweetConductor {
+        SweetConductor::from_config_rendezvous(
+            SweetConductorConfig::rendezvous(true),
+            SweetLocalRendezvous::new().await,
+        )
+        .await
     }
 
-    /// Create a SweetConductor with a new set of TestEnvs from the given config
+    /// Create a SweetConductor with a local rendezvous server and a custom
+    /// configuration. URLs for bootstrapping and direct connection establishment
+    /// are updated in the passed in conductor configuration anyway.
     pub async fn from_config_rendezvous<C, R>(config: C, rendezvous: R) -> SweetConductor
     where
         C: Into<SweetConductorConfig>,
@@ -174,10 +171,7 @@ impl SweetConductor {
 
         let config: SweetConductorConfig = config.into();
         let mut config: ConductorConfig = if let Some(r) = rendezvous.clone() {
-            config
-                .tune_network_config(|nc| nc.mem_bootstrap = false)
-                .apply_rendezvous(&r)
-                .into()
+            config.apply_rendezvous(&r).into()
         } else {
             if config
                 .network
@@ -193,7 +187,10 @@ impl SweetConductor {
                 .as_str()
                 .starts_with("rendezvous:")
             {
-                panic!("Must use rendezvous SweetConductor if rendezvous: is specified in config.network.transport_pool[].signal_url");
+                panic!("Must use rendezvous SweetConductor if rendezvous: is specified in config.network.signal_url");
+            }
+            if config.network.relay_url.as_str().starts_with("rendezvous:") {
+                panic!("Must use rendezvous SweetConductor if rendezvous: is specified in config.network.relay_url");
             }
             config.into()
         };
@@ -214,33 +211,9 @@ impl SweetConductor {
 
         let handle = Self::handle_from_existing(keystore, &config, &[]).await;
 
-        tracing::info!("Starting with config: {:?}", config);
+        info!("Starting with config: {:?}", config);
 
         Self::new(handle, dir, Arc::new(config), rendezvous).await
-    }
-
-    /// Create a SweetConductor from a partially-configured ConductorBuilder
-    pub async fn from_builder(builder: ConductorBuilder) -> SweetConductor {
-        let db_dir = TestDir::new(test_db_dir());
-        let builder = builder.with_data_root_path(db_dir.as_ref().to_path_buf().into());
-        let config = builder.config.clone();
-        let handle = builder.test(&[]).await.unwrap();
-        Self::new(handle, db_dir, Arc::new(config), None).await
-    }
-
-    /// Create a SweetConductor from a partially-configured ConductorBuilder
-    pub async fn from_builder_rendezvous<R>(
-        builder: ConductorBuilder,
-        rendezvous: R,
-    ) -> SweetConductor
-    where
-        R: Into<DynSweetRendezvous> + Clone,
-    {
-        let db_dir = TestDir::new(test_db_dir());
-        let builder = builder.with_data_root_path(db_dir.as_ref().to_path_buf().into());
-        let config = builder.config.clone();
-        let handle = builder.test(&[]).await.unwrap();
-        Self::new(handle, db_dir, Arc::new(config), Some(rendezvous.into())).await
     }
 
     /// Create a handle from an existing environment and config
@@ -258,11 +231,6 @@ impl SweetConductor {
             .test(extra_dna_files)
             .await
             .unwrap()
-    }
-
-    /// Create a SweetConductor with a new set of TestEnvs from the given config
-    pub async fn from_standard_config() -> SweetConductor {
-        Self::from_config(SweetConductorConfig::standard()).await
     }
 
     /// Get the rendezvous config that this conductor is using, if any
@@ -446,7 +414,7 @@ impl SweetConductor {
                         .unwrap()
                         .is_some()
                 },
-                None,
+                Some(10_000),
                 None,
             )
             .await
@@ -809,12 +777,6 @@ impl SweetConductor {
 
         // Collect all the agent infos across the spaces on these conductors.
         for c in conductors.clone().into_iter() {
-            if c.get_config().has_rendezvous_bootstrap() {
-                panic!(
-                    "exchange_peer_info cannot reliably be used with rendezvous bootstrap servers"
-                );
-            }
-
             for dna_hash in c.spaces.get_from_spaces(|s| s.dna_hash.clone()) {
                 let agent_infos = c
                     .holochain_p2p()

@@ -4,10 +4,10 @@
 
 use hdk::prelude::*;
 use holo_hash::ActionHash;
-use holochain::sweettest::SweetConductorBatch;
 use holochain::sweettest::SweetConductorConfig;
 use holochain::sweettest::SweetInlineZomes;
 use holochain::sweettest::{await_consistency, SweetConductor, SweetDnaFile};
+use holochain::sweettest::{SweetConductorBatch, SweetLocalRendezvous};
 use holochain::test_utils::inline_zomes::simple_crud_zome;
 use holochain_zome_types::record::Record;
 
@@ -99,14 +99,14 @@ async fn gossip_resumes_after_restart() {
 async fn new_conductor_reaches_consistency_with_existing_conductor() {
     holochain_trace::test_run();
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
-    let mk_conductor = || async {
-        let mut conductor = SweetConductor::from_standard_config().await;
-        let app = conductor.setup_app("app", [&dna_file]).await.unwrap();
-        let cell = app.into_cells().pop().unwrap();
-        let zome = cell.zome(SweetInlineZomes::COORDINATOR);
-        (conductor, cell, zome)
-    };
-    let (conductor0, cell0, zome0) = mk_conductor().await;
+    let mut conductor0 = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        SweetLocalRendezvous::new().await,
+    )
+    .await;
+    let app0 = conductor0.setup_app("app", [&dna_file]).await.unwrap();
+    let cell0 = app0.into_cells().pop().unwrap();
+    let zome0 = cell0.zome(SweetInlineZomes::COORDINATOR);
 
     // Create an entry before the conductors know about each other
     let hash: ActionHash = conductor0
@@ -114,7 +114,16 @@ async fn new_conductor_reaches_consistency_with_existing_conductor() {
         .await;
 
     // Startup and do peer discovery
-    let (conductor1, cell1, zome1) = mk_conductor().await;
+    let mut conductor1 = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        conductor0.rendezvous().unwrap().clone(),
+    )
+    .await;
+    let app1 = conductor1.setup_app("app", [&dna_file]).await.unwrap();
+    let cell1 = app1.into_cells().pop().unwrap();
+    let zome1 = cell1.zome(SweetInlineZomes::COORDINATOR);
+
+    SweetConductor::exchange_peer_info([&conductor0, &conductor1]).await;
 
     await_consistency([&cell0, &cell1]).await.unwrap();
     let record: Option<Record> = conductor1.call(&zome1, "read", hash.clone()).await;

@@ -1,4 +1,3 @@
-use futures::future;
 use hdk::prelude::{PreflightRequest, PreflightRequestAcceptance};
 use holo_hash::{ActionHash, EntryHash};
 use holochain::conductor::api::error::{ConductorApiError, ConductorApiResult};
@@ -7,8 +6,7 @@ use holochain::core::workflow::WorkflowError;
 use holochain::prelude::CountersigningSessionState;
 use holochain::retry_until_timeout;
 use holochain::sweettest::{
-    await_consistency, SweetConductor, SweetConductorBatch, SweetConductorConfig, SweetDnaFile,
-    SweetLocalRendezvous,
+    await_consistency, SweetConductorBatch, SweetConductorConfig, SweetDnaFile,
 };
 use holochain_state::prelude::{IncompleteCommitReason, SourceChainError};
 use holochain_types::app::DisabledAppReason;
@@ -139,22 +137,8 @@ async fn retry_countersigning_commit_on_missing_deps() {
         nc.disable_publish = true;
         nc.disable_gossip = true;
     });
-    let rendezvous = SweetLocalRendezvous::new().await;
 
-    let mut conductors = SweetConductorBatch::new(
-        future::join_all(
-            std::iter::repeat_with(|| {
-                SweetConductor::create_with_defaults_and_metrics(
-                    config.clone(),
-                    None,
-                    Some(rendezvous.clone()),
-                    false,
-                )
-            })
-            .take(3),
-        )
-        .await,
-    );
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(3, config).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
     let apps = conductors.setup_app("app", &[dna]).await.unwrap();

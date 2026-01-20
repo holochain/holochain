@@ -618,7 +618,7 @@ async fn enable_disable_app() -> Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 async fn list_agents() -> Result<()> {
     // Start two conductors
-    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
 
     ensure_fixture_packaged().await?;
 
@@ -699,7 +699,8 @@ async fn list_dnas_with_origin() -> Result<()> {
         },
     }]);
 
-    let mut conductor = SweetConductor::from_config(config).await;
+    let mut conductor =
+        SweetConductor::from_config_rendezvous(config, SweetLocalRendezvous::new().await).await;
     let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
     let expected_hash = dna.dna_hash().to_string();
 

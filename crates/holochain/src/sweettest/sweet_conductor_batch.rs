@@ -13,7 +13,7 @@ pub struct SweetConductorBatch(Vec<SweetConductor>);
 
 impl SweetConductorBatch {
     /// Constructor with validation
-    pub fn new(conductors: Vec<SweetConductor>) -> Self {
+    fn new(conductors: Vec<SweetConductor>) -> Self {
         let paths: HashSet<PathBuf> = conductors
             .iter()
             .filter_map(|c| {
@@ -31,20 +31,27 @@ impl SweetConductorBatch {
         Self(conductors)
     }
 
-    /// Map the given ConductorConfigs into SweetConductors, each with its own new TestEnvironments
-    #[allow(clippy::let_and_return)]
-    pub async fn from_configs<C, I>(configs: I) -> SweetConductorBatch
-    where
-        C: Into<SweetConductorConfig>,
-        I: IntoIterator<Item = C>,
-    {
-        Self::new(
-            future::join_all(configs.into_iter().map(|c| SweetConductor::from_config(c))).await,
-        )
+    /// Create the given number of new SweetConductors with the default configuration,
+    /// using a rendezvous server for peer discovery and direct connection establishment.
+    pub async fn from_standard_config_rendezvous(num: usize) -> SweetConductorBatch {
+        Self::from_config_rendezvous(num, SweetConductorConfig::rendezvous(true)).await
     }
 
-    /// Create SweetConductors from the given ConductorConfigs, each with its own new TestEnvironments,
-    /// using a "rendezvous" bootstrap server for peer discovery.
+    /// Create a number of SweetConductors from the given conductor configuration,
+    /// using a rendezvous server for peer discovery and direct connection establishment.
+    ///
+    /// All conductors share the same conductor config.
+    pub async fn from_config_rendezvous<C>(num: usize, config: C) -> SweetConductorBatch
+    where
+        C: Into<SweetConductorConfig> + Clone,
+    {
+        Self::from_configs_rendezvous(std::iter::repeat_n(config, num)).await
+    }
+
+    /// Create as many SweetConductors as conductor configurations were passed in,
+    /// using a rendezvous server for peer discovery and direct connection establishment.
+    ///
+    /// Conductors are assigned the configurations that were passed in.
     #[allow(clippy::let_and_return)]
     pub async fn from_configs_rendezvous<C, I>(configs: I) -> SweetConductorBatch
     where
@@ -62,42 +69,9 @@ impl SweetConductorBatch {
         )
     }
 
-    /// Create the given number of new SweetConductors, each with its own new TestEnvironments
-    pub async fn from_config<C: Clone + Into<SweetConductorConfig>>(
-        num: usize,
-        config: C,
-    ) -> SweetConductorBatch {
-        let config = config.into();
-        Self::from_configs(std::iter::repeat_n(config, num)).await
-    }
-
-    /// Create a number of SweetConductors from the given ConductorConfig, each with its own new TestEnvironments.
-    /// using a "rendezvous" bootstrap server for peer discovery.
-    pub async fn from_config_rendezvous<C>(num: usize, config: C) -> SweetConductorBatch
-    where
-        C: Into<SweetConductorConfig> + Clone,
-    {
-        Self::from_configs_rendezvous(std::iter::repeat_n(config, num)).await
-    }
-
-    /// Create the given number of new SweetConductors, each with its own new TestEnvironments
-    pub async fn from_standard_config(num: usize) -> SweetConductorBatch {
-        Self::from_configs(std::iter::repeat_with(SweetConductorConfig::standard).take(num)).await
-    }
-
-    /// Create the given number of new SweetConductors, each with its own new TestEnvironments
-    pub async fn from_standard_config_rendezvous(num: usize) -> SweetConductorBatch {
-        Self::from_config_rendezvous(num, SweetConductorConfig::rendezvous(true)).await
-    }
-
     /// Iterate over the SweetConductors
     pub fn iter(&self) -> impl Iterator<Item = &SweetConductor> {
         self.0.iter()
-    }
-
-    /// Iterate over the SweetConductors, mutably
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut SweetConductor> {
-        self.0.iter_mut()
     }
 
     /// Convert to a Vec
@@ -108,26 +82,6 @@ impl SweetConductorBatch {
     /// Get the conductor at an index.
     pub fn get(&self, i: usize) -> Option<&SweetConductor> {
         self.0.get(i)
-    }
-
-    /// Add an existing conductor to this batch
-    pub fn add_conductor(&mut self, c: SweetConductor) {
-        self.0.push(c);
-    }
-
-    /// Create and add a new conductor to this batch
-    pub async fn add_conductor_from_config<C>(&mut self, c: C)
-    where
-        C: Into<SweetConductorConfig>,
-    {
-        let conductor =
-            if let Some(rendezvous) = self.0.first().and_then(|c| c.get_rendezvous_config()) {
-                SweetConductor::from_config_rendezvous(c, rendezvous).await
-            } else {
-                SweetConductor::from_config(c).await
-            };
-
-        self.0.push(conductor);
     }
 
     /// Opinionated app setup.

@@ -171,16 +171,6 @@ impl ConductorConfig {
     pub fn conductor_tuning_params(&self) -> ConductorTuningParams {
         self.tuning_params.clone().unwrap_or_default()
     }
-
-    /// Check if the config is set to use a rendezvous bootstrap server
-    pub fn has_rendezvous_bootstrap(&self) -> bool {
-        self.network.bootstrap_url == url2::url2!("rendezvous:")
-    }
-}
-
-#[cfg(feature = "test-utils")]
-fn default_mem_bootstrap() -> bool {
-    true
 }
 
 /// Configure Kitsune2 Reporting.
@@ -267,11 +257,6 @@ pub struct NetworkConfig {
     #[cfg(feature = "test-utils")]
     #[serde(default)]
     pub disable_gossip: bool,
-
-    /// Use the in-memory bootstrap module instead of the real one.
-    #[cfg(feature = "test-utils")]
-    #[serde(default = "default_mem_bootstrap")]
-    pub mem_bootstrap: bool,
 }
 
 impl Default for NetworkConfig {
@@ -292,8 +277,6 @@ impl Default for NetworkConfig {
             disable_publish: false,
             #[cfg(feature = "test-utils")]
             disable_gossip: false,
-            #[cfg(feature = "test-utils")]
-            mem_bootstrap: true,
         }
     }
 }
@@ -643,8 +626,6 @@ fn kitsune2_config_schema(generator: &mut schemars::SchemaGenerator) -> Schema {
         core_publish: Option<kitsune2_core::factories::CorePublishModConfig>,
         #[serde(flatten)]
         core_space: Option<kitsune2_core::factories::CoreSpaceModConfig>,
-        #[serde(flatten)]
-        mem_bootstrap: Option<kitsune2_core::factories::MemBootstrapModConfig>,
         #[serde(flatten)]
         mem_peer_store: Option<kitsune2_core::factories::MemPeerStoreModConfig>,
         #[serde(flatten)]

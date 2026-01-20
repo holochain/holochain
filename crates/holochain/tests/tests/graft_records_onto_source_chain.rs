@@ -7,7 +7,7 @@ use holo_hash::fixt::AgentPubKeyFixturator;
 use holochain::conductor::api::error::ConductorApiError;
 use holochain::conductor::conductor::InstallAppCommonFlags;
 use holochain::sweettest::{
-    DynSweetRendezvous, SweetConductor, SweetConductorConfig, SweetDnaFile,
+    SweetConductor, SweetConductorConfig, SweetDnaFile, SweetLocalRendezvous,
 };
 use holochain_keystore::MetaLairClient;
 use holochain_sqlite::db::{DbKindAuthored, DbWrite};
@@ -24,8 +24,9 @@ async fn grafting() {
     config.chc_url = Some(url2::Url2::parse(
         holochain::conductor::chc::CHC_LOCAL_MAGIC_URL,
     ));
-    let mut conductor_1 = SweetConductor::from_config(config.clone()).await;
-    let keystore = conductor_1.keystore();
+    let mut conductor_1 =
+        SweetConductor::from_config_rendezvous(config.clone(), SweetLocalRendezvous::new().await)
+            .await;
 
     let apps = conductor_1.setup_app("app", [&dna_file]).await.unwrap();
     let (alice_cell_1,) = apps.into_tuple();
@@ -216,7 +217,7 @@ async fn grafting() {
 
     // Start a second conductor.
     let mut conductor_2 =
-        SweetConductor::create_with_defaults(config, Some(keystore), None::<DynSweetRendezvous>)
+        SweetConductor::from_config_rendezvous(config.clone(), SweetLocalRendezvous::new().await)
             .await;
 
     let _records = conductor_2

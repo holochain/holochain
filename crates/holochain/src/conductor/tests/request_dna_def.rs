@@ -4,7 +4,7 @@ use holochain_wasm_test_utils::TestWasm;
 #[tokio::test(flavor = "multi_thread")]
 async fn request_dna_def() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
     let app = conductor.setup_app("app", [&dna]).await.unwrap();
     let cells = app.into_cells();
 

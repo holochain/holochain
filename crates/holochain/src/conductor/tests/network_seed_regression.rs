@@ -10,7 +10,7 @@ use tempfile::{tempdir, TempDir};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn network_seed_regression() {
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::standard().await;
     let tmp = tempdir().unwrap();
     let (dna, _, _) = SweetDnaFile::from_test_wasms(
         "".into(),
@@ -90,7 +90,7 @@ async fn network_seed_regression() {
 /// Test all possible combinations of Locations and network seeds:
 #[tokio::test(flavor = "multi_thread")]
 async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::standard().await;
     let tmp = tempdir().unwrap();
     let (dna, _, _) = SweetDnaFile::from_test_wasms(
         "".to_string(),

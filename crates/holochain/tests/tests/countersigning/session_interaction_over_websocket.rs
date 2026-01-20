@@ -656,7 +656,6 @@ impl Agent {
         });
         config.network.bootstrap_url = Url2::parse(bootstrap_url);
         config.network.signal_url = Url2::parse(signal_url);
-        config.network.mem_bootstrap = false;
         let config_path = write_config(environment_path, &config);
 
         let (_holochain, admin_port) = start_holochain_with_lair(config_path.clone(), true).await;

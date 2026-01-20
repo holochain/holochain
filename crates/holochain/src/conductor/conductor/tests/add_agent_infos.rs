@@ -1,3 +1,4 @@
+use crate::sweettest::SweetLocalRendezvous;
 use crate::{
     retry_until_timeout,
     sweettest::{SweetConductor, SweetConductorConfig, SweetDnaFile},
@@ -58,11 +59,11 @@ async fn add_agent_infos_to_peer_store() {
     drop(conductor);
 
     // Add agent info from first app installation to a new conductor's peer store.
-    let config = SweetConductorConfig::standard().tune_network_config(|nc| {
-        nc.disable_bootstrap = true;
-    });
-
-    let mut conductor = SweetConductor::from_config(config).await;
+    let mut conductor = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(false),
+        SweetLocalRendezvous::new().await,
+    )
+    .await;
 
     // Install an app with the same DNA to create the space first
     let _app: crate::sweettest::SweetApp = conductor

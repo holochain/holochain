@@ -12,8 +12,7 @@ use std::sync::Arc;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn call_init_in_inline_zomes_passes() {
-    let config = SweetConductorConfig::standard();
-    let mut conductor = SweetConductor::from_config(config).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let agent = SweetAgents::one(conductor.keystore()).await;
     let is_init_called = Arc::new(AtomicBool::new(false));
     let is_init_called_clone = is_init_called.clone();
@@ -43,8 +42,7 @@ async fn call_init_in_inline_zomes_passes() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn call_init_across_cells_passes() {
-    let config = SweetConductorConfig::standard();
-    let mut conductor = SweetConductor::from_config(config).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let agent = SweetAgents::one(conductor.keystore()).await;
     let is_init_called = Arc::new(AtomicBool::new(false));
     let is_init_called_clone = is_init_called.clone();
@@ -92,8 +90,7 @@ async fn call_init_across_cells_passes() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn call_init_from_init_across_cells() {
-    let config = SweetConductorConfig::standard();
-    let mut conductor = SweetConductor::from_config(config).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let agent = SweetAgents::one(conductor.keystore()).await;
     let inits = Arc::new(AtomicU8::new(0));
     let inits1 = inits.clone();
@@ -155,8 +152,7 @@ async fn call_init_from_init_across_cells() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn call_init_with_invalid_return_type_in_inline_zomes() {
-    let config = SweetConductorConfig::standard();
-    let mut conductor = SweetConductor::from_config(config).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let agent = SweetAgents::one(conductor.keystore()).await;
     let zome = SweetInlineZomes::new(vec![], 0)
         .function("init", |_, _: ()| Ok(42))
@@ -187,8 +183,7 @@ async fn call_init_with_invalid_return_type_in_inline_zomes() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn call_init_with_invalid_return_type_across_cells() {
-    let config = SweetConductorConfig::standard();
-    let mut conductor = SweetConductor::from_config(config).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let agent = SweetAgents::one(conductor.keystore()).await;
     let zome_1 = SweetInlineZomes::new(vec![], 0)
         .function("init", move |_, _: ()| Ok(42))
@@ -236,8 +231,7 @@ async fn call_init_with_invalid_return_type_across_cells() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn call_init_with_invalid_return_type_from_init_across_cells() {
-    let config = SweetConductorConfig::standard();
-    let mut conductor = SweetConductor::from_config(config).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let agent = SweetAgents::one(conductor.keystore()).await;
     let zome_1 = SweetInlineZomes::new(vec![], 0)
         .function("init", move |_, _: ()| Ok(42))
@@ -297,8 +291,7 @@ async fn call_init_with_invalid_return_type_from_init_across_cells() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn call_init_with_invalid_parameters_in_inline_zomes() {
-    let config = SweetConductorConfig::standard();
-    let mut conductor = SweetConductor::from_config(config).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let agent = SweetAgents::one(conductor.keystore()).await;
     let zome = SweetInlineZomes::new(vec![], 0)
         .function("init", |_, _: usize| Ok(InitCallbackResult::Pass))
@@ -329,8 +322,7 @@ async fn call_init_with_invalid_parameters_in_inline_zomes() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn call_init_with_invalid_parameters_across_cells() {
-    let config = SweetConductorConfig::standard();
-    let mut conductor = SweetConductor::from_config(config).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let agent = SweetAgents::one(conductor.keystore()).await;
     let zome_1 = SweetInlineZomes::new(vec![], 0)
         .function("init", move |_, _: usize| Ok(InitCallbackResult::Pass))
@@ -378,8 +370,7 @@ async fn call_init_with_invalid_parameters_across_cells() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn call_init_with_invalid_parameters_from_init_across_cells() {
-    let config = SweetConductorConfig::standard();
-    let mut conductor = SweetConductor::from_config(config).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let agent = SweetAgents::one(conductor.keystore()).await;
     let zome_1 = SweetInlineZomes::new(vec![], 0)
         .function("init", move |_, _: usize| Ok(InitCallbackResult::Pass))
@@ -440,8 +431,7 @@ async fn call_init_with_invalid_parameters_from_init_across_cells() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn call_init_directly_only_calls_once() {
-    let config = SweetConductorConfig::standard();
-    let mut conductor = SweetConductor::from_config(config).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::InitSingle]).await;
     let app = conductor.setup_app("app", &[dna]).await.unwrap();

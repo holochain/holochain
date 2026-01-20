@@ -73,7 +73,7 @@ async fn main_workflow() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let dna_hash = dna_file.dna_hash().clone();
 
-    let mut conductor = SweetConductor::from_config(SweetConductorConfig::standard()).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor
         .setup_app("", std::slice::from_ref(&dna_file))
         .await
@@ -690,7 +690,7 @@ async fn app_validation_workflow_test() {
     ])
     .await;
 
-    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
     let apps = conductors.setup_app("test_app", [&dna_file]).await.unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();
     let alice_cell_id = alice.cell_id().clone();
@@ -1145,7 +1145,7 @@ async fn app_validation_produces_warrants() {
     assert_eq!(dna_sans.dna_hash(), dna_avec_1.dna_hash());
     assert_eq!(dna_avec_1.dna_hash(), dna_avec_2.dna_hash());
 
-    let mut conductors = SweetConductorBatch::from_standard_config(3).await;
+    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(3).await;
     let (alice,) = conductors[0]
         .setup_app("test_app", [&dna_sans])
         .await
@@ -1257,7 +1257,6 @@ async fn app_validation_produces_warrants() {
 
 /// Alice creates an invalid op, Bob authors a warrant, and Carol validates the warrant+op but does
 /// not issue a second warrant.
-#[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
 async fn skip_issuing_warrant_if_one_found() {
     holochain_trace::test_run();
@@ -1306,9 +1305,12 @@ async fn skip_issuing_warrant_if_one_found() {
         nc.disable_gossip = true;
     });
 
-    let mut conductors =
-        SweetConductorBatch::from_configs([no_validate_config, other_config.clone(), other_config])
-            .await;
+    let mut conductors = SweetConductorBatch::from_configs_rendezvous([
+        no_validate_config,
+        other_config.clone(),
+        other_config,
+    ])
+    .await;
 
     let ((alice,), (_bob,), (carol,)) = conductors
         .setup_app("test_app", [&dna_file])

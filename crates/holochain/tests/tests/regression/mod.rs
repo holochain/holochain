@@ -18,7 +18,7 @@ mod zome_call_atomic;
 #[cfg(not(feature = "wasmer_wamr"))]
 async fn wasm_disk_cache() {
     holochain_trace::test_run();
-    let mut conductor = SweetConductor::from_config(SweetConductorConfig::standard()).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
 
     let mut cache_dir = conductor.db_path().to_owned();
     cache_dir.push(WASM_CACHE);
@@ -250,8 +250,11 @@ async fn zero_arc_can_delete_link() {
         SweetConductorConfig::standard().tune_network_config(|nc| nc.target_arc_factor = 0);
 
     let other_config = SweetConductorConfig::standard();
-    let mut conductors =
-        SweetConductorBatch::from_configs(vec![other_config, empty_arc_conductor_config]).await;
+    let mut conductors = SweetConductorBatch::from_configs_rendezvous(vec![
+        other_config,
+        empty_arc_conductor_config,
+    ])
+    .await;
 
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Link])
         .await

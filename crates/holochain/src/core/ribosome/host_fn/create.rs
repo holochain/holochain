@@ -123,10 +123,9 @@ pub mod wasm_test {
     /// we can get an entry hash out of the fn directly
     #[tokio::test(flavor = "multi_thread")]
     async fn create_entry_test() {
-        let ribosome =
-            RealRibosomeFixturator::new(crate::fixt::Zomes(vec![TestWasm::Create]))
-                .next()
-                .unwrap();
+        let ribosome = RealRibosomeFixturator::new(crate::fixt::Zomes(vec![TestWasm::Create]))
+            .next()
+            .unwrap();
         let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
         call_context.zome = TestWasmPair::<IntegrityZome, CoordinatorZome>::from(TestWasm::Create)
             .coordinator

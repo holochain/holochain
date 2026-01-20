@@ -557,10 +557,10 @@ mod test {
     use crate::conductor::Conductor;
     use crate::conductor::ConductorHandle;
     use crate::fixt::RealRibosomeFixturator;
-    use crate::sweettest::websocket_client_by_port;
     use crate::sweettest::SweetDnaFile;
     use crate::sweettest::WsPollRecv;
     use crate::sweettest::{app_bundle_from_dnas, authenticate_app_ws_client};
+    use crate::sweettest::{websocket_client_by_port, SweetConductorConfig};
     use crate::test_utils::install_app_in_conductor;
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
@@ -745,7 +745,12 @@ mod test {
         dnas_with_proofs: Vec<(DnaFile, Option<MembraneProof>)>,
     ) -> (Arc<TempDir>, ConductorHandle) {
         let db_dir = test_db_dir();
-        let config = holochain::sweettest::SweetConductorConfig::standard().into();
+        let config = SweetConductorConfig::standard()
+            .tune_network_config(|nc| {
+                nc.disable_bootstrap = true;
+                nc.signal_url = url2::Url2::parse("ws://dummy.url");
+            })
+            .into();
         let conductor_handle = ConductorBuilder::new()
             .config(config)
             .with_data_root_path(db_dir.path().to_path_buf().into())

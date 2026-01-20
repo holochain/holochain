@@ -12,7 +12,7 @@ use std::collections::HashMap;
 async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
     holochain_trace::test_run();
 
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
 
     async fn make_payload(clone_limit: u32) -> InstallAppPayload {
         // The integrity zome in this WASM will fail if the properties are not set. This helps verify that genesis
@@ -136,7 +136,7 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn reject_duplicate_app_for_same_agent() {
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::standard().await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let path = format!("{}", dna.dna_hash());
@@ -240,7 +240,7 @@ async fn reject_duplicate_app_for_same_agent() {
 #[cfg(feature = "unstable-migration")]
 #[tokio::test(flavor = "multi_thread")]
 async fn cells_by_dna_lineage() {
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
 
     async fn mk_dna(lineage: &[&DnaHash]) -> DnaFile {
         let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
@@ -332,7 +332,7 @@ async fn cells_by_dna_lineage() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn use_existing_integration() {
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::standard().await;
 
     let (dna1, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::WhoAmI]).await;
     let (dna2, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::WhoAmI]).await;
