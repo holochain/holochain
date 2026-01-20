@@ -368,20 +368,25 @@ async fn test_foreign_key_constraints() {
 
     // Insert a DnaDef
     let dna_hash = vec![1u8; 32];
-    sqlx::query("INSERT INTO DnaDef (hash, name, network_seed, properties) VALUES (?, ?, ?, ?)")
-        .bind(&dna_hash)
-        .bind("test_dna")
-        .bind("test_seed")
-        .bind(vec![0u8])
-        .execute(db_conn.pool())
-        .await
-        .expect("Failed to insert DnaDef");
+    let agent = vec![2u8; 32]; // Agent public key
+    sqlx::query(
+        "INSERT INTO DnaDef (hash, agent, name, network_seed, properties) VALUES (?, ?, ?, ?, ?)",
+    )
+    .bind(&dna_hash)
+    .bind(&agent)
+    .bind("test_dna")
+    .bind("test_seed")
+    .bind(vec![0u8])
+    .execute(db_conn.pool())
+    .await
+    .expect("Failed to insert DnaDef");
 
     // Insert an IntegrityZome referencing the DnaDef
     sqlx::query(
-        "INSERT INTO IntegrityZome (dna_hash, zome_index, zome_name, dependencies) VALUES (?, ?, ?, ?)",
+        "INSERT INTO IntegrityZome (dna_hash, agent, zome_index, zome_name, dependencies) VALUES (?, ?, ?, ?, ?)",
     )
     .bind(&dna_hash)
+    .bind(&agent)
     .bind(0)
     .bind("test_zome")
     .bind("[]")
@@ -390,19 +395,23 @@ async fn test_foreign_key_constraints() {
     .expect("Failed to insert IntegrityZome");
 
     // Verify the zome was inserted
-    let count: i32 = sqlx::query_scalar("SELECT COUNT(*) FROM IntegrityZome WHERE dna_hash = ?")
-        .bind(&dna_hash)
-        .fetch_one(db_conn.pool())
-        .await
-        .expect("Failed to count zomes");
+    let count: i32 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM IntegrityZome WHERE dna_hash = ? AND agent = ?")
+            .bind(&dna_hash)
+            .bind(&agent)
+            .fetch_one(db_conn.pool())
+            .await
+            .expect("Failed to count zomes");
     assert_eq!(count, 1);
 
     // Try to insert an IntegrityZome with a non-existent dna_hash (should fail)
     let bad_dna_hash = vec![99u8; 32];
+    let bad_agent = vec![99u8; 32];
     let err = sqlx::query(
-        "INSERT INTO IntegrityZome (dna_hash, zome_index, zome_name, dependencies) VALUES (?, ?, ?, ?)",
+        "INSERT INTO IntegrityZome (dna_hash, agent, zome_index, zome_name, dependencies) VALUES (?, ?, ?, ?, ?)",
     )
     .bind(&bad_dna_hash)
+    .bind(&bad_agent)
     .bind(0)
     .bind("bad_zome")
     .bind("[]")
@@ -418,16 +427,19 @@ async fn test_foreign_key_constraints() {
     );
 
     // Delete the DnaDef and verify cascading delete removes the zome
-    sqlx::query("DELETE FROM DnaDef WHERE hash = ?")
+    sqlx::query("DELETE FROM DnaDef WHERE hash = ? AND agent = ?")
         .bind(&dna_hash)
+        .bind(&agent)
         .execute(db_conn.pool())
         .await
         .expect("Failed to delete DnaDef");
 
-    let count: i32 = sqlx::query_scalar("SELECT COUNT(*) FROM IntegrityZome WHERE dna_hash = ?")
-        .bind(&dna_hash)
-        .fetch_one(db_conn.pool())
-        .await
-        .expect("Failed to count zomes after delete");
+    let count: i32 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM IntegrityZome WHERE dna_hash = ? AND agent = ?")
+            .bind(&dna_hash)
+            .bind(&agent)
+            .fetch_one(db_conn.pool())
+            .await
+            .expect("Failed to count zomes after delete");
     assert_eq!(count, 0, "Expected cascading delete to remove zome");
 }
