@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING** Dumping network stats with the admin and app APIs now returns a consistent response type of `HolochainTransportStats` where previously they returned `ApiTransportStats` and `TransportStats` respectively. The app response was missing blocked message counts. The Holochain type also converts `Space` values into `DnaHash` values for easier use in app code. #5611 
+
 ## 0.7.0-dev.8
 
 - Locally authored data is now only published after it has been integrated. This resolves a race condition where remote conductors might fail to fetch published ops by id because they haven’t been integrated locally yet. \#5545

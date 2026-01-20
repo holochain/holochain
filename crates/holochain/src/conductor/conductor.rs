@@ -2578,10 +2578,23 @@ mod misc_impls {
         }
 
         /// Dump of backend network stats from the Kitsune2 network transport.
-        pub async fn dump_network_stats(
-            &self,
-        ) -> ConductorApiResult<kitsune2_api::ApiTransportStats> {
-            Ok(self.holochain_p2p.dump_network_stats().await?)
+        pub async fn dump_network_stats(&self) -> ConductorApiResult<HolochainTransportStats> {
+            let transport_stats = self.holochain_p2p.dump_network_stats().await?;
+            Ok(HolochainTransportStats {
+                transport_stats: transport_stats.transport_stats,
+                blocked_message_counts: transport_stats
+                    .blocked_message_counts
+                    .into_iter()
+                    .map(|(k, v)| {
+                        (
+                            k,
+                            v.into_iter()
+                                .map(|(space, count)| (DnaHash::from_k2_space(&space), count))
+                                .collect(),
+                        )
+                    })
+                    .collect(),
+            })
         }
 
         /// Dump of backend network stats from the Kitsune2 network transport.
@@ -2591,7 +2604,7 @@ mod misc_impls {
         pub async fn dump_network_stats_for_app(
             &self,
             installed_app_id: &InstalledAppId,
-        ) -> ConductorApiResult<kitsune2_api::TransportStats> {
+        ) -> ConductorApiResult<HolochainTransportStats> {
             let all_dna_hashes = {
                 let state = self.get_state().await?;
                 let installed_app = state.get_app(installed_app_id)?;
@@ -2614,8 +2627,8 @@ mod misc_impls {
             };
 
             let mut keep_peer_ids = HashSet::new();
-            for dna_hash in all_dna_hashes {
-                let peer_store = self.holochain_p2p.peer_store(dna_hash).await?;
+            for dna_hash in &all_dna_hashes {
+                let peer_store = self.holochain_p2p.peer_store(dna_hash.clone()).await?;
                 keep_peer_ids.extend(peer_store.get_all().await?.into_iter().filter_map(|p| {
                     p.url
                         .as_ref()
@@ -2625,18 +2638,49 @@ mod misc_impls {
             }
 
             let stats = self.holochain_p2p.dump_network_stats().await?;
-            Ok(TransportStats {
-                // Common information, fine to return
-                backend: stats.transport_stats.backend,
-                // These are our peer URLs, always give this back
-                peer_urls: stats.transport_stats.peer_urls,
-                // This contains connections for the whole conductor, filter it down
-                // to only the connections that are relevant to the current app
-                connections: stats
-                    .transport_stats
-                    .connections
+            Ok(HolochainTransportStats {
+                transport_stats: TransportStats {
+                    // Common information, fine to return
+                    backend: stats.transport_stats.backend,
+                    // These are our peer URLs, always give this back
+                    peer_urls: stats.transport_stats.peer_urls,
+                    // This contains connections for the whole conductor, filter it down
+                    // to only the connections that are relevant to the current app
+                    connections: stats
+                        .transport_stats
+                        .connections
+                        .into_iter()
+                        .filter(|s| keep_peer_ids.contains(&s.pub_key))
+                        .collect(),
+                },
+                blocked_message_counts: stats
+                    .blocked_message_counts
                     .into_iter()
-                    .filter(|s| keep_peer_ids.contains(&s.pub_key))
+                    .filter_map(|(url, space_counts)| {
+                        if url.peer_id().is_some_and(|id| keep_peer_ids.contains(id)) {
+                            let filtered: HashMap<DnaHash, kitsune2_api::MessageBlockCount> =
+                                space_counts
+                                    .into_iter()
+                                    .filter_map(|(space, count)| {
+                                        let hash = DnaHash::from_k2_space(&space);
+
+                                        if all_dna_hashes.contains(&hash) {
+                                            Some((hash, count))
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                    .collect();
+
+                            if !filtered.is_empty() {
+                                Some((url, filtered))
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    })
                     .collect(),
             })
         }
