@@ -67,7 +67,7 @@ jobs:
             target: wasmer_sys
           - os: macos-15-intel
             target: wasmer_sys
-          - os: depot-windows-2025-8
+          - os: windows-latest
             target: wasmer_sys
     steps:
       - name: checkout
