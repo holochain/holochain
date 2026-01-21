@@ -45,7 +45,9 @@ pub struct Spaces {
     /// The map of running queue consumer workflows.
     pub(crate) queue_consumer_map: QueueConsumerMap,
     pub(crate) conductor_db: DbWrite<DbKindConductor>,
-    pub(crate) wasm_db: holochain_data::DbWrite<holochain_data::kind::Wasm>,
+    pub(crate) wasm_store: holochain_state::wasm::WasmStore,
+    pub(crate) dna_def_store: holochain_state::dna_def::DnaDefStore,
+    pub(crate) entry_def_store: holochain_state::entry_def::EntryDefStore,
     db_key: DbKey,
 }
 
@@ -199,13 +201,20 @@ impl Spaces {
         .await
         .map_err(|e| std::io::Error::other(e.to_string()))?;
 
+        // Create store instances from the wasm database
+        let wasm_store = holochain_state::wasm::WasmStore::new(wasm_db.clone());
+        let dna_def_store = holochain_state::dna_def::DnaDefStore::new(wasm_db.clone());
+        let entry_def_store = holochain_state::entry_def::EntryDefStore::new(wasm_db);
+
         Ok(Spaces {
             map: RwShare::new(HashMap::new()),
             db_dir: Arc::new(root_db_dir),
             config,
             queue_consumer_map: QueueConsumerMap::new(),
             conductor_db,
-            wasm_db,
+            wasm_store,
+            dna_def_store,
+            entry_def_store,
             db_key,
         })
     }
