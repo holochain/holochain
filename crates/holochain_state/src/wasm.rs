@@ -22,6 +22,14 @@ impl<Db> WasmStore<Db> {
 }
 
 impl WasmStore<holochain_data::DbRead<holochain_data::kind::Wasm>> {
+    /// Check whether a WASM module exists in the database.
+    pub async fn contains(&self, hash: &WasmHash) -> StateQueryResult<bool> {
+        self.db
+            .wasm_exists(hash)
+            .await
+            .map_err(StateQueryError::from)
+    }
+
     /// Retrieve a WASM module from the database by its hash.
     pub async fn get(&self, hash: &WasmHash) -> StateQueryResult<Option<DnaWasmHashed>> {
         match self.db.get_wasm(hash).await {

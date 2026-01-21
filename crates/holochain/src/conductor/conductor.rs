@@ -730,8 +730,9 @@ mod dna_impls {
             // TODO: PERF: This loop might be slow
             let wasms = futures::future::join_all(code.map(DnaWasmHashed::from_content)).await;
 
+            let wasm_read = self.spaces.wasm_store.as_read();
             for wasm in wasms {
-                if !self.spaces.wasm_store.contains(wasm.as_hash()).await? {
+                if !wasm_read.contains(wasm.as_hash()).await? {
                     self.spaces.wasm_store.put(wasm).await?;
                 }
             }
