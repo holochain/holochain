@@ -16,13 +16,9 @@ pub async fn get(
 pub async fn get_all(
     db: &holochain_data::DbRead<holochain_data::kind::Wasm>,
 ) -> StateQueryResult<Vec<(CellId, DnaDef)>> {
-    // Note: This function is tricky because we need to map DNAs back to CellIds,
-    // but the wasm database only stores DNAs. We would need to query the conductor
-    // database to get all cells and their DNA associations.
-    // For now, return empty as this may not be used in the critical path.
-    // TODO: Implement proper retrieval from conductor DB or refactor caller
-    let _ = db;
-    Ok(Vec::new())
+    db.get_all_dna_defs()
+        .await
+        .map_err(|e| crate::query::StateQueryError::from(e))
 }
 
 pub async fn contains(

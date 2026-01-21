@@ -111,6 +111,7 @@ mod tests {
             holochain_data::HolochainDataConfig {
                 key: None,
                 sync_level: holochain_data::DbSyncLevel::Off,
+                max_readers: 8,
             },
         )
         .await
@@ -144,6 +145,7 @@ mod tests {
             holochain_data::HolochainDataConfig {
                 key: None,
                 sync_level: holochain_data::DbSyncLevel::Off,
+                max_readers: 8,
             },
         )
         .await
