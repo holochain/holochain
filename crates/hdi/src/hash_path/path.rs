@@ -172,6 +172,9 @@ pub struct TypedPath {
     pub link_type: ScopedLinkType,
     /// The [`Path`] that is using this [`LinkType`].
     pub path: Path,
+    /// The strategy to use when fetching paths.
+    #[serde(default)]
+    pub strategy: GetStrategy,
 }
 
 /// Wrap components vector.
@@ -328,7 +331,14 @@ impl TypedPath {
         Self {
             link_type: link_type.into(),
             path,
+            strategy: GetStrategy::default(),
         }
+    }
+
+    /// Set the [`GetStrategy`] for this path.
+    pub fn with_strategy(mut self, strategy: GetStrategy) -> Self {
+        self.strategy = strategy;
+        self
     }
 
     /// The parent of the current path is simply the path truncated one level.
@@ -336,7 +346,11 @@ impl TypedPath {
         if self.path.as_ref().len() > 1 {
             let parent_vec: Vec<Component> =
                 self.path.as_ref()[0..self.path.as_ref().len() - 1].to_vec();
-            Some(Path::from(parent_vec).into_typed(self.link_type))
+            Some(Self {
+                link_type: self.link_type,
+                path: Path::from(parent_vec),
+                strategy: self.strategy,
+            })
         } else {
             None
         }
@@ -406,6 +420,31 @@ fn hash_path_component() {
             "unknown char for u32: 151587081".into()
         )),
     );
+}
+
+#[test]
+#[cfg(test)]
+fn hash_path_typed_path_with_strategy() {
+    use holochain_integrity_types::{LinkType, ZomeIndex};
+
+    // Test TypedPath creation with default strategy
+    let path = Path::from("test.path");
+    let link_type = ScopedLinkType {
+        zome_index: ZomeIndex(0),
+        zome_type: LinkType(0),
+    };
+    let typed_path = TypedPath::new(link_type, path.clone());
+    assert_eq!(typed_path.strategy, GetStrategy::Network); // Default should be Network
+
+    // Test TypedPath creation with specific strategy
+    let typed_path_local = typed_path.clone().with_strategy(GetStrategy::Local);
+    assert_eq!(typed_path_local.strategy, GetStrategy::Local);
+
+    // Test that parent preserves the strategy
+    let path_with_parent = Path::from("test.path.child");
+    let typed_path = TypedPath::new(link_type, path_with_parent).with_strategy(GetStrategy::Local);
+    let parent = typed_path.parent().expect("should have parent");
+    assert_eq!(parent.strategy, GetStrategy::Local);
 }
 
 #[test]

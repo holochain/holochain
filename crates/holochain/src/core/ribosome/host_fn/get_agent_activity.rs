@@ -23,18 +23,19 @@ pub fn get_agent_activity(
                 agent_pubkey,
                 chain_query_filter,
                 activity_request,
+                get_options,
             } = input;
             let options = match activity_request {
                 ActivityRequest::Status => GetActivityOptions {
                     include_valid_activity: false,
                     include_rejected_activity: false,
-                    get_options: GetOptions::local(),
+                    get_options,
                     ..Default::default()
                 },
                 ActivityRequest::Full => GetActivityOptions {
                     include_valid_activity: true,
                     include_rejected_activity: true,
-                    get_options: GetOptions::local(),
+                    get_options,
                     ..Default::default()
                 },
             };

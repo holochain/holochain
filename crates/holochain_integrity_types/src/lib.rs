@@ -22,6 +22,7 @@ pub mod entry;
 #[allow(missing_docs)]
 pub mod entry_def;
 pub mod genesis;
+pub mod get_strategy;
 pub mod info;
 #[allow(missing_docs)]
 pub mod link;
