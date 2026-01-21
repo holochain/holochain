@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **BREAKING CHANGE**: Remove features for tx5 transport variants `datachannel-vendored` and `backend-libdatachannel`. The only supported tx5 transport is `backend-go-pion` now.
 - **BREAKING CHANGE**: Default to iroh transport for all binaries.
 - Revert to iroh's public relay server URL `https://use1-1.relay.n0.iroh-canary.iroh.link./` in the conductor config.
+- Reinstate tests that ensure publish and gossip doesn't contact blocked nodes.
 - Set default iroh relay server to `dev-test-bootstrap2-iroh-relay.holochain.org`.
 - Run test workflow for all platforms with iroh transport. One job to test tx5 on Ubuntu is kept in the workflow.
 - Update kitsune2 to v0.4.0-dev.2, which includes the iroh relay integration with the bootstrap server.
