@@ -51,12 +51,24 @@ impl DbSyncLevel {
 }
 
 /// Configuration options for Holochain database connections.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct HolochainDataConfig {
     /// Optional encryption key for the database.
     pub key: Option<DbKey>,
     /// SQLite synchronous level.
     pub sync_level: DbSyncLevel,
+    /// Number of read connections in the pool.
+    pub max_readers: u16,
+}
+
+impl Default for HolochainDataConfig {
+    fn default() -> Self {
+        Self {
+            key: None,
+            sync_level: Default::default(),
+            max_readers: 8,
+        }
+    }
 }
 
 impl HolochainDataConfig {
@@ -74,6 +86,12 @@ impl HolochainDataConfig {
     /// Set the synchronous level.
     pub fn with_sync_level(mut self, sync_level: DbSyncLevel) -> Self {
         self.sync_level = sync_level;
+        self
+    }
+
+    /// Set the number of read connections in the pool
+    pub fn with_max_readers(mut self, max_readers: u16) -> Self {
+        self.max_readers = max_readers;
         self
     }
 }
@@ -137,18 +155,20 @@ async fn connect_database(
         .filename(db_path)
         .create_if_missing(true);
 
+    let max_readers = config.max_readers;
     opts = configure_sqlite_options(opts, config)?;
 
-    create_pool(opts).await
+    create_pool(opts, max_readers).await
 }
 
 /// Connect to an in-memory SQLite database for testing.
 #[cfg(feature = "test-utils")]
 async fn connect_database_memory(config: HolochainDataConfig) -> sqlx::Result<Pool<Sqlite>> {
     let opts = SqliteConnectOptions::from_str(":memory:")?;
+    let max_readers = config.max_readers;
     let opts = configure_sqlite_options(opts, config)?;
 
-    create_pool(opts).await
+    create_pool(opts, max_readers).await
 }
 
 /// Configure SQLite-specific options including encryption and WAL mode.
@@ -175,10 +195,9 @@ fn configure_sqlite_options(
 }
 
 /// Create a connection pool with standard options.
-async fn create_pool(opts: SqliteConnectOptions) -> sqlx::Result<Pool<Sqlite>> {
-    let max_cons = num_read_threads();
+async fn create_pool(opts: SqliteConnectOptions, max_readers: u16) -> sqlx::Result<Pool<Sqlite>> {
     let pool = SqlitePoolOptions::new()
-        .max_connections(max_cons as u32)
+        .max_connections(max_readers as u32 + 1)
         .min_connections(0)
         .idle_timeout(std::time::Duration::from_secs(30))
         .acquire_timeout(std::time::Duration::from_secs(30))
@@ -186,14 +205,6 @@ async fn create_pool(opts: SqliteConnectOptions) -> sqlx::Result<Pool<Sqlite>> {
         .await?;
 
     Ok(pool)
-}
-
-/// Calculate the number of read threads based on CPU count.
-///
-/// Returns at least 4, or the number of CPUs.
-fn num_read_threads() -> usize {
-    let num_cpus = num_cpus::get();
-    std::cmp::max(num_cpus, 4)
 }
 
 #[cfg(all(test, feature = "test-utils"))]

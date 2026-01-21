@@ -16,4 +16,7 @@ pub enum ConductorConfigError {
 
     #[error("Invalid network config: {0}")]
     InvalidNetworkConfig(String),
+
+    #[error("Invalid config: {0}")]
+    InvalidConfig(String),
 }

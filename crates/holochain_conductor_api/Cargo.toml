@@ -36,6 +36,7 @@ holochain_keystore = { version = "^0.7.0-dev.5", path = "../holochain_keystore" 
 shrinkwraprs = "0.3.0"
 indexmap = { version = "2.6.0", features = ["serde"] }
 schemars = "0.9"
+num_cpus = "1.17.0"
 
 [dev-dependencies]
 holochain_conductor_api = { path = ".", features = ["test-utils"] }

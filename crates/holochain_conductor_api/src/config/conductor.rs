@@ -69,7 +69,7 @@ pub use error::*;
 pub use keystore_config::KeystoreConfig;
 
 /// All the config information for the conductor
-#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema, Default)]
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
 pub struct ConductorConfig {
     /// Override the environment specified tracing config.
     #[serde(default)]
@@ -110,12 +110,48 @@ pub struct ConductorConfig {
     #[serde(default)]
     pub db_sync_strategy: DbSyncStrategy,
 
+    /// Override the default number of read connections available per database.
+    ///
+    /// The value defaults to twice the number of CPUs or 8, whichever is greater.
+    ///
+    /// This is best left at its default value unless you know what you are doing.
+    #[serde(default = "default_db_max_readers")]
+    pub db_max_readers: u16,
+
     /// Tuning parameters to adjust the behaviour of the conductor.
     #[serde(default)]
     pub tuning_params: Option<ConductorTuningParams>,
 
     /// Tracing scope.
     pub tracing_scope: Option<String>,
+}
+
+fn default_db_max_readers() -> u16 {
+    calculate_default_db_max_readers(num_cpus::get())
+}
+
+fn calculate_default_db_max_readers(num_cpus_count: usize) -> u16 {
+    let num_cpus_count = u16::try_from(num_cpus_count).unwrap_or(u16::MAX);
+    let cpus_x2 = num_cpus_count.saturating_mul(2);
+    std::cmp::max(cpus_x2, 8)
+}
+
+impl Default for ConductorConfig {
+    fn default() -> Self {
+        Self {
+            tracing_override: None,
+            data_root_path: None,
+            keystore: KeystoreConfig::default(),
+            admin_interfaces: None,
+            network: NetworkConfig::default(),
+            #[cfg(feature = "chc")]
+            chc_url: None,
+            db_sync_strategy: DbSyncStrategy::default(),
+            db_max_readers: default_db_max_readers(),
+            tuning_params: None,
+            tracing_scope: None,
+        }
+    }
 }
 
 /// Helper function to load a config from a YAML string.
@@ -699,6 +735,7 @@ mod tests {
                 keystore: KeystoreConfig::DangerTestKeystore,
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::default(),
+                db_max_readers: default_db_max_readers(),
                 #[cfg(feature = "chc")]
                 chc_url: None,
                 tuning_params: None,
@@ -756,6 +793,7 @@ mod tests {
       }
 
     db_sync_strategy: Fast
+    db_max_readers: 100
     "#;
 
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
@@ -796,6 +834,7 @@ mod tests {
                 }]),
                 network: network_config,
                 db_sync_strategy: DbSyncStrategy::Fast,
+                db_max_readers: 100,
                 #[cfg(feature = "chc")]
                 chc_url: None,
                 tuning_params: None,
@@ -825,6 +864,7 @@ mod tests {
                 },
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::Resilient,
+                db_max_readers: default_db_max_readers(),
                 #[cfg(feature = "chc")]
                 chc_url: None,
                 tuning_params: None,
@@ -980,5 +1020,29 @@ mod tests {
                 }
             })
         );
+    }
+
+    #[test]
+    fn default_db_max_readers_calculation() {
+        let config = ConductorConfig::default();
+        assert_eq!(config.db_max_readers, default_db_max_readers());
+
+        // On systems with <= 4 CPUs, db_max_readers should default to 8.
+        let cpu_count = 4;
+        assert_eq!(calculate_default_db_max_readers(cpu_count), 8);
+
+        let cpu_count = 3;
+        assert_eq!(calculate_default_db_max_readers(cpu_count), 8);
+
+        // On systems with > 4 CPUs, db_max_readers should default to 2x CPU count
+        let cpu_count = 5;
+        assert_eq!(calculate_default_db_max_readers(cpu_count), 10);
+
+        // db_max_readers won't overflow
+        let cpu_count = (u16::MAX as usize / 2) + 1;
+        assert_eq!(calculate_default_db_max_readers(cpu_count), u16::MAX);
+
+        let cpu_count = u32::MAX as usize;
+        assert_eq!(calculate_default_db_max_readers(cpu_count), u16::MAX);
     }
 }
