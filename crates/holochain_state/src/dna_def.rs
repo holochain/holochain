@@ -20,11 +20,6 @@ impl<Db> DnaDefStore<Db> {
 }
 
 impl DnaDefStore<holochain_data::DbRead<holochain_data::kind::Wasm>> {
-    /// Check whether a DNA definition exists in the database.
-    pub async fn contains(&self, cell_id: &CellId) -> StateQueryResult<bool> {
-        Ok(self.db.dna_def_exists(cell_id).await?)
-    }
-
     /// Retrieve a DNA definition from the database by its cell ID.
     pub async fn get(&self, cell_id: &CellId) -> StateQueryResult<Option<(CellId, DnaDef)>> {
         match self.db.get_dna_def(cell_id).await? {
@@ -32,41 +27,11 @@ impl DnaDefStore<holochain_data::DbRead<holochain_data::kind::Wasm>> {
             None => Ok(None),
         }
     }
-
-    /// Retrieve all DNA definitions from the database.
-    pub async fn get_all(&self) -> StateQueryResult<Vec<(CellId, DnaDef)>> {
-        self.db
-            .get_all_dna_defs()
-            .await
-            .map_err(crate::query::StateQueryError::from)
-    }
 }
 
 impl DnaDefStore<holochain_data::DbWrite<holochain_data::kind::Wasm>> {
-    /// Check whether a DNA definition exists in the database.
-    pub async fn contains(&self, cell_id: &CellId) -> StateQueryResult<bool> {
-        Ok(self.db.as_ref().dna_def_exists(cell_id).await?)
-    }
-
-    /// Retrieve a DNA definition from the database by its cell ID.
-    pub async fn get(&self, cell_id: &CellId) -> StateQueryResult<Option<(CellId, DnaDef)>> {
-        match self.db.as_ref().get_dna_def(cell_id).await? {
-            Some(dna_def) => Ok(Some((cell_id.clone(), dna_def))),
-            None => Ok(None),
-        }
-    }
-
-    /// Retrieve all DNA definitions from the database.
-    pub async fn get_all(&self) -> StateQueryResult<Vec<(CellId, DnaDef)>> {
-        self.db
-            .as_ref()
-            .get_all_dna_defs()
-            .await
-            .map_err(crate::query::StateQueryError::from)
-    }
-
     /// Store or update a DNA definition in the database.
-    pub async fn upsert(&self, cell_id: &CellId, dna_def: &DnaDef) -> StateMutationResult<()> {
+    pub async fn put(&self, cell_id: &CellId, dna_def: &DnaDef) -> StateMutationResult<()> {
         self.db.put_dna_def(cell_id, dna_def).await?;
         Ok(())
     }

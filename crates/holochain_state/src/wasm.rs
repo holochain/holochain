@@ -22,14 +22,6 @@ impl<Db> WasmStore<Db> {
 }
 
 impl WasmStore<holochain_data::DbRead<holochain_data::kind::Wasm>> {
-    /// Check whether a WASM module exists in the database.
-    pub async fn contains(&self, hash: &WasmHash) -> StateQueryResult<bool> {
-        self.db
-            .wasm_exists(hash)
-            .await
-            .map_err(StateQueryError::from)
-    }
-
     /// Retrieve a WASM module from the database by its hash.
     pub async fn get(&self, hash: &WasmHash) -> StateQueryResult<Option<DnaWasmHashed>> {
         match self.db.get_wasm(hash).await {
@@ -41,24 +33,6 @@ impl WasmStore<holochain_data::DbRead<holochain_data::kind::Wasm>> {
 }
 
 impl WasmStore<holochain_data::DbWrite<holochain_data::kind::Wasm>> {
-    /// Check whether a WASM module exists in the database.
-    pub async fn contains(&self, hash: &WasmHash) -> StateQueryResult<bool> {
-        self.db
-            .as_ref()
-            .wasm_exists(hash)
-            .await
-            .map_err(StateQueryError::from)
-    }
-
-    /// Retrieve a WASM module from the database by its hash.
-    pub async fn get(&self, hash: &WasmHash) -> StateQueryResult<Option<DnaWasmHashed>> {
-        match self.db.as_ref().get_wasm(hash).await {
-            Ok(Some(wasm_hashed)) => Ok(Some(wasm_hashed)),
-            Ok(None) => Ok(None),
-            Err(e) => Err(StateQueryError::from(e)),
-        }
-    }
-
     /// Store a WASM module in the database.
     pub async fn put(&self, wasm: DnaWasmHashed) -> StateMutationResult<()> {
         self.db
@@ -122,13 +96,11 @@ mod tests {
             DnaWasmHashed::from_content(DnaWasm::from(holochain_wasm_test_utils::TestWasm::Foo))
                 .await;
 
-        // Use methods instead of functions
         store
             .put(wasm.clone())
             .await
             .map_err(|e| StateQueryError::Other(e.to_string()))?;
-        assert!(store.contains(wasm.as_hash()).await?);
-        let ret = store.get(wasm.as_hash()).await?.unwrap();
+        let ret = store.as_read().get(wasm.as_hash()).await?.unwrap();
         assert_eq!(ret, wasm);
 
         Ok(())
@@ -164,13 +136,11 @@ mod tests {
 
         // Downgrade to read-only store using as_read()
         let read_store = store.as_read();
-        assert!(read_store.contains(wasm.as_hash()).await?);
         let ret = read_store.get(wasm.as_hash()).await?.unwrap();
         assert_eq!(ret, wasm);
 
         // Test into_read() conversion
         let read_store2: WasmStoreRead = store.into();
-        assert!(read_store2.contains(wasm.as_hash()).await?);
         let ret2 = read_store2.get(wasm.as_hash()).await?.unwrap();
         assert_eq!(ret2, wasm);
 

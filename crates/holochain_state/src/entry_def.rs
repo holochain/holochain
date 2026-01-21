@@ -22,36 +22,6 @@ impl<Db> EntryDefStore<Db> {
 }
 
 impl EntryDefStore<holochain_data::DbRead<holochain_data::kind::Wasm>> {
-    /// Check whether an entry definition exists in the database.
-    pub async fn contains(&self, key: EntryDefBufferKey) -> StateQueryResult<bool> {
-        use holochain_serialized_bytes::SerializedBytes;
-        let serialized: SerializedBytes =
-            key.try_into()
-                .map_err(|e: holochain_serialized_bytes::SerializedBytesError| {
-                    StateQueryError::from(e)
-                })?;
-        let key_bytes = serialized.bytes().to_vec();
-        self.db
-            .entry_def_exists(&key_bytes)
-            .await
-            .map_err(StateQueryError::from)
-    }
-
-    /// Retrieve an entry definition from the database by its key.
-    pub async fn get(&self, key: EntryDefBufferKey) -> StateQueryResult<Option<EntryDef>> {
-        use holochain_serialized_bytes::SerializedBytes;
-        let serialized: SerializedBytes =
-            key.try_into()
-                .map_err(|e: holochain_serialized_bytes::SerializedBytesError| {
-                    StateQueryError::from(e)
-                })?;
-        let key_bytes = serialized.bytes().to_vec();
-        match self.db.get_entry_def(&key_bytes).await {
-            Ok(entry_def) => Ok(entry_def),
-            Err(e) => Err(StateQueryError::from(e)),
-        }
-    }
-
     /// Retrieve all entry definitions from the database.
     pub async fn get_all(&self) -> StateQueryResult<Vec<(EntryDefBufferKey, EntryDef)>> {
         let all_entry_defs = self
@@ -75,59 +45,6 @@ impl EntryDefStore<holochain_data::DbRead<holochain_data::kind::Wasm>> {
 }
 
 impl EntryDefStore<holochain_data::DbWrite<holochain_data::kind::Wasm>> {
-    /// Check whether an entry definition exists in the database.
-    pub async fn contains(&self, key: EntryDefBufferKey) -> StateQueryResult<bool> {
-        use holochain_serialized_bytes::SerializedBytes;
-        let serialized: SerializedBytes =
-            key.try_into()
-                .map_err(|e: holochain_serialized_bytes::SerializedBytesError| {
-                    StateQueryError::from(e)
-                })?;
-        let key_bytes = serialized.bytes().to_vec();
-        self.db
-            .as_ref()
-            .entry_def_exists(&key_bytes)
-            .await
-            .map_err(StateQueryError::from)
-    }
-
-    /// Retrieve an entry definition from the database by its key.
-    pub async fn get(&self, key: EntryDefBufferKey) -> StateQueryResult<Option<EntryDef>> {
-        use holochain_serialized_bytes::SerializedBytes;
-        let serialized: SerializedBytes =
-            key.try_into()
-                .map_err(|e: holochain_serialized_bytes::SerializedBytesError| {
-                    StateQueryError::from(e)
-                })?;
-        let key_bytes = serialized.bytes().to_vec();
-        match self.db.as_ref().get_entry_def(&key_bytes).await {
-            Ok(entry_def) => Ok(entry_def),
-            Err(e) => Err(StateQueryError::from(e)),
-        }
-    }
-
-    /// Retrieve all entry definitions from the database.
-    pub async fn get_all(&self) -> StateQueryResult<Vec<(EntryDefBufferKey, EntryDef)>> {
-        let all_entry_defs = self
-            .db
-            .as_ref()
-            .get_all_entry_defs()
-            .await
-            .map_err(StateQueryError::from)?;
-
-        use holochain_serialized_bytes::{SerializedBytes, UnsafeBytes};
-        all_entry_defs
-            .into_iter()
-            .map(|(key_bytes, entry_def)| {
-                let serialized = SerializedBytes::from(UnsafeBytes::from(key_bytes));
-                let key: EntryDefBufferKey = serialized.try_into().map_err(
-                    |e: holochain_serialized_bytes::SerializedBytesError| StateQueryError::from(e),
-                )?;
-                Ok((key, entry_def))
-            })
-            .collect()
-    }
-
     /// Store an entry definition in the database.
     pub async fn put(
         &self,
