@@ -742,7 +742,7 @@ mod dna_impls {
 
             self.spaces
                 .dna_def_store
-                .upsert(&cell_id, &dna_def_hashed.into_content())
+                .put(&cell_id, &dna_def_hashed.into_content())
                 .await?;
 
             Ok(zome_defs)
