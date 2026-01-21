@@ -624,9 +624,11 @@ mod dna_impls {
                 .collect::<ConductorResult<HashSet<_>>>()?;
 
             // Get the code for each unique wasm.
+            let wasm_store = WasmStore::new(db.as_ref().clone());
             let mut wasms_and_hashes = HashMap::new();
             for wasm_hash in unique_wasm_hashes {
-                let wasm_hashed = holochain_state::wasm::get(db.as_ref(), &wasm_hash)
+                let wasm_hashed = wasm_store
+                    .get(&wasm_hash)
                     .await?
                     .ok_or(ConductorError::WasmMissing)?;
                 wasms_and_hashes.insert(wasm_hash, wasm_hashed.into_content());
@@ -728,11 +730,10 @@ mod dna_impls {
             // TODO: PERF: This loop might be slow
             let wasms = futures::future::join_all(code.map(DnaWasmHashed::from_content)).await;
 
+            let wasm_store = holochain_state::wasm::WasmStore::new(self.spaces.wasm_db.clone());
             for wasm in wasms {
-                if !holochain_state::wasm::contains(self.spaces.wasm_db.as_ref(), wasm.as_hash())
-                    .await?
-                {
-                    holochain_state::wasm::put(&self.spaces.wasm_db, wasm).await?;
+                if !wasm_store.contains(wasm.as_hash()).await? {
+                    wasm_store.put(wasm).await?;
                 }
             }
 
