@@ -24,7 +24,9 @@ derive_more = { version = "2.0", features = ["display", "index"] }
 either = "1.5.0"
 futures = "0.3"
 getrandom = "0.3"
-holo_hash = { version = "^0.6.1-rc.0", path = "../holo_hash", features = ["full"] }
+holo_hash = { version = "^0.6.1-rc.0", path = "../holo_hash", features = [
+  "full",
+] }
 holochain_cascade = { version = "^0.6.1-rc.0", default-features = false, path = "../holochain_cascade" }
 holochain_chc = { version = "^0.3.1-rc.0", path = "../holochain_chc", default-features = false }
 holochain_conductor_api = { version = "^0.6.1-rc.0", path = "../holochain_conductor_api", default-features = false }
@@ -51,7 +53,9 @@ itertools = { version = "0.14" }
 kitsune2_api = "0.4.0-dev.2"
 kitsune2_core = "0.4.0-dev.2"
 mockall = "0.13"
-mr_bundle = { version = "^0.6.1-rc.0", path = "../mr_bundle", features = ["fs"] }
+mr_bundle = { version = "^0.6.1-rc.0", path = "../mr_bundle", features = [
+  "fs",
+] }
 must_future = "0.1.1"
 nanoid = "0.4"
 holochain_trace = { version = "^0.6.1-rc.0", path = "../holochain_trace" }

@@ -15,7 +15,9 @@ edition = "2021"
 base64 = "0.22"
 derive_more = { version = "2.0", features = ["from"] }
 futures = "0.3"
-holo_hash = { version = "^0.6.1-rc.0", path = "../holo_hash", features = ["full"] }
+holo_hash = { version = "^0.6.1-rc.0", path = "../holo_hash", features = [
+  "full",
+] }
 holochain_serialized_bytes = "=0.0.56"
 holochain_zome_types = { version = "^0.6.1-rc.0", path = "../holochain_zome_types" }
 holochain_secure_primitive = { version = "^0.6.1-rc.0", path = "../holochain_secure_primitive" }
