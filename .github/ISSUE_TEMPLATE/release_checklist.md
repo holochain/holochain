@@ -14,18 +14,14 @@ flowchart TB
 
     Start --> Binaries[binaries]
     Start --> WindTunnel[wind-tunnel]
-    Start --> MatthmeBinaries[matthme/holochain-binaries]
     Start --> Holonix1[Holonix: nix, holochain]
     Start --> HcSpinRustUtils[hc-spin-rust-utils]
 
     %% binaries
-    Binaries --> Complete
+    Binaries --> Kangaroo[kangaroo-electron]
 
     %% wind-tunnel
     WindTunnel --> Complete
-
-    %% matthme binaries
-    MatthmeBinaries ---> Kangaroo[kangaroo-electron]
 
     %% hc-spin-rust-utils
     HcSpinRustUtils --> Kangaroo
@@ -42,22 +38,18 @@ flowchart TB
     HttpGw --> Complete
 
     %% holochain-client-js
-    JSClient --> Tryorama[tryorama]
     JSClient --> HcSpin[hc-spin]
     JSClient --> Kangaroo
 
     %% hc-spin
     HcSpin --> AppLibsComplete
 
-    %% tryorama
-    Tryorama --> AppLibsComplete
-
     %% app libraries complete
     AppLibsComplete{App Libraries Complete!}
     AppLibsComplete --> Scaffold[scaffolding]
 
     %% scaffold
-    Scaffold --> Holonix2[Holonix: hc-spin, hc-scaffold, playground]
+    Scaffold --> Holonix2[Holonix: hc-spin, hc-scaffold]
     
     %% holonix (again)
     Holonix2 --> AppToolsComplete{App Tooling Complete!}
@@ -112,8 +104,6 @@ Assigned to @
   - Bump version and update README with compatibility info.
   - Create new branch `main-X`.
 
-- [ ] `matthme/holochain-binaries`
-  - Wait for hourly cronjob to run and confirm that it successfully published binaries.
 - [ ] Holonix
   - Update nix.
   - Bump `holochain`.
@@ -150,15 +140,6 @@ Assigned to @
   - Manually create github release at new tag with changelog description.
   - Manually publish to npm.
 
-- [ ] `tryorama`
-  - Update nix flake.
-  - Update to use new holochain version.
-  - Bump version and update README with compatability info.
-  - Create new branch `main-X`.
-  - Add tag `vY` for newly bumped version Y.
-  - Manually create github release at new tag with changelog description.
-  - Manually publish to npm.
-
 - [ ] `kangaroo-electron`
   - Update to use new holochain version.
   - Create new branch `main-X`.
@@ -180,7 +161,6 @@ Assigned to @
 
 - [ ] `holonix`
   - Pin `hc-scaffold` to new release tag.
-  - Pin `playground` to new release tag.
 
 **App Tooling Complete**
 
