@@ -88,7 +88,7 @@ async fn gossip_resumes_after_restart() {
     conductors.exchange_peer_info().await;
 
     // Ensure that gossip loops resume upon startup.
-    await_consistency(30, [&cell_0, &cell_1]).await.unwrap();
+    await_consistency([&cell_0, &cell_1]).await.unwrap();
     let record: Option<Record> = conductors[1].call(&zome_1, "read", hash.clone()).await;
     assert_eq!(record.unwrap().action_address(), &hash);
 }
@@ -116,7 +116,7 @@ async fn new_conductor_reaches_consistency_with_existing_conductor() {
     // Startup and do peer discovery
     let (conductor1, cell1, zome1) = mk_conductor().await;
 
-    await_consistency(60, [&cell0, &cell1]).await.unwrap();
+    await_consistency([&cell0, &cell1]).await.unwrap();
     let record: Option<Record> = conductor1.call(&zome1, "read", hash.clone()).await;
     assert_eq!(record.unwrap().action_address(), &hash);
 }

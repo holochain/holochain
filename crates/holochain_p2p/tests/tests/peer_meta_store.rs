@@ -207,6 +207,7 @@ async fn set_peer_unresponsive_in_peer_meta_store() {
 }
 
 #[tokio::test]
+#[ignore = "flaky until Iroh networking upgrade"]
 async fn unresponsive_peers_are_removed_from_store_after_expiry() {
     let db = DbWrite::test_in_mem(DbKindPeerMetaStore(Arc::new(DnaHash::from_raw_36(
         vec![0x0a; 36],

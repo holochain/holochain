@@ -79,7 +79,7 @@ async fn should_not_allow_installing_apps_with_same_dna_but_different_overrides(
             err,
             ConductorError::InternalCellError(CellError::P2pConfigOverridesConflict { .. })
         ),
-        "expected P2pConfigOverridesConflict error, got {err:?}"
+        "expected P2pConfigOverridesConflict error, got {err:?}",
     );
 }
 

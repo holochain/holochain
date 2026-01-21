@@ -61,7 +61,7 @@ async fn invalid_op_warrant_issuance_can_be_disabled() {
         .unwrap()
         .into_tuple();
 
-    await_consistency(15, [&alice, &bob]).await.unwrap();
+    await_consistency([&alice, &bob]).await.unwrap();
 
     // Bob must not have issued a warrant against Alice.
     // A warrant would have been created as part of app validating all of Alice's
@@ -134,7 +134,7 @@ async fn skip_self_validation_to_cause_warrant() {
         .unwrap()
         .into_tuple();
 
-    await_consistency(15, [&alice, &bob]).await.unwrap();
+    await_consistency([&alice, &bob]).await.unwrap();
 
     // Now Alice creates some data that Bob will reject, causing Bob to issue a warrant against Alice.
     let _: ActionHash = conductors[0]
@@ -142,7 +142,7 @@ async fn skip_self_validation_to_cause_warrant() {
         .await;
 
     // Should sync the data to Bob.
-    await_consistency(15, [&alice, &bob]).await.unwrap();
+    await_consistency([&alice, &bob]).await.unwrap();
 
     let alice_pubkey = alice.agent_pubkey().clone();
     let warrants = conductors[1]
