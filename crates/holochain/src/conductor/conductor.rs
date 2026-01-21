@@ -604,11 +604,10 @@ mod dna_impls {
                 .collect();
 
             // Retrieve DNA definitions from wasm database
+            let dna_def_store = holochain_state::dna_def::DnaDefStore::new(db.as_ref().clone());
             let mut dna_defs_with_cell_id = Vec::new();
             for cell_id in all_cells {
-                if let Some(cell_dna_tuple) =
-                    holochain_state::dna_def::get(db.as_ref(), &cell_id).await?
-                {
+                if let Some(cell_dna_tuple) = dna_def_store.get(&cell_id).await? {
                     dna_defs_with_cell_id.push(cell_dna_tuple);
                 }
             }
@@ -648,7 +647,9 @@ mod dna_impls {
                 })
                 // This needs to happen due to the environment not being Send
                 .collect::<Vec<_>>();
-            let entry_defs = holochain_state::entry_def::get_all(db.as_ref()).await?;
+            let entry_def_store =
+                holochain_state::entry_def::EntryDefStore::new(db.as_ref().clone());
+            let entry_defs = entry_def_store.get_all().await?;
 
             // try to join all the tasks and return the list of dna files
             let ribosomes_with_cell_id_future =
@@ -737,16 +738,17 @@ mod dna_impls {
                 }
             }
 
+            let entry_def_store =
+                holochain_state::entry_def::EntryDefStore::new(self.spaces.wasm_db.clone());
             for (key, entry_def) in zome_defs.clone() {
-                holochain_state::entry_def::put(&self.spaces.wasm_db, key, &entry_def).await?;
+                entry_def_store.put(key, &entry_def).await?;
             }
 
-            holochain_state::dna_def::upsert(
-                &self.spaces.wasm_db,
-                &cell_id,
-                &dna_def_hashed.into_content(),
-            )
-            .await?;
+            let dna_def_store =
+                holochain_state::dna_def::DnaDefStore::new(self.spaces.wasm_db.clone());
+            dna_def_store
+                .upsert(&cell_id, &dna_def_hashed.into_content())
+                .await?;
 
             Ok(zome_defs)
         }
