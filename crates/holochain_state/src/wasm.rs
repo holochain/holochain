@@ -5,6 +5,27 @@ use crate::query::StateQueryError;
 use holo_hash::WasmHash;
 use holochain_types::prelude::*;
 
+/// Store a WASM module in the database.
+pub async fn put(
+    db: &holochain_data::DbWrite<holochain_data::kind::Wasm>,
+    wasm: DnaWasmHashed,
+) -> StateMutationResult<()> {
+    db.put_wasm(wasm).await.map_err(StateMutationError::from)
+}
+
+/// Check whether a WASM module exists in the database.
+///
+/// Returns `Ok(true)` if the WASM exists, `Ok(false)` if not, or an error if the query fails.
+pub async fn contains(
+    db: &holochain_data::DbRead<holochain_data::kind::Wasm>,
+    hash: &WasmHash,
+) -> StateQueryResult<bool> {
+    db.wasm_exists(hash).await.map_err(StateQueryError::from)
+}
+
+/// Retrieve a WASM module from the database by its hash.
+///
+/// Returns `Ok(Some(wasm))` if found, `Ok(None)` if not found, or an error if the query fails.
 pub async fn get(
     db: &holochain_data::DbRead<holochain_data::kind::Wasm>,
     hash: &WasmHash,
@@ -14,20 +35,6 @@ pub async fn get(
         Ok(None) => Ok(None),
         Err(e) => Err(StateQueryError::from(e)),
     }
-}
-
-pub async fn contains(
-    db: &holochain_data::DbRead<holochain_data::kind::Wasm>,
-    hash: &WasmHash,
-) -> StateQueryResult<bool> {
-    db.wasm_exists(hash).await.map_err(StateQueryError::from)
-}
-
-pub async fn put(
-    db: &holochain_data::DbWrite<holochain_data::kind::Wasm>,
-    wasm: DnaWasmHashed,
-) -> StateMutationResult<()> {
-    db.put_wasm(wasm).await.map_err(StateMutationError::from)
 }
 
 #[cfg(test)]
