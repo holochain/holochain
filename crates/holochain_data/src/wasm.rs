@@ -163,6 +163,58 @@ impl DbRead<Wasm> {
             })
             .collect()
     }
+
+    /// Get all DNA definitions with their associated cell IDs.
+    pub async fn get_all_dna_defs(&self) -> sqlx::Result<Vec<(CellId, DnaDef)>> {
+        // First, fetch all DnaDef records
+        let dna_models: Vec<DnaDefModel> = sqlx::query_as(
+            "SELECT hash, agent, name, network_seed, properties, lineage FROM DnaDef",
+        )
+        .fetch_all(self.pool())
+        .await?;
+
+        let mut results = Vec::new();
+
+        for dna_model in dna_models {
+            let hash_bytes = dna_model.hash.clone();
+            let agent_bytes = dna_model.agent.clone();
+
+            // Fetch integrity zomes for this DNA
+            let integrity_zomes: Vec<IntegrityZomeModel> = sqlx::query_as(
+                "SELECT dna_hash, agent, zome_index, zome_name, wasm_hash, dependencies FROM IntegrityZome WHERE dna_hash = ? AND agent = ? ORDER BY zome_index",
+            )
+            .bind(&hash_bytes)
+            .bind(&agent_bytes)
+            .fetch_all(self.pool())
+            .await?;
+
+            // Fetch coordinator zomes for this DNA
+            let coordinator_zomes: Vec<CoordinatorZomeModel> = sqlx::query_as(
+                "SELECT dna_hash, agent, zome_index, zome_name, wasm_hash, dependencies FROM CoordinatorZome WHERE dna_hash = ? AND agent = ? ORDER BY zome_index",
+            )
+            .bind(&hash_bytes)
+            .bind(&agent_bytes)
+            .fetch_all(self.pool())
+            .await?;
+
+            // Convert to DnaDef
+            let dna_def = dna_model
+                .to_dna_def(integrity_zomes, coordinator_zomes)
+                .map_err(|e| {
+                    sqlx::Error::Decode(Box::new(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        e,
+                    )))
+                })?;
+
+            // Create CellId from the hash and agent
+            let cell_id = dna_model.to_cell_id();
+
+            results.push((cell_id, dna_def));
+        }
+
+        Ok(results)
+    }
 }
 
 // Write operations
@@ -789,5 +841,84 @@ mod tests {
             new_coordinator_count, 1,
             "New DNA should have 1 coordinator zome"
         );
+    }
+
+    #[tokio::test]
+    async fn get_all_dna_defs_test() {
+        let db = test_db().await;
+
+        // Create and store multiple DNA definitions
+        let wasm_code = vec![0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00];
+        let wasm = DnaWasm {
+            code: wasm_code.into(),
+        };
+        let wasm_hash = wasm.to_hash().await;
+        let wasm_hashed = DnaWasmHashed::with_pre_hashed(wasm, wasm_hash.clone());
+        db.put_wasm(wasm_hashed).await.unwrap();
+
+        // Create first DNA
+        let integrity_zomes1 = vec![(
+            ZomeName::from("integrity1"),
+            IntegrityZomeDef::from_hash(wasm_hash.clone()),
+        )];
+        let coordinator_zomes1 = vec![(
+            ZomeName::from("coordinator1"),
+            CoordinatorZomeDef::from_hash(wasm_hash.clone()),
+        )];
+        let dna_def1 = DnaDef {
+            name: "dna1".to_string(),
+            modifiers: DnaModifiers {
+                network_seed: "seed1".to_string(),
+                properties: SerializedBytes::default(),
+            },
+            integrity_zomes: integrity_zomes1,
+            coordinator_zomes: coordinator_zomes1,
+            #[cfg(feature = "unstable-migration")]
+            lineage: std::collections::HashSet::new(),
+        };
+        let hash1 = dna_def1.to_hash();
+        let cell_id1 = test_cell_id(&hash1);
+        db.put_dna_def(&cell_id1, &dna_def1).await.unwrap();
+
+        // Create second DNA with different agent
+        let agent2 = AgentPubKey::from_raw_32(vec![1u8; 32]);
+        let integrity_zomes2 = vec![(
+            ZomeName::from("integrity2"),
+            IntegrityZomeDef::from_hash(wasm_hash.clone()),
+        )];
+        let coordinator_zomes2 = vec![(
+            ZomeName::from("coordinator2"),
+            CoordinatorZomeDef::from_hash(wasm_hash.clone()),
+        )];
+        let dna_def2 = DnaDef {
+            name: "dna2".to_string(),
+            modifiers: DnaModifiers {
+                network_seed: "seed2".to_string(),
+                properties: SerializedBytes::default(),
+            },
+            integrity_zomes: integrity_zomes2,
+            coordinator_zomes: coordinator_zomes2,
+            #[cfg(feature = "unstable-migration")]
+            lineage: std::collections::HashSet::new(),
+        };
+        let hash2 = dna_def2.to_hash();
+        let cell_id2 = CellId::new(hash2.clone(), agent2);
+        db.put_dna_def(&cell_id2, &dna_def2).await.unwrap();
+
+        // Get all DNA definitions
+        let all_dnas = db.as_ref().get_all_dna_defs().await.unwrap();
+
+        // Verify we got both DNAs
+        assert_eq!(all_dnas.len(), 2);
+
+        // Verify the cell IDs and DNA names
+        let names: Vec<_> = all_dnas.iter().map(|(_, dna)| &dna.name).collect();
+        assert!(names.contains(&&"dna1".to_string()));
+        assert!(names.contains(&&"dna2".to_string()));
+
+        // Verify we can find each DNA by cell ID
+        let cell_ids: Vec<_> = all_dnas.iter().map(|(cell_id, _)| cell_id).collect();
+        assert!(cell_ids.contains(&&cell_id1));
+        assert!(cell_ids.contains(&&cell_id2));
     }
 }

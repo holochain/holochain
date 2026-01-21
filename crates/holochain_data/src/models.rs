@@ -88,6 +88,18 @@ impl DnaDefModel {
         DnaHash::from_raw_32(self.hash.clone())
     }
 
+    /// Get the AgentPubKey from this model.
+    pub fn agent_pubkey(&self) -> holochain_types::prelude::AgentPubKey {
+        holochain_types::prelude::AgentPubKey::from_raw_32(self.agent.clone())
+    }
+
+    /// Create a CellId from the DNA hash and agent pubkey.
+    pub fn to_cell_id(&self) -> CellId {
+        let dna_hash = self.dna_hash();
+        let agent = self.agent_pubkey();
+        CellId::new(dna_hash, agent)
+    }
+
     /// Convert to a DnaDef given the associated zomes.
     ///
     /// This requires integrity and coordinator zome models to be provided,
