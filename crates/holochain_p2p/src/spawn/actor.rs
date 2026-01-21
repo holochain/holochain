@@ -2416,8 +2416,13 @@ impl actor::HcP2p for HolochainP2pActor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(feature = "transport-tx5-backend-go-pion")]
-    use crate::actor::HcP2p;
+    use crate::{
+        actor::HcP2p,
+        event::{
+            CountersigningSessionNegotiationMessage, GetActivityOptions, GetLinksOptions,
+            HcP2pHandler,
+        },
+    };
 
     #[tokio::test(flavor = "multi_thread")]
     async fn correct_id_loc_calc() {
@@ -2468,7 +2473,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[cfg(feature = "transport-tx5-backend-go-pion")]
+    #[cfg(feature = "kitsune2_transport_tx5")]
     async fn should_set_kitsune2_config() {
         let actor = test_p2p_actor().await;
 
@@ -2505,7 +2510,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[cfg(feature = "transport-tx5-backend-go-pion")]
+    #[cfg(feature = "kitsune2_transport_tx5")]
     async fn should_get_no_overrides_for_space_if_default() {
         let actor = test_p2p_actor().await;
         let actor_p2p: Arc<HolochainP2pActor> =
@@ -2520,7 +2525,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[cfg(feature = "transport-tx5-backend-go-pion")]
+    #[cfg(feature = "kitsune2_transport_tx5")]
     async fn should_get_overrides_for_space_if_provided() {
         let actor = test_p2p_actor().await;
         let actor_p2p: Arc<HolochainP2pActor> =
@@ -2553,7 +2558,7 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "transport-tx5-backend-go-pion")]
+    #[cfg(feature = "kitsune2_transport_tx5")]
     async fn test_p2p_actor() -> Arc<dyn HcP2p> {
         use kitsune2_core::factories::{CoreBootstrapConfig, CoreBootstrapModConfig};
 
@@ -2591,5 +2596,871 @@ mod tests {
         HolochainP2pActor::create(config, holochain_keystore::test_keystore())
             .await
             .expect("failed to create actor")
+    }
+
+    struct TestP2pActorHarness {
+        pub actor: Arc<HolochainP2pActor>,
+        pub event_handler: Arc<BlockingEventHandler>,
+    }
+
+    #[derive(Clone, Debug)]
+    struct BlockingEventHandler {
+        pub handle_call_remote_count: Arc<Mutex<u32>>,
+        pub handle_publish_count: Arc<Mutex<u32>>,
+        pub handle_get_count: Arc<Mutex<u32>>,
+        pub handle_get_links_count: Arc<Mutex<u32>>,
+        pub handle_count_links_count: Arc<Mutex<u32>>,
+        pub handle_get_agent_activity_count: Arc<Mutex<u32>>,
+        pub handle_must_get_agent_activity_count: Arc<Mutex<u32>>,
+        pub handle_validation_receipts_received_count: Arc<Mutex<u32>>,
+        pub handle_publish_countersign_count: Arc<Mutex<u32>>,
+        pub handle_countersigning_session_negotiation_count: Arc<Mutex<u32>>,
+    }
+
+    impl BlockingEventHandler {
+        fn new() -> Self {
+            Self {
+                handle_call_remote_count: Arc::new(Mutex::new(0)),
+                handle_publish_count: Arc::new(Mutex::new(0)),
+                handle_get_count: Arc::new(Mutex::new(0)),
+                handle_get_links_count: Arc::new(Mutex::new(0)),
+                handle_count_links_count: Arc::new(Mutex::new(0)),
+                handle_get_agent_activity_count: Arc::new(Mutex::new(0)),
+                handle_must_get_agent_activity_count: Arc::new(Mutex::new(0)),
+                handle_validation_receipts_received_count: Arc::new(Mutex::new(0)),
+                handle_publish_countersign_count: Arc::new(Mutex::new(0)),
+                handle_countersigning_session_negotiation_count: Arc::new(Mutex::new(0)),
+            }
+        }
+    }
+
+    // All handlers return a future that never resolves
+    impl HcP2pHandler for BlockingEventHandler {
+        fn handle_call_remote(
+            &self,
+            _dna_hash: DnaHash,
+            _to_agent: AgentPubKey,
+            _zome_call_params_serialized: ExternIO,
+            _signature: holochain_types::prelude::Signature,
+        ) -> BoxFut<'_, HolochainP2pResult<SerializedBytes>> {
+            // Increment counter
+            let mut count = self.handle_call_remote_count.lock().unwrap();
+            *count += 1;
+
+            // Block indefinitely
+            Box::pin(std::future::pending())
+        }
+
+        fn handle_publish(
+            &self,
+            _dna_hash: DnaHash,
+            _ops: Vec<holochain_types::dht_op::DhtOp>,
+        ) -> BoxFut<'_, HolochainP2pResult<()>> {
+            // Increment counter
+            let mut count = self.handle_publish_count.lock().unwrap();
+            *count += 1;
+
+            // Block indefinitely
+            Box::pin(std::future::pending())
+        }
+
+        fn handle_get(
+            &self,
+            _dna_hash: DnaHash,
+            _to_agent: AgentPubKey,
+            _dht_hash: holo_hash::AnyDhtHash,
+        ) -> BoxFut<'_, HolochainP2pResult<WireOps>> {
+            // Increment counter
+            let mut count = self.handle_get_count.lock().unwrap();
+            *count += 1;
+
+            // Block indefinitely
+            Box::pin(std::future::pending())
+        }
+
+        fn handle_get_links(
+            &self,
+            _dna_hash: DnaHash,
+            _to_agent: AgentPubKey,
+            _link_key: WireLinkKey,
+            _options: GetLinksOptions,
+        ) -> BoxFut<'_, HolochainP2pResult<WireLinkOps>> {
+            // Increment counter
+            let mut count = self.handle_get_links_count.lock().unwrap();
+            *count += 1;
+
+            // Block indefinitely
+            Box::pin(std::future::pending())
+        }
+
+        fn handle_count_links(
+            &self,
+            _dna_hash: DnaHash,
+            _to_agent: AgentPubKey,
+            _query: WireLinkQuery,
+        ) -> BoxFut<'_, HolochainP2pResult<CountLinksResponse>> {
+            // Increment counter
+            let mut count = self.handle_count_links_count.lock().unwrap();
+            *count += 1;
+
+            // Block indefinitely
+            Box::pin(std::future::pending())
+        }
+
+        fn handle_get_agent_activity(
+            &self,
+            _dna_hash: DnaHash,
+            _to_agent: AgentPubKey,
+            _agent: AgentPubKey,
+            _query: ChainQueryFilter,
+            _options: GetActivityOptions,
+        ) -> BoxFut<'_, HolochainP2pResult<AgentActivityResponse>> {
+            // Increment counter
+            let mut count = self.handle_get_agent_activity_count.lock().unwrap();
+            *count += 1;
+
+            // Block indefinitely
+            Box::pin(std::future::pending())
+        }
+
+        fn handle_must_get_agent_activity(
+            &self,
+            _dna_hash: DnaHash,
+            _to_agent: AgentPubKey,
+            _author: AgentPubKey,
+            _filter: holochain_zome_types::chain::ChainFilter,
+        ) -> BoxFut<'_, HolochainP2pResult<MustGetAgentActivityResponse>> {
+            // Increment counter
+            let mut count = self.handle_must_get_agent_activity_count.lock().unwrap();
+            *count += 1;
+
+            // Block indefinitely
+            Box::pin(std::future::pending())
+        }
+
+        fn handle_validation_receipts_received(
+            &self,
+            _dna_hash: DnaHash,
+            _to_agent: AgentPubKey,
+            _receipts: holochain_types::prelude::ValidationReceiptBundle,
+        ) -> BoxFut<'_, HolochainP2pResult<()>> {
+            // Increment counter
+            let mut count = self
+                .handle_validation_receipts_received_count
+                .lock()
+                .unwrap();
+            *count += 1;
+
+            // Block indefinitely
+            Box::pin(std::future::pending())
+        }
+
+        fn handle_publish_countersign(
+            &self,
+            _dna_hash: DnaHash,
+            _op: holochain_types::dht_op::ChainOp,
+        ) -> BoxFut<'_, HolochainP2pResult<()>> {
+            // Increment counter
+            let mut count = self.handle_publish_countersign_count.lock().unwrap();
+            *count += 1;
+
+            // Block indefinitely
+            Box::pin(std::future::pending())
+        }
+
+        fn handle_countersigning_session_negotiation(
+            &self,
+            _dna_hash: DnaHash,
+            _to_agent: AgentPubKey,
+            _message: CountersigningSessionNegotiationMessage,
+        ) -> BoxFut<'_, HolochainP2pResult<()>> {
+            // Increment counter
+            let mut count = self
+                .handle_countersigning_session_negotiation_count
+                .lock()
+                .unwrap();
+            *count += 1;
+
+            // Block indefinitely
+            Box::pin(std::future::pending())
+        }
+    }
+
+    impl TestP2pActorHarness {
+        async fn new(concurrency_limit: u16) -> Self {
+            let config = HolochainP2pConfig {
+                incoming_request_concurrency_limit: concurrency_limit,
+                network_config: Some(serde_json::json!({
+                    "coreBootstrap": {
+                        "serverUrl": "https://not_a_host"
+                    },
+                    "tx5Transport": {
+                        "serverUrl": "wss://not_a_host",
+                        "timeoutS": 30,
+                        "webrtcConnectTimeoutS": 25,
+                    }
+                })),
+                ..Default::default()
+            };
+            let actor = HolochainP2pActor::create(config, holochain_keystore::test_keystore())
+                .await
+                .unwrap();
+            let actor: Arc<HolochainP2pActor> = Arc::downcast(actor).unwrap();
+            let event_handler = Arc::new(BlockingEventHandler::new());
+            actor.register_handler(event_handler.clone()).await.unwrap();
+
+            Self {
+                actor,
+                event_handler,
+            }
+        }
+
+        fn recv_notify(
+            &self,
+            from_peer: Url,
+            space_id: SpaceId,
+            data: bytes::Bytes,
+        ) -> K2Result<()> {
+            self.actor.recv_notify(from_peer, space_id, data)
+        }
+
+        fn register_pending_message_response_handler(
+            &self,
+            msg_id: u64,
+        ) -> tokio::sync::oneshot::Receiver<WireMessage> {
+            let (s, r) = tokio::sync::oneshot::channel();
+            self.actor
+                .pending
+                .lock()
+                .unwrap()
+                .register(msg_id, s, Duration::from_secs(60));
+            r
+        }
+    }
+
+    fn create_encode_wire_message_get_req(msg_id: u64) -> bytes::Bytes {
+        let msg = WireMessage::GetReq {
+            msg_id,
+            to_agent: AgentPubKey::from_raw_32(vec![1; 32]),
+            dht_hash: ActionHash::from_raw_32(vec![2; 32]).into(),
+        };
+        WireMessage::encode_batch(&[&msg]).unwrap()
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn incoming_authority_requests_are_concurrency_limited() {
+        let dna_hash = DnaHash::from_raw_32(vec![0; 32]);
+        let space_id = dna_hash.to_k2_space();
+        let from_peer = kitsune2_api::Url::from_str("ws://test:80/1").unwrap();
+
+        let concurrency_limit = 15;
+        let harness = TestP2pActorHarness::new(concurrency_limit).await;
+
+        // Receive concurrency-limited messages up to limit
+        for i in 0..concurrency_limit {
+            let msg_data = create_encode_wire_message_get_req(i as u64);
+            harness
+                .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
+                .unwrap();
+        }
+
+        // Messages were all handled
+        let all_handled = retry_fn_until_timeout(
+            async || {
+                let handled_count = harness.event_handler.handle_get_count.lock().unwrap();
+                *handled_count == concurrency_limit as u32
+            },
+            None,
+            None,
+        )
+        .await;
+        assert!(all_handled.is_ok());
+
+        // Concurrency limit permits were claimed
+        assert_eq!(
+            harness
+                .actor
+                .incoming_request_concurrency_limit_semaphore
+                .available_permits(),
+            0
+        );
+
+        // Receive another message that is concurrency-limited
+        let msg_data = create_encode_wire_message_get_req(3);
+        harness
+            .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
+            .unwrap();
+
+        // Message beyond limit is not handled
+        let is_handled = retry_fn_until_timeout(
+            async || {
+                let handled_count = harness.event_handler.handle_get_count.lock().unwrap();
+                *handled_count == concurrency_limit as u32 + 1
+            },
+            None,
+            None,
+        )
+        .await;
+        assert!(is_handled.is_err());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn authority_request_wire_messages_are_concurrency_limited() {
+        let dna_hash = DnaHash::from_raw_32(vec![0; 32]);
+        let space_id = dna_hash.to_k2_space();
+        let from_peer = kitsune2_api::Url::from_str("ws://test:80/1").unwrap();
+
+        let concurrency_limit = 2;
+        let harness = TestP2pActorHarness::new(concurrency_limit).await;
+
+        // Initially all permits should be available
+        assert_eq!(
+            harness
+                .actor
+                .incoming_request_concurrency_limit_semaphore
+                .available_permits(),
+            concurrency_limit as usize
+        );
+
+        // Receive concurrency-limited messages up to limit
+        for i in 0..concurrency_limit {
+            let msg_data = create_encode_wire_message_get_req(i as u64);
+            harness
+                .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
+                .unwrap();
+        }
+
+        // GetReq is limited
+        let msg = WireMessage::GetReq {
+            msg_id: 1,
+            to_agent: AgentPubKey::from_raw_32(vec![1; 32]),
+            dht_hash: ActionHash::from_raw_32(vec![2; 32]).into(),
+        };
+        let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
+        harness
+            .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
+            .unwrap();
+
+        // Message was not handled
+        let is_handled = retry_fn_until_timeout(
+            async || {
+                let handled_count = harness.event_handler.handle_get_count.lock().unwrap();
+                *handled_count == concurrency_limit as u32 + 1
+            },
+            Some(1000),
+            None,
+        )
+        .await;
+        assert!(is_handled.is_err());
+
+        // GetLinksReq is limited
+        let msg = WireMessage::GetLinksReq {
+            msg_id: 2,
+            to_agent: AgentPubKey::from_raw_32(vec![1; 32]),
+            options: GetLinksOptions {},
+            link_key: WireLinkKey {
+                base: ActionHash::from_raw_32(vec![2; 32]).into(),
+                type_query: LinkTypeFilter::Types(Vec::new()),
+                tag: None,
+                after: None,
+                before: None,
+                author: None,
+            },
+        };
+        let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
+        harness
+            .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
+            .unwrap();
+
+        // Message was not handled
+        let is_handled = retry_fn_until_timeout(
+            async || {
+                let handled_count = harness.event_handler.handle_get_links_count.lock().unwrap();
+                *handled_count == 1
+            },
+            Some(1000),
+            None,
+        )
+        .await;
+        assert!(is_handled.is_err());
+
+        // CountLinksReq is limited
+        let msg = WireMessage::CountLinksReq {
+            msg_id: 3,
+            to_agent: AgentPubKey::from_raw_32(vec![1; 32]),
+            query: WireLinkQuery {
+                base: ActionHash::from_raw_32(vec![2; 32]).into(),
+                link_type: LinkTypeFilter::Types(Vec::new()),
+                tag_prefix: None,
+                before: None,
+                after: None,
+                author: None,
+            },
+        };
+        let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
+        harness
+            .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
+            .unwrap();
+
+        // Message was not handled
+        let is_handled = retry_fn_until_timeout(
+            async || {
+                let handled_count = harness
+                    .event_handler
+                    .handle_count_links_count
+                    .lock()
+                    .unwrap();
+                *handled_count == 1
+            },
+            Some(1000),
+            None,
+        )
+        .await;
+        assert!(is_handled.is_err());
+
+        // GetAgentActivityReq is limited
+        let msg = WireMessage::GetAgentActivityReq {
+            msg_id: 4,
+            to_agent: AgentPubKey::from_raw_32(vec![1; 32]),
+            agent: AgentPubKey::from_raw_32(vec![2; 32]),
+            query: ChainQueryFilter::new(),
+            options: GetActivityOptions {
+                include_valid_activity: true,
+                include_rejected_activity: true,
+                include_warrants: true,
+                include_full_records: true,
+            },
+        };
+        let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
+        harness
+            .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
+            .unwrap();
+
+        // Message was not handled
+        let is_handled = retry_fn_until_timeout(
+            async || {
+                let handled_count = harness
+                    .event_handler
+                    .handle_get_agent_activity_count
+                    .lock()
+                    .unwrap();
+                *handled_count == 1
+            },
+            Some(1000),
+            None,
+        )
+        .await;
+        assert!(is_handled.is_err());
+
+        // MustGetAgentActivityReq is limited
+        let msg = WireMessage::MustGetAgentActivityReq {
+            msg_id: 5,
+            to_agent: AgentPubKey::from_raw_32(vec![1; 32]),
+            agent: AgentPubKey::from_raw_32(vec![2; 32]),
+            filter: ChainFilter::new(ActionHash::from_raw_32(vec![3; 32])),
+        };
+        let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
+        harness
+            .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
+            .unwrap();
+
+        // Message was not handled
+        let is_handled = retry_fn_until_timeout(
+            async || {
+                let handled_count = harness
+                    .event_handler
+                    .handle_must_get_agent_activity_count
+                    .lock()
+                    .unwrap();
+                *handled_count == 1
+            },
+            Some(1000),
+            None,
+        )
+        .await;
+        assert!(is_handled.is_err());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn other_wire_messages_are_not_concurrency_limited() {
+        let dna_hash = DnaHash::from_raw_32(vec![0; 32]);
+        let space_id = dna_hash.to_k2_space();
+        let from_peer = kitsune2_api::Url::from_str("ws://test:80/1").unwrap();
+
+        let concurrency_limit = 2;
+        let harness = TestP2pActorHarness::new(concurrency_limit).await;
+
+        // Initially all permits should be available
+        assert_eq!(
+            harness
+                .actor
+                .incoming_request_concurrency_limit_semaphore
+                .available_permits(),
+            concurrency_limit as usize
+        );
+
+        // Receive concurrency-limited messages up to limit
+        for i in 0..concurrency_limit {
+            let msg_data = create_encode_wire_message_get_req(i as u64);
+            harness
+                .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
+                .unwrap();
+        }
+
+        // ErrorRes is not limited
+        let msg = WireMessage::ErrorRes {
+            msg_id: 1,
+            error: "test error".to_string(),
+        };
+        let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
+
+        let msg_receiver = harness.register_pending_message_response_handler(1);
+        harness
+            .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
+            .unwrap();
+
+        // Message was handled
+        assert!(msg_receiver.await.is_ok());
+
+        // CallRemoteRes is not limited
+        let msg = WireMessage::CallRemoteRes {
+            msg_id: 2,
+            response: SerializedBytes::try_from(()).unwrap(),
+        };
+        let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
+
+        let msg_receiver = harness.register_pending_message_response_handler(2);
+        harness
+            .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
+            .unwrap();
+
+        // Message was handled
+        assert!(msg_receiver.await.is_ok());
+
+        // GetRes is not limited
+        let msg = WireMessage::GetRes {
+            msg_id: 3,
+            response: WireOps::Record(WireRecordOps::new()),
+        };
+        let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
+
+        let msg_receiver = harness.register_pending_message_response_handler(3);
+        harness
+            .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
+            .unwrap();
+
+        // Message was handled
+        assert!(msg_receiver.await.is_ok());
+
+        // GetLinksRes is not limited
+        let msg = WireMessage::GetLinksRes {
+            msg_id: 4,
+            response: WireLinkOps::default(),
+        };
+        let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
+
+        let msg_receiver = harness.register_pending_message_response_handler(4);
+        harness
+            .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
+            .unwrap();
+
+        // Message was handled
+        assert!(msg_receiver.await.is_ok());
+
+        // CountLinksRes is not limited
+        let msg = WireMessage::CountLinksRes {
+            msg_id: 5,
+            response: CountLinksResponse::new(Vec::new()),
+        };
+        let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
+
+        let msg_receiver = harness.register_pending_message_response_handler(5);
+        harness
+            .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
+            .unwrap();
+
+        // Message was handled
+        assert!(msg_receiver.await.is_ok());
+
+        // GetAgentActivityRes is not limited
+        let msg = WireMessage::GetAgentActivityRes {
+            msg_id: 6,
+            response: AgentActivityResponse {
+                agent: AgentPubKey::from_raw_32(vec![1; 32]),
+                valid_activity: ChainItems::NotRequested,
+                rejected_activity: ChainItems::NotRequested,
+                status: ChainStatus::Valid(ChainHead {
+                    action_seq: 0,
+                    hash: ActionHash::from_raw_32(vec![2; 32]),
+                }),
+                highest_observed: None,
+                warrants: Vec::new(),
+            },
+        };
+        let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
+
+        let msg_receiver = harness.register_pending_message_response_handler(6);
+        harness
+            .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
+            .unwrap();
+
+        // Message was handled
+        assert!(msg_receiver.await.is_ok());
+
+        // MustGetAgentActivityRes is not limited
+        let msg = WireMessage::MustGetAgentActivityRes {
+            msg_id: 7,
+            response: MustGetAgentActivityResponse::EmptyRange,
+        };
+        let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
+
+        let msg_receiver = harness.register_pending_message_response_handler(7);
+        harness
+            .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
+            .unwrap();
+
+        // Message was handled
+        assert!(msg_receiver.await.is_ok());
+
+        // SendValidationReceiptsRes is not limited
+        let msg = WireMessage::SendValidationReceiptsRes { msg_id: 8 };
+        let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
+
+        let msg_receiver = harness.register_pending_message_response_handler(8);
+        harness
+            .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
+            .unwrap();
+
+        // Message was handled
+        assert!(msg_receiver.await.is_ok());
+
+        // CallRemoteReq is not limited
+        let msg = WireMessage::CallRemoteReq {
+            msg_id: 9,
+            to_agent: AgentPubKey::from_raw_32(vec![1; 32]),
+            zome_call_params_serialized: ExternIO::encode(()).unwrap(),
+            signature: Signature([0; 64]),
+        };
+        let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
+        harness
+            .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
+            .unwrap();
+
+        // Message was handled
+        let is_handled = retry_fn_until_timeout(
+            async || {
+                let handled_count = harness
+                    .event_handler
+                    .handle_call_remote_count
+                    .lock()
+                    .unwrap();
+                *handled_count == 1
+            },
+            None,
+            None,
+        )
+        .await;
+        assert!(is_handled.is_ok());
+
+        // SendValidationReceiptsReq is not limited
+        let msg = WireMessage::SendValidationReceiptsReq {
+            msg_id: 10,
+            to_agent: AgentPubKey::from_raw_32(vec![1; 32]),
+            receipts: Vec::new().into(),
+        };
+        let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
+        harness
+            .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
+            .unwrap();
+
+        // Message was handled
+        let is_handled = retry_fn_until_timeout(
+            async || {
+                let handled_count = harness
+                    .event_handler
+                    .handle_validation_receipts_received_count
+                    .lock()
+                    .unwrap();
+                *handled_count == 1
+            },
+            None,
+            None,
+        )
+        .await;
+        assert!(is_handled.is_ok());
+
+        // RemoteSignalEvt is not limited
+        let msg = WireMessage::RemoteSignalEvt {
+            to_agent: AgentPubKey::from_raw_32(vec![1; 32]),
+            zome_call_params_serialized: ExternIO::encode(()).unwrap(),
+            signature: Signature([0; 64]),
+        };
+        let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
+        harness
+            .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
+            .unwrap();
+
+        // Message was handled
+        let is_handled = retry_fn_until_timeout(
+            async || {
+                let handled_count = harness
+                    .event_handler
+                    .handle_call_remote_count
+                    .lock()
+                    .unwrap();
+                *handled_count == 2 // Should be 2 now (CallRemoteReq + RemoteSignalEvt)
+            },
+            None,
+            None,
+        )
+        .await;
+        assert!(is_handled.is_ok());
+
+        // PublishCountersignEvt is not limited
+        let msg = WireMessage::PublishCountersignEvt {
+            op: holochain_types::dht_op::ChainOp::RegisterAgentActivity(
+                Signature([0; 64]),
+                Action::InitZomesComplete(InitZomesComplete {
+                    author: AgentPubKey::from_raw_32(vec![1; 32]),
+                    timestamp: holochain_types::prelude::Timestamp::now(),
+                    action_seq: 0,
+                    prev_action: ActionHash::from_raw_32(vec![2; 32]),
+                }),
+            ),
+        };
+        let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
+        harness
+            .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
+            .unwrap();
+
+        // Message was handled
+        let is_handled = retry_fn_until_timeout(
+            async || {
+                let handled_count = harness
+                    .event_handler
+                    .handle_publish_countersign_count
+                    .lock()
+                    .unwrap();
+                *handled_count == 1 // Should be 2 now (CallRemoteReq + RemoteSignalEvt)
+            },
+            None,
+            None,
+        )
+        .await;
+        assert!(is_handled.is_ok());
+
+        // CountersigningSessionNegotiationEvt is not limited
+        let msg = WireMessage::CountersigningSessionNegotiationEvt {
+            to_agent: AgentPubKey::from_raw_32(vec![1; 32]),
+            message: CountersigningSessionNegotiationMessage::AuthorityResponse(Vec::new()),
+        };
+        let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
+        harness
+            .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
+            .unwrap();
+
+        // Message was handled
+        let is_handled = retry_fn_until_timeout(
+            async || {
+                let handled_count = harness
+                    .event_handler
+                    .handle_countersigning_session_negotiation_count
+                    .lock()
+                    .unwrap();
+                *handled_count == 1 // Should be 2 now (CallRemoteReq + RemoteSignalEvt)
+            },
+            None,
+            None,
+        )
+        .await;
+        assert!(is_handled.is_ok());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn batch_wire_messages_apply_concurrency_limit_only_to_authority_requests() {
+        let dna_hash = DnaHash::from_raw_32(vec![0; 32]);
+        let space_id = dna_hash.to_k2_space();
+        let from_peer = kitsune2_api::Url::from_str("ws://test:80/1").unwrap();
+
+        let concurrency_limit = 2;
+        let harness = TestP2pActorHarness::new(concurrency_limit).await;
+
+        // Initially all permits should be available
+        assert_eq!(
+            harness
+                .actor
+                .incoming_request_concurrency_limit_semaphore
+                .available_permits(),
+            concurrency_limit as usize
+        );
+
+        // The batch of messages contains concurrency-limited messages up to limit
+        let mut wire_messages_batch = vec![];
+
+        for i in 0..concurrency_limit {
+            let msg = WireMessage::GetReq {
+                msg_id: i as u64,
+                to_agent: AgentPubKey::from_raw_32(vec![1; 32]),
+                dht_hash: ActionHash::from_raw_32(vec![2; 32]).into(),
+            };
+            wire_messages_batch.push(msg);
+        }
+
+        // The batch of messages contains an ErrorRes which is is not limited
+        let msg_id = 888;
+        let unlimited_message_reciever = harness.register_pending_message_response_handler(msg_id);
+        let msg = WireMessage::ErrorRes {
+            msg_id,
+            error: "test error".to_string(),
+        };
+        wire_messages_batch.push(msg);
+
+        // The batch of messages contains an additional concurrency-limited message
+        let msg = WireMessage::GetReq {
+            msg_id: 999,
+            to_agent: AgentPubKey::from_raw_32(vec![1; 32]),
+            dht_hash: ActionHash::from_raw_32(vec![2; 32]).into(),
+        };
+        wire_messages_batch.push(msg);
+
+        // The batch is received in one payload
+        let wire_message_batch: Vec<&WireMessage> = wire_messages_batch.iter().collect();
+        let wire_message_batch_slice: &[&WireMessage] = &wire_message_batch;
+        let wire_messages_batch_bytes =
+            WireMessage::encode_batch(wire_message_batch_slice).unwrap();
+        harness
+            .recv_notify(
+                from_peer.clone(),
+                space_id.clone(),
+                wire_messages_batch_bytes,
+            )
+            .unwrap();
+
+        // The concurrency-limited messages within the limit are handled
+        let is_handled = retry_fn_until_timeout(
+            async || {
+                let handled_count = harness.event_handler.handle_get_count.lock().unwrap();
+                *handled_count == concurrency_limit as u32
+            },
+            None,
+            None,
+        )
+        .await;
+        assert!(is_handled.is_ok());
+
+        // The additional concurrency-limited message is not handled
+        let is_handled = retry_fn_until_timeout(
+            async || {
+                let handled_count = harness.event_handler.handle_get_count.lock().unwrap();
+                *handled_count == concurrency_limit as u32 + 1
+            },
+            None,
+            None,
+        )
+        .await;
+        assert!(is_handled.is_err());
+
+        // The non limited message is handled
+        assert!(unlimited_message_reciever.await.is_ok());
     }
 }

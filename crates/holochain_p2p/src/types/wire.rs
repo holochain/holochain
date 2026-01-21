@@ -172,35 +172,6 @@ impl WireMessage {
         }
     }
 
-    pub fn get_msg_variant_label(&self) -> String {
-        match self {
-            WireMessage::ErrorRes { .. } => "error_response".to_string(),
-            WireMessage::CallRemoteReq { .. } => "call_remote".to_string(),
-            WireMessage::CallRemoteRes { .. } => "call_remote_response".to_string(),
-            WireMessage::GetReq { .. } => "get".to_string(),
-            WireMessage::GetRes { .. } => "get_response".to_string(),
-            WireMessage::GetLinksReq { .. } => "get_links".to_string(),
-            WireMessage::GetLinksRes { .. } => "get_links_response".to_string(),
-            WireMessage::CountLinksReq { .. } => "count_links".to_string(),
-            WireMessage::CountLinksRes { .. } => "count_links_response".to_string(),
-            WireMessage::GetAgentActivityReq { .. } => "get_agent_activity".to_string(),
-            WireMessage::GetAgentActivityRes { .. } => "get_agent_activity_response".to_string(),
-            WireMessage::MustGetAgentActivityReq { .. } => "must_get_agent_activity".to_string(),
-            WireMessage::MustGetAgentActivityRes { .. } => {
-                "must_get_agent_activity_response".to_string()
-            }
-            WireMessage::SendValidationReceiptsReq { .. } => "send_validation_receipts".to_string(),
-            WireMessage::SendValidationReceiptsRes { .. } => {
-                "send_validation_receipts_response".to_string()
-            }
-            WireMessage::RemoteSignalEvt { .. } => "remote_signal_evt".to_string(),
-            WireMessage::PublishCountersignEvt { .. } => "publish_countersign_evt".to_string(),
-            WireMessage::CountersigningSessionNegotiationEvt { .. } => {
-                "countersigning_session_negotiation_evt".to_string()
-            }
-        }
-    }
-
     /// Outgoing "CallRemote" request.
     pub fn call_remote_req(
         to_agent: holo_hash::AgentPubKey,
