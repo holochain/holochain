@@ -7,25 +7,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.6.1-rc.0
+
 - **BREAKING CHANGE** Test utility `await_consistency` has been renamed to `await_consistency_s`. The function `await_consistency` now has a hard-coded 60 second timeout and should always be used by default to reduce test flakiness.
 - **BREAKING CHANGE**: Remove features for tx5 transport variants `datachannel-vendored` and `backend-libdatachannel`. The only supported tx5 transport is `backend-go-pion` now.
-- **BREAKING CHANGE**: Removed `block_agent` and `unblock_agent` functions from the HDK. These functions were behind the `unstable-functions` feature flag and have been removed as blocking should be a system-level behavior triggered by warrants, not application-level logic. The host functions remain as no-ops for backward compatibility with existing apps. Applications using these functions should remove the calls - they will succeed but have no effect. [#5518]
-- Expanded `GetOptions` with network control fields (`remote_agent_count`, `timeout_ms`) to give developers finer-grained control over network requests. The cascade now respects these options when making network calls. #5422
-- **BREAKING CHANGE**: `GetOptions` fields are now private with getter methods. Code that accessed `options.strategy` directly must now use `options.strategy()`. #5422
-- **BREAKING CHANGE**: `get_agent_activity` function now requires a fourth parameter `GetOptions`. #5422
-- **BREAKING CHANGE** Add `GetStrategy` field to [`Anchor`] struct to allow users to specify whether anchor operations should use network or local-only fetching. The [`Anchor`] struct now has a `strategy` field with serde default, and a `with_strategy()` builder method. New functions `anchor_with_strategy()`, `list_anchor_type_addresses_with_strategy()`, `list_anchor_addresses_with_strategy()`, and `list_anchor_tags_with_strategy()` have been added to the HDK to support this functionality. Additionally, an `AnchorExt` trait has been added to convert [`Anchor`] directly to [`TypedPath`] while preserving the strategy. Applications can now configure anchors to use local-only fetching by calling `.with_strategy(GetStrategy::Local)` on an [`Anchor`]. This complements the similar change to [`TypedPath`]. #5471
-- **BREAKING CHANGE** Add `GetStrategy` field to `TypedPath` to allow users to specify whether path operations should use network or local-only fetching. The `GetStrategy` enum has been moved from `holochain_zome_types` to `holochain_integrity_types` and re-exported for backward compatibility. Applications can now configure paths to use local-only fetching by calling `.with_strategy(GetStrategy::Local)` on a TypedPath. #5471
+- **BREAKING CHANGE**: Removed `block_agent` and `unblock_agent` functions from the HDK. These functions were behind the `unstable-functions` feature flag and have been removed as blocking should be a system-level behavior triggered by warrants, not application-level logic. The host functions remain as no-ops for backward compatibility with existing apps. Applications using these functions should remove the calls - they will succeed but have no effect. \[\#5518\]
+- Expanded `GetOptions` with network control fields (`remote_agent_count`, `timeout_ms`) to give developers finer-grained control over network requests. The cascade now respects these options when making network calls. \#5422
+- **BREAKING CHANGE**: `GetOptions` fields are now private with getter methods. Code that accessed `options.strategy` directly must now use `options.strategy()`. \#5422
+- **BREAKING CHANGE**: `get_agent_activity` function now requires a fourth parameter `GetOptions`. \#5422
+- **BREAKING CHANGE** Add `GetStrategy` field to \[`Anchor`\] struct to allow users to specify whether anchor operations should use network or local-only fetching. The \[`Anchor`\] struct now has a `strategy` field with serde default, and a `with_strategy()` builder method. New functions `anchor_with_strategy()`, `list_anchor_type_addresses_with_strategy()`, `list_anchor_addresses_with_strategy()`, and `list_anchor_tags_with_strategy()` have been added to the HDK to support this functionality. Additionally, an `AnchorExt` trait has been added to convert \[`Anchor`\] directly to \[`TypedPath`\] while preserving the strategy. Applications can now configure anchors to use local-only fetching by calling `.with_strategy(GetStrategy::Local)` on an \[`Anchor`\]. This complements the similar change to \[`TypedPath`\]. \#5471
+- **BREAKING CHANGE** Add `GetStrategy` field to `TypedPath` to allow users to specify whether path operations should use network or local-only fetching. The `GetStrategy` enum has been moved from `holochain_zome_types` to `holochain_integrity_types` and re-exported for backward compatibility. Applications can now configure paths to use local-only fetching by calling `.with_strategy(GetStrategy::Local)` on a TypedPath. \#5471
 - **BREAKING CHANGE**: Default to iroh transport for all binaries.
-- Revert to iroh's public relay server URL `https://use1-1.relay.n0.iroh-canary.iroh.link./` in the conductor config.
-- Reinstate tests that ensure publish and gossip doesn't contact blocked nodes.
+- Revert to iroh’s public relay server URL `https://use1-1.relay.n0.iroh-canary.iroh.link./` in the conductor config.
+- Reinstate tests that ensure publish and gossip doesn’t contact blocked nodes.
 - Set default iroh relay server to `dev-test-bootstrap2-iroh-relay.holochain.org`.
 - Run test workflow for all platforms with iroh transport. One job to test tx5 on Ubuntu is kept in the workflow.
 - Update kitsune2 to v0.4.0-dev.2, which includes the iroh relay integration with the bootstrap server.
 - Crates `holochain_cli_client` and `holochain_client` now have features to set which network transport is compiled in (tx5 or iroh).
 - **BREAKING CHANGE** Feature `mock_network` was removed from crate `holochain_p2p`. It was only referencing `test_utils`, so instead `test_utils` should be used directly.
 - Conductor now overrides the Cell bootstrap and signal urls if specified in the app manifest.
-- Fix: `EnableCloneCell` now works consistently when called with either `CloneId` or `DnaHash` on already-enabled clones. Previously, using a `DnaHash` would fail with `CloneCellNotFound` while using a `CloneId` would succeed. #5519
-- **BREAKING CHANGE** Removed the `InstalledAppCommon` function `get_disabled_clone_id`. #5519
+- Fix: `EnableCloneCell` now works consistently when called with either `CloneId` or `DnaHash` on already-enabled clones. Previously, using a `DnaHash` would fail with `CloneCellNotFound` while using a `CloneId` would succeed. \#5519
+- **BREAKING CHANGE** Removed the `InstalledAppCommon` function `get_disabled_clone_id`. \#5519
 - Removed the unnecessary `hc_stress_test` helper module, its integration test, and example binaries now that performance testing lives in the `holochain/wind-tunnel` repository.
 - Conductor now overrides the Cell bootstrap and signal urls if specified in the app manifest [5524](https://github.com/holochain/holochain/pull/5524).
 - Added feature `transport-iroh` for using Iroh as network transport backend.
