@@ -51,13 +51,26 @@ pub enum DbSyncStrategy {
 }
 
 /// Configuration for holochain_sqlite ConnectionPool.
-#[derive(Default, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct PoolConfig {
     /// The sqlite synchronous level.
     pub synchronous_level: DbSyncLevel,
 
     /// The key with which to encrypt this database.
     pub key: DbKey,
+
+    /// Number of read connections in the pool.
+    pub max_readers: u16,
+}
+
+impl Default for PoolConfig {
+    fn default() -> Self {
+        Self {
+            synchronous_level: Default::default(),
+            key: Default::default(),
+            max_readers: 8,
+        }
+    }
 }
 
 pub(super) fn new_connection_pool(path: Option<&Path>, config: PoolConfig) -> ConnectionPool {
@@ -66,19 +79,12 @@ pub(super) fn new_connection_pool(path: Option<&Path>, config: PoolConfig) -> Co
         Some(path) => SqliteConnectionManager::file(path),
         None => SqliteConnectionManager::memory(),
     };
+    // Pool size is max readers + 1 writer
+    let max_size = config.max_readers as u32 + 1;
     let customizer = Box::new(ConnCustomizer { config });
 
-    /*
-     * We want
-     * - num_read_threads connections for standard read limit
-     * - num_read_threads for use in long running read transactions, to allow the normal pool to continue to be used
-     * - 1 connection for writing
-     */
-    let max_cons = num_read_threads() * 2 + 1;
-
     r2d2::Pool::builder()
-        // Only up to 20 connections at a time
-        .max_size(max_cons as u32)
+        .max_size(max_size)
         // Never maintain idle connections
         .min_idle(Some(0))
         // Close connections after 30-60 seconds of idle time
@@ -129,12 +135,6 @@ pub(super) fn initialize_connection(conn: &mut Connection, config: &PoolConfig) 
     vtab::array::load_module(conn)?;
 
     Ok(())
-}
-
-pub fn num_read_threads() -> usize {
-    let num_cpus = num_cpus::get();
-    let num_threads = num_cpus.checked_div(2).unwrap_or(0);
-    std::cmp::max(num_threads, 4)
 }
 
 #[cfg(feature = "test_utils")]
