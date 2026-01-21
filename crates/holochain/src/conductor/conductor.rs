@@ -593,8 +593,6 @@ mod dna_impls {
             impl IntoIterator<Item = (CellId, RealRibosome)>,
             impl IntoIterator<Item = (EntryDefBufferKey, EntryDef)>,
         )> {
-            let db = &self.spaces.wasm_db;
-
             // Get all installed cells from conductor state
             let state = self.get_state().await?;
             let all_cells: Vec<CellId> = state
@@ -604,10 +602,11 @@ mod dna_impls {
                 .collect();
 
             // Retrieve DNA definitions from wasm database
-            let dna_def_store = holochain_state::dna_def::DnaDefStore::new(db.as_ref().clone());
             let mut dna_defs_with_cell_id = Vec::new();
             for cell_id in all_cells {
-                if let Some(cell_dna_tuple) = dna_def_store.get(&cell_id).await? {
+                if let Some(cell_dna_tuple) =
+                    self.spaces.dna_def_store.as_read().get(&cell_id).await?
+                {
                     dna_defs_with_cell_id.push(cell_dna_tuple);
                 }
             }
@@ -623,10 +622,12 @@ mod dna_impls {
                 .collect::<ConductorResult<HashSet<_>>>()?;
 
             // Get the code for each unique wasm.
-            let wasm_store = WasmStore::new(db.as_ref().clone());
             let mut wasms_and_hashes = HashMap::new();
             for wasm_hash in unique_wasm_hashes {
-                let wasm_hashed = wasm_store
+                let wasm_hashed = self
+                    .spaces
+                    .wasm_store
+                    .as_read()
                     .get(&wasm_hash)
                     .await?
                     .ok_or(ConductorError::WasmMissing)?;
@@ -647,9 +648,7 @@ mod dna_impls {
                 })
                 // This needs to happen due to the environment not being Send
                 .collect::<Vec<_>>();
-            let entry_def_store =
-                holochain_state::entry_def::EntryDefStore::new(db.as_ref().clone());
-            let entry_defs = entry_def_store.get_all().await?;
+            let entry_defs = self.spaces.entry_def_store.as_read().get_all().await?;
 
             // try to join all the tasks and return the list of dna files
             let ribosomes_with_cell_id_future =
@@ -731,22 +730,18 @@ mod dna_impls {
             // TODO: PERF: This loop might be slow
             let wasms = futures::future::join_all(code.map(DnaWasmHashed::from_content)).await;
 
-            let wasm_store = holochain_state::wasm::WasmStore::new(self.spaces.wasm_db.clone());
             for wasm in wasms {
-                if !wasm_store.contains(wasm.as_hash()).await? {
-                    wasm_store.put(wasm).await?;
+                if !self.spaces.wasm_store.contains(wasm.as_hash()).await? {
+                    self.spaces.wasm_store.put(wasm).await?;
                 }
             }
 
-            let entry_def_store =
-                holochain_state::entry_def::EntryDefStore::new(self.spaces.wasm_db.clone());
             for (key, entry_def) in zome_defs.clone() {
-                entry_def_store.put(key, &entry_def).await?;
+                self.spaces.entry_def_store.put(key, &entry_def).await?;
             }
 
-            let dna_def_store =
-                holochain_state::dna_def::DnaDefStore::new(self.spaces.wasm_db.clone());
-            dna_def_store
+            self.spaces
+                .dna_def_store
                 .upsert(&cell_id, &dna_def_hashed.into_content())
                 .await?;
 
