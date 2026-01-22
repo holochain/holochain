@@ -112,11 +112,31 @@ pub struct ConductorConfig {
 
     /// Override the default number of read connections available per database.
     ///
-    /// The value defaults to twice the number of CPUs or 8, whichever is greater.
+    /// The value defaults to twice the number of CPUs, or 8, whichever is greater.
+    ///
+    /// Note that this configuration is related to the value of `incoming_request_concurrency_limit`.
+    /// If one of these is modified, you may want to modify the other to reflect it.
     ///
     /// This is best left at its default value unless you know what you are doing.
     #[serde(default = "default_db_max_readers")]
     pub db_max_readers: u16,
+
+    /// Maximum number of authority responses that can be served in parallel.
+    ///
+    /// These are responses to requests from other agents of
+    /// `get`, `get_links`, `count_links`, `get_agent_activity`, and `must_get_agent_activity`.
+    ///
+    /// Any additional requests for authority responses beyond this limit are ignored.
+    ///
+    /// The default value is either 1 or the following calculated value, whichever is greater:
+    /// - The default value of `db_max_readers` minus 3, for readers allocated to concurrently running workflows.
+    ///
+    /// Note that this configuration is related to the value of `db_max_readers`.
+    /// If one of these is modified, you may want to modify the other to reflect it.
+    ///
+    /// This is best left at its default value unless you know what you are doing.
+    #[serde(default = "default_incoming_request_concurrency_limit")]
+    pub incoming_request_concurrency_limit: u16,
 
     /// Tuning parameters to adjust the behaviour of the conductor.
     #[serde(default)]
@@ -126,6 +146,7 @@ pub struct ConductorConfig {
     pub tracing_scope: Option<String>,
 }
 
+/// Default value is either 8, or the number of CPU cores multiplied by 2, whichever is greater.
 fn default_db_max_readers() -> u16 {
     calculate_default_db_max_readers(num_cpus::get())
 }
@@ -134,6 +155,12 @@ fn calculate_default_db_max_readers(num_cpus_count: usize) -> u16 {
     let num_cpus_count = u16::try_from(num_cpus_count).unwrap_or(u16::MAX);
     let cpus_x2 = num_cpus_count.saturating_mul(2);
     std::cmp::max(cpus_x2, 8)
+}
+
+/// Default value is either 1 or the following calculated value, whichever is greater:
+/// - The default value of `db_max_readers` minus 3, for readers allocated to concurrently running workflows.
+fn default_incoming_request_concurrency_limit() -> u16 {
+    std::cmp::max(default_db_max_readers() - 3, 1)
 }
 
 impl Default for ConductorConfig {
@@ -148,6 +175,7 @@ impl Default for ConductorConfig {
             chc_url: None,
             db_sync_strategy: DbSyncStrategy::default(),
             db_max_readers: default_db_max_readers(),
+            incoming_request_concurrency_limit: default_incoming_request_concurrency_limit(),
             tuning_params: None,
             tracing_scope: None,
         }
@@ -759,6 +787,7 @@ mod tests {
                 chc_url: None,
                 tuning_params: None,
                 tracing_scope: None,
+                incoming_request_concurrency_limit: default_incoming_request_concurrency_limit(),
             }
         );
     }
@@ -813,6 +842,7 @@ mod tests {
 
     db_sync_strategy: Fast
     db_max_readers: 100
+    incoming_request_concurrency_limit: 100
     "#;
 
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
@@ -854,6 +884,7 @@ mod tests {
                 network: network_config,
                 db_sync_strategy: DbSyncStrategy::Fast,
                 db_max_readers: 100,
+                incoming_request_concurrency_limit: 100,
                 #[cfg(feature = "chc")]
                 chc_url: None,
                 tuning_params: None,
@@ -888,6 +919,7 @@ mod tests {
                 chc_url: None,
                 tuning_params: None,
                 tracing_scope: None,
+                incoming_request_concurrency_limit: default_incoming_request_concurrency_limit(),
             }
         );
     }

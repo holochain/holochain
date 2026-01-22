@@ -239,6 +239,7 @@ impl ConductorBuilder {
             request_timeout: std::time::Duration::from_secs(config.network.request_timeout_s),
             #[cfg(feature = "test_utils")]
             mem_bootstrap: config.network.mem_bootstrap,
+            incoming_request_concurrency_limit: config.incoming_request_concurrency_limit,
             ..Default::default()
         };
 

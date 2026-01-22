@@ -39,6 +39,8 @@ tokio = { version = "1.27", features = ["full"] }
 tracing = "0.1"
 tracing-appender = "0.2.3"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
+strum = "0.27.2"
+strum_macros = "0.27.2"
 
 kitsune2 = { version = "0.4.0-dev.2", default-features = false }
 kitsune2_bootstrap_srv = { version = "0.4.0-dev.2", default-features = false, optional = true }
