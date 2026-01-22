@@ -237,6 +237,7 @@ impl ConductorBuilder {
             report,
             compat,
             request_timeout: std::time::Duration::from_secs(config.network.request_timeout_s),
+            incoming_request_concurrency_limit: config.incoming_request_concurrency_limit,
             ..Default::default()
         };
 
