@@ -23,6 +23,7 @@ use std::sync::Mutex;
 
 mod add_agent_infos;
 mod app_state;
+mod builder;
 mod cells_with_conflicting_overrides;
 mod p2p_config_override;
 mod state_dump;
