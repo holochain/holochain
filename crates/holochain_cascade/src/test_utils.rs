@@ -12,6 +12,7 @@ use holo_hash::AnyDhtHashPrimitive;
 use holo_hash::EntryHash;
 use holochain_chc::ChcImpl;
 use holochain_p2p::actor;
+use holochain_p2p::actor::{GetLinksRequestOptions, NetworkRequestOptions};
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_p2p::HolochainP2pError;
@@ -65,7 +66,11 @@ impl PassThroughNetwork {
 
 #[async_trait::async_trait]
 impl HolochainP2pDnaT for PassThroughNetwork {
-    async fn get(&self, dht_hash: holo_hash::AnyDhtHash) -> HolochainP2pResult<Vec<WireOps>> {
+    async fn get(
+        &self,
+        dht_hash: holo_hash::AnyDhtHash,
+        _options: NetworkRequestOptions,
+    ) -> HolochainP2pResult<Vec<WireOps>> {
         let mut out = Vec::new();
         match dht_hash.into_primitive() {
             AnyDhtHashPrimitive::Entry(hash) => {
@@ -91,7 +96,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
     async fn get_links(
         &self,
         link_key: WireLinkKey,
-        options: actor::GetLinksOptions,
+        options: GetLinksRequestOptions,
     ) -> HolochainP2pResult<Vec<WireLinkOps>> {
         let mut out = Vec::new();
         for db in &self.envs {
@@ -103,7 +108,11 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         Ok(out)
     }
 
-    async fn count_links(&self, query: WireLinkQuery) -> HolochainP2pResult<CountLinksResponse> {
+    async fn count_links(
+        &self,
+        query: WireLinkQuery,
+        _options: NetworkRequestOptions,
+    ) -> HolochainP2pResult<CountLinksResponse> {
         let mut out = HashSet::new();
 
         for db in &self.envs {
@@ -145,6 +154,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         &self,
         agent: AgentPubKey,
         filter: ChainFilter,
+        _options: NetworkRequestOptions,
     ) -> HolochainP2pResult<Vec<MustGetAgentActivityResponse>> {
         let mut out = Vec::new();
         for db in &self.envs {

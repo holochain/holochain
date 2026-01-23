@@ -5,6 +5,7 @@ use holo_hash::{
     DnaHash,
 };
 use holochain_keystore::{test_keystore, MetaLairClient};
+use holochain_p2p::actor::NetworkRequestOptions;
 use holochain_p2p::{
     actor::DynHcP2p, event::MockHcP2pHandler, spawn_holochain_p2p, HolochainP2pConfig,
     HolochainP2pError, HolochainP2pLocalAgent,
@@ -399,7 +400,13 @@ async fn get_to_blocked_agent_fails() {
     exchange_agent_infos(alice.clone(), bob.clone(), &dna_hash).await;
 
     // Before the block Alice can make get request and Bob answers them.
-    let response = alice.get(dna_hash.clone(), fixt!(ActionHash).into()).await;
+    let response = alice
+        .get(
+            dna_hash.clone(),
+            fixt!(ActionHash).into(),
+            NetworkRequestOptions::default(),
+        )
+        .await;
     assert!(
         response.is_ok(),
         "Expected get to succeed before block but got: {response:?}"
@@ -426,7 +433,13 @@ async fn get_to_blocked_agent_fails() {
     // implementation internally discards blocked agents when inserting.
 
     // Alice makes a get request. Bob is blocked, so there should be no one to respond.
-    let response = alice.get(dna_hash.clone(), fixt!(ActionHash).into()).await;
+    let response = alice
+        .get(
+            dna_hash.clone(),
+            fixt!(ActionHash).into(),
+            NetworkRequestOptions::default(),
+        )
+        .await;
     assert!(matches!(
         response,
         Err(HolochainP2pError::NoPeersForLocation(_, _))
@@ -460,7 +473,13 @@ async fn get_by_blocked_agent_fails() {
     exchange_agent_infos(alice.clone(), bob.clone(), &dna_hash).await;
 
     // Before the block Bob can make get requests and Alice answers them.
-    let response = bob.get(dna_hash.clone(), fixt!(ActionHash).into()).await;
+    let response = bob
+        .get(
+            dna_hash.clone(),
+            fixt!(ActionHash).into(),
+            NetworkRequestOptions::default(),
+        )
+        .await;
     assert!(response.is_ok());
 
     alice
@@ -480,7 +499,13 @@ async fn get_by_blocked_agent_fails() {
 
     // Bob makes a get request. Alice could respond, but must not, to prove the block for incoming
     // requests is effective.
-    let response = bob.get(dna_hash.clone(), fixt!(ActionHash).into()).await;
+    let response = bob
+        .get(
+            dna_hash.clone(),
+            fixt!(ActionHash).into(),
+            NetworkRequestOptions::default(),
+        )
+        .await;
     assert!(response.is_err(), "expected error, got {response:?}");
 }
 
