@@ -9,7 +9,7 @@ use matches::assert_matches;
 async fn get_agent_activity() {
     holochain_trace::test_run();
 
-    let mut conductor_batch = SweetConductorBatch::from_standard_config_rendezvous(2).await;
+    let mut conductor_batch = SweetConductorBatch::standard(2).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Crd]).await;
 

@@ -116,7 +116,7 @@ pub mod wasm_test {
     async fn unlock_timeout_session() {
         holochain_trace::test_run();
 
-        let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
+        let mut conductors = SweetConductorBatch::standard(2).await;
 
         let (dna_file, _, _) =
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
@@ -504,7 +504,7 @@ pub mod wasm_test {
     async fn lock_chain() {
         holochain_trace::test_run();
 
-        let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
+        let mut conductors = SweetConductorBatch::standard(2).await;
 
         let (dna_file, _, _) =
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
@@ -1253,7 +1253,7 @@ pub mod wasm_test {
         let (dna_file, _, _) =
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
 
-        let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(3).await;
+        let mut conductors = SweetConductorBatch::standard(3).await;
         let apps = conductors
             .setup_app("countersigning", [&dna_file])
             .await

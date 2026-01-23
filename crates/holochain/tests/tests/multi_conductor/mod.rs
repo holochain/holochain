@@ -159,7 +159,7 @@ async fn private_entries_update_consistency() {
             .map_err(Into::into)
         });
 
-    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
+    let mut conductors = SweetConductorBatch::standard(2).await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zome.0).await;
     let dnas = vec![dna_file];
@@ -223,7 +223,7 @@ async fn private_entries_dont_leak() {
                 .map_err(Into::into)
         });
 
-    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
+    let mut conductors = SweetConductorBatch::standard(2).await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zome.0).await;
     let dnas = vec![dna_file];

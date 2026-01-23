@@ -618,7 +618,7 @@ async fn enable_disable_app() -> Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 async fn list_agents() -> Result<()> {
     // Start two conductors
-    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
+    let mut conductors = SweetConductorBatch::standard(2).await;
 
     ensure_fixture_packaged().await?;
 

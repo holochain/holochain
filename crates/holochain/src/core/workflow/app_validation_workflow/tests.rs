@@ -525,7 +525,7 @@ async fn multi_create_link_validation() {
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AppValidation]).await;
 
-    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
+    let mut conductors = SweetConductorBatch::standard(2).await;
     let apps = conductors.setup_app("posts_test", &[dna]).await.unwrap();
 
     let ((alice,), (bobbo,)) = apps.into_tuples();
@@ -690,7 +690,7 @@ async fn app_validation_workflow_test() {
     ])
     .await;
 
-    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
+    let mut conductors = SweetConductorBatch::standard(2).await;
     let apps = conductors.setup_app("test_app", [&dna_file]).await.unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();
     let alice_cell_id = alice.cell_id().clone();
@@ -1145,7 +1145,7 @@ async fn app_validation_produces_warrants() {
     assert_eq!(dna_sans.dna_hash(), dna_avec_1.dna_hash());
     assert_eq!(dna_avec_1.dna_hash(), dna_avec_2.dna_hash());
 
-    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(3).await;
+    let mut conductors = SweetConductorBatch::standard(3).await;
     let (alice,) = conductors[0]
         .setup_app("test_app", [&dna_sans])
         .await
