@@ -32,7 +32,7 @@ mod fixture;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn handle_signal() {
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::standard().await;
 
     // Connect admin client
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
@@ -128,7 +128,7 @@ pub struct TestString(pub String);
 
 #[tokio::test(flavor = "multi_thread")]
 async fn close_on_drop_is_clone_safe() {
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::standard().await;
 
     // Connect admin client
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
@@ -183,7 +183,7 @@ async fn close_on_drop_is_clone_safe() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn deferred_memproof_installation() {
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::standard().await;
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
     let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{admin_port}"), None)
         .await
@@ -276,7 +276,7 @@ async fn deferred_memproof_installation() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn connect_multiple_addresses() {
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::standard().await;
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
 
     let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{admin_port}"), None)
@@ -332,7 +332,7 @@ async fn connect_multiple_addresses() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn connect_with_custom_origin() {
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::standard().await;
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
 
     let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{admin_port}"), None)
@@ -399,7 +399,7 @@ async fn connect_with_custom_origin() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn dump_network_stats() {
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::standard().await;
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
     let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{admin_port}"), None)
         .await
@@ -460,7 +460,7 @@ async fn dump_network_stats() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn dump_network_metrics() {
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::standard().await;
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
     let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{admin_port}"), None)
         .await
@@ -518,7 +518,7 @@ async fn dump_network_metrics() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn agent_info() {
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::standard().await;
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
     let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{admin_port}"), None)
         .await
@@ -592,7 +592,7 @@ async fn peer_meta_info() {
     // conductor tests in the holochain crate where the peer meta store is
     // accessible on the SweetConductor.
 
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::standard().await;
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
     let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{admin_port}"), None)
         .await

@@ -13,7 +13,7 @@ async fn space_removed_on_uninstall() {
     holochain_trace::test_run();
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
     let app = conductor.setup_app("test_app", [&dna_file]).await.unwrap();
     let cells = app.into_cells();
     let cell = &cells[0];

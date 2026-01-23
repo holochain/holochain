@@ -1244,7 +1244,7 @@ pub mod wasm_test {
         let (dna_file, _, _) =
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::HdkExtern]).await;
 
-        let mut conductor = SweetConductor::from_standard_config().await;
+        let mut conductor = SweetConductor::standard().await;
 
         let apps = conductor.setup_apps("app-", 2, &[dna_file]).await.unwrap();
 

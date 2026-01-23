@@ -118,7 +118,7 @@ async fn can_update_state() {
 async fn uninstall_app() {
     holochain_trace::test_run();
     let (dna, _, _) = mk_dna(simple_crud_zome()).await;
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
 
     let app_1 = conductor.setup_app("app1", [&dna]).await.unwrap();
 
@@ -274,7 +274,7 @@ async fn uninstall_app() {
 async fn delete_clone_cell_deletes_cell_databases() {
     holochain_trace::test_run();
     let (dna, _, _) = mk_dna(simple_crud_zome()).await;
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
 
     let app_id = "app".to_string();
     let role_name = "role".to_string();
@@ -377,7 +377,7 @@ async fn delete_clone_cell_deletes_cell_databases() {
 async fn disabled_app_cannot_be_called() {
     holochain_trace::test_run();
     let zome = simple_create_entry_zome();
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
     let app = common_genesis_test_app(&mut conductor, ("zome", zome))
         .await
         .unwrap();
@@ -416,7 +416,7 @@ async fn disabled_app_cannot_be_called() {
 async fn disabled_clone_cell_cannot_be_called() {
     holochain_trace::test_run();
     let zome = simple_create_entry_zome();
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
     let app = common_genesis_test_app(&mut conductor, ("zome", zome))
         .await
         .unwrap();
@@ -508,7 +508,7 @@ async fn app_status_filters() {
     let zome = InlineIntegrityZome::new_unique(Vec::new(), 0);
     let dnas = [mk_dna(("dna", zome)).await.0];
 
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
 
     conductor.setup_app("enabled", &dnas).await.unwrap();
     conductor.setup_app("disabled", &dnas).await.unwrap();
@@ -563,7 +563,7 @@ async fn app_status_filters() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn enable_and_disable_app_are_idempotent() {
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AgentInfo])
         .await
         .0;
@@ -632,7 +632,7 @@ async fn enable_and_disable_app_are_idempotent() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn app_status_and_cell_state() {
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::standard().await;
 
     // Check conductor state is empty.
     let state = conductor.get_state().await.unwrap();

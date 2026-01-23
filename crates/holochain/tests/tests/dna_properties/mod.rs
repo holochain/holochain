@@ -25,7 +25,7 @@ async fn test_dna_properties_macro() {
     })];
 
     // Create a Conductor
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
     let app = conductor.setup_app("app", dnas).await.unwrap();
     let alice_zome = app.cells()[0].zome(TestWasm::DnaProperties);
 
@@ -57,7 +57,7 @@ async fn test_dna_properties_fails_with_invalid_properties() {
     let dnas = &[dna_file.update_modifiers(modifiers)];
 
     // Create a Conductor
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
     let app = conductor.setup_app("app", dnas).await.unwrap();
     let alice_zome = app.cells()[0].zome(TestWasm::DnaProperties);
 

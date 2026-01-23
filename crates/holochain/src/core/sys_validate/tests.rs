@@ -196,7 +196,7 @@ async fn incoming_ops_filters_private_entry() {
 #[ignore = "flaky"]
 async fn valid_chain_fact_test() {
     let n = 100;
-    let keystore = SweetConductor::from_standard_config().await.keystore();
+    let keystore = SweetConductor::standard().await.keystore();
     let author = SweetAgents::one(keystore.clone()).await;
 
     let mut chain = valid_arbitrary_chain(&keystore, author, n).await;

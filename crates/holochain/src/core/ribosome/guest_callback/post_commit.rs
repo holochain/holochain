@@ -329,7 +329,7 @@ mod slow_tests {
 
         let (dna_foo, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
 
-        let mut conductor = SweetConductor::from_standard_config().await;
+        let mut conductor = SweetConductor::standard().await;
         let alice = conductor.setup_app("app", &[dna_foo]).await.unwrap();
 
         let (cell_1,) = alice.into_tuple();

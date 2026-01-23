@@ -207,7 +207,7 @@ impl TestCase {
     where
         P: serde::Serialize + std::fmt::Debug,
     {
-        let mut conductor = SweetConductor::from_standard_config().await;
+        let mut conductor = SweetConductor::standard().await;
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Crd]).await;
         let app = conductor.setup_app("", &[dna_file]).await.unwrap();
         let dna_hash = app.cells()[0].dna_hash().clone();

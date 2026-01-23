@@ -15,7 +15,7 @@ use holochain_zome_types::signal::AppSignal;
 async fn zome_call_error_drop_uncommited() {
     holochain_trace::test_run();
 
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
 
     let zome = InlineZomeSet::new_unique_single(
         "integrity",
