@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix: DbKind display implementation now properly includes the associated CellId or DnaHash of the database, instead of escaped rust code.
+
 ## 0.7.0-dev.9
 
 - **BREAKING CHANGE** `ConductorConfig` now includes a field `incoming_request_concurrency_limit` for specifying the number of incoming authority requests that will be handled concurrently. Additional requests will be dropped. This limit only applies to incoming requests to `get`, `get_links`, `count_links`, `get_agent_activity`, `must_get_agent_activity`.
