@@ -54,7 +54,7 @@ CREATE TABLE Entry (
 -- For simpler querying of cap grants from the agent chain.
 CREATE TABLE CapGrant (
     action_hash BLOB PRIMARY KEY,
-    cap_access  TEXT NOT NULL,  -- 'unrestricted', 'transferable', 'assigned'
+    cap_access  TEXT NOT NULL, -- 'unrestricted', 'transferable', 'assigned'
     tag         TEXT,
    
     FOREIGN KEY(action_hash) REFERENCES Action(hash)
@@ -100,88 +100,73 @@ CREATE TABLE ValidationReceipt (
 );
 ```
 
-#### 2. DHT Database with Limbo Tables
+#### 2. DHT Database
 **Purpose**: Store validated DHT data and ops pending validation
 
 ```sql
--- Limbo tables for ops being validated
+-- DHT actions.
+CREATE TABLE DhtAction (
+   hash        BLOB PRIMARY KEY,
+   author      BLOB NOT NULL,
+   seq         INTEGER, -- NULL for actions not in agent activity
+   prev_hash   BLOB,    -- NULL for actions not in agent activity
+   timestamp   INTEGER NOT NULL,
+   action_type TEXT NOT NULL,
+   action_data BLOB NOT NULL, -- Serialized ActionData enum
+   
+   -- Record validity (aggregated from all ops for this record)
+   -- A record is the combination of action + entry (if applicable)
+   record_validity TEXT NOT NULL -- 'valid', 'rejected'
+);
+
+-- DHT entries.
+CREATE TABLE DhtEntry (
+   hash BLOB PRIMARY KEY,
+   blob BLOB NOT NULL
+);
+
+-- Limbo for DHT ops which are in the process of being validated.
 CREATE TABLE LimboOp (
-    hash BLOB PRIMARY KEY,
-    op_type TEXT NOT NULL,
+    hash        BLOB PRIMARY KEY,
+    op_type     TEXT NOT NULL,
     action_hash BLOB NOT NULL,
-    basis_hash BLOB NOT NULL,
     
-    -- Validation tracking
-    validation_stage TEXT NOT NULL, -- 'pending_sys', 'pending_app', 'complete'
-    sys_validation_status TEXT,     -- NULL, 'valid', 'rejected', 'abandoned'
-    app_validation_status TEXT,     -- NULL, 'valid', 'rejected', 'abandoned'
+    -- DHT location
+    basis_hash         BLOB NOT NULL,
+    storage_center_loc INTEGER NOT NULL,
     
-    -- Dependencies for validation ordering
-    dependency1 BLOB,
-    dependency2 BLOB,
+    -- Local validation state
+    validation_stage      TEXT NOT NULL, -- 'pending_sys', 'pending_app', 'complete'
+    sys_validation_status TEXT,          -- NULL, 'valid', 'rejected', 'abandoned'
+    app_validation_status TEXT,          -- NULL, 'valid', 'rejected', 'abandoned'
     
     -- Timing
     when_received INTEGER NOT NULL,
     validation_attempts INTEGER DEFAULT 0,
     last_validation_attempt INTEGER,
     
-    -- The staged action and entry data
+    -- The action referenced by this op
     action_blob BLOB NOT NULL,
-    entry_blob BLOB
 );
 
--- Track validation receipts
--- Validated tables in DHT database
-CREATE TABLE DhtAction (
-    hash BLOB PRIMARY KEY,
-    author BLOB NOT NULL,
-    seq INTEGER,          -- NULL for actions not in agent activity
-    prev_hash BLOB,       -- NULL for actions not in agent activity
-    timestamp INTEGER NOT NULL,
-    action_type TEXT NOT NULL,
-    action_data BLOB NOT NULL, -- Serialized ActionData enum
-    entry_hash BLOB,      -- NULL for non-entry actions
-    
-    -- Record validity (aggregated from all ops for this record)
-    -- A record is the combination of action + entry (if applicable)
-    record_validity TEXT NOT NULL -- 'valid', 'rejected'
-);
-
--- Entries stored in DHT (entry authorities always have the action too)
-CREATE TABLE DhtEntry (
-    hash BLOB PRIMARY KEY,
-    blob BLOB NOT NULL
-);
-
--- Direct lookup tables for DHT queryable entries
--- Direct lookup table for queryable entries
--- Note: CapClaim entries are not included here as they are always Private
--- and only used locally by the claimant agent
-CREATE TABLE DhtCapGrant (
-    action_hash BLOB PRIMARY KEY,
-    cap_access TEXT NOT NULL,  -- 'unrestricted', 'transferable', 'assigned'
-    tag TEXT,
-    FOREIGN KEY(action_hash) REFERENCES DhtAction(hash)
-);
-
--- Validated Ops in DHT
+-- DHT ops which have completed validation and are integrated into the DHT.
 CREATE TABLE DhtOp (
-    hash BLOB PRIMARY KEY,
-    op_type TEXT NOT NULL,
+    hash        BLOB PRIMARY KEY,
+    op_type     TEXT NOT NULL,
     action_hash BLOB NOT NULL,
-    basis_hash BLOB NOT NULL,
+
+    -- DHT location
+    basis_hash         BLOB NOT NULL,
     storage_center_loc INTEGER NOT NULL,
-    
+
     -- Final validation result
-    validation_status TEXT NOT NULL, -- 'valid', 'rejected'
-    
-    -- Integration tracking
-    when_integrated INTEGER NOT NULL,
-    
-    -- Publishing/gossip tracking
-    last_publish_time INTEGER,
-    receipts_complete BOOLEAN DEFAULT FALSE,
-    
+    validation_status TEXT NOT NULL,    -- 'valid', 'rejected'
+    locally_validated BOOLEAN NOT NULL, -- whether this op validated by us, or fetched from an authority
+
+    -- Timing
+    when_received   INTEGER NOT NULL, -- copied from LimboOp
+    when_integrated INTEGER NOT NULL, -- set when moved from LimboOp
+
     FOREIGN KEY(action_hash) REFERENCES DhtAction(hash)
 );
 
@@ -195,10 +180,10 @@ CREATE TABLE DhtLink (
     tag BLOB,
     author BLOB NOT NULL,
     timestamp INTEGER NOT NULL,
-    
+
     -- Link status
     is_deleted BOOLEAN DEFAULT FALSE,
-    
+
     FOREIGN KEY(create_link_hash) REFERENCES DhtAction(hash)
 );
 ```
