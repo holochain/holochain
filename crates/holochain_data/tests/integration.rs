@@ -64,9 +64,7 @@ async fn error_on_non_directory_path() {
 
     let db_id = TestDbId("test_database".to_string());
     let config = holochain_data::HolochainDataConfig::new();
-    let err = open_db(file_path, db_id, config)
-        .await
-        .unwrap_err();
+    let err = open_db(file_path, db_id, config).await.unwrap_err();
 
     assert!(err.to_string().contains("Path must be a directory"));
 }
@@ -173,9 +171,7 @@ async fn encrypted_database_wrong_key_fails() {
     let config2 = holochain_data::HolochainDataConfig::new().with_key(db_key2);
     // With WAL mode enabled, connection fails immediately with wrong key
     // because enabling WAL requires reading the database header
-    let err = open_db(&tmp_dir, db_id.clone(), config2)
-        .await
-        .unwrap_err();
+    let err = open_db(&tmp_dir, db_id.clone(), config2).await.unwrap_err();
     // SQLCipher returns errors related to SQL or encryption when the wrong key is used
     let err_msg = err.to_string();
     assert!(
