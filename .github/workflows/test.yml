@@ -65,8 +65,6 @@ jobs:
             target: wasmer_sys-transport_tx5
           - os: macos-latest
             target: wasmer_sys
-          - os: macos-15-intel
-            target: wasmer_sys
           - os: depot-windows-2025-8
             target: wasmer_sys
     steps:
