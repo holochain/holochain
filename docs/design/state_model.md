@@ -5,8 +5,9 @@
 
 The Holochain data storage and validation architecture provides:
 
-1. Ops as the unit of validation with aggregated validity status for records
-2. Validation limbo tables to separate pending data from validated data
+1. [Action and entry](./data_model.md) data storage for agents' authored chains
+1. Ops as the unit of validation, with an aggregated validity status for records
+2. Validation limbo tables to separate pending data from validated DHT data
 3. Unified data querying without separate cache database
 4. Distinct schemas for authored and DHT databases, with limbo tables in DHT
 5. Direct data queries without complex joins
@@ -25,7 +26,10 @@ The Holochain data storage and validation architecture provides:
 ### Database Structure
 
 #### 1. Authored Database
-**Purpose**: Store an agent's own authored chain data
+**Purpose**: Store an agent's own authored chain data.
+
+Regardless of what data the agent stores and validates on behalf of other DHT agents, their own authored chain is 
+always fully stored and accessible.
 
 ```sql
 -- Authored Actions
@@ -36,13 +40,13 @@ CREATE TABLE Action (
     prev_hash BLOB,
     timestamp INTEGER NOT NULL,
     action_type TEXT NOT NULL,
-    action_data BLOB -- Serialized ActionData enum
+    action_data BLOB -- Serialized ActionData enum, containing action-type fields
 );
 
 -- Authored Entries
 CREATE TABLE Entry (
     hash BLOB PRIMARY KEY,
-    blob BLOB NOT NULL
+    blob BLOB NOT NULL,
 );
 
 -- Direct lookup tables for queryable entry types
