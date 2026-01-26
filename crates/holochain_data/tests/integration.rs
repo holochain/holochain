@@ -1,5 +1,5 @@
 use holochain_data::DbKey;
-use holochain_data::{setup_holochain_data, DatabaseIdentifier};
+use holochain_data::{open_db, DatabaseIdentifier};
 use sqlx::Row;
 use std::sync::{Arc, Mutex};
 
@@ -18,7 +18,7 @@ async fn create_database() {
     let db_id = TestDbId("test_database".to_string());
 
     let config = holochain_data::HolochainDataConfig::new();
-    let result = setup_holochain_data(&tmp_dir, db_id.clone(), config).await;
+    let result = open_db(&tmp_dir, db_id.clone(), config).await;
 
     assert!(
         result.is_ok(),
@@ -45,8 +45,8 @@ async fn multiple_databases_same_directory() {
     let db_id_2 = TestDbId("database_two".to_string());
 
     let config = holochain_data::HolochainDataConfig::new();
-    let result_1 = setup_holochain_data(&tmp_dir, db_id_1.clone(), config.clone()).await;
-    let result_2 = setup_holochain_data(&tmp_dir, db_id_2.clone(), config).await;
+    let result_1 = open_db(&tmp_dir, db_id_1.clone(), config.clone()).await;
+    let result_2 = open_db(&tmp_dir, db_id_2.clone(), config).await;
 
     assert!(result_1.is_ok());
     assert!(result_2.is_ok());
@@ -64,7 +64,7 @@ async fn error_on_non_directory_path() {
 
     let db_id = TestDbId("test_database".to_string());
     let config = holochain_data::HolochainDataConfig::new();
-    let err = setup_holochain_data(file_path, db_id, config)
+    let err = open_db(file_path, db_id, config)
         .await
         .unwrap_err();
 
@@ -86,7 +86,7 @@ async fn encrypted_database() {
 
     // Create database with encryption
     let config = holochain_data::HolochainDataConfig::new().with_key(db_key.clone());
-    let result = setup_holochain_data(&tmp_dir, db_id.clone(), config).await;
+    let result = open_db(&tmp_dir, db_id.clone(), config).await;
     assert!(
         result.is_ok(),
         "Failed to create encrypted database: {:?}",
@@ -129,7 +129,7 @@ async fn encrypted_database() {
 
     // Try to open the same database again with the same key
     let config_reopen = holochain_data::HolochainDataConfig::new().with_key(db_key);
-    let result_reopen = setup_holochain_data(&tmp_dir, db_id.clone(), config_reopen).await;
+    let result_reopen = open_db(&tmp_dir, db_id.clone(), config_reopen).await;
     assert!(
         result_reopen.is_ok(),
         "Failed to reopen encrypted database: {:?}",
@@ -151,7 +151,7 @@ async fn encrypted_database_wrong_key_fails() {
         .expect("Failed to generate first database key");
 
     let config1 = holochain_data::HolochainDataConfig::new().with_key(db_key1);
-    let result = setup_holochain_data(&tmp_dir, db_id.clone(), config1).await;
+    let result = open_db(&tmp_dir, db_id.clone(), config1).await;
     assert!(result.is_ok(), "Failed to create encrypted database");
     let db_conn1 = result.unwrap();
 
@@ -173,7 +173,7 @@ async fn encrypted_database_wrong_key_fails() {
     let config2 = holochain_data::HolochainDataConfig::new().with_key(db_key2);
     // With WAL mode enabled, connection fails immediately with wrong key
     // because enabling WAL requires reading the database header
-    let err = setup_holochain_data(&tmp_dir, db_id.clone(), config2)
+    let err = open_db(&tmp_dir, db_id.clone(), config2)
         .await
         .unwrap_err();
     // SQLCipher returns errors related to SQL or encryption when the wrong key is used
@@ -195,7 +195,7 @@ async fn pragma_configuration() {
     // Create database with custom sync level
     let config = holochain_data::HolochainDataConfig::new()
         .with_sync_level(holochain_data::DbSyncLevel::Off);
-    let result = setup_holochain_data(&tmp_dir, db_id.clone(), config).await;
+    let result = open_db(&tmp_dir, db_id.clone(), config).await;
     assert!(
         result.is_ok(),
         "Failed to create database: {:?}",
@@ -227,7 +227,7 @@ async fn migrations_applied() {
     let db_id = TestDbId("migrations_test_database".to_string());
 
     let config = holochain_data::HolochainDataConfig::new();
-    let result = setup_holochain_data(&tmp_dir, db_id.clone(), config).await;
+    let result = open_db(&tmp_dir, db_id.clone(), config).await;
     assert!(
         result.is_ok(),
         "Failed to create database: {:?}",
@@ -293,7 +293,7 @@ async fn example_query_patterns() {
     let db_id = TestDbId("example_test_database".to_string());
 
     let config = holochain_data::HolochainDataConfig::new();
-    let db_conn = setup_holochain_data(&tmp_dir, db_id, config)
+    let db_conn = open_db(&tmp_dir, db_id, config)
         .await
         .expect("Failed to create database");
 
@@ -362,7 +362,7 @@ async fn test_foreign_key_constraints() {
     let db_id = TestDbId("fk_test_database".to_string());
 
     let config = holochain_data::HolochainDataConfig::new();
-    let db_conn = setup_holochain_data(&tmp_dir, db_id, config)
+    let db_conn = open_db(&tmp_dir, db_id, config)
         .await
         .expect("Failed to create database");
 

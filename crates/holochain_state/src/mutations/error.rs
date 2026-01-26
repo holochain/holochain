@@ -5,6 +5,7 @@ use thiserror::Error;
 pub enum StateMutationError {
     #[error(transparent)]
     Sql(#[from] holochain_sqlite::rusqlite::Error),
+
     #[error(transparent)]
     Sqlx(#[from] sqlx::Error),
 

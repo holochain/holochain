@@ -189,7 +189,7 @@ impl Spaces {
             .await
             .map_err(ConductorError::other)?;
 
-        let wasm_db = holochain_data::setup_holochain_data(
+        let wasm_db = holochain_data::open_db(
             root_db_dir.as_ref(),
             holochain_data::kind::Wasm,
             holochain_data::HolochainDataConfig {

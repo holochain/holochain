@@ -22,7 +22,7 @@ impl<I: DatabaseIdentifier> DbRead<I> {
     /// Create a new read handle.
     ///
     /// This is primarily for internal use. Users should obtain handles
-    /// via [`setup_holochain_data`](crate::setup_holochain_data) or by
+    /// via [`setup_holochain_data`](crate::open_db) or by
     /// converting from a [`DbWrite`] handle.
     pub(crate) fn new(pool: Pool<Sqlite>, identifier: I) -> Self {
         Self { pool, identifier }
@@ -51,7 +51,7 @@ impl<I: DatabaseIdentifier> DbWrite<I> {
     /// Create a new write handle.
     ///
     /// This is primarily for internal use. Users should obtain handles
-    /// via [`setup_holochain_data`](crate::setup_holochain_data).
+    /// via [`setup_holochain_data`](crate::open_db).
     pub(crate) fn new(pool: Pool<Sqlite>, identifier: I) -> Self {
         Self(DbRead::new(pool, identifier))
     }
