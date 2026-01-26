@@ -262,6 +262,109 @@ pub struct OpenChainData {
 }
 ```
 
+### Creation and Distribution Flow
+
+The high-level flow for authoring actions and distributing ops is as follows:
+
+```
+1. Author new action locally
+   ├─> Insert into `Action` table
+   ├─> Insert into `Entry` table (if applicable)
+   └─> Insert into `CapGrant` table (if applicable)
+
+2. Self validation
+   ├─> Run sys validation check
+   ├─> Run app validation checks via WASM
+   └─> On failure: rollback transaction, chain unchanged
+
+3. Create ops for publishing
+   ├─> If this is a countersigning action, skip this step
+   └─> Insert into AuthoredOp with publishing state
+
+4. Publish DHT Ops Workflow
+   ├─> Query ops which are ready for publishing from `AuthoredOp`
+   ├─> Group by `basis_hash` for efficient sending
+   ├─> Send ops to DHT authorities over the network
+   └─> Update `last_publish_time` in `AuthoredOp`
+
+5. Validation Receipt Workflow
+   ├─> Receive validation receipts from validators
+   ├─> Insert into `ValidationReceipt` table
+   └─> Update `receipts_complete` in `AuthoredOp` when sufficient receipts received
+```
+
+#### Publish Query and Op Construction
+
+The publish workflow queries the authored database for ops that need publishing and constructs the full `DhtOp` for network transmission.
+
+**Query Logic:**
+
+The query selects from `AuthoredOp` table, joining to `Action` and optionally `Entry`:
+
+```sql
+SELECT
+    Action.hash as action_hash,
+    Action.author,
+    Action.timestamp,
+    Action.action_type,
+    Action.action_data,
+    Entry.blob as entry_blob,
+    AuthoredOp.hash as op_hash,
+    AuthoredOp.op_type,
+    AuthoredOp.basis_hash
+FROM AuthoredOp
+JOIN Action ON AuthoredOp.action_hash = Action.hash
+LEFT JOIN Entry ON Action.entry_hash = Entry.hash
+WHERE
+    Action.author = :author
+    AND (AuthoredOp.last_publish_time IS NULL
+        OR AuthoredOp.last_publish_time <= :recency_threshold)
+    AND AuthoredOp.receipts_complete IS NULL
+ORDER BY Action.seq, Action.timestamp
+```
+
+**In-Memory Transform:**
+
+For each row returned:
+1. **Deserialize Action**: Reconstruct full `Action` from common fields + the `action_data` BLOB
+2. **Check Entry Privacy**: Deserialize `action_data` to determine if entry is private (from `EntryType`)
+3. **Filter Private StoreEntry Ops**: Exclude `StoreEntry` ops where entry visibility is `Private`
+4. **Construct DhtOp**: Build the appropriate `DhtOp` variant based on `op_type`:
+   - `StoreRecord`: Requires Action + Entry (if present)
+   - `StoreEntry`: Requires Action + Entry
+   - `RegisterAgentActivity`: Requires Action only
+   - `RegisterUpdatedContent`: Requires Action only
+   - `RegisterUpdatedRecord`: Requires Action only
+   - `RegisterDeletedBy`: Requires Action only
+   - `RegisterDeletedEntryAction`: Requires Action only
+   - `RegisterAddLink`: Requires Action only
+   - `RegisterRemoveLink`: Requires Action only
+5. **Group by Basis**: Collect ops by `basis_hash` for efficient network transmission
+
+**Incompatibilities with Current Implementation:**
+
+1. **Missing `withhold_publish` field**: The current code checks `DhtOp.withhold_publish IS NULL` to exclude countersigning ops. The new `AuthoredOp` schema doesn't include this field.
+   - *Resolution needed*: Add `withhold_publish BOOLEAN` field to `AuthoredOp` table, or handle countersigning differently.
+
+2. **Missing `when_integrated` field**: The current code checks `DhtOp.when_integrated IS NOT NULL` to ensure ops are only published after local validation completes. The new `AuthoredOp` schema doesn't track integration.
+   - *Resolution needed*: Authored ops don't need integration tracking since they're locally validated before insertion. This filter may be unnecessary in the new model, or we need a different field like `locally_validated BOOLEAN`.
+
+3. **`op_order` field**: Not needed in the new design.
+   - **Current Purpose**: `OpOrder` combines op type priority (0-9) with timestamp to ensure "the most likely ordering where dependencies will come first"
+   - **New Approach**: Use `ORDER BY Action.seq, Action.timestamp` in the publish query
+   - **Rationale**:
+     - Sequence number naturally orders actions from earliest to latest in the chain
+     - Publishing foundational data first helps nodes joining large networks validate more efficiently
+     - Timestamp breaks ties when multiple ops reference the same action
+     - Simpler than maintaining a computed ordering field
+   - **Resolution**: No `op_order` column needed in `AuthoredOp`
+
+4. **Entry privacy check**: The current code has `Action.private_entry = 0` as a database column. The new schema requires deserializing `action_data` to check `EntryType` visibility.
+   - *Resolution needed*: Either add `private_entry BOOLEAN` to `Action` table for query efficiency, or perform privacy filtering in-memory after deserialization.
+
+5. **Warrant Ops**: The current query includes a UNION for Warrant ops from a separate `Warrant` table. The new design doesn't show warrant storage.
+   - *Resolution needed*: Clarify where warrants are stored (likely in Action table with `action_type = 'Warrant'`).
+
 ### Validation Flow
 
 ```
