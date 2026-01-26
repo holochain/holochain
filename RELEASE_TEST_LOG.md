@@ -2,6 +2,20 @@
 
 This file documents results of release tests as described in the [Holochain release process](RELEASE.md).
 
+## 2026-01-23: v0.6.1-rc.0
+
+*Success*
+- Ran a test with 5 nodes.
+- Peer discovery was fast.
+- Initial sync took around a minute.
+- Signals were sent with 100% reliability.
+- Entries created by all nodes were received by all peers, in less than a minute.
+- After shutting down one node and creating data with the other nodes, when the offline node came back online, it took
+  less than a minute for all data to be synced.
+- Started a 6th node and waited for it to sync with the network. It took about 3 minutes to sync. This was the only odd behavior noted in the test, to sync the roughly 400 ops.
+- This was the first test with the iroh transport as default in Holochain. Syncs happened in about a minute
+  in most cases, 3 minutes at most, which is an improvement in terms of reliability and speed.
+
 ## 2025-09-01: v0.5.6-rc.0
 
 *Success*
