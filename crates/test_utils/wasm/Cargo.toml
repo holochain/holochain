@@ -1,6 +1,6 @@
 [package]
 name = "holochain_wasm_test_utils"
-version = "0.7.0-dev.8"
+version = "0.7.0-dev.9"
 authors = ["thedavidmeister", "thedavidmeister@gmail.com"]
 edition = "2021"
 description = "Utilities for Wasm testing for Holochain"
@@ -20,7 +20,7 @@ unstable-functions = []
 
 # reminder - do not use workspace deps
 [dependencies]
-holochain_types = { version = "^0.7.0-dev.8", path = "../../holochain_types" }
+holochain_types = { version = "^0.7.0-dev.9", path = "../../holochain_types" }
 strum = "0.27"
 strum_macros = "0.27"
 

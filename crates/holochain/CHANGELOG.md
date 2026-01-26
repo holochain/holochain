@@ -7,11 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.7.0-dev.9
+
 - **BREAKING CHANGE** `ConductorConfig` now includes a field `incoming_request_concurrency_limit` for specifying the number of incoming authority requests that will be handled concurrently. Additional requests will be dropped. This limit only applies to incoming requests to `get`, `get_links`, `count_links`, `get_agent_activity`, `must_get_agent_activity`.
 - **BREAKING CHANGE** `ConductorConfig` now includes an optional field `db_max_readers` for overriding the maximum number of read connections per database.
 - Remove `mem_bootstrap` from `HolochainP2pConfig`. Either a locally spawned bootstrap server or no bootstrap service at all should be used for testing.
-- Remove `SweetConductor::from_standard_config`. It used a WAN bootstrap and relay service. A locally spawned server is used instead. The new default for `SweetConductor` is `standard()`. 
-- **BREAKING** Dumping network stats with the admin and app APIs now returns a consistent response type of `HolochainTransportStats` where previously they returned `ApiTransportStats` and `TransportStats` respectively. The app response was missing blocked message counts. The Holochain type also converts `Space` values into `DnaHash` values for easier use in app code. #5611 
+- Remove `SweetConductor::from_standard_config`. It used a WAN bootstrap and relay service. A locally spawned server is used instead. The new default for `SweetConductor` is `standard()`.
+- **BREAKING** Dumping network stats with the admin and app APIs now returns a consistent response type of `HolochainTransportStats` where previously they returned `ApiTransportStats` and `TransportStats` respectively. The app response was missing blocked message counts. The Holochain type also converts `Space` values into `DnaHash` values for easier use in app code. \#5611
 
 ## 0.7.0-dev.8
 
