@@ -32,72 +32,68 @@ Regardless of what data the agent stores and validates on behalf of other DHT ag
 always fully stored and accessible.
 
 ```sql
--- Authored Actions
+-- Authored actions
 CREATE TABLE Action (
-    hash BLOB PRIMARY KEY,
-    author BLOB NOT NULL,
-    seq INTEGER NOT NULL,
-    prev_hash BLOB,
-    timestamp INTEGER NOT NULL,
+    hash        BLOB PRIMARY KEY,
+    author      BLOB NOT NULL,
+    seq         INTEGER NOT NULL,
+    prev_hash   BLOB,
+    timestamp   INTEGER NOT NULL,
     action_type TEXT NOT NULL,
     action_data BLOB -- Serialized ActionData enum, containing action-type fields
 );
 
--- Authored Entries
+-- Authored entries
 CREATE TABLE Entry (
     hash BLOB PRIMARY KEY,
     blob BLOB NOT NULL,
 );
 
--- Direct lookup tables for queryable entry types
-
--- Capability grants indexed by secret and access type
+-- Capability grants lookup table.
+-- 
+-- For simpler querying of cap grants from the agent chain.
 CREATE TABLE CapGrant (
-    entry_hash BLOB PRIMARY KEY,
-    action_hash BLOB NOT NULL,
-    author BLOB NOT NULL,
-    cap_secret BLOB,           -- NULL for unrestricted grants
-    cap_access TEXT NOT NULL,  -- 'unrestricted', 'transferable', 'assigned'
-    functions BLOB,            -- Serialized list of allowed functions
-    assignees BLOB,            -- Serialized list of assignees
-    FOREIGN KEY(entry_hash) REFERENCES Entry(hash),
+    action_hash BLOB PRIMARY KEY,
+    cap_access  TEXT NOT NULL,  -- 'unrestricted', 'transferable', 'assigned'
+    tag         TEXT,
+   
     FOREIGN KEY(action_hash) REFERENCES Action(hash)
 );
 
--- Capability claims indexed by secret
+-- Capability claims table.
+-- 
+-- For recording cap claims from other agents that are granted to a local agent.
 CREATE TABLE CapClaim (
-    entry_hash BLOB PRIMARY KEY,
-    action_hash BLOB NOT NULL,
-    author BLOB NOT NULL,
-    cap_secret BLOB NOT NULL,
-    grantor BLOB NOT NULL,
-    FOREIGN KEY(entry_hash) REFERENCES Entry(hash),
-    FOREIGN KEY(action_hash) REFERENCES Action(hash)
+    action_hash BLOB PRIMARY KEY,
+    tag         TEXT NOT NULL,
+    grantor     BLOB NOT NULL,
+    secret      BLOB NOT NULL,
 );
 
--- Authored Ops (for publishing)
+-- Authored ops.
+-- 
+-- For publishing state only, does not contain a complete op.
 CREATE TABLE AuthoredOp (
-    hash BLOB PRIMARY KEY,
+    hash        BLOB PRIMARY KEY,
     action_hash BLOB NOT NULL,
-    op_type TEXT NOT NULL,
-    basis_hash BLOB NOT NULL,
+    op_type     TEXT NOT NULL,
+    basis_hash  BLOB NOT NULL,
     
     -- Publishing state
     last_publish_time INTEGER,
     receipts_complete BOOLEAN,
-    withhold_publish BOOLEAN,  -- For countersigning ops
     
     FOREIGN KEY(action_hash) REFERENCES Action(hash)
 );
 
--- Validation receipts for authored ops
--- Validation receipts for authored ops
--- These track that other agents have validated our authored ops
+-- Validation receipts for authored ops.
+--
+-- For tracking that other agents have validated our authored ops
 CREATE TABLE ValidationReceipt (
-    hash BLOB PRIMARY KEY,
-    op_hash BLOB NOT NULL,
-    validator BLOB NOT NULL,
-    signature BLOB NOT NULL,
+    hash          BLOB PRIMARY KEY,
+    op_hash       BLOB NOT NULL,
+    validators    BLOB NOT NULL,
+    signature     BLOB NOT NULL,
     when_received INTEGER NOT NULL,
     
     FOREIGN KEY(op_hash) REFERENCES AuthoredOp(hash)
@@ -162,14 +158,9 @@ CREATE TABLE DhtEntry (
 -- Note: CapClaim entries are not included here as they are always Private
 -- and only used locally by the claimant agent
 CREATE TABLE DhtCapGrant (
-    entry_hash BLOB PRIMARY KEY,
-    action_hash BLOB NOT NULL,
-    author BLOB NOT NULL,
-    cap_secret BLOB,
-    cap_access TEXT NOT NULL,
-    functions BLOB,
-    assignees BLOB,
-    FOREIGN KEY(entry_hash) REFERENCES DhtEntry(hash),
+    action_hash BLOB PRIMARY KEY,
+    cap_access TEXT NOT NULL,  -- 'unrestricted', 'transferable', 'assigned'
+    tag TEXT,
     FOREIGN KEY(action_hash) REFERENCES DhtAction(hash)
 );
 
@@ -525,39 +516,41 @@ pub struct OpenChainData {
 
 Cap grant/claim lookups use dedicated tables for direct access without chain scans:
 
-```sql  
--- Find cap grant by secret (direct lookup)
+```sql
+-- Find cap grant by access type (direct lookup, join for other fields)
 SELECT cg.*, Action.*, Entry.*
 FROM CapGrant cg
-JOIN Action ON cg.action_hash = Action.hash  
-JOIN Entry ON cg.entry_hash = Entry.hash
-WHERE cg.cap_secret = ?;
+JOIN Action ON cg.action_hash = Action.hash
+JOIN Entry ON Action.entry_hash = Entry.hash
+WHERE cg.cap_access = ?;
 
--- Find all unrestricted grants by an author
-SELECT cg.*, Action.*
+-- Find all grants by an author (join to Action for author)
+SELECT cg.*, Action.*, Entry.*
 FROM CapGrant cg
 JOIN Action ON cg.action_hash = Action.hash
-WHERE cg.author = ? 
-  AND cg.cap_access = 'unrestricted';
+JOIN Entry ON Action.entry_hash = Entry.hash
+WHERE Action.author = ?;
 
--- Find transferable grants with specific functions
-SELECT cg.*
-FROM CapGrant cg  
-WHERE cg.cap_access = 'transferable'
-  AND cg.functions LIKE '%' || ? || '%';
+-- Find grants by tag
+SELECT cg.*, Action.*, Entry.*
+FROM CapGrant cg
+JOIN Action ON cg.action_hash = Action.hash
+JOIN Entry ON Action.entry_hash = Entry.hash
+WHERE cg.tag = ?;
 
 -- Find cap claims by grantor (direct lookup)
 SELECT cc.*, Action.*, Entry.*
 FROM CapClaim cc
 JOIN Action ON cc.action_hash = Action.hash
-JOIN Entry ON cc.entry_hash = Entry.hash
+JOIN Entry ON Action.entry_hash = Entry.hash
 WHERE cc.grantor = ?;
 
--- Verify claim chain - match claim to grant
-SELECT grant.cap_access, grant.functions, grant.assignees
-FROM CapClaim claim
-JOIN CapGrant grant ON claim.cap_secret = grant.cap_secret
-WHERE claim.entry_hash = ?;
+-- Find cap claims by tag
+SELECT cc.*, Action.*, Entry.*
+FROM CapClaim cc
+JOIN Action ON cc.action_hash = Action.hash
+JOIN Entry ON Action.entry_hash = Entry.hash
+WHERE cc.tag = ?;
 
 -- Chain traversal (no BLOB deserialization needed)  
 SELECT hash, seq, prev_hash, timestamp, action_type
