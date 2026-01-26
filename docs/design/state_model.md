@@ -101,7 +101,7 @@ CREATE TABLE ValidationReceipt (
 ```
 
 #### 2. DHT Database
-**Purpose**: Store validated DHT data and ops pending validation
+**Purpose**: Store validated DHT data, and ops pending validation
 
 ```sql
 -- DHT actions.
@@ -169,23 +169,97 @@ CREATE TABLE DhtOp (
 
     FOREIGN KEY(action_hash) REFERENCES DhtAction(hash)
 );
+```
 
--- Links (derived from ops, for efficient querying)
-CREATE TABLE DhtLink (
-    create_link_hash BLOB PRIMARY KEY,
-    base_hash BLOB NOT NULL,
-    target_hash BLOB NOT NULL,
-    zome_index INTEGER NOT NULL,
-    link_type INTEGER NOT NULL,
-    tag BLOB,
-    author BLOB NOT NULL,
-    timestamp INTEGER NOT NULL,
+### Rust Structure
+```rust
+/// Common action header stored for all action types
+pub struct ActionHeader {
+    pub author: AgentPubKey,
+    pub timestamp: Timestamp,
+    pub action_seq: u32,
+    pub prev_action: ActionHash,
+}
 
-    -- Link status
-    is_deleted BOOLEAN DEFAULT FALSE,
+/// Action-specific data stored separately from header
+pub enum ActionData {
+    Dna(DnaData),
+    AgentValidationPkg(AgentValidationPkgData),
+    InitZomesComplete(InitZomesCompleteData),
+    Create(CreateData),
+    Update(UpdateData),
+    Delete(DeleteData),
+    CreateLink(CreateLinkData),
+    DeleteLink(DeleteLinkData),
+    CloseChain(CloseChainData),
+    OpenChain(OpenChainData),
+}
 
-    FOREIGN KEY(create_link_hash) REFERENCES DhtAction(hash)
-);
+/// Lightweight reference for queries
+pub struct ActionRef {
+    pub hash: ActionHash,
+    pub action_type: ActionType,
+    pub header: ActionHeader,
+}
+
+/// Full action with data loaded on-demand
+pub struct Action {
+    pub hash: ActionHash,
+    pub header: ActionHeader,
+    pub data: ActionData,
+}
+
+// Action-specific data structures (without redundant common fields)
+pub struct CreateData {
+    pub entry_type: EntryType,
+    pub entry_hash: EntryHash,
+    pub weight: EntryRateWeight,
+}
+
+pub struct UpdateData {
+    pub original_action_address: ActionHash,
+    pub original_entry_address: EntryHash,
+    pub entry_type: EntryType,
+    pub entry_hash: EntryHash,
+    pub weight: EntryRateWeight,
+}
+
+pub struct DeleteData {
+    pub deletes_address: ActionHash,
+    pub deletes_entry_address: EntryHash,
+    pub weight: RateWeight,
+}
+
+pub struct CreateLinkData {
+    pub base_address: AnyLinkableHash,
+    pub target_address: AnyLinkableHash,
+    pub zome_index: ZomeIndex,
+    pub link_type: LinkType,
+    pub tag: LinkTag,
+    pub weight: RateWeight,
+}
+
+pub struct DeleteLinkData {
+    pub base_address: AnyLinkableHash,
+    pub link_add_address: ActionHash,
+}
+
+// Minimal data for chain-only actions
+pub struct DnaData {
+    pub dna_hash: DnaHash,
+}
+
+pub struct AgentValidationPkgData {
+    pub membrane_proof: Option<MembraneProof>,
+}
+
+pub struct InitZomesCompleteData {}
+pub struct CloseChainData {
+    pub new_dna_hash: DnaHash,
+}
+pub struct OpenChainData {
+    pub previous_dna_hash: DnaHash,
+}
 ```
 
 ### Validation Flow
@@ -224,6 +298,10 @@ The record validity is determined at the time of integration by examining all kn
 **Note on Partial Views:**
 Since validators hold shards (specific op types over specific ranges), they make validity decisions based on the ops they know about. A record is considered valid if any of its known ops are valid and none are known to be invalid. The absence of some ops does not make a record pending or invalid.
 
+### Record Validity Correction
+
+TODO: It is a future piece of work to define this logic.
+
 ## Query Patterns
 
 ### Get Record by Hash
@@ -245,15 +323,6 @@ FROM DhtEntry AS Entry
 JOIN DhtAction AS Action ON Action.entry_hash = Entry.hash
 WHERE hash = ?
   AND Action.record_validity = 'valid'
-```
-
-### Get Links
-
-```sql
-SELECT *
-FROM DhtLink
-WHERE base_hash = ?
-  AND is_deleted = FALSE
 ```
 
 ### Agent Activity
@@ -406,96 +475,7 @@ CREATE TABLE Action (
 
 Note: Queryable entry types (CapGrant, CapClaim) have dedicated tables in the Entry section for direct lookup without requiring full chain scans.
 
-### Rust Structure
-```rust
-/// Common action header stored for all action types
-pub struct ActionHeader {
-    pub author: AgentPubKey,
-    pub timestamp: Timestamp,
-    pub action_seq: u32,
-    pub prev_action: ActionHash,
-}
 
-/// Action-specific data stored separately from header
-pub enum ActionData {
-    Dna(DnaData),
-    AgentValidationPkg(AgentValidationPkgData),
-    InitZomesComplete(InitZomesCompleteData),
-    Create(CreateData),
-    Update(UpdateData),
-    Delete(DeleteData),
-    CreateLink(CreateLinkData),
-    DeleteLink(DeleteLinkData),
-    CloseChain(CloseChainData),
-    OpenChain(OpenChainData),
-}
-
-/// Lightweight reference for queries
-pub struct ActionRef {
-    pub hash: ActionHash,
-    pub action_type: ActionType,
-    pub header: ActionHeader,
-}
-
-/// Full action with data loaded on-demand
-pub struct Action {
-    pub hash: ActionHash,
-    pub header: ActionHeader,
-    pub data: ActionData,
-}
-
-// Action-specific data structures (without redundant common fields)
-pub struct CreateData {
-    pub entry_type: EntryType,
-    pub entry_hash: EntryHash,
-    pub weight: EntryRateWeight,
-}
-
-pub struct UpdateData {
-    pub original_action_address: ActionHash,
-    pub original_entry_address: EntryHash,
-    pub entry_type: EntryType,
-    pub entry_hash: EntryHash,
-    pub weight: EntryRateWeight,
-}
-
-pub struct DeleteData {
-    pub deletes_address: ActionHash,
-    pub deletes_entry_address: EntryHash,
-    pub weight: RateWeight,
-}
-
-pub struct CreateLinkData {
-    pub base_address: AnyLinkableHash,
-    pub target_address: AnyLinkableHash,
-    pub zome_index: ZomeIndex,
-    pub link_type: LinkType,
-    pub tag: LinkTag,
-    pub weight: RateWeight,
-}
-
-pub struct DeleteLinkData {
-    pub base_address: AnyLinkableHash,
-    pub link_add_address: ActionHash,
-}
-
-// Minimal data for chain-only actions
-pub struct DnaData {
-    pub dna_hash: DnaHash,
-}
-
-pub struct AgentValidationPkgData {
-    pub membrane_proof: Option<MembraneProof>,
-}
-
-pub struct InitZomesCompleteData {}
-pub struct CloseChainData {
-    pub new_dna_hash: DnaHash,
-}
-pub struct OpenChainData {
-    pub previous_dna_hash: DnaHash,
-}
-```
 
 ### Query Patterns
 
