@@ -151,7 +151,7 @@ impl DnaDefModel {
 /// Maps to the `IntegrityZome` table.
 #[derive(Debug, Clone, FromRow)]
 pub struct IntegrityZomeModel {
-    /// The cell ID this zome belongs to.
+    /// The DNA hash this zome belongs to.
     pub dna_hash: Vec<u8>,
     /// The agent public key (32 bytes).
     pub agent: Vec<u8>,
@@ -222,7 +222,7 @@ impl IntegrityZomeModel {
 /// Maps to the `CoordinatorZome` table.
 #[derive(Debug, Clone, FromRow)]
 pub struct CoordinatorZomeModel {
-    /// The cell ID this zome belongs to.
+    /// The DNA hash this zome belongs to.
     pub dna_hash: Vec<u8>,
     /// The agent public key (32 bytes).
     pub agent: Vec<u8>,

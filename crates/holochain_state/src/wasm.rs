@@ -87,7 +87,7 @@ mod tests {
         holochain_trace::test_run();
 
         let tempdir = tempfile::tempdir().unwrap();
-        let db = holochain_data::setup_holochain_data(
+        let db = holochain_data::open_db(
             tempdir.path(),
             holochain_data::kind::Wasm,
             holochain_data::HolochainDataConfig {
@@ -119,7 +119,7 @@ mod tests {
         holochain_trace::test_run();
 
         let tempdir = tempfile::tempdir().unwrap();
-        let db = holochain_data::setup_holochain_data(
+        let db = holochain_data::open_db(
             tempdir.path(),
             holochain_data::kind::Wasm,
             holochain_data::HolochainDataConfig {

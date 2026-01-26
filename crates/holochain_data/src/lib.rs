@@ -113,7 +113,7 @@ pub struct HolochainDbConn<I: DatabaseIdentifier> {
 /// # Errors
 ///
 /// Returns an error if `path` is not a directory.
-pub async fn setup_holochain_data<I: DatabaseIdentifier>(
+pub async fn open_db<I: DatabaseIdentifier>(
     path: impl AsRef<Path>,
     database_id: I,
     config: HolochainDataConfig,
