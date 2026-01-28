@@ -87,7 +87,7 @@ jobs:
     name: test (wasmer_wamr)
     # Our intended target for wasmer_wamr feature is iOS and Android.
     # For now, wasmer_wamr tests are only run on macos-latest
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
     steps:
@@ -97,15 +97,10 @@ jobs:
       - name: "Common Test Setup Actions"
         uses: ./.github/actions/common-pre
         
-      - name: install build dependencies (macos-latest, wasmer_wamr)
-        run: |
-          brew install llvm
-          echo "PATH=/opt/homebrew/opt/llvm/bin:$PATH" >> "$GITHUB_ENV"
-
       - name: "Build workspace and run tests"
         uses: ./.github/actions/common-test
         with:
-          os: "macos-latest"
+          os: "ubuntu-latest"
           target: "wasmer_wamr"
           influx-token: ${{ secrets.INFLUX_TOKEN }}
 
