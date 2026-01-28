@@ -1,67 +1,65 @@
-use crate::mutations;
-use crate::prelude::from_blob;
 use crate::prelude::StateMutationResult;
 use crate::prelude::StateQueryResult;
-use crate::query::to_blob;
-use holochain_sqlite::rusqlite::named_params;
-use holochain_sqlite::rusqlite::OptionalExtension;
-use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::prelude::CellId;
 use holochain_types::prelude::DnaDef;
 
-pub fn get(txn: &Transaction<'_>, cell_id: &CellId) -> StateQueryResult<Option<(CellId, DnaDef)>> {
-    let item = txn
-        .query_row(
-            "SELECT cell_id, dna_def FROM DnaDef WHERE cell_id = :cell_id",
-            named_params! {
-                ":cell_id": to_blob(cell_id)?
-            },
-            |row| {
-                let cell_id_blob = row.get("cell_id")?;
-                let dna_def_blob = row.get("dna_def")?;
-                Ok((cell_id_blob, dna_def_blob))
-            },
-        )
-        .optional()?;
-    match item {
-        Some((cell_id_blob, dna_def_blob)) => {
-            Ok(Some((from_blob(cell_id_blob)?, from_blob(dna_def_blob)?)))
-        }
-        None => Ok(None),
+/// A wrapper around the DNA definition database for managing DNA definition storage and retrieval.
+#[derive(Clone)]
+pub struct DnaDefStore<Db = holochain_data::DbWrite<holochain_data::kind::Wasm>> {
+    db: Db,
+}
+
+/// A read-only view of the DNA definition store.
+pub type DnaDefStoreRead = DnaDefStore<holochain_data::DbRead<holochain_data::kind::Wasm>>;
+
+impl<Db> DnaDefStore<Db> {
+    /// Create a new DnaDefStore from a database handle.
+    pub fn new(db: Db) -> Self {
+        Self { db }
     }
 }
 
-#[allow(clippy::let_and_return)] // required to drop temporary
-pub fn get_all(txn: &Transaction<'_>) -> StateQueryResult<Vec<(CellId, DnaDef)>> {
-    let mut stmt = txn.prepare(
-        "
-            SELECT cell_id, dna_def FROM DnaDef
-        ",
-    )?;
-    let items = stmt
-        .query_and_then([], |row| {
-            let cell_id: CellId = from_blob(row.get("cell_id")?)?;
-            let dna_def_blob = row.get("dna_def")?;
-            StateQueryResult::Ok((cell_id, from_blob(dna_def_blob)?))
-        })?
-        .collect();
-    items
+impl DnaDefStore<holochain_data::DbRead<holochain_data::kind::Wasm>> {
+    /// Retrieve a DNA definition from the database by its cell ID.
+    pub async fn get(&self, cell_id: &CellId) -> StateQueryResult<Option<(CellId, DnaDef)>> {
+        match self.db.get_dna_def(cell_id).await? {
+            Some(dna_def) => Ok(Some((cell_id.clone(), dna_def))),
+            None => Ok(None),
+        }
+    }
 }
 
-pub fn contains(txn: &Transaction<'_>, cell_id: &CellId) -> StateQueryResult<bool> {
-    Ok(txn.query_row(
-        "SELECT EXISTS(SELECT 1 FROM DnaDef WHERE cell_id = :cell_id)",
-        named_params! {
-            ":cell_id": to_blob(cell_id)?
-        },
-        |row| row.get(0),
-    )?)
+impl DnaDefStore<holochain_data::DbWrite<holochain_data::kind::Wasm>> {
+    /// Store or update a DNA definition in the database.
+    pub async fn put(&self, cell_id: &CellId, dna_def: &DnaDef) -> StateMutationResult<()> {
+        self.db.put_dna_def(cell_id, dna_def).await?;
+        Ok(())
+    }
+
+    /// Downgrade this writable store to a read-only store.
+    pub fn as_read(&self) -> DnaDefStoreRead {
+        DnaDefStore::new(self.db.as_ref().clone())
+    }
+
+    /// Convert this writable store into a read-only store.
+    pub fn into_read(self) -> DnaDefStoreRead {
+        DnaDefStore::new(self.db.as_ref().clone())
+    }
 }
 
-pub fn upsert(
-    txn: &mut Transaction,
-    cell_id: &CellId,
-    dna_def: &DnaDef,
-) -> StateMutationResult<()> {
-    mutations::upsert_dna_def(txn, cell_id, dna_def)
+impl From<DnaDefStore<holochain_data::DbWrite<holochain_data::kind::Wasm>>> for DnaDefStoreRead {
+    fn from(store: DnaDefStore<holochain_data::DbWrite<holochain_data::kind::Wasm>>) -> Self {
+        store.into_read()
+    }
+}
+
+#[cfg(feature = "test_utils")]
+impl<Db> DnaDefStore<Db>
+where
+    Db: AsRef<holochain_data::DbRead<holochain_data::kind::Wasm>>,
+{
+    /// Get a reference to the raw database handle for testing purposes.
+    pub fn raw_db_read(&self) -> &holochain_data::DbRead<holochain_data::kind::Wasm> {
+        self.db.as_ref()
+    }
 }

@@ -8,8 +8,9 @@ use crate::models::{
     CoordinatorZomeModel, DnaDefModel, EntryDefModel, IntegrityZomeModel, WasmModel,
 };
 use holo_hash::HashableContentExtSync;
-use holo_hash::{DnaHash, WasmHash};
+use holo_hash::WasmHash;
 use holochain_integrity_types::prelude::EntryDef;
+use holochain_types::prelude::CellId;
 use holochain_types::prelude::{DnaDef, DnaWasmHashed};
 use holochain_zome_types::zome::{WasmZome, ZomeDef};
 
@@ -17,7 +18,7 @@ use holochain_zome_types::zome::{WasmZome, ZomeDef};
 impl DbRead<Wasm> {
     /// Check if WASM bytecode exists in the database.
     pub async fn wasm_exists(&self, hash: &WasmHash) -> sqlx::Result<bool> {
-        let hash_bytes = hash.get_raw_39();
+        let hash_bytes = hash.get_raw_32();
         let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM Wasm WHERE hash = ?)")
             .bind(hash_bytes)
             .fetch_one(self.pool())
@@ -27,7 +28,7 @@ impl DbRead<Wasm> {
 
     /// Get WASM bytecode by hash.
     pub async fn get_wasm(&self, hash: &WasmHash) -> sqlx::Result<Option<DnaWasmHashed>> {
-        let hash_bytes = hash.get_raw_39();
+        let hash_bytes = hash.get_raw_32();
         let model: Option<WasmModel> = sqlx::query_as("SELECT hash, code FROM Wasm WHERE hash = ?")
             .bind(hash_bytes)
             .fetch_optional(self.pool())
@@ -46,24 +47,30 @@ impl DbRead<Wasm> {
     }
 
     /// Check if a DNA definition exists in the database.
-    pub async fn dna_def_exists(&self, hash: &DnaHash) -> sqlx::Result<bool> {
-        let hash_bytes = hash.get_raw_39();
-        let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM DnaDef WHERE hash = ?)")
-            .bind(hash_bytes)
-            .fetch_one(self.pool())
-            .await?;
+    pub async fn dna_def_exists(&self, cell_id: &CellId) -> sqlx::Result<bool> {
+        let hash_bytes = cell_id.dna_hash().get_raw_32();
+        let agent_bytes = cell_id.agent_pubkey().get_raw_32();
+
+        let exists: bool =
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM DnaDef WHERE hash = ? AND agent = ?)")
+                .bind(hash_bytes)
+                .bind(agent_bytes)
+                .fetch_one(self.pool())
+                .await?;
         Ok(exists)
     }
 
     /// Get a DNA definition by hash.
-    pub async fn get_dna_def(&self, hash: &DnaHash) -> sqlx::Result<Option<DnaDef>> {
-        let hash_bytes = hash.get_raw_39();
+    pub async fn get_dna_def(&self, cell_id: &CellId) -> sqlx::Result<Option<DnaDef>> {
+        let hash_bytes = cell_id.dna_hash().get_raw_32();
+        let agent_bytes = cell_id.agent_pubkey().get_raw_32();
 
         // Fetch the DnaDef model
         let dna_model: Option<DnaDefModel> = sqlx::query_as(
-            "SELECT hash, name, network_seed, properties, lineage FROM DnaDef WHERE hash = ?",
+            "SELECT hash, agent, name, network_seed, properties, lineage FROM DnaDef WHERE hash = ? AND agent = ?",
         )
         .bind(hash_bytes)
+        .bind(agent_bytes)
         .fetch_optional(self.pool())
         .await?;
 
@@ -74,17 +81,19 @@ impl DbRead<Wasm> {
 
         // Fetch integrity zomes
         let integrity_zomes: Vec<IntegrityZomeModel> = sqlx::query_as(
-            "SELECT dna_hash, zome_index, zome_name, wasm_hash, dependencies FROM IntegrityZome WHERE dna_hash = ? ORDER BY zome_index",
+            "SELECT dna_hash, agent, zome_index, zome_name, wasm_hash, dependencies FROM IntegrityZome WHERE dna_hash = ? AND agent = ? ORDER BY zome_index",
         )
         .bind(hash_bytes)
+        .bind(agent_bytes)
         .fetch_all(self.pool())
         .await?;
 
         // Fetch coordinator zomes
         let coordinator_zomes: Vec<CoordinatorZomeModel> = sqlx::query_as(
-            "SELECT dna_hash, zome_index, zome_name, wasm_hash, dependencies FROM CoordinatorZome WHERE dna_hash = ? ORDER BY zome_index",
+            "SELECT dna_hash, agent, zome_index, zome_name, wasm_hash, dependencies FROM CoordinatorZome WHERE dna_hash = ? AND agent = ? ORDER BY zome_index",
         )
         .bind(hash_bytes)
+        .bind(agent_bytes)
         .fetch_all(self.pool())
         .await?;
 
@@ -154,6 +163,58 @@ impl DbRead<Wasm> {
             })
             .collect()
     }
+
+    /// Get all DNA definitions with their associated cell IDs.
+    pub async fn get_all_dna_defs(&self) -> sqlx::Result<Vec<(CellId, DnaDef)>> {
+        // First, fetch all DnaDef records
+        let dna_models: Vec<DnaDefModel> = sqlx::query_as(
+            "SELECT hash, agent, name, network_seed, properties, lineage FROM DnaDef",
+        )
+        .fetch_all(self.pool())
+        .await?;
+
+        let mut results = Vec::new();
+
+        for dna_model in dna_models {
+            let hash_bytes = dna_model.hash.clone();
+            let agent_bytes = dna_model.agent.clone();
+
+            // Fetch integrity zomes for this DNA
+            let integrity_zomes: Vec<IntegrityZomeModel> = sqlx::query_as(
+                "SELECT dna_hash, agent, zome_index, zome_name, wasm_hash, dependencies FROM IntegrityZome WHERE dna_hash = ? AND agent = ? ORDER BY zome_index",
+            )
+            .bind(&hash_bytes)
+            .bind(&agent_bytes)
+            .fetch_all(self.pool())
+            .await?;
+
+            // Fetch coordinator zomes for this DNA
+            let coordinator_zomes: Vec<CoordinatorZomeModel> = sqlx::query_as(
+                "SELECT dna_hash, agent, zome_index, zome_name, wasm_hash, dependencies FROM CoordinatorZome WHERE dna_hash = ? AND agent = ? ORDER BY zome_index",
+            )
+            .bind(&hash_bytes)
+            .bind(&agent_bytes)
+            .fetch_all(self.pool())
+            .await?;
+
+            // Convert to DnaDef
+            let dna_def = dna_model
+                .to_dna_def(integrity_zomes, coordinator_zomes)
+                .map_err(|e| {
+                    sqlx::Error::Decode(Box::new(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        e,
+                    )))
+                })?;
+
+            // Create CellId from the hash and agent
+            let cell_id = dna_model.to_cell_id();
+
+            results.push((cell_id, dna_def));
+        }
+
+        Ok(results)
+    }
 }
 
 // Write operations
@@ -161,7 +222,7 @@ impl DbWrite<Wasm> {
     /// Store WASM bytecode.
     pub async fn put_wasm(&self, wasm: DnaWasmHashed) -> sqlx::Result<()> {
         let (wasm, hash) = wasm.into_inner();
-        let hash_bytes = hash.get_raw_39();
+        let hash_bytes = hash.get_raw_32();
         let code = wasm.code.to_vec();
 
         sqlx::query("INSERT OR REPLACE INTO Wasm (hash, code) VALUES (?, ?)")
@@ -176,11 +237,12 @@ impl DbWrite<Wasm> {
     /// Store a DNA definition and its associated zomes.
     ///
     /// This operation is transactional - either all data is stored or none is.
-    pub async fn put_dna_def(&self, dna_def: &DnaDef) -> sqlx::Result<()> {
+    pub async fn put_dna_def(&self, cell_id: &CellId, dna_def: &DnaDef) -> sqlx::Result<()> {
         let mut tx = self.pool().begin().await?;
 
         let hash = dna_def.to_hash();
-        let hash_bytes = hash.get_raw_39();
+        let hash_bytes = hash.get_raw_32();
+        let agent_bytes = cell_id.agent_pubkey().get_raw_32();
         let name = dna_def.name.clone();
         let network_seed = dna_def.modifiers.network_seed.clone();
         let properties = dna_def.modifiers.properties.bytes().to_vec();
@@ -195,9 +257,10 @@ impl DbWrite<Wasm> {
 
         // Insert DnaDef
         sqlx::query(
-            "INSERT OR REPLACE INTO DnaDef (hash, name, network_seed, properties, lineage) VALUES (?, ?, ?, ?, ?)",
+            "INSERT OR REPLACE INTO DnaDef (hash, agent, name, network_seed, properties, lineage) VALUES (?, ?, ?, ?, ?, ?)",
         )
             .bind(hash_bytes)
+            .bind(agent_bytes)
             .bind(name)
             .bind(network_seed)
             .bind(properties)
@@ -206,13 +269,15 @@ impl DbWrite<Wasm> {
             .await?;
 
         // Delete existing zomes for this DNA to avoid orphans when updating
-        sqlx::query("DELETE FROM IntegrityZome WHERE dna_hash = ?")
+        sqlx::query("DELETE FROM IntegrityZome WHERE dna_hash = ? AND agent = ?")
             .bind(hash_bytes)
+            .bind(agent_bytes)
             .execute(&mut *tx)
             .await?;
 
-        sqlx::query("DELETE FROM CoordinatorZome WHERE dna_hash = ?")
+        sqlx::query("DELETE FROM CoordinatorZome WHERE dna_hash = ? AND agent = ?")
             .bind(hash_bytes)
+            .bind(agent_bytes)
             .execute(&mut *tx)
             .await?;
 
@@ -224,7 +289,7 @@ impl DbWrite<Wasm> {
                     e.to_string(),
                 )))
             })?;
-            let wasm_hash_bytes = wasm_hash.get_raw_39();
+            let wasm_hash_bytes = wasm_hash.get_raw_32();
 
             // Extract dependencies from the ZomeDef
             let dependencies = match zome_def.as_any_zome_def() {
@@ -239,9 +304,10 @@ impl DbWrite<Wasm> {
             };
 
             sqlx::query(
-                "INSERT OR REPLACE INTO IntegrityZome (dna_hash, zome_index, zome_name, wasm_hash, dependencies) VALUES (?, ?, ?, ?, ?)",
+                "INSERT OR REPLACE INTO IntegrityZome (dna_hash, agent, zome_index, zome_name, wasm_hash, dependencies) VALUES (?, ?, ?, ?, ?, ?)",
             )
             .bind(hash_bytes)
+            .bind(agent_bytes)
             .bind(zome_index as i64)
             .bind(&zome_name.0)
             .bind(wasm_hash_bytes)
@@ -258,7 +324,7 @@ impl DbWrite<Wasm> {
                     e.to_string(),
                 )))
             })?;
-            let wasm_hash_bytes = wasm_hash.get_raw_39();
+            let wasm_hash_bytes = wasm_hash.get_raw_32();
 
             // Extract dependencies from the ZomeDef
             let dependencies = match zome_def.as_any_zome_def() {
@@ -273,9 +339,10 @@ impl DbWrite<Wasm> {
             };
 
             sqlx::query(
-                "INSERT OR REPLACE INTO CoordinatorZome (dna_hash, zome_index, zome_name, wasm_hash, dependencies) VALUES (?, ?, ?, ?, ?)",
+                "INSERT OR REPLACE INTO CoordinatorZome (dna_hash, agent, zome_index, zome_name, wasm_hash, dependencies) VALUES (?, ?, ?, ?, ?, ?)",
             )
             .bind(hash_bytes)
+            .bind(agent_bytes)
             .bind(zome_index as i64)
             .bind(&zome_name.0)
             .bind(wasm_hash_bytes)
@@ -309,19 +376,26 @@ impl DbWrite<Wasm> {
 mod tests {
     use super::*;
     use crate::kind::Wasm;
-    use crate::test_setup_holochain_data;
+    use crate::test_open_db;
     use holo_hash::HasHash;
     use holo_hash::HashableContentExtAsync;
     use holochain_integrity_types::{zome::ZomeName, EntryDefId, EntryVisibility};
     use holochain_serialized_bytes::SerializedBytes;
-    use holochain_types::prelude::{DnaModifiers, DnaWasm};
+    use holochain_types::prelude::{AgentPubKey, DnaHash, DnaModifiers, DnaWasm};
     use holochain_zome_types::zome::{CoordinatorZomeDef, IntegrityZomeDef};
 
     /// Helper to create a test database
     async fn test_db() -> DbWrite<Wasm> {
-        test_setup_holochain_data(Wasm)
+        test_open_db(Wasm)
             .await
             .expect("Failed to create test database")
+    }
+
+    /// Helper to create a test CellId
+    fn test_cell_id(dna_hash: &DnaHash) -> CellId {
+        // Create a test agent key
+        let agent = AgentPubKey::from_raw_32(vec![0u8; 32]);
+        CellId::new(dna_hash.clone(), agent)
     }
 
     #[tokio::test]
@@ -404,19 +478,20 @@ mod tests {
         };
 
         let hash = dna_def.to_hash();
+        let cell_id = test_cell_id(&hash);
 
         // Should not exist initially
-        assert!(!db.as_ref().dna_def_exists(&hash).await.unwrap());
-        assert!(db.as_ref().get_dna_def(&hash).await.unwrap().is_none());
+        assert!(!db.as_ref().dna_def_exists(&cell_id).await.unwrap());
+        assert!(db.as_ref().get_dna_def(&cell_id).await.unwrap().is_none());
 
         // Store DNA definition
-        db.put_dna_def(&dna_def).await.unwrap();
+        db.put_dna_def(&cell_id, &dna_def).await.unwrap();
 
         // Should exist now
-        assert!(db.as_ref().dna_def_exists(&hash).await.unwrap());
+        assert!(db.as_ref().dna_def_exists(&cell_id).await.unwrap());
 
         // Retrieve and verify
-        let retrieved = db.as_ref().get_dna_def(&hash).await.unwrap().unwrap();
+        let retrieved = db.as_ref().get_dna_def(&cell_id).await.unwrap().unwrap();
         assert_eq!(retrieved.name, "test_dna");
         assert_eq!(retrieved.modifiers.network_seed, "test_seed");
         assert_eq!(retrieved.integrity_zomes.len(), 1);
@@ -524,10 +599,11 @@ mod tests {
         };
 
         let hash = dna_def.to_hash();
+        let cell_id = test_cell_id(&hash);
 
         // Store and retrieve
-        db.put_dna_def(&dna_def).await.unwrap();
-        let retrieved = db.as_ref().get_dna_def(&hash).await.unwrap().unwrap();
+        db.put_dna_def(&cell_id, &dna_def).await.unwrap();
+        let retrieved = db.as_ref().get_dna_def(&cell_id).await.unwrap().unwrap();
 
         // Verify structure
         assert_eq!(retrieved.name, "test_dna_deps");
@@ -654,17 +730,18 @@ mod tests {
         };
 
         let hash = dna_def_v1.to_hash();
-        db.put_dna_def(&dna_def_v1).await.unwrap();
+        let cell_id = test_cell_id(&hash);
+        db.put_dna_def(&cell_id, &dna_def_v1).await.unwrap();
 
         // Verify initial state
-        let retrieved_v1 = db.as_ref().get_dna_def(&hash).await.unwrap().unwrap();
+        let retrieved_v1 = db.as_ref().get_dna_def(&cell_id).await.unwrap().unwrap();
         assert_eq!(retrieved_v1.integrity_zomes.len(), 3);
         assert_eq!(retrieved_v1.coordinator_zomes.len(), 2);
 
         // Count zomes directly in the database
         let integrity_count: i64 =
             sqlx::query_scalar("SELECT COUNT(*) FROM IntegrityZome WHERE dna_hash = ?")
-                .bind(hash.get_raw_39())
+                .bind(hash.get_raw_32())
                 .fetch_one(db.pool())
                 .await
                 .unwrap();
@@ -672,7 +749,7 @@ mod tests {
 
         let coordinator_count: i64 =
             sqlx::query_scalar("SELECT COUNT(*) FROM CoordinatorZome WHERE dna_hash = ?")
-                .bind(hash.get_raw_39())
+                .bind(hash.get_raw_32())
                 .fetch_one(db.pool())
                 .await
                 .unwrap();
@@ -703,25 +780,26 @@ mod tests {
 
         // Different hash since zomes changed
         let hash_v2 = dna_def_v2.to_hash();
+        let cell_id_v2 = test_cell_id(&hash_v2);
         assert_ne!(hash, hash_v2, "Hash should change when zomes change");
 
         // Update the DNA definition
-        db.put_dna_def(&dna_def_v2).await.unwrap();
+        db.put_dna_def(&cell_id_v2, &dna_def_v2).await.unwrap();
 
         // Verify old DNA still has original zomes
-        let retrieved_v1 = db.as_ref().get_dna_def(&hash).await.unwrap().unwrap();
+        let retrieved_v1 = db.as_ref().get_dna_def(&cell_id).await.unwrap().unwrap();
         assert_eq!(retrieved_v1.integrity_zomes.len(), 3);
         assert_eq!(retrieved_v1.coordinator_zomes.len(), 2);
 
         // Verify new DNA has new zomes
-        let retrieved_v2 = db.as_ref().get_dna_def(&hash_v2).await.unwrap().unwrap();
+        let retrieved_v2 = db.as_ref().get_dna_def(&cell_id_v2).await.unwrap().unwrap();
         assert_eq!(retrieved_v2.integrity_zomes.len(), 1);
         assert_eq!(retrieved_v2.coordinator_zomes.len(), 1);
 
         // Verify no orphaned zomes remain for the old DNA hash
         let integrity_count_after: i64 =
             sqlx::query_scalar("SELECT COUNT(*) FROM IntegrityZome WHERE dna_hash = ?")
-                .bind(hash.get_raw_39())
+                .bind(hash.get_raw_32())
                 .fetch_one(db.pool())
                 .await
                 .unwrap();
@@ -732,7 +810,7 @@ mod tests {
 
         let coordinator_count_after: i64 =
             sqlx::query_scalar("SELECT COUNT(*) FROM CoordinatorZome WHERE dna_hash = ?")
-                .bind(hash.get_raw_39())
+                .bind(hash.get_raw_32())
                 .fetch_one(db.pool())
                 .await
                 .unwrap();
@@ -744,7 +822,7 @@ mod tests {
         // Verify new DNA has correct counts
         let new_integrity_count: i64 =
             sqlx::query_scalar("SELECT COUNT(*) FROM IntegrityZome WHERE dna_hash = ?")
-                .bind(hash_v2.get_raw_39())
+                .bind(hash_v2.get_raw_32())
                 .fetch_one(db.pool())
                 .await
                 .unwrap();
@@ -755,7 +833,7 @@ mod tests {
 
         let new_coordinator_count: i64 =
             sqlx::query_scalar("SELECT COUNT(*) FROM CoordinatorZome WHERE dna_hash = ?")
-                .bind(hash_v2.get_raw_39())
+                .bind(hash_v2.get_raw_32())
                 .fetch_one(db.pool())
                 .await
                 .unwrap();
@@ -763,5 +841,84 @@ mod tests {
             new_coordinator_count, 1,
             "New DNA should have 1 coordinator zome"
         );
+    }
+
+    #[tokio::test]
+    async fn get_all_dna_defs_test() {
+        let db = test_db().await;
+
+        // Create and store multiple DNA definitions
+        let wasm_code = vec![0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00];
+        let wasm = DnaWasm {
+            code: wasm_code.into(),
+        };
+        let wasm_hash = wasm.to_hash().await;
+        let wasm_hashed = DnaWasmHashed::with_pre_hashed(wasm, wasm_hash.clone());
+        db.put_wasm(wasm_hashed).await.unwrap();
+
+        // Create first DNA
+        let integrity_zomes1 = vec![(
+            ZomeName::from("integrity1"),
+            IntegrityZomeDef::from_hash(wasm_hash.clone()),
+        )];
+        let coordinator_zomes1 = vec![(
+            ZomeName::from("coordinator1"),
+            CoordinatorZomeDef::from_hash(wasm_hash.clone()),
+        )];
+        let dna_def1 = DnaDef {
+            name: "dna1".to_string(),
+            modifiers: DnaModifiers {
+                network_seed: "seed1".to_string(),
+                properties: SerializedBytes::default(),
+            },
+            integrity_zomes: integrity_zomes1,
+            coordinator_zomes: coordinator_zomes1,
+            #[cfg(feature = "unstable-migration")]
+            lineage: std::collections::HashSet::new(),
+        };
+        let hash1 = dna_def1.to_hash();
+        let cell_id1 = test_cell_id(&hash1);
+        db.put_dna_def(&cell_id1, &dna_def1).await.unwrap();
+
+        // Create second DNA with different agent
+        let agent2 = AgentPubKey::from_raw_32(vec![1u8; 32]);
+        let integrity_zomes2 = vec![(
+            ZomeName::from("integrity2"),
+            IntegrityZomeDef::from_hash(wasm_hash.clone()),
+        )];
+        let coordinator_zomes2 = vec![(
+            ZomeName::from("coordinator2"),
+            CoordinatorZomeDef::from_hash(wasm_hash.clone()),
+        )];
+        let dna_def2 = DnaDef {
+            name: "dna2".to_string(),
+            modifiers: DnaModifiers {
+                network_seed: "seed2".to_string(),
+                properties: SerializedBytes::default(),
+            },
+            integrity_zomes: integrity_zomes2,
+            coordinator_zomes: coordinator_zomes2,
+            #[cfg(feature = "unstable-migration")]
+            lineage: std::collections::HashSet::new(),
+        };
+        let hash2 = dna_def2.to_hash();
+        let cell_id2 = CellId::new(hash2.clone(), agent2);
+        db.put_dna_def(&cell_id2, &dna_def2).await.unwrap();
+
+        // Get all DNA definitions
+        let all_dnas = db.as_ref().get_all_dna_defs().await.unwrap();
+
+        // Verify we got both DNAs
+        assert_eq!(all_dnas.len(), 2);
+
+        // Verify the cell IDs and DNA names
+        let names: Vec<_> = all_dnas.iter().map(|(_, dna)| &dna.name).collect();
+        assert!(names.contains(&&"dna1".to_string()));
+        assert!(names.contains(&&"dna2".to_string()));
+
+        // Verify we can find each DNA by cell ID
+        let cell_ids: Vec<_> = all_dnas.iter().map(|(cell_id, _)| cell_id).collect();
+        assert!(cell_ids.contains(&&cell_id1));
+        assert!(cell_ids.contains(&&cell_id2));
     }
 }
