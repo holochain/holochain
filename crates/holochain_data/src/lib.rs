@@ -135,9 +135,7 @@ pub async fn open_db<I: DatabaseIdentifier>(
 }
 
 #[cfg(feature = "test-utils")]
-pub async fn test_setup_holochain_data<I: DatabaseIdentifier>(
-    database_id: I,
-) -> sqlx::Result<DbWrite<I>> {
+pub async fn test_open_db<I: DatabaseIdentifier>(database_id: I) -> sqlx::Result<DbWrite<I>> {
     let pool = connect_database_memory(HolochainDataConfig::default()).await?;
 
     // Run migrations
@@ -224,7 +222,7 @@ mod tests {
     #[tokio::test]
     async fn in_memory_database_with_migrations() {
         // Set up in-memory database
-        let db = test_setup_holochain_data(TestDbId)
+        let db = test_open_db(TestDbId)
             .await
             .expect("Failed to set up test database");
 

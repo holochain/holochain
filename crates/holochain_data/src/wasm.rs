@@ -376,7 +376,7 @@ impl DbWrite<Wasm> {
 mod tests {
     use super::*;
     use crate::kind::Wasm;
-    use crate::test_setup_holochain_data;
+    use crate::test_open_db;
     use holo_hash::HasHash;
     use holo_hash::HashableContentExtAsync;
     use holochain_integrity_types::{zome::ZomeName, EntryDefId, EntryVisibility};
@@ -386,7 +386,7 @@ mod tests {
 
     /// Helper to create a test database
     async fn test_db() -> DbWrite<Wasm> {
-        test_setup_holochain_data(Wasm)
+        test_open_db(Wasm)
             .await
             .expect("Failed to create test database")
     }

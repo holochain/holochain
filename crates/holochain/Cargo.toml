@@ -249,6 +249,7 @@ sqlite-encrypted = [
   "holochain_state/sqlite-encrypted",
   "holochain_types/sqlite-encrypted",
   "holochain_zome_types/sqlite-encrypted",
+  "holochain_data/sqlite-encrypted",
 ]
 
 # Compile SQLite from source rather than depending on a library.
