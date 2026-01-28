@@ -1,4 +1,5 @@
 name: 'Common Test Setup Actions'
+description: Steps common to setting up any test job
 runs:
   using: 'composite'
   steps:
