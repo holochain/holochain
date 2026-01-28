@@ -7,7 +7,10 @@ use test_case::test_case;
 #[test_case(2)]
 #[test_case(4)]
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "flaky local networking test; re-check after Iroh upgrade"]
+#[cfg_attr(
+    not(feature = "transport-iroh"),
+    ignore = "requires Iroh transport for stability"
+)]
 async fn conductors_call_remote(num_conductors: usize) {
     holochain_trace::test_run();
 
