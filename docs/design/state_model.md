@@ -34,13 +34,16 @@ always fully stored and accessible.
 ```sql
 -- Authored actions
 CREATE TABLE Action (
-    hash        BLOB PRIMARY KEY,
-    author      BLOB NOT NULL,
-    seq         INTEGER NOT NULL,
-    prev_hash   BLOB,
-    timestamp   INTEGER NOT NULL,
-    action_type TEXT NOT NULL,
-    action_data BLOB -- Serialized ActionData enum, containing action-type fields
+    hash         BLOB PRIMARY KEY,
+    author       BLOB NOT NULL,
+    seq          INTEGER NOT NULL,
+    prev_hash    BLOB,
+    timestamp    INTEGER NOT NULL,
+    action_type  TEXT NOT NULL,
+    action_data  BLOB,         -- Serialized ActionData enum, containing action-type fields
+   
+    -- Reference fields for entry meta
+    entry_hash   BLOB,         -- NULL for non-entry actions
 );
 
 -- Authored entries
@@ -106,14 +109,17 @@ CREATE TABLE ValidationReceipt (
 ```sql
 -- DHT actions.
 CREATE TABLE DhtAction (
-   hash        BLOB PRIMARY KEY,
-   author      BLOB NOT NULL,
-   seq         INTEGER, -- NULL for actions not in agent activity
-   prev_hash   BLOB,    -- NULL for actions not in agent activity
-   timestamp   INTEGER NOT NULL,
-   action_type TEXT NOT NULL,
-   action_data BLOB NOT NULL, -- Serialized ActionData enum
-   
+   hash          BLOB PRIMARY KEY,
+   author        BLOB NOT NULL,
+   seq           INTEGER,      -- NULL for actions not in agent activity
+   prev_hash     BLOB,         -- NULL for actions not in agent activity
+   timestamp     INTEGER NOT NULL,
+   action_type   TEXT NOT NULL,
+   action_data   BLOB NOT NULL, -- Serialized ActionData enum
+
+   -- Reference fields for entry meta
+   entry_hash    BLOB,         -- NULL for non-entry actions
+
    -- Record validity (aggregated from all ops for this record)
    -- A record is the combination of action + entry (if applicable)
    record_validity TEXT NOT NULL -- 'valid', 'rejected'
@@ -327,9 +333,7 @@ ORDER BY Action.seq, Action.timestamp
 
 For each row returned:
 1. **Deserialize Action**: Reconstruct full `Action` from common fields + the `action_data` BLOB
-2. **Check Entry Privacy**: Deserialize `action_data` to determine if entry is private (from `EntryType`)
-3. **Filter Private StoreEntry Ops**: Exclude `StoreEntry` ops where entry visibility is `Private`
-4. **Construct DhtOp**: Build the appropriate `DhtOp` variant based on `op_type`:
+2. **Construct DhtOp**: Build the appropriate `DhtOp` variant based on `op_type`:
    - `StoreRecord`: Requires Action + Entry (if present)
    - `StoreEntry`: Requires Action + Entry
    - `RegisterAgentActivity`: Requires Action only
@@ -359,10 +363,7 @@ For each row returned:
      - Simpler than maintaining a computed ordering field
    - **Resolution**: No `op_order` column needed in `AuthoredOp`
 
-4. **Entry privacy check**: The current code has `Action.private_entry = 0` as a database column. The new schema requires deserializing `action_data` to check `EntryType` visibility.
-   - *Resolution needed*: Either add `private_entry BOOLEAN` to `Action` table for query efficiency, or perform privacy filtering in-memory after deserialization.
-
-5. **Warrant Ops**: The current query includes a UNION for Warrant ops from a separate `Warrant` table. The new design doesn't show warrant storage.
+4**Warrant Ops**: The current query includes a UNION for Warrant ops from a separate `Warrant` table. The new design doesn't show warrant storage.
    - *Resolution needed*: Clarify where warrants are stored (likely in Action table with `action_type = 'Warrant'`).
 
 ### Validation Flow
@@ -566,13 +567,15 @@ Actions are stored with common fields in the main table and action-specific data
 ```sql
 -- Main action storage
 CREATE TABLE Action (
-    hash BLOB PRIMARY KEY,
-    author BLOB NOT NULL,
-    seq INTEGER NOT NULL,
-    prev_hash BLOB,
-    timestamp INTEGER NOT NULL,
-    action_type TEXT NOT NULL,
-    action_data BLOB -- Serialized ActionData enum
+    hash          BLOB PRIMARY KEY,
+    author        BLOB NOT NULL,
+    seq           INTEGER NOT NULL,
+    prev_hash     BLOB,
+    timestamp     INTEGER NOT NULL,
+    action_type   TEXT NOT NULL,
+    action_data   BLOB,         -- Serialized ActionData enum
+    entry_hash    BLOB,         -- NULL for non-entry actions
+    private_entry BOOLEAN       -- NULL for non-entry actions, TRUE/FALSE for entry actions
 );
 ```
 
