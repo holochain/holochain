@@ -225,7 +225,7 @@ mod tests {
     )]
     async fn consistency_reached() {
         holochain_trace::test_run();
-        let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
+        let mut conductors = SweetConductorBatch::standard(2).await;
         #[derive(Debug, Deserialize, Serialize)]
         struct E;
         holochain_serial!(E);
@@ -279,7 +279,7 @@ mod tests {
     )]
     async fn consistency_reached_with_private_entry() {
         holochain_trace::test_run();
-        let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
+        let mut conductors = SweetConductorBatch::standard(2).await;
         let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
             .await
             .0;
@@ -358,7 +358,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn consistency_not_reached_when_ops_not_integrated() {
         holochain_trace::test_run();
-        let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
+        let mut conductors = SweetConductorBatch::standard(2).await;
         let dna_file = SweetDnaFile::unique_from_inline_zomes((
             "integrity",
             InlineIntegrityZome::new_unique(vec![], 0),

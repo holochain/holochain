@@ -10,7 +10,7 @@ pub struct BookEntry {
 async fn agents_can_find_entries_at_paths() {
     holochain_trace::test_run();
 
-    let mut conductor_batch = SweetConductorBatch::from_standard_config_rendezvous(2).await;
+    let mut conductor_batch = SweetConductorBatch::standard(2).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Paths]).await;
 
@@ -96,7 +96,7 @@ async fn agents_can_find_entries_at_paths() {
 async fn agents_can_find_multiple_entries_at_same_path() {
     holochain_trace::test_run();
 
-    let mut conductor_batch = SweetConductorBatch::from_standard_config_rendezvous(2).await;
+    let mut conductor_batch = SweetConductorBatch::standard(2).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Paths]).await;
 
@@ -223,7 +223,7 @@ async fn agents_can_find_multiple_entries_at_same_path() {
 async fn agents_can_find_entries_with_partial_path() {
     holochain_trace::test_run();
 
-    let mut conductor_batch = SweetConductorBatch::from_standard_config_rendezvous(2).await;
+    let mut conductor_batch = SweetConductorBatch::standard(2).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Paths]).await;
 
@@ -326,7 +326,7 @@ async fn agents_can_find_entries_with_partial_path() {
 async fn paths_are_case_sensitive() {
     holochain_trace::test_run();
 
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Paths]).await;
 
@@ -393,7 +393,7 @@ async fn paths_are_case_sensitive() {
 async fn paths_can_be_created_fully_or_with_path_sharding() {
     holochain_trace::test_run();
 
-    let mut conductor_batch = SweetConductorBatch::from_standard_config_rendezvous(2).await;
+    let mut conductor_batch = SweetConductorBatch::standard(2).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Paths]).await;
 

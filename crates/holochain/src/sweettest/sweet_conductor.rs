@@ -109,7 +109,7 @@ impl SweetConductor {
     /// with bootstrapping enabled by default. A local rendezvous server
     /// is spawned and referenced in the conductor config for bootstrapping
     /// and direct connection establishment.
-    pub async fn from_standard_config() -> SweetConductor {
+    pub async fn standard() -> SweetConductor {
         SweetConductor::from_config_rendezvous(
             SweetConductorConfig::rendezvous(true),
             SweetLocalRendezvous::new().await,

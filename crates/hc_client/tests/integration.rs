@@ -42,7 +42,7 @@ fn get_hc_command() -> PathBuf {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn list_dnas() -> Result<()> {
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
     let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
     let expected_hash = dna.dna_hash().to_string();
 
@@ -70,7 +70,7 @@ async fn list_dnas() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn list_apps() -> Result<()> {
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::standard().await;
     let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 
     conductor.setup_app("app", &[dna]).await?;
@@ -98,7 +98,7 @@ async fn list_apps() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn list_app_interfaces() -> Result<()> {
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::standard().await;
 
     let admin_port = conductor
         .get_arbitrary_admin_websocket_port()
@@ -138,7 +138,7 @@ async fn list_app_interfaces() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn new_agent() -> Result<()> {
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::standard().await;
 
     let admin_port = conductor
         .get_arbitrary_admin_websocket_port()
@@ -168,7 +168,7 @@ async fn new_agent() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn install_app() -> Result<()> {
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::standard().await;
 
     let admin_port = conductor
         .get_arbitrary_admin_websocket_port()
@@ -219,7 +219,7 @@ async fn install_app() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn uninstall_app() -> Result<()> {
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::standard().await;
 
     let admin_port = conductor
         .get_arbitrary_admin_websocket_port()
@@ -339,7 +339,7 @@ async fn package_fixture() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn list_cells_and_dnas() -> Result<()> {
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::standard().await;
 
     let admin_port = conductor
         .get_arbitrary_admin_websocket_port()
@@ -474,7 +474,7 @@ async fn list_cells_and_dnas() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn enable_disable_app() -> Result<()> {
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::standard().await;
 
     let admin_port = conductor
         .get_arbitrary_admin_websocket_port()
@@ -618,7 +618,7 @@ async fn enable_disable_app() -> Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 async fn list_agents() -> Result<()> {
     // Start two conductors
-    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
+    let mut conductors = SweetConductorBatch::standard(2).await;
 
     ensure_fixture_packaged().await?;
 
@@ -768,7 +768,7 @@ async fn list_dnas_with_origin() -> Result<()> {
 async fn peer_meta_info() -> Result<()> {
     ensure_fixture_packaged().await?;
 
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::standard().await;
 
     // Install the fixture app (which contains multiple DNAs)
     let happ_path = fixture_path(["my-app", "my-fixture-app.happ"])?;
@@ -886,7 +886,7 @@ async fn peer_meta_info() -> Result<()> {
 async fn zome_call_auth() -> Result<()> {
     ensure_fixture_packaged().await?;
 
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::standard().await;
 
     // Install the fixture app
     let happ_path = fixture_path(["my-app", "my-fixture-app.happ"])?;
@@ -967,7 +967,7 @@ async fn zome_call_auth() -> Result<()> {
 async fn zome_call() -> Result<()> {
     ensure_fixture_packaged().await?;
 
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::standard().await;
 
     // Install the fixture app
     let happ_path = fixture_path(["my-app", "my-fixture-app.happ"])?;
@@ -1085,7 +1085,7 @@ async fn zome_call() -> Result<()> {
 async fn zome_call_returns_hash() -> Result<()> {
     ensure_fixture_packaged().await?;
 
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::standard().await;
 
     // Install the fixture app
     let happ_path = fixture_path(["my-app", "my-fixture-app.happ"])?;
