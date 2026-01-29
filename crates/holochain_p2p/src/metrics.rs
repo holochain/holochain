@@ -7,7 +7,8 @@ pub type P2pRequestDurationMetric = Histogram<f64>;
 /// A counter metric for measuring the number of incoming p2p requests that have been ignored.
 pub type P2pRequestIgnoredMetric = Counter<u64>;
 
-/// Create a new histogram metric for measuring the duration of p2p requests.
+/// Create a new histogram metric for measuring the duration of outgoing p2p requests,
+/// up until they are handed off to the transport.
 pub fn create_p2p_outgoing_request_duration_metric() -> P2pRequestDurationMetric {
     meter_with_version(
         "hc.holochain_p2p",
@@ -17,11 +18,13 @@ pub fn create_p2p_outgoing_request_duration_metric() -> P2pRequestDurationMetric
     )
     .f64_histogram("hc.holochain_p2p.request.duration")
     .with_unit(Unit::new("s"))
-    .with_description("The time spent sending an outgoing p2p request awaiting the response")
+    .with_description(
+        "The time spent sending an outgoing p2p request until it is handed off to the transport",
+    )
     .init()
 }
 
-/// Create a new histogram metric for measuring the duration of p2p requests.
+/// Create a new histogram metric for measuring the duration of handling incoming p2p requests.
 pub fn create_p2p_handle_incoming_request_duration_metric() -> P2pRequestDurationMetric {
     meter_with_version(
         "hc.holochain_p2p",
