@@ -197,15 +197,6 @@ pub enum ActionData {
     Delete(DeleteData),
     CreateLink(CreateLinkData),
     DeleteLink(DeleteLinkData),
-    CloseChain(CloseChainData),
-    OpenChain(OpenChainData),
-}
-
-/// Lightweight reference for queries
-pub struct ActionRef {
-    pub hash: ActionHash,
-    pub action_type: ActionType,
-    pub header: ActionHeader,
 }
 
 /// Full action with data loaded on-demand
@@ -260,12 +251,6 @@ pub struct AgentValidationPkgData {
 }
 
 pub struct InitZomesCompleteData {}
-pub struct CloseChainData {
-    pub new_dna_hash: DnaHash,
-}
-pub struct OpenChainData {
-    pub previous_dna_hash: DnaHash,
-}
 ```
 
 ### Creation and Distribution Flow
@@ -273,19 +258,19 @@ pub struct OpenChainData {
 The high-level flow for authoring actions and distributing ops is as follows:
 
 ```
-1. Author new action locally
-   ├─> Insert into `Action` table
-   ├─> Insert into `Entry` table (if applicable)
-   └─> Insert into `CapGrant` table (if applicable)
-
-2. Self validation
+1. Self validation
    ├─> Run sys validation check
    ├─> Run app validation checks via WASM
    └─> On failure: rollback transaction, chain unchanged
 
+2. Author new action locally
+   ├─> Insert into `Action` table
+   ├─> Insert into `Entry` table (if applicable)
+   └─> Insert into `CapGrant` table (if applicable)
+
 3. Create ops for publishing
-   ├─> If this is a countersigning action, skip this step
-   └─> Insert into AuthoredOp with publishing state
+   ├─> If this is a countersigning action, skip this step (ops created on session completion)
+   └─> Insert into `AuthoredOp` with publishing state
 
 4. Publish DHT Ops Workflow
    ├─> Query ops which are ready for publishing from `AuthoredOp`
@@ -297,6 +282,13 @@ The high-level flow for authoring actions and distributing ops is as follows:
    ├─> Receive validation receipts from validators
    ├─> Insert into `ValidationReceipt` table
    └─> Update `receipts_complete` in `AuthoredOp` when sufficient receipts received
+
+6. Countersigning Session Completion Workflow (if applicable)
+   ├─> Verify all participants have signed
+   ├─> Create ops from the countersigned action/entry
+   ├─> Insert into `AuthoredOp` with publishing state
+   ├─> Unlock the chain
+   └─> Trigger publish workflow
 ```
 
 #### Publish Query and Op Construction
@@ -343,12 +335,12 @@ For each row returned:
    - `RegisterDeletedEntryAction`: Requires Action only
    - `RegisterAddLink`: Requires Action only
    - `RegisterRemoveLink`: Requires Action only
-5. **Group by Basis**: Collect ops by `basis_hash` for efficient network transmission
+3. **Group by Basis**: Collect ops by `basis_hash` for efficient network transmission
 
-**Incompatibilities with Current Implementation:**
+**Differences to Current Implementation:**
 
 1. **Missing `withhold_publish` field**: The current code checks `DhtOp.withhold_publish IS NULL` to exclude countersigning ops. The new `AuthoredOp` schema doesn't include this field.
-   - *Resolution needed*: Add `withhold_publish BOOLEAN` field to `AuthoredOp` table, or handle countersigning differently.
+   - **Resolution**: Countersigning completion should produce ops from the action/entry instead of clearing a field. No `withhold_publish` field needed in `AuthoredOp` table. During the countersigning session, ops are not created at all - they are only created when the session successfully completes, at which point they are immediately publishable. This approach is superior because: (a) entries should not be served during active countersigning sessions since the session may fail, (b) it eliminates intermediate "withheld" state and associated cleanup complexity, (c) op existence semantically means "publishable data", and (d) failed sessions leave no garbage ops in the database.
 
 2. **Missing `when_integrated` field**: The current code checks `DhtOp.when_integrated IS NOT NULL` to ensure ops are only published after local validation completes. The new `AuthoredOp` schema doesn't track integration.
    - *Resolution needed*: Authored ops don't need integration tracking since they're locally validated before insertion. This filter may be unnecessary in the new model, or we need a different field like `locally_validated BOOLEAN`.
