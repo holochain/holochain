@@ -98,8 +98,23 @@ CREATE TABLE ValidationReceipt (
     validators    BLOB NOT NULL,
     signature     BLOB NOT NULL,
     when_received INTEGER NOT NULL,
-    
+
     FOREIGN KEY(op_hash) REFERENCES AuthoredOp(hash)
+);
+
+-- Authored warrants.
+--
+-- For warrants issued by this agent about invalid behavior by other agents
+CREATE TABLE Warrant (
+    hash      BLOB PRIMARY KEY,
+    author    BLOB NOT NULL,
+    timestamp INTEGER NOT NULL,
+    warrantee BLOB NOT NULL,
+    proof     BLOB NOT NULL,  -- Serialized WarrantProof (InvalidChainOp or ChainFork)
+
+    -- Publishing state
+    last_publish_time INTEGER,
+    receipts_complete BOOLEAN
 );
 ```
 
@@ -174,6 +189,20 @@ CREATE TABLE DhtOp (
     when_integrated INTEGER NOT NULL, -- set when moved from LimboOp
 
     FOREIGN KEY(action_hash) REFERENCES DhtAction(hash)
+);
+
+-- DHT warrants.
+--
+-- For warrants received from the network about invalid behavior
+CREATE TABLE DhtWarrant (
+    hash      BLOB PRIMARY KEY,
+    author    BLOB NOT NULL,
+    timestamp INTEGER NOT NULL,
+    warrantee BLOB NOT NULL,
+    proof     BLOB NOT NULL,  -- Serialized WarrantProof (InvalidChainOp or ChainFork)
+
+    -- DHT location (stored at warrantee's agent authority)
+    storage_center_loc INTEGER NOT NULL
 );
 ```
 
@@ -338,10 +367,12 @@ The publish workflow queries the authored database for ops that need publishing 
 
 **Query Logic:**
 
-The query selects from `AuthoredOp` table, joining to `Action` and optionally `Entry`, with a cross-database join to `DhtOp` to ensure only integrated ops are published:
+The query selects from `AuthoredOp` table, joining to `Action` and optionally `Entry`, with a cross-database join to `DhtOp` to ensure only integrated ops are published. A UNION includes warrants from the `Warrant` table:
 
 ```sql
+-- Chain ops
 SELECT
+    'chain' as op_category,
     Action.hash as action_hash,
     Action.author,
     Action.timestamp,
@@ -350,7 +381,8 @@ SELECT
     Entry.blob as entry_blob,
     AuthoredOp.hash as op_hash,
     AuthoredOp.op_type,
-    AuthoredOp.basis_hash
+    AuthoredOp.basis_hash,
+    AuthoredOp.last_publish_time
 FROM AuthoredOp
 JOIN Action ON AuthoredOp.action_hash = Action.hash
 LEFT JOIN Entry ON Action.entry_hash = Entry.hash
@@ -362,7 +394,30 @@ WHERE
         OR AuthoredOp.last_publish_time <= :recency_threshold)
     AND AuthoredOp.receipts_complete IS NULL
     AND dht.DhtOp.validation_status = 'valid'  -- Only publish validated ops
-ORDER BY Action.seq, Action.timestamp
+
+UNION ALL
+
+-- Warrant ops
+SELECT
+    'warrant' as op_category,
+    NULL as action_hash,
+    Warrant.author,
+    Warrant.timestamp,
+    'Warrant' as action_type,
+    NULL as action_data,
+    NULL as entry_blob,
+    Warrant.hash as op_hash,
+    'Warrant' as op_type,
+    Warrant.warrantee as basis_hash,  -- Warrants stored at warrantee's authority
+    Warrant.last_publish_time
+FROM Warrant
+WHERE
+    Warrant.author = :author
+    AND (Warrant.last_publish_time IS NULL
+        OR Warrant.last_publish_time <= :recency_threshold)
+    AND Warrant.receipts_complete IS NULL
+
+ORDER BY timestamp
 ```
 
 **In-Memory Transform:**
@@ -403,9 +458,6 @@ For each row returned:
      - Timestamp breaks ties when multiple ops reference the same action
      - Simpler than maintaining a computed ordering field
    - **Resolution**: No `op_order` column needed in `AuthoredOp`
-
-4. **Warrant Ops**: The current query includes a UNION for Warrant ops from a separate `Warrant` table. The new design doesn't show warrant storage.
-   - *Resolution needed*: Clarify where warrants are stored (likely in Action table with `action_type = 'Warrant'`).
 
 ### Validation Flow
 
