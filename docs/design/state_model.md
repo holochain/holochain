@@ -343,10 +343,12 @@ The high-level flow for authoring actions and distributing ops is as follows:
    └─> Insert into `AuthoredOp` with publishing state
 
 4. Publish DHT Ops Workflow
-   ├─> Query ops which are ready for publishing from `AuthoredOp`
+   ├─> Query ops which are ready for publishing from `AuthoredOp` and `Warrant`
+   ├─> Cross-database LEFT JOIN to `DhtOp` to check integration status
+   ├─> Publish if: op not in `DhtOp` (outside arc) OR op in `DhtOp` with `validation_status = 'valid'`
    ├─> Group by `basis_hash` for efficient sending
    ├─> Send ops to DHT authorities over the network
-   └─> Update `last_publish_time` in `AuthoredOp`
+   └─> Update `last_publish_time` in `AuthoredOp` (or `Warrant`)
 
 5. Validation Receipt Workflow
    ├─> Receive validation receipts from validators
@@ -386,14 +388,16 @@ SELECT
 FROM AuthoredOp
 JOIN Action ON AuthoredOp.action_hash = Action.hash
 LEFT JOIN Entry ON Action.entry_hash = Entry.hash
--- Cross-database join to ensure op is integrated before publishing
-JOIN dht.DhtOp ON AuthoredOp.hash = dht.DhtOp.hash
+-- Cross-database LEFT JOIN to check integration status
+-- NULL means op is outside our arc (not stored locally, safe to publish)
+-- Non-NULL means op is within our arc (must be integrated before publishing)
+LEFT JOIN dht.DhtOp ON AuthoredOp.hash = dht.DhtOp.hash
 WHERE
     Action.author = :author
     AND (AuthoredOp.last_publish_time IS NULL
         OR AuthoredOp.last_publish_time <= :recency_threshold)
     AND AuthoredOp.receipts_complete IS NULL
-    AND dht.DhtOp.validation_status = 'valid'  -- Only publish validated ops
+    AND (dht.DhtOp.hash IS NULL OR dht.DhtOp.validation_status = 'valid')
 
 UNION ALL
 
@@ -443,11 +447,11 @@ For each row returned:
    - **Resolution**: Countersigning completion should produce ops from the action/entry instead of clearing a field. No `withhold_publish` field needed in `AuthoredOp` table. During the countersigning session, ops are not created at all - they are only created when the session successfully completes, at which point they are immediately publishable. This approach is superior because: (a) entries should not be served during active countersigning sessions since the session may fail, (b) it eliminates intermediate "withheld" state and associated cleanup complexity, (c) op existence semantically means "publishable data", and (d) failed sessions leave no garbage ops in the database.
 
 2. **Missing `when_integrated` field**: The current code checks `DhtOp.when_integrated IS NOT NULL` to ensure ops are only published after local validation completes. The new `AuthoredOp` schema doesn't track integration.
-   - **Resolution**: Use a read-only cross-database query instead of maintaining duplicate state. The publish query performs a JOIN with the DHT database's `DhtOp` table to check integration status: `JOIN dht.DhtOp ON AuthoredOp.hash = dht.DhtOp.hash WHERE dht.DhtOp.validation_status = 'valid'`. This approach is necessary because:
+   - **Resolution**: Use a read-only cross-database query instead of maintaining duplicate state. The publish query performs a LEFT JOIN with the DHT database's `DhtOp` table to check integration status: `LEFT JOIN dht.DhtOp ON AuthoredOp.hash = dht.DhtOp.hash WHERE dht.DhtOp.hash IS NULL OR dht.DhtOp.validation_status = 'valid'`. This approach is necessary because:
      - The agent's storage arc can change over time, making sequencing-based approaches fragile
      - Ops within the agent's arc must be integrated before publishing (so they can be served to peers)
-     - Ops outside the agent's arc don't need local integration but still need to be published
-   - The cross-database join naturally handles arc changes by checking current state at publish time, avoiding stale state issues. While this requires using cross-database query features in `holochain_state` and `holochain_data`, it's the simplest approach that correctly handles all edge cases. No cross-database state updates are needed - integration status has a single source of truth in the `DhtOp` table.
+     - Ops outside the agent's arc won't be in `DhtOp` at all, but still need to be published
+   - The LEFT JOIN handles both cases: if the op is NULL in DhtOp (outside arc), publish immediately; if non-NULL (inside arc), only publish when validated. The cross-database join naturally handles arc changes by checking current state at publish time, avoiding stale state issues. While this requires using cross-database query features in `holochain_state` and `holochain_data`, it's the simplest approach that correctly handles all edge cases. No cross-database state updates are needed - integration status has a single source of truth in the `DhtOp` table.
 
 3. **`op_order` field**: Not needed in the new design.
    - **Current Purpose**: `OpOrder` combines op type priority (0-9) with timestamp to ensure "the most likely ordering where dependencies will come first"
