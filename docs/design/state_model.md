@@ -338,7 +338,7 @@ The publish workflow queries the authored database for ops that need publishing 
 
 **Query Logic:**
 
-The query selects from `AuthoredOp` table, joining to `Action` and optionally `Entry`:
+The query selects from `AuthoredOp` table, joining to `Action` and optionally `Entry`, with a cross-database join to `DhtOp` to ensure only integrated ops are published:
 
 ```sql
 SELECT
@@ -354,11 +354,14 @@ SELECT
 FROM AuthoredOp
 JOIN Action ON AuthoredOp.action_hash = Action.hash
 LEFT JOIN Entry ON Action.entry_hash = Entry.hash
+-- Cross-database join to ensure op is integrated before publishing
+JOIN dht.DhtOp ON AuthoredOp.hash = dht.DhtOp.hash
 WHERE
     Action.author = :author
     AND (AuthoredOp.last_publish_time IS NULL
         OR AuthoredOp.last_publish_time <= :recency_threshold)
     AND AuthoredOp.receipts_complete IS NULL
+    AND dht.DhtOp.validation_status = 'valid'  -- Only publish validated ops
 ORDER BY Action.seq, Action.timestamp
 ```
 
@@ -385,7 +388,11 @@ For each row returned:
    - **Resolution**: Countersigning completion should produce ops from the action/entry instead of clearing a field. No `withhold_publish` field needed in `AuthoredOp` table. During the countersigning session, ops are not created at all - they are only created when the session successfully completes, at which point they are immediately publishable. This approach is superior because: (a) entries should not be served during active countersigning sessions since the session may fail, (b) it eliminates intermediate "withheld" state and associated cleanup complexity, (c) op existence semantically means "publishable data", and (d) failed sessions leave no garbage ops in the database.
 
 2. **Missing `when_integrated` field**: The current code checks `DhtOp.when_integrated IS NOT NULL` to ensure ops are only published after local validation completes. The new `AuthoredOp` schema doesn't track integration.
-   - *Resolution needed*: Authored ops don't need integration tracking since they're locally validated before insertion. This filter may be unnecessary in the new model, or we need a different field like `locally_validated BOOLEAN`.
+   - **Resolution**: Use a read-only cross-database query instead of maintaining duplicate state. The publish query performs a JOIN with the DHT database's `DhtOp` table to check integration status: `JOIN dht.DhtOp ON AuthoredOp.hash = dht.DhtOp.hash WHERE dht.DhtOp.validation_status = 'valid'`. This approach is necessary because:
+     - The agent's storage arc can change over time, making sequencing-based approaches fragile
+     - Ops within the agent's arc must be integrated before publishing (so they can be served to peers)
+     - Ops outside the agent's arc don't need local integration but still need to be published
+   - The cross-database join naturally handles arc changes by checking current state at publish time, avoiding stale state issues. While this requires using cross-database query features in `holochain_state` and `holochain_data`, it's the simplest approach that correctly handles all edge cases. No cross-database state updates are needed - integration status has a single source of truth in the `DhtOp` table.
 
 3. **`op_order` field**: Not needed in the new design.
    - **Current Purpose**: `OpOrder` combines op type priority (0-9) with timestamp to ensure "the most likely ordering where dependencies will come first"
@@ -397,7 +404,7 @@ For each row returned:
      - Simpler than maintaining a computed ordering field
    - **Resolution**: No `op_order` column needed in `AuthoredOp`
 
-4**Warrant Ops**: The current query includes a UNION for Warrant ops from a separate `Warrant` table. The new design doesn't show warrant storage.
+4. **Warrant Ops**: The current query includes a UNION for Warrant ops from a separate `Warrant` table. The new design doesn't show warrant storage.
    - *Resolution needed*: Clarify where warrants are stored (likely in Action table with `action_type = 'Warrant'`).
 
 ### Validation Flow
