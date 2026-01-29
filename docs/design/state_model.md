@@ -178,6 +178,9 @@ CREATE TABLE DhtOp (
 ```
 
 ### Rust Structure
+
+Actions:
+
 ```rust
 /// Common action header stored for all action types
 pub struct ActionHeader {
@@ -253,6 +256,44 @@ pub struct AgentValidationPkgData {
 pub struct InitZomesCompleteData {}
 ```
 
+DHT Operations:
+
+```rust
+/// Top-level DHT operation that can be either a chain operation or a warrant.
+pub enum DhtOp {
+    /// An op representing storage of some record information.
+    ChainOp(Box<ChainOp>),
+    /// An op representing storage of a claim that a ChainOp was invalid.
+    WarrantOp(Box<WarrantOp>),
+}
+
+/// Chain operations that represent chain data distributed across the network.
+/// Each operation is stored at a specific DHT location determined by its basis hash.
+pub enum ChainOp {
+    /// Stores the complete record at the record authority
+    CreateRecord(SignedAction, Option<Entry>),
+    /// Stores entry content at the entry authority
+    CreateEntry(SignedAction, Entry),
+    /// Agent activity stored at the agent's authority
+    AgentActivity(SignedAction),
+    /// Entry updates indexed at the original entry authority
+    UpdateEntry(SignedAction, Entry),
+    /// Updates indexed at the original record authority
+    UpdateRecord(SignedAction),
+    /// Entry deletes indexed at the original entry authority
+    DeleteEntry(SignedAction),
+    /// Deletes indexed at the original record authority
+    DeleteRecord(SignedAction),
+    /// Links indexed at the base address
+    CreateLink(SignedAction),
+    /// Link deletes indexed at the base address
+    DeleteLink(SignedAction),
+}
+
+/// Warrant operation representing a claim that a ChainOp was invalid.
+pub struct WarrantOp(SignedWarrant);
+```
+
 ### Creation and Distribution Flow
 
 The high-level flow for authoring actions and distributing ops is as follows:
@@ -293,7 +334,7 @@ The high-level flow for authoring actions and distributing ops is as follows:
 
 #### Publish Query and Op Construction
 
-The publish workflow queries the authored database for ops that need publishing and constructs the full `DhtOp` for network transmission.
+The publish workflow queries the authored database for ops that need publishing and constructs the full `ChainOp` (wrapped in `DhtOp`) for network transmission.
 
 **Query Logic:**
 
@@ -325,17 +366,18 @@ ORDER BY Action.seq, Action.timestamp
 
 For each row returned:
 1. **Deserialize Action**: Reconstruct full `Action` from common fields + the `action_data` BLOB
-2. **Construct DhtOp**: Build the appropriate `DhtOp` variant based on `op_type`:
-   - `StoreRecord`: Requires Action + Entry (if present)
-   - `StoreEntry`: Requires Action + Entry
-   - `RegisterAgentActivity`: Requires Action only
-   - `RegisterUpdatedContent`: Requires Action only
-   - `RegisterUpdatedRecord`: Requires Action only
-   - `RegisterDeletedBy`: Requires Action only
-   - `RegisterDeletedEntryAction`: Requires Action only
-   - `RegisterAddLink`: Requires Action only
-   - `RegisterRemoveLink`: Requires Action only
-3. **Group by Basis**: Collect ops by `basis_hash` for efficient network transmission
+2. **Construct ChainOp**: Build the appropriate `ChainOp` variant based on `op_type`:
+   - `CreateRecord`: Requires SignedAction + Entry (if present)
+   - `CreateEntry`: Requires SignedAction + Entry
+   - `AgentActivity`: Requires SignedAction only
+   - `UpdateEntry`: Requires SignedAction + Entry
+   - `UpdateRecord`: Requires SignedAction only
+   - `DeleteEntry`: Requires SignedAction only
+   - `DeleteRecord`: Requires SignedAction only
+   - `CreateLink`: Requires SignedAction only
+   - `DeleteLink`: Requires SignedAction only
+3. **Wrap in DhtOp**: Wrap the `ChainOp` in `DhtOp::ChainOp(Box::new(chain_op))`
+4. **Group by Basis**: Collect ops by `basis_hash` for efficient network transmission
 
 **Differences to Current Implementation:**
 
