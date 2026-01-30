@@ -67,15 +67,15 @@ pub struct DnaDefModel {
 impl DnaDefModel {
     /// Create a new DnaDefModel.
     pub fn new(
-        dna_hash: &CellId,
+        cell_id: &CellId,
         name: String,
         network_seed: String,
         properties: Vec<u8>,
         lineage: Option<sqlx::types::JsonValue>,
     ) -> Self {
         Self {
-            hash: dna_hash.dna_hash().get_raw_32().to_vec(),
-            agent: dna_hash.agent_pubkey().get_raw_32().to_vec(),
+            hash: cell_id.dna_hash().get_raw_32().to_vec(),
+            agent: cell_id.agent_pubkey().get_raw_32().to_vec(),
             name,
             network_seed,
             properties,

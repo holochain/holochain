@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE** The `Spaces` struct now contains dedicated `wasm_store`, `dna_def_store`, and `entry_def_store` fields instead of directly exposing the underlying `wasm_db`. These are using the new WASM database from `holochain_data` under the hood. There is no migration path from an existing installation to this version.
 - Rename `SweetConductor::from_standard_config` to `SweetConductor::standard`.
 - Rename `SweetConductorBatch::from_standard_config_rendezvous` to `SweetConductorBatch::standard`.
 - Fix: DbKind display implementation now properly includes the associated CellId or DnaHash of the database, instead of escaped rust code.
