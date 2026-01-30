@@ -296,20 +296,35 @@ pub enum DhtOp {
     WarrantOp(Box<WarrantOp>),
 }
 
+/// Represents how entry data is included in an op.
+pub enum OpEntry {
+    /// The entry is present in this op
+    Present(Entry),
+    /// The action references a private entry, which is not included
+    Hidden,
+    /// The entry exists but is not stored with this specific op
+    NotStored,
+}
+
 /// Chain operations that represent chain data distributed across the network.
 /// Each operation is stored at a specific DHT location determined by its basis hash.
 pub enum ChainOp {
     /// Stores the complete record at the record authority
-    CreateRecord(SignedAction, Option<Entry>),
+    /// OpEntry will be Present for public entries, Hidden for private entries
+    CreateRecord(SignedAction, OpEntry),
     /// Stores entry content at the entry authority
+    /// Only created for public entries
     CreateEntry(SignedAction, Entry),
     /// Agent activity stored at the agent's authority
-    AgentActivity(SignedAction),
+    /// May optionally cache entry data for certain entry types
+    AgentActivity(SignedAction, Option<Entry>),
     /// Entry updates indexed at the original entry authority
+    /// Only created for public entries
     UpdateEntry(SignedAction, Entry),
     /// Updates indexed at the original record authority
     UpdateRecord(SignedAction),
     /// Entry deletes indexed at the original entry authority
+    /// Only created if original entry was public
     DeleteEntry(SignedAction),
     /// Deletes indexed at the original record authority
     DeleteRecord(SignedAction),
@@ -340,6 +355,7 @@ The high-level flow for authoring actions and distributing ops is as follows:
 
 3. Create ops for publishing
    ├─> If this is a countersigning action, skip this step (ops created on session completion)
+   ├─> Transform action/entry into DHT ops (see "Action to Op Transform" below)
    └─> Insert into `AuthoredOp` with publishing state
 
 4. Publish DHT Ops Workflow
@@ -362,6 +378,75 @@ The high-level flow for authoring actions and distributing ops is as follows:
    ├─> Unlock the chain
    └─> Trigger publish workflow
 ```
+
+#### Action to Op Transform
+
+When a new action (and optional entry) is authored, it must be transformed into one or more DHT ops for distribution. The specific ops created depend on the action type and whether the entry is private.
+
+**Transform Rules:**
+
+For **Create** actions:
+- Always create `AgentActivity(SignedAction, Option<Entry>)` op (stored at agent's authority)
+  - `Option<Entry>` is Some if the entry type has `cached_at_agent_activity` enabled
+- Always create `CreateRecord(SignedAction, OpEntry)` op (stored at action hash authority)
+  - For public entries: `OpEntry::Present(entry)`
+  - For private entries: `OpEntry::Hidden`
+- If action has a public entry: create `CreateEntry(SignedAction, Entry)` op (stored at entry hash authority)
+- If action has a private entry: do NOT create `CreateEntry` op
+
+For **Update** actions:
+- Always create `AgentActivity(SignedAction, Option<Entry>)` op
+  - `Option<Entry>` is Some if the entry type has `cached_at_agent_activity` enabled
+- Always create `UpdateRecord(SignedAction)` op (stored at original action hash authority)
+- If action has a public entry: create `UpdateEntry(SignedAction, Entry)` op (stored at original entry hash authority)
+- If action has a private entry: do NOT create `UpdateEntry` op
+
+For **Delete** actions:
+- Always create `AgentActivity(SignedAction, None)` op
+- Always create `DeleteRecord(SignedAction)` op (stored at original action hash authority)
+- If the deleted action had a public entry: create `DeleteEntry(SignedAction)` op (stored at original entry hash authority)
+- If the deleted action had a private entry: do NOT create `DeleteEntry` op
+
+For **CreateLink** actions:
+- Always create `AgentActivity(SignedAction, None)` op
+- Always create `CreateLink(SignedAction)` op (stored at base address)
+
+For **DeleteLink** actions:
+- Always create `AgentActivity(SignedAction, None)` op
+- Always create `DeleteLink(SignedAction)` op (stored at base address of the link being deleted)
+
+For **Dna**, **AgentValidationPkg**, and **InitZomesComplete** actions:
+- Always create `AgentActivity(SignedAction, None)` op
+- No record or entry ops (these are chain-only actions)
+
+**Private Entry Rationale:**
+
+Private entries are handled differently in op creation:
+
+1. **`CreateEntry`/`UpdateEntry` ops are never created for private entries**
+   - These ops are stored at entry hash authorities and always contain the full entry
+   - Creating them for private entries would expose the content to entry authorities
+   - Private entries cannot be retrieved by entry hash, so entry authority storage serves no purpose
+
+2. **`CreateRecord`/`UpdateRecord` ops use `OpEntry::Hidden` for private entries**
+   - These ops are stored at action hash authorities chosen through DHT routing
+   - `OpEntry::Hidden` indicates an entry exists but is not included in the op
+   - When fetching the full record, the entry must be requested separately from the author
+
+3. **`DeleteEntry` ops are never created for private entries**
+   - Since `CreateEntry` was never created, there's nothing at the entry authority to mark as deleted
+   - `DeleteRecord` ops are sufficient to mark the action as deleted
+
+4. **`AgentActivity` ops may cache private entries**
+   - If `cached_at_agent_activity` is enabled, the entry is included in `Option<Entry>`
+   - This allows agent authorities to serve the complete record
+   - This is an optimization choice per entry type
+
+**Implementation Note:**
+
+The `private_entry` field in the Action table (or the `EntryVisibility` from entry type) is checked during op creation to determine:
+- Whether to create `CreateEntry`/`UpdateEntry`/`DeleteEntry` ops (never for private)
+- Whether to use `OpEntry::Hidden` or `OpEntry::Present` in `CreateRecord` ops
 
 #### Publish Query and Op Construction
 
@@ -429,15 +514,19 @@ ORDER BY timestamp
 For each row returned:
 1. **Deserialize Action**: Reconstruct full `Action` from common fields + the `action_data` BLOB
 2. **Construct ChainOp**: Build the appropriate `ChainOp` variant based on `op_type`:
-   - `CreateRecord`: Requires SignedAction + Entry (if present)
-   - `CreateEntry`: Requires SignedAction + Entry
-   - `AgentActivity`: Requires SignedAction only
-   - `UpdateEntry`: Requires SignedAction + Entry
-   - `UpdateRecord`: Requires SignedAction only
-   - `DeleteEntry`: Requires SignedAction only
-   - `DeleteRecord`: Requires SignedAction only
-   - `CreateLink`: Requires SignedAction only
-   - `DeleteLink`: Requires SignedAction only
+   - `CreateRecord`: Requires `SignedAction` + `OpEntry`
+     - If entry exists and is public: `OpEntry::Present(entry)`
+     - If entry exists and is private: `OpEntry::Hidden`
+     - If no entry: `OpEntry::NotStored` (for actions without entries)
+   - `CreateEntry`: Requires `SignedAction` + `Entry` (entry must be present and public)
+   - `AgentActivity`: Requires `SignedAction` + `Option<Entry>`
+     - Entry is Some if `cached_at_agent_activity` is enabled for the entry type
+   - `UpdateEntry`: Requires `SignedAction` + `Entry` (entry must be present and public)
+   - `UpdateRecord`: Requires `SignedAction` only
+   - `DeleteEntry`: Requires `SignedAction` only
+   - `DeleteRecord`: Requires `SignedAction` only
+   - `CreateLink`: Requires `SignedAction` only
+   - `DeleteLink`: Requires `SignedAction` only
 3. **Wrap in DhtOp**: Wrap the `ChainOp` in `DhtOp::ChainOp(Box::new(chain_op))`
 4. **Group by Basis**: Collect ops by `basis_hash` for efficient network transmission
 
