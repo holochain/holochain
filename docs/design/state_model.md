@@ -302,35 +302,36 @@ pub enum OpEntry {
     Present(Entry),
     /// The action references a private entry, which is not included
     Hidden,
-    /// The entry exists but is not stored with this specific op
-    NotStored,
 }
 
 /// Chain operations that represent chain data distributed across the network.
 /// Each operation is stored at a specific DHT location determined by its basis hash.
 pub enum ChainOp {
-    /// Stores the complete record at the record authority
-    /// OpEntry will be Present for public entries, Hidden for private entries
+    /// Stores the complete record at the record authority.
+    ///
+    /// OpEntry will be Present for public entries, Hidden for private entries.
     CreateRecord(SignedAction, OpEntry),
-    /// Stores entry content at the entry authority
-    /// Only created for public entries
+    /// Stores entry content at the entry authority.
+    /// 
+    /// Op type is only created for public entries.
     CreateEntry(SignedAction, Entry),
-    /// Agent activity stored at the agent's authority
-    /// May optionally cache entry data for certain entry types
-    AgentActivity(SignedAction, Option<Entry>),
-    /// Entry updates indexed at the original entry authority
-    /// Only created for public entries
+    /// Agent activity stored at the agent's authority.
+    AgentActivity(SignedAction),
+    /// Entry updates indexed at the original entry authority.
+    ///
+    /// Only created if the original entry was public.
     UpdateEntry(SignedAction, Entry),
-    /// Updates indexed at the original record authority
+    /// Updates indexed at the original record authority.
     UpdateRecord(SignedAction),
-    /// Entry deletes indexed at the original entry authority
-    /// Only created if original entry was public
+    /// Entry deletes indexed at the original entry authority.
+    /// 
+    /// Only created if the original entry was public.
     DeleteEntry(SignedAction),
-    /// Deletes indexed at the original record authority
+    /// Deletes indexed at the original record authority.
     DeleteRecord(SignedAction),
-    /// Links indexed at the base address
+    /// Links indexed at the base address.
     CreateLink(SignedAction),
-    /// Link deletes indexed at the base address
+    /// Link deletes indexed at the base address.
     DeleteLink(SignedAction),
 }
 
@@ -386,8 +387,7 @@ When a new action (and optional entry) is authored, it must be transformed into 
 **Transform Rules:**
 
 For **Create** actions:
-- Always create `AgentActivity(SignedAction, Option<Entry>)` op (stored at agent's authority)
-  - `Option<Entry>` is Some if the entry type has `cached_at_agent_activity` enabled
+- Always create `AgentActivity(SignedAction)` op (stored at agent's authority)
 - Always create `CreateRecord(SignedAction, OpEntry)` op (stored at action hash authority)
   - For public entries: `OpEntry::Present(entry)`
   - For private entries: `OpEntry::Hidden`
@@ -395,28 +395,27 @@ For **Create** actions:
 - If action has a private entry: do NOT create `CreateEntry` op
 
 For **Update** actions:
-- Always create `AgentActivity(SignedAction, Option<Entry>)` op
-  - `Option<Entry>` is Some if the entry type has `cached_at_agent_activity` enabled
+- Always create `AgentActivity(SignedAction)` op
 - Always create `UpdateRecord(SignedAction)` op (stored at original action hash authority)
 - If action has a public entry: create `UpdateEntry(SignedAction, Entry)` op (stored at original entry hash authority)
 - If action has a private entry: do NOT create `UpdateEntry` op
 
 For **Delete** actions:
-- Always create `AgentActivity(SignedAction, None)` op
+- Always create `AgentActivity(SignedAction)` op
 - Always create `DeleteRecord(SignedAction)` op (stored at original action hash authority)
 - If the deleted action had a public entry: create `DeleteEntry(SignedAction)` op (stored at original entry hash authority)
 - If the deleted action had a private entry: do NOT create `DeleteEntry` op
 
 For **CreateLink** actions:
-- Always create `AgentActivity(SignedAction, None)` op
+- Always create `AgentActivity(SignedAction)` op
 - Always create `CreateLink(SignedAction)` op (stored at base address)
 
 For **DeleteLink** actions:
-- Always create `AgentActivity(SignedAction, None)` op
+- Always create `AgentActivity(SignedAction)` op
 - Always create `DeleteLink(SignedAction)` op (stored at base address of the link being deleted)
 
 For **Dna**, **AgentValidationPkg**, and **InitZomesComplete** actions:
-- Always create `AgentActivity(SignedAction, None)` op
+- Always create `AgentActivity(SignedAction)` op
 - No record or entry ops (these are chain-only actions)
 
 **Private Entry Rationale:**
@@ -431,18 +430,12 @@ Private entries are handled differently in op creation:
 2. **`CreateRecord`/`UpdateRecord` ops use `OpEntry::Hidden` for private entries**
    - These ops are stored at action hash authorities chosen through DHT routing
    - `OpEntry::Hidden` indicates an entry exists but is not included in the op
-   - When fetching the full record, the entry must be requested separately from the author
 
 3. **`DeleteEntry` ops are never created for private entries**
    - Since `CreateEntry` was never created, there's nothing at the entry authority to mark as deleted
    - `DeleteRecord` ops are sufficient to mark the action as deleted
 
-4. **`AgentActivity` ops may cache private entries**
-   - If `cached_at_agent_activity` is enabled, the entry is included in `Option<Entry>`
-   - This allows agent authorities to serve the complete record
-   - This is an optimization choice per entry type
-
-**Implementation Note:**
+**Note:**
 
 The `private_entry` field in the Action table (or the `EntryVisibility` from entry type) is checked during op creation to determine:
 - Whether to create `CreateEntry`/`UpdateEntry`/`DeleteEntry` ops (never for private)
