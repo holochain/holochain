@@ -7,9 +7,9 @@ The Holochain data storage and validation architecture provides:
 
 1. [Action and entry](./data_model.md) data storage for agents' authored chains
 1. Ops as the unit of validation, with an aggregated validity status for records
-2. Validation limbo tables to separate pending data from validated DHT data
+2. Validation limbo table (`LimboOp`) to track pending ops, with shared DhtAction/DhtEntry tables
 3. Unified data querying without separate cache database
-4. Distinct schemas for authored and DHT databases, with limbo tables in DHT
+4. Distinct schemas for authored and DHT databases
 5. Direct data queries without complex joins
 
 ## Architecture
@@ -18,7 +18,7 @@ The Holochain data storage and validation architecture provides:
 
 1. **Ops are the unit of validation**: All validation happens at the op level
 2. **Records aggregate op validity**: A record's validity is derived from its constituent ops
-3. **Validation limbo isolates pending data**: Unvalidated ops stay in limbo tables until validated
+3. **Validation limbo isolates pending ops**: Unvalidated ops stay in LimboOp table until validated, with actions and entries in shared DhtAction/DhtEntry tables marked by NULL record_validity
 4. **Distinct schemas per database type**: Authored and DHT databases have schemas tailored to their needs
 5. **Unified data storage**: DHT database serves both obligated and cached data, distinguished by arc coverage
 6. **Clear state transitions**: Data moves through well-defined states with no ambiguity
@@ -137,7 +137,8 @@ CREATE TABLE DhtAction (
 
    -- Record validity (aggregated from all ops for this record)
    -- A record is the combination of action + entry (if applicable)
-   record_validity TEXT NOT NULL -- 'valid', 'rejected'
+   -- NULL for records in limbo, 'valid' or 'rejected' after integration
+   record_validity TEXT -- NULL, 'valid', 'rejected'
 );
 
 -- DHT entries.
@@ -151,23 +152,25 @@ CREATE TABLE LimboOp (
     hash        BLOB PRIMARY KEY,
     op_type     TEXT NOT NULL,
     action_hash BLOB NOT NULL,
-    
+
     -- DHT location
     basis_hash         BLOB NOT NULL,
     storage_center_loc INTEGER NOT NULL,
-    
+
     -- Local validation state
     validation_stage      TEXT NOT NULL, -- 'pending_sys', 'pending_app', 'complete'
     sys_validation_status TEXT,          -- NULL, 'valid', 'rejected', 'abandoned'
     app_validation_status TEXT,          -- NULL, 'valid', 'rejected', 'abandoned'
-    
+
+    -- Validation receipt requirement
+    require_receipt BOOLEAN NOT NULL,    -- Whether to send validation receipt back to author
+
     -- Timing
     when_received INTEGER NOT NULL,
     validation_attempts INTEGER DEFAULT 0,
     last_validation_attempt INTEGER,
-    
-    -- The action referenced by this op
-    action_blob BLOB NOT NULL,
+
+    FOREIGN KEY(action_hash) REFERENCES DhtAction(hash)
 );
 
 -- DHT ops which have completed validation and are integrated into the DHT.
@@ -555,6 +558,8 @@ The validation flow processes incoming DHT ops through several stages, from init
    ├─> Filter duplicate ops already being processed
    ├─> Verify counterfeit checks (signature validation)
    ├─> Filter ops already in database (check DhtOp table)
+   ├─> Insert action into DhtAction with record_validity=NULL
+   ├─> Insert entry (if applicable) into DhtEntry
    └─> Insert into LimboOp with validation_stage='pending_sys'
 
 2. Sys Validation Workflow
@@ -573,8 +578,7 @@ The validation flow processes incoming DHT ops through several stages, from init
 4. Integration Workflow (if both valid)
    ├─> Query LimboOp for ops with validation_stage='complete'
    ├─> Move op from LimboOp to DhtOp (set when_integrated)
-   ├─> Insert/update DhtAction with aggregated record_validity
-   ├─> Insert DhtEntry (if applicable and not already present)
+   ├─> Update DhtAction record_validity with aggregated status
    └─> Delete from LimboOp
 ```
 
@@ -611,18 +615,17 @@ The incoming DHT ops workflow is the entry point for all DHT ops received from t
      - It also prevents wasting resources processing other ops in the batch
 
 5. **Insert Into Limbo**
-   - Insert batch of validated ops into `LimboOp` table within a single write transaction
+   - Insert the batch of validated ops into tables within a single write transaction
    - For each op in the batch:
-     - Extract and store the action in the limbo action table
-     - Extract and store the entry (if present) in the limbo entry table
+     - Extract and insert action into `DhtAction` table with `record_validity = NULL`
+     - Extract and insert entry (if present) into `DhtEntry` table
      - Insert op metadata into `LimboOp` table
-   - Set initial validation state:
+   - Set initial validation state in `LimboOp`:
      - `validation_stage = 'pending_sys'`
      - `sys_validation_status = NULL`
      - `app_validation_status = NULL`
      - `when_received = current_timestamp`
    - Set `require_receipt = true` to send validation receipts back to author
-   - Transaction ensures atomicity: either all ops in batch are inserted or none
 
 6. **Trigger Sys Validation**
    - Send trigger to `sys_validation_workflow` queue consumer
@@ -651,42 +654,20 @@ The sys validation workflow performs system-level integrity checks on ops in the
 **Query for Ops Pending Sys Validation:**
 
 ```sql
--- Chain ops pending sys validation
+-- Ops pending sys validation
 SELECT
-    Action.blob as action_blob,
-    Action.author as author,
-    Entry.blob as entry_blob,
-    DhtOp.type as dht_type,
-    DhtOp.hash as dht_hash,
-    DhtOp.num_validation_attempts,
-    DhtOp.op_order
-FROM DhtOp
-JOIN Action ON DhtOp.action_hash = Action.hash
-LEFT JOIN Entry ON Action.entry_hash = Entry.hash
+    LimboOp.hash,
+    LimboOp.op_type,
+    LimboOp.action_hash,
+    LimboOp.validation_attempts,
+    DhtAction.author,
+    DhtAction.entry_hash
+FROM LimboOp
+JOIN DhtAction ON LimboOp.action_hash = DhtAction.hash
 WHERE
-    DhtOp.when_integrated IS NULL
-    AND DhtOp.validation_status IS NULL
-    AND (DhtOp.validation_stage IS NULL OR DhtOp.validation_stage = 0)
-
-UNION ALL
-
--- Warrant ops pending sys validation
-SELECT
-    Warrant.blob as action_blob,
-    Warrant.author as author,
-    NULL as entry_blob,
-    DhtOp.type as dht_type,
-    DhtOp.hash as dht_hash,
-    DhtOp.num_validation_attempts,
-    DhtOp.op_order
-FROM DhtOp
-JOIN Warrant ON DhtOp.action_hash = Warrant.hash
-WHERE
-    DhtOp.when_integrated IS NULL
-    AND DhtOp.validation_status IS NULL
-    AND (DhtOp.validation_stage IS NULL OR DhtOp.validation_stage = 0)
-
-ORDER BY num_validation_attempts, op_order
+    LimboOp.validation_stage = 'pending_sys'
+    AND LimboOp.sys_validation_status IS NULL
+ORDER BY validation_attempts, when_received
 LIMIT 10000
 ```
 
@@ -709,21 +690,23 @@ LIMIT 10000
 4. **Update Validation Status**
    - For **valid** ops:
      ```sql
-     UPDATE DhtOp
-     SET validation_stage = 1,  -- pending_app
-         when_sys_validated = CURRENT_TIMESTAMP,
-         num_validation_attempts = num_validation_attempts + 1
+     UPDATE LimboOp
+     SET validation_stage = 'pending_app',
+         sys_validation_status = 'valid',
+         last_validation_attempt = CURRENT_TIMESTAMP,
+         validation_attempts = 0
      WHERE hash = :op_hash
      ```
    - For **rejected** ops:
      ```sql
-     UPDATE DhtOp
-     SET validation_status = 'rejected',
-         when_sys_validated = CURRENT_TIMESTAMP,
-         num_validation_attempts = num_validation_attempts + 1
+     UPDATE LimboOp
+     SET sys_validation_status = 'rejected',
+         last_validation_attempt = CURRENT_TIMESTAMP,
+         validation_attempts = 0
      WHERE hash = :op_hash
      ```
    - For ops with **missing dependencies**: no status update, retry after network fetch
+     - TODO increment validation_attempts
 
 5. **Trigger Next Workflow**
    - If any ops accepted: trigger `app_validation_workflow`
@@ -779,21 +762,19 @@ The app validation workflow executes application-defined validation logic via WA
 
 ```sql
 SELECT
-    Action.blob as action_blob,
-    Action.author as author,
-    Entry.blob as entry_blob,
-    DhtOp.type as dht_type,
-    DhtOp.hash as dht_hash,
-    DhtOp.num_validation_attempts,
-    DhtOp.op_order
-FROM DhtOp
-JOIN Action ON DhtOp.action_hash = Action.hash
-LEFT JOIN Entry ON Action.entry_hash = Entry.hash
+    LimboOp.hash,
+    LimboOp.op_type,
+    LimboOp.action_hash,
+    LimboOp.validation_attempts,
+    DhtAction.author,
+    DhtAction.entry_hash
+FROM LimboOp
+JOIN DhtAction ON LimboOp.action_hash = DhtAction.hash
 WHERE
-    DhtOp.when_integrated IS NULL
-    AND DhtOp.validation_status IS NULL
-    AND (DhtOp.validation_stage = 1 OR DhtOp.validation_stage = 2)
-ORDER BY num_validation_attempts, op_order
+    LimboOp.validation_stage = 'pending_app'
+    AND LimboOp.sys_validation_status = 'valid'
+    AND LimboOp.app_validation_status IS NULL
+ORDER BY validation_attempts, when_received
 LIMIT 10000
 ```
 
@@ -811,26 +792,25 @@ LIMIT 10000
 3. **Update Validation Status**
    - For **valid** ops:
      ```sql
-     UPDATE DhtOp
-     SET validation_stage = 3,  -- complete
-         validation_status = 'valid',
-         when_app_validated = CURRENT_TIMESTAMP,
-         num_validation_attempts = num_validation_attempts + 1
+     UPDATE LimboOp
+     SET validation_stage = 'complete',
+         app_validation_status = 'valid',
+         last_validation_attempt = CURRENT_TIMESTAMP,
+         validation_attempts = validation_attempts + 1
      WHERE hash = :op_hash
      ```
    - For **rejected** ops:
      ```sql
-     UPDATE DhtOp
-     SET validation_status = 'rejected',
-         when_app_validated = CURRENT_TIMESTAMP,
-         num_validation_attempts = num_validation_attempts + 1
+     UPDATE LimboOp
+     SET app_validation_status = 'rejected',
+         last_validation_attempt = CURRENT_TIMESTAMP,
+         validation_attempts = validation_attempts + 1
      WHERE hash = :op_hash
      ```
    - For ops **awaiting dependencies**:
      ```sql
-     UPDATE DhtOp
-     SET validation_stage = 2,  -- awaiting_app_deps
-         num_validation_attempts = num_validation_attempts + 1
+     UPDATE LimboOp
+     SET validation_attempts = validation_attempts + 1
      WHERE hash = :op_hash
      ```
 
@@ -845,21 +825,18 @@ The integration workflow moves validated ops from the limbo table to the DHT tab
 
 ```sql
 SELECT
-    DhtOp.hash,
-    DhtOp.type,
-    DhtOp.action_hash,
-    DhtOp.basis_hash,
-    DhtOp.validation_status,
-    Action.blob as action_blob,
-    Entry.blob as entry_blob
-FROM DhtOp
-JOIN Action ON DhtOp.action_hash = Action.hash
-LEFT JOIN Entry ON Action.entry_hash = Entry.hash
+    LimboOp.hash,
+    LimboOp.op_type,
+    LimboOp.action_hash,
+    LimboOp.basis_hash,
+    LimboOp.sys_validation_status,
+    LimboOp.app_validation_status
+FROM LimboOp
 WHERE
-    DhtOp.when_integrated IS NULL
-    AND DhtOp.validation_status IS NOT NULL
-    AND DhtOp.validation_stage = 3  -- complete
-ORDER BY DhtOp.op_order
+    LimboOp.validation_stage = 'complete'
+    AND (LimboOp.sys_validation_status = 'valid' OR LimboOp.sys_validation_status = 'rejected')
+    AND (LimboOp.app_validation_status = 'valid' OR LimboOp.app_validation_status = 'rejected')
+ORDER BY LimboOp.when_received
 ```
 
 **Workflow Steps:**
@@ -872,69 +849,64 @@ ORDER BY DhtOp.op_order
    ```sql
    INSERT INTO DhtOp (
        hash,
-       type,
+       op_type,
        action_hash,
        basis_hash,
        storage_center_loc,
        validation_status,
+       locally_validated,
        when_received,
        when_integrated
    )
    SELECT
        hash,
-       type,
+       op_type,
        action_hash,
        basis_hash,
        storage_center_loc,
-       validation_status,
-       when_stored,  -- from LimboOp
+       CASE
+           WHEN sys_validation_status = 'valid' AND app_validation_status = 'valid' THEN 'valid'
+           ELSE 'rejected'
+       END,
+       TRUE,  -- locally_validated
+       when_received,
        CURRENT_TIMESTAMP
    FROM LimboOp
    WHERE hash = :op_hash
    ```
 
-3. **Insert/Update DhtAction**
+3. **Update DhtAction with Record Validity**
    - Compute aggregated `record_validity` from all ops for this action
    - **Rules:**
      - If ANY op for this action is rejected: `record_validity = 'rejected'`
      - If at least one op is valid and none rejected: `record_validity = 'valid'`
    ```sql
-   INSERT INTO DhtAction (
-       hash, author, seq, prev_hash, timestamp,
-       action_type, action_data, entry_hash,
-       record_validity
-   )
-   VALUES (...)
-   ON CONFLICT (hash) DO UPDATE
+   UPDATE DhtAction
    SET record_validity = :aggregated_validity
+   WHERE hash = :action_hash
    ```
 
-4. **Insert DhtEntry** (if applicable)
-   - If action has entry and entry not already present:
-   ```sql
-   INSERT OR IGNORE INTO DhtEntry (hash, blob)
-   VALUES (:entry_hash, :entry_blob)
-   ```
+   Note: DhtAction and DhtEntry rows are created during incoming op insertion (step 1.5) with `record_validity = NULL`
 
-5. **Delete from LimboOp**
+4. **Delete from LimboOp**
    ```sql
    DELETE FROM LimboOp WHERE hash = :op_hash
    ```
 
-6. **Send Validation Receipt** (if required)
+5. **Send Validation Receipt** (if required)
    - If op came from network and `require_receipt = true`
    - Send signed validation receipt back to author
 
 **State Transition Summary:**
 
 ```
-Incoming → LimboOp (validation_stage=0)
+Incoming → DhtAction (record_validity=NULL) + DhtEntry (if applicable) + LimboOp (validation_stage=0)
          ↓ (sys validation)
          LimboOp (validation_stage=1)
          ↓ (app validation)
          LimboOp (validation_stage=3, validation_status='valid'|'rejected')
          ↓ (integration)
-         DhtOp (when_integrated=timestamp) + DhtAction + DhtEntry
+         DhtOp (when_integrated=timestamp) + UPDATE DhtAction.record_validity
          DELETE from LimboOp
 ```
 
@@ -943,7 +915,7 @@ Incoming → LimboOp (validation_stage=0)
 **Rules:**
 1. A record is **INVALID** if ANY known ops for it are rejected
 2. A record is **VALID** if at least one known op for it is valid and no known ops are rejected
-3. Abandoned ops never leave the limbo state, so records in DHT only have 'valid' or 'rejected' status
+3. Records in limbo have NULL record_validity. After integration, record_validity is 'valid' or 'rejected'
 4. A record's validity is computed on integration, not on query
 5. Validators may have partial views due to sharding - validity is based only on known ops
 
@@ -965,6 +937,7 @@ SELECT Action.*, Entry.*
 FROM DhtAction AS Action
 LEFT JOIN DhtEntry AS Entry ON Action.entry_hash = Entry.hash
 WHERE Action.hash = ?
+  AND Action.record_validity IS NOT NULL
   AND Action.record_validity = 'valid'
 ```
 
@@ -976,6 +949,7 @@ SELECT Entry.*, Action.record_validity
 FROM DhtEntry AS Entry
 JOIN DhtAction AS Action ON Action.entry_hash = Entry.hash
 WHERE hash = ?
+  AND Action.record_validity IS NOT NULL
   AND Action.record_validity = 'valid'
 ```
 
@@ -984,6 +958,7 @@ WHERE hash = ?
 ```sql
 SELECT * FROM DhtAction
 WHERE author = ?
+  AND record_validity IS NOT NULL
   AND record_validity = 'valid'
 ORDER BY seq
 ```
@@ -991,7 +966,7 @@ ORDER BY seq
 ## Workflow Specifications
 
 ### Incoming DHT Ops Workflow
-Ops are inserted into LimboOp table with validation_stage='pending_sys'
+Ops are inserted into LimboOp table with validation_stage='pending_sys'. Actions are inserted into DhtAction with record_validity=NULL, and entries (if applicable) are inserted into DhtEntry.
 
 ### Sys Validation Workflow  
 Updates sys_validation_status in LimboOp, triggers app validation or abandonment
@@ -1064,6 +1039,8 @@ Warrants require special consideration:
 ### Mutations
 
 1. **insert_network_op** (from network)
+   - Insert action into DhtAction with record_validity=NULL
+   - Insert entry (if applicable) into DhtEntry
    - Insert into LimboOp with validation_stage='pending_sys'
 
 2. **author_action** (local authoring)
@@ -1081,8 +1058,7 @@ Warrants require special consideration:
 
 5. **set_when_integrated** (after all validation)
    - Move from LimboOp to DhtOp
-   - Update record validity in DhtAction
-   - Insert DhtEntry if applicable
+   - Update record_validity in DhtAction
 
 6. **set_receipts_complete** (after enough receipts)
    - Update DhtOp.receipts_complete
@@ -1101,12 +1077,13 @@ The system maintains these invariants:
 
 1. **No op exists in both LimboOp and DhtOp simultaneously**
 2. **Every DhtOp has a definite validation_status (never NULL)**
-3. **Every DhtAction has a computed record_validity**
-4. **Ops move from limbo to DHT atomically with record updates**
-5. **Rejected ops in DhtOp cause their records to be marked invalid**
+3. **DhtAction has NULL record_validity for pending records, 'valid' or 'rejected' for integrated records**
+4. **Ops move from limbo to DHT atomically with record_validity updates**
+5. **Rejected ops in DhtOp cause their records to be marked 'rejected'**
 6. **Dependencies are resolved before validation proceeds**
 7. **Authored ops remain in authored database until locally validated**
 8. **Failed local validation can be rolled back without affecting the chain**
+9. **Queries for validated data always check record_validity IS NOT NULL**
 
 ## Optimized Action Storage Design
 
