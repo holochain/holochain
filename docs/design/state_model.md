@@ -551,7 +551,7 @@ The validation flow processes incoming DHT ops through several stages, from init
 
 ```
 1. Incoming DHT Ops Workflow
-   ├─> Compute op hash (DhtOpHash) from op content
+   ├─> Compute op hash (`DhtOpHash`) from op content
    ├─> Filter duplicate ops already being processed
    ├─> Verify counterfeit checks (signature validation)
    ├─> Filter ops already in database (check DhtOp table)
@@ -580,49 +580,49 @@ The validation flow processes incoming DHT ops through several stages, from init
 
 #### Incoming DHT Ops Workflow
 
-The incoming DHT ops workflow is the entry point for all DHT ops received from the network or authored locally. It performs initial validation and inserts ops into the limbo table for further processing.
+The incoming DHT ops workflow is the entry point for all DHT ops received from the network. It performs initial validation and inserts ops into limbo for further processing.
 
 **Workflow Steps:**
 
 1. **Compute Op Hash**
-   - Call `DhtOpHashed::from_content_sync(op)` to compute the hash
-   - This verifies the op hash matches the op content
-   - Rejects ops with mismatched hashes
+   - Use the `holo_hash` crate to compute the op hash from the full op content.
 
-2. **Deduplication Check**
-   - Check `IncomingOpHashes` shared state to filter ops already being processed
-   - Prevents duplicate work for ops in flight
-   - Uses `OpsClaim` RAII guard to track ops being processed
-
-3. **Counterfeit Checks**
-   - For `ChainOp`: verify action signature via `counterfeit_check_action`
-     - Calls `verify_action_signature(signature, action)`
-     - Verifies `action.signer().verify_signature(sig, action)`
-     - Rejects ops with invalid signatures
-   - For `WarrantOp`: verify warrant signature via `counterfeit_check_warrant`
-   - Drop entire batch if any op fails counterfeit checks
-
-4. **Existence Check**
-   - Query `DhtOp` table to filter ops already in database
+2. **Existence Check**
+    - Query `DhtOp` table to filter ops already in database
    ```sql
    SELECT EXISTS(
        SELECT 1 FROM DhtOp WHERE DhtOp.hash = :hash
    )
    ```
-   - Skip ops that already exist
+    - Skip ops that already exist
+
+3. **Deduplication Check**
+   - Check the current working state to filter ops already being processed to prevent duplicate work for ops in flight.
+
+4. **Counterfeit Checks**
+   - For each op, verify structural integrity and cryptographic validity:
+     - **Signature verification**:
+         - For `ChainOp`: `verify_action_signature(signature, action)` ensures signature is valid for the action
+         - For `WarrantOp`: `verify_warrant_signature(warrant_op)` ensures warrant signature is valid
+     - **Action hash verification**: Using `holo_hash` to compute the action hash ensures that the action content matches the provided action hash.
+     - **Entry hash verification**: For actions with an entry, use `holo_hash` to verify entry content hashes to the entry hash referenced in the action.
+   - **Batch rejection**: If any op fails any check, the entire incoming batch is dropped
+     - This prevents the invalid op from entering the system
+     - It also prevents wasting resources processing other ops in the batch
 
 5. **Insert Into Limbo**
-   - Insert remaining ops into `LimboOp` table
-   - Calls `insert_op_dht(txn, op, serialized_size, transfer_data)`
-   - This performs additional hash verification:
-     - **Action hash verification**: `ActionHashed::from_content_sync(action)` ensures action hash matches action content
-     - **Entry hash verification**: `insert_entry(txn, entry_hash, entry)` ensures entry hash matches entry content
-   - Set initial state:
+   - Insert batch of validated ops into `LimboOp` table within a single write transaction
+   - For each op in the batch:
+     - Extract and store the action in the limbo action table
+     - Extract and store the entry (if present) in the limbo entry table
+     - Insert op metadata into `LimboOp` table
+   - Set initial validation state:
      - `validation_stage = 'pending_sys'`
      - `sys_validation_status = NULL`
      - `app_validation_status = NULL`
      - `when_received = current_timestamp`
-   - Set `require_receipt = true` to send validation receipts
+   - Set `require_receipt = true` to send validation receipts back to author
+   - Transaction ensures atomicity: either all ops in batch are inserted or none
 
 6. **Trigger Sys Validation**
    - Send trigger to `sys_validation_workflow` queue consumer
@@ -630,11 +630,13 @@ The incoming DHT ops workflow is the entry point for all DHT ops received from t
 
 **Hash Verification Summary:**
 
-All incoming ops undergo four critical hash verifications:
+All incoming ops undergo four critical hash verifications during counterfeit checks (step 3):
 1. **Op hash**: Verified by `DhtOpHashed::from_content_sync()` - ensures op content matches provided hash
 2. **Action hash**: Verified by `ActionHashed::from_content_sync()` - ensures action content matches action hash in op
-3. **Entry hash**: Verified by entry insertion - ensures entry content matches entry hash in action
-4. **Signature**: Verified by `verify_action_signature()` - ensures signature is valid for the action
+3. **Entry hash**: Verified by hashing entry content - ensures entry content matches entry hash in action
+4. **Signature**: Verified by `verify_action_signature()` or `verify_warrant_signature()` - ensures signature is valid
+
+If any verification fails, the entire batch is rejected before database insertion.
 
 **Error Handling:**
 
