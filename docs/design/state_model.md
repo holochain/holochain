@@ -165,9 +165,10 @@ CREATE TABLE LimboOp (
     -- Validation receipt requirement
     require_receipt BOOLEAN NOT NULL,    -- Whether to send validation receipt back to author
 
-    -- Timing
+    -- Timing and attempt tracking
     when_received INTEGER NOT NULL,
-    validation_attempts INTEGER DEFAULT 0,
+    sys_validation_attempts INTEGER DEFAULT 0,
+    app_validation_attempts INTEGER DEFAULT 0,
     last_validation_attempt INTEGER,
 
     FOREIGN KEY(action_hash) REFERENCES DhtAction(hash)
@@ -687,7 +688,7 @@ SELECT
     LimboOp.hash,
     LimboOp.op_type,
     LimboOp.action_hash,
-    LimboOp.validation_attempts,
+    LimboOp.sys_validation_attempts,
     DhtAction.author,
     DhtAction.entry_hash
 FROM LimboOp
@@ -695,15 +696,15 @@ JOIN DhtAction ON LimboOp.action_hash = DhtAction.hash
 WHERE
     LimboOp.validation_stage = 'pending_sys'
     AND LimboOp.sys_validation_status IS NULL
-ORDER BY validation_attempts, when_received
+ORDER BY sys_validation_attempts, when_received
 LIMIT 10000
 ```
 
 **Workflow Steps:**
 
 1. **Query Pending Ops**
-   - Select ops with `validation_stage = NULL or 'pending_sys'` (value 0)
-   - Order by validation attempts (least first), then op order
+   - Select ops with `validation_stage = 'pending_sys'`
+   - Order by sys validation attempts (least first), then received time
    - Limit to 10000 ops per workflow run
 
 2. **Fetch Dependencies**
@@ -722,7 +723,7 @@ LIMIT 10000
      SET validation_stage = 'pending_app',
          sys_validation_status = 'valid',
          last_validation_attempt = CURRENT_TIMESTAMP,
-         validation_attempts = 0
+         sys_validation_attempts = sys_validation_attempts + 1
      WHERE hash = :op_hash
      ```
    - For **rejected** ops:
@@ -730,11 +731,11 @@ LIMIT 10000
      UPDATE LimboOp
      SET sys_validation_status = 'rejected',
          last_validation_attempt = CURRENT_TIMESTAMP,
-         validation_attempts = 0
+         sys_validation_attempts = sys_validation_attempts + 1
      WHERE hash = :op_hash
      ```
    - For ops with **missing dependencies**: no status update, retry after network fetch
-     - TODO increment validation_attempts
+     - TODO increment sys_validation_attempts
 
 5. **Trigger Next Workflow**
    - If any ops accepted: trigger `app_validation_workflow`
@@ -793,7 +794,7 @@ SELECT
     LimboOp.hash,
     LimboOp.op_type,
     LimboOp.action_hash,
-    LimboOp.validation_attempts,
+    LimboOp.app_validation_attempts,
     DhtAction.author,
     DhtAction.entry_hash
 FROM LimboOp
@@ -802,15 +803,15 @@ WHERE
     LimboOp.validation_stage = 'pending_app'
     AND LimboOp.sys_validation_status = 'valid'
     AND LimboOp.app_validation_status IS NULL
-ORDER BY validation_attempts, when_received
+ORDER BY app_validation_attempts, when_received
 LIMIT 10000
 ```
 
 **Workflow Steps:**
 
 1. **Query Pending Ops**
-   - Select ops with `validation_stage = 'pending_app' (1) or 'awaiting_app_deps' (2)`
-   - Order by validation attempts, then op order
+   - Select ops with `validation_stage = 'pending_app'`
+   - Order by app validation attempts (least first), then received time
 
 2. **Execute WASM Validation**
    - Load appropriate DNA and ribosome
@@ -824,7 +825,7 @@ LIMIT 10000
      SET validation_stage = 'complete',
          app_validation_status = 'valid',
          last_validation_attempt = CURRENT_TIMESTAMP,
-         validation_attempts = validation_attempts + 1
+         app_validation_attempts = app_validation_attempts + 1
      WHERE hash = :op_hash
      ```
    - For **rejected** ops:
@@ -832,13 +833,13 @@ LIMIT 10000
      UPDATE LimboOp
      SET app_validation_status = 'rejected',
          last_validation_attempt = CURRENT_TIMESTAMP,
-         validation_attempts = validation_attempts + 1
+         app_validation_attempts = app_validation_attempts + 1
      WHERE hash = :op_hash
      ```
    - For ops **awaiting dependencies**:
      ```sql
      UPDATE LimboOp
-     SET validation_attempts = validation_attempts + 1
+     SET app_validation_attempts = app_validation_attempts + 1
      WHERE hash = :op_hash
      ```
 
