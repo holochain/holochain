@@ -22,7 +22,7 @@ sodoken = "0.1.0"
 tokio = { version = "1.27", features = ["full"] }
 libsqlite3-sys = "0.35"
 holo_hash = { version = "^0.7.0-dev.3", path = "../holo_hash" }
-holochain_types = { version = "^0.7.0-dev.9", path = "../holochain_types" }
+holochain_types = { version = "^0.7.0-dev.10", path = "../holochain_types" }
 holochain_integrity_types = { version = "^0.7.0-dev.4", path = "../holochain_integrity_types" }
 holochain_zome_types = { version = "^0.7.0-dev.5", path = "../holochain_zome_types" }
 holochain_serialized_bytes = "=0.0.56"
