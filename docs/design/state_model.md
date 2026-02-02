@@ -870,17 +870,25 @@ ORDER BY LimboOp.when_received
    ```
 
 3. **Update `DhtAction` with Record Validity**
-   - Compute aggregated `record_validity` from all ops for this action
-   - **Rules:**
+   - Aggregate `record_validity` from all ops for this action using a single query
+   - **Rules (applied in SQL):**
      - If ANY op for this action is rejected: `record_validity = 'rejected'`
      - If at least one op is valid and none rejected: `record_validity = 'valid'`
    ```sql
    UPDATE DhtAction
-   SET record_validity = :aggregated_validity
+   SET record_validity = (
+       SELECT CASE
+           WHEN COUNT(CASE WHEN validation_status = 'rejected' THEN 1 END) > 0 THEN 'rejected'
+           WHEN COUNT(CASE WHEN validation_status = 'valid' THEN 1 END) > 0 THEN 'valid'
+           ELSE NULL
+       END
+       FROM DhtOp
+       WHERE action_hash = :action_hash
+   )
    WHERE hash = :action_hash
    ```
 
-   Note: DhtAction and DhtEntry rows are created during incoming op insertion (step 1.5) with `record_validity = NULL`
+   Note: DhtAction and DhtEntry rows are created during incoming op insertion (step 6) with `record_validity = NULL`
 
 4. **Delete from LimboOp**
    ```sql
@@ -890,7 +898,7 @@ ORDER BY LimboOp.when_received
 5. **Commit Transaction**
     - Commit the write transaction to finalize changes for this op.
 
-5. **Send Validation Receipt** (if required)
+6. **Send Validation Receipt** (if required)
    - If op came from network and `require_receipt = true`
    - Send signed validation receipt back to author
 
