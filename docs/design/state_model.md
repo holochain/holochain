@@ -616,7 +616,7 @@ The incoming DHT ops workflow is the entry point for all DHT ops received from t
    - Verify that the location of the op hash falls within the current arc set for local agents.
    - If any ops don't fall within the expected arcs, reject the batch.
 
-2. **Existence Check**
+3. **Existence Check**
     - Query `DhtOp` table to filter ops already in database
    ```sql
    SELECT EXISTS(
@@ -625,10 +625,10 @@ The incoming DHT ops workflow is the entry point for all DHT ops received from t
    ```
     - Skip ops that already exist
 
-3. **Deduplication Check**
+4. **Deduplication Check**
    - Check the current working state to filter ops already being processed to prevent duplicate work for ops in flight.
 
-4. **Counterfeit Checks and Hash Verification**
+5. **Counterfeit Checks and Hash Verification**
    - For each op, verify structural integrity and cryptographic validity:
      - **Signature verification**:
          - For `ChainOp`: `verify_action_signature(signature, action)` ensures signature is valid for the action
@@ -640,7 +640,7 @@ The incoming DHT ops workflow is the entry point for all DHT ops received from t
      - This prevents the invalid op from entering the system
      - It also prevents wasting resources processing other ops in the batch
 
-5. **Insert Into Limbo**
+6. **Insert Into Limbo**
    - Insert the batch of `HashedChainOp` into tables within a single write transaction
    - For each `HashedChainOp` in the batch:
      - Insert action from `action: SignedActionHashed` into `DhtAction` table with `record_validity = NULL`
@@ -653,7 +653,7 @@ The incoming DHT ops workflow is the entry point for all DHT ops received from t
      - `when_received = current_timestamp`
    - Set `require_receipt = true` to send validation receipts back to author
 
-6. **Trigger Sys Validation**
+7. **Trigger Sys Validation**
    - Send trigger to `sys_validation_workflow` queue consumer
    - Workflow run completes
 
@@ -674,7 +674,7 @@ After successful verification, each `ChainOp` is converted to `HashedChainOp` co
 - Invalid signature: Drop the entire batch
 - Hash mismatch: Rejected during hash computation
 - Wrong location: Drop the entire batch
-- Database errors: Workflow returns error, op batch is dropped
+- Database errors: Workflow returns an error, op batch is dropped
 
 #### Sys Validation Workflow
 
@@ -696,7 +696,7 @@ JOIN DhtAction ON LimboOp.action_hash = DhtAction.hash
 WHERE
     LimboOp.validation_stage = 'pending_sys'
     AND LimboOp.sys_validation_status IS NULL
-ORDER BY sys_validation_attempts, when_received
+ORDER BY sys_validation_attempts, DhtAction.seq, when_received
 LIMIT 10000
 ```
 
@@ -704,8 +704,8 @@ LIMIT 10000
 
 1. **Query Pending Ops**
    - Select ops with `validation_stage = 'pending_sys'`
-   - Order by sys validation attempts (least first), then received time
-   - Limit to 10000 ops per workflow run
+   - Order by sys validation attempts (least first), then action sequence, then received time
+   - Limit to 10,000 ops per workflow run
 
 2. **Fetch Dependencies**
    - Concurrently fetch dependencies from local databases
@@ -746,43 +746,6 @@ LIMIT 10000
    - If dependencies fetched: re-trigger `sys_validation_workflow`
    - If still missing: sleep and retry later
 
-**Sys Validation Checks:**
-
-Checks vary by op type. All checks validate:
-- Action sequence and chain structure
-- Signature validity (already checked in incoming workflow)
-- Entry hash matches entry content (if entry present)
-- Action hash matches action content
-
-For `CreateRecord` / `CreateEntry`:
-- Previous action exists (if seq > 0)
-- Entry type matches between action and entry
-- Entry size within limits
-- AgentPubKey creates preceded by AgentValidationPkg
-
-For `UpdateEntry` / `UpdateRecord`:
-- Original action exists and is found
-- Original entry hash matches
-- Entry type consistency
-
-For `DeleteEntry` / `DeleteRecord`:
-- Deleted action exists and is Create or Update
-
-For `CreateLink`:
-- Tag size within limits
-
-For `DeleteLink`:
-- Link add action exists and is CreateLink
-
-For `AgentActivity`:
-- DNA action at seq 0 has correct DNA hash
-- Previous action not CloseChain
-
-For `WarrantOp`:
-- Fetch and validate warranted action
-- If warranted action is invalid: accept warrant, block author
-- If warranted action is valid: reject warrant, block warrant author
-
 #### App Validation Workflow
 
 The app validation workflow executes application-defined validation logic via WASM for ops that have passed sys validation.
@@ -803,7 +766,7 @@ WHERE
     LimboOp.validation_stage = 'pending_app'
     AND LimboOp.sys_validation_status = 'valid'
     AND LimboOp.app_validation_status IS NULL
-ORDER BY app_validation_attempts, when_received
+ORDER BY app_validation_attempts, DhtAction.seq, when_received
 LIMIT 10000
 ```
 
@@ -811,7 +774,7 @@ LIMIT 10000
 
 1. **Query Pending Ops**
    - Select ops with `validation_stage = 'pending_app'`
-   - Order by app validation attempts (least first), then received time
+   - Order by app validation attempts (least first), then action sequence, then received time
 
 2. **Execute WASM Validation**
    - Load appropriate DNA and ribosome
@@ -848,7 +811,7 @@ LIMIT 10000
 
 #### Integration Workflow
 
-The integration workflow moves validated ops from the limbo table to the DHT table and updates record validity status.
+The integration workflow moves validated ops from the limbo table to the DHT table and updates the associated record validity status.
 
 **Query for Ops Ready for Integration:**
 
@@ -871,10 +834,12 @@ ORDER BY LimboOp.when_received
 **Workflow Steps:**
 
 1. **Query Completed Ops**
-   - Select ops with `validation_stage = 'complete'` and `when_integrated IS NULL`
-   - Both valid and rejected ops are integrated
+   - Select ops with `validation_stage = 'complete'` and both sys and app validation statuses set.
+   - Both valid and rejected ops are integrated.
 
 2. **Move Op to DhtOp Table**
+   - Start a write transaction for each op.
+   - Execute the following insert:
    ```sql
    INSERT INTO DhtOp (
        hash,
@@ -904,7 +869,7 @@ ORDER BY LimboOp.when_received
    WHERE hash = :op_hash
    ```
 
-3. **Update DhtAction with Record Validity**
+3. **Update `DhtAction` with Record Validity**
    - Compute aggregated `record_validity` from all ops for this action
    - **Rules:**
      - If ANY op for this action is rejected: `record_validity = 'rejected'`
@@ -921,6 +886,9 @@ ORDER BY LimboOp.when_received
    ```sql
    DELETE FROM LimboOp WHERE hash = :op_hash
    ```
+
+5. **Commit Transaction**
+    - Commit the write transaction to finalize changes for this op.
 
 5. **Send Validation Receipt** (if required)
    - If op came from network and `require_receipt = true`
