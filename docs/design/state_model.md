@@ -730,11 +730,15 @@ The incoming DHT ops workflow is the entry point for all DHT ops received from t
      - It also prevents wasting resources processing other ops in the batch
 
 6. **Insert Into Limbo**
-   - Insert the batch of `HashedChainOp` into tables within a single write transaction
-   - For each `HashedChainOp` in the batch:
-     - Insert action from `action: SignedActionHashed` into `DhtAction` table with `record_validity = NULL`
-     - Insert entry from `entry: Option<EntryHashed>` (if present) into `DhtEntry` table
-     - Insert op metadata into `LimboOp` table using pre-computed hashes (`op_hash`, `action.hash`, `basis_hash`, `storage_center_loc`)
+   - Insert the batch of ops into tables within a single write transaction
+   - For each op in the batch:
+     - **If chain op (`DhtOp::ChainOp`)**:
+       - Insert action from `action: SignedActionHashed` into `DhtAction` table with `record_validity = NULL`
+       - Insert entry from `entry: Option<EntryHashed>` (if present) into `DhtEntry` table
+       - Insert op metadata into `LimboOp` table using pre-computed hashes (`op_hash`, `action.hash`, `basis_hash`, `storage_center_loc`)
+     - **If warrant op (`DhtOp::WarrantOp`)**:
+       - No action or entry insertion (warrants don't have actions)
+       - Insert op metadata into `LimboOp` table with warrant-specific data (`op_hash`, `basis_hash = warrantee`, `storage_center_loc`)
    - Set initial validation state in `LimboOp`:
      - `validation_stage = 'pending_sys'`
      - `sys_validation_status = NULL`
@@ -1021,15 +1025,30 @@ ORDER BY LimboOp.when_received
    );
    ```
 
-5. **Delete from LimboOp**
+5. **Update Warrant Index Table** (if applicable)
+   - If the op is a warrant op (`op_type = 'Warrant'`) and the op is valid, insert into `DhtWarrant` table:
+   ```sql
+   INSERT INTO DhtWarrant (hash, author, timestamp, warrantee, proof, storage_center_loc)
+   VALUES (
+       :warrant_hash,
+       :author,        -- extracted from warrant proof
+       :timestamp,     -- extracted from warrant
+       :warrantee,     -- extracted from warrant
+       :proof,         -- serialized WarrantProof BLOB
+       :storage_center_loc
+   )
+   WHERE :validation_status = 'valid'
+   ```
+
+6. **Delete from LimboOp**
    ```sql
    DELETE FROM LimboOp WHERE hash = :op_hash
    ```
 
-6. **Commit Transaction**
+7. **Commit Transaction**
     - Commit the write transaction to finalize changes for this op.
 
-7. **Send Validation Receipt** (if required)
+8. **Send Validation Receipt** (if required)
    - If op came from network and `require_receipt = true`
    - Send a signed validation receipt back to the author
 
@@ -1201,17 +1220,62 @@ TODO: Design how to track and prune cached ops when storage pressure occurs.
 
 ## Warrant Handling
 
-Warrants require special consideration:
+Warrant ops follow the same validation and integration workflow as chain ops, but with warrant-specific validation logic.
 
-1. **ChainIntegrityWarrant**: Proves an author broke chain rules
+### Warrant Processing Flow
+
+Warrants are processed through the standard validation pipeline:
+
+1. **Incoming DHT Ops Workflow** (same as chain ops)
+   - Warrant op arrives as `DhtOp::WarrantOp(warrant)`
+   - Hash verification and counterfeit checks performed
+   - Inserted into `LimboOp` with `op_type = 'Warrant'`
+   - Warrant proof data stored in the op
+   - No action/entry inserted (warrants don't have actions)
+
+2. **Sys Validation Workflow** (warrant-specific logic)
+   - Warrant validation depends on warrant type:
+
+   **ChainIntegrityWarrant**: Proves an author broke chain rules
    - Stays in `LimboOp` until the warranted action is fetched and validated
-   - If warranted action is rejected, warrant moves to `DhtOp` as valid
-   - If warranted action is valid, the warrant is rejected and removed
+   - If warranted action is rejected: warrant is valid (proves the claim)
+   - If warranted action is valid: warrant is rejected (false claim)
 
-2. **ChainForkWarrant**: Proves an author has forked their chain
+   **ChainForkWarrant**: Proves an author has forked their chain
    - Stays in `LimboOp` until both forked actions are fetched and checked
-   - If both forked actions are at the same sequence number, warrant moves to `DhtOp` as valid
-   - If the forked actions do not match the fork condition, the warrant is rejected and removed
+   - If both forked actions are at the same sequence number: warrant is valid (proves fork)
+   - If the forked actions do not match the fork condition: warrant is rejected (false claim)
+
+3. **Integration Workflow** (same as chain ops, with additional warrant table update)
+   - When warrant validation completes (valid or rejected), warrant op moves to `DhtOp`
+   - Additionally, extract warrant data to `DhtWarrant` table for efficient querying:
+   ```sql
+   INSERT INTO DhtWarrant (hash, author, timestamp, warrantee, proof, storage_center_loc)
+   SELECT
+       :warrant_hash,
+       :author,        -- extracted from warrant
+       :timestamp,     -- extracted from warrant
+       :warrantee,     -- extracted from warrant
+       :proof,         -- serialized WarrantProof
+       :storage_center_loc
+   WHERE :validation_status = 'valid'  -- Only index valid warrants
+   ```
+
+### Warrant Query Patterns
+
+Valid warrants can be queried from the `DhtWarrant` table:
+
+```sql
+-- Find all warrants against a specific agent
+SELECT * FROM DhtWarrant
+WHERE warrantee = ?
+ORDER BY timestamp DESC;
+
+-- Check if a specific warrant exists
+SELECT EXISTS(
+    SELECT 1 FROM DhtWarrant WHERE hash = ?
+);
+```
 
 ## Data Integrity Invariants
 
