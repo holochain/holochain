@@ -64,13 +64,37 @@ CREATE TABLE CapGrant (
 );
 
 -- Capability claims table.
--- 
+--
 -- For recording cap claims from other agents that are granted to a local agent.
 CREATE TABLE CapClaim (
     action_hash BLOB PRIMARY KEY,
     tag         TEXT NOT NULL,
     grantor     BLOB NOT NULL,
     secret      BLOB NOT NULL,
+);
+
+-- Link index table.
+--
+-- For efficient link queries. Populated at integration time when CreateLink ops are validated.
+CREATE TABLE Link (
+    action_hash BLOB PRIMARY KEY,
+    base_hash   BLOB NOT NULL,
+    zome_index  INTEGER NOT NULL,
+    link_type   INTEGER NOT NULL,
+    tag         BLOB,
+
+    FOREIGN KEY(action_hash) REFERENCES Action(hash)
+);
+
+-- Deleted link index table.
+--
+-- For tracking which links have been deleted. Populated at integration time when DeleteLink ops are validated.
+CREATE TABLE DeletedLink (
+    action_hash      BLOB PRIMARY KEY,  -- The DeleteLink action
+    create_link_hash BLOB NOT NULL,      -- The CreateLink being deleted
+
+    FOREIGN KEY(action_hash) REFERENCES Action(hash),
+    FOREIGN KEY(create_link_hash) REFERENCES Link(action_hash)
 );
 
 -- Authored ops.
@@ -207,6 +231,31 @@ CREATE TABLE DhtWarrant (
 
     -- DHT location (stored at warrantee's agent authority)
     storage_center_loc INTEGER NOT NULL
+);
+
+-- Link index table.
+--
+-- For efficient link queries. Populated at integration time when CreateLink ops are validated.
+CREATE TABLE Link (
+    action_hash BLOB PRIMARY KEY,
+    base_hash   BLOB NOT NULL,
+    target_hash BLOB NOT NULL,
+    zome_index  INTEGER NOT NULL,
+    link_type   INTEGER NOT NULL,
+    tag         BLOB,
+
+    FOREIGN KEY(action_hash) REFERENCES DhtAction(hash)
+);
+
+-- Deleted link index table.
+--
+-- For tracking which links have been deleted. Populated at integration time when DeleteLink ops are validated.
+CREATE TABLE DeletedLink (
+    action_hash      BLOB PRIMARY KEY,  -- The DeleteLink action
+    create_link_hash BLOB NOT NULL,      -- The CreateLink being deleted
+
+    FOREIGN KEY(action_hash) REFERENCES DhtAction(hash),
+    FOREIGN KEY(create_link_hash) REFERENCES Link(action_hash)
 );
 ```
 
@@ -375,7 +424,9 @@ The high-level flow for authoring actions and distributing ops is as follows:
 2. Author new action locally
    ├─> Insert into `Action` table
    ├─> Insert into `Entry` table (if applicable)
-   └─> Insert into `CapGrant` table (if applicable)
+   ├─> Insert into `CapGrant` or `CapClaim` table (if applicable)
+   ├─> Insert into `Link` table (if action is CreateLink)
+   └─> Insert into `DeletedLink` table (if action is DeleteLink)
 
 3. Create ops for publishing
    ├─> If this is a countersigning action, skip this step (ops created on session completion)
@@ -890,15 +941,38 @@ ORDER BY LimboOp.when_received
 
    Note: DhtAction and DhtEntry rows are created during incoming op insertion (step 6) with `record_validity = NULL`
 
-4. **Delete from LimboOp**
+4. **Update Link Index Tables** (if applicable)
+   - If the action is a `CreateLink` and the op is valid, insert into `Link` table:
+   ```sql
+   INSERT INTO Link (action_hash, base_hash, zome_index, link_type, tag)
+   SELECT
+       Action.hash,
+       :base_hash,      -- extracted from action_data
+       :zome_index,     -- extracted from action_data
+       :link_type,      -- extracted from action_data
+       :tag             -- extracted from action_data
+   FROM DhtAction AS Action
+   WHERE Action.hash = :action_hash
+       AND Action.record_validity = 'valid'
+       AND Action.action_type = 'CreateLink'
+   ```
+   - If the action is a `CreateLink` and the op is rejected, ensure no row exists in `Link` table for this action (delete if necessary).
+   - If the action is a `DeleteLink` and the op is valid, insert into `DeletedLink` table:
+   ```sql
+   INSERT INTO DeletedLink (action_hash, create_link_hash)
+   VALUES (:action_hash, :create_link_hash)  -- create_link_hash from action_data
+   ```
+   - If the action is a `DeleteLink` and the op is rejected, ensure no row exists in `DeletedLink` table for this action (delete if necessary).
+
+5. **Delete from LimboOp**
    ```sql
    DELETE FROM LimboOp WHERE hash = :op_hash
    ```
 
-5. **Commit Transaction**
+6. **Commit Transaction**
     - Commit the write transaction to finalize changes for this op.
 
-6. **Send Validation Receipt** (if required)
+7. **Send Validation Receipt** (if required)
    - If op came from network and `require_receipt = true`
    - Send a signed validation receipt back to the author
 
@@ -913,7 +987,7 @@ The record validity is determined at the time of integration by examining all kn
 
 ### Record Validity Correction
 
-TODO: It is a future piece of work to define this logic.
+TODO: It is a future piece of work to define this logic. When implemented, this logic must also clean up index tables (`Link`, `DeletedLink`, `CapGrant`, `CapClaim`) when records are invalidated.
 
 ## Query Patterns
 
@@ -946,37 +1020,39 @@ Justification for *any*: An entry can be referenced by multiple actions. If at l
 
 ### Get Links
 
-Query all non-deleted links from a base hash with filtering applied in application code.
+Query all non-deleted links from a base hash using the Link index table populated at integration time.
 
 ```sql
--- Find CreateLink ops
-SELECT Op.*, Action.*
-FROM DhtOp AS Op
-JOIN DhtAction AS Action ON Op.action_hash = Action.hash
-WHERE Op.basis_hash = ?  -- base hash
-  AND Action.action_type = 'CreateLink'
-  AND Op.validation_status = 'valid'
+-- Find non-deleted links from base
+SELECT Link.*, Action.*
+FROM Link
+JOIN DhtAction AS Action ON Link.action_hash = Action.hash
+LEFT JOIN DeletedLink ON Link.action_hash = DeletedLink.create_link_hash
+WHERE Link.base_hash = ?
+  AND DeletedLink.create_link_hash IS NULL  -- Exclude deleted links
   AND Action.record_validity = 'valid'
--- Application code then:
---   - Deserializes action_data to extract link_type, tag, target, timestamp
---   - Filters by link_type, tag prefix, author, timestamp bounds
---   - Removes links with matching DeleteLink actions
+-- Additional filters can be applied in SQL or application code:
+--   - link_type: WHERE Link.link_type = ?
+--   - zome_index: WHERE Link.zome_index = ?
+--   - tag prefix: WHERE Link.tag >= ? AND Link.tag < ?  (bytewise comparison)
+--   - author: WHERE Action.author = ?
+--   - timestamp bounds: WHERE Action.timestamp BETWEEN ? AND ?
 ```
 
 ### Count Links
 
-Count links matching query criteria without retrieving full link data.
+Count non-deleted links matching query criteria using the `Link` index table.
 
 ```sql
--- Count CreateLink ops (additional filtering in application code)
+-- Count non-deleted links
 SELECT COUNT(*)
-FROM DhtOp AS Op
-JOIN DhtAction AS Action ON Op.action_hash = Action.hash
-WHERE Op.basis_hash = ?
-  AND Action.action_type = 'CreateLink'
-  AND Op.validation_status = 'valid'
+FROM Link
+LEFT JOIN DeletedLink ON Link.action_hash = DeletedLink.create_link_hash
+JOIN DhtAction AS Action ON Link.action_hash = Action.hash
+WHERE Link.base_hash = ?
+  AND DeletedLink.create_link_hash IS NULL
   AND Action.record_validity = 'valid'
--- Then filter in application for link_type, tag prefix, deleted links
+-- Additional filters (link_type, tag prefix, author, timestamp) applied as needed
 ```
 
 ### Get Agent Activity
@@ -1071,14 +1147,14 @@ TODO: Design how to track and prune cached ops when storage pressure occurs.
 Warrants require special consideration:
 
 1. **ChainIntegrityWarrant**: Proves an author broke chain rules
-   - Stays in LimboOp until warranted action is fetched and validated
-   - If warranted action is rejected, warrant moves to DhtOp as valid
-   - If warranted action is valid, warrant is rejected
+   - Stays in `LimboOp` until the warranted action is fetched and validated
+   - If warranted action is rejected, warrant moves to `DhtOp` as valid
+   - If warranted action is valid, the warrant is rejected and removed
 
-2. **Warrant Validation Dependencies**: 
-   - Warrants can have up to 2 dependencies (the actions being warranted)
-   - These must be resolved before warrant validation can complete
-   - Dependencies tracked in dependency1 and dependency2 fields of LimboOp
+2. **ChainForkWarrant**: Proves an author has forked their chain
+   - Stays in `LimboOp` until both forked actions are fetched and checked
+   - If both forked actions are at the same sequence number, warrant moves to `DhtOp` as valid
+   - If the forked actions do not match the fork condition, the warrant is rejected and removed
 
 ## Data Integrity Invariants
 
