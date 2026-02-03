@@ -948,67 +948,7 @@ WHERE author = ?
 ORDER BY seq
 ```
 
-### Cache Pruning Strategy
-
-When storage pressure occurs:
-1. Identify ops outside the current arc set (`storage_center_loc` not in [arc_start, arc_end] for any local agent)
-2. Sort by `last_access_time` (tracked separately)
-3. Prune oldest first until storage target met
-
-## Warrant Handling
-
-Warrants require special consideration:
-
-1. **ChainIntegrityWarrant**: Proves an author broke chain rules
-   - Stays in LimboOp until warranted action is fetched and validated
-   - If warranted action is rejected, warrant moves to DhtOp as valid
-   - If warranted action is valid, warrant is rejected
-
-2. **Warrant Validation Dependencies**: 
-   - Warrants can have up to 2 dependencies (the actions being warranted)
-   - These must be resolved before warrant validation can complete
-   - Dependencies tracked in dependency1 and dependency2 fields of LimboOp
-
-## Data Integrity Invariants
-
-The system maintains these invariants:
-
-1. **No op exists in both LimboOp and DhtOp simultaneously**
-2. **Every DhtOp has a definite validation_status (never NULL)**
-3. **DhtAction has NULL record_validity for pending records, 'valid' or 'rejected' for integrated records**
-4. **Ops move from limbo to DHT atomically with record_validity updates**
-5. **Rejected ops in DhtOp cause their records to be marked 'rejected'**
-6. **Dependencies are resolved before validation proceeds**
-7. **Authored ops remain in authored database until locally validated**
-8. **Failed local validation can be rolled back without affecting the chain**
-9. **Queries for validated data always check record_validity IS NOT NULL**
-
-## Optimized Action Storage Design
-
-Actions are stored with common fields in the main table and action-specific data as a serialized BLOB. Where action-specific fields need to be queried, separate index tables provide efficient access.
-
-### Database Schema
-
-```sql
--- Main action storage
-CREATE TABLE Action (
-    hash          BLOB PRIMARY KEY,
-    author        BLOB NOT NULL,
-    seq           INTEGER NOT NULL,
-    prev_hash     BLOB,
-    timestamp     INTEGER NOT NULL,
-    action_type   TEXT NOT NULL,
-    action_data   BLOB,         -- Serialized ActionData enum
-    entry_hash    BLOB,         -- NULL for non-entry actions
-    private_entry BOOLEAN       -- NULL for non-entry actions, TRUE/FALSE for entry actions
-);
-```
-
-Note: Queryable entry types (CapGrant, CapClaim) have dedicated tables in the Entry section for direct lookup without requiring full chain scans.
-
-
-
-### Query Patterns
+### Cap Grant and Claim Lookups
 
 Cap grant/claim lookups use dedicated tables for direct access without chain scans:
 
@@ -1058,3 +998,33 @@ ORDER BY seq;
 SELECT * FROM Action WHERE hash = ?;
 -- Then deserialize action_data BLOB in application
 ```
+
+### Cache Pruning Strategy
+
+TODO: Design how to track and prune cached ops when storage pressure occurs.
+
+## Warrant Handling
+
+Warrants require special consideration:
+
+1. **ChainIntegrityWarrant**: Proves an author broke chain rules
+   - Stays in LimboOp until warranted action is fetched and validated
+   - If warranted action is rejected, warrant moves to DhtOp as valid
+   - If warranted action is valid, warrant is rejected
+
+2. **Warrant Validation Dependencies**: 
+   - Warrants can have up to 2 dependencies (the actions being warranted)
+   - These must be resolved before warrant validation can complete
+   - Dependencies tracked in dependency1 and dependency2 fields of LimboOp
+
+## Data Integrity Invariants
+
+The system maintains these invariants:
+
+1. **No op exists in both `LimboOp` and `DhtOp` simultaneously**
+2. **Every DhtOp has a definite `validation_status` (never `NULL`)**
+3. **`DhtAction` has a `NULL` value for `record_validity` for pending records, 'valid' or 'rejected' for integrated records**
+4. **Ops are moved from limbo to DHT atomically with `record_validity` updates**
+5. **Rejected ops in `DhtOp` cause their records to be marked 'rejected'**
+6. **Dependencies are resolved before validation proceeds**
+7. **Queries for validated data always check `record_validity IS NOT NULL` or `record_validity = 'valid'`**
