@@ -75,7 +75,7 @@ CREATE TABLE CapClaim (
 
 -- Link index table.
 --
--- For efficient link queries. Populated at integration time when CreateLink ops are validated.
+-- For efficient link queries. Populated when authoring `CreateLink` actions.
 CREATE TABLE Link (
     action_hash BLOB PRIMARY KEY,
     base_hash   BLOB NOT NULL,
@@ -88,7 +88,7 @@ CREATE TABLE Link (
 
 -- Deleted link index table.
 --
--- For tracking which links have been deleted. Populated at integration time when DeleteLink ops are validated.
+-- For tracking which links have been deleted. Populated when authoring `DeleteLink` actions.
 CREATE TABLE DeletedLink (
     action_hash      BLOB PRIMARY KEY,  -- The DeleteLink action
     create_link_hash BLOB NOT NULL,      -- The CreateLink being deleted
@@ -252,7 +252,6 @@ CREATE TABLE DhtWarrant (
 CREATE TABLE Link (
     action_hash BLOB PRIMARY KEY,
     base_hash   BLOB NOT NULL,
-    target_hash BLOB NOT NULL,
     zome_index  INTEGER NOT NULL,
     link_type   INTEGER NOT NULL,
     tag         BLOB,
@@ -992,13 +991,29 @@ ORDER BY LimboOp.when_received
        AND Action.record_validity = 'valid'
        AND Action.action_type = 'CreateLink'
    ```
-   - If the action is a `CreateLink` and the op is rejected, ensure no row exists in `Link` table for this action (delete if necessary).
+   - If the action is a `CreateLink` and the op is rejected, ensure no row exists in `Link` table for this action:
+   ```sql
+   DELETE FROM Link
+   WHERE action_hash = :action_hash
+   AND :action_hash IN (
+   SELECT hash FROM DhtAction
+   WHERE hash = :action_hash AND record_validity = 'rejected'
+   );
+   ```
    - If the action is a `DeleteLink` and the op is valid, insert into `DeletedLink` table:
    ```sql
    INSERT INTO DeletedLink (action_hash, create_link_hash)
    VALUES (:action_hash, :create_link_hash)  -- create_link_hash from action_data
    ```
-   - If the action is a `DeleteLink` and the op is rejected, ensure no row exists in `DeletedLink` table for this action (delete if necessary).
+   - If the action is a `DeleteLink` and the op is rejected, ensure no row exists in `DeletedLink` table for this action:
+   ```sql
+   DELETE FROM DeletedLink
+   WHERE action_hash = :action_hash
+   AND :action_hash IN (
+   SELECT hash FROM DhtAction
+   WHERE hash = :action_hash AND record_validity = 'rejected'
+   );
+   ```
 
 5. **Delete from LimboOp**
    ```sql
