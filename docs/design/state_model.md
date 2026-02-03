@@ -205,6 +205,9 @@ CREATE TABLE LimboOp (
     app_validation_attempts INTEGER DEFAULT 0,
     last_validation_attempt INTEGER,
 
+    -- Storage tracking
+    serialized_size INTEGER NOT NULL,  -- Size in bytes, calculated when op arrives
+
     FOREIGN KEY(action_hash) REFERENCES DhtAction(hash)
 );
 
@@ -737,6 +740,7 @@ The incoming DHT ops workflow is the entry point for all DHT ops received from t
      - `sys_validation_status = NULL`
      - `app_validation_status = NULL`
      - `when_received = current_timestamp`
+     - `serialized_size = encoded size of the op's transfer representation
    - Set `require_receipt = true` to send validation receipts back to author
 
 7. **Trigger Sys Validation**
@@ -936,7 +940,8 @@ ORDER BY LimboOp.when_received
        validation_status,
        locally_validated,
        when_received,
-       when_integrated
+       when_integrated,
+       serialized_size
    )
    SELECT
        hash,
@@ -950,7 +955,8 @@ ORDER BY LimboOp.when_received
        END,
        TRUE,  -- locally_validated
        when_received,
-       CURRENT_TIMESTAMP
+       CURRENT_TIMESTAMP,
+       serialized_size  -- calculated when op arrived
    FROM LimboOp
    WHERE hash = :op_hash
    ```
