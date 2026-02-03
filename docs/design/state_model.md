@@ -97,6 +97,16 @@ CREATE TABLE DeletedLink (
     FOREIGN KEY(create_link_hash) REFERENCES Link(action_hash)
 );
 
+-- Chain lock table.
+--
+-- For coordinating countersigning sessions. Prevents new actions from being committed to the chain
+-- while a countersigning session is in progress.
+CREATE TABLE ChainLock (
+    author                BLOB PRIMARY KEY,  -- Agent who holds the lock
+    subject               BLOB NOT NULL,      -- What is being locked (e.g., session hash)
+    expires_at_timestamp  INTEGER NOT NULL    -- Unix timestamp when lock expires
+);
+
 -- Authored ops.
 -- 
 -- For publishing state only, does not contain a complete op.
@@ -446,12 +456,35 @@ The high-level flow for authoring actions and distributing ops is as follows:
    ├─> Insert into `ValidationReceipt` table
    └─> Update `receipts_complete` in `AuthoredOp` when sufficient receipts received
 
-6. Countersigning Session Completion Workflow (if applicable)
+6. Countersigning Workflow (if applicable)
+   ├─> Lock the chain: Insert into `ChainLock` with session subject and expiration
+   ├─> Wait for all participants to sign
    ├─> Verify all participants have signed
    ├─> Create ops from the countersigned action/entry
    ├─> Insert into `AuthoredOp` with publishing state
-   ├─> Unlock the chain
+   ├─> Unlock the chain: Delete from `ChainLock` where author = current agent
    └─> Trigger publish workflow
+
+   **Chain Lock Query:**
+   ```sql
+   -- Acquire lock
+   INSERT INTO ChainLock (author, subject, expires_at_timestamp)
+   VALUES (?, ?, ?)
+   ON CONFLICT (author) DO UPDATE
+   SET subject = excluded.subject,
+       expires_at_timestamp = excluded.expires_at_timestamp;
+
+   -- Check if chain is locked
+   SELECT * FROM ChainLock
+   WHERE author = ?
+     AND expires_at_timestamp > CURRENT_TIMESTAMP;
+
+   -- Release lock
+   DELETE FROM ChainLock WHERE author = ?;
+
+   -- Clean up expired locks
+   DELETE FROM ChainLock WHERE expires_at_timestamp <= CURRENT_TIMESTAMP;
+   ```
 ```
 
 #### Action to Op Transform
