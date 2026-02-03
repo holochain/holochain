@@ -28,6 +28,9 @@
 //!   ## Use the Holochain-provided dev-test sbd/signalling server.
 //!   signal_url: wss://dev-test-bootstrap2.holochain.org
 //!
+//!   ## Use the iroh relay server.
+//!   relay_url: https://use1-1.relay.n0.iroh-canary.iroh.link./
+//!
 //!   ## Override the default WebRTC STUN configuration.
 //!   ## This is OPTIONAL. If this is not specified, it will default
 //!   ## to what you can see here:
@@ -735,7 +738,7 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
-    fn test_config_load_yaml() {
+    fn config_load_yaml() {
         let bad_path = Path::new("fake");
         let result = ConductorConfig::load_yaml(bad_path);
         assert_eq!(
@@ -747,13 +750,13 @@ mod tests {
     }
 
     #[test]
-    fn test_config_bad_yaml() {
+    fn config_bad_yaml() {
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml("this isn't yaml");
         assert_matches!(result, Err(ConductorConfigError::SerializationError(_)));
     }
 
     #[test]
-    fn test_config_complete_minimal_config() {
+    fn config_complete_minimal_config() {
         let yaml = r#"---
     data_root_path: /path/to/env
     keystore:
@@ -780,7 +783,7 @@ mod tests {
     }
 
     #[test]
-    fn test_config_rejects_unrecognized_fields() {
+    fn config_rejects_unrecognized_fields() {
         // Test unrecognized field at top level
         let yaml = r#"---
 data_root_path: /path/to/env
@@ -803,7 +806,7 @@ unknown_field: some_value
         let yaml = r#"---
 data_root_path: /path/to/env
 keystore:
-  type: danger_test_keystore
+  type: lair_server
   unknown_keystore_field: true
    "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
@@ -819,7 +822,7 @@ keystore:
     }
 
     #[test]
-    fn test_admin_interface_rejects_unrecognized_fields() {
+    fn admin_interface_rejects_unrecognized_fields() {
         // Test unrecognized field in admin interface
         let yaml = r#"---
 data_root_path: /path/to/env
@@ -868,14 +871,14 @@ admin_interfaces:
     }
 
     #[test]
-    fn test_empty_config_uses_default_values() {
+    fn empty_config_uses_default_values() {
         let result: ConductorConfig = config_from_yaml("").unwrap();
         pretty_assertions::assert_eq!(result, ConductorConfig::default());
     }
 
     #[test]
     #[allow(clippy::field_reassign_with_default)]
-    fn test_config_complete_config() {
+    fn config_complete_config() {
         holochain_trace::test_run();
 
         let yaml = r#"---
@@ -966,7 +969,7 @@ admin_interfaces:
     }
 
     #[test]
-    fn test_config_new_lair_keystore() {
+    fn config_new_lair_keystore() {
         let yaml = r#"---
     data_root_path: /path/to/env
     keystore:
