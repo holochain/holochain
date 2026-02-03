@@ -900,21 +900,16 @@ ORDER BY LimboOp.when_received
 
 6. **Send Validation Receipt** (if required)
    - If op came from network and `require_receipt = true`
-   - Send signed validation receipt back to author
+   - Send a signed validation receipt back to author
 
 ### Record Validity Aggregation
 
 **Rules:**
-1. A record is **INVALID** if ANY known ops for it are rejected
-2. A record is **VALID** if at least one known op for it is valid and no known ops are rejected
-3. Records in limbo have NULL record_validity. After integration, record_validity is 'valid' or 'rejected'
-4. A record's validity is computed on integration, not on query
-5. Validators may have partial views due to sharding - validity is based only on known ops
+1. A record is **INVALID** if ANY known ops for it are rejected.
+2. A record is **VALID** if at least one known op for it is valid and no known ops are rejected.
+3. Records in limbo have a `NULL` value for `record_validity`. After integration of the first op for a record, `record_validity` is `'valid'` or `'rejected'`.
 
 The record validity is determined at the time of integration by examining all known ops associated with the record. Due to the sharding model, a validator may not have all ops for a record - they hold specific op types over specific ranges. This aggregated status is stored with the record itself, eliminating the need for complex joins during queries.
-
-**Note on Partial Views:**
-Since validators hold shards (specific op types over specific ranges), they make validity decisions based on the ops they know about. A record is considered valid if any of its known ops are valid and none are known to be invalid. The absence of some ops does not make a record pending or invalid.
 
 ### Record Validity Correction
 
@@ -929,7 +924,6 @@ SELECT Action.*, Entry.*
 FROM DhtAction AS Action
 LEFT JOIN DhtEntry AS Entry ON Action.entry_hash = Entry.hash
 WHERE Action.hash = ?
-  AND Action.record_validity IS NOT NULL
   AND Action.record_validity = 'valid'
 ```
 
@@ -941,7 +935,6 @@ SELECT Entry.*, Action.record_validity
 FROM DhtEntry AS Entry
 JOIN DhtAction AS Action ON Action.entry_hash = Entry.hash
 WHERE hash = ?
-  AND Action.record_validity IS NOT NULL
   AND Action.record_validity = 'valid'
 ```
 
@@ -955,62 +948,12 @@ WHERE author = ?
 ORDER BY seq
 ```
 
-## Workflow Specifications
-
-### Incoming DHT Ops Workflow
-Ops are inserted into LimboOp table with validation_stage='pending_sys'. Actions are inserted into DhtAction with record_validity=NULL, and entries (if applicable) are inserted into DhtEntry.
-
-### Sys Validation Workflow  
-Updates sys_validation_status in LimboOp, triggers app validation or abandonment
-
-### App Validation Workflow
-Updates app_validation_status in LimboOp, triggers integration if valid
-
-### Integration Workflow
-Moves validated ops from LimboOp to DhtOp, updates record validity in DhtAction
-
-### Publish DHT Ops Workflow
-Queries AuthoredOp from the authored database for unpublished or recently published ops, tracking publish attempts and timing
-
-### Validation Receipt Workflow
-Tracks validation receipts for authored ops. When sufficient receipts are received for an authored op, updates receipts_complete flag in AuthoredOp table to prevent unnecessary republishing
-
-## Unified Storage with Arc Coverage
-
-The DHT database stores all validated data, with arc coverage determining storage obligations. This eliminates the need for a separate cache database and the associated query complexity of merging results from two sources.
-
-**Key aspects:**
-1. **Single query path**: All data queries go to the DHT database
-2. **Arc coverage tracking**: Determines which data is obligated vs cached
-3. **Retention policy**: Data outside arc can be pruned under storage pressure
-4. **No result merging**: Eliminates complex logic combining DHT and cache results
-
-```sql
--- Arc coverage table (in conductor database)
-CREATE TABLE ArcCoverage (
-    dna_hash BLOB NOT NULL,
-    agent_hash BLOB NOT NULL,
-    arc_start INTEGER NOT NULL,  -- Start of arc range (0-2^32)
-    arc_end INTEGER NOT NULL,    -- End of arc range (0-2^32)
-    last_updated INTEGER NOT NULL,
-    
-    PRIMARY KEY (dna_hash, agent_hash)
-);
-```
-
-Data classification:
-- **Within arc**: Obligated storage (storage_center_loc in [arc_start, arc_end])
-- **Outside arc**: Cached data, eligible for pruning
-- **Authored**: Always retained regardless of arc
-
 ### Cache Pruning Strategy
 
 When storage pressure occurs:
-1. Identify ops outside current arc (storage_center_loc not in [arc_start, arc_end])
-2. Sort by last_access_time (tracked separately)
+1. Identify ops outside the current arc set (`storage_center_loc` not in [arc_start, arc_end] for any local agent)
+2. Sort by `last_access_time` (tracked separately)
 3. Prune oldest first until storage target met
-4. Never prune authored ops or ops within arc
-5. Consider keeping frequently accessed data even if outside arc
 
 ## Warrant Handling
 
@@ -1025,43 +968,6 @@ Warrants require special consideration:
    - Warrants can have up to 2 dependencies (the actions being warranted)
    - These must be resolved before warrant validation can complete
    - Dependencies tracked in dependency1 and dependency2 fields of LimboOp
-
-## Key Operations
-
-### Mutations
-
-1. **insert_network_op** (from network)
-   - Insert action into DhtAction with record_validity=NULL
-   - Insert entry (if applicable) into DhtEntry
-   - Insert into LimboOp with validation_stage='pending_sys'
-
-2. **author_action** (local authoring)
-   - Insert into authored Action/Entry tables
-   - Create AuthoredOp records
-   - Validate locally before committing
-   - On validation failure, rollback without affecting chain
-
-3. **publish_authored_op** (after local validation)
-   - Mark AuthoredOp as published (set when_published)
-   - Op enters network propagation
-
-4. **set_validation_status** (after validation)
-   - Update LimboOp.sys/app_validation_status
-
-5. **set_when_integrated** (after all validation)
-   - Move from LimboOp to DhtOp
-   - Update record_validity in DhtAction
-
-6. **set_receipts_complete** (after enough receipts)
-   - Update DhtOp.receipts_complete
-
-### Queries
-
-1. **get_record** - Query DhtAction + DhtEntry by record_validity
-2. **get_entry** - Query DhtEntry joined with DhtAction for record_validity
-3. **get_links** - Direct query of DhtLink table
-4. **agent_activity** - Query DhtAction by author and record_validity
-5. **validation_limbo** - Query LimboOp by validation_stage
 
 ## Data Integrity Invariants
 
@@ -1152,11 +1058,3 @@ ORDER BY seq;
 SELECT * FROM Action WHERE hash = ?;
 -- Then deserialize action_data BLOB in application
 ```
-
-### Benefits of This Approach
-
-1. **Minimal redundancy** - Common fields stored once
-2. **Simple core schema** - Main table remains clean
-3. **Selective indexing** - Only queryable fields get index tables
-4. **Efficient chain operations** - No BLOB deserialization for traversal
-5. **Flexible querying** - Index tables enable specific queries without full scans
