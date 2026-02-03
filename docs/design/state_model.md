@@ -226,6 +226,9 @@ CREATE TABLE DhtOp (
     when_received   INTEGER NOT NULL, -- copied from LimboOp
     when_integrated INTEGER NOT NULL, -- set when moved from LimboOp
 
+    -- Storage tracking
+    serialized_size INTEGER NOT NULL DEFAULT 0, -- size in bytes for storage quota management
+
     FOREIGN KEY(action_hash) REFERENCES DhtAction(hash)
 );
 
