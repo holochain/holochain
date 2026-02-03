@@ -900,7 +900,7 @@ ORDER BY LimboOp.when_received
 
 6. **Send Validation Receipt** (if required)
    - If op came from network and `require_receipt = true`
-   - Send a signed validation receipt back to author
+   - Send a signed validation receipt back to the author
 
 ### Record Validity Aggregation
 
@@ -919,6 +919,8 @@ TODO: It is a future piece of work to define this logic.
 
 ### Get Record by Hash
 
+Retrieve a complete record (action and entry) from the DHT by action hash.
+
 ```sql
 SELECT Action.*, Entry.*
 FROM DhtAction AS Action
@@ -929,23 +931,84 @@ WHERE Action.hash = ?
 
 ### Get Entry by Hash
 
+Retrieve an entry from the DHT using the validation status from any action that references it.
+
 ```sql
--- Entry authorities always have the action, so we can check validity
-SELECT Entry.*, Action.record_validity
+SELECT Entry.*, Action.*
 FROM DhtEntry AS Entry
 JOIN DhtAction AS Action ON Action.entry_hash = Entry.hash
-WHERE hash = ?
+WHERE Entry.hash = ?
   AND Action.record_validity = 'valid'
+LIMIT 1
 ```
 
-### Agent Activity
+Justification for *any*: An entry can be referenced by multiple actions. If at least one action referencing the entry is valid, the entry is considered valid to be served to the network or used.
+
+### Get Links
+
+Query all non-deleted links from a base hash with filtering applied in application code.
 
 ```sql
-SELECT * FROM DhtAction
-WHERE author = ?
-  AND record_validity IS NOT NULL
-  AND record_validity = 'valid'
-ORDER BY seq
+-- Find CreateLink ops
+SELECT Op.*, Action.*
+FROM DhtOp AS Op
+JOIN DhtAction AS Action ON Op.action_hash = Action.hash
+WHERE Op.basis_hash = ?  -- base hash
+  AND Action.action_type = 'CreateLink'
+  AND Op.validation_status = 'valid'
+  AND Action.record_validity = 'valid'
+-- Application code then:
+--   - Deserializes action_data to extract link_type, tag, target, timestamp
+--   - Filters by link_type, tag prefix, author, timestamp bounds
+--   - Removes links with matching DeleteLink actions
+```
+
+### Count Links
+
+Count links matching query criteria without retrieving full link data.
+
+```sql
+-- Count CreateLink ops (additional filtering in application code)
+SELECT COUNT(*)
+FROM DhtOp AS Op
+JOIN DhtAction AS Action ON Op.action_hash = Action.hash
+WHERE Op.basis_hash = ?
+  AND Action.action_type = 'CreateLink'
+  AND Op.validation_status = 'valid'
+  AND Action.record_validity = 'valid'
+-- Then filter in application for link_type, tag prefix, deleted links
+```
+
+### Get Agent Activity
+
+Query an agent's chain activity with flexible filtering for action types, entry types, and validation status.
+
+```sql
+SELECT Action.*
+FROM DhtAction AS Action
+WHERE Action.author = ?
+  AND Action.record_validity IS NOT NULL
+ORDER BY Action.seq
+-- Application code filters for:
+--   - Specific action_type values
+--   - Entry types (via action_data deserialization)
+--   - Sequence ranges
+--   - Include valid/rejected/warrants based on GetActivityOptions
+```
+
+### Must Get Agent Activity
+
+Deterministic hash-bounded query for agent activity used in countersigning scenarios.
+
+```sql
+-- Query with sequence bounds
+SELECT Action.*
+FROM DhtAction AS Action
+WHERE Action.author = ?
+  AND Action.seq BETWEEN ? AND ?  -- or bounded by prev_hash chain traversal
+  AND Action.record_validity IS NOT NULL
+ORDER BY Action.seq
+-- Application code verifies that there are no gaps in sequence numbers (complete chain segment)
 ```
 
 ### Cap Grant and Claim Lookups
