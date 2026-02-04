@@ -28,6 +28,9 @@
 //!   ## Use the Holochain-provided dev-test sbd/signalling server.
 //!   signal_url: wss://dev-test-bootstrap2.holochain.org
 //!
+//!   ## Use the iroh relay server.
+//!   relay_url: https://use1-1.relay.n0.iroh-canary.iroh.link./
+//!
 //!   ## Override the default WebRTC STUN configuration.
 //!   ## This is OPTIONAL. If this is not specified, it will default
 //!   ## to what you can see here:
@@ -70,6 +73,7 @@ pub use keystore_config::KeystoreConfig;
 
 /// All the config information for the conductor
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ConductorConfig {
     /// Override the environment specified tracing config.
     #[serde(default)]
@@ -239,7 +243,11 @@ impl ConductorConfig {
 
 /// Configure Kitsune2 Reporting.
 #[derive(Clone, Default, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case", rename_all_fields = "snake_case")]
+#[serde(
+    rename_all = "snake_case",
+    rename_all_fields = "snake_case",
+    deny_unknown_fields
+)]
 pub enum ReportConfig {
     /// Default to no reporting.
     #[default]
@@ -257,7 +265,7 @@ pub enum ReportConfig {
 
 /// All the network config information for the conductor.
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct NetworkConfig {
     /// Authentication material if required by sbd/signal/bootstrap services.
     /// This material should be specified as a base64 string
@@ -562,6 +570,7 @@ impl NetworkConfig {
 
 /// Tuning parameters to adjust the behaviour of the conductor.
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ConductorTuningParams {
     /// The delay between retries of sys validation when there are missing dependencies waiting to be found on the DHT.
     ///
@@ -729,7 +738,7 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
-    fn test_config_load_yaml() {
+    fn config_load_yaml() {
         let bad_path = Path::new("fake");
         let result = ConductorConfig::load_yaml(bad_path);
         assert_eq!(
@@ -741,13 +750,13 @@ mod tests {
     }
 
     #[test]
-    fn test_config_bad_yaml() {
+    fn config_bad_yaml() {
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml("this isn't yaml");
         assert_matches!(result, Err(ConductorConfigError::SerializationError(_)));
     }
 
     #[test]
-    fn test_config_complete_minimal_config() {
+    fn config_complete_minimal_config() {
         let yaml = r#"---
     data_root_path: /path/to/env
     keystore:
@@ -774,21 +783,106 @@ mod tests {
     }
 
     #[test]
-    fn test_empty_config_uses_default_values() {
+    fn config_rejects_unrecognized_fields() {
+        // Test unrecognized field at top level
+        let yaml = r#"---
+data_root_path: /path/to/env
+keystore:
+  type: danger_test_keystore
+unknown_field: some_value
+   "#;
+        let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
+        assert_matches!(result, Err(ConductorConfigError::SerializationError(_)));
+        if let Err(ConductorConfigError::SerializationError(e)) = result {
+            let error_msg = e.to_string();
+            assert!(
+                error_msg.contains("unknown_field"),
+                "Error message should mention the unknown field name: {}",
+                error_msg
+            );
+        }
+
+        // Test unrecognized field in keystore config
+        let yaml = r#"---
+data_root_path: /path/to/env
+keystore:
+  type: lair_server
+  unknown_keystore_field: true
+   "#;
+        let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
+        assert_matches!(result, Err(ConductorConfigError::SerializationError(_)));
+        if let Err(ConductorConfigError::SerializationError(e)) = result {
+            let error_msg = e.to_string();
+            assert!(
+                error_msg.contains("unknown_keystore_field"),
+                "Error message should mention the unknown field name: {}",
+                error_msg
+            );
+        }
+    }
+
+    #[test]
+    fn admin_interface_rejects_unrecognized_fields() {
+        // Test unrecognized field in admin interface
+        let yaml = r#"---
+data_root_path: /path/to/env
+keystore:
+  type: danger_test_keystore
+admin_interfaces:
+  - driver:
+      type: websocket
+      port: 12345
+      allowed_origins: "*"
+      unknown_driver_field: test
+   "#;
+        let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
+        assert_matches!(result, Err(ConductorConfigError::SerializationError(_)));
+        if let Err(ConductorConfigError::SerializationError(e)) = result {
+            let error_msg = e.to_string();
+            assert!(
+                error_msg.contains("unknown_driver_field"),
+                "Error message should mention the unknown field name: {}",
+                error_msg
+            );
+        }
+
+        // Test unrecognized field at admin interface level
+        let yaml = r#"---
+data_root_path: /path/to/env
+keystore:
+  type: danger_test_keystore
+admin_interfaces:
+  - driver:
+      type: websocket
+      port: 12345
+      allowed_origins: "*"
+    unknown_admin_field: value
+   "#;
+        let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
+        assert_matches!(result, Err(ConductorConfigError::SerializationError(_)));
+        if let Err(ConductorConfigError::SerializationError(e)) = result {
+            let error_msg = e.to_string();
+            assert!(
+                error_msg.contains("unknown_admin_field"),
+                "Error message should mention the unknown field name: {}",
+                error_msg
+            );
+        }
+    }
+
+    #[test]
+    fn empty_config_uses_default_values() {
         let result: ConductorConfig = config_from_yaml("").unwrap();
         pretty_assertions::assert_eq!(result, ConductorConfig::default());
     }
 
     #[test]
     #[allow(clippy::field_reassign_with_default)]
-    fn test_config_complete_config() {
+    fn config_complete_config() {
         holochain_trace::test_run();
 
         let yaml = r#"---
     data_root_path: /path/to/env
-    signing_service_uri: ws://localhost:9001
-    encryption_service_uri: ws://localhost:9002
-    decryption_service_uri: ws://localhost:9003
 
     keystore:
       type: lair_server_in_proc
@@ -875,10 +969,9 @@ mod tests {
     }
 
     #[test]
-    fn test_config_new_lair_keystore() {
+    fn config_new_lair_keystore() {
         let yaml = r#"---
     data_root_path: /path/to/env
-    keystore_path: /path/to/keystore
     keystore:
       type: lair_server
       connection_url: "unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"
