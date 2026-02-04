@@ -116,6 +116,7 @@ use holochain_sqlite::prelude::*;
 use holochain_sqlite::sql::sql_cell::ACTION_HASH_BY_PREV;
 use holochain_state::integrate::insert_locally_validated_op;
 use holochain_state::prelude::*;
+use holochain_state::query::StateQueryError;
 use rusqlite::Transaction;
 use std::convert::TryInto;
 use std::sync::Arc;
@@ -135,6 +136,8 @@ mod tests;
 mod unit_tests;
 #[cfg(test)]
 mod validate_op_tests;
+#[cfg(test)]
+mod validate_warrant_tests;
 
 /// The sys validation workflow. It is described in the module level documentation.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
@@ -220,7 +223,11 @@ pub async fn sys_validation_workflow(
     }
 }
 
-type ForkedPair = ((ActionHash, Signature), (ActionHash, Signature));
+/// Evidence of a chain fork: two actions at the same sequence number with a common predecessor.
+struct ForkedPair {
+    action_pair: ((ActionHash, Signature), (ActionHash, Signature)),
+    seq: u32,
+}
 
 async fn sys_validation_workflow_inner(
     workspace: Arc<SysValidationWorkspace>,
@@ -305,17 +312,12 @@ async fn sys_validation_workflow_inner(
                 ..Default::default()
             };
             let mut invalid_ops = vec![];
-
-            #[cfg(feature = "unstable-warrants")]
             let mut forked_pairs: Vec<(AgentPubKey, ForkedPair)> = Vec::with_capacity(0);
-            #[cfg(not(feature = "unstable-warrants"))]
-            let forked_pairs: Vec<(AgentPubKey, ForkedPair)> = vec![];
 
             for (hashed_op, outcome) in validation_outcomes {
                 let (op, op_hash) = hashed_op.into_inner();
                 let op_type = op.get_type();
 
-                #[cfg(feature = "unstable-warrants")]
                 if let DhtOp::ChainOp(chain_op) = &op {
                     // Author a ChainFork warrant if fork is detected
                     let action = chain_op.action();
@@ -324,7 +326,10 @@ async fn sys_validation_workflow_inner(
                         let action_hash = action.to_hash();
                         forked_pairs.push((
                             action.author().clone(),
-                            ((action_hash, signature), forked_action),
+                            ForkedPair {
+                                action_pair: ((action_hash, signature), forked_action),
+                                seq: action.action_seq(),
+                            },
                         ));
                     }
                 }
@@ -401,10 +406,15 @@ async fn sys_validation_workflow_inner(
             warrants.push(warrant_op);
         }
 
-        for (author, pair) in _forked_pairs {
-            let warrant_op =
-                make_fork_warrant_op_inner(&_keystore, _representative_agent.clone(), author, pair)
-                    .await?;
+        for (author, fork) in _forked_pairs {
+            let warrant_op = make_fork_warrant_op_inner(
+                &_keystore,
+                _representative_agent.clone(),
+                author,
+                fork.action_pair,
+                fork.seq,
+            )
+            .await?;
             warrants.push(warrant_op);
         }
 
@@ -1059,7 +1069,7 @@ async fn validate_warrant_op(
             ChainIntegrityWarrant::ChainFork {
                 action_pair: ((a1, a1_sig), (a2, a2_sig)),
                 chain_author,
-                ..
+                seq,
             } => {
                 let (action1, action2) = {
                     let deps = validation_dependencies.lock().expect("poisoned");
@@ -1090,16 +1100,29 @@ async fn validate_warrant_op(
                         .into());
                     }
 
-                    // A fork is evidenced by two actions with a common predecessor.
-                    // NOTE: we could also check sequence numbers, but then we'd have to traverse
-                    // both forks backwards until reaching a common ancestor to protect against an
-                    // attack where someone authors a warrant using two actions from two different DNAs.
-                    // Using seq numbers makes it easier to detect and prove a fork, but using prev_action
-                    // prevents the attack.
-                    if action1.prev_action() != action2.prev_action() {
+                    // Both actions must have the same sequence number (a fork occurs at a single seq)
+                    if action1.action_seq() != action2.action_seq() {
                         return Err(ValidationOutcome::InvalidWarrant(
                             Box::new(op.warrant().clone()),
                             "action pair seq mismatch".into(),
+                        )
+                        .into());
+                    }
+
+                    // The actions' sequence number must match the warrant's declared seq
+                    if action1.action_seq() != *seq {
+                        return Err(ValidationOutcome::InvalidWarrant(
+                            Box::new(op.warrant().clone()),
+                            "warrant seq mismatch".into(),
+                        )
+                        .into());
+                    }
+
+                    // A fork is evidenced by two actions with a common predecessor.
+                    if action1.prev_action() != action2.prev_action() {
+                        return Err(ValidationOutcome::InvalidWarrant(
+                            Box::new(op.warrant().clone()),
+                            "action pair prev_action mismatch".into(),
                         )
                         .into());
                     }
@@ -1521,6 +1544,7 @@ pub async fn make_fork_warrant_op_inner(
     warrant_author: AgentPubKey,
     chain_author: AgentPubKey,
     action_pair: ((ActionHash, Signature), (ActionHash, Signature)),
+    seq: u32,
 ) -> WorkflowResult<DhtOpHashed> {
     debug_assert_ne!(action_pair.0 .0, action_pair.1 .0);
     tracing::warn!(
@@ -1533,6 +1557,7 @@ pub async fn make_fork_warrant_op_inner(
         WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork {
             chain_author: chain_author.clone(),
             action_pair,
+            seq,
         }),
         warrant_author,
         Timestamp::now(),
@@ -1546,7 +1571,13 @@ pub async fn make_fork_warrant_op_inner(
     Ok(op)
 }
 
-pub fn detect_fork(
+/// Detects chain forks by finding actions with the same `prev_action`.
+///
+/// The SQL query returns any action sharing the same `prev_hash` but with a
+/// different hash. The author check is performed in memory: if the authors
+/// match, a fork is confirmed. If they differ, a cross-author `prev_action`
+/// collision error is returned.
+fn detect_fork(
     txn: &mut Transaction<'_>,
     action: &Action,
 ) -> StateQueryResult<Option<(ActionHash, Signature)>> {
@@ -1572,16 +1603,28 @@ pub fn detect_fork(
             },
         )?
         .collect::<Result<Vec<_>, _>>()?;
-    items
-        .into_iter()
-        .filter_map(|maybe_tuple| {
-            maybe_tuple.map(|(hash, action_blob)| {
-                from_blob::<SignedAction>(action_blob)
-                    .map(|action| (hash, action.signature().clone()))
-            })
-        })
-        .next()
-        .transpose()
+
+    let incoming_author = action.author();
+
+    for maybe_tuple in items {
+        let Some((hash, action_blob)) = maybe_tuple else {
+            continue;
+        };
+        let signed_action = from_blob::<SignedAction>(action_blob)?;
+        let existing_author = signed_action.action().author();
+
+        if existing_author != incoming_author {
+            return Err(StateQueryError::Other(format!(
+                "Cross-author prev_action collision: incoming author {incoming_author} \
+                 differs from existing author {existing_author} for prev_action {:?}",
+                action.prev_action()
+            )));
+        }
+
+        return Ok(Some((hash, signed_action.signature().clone())));
+    }
+
+    Ok(None)
 }
 
 #[derive(Debug, Clone)]

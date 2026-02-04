@@ -69,6 +69,7 @@ async fn write_chain_fork_warrant_to_database() {
                 (fixt!(ActionHash), fixt!(Signature)),
                 (fixt!(ActionHash), fixt!(Signature)),
             ),
+            seq: 5,
         }),
         fixt!(AgentPubKey),
         Timestamp::now(),

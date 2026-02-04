@@ -1,4 +1,5 @@
 use super::*;
+use crate::retry_until_timeout;
 use crate::sweettest::*;
 use crate::test_utils::host_fn_caller::*;
 use crate::test_utils::wait_for_integration;
@@ -101,48 +102,89 @@ async fn sys_validation_produces_invalid_chain_op_warrant() {
     .unwrap();
 }
 
-#[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
 async fn sys_validation_produces_forked_chain_warrant() {
     holochain_trace::test_run();
+    let keystore = holochain_keystore::test_keystore();
+
+    // Create Alice's key (the forking agent)
+    let alice_pubkey = keystore.new_sign_keypair_random().await.unwrap();
+
     let (dna, _, _) =
         SweetDnaFile::unique_from_inline_zomes(crate::test_utils::inline_zomes::simple_crud_zome())
             .await;
 
-    let mut conductors = SweetConductorBatch::standard(2).await;
-    let ((alice,), (bob,)) = conductors
-        .setup_app("app", [&dna])
-        .await
-        .unwrap()
-        .into_tuples();
-    let alice_pubkey = alice.agent_pubkey().clone();
-    let bob_pubkey = bob.agent_pubkey().clone();
+    // Set up only Bob (we manually create Alice's ops to avoid gossip flakiness)
+    let mut conductor = SweetConductor::standard().await;
+    let bob = conductor.setup_app("app", [&dna]).await.unwrap();
+    let bob_pubkey = bob.agent().clone();
+    let bob_cell_id = bob.cells()[0].cell_id().clone();
 
-    // For this test we want bob to get alice's chain so he can detect the fork
-    conductors.exchange_peer_info().await;
-
-    let action_hash: ActionHash = conductors[0]
-        .call(&alice.zome("coordinator"), "create_unit", ())
-        .await;
-    let records: Option<Record> = conductors[0]
-        .call(&alice.zome("coordinator"), "read", action_hash)
-        .await;
-
-    //- Modify the just-created record to produce a chain fork
-    let record = records.unwrap();
-    let (action, _) = record.into_inner();
-    let mut action = action.into_inner().0.into_content();
-    let entry = Entry::App(AppEntryBytes(UnsafeBytes::from(vec![11; 11]).into()));
-    *action.entry_data_mut().unwrap().0 = entry.to_hash();
-    let action = SignedActionHashed::sign(&conductors[0].keystore(), action.into_hashed())
+    // Create Alice's genesis action (Dna action at seq 0)
+    let mut dna_action = fixt!(Dna);
+    dna_action.author = alice_pubkey.clone();
+    let dna_action = Action::Dna(dna_action);
+    let signed_dna_action = SignedActionHashed::sign(&keystore, dna_action.into_hashed())
         .await
         .unwrap();
-    let (action, signature) = action.into_inner();
-    let action = SignedAction::new(action.into_content(), signature);
-    let forked_op =
-        ChainOp::from_type(ChainOpType::StoreRecord, action.clone(), Some(entry)).unwrap();
+    let prev_action_hash = signed_dna_action.as_hash().clone();
 
-    //- Check that the op is valid
+    // Create the original action at seq 1
+    let original_entry = Entry::App(AppEntryBytes(UnsafeBytes::from(vec![1; 10]).into()));
+    let mut original_create = fixt!(Create);
+    original_create.author = alice_pubkey.clone();
+    original_create.prev_action = prev_action_hash.clone();
+    original_create.action_seq = 1;
+    original_create.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
+    original_create.entry_hash = original_entry.to_hash();
+
+    // Create a forked action at seq 1 with a different entry
+    let forked_entry = Entry::App(AppEntryBytes(UnsafeBytes::from(vec![2; 10]).into()));
+    let mut forked_create = fixt!(Create);
+    forked_create.author = alice_pubkey.clone();
+    forked_create.prev_action = prev_action_hash.clone();
+    forked_create.action_seq = 1;
+    forked_create.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
+    forked_create.entry_hash = forked_entry.to_hash();
+
+    let original_action = Action::Create(original_create);
+    let forked_action = Action::Create(forked_create);
+
+    let signed_original = SignedActionHashed::sign(&keystore, original_action.into_hashed())
+        .await
+        .unwrap();
+    let signed_forked = SignedActionHashed::sign(&keystore, forked_action.into_hashed())
+        .await
+        .unwrap();
+
+    let original_action_hash = signed_original.as_hash().clone();
+    let forked_action_hash = signed_forked.as_hash().clone();
+    let expected_seq = 1u32;
+
+    // Build ChainOps for genesis, original, and forked actions
+    let (dna_content, dna_sig) = signed_dna_action.into_inner();
+    let dna_signed = SignedAction::new(dna_content.into_content(), dna_sig);
+    let prev_op = ChainOp::from_type(ChainOpType::StoreRecord, dna_signed, None).unwrap();
+
+    let (orig_content, orig_sig) = signed_original.into_inner();
+    let orig_signed = SignedAction::new(orig_content.into_content(), orig_sig);
+    let original_op =
+        ChainOp::from_type(ChainOpType::StoreRecord, orig_signed, Some(original_entry)).unwrap();
+
+    let (fork_content, fork_sig) = signed_forked.into_inner();
+    let fork_signed = SignedAction::new(fork_content.into_content(), fork_sig);
+    let forked_op =
+        ChainOp::from_type(ChainOpType::StoreRecord, fork_signed, Some(forked_entry)).unwrap();
+
+    // Verify the forked op is valid on its own
     let dna_hash = dna.dna_hash().clone();
     let outcome = crate::core::workflow::sys_validation_workflow::validate_op(
         &forked_op.clone().into(),
@@ -153,52 +195,233 @@ async fn sys_validation_produces_forked_chain_warrant() {
     .unwrap();
     matches::assert_matches!(outcome, Outcome::Accepted);
 
-    //- Check that the op creates a fork
-    let maybe_fork = conductors[0]
-        .spaces
-        .dht_db(dna.dna_hash())
-        .unwrap()
-        .test_write(move |txn| detect_fork(txn, &action).unwrap());
-    assert!(maybe_fork.is_some());
-
-    await_consistency([&alice, &bob]).await.unwrap();
-
-    //- Inject the forked op directly into bob's DHT db
-    let forked_op = DhtOpHashed::from_content_sync(forked_op);
-    let db = conductors[1].spaces.dht_db(dna.dna_hash()).unwrap();
+    // Inject genesis + original action (as already-integrated data) and the
+    // forked op (as pending validation) into Bob's DHT db
+    let prev_op_hashed = DhtOpHashed::from_content_sync(prev_op);
+    let original_op_hashed = DhtOpHashed::from_content_sync(original_op);
+    let forked_op_hashed = DhtOpHashed::from_content_sync(forked_op);
+    let db = conductor.spaces.dht_db(dna.dna_hash()).unwrap();
     db.test_write(move |txn| {
-        insert_op_dht(txn, &forked_op, 0, None).unwrap();
+        insert_op_dht(txn, &prev_op_hashed, 0, None).unwrap();
+        insert_op_dht(txn, &original_op_hashed, 0, None).unwrap();
+        insert_op_dht(txn, &forked_op_hashed, 0, None).unwrap();
     });
 
-    //- Check that bob authored a chain fork warrant
-    crate::wait_for_1m!(
-        {
-            //- Trigger sys validation
-            conductors[1]
-                .get_cell_triggers(bob.cell_id())
-                .await
-                .unwrap()
-                .sys_validation
-                .trigger(&"test");
+    // Check that Bob authored a chain fork warrant with the correct action hashes
+    retry_until_timeout!(60_000, 500, {
+        // Trigger sys validation
+        conductor
+            .get_cell_triggers(&bob_cell_id)
+            .await
+            .unwrap()
+            .sys_validation
+            .trigger(&"test");
 
-            let alice_pubkey = alice_pubkey.clone();
-            conductors[1]
-                .spaces
-                .get_or_create_authored_db(dna.dna_hash(), bob_pubkey.clone())
-                .unwrap()
-                .test_read(move |txn| {
-                    let store = CascadeTxnWrapper::from(txn);
-                    store.get_warrants_for_agent(&alice_pubkey, false).unwrap()
-                })
-        },
-        |warrants: &Vec<WarrantOp>| { !warrants.is_empty() },
-        |mut warrants: Vec<WarrantOp>| {
-            matches::assert_matches!(
-                warrants.pop().unwrap().proof,
-                WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork { .. })
-            )
+        let query_author = alice_pubkey.clone();
+        let warrants: Vec<WarrantOp> = conductor
+            .spaces
+            .get_or_create_authored_db(dna.dna_hash(), bob_pubkey.clone())
+            .unwrap()
+            .test_read(move |txn| {
+                let store = CascadeTxnWrapper::from(txn);
+                store.get_warrants_for_agent(&query_author, false).unwrap()
+            });
+
+        if !warrants.is_empty() {
+            let warrant = &warrants[0];
+            match &warrant.proof {
+                WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork {
+                    chain_author,
+                    action_pair: ((hash1, _sig1), (hash2, _sig2)),
+                    seq,
+                }) => {
+                    assert_eq!(chain_author, &alice_pubkey);
+                    assert_eq!(*seq, expected_seq, "Warrant seq should match action seq");
+                    let hashes = [hash1.clone(), hash2.clone()];
+                    assert!(
+                        hashes.contains(&original_action_hash),
+                        "Warrant should contain original action hash"
+                    );
+                    assert!(
+                        hashes.contains(&forked_action_hash),
+                        "Warrant should contain forked action hash"
+                    );
+                }
+                _ => panic!("Expected ChainFork warrant"),
+            }
+            break;
         }
-    );
+    });
+}
+
+/// Test that when a peer receives both forked ops and runs sys validation,
+/// they create 2 chain fork warrants (one when validating each op).
+#[tokio::test(flavor = "multi_thread")]
+async fn sys_validation_produces_two_warrants_when_receiving_both_forked_ops() {
+    holochain_trace::test_run();
+    let keystore = holochain_keystore::test_keystore();
+
+    // Create Alice's key (the forking agent)
+    let alice_pubkey = keystore.new_sign_keypair_random().await.unwrap();
+
+    let (dna, _, _) =
+        SweetDnaFile::unique_from_inline_zomes(crate::test_utils::inline_zomes::simple_crud_zome())
+            .await;
+
+    // Set up only Bob (we don't need Alice as a conductor since we're manually creating her ops)
+    let mut conductor = SweetConductor::standard().await;
+    let bob = conductor.setup_app("app", [&dna]).await.unwrap();
+    let bob_pubkey = bob.agent().clone();
+    let bob_cell_id = bob.cells()[0].cell_id().clone();
+
+    // Create Alice's genesis action (Dna action at seq 0)
+    let mut dna_action = fixt!(Dna);
+    dna_action.author = alice_pubkey.clone();
+    let dna_action = Action::Dna(dna_action);
+    let signed_dna_action = SignedActionHashed::sign(&keystore, dna_action.into_hashed())
+        .await
+        .unwrap();
+    let prev_action_hash = signed_dna_action.as_hash().clone();
+
+    // Create two forked actions that both point to the same prev_action
+    let entry1 = Entry::App(AppEntryBytes(UnsafeBytes::from(vec![1; 10]).into()));
+    let entry2 = Entry::App(AppEntryBytes(UnsafeBytes::from(vec![2; 10]).into()));
+
+    let mut create1 = fixt!(Create);
+    create1.author = alice_pubkey.clone();
+    create1.prev_action = prev_action_hash.clone();
+    create1.action_seq = 1;
+    create1.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
+    create1.entry_hash = entry1.to_hash();
+
+    let mut create2 = fixt!(Create);
+    create2.author = alice_pubkey.clone();
+    create2.prev_action = prev_action_hash.clone();
+    create2.action_seq = 1;
+    create2.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
+    create2.entry_hash = entry2.to_hash();
+
+    let action1 = Action::Create(create1);
+    let action2 = Action::Create(create2);
+
+    let signed_action1 = SignedActionHashed::sign(&keystore, action1.into_hashed())
+        .await
+        .unwrap();
+    let signed_action2 = SignedActionHashed::sign(&keystore, action2.into_hashed())
+        .await
+        .unwrap();
+
+    let action1_hash = signed_action1.as_hash().clone();
+    let action2_hash = signed_action2.as_hash().clone();
+
+    // Create ChainOps for the previous action and both forked actions
+    let (dna_action_content, dna_sig) = signed_dna_action.into_inner();
+    let dna_signed_action = SignedAction::new(dna_action_content.into_content(), dna_sig);
+    let prev_op = ChainOp::from_type(ChainOpType::StoreRecord, dna_signed_action, None).unwrap();
+
+    let (action1_content, sig1) = signed_action1.into_inner();
+    let signed_action1 = SignedAction::new(action1_content.into_content(), sig1);
+    let op1 = ChainOp::from_type(ChainOpType::StoreRecord, signed_action1, Some(entry1)).unwrap();
+
+    let (action2_content, sig2) = signed_action2.into_inner();
+    let signed_action2 = SignedAction::new(action2_content.into_content(), sig2);
+    let op2 = ChainOp::from_type(ChainOpType::StoreRecord, signed_action2, Some(entry2)).unwrap();
+
+    // Verify both ops are valid on their own
+    let dna_hash = dna.dna_hash().clone();
+    let outcome1 = crate::core::workflow::sys_validation_workflow::validate_op(
+        &op1.clone().into(),
+        &dna_hash,
+        Default::default(),
+    )
+    .await
+    .unwrap();
+    matches::assert_matches!(outcome1, Outcome::Accepted);
+
+    let outcome2 = crate::core::workflow::sys_validation_workflow::validate_op(
+        &op2.clone().into(),
+        &dna_hash,
+        Default::default(),
+    )
+    .await
+    .unwrap();
+    matches::assert_matches!(outcome2, Outcome::Accepted);
+
+    // Inject the previous action and both forked ops into Bob's DHT db
+    let prev_op_hashed = DhtOpHashed::from_content_sync(prev_op);
+    let op1_hashed = DhtOpHashed::from_content_sync(op1);
+    let op2_hashed = DhtOpHashed::from_content_sync(op2);
+    let db = conductor.spaces.dht_db(dna.dna_hash()).unwrap();
+    db.test_write(move |txn| {
+        insert_op_dht(txn, &prev_op_hashed, 0, None).unwrap();
+        insert_op_dht(txn, &op1_hashed, 0, None).unwrap();
+        insert_op_dht(txn, &op2_hashed, 0, None).unwrap();
+    });
+
+    // Check that Bob authored 2 chain fork warrants
+    retry_until_timeout!(60_000, 500, {
+        // Trigger sys validation
+        conductor
+            .get_cell_triggers(&bob_cell_id)
+            .await
+            .unwrap()
+            .sys_validation
+            .trigger(&"test");
+
+        let query_author = alice_pubkey.clone();
+        let warrants: Vec<WarrantOp> = conductor
+            .spaces
+            .get_or_create_authored_db(dna.dna_hash(), bob_pubkey.clone())
+            .unwrap()
+            .test_read(move |txn| {
+                let store = CascadeTxnWrapper::from(txn);
+                store.get_warrants_for_agent(&query_author, false).unwrap()
+            });
+
+        if warrants.len() == 2 {
+            // Verify we have exactly 2 warrants
+            assert_eq!(warrants.len(), 2, "Expected 2 chain fork warrants");
+
+            // Collect all action hashes from both warrants
+            let mut all_hashes = Vec::new();
+            for warrant in &warrants {
+                match &warrant.proof {
+                    WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork {
+                        chain_author,
+                        action_pair: ((hash1, _sig1), (hash2, _sig2)),
+                        seq,
+                    }) => {
+                        // Verify chain_author matches alice
+                        assert_eq!(chain_author, &alice_pubkey);
+                        // Verify seq matches the forked actions' sequence number
+                        assert_eq!(*seq, 1, "Warrant seq should match forked action seq");
+                        all_hashes.push(hash1.clone());
+                        all_hashes.push(hash2.clone());
+                    }
+                    _ => panic!("Expected ChainFork warrant"),
+                }
+            }
+
+            // Both warrants should reference the same pair of forked actions
+            assert!(
+                all_hashes.contains(&action1_hash),
+                "Warrants should contain action1 hash"
+            );
+            assert!(
+                all_hashes.contains(&action2_hash),
+                "Warrants should contain action2 hash"
+            );
+            break;
+        }
+    });
 }
 
 async fn run_test(
@@ -574,6 +797,17 @@ async fn test_detect_fork() {
         // Not a fork, because a3 is already in the chain
         assert!(detect_fork(txn, &a3).unwrap().is_none());
 
+        // Not a fork: DNA actions have no prev_action, so the SQL query `prev_hash = :prev_hash`
+        // with NULL returns no rows (since NULL = NULL is NULL in SQL, not true).
+        // Create a different DNA action to ensure it doesn't match any existing action.
+        let mut another_dna = fixt!(Dna);
+        another_dna.author = author1.clone();
+        let another_dna_action = Action::Dna(another_dna);
+        assert!(
+            detect_fork(txn, &another_dna_action).unwrap().is_none(),
+            "DNA actions cannot fork - they have no prev_action"
+        );
+
         // Is a fork, because:
         // - a1 already exists
         // - both actions point to the same previous action a0
@@ -586,18 +820,19 @@ async fn test_detect_fork() {
         // - both are under the authorship of the key which a2 updates to
         assert_eq!(detect_fork(txn, &a3_fork).unwrap().unwrap().0, a3_hash);
 
-        // This is not valid in sys validation because the author is not valid,
-        // but it still does technically constitute a fork (it's just an invalid action)
-        assert_eq!(
-            detect_fork(txn, &a3_fork_author1).unwrap().unwrap().0,
-            a3_hash
+        // Error: a3_fork_author1 has author1 but the existing a3 in the DB
+        // has author2. The in-memory author check detects a cross-author
+        // prev_action collision and returns an error.
+        assert!(
+            detect_fork(txn, &a3_fork_author1).is_err(),
+            "Cross-author prev_action collision should return an error"
         );
 
-        // This is not valid in sys validation because the author is not valid,
-        // but it does still constitute a fork (it's just an invalid action)
-        assert_eq!(
-            detect_fork(txn, &a3_fork_other_author).unwrap().unwrap().0,
-            a3_hash
+        // Error: a3_fork_other_author has a random author that doesn't match
+        // any existing action with the same prev_hash.
+        assert!(
+            detect_fork(txn, &a3_fork_other_author).is_err(),
+            "Cross-author prev_action collision should return an error"
         );
     });
 }
