@@ -101,7 +101,6 @@ async fn sys_validation_produces_invalid_chain_op_warrant() {
     .unwrap();
 }
 
-#[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
 async fn sys_validation_produces_forked_chain_warrant() {
     holochain_trace::test_run();
@@ -121,11 +120,15 @@ async fn sys_validation_produces_forked_chain_warrant() {
     // For this test we want bob to get alice's chain so he can detect the fork
     conductors.exchange_peer_info().await;
 
-    let action_hash: ActionHash = conductors[0]
+    let original_action_hash: ActionHash = conductors[0]
         .call(&alice.zome("coordinator"), "create_unit", ())
         .await;
     let records: Option<Record> = conductors[0]
-        .call(&alice.zome("coordinator"), "read", action_hash)
+        .call(
+            &alice.zome("coordinator"),
+            "read",
+            original_action_hash.clone(),
+        )
         .await;
 
     //- Modify the just-created record to produce a chain fork
@@ -134,10 +137,12 @@ async fn sys_validation_produces_forked_chain_warrant() {
     let mut action = action.into_inner().0.into_content();
     let entry = Entry::App(AppEntryBytes(UnsafeBytes::from(vec![11; 11]).into()));
     *action.entry_data_mut().unwrap().0 = entry.to_hash();
-    let action = SignedActionHashed::sign(&conductors[0].keystore(), action.into_hashed())
-        .await
-        .unwrap();
-    let (action, signature) = action.into_inner();
+    let signed_forked_action =
+        SignedActionHashed::sign(&conductors[0].keystore(), action.into_hashed())
+            .await
+            .unwrap();
+    let forked_action_hash = signed_forked_action.as_hash().clone();
+    let (action, signature) = signed_forked_action.into_inner();
     let action = SignedAction::new(action.into_content(), signature);
     let forked_op =
         ChainOp::from_type(ChainOpType::StoreRecord, action.clone(), Some(entry)).unwrap();
@@ -170,7 +175,7 @@ async fn sys_validation_produces_forked_chain_warrant() {
         insert_op_dht(txn, &forked_op, 0, None).unwrap();
     });
 
-    //- Check that bob authored a chain fork warrant
+    //- Check that bob authored a chain fork warrant with correct action hashes
     crate::wait_for_1m!(
         {
             //- Trigger sys validation
@@ -193,10 +198,27 @@ async fn sys_validation_produces_forked_chain_warrant() {
         },
         |warrants: &Vec<WarrantOp>| { !warrants.is_empty() },
         |mut warrants: Vec<WarrantOp>| {
-            matches::assert_matches!(
-                warrants.pop().unwrap().proof,
-                WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork { .. })
-            )
+            let warrant = warrants.pop().unwrap();
+            match &warrant.proof {
+                WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork {
+                    chain_author,
+                    action_pair: ((hash1, _sig1), (hash2, _sig2)),
+                }) => {
+                    // Verify chain_author matches alice
+                    assert_eq!(chain_author, &alice_pubkey);
+                    // Verify both action hashes are present (order may vary)
+                    let hashes = [hash1.clone(), hash2.clone()];
+                    assert!(
+                        hashes.contains(&original_action_hash),
+                        "Warrant should contain original action hash"
+                    );
+                    assert!(
+                        hashes.contains(&forked_action_hash),
+                        "Warrant should contain forked action hash"
+                    );
+                }
+                _ => panic!("Expected ChainFork warrant"),
+            }
         }
     );
 }
@@ -573,6 +595,17 @@ async fn test_detect_fork() {
 
         // Not a fork, because a3 is already in the chain
         assert!(detect_fork(txn, &a3).unwrap().is_none());
+
+        // Not a fork: DNA actions have no prev_action, so the SQL query `prev_hash = :prev_hash`
+        // with NULL returns no rows (since NULL = NULL is NULL in SQL, not true).
+        // Create a different DNA action to ensure it doesn't match any existing action.
+        let mut another_dna = fixt!(Dna);
+        another_dna.author = author1.clone();
+        let another_dna_action = Action::Dna(another_dna);
+        assert!(
+            detect_fork(txn, &another_dna_action).unwrap().is_none(),
+            "DNA actions cannot fork - they have no prev_action"
+        );
 
         // Is a fork, because:
         // - a1 already exists
