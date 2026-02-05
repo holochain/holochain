@@ -1146,29 +1146,32 @@ Justification for *any*: An entry can be referenced by multiple actions. If at l
 
 Query all non-deleted links from a base hash using the Link index table populated at integration time.
 
+Find non-deleted links from base:
+
 ```sql
--- Find non-deleted links from base
 SELECT Link.*, Action.*
 FROM Link
 JOIN DhtAction AS Action ON Link.action_hash = Action.hash
 LEFT JOIN DeletedLink ON Link.action_hash = DeletedLink.create_link_hash
 WHERE Link.base_hash = ?
-  AND DeletedLink.create_link_hash IS NULL  -- Exclude deleted links
+  AND DeletedLink.create_link_hash IS NULL
   AND Action.record_validity = 'valid'
--- Additional filters can be applied in SQL or application code:
---   - link_type: WHERE Link.link_type = ?
---   - zome_index: WHERE Link.zome_index = ?
---   - tag prefix: WHERE Link.tag >= ? AND Link.tag < ?  (bytewise comparison)
---   - author: WHERE Action.author = ?
---   - timestamp bounds: WHERE Action.timestamp BETWEEN ? AND ?
 ```
+
+Additional filters can be applied in SQL or application code:
+- link_type: `WHERE Link.link_type = ?`
+- zome_index: `WHERE Link.zome_index = ?`
+- tag prefix: `WHERE Link.tag >= ? AND Link.tag < ?` (bytewise comparison)
+- author: `WHERE Action.author = ?`
+- timestamp bounds: `WHERE Action.timestamp BETWEEN ? AND ?`
 
 ### Count Links
 
 Count non-deleted links matching query criteria using the `Link` index table.
 
+Count non-deleted links:
+
 ```sql
--- Count non-deleted links
 SELECT COUNT(*)
 FROM Link
 LEFT JOIN DeletedLink ON Link.action_hash = DeletedLink.create_link_hash
@@ -1176,8 +1179,9 @@ JOIN DhtAction AS Action ON Link.action_hash = Action.hash
 WHERE Link.base_hash = ?
   AND DeletedLink.create_link_hash IS NULL
   AND Action.record_validity = 'valid'
--- Additional filters (link_type, tag prefix, author, timestamp) applied as needed
 ```
+
+Additional filters (link_type, tag prefix, author, timestamp) applied as needed.
 
 ### Get Agent Activity
 
@@ -1189,69 +1193,82 @@ FROM DhtAction AS Action
 WHERE Action.author = ?
   AND Action.record_validity IS NOT NULL
 ORDER BY Action.seq
--- Application code filters for:
---   - Specific action_type values
---   - Entry types (via action_data deserialization)
---   - Sequence ranges
---   - Include valid/rejected/warrants based on GetActivityOptions
 ```
+
+Application code filters for:
+- Specific action_type values
+- Entry types (via action_data deserialization)
+- Sequence ranges
+- Include valid/rejected/warrants based on GetActivityOptions
 
 ### Must Get Agent Activity
 
 Deterministic hash-bounded query for agent activity used in countersigning scenarios.
 
+Query with sequence bounds:
+
 ```sql
--- Query with sequence bounds
 SELECT Action.*
 FROM DhtAction AS Action
 WHERE Action.author = ?
-  AND Action.seq BETWEEN ? AND ?  -- or bounded by prev_hash chain traversal
+  AND Action.seq BETWEEN ? AND ?
   AND Action.record_validity IS NOT NULL
 ORDER BY Action.seq
--- Application code verifies that there are no gaps in sequence numbers (complete chain segment)
 ```
+
+Or bounded by prev_hash chain traversal.
+
+Application code verifies that there are no gaps in sequence numbers (complete chain segment).
 
 ### Query Authored Chain with `ChainQueryFilter`
 
 Query the authored source chain with filtering criteria from `ChainQueryFilter`. The authored database doesn't need index tables since the chain is ordered by sequence and typically queried by walking the chain.
 
+Base query with common filters:
+
 ```sql
--- Base query with common filters
 SELECT Action.*, Entry.*
 FROM Action
 LEFT JOIN Entry ON Action.entry_hash = Entry.hash
 WHERE Action.author = ?
-  -- Sequence range filter (if ChainQueryFilterRange::ActionSeqRange)
   AND Action.seq BETWEEN :start_seq AND :end_seq
-  -- Action type filter (if specified)
   AND Action.action_type IN ('Create', 'Update', ...)
-  -- Entry hash filter (if specified)
   AND Action.entry_hash IN (...)
-  -- Ordering
-ORDER BY Action.seq ASC  -- or DESC if order_descending = true
+ORDER BY Action.seq ASC
 ```
 
 **Handling Different Range Types:**
 
-1. **Unbounded**: No sequence filtering
-   ```sql
-   -- No WHERE clause for sequence
-   ```
+**Unbounded**: No sequence filtering
 
-2. **ActionSeqRange(start, end)**: Filter by sequence numbers
-   ```sql
-   WHERE Action.seq BETWEEN :start_seq AND :end_seq
-   ```
+```sql
+SELECT Action.*, Entry.*
+FROM Action
+LEFT JOIN Entry ON Action.entry_hash = Entry.hash
+WHERE Action.author = ?
+ORDER BY Action.seq ASC
+```
 
-3. **ActionHashRange(start_hash, end_hash)**: Hash-bounded range with fork disambiguation
-   - Query all actions
-   - Walk backwards from `end_hash` following `prev_hash` until reaching `start_hash`
-   - Application code performs the chain traversal (cannot be done efficiently in SQL)
+**ActionSeqRange(start, end)**: Filter by sequence numbers
 
-4. **ActionHashTerminated(end_hash, n)**: Hash-terminated with N preceding records
-   - Query all actions
-   - Walk backwards from `end_hash` following `prev_hash` for N steps
-   - Application code performs the chain traversal
+```sql
+SELECT Action.*, Entry.*
+FROM Action
+LEFT JOIN Entry ON Action.entry_hash = Entry.hash
+WHERE Action.author = ?
+  AND Action.seq BETWEEN :start_seq AND :end_seq
+ORDER BY Action.seq ASC
+```
+
+**ActionHashRange(start_hash, end_hash)**: Hash-bounded range with fork disambiguation
+- Query all actions
+- Walk backwards from `end_hash` following `prev_hash` until reaching `start_hash`
+- Application code performs the chain traversal (cannot be done efficiently in SQL)
+
+**ActionHashTerminated(end_hash, n)**: Hash-terminated with N preceding records
+- Query all actions
+- Walk backwards from `end_hash` following `prev_hash` for N steps
+- Application code performs the chain traversal
 
 **Entry Type Filtering:**
 
@@ -1261,52 +1278,72 @@ Entry type filtering requires deserializing `action_data` to extract the `entry_
 
 Cap grant/claim lookups use dedicated tables for direct access without chain scans:
 
+Find cap grant by access type (direct lookup, join for other fields):
+
 ```sql
--- Find cap grant by access type (direct lookup, join for other fields)
 SELECT cg.*, Action.*, Entry.*
 FROM CapGrant cg
 JOIN Action ON cg.action_hash = Action.hash
 JOIN Entry ON Action.entry_hash = Entry.hash
 WHERE cg.cap_access = ?;
+```
 
--- Find all grants by an author (join to Action for author)
+Find all grants by an author (join to Action for author):
+
+```sql
 SELECT cg.*, Action.*, Entry.*
 FROM CapGrant cg
 JOIN Action ON cg.action_hash = Action.hash
 JOIN Entry ON Action.entry_hash = Entry.hash
 WHERE Action.author = ?;
+```
 
--- Find grants by tag
+Find grants by tag:
+
+```sql
 SELECT cg.*, Action.*, Entry.*
 FROM CapGrant cg
 JOIN Action ON cg.action_hash = Action.hash
 JOIN Entry ON Action.entry_hash = Entry.hash
 WHERE cg.tag = ?;
+```
 
--- Find cap claims by grantor (direct lookup)
+Find cap claims by grantor (direct lookup):
+
+```sql
 SELECT cc.*, Action.*, Entry.*
 FROM CapClaim cc
 JOIN Action ON cc.action_hash = Action.hash
 JOIN Entry ON Action.entry_hash = Entry.hash
 WHERE cc.grantor = ?;
+```
 
--- Find cap claims by tag
+Find cap claims by tag:
+
+```sql
 SELECT cc.*, Action.*, Entry.*
 FROM CapClaim cc
 JOIN Action ON cc.action_hash = Action.hash
 JOIN Entry ON Action.entry_hash = Entry.hash
 WHERE cc.tag = ?;
+```
 
--- Chain traversal (no BLOB deserialization needed)  
+Chain traversal (no BLOB deserialization needed):
+
+```sql
 SELECT hash, seq, prev_hash, timestamp, action_type
 FROM Action
 WHERE author = ?
 ORDER BY seq;
-
--- Full action retrieval (deserialize BLOB for details)
-SELECT * FROM Action WHERE hash = ?;
--- Then deserialize action_data BLOB in application
 ```
+
+Full action retrieval (deserialize BLOB for details):
+
+```sql
+SELECT * FROM Action WHERE hash = ?;
+```
+
+Then deserialize action_data BLOB in application.
 
 ### Find Updates for a Create Action
 
@@ -1648,13 +1685,17 @@ Warrants are processed through the standard validation pipeline:
 
 Valid warrants can be queried from the `DhtWarrant` table:
 
+Find all warrants against a specific agent:
+
 ```sql
--- Find all warrants against a specific agent
 SELECT * FROM DhtWarrant
 WHERE warrantee = ?
 ORDER BY timestamp DESC;
+```
 
--- Check if a specific warrant exists
+Check if a specific warrant exists:
+
+```sql
 SELECT EXISTS(
     SELECT 1 FROM DhtWarrant WHERE hash = ?
 );
