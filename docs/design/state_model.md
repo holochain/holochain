@@ -1,4 +1,3 @@
-# Data Logic Design Reference
 # Data State Model
 
 ## Overview
@@ -7,7 +6,7 @@ The Holochain data storage and validation architecture provides:
 
 1. [Action and entry](./data_model.md) data storage for agents' authored chains
 1. Ops as the unit of validation, with an aggregated validity status for records
-2. Validation limbo table (`LimboOp`) to track pending ops, with shared DhtAction/DhtEntry tables
+2. Validation limbo table (`LimboOp`) to track pending ops, with shared `DhtAction`/`DhtEntry` tables
 3. Unified data querying without separate cache database
 4. Distinct schemas for authored and DHT databases
 5. Direct data queries without complex joins
@@ -18,7 +17,7 @@ The Holochain data storage and validation architecture provides:
 
 1. **Ops are the unit of validation**: All validation happens at the op level
 2. **Records aggregate op validity**: A record's validity is derived from its constituent ops
-3. **Validation limbo isolates pending ops**: Unvalidated ops stay in LimboOp table until validated, with actions and entries in shared DhtAction/DhtEntry tables marked by NULL record_validity
+3. **Validation limbo isolates pending ops**: Unvalidated ops stay in `LimboOp` table until validated, with actions and entries in shared `DhtAction`/`DhtEntry` tables marked by NULL `record_validity`
 4. **Distinct schemas per database type**: Authored and DHT databases have schemas tailored to their needs
 5. **Unified data storage**: DHT database serves both obligated and cached data, distinguished by arc coverage
 6. **Clear state transitions**: Data moves through well-defined states with no ambiguity
@@ -618,8 +617,8 @@ ORDER BY timestamp
 **In-Memory Transform:**
 
 For each row returned:
-1. **Deserialize Action**: Reconstruct full `Action` from common fields + the `action_data` BLOB
-2. **Construct ChainOp**: Build the appropriate `ChainOp` variant based on `op_type`:
+1. **Deserialize `Action`**: Reconstruct full `Action` from common fields + the `action_data` BLOB
+2. **Construct `ChainOp`**: Build the appropriate `ChainOp` variant based on `op_type`:
    - `CreateRecord`: Requires `SignedAction` + `OpEntry`
      - If entry exists and is public: `OpEntry::Present(entry)`
      - If entry exists and is private: `OpEntry::Hidden`
@@ -633,8 +632,8 @@ For each row returned:
    - `DeleteRecord`: Requires `SignedAction` only
    - `CreateLink`: Requires `SignedAction` only
    - `DeleteLink`: Requires `SignedAction` only
-3. **Wrap in DhtOp**: Wrap the `ChainOp` in `DhtOp::ChainOp(Box::new(chain_op))`
-4. **Group by Basis**: Collect ops by `basis_hash` for efficient network transmission
+3. **Wrap in `DhtOp`**: Wrap the `ChainOp` in `DhtOp::ChainOp(Box::new(chain_op))`
+4. **Group by `basis_hash`**: Collect ops by `basis_hash` for efficient network transmission
 
 **Differences to Current Implementation:**
 
@@ -646,7 +645,7 @@ For each row returned:
      - The agent's storage arc can change over time, making sequencing-based approaches fragile
      - Ops within the agent's arc must be integrated before publishing (so they can be served to peers)
      - Ops outside the agent's arc won't be in `DhtOp` at all, but still need to be published
-   - The LEFT JOIN handles both cases: if the op is NULL in DhtOp (outside arc), publish immediately; if non-NULL (inside arc), only publish when validated. The cross-database join naturally handles arc changes by checking current state at publish time, avoiding stale state issues. While this requires using cross-database query features in `holochain_state` and `holochain_data`, it's the simplest approach that correctly handles all edge cases. No cross-database state updates are needed - integration status has a single source of truth in the `DhtOp` table.
+   - The LEFT JOIN handles both cases: if the op is NULL in `DhtOp` (outside arc), publish immediately; if non-NULL (inside arc), only publish when validated. The cross-database join naturally handles arc changes by checking current state at publish time, avoiding stale state issues. While this requires using cross-database query features in `holochain_state` and `holochain_data`, it's the simplest approach that correctly handles all edge cases. No cross-database state updates are needed - integration status has a single source of truth in the `DhtOp` table.
 
 3. **`op_order` field**: Not needed in the new design.
    - **Current Purpose**: `OpOrder` combines op type priority (0-9) with timestamp to ensure "the most likely ordering where dependencies will come first"
@@ -668,29 +667,29 @@ The validation flow processes incoming DHT ops through several stages, from init
    ├─> Filter duplicate ops already being processed
    ├─> Verify counterfeit checks (signature and hash verification)
    ├─> Convert `ChainOp` to `HashedChainOp` (internal type with checked hashes)
-   ├─> Filter ops already in database (check DhtOp table)
-   ├─> Insert action into DhtAction with record_validity=NULL
-   ├─> Insert entry (if applicable) into DhtEntry
-   └─> Insert into LimboOp with validation_stage='pending_sys'
+   ├─> Filter ops already in database (check `DhtOp` table)
+   ├─> Insert action into `DhtAction` with `record_validity=NULL`
+   ├─> Insert entry (if applicable) into `DhtEntry`
+   └─> Insert into `LimboOp` with `validation_stage='pending_sys'`
 
 2. Sys Validation Workflow
-   ├─> Query LimboOp for ops with validation_stage='pending_sys'
-   ├─> Check dependencies in DhtAction/DhtEntry
+   ├─> Query `LimboOp` for ops with `validation_stage='pending_sys'`
+   ├─> Check dependencies in `DhtAction`/`DhtEntry`
    ├─> Perform sys validation checks
-   └─> Update sys_validation_status in LimboOp
+   └─> Update `sys_validation_status` in `LimboOp`
        └─> Trigger app validation if valid
 
 3. App Validation Workflow (if sys valid)
-   ├─> Query LimboOp for ops with validation_stage='pending_app'
+   ├─> Query `LimboOp` for ops with `validation_stage='pending_app'`
    ├─> Run WASM validation callbacks
-   └─> Update app_validation_status in LimboOp
+   └─> Update `app_validation_status` in `LimboOp`
        └─> Trigger integration if valid
 
 4. Integration Workflow (if both valid)
-   ├─> Query LimboOp for ops with validation_stage='complete'
-   ├─> Move op from LimboOp to DhtOp (set when_integrated)
-   ├─> Update DhtAction record_validity with aggregated status
-   └─> Delete from LimboOp
+   ├─> Query `LimboOp` for ops with `validation_stage='complete'`
+   ├─> Move op from `LimboOp` to `DhtOp` (set `when_integrated`)
+   ├─> Update `DhtAction` `record_validity` with aggregated status
+   └─> Delete from `LimboOp`
 ```
 
 #### Incoming DHT Ops Workflow
@@ -985,7 +984,7 @@ ORDER BY LimboOp.when_received
    WHERE hash = :action_hash
    ```
 
-   Note: DhtAction and DhtEntry rows are created during incoming op insertion (step 6) with `record_validity = NULL`
+   Note: `DhtAction` and `DhtEntry` rows are created during incoming op insertion (step 6) with `record_validity = NULL`
 
 4. **Update Index Tables** (if applicable)
    - If the action is a `CreateLink` and the op is valid, insert into `Link` table:
@@ -1088,7 +1087,7 @@ ORDER BY LimboOp.when_received
    )
    ```
 
-6. **Delete from LimboOp**
+6. **Delete from `LimboOp`**
    ```sql
    DELETE FROM LimboOp WHERE hash = :op_hash
    ```
@@ -1111,7 +1110,7 @@ The record validity is determined at the time of integration by examining all kn
 
 ### Record Validity Correction
 
-TODO: It is a future piece of work to define this logic. When implemented, this logic must also clean up index tables (`Link`, `DeletedLink`, `CapGrant`, `CapClaim`) when records are invalidated.
+TODO: It is a future piece of work to define this logic. When implemented, this logic must also clean up index tables (`Link`, `DeletedLink`, `UpdatedRecord`, `DeletedRecord`, `CapGrant`, `CapClaim`) when records are invalidated.
 
 ## Query Patterns
 
@@ -1144,7 +1143,7 @@ Justification for *any*: An entry can be referenced by multiple actions. If at l
 
 ### Get Links
 
-Query all non-deleted links from a base hash using the Link index table populated at integration time.
+Query all non-deleted links from a base hash using the `Link` index table populated at integration time.
 
 Find non-deleted links from base:
 
@@ -1343,11 +1342,11 @@ Full action retrieval (deserialize BLOB for details):
 SELECT * FROM Action WHERE hash = ?;
 ```
 
-Then deserialize action_data BLOB in application.
+Then deserialize `action_data` BLOB in application.
 
 ### Find Updates for a Create Action
 
-Retrieve all Update actions that reference a specific Create action. Updates form a chain where each Update references either the original Create or another Update.
+Retrieve all `Update` actions that reference a specific `Create` action. Updates form a chain where each `Update` references either the original `Create` or another `Update`.
 
 Uses the `UpdatedRecord` index table populated during integration.
 
@@ -1408,7 +1407,7 @@ ORDER BY depth, seq
 
 ### Find Deletes for an Action
 
-Retrieve all Delete actions that reference a specific action (Create or Update).
+Retrieve all `Delete` actions that reference a specific action (`Create` or `Update`).
 
 Uses the `DeletedRecord` index table populated during integration.
 
@@ -1429,7 +1428,7 @@ ORDER BY Action.seq
 
 ### Find All Deletes for a Record (Create + Update Chain)
 
-Retrieve all Delete actions that reference either the original Create or any Update in its chain.
+Retrieve all `Delete` actions that reference either the original `Create` or any `Update` in its chain.
 
 Uses the `UpdatedRecord` and `DeletedRecord` index tables.
 
@@ -1465,11 +1464,11 @@ ORDER BY Action.seq
 - Filter records that have been deleted in any version
 
 **Rationale:**
-In Holochain, deleting an Update action doesn't automatically delete the original Create. Applications may want to consider a record "deleted" if ANY version is deleted, or only if ALL versions are deleted. This query returns all deletes; application logic decides how to interpret them.
+In Holochain, deleting an `Update` action doesn't automatically delete the original `Create`. Applications may want to consider a record "deleted" if ANY version is deleted, or only if ALL versions are deleted. This query returns all deletes; application logic decides how to interpret them.
 
 ### Get Live Records (Filter Out Deleted)
 
-Query for records that haven't been deleted. A record is "live" if there are no Delete actions referencing it.
+Query for records that haven't been deleted. A record is "live" if there are no `Delete` actions referencing it.
 
 Uses the `DeletedRecord` index table.
 
@@ -1579,7 +1578,7 @@ ORDER BY Action.seq
 
 ```rust
 pub struct RecordDetails {
-    /// The original action (Create or Update)
+    /// The original action (`Create` or `Update`)
     pub original: Record,
     /// All updates in chronological order
     pub updates: Vec<Record>,
@@ -1706,7 +1705,7 @@ SELECT EXISTS(
 The system maintains these invariants:
 
 1. **No op exists in both `LimboOp` and `DhtOp` simultaneously**
-2. **Every DhtOp has a definite `validation_status` (never `NULL`)**
+2. **Every `DhtOp` has a definite `validation_status` (never `NULL`)**
 3. **`DhtAction` has a `NULL` value for `record_validity` for pending records, 'valid' or 'rejected' for integrated records**
 4. **Ops are moved from limbo to DHT atomically with `record_validity` updates**
 5. **Rejected ops in `DhtOp` cause their records to be marked 'rejected'**
