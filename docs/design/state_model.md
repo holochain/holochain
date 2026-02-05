@@ -53,13 +53,13 @@ CREATE TABLE Entry (
 );
 
 -- Capability grants lookup table.
--- 
+--
 -- For simpler querying of cap grants from the agent chain.
 CREATE TABLE CapGrant (
     action_hash BLOB PRIMARY KEY,
     cap_access  TEXT NOT NULL, -- 'unrestricted', 'transferable', 'assigned'
     tag         TEXT,
-   
+
     FOREIGN KEY(action_hash) REFERENCES Action(hash)
 );
 
@@ -258,7 +258,7 @@ CREATE TABLE Link (
     link_type   INTEGER NOT NULL,
     tag         BLOB,
 
-    FOREIGN KEY(action_hash) REFERENCES DhtAction(hash)
+    FOREIGN KEY(action_hash) REFERENCES DhtAction(hash) ON DELETE CASCADE
 );
 
 -- Deleted link index table.
@@ -268,8 +268,34 @@ CREATE TABLE DeletedLink (
     action_hash      BLOB PRIMARY KEY,  -- The DeleteLink action
     create_link_hash BLOB NOT NULL,      -- The CreateLink being deleted
 
-    FOREIGN KEY(action_hash) REFERENCES DhtAction(hash)
+    FOREIGN KEY(action_hash) REFERENCES DhtAction(hash) ON DELETE CASCADE
 );
+
+-- Update index table.
+--
+-- For efficient update queries. Populated at integration time when Update actions are validated.
+CREATE TABLE UpdatedRecord (
+    action_hash              BLOB PRIMARY KEY,  -- The Update action
+    original_action_hash     BLOB NOT NULL,      -- The original Create or Update being updated
+    original_entry_hash      BLOB NOT NULL,      -- The original entry being updated
+
+    FOREIGN KEY(action_hash) REFERENCES DhtAction(hash) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_updated_record_original ON UpdatedRecord(original_action_hash);
+
+-- Delete index table.
+--
+-- For efficient delete queries. Populated at integration time when Delete actions are validated.
+CREATE TABLE DeletedRecord (
+    action_hash         BLOB PRIMARY KEY,  -- The Delete action
+    deletes_action_hash BLOB NOT NULL,      -- The action being deleted
+    deletes_entry_hash  BLOB NOT NULL,      -- The entry being deleted
+
+    FOREIGN KEY(action_hash) REFERENCES DhtAction(hash) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_deleted_record_deletes ON DeletedRecord(deletes_action_hash);
 ```
 
 ### Rust Structure
@@ -984,16 +1010,16 @@ ORDER BY LimboOp.when_received
 
    Note: DhtAction and DhtEntry rows are created during incoming op insertion (step 6) with `record_validity = NULL`
 
-4. **Update Link Index Tables** (if applicable)
+4. **Update Index Tables** (if applicable)
    - If the action is a `CreateLink` and the op is valid, insert into `Link` table:
    ```sql
    INSERT INTO Link (action_hash, base_hash, zome_index, link_type, tag)
    SELECT
        Action.hash,
-       :base_hash,      -- extracted from action_data
-       :zome_index,     -- extracted from action_data
-       :link_type,      -- extracted from action_data
-       :tag             -- extracted from action_data
+       :base_hash,      -- extracted from action_data during integration
+       :zome_index,     -- extracted from action_data during integration
+       :link_type,      -- extracted from action_data during integration
+       :tag             -- extracted from action_data during integration
    FROM DhtAction AS Action
    WHERE Action.hash = :action_hash
        AND Action.record_validity = 'valid'
@@ -1004,26 +1030,74 @@ ORDER BY LimboOp.when_received
    DELETE FROM Link
    WHERE action_hash = :action_hash
    AND :action_hash IN (
-   SELECT hash FROM DhtAction
-   WHERE hash = :action_hash AND record_validity = 'rejected'
+       SELECT hash FROM DhtAction
+       WHERE hash = :action_hash AND record_validity = 'rejected'
    );
    ```
    - If the action is a `DeleteLink` and the op is valid, insert into `DeletedLink` table:
    ```sql
    INSERT INTO DeletedLink (action_hash, create_link_hash)
-   VALUES (:action_hash, :create_link_hash)  -- create_link_hash from action_data
+   SELECT
+       Action.hash,
+       :create_link_hash  -- extracted from action_data during integration
+   FROM DhtAction AS Action
+   WHERE Action.hash = :action_hash
+       AND Action.record_validity = 'valid'
+       AND Action.action_type = 'DeleteLink'
    ```
    - If the action is a `DeleteLink` and the op is rejected, ensure no row exists in `DeletedLink` table for this action:
    ```sql
    DELETE FROM DeletedLink
    WHERE action_hash = :action_hash
    AND :action_hash IN (
-   SELECT hash FROM DhtAction
-   WHERE hash = :action_hash AND record_validity = 'rejected'
+       SELECT hash FROM DhtAction
+       WHERE hash = :action_hash AND record_validity = 'rejected'
+   );
+   ```
+   - If the action is an `Update` and the op is valid, insert into `UpdatedRecord` table:
+   ```sql
+   INSERT INTO UpdatedRecord (action_hash, original_action_hash, original_entry_hash)
+   SELECT
+       Action.hash,
+       :original_action_hash,  -- extracted from action_data during integration
+       :original_entry_hash    -- extracted from action_data during integration
+   FROM DhtAction AS Action
+   WHERE Action.hash = :action_hash
+       AND Action.record_validity = 'valid'
+       AND Action.action_type = 'Update'
+   ```
+   - If the action is an `Update` and the op is rejected, ensure no row exists in `UpdatedRecord` table:
+   ```sql
+   DELETE FROM UpdatedRecord
+   WHERE action_hash = :action_hash
+   AND :action_hash IN (
+       SELECT hash FROM DhtAction
+       WHERE hash = :action_hash AND record_validity = 'rejected'
+   );
+   ```
+   - If the action is a `Delete` and the op is valid, insert into `DeletedRecord` table:
+   ```sql
+   INSERT INTO DeletedRecord (action_hash, deletes_action_hash, deletes_entry_hash)
+   SELECT
+       Action.hash,
+       :deletes_action_hash,  -- extracted from action_data during integration
+       :deletes_entry_hash    -- extracted from action_data during integration
+   FROM DhtAction AS Action
+   WHERE Action.hash = :action_hash
+       AND Action.record_validity = 'valid'
+       AND Action.action_type = 'Delete'
+   ```
+   - If the action is a `Delete` and the op is rejected, ensure no row exists in `DeletedRecord` table:
+   ```sql
+   DELETE FROM DeletedRecord
+   WHERE action_hash = :action_hash
+   AND :action_hash IN (
+       SELECT hash FROM DhtAction
+       WHERE hash = :action_hash AND record_validity = 'rejected'
    );
    ```
 
-5. **Update Warrant Index Table** (if applicable)
+5. **Insert Into Warrant Table** (if applicable)
    - If the op is a warrant op (`op_type = 'Warrant'`) and the op is valid, insert into `DhtWarrant` table:
    ```sql
    INSERT INTO DhtWarrant (hash, author, timestamp, warrantee, proof, storage_center_loc)
@@ -1035,7 +1109,6 @@ ORDER BY LimboOp.when_received
        :proof,         -- serialized WarrantProof BLOB
        :storage_center_loc
    )
-   WHERE :validation_status = 'valid'
    ```
 
 6. **Delete from LimboOp**
@@ -1211,6 +1284,295 @@ ORDER BY seq;
 SELECT * FROM Action WHERE hash = ?;
 -- Then deserialize action_data BLOB in application
 ```
+
+### Find Updates for a Create Action
+
+Retrieve all Update actions that reference a specific Create action. Updates form a chain where each Update references either the original Create or another Update.
+
+Uses the `UpdatedRecord` index table populated during integration.
+
+```sql
+-- Find direct updates (one hop)
+SELECT Action.*, Entry.*
+FROM UpdatedRecord
+JOIN DhtAction AS Action ON UpdatedRecord.action_hash = Action.hash
+LEFT JOIN DhtEntry AS Entry ON Action.entry_hash = Entry.hash
+WHERE UpdatedRecord.original_action_hash = ?
+  AND Action.record_validity = 'valid'
+ORDER BY Action.seq
+
+-- Find full update chain (recursive)
+WITH RECURSIVE update_chain AS (
+  -- Base case: direct updates of the create
+  SELECT
+    UpdatedRecord.action_hash as hash,
+    Action.author,
+    Action.seq,
+    Action.timestamp,
+    Action.entry_hash,
+    1 as depth
+  FROM UpdatedRecord
+  JOIN DhtAction AS Action ON UpdatedRecord.action_hash = Action.hash
+  WHERE UpdatedRecord.original_action_hash = ?
+    AND Action.record_validity = 'valid'
+
+  UNION ALL
+
+  -- Recursive case: updates of updates
+  SELECT
+    ur.action_hash,
+    a.author,
+    a.seq,
+    a.timestamp,
+    a.entry_hash,
+    uc.depth + 1
+  FROM UpdatedRecord ur
+  JOIN DhtAction a ON ur.action_hash = a.hash
+  INNER JOIN update_chain uc ON ur.original_action_hash = uc.hash
+  WHERE a.record_validity = 'valid'
+)
+SELECT uc.*, Entry.*
+FROM update_chain uc
+LEFT JOIN DhtEntry AS Entry ON uc.entry_hash = Entry.hash
+ORDER BY depth, seq
+```
+
+**Use Cases:**
+- Get the latest version of a record
+- Show update history to users
+- Traverse the update chain to find all versions
+
+**Application Logic:**
+- Latest version: take the last update in the chain, or the original if no updates exist
+- Update graph: if multiple updates reference the same action, the chain branches
+
+### Find Deletes for an Action
+
+Retrieve all Delete actions that reference a specific action (Create or Update).
+
+Uses the `DeletedRecord` index table populated during integration.
+
+```sql
+-- Find deletes for a specific action
+SELECT Action.*
+FROM DeletedRecord
+JOIN DhtAction AS Action ON DeletedRecord.action_hash = Action.hash
+WHERE DeletedRecord.deletes_action_hash = ?
+  AND Action.record_validity = 'valid'
+ORDER BY Action.seq
+```
+
+**Use Cases:**
+- Check if a record has been deleted
+- Show who deleted a record and when
+- Filter out deleted content from queries
+
+### Find All Deletes for a Record (Create + Update Chain)
+
+Retrieve all Delete actions that reference either the original Create or any Update in its chain.
+
+Uses the `UpdatedRecord` and `DeletedRecord` index tables.
+
+```sql
+-- Find all actions in the record's lifecycle (create + updates)
+WITH RECURSIVE record_chain AS (
+  -- Base case: the original create/update
+  SELECT hash, 0 as depth
+  FROM DhtAction
+  WHERE hash = ?
+
+  UNION ALL
+
+  -- Recursive case: updates of this action
+  SELECT UpdatedRecord.action_hash, rc.depth + 1
+  FROM UpdatedRecord
+  JOIN DhtAction AS Action ON UpdatedRecord.action_hash = Action.hash
+  INNER JOIN record_chain rc ON UpdatedRecord.original_action_hash = rc.hash
+  WHERE Action.record_validity = 'valid'
+)
+-- Find all deletes for any action in the chain
+SELECT DISTINCT Action.*
+FROM DeletedRecord
+JOIN DhtAction AS Action ON DeletedRecord.action_hash = Action.hash
+WHERE Action.record_validity = 'valid'
+  AND DeletedRecord.deletes_action_hash IN (SELECT hash FROM record_chain)
+ORDER BY Action.seq
+```
+
+**Use Cases:**
+- Determine if any version of a record has been deleted
+- Show complete deletion history
+- Filter records that have been deleted in any version
+
+**Rationale:**
+In Holochain, deleting an Update action doesn't automatically delete the original Create. Applications may want to consider a record "deleted" if ANY version is deleted, or only if ALL versions are deleted. This query returns all deletes; application logic decides how to interpret them.
+
+### Get Live Records (Filter Out Deleted)
+
+Query for records that haven't been deleted. A record is "live" if there are no Delete actions referencing it.
+
+Uses the `DeletedRecord` index table.
+
+```sql
+-- Get live records by excluding those with deletes
+SELECT Action.*, Entry.*
+FROM DhtAction AS Action
+LEFT JOIN DhtEntry AS Entry ON Action.entry_hash = Entry.hash
+WHERE Action.action_type = 'Create'
+  AND Action.record_validity = 'valid'
+  -- Exclude creates that have been deleted
+  AND NOT EXISTS (
+    SELECT 1 FROM DeletedRecord
+    JOIN DhtAction AS DeleteAction ON DeletedRecord.action_hash = DeleteAction.hash
+    WHERE DeleteAction.record_validity = 'valid'
+      AND DeletedRecord.deletes_action_hash = Action.hash
+  )
+ORDER BY Action.seq
+```
+
+**Use Cases:**
+- List all active/live records
+- Filter query results to exclude deleted content
+- Count non-deleted records
+
+**Application Variations:**
+- **Strict live filter**: Exclude records where ANY version (create or update) has been deleted
+- **Permissive live filter**: Only exclude records where ALL versions have been deleted
+- **Latest live version**: Get the most recent update that hasn't been deleted
+
+### Get Record Details (Complete Lifecycle)
+
+Retrieve a complete record with all updates and deletes, letting the application decide how to resolve the current state.
+
+Uses the `UpdatedRecord` and `DeletedRecord` index tables.
+
+```sql
+-- Get the original action
+SELECT 'original' as record_type, Action.*, Entry.*
+FROM DhtAction AS Action
+LEFT JOIN DhtEntry AS Entry ON Action.entry_hash = Entry.hash
+WHERE Action.hash = ?
+  AND Action.record_validity = 'valid'
+
+UNION ALL
+
+-- Get all updates in the chain
+WITH RECURSIVE update_chain AS (
+  SELECT
+    UpdatedRecord.action_hash as hash,
+    Action.author,
+    Action.seq,
+    Action.timestamp,
+    Action.entry_hash,
+    Action.action_type,
+    1 as depth
+  FROM UpdatedRecord
+  JOIN DhtAction AS Action ON UpdatedRecord.action_hash = Action.hash
+  WHERE UpdatedRecord.original_action_hash = ?
+    AND Action.record_validity = 'valid'
+
+  UNION ALL
+
+  SELECT
+    ur.action_hash,
+    a.author,
+    a.seq,
+    a.timestamp,
+    a.entry_hash,
+    a.action_type,
+    uc.depth + 1
+  FROM UpdatedRecord ur
+  JOIN DhtAction a ON ur.action_hash = a.hash
+  INNER JOIN update_chain uc ON ur.original_action_hash = uc.hash
+  WHERE a.record_validity = 'valid'
+)
+SELECT 'update' as record_type, uc.*, Entry.*
+FROM update_chain uc
+LEFT JOIN DhtEntry AS Entry ON uc.entry_hash = Entry.hash
+ORDER BY uc.depth, uc.seq
+
+UNION ALL
+
+-- Get all deletes for any action in the chain
+WITH RECURSIVE record_chain AS (
+  SELECT hash, 0 as depth
+  FROM DhtAction
+  WHERE hash = ?
+
+  UNION ALL
+
+  SELECT ur.action_hash, rc.depth + 1
+  FROM UpdatedRecord ur
+  JOIN DhtAction AS Action ON ur.action_hash = Action.hash
+  INNER JOIN record_chain rc ON ur.original_action_hash = rc.hash
+  WHERE Action.record_validity = 'valid'
+)
+SELECT 'delete' as record_type, Action.*, NULL as hash, NULL as blob
+FROM DeletedRecord
+JOIN DhtAction AS Action ON DeletedRecord.action_hash = Action.hash
+WHERE Action.record_validity = 'valid'
+  AND DeletedRecord.deletes_action_hash IN (SELECT hash FROM record_chain)
+ORDER BY Action.seq
+```
+
+**Return Structure (Application Layer):**
+
+```rust
+pub struct RecordDetails {
+    /// The original action (Create or Update)
+    pub original: Record,
+    /// All updates in chronological order
+    pub updates: Vec<Record>,
+    /// All deletes affecting this record or its updates
+    pub deletes: Vec<SignedActionHashed>,
+}
+
+impl RecordDetails {
+    /// Check if this record is live (not deleted)
+    pub fn is_live(&self) -> bool {
+        self.deletes.is_empty()
+    }
+
+    /// Get the latest version (last update or original if no updates)
+    pub fn latest_version(&self) -> &Record {
+        self.updates.last().unwrap_or(&self.original)
+    }
+
+    /// Get the latest live version (excluding deleted updates)
+    pub fn latest_live_version(&self) -> Option<&Record> {
+        let deleted_hashes: HashSet<_> = self.deletes
+            .iter()
+            .map(|d| d.action().deletes_address())
+            .collect();
+
+        // Check updates in reverse order
+        for update in self.updates.iter().rev() {
+            if !deleted_hashes.contains(&update.action_address()) {
+                return Some(update);
+            }
+        }
+
+        // Check original
+        if !deleted_hashes.contains(&self.original.action_address()) {
+            Some(&self.original)
+        } else {
+            None
+        }
+    }
+}
+```
+
+**Use Cases:**
+- Display complete record history to users
+- Let application implement custom resolution logic
+- Show "edited" and "deleted" indicators in UI
+- Implement conflict resolution for forked update chains
+
+**Notes:**
+- This query may return substantial data for records with many updates/deletes
+- Consider pagination for records with long histories
+- Application layer decides interpretation: "deleted" might mean ANY delete, or ALL versions deleted
+- Update chains can branch if multiple updates reference the same action (application handles resolution)
 
 ### Cache Pruning Strategy
 
