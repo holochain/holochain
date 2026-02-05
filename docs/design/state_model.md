@@ -93,8 +93,7 @@ CREATE TABLE DeletedLink (
     action_hash      BLOB PRIMARY KEY,  -- The DeleteLink action
     create_link_hash BLOB NOT NULL,      -- The CreateLink being deleted
 
-    FOREIGN KEY(action_hash) REFERENCES Action(hash),
-    FOREIGN KEY(create_link_hash) REFERENCES Link(action_hash)
+    FOREIGN KEY(action_hash) REFERENCES Action(hash)
 );
 
 -- Chain lock table.
@@ -269,8 +268,7 @@ CREATE TABLE DeletedLink (
     action_hash      BLOB PRIMARY KEY,  -- The DeleteLink action
     create_link_hash BLOB NOT NULL,      -- The CreateLink being deleted
 
-    FOREIGN KEY(action_hash) REFERENCES DhtAction(hash),
-    FOREIGN KEY(create_link_hash) REFERENCES Link(action_hash)
+    FOREIGN KEY(action_hash) REFERENCES DhtAction(hash)
 );
 ```
 
