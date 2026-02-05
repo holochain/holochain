@@ -73,29 +73,6 @@ CREATE TABLE CapClaim (
     secret      BLOB NOT NULL,
 );
 
--- Link index table.
---
--- For efficient link queries. Populated when authoring `CreateLink` actions.
-CREATE TABLE Link (
-    action_hash BLOB PRIMARY KEY,
-    base_hash   BLOB NOT NULL,
-    zome_index  INTEGER NOT NULL,
-    link_type   INTEGER NOT NULL,
-    tag         BLOB,
-
-    FOREIGN KEY(action_hash) REFERENCES Action(hash)
-);
-
--- Deleted link index table.
---
--- For tracking which links have been deleted. Populated when authoring `DeleteLink` actions.
-CREATE TABLE DeletedLink (
-    action_hash      BLOB PRIMARY KEY,  -- The DeleteLink action
-    create_link_hash BLOB NOT NULL,      -- The CreateLink being deleted
-
-    FOREIGN KEY(action_hash) REFERENCES Action(hash)
-);
-
 -- Chain lock table.
 --
 -- For coordinating countersigning sessions. Prevents new actions from being committed to the chain
@@ -1233,6 +1210,52 @@ WHERE Action.author = ?
 ORDER BY Action.seq
 -- Application code verifies that there are no gaps in sequence numbers (complete chain segment)
 ```
+
+### Query Authored Chain with `ChainQueryFilter`
+
+Query the authored source chain with filtering criteria from `ChainQueryFilter`. The authored database doesn't need index tables since the chain is ordered by sequence and typically queried by walking the chain.
+
+```sql
+-- Base query with common filters
+SELECT Action.*, Entry.*
+FROM Action
+LEFT JOIN Entry ON Action.entry_hash = Entry.hash
+WHERE Action.author = ?
+  -- Sequence range filter (if ChainQueryFilterRange::ActionSeqRange)
+  AND Action.seq BETWEEN :start_seq AND :end_seq
+  -- Action type filter (if specified)
+  AND Action.action_type IN ('Create', 'Update', ...)
+  -- Entry hash filter (if specified)
+  AND Action.entry_hash IN (...)
+  -- Ordering
+ORDER BY Action.seq ASC  -- or DESC if order_descending = true
+```
+
+**Handling Different Range Types:**
+
+1. **Unbounded**: No sequence filtering
+   ```sql
+   -- No WHERE clause for sequence
+   ```
+
+2. **ActionSeqRange(start, end)**: Filter by sequence numbers
+   ```sql
+   WHERE Action.seq BETWEEN :start_seq AND :end_seq
+   ```
+
+3. **ActionHashRange(start_hash, end_hash)**: Hash-bounded range with fork disambiguation
+   - Query all actions
+   - Walk backwards from `end_hash` following `prev_hash` until reaching `start_hash`
+   - Application code performs the chain traversal (cannot be done efficiently in SQL)
+
+4. **ActionHashTerminated(end_hash, n)**: Hash-terminated with N preceding records
+   - Query all actions
+   - Walk backwards from `end_hash` following `prev_hash` for N steps
+   - Application code performs the chain traversal
+
+**Entry Type Filtering:**
+
+Entry type filtering requires deserializing `action_data` to extract the `entry_type` field. This should be handled in application code after fetching matching actions,
 
 ### Cap Grant and Claim Lookups
 
