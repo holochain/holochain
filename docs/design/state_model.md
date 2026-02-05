@@ -4,22 +4,20 @@
 
 The Holochain data storage and validation architecture provides:
 
-1. [Action and entry](./data_model.md) data storage for agents' authored chains
-1. Ops as the unit of validation, with an aggregated validity status for records
-2. Validation limbo table (`LimboOp`) to track pending ops, with shared `DhtAction`/`DhtEntry` tables
-3. Unified data querying without separate cache database
-4. Distinct schemas for authored and DHT databases
-5. Direct data queries without complex joins
+1. [Action and entry](./data_model.md) data storage for agents' authored chains.
+1. Ops as the unit of validation, with an aggregated validity status for records.
+2. Validation limbo table (`LimboOp`) to track pending ops, with shared `DhtAction`/`DhtEntry` tables.
+3. Unified data querying for both obligated and cached data in the DHT database.
 
 ## Architecture
 
 ### Core Principles
 
-1. **Ops are the unit of validation**: All validation happens at the op level
-2. **Records aggregate op validity**: A record's validity is derived from its constituent ops
-3. **Validation limbo isolates pending ops**: Unvalidated ops stay in `LimboOp` table until validated, with actions and entries in shared `DhtAction`/`DhtEntry` tables marked by NULL `record_validity`
-4. **Distinct schemas per database type**: Authored and DHT databases have schemas tailored to their needs
-5. **Unified data storage**: DHT database serves both obligated and cached data, distinguished by arc coverage
+1. **Ops are the unit of validation**: All validation happens at the op level.
+2. **Records aggregate op validity**: A record's validity is derived from its derived ops.
+3. **Validation limbo isolates pending ops**: Unvalidated ops stay in `LimboOp` table until validated, with actions and entries in shared `DhtAction`/`DhtEntry` tables marked by NULL `record_validity`.
+4. **Distinct schemas per database type**: Authored and DHT databases have schemas tailored to their needs.
+5. **Unified data storage**: DHT database serves both obligated and cached data. Cached data can be distinguished by arc coverage as required.
 6. **Clear state transitions**: Data moves through well-defined states with no ambiguity
 
 ### Database Structure
