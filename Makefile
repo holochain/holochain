@@ -5,7 +5,7 @@
 COMMON_DEFAULT_FEATURES=slow_tests,build_wasms,sqlite-encrypted
 DEFAULT_FEATURES=transport-iroh,$(COMMON_DEFAULT_FEATURES)
 DEFAULT_FEATURES_TRANSPORT_TX5=transport-tx5-backend-go-pion,$(COMMON_DEFAULT_FEATURES)
-UNSTABLE_FEATURES=chc,unstable-sharding,unstable-warrants,unstable-functions,unstable-migration,$(DEFAULT_FEATURES)
+UNSTABLE_FEATURES=chc,unstable-sharding,unstable-functions,unstable-migration,$(DEFAULT_FEATURES)
 
 # mark everything as phony because it doesn't represent a file-system output
 .PHONY: default \

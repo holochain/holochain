@@ -113,7 +113,7 @@ use holochain_cascade::CascadeImpl;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_sqlite::prelude::*;
-use holochain_sqlite::sql::sql_cell::ACTION_HASH_BY_PREV;
+use holochain_sqlite::sql::sql_cell::ACTION_HASH_BY_PREV_AND_AUTHOR;
 use holochain_state::integrate::insert_locally_validated_op;
 use holochain_state::prelude::*;
 use rusqlite::Transaction;
@@ -135,6 +135,8 @@ mod tests;
 mod unit_tests;
 #[cfg(test)]
 mod validate_op_tests;
+#[cfg(test)]
+mod validate_warrant_tests;
 
 /// The sys validation workflow. It is described in the module level documentation.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
@@ -305,17 +307,12 @@ async fn sys_validation_workflow_inner(
                 ..Default::default()
             };
             let mut invalid_ops = vec![];
-
-            #[cfg(feature = "unstable-warrants")]
             let mut forked_pairs: Vec<(AgentPubKey, ForkedPair)> = Vec::with_capacity(0);
-            #[cfg(not(feature = "unstable-warrants"))]
-            let forked_pairs: Vec<(AgentPubKey, ForkedPair)> = vec![];
 
             for (hashed_op, outcome) in validation_outcomes {
                 let (op, op_hash) = hashed_op.into_inner();
                 let op_type = op.get_type();
 
-                #[cfg(feature = "unstable-warrants")]
                 if let DhtOp::ChainOp(chain_op) = &op {
                     // Author a ChainFork warrant if fork is detected
                     let action = chain_op.action();
@@ -1546,16 +1543,17 @@ pub async fn make_fork_warrant_op_inner(
     Ok(op)
 }
 
-pub fn detect_fork(
+fn detect_fork(
     txn: &mut Transaction<'_>,
     action: &Action,
 ) -> StateQueryResult<Option<(ActionHash, Signature)>> {
-    let mut statement = txn.prepare(ACTION_HASH_BY_PREV)?;
+    let mut statement = txn.prepare(ACTION_HASH_BY_PREV_AND_AUTHOR)?;
     let items = statement
         .query_map(
             named_params! {
                 ":prev_hash": action.prev_action(),
                 ":hash": action.to_hash(),
+                ":author": action.author(),
             },
             // First, try to deserialize the hash as an ActionHash...
             |row| match row.get("hash") {

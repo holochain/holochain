@@ -2,7 +2,8 @@ pub mod sql_cell {
     pub const SET_VALIDATED_OPS_TO_INTEGRATED: &str =
         include_str!("sql/cell/set_validated_ops_to_integrated.sql");
 
-    pub const ACTION_HASH_BY_PREV: &str = include_str!("sql/cell/action_hash_by_prev.sql");
+    pub const ACTION_HASH_BY_PREV_AND_AUTHOR: &str =
+        include_str!("sql/cell/action_hash_by_prev_and_author.sql");
     pub const ALL_READY_ACTIVITY: &str = include_str!("sql/cell/all_ready_activity.sql");
     pub const DELETE_ACTIONS_AFTER_SEQ: &str =
         include_str!("sql/cell/delete_actions_after_seq.sql");

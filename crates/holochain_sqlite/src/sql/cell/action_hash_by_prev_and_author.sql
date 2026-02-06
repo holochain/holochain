@@ -6,5 +6,6 @@ FROM
 WHERE
   hash != :hash
   AND prev_hash = :prev_hash
+  AND author = :author
 LIMIT
   1
