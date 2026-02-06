@@ -143,17 +143,11 @@ async fn validate_chain_fork_warrant_rejected_prev_actions_differ() {
 //    `CounterfeitAction` since counterfeit ops are expected to be filtered before sys validation
 // The signature verification for actions in warrants is still exercised by the valid warrant test.
 
-/// Test that a ChainFork warrant is rejected when `detect_fork` finds a cross-author collision.
+/// Test that a ChainFork warrant is rejected when the action pair has different authors.
 ///
-/// This test verifies the end-to-end scenario where the SQL query in `detect_fork` doesn't
-/// filter by author (it only matches `prev_hash`), but the warrant validation correctly
-/// rejects the warrant because the two actions have different authors.
-///
-/// Scenario:
-/// 1. Agent A has action A1 pointing to prev_hash H
-/// 2. Agent B has action B1 also pointing to prev_hash H (cross-author collision)
-/// 3. `detect_fork` would return B1 when checking A1 (since SQL doesn't filter by author)
-/// 4. A warrant created from this pair must be rejected with "action pair author mismatch"
+/// Note: `detect_fork` now filters by author in its SQL query, so cross-author collisions
+/// will not produce warrants in practice. This test verifies defense-in-depth: even if a
+/// cross-author warrant were somehow constructed, the warrant validation correctly rejects it.
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_chain_fork_warrant_rejected_cross_author_collision() {
     holochain_trace::test_run();
@@ -162,8 +156,6 @@ async fn validate_chain_fork_warrant_rejected_cross_author_collision() {
 
     // Create the cross-author collision scenario:
     // Two actions from different authors pointing to the same prev_hash.
-    // This simulates what detect_fork might find since its SQL query
-    // doesn't filter by author.
     let (action_agent_a, action_agent_b, _shared_prev_hash) =
         test_case.create_cross_author_collision().await;
 
@@ -308,10 +300,9 @@ impl ChainForkWarrantTestCase {
 
     /// Create a cross-author collision: two actions from different agents with same prev_hash.
     ///
-    /// This simulates the scenario where `detect_fork` (which doesn't filter by author in its
-    /// SQL query) might find an action from a different agent that happens to share the same
-    /// `prev_hash`. In practice this shouldn't happen with valid chains, but the warrant
-    /// validation must still handle this case correctly by rejecting the warrant.
+    /// This creates two actions from different agents with the same `prev_hash`.
+    /// While `detect_fork` now filters by author (preventing this from producing warrants),
+    /// this helper is still useful for testing warrant validation defense-in-depth.
     async fn create_cross_author_collision(
         &self,
     ) -> (SignedActionHashed, SignedActionHashed, ActionHash) {

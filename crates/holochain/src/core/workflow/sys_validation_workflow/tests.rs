@@ -781,18 +781,12 @@ async fn test_detect_fork() {
         // - both are under the authorship of the key which a2 updates to
         assert_eq!(detect_fork(txn, &a3_fork).unwrap().unwrap().0, a3_hash);
 
-        // This is not valid in sys validation because the author is not valid,
-        // but it still does technically constitute a fork (it's just an invalid action)
-        assert_eq!(
-            detect_fork(txn, &a3_fork_author1).unwrap().unwrap().0,
-            a3_hash
-        );
+        // Not a fork: a3_fork_author1 has author1 but the existing a3 in the DB
+        // has author2, so the author filter excludes it.
+        assert!(detect_fork(txn, &a3_fork_author1).unwrap().is_none());
 
-        // This is not valid in sys validation because the author is not valid,
-        // but it does still constitute a fork (it's just an invalid action)
-        assert_eq!(
-            detect_fork(txn, &a3_fork_other_author).unwrap().unwrap().0,
-            a3_hash
-        );
+        // Not a fork: a3_fork_other_author has a random author that doesn't match
+        // any existing action with the same prev_hash.
+        assert!(detect_fork(txn, &a3_fork_other_author).unwrap().is_none());
     });
 }

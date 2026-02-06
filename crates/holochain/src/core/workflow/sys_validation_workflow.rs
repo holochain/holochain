@@ -113,7 +113,7 @@ use holochain_cascade::CascadeImpl;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_sqlite::prelude::*;
-use holochain_sqlite::sql::sql_cell::ACTION_HASH_BY_PREV;
+use holochain_sqlite::sql::sql_cell::ACTION_HASH_BY_PREV_AND_AUTHOR;
 use holochain_state::integrate::insert_locally_validated_op;
 use holochain_state::prelude::*;
 use rusqlite::Transaction;
@@ -1547,12 +1547,13 @@ fn detect_fork(
     txn: &mut Transaction<'_>,
     action: &Action,
 ) -> StateQueryResult<Option<(ActionHash, Signature)>> {
-    let mut statement = txn.prepare(ACTION_HASH_BY_PREV)?;
+    let mut statement = txn.prepare(ACTION_HASH_BY_PREV_AND_AUTHOR)?;
     let items = statement
         .query_map(
             named_params! {
                 ":prev_hash": action.prev_action(),
                 ":hash": action.to_hash(),
+                ":author": action.author(),
             },
             // First, try to deserialize the hash as an ActionHash...
             |row| match row.get("hash") {
