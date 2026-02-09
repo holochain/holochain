@@ -1,6 +1,6 @@
 [package]
 name = "holochain_types"
-version = "0.7.0-dev.10"
+version = "0.7.0-dev.11"
 description = "Holochain common types"
 license = "Apache-2.0"
 repository = "https://github.com/holochain/holochain"
