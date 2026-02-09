@@ -13,7 +13,7 @@ edition = "2021"
 async-trait = "0.1"
 anyhow = "1.0"
 base64 = "0.22"
-bytes = "1.10"
+bytes = "1.11"
 derive_more = { version = "2.0", features = [
   "display",
   "into",

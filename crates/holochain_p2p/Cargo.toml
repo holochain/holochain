@@ -49,7 +49,7 @@ kitsune2_core = "0.4.0-dev.2"
 kitsune2_gossip = "0.4.0-dev.2"
 kitsune2_transport_iroh = { version = "0.4.0-dev.2", default-features = false, optional = true }
 kitsune2_transport_tx5 = { version = "0.4.0-dev.2", default-features = false, optional = true }
-bytes = "1.10"
+bytes = "1.11"
 holochain_sqlite = { version = "^0.7.0-dev.8", path = "../holochain_sqlite" }
 lair_keystore_api = "=0.6.3"
 parking_lot = "0.12.3"
