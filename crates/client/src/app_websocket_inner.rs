@@ -123,12 +123,24 @@ impl AppWebsocketInner {
             .map_err(ConductorApiError::WebsocketError)
     }
 
+    /// Sends a request using the connection-level default timeout.
     pub(crate) async fn send(&self, msg: AppRequest) -> ConductorApiResult<AppResponse> {
-        let response = self
-            .tx
-            .request(msg)
-            .await
-            .map_err(ConductorApiError::WebsocketError)?;
+        self.send_with_timeout(msg, None).await
+    }
+
+    /// Sends a request with an optional per-call timeout override.
+    ///
+    /// When `timeout` is `None`, the connection-level default is used.
+    pub(crate) async fn send_with_timeout(
+        &self,
+        msg: AppRequest,
+        timeout: Option<std::time::Duration>,
+    ) -> ConductorApiResult<AppResponse> {
+        let response = match timeout {
+            Some(t) => self.tx.request_timeout(msg, t).await,
+            None => self.tx.request(msg).await,
+        }
+        .map_err(ConductorApiError::WebsocketError)?;
 
         match response {
             AppResponse::Error(error) => Err(ConductorApiError::ExternalApiWireError(error)),
