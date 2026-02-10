@@ -22,6 +22,7 @@ use std::collections::BTreeMap;
 use std::fmt::Formatter;
 use std::net::ToSocketAddrs;
 use std::sync::Arc;
+use std::time::Duration;
 
 /// A websocket connection to a Holochain app running in a Conductor.
 #[derive(Clone)]
@@ -236,12 +237,38 @@ impl AppWebsocket {
         &self.app_info
     }
 
+    /// Calls a zome function using the connection-level default parameters, including timeout.
+    ///
+    /// In case you need to override the timeout for this call,
+    /// use [`AppWebsocket::call_zome_with_options`] instead with a custom [`CallZomeOptions`].
     pub async fn call_zome(
         &self,
         target: ZomeCallTarget,
         zome_name: ZomeName,
         fn_name: FunctionName,
         payload: ExternIO,
+    ) -> ConductorApiResult<ExternIO> {
+        self.call_zome_with_options(
+            target,
+            zome_name,
+            fn_name,
+            payload,
+            CallZomeOptions::default(),
+        )
+        .await
+    }
+
+    /// Calls a zome function with per-call options.
+    ///
+    /// Use this to override the connection-level timeout for an individual
+    /// zome call via [`CallZomeOptions`].
+    pub async fn call_zome_with_options(
+        &self,
+        target: ZomeCallTarget,
+        zome_name: ZomeName,
+        fn_name: FunctionName,
+        payload: ExternIO,
+        options: CallZomeOptions,
     ) -> ConductorApiResult<ExternIO> {
         let cell_id = match target {
             ZomeCallTarget::CellId(cell_id) => cell_id,
@@ -268,15 +295,36 @@ impl AppWebsocket {
             .await
             .map_err(|e| ConductorApiError::SignZomeCallError(e.to_string()))?;
 
-        self.signed_call_zome(signed_zome_call).await
+        self.signed_call_zome_with_options(signed_zome_call, options)
+            .await
     }
 
+    /// Sends a pre-signed zome call using the connection-level default parameters, including timeout.
+    ///
+    /// In case you need to override the timeout for this call,
+    /// use [`AppWebsocket::signed_call_zome_with_options`] instead with a custom [`CallZomeOptions`].
     pub async fn signed_call_zome(
         &self,
         signed_params: ZomeCallParamsSigned,
     ) -> ConductorApiResult<ExternIO> {
+        self.signed_call_zome_with_options(signed_params, CallZomeOptions::default())
+            .await
+    }
+
+    /// Sends a pre-signed zome call with per-call options.
+    ///
+    /// Use this to override the connection-level timeout for an individual
+    /// zome call via [`CallZomeOptions`].
+    pub async fn signed_call_zome_with_options(
+        &self,
+        signed_params: ZomeCallParamsSigned,
+        options: CallZomeOptions,
+    ) -> ConductorApiResult<ExternIO> {
         let app_request = AppRequest::CallZome(Box::new(signed_params));
-        let response = self.inner.send(app_request).await?;
+        let response = self
+            .inner
+            .send_with_timeout(app_request, options.timeout)
+            .await?;
 
         match response {
             AppResponse::ZomeCalled(result) => Ok(*result),
@@ -494,6 +542,46 @@ impl From<RoleName> for ZomeCallTarget {
 impl From<CloneId> for ZomeCallTarget {
     fn from(clone_id: CloneId) -> Self {
         ZomeCallTarget::CloneId(clone_id)
+    }
+}
+
+/// Options for a single zome call request.
+///
+/// Use this with [`AppWebsocket::call_zome_with_options`] or
+/// [`AppWebsocket::signed_call_zome_with_options`] to override the
+/// connection-level timeout on a per-call basis.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use std::time::Duration;
+/// use holochain_client::CallZomeOptions;
+///
+/// // Use default options (connection-level timeout).
+/// let opts = CallZomeOptions::new();
+///
+/// // Override the timeout for a long-running zome call.
+/// let opts = CallZomeOptions::new().with_timeout(Duration::from_secs(300));
+/// ```
+#[derive(Debug, Clone, Default)]
+pub struct CallZomeOptions {
+    /// Per-call timeout override.
+    ///
+    /// When `None`, the connection-level `default_request_timeout` is used.
+    /// When `Some`, this duration is used instead.
+    pub timeout: Option<Duration>,
+}
+
+impl CallZomeOptions {
+    /// Creates default options with no overrides.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets the timeout for this zome call.
+    pub fn with_timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = Some(timeout);
+        self
     }
 }
 
