@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.6.1-rc.2
+
 ## 0.6.1-rc.1
 
 - **BREAKING CHANGE** `ConductorConfig` now includes a field `incoming_request_concurrency_limit` for specifying the number of incoming authority requests that will be handled concurrently. Additional requests will be dropped. This limit only applies to incoming requests to `get`, `get_links`, `count_links`, `get_agent_activity`, `must_get_agent_activity`.

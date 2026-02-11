@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.8.1-rc.2
+
 ### Added
 
 - Added `CallZomeOptions` struct and `call_zome_with_options` / `signed_call_zome_with_options` methods to `AppWebsocket` to allow configuring a per-call timeout for zome calls. [\#5644](https://github.com/holochain/holochain/pull/5644)
