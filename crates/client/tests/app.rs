@@ -658,7 +658,7 @@ async fn peer_meta_info() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn call_zome_with_options_custom_timeout() {
-    let conductor = SweetConductor::standard().await;
+    let conductor = SweetConductor::from_standard_config().await;
 
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
     let admin_ws = AdminWebsocket::connect((Ipv4Addr::LOCALHOST, admin_port), None)
