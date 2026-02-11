@@ -6,7 +6,7 @@ mod signing;
 mod util;
 
 pub use admin_websocket::{AdminWebsocket, AuthorizeSigningCredentialsPayload, EnableAppResponse};
-pub use app_websocket::{AppWebsocket, ZomeCallTarget};
+pub use app_websocket::{AppWebsocket, CallZomeOptions, ZomeCallTarget};
 pub use error::{ConductorApiError, ConductorApiResult};
 pub use holochain_conductor_api::{
     AdminRequest, AdminResponse, AppAuthenticationRequest, AppAuthenticationToken,

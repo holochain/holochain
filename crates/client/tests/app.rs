@@ -5,8 +5,8 @@ use holochain::{
     sweettest::SweetConductor,
 };
 use holochain_client::{
-    AdminWebsocket, AppWebsocket, AuthorizeSigningCredentialsPayload, ClientAgentSigner,
-    InstallAppPayload, InstalledAppId,
+    AdminWebsocket, AppWebsocket, AuthorizeSigningCredentialsPayload, CallZomeOptions,
+    ClientAgentSigner, ConductorApiError, InstallAppPayload, InstalledAppId,
 };
 use holochain_conductor_api::{CellInfo, IssueAppAuthenticationTokenPayload};
 use holochain_types::{
@@ -654,4 +654,101 @@ async fn peer_meta_info() {
         .get(&dna_hash)
         .expect("No meta infos found for dna hash.");
     assert_eq!(meta_infos.len(), 0);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn call_zome_with_options_custom_timeout() {
+    let conductor = SweetConductor::from_standard_config().await;
+
+    let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
+    let admin_ws = AdminWebsocket::connect((Ipv4Addr::LOCALHOST, admin_port), None)
+        .await
+        .unwrap();
+
+    let app_id: InstalledAppId = "test-app".into();
+    admin_ws
+        .install_app(InstallAppPayload {
+            agent_key: None,
+            installed_app_id: Some(app_id.clone()),
+            network_seed: None,
+            roles_settings: None,
+            source: AppBundleSource::Bytes(fixture::get_fixture_app_bundle()),
+            ignore_genesis_failure: false,
+        })
+        .await
+        .unwrap();
+    admin_ws.enable_app(app_id.clone()).await.unwrap();
+
+    let app_ws_port = admin_ws
+        .attach_app_interface(0, None, AllowedOrigins::Any, None)
+        .await
+        .unwrap();
+    let token_issued = admin_ws
+        .issue_app_auth_token(app_id.clone().into())
+        .await
+        .unwrap();
+    let signer = ClientAgentSigner::default();
+
+    let app_ws = AppWebsocket::connect(
+        (Ipv4Addr::LOCALHOST, app_ws_port),
+        token_issued.token,
+        signer.clone().into(),
+        None,
+    )
+    .await
+    .unwrap();
+
+    let installed_app = app_ws.app_info().await.unwrap().unwrap();
+    let cells = installed_app.cell_info.into_values().next().unwrap();
+    let cell_id = match cells[0].clone() {
+        CellInfo::Provisioned(c) => c.cell_id,
+        _ => panic!("Invalid cell type"),
+    };
+
+    let credentials = admin_ws
+        .authorize_signing_credentials(AuthorizeSigningCredentialsPayload {
+            cell_id: cell_id.clone(),
+            functions: None,
+        })
+        .await
+        .unwrap();
+    signer.add_credentials(cell_id.clone(), credentials);
+
+    const TEST_ZOME_NAME: &str = "foo";
+    const TEST_FN_NAME: &str = "emitter";
+
+    // A generous timeout should succeed.
+    let result = app_ws
+        .call_zome_with_options(
+            cell_id.clone().into(),
+            TEST_ZOME_NAME.into(),
+            TEST_FN_NAME.into(),
+            ExternIO::encode(()).unwrap(),
+            CallZomeOptions::new().with_timeout(Duration::from_secs(60)),
+        )
+        .await;
+    assert!(
+        result.is_ok(),
+        "call_zome_with_options should succeed with a generous timeout"
+    );
+
+    // A near-zero timeout should fail with a timeout error.
+    let result = app_ws
+        .call_zome_with_options(
+            cell_id.into(),
+            TEST_ZOME_NAME.into(),
+            TEST_FN_NAME.into(),
+            ExternIO::encode(()).unwrap(),
+            CallZomeOptions::new().with_timeout(Duration::from_nanos(1)),
+        )
+        .await;
+    assert!(
+        matches!(
+            result,
+            Err(ConductorApiError::WebsocketError(
+                holochain_websocket::WebsocketError::Timeout(_)
+            ))
+        ),
+        "Expected a timeout error, got: {result:?}"
+    );
 }
