@@ -125,6 +125,8 @@ mod hc_p2p_handler_impl;
 
 mod state_dump_helpers;
 
+mod network_readiness;
+
 /// Verify signature of a signed zome call.
 ///
 /// [Signature verification](holochain_conductor_api::AppRequest::CallZome)
@@ -198,6 +200,9 @@ pub struct Conductor {
 
     /// Container to connect app signals to app interfaces, by installed app id.
     app_broadcast: AppBroadcast,
+
+    /// Handle for broadcasting and subscribing to network readiness events.
+    network_readiness: network_readiness::NetworkReadinessHandle,
 }
 
 impl std::fmt::Debug for Conductor {
@@ -265,6 +270,7 @@ mod startup_shutdown_impls {
                 wasmer_module_cache: None,
                 app_auth_token_store: RwShare::default(),
                 app_broadcast: AppBroadcast::default(),
+                network_readiness: network_readiness::NetworkReadinessHandle::new(1000),
             }
         }
 
@@ -1129,6 +1135,131 @@ mod network_impls {
                 Err(error) => Err(error),
             }
         }
+
+        /// Subscribe to network readiness events.
+        ///
+        /// Returns a receiver that will receive all network readiness events, including
+        /// join started/complete/failed events and peer discovery events.
+        ///
+        /// # Example
+        ///
+        /// ```rust,ignore
+        /// let mut events = conductor.subscribe_network_readiness();
+        /// while let Ok(event) = events.recv().await {
+        ///     match event {
+        ///         NetworkReadinessEvent::JoinComplete { cell_id } => {
+        ///             println!("Cell {} joined the network!", cell_id);
+        ///         }
+        ///         _ => {}
+        ///     }
+        /// }
+        /// ```
+        pub fn subscribe_network_readiness(
+            &self,
+        ) -> tokio::sync::broadcast::Receiver<network_readiness::NetworkReadinessEvent> {
+            self.network_readiness.subscribe()
+        }
+
+        /// Wait for a cell to become ready for network operations.
+        ///
+        /// This waits for the cell to complete joining the k2 space. Returns immediately
+        /// if the cell has already joined, or waits up to the specified timeout.
+        ///
+        /// This is more reliable than using arbitrary sleeps or retry loops, as it waits
+        /// for the actual join completion event.
+        ///
+        /// # Arguments
+        ///
+        /// * `cell_id` - The cell to wait for
+        /// * `timeout` - Maximum time to wait (recommended: 5-10 seconds)
+        ///
+        /// # Returns
+        ///
+        /// * `Ok(())` - Cell is ready for network operations
+        /// * `Err(ConductorApiError)` - Timeout or join failed
+        ///
+        /// # Example
+        ///
+        /// ```rust,ignore
+        /// // After enabling an app
+        /// conductor.enable_app("my-app").await?;
+        ///
+        /// // Wait for cells to be ready
+        /// for cell_id in app.cell_ids() {
+        ///     conductor.await_cell_network_ready(&cell_id, Duration::from_secs(10)).await?;
+        /// }
+        ///
+        /// // Now safe to make network calls
+        /// conductor.call_zome(...).await?;
+        /// ```
+        pub async fn await_cell_network_ready(
+            &self,
+            cell_id: &CellId,
+            timeout: std::time::Duration,
+        ) -> ConductorApiResult<()> {
+            let mut rx = self.subscribe_network_readiness();
+
+            // Check if the cell already exists and is running
+            // (This handles the case where join already completed before we subscribed)
+            if self
+                .running_cells
+                .share_ref(|cells| cells.contains_key(cell_id))
+            {
+                // Cell is running, but we need to wait for the join to complete
+                // Set up the listener before checking status to avoid race conditions
+            }
+
+            tokio::time::timeout(timeout, async {
+                loop {
+                    match rx.recv().await {
+                        Ok(event) => {
+                            match event {
+                                network_readiness::NetworkReadinessEvent::JoinComplete {
+                                    cell_id: ref event_cell_id,
+                                } if event_cell_id == cell_id => {
+                                    return Ok(());
+                                }
+                                network_readiness::NetworkReadinessEvent::JoinFailed {
+                                    cell_id: ref event_cell_id,
+                                    error,
+                                } if event_cell_id == cell_id => {
+                                    return Err(ConductorApiError::Other(
+                                        format!(
+                                            "Network join failed for cell {}: {}",
+                                            cell_id, error
+                                        )
+                                        .into(),
+                                    ));
+                                }
+                                _ => {
+                                    // Ignore other events
+                                }
+                            }
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
+                            // We lagged behind, continue listening
+                            continue;
+                        }
+                        Err(_) => {
+                            // Channel closed, this shouldn't happen
+                            return Err(ConductorApiError::Other(
+                                "Network readiness event channel closed".into(),
+                            ));
+                        }
+                    }
+                }
+            })
+            .await
+            .map_err(|_| {
+                ConductorApiError::Other(
+                    format!(
+                        "Timeout waiting for cell {} to become network ready",
+                        cell_id
+                    )
+                    .into(),
+                )
+            })?
+        }
     }
 }
 
@@ -1882,12 +2013,37 @@ mod app_status_impls {
                     let cell_id = cell.id().clone();
                     let agent_pubkey = cell_id.agent_pubkey().clone();
                     let holochain_p2p_dna = cell.holochain_p2p_dna().clone();
+                    let network_readiness = self.network_readiness.clone();
                     async move {
-                        if let Err(e) = holochain_p2p_dna
+                        // Emit join started event
+                        network_readiness.emit(
+                            network_readiness::NetworkReadinessEvent::JoinStarted {
+                                cell_id: cell_id.clone(),
+                            },
+                        );
+
+                        // Perform the join
+                        match holochain_p2p_dna
                             .join(agent_pubkey, None, config_override)
                             .await
                         {
-                            tracing::error!(?e, ?cell_id, "Network join failed.");
+                            Ok(()) => {
+                                tracing::info!(?cell_id, "Network join completed successfully.");
+                                network_readiness.emit(
+                                    network_readiness::NetworkReadinessEvent::JoinComplete {
+                                        cell_id,
+                                    },
+                                );
+                            }
+                            Err(e) => {
+                                tracing::error!(?e, ?cell_id, "Network join failed.");
+                                network_readiness.emit(
+                                    network_readiness::NetworkReadinessEvent::JoinFailed {
+                                        cell_id,
+                                        error: e.to_string(),
+                                    },
+                                );
+                            }
                         }
                     }
                     .instrument(tracing::info_span!("network join task", ?i))

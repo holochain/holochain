@@ -7,6 +7,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+### Added
+
+- **Network Readiness Events**: Added event-driven network readiness signaling to address race conditions where cells appeared "enabled" before network joining completed. New APIs include:
+  - `Conductor::subscribe_network_readiness()` - Subscribe to network readiness events
+  - `Conductor::await_cell_network_ready()` - Wait for a specific cell to complete network joining
+  - `NetworkReadinessEvent` enum with `JoinStarted`, `JoinComplete`, `JoinFailed`, `PeerDiscovered`, and `BootstrapComplete` events
+
+  This provides proper event-driven waiting for network operations rather than requiring retry loops or arbitrary timeouts in downstream code. Events are emitted during the cell join process, allowing applications to reliably detect when cells are ready for network operations.
+
 ## 0.7.0-dev.11
 
 - Added `deny_unknown_fields` to conductor configuration structs to improve UX by rejecting configurations with typos or obsolete fields. This helps catch configuration errors early. \#5455
