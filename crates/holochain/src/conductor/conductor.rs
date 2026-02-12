@@ -1198,16 +1198,30 @@ mod network_impls {
             cell_id: &CellId,
             timeout: std::time::Duration,
         ) -> ConductorApiResult<()> {
+            // First check if the cell has already completed or failed joining
+            // This handles the case where the join happened before we subscribed to events
+            if self.network_readiness.has_completed_join(cell_id).await {
+                return Ok(());
+            }
+
+            if self.network_readiness.has_failed_join(cell_id).await {
+                return Err(ConductorApiError::Other(
+                    format!("Network join previously failed for cell {}", cell_id).into(),
+                ));
+            }
+
+            // Subscribe to future events
             let mut rx = self.subscribe_network_readiness();
 
-            // Check if the cell already exists and is running
-            // (This handles the case where join already completed before we subscribed)
-            if self
-                .running_cells
-                .share_ref(|cells| cells.contains_key(cell_id))
-            {
-                // Cell is running, but we need to wait for the join to complete
-                // Set up the listener before checking status to avoid race conditions
+            // Re-check status after subscribing to handle race condition
+            if self.network_readiness.has_completed_join(cell_id).await {
+                return Ok(());
+            }
+
+            if self.network_readiness.has_failed_join(cell_id).await {
+                return Err(ConductorApiError::Other(
+                    format!("Network join previously failed for cell {}", cell_id).into(),
+                ));
             }
 
             tokio::time::timeout(timeout, async {

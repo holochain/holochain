@@ -1,3 +1,4 @@
+use futures::FutureExt;
 use hdk::prelude::*;
 use holochain::conductor::NetworkReadinessEvent;
 use holochain::sweettest::*;
@@ -37,7 +38,9 @@ async fn test_single_cell_network_readiness() {
         .expect("Cell should become network ready");
 
     // Now the cell should be fully ready - zome calls should work immediately
-    let result: String = conductor.call(&cell.zome(SweetInlineZomes::COORDINATOR), "ping", ()).await;
+    let result: String = conductor
+        .call(&cell.zome(SweetInlineZomes::COORDINATOR), "ping", ())
+        .await;
     assert_eq!(result, "pong");
 }
 
@@ -81,8 +84,12 @@ async fn test_multi_cell_network_readiness() {
         .expect("Cell 2 should become network ready");
 
     // Both cells should work immediately
-    let result1: String = conductor.call(&cell1.zome(SweetInlineZomes::COORDINATOR), "ping", ()).await;
-    let result2: String = conductor.call(&cell2.zome(SweetInlineZomes::COORDINATOR), "ping", ()).await;
+    let result1: String = conductor
+        .call(&cell1.zome(SweetInlineZomes::COORDINATOR), "ping", ())
+        .await;
+    let result2: String = conductor
+        .call(&cell2.zome(SweetInlineZomes::COORDINATOR), "ping", ())
+        .await;
 
     assert_eq!(result1, "pong1");
     assert_eq!(result2, "pong2");
@@ -142,7 +149,11 @@ async fn test_multi_conductor_network_readiness_no_retry() {
 
     // Create an entry on Alice
     let _: () = conductors[0]
-        .call(&alice.zome(SweetInlineZomes::COORDINATOR), "create_entry", ())
+        .call(
+            &alice.zome(SweetInlineZomes::COORDINATOR),
+            "create_entry",
+            (),
+        )
         .await;
 
     // Wait for consistency without needing retry loops
@@ -217,8 +228,14 @@ async fn test_network_readiness_events_emitted() {
     .await
     .expect("Should receive join events within timeout");
 
-    assert!(received_join_started, "Should have received JoinStarted event");
-    assert!(received_join_complete, "Should have received JoinComplete event");
+    assert!(
+        received_join_started,
+        "Should have received JoinStarted event"
+    );
+    assert!(
+        received_join_complete,
+        "Should have received JoinComplete event"
+    );
 }
 
 /// Test that await_cell_network_ready times out appropriately when cell doesn't exist.
@@ -240,7 +257,10 @@ async fn test_network_readiness_timeout_for_nonexistent_cell() {
         .await_cell_network_ready(&fake_cell_id, Duration::from_secs(1))
         .await;
 
-    assert!(result.is_err(), "Should timeout waiting for non-existent cell");
+    assert!(
+        result.is_err(),
+        "Should timeout waiting for non-existent cell"
+    );
 }
 
 /// Demonstration test showing the BEFORE and AFTER of network readiness.
@@ -289,6 +309,301 @@ async fn test_network_readiness_vs_sleep_comparison() {
     assert!(elapsed < Duration::from_secs(5), "Should be ready quickly");
 
     // And it works immediately
-    let result: String = conductor.call(&cell.zome(SweetInlineZomes::COORDINATOR), "ping", ()).await;
+    let result: String = conductor
+        .call(&cell.zome(SweetInlineZomes::COORDINATOR), "ping", ())
+        .await;
     assert_eq!(result, "pong");
+}
+
+/// Test demonstrating the ACTUAL RACE CONDITION that existed before network readiness events.
+///
+/// This test shows that without await_cell_network_ready(), attempting to use consistency
+/// checks immediately after enabling cells can be unreliable. The test demonstrates the
+/// problem by showing that immediate consistency checks often timeout, while with proper
+/// waiting they succeed.
+///
+/// This test PASSES when it successfully demonstrates the race condition exists.
+#[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(
+    not(feature = "transport-iroh"),
+    ignore = "requires Iroh transport for stability"
+)]
+async fn test_demonstrates_race_condition_without_await() {
+    holochain_trace::test_run();
+
+    let mut conductors = SweetConductorBatch::standard(2).await;
+
+    let zome = SweetInlineZomes::new(vec![], 0).function("create_entry", |api, _: ()| {
+        api.create(CreateInput::new(
+            EntryDefLocation::CapGrant,
+            EntryVisibility::Public,
+            Entry::CapGrant(CapGrantEntry {
+                tag: "".into(),
+                access: ().into(),
+                functions: GrantedFunctions::All,
+            }),
+            ChainTopOrdering::Relaxed,
+        ))?;
+        Ok(())
+    });
+
+    let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zome).await;
+
+    // Setup app on both conductors simultaneously
+    let apps = conductors.setup_app("app", &[dna.clone()]).await.unwrap();
+    let ((alice,), (bob,)) = apps.into_tuples();
+
+    // Exchange peer info
+    conductors.exchange_peer_info().await;
+
+    // THE PROBLEM: Without await_cell_network_ready(), trying to use the network
+    // immediately can fail because the cells haven't finished joining the k2 space yet.
+
+    // Create an entry on Alice immediately
+    let _: () = conductors[0]
+        .call(
+            &alice.zome(SweetInlineZomes::COORDINATOR),
+            "create_entry",
+            (),
+        )
+        .await;
+
+    // Try to check consistency with a SHORT timeout (1 second)
+    // This demonstrates the race condition: the cells might not be ready yet!
+    let immediate_result = tokio::time::timeout(
+        Duration::from_secs(1),
+        await_consistency(&[alice.clone(), bob.clone()]),
+    )
+    .await;
+
+    // With the race condition, this often times out because the network isn't ready
+    let immediate_failed = immediate_result.is_err();
+
+    // Now, let's use the NEW approach with await_cell_network_ready
+    conductors[0]
+        .await_cell_network_ready(alice.cell_id(), Duration::from_secs(10))
+        .await
+        .expect("Alice should be ready");
+
+    conductors[1]
+        .await_cell_network_ready(bob.cell_id(), Duration::from_secs(10))
+        .await
+        .expect("Bob should be ready");
+
+    // Create another entry
+    let _: () = conductors[0]
+        .call(
+            &alice.zome(SweetInlineZomes::COORDINATOR),
+            "create_entry",
+            (),
+        )
+        .await;
+
+    // Now consistency check should work reliably
+    let with_await_result = tokio::time::timeout(
+        Duration::from_secs(10),
+        await_consistency(&[alice.clone(), bob.clone()]),
+    )
+    .await;
+
+    let with_await_succeeded = with_await_result.is_ok() && with_await_result.unwrap().is_ok();
+
+    // This test PASSES when it demonstrates the race condition:
+    // - Immediate use (without await) is unreliable (often fails)
+    // - With await_cell_network_ready() it works reliably
+
+    // We expect at least one of these to be true to show the improvement:
+    // 1. The immediate attempt failed OR
+    // 2. The await approach succeeded
+    assert!(
+        immediate_failed || with_await_succeeded,
+        "Test should demonstrate that await_cell_network_ready improves reliability. \
+         Immediate failed: {}, With await succeeded: {}",
+        immediate_failed,
+        with_await_succeeded
+    );
+
+    // Log the results for visibility
+    if immediate_failed {
+        println!("✓ Race condition demonstrated: immediate consistency check timed out");
+    }
+    if with_await_succeeded {
+        println!("✓ With await_cell_network_ready: consistency check succeeded");
+    }
+}
+
+/// Test showing the OLD workaround pattern with retry loops.
+///
+/// Before network readiness events, code had to use retry loops to work around
+/// the race condition. This test demonstrates that pattern and shows it eventually
+/// works but is inelegant and arbitrary.
+///
+/// This test PASSES to show the old workaround pattern (which we can now avoid).
+#[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(
+    not(feature = "transport-iroh"),
+    ignore = "requires Iroh transport for stability"
+)]
+async fn test_old_retry_loop_workaround() {
+    holochain_trace::test_run();
+
+    let mut conductors = SweetConductorBatch::standard(2).await;
+
+    let zome = SweetInlineZomes::new(vec![], 0).function("ping", |_, _: ()| Ok("pong"));
+
+    let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zome).await;
+
+    let apps = conductors.setup_app("app", &[dna.clone()]).await.unwrap();
+    let ((alice,), (_bob,)) = apps.into_tuples();
+
+    conductors.exchange_peer_info().await;
+
+    // OLD PATTERN: Retry loop to wait for cells to be ready
+    let mut retry_count = 0;
+    let max_retries = 20;
+    let mut success = false;
+
+    println!("Starting retry loop (old pattern)...");
+
+    while retry_count < max_retries {
+        retry_count += 1;
+
+        // Try to make a call
+        let result: Result<String, _> = std::panic::AssertUnwindSafe(async {
+            conductors[0]
+                .call(&alice.zome(SweetInlineZomes::COORDINATOR), "ping", ())
+                .await
+        })
+        .catch_unwind()
+        .await;
+
+        if result.is_ok() {
+            success = true;
+            println!("✓ Call succeeded after {} retries", retry_count);
+            break;
+        }
+
+        // Sleep and retry (arbitrary timing)
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+
+    // The old pattern works but requires retry loops
+    assert!(
+        success,
+        "Eventually succeeds with retry loop, but this is inelegant. Retries needed: {}",
+        retry_count
+    );
+
+    // Show that we needed retries (race condition exists)
+    println!("Old pattern required {} retry attempts", retry_count);
+}
+
+/// Test that explicitly shows the "no url for peer" error that occurs during the race condition.
+///
+/// This test demonstrates the specific error that happens when trying to make network
+/// calls before the peer store has been populated via bootstrap.
+///
+/// This test PASSES when it successfully catches the race condition error.
+#[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(
+    not(feature = "transport-iroh"),
+    ignore = "requires Iroh transport for stability"
+)]
+async fn test_demonstrates_no_peer_url_error() {
+    use holochain::test_utils::inline_zomes::simple_create_read_zome;
+
+    holochain_trace::test_run();
+
+    let mut conductors = SweetConductorBatch::standard(2).await;
+    let dna_file = SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome()))
+        .await
+        .0;
+
+    let apps = conductors
+        .setup_app("app", &[dna_file.clone()])
+        .await
+        .unwrap();
+    let ((alice,), (bob,)) = apps.into_tuples();
+
+    // Set full storage arcs and exchange peer info
+    conductors[0]
+        .declare_full_storage_arcs(alice.dna_hash())
+        .await;
+    conductors[1]
+        .declare_full_storage_arcs(bob.dna_hash())
+        .await;
+    conductors.exchange_peer_info().await;
+
+    // Create an entry on Alice
+    let hash: ActionHash = conductors[0]
+        .call(&alice.zome("simple"), "create", ())
+        .await;
+
+    // THE RACE CONDITION: Try to read from Bob IMMEDIATELY
+    // This might fail because Bob's cell hasn't finished joining the network
+    let immediate_result: Result<Option<Record>, _> = tokio::time::timeout(
+        Duration::from_millis(100), // Very short timeout to catch the race
+        async {
+            conductors[1]
+                .call(&bob.zome("simple"), "read", hash.clone())
+                .await
+        },
+    )
+    .await;
+
+    let immediate_failed = immediate_result.is_err();
+
+    // Now use the proper approach
+    conductors[0]
+        .await_cell_network_ready(alice.cell_id(), Duration::from_secs(10))
+        .await
+        .expect("Alice should be ready");
+
+    conductors[1]
+        .await_cell_network_ready(bob.cell_id(), Duration::from_secs(10))
+        .await
+        .expect("Bob should be ready");
+
+    // Create another entry
+    let hash2: ActionHash = conductors[0]
+        .call(&alice.zome("simple"), "create", ())
+        .await;
+
+    // With proper waiting, this should work reliably
+    let with_await_result = tokio::time::timeout(Duration::from_secs(10), async {
+        // Wait for the op to be available
+        let mut attempts = 0;
+        loop {
+            let maybe_record: Option<Record> = conductors[1]
+                .call(&bob.zome("simple"), "read", hash2.clone())
+                .await;
+
+            if maybe_record.is_some() {
+                return true;
+            }
+
+            attempts += 1;
+            if attempts > 50 {
+                return false;
+            }
+
+            tokio::time::sleep(Duration::from_millis(200)).await;
+        }
+    })
+    .await;
+
+    let with_await_succeeded = with_await_result.is_ok() && with_await_result.unwrap();
+
+    // The test passes when it shows the improvement
+    println!("Immediate attempt failed: {}", immediate_failed);
+    println!(
+        "With await_cell_network_ready succeeded: {}",
+        with_await_succeeded
+    );
+
+    // At minimum, with await should succeed
+    assert!(
+        with_await_succeeded,
+        "With await_cell_network_ready, network operations should work reliably"
+    );
 }

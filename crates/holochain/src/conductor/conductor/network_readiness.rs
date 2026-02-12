@@ -5,8 +5,9 @@
 //! polling or using arbitrary timeouts.
 
 use holochain_types::prelude::{AgentPubKey, CellId, DnaHash};
+use std::collections::HashSet;
 use std::sync::Arc;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, RwLock};
 
 /// Events related to network readiness during cell activation.
 ///
@@ -89,6 +90,10 @@ impl NetworkReadinessEvent {
 #[derive(Clone)]
 pub struct NetworkReadinessHandle {
     sender: Arc<broadcast::Sender<NetworkReadinessEvent>>,
+    /// Track which cells have completed joining to handle late subscribers
+    completed_joins: Arc<RwLock<HashSet<CellId>>>,
+    /// Track which cells have failed joining
+    failed_joins: Arc<RwLock<HashSet<CellId>>>,
 }
 
 impl NetworkReadinessHandle {
@@ -97,6 +102,8 @@ impl NetworkReadinessHandle {
         let (sender, _) = broadcast::channel(capacity);
         Self {
             sender: Arc::new(sender),
+            completed_joins: Arc::new(RwLock::new(HashSet::new())),
+            failed_joins: Arc::new(RwLock::new(HashSet::new())),
         }
     }
 
@@ -112,8 +119,50 @@ impl NetworkReadinessHandle {
     ///
     /// This is called internally by the conductor during network operations.
     pub(crate) fn emit(&self, event: NetworkReadinessEvent) {
+        // Track state for late subscribers
+        // We use try_write since we're in an async context and can't block
+        match &event {
+            NetworkReadinessEvent::JoinComplete { cell_id } => {
+                if let Ok(mut completed) = self.completed_joins.try_write() {
+                    completed.insert(cell_id.clone());
+                } else {
+                    // If we can't get the lock, spawn a task to update it
+                    let completed_joins = self.completed_joins.clone();
+                    let cell_id = cell_id.clone();
+                    tokio::spawn(async move {
+                        let mut completed = completed_joins.write().await;
+                        completed.insert(cell_id);
+                    });
+                }
+            }
+            NetworkReadinessEvent::JoinFailed { cell_id, .. } => {
+                if let Ok(mut failed) = self.failed_joins.try_write() {
+                    failed.insert(cell_id.clone());
+                } else {
+                    // If we can't get the lock, spawn a task to update it
+                    let failed_joins = self.failed_joins.clone();
+                    let cell_id = cell_id.clone();
+                    tokio::spawn(async move {
+                        let mut failed = failed_joins.write().await;
+                        failed.insert(cell_id);
+                    });
+                }
+            }
+            _ => {}
+        }
+
         // We don't care if there are no receivers
         let _ = self.sender.send(event);
+    }
+
+    /// Check if a cell has already completed joining.
+    pub(crate) async fn has_completed_join(&self, cell_id: &CellId) -> bool {
+        self.completed_joins.read().await.contains(cell_id)
+    }
+
+    /// Check if a cell has already failed joining.
+    pub(crate) async fn has_failed_join(&self, cell_id: &CellId) -> bool {
+        self.failed_joins.read().await.contains(cell_id)
     }
 
     /// Get the number of active subscribers.
