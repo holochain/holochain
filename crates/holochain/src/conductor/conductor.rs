@@ -125,7 +125,8 @@ mod hc_p2p_handler_impl;
 
 mod state_dump_helpers;
 
-mod network_readiness;
+pub(crate) mod network_readiness;
+pub use network_readiness::NetworkReadinessEvent;
 
 /// Verify signature of a signed zome call.
 ///
