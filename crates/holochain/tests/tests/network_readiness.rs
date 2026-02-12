@@ -1,4 +1,3 @@
-use futures::FutureExt;
 use hdk::prelude::*;
 use holochain::conductor::NetworkReadinessEvent;
 use holochain::sweettest::*;
@@ -408,28 +407,17 @@ async fn test_demonstrates_race_condition_without_await() {
 
     let with_await_succeeded = with_await_result.is_ok() && with_await_result.unwrap().is_ok();
 
-    // This test PASSES when it demonstrates the race condition:
-    // - Immediate use (without await) is unreliable (often fails)
-    // - With await_cell_network_ready() it works reliably
-
-    // We expect at least one of these to be true to show the improvement:
-    // 1. The immediate attempt failed OR
-    // 2. The await approach succeeded
+    // The await approach MUST succeed - this validates the feature works
     assert!(
-        immediate_failed || with_await_succeeded,
-        "Test should demonstrate that await_cell_network_ready improves reliability. \
-         Immediate failed: {}, With await succeeded: {}",
-        immediate_failed,
-        with_await_succeeded
+        with_await_succeeded,
+        "await_cell_network_ready() must make operations reliable"
     );
 
     // Log the results for visibility
     if immediate_failed {
         println!("✓ Race condition demonstrated: immediate consistency check timed out");
     }
-    if with_await_succeeded {
-        println!("✓ With await_cell_network_ready: consistency check succeeded");
-    }
+    println!("✓ With await_cell_network_ready: consistency check succeeded");
 }
 
 /// Test showing the OLD workaround pattern with retry loops.
@@ -468,13 +456,11 @@ async fn test_old_retry_loop_workaround() {
     while retry_count < max_retries {
         retry_count += 1;
 
-        // Try to make a call
-        let result: Result<String, _> = std::panic::AssertUnwindSafe(async {
-            conductors[0]
-                .call(&alice.zome(SweetInlineZomes::COORDINATOR), "ping", ())
-                .await
-        })
-        .catch_unwind()
+        // Try to make a call - use timeout to detect when network isn't ready
+        let result = tokio::time::timeout(
+            Duration::from_millis(200),
+            conductors[0].call::<_, String>(&alice.zome(SweetInlineZomes::COORDINATOR), "ping", ()),
+        )
         .await;
 
         if result.is_ok() {

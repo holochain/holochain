@@ -118,6 +118,16 @@ impl NetworkReadinessHandle {
     /// Emit a network readiness event.
     ///
     /// This is called internally by the conductor during network operations.
+    ///
+    /// # State Update Ordering
+    ///
+    /// This method broadcasts events before ensuring state updates complete when the lock
+    /// is contended (requiring async spawn). This creates a brief window where subscribers
+    /// receive events but `has_completed_join()` may still return false.
+    ///
+    /// This is acceptable because `await_cell_network_ready()` uses a double-check pattern:
+    /// it checks state before subscribing, subscribes, then re-checks after subscription,
+    /// ensuring late subscribers still get immediate responses once state updates complete.
     pub(crate) fn emit(&self, event: NetworkReadinessEvent) {
         // Track state for late subscribers
         // We use try_write since we're in an async context and can't block
@@ -163,12 +173,6 @@ impl NetworkReadinessHandle {
     /// Check if a cell has already failed joining.
     pub(crate) async fn has_failed_join(&self, cell_id: &CellId) -> bool {
         self.failed_joins.read().await.contains(cell_id)
-    }
-
-    /// Get the number of active subscribers.
-    #[cfg(test)]
-    pub fn subscriber_count(&self) -> usize {
-        self.sender.receiver_count()
     }
 }
 

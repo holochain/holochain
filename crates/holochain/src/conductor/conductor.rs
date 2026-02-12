@@ -1252,7 +1252,18 @@ mod network_impls {
                             }
                         }
                         Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
-                            // We lagged behind, continue listening
+                            // We lagged behind and may have missed the JoinComplete/JoinFailed event.
+                            // Check the state tracking to see if we can determine the outcome.
+                            if self.network_readiness.has_completed_join(cell_id).await {
+                                return Ok(());
+                            }
+                            if self.network_readiness.has_failed_join(cell_id).await {
+                                return Err(ConductorApiError::Other(
+                                    format!("Network join previously failed for cell {}", cell_id)
+                                        .into(),
+                                ));
+                            }
+                            // Otherwise continue listening for future events
                             continue;
                         }
                         Err(_) => {
