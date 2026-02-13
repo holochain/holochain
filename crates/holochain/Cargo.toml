@@ -31,7 +31,7 @@ holochain_cascade = { version = "^0.7.0-dev.11", default-features = false, path 
 holochain_chc = { version = "^0.4.0-dev.11", path = "../holochain_chc", default-features = false }
 holochain_conductor_api = { version = "^0.7.0-dev.11", path = "../holochain_conductor_api", default-features = false }
 holochain_data = { version = "^0.7.0-dev.0", path = "../holochain_data", features = [
-    "sqlite-encrypted",
+  "sqlite-encrypted",
 ] }
 holochain_keystore = { version = "^0.7.0-dev.5", path = "../holochain_keystore", default-features = false }
 holochain_p2p = { version = "^0.7.0-dev.11", default-features = false, path = "../holochain_p2p" }
