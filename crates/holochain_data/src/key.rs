@@ -41,6 +41,19 @@ impl Default for DbKey {
 }
 
 impl DbKey {
+    #[cfg(feature = "test-utils")]
+    fn priv_new(
+        locked: String,
+        key: sodoken::SizedLockedArray<32>,
+        salt: Arc<Mutex<sodoken::SizedLockedArray<16>>>,
+    ) -> Self {
+        Self {
+            key: Arc::new(Mutex::new(key)),
+            salt,
+            locked,
+        }
+    }
+
     async fn priv_gen(
         nonce: [u8; sodoken::secretbox::XSALSA_NONCEBYTES],
         mut key: sodoken::SizedLockedArray<32>,
