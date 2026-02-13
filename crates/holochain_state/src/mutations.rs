@@ -409,15 +409,6 @@ pub fn upsert_dna_def(
     Ok(())
 }
 
-/// Insert a [`EntryDef`] into the database.
-pub fn insert_entry_def(
-    _db: &holochain_data::DbWrite<holochain_data::kind::Wasm>,
-    _key: Vec<u8>,
-    _entry_def: &EntryDef,
-) -> StateMutationResult<()> {
-    todo!("insert_entry_def needs async update")
-}
-
 /// Insert [`ConductorState`](https://docs.rs/holochain/latest/holochain/conductor/state/struct.ConductorState.html)
 /// into the database.
 pub fn insert_conductor_state(
