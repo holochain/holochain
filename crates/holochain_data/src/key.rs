@@ -41,6 +41,7 @@ impl Default for DbKey {
 }
 
 impl DbKey {
+    #[cfg(feature = "test-utils")]
     fn priv_new(
         locked: String,
         key: sodoken::SizedLockedArray<32>,

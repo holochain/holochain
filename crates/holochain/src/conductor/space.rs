@@ -19,8 +19,8 @@ use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::DynHcP2p;
 use holochain_sqlite::prelude::{
-    DatabaseResult, DbKey, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbKindWasm,
-    DbSyncLevel, DbSyncStrategy, DbWrite, PoolConfig, ReadAccess,
+    DatabaseResult, DbKey, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbSyncLevel,
+    DbSyncStrategy, DbWrite, PoolConfig, ReadAccess,
 };
 use holochain_state::{host_fn_workspace::SourceChainWorkspace, mutations, prelude::*};
 use holochain_util::timed;
@@ -45,7 +45,9 @@ pub struct Spaces {
     /// The map of running queue consumer workflows.
     pub(crate) queue_consumer_map: QueueConsumerMap,
     pub(crate) conductor_db: DbWrite<DbKindConductor>,
-    pub(crate) wasm_db: DbWrite<DbKindWasm>,
+    pub(crate) wasm_store: holochain_state::wasm::WasmStore,
+    pub(crate) dna_def_store: holochain_state::dna_def::DnaDefStore,
+    pub(crate) entry_def_store: holochain_state::entry_def::EntryDefStore,
     db_key: DbKey,
 }
 
@@ -144,7 +146,7 @@ impl Spaces {
         let db_key = match tokio::fs::read_to_string(db_key_path.clone()).await {
             Ok(locked) => DbKey::load(locked, passphrase.clone()).await?,
             Err(_) => {
-                let db_key = DbKey::generate(passphrase).await?;
+                let db_key = DbKey::generate(passphrase.clone()).await?;
                 tokio::fs::write(db_key_path, db_key.locked.clone()).await?;
                 db_key
             }
@@ -163,7 +165,7 @@ impl Spaces {
             DbSyncStrategy::Resilient => DbSyncLevel::Normal,
         };
 
-        let (conductor_db, wasm_db) = tokio::task::block_in_place(|| {
+        let conductor_db = tokio::task::block_in_place(|| {
             let conductor_db = DbWrite::open_with_pool_config(
                 root_db_dir.as_ref(),
                 DbKindConductor,
@@ -173,17 +175,36 @@ impl Spaces {
                     max_readers: config.db_max_readers,
                 },
             )?;
-            let wasm_db = DbWrite::open_with_pool_config(
-                root_db_dir.as_ref(),
-                DbKindWasm,
-                PoolConfig {
-                    synchronous_level: db_sync_level,
-                    key: db_key.clone(),
-                    max_readers: config.db_max_readers,
-                },
-            )?;
-            ConductorResult::Ok((conductor_db, wasm_db))
+            ConductorResult::Ok(conductor_db)
         })?;
+
+        let db_sync = match db_sync_level {
+            DbSyncLevel::Off => holochain_data::DbSyncLevel::Off,
+            DbSyncLevel::Normal => holochain_data::DbSyncLevel::Normal,
+            DbSyncLevel::Full => holochain_data::DbSyncLevel::Full,
+        };
+
+        // Convert the DbKey from holochain_sqlite to holochain_data format
+        let data_db_key = holochain_data::DbKey::load(db_key.locked.clone(), passphrase.clone())
+            .await
+            .map_err(ConductorError::other)?;
+
+        let wasm_db = holochain_data::open_db(
+            root_db_dir.as_ref(),
+            holochain_data::kind::Wasm,
+            holochain_data::HolochainDataConfig {
+                key: Some(data_db_key),
+                sync_level: db_sync,
+                max_readers: config.db_max_readers,
+            },
+        )
+        .await
+        .map_err(|e| std::io::Error::other(e.to_string()))?;
+
+        // Create store instances from the wasm database
+        let wasm_store = holochain_state::wasm::WasmStore::new(wasm_db.clone());
+        let dna_def_store = holochain_state::dna_def::DnaDefStore::new(wasm_db.clone());
+        let entry_def_store = holochain_state::entry_def::EntryDefStore::new(wasm_db);
 
         Ok(Spaces {
             map: RwShare::new(HashMap::new()),
@@ -191,7 +212,9 @@ impl Spaces {
             config,
             queue_consumer_map: QueueConsumerMap::new(),
             conductor_db,
-            wasm_db,
+            wasm_store,
+            dna_def_store,
+            entry_def_store,
             db_key,
         })
     }

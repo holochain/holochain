@@ -23,8 +23,12 @@ holo_hash = { version = "^0.7.0-dev.3", path = "../holo_hash", features = [
 ] }
 fallible-iterator = "0.3.0"
 holochain_chc = { version = "^0.4.0-dev.11", path = "../holochain_chc" }
+holochain_data = { version = "^0.7.0-dev.0", path = "../holochain_data", features = [
+  "sqlite-encrypted",
+] }
 holochain_keystore = { version = "^0.7.0-dev.5", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.56"
+sqlx = { version = "=0.9.0-alpha.1" }
 holochain_types = { version = "^0.7.0-dev.11", path = "../holochain_types" }
 holochain_zome_types = { version = "^0.7.0-dev.5", path = "../holochain_zome_types", features = [
   "full",
