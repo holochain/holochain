@@ -199,8 +199,6 @@ pub enum ChainStatus {
     /// look at the value of [`AgentActivity::warrants`] and/or call
     /// `hdk::chain::get_agent_activity` with [`ActivityRequest::Full`] and look
     /// at the values in [`AgentActivity::rejected_activity`].
-    ///
-    /// **NOTE**: Chain fork detection is not considered stable at this time.
     Forked(ChainFork),
     /// The chain is not forked, but is invalid from the given action sequence
     /// and action hash forward, by virtue of this authority finding a
@@ -229,8 +227,6 @@ pub struct ChainHead {
 /// of the values in `first_action` and `second_action` is undefined, and in
 /// cases of three or more actions causing a fork, different peers may report
 /// different hash pairs.
-///
-/// **NOTE**: Chain fork detection is not considered stable at this time.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ChainFork {
     /// The point where the chain has forked.
