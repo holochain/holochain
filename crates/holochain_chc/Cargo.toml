@@ -1,6 +1,6 @@
 [package]
 name = "holochain_chc"
-version = "0.4.0-dev.11"
+version = "0.4.0-dev.12"
 description = "Defines the Chain Head Coordinator (CHC) API for Holochain and provides an HTTP client implementation."
 license = "Apache-2.0"
 repository = "https://github.com/holochain/holochain"
