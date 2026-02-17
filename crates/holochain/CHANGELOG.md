@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Import influxive crates from https://github.com/holochain/influxive into monorepo and update their dependencies.
 - **BREAKING CHANGE** Remove implicit features created by enabling optional crates: #5663
   - For `holo_hash`, the `serde` and `serde_bytes` features are removed, please use `serialization` instead.
   - For `holo_hash`, the `rusqlite` feature has been removed, please use `sqlite` or `sqlite-encrypted` instead.
