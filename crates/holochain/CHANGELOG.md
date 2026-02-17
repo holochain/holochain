@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Import influxive crates from https://github.com/holochain/influxive into monorepo and update their dependencies.
 - Stabilized chain fork warrants that were previously behind the `unstable-warrants` feature; the feature has now been removed. \#5641
 
 ## 0.7.0-dev.12
