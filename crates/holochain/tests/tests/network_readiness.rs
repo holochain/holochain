@@ -24,7 +24,7 @@ async fn test_single_cell_network_readiness() {
 
     // Install and enable the app
     let app = conductor
-        .setup_app_for_agent("app", agent.clone(), &[dna.clone()])
+        .setup_app_for_agent("app", agent.clone(), std::slice::from_ref(&dna))
         .await
         .unwrap();
     let (cell,) = app.into_tuple();
@@ -128,7 +128,7 @@ async fn test_multi_conductor_network_readiness_no_retry() {
     let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zome).await;
 
     // Setup app on both conductors simultaneously
-    let apps = conductors.setup_app("app", &[dna.clone()]).await.unwrap();
+    let apps = conductors.setup_app("app", std::slice::from_ref(&dna)).await.unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();
 
     // Exchange peer info so they know about each other
@@ -195,7 +195,7 @@ async fn test_network_readiness_events_emitted() {
 
     // Install and enable the app
     let app = conductor
-        .setup_app_for_agent("app", agent.clone(), &[dna.clone()])
+        .setup_app_for_agent("app", agent.clone(), std::slice::from_ref(&dna))
         .await
         .unwrap();
     let (cell,) = app.into_tuple();
@@ -291,7 +291,7 @@ async fn test_network_readiness_vs_sleep_comparison() {
     let start = std::time::Instant::now();
 
     let app = conductor
-        .setup_app_for_agent("app", agent, &[dna.clone()])
+        .setup_app_for_agent("app", agent, std::slice::from_ref(&dna))
         .await
         .unwrap();
     let (cell,) = app.into_tuple();
@@ -349,7 +349,7 @@ async fn test_demonstrates_race_condition_without_await() {
     let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zome).await;
 
     // Setup app on both conductors simultaneously
-    let apps = conductors.setup_app("app", &[dna.clone()]).await.unwrap();
+    let apps = conductors.setup_app("app", std::slice::from_ref(&dna)).await.unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();
 
     // Exchange peer info
@@ -441,7 +441,7 @@ async fn test_old_retry_loop_workaround() {
 
     let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zome).await;
 
-    let apps = conductors.setup_app("app", &[dna.clone()]).await.unwrap();
+    let apps = conductors.setup_app("app", std::slice::from_ref(&dna)).await.unwrap();
     let ((alice,), (_bob,)) = apps.into_tuples();
 
     conductors.exchange_peer_info().await;
@@ -506,7 +506,7 @@ async fn test_demonstrates_no_peer_url_error() {
         .0;
 
     let apps = conductors
-        .setup_app("app", &[dna_file.clone()])
+        .setup_app("app", std::slice::from_ref(&dna_file))
         .await
         .unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();
