@@ -14,6 +14,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20260216.002130
+
+## [hcterm-0.7.0-dev.12](crates/hcterm/CHANGELOG.md#0.7.0-dev.12)
+
+## [holochain\_cli-0.7.0-dev.12](crates/holochain_cli/CHANGELOG.md#0.7.0-dev.12)
+
+## [holochain\_cli\_client-0.7.0-dev.12](crates/holochain_cli_client/CHANGELOG.md#0.7.0-dev.12)
+
+## [holochain\_cli\_sandbox-0.7.0-dev.12](crates/holochain_cli_sandbox/CHANGELOG.md#0.7.0-dev.12)
+
+## [holochain\_client-0.9.0-dev.12](crates/holochain_client/CHANGELOG.md#0.9.0-dev.12)
+
+### Added
+
+- Added `CallZomeOptions` struct and `call_zome_with_options` / `signed_call_zome_with_options` methods to `AppWebsocket` to allow configuring a per-call timeout for zome calls. [\#5644](https://github.com/holochain/holochain/pull/5644)
+
+## [holochain-0.7.0-dev.12](crates/holochain/CHANGELOG.md#0.7.0-dev.12)
+
+- **BREAKING CHANGE** The `Spaces` struct now contains dedicated `wasm_store`, `dna_def_store`, and `entry_def_store` fields instead of directly exposing the underlying `wasm_db`. These are using the new WASM database from `holochain_data` under the hood. There is no migration path from an existing installation to this version.
+
+## [holochain\_cascade-0.7.0-dev.12](crates/holochain_cascade/CHANGELOG.md#0.7.0-dev.12)
+
+## [holochain\_wasm\_test\_utils-0.7.0-dev.12](crates/holochain_wasm_test_utils/CHANGELOG.md#0.7.0-dev.12)
+
+## [holochain\_p2p-0.7.0-dev.12](crates/holochain_p2p/CHANGELOG.md#0.7.0-dev.12)
+
+## [holochain\_state-0.7.0-dev.12](crates/holochain_state/CHANGELOG.md#0.7.0-dev.12)
+
+## [holochain\_chc-0.4.0-dev.12](crates/holochain_chc/CHANGELOG.md#0.4.0-dev.12)
+
+## [holochain\_data-0.7.0-dev.1](crates/holochain_data/CHANGELOG.md#0.7.0-dev.1)
+
 # 20260209.002210
 
 ## [hcterm-0.7.0-dev.11](crates/hcterm/CHANGELOG.md#0.7.0-dev.11)
