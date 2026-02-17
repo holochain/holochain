@@ -128,7 +128,10 @@ async fn test_multi_conductor_network_readiness_no_retry() {
     let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zome).await;
 
     // Setup app on both conductors simultaneously
-    let apps = conductors.setup_app("app", std::slice::from_ref(&dna)).await.unwrap();
+    let apps = conductors
+        .setup_app("app", std::slice::from_ref(&dna))
+        .await
+        .unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();
 
     // Exchange peer info so they know about each other
@@ -349,7 +352,10 @@ async fn test_demonstrates_race_condition_without_await() {
     let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zome).await;
 
     // Setup app on both conductors simultaneously
-    let apps = conductors.setup_app("app", std::slice::from_ref(&dna)).await.unwrap();
+    let apps = conductors
+        .setup_app("app", std::slice::from_ref(&dna))
+        .await
+        .unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();
 
     // Exchange peer info
@@ -441,7 +447,10 @@ async fn test_old_retry_loop_workaround() {
 
     let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zome).await;
 
-    let apps = conductors.setup_app("app", std::slice::from_ref(&dna)).await.unwrap();
+    let apps = conductors
+        .setup_app("app", std::slice::from_ref(&dna))
+        .await
+        .unwrap();
     let ((alice,), (_bob,)) = apps.into_tuples();
 
     conductors.exchange_peer_info().await;
