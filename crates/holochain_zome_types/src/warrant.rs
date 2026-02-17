@@ -153,6 +153,8 @@ pub enum ChainIntegrityWarrant {
         chain_author: AgentPubKey,
         /// Two actions of the same seq number which prove the fork
         action_pair: (ActionHashAndSig, ActionHashAndSig),
+        /// The seq number at which the fork occurs
+        seq: u32,
     },
 }
 

@@ -308,12 +308,6 @@ unstable-migration = [
   "holochain_conductor_api/unstable-migration",
 ]
 
-# Enables unstable warrants feature.
-#
-# Invalid op warrants are now stabilized, but this feature flag is retained for
-# chain fork warrants.
-unstable-warrants = []
-
 # Enable sharding for networks. This is currently considered an unstable feature
 # and with the feature disabled you will only be able to configure nodes that have
 # a full or empty arc.
