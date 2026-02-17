@@ -115,33 +115,46 @@ impl NetworkReadinessHandle {
         self.sender.subscribe()
     }
 
-    /// Emit a network readiness event.
-    ///
-    /// This is called internally by the conductor during network operations.
+    /// Emit a network readiness event to all current subscribers via `sender.send`, and
+    /// record terminal states (`JoinComplete`, `JoinFailed`) in `completed_joins` /
+    /// `failed_joins` so that late callers of `has_completed_join` can still determine
+    /// the outcome without waiting for a future event.
     ///
     /// # State Update Ordering
     ///
-    /// This method broadcasts events before ensuring state updates complete when the lock
-    /// is contended (requiring async spawn). This creates a brief window where subscribers
-    /// receive events but `has_completed_join()` may still return false.
+    /// This method is intentionally synchronous so it can be called from non-async contexts.
+    /// It attempts to acquire the write lock via `try_write()`. When the lock is immediately
+    /// available the state is updated **before** `sender.send` broadcasts the event, so
+    /// subscribers and `has_completed_join` are consistent. When the lock is contended,
+    /// however, a `tokio::spawn` task is used to perform the write asynchronously. In that
+    /// case `sender.send` fires **before** `completed_joins` / `failed_joins` is updated,
+    /// creating a brief window where a subscriber receives a `JoinComplete` or `JoinFailed`
+    /// event while `has_completed_join` still returns `false`.
     ///
-    /// This is acceptable because `await_cell_network_ready()` uses a double-check pattern:
-    /// it checks state before subscribing, subscribes, then re-checks after subscription,
-    /// ensuring late subscribers still get immediate responses once state updates complete.
+    /// These spawned tasks are fire-and-forget: if the Tokio runtime is shutting down the
+    /// task may be dropped before it runs, leaving `completed_joins` / `failed_joins` in a
+    /// stale state. This is acceptable for shutdown scenarios where readiness is no longer
+    /// relevant.
+    ///
+    /// Callers that need a reliable "already completed" check must use the double-check
+    /// pattern implemented in `await_cell_network_ready`: check state, subscribe to the
+    /// channel, check state again, then wait for the event. This bracketing ensures that
+    /// even if the state update races with the subscription, at most one extra event loop
+    /// iteration is needed before the correct answer is visible.
     pub(crate) fn emit(&self, event: NetworkReadinessEvent) {
-        // Track state for late subscribers
-        // We use try_write since we're in an async context and can't block
+        // Update completed_joins / failed_joins before broadcasting so that
+        // has_completed_join() is consistent with the event when the lock is
+        // uncontended. When try_write() fails, fall back to a fire-and-forget
+        // spawned task (see doc comment above for ordering implications).
         match &event {
             NetworkReadinessEvent::JoinComplete { cell_id } => {
                 if let Ok(mut completed) = self.completed_joins.try_write() {
                     completed.insert(cell_id.clone());
                 } else {
-                    // If we can't get the lock, spawn a task to update it
                     let completed_joins = self.completed_joins.clone();
                     let cell_id = cell_id.clone();
                     tokio::spawn(async move {
-                        let mut completed = completed_joins.write().await;
-                        completed.insert(cell_id);
+                        completed_joins.write().await.insert(cell_id);
                     });
                 }
             }
@@ -149,12 +162,10 @@ impl NetworkReadinessHandle {
                 if let Ok(mut failed) = self.failed_joins.try_write() {
                     failed.insert(cell_id.clone());
                 } else {
-                    // If we can't get the lock, spawn a task to update it
                     let failed_joins = self.failed_joins.clone();
                     let cell_id = cell_id.clone();
                     tokio::spawn(async move {
-                        let mut failed = failed_joins.write().await;
-                        failed.insert(cell_id);
+                        failed_joins.write().await.insert(cell_id);
                     });
                 }
             }
