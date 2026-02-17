@@ -21,11 +21,9 @@ impl Conductor {
         // Get or create the space for this cell.
         let space = self.get_or_create_space(cell_id.dna_hash())?;
 
-        let chc = None;
         let network = holochain_p2p::HolochainP2pDna::new(
             self.holochain_p2p().clone(),
             cell_id.dna_hash().clone(),
-            chc,
         );
 
         let source_chain: SourceChain = space
@@ -142,11 +140,9 @@ impl Conductor {
     ) -> ConductorApiResult<()> {
         let space = self.get_or_create_space(cell_id.dna_hash())?;
         let ribosome = self.get_ribosome(cell_id)?;
-        let chc = None;
         let network = holochain_p2p::HolochainP2pDna::new(
             self.holochain_p2p().clone(),
             cell_id.dna_hash().clone(),
-            chc,
         );
 
         // Create a raw source chain to validate against because

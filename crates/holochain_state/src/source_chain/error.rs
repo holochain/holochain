@@ -6,7 +6,6 @@ use crate::scratch::ScratchError;
 use crate::scratch::SyncScratchError;
 use holo_hash::ActionHash;
 use holo_hash::EntryHash;
-use holochain_chc::ChcError;
 use holochain_serialized_bytes::prelude::*;
 use holochain_sqlite::error::DatabaseError;
 use holochain_types::prelude::*;
@@ -29,13 +28,6 @@ pub enum SourceChainError {
         Option<ActionHash>,
         Option<HeadInfo>,
     ),
-
-    #[error(
-        "Attempted to commit a bundle to the source chain, but the CHC's head has moved since the bundle began. \
-        The source chain needs to be synced with the CHC before proceeding. \
-        Context: {0}, Original error: {1:?}"
-    )]
-    ChcHeadMoved(String, ChcError),
 
     #[error(transparent)]
     TimestampError(#[from] holochain_zome_types::prelude::TimestampError),

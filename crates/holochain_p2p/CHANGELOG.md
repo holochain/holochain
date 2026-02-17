@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- **BREAKING CHANGE** Removed `chc` field from `HolochainP2pDna` and `chc()` method from `HolochainP2pDnaT`. Removed `ChcError` variant from `HolochainP2pError`. \#5551
+
 ## 0.7.0-dev.12
 
 ## 0.7.0-dev.11

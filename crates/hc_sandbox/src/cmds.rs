@@ -38,11 +38,6 @@ pub struct Create {
     /// Use this option to run the sandboxed conductors when you don't have access to the lair binary.
     #[arg(long)]
     pub in_process_lair: bool,
-
-    /// Set the conductor config CHC (Chain Head Coordinator) URL
-    #[cfg(feature = "chc")]
-    #[arg(long, value_parser=try_parse_url2)]
-    pub chc_url: Option<Url2>,
 }
 
 #[derive(Debug, Parser, Clone)]
@@ -292,8 +287,6 @@ impl Default for Create {
             root: None,
             directories: Vec::with_capacity(0),
             in_process_lair: false,
-            #[cfg(feature = "chc")]
-            chc_url: None,
         }
     }
 }

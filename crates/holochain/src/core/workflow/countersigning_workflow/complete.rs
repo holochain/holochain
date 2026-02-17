@@ -3,7 +3,6 @@ use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::weigh_placeholder;
 use crate::core::workflow::{WorkflowError, WorkflowResult};
 use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, EntryHash};
-use holochain_chc::AddRecordPayload;
 use holochain_keystore::{AgentPubKeyExt, MetaLairClient};
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_sqlite::db::ReadAccess;
@@ -192,29 +191,6 @@ async fn reveal_countersigning_session(
     integration_trigger: TriggerSender,
     publish_trigger: TriggerSender,
 ) -> WorkflowResult<()> {
-    if let Some(chc) = network.chc() {
-        tracing::info!(
-            "Adding countersigning session record to the CHC: {:?}",
-            session_record
-        );
-        let payload =
-            AddRecordPayload::from_records(keystore, author.clone(), vec![session_record])
-                .await
-                .map_err(SourceChainError::other)?;
-
-        // TODO Need to be able to recover from this by pushing when we're behind the CHC.
-        // This is a serious failure, but we have to continue with the workflow.
-        // It would be worse to not publish the session record than to be out of sync with the CHC.
-        // Being behind the CHC is a recoverable state, or should be at some point. We don't want
-        // to try and figure out a partial publish of the session record from an unknown state.
-        if let Err(e) = chc.add_records_request(payload).await {
-            tracing::error!(
-                "Failed to add countersigning session record to the CHC: {:?}",
-                e
-            );
-        }
-    }
-
     apply_success_state_changes(space, author, this_cells_action_hash, integration_trigger).await?;
 
     publish_trigger.trigger(&"publish countersigning_success");

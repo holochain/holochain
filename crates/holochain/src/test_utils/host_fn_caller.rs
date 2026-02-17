@@ -121,7 +121,6 @@ impl HostFnCaller {
         let network = holochain_p2p::HolochainP2pDna::new(
             handle.holochain_p2p().clone(),
             cell_id.dna_hash().clone(),
-            None,
         );
 
         let zome_path = (
@@ -274,10 +273,7 @@ impl HostFnCaller {
         // Write
         workspace
             .source_chain()
-            .flush(
-                self.network.target_arcs().await.unwrap(),
-                self.network.chc(),
-            )
+            .flush(self.network.target_arcs().await.unwrap())
             .await
             .unwrap();
 
@@ -298,10 +294,7 @@ impl HostFnCaller {
         // Write
         workspace
             .source_chain()
-            .flush(
-                self.network.target_arcs().await.unwrap(),
-                self.network.chc(),
-            )
+            .flush(self.network.target_arcs().await.unwrap())
             .await
             .unwrap();
 
@@ -325,10 +318,7 @@ impl HostFnCaller {
         // Write
         workspace
             .source_chain()
-            .flush(
-                self.network.target_arcs().await.unwrap(),
-                self.network.chc(),
-            )
+            .flush(self.network.target_arcs().await.unwrap())
             .await
             .unwrap();
 
@@ -373,10 +363,7 @@ impl HostFnCaller {
         // Write
         workspace
             .source_chain()
-            .flush(
-                self.network.target_arcs().await.unwrap(),
-                self.network.chc(),
-            )
+            .flush(self.network.target_arcs().await.unwrap())
             .await
             .unwrap();
 
@@ -401,10 +388,7 @@ impl HostFnCaller {
         // Write
         workspace
             .source_chain()
-            .flush(
-                self.network.target_arcs().await.unwrap(),
-                self.network.chc(),
-            )
+            .flush(self.network.target_arcs().await.unwrap())
             .await
             .unwrap();
 
@@ -434,10 +418,7 @@ impl HostFnCaller {
         // Write
         workspace
             .source_chain()
-            .flush(
-                self.network.target_arcs().await.unwrap(),
-                self.network.chc(),
-            )
+            .flush(self.network.target_arcs().await.unwrap())
             .await
             .unwrap();
 
@@ -467,10 +448,7 @@ impl HostFnCaller {
         // Write
         workspace
             .source_chain()
-            .flush(
-                self.network.target_arcs().await.unwrap(),
-                self.network.chc(),
-            )
+            .flush(self.network.target_arcs().await.unwrap())
             .await
             .unwrap();
 
@@ -503,10 +481,7 @@ impl HostFnCaller {
         // Write
         workspace
             .source_chain()
-            .flush(
-                self.network.target_arcs().await.unwrap(),
-                self.network.chc(),
-            )
+            .flush(self.network.target_arcs().await.unwrap())
             .await
             .unwrap();
         unwrap_to!(output.unwrap() => ZomeCallResponse::Ok).to_owned()

@@ -533,7 +533,7 @@ pub async fn fake_genesis_for_agent(
     let dna = fake_dna_file("cool dna");
     let dna_hash = dna.dna_hash().clone();
 
-    source_chain::genesis(vault, dht_db.clone(), keystore, dna_hash, agent, None, None).await
+    source_chain::genesis(vault, dht_db.clone(), keystore, dna_hash, agent, None).await
 }
 
 /// Force all dht ops without enough validation receipts to be published.
