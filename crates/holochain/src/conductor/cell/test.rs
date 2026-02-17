@@ -34,7 +34,7 @@ async fn test_cell_handle_publish() {
         .unwrap();
     let dht_db = spaces.test_spaces[&dna].space.dht_db.clone();
 
-    let holochain_p2p_cell = HolochainP2pDna::new(Arc::new(MockHcP2p::new()), dna.clone(), None);
+    let holochain_p2p_cell = HolochainP2pDna::new(Arc::new(MockHcP2p::new()), dna.clone());
 
     let db_dir = test_db_dir().path().to_path_buf();
     let data_root_path: DataRootPath = db_dir.clone().into();
@@ -67,7 +67,6 @@ async fn test_cell_handle_publish() {
         db.clone(),
         dht_db.clone(),
         ribosome,
-        None,
         None,
     )
     .await

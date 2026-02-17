@@ -13,7 +13,6 @@ mod clone_cell;
 mod countersigning;
 mod dna_properties;
 mod gossip;
-mod graft_records_onto_source_chain;
 mod init;
 mod inline_zome_spec;
 mod integrity_zome;

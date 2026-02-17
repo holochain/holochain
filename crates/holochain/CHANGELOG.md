@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## 0.7.0-dev.13
 
 - Stabilized chain fork warrants that were previously behind the `unstable-warrants` feature; the feature has now been removed. \#5641
+- **BREAKING CHANGE** Removed the `chc` feature and all Chain Head Coordinator (CHC) code. The `holochain_chc` crate has been removed. The `chc` Cargo feature flag no longer exists. Removed `chc` parameter from `source_chain::genesis()` and `SourceChain::flush()`. Removed `ChcHeadMoved` variant from `SourceChainError`. \#5551
+- **BREAKING CHANGE** Removed `GraftRecords` and `RecordsGrafted` from the Admin API. Grafting is no longer supported since it was intended to be used by `holochain_chc` and wasn't safe to call in general. \#5551
 
 ## 0.7.0-dev.12
 

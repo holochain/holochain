@@ -84,7 +84,7 @@ where
         let countersigning_op = workspace.source_chain().countersigning_op()?;
         match workspace
             .source_chain()
-            .flush(network.target_arcs().await?, network.chc())
+            .flush(network.target_arcs().await?)
             .await
         {
             Ok((flushed_actions, total_inserted_warrants)) => {

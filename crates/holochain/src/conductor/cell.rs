@@ -30,7 +30,6 @@ use error::CellError;
 use futures::future::FutureExt;
 use holo_hash::*;
 use holochain_cascade::authority;
-use holochain_chc::ChcImpl;
 use holochain_nonce::fresh_nonce;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pError, HolochainP2pResult};
@@ -170,7 +169,6 @@ impl Cell {
         dht_db: DbWrite<DbKindDht>,
         ribosome: Ribosome,
         membrane_proof: Option<MembraneProof>,
-        chc: Option<ChcImpl>,
     ) -> CellResult<()>
     where
         Ribosome: RibosomeT + 'static,
@@ -188,7 +186,7 @@ impl Cell {
             return Ok(());
         }
 
-        let args = GenesisWorkflowArgs::new(cell_id.clone(), membrane_proof, ribosome, chc);
+        let args = GenesisWorkflowArgs::new(cell_id.clone(), membrane_proof, ribosome);
 
         genesis_workflow(workspace, conductor_api, args)
             .await

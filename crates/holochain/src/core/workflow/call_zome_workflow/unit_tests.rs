@@ -248,7 +248,7 @@ impl TestCase {
             is_root_zome_call: true,
         };
         let hc_p2p = Arc::new(hc_p2p);
-        let network = Arc::new(HolochainP2pDna::new(hc_p2p, dna_hash, None));
+        let network = Arc::new(HolochainP2pDna::new(hc_p2p, dna_hash));
 
         Self {
             workspace,

@@ -18,7 +18,7 @@ use holochain_types::{
 use holochain_websocket::{connect, ConnectRequest, WebsocketConfig, WebsocketSender};
 use holochain_zome_types::{
     capability::GrantedFunctions,
-    prelude::{DnaDef, GrantZomeCallCapabilityPayload, Record},
+    prelude::{DnaDef, GrantZomeCallCapabilityPayload},
 };
 use kitsune2_api::Url;
 use serde::{Deserialize, Serialize};
@@ -511,24 +511,6 @@ impl AdminWebsocket {
         let response = self.send(msg).await?;
         match response {
             AdminResponse::CoordinatorsUpdated => Ok(()),
-            _ => unreachable!("Unexpected response {:?}", response),
-        }
-    }
-
-    pub async fn graft_records(
-        &self,
-        cell_id: CellId,
-        validate: bool,
-        records: Vec<Record>,
-    ) -> ConductorApiResult<()> {
-        let msg = AdminRequest::GraftRecords {
-            cell_id,
-            validate,
-            records,
-        };
-        let response = self.send(msg).await?;
-        match response {
-            AdminResponse::RecordsGrafted => Ok(()),
             _ => unreachable!("Unexpected response {:?}", response),
         }
     }

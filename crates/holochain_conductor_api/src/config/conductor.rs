@@ -96,13 +96,6 @@ pub struct ConductorConfig {
     #[serde(default)]
     pub network: NetworkConfig,
 
-    /// Optional specification of Chain Head Coordination service URL.
-    /// If set, each cell's commit workflow will include synchronizing with the specified CHC service.
-    /// If you don't know what this means, leave this setting alone (as `None`)
-    #[schemars(default, schema_with = "holochain_util::jsonschema::url2_schema")]
-    #[cfg(feature = "chc")]
-    pub chc_url: Option<url2::Url2>,
-
     /// Override the default database synchronous strategy.
     ///
     /// See [sqlite documentation] for information about database sync levels.
@@ -175,8 +168,6 @@ impl Default for ConductorConfig {
             keystore: KeystoreConfig::default(),
             admin_interfaces: None,
             network: NetworkConfig::default(),
-            #[cfg(feature = "chc")]
-            chc_url: None,
             db_sync_strategy: DbSyncStrategy::default(),
             db_max_readers: default_db_max_readers(),
             incoming_request_concurrency_limit: default_incoming_request_concurrency_limit(),
@@ -773,8 +764,6 @@ mod tests {
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::default(),
                 db_max_readers: default_db_max_readers(),
-                #[cfg(feature = "chc")]
-                chc_url: None,
                 tuning_params: None,
                 tracing_scope: None,
                 incoming_request_concurrency_limit: default_incoming_request_concurrency_limit(),
@@ -960,8 +949,6 @@ admin_interfaces:
                 db_sync_strategy: DbSyncStrategy::Fast,
                 db_max_readers: 100,
                 incoming_request_concurrency_limit: 100,
-                #[cfg(feature = "chc")]
-                chc_url: None,
                 tuning_params: None,
                 tracing_scope: None,
             }
@@ -989,8 +976,6 @@ admin_interfaces:
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::Resilient,
                 db_max_readers: default_db_max_readers(),
-                #[cfg(feature = "chc")]
-                chc_url: None,
                 tuning_params: None,
                 tracing_scope: None,
                 incoming_request_concurrency_limit: default_incoming_request_concurrency_limit(),

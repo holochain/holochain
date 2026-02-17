@@ -51,7 +51,6 @@ pretty_assertions = "1.4"
 workspace = true
 
 [features]
-chc = []
 unstable-migration = []
 unstable-sharding = []
 unstable-countersigning = []
