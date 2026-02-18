@@ -1,5 +1,5 @@
 use hdk::prelude::*;
-use holochain::conductor::NetworkReadinessEvent;
+use holochain::conductor::{ConductorNetworkState, NetworkReadinessEvent};
 use holochain::sweettest::*;
 use std::time::Duration;
 
@@ -600,5 +600,126 @@ async fn test_demonstrates_no_peer_url_error() {
     assert!(
         with_await_succeeded,
         "With await_cell_network_ready, network operations should work reliably"
+    );
+}
+
+/// Test that `conductor.network_state` is automatically kept up-to-date.
+///
+/// This test verifies all four fields of [`ConductorNetworkState`]:
+/// - `joined_cells` is populated when a cell completes joining.
+/// - `failed_cells` is empty when joining succeeds.
+/// - `peers_by_dna` is populated as peers are discovered via the peer store.
+/// - `bootstrap_complete_dnas` is marked complete once the initial peer set is known.
+///
+/// Two conductors are used so that peer discovery actually occurs.
+#[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(
+    not(feature = "transport-iroh"),
+    ignore = "requires Iroh transport for stability"
+)]
+async fn test_network_state_tracks_all_fields() {
+    holochain_trace::test_run();
+
+    let mut conductors = SweetConductorBatch::standard(2).await;
+
+    let zome = SweetInlineZomes::new(vec![], 0).function("ping", |_, _: ()| Ok("pong"));
+    let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zome).await;
+    let dna_hash = dna.dna_hash().clone();
+
+    let apps = conductors
+        .setup_app("app", std::slice::from_ref(&dna))
+        .await
+        .unwrap();
+    let ((alice,), (bob,)) = apps.into_tuples();
+
+    // Exchange peer info so both conductors can discover each other.
+    conductors.exchange_peer_info().await;
+
+    // Wait for both cells to be fully joined before inspecting state.
+    conductors[0]
+        .await_cell_network_ready(alice.cell_id(), Duration::from_secs(15))
+        .await
+        .expect("Alice should become network ready");
+    conductors[1]
+        .await_cell_network_ready(bob.cell_id(), Duration::from_secs(15))
+        .await
+        .expect("Bob should become network ready");
+
+    // ── Field 1: joined_cells ────────────────────────────────────────────────
+    // The cell must appear in joined_cells after a successful join.
+    {
+        let state: ConductorNetworkState = conductors[0]
+            .raw_handle()
+            .network_state
+            .read()
+            .await
+            .clone();
+        assert!(
+            state.is_joined(alice.cell_id()),
+            "Alice's cell must be in joined_cells after await_cell_network_ready"
+        );
+        assert!(
+            state.joined_cells.contains(alice.cell_id()),
+            "joined_cells must contain Alice's cell_id"
+        );
+    }
+
+    // ── Field 2: failed_cells ────────────────────────────────────────────────
+    // A successful join must not add anything to failed_cells.
+    {
+        let state: ConductorNetworkState = conductors[0]
+            .raw_handle()
+            .network_state
+            .read()
+            .await
+            .clone();
+        assert!(
+            state.failed_cells.is_empty(),
+            "failed_cells must be empty when all joins succeed"
+        );
+        assert!(
+            state.join_error(alice.cell_id()).is_none(),
+            "join_error() must return None for a successful join"
+        );
+    }
+
+    // ── Fields 3 & 4: peers_by_dna and bootstrap_complete_dnas ──────────────
+    // These are populated by the background peer-monitoring task.  We poll
+    // until the task has had a chance to run (bounded by a generous timeout).
+    let peer_discovered = tokio::time::timeout(Duration::from_secs(20), async {
+        loop {
+            let state: ConductorNetworkState = conductors[0]
+                .raw_handle()
+                .network_state
+                .read()
+                .await
+                .clone();
+            if state.peer_count(&dna_hash) > 0 && state.is_bootstrap_complete(&dna_hash) {
+                return state;
+            }
+            tokio::time::sleep(Duration::from_millis(200)).await;
+        }
+    })
+    .await
+    .expect("Peer discovery and bootstrap-complete must happen within timeout");
+
+    // peers_by_dna must contain the DNA space and at least one agent.
+    assert!(
+        peer_discovered.peers_by_dna.contains_key(&dna_hash),
+        "peers_by_dna must contain Alice's DNA space"
+    );
+    assert!(
+        peer_discovered.peer_count(&dna_hash) > 0,
+        "peer_count() must be > 0 after peer discovery"
+    );
+
+    // bootstrap_complete_dnas must include this DNA space.
+    assert!(
+        peer_discovered.is_bootstrap_complete(&dna_hash),
+        "bootstrap_complete_dnas must include Alice's DNA space after bootstrap"
+    );
+    assert!(
+        peer_discovered.bootstrap_complete_dnas.contains(&dna_hash),
+        "bootstrap_complete_dnas set must contain the dna_hash directly"
     );
 }
