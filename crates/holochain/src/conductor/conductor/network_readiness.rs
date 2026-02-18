@@ -4,9 +4,10 @@
 //! code to wait for cells to be fully ready for network operations, rather than
 //! polling or using arbitrary timeouts.
 
+pub use holochain_conductor_api::ConductorNetworkState;
 use holochain_p2p::actor::DynHcP2p;
 use holochain_types::prelude::{AgentPubKey, CellId, DnaHash};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::{broadcast, RwLock};
@@ -85,46 +86,6 @@ impl NetworkReadinessEvent {
             Self::JoinComplete { cell_id } => Some(cell_id.dna_hash()),
             Self::JoinFailed { cell_id, .. } => Some(cell_id.dna_hash()),
         }
-    }
-}
-
-/// A snapshot of the current network state of the conductor.
-///
-/// Updated automatically as [`NetworkReadinessEvent`]s are emitted. Accessible
-/// via [`NetworkReadinessHandle::network_state`] or the `network_state` field on
-/// the conductor handle.
-#[derive(Debug, Default, Clone)]
-pub struct ConductorNetworkState {
-    /// Cells that have successfully joined the network.
-    pub joined_cells: HashSet<CellId>,
-    /// Cells that failed to join, keyed by cell ID with the error message.
-    pub failed_cells: HashMap<CellId, String>,
-    /// Known peers per DNA space, populated as [`NetworkReadinessEvent::PeerDiscovered`]
-    /// events arrive.
-    pub peers_by_dna: HashMap<DnaHash, HashSet<AgentPubKey>>,
-    /// DNA spaces for which initial bootstrap/peer-discovery has completed.
-    pub bootstrap_complete_dnas: HashSet<DnaHash>,
-}
-
-impl ConductorNetworkState {
-    /// Returns `true` if the given cell has successfully joined the network.
-    pub fn is_joined(&self, cell_id: &CellId) -> bool {
-        self.joined_cells.contains(cell_id)
-    }
-
-    /// Returns the error for a cell that failed to join, if any.
-    pub fn join_error(&self, cell_id: &CellId) -> Option<&str> {
-        self.failed_cells.get(cell_id).map(|s| s.as_str())
-    }
-
-    /// Returns the number of peers known for a DNA space.
-    pub fn peer_count(&self, dna_hash: &DnaHash) -> usize {
-        self.peers_by_dna.get(dna_hash).map_or(0, |s| s.len())
-    }
-
-    /// Returns `true` if bootstrap has completed for the given DNA space.
-    pub fn is_bootstrap_complete(&self, dna_hash: &DnaHash) -> bool {
-        self.bootstrap_complete_dnas.contains(dna_hash)
     }
 }
 
