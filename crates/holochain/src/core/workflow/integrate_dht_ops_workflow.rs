@@ -105,7 +105,7 @@ pub async fn integrate_dht_ops_workflow(
         .await?;
     let changed = stored_ops.len();
     let ops_ps = changed as f64 / start.elapsed().as_micros() as f64 * 1_000_000.0;
-    tracing::info!(?changed, %ops_ps, "ops integrated");
+    tracing::debug!(?changed, %ops_ps, "ops integrated");
     if changed > 0 {
         let dna_hash = network.dna_hash().clone();
         network.new_integrated_data(stored_ops).await?;

@@ -1,6 +1,6 @@
 [package]
 name = "holochain_data"
-version = "0.7.0-dev.0"
+version = "0.7.0-dev.1"
 description = "Database abstraction layer for Holochain using sqlx"
 license = "Apache-2.0"
 repository = "https://github.com/holochain/holochain"
@@ -29,7 +29,7 @@ holochain_serialized_bytes = "=0.0.56"
 serde_json = "1.0"
 
 [dev-dependencies]
-holochain_data = { path = ".", features = ["test-utils"] }
+holochain_data = { path = ".", features = ["test-utils", "sqlite-encrypted"] }
 
 tempfile = "3.3"
 

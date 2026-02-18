@@ -16,6 +16,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
   This provides proper event-driven waiting for network operations rather than requiring retry loops or arbitrary timeouts in downstream code. Events are emitted during the cell join process, allowing applications to reliably detect when cells are ready for network operations.
 
+- Stabilized chain fork warrants that were previously behind the `unstable-warrants` feature; the feature has now been removed. \#5641
+
+## 0.7.0-dev.12
+
+- **BREAKING CHANGE** The `Spaces` struct now contains dedicated `wasm_store`, `dna_def_store`, and `entry_def_store` fields instead of directly exposing the underlying `wasm_db`. These are using the new WASM database from `holochain_data` under the hood. There is no migration path from an existing installation to this version.
+
 ## 0.7.0-dev.11
 
 - Added `deny_unknown_fields` to conductor configuration structs to improve UX by rejecting configurations with typos or obsolete fields. This helps catch configuration errors early. \#5455

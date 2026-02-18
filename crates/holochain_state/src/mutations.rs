@@ -1,4 +1,3 @@
-use crate::entry_def::EntryDefStoreKey;
 use crate::query::from_blob;
 use crate::query::to_blob;
 use crate::schedule::fn_is_scheduled;
@@ -406,19 +405,6 @@ pub fn upsert_dna_def(
     stmt.execute(named_params! {
         ":cell_id": to_blob(cell_id)?,
         ":dna_def": to_blob(dna_def)?,
-    })?;
-    Ok(())
-}
-
-/// Insert a [`EntryDef`] into the database.
-pub fn insert_entry_def(
-    txn: &mut Transaction,
-    key: EntryDefStoreKey,
-    entry_def: &EntryDef,
-) -> StateMutationResult<()> {
-    sql_insert!(txn, EntryDef, {
-        "key": key,
-        "blob": to_blob(entry_def)?,
     })?;
     Ok(())
 }

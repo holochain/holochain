@@ -374,6 +374,7 @@ async fn get_activity_with_warrants() {
         let p = WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork {
             chain_author: td.agent.clone(),
             action_pair,
+            seq: 0,
         });
         let warrant = Warrant::new(
             p,

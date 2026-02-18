@@ -145,7 +145,7 @@ Use **manual `Row` access** (#2) only for:
 ## Example Usage
 
 ```rust
-use holochain_data::{setup_holochain_data, HolochainDataConfig};
+use holochain_data::{open_db, HolochainDataConfig};
 
 // Set up database with encryption and a pool with 4 readers.
 let key = DbKey::generate(passphrase).await?;
@@ -154,7 +154,7 @@ let config = HolochainDataConfig::new()
     .with_sync_level(DbSyncLevel::Normal)
     .with_max_readers(4);
 
-let db = setup_holochain_data(path, db_id, config).await?;
+let db = open_db(path, db_id, config).await?;
 
 // Migrations run automatically
 // Now use the connection pool for queries
