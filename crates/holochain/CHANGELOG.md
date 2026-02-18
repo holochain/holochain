@@ -9,12 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
-- **Network Readiness Events**: Added event-driven network readiness signaling to address race conditions where cells appeared "enabled" before network joining completed. New APIs include:
-  - `Conductor::subscribe_network_readiness()` - Subscribe to network readiness events
-  - `Conductor::await_cell_network_ready()` - Wait for a specific cell to complete network joining
-  - `NetworkReadinessEvent` enum with `JoinStarted`, `JoinComplete`, `JoinFailed`, `PeerDiscovered`, and `BootstrapComplete` events
-
-  This provides proper event-driven waiting for network operations rather than requiring retry loops or arbitrary timeouts in downstream code. Events are emitted during the cell join process, allowing applications to reliably detect when cells are ready for network operations.
+- Added event-driven network readiness signalling (`NetworkReadinessEvent`, `ConductorNetworkState`, `await_cell_network_ready`, `subscribe_network_readiness`) so downstream code can wait for cells to be fully ready for network operations without retry loops or arbitrary timeouts. Readiness is also exposed over the admin WebSocket via `GetNetworkState` and `AwaitCellNetworkReady`. [\#5647](https://github.com/holochain/holochain/pull/5647)
 
 - Stabilized chain fork warrants that were previously behind the `unstable-warrants` feature; the feature has now been removed. \#5641
 
