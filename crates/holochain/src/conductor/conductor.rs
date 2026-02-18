@@ -209,7 +209,7 @@ pub struct Conductor {
     /// Live snapshot of network state (joined cells, known peers, bootstrap status),
     /// updated automatically as network readiness events are emitted.
     ///
-    /// This is an `Arc` into [`network_readiness`]'s internal state, so reads always
+    /// This is an `Arc` into the `NetworkReadinessHandle`'s internal state, so reads always
     /// reflect the latest information without needing to subscribe to events manually.
     pub network_state:
         std::sync::Arc<tokio::sync::RwLock<network_readiness::ConductorNetworkState>>,
