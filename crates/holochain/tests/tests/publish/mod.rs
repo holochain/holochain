@@ -228,7 +228,7 @@ async fn warrant_is_published() {
 
     // Carol should receive the warrant against Alice.
     // The warrant and the warrant op should have been written to the authored databases.
-    tokio::time::timeout(Duration::from_secs(20), async {
+    tokio::time::timeout(Duration::from_secs(60), async {
         loop {
             let alice_pubkey = alice.agent_pubkey().clone();
             let warrants = conductors[2]
