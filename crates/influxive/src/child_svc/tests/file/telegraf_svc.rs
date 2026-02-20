@@ -1,4 +1,4 @@
-use crate::common::telegraf_binaries::TELEGRAF_SPEC;
+use super::telegraf_binaries::TELEGRAF_SPEC;
 use std::path::PathBuf;
 use std::process::Stdio;
 

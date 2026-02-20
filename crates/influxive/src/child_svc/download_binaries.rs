@@ -1,7 +1,8 @@
-use influxive_downloader::*;
+use crate::downloader::{Archive, DownloadSpec, Hash};
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 mod tgt {
+
     use super::*;
     pub const DL_DB: Option<DownloadSpec> = Some(DownloadSpec {
         url: "https://dl.influxdata.com/influxdb/releases/influxdb2-2.7.6_linux_amd64.tar.gz",

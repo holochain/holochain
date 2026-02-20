@@ -1,5 +1,7 @@
 use super::*;
 
+mod file;
+
 const DASHBOARD_TEMPLATE: &[u8] = include_bytes!("test_dashboard_template.json");
 
 #[tokio::test(flavor = "multi_thread")]

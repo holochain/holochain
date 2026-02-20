@@ -5,8 +5,8 @@
 //! influxive-child-svc crate as a means to make it easy for the dependencies
 //! to be optional.
 
+use crate::types::err_other;
 use base64::prelude::{Engine as _, BASE64_URL_SAFE_NO_PAD};
-use influxive_core::err_other;
 use std::io::Result;
 
 /// Indicate what archive type is used in the target.
@@ -20,6 +20,7 @@ pub enum Archive {
     },
 
     /// zip archive
+    #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
     Zip {
         /// Path inside archive to target file.
         // str instead of Path so it can be const initialized
@@ -162,6 +163,7 @@ impl DownloadSpec {
                 self.extract_tar_gz(tmp.path().to_owned(), file).await?;
                 inner_path
             }
+            #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
             Archive::Zip { inner_path } => {
                 self.extract_zip(tmp.path().to_owned(), file).await?;
                 inner_path
@@ -218,6 +220,7 @@ impl DownloadSpec {
         .await?
     }
 
+    #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
     async fn extract_zip(&self, tmp: std::path::PathBuf, src: std::fs::File) -> Result<()> {
         tokio::task::spawn_blocking(move || {
             let mut archive = zip::ZipArchive::new(src).map_err(err_other)?;
@@ -247,6 +250,7 @@ mod tests {
         file_extension: "",
     };
 
+    #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
     const TEST_ZIP: DownloadSpec = DownloadSpec {
         url: "https://dl.influxdata.com/influxdb/releases/influxdb2-client-2.7.3-windows-amd64.zip",
         archive: Archive::Zip {
@@ -283,6 +287,7 @@ mod tests {
         }
     }
 
+    #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
     #[tokio::test(flavor = "multi_thread")]
     async fn zip_sanity() {
         println!("{TEST_ZIP:?}");

@@ -9,7 +9,7 @@
 //! # #[tokio::main(flavor = "multi_thread")]
 //! # async fn main() {
 //! #     use std::sync::Arc;
-//! use influxive_writer::*;
+//! use influxive::writer::*;
 //!
 //! // create an influxive writer
 //! let writer = InfluxiveWriter::with_token_auth(
@@ -21,7 +21,7 @@
 //!
 //! // register the meter provider
 //! opentelemetry_api::global::set_meter_provider(
-//!     influxive_otel::InfluxiveMeterProvider::new(
+//!     influxive::otel::InfluxiveMeterProvider::new(
 //!         Default::default(),
 //!         Arc::new(writer),
 //!     )
@@ -37,7 +37,7 @@
 //! # }
 //! ```
 
-use influxive_core::*;
+use crate::types::*;
 use opentelemetry_api::metrics::*;
 use std::collections::HashMap;
 use std::sync::Arc;

@@ -90,18 +90,24 @@
 
 use std::sync::Arc;
 
-use influxive_child_svc::InfluxiveChildSvc;
-use influxive_otel::InfluxiveMeterProvider;
-use influxive_writer::*;
+use child_svc::InfluxiveChildSvc;
+use otel::InfluxiveMeterProvider;
+use writer::*;
 
 #[doc(inline)]
-pub use influxive_child_svc::InfluxiveChildSvcConfig;
+pub use child_svc::InfluxiveChildSvcConfig;
 
 #[doc(inline)]
-pub use influxive_writer::InfluxiveWriterConfig;
+pub use writer::InfluxiveWriterConfig;
 
 #[doc(inline)]
-pub use influxive_otel::InfluxiveMeterProviderConfig;
+pub use otel::InfluxiveMeterProviderConfig;
+
+pub mod child_svc;
+mod downloader;
+pub mod otel;
+pub mod types;
+pub mod writer;
 
 /// Create an opentelemetry_api MeterProvider ready to provide metrics
 /// to a running child process instance of InfluxDB.

@@ -4444,35 +4444,6 @@ dependencies = [
 name = "influxive"
 version = "0.0.6-dev.0"
 dependencies = [
- "influxive-child-svc",
- "influxive-otel",
- "influxive-writer",
- "opentelemetry_api",
- "tempfile",
- "tokio",
-]
-
-[[package]]
-name = "influxive-child-svc"
-version = "0.0.6-dev.0"
-dependencies = [
- "hex-literal",
- "influxive-core",
- "influxive-downloader",
- "influxive-writer",
- "tempfile",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "influxive-core"
-version = "0.0.6-dev.0"
-
-[[package]]
-name = "influxive-downloader"
-version = "0.0.6-dev.0"
-dependencies = [
  "base64 0.22.1",
  "digest 0.10.7",
  "dirs",
@@ -4480,23 +4451,15 @@ dependencies = [
  "futures",
  "hex",
  "hex-literal",
- "influxive-core",
+ "influxdb",
+ "opentelemetry_api",
  "reqwest 0.12.28",
  "sha2 0.10.9",
  "tar",
  "tempfile",
  "tokio",
+ "tracing",
  "zip 3.0.0",
-]
-
-[[package]]
-name = "influxive-otel"
-version = "0.0.6-dev.0"
-dependencies = [
- "influxive-core",
- "influxive-writer",
- "opentelemetry_api",
- "tokio",
 ]
 
 [[package]]
@@ -4506,20 +4469,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f4de21a259dc1a3e8c8b8621632d5c9149489a774f9a82639057e890d197dd0a"
 dependencies = [
  "opentelemetry_api",
-]
-
-[[package]]
-name = "influxive-writer"
-version = "0.0.6-dev.0"
-dependencies = [
- "hex-literal",
- "influxdb",
- "influxive-child-svc",
- "influxive-core",
- "influxive-downloader",
- "tempfile",
- "tokio",
- "tracing",
 ]
 
 [[package]]
