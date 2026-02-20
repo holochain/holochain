@@ -33,6 +33,9 @@ use crate::writer::*;
 use std::io::Result;
 
 #[cfg(feature = "download_binaries")]
+mod downloader;
+
+#[cfg(feature = "download_binaries")]
 mod download_binaries;
 
 #[cfg(test)]
@@ -493,10 +496,14 @@ async fn validate_influx(
     };
 
     // alas, the cli prints out the unhelpful version "dev".
-    if is_cli && !ver.contains("build_date: 2023-04-28") {
-        return Err(err_other(format!("invalid build_date: {ver}")));
-    } else if !is_cli && !ver.contains("InfluxDB v2.7.6") {
-        return Err(err_other(format!("invalid version: {ver}")));
+    if is_cli && !ver.contains("build_date: 2024-04-16") {
+        return Err(err_other(format!(
+            "expected build date 2024-04-16 of Influx CLI, got: {ver}"
+        )));
+    } else if !is_cli && !ver.contains("InfluxDB v2.8.0") {
+        return Err(err_other(format!(
+            "expected v2.8.0 of InfluxDB, got: {ver}"
+        )));
     }
 
     Ok(bin_path)
