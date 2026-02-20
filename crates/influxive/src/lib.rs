@@ -104,7 +104,6 @@ pub use writer::InfluxiveWriterConfig;
 pub use otel::InfluxiveMeterProviderConfig;
 
 pub mod child_svc;
-mod downloader;
 pub mod otel;
 pub mod types;
 pub mod writer;
