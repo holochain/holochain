@@ -53,5 +53,3 @@ transport-iroh = ["holochain_cli_sandbox/transport-iroh"]
 transport-tx5-backend-go-pion = [
   "holochain_cli_sandbox/transport-tx5-backend-go-pion",
 ]
-
-chc = ["holochain_cli_sandbox/chc"]

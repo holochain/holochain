@@ -66,5 +66,3 @@ transport-iroh = ["holochain_client/transport-iroh"]
 transport-tx5-backend-go-pion = [
   "holochain_client/transport-tx5-backend-go-pion",
 ]
-
-chc = ["holochain_conductor_api/chc", "holochain_conductor_config/chc"]

@@ -28,7 +28,6 @@ holo_hash = { version = "^0.7.0-dev.3", path = "../holo_hash", features = [
   "full",
 ] }
 holochain_cascade = { version = "^0.7.0-dev.12", default-features = false, path = "../holochain_cascade" }
-holochain_chc = { version = "^0.4.0-dev.12", path = "../holochain_chc", default-features = false }
 holochain_conductor_api = { version = "^0.7.0-dev.11", path = "../holochain_conductor_api", default-features = false }
 holochain_data = { version = "^0.7.0-dev.1", path = "../holochain_data", features = [
   "sqlite-encrypted",
@@ -112,13 +111,6 @@ async-once-cell = { version = "0.5", optional = true }
 get_if_addrs = { version = "0.5.3", optional = true }
 schemars = "0.9"
 
-# chc deps
-bytes = { version = "1", optional = true }
-reqwest = { version = "0.12", default-features = false, features = [
-  "json",
-  "rustls-tls",
-], optional = true }
-
 # fact deps
 petgraph = { version = "0.6.0", features = ["quickcheck", "stable_graph"] }
 
@@ -144,7 +136,6 @@ lair_keystore = "0.6.3"
 maplit = "1"
 pretty_assertions = "1.4"
 regex = "1.5"
-reqwest = { version = "0.12", default-features = false }
 test-case = "3.3"
 tokio = { version = "1.36.0", features = ["full", "test-util"] }
 tokio-tungstenite = "0.27"
@@ -217,7 +208,6 @@ test_utils = [
   "async-once-cell",
   "get_if_addrs",
   "holo_hash/fixturators",
-  "dep:bytes",
 ]
 
 fuzzing = []
@@ -292,15 +282,6 @@ wasmer_sys = [
 # Enable wasm interpreter (experimental)
 # Incompatible with "wasmer_sys"
 wasmer_wamr = ["wasmer/wamr", "holochain_wasmer_host/wasmer_wamr"]
-
-# Enable chain head coordination
-chc = [
-  "dep:bytes",
-  "dep:reqwest",
-  "holochain_conductor_api/chc",
-  "holochain_conductor_config/chc",
-  "holochain_chc/http",
-]
 
 # Enable the unstable migration feature
 unstable-migration = [

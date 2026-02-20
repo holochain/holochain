@@ -2,7 +2,6 @@
 //! holochain specific wrapper around more generic p2p module
 
 use holo_hash::*;
-use holochain_chc::ChcImpl;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::cell_config_overrides::CellConfigOverrides;
 use holochain_types::prelude::*;
@@ -205,9 +204,6 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
     /// Get the target arcs of the agents currently in this space.
     async fn target_arcs(&self) -> HolochainP2pResult<Vec<kitsune2_api::DhtArc>>;
 
-    /// Access to the specified CHC
-    fn chc(&self) -> Option<ChcImpl>;
-
     /// Block an agent for this cell.
     async fn block(&self, block: Block) -> HolochainP2pResult<()>;
 }
@@ -221,16 +217,14 @@ pub type DynHolochainP2pDna = Arc<dyn HolochainP2pDnaT>;
 pub struct HolochainP2pDna {
     sender: actor::DynHcP2p,
     dna_hash: Arc<DnaHash>,
-    chc: Option<ChcImpl>,
 }
 
 impl HolochainP2pDna {
     /// Construct a HolochainP2pDna from components.
-    pub fn new(hc_p2p: actor::DynHcP2p, dna_hash: DnaHash, chc: Option<ChcImpl>) -> Self {
+    pub fn new(hc_p2p: actor::DynHcP2p, dna_hash: DnaHash) -> Self {
         Self {
             sender: hc_p2p,
             dna_hash: dna_hash.into(),
-            chc,
         }
     }
 }
@@ -416,10 +410,6 @@ impl HolochainP2pDnaT for HolochainP2pDna {
 
     async fn target_arcs(&self) -> HolochainP2pResult<Vec<kitsune2_api::DhtArc>> {
         self.sender.target_arcs(self.dna_hash()).await
-    }
-
-    fn chc(&self) -> Option<ChcImpl> {
-        self.chc.clone()
     }
 
     async fn block(&self, block: Block) -> HolochainP2pResult<()> {

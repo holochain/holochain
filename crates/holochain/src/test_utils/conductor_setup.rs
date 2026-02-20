@@ -12,7 +12,6 @@ use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::RibosomeT;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
-use holochain_chc::ChcImpl;
 use holochain_keystore::MetaLairClient;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::prelude::test_db_dir;
@@ -43,7 +42,6 @@ impl CellHostFnCaller {
         cell_id: &CellId,
         handle: &ConductorHandle,
         dna_file: &DnaFile,
-        chc: Option<ChcImpl>,
     ) -> Self {
         let authored_db = handle.get_authored_db(cell_id.dna_hash()).unwrap();
         let dht_db = handle.get_dht_db(cell_id.dna_hash()).unwrap();
@@ -51,7 +49,7 @@ impl CellHostFnCaller {
         let keystore = handle.keystore().clone();
         let network = handle
             .holochain_p2p()
-            .to_dna(cell_id.dna_hash().clone(), chc);
+            .to_dna(cell_id.dna_hash().clone());
         let triggers = handle.get_cell_triggers(cell_id).await.unwrap();
         let cell_conductor_api = CellConductorApi::new(handle.clone(), cell_id.clone());
 
