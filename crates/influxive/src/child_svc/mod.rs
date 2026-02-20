@@ -408,6 +408,36 @@ impl InfluxiveChildSvc {
     pub fn write_metric(&self, metric: Metric) {
         self.writer.write_metric(metric);
     }
+
+    /// Write raw line protocol data to the running InfluxDB instance.
+    /// This is useful for testing or importing data in InfluxDB line protocol format.
+    pub async fn write_line_protocol<D: AsRef<str>>(&self, data: D) -> Result<()> {
+        use std::io::Write;
+
+        let data = data.as_ref();
+
+        // Write data to a temp file since influx write reads from file or stdin
+        let mut tmp = tempfile::NamedTempFile::new()?;
+        tmp.write_all(data.as_bytes())?;
+        tmp.flush()?;
+
+        cmd_output!(
+            &self.influx_path,
+            "write",
+            "--host",
+            &self.host,
+            "--token",
+            &self.token,
+            "--org",
+            &self.config.org,
+            "--bucket",
+            &self.config.bucket,
+            "--file",
+            tmp.path()
+        )?;
+
+        Ok(())
+    }
 }
 
 impl MetricWriter for InfluxiveChildSvc {
