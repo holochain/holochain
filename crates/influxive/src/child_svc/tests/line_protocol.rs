@@ -3,14 +3,8 @@ use crate::types::*;
 use crate::writer::*;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-use telegraf_influx_file_conf::TelegrafLineProtocolConfig;
-use telegraf_svc::TelegrafSvc;
 
-mod telegraf_binaries;
-mod telegraf_influx_file_conf;
-mod telegraf_svc;
-
-/// Setup [`InfluxiveWriter`] to use [`LineProtocolFileBackendFactory`]
+/// Setup [`InfluxiveWriter`]
 pub fn create_influx_file_writer(test_path: &PathBuf) -> InfluxiveWriter {
     let _ = std::fs::remove_file(test_path);
     let mut config = InfluxiveWriterConfig::create_with_influx_file(test_path.clone());
@@ -87,58 +81,35 @@ async fn write_to_file_then_read() {
     let test_dir_guard = tempfile::tempdir().unwrap();
     let test_dir = test_dir_guard.path().to_owned();
     let metrics_path = test_dir.join("test_metrics.influx");
-    let telegraf_config_path = test_dir.join("test_telegraf.conf");
 
-    // Write metrics to disk
+    // Write test metrics to disk in line protocol format
     write_metrics_to_file(&metrics_path).await;
 
     // Launch influxDB
     let influx_process = spawn_influx(&test_dir).await;
 
-    // Generate Telegraf config
-    let config = TelegrafLineProtocolConfig::new(
-        influx_process.get_host(),
-        influx_process.get_token(),
-        "influxive",
-        "influxive",
-        metrics_path.to_str().unwrap(),
-    );
-    assert!(config.write_to_file(telegraf_config_path.as_path()).is_ok());
+    // Read the line protocol file and write directly to InfluxDB
+    let line_protocol = std::fs::read_to_string(&metrics_path).unwrap();
+    influx_process
+        .write_line_protocol(&line_protocol)
+        .await
+        .unwrap();
 
-    // Launch Telegraf
-    let _telegraf_process = TelegrafSvc::spawn(
-        telegraf_config_path.to_str().unwrap(),
-        test_dir.to_str().unwrap(),
-        true,
-    )
-    .await
-    .unwrap();
-
-    // Wait for telegraf to process by querying influxDB every second until we get the expected
-    // result or a timeout
-    let mut line_count = 0;
-    tokio::time::timeout(std::time::Duration::from_secs(20), async {
-        loop {
-            let result = influx_process
-                .query(
-                    r#"from(bucket: "influxive")
+    // Query influxDB to verify the data was written correctly
+    let result = influx_process
+        .query(
+            r#"from(bucket: "influxive")
 |> range(start: -15m, stop: now())
 |> filter(fn: (r) => r["_measurement"] == "my-second-metric")
 |> filter(fn: (r) => r["_field"] == "val")"#,
-                )
-                .await
-                .unwrap();
+        )
+        .await
+        .unwrap();
 
-            line_count = result
-                .split('\n')
-                .filter(|l| l.contains("my-second-metric"))
-                .count();
-            if line_count == 10 {
-                break;
-            }
-            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-        }
-    })
-    .await
-    .unwrap_or_else(|_| panic!("Error: Test timed out. line_count = {line_count} ; Expected: 10"));
+    let line_count = result
+        .split('\n')
+        .filter(|l| l.contains("my-second-metric"))
+        .count();
+
+    assert_eq!(line_count, 10, "Expected 10 metrics, got {line_count}");
 }

@@ -1,6 +1,6 @@
 use super::*;
 
-mod file;
+mod line_protocol;
 
 const DASHBOARD_TEMPLATE: &[u8] = include_bytes!("test_dashboard_template.json");
 
