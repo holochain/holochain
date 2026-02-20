@@ -1,5 +1,5 @@
+use crate::downloader::{Archive, DownloadSpec, Hash};
 use hex_literal::hex;
-use influxive_downloader::{Archive, DownloadSpec, Hash};
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 pub const TELEGRAF_SPEC: DownloadSpec = DownloadSpec {

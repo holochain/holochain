@@ -7,7 +7,7 @@
 //! ## Example [Metric] type creation:
 //!
 //! ```
-//! let _metric = influxive_core::Metric::new(std::time::SystemTime::now(), "my.name")
+//! let _metric = influxive::types::Metric::new(std::time::SystemTime::now(), "my.name")
 //!     .with_field("field.bool", true)
 //!     .with_field("field.float", 3.14)
 //!     .with_field("field.signed", -42)
@@ -23,6 +23,7 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
+// TODO replace by thiserror
 /// Convenience wrapper around [`std::io::Error::other`].
 pub fn err_other<E>(error: E) -> std::io::Error
 where
@@ -67,6 +68,7 @@ stringtype_from_impl! {
     Arc<str>, f, { StringType::ArcString(f) },
 }
 
+// TODO eliminate
 /// Field-type enum for sending data to InfluxDB.
 #[derive(Debug, Clone)]
 pub enum DataType {

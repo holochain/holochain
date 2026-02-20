@@ -12,8 +12,8 @@
 //! ```
 //! # #[tokio::main(flavor = "multi_thread")]
 //! # async fn main() {
-//! use influxive_core::Metric;
-//! use influxive_writer::*;
+//! use influxive::types::Metric;
+//! use influxive::writer::*;
 //!
 //! let writer = InfluxiveWriter::with_token_auth(
 //!     InfluxiveWriterConfig::default(),
@@ -38,8 +38,8 @@
 //! ```rust
 //! # #[tokio::main(flavor = "multi_thread")]
 //! # async fn main() {
-//! use influxive_core::Metric;
-//! use influxive_writer::*;
+//! use influxive::types::Metric;
+//! use influxive::writer::*;
 //!
 //! let path = std::path::PathBuf::from("my-metrics.influx");
 //! let config = InfluxiveWriterConfig::create_with_influx_file(path.clone());
@@ -61,7 +61,7 @@
 //! # }
 //! ```
 
-use influxive_core::*;
+use crate::types::*;
 use std::sync::Arc;
 
 trait DataTypeExt {
@@ -418,7 +418,7 @@ impl InfluxiveWriter {
     }
 }
 
-impl influxive_core::MetricWriter for InfluxiveWriter {
+impl crate::types::MetricWriter for InfluxiveWriter {
     fn write_metric(&self, metric: Metric) {
         InfluxiveWriter::write_metric(self, metric);
     }

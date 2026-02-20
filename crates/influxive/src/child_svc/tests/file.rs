@@ -1,12 +1,14 @@
-use crate::common::telegraf_influx_file_conf::TelegrafLineProtocolConfig;
-use crate::common::telegraf_svc::TelegrafSvc;
-use influxive_child_svc::{InfluxiveChildSvc, InfluxiveChildSvcConfig};
-use influxive_core::*;
-use influxive_writer::*;
+use crate::child_svc::{InfluxiveChildSvc, InfluxiveChildSvcConfig};
+use crate::types::*;
+use crate::writer::*;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
+use telegraf_influx_file_conf::TelegrafLineProtocolConfig;
+use telegraf_svc::TelegrafSvc;
 
-mod common;
+mod telegraf_binaries;
+mod telegraf_influx_file_conf;
+mod telegraf_svc;
 
 /// Setup [`InfluxiveWriter`] to use [`LineProtocolFileBackendFactory`]
 pub fn create_influx_file_writer(test_path: &PathBuf) -> InfluxiveWriter {

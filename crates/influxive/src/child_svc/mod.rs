@@ -7,8 +7,8 @@
 //! ```
 //! # #[tokio::main(flavor = "multi_thread")]
 //! # async fn main() {
-//! use influxive_core::Metric;
-//! use influxive_child_svc::*;
+//! use influxive::types::Metric;
+//! use influxive::child_svc::*;
 //!
 //! let tmp = tempfile::tempdir().unwrap();
 //!
@@ -28,15 +28,17 @@
 //! # }
 //! ```
 
+use crate::types::*;
+use crate::writer::*;
 use std::io::Result;
 
 #[cfg(feature = "download_binaries")]
 mod download_binaries;
 
-use influxive_core::*;
-use influxive_writer::*;
+#[cfg(test)]
+mod tests;
 
-pub use influxive_writer::InfluxiveWriterConfig;
+pub use crate::writer::InfluxiveWriterConfig;
 
 macro_rules! cmd_output {
     ($cmd:expr $(,$arg:expr)*) => {async {
@@ -555,6 +557,3 @@ async fn spawn_influxd(
 
     Ok((child, port))
 }
-
-#[cfg(test)]
-mod test;

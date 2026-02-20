@@ -10,7 +10,7 @@ repository = "https://github.com/holochain/holochain"
 
 # reminder - do not use workspace deps
 [dependencies]
-influxive = { version = "0.0.6-dev.0", path = "../influxive", optional = true }
+influxive = { version = "0.0.6-dev.0", path = "../influxive" }
 opentelemetry_api = { version = "0.20.0", features = ["metrics"] }
 tracing = "0.1.37"
 

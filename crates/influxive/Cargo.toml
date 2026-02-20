@@ -11,11 +11,46 @@ keywords = ["metrics"]
 categories = ["development-tools"]
 
 [dependencies]
-influxive-child-svc = { version = "0.0.6-dev.0", path = "../influxive-child-svc" }
-influxive-otel = { version = "0.0.6-dev.0", path = "../influxive-otel" }
-influxive-writer = { version = "0.0.6-dev.0", path = "../influxive-writer" }
-
-[dev-dependencies]
+influxdb = "0.7"
 opentelemetry_api = { version = "0.20.0", features = ["metrics"] }
 tempfile = "3"
+tokio = { version = "1", features = ["process"] }
+tracing = "0.1"
+
+# downloader dependencies
+base64 = { version = "0.22", optional = true }
+digest = { version = "0.10", optional = true }
+dirs = { version = "6", optional = true }
+flate2 = { version = "1", optional = true }
+futures = { version = "0.3", optional = true }
+hex = { version = "0.4", optional = true }
+hex-literal = { version = "1.1", optional = true }
+reqwest = { version = "0.12", features = [
+    "rustls-tls",
+    "stream",
+], optional = true }
+sha2 = { version = "0.10", optional = true }
+tar = { version = "0.4", optional = true }
+zip = { version = "3.0", optional = true }
+
+[dev-dependencies]
 tokio = { version = "1", features = ["full"] }
+
+[features]
+default = ["download_binaries"]
+
+# compiles in the ability to download release influxd and influx binaries
+# as a fallback in case they are not found on the path
+download_binaries = [
+    "dep:base64",
+    "dep:digest",
+    "dep:dirs",
+    "dep:flate2",
+    "dep:futures",
+    "dep:hex",
+    "dep:hex-literal",
+    "dep:reqwest",
+    "dep:sha2",
+    "dep:tar",
+    "dep:zip",
+]
