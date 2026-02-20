@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+### Added
+
+- Added event-driven network readiness signalling (`NetworkReadinessEvent`, `ConductorNetworkState`, `await_cell_network_ready`, `subscribe_network_readiness`) so downstream code can wait for cells to be fully ready for network operations without retry loops or arbitrary timeouts. Readiness is also exposed over the admin WebSocket via `GetNetworkState` and `AwaitCellNetworkReady`. [\#5647](https://github.com/holochain/holochain/pull/5647)
+
 - Stabilized chain fork warrants that were previously behind the `unstable-warrants` feature; the feature has now been removed. \#5641
 
 ## 0.7.0-dev.12

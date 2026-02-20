@@ -608,6 +608,51 @@ impl AdminWebsocket {
         })
     }
 
+    /// Get a snapshot of the conductor's current network state.
+    ///
+    /// Returns immediately with the current state. Fields are updated automatically
+    /// by the conductor as cells join the network and peers are discovered.
+    ///
+    /// To wait until a specific cell is ready, use [`AdminWebsocket::await_cell_network_ready`].
+    pub async fn get_network_state(
+        &self,
+    ) -> ConductorApiResult<holochain_conductor_api::ConductorNetworkState> {
+        let response = self.send(AdminRequest::GetNetworkState).await?;
+        match response {
+            AdminResponse::NetworkState(state) => Ok(state),
+            _ => unreachable!("Unexpected response {:?}", response),
+        }
+    }
+
+    /// Wait until a specific cell has joined the network, or until the timeout elapses.
+    ///
+    /// Blocks until the cell successfully joins its k2 network space. Use this instead
+    /// of polling or arbitrary sleeps after enabling an app.
+    ///
+    /// Returns `Ok(())` when the cell is ready. Returns an error if the join fails or
+    /// the timeout elapses.
+    ///
+    /// # Arguments
+    ///
+    /// * `cell_id` — the cell to wait for.
+    /// * `timeout_ms` — maximum wait time in milliseconds. Defaults to 30 000 ms if `None`.
+    pub async fn await_cell_network_ready(
+        &self,
+        cell_id: holochain_types::prelude::CellId,
+        timeout_ms: Option<u64>,
+    ) -> ConductorApiResult<()> {
+        let response = self
+            .send(AdminRequest::AwaitCellNetworkReady {
+                cell_id,
+                timeout_ms,
+            })
+            .await?;
+        match response {
+            AdminResponse::CellNetworkReady => Ok(()),
+            _ => unreachable!("Unexpected response {:?}", response),
+        }
+    }
+
     async fn send(&self, msg: AdminRequest) -> ConductorApiResult<AdminResponse> {
         let response: AdminResponse = self
             .tx

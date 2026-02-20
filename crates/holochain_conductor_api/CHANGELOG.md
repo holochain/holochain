@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+### Added
+
+- Added `ConductorNetworkState` type and `AdminRequest::GetNetworkState` / `AdminRequest::AwaitCellNetworkReady` endpoints so external clients can query or wait for cell network readiness over the admin WebSocket. [\#5647](https://github.com/holochain/holochain/pull/5647)
+
 ## 0.7.0-dev.11
 
 ## 0.7.0-dev.10

@@ -290,6 +290,22 @@ impl AdminInterfaceApi {
             StorageInfo => Ok(AdminResponse::StorageInfo(
                 self.conductor_handle.storage_info().await?,
             )),
+
+            GetNetworkState => {
+                let state = self.conductor_handle.network_state.read().await.clone();
+                Ok(AdminResponse::NetworkState(state))
+            }
+
+            AwaitCellNetworkReady {
+                cell_id,
+                timeout_ms,
+            } => {
+                let timeout = std::time::Duration::from_millis(timeout_ms.unwrap_or(30_000));
+                self.conductor_handle
+                    .await_cell_network_ready(&cell_id, timeout)
+                    .await?;
+                Ok(AdminResponse::CellNetworkReady)
+            }
             IssueAppAuthenticationToken(payload) => {
                 Ok(AdminResponse::AppAuthenticationTokenIssued(
                     self.conductor_handle

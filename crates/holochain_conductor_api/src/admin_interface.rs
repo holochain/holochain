@@ -5,7 +5,45 @@ use holochain_types::prelude::*;
 use holochain_types::websocket::AllowedOrigins;
 use holochain_zome_types::cell::CellId;
 use kitsune2_api::Url;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
+
+/// A snapshot of the current network state of the conductor.
+///
+/// Returned by [`AdminRequest::GetNetworkState`]. Updated automatically as
+/// cells join, fail to join, and as peers are discovered.
+#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ConductorNetworkState {
+    /// Cells that have successfully joined the network.
+    pub joined_cells: HashSet<CellId>,
+    /// Cells that failed to join the network, keyed by cell ID with the error message.
+    pub failed_cells: HashMap<CellId, String>,
+    /// Known peers per DNA space, populated as peers are discovered.
+    pub peers_by_dna: HashMap<DnaHash, HashSet<AgentPubKey>>,
+    /// DNA spaces for which initial bootstrap/peer-discovery has completed.
+    pub bootstrap_complete_dnas: HashSet<DnaHash>,
+}
+
+impl ConductorNetworkState {
+    /// Returns `true` if the given cell has successfully joined the network.
+    pub fn is_joined(&self, cell_id: &CellId) -> bool {
+        self.joined_cells.contains(cell_id)
+    }
+
+    /// Returns the error for a cell that failed to join, if any.
+    pub fn join_error(&self, cell_id: &CellId) -> Option<&str> {
+        self.failed_cells.get(cell_id).map(|s| s.as_str())
+    }
+
+    /// Returns the number of peers known for a DNA space.
+    pub fn peer_count(&self, dna_hash: &DnaHash) -> usize {
+        self.peers_by_dna.get(dna_hash).map_or(0, |s| s.len())
+    }
+
+    /// Returns `true` if bootstrap has completed for the given DNA space.
+    pub fn is_bootstrap_complete(&self, dna_hash: &DnaHash) -> bool {
+        self.bootstrap_complete_dnas.contains(dna_hash)
+    }
+}
 
 /// Represents the available conductor functions to call over an admin interface.
 ///
@@ -449,6 +487,39 @@ pub enum AdminRequest {
     /// Namely, this finds cells with DNAs whose manifest lists the given DNA hash in its `lineage` field.
     #[cfg(feature = "unstable-migration")]
     GetCompatibleCells(DnaHash),
+
+    /// Get a snapshot of the current network state of the conductor.
+    ///
+    /// Returns the current state of all cells and peer discovery without blocking.
+    /// Fields are updated automatically as cells join the network and peers are discovered.
+    ///
+    /// To wait until a specific cell is ready, use [`AdminRequest::AwaitCellNetworkReady`].
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::NetworkState`]
+    GetNetworkState,
+
+    /// Wait until a specific cell has joined the network, or until the timeout elapses.
+    ///
+    /// This is the admin-interface equivalent of the in-process
+    /// `ConductorHandle::await_cell_network_ready` method. It blocks the request until the cell
+    /// has successfully joined its k2 space, or until `timeout_ms` milliseconds have elapsed.
+    ///
+    /// If the join succeeds, returns [`AdminResponse::CellNetworkReady`].
+    /// If the join fails or the timeout elapses, returns [`AdminResponse::Error`].
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::CellNetworkReady`]
+    AwaitCellNetworkReady {
+        /// The cell to wait for.
+        cell_id: CellId,
+        /// Maximum time to wait, in milliseconds.
+        /// If not set, waits up to 30 seconds.
+        #[serde(default)]
+        timeout_ms: Option<u64>,
+    },
 }
 
 /// Represents the possible responses to an [`AdminRequest`]
@@ -605,6 +676,17 @@ pub enum AdminResponse {
     /// The successful response to an [`AdminRequest::GetCompatibleCells`].
     #[cfg(feature = "unstable-migration")]
     CompatibleCells(CompatibleCells),
+
+    /// The successful response to an [`AdminRequest::GetNetworkState`].
+    ///
+    /// Contains a snapshot of the conductor's current network state: which cells have joined,
+    /// which have failed, and what peers have been discovered per DNA space.
+    NetworkState(ConductorNetworkState),
+
+    /// The successful response to an [`AdminRequest::AwaitCellNetworkReady`].
+    ///
+    /// The cell has successfully joined the network and is ready for operations.
+    CellNetworkReady,
 }
 
 #[cfg(feature = "unstable-migration")]

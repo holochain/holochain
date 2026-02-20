@@ -11,7 +11,7 @@ pub use error::{ConductorApiError, ConductorApiResult};
 pub use holochain_conductor_api::{
     AdminRequest, AdminResponse, AppAuthenticationRequest, AppAuthenticationToken,
     AppAuthenticationTokenIssued, AppInfo, AppRequest, AppResponse, AppStatusFilter, CellInfo,
-    IssueAppAuthenticationTokenPayload, PeerMetaInfo, ProvisionedCell,
+    ConductorNetworkState, IssueAppAuthenticationTokenPayload, PeerMetaInfo, ProvisionedCell,
 };
 pub use holochain_types::{
     app::{InstallAppPayload, InstalledAppId},
