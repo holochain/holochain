@@ -12,7 +12,8 @@ categories = ["development-tools"]
 
 [dependencies]
 influxdb = "0.8"
-opentelemetry_api = { version = "0.20.0", features = ["metrics"] }
+opentelemetry = "0.31"
+opentelemetry_sdk = "0.31"
 tempfile = "3"
 tokio = { version = "1", features = ["process"] }
 tracing = "0.1"

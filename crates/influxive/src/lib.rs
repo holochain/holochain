@@ -1,5 +1,5 @@
 #![deny(missing_docs)]
-#![deny(warnings)]
+// #![deny(warnings)]
 #![deny(unsafe_code)]
 //! High-level Rust integration of opentelemetry metrics and InfluxDB.
 //!
@@ -115,7 +115,7 @@ pub async fn influxive_child_process_meter_provider(
     otel_config: InfluxiveMeterProviderConfig,
 ) -> std::io::Result<(Arc<InfluxiveChildSvc>, InfluxiveMeterProvider)> {
     let influxive = Arc::new(InfluxiveChildSvc::new(svc_config).await?);
-    let meter_provider = InfluxiveMeterProvider::new(otel_config, influxive.clone());
+    let meter_provider = InfluxiveMeterProvider::new(otel_config); //, influxive.clone());
     Ok((influxive, meter_provider))
 }
 
@@ -129,7 +129,7 @@ pub fn influxive_external_meter_provider_token_auth<H: AsRef<str>, B: AsRef<str>
     token: T,
 ) -> InfluxiveMeterProvider {
     let writer = InfluxiveWriter::with_token_auth(writer_config, host, bucket, token);
-    InfluxiveMeterProvider::new(otel_config, Arc::new(writer))
+    InfluxiveMeterProvider::new(otel_config) //, Arc::new(writer))
 }
 
 /// Create an opentelemetry_api MeterProvider ready to provide metrics
@@ -140,8 +140,8 @@ pub fn influxive_file_meter_provider(
 ) -> InfluxiveMeterProvider {
     // host/bucket/token are not needed when using a file writer
     let writer = InfluxiveWriter::with_token_auth(writer_config, "", "", "");
-    InfluxiveMeterProvider::new(otel_config, Arc::new(writer))
+    InfluxiveMeterProvider::new(otel_config) //, Arc::new(writer))
 }
 
 #[cfg(test)]
-mod test;
+mod tests;

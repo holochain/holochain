@@ -15,12 +15,12 @@ async fn file_meter_provider_one_metric_one_value() {
     );
 
     // register our meter provider
-    opentelemetry_api::global::set_meter_provider(meter_provider);
+    opentelemetry::global::set_meter_provider(meter_provider);
 
     // create a metric
-    let m = opentelemetry_api::global::meter("my.meter")
+    let m = opentelemetry::global::meter("my.meter")
         .f64_histogram("my.metric")
-        .init();
+        .build();
 
     // make a recording
     m.record(4.13, &[]);
