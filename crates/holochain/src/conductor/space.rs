@@ -19,10 +19,10 @@ use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::DynHcP2p;
 use holochain_sqlite::prelude::{
-    DatabaseResult, DbKey, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbSyncLevel,
-    DbSyncStrategy, DbWrite, PoolConfig, ReadAccess,
+    DatabaseResult, DbKey, DbKindAuthored, DbKindCache, DbKindDht, DbSyncLevel, DbSyncStrategy,
+    DbWrite, PoolConfig,
 };
-use holochain_state::{host_fn_workspace::SourceChainWorkspace, mutations, prelude::*};
+use holochain_state::{host_fn_workspace::SourceChainWorkspace, prelude::*};
 use holochain_util::timed;
 use lair_keystore_api::prelude::SharedLockedArray;
 use rusqlite::OptionalExtension;
@@ -44,7 +44,8 @@ pub struct Spaces {
     pub(crate) config: Arc<ConductorConfig>,
     /// The map of running queue consumer workflows.
     pub(crate) queue_consumer_map: QueueConsumerMap,
-    pub(crate) conductor_db: DbWrite<DbKindConductor>,
+    /// Conductor database (holochain_data) for normalized ConductorState
+    pub(crate) conductor_db: holochain_data::DbWrite<holochain_data::kind::Conductor>,
     pub(crate) wasm_store: holochain_state::wasm::WasmStore,
     pub(crate) dna_def_store: holochain_state::dna_def::DnaDefStore,
     pub(crate) entry_def_store: holochain_state::entry_def::EntryDefStore,
@@ -189,6 +190,17 @@ impl Spaces {
             .await
             .map_err(ConductorError::other)?;
 
+        let conductor_db = holochain_data::setup_holochain_data(
+            root_db_dir.as_ref(),
+            holochain_data::kind::Conductor,
+            holochain_data::HolochainDataConfig {
+                key: Some(data_db_key.clone()),
+                sync_level: db_sync,
+            },
+        )
+        .await
+        .map_err(|e| std::io::Error::other(e.to_string()))?;
+
         let wasm_db = holochain_data::open_db(
             root_db_dir.as_ref(),
             holochain_data::kind::Wasm,
@@ -221,7 +233,18 @@ impl Spaces {
 
     /// Unblock some target.
     pub async fn unblock(&self, input: Block) -> DatabaseResult<()> {
-        holochain_state::block::unblock(&self.conductor_db, input).await
+        self.conductor_db
+            .unblock(input)
+            .await
+            .map_err(|e| DatabaseError::Other(e.into()))
+    }
+
+    /// Block some target.
+    pub async fn block(&self, input: Block) -> DatabaseResult<()> {
+        self.conductor_db
+            .block(input)
+            .await
+            .map_err(|e| DatabaseError::Other(e.into()))
     }
 
     /// Check if some target is blocked.
@@ -247,34 +270,41 @@ impl Spaces {
             return Ok(false);
         }
 
-        self.conductor_db
-            .read_async(move |txn| {
-                Ok(
-                    // If the target_id is directly blocked then we always return true.
-                    holochain_state::block::query_is_blocked(txn, target_id, timestamp)?
-            // If there are zero unblocked cells then return true.
-            || {
-                let mut all_blocked_cell_ids = true;
-                for cell_id in cell_ids {
-                    if !holochain_state::block::query_is_blocked(
-                        txn,
-                        BlockTargetId::Cell(cell_id), timestamp)? {
-                            all_blocked_cell_ids = false;
-                            break;
-                        }
-                }
-                all_blocked_cell_ids
-            },
-                )
-            })
+        // Check if the target_id itself is directly blocked
+        let target_blocked = self
+            .conductor_db
+            .as_ref()
+            .is_blocked(target_id.clone(), timestamp)
             .await
+            .map_err(|e| ConductorError::other(e))?;
+
+        if target_blocked {
+            return Ok(true);
+        }
+
+        // Check if all the cell_ids are blocked
+        let cell_targets: Vec<BlockTargetId> =
+            cell_ids.into_iter().map(BlockTargetId::Cell).collect();
+
+        let all_cells_blocked = self
+            .conductor_db
+            .as_ref()
+            .are_all_blocked(cell_targets, timestamp)
+            .await
+            .map_err(|e| ConductorError::other(e))?;
+
+        Ok(all_cells_blocked)
     }
 
     /// Get the holochain conductor state
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn get_state(&self) -> ConductorResult<ConductorState> {
         timed!([1, 10, 1000], "get_state", {
-            match query_conductor_state(&self.conductor_db).await? {
+            match crate::conductor::state_persistence::load_conductor_state(
+                self.conductor_db.as_ref(),
+            )
+            .await?
+            {
                 Some(state) => Ok(state),
                 // update_state will again try to read the state. It's a little
                 // inefficient in the infrequent case where we haven't saved the
@@ -304,22 +334,24 @@ impl Spaces {
         O: Send + 'static,
     {
         timed!([1, 10, 1000], "update_state_prime", {
-            self.conductor_db
-                .write_async(move |txn| {
-                    let state = txn
-                        .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
-                            row.get("blob")
-                        })
-                        .optional()?;
-                    let state = match state {
-                        Some(state) => from_blob(state)?,
-                        None => ConductorState::default(),
-                    };
-                    let (new_state, output) = f(state)?;
-                    mutations::insert_conductor_state(txn, (&new_state).try_into()?)?;
-                    Result::<_, ConductorError>::Ok((new_state, output))
-                })
-                .await
+            // Load current state from normalized tables
+            let state = crate::conductor::state_persistence::load_conductor_state(
+                self.conductor_db.as_ref(),
+            )
+            .await?
+            .unwrap_or_default();
+
+            // Apply the transformation
+            let (new_state, output) = f(state)?;
+
+            // Save new state to normalized tables
+            crate::conductor::state_persistence::save_conductor_state(
+                &self.conductor_db,
+                &new_state,
+            )
+            .await?;
+
+            Ok((new_state, output))
         })
     }
 

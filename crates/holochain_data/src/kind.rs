@@ -83,7 +83,7 @@ pub struct Conductor;
 
 impl DatabaseIdentifier for Conductor {
     fn database_id(&self) -> &str {
-        "conductor"
+        "conductor_v2.db"
     }
 }
 

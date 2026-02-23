@@ -92,8 +92,6 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::sql::sql_cell::state_dump;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
-use holochain_state::nonce::witness_nonce;
-use holochain_state::nonce::WitnessNonceResult;
 use holochain_state::prelude::*;
 use holochain_state::source_chain;
 pub use holochain_types::share;
@@ -798,6 +796,7 @@ mod network_impls {
     use holochain_sqlite::helpers::BytesSql;
     use holochain_sqlite::sql::sql_peer_meta_store;
     use holochain_sqlite::stats::{get_size_on_disk, get_used_size};
+    use holochain_state::nonce::WitnessNonceResult;
     use holochain_zome_types::block::Block;
     use holochain_zome_types::block::BlockTargetId;
     use kitsune2_api::Url;
@@ -933,14 +932,28 @@ mod network_impls {
             nonce: Nonce256Bits,
             expires: Timestamp,
         ) -> ConductorResult<WitnessNonceResult> {
-            Ok(witness_nonce(
-                &self.spaces.conductor_db,
-                agent,
-                nonce,
-                Timestamp::now(),
-                expires,
-            )
-            .await?)
+            let result = self
+                .spaces
+                .conductor_db
+                .witness_nonce(agent, nonce, Timestamp::now(), expires)
+                .await
+                .map_err(|e| ConductorError::other(e))?;
+
+            // Convert from holochain_data::WitnessNonceResult to holochain_state::WitnessNonceResult
+            Ok(match result {
+                holochain_data::conductor::WitnessNonceResult::Fresh => {
+                    holochain_state::nonce::WitnessNonceResult::Fresh
+                }
+                holochain_data::conductor::WitnessNonceResult::Duplicate => {
+                    holochain_state::nonce::WitnessNonceResult::Duplicate
+                }
+                holochain_data::conductor::WitnessNonceResult::Expired => {
+                    holochain_state::nonce::WitnessNonceResult::Expired
+                }
+                holochain_data::conductor::WitnessNonceResult::Future => {
+                    holochain_state::nonce::WitnessNonceResult::Future
+                }
+            })
         }
 
         /// Unblock some target.
