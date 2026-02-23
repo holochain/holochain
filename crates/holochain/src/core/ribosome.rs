@@ -441,8 +441,7 @@ impl ZomeCallInvocation {
     ///
     /// The checks MUST be done in this order as witnessing the nonce is a write operation,
     /// and so we MUST NOT write nonces until after we verify the signature.
-    #[allow(clippy::extra_unused_lifetimes)]
-    pub async fn is_authorized<'a>(
+    pub async fn is_authorized(
         &self,
         host_access: &ZomeCallHostAccess,
     ) -> ConductorResult<ZomeCallAuthorization> {
