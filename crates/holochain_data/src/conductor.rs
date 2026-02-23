@@ -446,11 +446,11 @@ impl DbWrite<Conductor> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{kind::Conductor, test_setup_holochain_data};
+    use crate::{kind::Conductor, test_open_db};
 
     #[tokio::test]
     async fn test_conductor_schema_created() {
-        let db = test_setup_holochain_data(Conductor)
+        let db = test_open_db(Conductor)
             .await
             .expect("Failed to set up test database");
 
@@ -473,7 +473,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_conductor_table_singleton() {
-        let db = test_setup_holochain_data(Conductor)
+        let db = test_open_db(Conductor)
             .await
             .expect("Failed to set up test database");
 
@@ -502,7 +502,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_installed_app_table() {
-        let db = test_setup_holochain_data(Conductor)
+        let db = test_open_db(Conductor)
             .await
             .expect("Failed to set up test database");
 
@@ -558,7 +558,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_app_role_foreign_key() {
-        let db = test_setup_holochain_data(Conductor)
+        let db = test_open_db(Conductor)
             .await
             .expect("Failed to set up test database");
 
@@ -634,7 +634,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cascade_delete() {
-        let db = test_setup_holochain_data(Conductor)
+        let db = test_open_db(Conductor)
             .await
             .expect("Failed to set up test database");
 
