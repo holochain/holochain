@@ -10,7 +10,6 @@ use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
 use holo_hash::AnyDhtHashPrimitive;
 use holo_hash::EntryHash;
-use holochain_chc::ChcImpl;
 use holochain_p2p::actor;
 use holochain_p2p::actor::{GetLinksRequestOptions, NetworkRequestOptions};
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
@@ -248,10 +247,6 @@ impl HolochainP2pDnaT for PassThroughNetwork {
 
     async fn target_arcs(&self) -> HolochainP2pResult<Vec<kitsune2_api::DhtArc>> {
         todo!()
-    }
-
-    fn chc(&self) -> Option<ChcImpl> {
-        None
     }
 
     async fn block(&self, _block: Block) -> HolochainP2pResult<()> {

@@ -14,7 +14,6 @@ use crate::core::ribosome::guest_callback::genesis_self_check::{
 };
 use crate::{conductor::api::CellConductorApiT, core::ribosome::RibosomeT};
 use derive_more::Constructor;
-use holochain_chc::ChcImpl;
 use holochain_sqlite::prelude::*;
 use holochain_state::source_chain;
 use holochain_types::prelude::*;
@@ -30,7 +29,6 @@ where
     cell_id: CellId,
     membrane_proof: Option<MembraneProof>,
     ribosome: Ribosome,
-    chc: Option<ChcImpl>,
 }
 
 // #[cfg_attr(feature = "instrument", tracing::instrument(skip(workspace, api, args)))]
@@ -58,7 +56,6 @@ where
         cell_id,
         membrane_proof,
         ribosome,
-        chc,
     } = args;
 
     if workspace
@@ -116,7 +113,6 @@ where
         cell_id.dna_hash().clone(),
         cell_id.agent_pubkey().clone(),
         membrane_proof,
-        chc,
     )
     .await?;
 
@@ -200,7 +196,6 @@ mod tests {
                 cell_id: CellId::new(dna.dna_hash().clone(), author.clone()),
                 membrane_proof: None,
                 ribosome,
-                chc: None,
             };
             let _: () = genesis_workflow(workspace, api, args).await.unwrap();
         }

@@ -22,7 +22,6 @@ holo_hash = { version = "^0.7.0-dev.3", path = "../holo_hash", features = [
   "full",
 ] }
 fallible-iterator = "0.3.0"
-holochain_chc = { version = "^0.4.0-dev.13", path = "../holochain_chc" }
 holochain_data = { version = "^0.7.0-dev.2", path = "../holochain_data", features = [
   "sqlite-encrypted",
 ] }
@@ -77,7 +76,6 @@ default = []
 fuzzing = ["holochain_types/fuzzing", "holochain_zome_types/fuzzing"]
 
 test_utils = [
-  "holochain_chc/test_utils",
   "holochain_keystore/test_utils",
   "holochain_types/test_utils",
   "holochain_zome_types/test_utils",

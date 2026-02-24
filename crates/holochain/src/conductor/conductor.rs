@@ -115,10 +115,6 @@ use tracing::*;
 
 mod builder;
 
-mod chc;
-
-mod graft_records_onto_source_chain;
-
 mod app_auth_token_store;
 
 mod hc_p2p_handler_impl;
@@ -1837,7 +1833,6 @@ mod clone_cell_impls {
 mod app_status_impls {
     use super::*;
     use crate::conductor::cell::error::CellResult;
-    use holochain_chc::ChcImpl;
     use holochain_types::cell_config_overrides::CellConfigOverrides;
 
     impl Conductor {
@@ -1850,12 +1845,7 @@ mod app_status_impls {
             let cells_to_create = cell_ids.map(|cell_id| {
                 let handle = self.clone();
                 let overrides = config_override.clone();
-                async move {
-                    handle
-                        .clone()
-                        .create_cell(&cell_id, handle.get_chc(&cell_id), overrides)
-                        .await
-                }
+                async move { handle.clone().create_cell(&cell_id, overrides).await }
             });
             // Create cells with bounded parallelism (max 5 concurrent)
             let cells = futures::stream::iter(cells_to_create)
@@ -1915,7 +1905,6 @@ mod app_status_impls {
         async fn create_cell(
             self: Arc<Self>,
             cell_id: &CellId,
-            chc: Option<ChcImpl>,
             overrides: Option<CellConfigOverrides>,
         ) -> CellResult<(Cell, InitialQueueTriggers)> {
             // check if there are any cell with the same DNA with a different overrides' config.
@@ -1946,7 +1935,6 @@ mod app_status_impls {
             let holochain_p2p_cell = holochain_p2p::HolochainP2pDna::new(
                 self.holochain_p2p.clone(),
                 cell_id.dna_hash().clone(),
-                chc,
             );
             let space = self
                 .get_or_create_space(cell_id.dna_hash())
@@ -2254,7 +2242,6 @@ mod misc_impls {
                         .target_arcs()
                         .await
                         .map_err(ConductorApiError::other)?,
-                    cell.holochain_p2p_dna().chc(),
                 )
                 .await?;
 
@@ -2322,7 +2309,6 @@ mod misc_impls {
                         .target_arcs()
                         .await
                         .map_err(ConductorApiError::other)?,
-                    cell.holochain_p2p_dna().chc(),
                 )
                 .await?;
 
@@ -3316,7 +3302,6 @@ pub(crate) async fn genesis_cells(
             let authored_db =
                 space.get_or_create_authored_db(cell_id_inner.agent_pubkey().clone())?;
             let dht_db = space.dht_db;
-            let chc = conductor.get_chc(&cell_id_inner);
             let ribosome = conductor.get_ribosome(&cell_id_inner).map_err(Box::new)?;
 
             Cell::genesis(
@@ -3326,7 +3311,6 @@ pub(crate) async fn genesis_cells(
                 dht_db,
                 ribosome,
                 proof,
-                chc,
             )
             .await
         })

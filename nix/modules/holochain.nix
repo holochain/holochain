@@ -66,15 +66,12 @@
         passthru.src.rev = flake.config.reconciledInputs.holochain.rev;
       });
 
-      holochain_chc = holochain.override { cargoExtraArgs = " --features chc"; };
-
     in
     {
       packages =
         {
           inherit
             holochain
-            holochain_chc
             ;
         };
     };

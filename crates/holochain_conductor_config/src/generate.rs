@@ -21,7 +21,6 @@ pub fn generate(
     directory: Option<PathBuf>,
     in_process_lair: bool,
     admin_port: u16,
-    #[cfg(feature = "chc")] chc_url: Option<url2::Url2>,
 ) -> anyhow::Result<ConfigRootPath> {
     let dir = generate_config_directory(root, directory)?;
 
@@ -38,10 +37,6 @@ pub fn generate(
 
     let mut config = create_config(dir.clone(), lair_connection_url)?;
     config.network = network.unwrap_or_default();
-    #[cfg(feature = "chc")]
-    {
-        config.chc_url = chc_url;
-    }
     set_admin_port(&mut config, admin_port);
     let path = write_config(dir.clone(), &config)?;
     msg!("Config {:?}", config);
@@ -141,15 +136,7 @@ mod test {
         let root = Some(temp_dir.path().to_path_buf());
         let directory = Some("test-config".into());
 
-        let config_root = generate(
-            None,
-            root,
-            directory,
-            true,
-            0,
-            #[cfg(feature = "chc")]
-            None,
-        )?;
+        let config_root = generate(None, root, directory, true, 0)?;
 
         assert!(config_root.as_path().exists());
         assert!(config_root.as_path().is_dir());
@@ -195,15 +182,7 @@ mod test {
             ..Default::default()
         };
 
-        let config_root = generate(
-            Some(network_config.clone()),
-            root,
-            directory,
-            true,
-            0,
-            #[cfg(feature = "chc")]
-            None,
-        )?;
+        let config_root = generate(Some(network_config.clone()), root, directory, true, 0)?;
 
         assert!(config_root.as_path().exists());
         assert!(config_root.as_path().is_dir());

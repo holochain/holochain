@@ -22,7 +22,6 @@ holo_hash = { version = "^0.7.0-dev.3", path = "../holo_hash", features = [
   "encoding",
   "hashing",
 ] }
-holochain_chc = { version = "^0.4.0-dev.13", path = "../holochain_chc" }
 holochain_keystore = { version = "^0.7.0-dev.6", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.56"
 holochain_types = { version = "^0.7.0-dev.12", path = "../holochain_types" }

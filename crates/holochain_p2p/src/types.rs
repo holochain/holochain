@@ -45,10 +45,6 @@ pub enum HolochainP2pError {
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),
-
-    /// Chain Head Coordination error
-    #[error(transparent)]
-    ChcError(#[from] holochain_chc::ChcError),
 }
 
 /// Holochain p2p result type.

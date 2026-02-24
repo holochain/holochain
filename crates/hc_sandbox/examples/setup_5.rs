@@ -33,8 +33,6 @@ async fn main() -> anyhow::Result<()> {
             None,
             false,
             0,
-            #[cfg(feature = "chc")]
-            None,
         )?;
 
         // Run a conductor and connect to the admin websocket

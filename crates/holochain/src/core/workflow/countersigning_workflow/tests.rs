@@ -282,7 +282,6 @@ async fn receive_signatures_and_complete() {
 
     // Expect to receive a publish event.
     test_harness.reconfigure_network(|mut net| {
-        net.expect_chc().return_once(|| None);
         net.expect_publish_countersign().return_once(|_, _| Ok(()));
         net
     });
@@ -371,7 +370,6 @@ async fn receive_valid_and_invalid_signatures_and_complete() {
 
     // Expect to receive a publish event.
     test_harness.reconfigure_network(|mut net| {
-        net.expect_chc().return_once(|| None);
         net.expect_publish_countersign().return_once(|_, _| Ok(()));
         net
     });
@@ -422,8 +420,6 @@ async fn ignore_signature_bundles_from_previous_session() {
     // Prepare network mock to expect two sessions to complete during this test
     test_harness.reconfigure_network({
         move |mut net| {
-            net.expect_chc().times(2).returning(|| None);
-
             net.expect_publish_countersign()
                 .times(2)
                 .returning(|_, _| Ok(()));
@@ -862,8 +858,6 @@ async fn recover_from_commit_after_restart_when_other_agent_completes() {
                 move |_, _, _| Ok(vec![activity_response.clone()])
             });
 
-            net.expect_chc().return_once(|| None);
-
             net.expect_publish_countersign().return_once(|_, _| Ok(()));
 
             net
@@ -1203,7 +1197,6 @@ async fn timeout_during_accept_does_not_interfere_with_previous_session() {
 
     // Expect to receive a publish event.
     test_harness.reconfigure_network(|mut net| {
-        net.expect_chc().return_once(|| None);
         net.expect_publish_countersign().return_once(|_, _| Ok(()));
         net
     });
@@ -1660,8 +1653,6 @@ async fn recover_and_complete_after_resolution_failures() {
                 move |_, _, _| Ok(vec![activity_response.clone()])
             });
 
-            net.expect_chc().return_once(|| None);
-
             net.expect_publish_countersign().return_once(|_, _| Ok(()));
 
             net
@@ -1693,8 +1684,6 @@ async fn recover_and_complete_after_resolution_failures() {
                 let activity_response = activity_response.clone();
                 move |_, _, _| Ok(vec![activity_response.clone()])
             });
-
-            net.expect_chc().return_once(|| None);
 
             net.expect_publish_countersign().return_once(|_, _| Ok(()));
 
@@ -1811,7 +1800,6 @@ impl TestHarness {
             keystore.clone(),
             dna_hash.clone(),
             author.clone(),
-            None,
             None,
         )
         .await
