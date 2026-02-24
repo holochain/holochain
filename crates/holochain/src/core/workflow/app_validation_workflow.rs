@@ -211,6 +211,11 @@ async fn app_validation_workflow_inner(
     let failed_ops = Arc::new(Mutex::new(HashSet::new()));
     let mut agent_activity_ops = vec![];
     let mut warrant_op_hashes: Vec<(DhtOpHash, OpBasis)> = vec![];
+    // Track action hashes already warranted in this batch to avoid creating duplicate
+    // warrants for the same action. Multiple op types (StoreRecord, StoreEntry,
+    // RegisterAgentActivity) can share the same action, and without this deduplication
+    // all of them would trigger a separate warrant when processed in the same run.
+    let mut warranted_in_batch = std::collections::HashSet::<holo_hash::ActionHash>::new();
 
     #[cfg(feature = "test_utils")]
     let disable_warrant_issuance = conductor
@@ -276,10 +281,18 @@ async fn app_validation_workflow_inner(
                 let rejected_ops = rejected_ops.clone();
 
                 if let Outcome::Rejected(_) = &outcome {
-                    let issue_warrant =
+                    let action_hash = chain_op.action().to_hash();
+
+                    let issue_warrant = if warranted_in_batch.contains(&action_hash) {
+                        tracing::trace!(
+                            "Op {} action is already being warranted in this batch, skipping",
+                            dht_op_hash
+                        );
+                        false
+                    } else {
                         match holochain_state::warrant::is_action_warranted_as_invalid(
                             &workspace.dht_db,
-                            chain_op.action().to_hash(),
+                            action_hash.clone(),
                             chain_op.author().clone(),
                         )
                         .await
@@ -299,13 +312,15 @@ async fn app_validation_workflow_inner(
                                 tracing::error!(error = ?e, "Error checking if op is warranted");
                                 false
                             }
-                        };
+                        }
+                    };
 
                     if disable_warrant_issuance {
                         tracing::warn!("Warrant issuance disabled - skipping issuing a warrant");
                     } else if !issue_warrant {
                         tracing::trace!("Not issuing a warrant for op {}", dht_op_hash);
                     } else {
+                        warranted_in_batch.insert(action_hash);
                         let keystore = conductor.keystore();
                         let warrant_op =
                             crate::core::workflow::sys_validation_workflow::make_invalid_chain_warrant_op(
