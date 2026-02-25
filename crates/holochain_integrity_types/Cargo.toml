@@ -51,18 +51,18 @@ hashing = ["holo_hash/hashing"]
 full = [
   "default",
   "hashing",
-  "subtle-encoding",
+  "dep:subtle-encoding",
   "holochain_timestamp/now",
   "schema",
 ]
 
-full-dna-def = ["derive_builder"]
+full-dna-def = ["dep:derive_builder"]
 
 schema = ["dep:schemars"]
 
 fuzzing = [
-  "proptest",
-  "proptest-derive",
+  "dep:proptest",
+  "dep:proptest-derive",
   "holochain_serialized_bytes/fuzzing",
   "holo_hash/fuzzing",
 ]

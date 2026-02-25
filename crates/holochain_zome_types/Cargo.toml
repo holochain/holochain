@@ -74,16 +74,16 @@ default = ["full-dna-def"]
 # Extra impls for DnaDef, including InlineZome, which are not used in Wasm
 # but used in Holochain
 full-dna-def = [
-  "derive_builder",
+  "dep:derive_builder",
   "dep:uuid",
-  "shrinkwraprs",
+  "dep:shrinkwraprs",
   "holochain_integrity_types/full-dna-def",
 ]
 
 full = [
   "default",
   "sqlite",
-  "num_enum",
+  "dep:num_enum",
   "holochain_timestamp/now",
   "properties",
   "holochain_integrity_types/full",
@@ -91,30 +91,30 @@ full = [
 ]
 
 fixturators = [
-  "fixt",
-  "rand",
+  "dep:fixt",
+  "dep:rand",
   "holo_hash/fixturators",
   "holochain_integrity_types/test_utils",
   "full-dna-def",
 ]
 
-properties = ["serde_yaml"]
+properties = ["dep:serde_yaml"]
 
 fuzzing = [
-  "contrafact",
-  "proptest",
-  "proptest-derive",
+  "dep:contrafact",
+  "dep:proptest",
+  "dep:proptest-derive",
   "holochain_integrity_types/fuzzing",
   "holochain_serialized_bytes/fuzzing",
   "holo_hash/fuzzing",
-  "rand",
-  "fixt",
+  "dep:rand",
+  "dep:fixt",
 ]
 
 test_utils = [
   "fuzzing",
   "fixturators",
-  "once_cell",
+  "dep:once_cell",
   "holo_hash/hashing",
   "holo_hash/test_utils",
   "full-dna-def",
@@ -123,6 +123,7 @@ test_utils = [
 
 instrument = []
 
+rusqlite = ["dep:rusqlite"]
 sqlite-encrypted = [
   "rusqlite",
   "rusqlite/bundled-sqlcipher-vendored-openssl",

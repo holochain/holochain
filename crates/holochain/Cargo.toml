@@ -121,7 +121,6 @@ sd-notify = "0.4"
 holochain = { path = ".", default-features = false, features = [
   "test_utils",
   "slow_tests",
-  "metrics_influxive",
 ] }
 holochain_state = { version = "^0.7.0-dev.13", path = "../holochain_state", features = [
   "test_utils",
@@ -174,24 +173,14 @@ path = "src/bin/holochain/main.rs"
 workspace = true
 
 [features]
-default = [
-  "sqlite-encrypted",
-  "metrics_influxive",
-  "schema",
-  "wasmer_sys",
-  "transport-iroh",
-]
-
-# Use the "Influxive" opentelemetry metrics binding to write metrics
-# to an InfluxDB time series database.
-metrics_influxive = ["holochain_metrics/influxive"]
+default = ["sqlite-encrypted", "schema", "wasmer_sys", "transport-iroh"]
 
 # Exposes additional functionality only needed for integration tests.
 # This feature should be turned off for production builds.
 test_utils = [
-  "fixt",
-  "contrafact",
-  "diff",
+  "dep:fixt",
+  "dep:contrafact",
+  "dep:diff",
   "hdk/test_utils",
   "holochain_sqlite/test_utils",
   "holochain_state/test_utils",
@@ -200,13 +189,13 @@ test_utils = [
   "holochain_cascade/test_utils",
   "holochain_conductor_api/test-utils",
   "holochain_p2p/test_utils",
-  "matches",
-  "holochain_test_wasm_common",
-  "holochain_wasm_test_utils",
-  "unwrap_to",
+  "dep:matches",
+  "dep:holochain_test_wasm_common",
+  "dep:holochain_wasm_test_utils",
+  "dep:unwrap_to",
   "dep:kitsune2_bootstrap_srv",
-  "async-once-cell",
-  "get_if_addrs",
+  "dep:async-once-cell",
+  "dep:get_if_addrs",
   "holo_hash/fixturators",
 ]
 

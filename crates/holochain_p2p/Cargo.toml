@@ -86,7 +86,7 @@ sqlite-encrypted = [
 sqlite = ["holo_hash/sqlite", "holochain_keystore/sqlite"]
 
 transport-iroh = [
-  "kitsune2_transport_iroh",
+  "dep:kitsune2_transport_iroh",
   "kitsune2/transport-iroh",
   "kitsune2_bootstrap_srv/iroh-relay",
 ]

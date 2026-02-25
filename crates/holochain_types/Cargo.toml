@@ -91,7 +91,7 @@ fixturators = ["dep:fixt", "holochain_zome_types/fixturators"]
 test_utils = [
   "fixturators",
   "fuzzing",
-  "isotest",
+  "dep:isotest",
   "holochain_keystore/test_utils",
   "holochain_zome_types/test_utils",
 ]
@@ -99,9 +99,9 @@ test_utils = [
 unstable-migration = []
 
 fuzzing = [
-  "contrafact",
-  "proptest",
-  "proptest-derive",
+  "dep:contrafact",
+  "dep:proptest",
+  "dep:proptest-derive",
   "holo_hash/fuzzing",
   "holochain_zome_types/fuzzing",
 ]
