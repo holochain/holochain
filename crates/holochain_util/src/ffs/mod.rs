@@ -29,10 +29,10 @@ macro_rules! impl_ffs {
         $(
             pub async fn $name<P: Clone + AsRef<std::path::Path>>(path: P $(, $arg : $arg_ty)*) -> IoResult<$output> {
 
-                #[cfg(feature = "tokio")]
+                #[cfg(feature = "tokio_helper")]
                 return tokio::fs::$name(path.clone() $(, $arg)*).await.map_err(mapper(path));
 
-                #[cfg(not(feature = "tokio"))]
+                #[cfg(not(feature = "tokio_helper"))]
                 return std::fs::$name(path.clone() $(, $arg)*).map_err(mapper(path));
             }
         )*

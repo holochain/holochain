@@ -81,10 +81,10 @@ test_utils = [
   "holochain_zome_types/test_utils",
   "holochain_sqlite/test_utils",
   "dep:holochain_timestamp",
-  "base64",
-  "contrafact",
-  "tempfile",
-  "nanoid",
+  "dep:base64",
+  "dep:contrafact",
+  "dep:tempfile",
+  "dep:nanoid",
 ]
 
 instrument = []

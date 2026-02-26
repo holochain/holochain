@@ -10,7 +10,7 @@ repository = "https://github.com/holochain/holochain"
 
 # reminder - do not use workspace deps
 [dependencies]
-influxive = { version = "=0.0.5", optional = true }
+influxive = { version = "=0.0.5" }
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 tracing = "0.1.37"
 
@@ -18,9 +18,5 @@ tracing = "0.1.37"
 tempfile = "3"
 tokio = { version = "1", features = ["full"] }
 
-
 [lints]
 workspace = true
-
-[features]
-default = ["influxive"]

@@ -10,7 +10,6 @@ fn metrics_none() {
     assert!(matches!(config, HolochainMetricsConfig::Disabled));
 }
 
-#[cfg(feature = "influxive")]
 #[tokio::test(flavor = "multi_thread")]
 async fn metrics_influxive_file() {
     let temp_dir = tempfile::TempDir::new().unwrap();
@@ -62,7 +61,6 @@ async fn metrics_influxive_file() {
 }
 
 #[test]
-#[cfg(feature = "influxive")]
 fn metrics_influxive_svc() {
     let config = HolochainMetricsConfig::from_env(
         std::path::PathBuf::from(".").as_path(),
@@ -75,7 +73,6 @@ fn metrics_influxive_svc() {
 }
 
 #[test]
-#[cfg(feature = "influxive")]
 fn metrics_influxive_external() {
     let config = HolochainMetricsConfig::from_env(
         std::path::PathBuf::from(".").as_path(),

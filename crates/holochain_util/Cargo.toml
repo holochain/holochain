@@ -30,8 +30,9 @@ tracing = "0.1"
 workspace = true
 
 [features]
-default = ["fs", "pw", "time", "tokio", "jsonschema"]
-pw = ["rpassword", "sodoken"]
+default = ["fs", "pw", "time", "tokio_helper", "jsonschema"]
+pw = ["dep:rpassword", "dep:sodoken"]
 fs = []
-time = ["tokio"]
+time = []
+tokio_helper = ["dep:tokio"]
 jsonschema = ["dep:schemars"]

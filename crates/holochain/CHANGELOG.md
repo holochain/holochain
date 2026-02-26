@@ -7,6 +7,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE** Remove implicit features created by enabling optional crates: #5663
+  - For `holo_hash`, the `serde` and `serde_bytes` features are removed, please use `serialization` instead.
+  - For `holo_hash`, the `rusqlite` feature has been removed, please use `sqlite` or `sqlite-encrypted` instead.
+  - For `holochain_trace`, the `tokio` and `shrinkwraprs` features are removed, please use `channels` instead.
+  - For `holochain_util`, the `tokio` feature is removed, please use `tokio_helper` instead.
+  - For `holochain_util`, the `rpassword` and `sodoken` features are removed, please use `pw` instead.
+  - For `holochain_metrics`, the `influxive` feature is removed and now cannot be disabled.
+  - For `holochain`, the `metrics_influxive` feature is removed and metrics are now only controlled with configuration.
+  - For `holochain_nonce`, the `subtle-encoding` feature has been renamed to `full`.
+  - For `hdi`, the `tracing` and `tracing-core` features have been removed, please use `trace` instead.
+  - For `holochain_integrity_types`, the `subtle-encoding` feature has been removed, please use `full` instead.
+  - For `holochain_zome_types`, the `serde_yaml` feature has been removed, please use `properties` instead.
+  - For `holochain_zome_types`, the `shrinkwraprs`, `derive_builder`, and `num_enum` features have been removed; they were implicit features of the `full-dna-def` and `full` features respectively.
+  - For `holochain_p2p`, the `kitsune2_transport_iroh` feature has been removed, please use `transport-iroh` instead.
+  - For `holochain_sqlite`, the `holochain_util` feature has been removed; the dependency is now unconditionally enabled.
+
 ## 0.7.0-dev.13
 
 - Stabilized chain fork warrants that were previously behind the `unstable-warrants` feature; the feature has now been removed. \#5641

@@ -13,7 +13,7 @@ repository = "https://github.com/holochain/holochain"
 
 [features]
 default = []
-channels = ["tokio", "shrinkwraprs"]
+channels = ["dep:tokio", "dep:shrinkwraprs"]
 
 # reminder - do not use workspace deps
 [dependencies]

@@ -44,7 +44,7 @@ workspace = true
 
 [features]
 default = []
-trace = ["tracing", "tracing-core", "holochain_integrity_types/tracing"]
+trace = ["dep:tracing", "dep:tracing-core", "holochain_integrity_types/tracing"]
 fuzzing = ["holochain_integrity_types/fuzzing"]
 mock = ["dep:mockall"]
 test_utils = [

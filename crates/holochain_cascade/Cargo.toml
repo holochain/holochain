@@ -50,7 +50,7 @@ workspace = true
 default = ["transport-iroh"]
 
 test_utils = [
-  "mockall",
+  "dep:mockall",
   "holochain_p2p/test_utils",
   "holochain_types/test_utils",
   "holochain_state/test_utils",
