@@ -27,6 +27,7 @@ mod schedule;
 mod send_signal;
 mod ser_regression;
 mod signals;
+mod startup_blocking;
 mod test_cli;
 mod test_utils;
 mod validate;
