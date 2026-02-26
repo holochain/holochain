@@ -7,13 +7,10 @@ use std::sync::Arc;
 #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 pub enum DbKind {
     /// Specifies the environment used for authoring data by all cells on the same [`DnaHash`].
-    #[display("{:?}-{:?}", "_0.dna_hash()", "_0.agent_pubkey()")]
     Authored(Arc<CellId>),
     /// Specifies the environment used for dht data by all cells on the same [`DnaHash`].
-    #[display("{:?}", "_0")]
     Dht(Arc<DnaHash>),
     /// Specifies the environment used by each Cache (one per dna).
-    #[display("{:?}", "_0")]
     Cache(Arc<DnaHash>),
     /// Specifies the environment used by a Conductor
     Conductor,

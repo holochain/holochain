@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix: DbKind display implementation now properly includes the associated CellId or DnaHash of the database, instead of escaped rust code.
+
 ## 0.6.1-rc.2
 
 ## 0.6.1-rc.1
