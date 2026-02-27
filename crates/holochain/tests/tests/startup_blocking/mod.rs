@@ -8,6 +8,7 @@
 
 #![cfg(feature = "test_utils")]
 
+mod multi_cell;
 mod websocket;
 
 use holo_hash::fixt::ActionHashFixturator;
