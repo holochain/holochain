@@ -440,15 +440,15 @@ fn metric_to_query(metric: Metric) -> influxdb::WriteQuery {
                 .expect("invalid system time")
                 .as_nanos(),
         ),
-        name.into_string(),
+        name,
     );
 
     for (k, v) in fields {
-        query = query.add_field(k.into_string(), v.into_type());
+        query = query.add_field(k, v.into_type());
     }
 
     for (k, v) in tags {
-        query = query.add_tag(k.into_string(), v.into_type());
+        query = query.add_tag(k, v.into_type());
     }
 
     query

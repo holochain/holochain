@@ -122,18 +122,18 @@ pub struct Metric {
     pub timestamp: std::time::SystemTime,
 
     /// The name of this metric report.
-    pub name: StringType,
+    pub name: String,
 
     /// The fields associated with this metric report.
-    pub fields: Vec<(StringType, DataType)>,
+    pub fields: Vec<(String, DataType)>,
 
     /// The tags associated with this metric report.
-    pub tags: Vec<(StringType, DataType)>,
+    pub tags: Vec<(String, DataType)>,
 }
 
 impl Metric {
     /// Construct a new metric report to be sent to InfluxDB.
-    pub fn new<N: Into<StringType>>(timestamp: std::time::SystemTime, name: N) -> Metric {
+    pub fn new(timestamp: std::time::SystemTime, name: impl Into<String>) -> Metric {
         Self {
             timestamp,
             name: name.into(),
@@ -143,9 +143,8 @@ impl Metric {
     }
 
     /// Add a field to this metric report.
-    pub fn with_field<N, V>(mut self, name: N, value: V) -> Self
+    pub fn with_field<V>(mut self, name: impl Into<String>, value: V) -> Self
     where
-        N: Into<StringType>,
         V: Into<DataType>,
     {
         self.fields.push((name.into(), value.into()));
@@ -153,9 +152,8 @@ impl Metric {
     }
 
     /// Add a tag to this metric report.
-    pub fn with_tag<N, V>(mut self, name: N, value: V) -> Self
+    pub fn with_tag<V>(mut self, name: impl Into<String>, value: V) -> Self
     where
-        N: Into<StringType>,
         V: Into<DataType>,
     {
         self.tags.push((name.into(), value.into()));
@@ -171,3 +169,6 @@ pub trait MetricWriter: 'static + Send + Sync {
     /// determined by the concrete implementation.
     fn write_metric(&self, metric: Metric);
 }
+
+/// Trait object for MetricWriter
+pub type DynMetricWriter = Arc<dyn MetricWriter>;
