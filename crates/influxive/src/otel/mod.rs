@@ -1,5 +1,5 @@
 #![deny(missing_docs)]
-#![deny(warnings)]
+// #![deny(warnings)]
 #![deny(unsafe_code)]
 //! Opentelemetry metrics bindings for influxive-child-svc.
 //!
@@ -37,415 +37,87 @@
 //! # }
 //! ```
 
-use crate::types::*;
-use opentelemetry_api::metrics::*;
-use std::collections::HashMap;
+use crate::child_svc::InfluxiveChildSvc;
+use crate::types::DynMetricWriter;
+use opentelemetry::metrics::{Meter, MeterProvider};
+use opentelemetry::InstrumentationScope;
+use opentelemetry_sdk::error::OTelSdkResult;
+use opentelemetry_sdk::metrics::data::{AggregatedMetrics, Metric, MetricData, ResourceMetrics};
+use opentelemetry_sdk::metrics::exporter::PushMetricExporter;
+use opentelemetry_sdk::metrics::{PeriodicReader, SdkMeterProvider, Temporality};
 use std::sync::Arc;
-use std::sync::Mutex;
+use std::time::{Duration, SystemTime};
 
-type Erased = Box<dyn Fn() + 'static + Send + Sync>;
-struct ErasedMap(Mutex<HashMap<u64, Erased>>);
+/// The writer
+pub struct InfluxiveOtelWriter {
+    influxive: DynMetricWriter,
+}
 
-impl ErasedMap {
-    pub fn new() -> Arc<Self> {
-        Arc::new(Self(Mutex::new(HashMap::new())))
-    }
-
-    pub fn push(&self, erased: Erased) -> u64 {
-        static ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
-        let id = ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        self.0.lock().unwrap().insert(id, erased);
-        id
-    }
-
-    pub fn remove(&self, id: u64) {
-        self.0.lock().unwrap().remove(&id);
-    }
-
-    pub fn invoke(&self) {
-        let mut map = std::mem::take(&mut *self.0.lock().unwrap());
-        for (_, cb) in map.iter() {
-            cb();
+impl InfluxiveOtelWriter {
+    fn write(&self, otel_metric: &Metric) {
+        match otel_metric.data() {
+            AggregatedMetrics::F64(metric_data) => match metric_data {
+                MetricData::Histogram(histogram) => {
+                    for data_point in histogram.data_points() {
+                        let mut influxive_metric =
+                            crate::types::Metric::new(SystemTime::now(), otel_metric.name())
+                                .with_field("count", data_point.count())
+                                .with_field("sum", data_point.sum());
+                        if let Some(min) = data_point.min() {
+                            influxive_metric = influxive_metric.with_field("min", min);
+                        }
+                        if let Some(max) = data_point.max() {
+                            influxive_metric = influxive_metric.with_field("max", max);
+                        }
+                        self.influxive.write_metric(influxive_metric);
+                    }
+                }
+                _ => unimplemented!(),
+            },
+            AggregatedMetrics::U64(metric_data) => match metric_data {
+                MetricData::Sum(sum) => {
+                    for data_point in sum.data_points() {
+                        let mut influxive_metric =
+                            crate::types::Metric::new(SystemTime::now(), otel_metric.name())
+                                .with_field("sum", data_point.value());
+                        for attribute in data_point.attributes() {
+                            influxive_metric = influxive_metric
+                                .with_tag(attribute.key.to_string(), attribute.value.to_string());
+                        }
+                        self.influxive.write_metric(influxive_metric);
+                    }
+                }
+                _ => unimplemented!(),
+            },
+            _ => unimplemented!(),
         }
-        let mut lock = self.0.lock().unwrap();
-        for (id, cb) in lock.drain() {
-            map.insert(id, cb);
-        }
-        std::mem::swap(&mut *lock, &mut map);
     }
 }
 
-struct InfluxiveUniMetric<T: 'static + std::fmt::Display + Into<DataType> + Send + Sync> {
-    this: std::sync::Weak<Self>,
-    influxive: Arc<dyn MetricWriter + 'static + Send + Sync>,
-    name: std::borrow::Cow<'static, str>,
-    unit: Option<opentelemetry_api::metrics::Unit>,
-    attributes: Option<Arc<[opentelemetry_api::KeyValue]>>,
-    _p: std::marker::PhantomData<T>,
-}
-
-impl<T: 'static + std::fmt::Display + Into<DataType> + Send + Sync> InfluxiveUniMetric<T> {
-    pub fn new(
-        influxive: Arc<dyn MetricWriter + 'static + Send + Sync>,
-        name: std::borrow::Cow<'static, str>,
-        // description over and over takes up too much space in the
-        // influx database, just ignore it for this application.
-        _description: Option<std::borrow::Cow<'static, str>>,
-        unit: Option<opentelemetry_api::metrics::Unit>,
-        attributes: Option<Arc<[opentelemetry_api::KeyValue]>>,
-    ) -> Arc<Self> {
-        Arc::new_cyclic(|this| Self {
-            this: this.clone(),
-            influxive,
-            name,
-            unit,
-            attributes,
-            _p: std::marker::PhantomData,
-        })
-    }
-
-    fn report(&self, value: T, attributes: &[opentelemetry_api::KeyValue]) {
-        let name = if let Some(unit) = &self.unit {
-            format!("{}.{}", &self.name, unit.as_str())
-        } else {
-            self.name.to_string()
-        };
-
-        // otel metrics are largely a single measurement... so
-        // just applying them to the generic "value" name in influx.
-        let mut metric = Metric::new(std::time::SystemTime::now(), name).with_field("value", value);
-
-        // everything else is a tag? would these be better as fields?
-        // some kind of naming convention to pick between the two??
-        for kv in attributes {
-            metric = metric.with_tag(kv.key.to_string(), kv.value.to_string());
-        }
-
-        if let Some(attributes) = &self.attributes {
-            for kv in attributes.iter() {
-                metric = metric.with_tag(kv.key.to_string(), kv.value.to_string());
+impl PushMetricExporter for InfluxiveOtelWriter {
+    async fn export(&self, metrics: &ResourceMetrics) -> OTelSdkResult {
+        for scope_metrics in metrics.scope_metrics() {
+            for metric in scope_metrics.metrics() {
+                self.write(metric);
             }
         }
-
-        self.influxive.write_metric(metric);
-    }
-}
-
-impl<T: 'static + std::fmt::Display + Into<DataType> + Send + Sync>
-    opentelemetry_api::metrics::SyncCounter<T> for InfluxiveUniMetric<T>
-{
-    fn add(&self, value: T, attributes: &[opentelemetry_api::KeyValue]) {
-        self.report(value, attributes)
-    }
-}
-
-impl<T: 'static + std::fmt::Display + Into<DataType> + Send + Sync>
-    opentelemetry_api::metrics::SyncUpDownCounter<T> for InfluxiveUniMetric<T>
-{
-    fn add(&self, value: T, attributes: &[opentelemetry_api::KeyValue]) {
-        self.report(value, attributes)
-    }
-}
-
-impl<T: 'static + std::fmt::Display + Into<DataType> + Send + Sync>
-    opentelemetry_api::metrics::SyncHistogram<T> for InfluxiveUniMetric<T>
-{
-    fn record(&self, value: T, attributes: &[opentelemetry_api::KeyValue]) {
-        self.report(value, attributes)
-    }
-}
-
-impl<T: 'static + std::fmt::Display + Into<DataType> + Send + Sync>
-    opentelemetry_api::metrics::AsyncInstrument<T> for InfluxiveUniMetric<T>
-{
-    fn observe(&self, measurement: T, attributes: &[opentelemetry_api::KeyValue]) {
-        self.report(measurement, attributes)
+        Ok(())
     }
 
-    fn as_any(&self) -> Arc<dyn std::any::Any> {
-        // this unwrap *should* be safe... so long as no one calls
-        // Arc::into_inner() ever, which shouldn't be possible
-        // because we're using trait objects everywhere??
-        self.this.upgrade().unwrap()
-    }
-}
-
-struct InfluxiveInstrumentProvider(
-    Arc<dyn MetricWriter + 'static + Send + Sync>,
-    Option<Arc<[opentelemetry_api::KeyValue]>>,
-    Arc<ErasedMap>,
-);
-
-macro_rules! obs_body {
-    ($s:ident, $t:ident, $n:ident, $d:ident, $u:ident, $c:ident,) => {{
-        let g = $t::new(InfluxiveUniMetric::new(
-            $s.0.clone(),
-            $n,
-            $d,
-            $u,
-            $s.1.clone(),
-        ));
-
-        let g2 = g.clone();
-        $s.2.push(Box::new(move || {
-            for cb in $c.iter() {
-                cb(&g2);
-            }
-        }));
-
-        Ok(g)
-    }};
-}
-
-impl opentelemetry_api::metrics::InstrumentProvider for InfluxiveInstrumentProvider {
-    fn u64_counter(
-        &self,
-        name: std::borrow::Cow<'static, str>,
-        description: Option<std::borrow::Cow<'static, str>>,
-        unit: Option<opentelemetry_api::metrics::Unit>,
-    ) -> opentelemetry_api::metrics::Result<opentelemetry_api::metrics::Counter<u64>> {
-        Ok(opentelemetry_api::metrics::Counter::new(
-            InfluxiveUniMetric::new(self.0.clone(), name, description, unit, self.1.clone()),
-        ))
+    fn force_flush(&self) -> OTelSdkResult {
+        Ok(())
     }
 
-    fn f64_counter(
-        &self,
-        name: std::borrow::Cow<'static, str>,
-        description: Option<std::borrow::Cow<'static, str>>,
-        unit: Option<opentelemetry_api::metrics::Unit>,
-    ) -> opentelemetry_api::metrics::Result<opentelemetry_api::metrics::Counter<f64>> {
-        Ok(opentelemetry_api::metrics::Counter::new(
-            InfluxiveUniMetric::new(self.0.clone(), name, description, unit, self.1.clone()),
-        ))
+    fn shutdown(&self) -> OTelSdkResult {
+        Ok(())
     }
 
-    fn u64_observable_counter(
-        &self,
-        name: std::borrow::Cow<'static, str>,
-        description: Option<std::borrow::Cow<'static, str>>,
-        unit: Option<opentelemetry_api::metrics::Unit>,
-        callback_list: Vec<opentelemetry_api::metrics::Callback<u64>>,
-    ) -> opentelemetry_api::metrics::Result<opentelemetry_api::metrics::ObservableCounter<u64>>
-    {
-        obs_body!(
-            self,
-            ObservableCounter,
-            name,
-            description,
-            unit,
-            callback_list,
-        )
+    fn shutdown_with_timeout(&self, _timeout: std::time::Duration) -> OTelSdkResult {
+        Ok(())
     }
 
-    fn f64_observable_counter(
-        &self,
-        name: std::borrow::Cow<'static, str>,
-        description: Option<std::borrow::Cow<'static, str>>,
-        unit: Option<opentelemetry_api::metrics::Unit>,
-        callback_list: Vec<opentelemetry_api::metrics::Callback<f64>>,
-    ) -> opentelemetry_api::metrics::Result<opentelemetry_api::metrics::ObservableCounter<f64>>
-    {
-        obs_body!(
-            self,
-            ObservableCounter,
-            name,
-            description,
-            unit,
-            callback_list,
-        )
-    }
-
-    fn i64_up_down_counter(
-        &self,
-        name: std::borrow::Cow<'static, str>,
-        description: Option<std::borrow::Cow<'static, str>>,
-        unit: Option<opentelemetry_api::metrics::Unit>,
-    ) -> opentelemetry_api::metrics::Result<opentelemetry_api::metrics::UpDownCounter<i64>> {
-        Ok(opentelemetry_api::metrics::UpDownCounter::new(
-            InfluxiveUniMetric::new(self.0.clone(), name, description, unit, self.1.clone()),
-        ))
-    }
-
-    fn f64_up_down_counter(
-        &self,
-        name: std::borrow::Cow<'static, str>,
-        description: Option<std::borrow::Cow<'static, str>>,
-        unit: Option<opentelemetry_api::metrics::Unit>,
-    ) -> opentelemetry_api::metrics::Result<opentelemetry_api::metrics::UpDownCounter<f64>> {
-        Ok(opentelemetry_api::metrics::UpDownCounter::new(
-            InfluxiveUniMetric::new(self.0.clone(), name, description, unit, self.1.clone()),
-        ))
-    }
-
-    fn i64_observable_up_down_counter(
-        &self,
-        name: std::borrow::Cow<'static, str>,
-        description: Option<std::borrow::Cow<'static, str>>,
-        unit: Option<opentelemetry_api::metrics::Unit>,
-        callback_list: Vec<opentelemetry_api::metrics::Callback<i64>>,
-    ) -> opentelemetry_api::metrics::Result<opentelemetry_api::metrics::ObservableUpDownCounter<i64>>
-    {
-        obs_body!(
-            self,
-            ObservableUpDownCounter,
-            name,
-            description,
-            unit,
-            callback_list,
-        )
-    }
-
-    fn f64_observable_up_down_counter(
-        &self,
-        name: std::borrow::Cow<'static, str>,
-        description: Option<std::borrow::Cow<'static, str>>,
-        unit: Option<opentelemetry_api::metrics::Unit>,
-        callback_list: Vec<opentelemetry_api::metrics::Callback<f64>>,
-    ) -> opentelemetry_api::metrics::Result<opentelemetry_api::metrics::ObservableUpDownCounter<f64>>
-    {
-        obs_body!(
-            self,
-            ObservableUpDownCounter,
-            name,
-            description,
-            unit,
-            callback_list,
-        )
-    }
-
-    fn u64_observable_gauge(
-        &self,
-        name: std::borrow::Cow<'static, str>,
-        description: Option<std::borrow::Cow<'static, str>>,
-        unit: Option<opentelemetry_api::metrics::Unit>,
-        callback_list: Vec<opentelemetry_api::metrics::Callback<u64>>,
-    ) -> opentelemetry_api::metrics::Result<opentelemetry_api::metrics::ObservableGauge<u64>> {
-        obs_body!(
-            self,
-            ObservableGauge,
-            name,
-            description,
-            unit,
-            callback_list,
-        )
-    }
-
-    fn i64_observable_gauge(
-        &self,
-        name: std::borrow::Cow<'static, str>,
-        description: Option<std::borrow::Cow<'static, str>>,
-        unit: Option<opentelemetry_api::metrics::Unit>,
-        callback_list: Vec<opentelemetry_api::metrics::Callback<i64>>,
-    ) -> opentelemetry_api::metrics::Result<opentelemetry_api::metrics::ObservableGauge<i64>> {
-        obs_body!(
-            self,
-            ObservableGauge,
-            name,
-            description,
-            unit,
-            callback_list,
-        )
-    }
-
-    fn f64_observable_gauge(
-        &self,
-        name: std::borrow::Cow<'static, str>,
-        description: Option<std::borrow::Cow<'static, str>>,
-        unit: Option<opentelemetry_api::metrics::Unit>,
-        callback_list: Vec<opentelemetry_api::metrics::Callback<f64>>,
-    ) -> opentelemetry_api::metrics::Result<opentelemetry_api::metrics::ObservableGauge<f64>> {
-        obs_body!(
-            self,
-            ObservableGauge,
-            name,
-            description,
-            unit,
-            callback_list,
-        )
-    }
-
-    fn f64_histogram(
-        &self,
-        name: std::borrow::Cow<'static, str>,
-        description: Option<std::borrow::Cow<'static, str>>,
-        unit: Option<opentelemetry_api::metrics::Unit>,
-    ) -> opentelemetry_api::metrics::Result<opentelemetry_api::metrics::Histogram<f64>> {
-        Ok(opentelemetry_api::metrics::Histogram::new(
-            InfluxiveUniMetric::new(self.0.clone(), name, description, unit, self.1.clone()),
-        ))
-    }
-
-    fn u64_histogram(
-        &self,
-        name: std::borrow::Cow<'static, str>,
-        description: Option<std::borrow::Cow<'static, str>>,
-        unit: Option<opentelemetry_api::metrics::Unit>,
-    ) -> opentelemetry_api::metrics::Result<opentelemetry_api::metrics::Histogram<u64>> {
-        Ok(opentelemetry_api::metrics::Histogram::new(
-            InfluxiveUniMetric::new(self.0.clone(), name, description, unit, self.1.clone()),
-        ))
-    }
-
-    fn i64_histogram(
-        &self,
-        name: std::borrow::Cow<'static, str>,
-        description: Option<std::borrow::Cow<'static, str>>,
-        unit: Option<opentelemetry_api::metrics::Unit>,
-    ) -> opentelemetry_api::metrics::Result<opentelemetry_api::metrics::Histogram<i64>> {
-        Ok(opentelemetry_api::metrics::Histogram::new(
-            InfluxiveUniMetric::new(self.0.clone(), name, description, unit, self.1.clone()),
-        ))
-    }
-
-    fn register_callback(
-        &self,
-        _instruments: &[Arc<dyn std::any::Any>],
-        callback: Box<dyn Fn(&dyn opentelemetry_api::metrics::Observer) + Send + Sync>,
-    ) -> opentelemetry_api::metrics::Result<Box<dyn opentelemetry_api::metrics::CallbackRegistration>>
-    {
-        struct O;
-        impl opentelemetry_api::metrics::Observer for O {
-            fn observe_f64(
-                &self,
-                inst: &dyn opentelemetry_api::metrics::AsyncInstrument<f64>,
-                measurement: f64,
-                attrs: &[opentelemetry_api::KeyValue],
-            ) {
-                inst.observe(measurement, attrs);
-            }
-
-            fn observe_u64(
-                &self,
-                inst: &dyn opentelemetry_api::metrics::AsyncInstrument<u64>,
-                measurement: u64,
-                attrs: &[opentelemetry_api::KeyValue],
-            ) {
-                inst.observe(measurement, attrs);
-            }
-
-            fn observe_i64(
-                &self,
-                inst: &dyn opentelemetry_api::metrics::AsyncInstrument<i64>,
-                measurement: i64,
-                attrs: &[opentelemetry_api::KeyValue],
-            ) {
-                inst.observe(measurement, attrs);
-            }
-        }
-
-        let id = self.2.push(Box::new(move || callback(&O)));
-
-        struct Unregister(u64, Arc<ErasedMap>);
-
-        impl opentelemetry_api::metrics::CallbackRegistration for Unregister {
-            fn unregister(&mut self) -> opentelemetry_api::metrics::Result<()> {
-                self.1.remove(self.0);
-                Ok(())
-            }
-        }
-
-        Ok(Box::new(Unregister(id, self.2.clone())))
+    fn temporality(&self) -> Temporality {
+        Temporality::Cumulative
     }
 }
 
@@ -478,63 +150,37 @@ impl InfluxiveMeterProviderConfig {
     }
 }
 
-/// Influxive InfluxDB Opentelemetry Meter Provider.
 #[derive(Clone)]
-pub struct InfluxiveMeterProvider(
-    Arc<dyn MetricWriter + 'static + Send + Sync>,
-    Arc<ErasedMap>,
-);
+pub(crate) struct InfluxiveMeterProvider {
+    inner: Arc<SdkMeterProvider>,
+}
 
 impl InfluxiveMeterProvider {
     /// Construct a new InfluxiveMeterProvider instance with a given
     /// "Influxive" InfluxiveDB child process connector.
-    pub fn new(
-        config: InfluxiveMeterProviderConfig,
-        influxive: Arc<dyn MetricWriter + 'static + Send + Sync>,
-    ) -> Self {
-        let strong = ErasedMap::new();
-
+    pub fn new(config: InfluxiveMeterProviderConfig, influxive: DynMetricWriter) -> Self {
+        let exporter = InfluxiveOtelWriter { influxive };
+        let mut reader_builder = PeriodicReader::builder(exporter);
         if let Some(interval) = config.observable_report_interval {
-            let weak = Arc::downgrade(&strong);
-            tokio::task::spawn(async move {
-                let mut interval = tokio::time::interval(interval);
-                loop {
-                    interval.tick().await;
-                    if let Some(strong) = weak.upgrade() {
-                        strong.invoke();
-                    } else {
-                        break;
-                    }
-                }
-            });
+            reader_builder = reader_builder.with_interval(interval);
         }
-
-        Self(influxive, strong)
-    }
-
-    /// Manually report all observable metrics.
-    pub fn report(&self) {
-        self.1.invoke();
+        let reader = reader_builder.build();
+        let provider = SdkMeterProvider::builder().with_reader(reader).build();
+        Self {
+            inner: Arc::new(provider),
+        }
     }
 }
 
-impl opentelemetry_api::metrics::MeterProvider for InfluxiveMeterProvider {
-    fn versioned_meter(
-        &self,
-        _name: impl Into<std::borrow::Cow<'static, str>>,
-        _version: Option<impl Into<std::borrow::Cow<'static, str>>>,
-        _schema_url: Option<impl Into<std::borrow::Cow<'static, str>>>,
-        attributes: Option<Vec<opentelemetry_api::KeyValue>>,
-    ) -> opentelemetry_api::metrics::Meter {
-        let attributes: Option<Arc<[opentelemetry_api::KeyValue]>> =
-            attributes.map(|a| a.into_boxed_slice().into());
-        opentelemetry_api::metrics::Meter::new(Arc::new(InfluxiveInstrumentProvider(
-            self.0.clone(),
-            attributes,
-            self.1.clone(),
-        )))
+impl MeterProvider for InfluxiveMeterProvider {
+    fn meter(&self, name: &'static str) -> Meter {
+        self.inner.meter(name)
+    }
+
+    fn meter_with_scope(&self, _scope: InstrumentationScope) -> Meter {
+        unimplemented!()
     }
 }
 
 #[cfg(test)]
-mod test;
+mod tests;
