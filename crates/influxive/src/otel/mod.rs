@@ -37,7 +37,6 @@
 //! # }
 //! ```
 
-use crate::child_svc::InfluxiveChildSvc;
 use crate::types::DynMetricWriter;
 use opentelemetry::metrics::{Meter, MeterProvider};
 use opentelemetry::InstrumentationScope;
@@ -46,7 +45,7 @@ use opentelemetry_sdk::metrics::data::{AggregatedMetrics, Metric, MetricData, Re
 use opentelemetry_sdk::metrics::exporter::PushMetricExporter;
 use opentelemetry_sdk::metrics::{PeriodicReader, SdkMeterProvider, Temporality};
 use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 
 /// The writer
 pub struct InfluxiveOtelWriter {
@@ -68,6 +67,18 @@ impl InfluxiveOtelWriter {
                         }
                         if let Some(max) = data_point.max() {
                             influxive_metric = influxive_metric.with_field("max", max);
+                        }
+                        self.influxive.write_metric(influxive_metric);
+                    }
+                }
+                MetricData::Gauge(gauge) => {
+                    for data_point in gauge.data_points() {
+                        let mut influxive_metric =
+                            crate::types::Metric::new(SystemTime::now(), otel_metric.name())
+                                .with_field("gauge", data_point.value());
+                        for attribute in data_point.attributes() {
+                            influxive_metric = influxive_metric
+                                .with_tag(attribute.key.to_string(), attribute.value.to_string());
                         }
                         self.influxive.write_metric(influxive_metric);
                     }
@@ -141,7 +152,7 @@ impl Default for InfluxiveMeterProviderConfig {
 
 impl InfluxiveMeterProviderConfig {
     /// Apply [InfluxiveMeterProviderConfig::observable_report_interval].
-    pub fn with_observable_report_interval(
+    pub fn with_report_interval(
         mut self,
         observable_report_interval: Option<std::time::Duration>,
     ) -> Self {
@@ -150,8 +161,10 @@ impl InfluxiveMeterProviderConfig {
     }
 }
 
+/// Meter provider to create meters for collecting metrics and writing them to
+/// and Influx DB.
 #[derive(Clone)]
-pub(crate) struct InfluxiveMeterProvider {
+pub struct InfluxiveMeterProvider {
     inner: Arc<SdkMeterProvider>,
 }
 

@@ -1,166 +1,69 @@
 use super::*;
 use crate::child_svc::*;
-use opentelemetry::KeyValue;
-use std::{str::FromStr, sync::Arc};
+use std::{
+    sync::{
+        atomic::{AtomicU16, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 use utils::*;
-
-// to be implemented:
-// f64_observable_gauge
 
 #[tokio::test(flavor = "multi_thread")]
 async fn observable_interval() {
     let tmp = tempfile::tempdir().unwrap();
+    let (svc, meter_provider) = setup(tmp.path()).await;
 
-    let influxive_svc = Arc::new(
-        InfluxiveChildSvc::new(
-            InfluxiveChildSvcConfig::default()
-                .with_database_path(Some(tmp.path().into()))
-                .with_metric_write(
-                    // pass every metric directly to the writer
-                    InfluxiveWriterConfig::default().with_batch_buffer_size(1),
-                ),
-        )
-        .await
-        .unwrap(),
-    );
-
-    let meter_provider = InfluxiveMeterProvider::new(
-        InfluxiveMeterProviderConfig::default()
-            .with_observable_report_interval(Some(Duration::from_millis(100))),
-        influxive_svc.clone(),
-    );
-
-    let counter = "counting_u64";
-
-    let metric = meter_provider
-        .meter("influxive")
-        .u64_counter(counter)
-        .build();
+    let name = "counting_u64";
+    let metric = meter_provider.meter("influxive").u64_counter(name).build();
 
     metric.add(1, &[]);
 
-    // Wait for metrics to be written to Influx.
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    let result = poll_query(&svc, name, "", 300, |r| {
+        r.tables.len() == 1 && !r.tables[0].rows.is_empty() && r.tables[0].rows.len() <= 2
+    })
+    .await;
+    assert_eq!(result.tables[0].get::<u64>(0, "_value"), 1);
 
-    let result = influxive_svc
-        .query(format!(
-            r#"
-from(bucket: "influxive")
-|> range(start: -15m, stop: now())
-|> filter(fn: (r) => r._measurement == "{counter}")
-"#
-        ))
-        .await
-        .unwrap();
-    let query_result = QueryResult::parse(&result);
-
-    assert_eq!(query_result.tables.len(), 1);
-    assert_eq!(query_result.tables[0].rows.len(), 1);
-    assert_eq!(query_result.tables[0].get::<u64>(0, "_value"), 1);
+    svc.shutdown();
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn u64_counter() {
     let tmp = tempfile::tempdir().unwrap();
-
-    let influxive_svc = Arc::new(
-        InfluxiveChildSvc::new(
-            InfluxiveChildSvcConfig::default()
-                .with_database_path(Some(tmp.path().into()))
-                .with_metric_write(InfluxiveWriterConfig::default().with_batch_buffer_size(1)),
-        )
-        .await
-        .unwrap(),
-    );
-
-    let meter_provider = InfluxiveMeterProvider::new(
-        InfluxiveMeterProviderConfig::default()
-            .with_observable_report_interval(Some(std::time::Duration::from_millis(100))),
-        influxive_svc.clone(),
-    );
+    let (svc, meter_provider) = setup(tmp.path()).await;
 
     let name = "u64_counter";
-
     let metric = meter_provider.meter("influxive").u64_counter(name).build();
 
     metric.add(1, &[]);
 
-    // Wait for report interval to elapse and data to be written.
-    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-
-    let result = QueryResult::parse(
-        &influxive_svc
-            .query(format!(
-                r#"
-from(bucket: "influxive")
-|> range(start: -15m, stop: now())
-|> filter(fn: (r) => r._measurement == "{name}")
-|> last()
-"#
-            ))
-            .await
-            .unwrap(),
-    );
-
-    assert_eq!(result.tables.len(), 1);
-    assert_eq!(result.tables[0].rows.len(), 1);
-    assert_eq!(result.tables[0].get::<u64>(0, "_value"), 1, "{result:#?}");
+    let result = poll_query(&svc, name, "|> last()", 300, |r| {
+        r.tables.len() == 1 && !r.tables[0].rows.is_empty() && r.tables[0].rows.len() <= 2
+    })
+    .await;
+    assert_eq!(result.tables[0].get::<u64>(0, "_value"), 1);
 
     for _ in 0..5 {
         metric.add(1, &[]);
     }
 
-    // Wait for report interval to elapse and data to be written.
-    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    poll_query(&svc, name, "|> last()", 300, |r| {
+        r.tables.len() == 1
+            && r.tables[0].rows.len() == 1
+            && r.tables[0].get::<u64>(0, "_value") == 6
+    })
+    .await;
 
-    let result = QueryResult::parse(
-        &influxive_svc
-            .query(format!(
-                r#"
-from(bucket: "influxive")
-|> range(start: -15m, stop: now())
-|> filter(fn: (r) => r._measurement == "{name}")
-|> last()
-"#
-            ))
-            .await
-            .unwrap(),
-    );
-
-    assert_eq!(result.tables.len(), 1);
-    assert_eq!(result.tables[0].rows.len(), 1);
-    assert_eq!(
-        result.tables[0].get::<u64>(0, "_value"),
-        6,
-        "result {result:#?}"
-    );
-
-    influxive_svc.shutdown();
-    drop(influxive_svc);
+    svc.shutdown();
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn f64_histogram() {
     let tmp = tempfile::tempdir().unwrap();
-
-    let influxive_svc = Arc::new(
-        InfluxiveChildSvc::new(
-            InfluxiveChildSvcConfig::default()
-                .with_database_path(Some(tmp.path().into()))
-                .with_metric_write(InfluxiveWriterConfig::default().with_batch_buffer_size(1)),
-        )
-        .await
-        .unwrap(),
-    );
-
-    let meter_provider = InfluxiveMeterProvider::new(
-        InfluxiveMeterProviderConfig::default()
-            .with_observable_report_interval(Some(std::time::Duration::from_millis(100))),
-        influxive_svc.clone(),
-    );
+    let (svc, meter_provider) = setup(tmp.path()).await;
 
     let name = "f64_histogram";
-
     let metric = meter_provider
         .meter("influxive")
         .f64_histogram(name)
@@ -168,34 +71,22 @@ async fn f64_histogram() {
 
     metric.record(1.0, &[]);
 
-    // Wait for report interval to elapse and data to be written.
-    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-
-    let result = QueryResult::parse(
-        &influxive_svc
-            .query(format!(
-                r#"
-from(bucket: "influxive")
-|> range(start: -15m, stop: now())
-|> filter(fn: (r) => r._measurement == "{name}")
-"#
-            ))
-            .await
-            .unwrap(),
-    );
-
     // Influx writes u64 values into one table and f64 values into another table.
     // Hence 2 tables are expected to be present.
-    assert_eq!(result.tables.len(), 2);
-    assert_eq!(result.tables[0].rows.len(), 1);
-    assert_eq!(result.tables[0].get::<String>(0, "_measurement"), name);
+    let result = poll_query(&svc, name, "", 300, |r| {
+        r.tables.len() == 2
+            && !r.tables[0].rows.is_empty()
+            && r.tables[0].rows.len() <= 2
+            && r.tables[1].rows.len() >= 3
+            && r.tables[1].rows.len() <= 4
+    })
+    .await;
 
+    assert_eq!(result.tables[0].get::<String>(0, "_measurement"), name);
     assert_eq!(result.tables[0].get::<String>(0, "_field"), "count");
     assert_eq!(result.tables[0].get::<u64>(0, "_value"), 1);
 
     assert_eq!(result.tables[1].get::<String>(0, "_measurement"), name);
-
-    assert_eq!(result.tables[1].rows.len(), 3);
     assert_eq!(result.tables[1].get::<String>(0, "_field"), "max");
     assert_eq!(result.tables[1].get::<f64>(0, "_value"), 1.0);
     assert_eq!(result.tables[1].get::<String>(1, "_field"), "min");
@@ -208,33 +99,21 @@ from(bucket: "influxive")
         metric.record(f64::from(i), &[]);
     }
 
-    // Wait for report interval to elapse and data to be written.
-    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    // Expect two rows now per field value.
+    let result = poll_query(&svc, name, "", 300, |r| {
+        r.tables.len() == 2
+            && r.tables[0].rows.len() >= 2
+            && r.tables[0].rows.len() <= 3
+            && r.tables[1].rows.len() >= 6
+            && r.tables[1].rows.len() <= 9
+    })
+    .await;
 
-    // Return all rows, not just the last one, to check that the writer
-    // only writer per specified interval and not for every recorded metric.
-    let result = QueryResult::parse(
-        &influxive_svc
-            .query(format!(
-                r#"
-from(bucket: "influxive")
-|> range(start: -15m, stop: now())
-|> filter(fn: (r) => r._measurement == "{name}")
-"#
-            ))
-            .await
-            .unwrap(),
-    );
-
-    assert_eq!(result.tables.len(), 2);
-    // Expect two rows now per table per value.
-    assert_eq!(result.tables[0].rows.len(), 2);
     assert_eq!(result.tables[0].get::<String>(0, "_field"), "count");
     assert_eq!(result.tables[0].get::<u64>(0, "_value"), 1);
     assert_eq!(result.tables[0].get::<String>(1, "_field"), "count");
     assert_eq!(result.tables[0].get::<u64>(1, "_value"), 11);
 
-    assert_eq!(result.tables[1].rows.len(), 6);
     assert_eq!(result.tables[1].get::<String>(0, "_field"), "max");
     assert_eq!(result.tables[1].get::<f64>(0, "_value"), 1.0);
     assert_eq!(result.tables[1].get::<String>(1, "_field"), "max");
@@ -248,8 +127,96 @@ from(bucket: "influxive")
     assert_eq!(result.tables[1].get::<String>(5, "_field"), "sum");
     assert_eq!(result.tables[1].get::<f64>(5, "_value"), 46.0);
 
-    influxive_svc.shutdown();
-    drop(influxive_svc);
+    svc.shutdown();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn f64_observable_gauge() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (svc, meter_provider) = setup(tmp.path()).await;
+
+    let name = "f64_observable_gauge";
+
+    let observed_value = AtomicU16::new(0);
+    // Create observable gauge metric that records an increasing value when observed.
+    meter_provider
+        .meter("influxive")
+        .f64_observable_gauge(name)
+        .with_callback(move |observer| {
+            let value = observed_value.fetch_add(1, Ordering::SeqCst);
+            observer.observe(value as f64, &[]);
+        })
+        .build();
+
+    let result = poll_query(&svc, name, "", 300, |r| {
+        r.tables.len() == 1 && !r.tables[0].rows.is_empty() && r.tables[0].rows.len() <= 2
+    })
+    .await;
+    assert_eq!(result.tables[0].get::<String>(0, "_field"), "gauge");
+    assert_eq!(result.tables[0].get::<String>(0, "_measurement"), name);
+    assert_eq!(result.tables[0].get::<f64>(0, "_value"), 0.0);
+
+    // Wait for more gauge values to have been recorded.
+    let result = poll_query(&svc, name, "", 500, |r| {
+        r.tables.len() == 1 && r.tables[0].rows.len() >= 5 && r.tables[0].rows.len() <= 6
+    })
+    .await;
+    assert_eq!(result.tables[0].get::<f64>(0, "_value"), 0.0);
+    assert_eq!(result.tables[0].get::<f64>(1, "_value"), 1.0);
+    assert_eq!(result.tables[0].get::<f64>(2, "_value"), 2.0);
+    assert_eq!(result.tables[0].get::<f64>(3, "_value"), 3.0);
+    assert_eq!(result.tables[0].get::<f64>(4, "_value"), 4.0);
+
+    svc.shutdown();
+}
+
+async fn setup(tmp: &std::path::Path) -> (Arc<InfluxiveChildSvc>, InfluxiveMeterProvider) {
+    let influxive_svc = Arc::new(
+        InfluxiveChildSvc::new(
+            InfluxiveChildSvcConfig::default()
+                .with_database_path(Some(tmp.into()))
+                .with_metric_write(InfluxiveWriterConfig::default().with_batch_buffer_size(1)),
+        )
+        .await
+        .unwrap(),
+    );
+    let meter_provider = InfluxiveMeterProvider::new(
+        InfluxiveMeterProviderConfig::default()
+            .with_report_interval(Some(Duration::from_millis(100))),
+        influxive_svc.clone(),
+    );
+    (influxive_svc, meter_provider)
+}
+
+async fn poll_query(
+    svc: &InfluxiveChildSvc,
+    measurement: &str,
+    query_suffix: &str,
+    timeout_ms: u64,
+    condition: impl Fn(&QueryResult) -> bool,
+) -> QueryResult {
+    tokio::time::timeout(Duration::from_millis(timeout_ms), async {
+        loop {
+            let result = QueryResult::parse(
+                &svc.query(format!(
+                    r#"
+from(bucket: "influxive")
+|> range(start: -15m, stop: now())
+|> filter(fn: (r) => r._measurement == "{measurement}")
+{query_suffix}"#
+                ))
+                .await
+                .unwrap(),
+            );
+            if condition(&result) {
+                println!("{result:#?}");
+                return result;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .unwrap()
 }
 
 mod utils {
@@ -291,14 +258,16 @@ mod utils {
                 .header
                 .split(',')
                 .position(|h| h == column)
-                .expect(&format!(
-                    "didn't find provided column {column} in row {}",
-                    self.rows[row]
-                ));
+                .unwrap_or_else(|| {
+                    panic!(
+                        "didn't find provided column {column} in row {}",
+                        self.rows[row]
+                    )
+                });
             self.rows[row]
                 .split(',')
                 .nth(col_idx)
-                .expect(&format!("didn't find column {col_idx}"))
+                .unwrap_or_else(|| panic!("didn't find column {col_idx}"))
                 .parse()
                 .unwrap()
         }

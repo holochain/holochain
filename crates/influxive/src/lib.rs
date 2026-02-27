@@ -110,7 +110,7 @@ pub mod writer;
 
 /// Create an opentelemetry_api MeterProvider ready to provide metrics
 /// to a running child process instance of InfluxDB.
-pub(crate) async fn influxive_child_process_meter_provider(
+pub async fn influxive_child_process_meter_provider(
     svc_config: InfluxiveChildSvcConfig,
     otel_config: InfluxiveMeterProviderConfig,
 ) -> std::io::Result<(Arc<InfluxiveChildSvc>, InfluxiveMeterProvider)> {
@@ -121,11 +121,7 @@ pub(crate) async fn influxive_child_process_meter_provider(
 
 /// Create an opentelemetry_api MeterProvider ready to provide metrics
 /// to an InfluxDB instance that is already running as a separate process.
-pub(crate) fn influxive_external_meter_provider_token_auth<
-    H: AsRef<str>,
-    B: AsRef<str>,
-    T: AsRef<str>,
->(
+pub fn influxive_external_meter_provider_token_auth<H: AsRef<str>, B: AsRef<str>, T: AsRef<str>>(
     writer_config: InfluxiveWriterConfig,
     otel_config: InfluxiveMeterProviderConfig,
     host: H,
@@ -138,7 +134,7 @@ pub(crate) fn influxive_external_meter_provider_token_auth<
 
 /// Create an opentelemetry_api MeterProvider ready to provide metrics
 /// to a file on disk.
-pub(crate) fn influxive_file_meter_provider(
+pub fn influxive_file_meter_provider(
     writer_config: InfluxiveWriterConfig,
     otel_config: InfluxiveMeterProviderConfig,
 ) -> InfluxiveMeterProvider {
