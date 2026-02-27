@@ -126,8 +126,8 @@ fn print_multi_cell_report(
     // Per-cell summary table.
     println!("\n  --- Per-Cell Summary ---");
     println!(
-        "    {:>5}  {:>12}  {:>12}  {:>8}  {:>8}",
-        "Cell", "Local 1st(ms)", "Net 1st(ms)", "L Errs", "N Errs"
+        "    {:>5}  {:>12}  {:>12}  {:>12}  {:>8}  {:>8}",
+        "Cell", "Local 1st(ms)", "Net 1st(ms)", "Last Err(ms)", "L Errs", "N Errs"
     );
 
     let mut any_local_timeout = false;
@@ -150,6 +150,12 @@ fn print_multi_cell_report(
             .iter()
             .filter(|r| r.error.is_some())
             .count();
+
+        let last_net_error = cr
+            .network_results
+            .iter()
+            .rev()
+            .find(|r| r.error.is_some());
 
         let local_ms = match local_first {
             Some(r) => {
@@ -177,11 +183,64 @@ fn print_multi_cell_report(
                 "TIMEOUT".to_string()
             }
         };
+        let last_err_ms = match last_net_error {
+            Some(r) => format!("{}", r.elapsed_since_restart.as_millis()),
+            None => "-".to_string(),
+        };
 
         println!(
-            "    {:>5}  {:>12}  {:>12}  {:>8}  {:>8}",
-            cr.cell_index, local_ms, network_ms, local_errors, network_errors
+            "    {:>5}  {:>12}  {:>12}  {:>12}  {:>8}  {:>8}",
+            cr.cell_index, local_ms, network_ms, last_err_ms, local_errors, network_errors
         );
+    }
+
+    // Network resolution timeline — sorted by first-success time.
+    // Shows whether cells resolve linearly (one-at-a-time) or in bursts.
+    println!("\n  --- Network Resolution Timeline ---");
+    let mut timeline: Vec<(usize, u128)> = cell_results
+        .iter()
+        .filter_map(|cr| {
+            cr.network_results
+                .iter()
+                .find(|r| r.link_count.map_or(false, |c| c > 0))
+                .map(|r| (cr.cell_index, r.elapsed_since_restart.as_millis()))
+        })
+        .collect();
+    timeline.sort_by_key(|&(_, ms)| ms);
+
+    let mut prev_ms: Option<u128> = None;
+    for (cell_idx, ms) in &timeline {
+        let delta = prev_ms.map(|p| ms - p).unwrap_or(0);
+        let delta_str = if prev_ms.is_some() {
+            format!("(+{}ms)", delta)
+        } else {
+            String::new()
+        };
+        println!("    {:>6}ms  Cell {:>2}  {}", ms, cell_idx, delta_str);
+        prev_ms = Some(*ms);
+    }
+    let timed_out: Vec<_> = cell_results
+        .iter()
+        .filter(|cr| !cr.network_results.iter().any(|r| r.link_count.map_or(false, |c| c > 0)))
+        .map(|cr| cr.cell_index)
+        .collect();
+    if !timed_out.is_empty() {
+        println!("    TIMEOUT  Cells {:?}", timed_out);
+    }
+
+    if timeline.len() >= 2 {
+        let first_ms = timeline.first().unwrap().1;
+        let last_ms = timeline.last().unwrap().1;
+        let spread = last_ms - first_ms;
+        println!(
+            "    Spread: {}ms (first at {}ms, last at {}ms)",
+            spread, first_ms, last_ms
+        );
+        if spread < 500 {
+            println!("    => All cells resolved in a burst (blocked then unblocked together)");
+        } else if spread > 5000 {
+            println!("    => Cells resolved over a long window (possible serial/linear pattern)");
+        }
     }
 
     // Show any cells that had errors (first error only per cell for brevity).
