@@ -98,25 +98,18 @@
 #[cfg(test)]
 mod test;
 
-#[cfg(feature = "influxive")]
 const DASH_DATABASE: &[u8] = include_bytes!("dashboards/database.json");
-#[cfg(feature = "influxive")]
 const DASH_CONDUCTOR: &[u8] = include_bytes!("dashboards/conductor.json");
-#[cfg(feature = "influxive")]
 const DASH_WASM: &[u8] = include_bytes!("dashboards/wasm.json");
-#[cfg(feature = "influxive")]
 const VAR_CELL_ID: &[u8] = include_bytes!("variables/cellid.json");
 
 /// Configuration for holochain metrics set by environment variables.
 enum HolochainMetricsEnv {
     None,
-    #[cfg(feature = "influxive")]
     InfluxiveFile {
         filepath: String,
     },
-    #[cfg(feature = "influxive")]
     InfluxiveChildSvc,
-    #[cfg(feature = "influxive")]
     InfluxiveExternal {
         host: String,
         bucket: String,
@@ -125,12 +118,6 @@ enum HolochainMetricsEnv {
 }
 
 impl HolochainMetricsEnv {
-    #[cfg(not(feature = "influxive"))]
-    pub fn load() -> Self {
-        Self::None
-    }
-
-    #[cfg(feature = "influxive")]
     pub fn load() -> Self {
         // Environment variable to set for enabling metrics with influxDB run as a child service.
         const ENV_CHILD_SVC: &str = "HOLOCHAIN_INFLUXIVE_CHILD_SVC";
@@ -198,7 +185,6 @@ pub enum HolochainMetricsConfig {
     ///
     /// NOTE: this means Holochain cannot initialize dashboards because it won't know where your
     /// InfluxDB server is or have credentials for it.
-    #[cfg(feature = "influxive")]
     InfluxiveFile {
         /// The writer config for writing metrics to a file.
         writer_config: influxive::InfluxiveWriterConfig,
@@ -208,7 +194,6 @@ pub enum HolochainMetricsConfig {
 
     /// Use influxive to connect to an already running InfluxDB instance.
     /// NOTE: this means we cannot initialize any dashboards.
-    #[cfg(feature = "influxive")]
     InfluxiveExternal {
         /// The writer config for connecting to the external influxdb instance.
         writer_config: influxive::InfluxiveWriterConfig,
@@ -228,7 +213,6 @@ pub enum HolochainMetricsConfig {
     },
 
     /// Use influxive as a child service to write metrics.
-    #[cfg(feature = "influxive")]
     InfluxiveChildSvc {
         /// The child service config for running the influxd server.
         child_svc_config: Box<influxive::InfluxiveChildSvcConfig>,
@@ -249,14 +233,12 @@ impl HolochainMetricsConfig {
 
     fn from_env(root_path: &std::path::Path, env: HolochainMetricsEnv) -> Self {
         match env {
-            #[cfg(feature = "influxive")]
             HolochainMetricsEnv::InfluxiveFile { filepath } => Self::InfluxiveFile {
                 writer_config: influxive::InfluxiveWriterConfig::create_with_influx_file(
                     std::path::PathBuf::from(filepath),
                 ),
                 otel_config: influxive::InfluxiveMeterProviderConfig::default(),
             },
-            #[cfg(feature = "influxive")]
             HolochainMetricsEnv::InfluxiveChildSvc => {
                 let mut database_path = std::path::PathBuf::from(root_path);
                 database_path.push("influxive");
@@ -268,7 +250,6 @@ impl HolochainMetricsConfig {
                     otel_config: influxive::InfluxiveMeterProviderConfig::default(),
                 }
             }
-            #[cfg(feature = "influxive")]
             HolochainMetricsEnv::InfluxiveExternal {
                 host,
                 bucket,
@@ -281,7 +262,6 @@ impl HolochainMetricsConfig {
                 token,
             },
             HolochainMetricsEnv::None => {
-                #[cfg(not(feature = "influxive"))]
                 {
                     let _root_path = root_path;
                 }
@@ -296,14 +276,12 @@ impl HolochainMetricsConfig {
             Self::Disabled => {
                 tracing::info!("Running without metrics");
             }
-            #[cfg(feature = "influxive")]
             Self::InfluxiveFile {
                 writer_config,
                 otel_config,
             } => {
                 Self::init_influxive_file(writer_config, otel_config);
             }
-            #[cfg(feature = "influxive")]
             Self::InfluxiveExternal {
                 writer_config,
                 otel_config,
@@ -313,7 +291,6 @@ impl HolochainMetricsConfig {
             } => {
                 Self::init_influxive_external(writer_config, otel_config, host, bucket, token);
             }
-            #[cfg(feature = "influxive")]
             Self::InfluxiveChildSvc {
                 child_svc_config,
                 otel_config,
@@ -323,7 +300,6 @@ impl HolochainMetricsConfig {
         }
     }
 
-    #[cfg(feature = "influxive")]
     fn init_influxive_file(
         writer_config: influxive::InfluxiveWriterConfig,
         otel_config: influxive::InfluxiveMeterProviderConfig,
@@ -339,7 +315,6 @@ impl HolochainMetricsConfig {
         opentelemetry_api::global::set_meter_provider(meter_provider);
     }
 
-    #[cfg(feature = "influxive")]
     fn init_influxive_external(
         writer_config: influxive::InfluxiveWriterConfig,
         otel_config: influxive::InfluxiveMeterProviderConfig,
@@ -361,7 +336,6 @@ impl HolochainMetricsConfig {
         opentelemetry_api::global::set_meter_provider(meter_provider);
     }
 
-    #[cfg(feature = "influxive")]
     async fn init_influxive_child_svc(
         child_svc_config: influxive::InfluxiveChildSvcConfig,
         otel_config: influxive::InfluxiveMeterProviderConfig,

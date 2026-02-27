@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Import influxive crates from https://github.com/holochain/influxive into monorepo and update their dependencies.
 - Fix: DbKind display implementation now properly includes the associated CellId or DnaHash of the database, instead of escaped rust code.
 
 ## 0.6.1-rc.2
