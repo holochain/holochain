@@ -5,8 +5,9 @@
 //! influxive-child-svc crate as a means to make it easy for the dependencies
 //! to be optional.
 
-use crate::types::err_other;
 use std::io::Result;
+
+use crate::influxive::types::err_other;
 
 /// Indicate what archive type is used in the target.
 #[derive(Clone, Debug)]
@@ -206,7 +207,7 @@ mod tests {
     #[cfg(not(target_os = "windows"))]
     #[tokio::test(flavor = "multi_thread")]
     async fn tar_gz_sanity() {
-        let tar = crate::child_svc::download_binaries::DL_CLI.unwrap();
+        let tar = crate::influxive::child_svc::download_binaries::DL_CLI.unwrap();
 
         println!("{tar:?}");
 
