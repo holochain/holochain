@@ -1,5 +1,5 @@
 #![deny(missing_docs)]
-// #![deny(warnings)]
+#![deny(warnings)]
 #![deny(unsafe_code)]
 //! High-level Rust integration of opentelemetry metrics and InfluxDB.
 //!
@@ -20,12 +20,12 @@
 //! ).await.unwrap();
 //!
 //! // register our meter provider
-//! opentelemetry_api::global::set_meter_provider(meter_provider);
+//! opentelemetry::global::set_meter_provider(meter_provider);
 //!
 //! // create a metric
-//! let m = opentelemetry_api::global::meter("my.meter")
+//! let m = opentelemetry::global::meter("my.meter")
 //!     .f64_histogram("my.metric")
-//!     .init();
+//!     .build();
 //!
 //! // make a recording
 //! m.record(3.14, &[]);
@@ -48,12 +48,12 @@
 //! );
 //!
 //! // register our meter provider
-//! opentelemetry_api::global::set_meter_provider(meter_provider);
+//! opentelemetry::global::set_meter_provider(meter_provider);
 //!
 //! // create a metric
-//! let m = opentelemetry_api::global::meter("my.meter")
+//! let m = opentelemetry::global::meter("my.meter")
 //!     .f64_histogram("my.metric")
-//!     .init();
+//!     .build();
 //!
 //! // make a recording
 //! m.record(3.14, &[]);
@@ -72,12 +72,12 @@
 //! );
 //!
 //! // register our meter provider
-//! opentelemetry_api::global::set_meter_provider(meter_provider);
+//! opentelemetry::global::set_meter_provider(meter_provider);
 //!
 //! // create a metric
-//! let m = opentelemetry_api::global::meter("my.meter")
+//! let m = opentelemetry::global::meter("my.meter")
 //!     .f64_histogram("my.metric")
-//!     .init();
+//!     .build();
 //!
 //! // make a recording
 //! m.record(3.14, &[]);
