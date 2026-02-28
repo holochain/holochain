@@ -3506,7 +3506,7 @@ name = "holochain_metrics"
 version = "0.7.0-dev.0"
 dependencies = [
  "influxive",
- "opentelemetry_api",
+ "opentelemetry 0.31.0",
  "tempfile",
  "tokio",
  "tracing",
