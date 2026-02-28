@@ -1,5 +1,5 @@
 use super::*;
-use std::io::BufRead;
+use std::{io::BufRead, time::Duration};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn file_meter_provider_one_metric_one_value() {
@@ -11,7 +11,8 @@ async fn file_meter_provider_one_metric_one_value() {
     // create our meter provider
     let meter_provider = influxive_file_meter_provider(
         InfluxiveWriterConfig::create_with_influx_file(test_path.clone()),
-        InfluxiveMeterProviderConfig::default(),
+        InfluxiveMeterProviderConfig::default()
+            .with_report_interval(Some(Duration::from_millis(50))),
     );
 
     // register our meter provider

@@ -1,5 +1,5 @@
 #![deny(missing_docs)]
-// #![deny(warnings)]
+#![deny(warnings)]
 #![deny(unsafe_code)]
 //! Opentelemetry metrics bindings for influxive-child-svc.
 //!
@@ -20,7 +20,7 @@
 //! );
 //!
 //! // register the meter provider
-//! opentelemetry_api::global::set_meter_provider(
+//! opentelemetry::global::set_meter_provider(
 //!     influxive::otel::InfluxiveMeterProvider::new(
 //!         Default::default(),
 //!         Arc::new(writer),
@@ -28,9 +28,9 @@
 //! );
 //!
 //! // create a metric
-//! let m = opentelemetry_api::global::meter("my.meter")
+//! let m = opentelemetry::global::meter("my.meter")
 //!     .f64_histogram("my.metric")
-//!     .init();
+//!     .build();
 //!
 //! // make a recording
 //! m.record(3.14, &[]);
@@ -134,35 +134,30 @@ impl PushMetricExporter for InfluxiveOtelWriter {
 
 /// Influxive InfluxDB Meter Provider Configuration.
 #[non_exhaustive]
+#[derive(Default)]
 pub struct InfluxiveMeterProviderConfig {
-    /// Reporting interval for observable metrics.
-    /// Set to `None` to disable periodic reporting
-    /// (you'll need to call [InfluxiveMeterProvider::report] manually).
-    /// Defaults to 30 seconds.
-    pub observable_report_interval: Option<std::time::Duration>,
-}
-
-impl Default for InfluxiveMeterProviderConfig {
-    fn default() -> Self {
-        Self {
-            observable_report_interval: Some(std::time::Duration::from_secs(30)),
-        }
-    }
+    /// Reporting interval for all metrics, sync and observable.
+    ///
+    /// The interval can also be configured with the env var OTEL_METRIC_EXPORT_INTERVAL.
+    /// This option has to be set to `None` for the env var to be effective, otherwise it
+    /// overrides any value set for the OTEL_METRIC_EXPORT_INTERVAL environment variable.
+    ///
+    /// If this option is `None` or interval is equal to zero, 60 seconds is used as the default.
+    ///
+    /// Defaults to None, which results in a 60 second interval.
+    pub report_interval: Option<std::time::Duration>,
 }
 
 impl InfluxiveMeterProviderConfig {
     /// Apply [InfluxiveMeterProviderConfig::observable_report_interval].
-    pub fn with_report_interval(
-        mut self,
-        observable_report_interval: Option<std::time::Duration>,
-    ) -> Self {
-        self.observable_report_interval = observable_report_interval;
+    pub fn with_report_interval(mut self, report_interval: Option<std::time::Duration>) -> Self {
+        self.report_interval = report_interval;
         self
     }
 }
 
 /// Meter provider to create meters for collecting metrics and writing them to
-/// and Influx DB.
+/// an Influx DB.
 #[derive(Clone)]
 pub struct InfluxiveMeterProvider {
     inner: Arc<SdkMeterProvider>,
@@ -174,7 +169,7 @@ impl InfluxiveMeterProvider {
     pub fn new(config: InfluxiveMeterProviderConfig, influxive: DynMetricWriter) -> Self {
         let exporter = InfluxiveOtelWriter { influxive };
         let mut reader_builder = PeriodicReader::builder(exporter);
-        if let Some(interval) = config.observable_report_interval {
+        if let Some(interval) = config.report_interval {
             reader_builder = reader_builder.with_interval(interval);
         }
         let reader = reader_builder.build();
