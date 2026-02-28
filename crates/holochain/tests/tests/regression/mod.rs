@@ -256,6 +256,10 @@ async fn zero_arc_can_delete_link() {
     ])
     .await;
 
+    holochain_metrics::HolochainMetricsConfig::new(conductors[0].db_path())
+        .init()
+        .await;
+
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Link])
         .await
         .0;

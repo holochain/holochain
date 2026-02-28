@@ -68,6 +68,10 @@ impl InfluxiveOtelWriter {
                         if let Some(max) = data_point.max() {
                             influxive_metric = influxive_metric.with_field("max", max);
                         }
+                        for attribute in data_point.attributes() {
+                            influxive_metric = influxive_metric
+                                .with_tag(attribute.key.to_string(), attribute.value.to_string());
+                        }
                         self.influxive.write_metric(influxive_metric);
                     }
                 }
@@ -149,7 +153,7 @@ pub struct InfluxiveMeterProviderConfig {
 }
 
 impl InfluxiveMeterProviderConfig {
-    /// Apply [InfluxiveMeterProviderConfig::observable_report_interval].
+    /// Apply [InfluxiveMeterProviderConfig::report_interval].
     pub fn with_report_interval(mut self, report_interval: Option<std::time::Duration>) -> Self {
         self.report_interval = report_interval;
         self
@@ -185,8 +189,8 @@ impl MeterProvider for InfluxiveMeterProvider {
         self.inner.meter(name)
     }
 
-    fn meter_with_scope(&self, _scope: InstrumentationScope) -> Meter {
-        unimplemented!()
+    fn meter_with_scope(&self, scope: InstrumentationScope) -> Meter {
+        self.inner.meter_with_scope(scope)
     }
 }
 
