@@ -4,11 +4,11 @@ use std::sync::Arc;
 use tokio::sync::Semaphore;
 
 pub fn create_pool_usage_metric(kind: DbKind, db_semaphores: Vec<Arc<Semaphore>>) {
+    let total_permits: usize = db_semaphores.iter().map(|s| s.available_permits()).sum();
     meter("hc.db")
         .f64_observable_gauge("hc.db.pool.utilization")
         .with_description("The utilisation of connections in the pool")
         .with_callback(move |observer| {
-            let total_permits: usize = db_semaphores.iter().map(|s| s.available_permits()).sum();
             let current_permits: usize = db_semaphores.iter().map(|s| s.available_permits()).sum();
 
             observer.observe(
