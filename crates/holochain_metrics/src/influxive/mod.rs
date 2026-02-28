@@ -1,5 +1,4 @@
 #![deny(missing_docs)]
-#![deny(warnings)]
 #![deny(unsafe_code)]
 //! High-level Rust integration of opentelemetry metrics and InfluxDB.
 //!

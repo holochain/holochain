@@ -1,5 +1,4 @@
 #![deny(missing_docs)]
-#![deny(warnings)]
 #![deny(unsafe_code)]
 //! Core types for influxive crates. The main point of this crate is to expose
 //! the [MetricWriter] trait to be used by downstream influxive crates.
