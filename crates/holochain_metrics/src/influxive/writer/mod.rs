@@ -19,7 +19,7 @@ impl DataTypeExt for DataType {
             DataType::F64(f) => influxdb::Type::Float(f),
             DataType::I64(i) => influxdb::Type::SignedInteger(i),
             DataType::U64(u) => influxdb::Type::UnsignedInteger(u),
-            DataType::String(s) => influxdb::Type::Text(s.into_string()),
+            DataType::String(s) => influxdb::Type::Text(s),
         }
     }
 }

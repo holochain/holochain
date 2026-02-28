@@ -4,7 +4,6 @@
 //! Core types for influxive crates. The main point of this crate is to expose
 //! the [MetricWriter] trait to be used by downstream influxive crates.
 
-use std::borrow::Cow;
 use std::sync::Arc;
 
 /// Errors from influxive operations.
@@ -53,43 +52,6 @@ pub enum InfluxiveError {
 /// Result type for influxive operations.
 pub type InfluxiveResult<T> = Result<T, InfluxiveError>;
 
-/// String type handling various string types usable by InfluxDB.
-#[derive(Debug, Clone)]
-pub enum StringType {
-    /// String value.
-    String(Cow<'static, str>),
-
-    /// String value.
-    ArcString(Arc<str>),
-}
-
-impl StringType {
-    /// Get an owned string out of this StringType.
-    pub fn into_string(self) -> String {
-        match self {
-            StringType::String(s) => s.into_owned(),
-            StringType::ArcString(s) => s.to_string(),
-        }
-    }
-}
-
-macro_rules! stringtype_from_impl {
-    ($($f:ty, $i:ident, $b:block,)*) => {$(
-        impl From<$f> for StringType {
-            fn from($i: $f) -> Self $b
-        }
-    )*};
-}
-
-stringtype_from_impl! {
-    String, f, { StringType::String(Cow::Owned(f)) },
-    &'static String, f, { StringType::String(Cow::Borrowed(f.as_str())) },
-    &'static str, f, { StringType::String(Cow::Borrowed(f)) },
-    Cow<'static, str>, f, { StringType::String(f) },
-    Arc<str>, f, { StringType::ArcString(f) },
-}
-
-// TODO eliminate
 /// Field-type enum for sending data to InfluxDB.
 #[derive(Debug, Clone)]
 pub enum DataType {
@@ -106,7 +68,7 @@ pub enum DataType {
     U64(u64),
 
     /// String value.
-    String(StringType),
+    String(String),
 }
 
 macro_rules! datatype_from_impl {
@@ -129,11 +91,10 @@ datatype_from_impl! {
     u16, f, { DataType::U64(f as u64) },
     u32, f, { DataType::U64(f as u64) },
     u64, f, { DataType::U64(f as u64) },
-    String, f, { DataType::String(f.into()) },
-    &'static String, f, { DataType::String(f.into()) },
-    &'static str, f, { DataType::String(f.into()) },
-    Cow<'static, str>, f, { DataType::String(f.into()) },
-    Arc<str>, f, { DataType::String(f.into()) },
+    String, f, { DataType::String(f) },
+    &'static String, f, { DataType::String(f.to_string()) },
+    &'static str, f, { DataType::String(f.to_string()) },
+    Arc<str>, f, { DataType::String(f.to_string()) },
 }
 
 /// A metric to record in the influxdb instance.
