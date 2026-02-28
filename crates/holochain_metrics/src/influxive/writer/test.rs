@@ -177,7 +177,7 @@ async fn writer_file_many() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn writer_file_all_data_types() {
-    use crate::influxive::types::{DataType, Metric, StringType};
+    use crate::influxive::types::{DataType, Metric};
     use std::io::BufRead;
 
     let temp_dir = tempfile::TempDir::new().unwrap();
@@ -191,11 +191,11 @@ async fn writer_file_all_data_types() {
         ("uint_field", DataType::U64(42)),
         (
             "string_field",
-            DataType::String(StringType::from("test value")),
+            DataType::String("test value".to_string()),
         ),
         (
             "quote_field",
-            DataType::String(StringType::from("a \"test\" value")),
+            DataType::String("a \"test\" value".to_string()),
         ),
     ];
 

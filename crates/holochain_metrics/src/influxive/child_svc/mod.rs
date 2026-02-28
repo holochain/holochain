@@ -296,7 +296,7 @@ impl InfluxiveChildSvc {
     /// Run a query against the running InfluxDB instance.
     /// Note, if you are writing metrics, prefer the 'write_metric' api
     /// as that will be more efficient.
-    pub async fn query<Q: Into<StringType>>(&self, flux_query: Q) -> InfluxiveResult<String> {
+    pub async fn query<Q: Into<String>>(&self, flux_query: Q) -> InfluxiveResult<String> {
         cmd_output!(
             &self.influx_path,
             "query",
@@ -307,7 +307,7 @@ impl InfluxiveChildSvc {
             &self.host,
             "--token",
             &self.token,
-            flux_query.into().into_string()
+            flux_query.into()
         )
     }
 
