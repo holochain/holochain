@@ -189,10 +189,7 @@ async fn writer_file_all_data_types() {
         ("float_field", DataType::F64(42.5)),
         ("int_field", DataType::I64(-42)),
         ("uint_field", DataType::U64(42)),
-        (
-            "string_field",
-            DataType::String("test value".to_string()),
-        ),
+        ("string_field", DataType::String("test value".to_string())),
         (
             "quote_field",
             DataType::String("a \"test\" value".to_string()),

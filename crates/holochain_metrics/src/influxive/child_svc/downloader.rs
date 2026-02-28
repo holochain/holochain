@@ -74,7 +74,10 @@ impl DownloadSpec {
     /// Check the local system for a cached version of this download,
     /// if found, return that path. Otherwise download, unpack, and
     /// verify, returning that newly downloaded path.
-    pub async fn download(&self, fallback_path: &std::path::Path) -> InfluxiveResult<std::path::PathBuf> {
+    pub async fn download(
+        &self,
+        fallback_path: &std::path::Path,
+    ) -> InfluxiveResult<std::path::PathBuf> {
         let name = format!("{}-{}", self.file_prefix, self.file_extension,);
 
         let cache_path = dirs::data_local_dir().map(|mut d| {
@@ -168,7 +171,11 @@ impl DownloadSpec {
     }
 
     #[cfg(not(target_os = "windows"))]
-    async fn extract_tar_gz(&self, tmp: std::path::PathBuf, mut src: std::fs::File) -> std::io::Result<()> {
+    async fn extract_tar_gz(
+        &self,
+        tmp: std::path::PathBuf,
+        mut src: std::fs::File,
+    ) -> std::io::Result<()> {
         tokio::task::spawn_blocking(move || {
             use std::io::Seek;
             use std::io::Write;
@@ -187,7 +194,11 @@ impl DownloadSpec {
     }
 
     #[cfg(target_os = "windows")]
-    async fn extract_zip(&self, tmp: std::path::PathBuf, src: std::fs::File) -> std::io::Result<()> {
+    async fn extract_zip(
+        &self,
+        tmp: std::path::PathBuf,
+        src: std::fs::File,
+    ) -> std::io::Result<()> {
         tokio::task::spawn_blocking(move || {
             let mut archive = zip::ZipArchive::new(src).map_err(std::io::Error::other)?;
             archive.extract(tmp).map_err(std::io::Error::other)
@@ -213,7 +224,6 @@ mod tests {
 
                 println!("{:?}", tar.download(tmp.path()).await.unwrap());
 
-                // okay if windows fails
                 let _ = tmp.close();
             }));
         }
@@ -226,7 +236,7 @@ mod tests {
     #[cfg(target_os = "windows")]
     #[tokio::test(flavor = "multi_thread")]
     async fn zip_sanity() {
-        let zip = crate::child_svc::download_binaries::DL_CLI.unwrap();
+        let zip = crate::influxive::child_svc::download_binaries::DL_CLI.unwrap();
 
         println!("{zip:?}");
 
