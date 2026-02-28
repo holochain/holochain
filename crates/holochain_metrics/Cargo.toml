@@ -19,6 +19,7 @@ tracing = "0.1"
 influxdb = "0.8"
 opentelemetry_sdk = "0.31"
 tempfile = "3"
+thiserror = "2.0.18"
 tokio = { version = "1", features = ["process"] }
 
 # influxd downloader dependencies
