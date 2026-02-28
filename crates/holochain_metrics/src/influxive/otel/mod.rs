@@ -2,42 +2,8 @@
 #![deny(warnings)]
 #![deny(unsafe_code)]
 //! Opentelemetry metrics bindings for influxive-child-svc.
-//!
-//! ## Example
-//!
-//! ```
-//! # #[tokio::main(flavor = "multi_thread")]
-//! # async fn main() {
-//! #     use std::sync::Arc;
-//! use influxive::writer::*;
-//!
-//! // create an influxive writer
-//! let writer = InfluxiveWriter::with_token_auth(
-//!     InfluxiveWriterConfig::default(),
-//!     "http://127.0.0.1:8086",
-//!     "my.bucket",
-//!     "my.token",
-//! );
-//!
-//! // register the meter provider
-//! opentelemetry::global::set_meter_provider(
-//!     influxive::otel::InfluxiveMeterProvider::new(
-//!         Default::default(),
-//!         Arc::new(writer),
-//!     )
-//! );
-//!
-//! // create a metric
-//! let m = opentelemetry::global::meter("my.meter")
-//!     .f64_histogram("my.metric")
-//!     .build();
-//!
-//! // make a recording
-//! m.record(3.14, &[]);
-//! # }
-//! ```
 
-use crate::types::DynMetricWriter;
+use super::types::DynMetricWriter;
 use opentelemetry::metrics::{Meter, MeterProvider};
 use opentelemetry::InstrumentationScope;
 use opentelemetry_sdk::error::OTelSdkResult;
@@ -59,7 +25,7 @@ impl InfluxiveOtelWriter {
                 MetricData::Histogram(histogram) => {
                     for data_point in histogram.data_points() {
                         let mut influxive_metric =
-                            crate::types::Metric::new(SystemTime::now(), otel_metric.name())
+                            super::types::Metric::new(SystemTime::now(), otel_metric.name())
                                 .with_field("count", data_point.count())
                                 .with_field("sum", data_point.sum());
                         if let Some(min) = data_point.min() {
@@ -78,7 +44,7 @@ impl InfluxiveOtelWriter {
                 MetricData::Gauge(gauge) => {
                     for data_point in gauge.data_points() {
                         let mut influxive_metric =
-                            crate::types::Metric::new(SystemTime::now(), otel_metric.name())
+                            super::types::Metric::new(SystemTime::now(), otel_metric.name())
                                 .with_field("gauge", data_point.value());
                         for attribute in data_point.attributes() {
                             influxive_metric = influxive_metric
@@ -93,7 +59,7 @@ impl InfluxiveOtelWriter {
                 MetricData::Sum(sum) => {
                     for data_point in sum.data_points() {
                         let mut influxive_metric =
-                            crate::types::Metric::new(SystemTime::now(), otel_metric.name())
+                            super::types::Metric::new(SystemTime::now(), otel_metric.name())
                                 .with_field("sum", data_point.value());
                         for attribute in data_point.attributes() {
                             influxive_metric = influxive_metric

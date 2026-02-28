@@ -1,5 +1,9 @@
-use super::*;
-use crate::child_svc::*;
+use crate::influxive::{
+    child_svc::{InfluxiveChildSvc, InfluxiveChildSvcConfig},
+    writer::InfluxiveWriterConfig,
+    InfluxiveMeterProvider, InfluxiveMeterProviderConfig,
+};
+use opentelemetry::metrics::MeterProvider;
 use std::{
     sync::{
         atomic::{AtomicU16, Ordering},

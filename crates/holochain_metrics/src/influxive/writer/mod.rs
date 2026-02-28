@@ -4,64 +4,8 @@
 //! Rust utility for efficiently writing metrics to InfluxDB.
 //! Metrics can be written directly to a running InfluxDB instance or
 //! written to a Line Protocol file on disk that can be pushed to InfluxDB using Telegraf.
-//!
-//! ## Example
-//!
-//! ### Writing to a running InfluxDB instance
-//!
-//! ```
-//! # #[tokio::main(flavor = "multi_thread")]
-//! # async fn main() {
-//! use influxive::types::Metric;
-//! use influxive::writer::*;
-//!
-//! let writer = InfluxiveWriter::with_token_auth(
-//!     InfluxiveWriterConfig::default(),
-//!     "http://127.0.0.1:8086",
-//!     "my.bucket",
-//!     "my.token",
-//! );
-//!
-//! writer.write_metric(
-//!     Metric::new(
-//!         std::time::SystemTime::now(),
-//!         "my.metric",
-//!     )
-//!     .with_field("value", 3.14)
-//!     .with_tag("tag", "test-tag")
-//! );
-//! # }
-//! ```
-//!
-//! ### Writing to a file on disk
-//!
-//! ```rust
-//! # #[tokio::main(flavor = "multi_thread")]
-//! # async fn main() {
-//! use influxive::types::Metric;
-//! use influxive::writer::*;
-//!
-//! let path = std::path::PathBuf::from("my-metrics.influx");
-//! let config = InfluxiveWriterConfig::create_with_influx_file(path.clone());
-//! // The file backend ignores host/bucket/token
-//! let writer = InfluxiveWriter::with_token_auth(config, "", "", "");
-//!
-//! writer.write_metric(
-//!     Metric::new(
-//!         std::time::SystemTime::now(),
-//!         "my.metric",
-//!     )
-//!     .with_field("value", 3.14)
-//!     .with_tag("tag", "test-tag")
-//! );
-//!
-//! // Now you can read and use the metrics file `my-metrics.influx`
-//!
-//! # let _ = std::fs::remove_file(path);
-//! # }
-//! ```
 
-use crate::types::*;
+use super::types::*;
 use std::sync::Arc;
 
 trait DataTypeExt {
@@ -418,7 +362,7 @@ impl InfluxiveWriter {
     }
 }
 
-impl crate::types::MetricWriter for InfluxiveWriter {
+impl super::types::MetricWriter for InfluxiveWriter {
     fn write_metric(&self, metric: Metric) {
         InfluxiveWriter::write_metric(self, metric);
     }

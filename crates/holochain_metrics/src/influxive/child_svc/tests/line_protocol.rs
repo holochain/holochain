@@ -1,6 +1,8 @@
-use crate::child_svc::{InfluxiveChildSvc, InfluxiveChildSvcConfig};
-use crate::types::*;
-use crate::writer::*;
+use crate::influxive::{
+    child_svc::{InfluxiveChildSvc, InfluxiveChildSvcConfig},
+    types::Metric,
+    writer::{InfluxiveWriter, InfluxiveWriterConfig},
+};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 

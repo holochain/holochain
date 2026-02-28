@@ -61,7 +61,7 @@ mr_bundle = { version = "^0.7.0-dev.0", path = "../mr_bundle", features = [
 must_future = "0.1.1"
 nanoid = "0.4"
 holochain_trace = { version = "^0.7.0-dev.0", path = "../holochain_trace" }
-holochain_metrics = { version = "^0.7.0-dev.0", path = "../holochain_metrics", default-features = false }
+holochain_metrics = { version = "^0.7.0-dev.0", path = "../holochain_metrics" }
 lair_keystore_api = "=0.6.3"
 once_cell = "1.4.1"
 one_err = "0.0.8"

@@ -1,35 +1,9 @@
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
 //! Run influxd as a child process.
-//!
-//! ## Example
-//!
-//! ```
-//! # #[tokio::main(flavor = "multi_thread")]
-//! # async fn main() {
-//! use influxive::types::Metric;
-//! use influxive::child_svc::*;
-//!
-//! let tmp = tempfile::tempdir().unwrap();
-//!
-//! let influxive = InfluxiveChildSvc::new(
-//!     InfluxiveChildSvcConfig::default()
-//!         .with_database_path(Some(tmp.path().to_owned())),
-//! ).await.unwrap();
-//!
-//! influxive.write_metric(
-//!     Metric::new(
-//!         std::time::SystemTime::now(),
-//!         "my.metric",
-//!     )
-//!     .with_field("value", 3.14)
-//!     .with_tag("tag", "test-tag")
-//! );
-//! # }
-//! ```
 
-use crate::types::*;
-use crate::writer::*;
+use super::types::*;
+use super::writer::*;
 use std::io::Result;
 
 #[cfg(feature = "download_binaries")]
@@ -40,8 +14,6 @@ mod download_binaries;
 
 #[cfg(test)]
 mod tests;
-
-pub use crate::writer::InfluxiveWriterConfig;
 
 macro_rules! cmd_output {
     ($cmd:expr $(,$arg:expr)*) => {async {
@@ -195,7 +167,7 @@ pub struct InfluxiveChildSvc {
     config: InfluxiveChildSvcConfig,
     host: String,
     token: String,
-    child: std::sync::Mutex<Option<tokio::process::Child>>,
+    _child: std::sync::Mutex<Option<tokio::process::Child>>,
     influx_path: std::path::PathBuf,
     writer: InfluxiveWriter,
 }
@@ -269,7 +241,7 @@ impl InfluxiveChildSvc {
             config,
             host,
             token,
-            child: std::sync::Mutex::new(Some(child)),
+            _child: std::sync::Mutex::new(Some(child)),
             influx_path,
             writer,
         };
@@ -305,13 +277,9 @@ impl InfluxiveChildSvc {
     }
 
     /// Shut down the child process. Further calls to it should error.
+    #[cfg(test)]
     pub fn shutdown(&self) {
-        drop(self.child.lock().unwrap().take());
-    }
-
-    /// Get the config this instance was created with.
-    pub fn get_config(&self) -> &InfluxiveChildSvcConfig {
-        &self.config
+        drop(self._child.lock().unwrap().take());
     }
 
     /// Get the host url of this running influxd instance.
@@ -319,12 +287,8 @@ impl InfluxiveChildSvc {
         &self.host
     }
 
-    /// Get the operator token of this running influxd instance.
-    pub fn get_token(&self) -> &str {
-        &self.token
-    }
-
     /// "Ping" the running InfluxDB instance, returning the result.
+    #[cfg(test)]
     pub async fn ping(&self) -> Result<()> {
         cmd_output!(&self.influx_path, "ping", "--host", &self.host)?;
         Ok(())
@@ -411,6 +375,7 @@ impl InfluxiveChildSvc {
 
     /// Write raw line protocol data to the running InfluxDB instance.
     /// This is useful for testing or importing data in InfluxDB line protocol format.
+    #[cfg(test)]
     pub async fn write_line_protocol<D: AsRef<str>>(&self, data: D) -> Result<()> {
         use std::io::Write;
 

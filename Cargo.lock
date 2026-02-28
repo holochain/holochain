@@ -3505,11 +3505,22 @@ dependencies = [
 name = "holochain_metrics"
 version = "0.7.0-dev.0"
 dependencies = [
- "influxive",
+ "digest 0.10.7",
+ "dirs",
+ "flate2",
+ "futures",
+ "hex",
+ "hex-literal",
+ "influxdb",
  "opentelemetry 0.31.0",
+ "opentelemetry_sdk 0.31.0",
+ "reqwest 0.12.28",
+ "sha2 0.10.9",
+ "tar",
  "tempfile",
  "tokio",
  "tracing",
+ "zip 3.0.0",
 ]
 
 [[package]]
@@ -4317,28 +4328,6 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "thiserror 2.0.18",
-]
-
-[[package]]
-name = "influxive"
-version = "0.0.6-dev.0"
-dependencies = [
- "digest 0.10.7",
- "dirs",
- "flate2",
- "futures",
- "hex",
- "hex-literal",
- "influxdb",
- "opentelemetry 0.31.0",
- "opentelemetry_sdk 0.31.0",
- "reqwest 0.12.28",
- "sha2 0.10.9",
- "tar",
- "tempfile",
- "tokio",
- "tracing",
- "zip 3.0.0",
 ]
 
 [[package]]

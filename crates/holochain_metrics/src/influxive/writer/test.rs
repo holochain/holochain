@@ -1,6 +1,10 @@
-use crate::types::*;
-use crate::writer::types::{Backend, BackendFactory};
-use crate::*;
+use crate::influxive::{
+    writer::{
+        types::{Backend, BackendFactory},
+        Metric,
+    },
+    *,
+};
 
 struct TestBackend {
     test_start: std::time::Instant,
@@ -173,7 +177,7 @@ async fn writer_file_many() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn writer_file_all_data_types() {
-    use crate::types::{DataType, Metric, StringType};
+    use crate::influxive::types::{DataType, Metric, StringType};
     use std::io::BufRead;
 
     let temp_dir = tempfile::TempDir::new().unwrap();

@@ -1,4 +1,4 @@
-use crate::child_svc::downloader::{Archive, DownloadSpec, Hash};
+use super::downloader::{Archive, DownloadSpec, Hash};
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 mod tgt {
