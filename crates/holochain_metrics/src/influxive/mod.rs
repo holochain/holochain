@@ -18,6 +18,7 @@ mod writer;
 
 pub(crate) use child_svc::*;
 pub(crate) use otel::*;
+pub(crate) use types::InfluxiveResult;
 pub(crate) use writer::{InfluxiveWriter, InfluxiveWriterConfig};
 
 /// Create an opentelemetry MeterProvider ready to provide metrics
@@ -25,7 +26,7 @@ pub(crate) use writer::{InfluxiveWriter, InfluxiveWriterConfig};
 pub(crate) async fn influxive_child_process_meter_provider(
     svc_config: InfluxiveChildSvcConfig,
     otel_config: InfluxiveMeterProviderConfig,
-) -> std::io::Result<(Arc<InfluxiveChildSvc>, InfluxiveMeterProvider)> {
+) -> InfluxiveResult<(Arc<InfluxiveChildSvc>, InfluxiveMeterProvider)> {
     let influxive = Arc::new(InfluxiveChildSvc::new(svc_config).await?);
     let meter_provider = InfluxiveMeterProvider::new(otel_config, influxive.clone());
     Ok((influxive, meter_provider))

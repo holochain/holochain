@@ -5,9 +5,7 @@
 //! influxive-child-svc crate as a means to make it easy for the dependencies
 //! to be optional.
 
-use std::io::Result;
-
-use crate::influxive::types::err_other;
+use super::super::types::{InfluxiveError, InfluxiveResult};
 
 /// Indicate what archive type is used in the target.
 #[derive(Clone, Debug)]
@@ -76,7 +74,7 @@ impl DownloadSpec {
     /// Check the local system for a cached version of this download,
     /// if found, return that path. Otherwise download, unpack, and
     /// verify, returning that newly downloaded path.
-    pub async fn download(&self, fallback_path: &std::path::Path) -> Result<std::path::PathBuf> {
+    pub async fn download(&self, fallback_path: &std::path::Path) -> InfluxiveResult<std::path::PathBuf> {
         let name = format!("{}-{}", self.file_prefix, self.file_extension,);
 
         let cache_path = dirs::data_local_dir().map(|mut d| {
@@ -112,7 +110,7 @@ impl DownloadSpec {
         Ok(fallback_path)
     }
 
-    async fn extract(&self) -> Result<(tempfile::TempDir, std::path::PathBuf)> {
+    async fn extract(&self) -> InfluxiveResult<(tempfile::TempDir, std::path::PathBuf)> {
         use futures::stream::StreamExt;
         use tokio::io::AsyncSeekExt;
         use tokio::io::AsyncWriteExt;
@@ -122,19 +120,16 @@ impl DownloadSpec {
         let file = tempfile::tempfile()?;
         let mut file = tokio::fs::File::from_std(file);
 
-        let response = reqwest::get(self.url).await.map_err(err_other)?;
+        let response = reqwest::get(self.url).await?;
         if !response.status().is_success() {
-            return Err(err_other(format!(
-                "Failed to download file: HTTP {}",
-                response.status()
-            )));
+            return Err(InfluxiveError::DownloadFailed(response.status().as_u16()));
         }
 
         let mut data_stream = response.bytes_stream();
         let mut hasher = self.archive_hash.get_hasher();
 
         while let Some(bytes) = data_stream.next().await {
-            let bytes = bytes.map_err(err_other)?;
+            let bytes = bytes?;
             hasher.update(&bytes);
 
             let mut reader: &[u8] = &bytes;
@@ -143,11 +138,10 @@ impl DownloadSpec {
 
         let hash = hasher.finalize();
         if &*hash != self.archive_hash.as_slice() {
-            return Err(err_other(format!(
-                "download archive hash mismatch, expected {}, got {}",
-                hex::encode(self.archive_hash.as_slice()),
-                hex::encode(hash),
-            )));
+            return Err(InfluxiveError::HashMismatch {
+                expected: hex::encode(self.archive_hash.as_slice()),
+                actual: hex::encode(hash),
+            });
         }
 
         file.flush().await?;
@@ -174,7 +168,7 @@ impl DownloadSpec {
     }
 
     #[cfg(not(target_os = "windows"))]
-    async fn extract_tar_gz(&self, tmp: std::path::PathBuf, mut src: std::fs::File) -> Result<()> {
+    async fn extract_tar_gz(&self, tmp: std::path::PathBuf, mut src: std::fs::File) -> std::io::Result<()> {
         tokio::task::spawn_blocking(move || {
             use std::io::Seek;
             use std::io::Write;
@@ -193,10 +187,10 @@ impl DownloadSpec {
     }
 
     #[cfg(target_os = "windows")]
-    async fn extract_zip(&self, tmp: std::path::PathBuf, src: std::fs::File) -> Result<()> {
+    async fn extract_zip(&self, tmp: std::path::PathBuf, src: std::fs::File) -> std::io::Result<()> {
         tokio::task::spawn_blocking(move || {
-            let mut archive = zip::ZipArchive::new(src).map_err(err_other)?;
-            archive.extract(tmp).map_err(err_other)
+            let mut archive = zip::ZipArchive::new(src).map_err(std::io::Error::other)?;
+            archive.extract(tmp).map_err(std::io::Error::other)
         })
         .await?
     }

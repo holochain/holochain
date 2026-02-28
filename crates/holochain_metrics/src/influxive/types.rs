@@ -7,14 +7,51 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
-// TODO replace by thiserror
-/// Convenience wrapper around [`std::io::Error::other`].
-pub fn err_other<E>(error: E) -> std::io::Error
-where
-    E: Into<Box<dyn std::error::Error + Send + Sync>>,
-{
-    std::io::Error::other(error)
+/// Errors from influxive operations.
+#[derive(thiserror::Error, Debug)]
+pub enum InfluxiveError {
+    /// IO errors (filesystem, process spawning, etc.)
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+
+    /// HTTP request failures.
+    #[cfg(feature = "download_binaries")]
+    #[error(transparent)]
+    Http(#[from] reqwest::Error),
+
+    /// HTTP download returned a non-success status.
+    #[cfg(feature = "download_binaries")]
+    #[error("Download failed: HTTP {0}")]
+    DownloadFailed(u16),
+
+    /// A command produced stderr output or failed to launch.
+    #[error("Command error: {0}")]
+    Command(String),
+
+    /// Binary version doesn't match the expected version.
+    #[error("Version mismatch: {0}")]
+    VersionMismatch(String),
+
+    /// Hash verification failed after download.
+    #[error("Hash mismatch: expected {expected}, got {actual}")]
+    HashMismatch {
+        /// The expected hash.
+        expected: String,
+        /// The actual hash.
+        actual: String,
+    },
+
+    /// Influxd process failed to start or become ready.
+    #[error("influxd startup failed: {0}")]
+    Startup(String),
+
+    /// Catch-all for miscellaneous errors.
+    #[error("{0}")]
+    Other(String),
 }
+
+/// Result type for influxive operations.
+pub type InfluxiveResult<T> = Result<T, InfluxiveError>;
 
 /// String type handling various string types usable by InfluxDB.
 #[derive(Debug, Clone)]
