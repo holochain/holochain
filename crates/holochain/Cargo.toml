@@ -92,7 +92,7 @@ tracing-subscriber = "0.3.16"
 url = "2.4"
 url2 = "0.0.6"
 uuid = { version = "1.8", features = ["serde", "v4"] }
-opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
+opentelemetry = "0.31"
 indexmap = { version = "2.6.0", features = ["serde"] }
 wasmer = { version = "6.0.1", default-features = false }
 wasmer-middlewares = { version = "6.0.1", optional = true, default-features = false }

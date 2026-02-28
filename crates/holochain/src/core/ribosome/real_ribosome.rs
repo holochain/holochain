@@ -96,8 +96,8 @@ use holochain_wasmer_host::prelude::*;
 use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner};
 use must_future::MustBoxFuture;
 use once_cell::sync::Lazy;
-use opentelemetry_api::global::meter_with_version;
-use opentelemetry_api::metrics::Counter;
+use opentelemetry::global::meter;
+use opentelemetry::metrics::Counter;
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
@@ -230,16 +230,11 @@ impl HostFnBuilder {
 
 impl RealRibosome {
     pub fn standard_usage_meter() -> Arc<Counter<u64>> {
-        meter_with_version(
-            "hc.ribosome.wasm",
-            Some("0"),
-            None::<&'static str>,
-            Some(vec![]),
-        )
-        .u64_counter("hc.ribosome.wasm.usage")
-        .with_description("The metered usage of a wasm ribosome.")
-        .init()
-        .into()
+        meter("hc.ribosome.wasm")
+            .u64_counter("hc.ribosome.wasm.usage")
+            .with_description("The metered usage of a wasm ribosome.")
+            .build()
+            .into()
     }
 
     /// Create a new instance
@@ -713,12 +708,9 @@ impl RealRibosome {
         fn_name: FunctionName,
     ) -> Result<Option<ExternIO>, RibosomeError> {
         let mut otel_info = vec![
-            opentelemetry_api::KeyValue::new(
-                "dna",
-                self.dna_file.dna_def_hashed().hash.to_string(),
-            ),
-            opentelemetry_api::KeyValue::new("zome", zome.zome_name().to_string()),
-            opentelemetry_api::KeyValue::new("fn", fn_name.to_string()),
+            opentelemetry::KeyValue::new("dna", self.dna_file.dna_def_hashed().hash.to_string()),
+            opentelemetry::KeyValue::new("zome", zome.zome_name().to_string()),
+            opentelemetry::KeyValue::new("fn", fn_name.to_string()),
         ];
 
         if let Some(agent_pubkey) = host_context.maybe_workspace().and_then(|workspace| {
@@ -727,7 +719,7 @@ impl RealRibosome {
                 .as_ref()
                 .map(|source_chain| source_chain.agent_pubkey().to_string())
         }) {
-            otel_info.push(opentelemetry_api::KeyValue::new("agent", agent_pubkey));
+            otel_info.push(opentelemetry::KeyValue::new("agent", agent_pubkey));
         }
 
         let call_context = CallContext {
