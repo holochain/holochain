@@ -1,9 +1,11 @@
 use crate::influxive::{
     child_svc::{InfluxiveChildSvc, InfluxiveChildSvcConfig},
+    create_meter_provider,
     writer::InfluxiveWriterConfig,
-    InfluxiveMeterProvider, InfluxiveMeterProviderConfig,
+    InfluxiveMeterProviderConfig,
 };
 use opentelemetry::{metrics::MeterProvider, KeyValue};
+use opentelemetry_sdk::metrics::SdkMeterProvider;
 use std::{
     sync::{
         atomic::{AtomicU16, Ordering},
@@ -210,7 +212,7 @@ async fn u64_counter_with_attributes() {
     svc.shutdown();
 }
 
-async fn setup(tmp: &std::path::Path) -> (Arc<InfluxiveChildSvc>, InfluxiveMeterProvider) {
+async fn setup(tmp: &std::path::Path) -> (Arc<InfluxiveChildSvc>, SdkMeterProvider) {
     let influxive_svc = Arc::new(
         InfluxiveChildSvc::new(
             InfluxiveChildSvcConfig::default()
@@ -222,7 +224,7 @@ async fn setup(tmp: &std::path::Path) -> (Arc<InfluxiveChildSvc>, InfluxiveMeter
         .await
         .unwrap(),
     );
-    let meter_provider = InfluxiveMeterProvider::new(
+    let meter_provider = create_meter_provider(
         InfluxiveMeterProviderConfig::default()
             .with_report_interval(Some(Duration::from_millis(100))),
         influxive_svc.clone(),

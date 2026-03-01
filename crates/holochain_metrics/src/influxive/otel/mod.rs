@@ -3,13 +3,10 @@
 //! Opentelemetry metrics bindings for influxive-child-svc.
 
 use super::types::DynMetricWriter;
-use opentelemetry::metrics::{Meter, MeterProvider};
-use opentelemetry::InstrumentationScope;
 use opentelemetry_sdk::error::OTelSdkResult;
 use opentelemetry_sdk::metrics::data::{AggregatedMetrics, Metric, MetricData, ResourceMetrics};
 use opentelemetry_sdk::metrics::exporter::PushMetricExporter;
 use opentelemetry_sdk::metrics::{PeriodicReader, SdkMeterProvider, Temporality};
-use std::sync::Arc;
 use std::time::SystemTime;
 
 #[cfg(test)]
@@ -128,36 +125,17 @@ impl InfluxiveMeterProviderConfig {
     }
 }
 
-/// Meter provider to create meters for collecting metrics and writing them to
-/// an Influx DB.
-#[derive(Clone)]
-pub struct InfluxiveMeterProvider {
-    inner: Arc<SdkMeterProvider>,
-}
-
-impl InfluxiveMeterProvider {
-    /// Construct a new InfluxiveMeterProvider instance with a given
-    /// Influxive writer.
-    pub fn new(config: InfluxiveMeterProviderConfig, influxive: DynMetricWriter) -> Self {
-        let exporter = InfluxiveOtelWriter { influxive };
-        let mut reader_builder = PeriodicReader::builder(exporter);
-        if let Some(interval) = config.report_interval {
-            reader_builder = reader_builder.with_interval(interval);
-        }
-        let reader = reader_builder.build();
-        let provider = SdkMeterProvider::builder().with_reader(reader).build();
-        Self {
-            inner: Arc::new(provider),
-        }
+/// Create a meter provider to create meters for collecting metrics and writing
+/// them to an Influx DB with a given Influxive writer.
+pub fn create_meter_provider(
+    config: InfluxiveMeterProviderConfig,
+    influxive: DynMetricWriter,
+) -> SdkMeterProvider {
+    let exporter = InfluxiveOtelWriter { influxive };
+    let mut reader_builder = PeriodicReader::builder(exporter);
+    if let Some(interval) = config.report_interval {
+        reader_builder = reader_builder.with_interval(interval);
     }
-}
-
-impl MeterProvider for InfluxiveMeterProvider {
-    fn meter(&self, name: &'static str) -> Meter {
-        self.inner.meter(name)
-    }
-
-    fn meter_with_scope(&self, scope: InstrumentationScope) -> Meter {
-        self.inner.meter_with_scope(scope)
-    }
+    let reader = reader_builder.build();
+    SdkMeterProvider::builder().with_reader(reader).build()
 }

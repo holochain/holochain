@@ -16,18 +16,22 @@ mod types;
 mod writer;
 
 pub(crate) use child_svc::*;
+use opentelemetry_sdk::metrics::SdkMeterProvider;
 pub(crate) use otel::*;
 pub(crate) use types::InfluxiveResult;
 pub(crate) use writer::{InfluxiveWriter, InfluxiveWriterConfig};
+
+#[cfg(test)]
+mod tests;
 
 /// Create an opentelemetry MeterProvider ready to provide metrics
 /// to a running child process instance of InfluxDB.
 pub(crate) async fn influxive_child_process_meter_provider(
     svc_config: InfluxiveChildSvcConfig,
     otel_config: InfluxiveMeterProviderConfig,
-) -> InfluxiveResult<(Arc<InfluxiveChildSvc>, InfluxiveMeterProvider)> {
+) -> InfluxiveResult<(Arc<InfluxiveChildSvc>, SdkMeterProvider)> {
     let influxive = Arc::new(InfluxiveChildSvc::new(svc_config).await?);
-    let meter_provider = InfluxiveMeterProvider::new(otel_config, influxive.clone());
+    let meter_provider = create_meter_provider(otel_config, influxive.clone());
     Ok((influxive, meter_provider))
 }
 
@@ -43,9 +47,9 @@ pub(crate) fn influxive_external_meter_provider_token_auth<
     host: H,
     bucket: B,
     token: T,
-) -> InfluxiveMeterProvider {
+) -> SdkMeterProvider {
     let writer = InfluxiveWriter::with_token_auth(writer_config, host, bucket, token);
-    InfluxiveMeterProvider::new(otel_config, Arc::new(writer))
+    create_meter_provider(otel_config, Arc::new(writer))
 }
 
 /// Create an opentelemetry MeterProvider ready to provide metrics
@@ -53,11 +57,8 @@ pub(crate) fn influxive_external_meter_provider_token_auth<
 pub(crate) fn influxive_file_meter_provider(
     writer_config: InfluxiveWriterConfig,
     otel_config: InfluxiveMeterProviderConfig,
-) -> InfluxiveMeterProvider {
+) -> SdkMeterProvider {
     // host/bucket/token are not needed when using a file writer
     let writer = InfluxiveWriter::with_token_auth(writer_config, "", "", "");
-    InfluxiveMeterProvider::new(otel_config, Arc::new(writer))
+    create_meter_provider(otel_config, Arc::new(writer))
 }
-
-#[cfg(test)]
-mod tests;
