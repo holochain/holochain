@@ -1,67 +1,10 @@
 #![deny(missing_docs)]
-#![deny(warnings)]
 #![deny(unsafe_code)]
 //! Rust utility for efficiently writing metrics to InfluxDB.
 //! Metrics can be written directly to a running InfluxDB instance or
 //! written to a Line Protocol file on disk that can be pushed to InfluxDB using Telegraf.
-//!
-//! ## Example
-//!
-//! ### Writing to a running InfluxDB instance
-//!
-//! ```
-//! # #[tokio::main(flavor = "multi_thread")]
-//! # async fn main() {
-//! use influxive::types::Metric;
-//! use influxive::writer::*;
-//!
-//! let writer = InfluxiveWriter::with_token_auth(
-//!     InfluxiveWriterConfig::default(),
-//!     "http://127.0.0.1:8086",
-//!     "my.bucket",
-//!     "my.token",
-//! );
-//!
-//! writer.write_metric(
-//!     Metric::new(
-//!         std::time::SystemTime::now(),
-//!         "my.metric",
-//!     )
-//!     .with_field("value", 3.14)
-//!     .with_tag("tag", "test-tag")
-//! );
-//! # }
-//! ```
-//!
-//! ### Writing to a file on disk
-//!
-//! ```rust
-//! # #[tokio::main(flavor = "multi_thread")]
-//! # async fn main() {
-//! use influxive::types::Metric;
-//! use influxive::writer::*;
-//!
-//! let path = std::path::PathBuf::from("my-metrics.influx");
-//! let config = InfluxiveWriterConfig::create_with_influx_file(path.clone());
-//! // The file backend ignores host/bucket/token
-//! let writer = InfluxiveWriter::with_token_auth(config, "", "", "");
-//!
-//! writer.write_metric(
-//!     Metric::new(
-//!         std::time::SystemTime::now(),
-//!         "my.metric",
-//!     )
-//!     .with_field("value", 3.14)
-//!     .with_tag("tag", "test-tag")
-//! );
-//!
-//! // Now you can read and use the metrics file `my-metrics.influx`
-//!
-//! # let _ = std::fs::remove_file(path);
-//! # }
-//! ```
 
-use crate::types::*;
+use super::types::*;
 use std::sync::Arc;
 
 trait DataTypeExt {
@@ -75,7 +18,7 @@ impl DataTypeExt for DataType {
             DataType::F64(f) => influxdb::Type::Float(f),
             DataType::I64(i) => influxdb::Type::SignedInteger(i),
             DataType::U64(u) => influxdb::Type::UnsignedInteger(u),
-            DataType::String(s) => influxdb::Type::Text(s.into_string()),
+            DataType::String(s) => influxdb::Type::Text(s),
         }
     }
 }
@@ -345,6 +288,8 @@ impl WriteBuf {
     }
 }
 
+const CHANNEL_CAPACITY: usize = 4096;
+
 /// InfluxDB metric writer instance.
 pub struct InfluxiveWriter(tokio::sync::mpsc::Sender<WriteCmd>);
 
@@ -362,7 +307,7 @@ impl InfluxiveWriter {
             token.as_ref().to_string(),
         );
 
-        let (write_send, mut write_recv) = tokio::sync::mpsc::channel(config.batch_buffer_size);
+        let (write_send, mut write_recv) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
 
         let write_send_timer = write_send.clone();
         let mut interval = tokio::time::interval(config.batch_duration / 3);
@@ -418,7 +363,7 @@ impl InfluxiveWriter {
     }
 }
 
-impl crate::types::MetricWriter for InfluxiveWriter {
+impl super::types::MetricWriter for InfluxiveWriter {
     fn write_metric(&self, metric: Metric) {
         InfluxiveWriter::write_metric(self, metric);
     }
@@ -440,15 +385,15 @@ fn metric_to_query(metric: Metric) -> influxdb::WriteQuery {
                 .expect("invalid system time")
                 .as_nanos(),
         ),
-        name.into_string(),
+        name,
     );
 
     for (k, v) in fields {
-        query = query.add_field(k.into_string(), v.into_type());
+        query = query.add_field(k, v.into_type());
     }
 
     for (k, v) in tags {
-        query = query.add_tag(k.into_string(), v.into_type());
+        query = query.add_tag(k, v.into_type());
     }
 
     query

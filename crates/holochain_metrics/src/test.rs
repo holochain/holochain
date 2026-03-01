@@ -1,5 +1,6 @@
 use crate::*;
-use std::io::BufRead;
+use influxive::{InfluxiveMeterProviderConfig, InfluxiveWriterConfig};
+use std::{io::BufRead, time::Duration};
 
 #[test]
 fn metrics_none() {
@@ -17,22 +18,18 @@ async fn metrics_influxive_file() {
         .path()
         .join(std::path::PathBuf::from("metrics.influx"));
 
-    let config = HolochainMetricsConfig::from_env(
-        temp_dir.path(),
-        HolochainMetricsEnv::InfluxiveFile {
-            filepath: filepath.as_path().to_str().unwrap().to_string(),
-        },
-    );
-    assert!(matches!(
-        config,
-        HolochainMetricsConfig::InfluxiveFile { .. }
-    ));
-
+    let config = HolochainMetricsConfig::InfluxiveFile {
+        writer_config: InfluxiveWriterConfig::create_with_influx_file(
+            filepath.as_path().to_path_buf(),
+        ),
+        otel_config: InfluxiveMeterProviderConfig::default()
+            .with_report_interval(Some(Duration::from_millis(100))),
+    };
     config.init().await;
 
-    let m = opentelemetry_api::global::meter("test")
+    let m = opentelemetry::global::meter("test")
         .f64_histogram("my.metric")
-        .init();
+        .build();
 
     // make a recording
     m.record(3.42, &[]);

@@ -2,7 +2,7 @@
 #![deny(unsafe_code)]
 //! Initialize holochain metrics.
 //! This crate should only be used in binaries to initialize the actual
-//! metrics collection. Libraries should just use the opentelemetry_api
+//! metrics collection. Libraries should just use the opentelemetry
 //! to report metrics if any collector has been initialized.
 //!
 //! ## Environment Variables
@@ -60,23 +60,21 @@
 //!   "byte.count", which both may have the filtering attribute "remote_id".
 //!   - Examples
 //!     - ```
-//!         use opentelemetry_api::{Context, KeyValue, metrics::Unit};
-//!         let req_dur = opentelemetry_api::global::meter("hc")
+//!         use opentelemetry::KeyValue;
+//!         let req_dur = opentelemetry::global::meter("hc")
 //!             .f64_histogram("hc.holochain_p2p.request.duration")
 //!             .with_description("holochain p2p request duration")
-//!             .with_unit(Unit::new("s"))
-//!             .init();
-//!         req_dur.record(0.42, &[
-//!             KeyValue::new("remote_id", "abcd"),
-//!         ]);
+//!             .with_unit("s")
+//!             .build();
+//!         req_dur.record(0.42, &[KeyValue::new("remote_id", "abcd")]);
 //!       ```
 //!     - ```
-//!         use opentelemetry_api::{Context, KeyValue, metrics::Unit};
-//!         let req_size = opentelemetry_api::global::meter("hc")
+//!         use opentelemetry::KeyValue;
+//!         let req_size = opentelemetry::global::meter("hc")
 //!             .u64_histogram("hc.holochain_p2p.request.byte.count")
 //!             .with_description("holochain p2p request byte count")
-//!             .with_unit(Unit::new("By"))
-//!             .init();
+//!             .with_unit("B")
+//!             .build();
 //!         req_size.record(42, &[
 //!             KeyValue::new("remote_id", "abcd"),
 //!         ]);
@@ -94,6 +92,8 @@
 //! | `hc.db.pool.utilization` | `f64_gauge` (observable) | | The utilization of connections in the pool. |- `kind`: The kind of database such as Conductor, Wasm or Dht etc.<br />- `id`: The unique identifier for this database if multiple instances can exist, such as a Dht database. |
 //! | `hc.db.connections.use_time` | `f64_histogram` | `s` | The time between borrowing a connection and returning it to the pool. |- `kind`: The kind of database such as Conductor, Wasm or Dht etc.<br />- `id`: The unique identifier for this database if multiple instances can exist, such as a Dht database. |
 //! | `hc.ribosome.wasm.usage` | `u64_counter` | | The metered usage of a wasm ribosome. | - `dna`: The DNA hash that this wasm is metered for.<br />- `zome`: The zome that this wasm is metered for.<br />- `fn`: The function that this wasm is metered for.<br />- `agent`: The agent that this wasm is metered for (if there is one). |
+
+pub(crate) mod influxive;
 
 #[cfg(test)]
 mod test;
@@ -317,7 +317,7 @@ impl HolochainMetricsConfig {
         let meter_provider = influxive::influxive_file_meter_provider(writer_config, otel_config);
 
         // set up opentelemetry to use our metrics collector
-        opentelemetry_api::global::set_meter_provider(meter_provider);
+        opentelemetry::global::set_meter_provider(meter_provider);
     }
 
     fn init_influxive_external(
@@ -338,7 +338,7 @@ impl HolochainMetricsConfig {
         );
 
         // setup opentelemetry to use our metrics collector
-        opentelemetry_api::global::set_meter_provider(meter_provider);
+        opentelemetry::global::set_meter_provider(meter_provider);
     }
 
     async fn init_influxive_child_svc(
@@ -369,7 +369,7 @@ impl HolochainMetricsConfig {
                 }
 
                 // setup opentelemetry to use our metrics collector
-                opentelemetry_api::global::set_meter_provider(meter_provider);
+                opentelemetry::global::set_meter_provider(meter_provider);
 
                 tracing::info!(host = %influxive.get_host(), "influxive metrics running");
             }

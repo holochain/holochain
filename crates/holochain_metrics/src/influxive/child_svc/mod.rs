@@ -1,36 +1,9 @@
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
 //! Run influxd as a child process.
-//!
-//! ## Example
-//!
-//! ```
-//! # #[tokio::main(flavor = "multi_thread")]
-//! # async fn main() {
-//! use influxive::types::Metric;
-//! use influxive::child_svc::*;
-//!
-//! let tmp = tempfile::tempdir().unwrap();
-//!
-//! let influxive = InfluxiveChildSvc::new(
-//!     InfluxiveChildSvcConfig::default()
-//!         .with_database_path(Some(tmp.path().to_owned())),
-//! ).await.unwrap();
-//!
-//! influxive.write_metric(
-//!     Metric::new(
-//!         std::time::SystemTime::now(),
-//!         "my.metric",
-//!     )
-//!     .with_field("value", 3.14)
-//!     .with_tag("tag", "test-tag")
-//! );
-//! # }
-//! ```
 
-use crate::types::*;
-use crate::writer::*;
-use std::io::Result;
+use super::types::*;
+use super::writer::*;
 
 #[cfg(feature = "download_binaries")]
 mod downloader;
@@ -40,8 +13,6 @@ mod download_binaries;
 
 #[cfg(test)]
 mod tests;
-
-pub use crate::writer::InfluxiveWriterConfig;
 
 macro_rules! cmd_output {
     ($cmd:expr $(,$arg:expr)*) => {async {
@@ -54,7 +25,7 @@ macro_rules! cmd_output {
         let output = proc.output().await?;
         let err = String::from_utf8_lossy(&output.stderr);
         if !err.is_empty() {
-            Err(err_other(err.to_string()))
+            Err(InfluxiveError::Command(err.to_string()))
         } else {
             Ok(String::from_utf8_lossy(&output.stdout).to_string())
         }
@@ -195,14 +166,14 @@ pub struct InfluxiveChildSvc {
     config: InfluxiveChildSvcConfig,
     host: String,
     token: String,
-    child: std::sync::Mutex<Option<tokio::process::Child>>,
+    _child: std::sync::Mutex<Option<tokio::process::Child>>,
     influx_path: std::path::PathBuf,
     writer: InfluxiveWriter,
 }
 
 impl InfluxiveChildSvc {
     /// Spawn a new influxd child process.
-    pub async fn new(config: InfluxiveChildSvcConfig) -> Result<Self> {
+    pub async fn new(config: InfluxiveChildSvcConfig) -> InfluxiveResult<Self> {
         let db_path = config.database_path.clone().unwrap_or_else(|| {
             let mut db_path = std::path::PathBuf::from(".");
             db_path.push("influxive");
@@ -269,7 +240,7 @@ impl InfluxiveChildSvc {
             config,
             host,
             token,
-            child: std::sync::Mutex::new(Some(child)),
+            _child: std::sync::Mutex::new(Some(child)),
             influx_path,
             writer,
         };
@@ -301,17 +272,13 @@ impl InfluxiveChildSvc {
             millis *= 2;
         }
 
-        Err(err_other("Unable to start influxd"))
+        Err(InfluxiveError::Startup("Unable to start influxd".into()))
     }
 
     /// Shut down the child process. Further calls to it should error.
+    #[cfg(test)]
     pub fn shutdown(&self) {
-        drop(self.child.lock().unwrap().take());
-    }
-
-    /// Get the config this instance was created with.
-    pub fn get_config(&self) -> &InfluxiveChildSvcConfig {
-        &self.config
+        drop(self._child.lock().unwrap().take());
     }
 
     /// Get the host url of this running influxd instance.
@@ -319,13 +286,9 @@ impl InfluxiveChildSvc {
         &self.host
     }
 
-    /// Get the operator token of this running influxd instance.
-    pub fn get_token(&self) -> &str {
-        &self.token
-    }
-
     /// "Ping" the running InfluxDB instance, returning the result.
-    pub async fn ping(&self) -> Result<()> {
+    #[cfg(test)]
+    pub async fn ping(&self) -> InfluxiveResult<()> {
         cmd_output!(&self.influx_path, "ping", "--host", &self.host)?;
         Ok(())
     }
@@ -333,7 +296,7 @@ impl InfluxiveChildSvc {
     /// Run a query against the running InfluxDB instance.
     /// Note, if you are writing metrics, prefer the 'write_metric' api
     /// as that will be more efficient.
-    pub async fn query<Q: Into<StringType>>(&self, flux_query: Q) -> Result<String> {
+    pub async fn query<Q: Into<String>>(&self, flux_query: Q) -> InfluxiveResult<String> {
         cmd_output!(
             &self.influx_path,
             "query",
@@ -344,12 +307,12 @@ impl InfluxiveChildSvc {
             &self.host,
             "--token",
             &self.token,
-            flux_query.into().into_string()
+            flux_query.into()
         )
     }
 
     /// List the existing dashboard data in the running InfluxDB instance.
-    pub async fn list_dashboards(&self) -> Result<String> {
+    pub async fn list_dashboards(&self) -> InfluxiveResult<String> {
         cmd_output!(
             &self.influx_path,
             "dashboards",
@@ -364,7 +327,7 @@ impl InfluxiveChildSvc {
     }
 
     /// Apply a template to the running InfluxDB instance.
-    pub async fn apply(&self, template: &[u8]) -> Result<String> {
+    pub async fn apply(&self, template: &[u8]) -> InfluxiveResult<String> {
         use tokio::io::AsyncWriteExt;
 
         let (file, tmp) = tempfile::Builder::new()
@@ -411,7 +374,8 @@ impl InfluxiveChildSvc {
 
     /// Write raw line protocol data to the running InfluxDB instance.
     /// This is useful for testing or importing data in InfluxDB line protocol format.
-    pub async fn write_line_protocol<D: AsRef<str>>(&self, data: D) -> Result<()> {
+    #[cfg(test)]
+    pub async fn write_line_protocol<D: AsRef<str>>(&self, data: D) -> InfluxiveResult<()> {
         use std::io::Write;
 
         let data = data.as_ref();
@@ -451,7 +415,7 @@ async fn dl_influx(
     _db_path: &std::path::Path,
     is_cli: bool,
     bin_path: &mut std::path::PathBuf,
-    err_list: &mut Vec<std::io::Error>,
+    err_list: &mut Vec<InfluxiveError>,
 ) -> Option<String> {
     let spec = if is_cli {
         &download_binaries::DL_CLI
@@ -466,18 +430,20 @@ async fn dl_influx(
                 match cmd_output!(&bin_path, "version") {
                     Ok(ver) => return Some(ver),
                     Err(err) => {
-                        err_list.push(err_other(format!("failed to run {bin_path:?}")));
+                        err_list.push(InfluxiveError::Other(format!("failed to run {bin_path:?}")));
                         err_list.push(err);
                     }
                 }
             }
             Err(err) => {
-                err_list.push(err_other("failed to download"));
+                err_list.push(InfluxiveError::Other("failed to download".into()));
                 err_list.push(err);
             }
         }
     } else {
-        err_list.push(err_other("no download configured for this target os/arch"));
+        err_list.push(InfluxiveError::Other(
+            "no download configured for this target os/arch".into(),
+        ));
     }
 
     None
@@ -487,7 +453,7 @@ async fn validate_influx(
     _db_path: &std::path::Path,
     config: &InfluxiveChildSvcConfig,
     is_cli: bool,
-) -> Result<std::path::PathBuf> {
+) -> InfluxiveResult<std::path::PathBuf> {
     let mut bin_path = if is_cli {
         "influx".into()
     } else {
@@ -506,7 +472,7 @@ async fn validate_influx(
         Ok(ver) => ver,
         Err(err) => {
             let mut err_list = Vec::new();
-            err_list.push(err_other(format!("failed to run {bin_path:?}")));
+            err_list.push(InfluxiveError::Other(format!("failed to run {bin_path:?}")));
             err_list.push(err);
 
             #[cfg(feature = "download_binaries")]
@@ -514,24 +480,24 @@ async fn validate_influx(
                 if let Some(ver) = dl_influx(_db_path, is_cli, &mut bin_path, &mut err_list).await {
                     ver
                 } else {
-                    return Err(err_other(format!("{err_list:?}",)));
+                    return Err(InfluxiveError::Other(format!("{err_list:?}")));
                 }
             }
 
             #[cfg(not(feature = "download_binaries"))]
             {
-                return Err(err_other(format!("{err_list:?}",)));
+                return Err(InfluxiveError::Other(format!("{err_list:?}")));
             }
         }
     };
 
     // alas, the cli prints out the unhelpful version "dev".
     if is_cli && !ver.contains("build_date: 2024-04-16") {
-        return Err(err_other(format!(
+        return Err(InfluxiveError::VersionMismatch(format!(
             "expected build date 2024-04-16 of Influx CLI, got: {ver}"
         )));
     } else if !is_cli && !ver.contains("InfluxDB v2.8.0") {
-        return Err(err_other(format!(
+        return Err(InfluxiveError::VersionMismatch(format!(
             "expected v2.8.0 of InfluxDB, got: {ver}"
         )));
     }
@@ -542,7 +508,7 @@ async fn validate_influx(
 async fn spawn_influxd(
     db_path: &std::path::Path,
     influxd_path: &std::path::Path,
-) -> Result<(tokio::process::Child, u16)> {
+) -> InfluxiveResult<(tokio::process::Child, u16)> {
     use tokio::io::AsyncBufReadExt;
 
     let (s, r) = tokio::sync::oneshot::channel();
@@ -567,7 +533,7 @@ async fn spawn_influxd(
 
     let mut child = proc
         .spawn()
-        .map_err(|err| err_other(format!("{proc_err}: {err:?}")))?;
+        .map_err(|err| InfluxiveError::Command(format!("{proc_err}: {err:?}")))?;
 
     let stdout = child.stdout.take().unwrap();
     let mut reader = tokio::io::BufReader::new(stdout).lines();
@@ -590,7 +556,9 @@ async fn spawn_influxd(
         }
     });
 
-    let port = r.await.map_err(|_| err_other("Failed to scrape port"))?;
+    let port = r
+        .await
+        .map_err(|_| InfluxiveError::Startup("Failed to scrape port".into()))?;
 
     Ok((child, port))
 }

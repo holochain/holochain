@@ -52,7 +52,7 @@ tokio = { version = "1.27", features = [
 ] }
 tracing = "0.1.18"
 getrandom = "0.3"
-opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
+opentelemetry = "0.31"
 schemars = "0.9"
 
 kitsune2_api = "0.4.0-dev.2"
