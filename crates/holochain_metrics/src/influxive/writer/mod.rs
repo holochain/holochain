@@ -288,6 +288,8 @@ impl WriteBuf {
     }
 }
 
+const CHANNEL_CAPACITY: usize = 4096;
+
 /// InfluxDB metric writer instance.
 pub struct InfluxiveWriter(tokio::sync::mpsc::Sender<WriteCmd>);
 
@@ -305,7 +307,7 @@ impl InfluxiveWriter {
             token.as_ref().to_string(),
         );
 
-        let (write_send, mut write_recv) = tokio::sync::mpsc::channel(config.batch_buffer_size);
+        let (write_send, mut write_recv) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
 
         let write_send_timer = write_send.clone();
         let mut interval = tokio::time::interval(config.batch_duration / 3);

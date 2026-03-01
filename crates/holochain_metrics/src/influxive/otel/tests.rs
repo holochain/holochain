@@ -3,7 +3,7 @@ use crate::influxive::{
     writer::InfluxiveWriterConfig,
     InfluxiveMeterProvider, InfluxiveMeterProviderConfig,
 };
-use opentelemetry::metrics::MeterProvider;
+use opentelemetry::{metrics::MeterProvider, KeyValue};
 use std::{
     sync::{
         atomic::{AtomicU16, Ordering},
@@ -103,13 +103,17 @@ async fn f64_histogram() {
         metric.record(f64::from(i), &[]);
     }
 
-    // Expect two rows now per field value.
+    // Expect two rows now per field value, with the updated count visible.
+    // It could happen that the first table contains a second line with
+    // the initial value of 1, so keep polling until the expected count
+    // 11 shows up.
     let result = poll_query(&svc, name, "", 300, |r| {
         r.tables.len() == 2
             && r.tables[0].rows.len() >= 2
             && r.tables[0].rows.len() <= 3
             && r.tables[1].rows.len() >= 6
             && r.tables[1].rows.len() <= 9
+            && r.tables[0].get::<u64>(r.tables[0].rows.len() - 1, "_value") == 11
     })
     .await;
 
@@ -170,6 +174,45 @@ async fn f64_observable_gauge() {
     assert_eq!(result.tables[0].get::<f64>(2, "_value"), 2.0);
     assert_eq!(result.tables[0].get::<f64>(3, "_value"), 3.0);
     assert_eq!(result.tables[0].get::<f64>(4, "_value"), 4.0);
+
+    svc.shutdown();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn u64_counter_with_attributes() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (svc, meter_provider) = setup(tmp.path()).await;
+
+    let name = "u64_counter";
+    let metric = meter_provider.meter("influxive").u64_counter(name).build();
+
+    // Record a metric with an attribute.
+    let mut attributes = vec![KeyValue::new("key", "value1")];
+    metric.add(1, &attributes);
+
+    let result = poll_query(&svc, name, "", 300, |r| {
+        r.tables.len() == 1 && !r.tables[0].rows.is_empty() && r.tables[0].rows.len() <= 2
+    })
+    .await;
+    assert_eq!(result.tables[0].get::<u64>(0, "_value"), 1);
+    assert_eq!(
+        result.tables[0].get::<String>(0, attributes[0].key.as_str()),
+        attributes[0].value.as_str()
+    );
+
+    // Record metric again with the same attribute, but another value.
+    attributes[0].value = "value2".into();
+    metric.add(1, &attributes);
+
+    let result = poll_query(&svc, name, "", 300, |r| {
+        r.tables.len() == 1
+            && r.tables[0].rows.len() >= 2
+            && r.tables[0].rows.len() <= 3
+            && r.tables[0].get::<String>(r.tables[0].rows.len() - 1, attributes[0].key.as_str())
+                == attributes[0].value.as_str()
+    })
+    .await;
+    assert_eq!(result.tables[0].get::<u64>(1, "_value"), 1);
 
     svc.shutdown();
 }

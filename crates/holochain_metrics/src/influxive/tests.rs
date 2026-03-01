@@ -27,15 +27,21 @@ async fn file_meter_provider_one_metric_one_value() {
     m.record(4.13, &[]);
 
     // Wait for the metric to be written
-    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-
-    // Check file content for metric
-    let file = std::fs::File::open(&test_path).unwrap();
-    let reader = std::io::BufReader::new(file);
-    let res = reader.lines().next().transpose().unwrap();
-    assert!(res.is_some());
-    let line = res.unwrap();
-    let split = line.split(' ').collect::<Vec<&str>>();
-    assert_eq!(split[0], "my.metric");
-    assert!(split[1].contains("4.13"));
+    tokio::time::timeout(Duration::from_millis(500), async {
+        loop {
+            // Check file content for metric
+            let file = std::fs::File::open(&test_path).unwrap();
+            let reader = std::io::BufReader::new(file);
+            let res = reader.lines().next().transpose().unwrap();
+            if let Some(line) = res {
+                let split = line.split(' ').collect::<Vec<&str>>();
+                assert_eq!(split[0], "my.metric");
+                assert!(split[1].contains("4.13"));
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .unwrap();
 }
