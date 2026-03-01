@@ -322,5 +322,9 @@ async fn writer_stress() {
 
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
-    assert!(factory.get_write_count() < 250);
+    assert!(
+        factory.get_write_count() < 250,
+        "expected < 250, but got {}",
+        factory.get_write_count()
+    );
 }

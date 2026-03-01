@@ -3,7 +3,7 @@ use crate::influxive::{
     writer::InfluxiveWriterConfig,
     InfluxiveMeterProvider, InfluxiveMeterProviderConfig,
 };
-use opentelemetry::metrics::MeterProvider;
+use opentelemetry::{metrics::MeterProvider, KeyValue};
 use std::{
     sync::{
         atomic::{AtomicU16, Ordering},
@@ -103,33 +103,26 @@ async fn f64_histogram() {
         metric.record(f64::from(i), &[]);
     }
 
-    // Expect two rows now per field value.
-    let result = poll_query(&svc, name, "", 300, |r| {
+    // Expect two rows now per field value, with the updated count visible.
+    // It could happen that the first table contains a second line with
+    // the initial value of 1, so keep polling until the expected count
+    // 11 shows up.
+    let result = poll_query(&svc, name, "|> last()", 300, |r| {
         r.tables.len() == 2
-            && r.tables[0].rows.len() >= 2
-            && r.tables[0].rows.len() <= 3
-            && r.tables[1].rows.len() >= 6
-            && r.tables[1].rows.len() <= 9
+            && r.tables[0].rows.len() == 1
+            && r.tables[1].rows.len() == 3
+            && r.tables[0].get::<u64>(0, "_value") == 11
+            && r.tables[1].get::<f64>(0, "_value") == 9.0
     })
     .await;
 
     assert_eq!(result.tables[0].get::<String>(0, "_field"), "count");
-    assert_eq!(result.tables[0].get::<u64>(0, "_value"), 1);
-    assert_eq!(result.tables[0].get::<String>(1, "_field"), "count");
-    assert_eq!(result.tables[0].get::<u64>(1, "_value"), 11);
 
     assert_eq!(result.tables[1].get::<String>(0, "_field"), "max");
-    assert_eq!(result.tables[1].get::<f64>(0, "_value"), 1.0);
-    assert_eq!(result.tables[1].get::<String>(1, "_field"), "max");
-    assert_eq!(result.tables[1].get::<f64>(1, "_value"), 9.0);
-    assert_eq!(result.tables[1].get::<String>(2, "_field"), "min");
-    assert_eq!(result.tables[1].get::<f64>(2, "_value"), 1.0);
-    assert_eq!(result.tables[1].get::<String>(3, "_field"), "min");
-    assert_eq!(result.tables[1].get::<f64>(3, "_value"), 0.0);
-    assert_eq!(result.tables[1].get::<String>(4, "_field"), "sum");
-    assert_eq!(result.tables[1].get::<f64>(4, "_value"), 1.0);
-    assert_eq!(result.tables[1].get::<String>(5, "_field"), "sum");
-    assert_eq!(result.tables[1].get::<f64>(5, "_value"), 46.0);
+    assert_eq!(result.tables[1].get::<String>(1, "_field"), "min");
+    assert_eq!(result.tables[1].get::<String>(2, "_field"), "sum");
+    assert_eq!(result.tables[1].get::<f64>(1, "_value"), 0.0);
+    assert_eq!(result.tables[1].get::<f64>(2, "_value"), 46.0);
 
     svc.shutdown();
 }
@@ -161,7 +154,7 @@ async fn f64_observable_gauge() {
     assert_eq!(result.tables[0].get::<f64>(0, "_value"), 0.0);
 
     // Wait for more gauge values to have been recorded.
-    let result = poll_query(&svc, name, "", 500, |r| {
+    let result = poll_query(&svc, name, "", 1000, |r| {
         r.tables.len() == 1 && r.tables[0].rows.len() >= 5 && r.tables[0].rows.len() <= 6
     })
     .await;
@@ -174,12 +167,57 @@ async fn f64_observable_gauge() {
     svc.shutdown();
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn u64_counter_with_attributes() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (svc, meter_provider) = setup(tmp.path()).await;
+
+    let name = "u64_counter";
+    let metric = meter_provider.meter("influxive").u64_counter(name).build();
+
+    // Record a metric with an attribute.
+    let attributes = vec![KeyValue::new("key", "value1")];
+    metric.add(1, &attributes);
+
+    let result = poll_query(&svc, name, "", 300, |r| {
+        r.tables.len() == 1 && !r.tables[0].rows.is_empty() && r.tables[0].rows.len() <= 2
+    })
+    .await;
+    assert_eq!(result.tables[0].get::<u64>(0, "_value"), 1);
+    assert_eq!(
+        result.tables[0].get::<String>(0, attributes[0].key.as_str()),
+        attributes[0].value.as_str()
+    );
+
+    // Record metric again with the same attribute, but another value.
+    let attributes_2 = vec![KeyValue::new("key", "value2")];
+    metric.add(1, &attributes_2);
+
+    let result = poll_query(&svc, name, "|> last()", 300, |r| {
+        r.tables.len() == 1 && r.tables[0].rows.len() == 2
+    })
+    .await;
+    assert_eq!(result.tables[0].get::<u64>(0, "_value"), 1);
+    assert_eq!(
+        result.tables[0].get::<String>(0, attributes[0].key.as_str()),
+        attributes[0].value.as_str()
+    );
+    assert_eq!(
+        result.tables[0].get::<String>(1, attributes_2[0].key.as_str()),
+        attributes_2[0].value.as_str()
+    );
+
+    svc.shutdown();
+}
+
 async fn setup(tmp: &std::path::Path) -> (Arc<InfluxiveChildSvc>, InfluxiveMeterProvider) {
     let influxive_svc = Arc::new(
         InfluxiveChildSvc::new(
             InfluxiveChildSvcConfig::default()
                 .with_database_path(Some(tmp.into()))
-                .with_metric_write(InfluxiveWriterConfig::default().with_batch_buffer_size(1)),
+                .with_metric_write(
+                    InfluxiveWriterConfig::default().with_batch_duration(Duration::from_millis(5)),
+                ),
         )
         .await
         .unwrap(),
@@ -201,7 +239,7 @@ async fn poll_query(
 ) -> QueryResult {
     tokio::time::timeout(Duration::from_millis(timeout_ms), async {
         loop {
-            let result = QueryResult::parse(
+            let query_result = QueryResult::parse(
                 &svc.query(format!(
                     r#"
 from(bucket: "influxive")
@@ -212,9 +250,9 @@ from(bucket: "influxive")
                 .await
                 .unwrap(),
             );
-            if condition(&result) {
-                println!("{result:#?}");
-                return result;
+            println!("{query_result:#?}");
+            if condition(&query_result) {
+                return query_result;
             }
             tokio::time::sleep(Duration::from_millis(20)).await;
         }

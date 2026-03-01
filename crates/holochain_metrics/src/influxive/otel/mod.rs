@@ -12,6 +12,9 @@ use opentelemetry_sdk::metrics::{PeriodicReader, SdkMeterProvider, Temporality};
 use std::sync::Arc;
 use std::time::SystemTime;
 
+#[cfg(test)]
+mod tests;
+
 /// The writer
 pub struct InfluxiveOtelWriter {
     influxive: DynMetricWriter,
@@ -118,7 +121,7 @@ pub struct InfluxiveMeterProviderConfig {
 }
 
 impl InfluxiveMeterProviderConfig {
-    /// Apply [InfluxiveMeterProviderConfig::report_interval].
+    /// Apply [`InfluxiveMeterProviderConfig::report_interval`].
     pub fn with_report_interval(mut self, report_interval: Option<std::time::Duration>) -> Self {
         self.report_interval = report_interval;
         self
@@ -134,7 +137,7 @@ pub struct InfluxiveMeterProvider {
 
 impl InfluxiveMeterProvider {
     /// Construct a new InfluxiveMeterProvider instance with a given
-    /// "Influxive" InfluxiveDB child process connector.
+    /// Influxive writer.
     pub fn new(config: InfluxiveMeterProviderConfig, influxive: DynMetricWriter) -> Self {
         let exporter = InfluxiveOtelWriter { influxive };
         let mut reader_builder = PeriodicReader::builder(exporter);
@@ -158,6 +161,3 @@ impl MeterProvider for InfluxiveMeterProvider {
         self.inner.meter_with_scope(scope)
     }
 }
-
-#[cfg(test)]
-mod tests;

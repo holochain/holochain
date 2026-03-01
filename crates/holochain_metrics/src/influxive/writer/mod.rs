@@ -1,4 +1,5 @@
 #![deny(missing_docs)]
+#![deny(warnings)]
 #![deny(unsafe_code)]
 //! Rust utility for efficiently writing metrics to InfluxDB.
 //! Metrics can be written directly to a running InfluxDB instance or

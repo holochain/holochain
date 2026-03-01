@@ -5,7 +5,7 @@
 //! influxive-child-svc crate as a means to make it easy for the dependencies
 //! to be optional.
 
-use super::super::types::{InfluxiveError, InfluxiveResult};
+use crate::influxive::types::{InfluxiveError, InfluxiveResult};
 
 /// Indicate what archive type is used in the target.
 #[derive(Clone, Debug)]
