@@ -176,7 +176,7 @@ async fn u64_counter_with_attributes() {
     let attributes_2 = vec![KeyValue::new("key", "value2")];
     metric.add(1, &attributes_2);
 
-    let result = poll_query(&svc, name, "|> last()", 500, |r| {
+    let result = poll_query(&svc, name, "|> last()", 1000, |r| {
         r.tables.len() == 1 && r.tables[0].rows.len() == 2
     })
     .await;

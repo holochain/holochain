@@ -2,7 +2,7 @@
 #![deny(unsafe_code)]
 //! Initialize holochain metrics.
 //! This crate should only be used in binaries to initialize the actual
-//! metrics collection. Libraries should just use the opentelemetry
+//! metrics collection. Libraries should just use the opentelemetry crate
 //! to report metrics if any collector has been initialized.
 //!
 //! ## Environment Variables
