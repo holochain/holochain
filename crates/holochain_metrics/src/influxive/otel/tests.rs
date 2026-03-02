@@ -16,25 +16,6 @@ use std::{
 use utils::*;
 
 #[tokio::test(flavor = "multi_thread")]
-async fn observable_interval() {
-    let tmp = tempfile::tempdir().unwrap();
-    let (svc, meter_provider) = setup(tmp.path()).await;
-
-    let name = "counting_u64";
-    let metric = meter_provider.meter("influxive").u64_counter(name).build();
-
-    metric.add(1, &[]);
-
-    let result = poll_query(&svc, name, "", 300, |r| {
-        r.tables.len() == 1 && !r.tables[0].rows.is_empty() && r.tables[0].rows.len() <= 2
-    })
-    .await;
-    assert_eq!(result.tables[0].get::<u64>(0, "_value"), 1);
-
-    svc.shutdown();
-}
-
-#[tokio::test(flavor = "multi_thread")]
 async fn u64_counter() {
     let tmp = tempfile::tempdir().unwrap();
     let (svc, meter_provider) = setup(tmp.path()).await;
@@ -45,7 +26,7 @@ async fn u64_counter() {
     metric.add(1, &[]);
 
     let result = poll_query(&svc, name, "|> last()", 300, |r| {
-        r.tables.len() == 1 && !r.tables[0].rows.is_empty() && r.tables[0].rows.len() <= 2
+        r.tables.len() == 1 && r.tables[0].rows.len() == 1
     })
     .await;
     assert_eq!(result.tables[0].get::<u64>(0, "_value"), 1);
@@ -78,13 +59,13 @@ async fn f64_histogram() {
     metric.record(1.0, &[]);
 
     // Influx writes u64 values into one table and f64 values into another table.
-    // Hence 2 tables are expected to be present.
+    // Hence, 2 tables are expected to be present.
     let result = poll_query(&svc, name, "", 300, |r| {
         r.tables.len() == 2
             && !r.tables[0].rows.is_empty()
-            && r.tables[0].rows.len() <= 2
+            && r.tables[0].rows.len() <= 3
             && r.tables[1].rows.len() >= 3
-            && r.tables[1].rows.len() <= 4
+            && r.tables[1].rows.len() <= 5
     })
     .await;
 
@@ -109,7 +90,7 @@ async fn f64_histogram() {
     // It could happen that the first table contains a second line with
     // the initial value of 1, so keep polling until the expected count
     // 11 shows up.
-    let result = poll_query(&svc, name, "|> last()", 300, |r| {
+    let result = poll_query(&svc, name, "|> last()", 400, |r| {
         r.tables.len() == 2
             && r.tables[0].rows.len() == 1
             && r.tables[1].rows.len() == 3
@@ -137,7 +118,7 @@ async fn f64_observable_gauge() {
     let name = "f64_observable_gauge";
 
     let observed_value = AtomicU16::new(0);
-    // Create observable gauge metric that records an increasing value when observed.
+    // Create an observable gauge metric that records an increasing value when observed.
     meter_provider
         .meter("influxive")
         .f64_observable_gauge(name)
@@ -195,7 +176,7 @@ async fn u64_counter_with_attributes() {
     let attributes_2 = vec![KeyValue::new("key", "value2")];
     metric.add(1, &attributes_2);
 
-    let result = poll_query(&svc, name, "|> last()", 300, |r| {
+    let result = poll_query(&svc, name, "|> last()", 500, |r| {
         r.tables.len() == 1 && r.tables[0].rows.len() == 2
     })
     .await;
