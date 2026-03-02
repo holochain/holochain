@@ -24,7 +24,7 @@ impl InfluxiveOtelWriter {
                 MetricData::Histogram(histogram) => {
                     for data_point in histogram.data_points() {
                         let mut influxive_metric =
-                            super::types::Metric::new(SystemTime::now(), otel_metric.name())
+                            super::types::Metric::new(histogram.time(), otel_metric.name())
                                 .with_field("count", data_point.count())
                                 .with_field("sum", data_point.sum());
                         if let Some(min) = data_point.min() {
@@ -43,7 +43,7 @@ impl InfluxiveOtelWriter {
                 MetricData::Gauge(gauge) => {
                     for data_point in gauge.data_points() {
                         let mut influxive_metric =
-                            super::types::Metric::new(SystemTime::now(), otel_metric.name())
+                            super::types::Metric::new(gauge.time(), otel_metric.name())
                                 .with_field("gauge", data_point.value());
                         for attribute in data_point.attributes() {
                             influxive_metric = influxive_metric
@@ -58,7 +58,7 @@ impl InfluxiveOtelWriter {
                 MetricData::Sum(sum) => {
                     for data_point in sum.data_points() {
                         let mut influxive_metric =
-                            super::types::Metric::new(SystemTime::now(), otel_metric.name())
+                            super::types::Metric::new(sum.time(), otel_metric.name())
                                 .with_field("sum", data_point.value());
                         for attribute in data_point.attributes() {
                             influxive_metric = influxive_metric
