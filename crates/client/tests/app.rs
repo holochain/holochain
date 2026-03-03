@@ -752,3 +752,103 @@ async fn call_zome_with_options_custom_timeout() {
         "Expected a timeout error, got: {result:?}"
     );
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn handle_signal_from_clone_cell() {
+    use holochain_types::prelude::{CreateCloneCellPayload, DnaModifiersOpt};
+    use holochain_zome_types::prelude::RoleName;
+
+    let conductor = SweetConductor::standard().await;
+
+    let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
+    let admin_ws = AdminWebsocket::connect((Ipv4Addr::LOCALHOST, admin_port), None)
+        .await
+        .unwrap();
+
+    let app_id: InstalledAppId = "test-app".into();
+    let role_name: RoleName = "foo".into();
+    admin_ws
+        .install_app(InstallAppPayload {
+            agent_key: None,
+            installed_app_id: Some(app_id.clone()),
+            network_seed: None,
+            roles_settings: None,
+            source: AppBundleSource::Bytes(fixture::get_fixture_app_bundle()),
+            ignore_genesis_failure: false,
+        })
+        .await
+        .unwrap();
+    admin_ws.enable_app(app_id.clone()).await.unwrap();
+
+    let app_ws_port = admin_ws
+        .attach_app_interface(0, None, AllowedOrigins::Any, None)
+        .await
+        .unwrap();
+    let token_issued = admin_ws
+        .issue_app_auth_token(app_id.clone().into())
+        .await
+        .unwrap();
+    let signer = ClientAgentSigner::default();
+    let app_ws = AppWebsocket::connect(
+        (Ipv4Addr::LOCALHOST, app_ws_port),
+        token_issued.token,
+        signer.clone().into(),
+        None,
+    )
+    .await
+    .unwrap();
+
+    // Create a clone cell
+    let cloned_cell = app_ws
+        .create_clone_cell(CreateCloneCellPayload {
+            role_name: role_name.clone(),
+            modifiers: DnaModifiersOpt::none().with_network_seed("seed".into()),
+            membrane_proof: None,
+            name: None,
+        })
+        .await
+        .unwrap();
+    let cell_id = cloned_cell.cell_id.clone();
+
+    let credentials = admin_ws
+        .authorize_signing_credentials(AuthorizeSigningCredentialsPayload {
+            cell_id: cell_id.clone(),
+            functions: None,
+        })
+        .await
+        .unwrap();
+    signer.add_credentials(cell_id.clone(), credentials);
+
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+
+    // Re-connect the signal listener after refreshing app info
+    app_ws
+        .on_signal(move |signal| match signal {
+            Signal::App { signal, .. } => {
+                let ts: TestString = signal.into_inner().decode().unwrap();
+                assert_eq!(ts.0.as_str(), "i am a signal");
+                tx.send(()).unwrap();
+            }
+            _ => panic!("Invalid signal"),
+        })
+        .await;
+
+    const TEST_ZOME_NAME: &str = "foo";
+    const TEST_FN_NAME: &str = "emitter";
+
+    // This call emits a signal
+    app_ws
+        .call_zome(
+            cloned_cell.cell_id.clone().into(),
+            TEST_ZOME_NAME.into(),
+            TEST_FN_NAME.into(),
+            ExternIO::encode(()).unwrap(),
+        )
+        .await
+        .unwrap();
+
+    // Wait for the signal to be processed.
+    let wait_result = tokio::time::timeout(Duration::from_secs(4), rx.recv()).await;
+
+    assert!(wait_result.is_ok(), "Signal was not received from the clone cell even after re-connecting on_signal");
+}
