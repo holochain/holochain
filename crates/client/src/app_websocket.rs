@@ -201,7 +201,12 @@ impl AppWebsocket {
     }
 
     pub async fn on_signal<F: Fn(Signal) + 'static + Sync + Send>(&self, handler: F) -> String {
-        let app_info = self.app_info.clone();
+        let app_info = match self.app_info().await {
+            Err(_) => self.app_info.clone(),
+            Ok(None) => self.app_info.clone(),
+            Ok(Some(info)) => info,
+        };
+
         self.inner
             .on_signal(move |signal| match signal.clone() {
                 Signal::App {
