@@ -98,6 +98,9 @@
 //! | `hc.db.connections.use_time` | `f64_histogram` | `s` | The time between borrowing a connection and returning it to the pool. |- `kind`: The kind of database such as Conductor, Wasm or Dht etc.<br />- `id`: The unique identifier for this database if multiple instances can exist, such as a Dht database. |
 //! | `hc.ribosome.wasm.usage` | `u64_counter` | | The metered usage of a wasm ribosome. | - `dna`: The DNA hash that this wasm is metered for.<br />- `zome`: The zome that this wasm is metered for.<br />- `fn`: The function that this wasm is metered for.<br />- `agent`: The agent that this wasm is metered for (if there is one). |
 
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+
 pub(crate) mod influxive;
 
 #[cfg(test)]
@@ -238,21 +241,32 @@ impl HolochainMetricsConfig {
     ///
     /// The output of this function is largely controlled by environment
     /// variables, please see the [crate-level documentation](crate) for usage.
-    pub fn new(root_path: &std::path::Path) -> Self {
+    pub fn new(root_path: &Path) -> Self {
         Self::from_env(root_path, HolochainMetricsEnv::load())
     }
 
-    fn from_env(root_path: &std::path::Path, env: HolochainMetricsEnv) -> Self {
+    /// Simple config constructor.
+    pub fn with_file(file_path: &Path, report_interval: Option<Duration>) -> HolochainMetricsConfig {
+        HolochainMetricsConfig::InfluxiveFile {
+            writer_config: influxive::InfluxiveWriterConfig::create_with_influx_file(
+                PathBuf::from(file_path),
+            ),
+            otel_config: influxive::InfluxiveMeterProviderConfig::default()
+                .with_report_interval(report_interval),
+        }
+    }
+
+    fn from_env(root_path: &Path, env: HolochainMetricsEnv) -> Self {
         match env {
             HolochainMetricsEnv::InfluxiveFile { filepath } => Self::InfluxiveFile {
                 writer_config: influxive::InfluxiveWriterConfig::create_with_influx_file(
-                    std::path::PathBuf::from(filepath),
+                    PathBuf::from(filepath),
                 ),
                 otel_config: influxive::InfluxiveMeterProviderConfig::default(),
             },
 
             HolochainMetricsEnv::InfluxiveChildSvc => {
-                let mut database_path = std::path::PathBuf::from(root_path);
+                let mut database_path = PathBuf::from(root_path);
                 database_path.push("influxive");
                 Self::InfluxiveChildSvc {
                     child_svc_config: Box::new(

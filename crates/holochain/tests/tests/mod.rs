@@ -35,3 +35,4 @@ mod warrants;
 mod websocket;
 mod websocket_stress;
 mod zero_arc;
+mod metrics;
