@@ -1,17 +1,14 @@
-use hdk::prelude::{Entry, EntryDef, LinkTypeFilter};
-use holo_hash::fixt::ActionHashFixturator;
+use hdk::prelude::{Entry, EntryDef};
 use holo_hash::ActionHash;
 use holochain::sweettest::{
-    await_consistency, SweetConductor, SweetConductorBatch, SweetConductorConfig, SweetDnaFile,
+    await_consistency,  SweetConductorBatch, SweetDnaFile,
     SweetInlineZomes,
 };
-use holochain::test_utils::retry_fn_until_timeout;
 use holochain_types::prelude::EntryVisibility;
 use holochain_zome_types::action::ChainTopOrdering;
-use holochain_zome_types::entry::{EntryDefLocation, GetOptions};
+use holochain_zome_types::entry::{EntryDefLocation};
 use holochain_zome_types::fixt::AppEntryBytesFixturator;
-use holochain_zome_types::link::{CreateLinkInput, DeleteLinkInput, GetLinksInput, Link};
-use holochain_zome_types::prelude::{CreateInput, LinkQuery};
+use holochain_zome_types::prelude::{CreateInput};
 use std::fs::read_to_string;
 use std::time::{Duration, Instant};
 
@@ -51,18 +48,31 @@ async fn metrics_test() {
     // Alice creates an entry.
     let link_hash: ActionHash = conductors[0].call(&alice_zome, "create_entry", ()).await;
 
-    await_consistency(&apps.cells_flattened()).await;
+    await_consistency(&apps.cells_flattened()).await.unwrap();
 
-    let seconds_elapsed = start.elapsed().as_secs();
+    let seconds_elapsed = start.elapsed().as_secs() as usize;
+    // It could be that the last record didn't get exported, so seconds_elapsed - 1.
+    let expected_records_per_metric = seconds_elapsed - 1;
 
     let metrics = read_to_string(influxive_file).unwrap();
-    println!("metrics {metrics}");
+    println!("metrics:\n{metrics}\n");
     let metrics = metrics.lines();
 
+    println!("{seconds_elapsed} s elapsed");
+    println!("Expected {expected_records_per_metric} records per metric");
+
     // DB metrics
-    let mut hc_db_connections_use_time = metrics.clone().filter(|line|line.contains("hc.db.connections.use_time"));
-    assert!(hc_db_connections_use_time.clone().count() >= seconds_elapsed as usize);
-    hc_db_connections_use_time.for_each(|metric| {
+    let db_connections_use_time = metrics
+        .clone()
+        .filter(|line| line.contains("hc.db.connections.use_time"));
+    let db_connections_use_time_count = db_connections_use_time.clone().count();
+    // 1 record per second for 5 database kinds.
+    assert!(
+        db_connections_use_time_count >= expected_records_per_metric - 1 * 5,
+        "expected >= {}, got {db_connections_use_time_count}",
+        expected_records_per_metric * 5
+    );
+    db_connections_use_time.for_each(|metric| {
         assert!(metric.contains("id="));
         assert!(metric.contains("kind="));
         assert!(metric.contains("count="));
@@ -71,11 +81,39 @@ async fn metrics_test() {
         assert!(metric.contains("min="));
     });
 
-    let mut hc_db_pool_utilization_metric = metrics.clone().filter(|line|line.contains("hc.db.pool.utilization"));
-    assert!(hc_db_pool_utilization_metric.clone().count() >= seconds_elapsed as usize);
-    hc_db_pool_utilization_metric.for_each(|metric| {
+    let db_pool_utilization = metrics
+        .clone()
+        .filter(|line| line.contains("hc.db.pool.utilization"));
+    let db_pool_utilization_count = db_pool_utilization.clone().count();
+    // 1 record per second for 5 database kinds
+    assert!(
+        db_pool_utilization_count >= expected_records_per_metric * 5,
+        "expected >= {}, got {db_pool_utilization_count}",
+        expected_records_per_metric * 5
+    );
+    db_pool_utilization.for_each(|metric| {
         assert!(metric.contains("id="));
         assert!(metric.contains("kind="));
         assert!(metric.contains("gauge="));
+    });
+
+    // Conductor metrics
+    let conductor_workflow_duration = metrics
+        .clone()
+        .filter(|line| line.contains("hc.conductor.workflow.duration"));
+    let conductor_workflow_duration_count = conductor_workflow_duration.clone().count();
+    // 1 record per second for 6 workflows
+    assert!(
+        conductor_workflow_duration_count >= expected_records_per_metric * 6,
+        "expected >= {}, got {conductor_workflow_duration_count}",
+        expected_records_per_metric * 6
+    );
+    conductor_workflow_duration.for_each(|metric| {
+        assert!(metric.contains("dna_hash="));
+        assert!(metric.contains("workflow="));
+        assert!(metric.contains("count="));
+        assert!(metric.contains("sum="));
+        assert!(metric.contains("max="));
+        assert!(metric.contains("min="));
     });
 }
