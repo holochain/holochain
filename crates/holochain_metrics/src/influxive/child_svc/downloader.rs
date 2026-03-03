@@ -175,7 +175,7 @@ impl DownloadSpec {
         &self,
         tmp: std::path::PathBuf,
         mut src: std::fs::File,
-    ) -> std::io::Result<()> {
+    ) -> InfluxiveResult<()> {
         tokio::task::spawn_blocking(move || {
             use std::io::Seek;
             use std::io::Write;
@@ -188,9 +188,10 @@ impl DownloadSpec {
             big_file.rewind()?;
 
             let mut archive = tar::Archive::new(big_file);
-            archive.unpack(tmp)
+            archive.unpack(tmp).map_err(InfluxiveError::Io)
         })
-        .await?
+        .await
+        .map_err(|err| InfluxiveError::Io(err.into()))?
     }
 
     #[cfg(target_os = "windows")]
@@ -198,12 +199,16 @@ impl DownloadSpec {
         &self,
         tmp: std::path::PathBuf,
         src: std::fs::File,
-    ) -> std::io::Result<()> {
+    ) -> InfluxiveResult<()> {
         tokio::task::spawn_blocking(move || {
             let mut archive = zip::ZipArchive::new(src).map_err(std::io::Error::other)?;
-            archive.extract(tmp).map_err(std::io::Error::other)
+            archive
+                .extract(tmp)
+                .map_err(std::io::Error::other)
+                .map_err(InfluxiveError::Io)
         })
-        .await?
+        .await
+        .map_err(|err| InfluxiveError::Io(err.into()))?
     }
 }
 
