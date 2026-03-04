@@ -5,7 +5,7 @@ use crate::prelude::*;
 use holo_hash::DhtOpHash;
 use holochain_integrity_types::Timestamp;
 use holochain_timestamp::InclusiveTimestampInterval;
-#[cfg(feature = "rusqlite")]
+#[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
 use rusqlite::{
     types::{FromSql, ToSqlOutput},
     ToSql,
@@ -57,7 +57,7 @@ impl From<BlockTarget> for BlockTargetId {
     }
 }
 
-#[cfg(feature = "rusqlite")]
+#[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
 impl ToSql for BlockTargetId {
     fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
         Ok(rusqlite::types::ToSqlOutput::Owned(
@@ -68,7 +68,7 @@ impl ToSql for BlockTargetId {
     }
 }
 
-#[cfg(feature = "rusqlite")]
+#[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
 impl FromSql for BlockTargetId {
     fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
         let bytes = match value {
@@ -93,7 +93,7 @@ pub enum BlockTargetReason {
     Ip(IpBlockReason),
 }
 
-#[cfg(feature = "rusqlite")]
+#[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
 impl ToSql for BlockTargetReason {
     fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
         Ok(rusqlite::types::ToSqlOutput::Owned(
@@ -104,7 +104,7 @@ impl ToSql for BlockTargetReason {
     }
 }
 
-#[cfg(feature = "rusqlite")]
+#[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
 impl FromSql for BlockTargetReason {
     fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
         let bytes = match value {

@@ -54,10 +54,6 @@ shrinkwraprs = { version = "0.3", optional = true }
 proptest = { version = "1", optional = true }
 proptest-derive = { version = "0", optional = true }
 
-# contrafact
-contrafact = { version = "0.2.0-rc.1", optional = true }
-once_cell = { version = "1.4", optional = true }
-
 # Enabled with the `schema` feature
 schemars = { version = "0.9", optional = true }
 
@@ -101,7 +97,6 @@ fixturators = [
 properties = ["dep:serde_yaml"]
 
 fuzzing = [
-  "dep:contrafact",
   "dep:proptest",
   "dep:proptest-derive",
   "holochain_integrity_types/fuzzing",
@@ -114,7 +109,6 @@ fuzzing = [
 test_utils = [
   "fuzzing",
   "fixturators",
-  "dep:once_cell",
   "holo_hash/hashing",
   "holo_hash/test_utils",
   "full-dna-def",
@@ -123,15 +117,14 @@ test_utils = [
 
 instrument = []
 
-rusqlite = ["dep:rusqlite"]
 sqlite-encrypted = [
-  "rusqlite",
+  "dep:rusqlite",
   "rusqlite/bundled-sqlcipher-vendored-openssl",
   "holo_hash/sqlite-encrypted",
   "holochain_timestamp/sqlite-encrypted",
 ]
 sqlite = [
-  "rusqlite",
+  "dep:rusqlite",
   "rusqlite/bundled",
   "holo_hash/sqlite",
   "holochain_timestamp/sqlite",
