@@ -102,7 +102,6 @@ impl PushMetricExporter for InfluxiveOtelWriter {
 
 /// Influxive InfluxDB Meter Provider Configuration.
 #[non_exhaustive]
-#[derive(Default)]
 pub struct InfluxiveMeterProviderConfig {
     /// Reporting interval for all metrics, sync and observable.
     ///
@@ -110,10 +109,25 @@ pub struct InfluxiveMeterProviderConfig {
     /// This option has to be set to `None` for the env var to be effective, otherwise it
     /// overrides any value set for the OTEL_METRIC_EXPORT_INTERVAL environment variable.
     ///
-    /// If this option is `None` or interval is equal to zero, 60 seconds is used as the default.
+    /// If this option is `None` or the interval is equal to zero, 10 seconds is used as the default.
     ///
-    /// Defaults to None, which results in a 60 second interval.
+    /// Defaults to None, which results in a 10 second interval.
     pub report_interval: Option<std::time::Duration>,
+}
+
+impl Default for InfluxiveMeterProviderConfig {
+    fn default() -> Self {
+        let report_interval= if let Ok(interval) = std::env::var("OTEL_METRIC_EXPORT_INTERVAL") {
+            // If env var is incorrect, panic.
+            Some(std::time::Duration::from_millis(interval.parse().expect("OTEL_METRIC_EXPORT_INTERVAL is not set to a valid integer")))
+        } else {
+            // If env var isn't set, default to 10 seconds.
+            Some(std::time::Duration::from_secs(10))
+        };
+        Self {
+            report_interval,
+        }
+    }
 }
 
 impl InfluxiveMeterProviderConfig {
