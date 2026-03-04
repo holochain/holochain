@@ -45,11 +45,11 @@ tokio = { version = "1", features = ["full"] }
 workspace = true
 
 [features]
-default = ["download_binaries"]
+default = ["download-binaries"]
 
 # compiles in the ability to download release influxd and influx binaries
 # as a fallback in case they are not found on the path
-download_binaries = [
+download-binaries = [
   "dep:digest",
   "dep:dirs",
   "dep:flate2",

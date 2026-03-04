@@ -5,10 +5,10 @@
 use super::types::*;
 use super::writer::*;
 
-#[cfg(feature = "download_binaries")]
+#[cfg(feature = "download-binaries")]
 mod downloader;
 
-#[cfg(feature = "download_binaries")]
+#[cfg(feature = "download-binaries")]
 mod download_binaries;
 
 #[cfg(test)]
@@ -38,7 +38,7 @@ macro_rules! cmd_output {
 pub struct InfluxiveChildSvcConfig {
     /// If true, will fall back to downloading influx release binaries.
     /// Defaults to `true`.
-    #[cfg(feature = "download_binaries")]
+    #[cfg(feature = "download-binaries")]
     pub download_binaries: bool,
 
     /// Path to influxd binary. If None, will try the path.
@@ -81,7 +81,7 @@ pub struct InfluxiveChildSvcConfig {
 impl Default for InfluxiveChildSvcConfig {
     fn default() -> Self {
         Self {
-            #[cfg(feature = "download_binaries")]
+            #[cfg(feature = "download-binaries")]
             download_binaries: true,
             influxd_path: None,
             influx_path: None,
@@ -98,7 +98,7 @@ impl Default for InfluxiveChildSvcConfig {
 
 impl InfluxiveChildSvcConfig {
     /// Apply [InfluxiveChildSvcConfig::download_binaries].
-    #[cfg(feature = "download_binaries")]
+    #[cfg(feature = "download-binaries")]
     pub fn with_download_binaries(mut self, download_binaries: bool) -> Self {
         self.download_binaries = download_binaries;
         self
@@ -410,7 +410,7 @@ impl MetricWriter for InfluxiveChildSvc {
     }
 }
 
-#[cfg(feature = "download_binaries")]
+#[cfg(feature = "download-binaries")]
 async fn dl_influx(
     _db_path: &std::path::Path,
     is_cli: bool,
@@ -475,7 +475,7 @@ async fn validate_influx(
             err_list.push(InfluxiveError::Other(format!("failed to run {bin_path:?}")));
             err_list.push(err);
 
-            #[cfg(feature = "download_binaries")]
+            #[cfg(feature = "download-binaries")]
             {
                 if let Some(ver) = dl_influx(_db_path, is_cli, &mut bin_path, &mut err_list).await {
                     ver
@@ -484,7 +484,7 @@ async fn validate_influx(
                 }
             }
 
-            #[cfg(not(feature = "download_binaries"))]
+            #[cfg(not(feature = "download-binaries"))]
             {
                 return Err(InfluxiveError::Other(format!("{err_list:?}")));
             }

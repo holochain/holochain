@@ -13,12 +13,12 @@ pub enum InfluxiveError {
     Io(#[from] std::io::Error),
 
     /// HTTP request failures.
-    #[cfg(feature = "download_binaries")]
+    #[cfg(feature = "download-binaries")]
     #[error(transparent)]
     Http(#[from] reqwest::Error),
 
     /// HTTP download returned a non-success status.
-    #[cfg(feature = "download_binaries")]
+    #[cfg(feature = "download-binaries")]
     #[error("Download failed: HTTP {0}")]
     DownloadFailed(u16),
 
