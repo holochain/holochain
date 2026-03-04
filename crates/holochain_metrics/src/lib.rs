@@ -35,7 +35,7 @@
 //!
 //! To set the interval at which recorded metrics are written to Influx,
 //! use `OTEL_METRIC_EXPORT_INTERVAL`. The value is specified as milliseconds.
-//! 60 s is the default. When the report interval is configured in the code,
+//! 10 s is the default. When the report interval is configured in the code,
 //! it overrides this environment variable setting.
 //!
 //! ## Metric Naming Conventions

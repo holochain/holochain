@@ -1,6 +1,6 @@
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
-//! Opentelemetry metrics bindings for influxive-child-svc.
+//! OpenTelemetry metrics exporter for Influxive.
 
 use super::types::DynMetricWriter;
 use opentelemetry_sdk::error::OTelSdkResult;
