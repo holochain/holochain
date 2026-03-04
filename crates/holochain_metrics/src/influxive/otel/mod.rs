@@ -51,7 +51,9 @@ impl InfluxiveOtelWriter {
                         self.influxive.write_metric(influxive_metric);
                     }
                 }
-                _ => unimplemented!(),
+                unimplemented_metric => {
+                    tracing::error!(?unimplemented_metric, "metric not implemented")
+                }
             },
             AggregatedMetrics::U64(metric_data) => match metric_data {
                 MetricData::Sum(sum) => {
@@ -66,9 +68,13 @@ impl InfluxiveOtelWriter {
                         self.influxive.write_metric(influxive_metric);
                     }
                 }
-                _ => unimplemented!(),
+                unimplemented_metric => {
+                    tracing::error!(?unimplemented_metric, "metric not implemented")
+                }
             },
-            _ => unimplemented!(),
+            unimplemented_metric => {
+                tracing::error!(?unimplemented_metric, "metric not implemented")
+            }
         }
     }
 }
@@ -117,16 +123,16 @@ pub struct InfluxiveMeterProviderConfig {
 
 impl Default for InfluxiveMeterProviderConfig {
     fn default() -> Self {
-        let report_interval= if let Ok(interval) = std::env::var("OTEL_METRIC_EXPORT_INTERVAL") {
+        let report_interval = if let Ok(interval) = std::env::var("OTEL_METRIC_EXPORT_INTERVAL") {
             // If env var is incorrect, panic.
-            Some(std::time::Duration::from_millis(interval.parse().expect("OTEL_METRIC_EXPORT_INTERVAL is not set to a valid integer")))
+            Some(std::time::Duration::from_millis(interval.parse().expect(
+                "OTEL_METRIC_EXPORT_INTERVAL is not set to a valid integer",
+            )))
         } else {
             // If env var isn't set, default to 10 seconds.
             Some(std::time::Duration::from_secs(10))
         };
-        Self {
-            report_interval,
-        }
+        Self { report_interval }
     }
 }
 
