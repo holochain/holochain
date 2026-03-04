@@ -1,22 +1,21 @@
-use hdk::prelude::{Entry, EntryDef};
+use hdk::prelude::{Entry, EntryDef, Record};
 use holo_hash::ActionHash;
 use holochain::sweettest::{
-    await_consistency,  SweetConductorBatch, SweetDnaFile,
-    SweetInlineZomes,
+    await_consistency, SweetConductorBatch, SweetDnaFile, SweetInlineZomes,
 };
 use holochain_types::prelude::EntryVisibility;
 use holochain_zome_types::action::ChainTopOrdering;
-use holochain_zome_types::entry::{EntryDefLocation};
+use holochain_zome_types::entry::EntryDefLocation;
 use holochain_zome_types::fixt::AppEntryBytesFixturator;
-use holochain_zome_types::prelude::{CreateInput};
+use holochain_zome_types::prelude::{CreateInput, GetInput, GetOptions};
 use std::fs::read_to_string;
 use std::time::{Duration, Instant};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn metrics_test() {
     let entry_def = EntryDef::default_from_id("entry");
-    let zomes =
-        SweetInlineZomes::new(vec![entry_def], 1).function("create_entry", move |api, _: ()| {
+    let zomes = SweetInlineZomes::new(vec![entry_def], 1)
+        .function("create_entry", move |api, _: ()| {
             let hash = api.create(CreateInput::new(
                 EntryDefLocation::app(0, 0),
                 EntryVisibility::Public,
@@ -24,6 +23,9 @@ async fn metrics_test() {
                 ChainTopOrdering::default(),
             ))?;
             Ok(hash)
+        })
+        .function("get_entry", move |api, hash: ActionHash| {
+            Ok(api.get(vec![GetInput::new(hash.into(), GetOptions::default())])?)
         });
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
@@ -46,7 +48,12 @@ async fn metrics_test() {
     let alice_zome = alice_cell.zome(SweetInlineZomes::COORDINATOR);
 
     // Alice creates an entry.
-    let link_hash: ActionHash = conductors[0].call(&alice_zome, "create_entry", ()).await;
+    let create_entry_hash: ActionHash = conductors[0].call(&alice_zome, "create_entry", ()).await;
+
+    // Alice gets her own entry.
+    let _: Vec<Option<Record>> = conductors[0]
+        .call(&alice_zome, "get_entry", create_entry_hash.clone())
+        .await;
 
     await_consistency(&apps.cells_flattened()).await.unwrap();
 
@@ -111,6 +118,23 @@ async fn metrics_test() {
     conductor_workflow_duration.for_each(|metric| {
         assert!(metric.contains("dna_hash="));
         assert!(metric.contains("workflow="));
+        assert!(metric.contains("count="));
+        assert!(metric.contains("sum="));
+        assert!(metric.contains("max="));
+        assert!(metric.contains("min="));
+    });
+
+    // Cascade metrics
+    let cascade_duration = metrics
+        .clone()
+        .filter(|line| line.contains("hc.cascade.duration"));
+    let cascade_duration_count = cascade_duration.clone().count();
+    // 1 record per get request
+    assert!(
+        cascade_duration_count >= 1,
+        "expected >= 1, got {cascade_duration_count}",
+    );
+    cascade_duration.for_each(|metric| {
         assert!(metric.contains("count="));
         assert!(metric.contains("sum="));
         assert!(metric.contains("max="));
