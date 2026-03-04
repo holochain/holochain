@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fixed an issue where the `on_signal` method of the client `AppWebsocket` would not handle signals for cloned cells correctly. Since Holochain now outputs signals only on connections associated with the app where they are emitted, filtering in the client is no longer necessary. #5672
+
 ## 0.7.0-dev.14
 
 - Import influxive crates from https://github.com/holochain/influxive into monorepo and update their dependencies.
