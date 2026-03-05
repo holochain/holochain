@@ -1,17 +1,19 @@
 use holo_hash::{AgentPubKey, DnaHash};
-use opentelemetry::{global::meter, metrics::Histogram, KeyValue};
+use opentelemetry::{global::meter, metrics, KeyValue};
 use std::sync::Arc;
 
-pub struct WorkflowDurationMetric {
-    histogram: Histogram<f64>,
+pub struct Histogram {
+    histogram: metrics::Histogram<f64>,
     attributes: Vec<KeyValue>,
 }
 
-impl WorkflowDurationMetric {
+impl Histogram {
     pub fn record(&self, value: f64) {
         self.histogram.record(value, &self.attributes);
     }
 }
+
+pub type WorkflowDurationMetric = Histogram;
 
 pub fn create_workflow_duration_metric(
     workflow_name: String,
@@ -33,7 +35,7 @@ pub fn create_workflow_duration_metric(
         .with_description("The time spent running a workflow")
         .build();
 
-    WorkflowDurationMetric {
+    Histogram {
         histogram,
         attributes,
     }
