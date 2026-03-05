@@ -5,6 +5,7 @@ use holochain_types::prelude::*;
 use holochain_types::websocket::AllowedOrigins;
 use holochain_zome_types::cell::CellId;
 use kitsune2_api::Url;
+use serde::ser::SerializeSeq;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// A snapshot of the current network state of the conductor.
@@ -16,6 +17,7 @@ pub struct ConductorNetworkState {
     /// Cells that have successfully joined the network.
     pub joined_cells: HashSet<CellId>,
     /// Cells that failed to join the network, keyed by cell ID with the error message.
+    #[serde(with = "serde_cell_id_map")]
     pub failed_cells: HashMap<CellId, String>,
     /// Known peers per DNA space, populated as peers are discovered.
     pub peers_by_dna: HashMap<DnaHash, HashSet<AgentPubKey>>,
@@ -785,12 +787,61 @@ pub struct AppAuthenticationTokenIssued {
     pub expires_at: Option<Timestamp>,
 }
 
+mod serde_cell_id_map {
+    use super::*;
+    use serde::Deserialize;
+    pub fn serialize<S>(
+        map: &HashMap<CellId, String>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(map.len()))?;
+        for (cell_id, error) in map {
+            seq.serialize_element(&(cell_id, error))?;
+        }
+        seq.end()
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<HashMap<CellId, String>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let entries: Vec<(CellId, String)> = Vec::deserialize(deserializer)?;
+        Ok(entries.into_iter().collect())
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{AdminRequest, AdminResponse, ExternalApiWireError};
+    use crate::{AdminRequest, AdminResponse, ConductorNetworkState, ExternalApiWireError};
     use serde::Deserialize;
 
     #[test]
+    fn conductor_network_state_json_round_trip() {
+        use holo_hash::{AgentPubKey, DnaHash};
+        use holochain_zome_types::cell::CellId;
+
+        let mut state = ConductorNetworkState::default();
+        let cell_a = CellId::new(
+            DnaHash::from_raw_36(vec![0; 36]),
+            AgentPubKey::from_raw_36(vec![1; 36]),
+        );
+        let cell_b = CellId::new(
+            DnaHash::from_raw_36(vec![2; 36]),
+            AgentPubKey::from_raw_36(vec![3; 36]),
+        );
+        state.joined_cells.insert(cell_a.clone());
+        state.failed_cells.insert(cell_b.clone(), "boom".to_string());
+
+        let json = serde_json::to_string(&state).unwrap();
+        let decoded: ConductorNetworkState = serde_json::from_str(&json).unwrap();
+
+        assert!(decoded.joined_cells.contains(&cell_a));
+        assert_eq!(decoded.failed_cells.get(&cell_b).unwrap(), "boom");
+    }
+
     fn admin_request_serialization() {
         use rmp_serde::Deserializer;
 
