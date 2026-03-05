@@ -1,4 +1,4 @@
-use super::metrics::{create_connection_use_time_metric, create_pool_usage_metric, UseTimeMetric};
+use super::metrics::{create_connection_use_time_metric, UseTimeMetric};
 use crate::db::conn::PConn;
 use crate::db::databases::DATABASE_HANDLES;
 use crate::db::guard::{PConnGuard, PTxnGuard};
@@ -337,15 +337,6 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
             statement_trace_fn,
             use_time_metric,
         };
-
-        create_pool_usage_metric(
-            kind.kind(),
-            vec![
-                db_read.write_semaphore.clone(),
-                db_read.read_semaphore.clone(),
-                db_read.long_read_semaphore.clone(),
-            ],
-        );
 
         Ok(DbWrite(db_read))
     }
