@@ -841,7 +841,7 @@ mod tests {
         assert_eq!(decoded.failed_cells.get(&cell_b).unwrap(), "boom");
     }
 
-    fn admin_request_serialization() {
+    fn _admin_request_serialization() {
         use rmp_serde::Deserializer;
 
         // make sure requests are serialized as expected
