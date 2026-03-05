@@ -32,7 +32,7 @@ async fn test_single_cell_network_readiness() {
     // Wait for the cell to be network ready
     // This should complete quickly without timing out
     conductor
-        .await_cell_network_ready(cell.cell_id(), Duration::from_secs(10))
+        .await_cell_network_join_complete(cell.cell_id(), Duration::from_secs(10))
         .await
         .expect("Cell should become network ready");
 
@@ -73,12 +73,12 @@ async fn test_multi_cell_network_readiness() {
 
     // Wait for both cells to be network ready
     conductor
-        .await_cell_network_ready(cell1.cell_id(), Duration::from_secs(10))
+        .await_cell_network_join_complete(cell1.cell_id(), Duration::from_secs(10))
         .await
         .expect("Cell 1 should become network ready");
 
     conductor
-        .await_cell_network_ready(cell2.cell_id(), Duration::from_secs(10))
+        .await_cell_network_join_complete(cell2.cell_id(), Duration::from_secs(10))
         .await
         .expect("Cell 2 should become network ready");
 
@@ -140,12 +140,12 @@ async fn test_multi_conductor_network_readiness_no_retry() {
     // Wait for both cells to be network ready
     // This is the key: no retry loops needed!
     conductors[0]
-        .await_cell_network_ready(alice.cell_id(), Duration::from_secs(10))
+        .await_cell_network_join_complete(alice.cell_id(), Duration::from_secs(10))
         .await
         .expect("Alice's cell should become network ready");
 
     conductors[1]
-        .await_cell_network_ready(bob.cell_id(), Duration::from_secs(10))
+        .await_cell_network_join_complete(bob.cell_id(), Duration::from_secs(10))
         .await
         .expect("Bob's cell should become network ready");
 
@@ -256,7 +256,7 @@ async fn test_network_readiness_timeout_for_nonexistent_cell() {
 
     // Attempting to wait for this cell should timeout
     let result = conductor
-        .await_cell_network_ready(&fake_cell_id, Duration::from_secs(1))
+        .await_cell_network_join_complete(&fake_cell_id, Duration::from_secs(1))
         .await;
 
     assert!(
@@ -301,7 +301,7 @@ async fn test_network_readiness_vs_sleep_comparison() {
 
     // ✅ Explicitly wait for network readiness - no guessing!
     conductor
-        .await_cell_network_ready(cell.cell_id(), Duration::from_secs(10))
+        .await_cell_network_join_complete(cell.cell_id(), Duration::from_secs(10))
         .await
         .expect("Cell should become network ready");
 
@@ -386,12 +386,12 @@ async fn test_demonstrates_race_condition_without_await() {
 
     // Now, let's use the NEW approach with await_cell_network_ready
     conductors[0]
-        .await_cell_network_ready(alice.cell_id(), Duration::from_secs(10))
+        .await_cell_network_join_complete(alice.cell_id(), Duration::from_secs(10))
         .await
         .expect("Alice should be ready");
 
     conductors[1]
-        .await_cell_network_ready(bob.cell_id(), Duration::from_secs(10))
+        .await_cell_network_join_complete(bob.cell_id(), Duration::from_secs(10))
         .await
         .expect("Bob should be ready");
 
@@ -550,12 +550,12 @@ async fn test_demonstrates_no_peer_url_error() {
 
     // Now use the proper approach
     conductors[0]
-        .await_cell_network_ready(alice.cell_id(), Duration::from_secs(10))
+        .await_cell_network_join_complete(alice.cell_id(), Duration::from_secs(10))
         .await
         .expect("Alice should be ready");
 
     conductors[1]
-        .await_cell_network_ready(bob.cell_id(), Duration::from_secs(10))
+        .await_cell_network_join_complete(bob.cell_id(), Duration::from_secs(10))
         .await
         .expect("Bob should be ready");
 
@@ -637,11 +637,11 @@ async fn test_network_state_tracks_all_fields() {
 
     // Wait for both cells to be fully joined before inspecting state.
     conductors[0]
-        .await_cell_network_ready(alice.cell_id(), Duration::from_secs(15))
+        .await_cell_network_join_complete(alice.cell_id(), Duration::from_secs(15))
         .await
         .expect("Alice should become network ready");
     conductors[1]
-        .await_cell_network_ready(bob.cell_id(), Duration::from_secs(15))
+        .await_cell_network_join_complete(bob.cell_id(), Duration::from_secs(15))
         .await
         .expect("Bob should become network ready");
 

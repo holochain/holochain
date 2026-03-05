@@ -1202,31 +1202,15 @@ mod network_impls {
         /// // Now safe to make network calls
         /// conductor.call_zome(...).await?;
         /// ```
-        pub async fn await_cell_network_ready(
+        pub async fn await_cell_network_join_complete(
             &self,
             cell_id: &CellId,
             timeout: std::time::Duration,
         ) -> ConductorApiResult<()> {
-            // First check if the cell has already completed or failed joining.
-            // This handles the case where the join happened before we subscribed to events.
-            if self.network_readiness.has_completed_join(cell_id).await {
-                return Ok(());
-            }
-            if let Some(error) = self.network_readiness.has_failed_join(cell_id).await {
-                return Err(ConductorApiError::Other(
-                    format!(
-                        "Network join previously failed for cell {}: {}",
-                        cell_id, error
-                    )
-                    .into(),
-                ));
-            }
-
-            // Subscribe to future events.
+            // Subscribe to events first, then check state to avoid a race where
+            // the join completes between checking and subscribing.
             let mut rx = self.subscribe_network_readiness();
 
-            // Re-check after subscribing to close the race between the first check
-            // and the subscription (double-check pattern).
             if self.network_readiness.has_completed_join(cell_id).await {
                 return Ok(());
             }

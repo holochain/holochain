@@ -291,7 +291,7 @@ impl AdminInterfaceApi {
             } => {
                 let timeout = std::time::Duration::from_millis(timeout_ms.unwrap_or(30_000));
                 self.conductor_handle
-                    .await_cell_network_ready(&cell_id, timeout)
+                    .await_cell_network_join_complete(&cell_id, timeout)
                     .await?;
                 Ok(AdminResponse::CellNetworkReady)
             }
