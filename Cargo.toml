@@ -27,7 +27,6 @@ members = [
   "crates/holochain_zome_types",
   "crates/mr_bundle",
   "crates/timestamp",
-  "crates/influxive",
   "crates/client",
   "crates/hc_client",
   "crates/hc",

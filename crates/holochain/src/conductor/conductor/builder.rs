@@ -315,11 +315,11 @@ impl ConductorBuilder {
                     duration_metric.record(
                         start.elapsed().as_secs_f64(),
                         &[
-                            opentelemetry_api::KeyValue::new(
+                            opentelemetry::KeyValue::new(
                                 "dna_hash",
                                 format!("{:?}", cell_id.dna_hash()),
                             ),
-                            opentelemetry_api::KeyValue::new(
+                            opentelemetry::KeyValue::new(
                                 "agent",
                                 format!("{:?}", cell_id.agent_pubkey()),
                             ),
