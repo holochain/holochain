@@ -2042,18 +2042,15 @@ mod app_status_impls {
                 .into_iter()
                 .map(|c| (c.id().clone(), Arc::new(c)))
                 .collect();
-            // Pair triggers with cell IDs so we can gate initialization on join success
-            let cell_id_trigger_pairs: Vec<(CellId, InitialQueueTriggers)> = new_cells_map
-                .keys()
-                .cloned()
-                .zip(triggers.into_iter())
-                .collect();
-
-            // Add agents to local agent store in kitsune with bounded parallelism (max 10 concurrent)
+            // Join cells to the network with bounded parallelism (max 10 concurrent).
+            // Each cell is added to running_cells and has its workflows triggered
+            // immediately when its own join succeeds, without waiting for other cells.
+            let running_cells_ref = self.running_cells.clone();
             let join_futures = new_cells_map
-                .values()
+                .into_iter()
+                .zip(triggers.into_iter())
                 .enumerate()
-                .map(|(i, cell)| {
+                .map(|(i, ((_, cell), trigger))| {
                     let config_override = config_override.clone();
                     let cell_id = cell.id().clone();
                     let agent_pubkey = cell_id.agent_pubkey().clone();
@@ -2061,15 +2058,14 @@ mod app_status_impls {
                     let network_readiness = self.network_readiness.clone();
                     let holochain_p2p = self.holochain_p2p.clone();
                     let shutting_down = self.shutting_down.clone();
+                    let running_cells = running_cells_ref.clone();
                     async move {
-                        // Emit join started event
                         network_readiness.emit(
                             network_readiness::NetworkReadinessEvent::JoinStarted {
                                 cell_id: cell_id.clone(),
                             },
                         );
 
-                        // Perform the join
                         match holochain_p2p_dna
                             .join(agent_pubkey, None, config_override)
                             .await
@@ -2081,16 +2077,16 @@ mod app_status_impls {
                                         cell_id: cell_id.clone(),
                                     },
                                 );
-                                // Start polling the peer store for this DNA space so that
-                                // PeerDiscovered and BootstrapComplete events are emitted.
-                                // The watcher is deduplicated per DNA, so multiple cells
-                                // sharing the same DNA only spawn one task.
                                 network_readiness.start_peer_monitoring(
                                     cell_id.dna_hash().clone(),
                                     holochain_p2p,
                                     shutting_down,
                                 );
-                                Some(cell_id)
+                                running_cells.share_mut(|cells| {
+                                    tracing::debug!(?cell_id, "added cell to running_cells");
+                                    cells.insert(cell_id, cell);
+                                });
+                                trigger.initialize_workflows();
                             }
                             Err(e) => {
                                 tracing::error!(?e, ?cell_id, "Network join failed.");
@@ -2100,35 +2096,16 @@ mod app_status_impls {
                                         error: e.to_string(),
                                     },
                                 );
-                                None
                             }
                         }
                     }
                     .instrument(tracing::info_span!("network join task", ?i))
                 })
                 .collect::<Vec<_>>();
-            let join_results = futures::stream::iter(join_futures)
+            futures::stream::iter(join_futures)
                 .buffer_unordered(10)
                 .collect::<Vec<_>>()
                 .await;
-            let successful_joins: HashSet<CellId> = join_results.into_iter().flatten().collect();
-
-            // Only add successfully joined cells to running_cells
-            let successful_cells: IndexMap<CellId, Arc<Cell>> = new_cells_map
-                .into_iter()
-                .filter(|(cell_id, _)| successful_joins.contains(cell_id))
-                .collect();
-            self.running_cells.share_mut(|cells| {
-                tracing::debug!(cell_ids = ?successful_cells.keys().collect::<Vec<_>>(), "added cells to running_cells");
-                cells.extend(successful_cells);
-            });
-
-            // Trigger cell workflows only for successfully joined cells
-            for (cell_id, trigger) in cell_id_trigger_pairs {
-                if successful_joins.contains(&cell_id) {
-                    trigger.initialize_workflows();
-                }
-            }
 
             Ok(())
         }
