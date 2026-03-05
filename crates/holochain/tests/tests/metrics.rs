@@ -100,6 +100,25 @@ async fn metrics() {
         assert!(metric.contains("min="));
     });
 
+    let db_write_txn_duration = metrics
+        .clone()
+        .filter(|line| line.contains("hc.db.write_txn.duration"));
+    let db_write_txn_duration_count = db_write_txn_duration.clone().count();
+    // 1 record per second for 5 database kinds (dht, cache, peer_meta_store, authored * 2)
+    assert!(
+        db_write_txn_duration_count >= expected_records_per_metric - 1,
+        "expected >= {}, got {db_write_txn_duration_count}",
+        expected_records_per_metric * 5
+    );
+    db_write_txn_duration.for_each(|metric| {
+        assert!(metric.contains("id="));
+        assert!(metric.contains("kind="));
+        assert!(metric.contains("count="));
+        assert!(metric.contains("sum="));
+        assert!(metric.contains("max="));
+        assert!(metric.contains("min="));
+    });
+
     // conductor metrics
     let conductor_workflow_duration = metrics
         .clone()
