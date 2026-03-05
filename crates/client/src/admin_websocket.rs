@@ -617,7 +617,12 @@ impl AdminWebsocket {
     /// # Arguments
     ///
     /// * `cell_id` — the cell to wait for.
-    /// * `timeout_ms` — maximum wait time in milliseconds. Defaults to 30 000 ms if `None`.
+    /// * `timeout_ms` — maximum wait time in milliseconds. Defaults to 30 000 ms if `None`.
+    ///
+    /// **Note:** `timeout_ms` must be ≤ the WebSocket client's `default_request_timeout`
+    /// (60 000 ms unless overridden). Otherwise the WebSocket layer returns a
+    /// [`holochain_websocket::WebsocketError`] before the conductor can handle the request.
+    /// Increase the client timeout first if you need to wait longer than 60 seconds.
     pub async fn await_cell_network_ready(
         &self,
         cell_id: holochain_types::prelude::CellId,
