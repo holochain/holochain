@@ -1,39 +1,13 @@
-use hdk::prelude::{Entry, EntryDef, Record};
+use hdk::prelude::Record;
 use holo_hash::ActionHash;
-use holochain::sweettest::{
-    await_consistency, SweetConductorBatch, SweetDnaFile, SweetInlineZomes,
-};
-use holochain_types::prelude::EntryVisibility;
-use holochain_zome_types::action::ChainTopOrdering;
-use holochain_zome_types::entry::EntryDefLocation;
-use holochain_zome_types::fixt::AppEntryBytesFixturator;
-use holochain_zome_types::prelude::{CreateInput, GetInput, GetOptions};
+use holochain::sweettest::{await_consistency, SweetConductorBatch, SweetDnaFile};
+use holochain_wasm_test_utils::TestWasm;
+use serde::Serialize;
 use std::fs::read_to_string;
 use std::time::{Duration, Instant};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn metrics() {
-    let entry_def = EntryDef::default_from_id("entry");
-    let zomes = SweetInlineZomes::new(vec![entry_def], 1)
-        .function("create_entry", move |api, _: ()| {
-            let hash = api.create(CreateInput::new(
-                EntryDefLocation::app(0, 0),
-                EntryVisibility::Public,
-                Entry::App(::fixt::fixt!(AppEntryBytes)),
-                ChainTopOrdering::default(),
-            ))?;
-            Ok(hash)
-        })
-        .function("get_entry", move |api, hash: ActionHash| {
-            Ok(api.get(vec![GetInput::new(hash.into(), GetOptions::default())])?)
-        })
-        .function("post_commit", move |api, _: ()| {
-            println!("post ing commint g");
-            Ok(())
-        });
-
-    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
-
     let tmp_file = tempfile::tempdir().unwrap();
     let influxive_file = tmp_file.path().join("metrics.influx");
     holochain_metrics::HolochainMetricsConfig::with_file(
@@ -43,6 +17,10 @@ async fn metrics() {
     .init()
     .await;
 
+    #[derive(Debug, Serialize)]
+    struct Post(pub String);
+
+    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let mut conductors = SweetConductorBatch::standard(2).await;
 
     let apps = conductors.setup_app("test_app", [&dna_file]).await.unwrap();
@@ -50,22 +28,26 @@ async fn metrics() {
     let bob_conductor = conductors.get(1).unwrap();
     let cells = apps.cells_flattened();
     let alice_cell = cells.get(0).unwrap();
-    let alice_zome = alice_cell.zome(SweetInlineZomes::COORDINATOR);
+    let alice_zome = alice_cell.zome(TestWasm::Create.coordinator_zome());
     let bob_cell = cells.get(1).unwrap();
-    let bob_zome = bob_cell.zome(SweetInlineZomes::COORDINATOR);
+    let bob_zome = bob_cell.zome(TestWasm::Create.coordinator_zome());
 
     let start = Instant::now();
     let mut get_requests = 0;
 
-    // Alice creates an entry.
-    let create_entry_hash: ActionHash = alice_conductor.call(&alice_zome, "create_entry", ()).await;
-    // Bob gets Alice's entry.
-    let _: Vec<Option<Record>> = bob_conductor
-        .call(&bob_zome, "get_entry", create_entry_hash.clone())
+    // Alice creates an entry to record zome call metrics.
+    let create_entry_hash: ActionHash = alice_conductor
+        .call(&alice_zome, "create_post", Post("test".to_string()))
+        .await;
+    // Bob gets Alice's entry to record network request metrics.
+    let _: Option<Record> = bob_conductor
+        .call(&bob_zome, "get_post_network", create_entry_hash.clone())
         .await;
     get_requests += 1;
 
     await_consistency(&apps.cells_flattened()).await.unwrap();
+
+    // Read metrics from file
 
     let seconds_elapsed = start.elapsed().as_secs() as usize;
     // It could be that the last record didn't get exported, so seconds_elapsed - 1.
@@ -87,7 +69,7 @@ async fn metrics() {
     let db_connections_use_time_count = db_connections_use_time.clone().count();
     // 1 record per second for 5 database kinds (dht, cache, peer_meta_store, authored * 2)
     assert!(
-        db_connections_use_time_count >= expected_records_per_metric - 1,
+        db_connections_use_time_count >= expected_records_per_metric * 5,
         "expected >= {}, got {db_connections_use_time_count}",
         expected_records_per_metric * 5
     );
@@ -106,7 +88,7 @@ async fn metrics() {
     let db_write_txn_duration_count = db_write_txn_duration.clone().count();
     // 1 record per second for 5 database kinds (dht, cache, peer_meta_store, authored * 2)
     assert!(
-        db_write_txn_duration_count >= expected_records_per_metric - 1,
+        db_write_txn_duration_count >= expected_records_per_metric * 5,
         "expected >= {}, got {db_write_txn_duration_count}",
         expected_records_per_metric * 5
     );
@@ -146,9 +128,9 @@ async fn metrics() {
     let conductor_post_commit_duration_count = conductor_post_commit_duration.clone().count();
     // 1 record per second for 2 agents having committed
     assert!(
-        conductor_post_commit_duration_count >= 2 * seconds_elapsed,
+        conductor_post_commit_duration_count >= expected_records_per_metric * 2,
         "expected >= {}, got {conductor_post_commit_duration_count}",
-        expected_records_per_metric * 2
+        expected_records_per_metric * 2,
     );
     conductor_post_commit_duration.for_each(|metric| {
         assert!(metric.contains("dna_hash="));
@@ -167,7 +149,7 @@ async fn metrics() {
     // 1 record per get request
     assert!(
         cascade_duration_count >= get_requests,
-        "expected >= 1, got {cascade_duration_count}",
+        "expected >= {get_requests}, got {cascade_duration_count}",
     );
     cascade_duration.for_each(|metric| {
         assert!(metric.contains("count="));
@@ -184,7 +166,7 @@ async fn metrics() {
     // 1 record per get request
     assert!(
         request_duration_count >= get_requests,
-        "expected >= 1, got {request_duration_count}",
+        "expected >= {get_requests}, got {request_duration_count}",
     );
     request_duration.for_each(|metric| {
         assert!(metric.contains("dna_hash="));
@@ -204,7 +186,7 @@ async fn metrics() {
     // 1 record per get request
     assert!(
         handle_request_duration_count >= get_requests,
-        "expected >= 1, got {handle_request_duration_count}",
+        "expected >= {get_requests}, got {handle_request_duration_count}",
     );
     handle_request_duration.for_each(|metric| {
         assert!(metric.contains("message_type="));
@@ -218,4 +200,22 @@ async fn metrics() {
     // hc.holochain_p2p.handle_request.ignored can't be easily tested, because
     // it records a metric only when concurrent requests are handled and one
     // of them is dropped.
+
+    // Ribosome metrics
+    let ribosome_wasm_usage = metrics
+        .clone()
+        .filter(|line| line.contains("hc.ribosome.wasm.usage"));
+    let ribosome_wasm_usage_count = ribosome_wasm_usage.clone().count();
+    // 10 records per second
+    assert!(
+        ribosome_wasm_usage_count >= expected_records_per_metric * 10,
+        "expected >= {}, got {ribosome_wasm_usage_count}",
+        expected_records_per_metric * 10
+    );
+    ribosome_wasm_usage.for_each(|metric| {
+        assert!(metric.contains("sum="));
+        assert!(metric.contains("dna="));
+        assert!(metric.contains("zome="));
+        assert!(metric.contains("fn="));
+    });
 }
