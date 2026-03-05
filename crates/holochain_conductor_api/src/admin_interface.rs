@@ -790,10 +790,7 @@ pub struct AppAuthenticationTokenIssued {
 mod serde_cell_id_map {
     use super::*;
     use serde::Deserialize;
-    pub fn serialize<S>(
-        map: &HashMap<CellId, String>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(map: &HashMap<CellId, String>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
@@ -833,7 +830,9 @@ mod tests {
             AgentPubKey::from_raw_36(vec![3; 36]),
         );
         state.joined_cells.insert(cell_a.clone());
-        state.failed_cells.insert(cell_b.clone(), "boom".to_string());
+        state
+            .failed_cells
+            .insert(cell_b.clone(), "boom".to_string());
 
         let json = serde_json::to_string(&state).unwrap();
         let decoded: ConductorNetworkState = serde_json::from_str(&json).unwrap();
