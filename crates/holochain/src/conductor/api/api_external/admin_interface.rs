@@ -241,17 +241,6 @@ impl AdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::PeerMetaInfo(r))
             }
-            GraftRecords {
-                cell_id,
-                validate,
-                records,
-            } => {
-                self.conductor_handle
-                    .clone()
-                    .graft_records_onto_source_chain(cell_id, validate, records)
-                    .await?;
-                Ok(AdminResponse::RecordsGrafted)
-            }
             GrantZomeCallCapability(payload) => self
                 .conductor_handle
                 .grant_zome_call_capability(*payload)

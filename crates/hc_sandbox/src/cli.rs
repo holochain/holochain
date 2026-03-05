@@ -259,8 +259,6 @@ impl HcSandbox {
                 root,
                 directories,
                 in_process_lair,
-                #[cfg(feature = "chc")]
-                chc_url,
             }) => {
                 let mut paths = Vec::with_capacity(num_sandboxes.into());
 
@@ -280,8 +278,6 @@ impl HcSandbox {
                         directories.get(i).cloned(),
                         in_process_lair,
                         0,
-                        #[cfg(feature = "chc")]
-                        chc_url.clone(),
                     )?;
                     paths.push(path);
                 }

@@ -5,7 +5,6 @@ use crate::conductor::CellError;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::workflow::WorkflowError;
 use holo_hash::DnaHash;
-use holochain_chc::ChcError;
 use holochain_sqlite::error::DatabaseError;
 use holochain_state::source_chain::SourceChainError;
 use holochain_types::prelude::*;
@@ -94,9 +93,6 @@ pub enum ConductorApiError {
 
     #[error(transparent)]
     RusqliteError(#[from] rusqlite::Error),
-
-    #[error(transparent)]
-    ChcError(#[from] ChcError),
 
     #[error(transparent)]
     RibosomeError(#[from] crate::core::ribosome::error::RibosomeError),

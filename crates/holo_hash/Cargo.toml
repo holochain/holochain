@@ -1,6 +1,6 @@
 [package]
 name = "holo_hash"
-version = "0.7.0-dev.3"
+version = "0.7.0-dev.4"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 keywords = ["holochain", "holo", "hash", "blake", "blake2b"]
 categories = ["cryptography"]
@@ -29,7 +29,7 @@ derive_more = { version = "2.0", features = [
 fixt = { version = "^0.7.0-dev.0", path = "../fixt", optional = true }
 futures = { version = "0.3", optional = true }
 holochain_serialized_bytes = { version = "=0.0.56", optional = true }
-holochain_util = { version = "^0.7.0-dev.0", path = "../holochain_util", default-features = false }
+holochain_util = { version = "^0.7.0-dev.1", path = "../holochain_util", default-features = false }
 kitsune2_api = { version = "0.4.0-dev.2", optional = true }
 must_future = { version = "0.1", optional = true }
 proptest = { version = "1", optional = true }
@@ -53,15 +53,31 @@ default = ["serialization", "holochain-wasmer"]
 full = ["fixturators", "hashing", "encoding", "sqlite"]
 
 test_utils = ["fixturators"]
-fixturators = ["fixt", "rand", "hashing", "encoding"]
-fuzzing = ["proptest", "proptest-derive", "holochain_serialized_bytes?/fuzzing"]
+fixturators = ["dep:fixt", "dep:rand", "hashing", "encoding"]
+fuzzing = [
+  "dep:proptest",
+  "dep:proptest-derive",
+  "holochain_serialized_bytes?/fuzzing",
+]
 
-hashing = ["futures", "must_future", "dep:blake2b_simd", "serialization"]
+hashing = [
+  "dep:futures",
+  "dep:must_future",
+  "dep:blake2b_simd",
+  "serialization",
+]
 kitsune2 = ["dep:bytes", "dep:kitsune2_api"]
-serialization = ["holochain_serialized_bytes", "serde", "serde_bytes"]
+serialization = [
+  "dep:holochain_serialized_bytes",
+  "dep:serde",
+  "dep:serde_bytes",
+]
 encoding = ["dep:base64", "dep:blake2b_simd", "dep:derive_more", "dep:sha2"]
-holochain-wasmer = ["holochain_wasmer_common"]
+holochain-wasmer = ["dep:holochain_wasmer_common"]
 schema = ["dep:schemars"]
 
-sqlite-encrypted = ["rusqlite", "rusqlite/bundled-sqlcipher-vendored-openssl"]
-sqlite = ["rusqlite", "rusqlite/bundled"]
+sqlite-encrypted = [
+  "dep:rusqlite",
+  "rusqlite/bundled-sqlcipher-vendored-openssl",
+]
+sqlite = ["dep:rusqlite", "rusqlite/bundled"]

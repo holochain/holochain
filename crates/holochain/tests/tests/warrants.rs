@@ -175,7 +175,7 @@ async fn warrant_is_gossiped() {
                     && warrants[0].warrant().author == *bob_cell.agent_pubkey() // Make sure that Bob authored the warrant and it's not been authored by Carol.
             }
         },
-        Some(30_000),
+        Some(60_000),
         None,
     )
     .await

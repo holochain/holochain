@@ -1,6 +1,6 @@
 [package]
 name = "holochain_zome_types"
-version = "0.7.0-dev.5"
+version = "0.7.0-dev.7"
 description = "Holochain zome types"
 license = "Apache-2.0"
 repository = "https://github.com/holochain/holochain"
@@ -12,13 +12,13 @@ edition = "2021"
 # reminder - do not use workspace deps
 [dependencies]
 holochain_timestamp = { version = "^0.7.0-dev.0", path = "../timestamp" }
-holo_hash = { version = "^0.7.0-dev.3", path = "../holo_hash", features = [
+holo_hash = { version = "^0.7.0-dev.4", path = "../holo_hash", features = [
   "encoding",
 ] }
-holochain_integrity_types = { version = "^0.7.0-dev.4", path = "../holochain_integrity_types", features = [
+holochain_integrity_types = { version = "^0.7.0-dev.5", path = "../holochain_integrity_types", features = [
   "tracing",
 ] }
-holochain_nonce = { version = "^0.7.0-dev.0", path = "../holochain_nonce" }
+holochain_nonce = { version = "^0.7.0-dev.1", path = "../holochain_nonce" }
 holochain_serialized_bytes = "=0.0.56"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_bytes = "0.11"
@@ -54,10 +54,6 @@ shrinkwraprs = { version = "0.3", optional = true }
 proptest = { version = "1", optional = true }
 proptest-derive = { version = "0", optional = true }
 
-# contrafact
-contrafact = { version = "0.2.0-rc.1", optional = true }
-once_cell = { version = "1.4", optional = true }
-
 # Enabled with the `schema` feature
 schemars = { version = "0.9", optional = true }
 
@@ -74,16 +70,16 @@ default = ["full-dna-def"]
 # Extra impls for DnaDef, including InlineZome, which are not used in Wasm
 # but used in Holochain
 full-dna-def = [
-  "derive_builder",
+  "dep:derive_builder",
   "dep:uuid",
-  "shrinkwraprs",
+  "dep:shrinkwraprs",
   "holochain_integrity_types/full-dna-def",
 ]
 
 full = [
   "default",
   "sqlite",
-  "num_enum",
+  "dep:num_enum",
   "holochain_timestamp/now",
   "properties",
   "holochain_integrity_types/full",
@@ -91,30 +87,28 @@ full = [
 ]
 
 fixturators = [
-  "fixt",
-  "rand",
+  "dep:fixt",
+  "dep:rand",
   "holo_hash/fixturators",
   "holochain_integrity_types/test_utils",
   "full-dna-def",
 ]
 
-properties = ["serde_yaml"]
+properties = ["dep:serde_yaml"]
 
 fuzzing = [
-  "contrafact",
-  "proptest",
-  "proptest-derive",
+  "dep:proptest",
+  "dep:proptest-derive",
   "holochain_integrity_types/fuzzing",
   "holochain_serialized_bytes/fuzzing",
   "holo_hash/fuzzing",
-  "rand",
-  "fixt",
+  "dep:rand",
+  "dep:fixt",
 ]
 
 test_utils = [
   "fuzzing",
   "fixturators",
-  "once_cell",
   "holo_hash/hashing",
   "holo_hash/test_utils",
   "full-dna-def",
@@ -124,13 +118,13 @@ test_utils = [
 instrument = []
 
 sqlite-encrypted = [
-  "rusqlite",
+  "dep:rusqlite",
   "rusqlite/bundled-sqlcipher-vendored-openssl",
   "holo_hash/sqlite-encrypted",
   "holochain_timestamp/sqlite-encrypted",
 ]
 sqlite = [
-  "rusqlite",
+  "dep:rusqlite",
   "rusqlite/bundled",
   "holo_hash/sqlite",
   "holochain_timestamp/sqlite",

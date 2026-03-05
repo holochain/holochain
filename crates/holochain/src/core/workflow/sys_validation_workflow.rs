@@ -373,13 +373,28 @@ async fn sys_validation_workflow_inner(
 
     {
         let mut warrants = vec![];
+        // Track action hashes already warranted in this batch to avoid creating duplicate
+        // warrants for the same action. Multiple op types (StoreRecord, StoreEntry,
+        // RegisterAgentActivity) can share the same action, and without this deduplication
+        // all of them would trigger a separate warrant when processed in the same run.
+        let mut warranted_in_batch = std::collections::HashSet::new();
         for (op_hash, chain_op) in invalid_ops
             .into_iter()
             .filter_map(|(h, op)| op.as_chain_op().map(|op| (h, op.clone())))
         {
+            let action_hash = chain_op.action().to_hash();
+
+            if warranted_in_batch.contains(&action_hash) {
+                tracing::trace!(
+                    "Op {} action is already being warranted in this batch, skipping",
+                    op_hash
+                );
+                continue;
+            }
+
             match holochain_state::warrant::is_action_warranted_as_invalid(
                 &workspace.dht_db,
-                chain_op.action().to_hash(),
+                action_hash.clone(),
                 chain_op.author().clone(),
             )
             .await
@@ -400,6 +415,7 @@ async fn sys_validation_workflow_inner(
                 }
             }
 
+            warranted_in_batch.insert(action_hash);
             let warrant_op =
                 make_invalid_chain_warrant_op(&_keystore, _representative_agent.clone(), &chain_op)
                     .await?;

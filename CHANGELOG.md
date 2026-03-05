@@ -32,6 +32,139 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20260302.002017
+
+## [hcterm-0.7.0-dev.14](crates/hcterm/CHANGELOG.md#0.7.0-dev.14)
+
+## [holochain\_cli-0.7.0-dev.14](crates/holochain_cli/CHANGELOG.md#0.7.0-dev.14)
+
+## [holochain\_cli\_bundle-0.7.0-dev.13](crates/holochain_cli_bundle/CHANGELOG.md#0.7.0-dev.13)
+
+## [holochain\_cli\_client-0.7.0-dev.14](crates/holochain_cli_client/CHANGELOG.md#0.7.0-dev.14)
+
+## [holochain\_cli\_sandbox-0.7.0-dev.14](crates/holochain_cli_sandbox/CHANGELOG.md#0.7.0-dev.14)
+
+## [holochain\_client-0.9.0-dev.14](crates/holochain_client/CHANGELOG.md#0.9.0-dev.14)
+
+## [holochain-0.7.0-dev.14](crates/holochain/CHANGELOG.md#0.7.0-dev.14)
+
+- Import influxive crates from https://github.com/holochain/influxive into monorepo and update their dependencies.
+- **BREAKING CHANGE** Remove implicit features created by enabling optional crates: \#5663
+  - For `holo_hash`, the `serde` and `serde_bytes` features are removed, please use `serialization` instead.
+  - For `holo_hash`, the `rusqlite` feature has been removed, please use `sqlite` or `sqlite-encrypted` instead.
+  - For `holochain_trace`, the `tokio` and `shrinkwraprs` features are removed, please use `channels` instead.
+  - For `holochain_util`, the `tokio` feature is removed, please use `tokio_helper` instead.
+  - For `holochain_util`, the `rpassword` and `sodoken` features are removed, please use `pw` instead.
+  - For `holochain_metrics`, the `influxive` feature is removed and now cannot be disabled.
+  - For `holochain`, the `metrics_influxive` feature is removed and metrics are now only controlled with configuration.
+  - For `holochain_nonce`, the `subtle-encoding` feature has been renamed to `full`.
+  - For `hdi`, the `tracing` and `tracing-core` features have been removed, please use `trace` instead.
+  - For `holochain_integrity_types`, the `subtle-encoding` feature has been removed, please use `full` instead.
+  - For `holochain_zome_types`, the `serde_yaml` feature has been removed, please use `properties` instead.
+  - For `holochain_zome_types`, the `shrinkwraprs`, `derive_builder`, and `num_enum` features have been removed; they were implicit features of the `full-dna-def` and `full` features respectively.
+  - For `holochain_p2p`, the `kitsune2_transport_iroh` feature has been removed, please use `transport-iroh` instead.
+  - For `holochain_sqlite`, the `holochain_util` feature has been removed; the dependency is now unconditionally enabled.
+
+## [holochain\_cascade-0.7.0-dev.14](crates/holochain_cascade/CHANGELOG.md#0.7.0-dev.14)
+
+## [holochain\_conductor\_config-0.7.0-dev.13](crates/holochain_conductor_config/CHANGELOG.md#0.7.0-dev.13)
+
+## [holochain\_metrics-0.7.0-dev.1](crates/holochain_metrics/CHANGELOG.md#0.7.0-dev.1)
+
+## [holochain\_test\_wasm\_common-0.7.0-dev.8](crates/holochain_test_wasm_common/CHANGELOG.md#0.7.0-dev.8)
+
+## [holochain\_wasm\_test\_utils-0.7.0-dev.14](crates/holochain_wasm_test_utils/CHANGELOG.md#0.7.0-dev.14)
+
+## [holochain\_websocket-0.7.0-dev.13](crates/holochain_websocket/CHANGELOG.md#0.7.0-dev.13)
+
+## [hdk-0.7.0-dev.8](crates/hdk/CHANGELOG.md#0.7.0-dev.8)
+
+## [holochain\_conductor\_api-0.7.0-dev.13](crates/holochain_conductor_api/CHANGELOG.md#0.7.0-dev.13)
+
+## [holochain\_p2p-0.7.0-dev.14](crates/holochain_p2p/CHANGELOG.md#0.7.0-dev.14)
+
+## [influxive-0.0.6-dev.0](crates/influxive/CHANGELOG.md#0.0.6-dev.0)
+
+## [hdi-0.8.0-dev.5](crates/hdi/CHANGELOG.md#0.8.0-dev.5)
+
+## [holochain\_state-0.7.0-dev.14](crates/holochain_state/CHANGELOG.md#0.7.0-dev.14)
+
+## [hdk\_derive-0.7.0-dev.5](crates/hdk_derive/CHANGELOG.md#0.7.0-dev.5)
+
+## [holochain\_data-0.7.0-dev.3](crates/holochain_data/CHANGELOG.md#0.7.0-dev.3)
+
+## [holochain\_state\_types-0.7.0-dev.5](crates/holochain_state_types/CHANGELOG.md#0.7.0-dev.5)
+
+## [holochain\_types-0.7.0-dev.13](crates/holochain_types/CHANGELOG.md#0.7.0-dev.13)
+
+## [holochain\_keystore-0.7.0-dev.7](crates/holochain_keystore/CHANGELOG.md#0.7.0-dev.7)
+
+## [holochain\_sqlite-0.7.0-dev.10](crates/holochain_sqlite/CHANGELOG.md#0.7.0-dev.10)
+
+## [mr\_bundle-0.7.0-dev.1](crates/mr_bundle/CHANGELOG.md#0.7.0-dev.1)
+
+## [holochain\_trace-0.7.0-dev.1](crates/holochain_trace/CHANGELOG.md#0.7.0-dev.1)
+
+## [holochain\_zome\_types-0.7.0-dev.7](crates/holochain_zome_types/CHANGELOG.md#0.7.0-dev.7)
+
+## [holochain\_integrity\_types-0.7.0-dev.5](crates/holochain_integrity_types/CHANGELOG.md#0.7.0-dev.5)
+
+## [holochain\_nonce-0.7.0-dev.1](crates/holochain_nonce/CHANGELOG.md#0.7.0-dev.1)
+
+## [holo\_hash-0.7.0-dev.4](crates/holo_hash/CHANGELOG.md#0.7.0-dev.4)
+
+## [holochain\_secure\_primitive-0.7.0-dev.1](crates/holochain_secure_primitive/CHANGELOG.md#0.7.0-dev.1)
+
+## [holochain\_util-0.7.0-dev.1](crates/holochain_util/CHANGELOG.md#0.7.0-dev.1)
+
+# 20260223.112802
+
+## [hcterm-0.7.0-dev.13](crates/hcterm/CHANGELOG.md#0.7.0-dev.13)
+
+## [holochain\_cli-0.7.0-dev.13](crates/holochain_cli/CHANGELOG.md#0.7.0-dev.13)
+
+## [holochain\_cli\_bundle-0.7.0-dev.12](crates/holochain_cli_bundle/CHANGELOG.md#0.7.0-dev.12)
+
+## [holochain\_cli\_client-0.7.0-dev.13](crates/holochain_cli_client/CHANGELOG.md#0.7.0-dev.13)
+
+## [holochain\_cli\_sandbox-0.7.0-dev.13](crates/holochain_cli_sandbox/CHANGELOG.md#0.7.0-dev.13)
+
+## [holochain\_client-0.9.0-dev.13](crates/holochain_client/CHANGELOG.md#0.9.0-dev.13)
+
+## [holochain-0.7.0-dev.13](crates/holochain/CHANGELOG.md#0.7.0-dev.13)
+
+- Stabilized chain fork warrants that were previously behind the `unstable-warrants` feature; the feature has now been removed. \#5641
+
+## [holochain\_cascade-0.7.0-dev.13](crates/holochain_cascade/CHANGELOG.md#0.7.0-dev.13)
+
+## [holochain\_conductor\_config-0.7.0-dev.12](crates/holochain_conductor_config/CHANGELOG.md#0.7.0-dev.12)
+
+## [holochain\_test\_wasm\_common-0.7.0-dev.7](crates/holochain_test_wasm_common/CHANGELOG.md#0.7.0-dev.7)
+
+## [holochain\_wasm\_test\_utils-0.7.0-dev.13](crates/holochain_wasm_test_utils/CHANGELOG.md#0.7.0-dev.13)
+
+## [holochain\_websocket-0.7.0-dev.12](crates/holochain_websocket/CHANGELOG.md#0.7.0-dev.12)
+
+## [hdk-0.7.0-dev.7](crates/hdk/CHANGELOG.md#0.7.0-dev.7)
+
+## [holochain\_conductor\_api-0.7.0-dev.12](crates/holochain_conductor_api/CHANGELOG.md#0.7.0-dev.12)
+
+## [holochain\_p2p-0.7.0-dev.13](crates/holochain_p2p/CHANGELOG.md#0.7.0-dev.13)
+
+## [holochain\_state-0.7.0-dev.13](crates/holochain_state/CHANGELOG.md#0.7.0-dev.13)
+
+## [holochain\_chc-0.4.0-dev.13](crates/holochain_chc/CHANGELOG.md#0.4.0-dev.13)
+
+## [holochain\_data-0.7.0-dev.2](crates/holochain_data/CHANGELOG.md#0.7.0-dev.2)
+
+## [holochain\_types-0.7.0-dev.12](crates/holochain_types/CHANGELOG.md#0.7.0-dev.12)
+
+## [holochain\_keystore-0.7.0-dev.6](crates/holochain_keystore/CHANGELOG.md#0.7.0-dev.6)
+
+## [holochain\_sqlite-0.7.0-dev.9](crates/holochain_sqlite/CHANGELOG.md#0.7.0-dev.9)
+
+## [holochain\_zome\_types-0.7.0-dev.6](crates/holochain_zome_types/CHANGELOG.md#0.7.0-dev.6)
+
 # 20260216.002130
 
 ## [hcterm-0.7.0-dev.12](crates/hcterm/CHANGELOG.md#0.7.0-dev.12)

@@ -2786,7 +2786,7 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
             // If app installation fails due to genesis failure, normally the
             // app will be immediately uninstalled. When this flag is set, the
             // app is left installed with empty cells intact. This can be useful
-            // for using `GraftRecordsOntoSourceChain` or diagnostics.
+            // for diagnostics.
             ignore_genesis_failure: bool,
         }
         ```
@@ -2984,13 +2984,6 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
 * `GetAgentInfo { dna_hash: Option<DnaHash> } -> AgentInfoReturned(Vec<AgentInfoSigned>)`: Request information about the agents in this Conductor's peer store; that is, the peers that this Conductor knows about.
     * **Notes**: Implementations MAY implement this function. It is useful for testing across networks. It is also intended for use cases in which it is important for peer info to be transmitted out-of-band.
     * **Arguments**: If supplied, the `dna_hash` argument MUST constrain the results to the peers of the specified DNA.
-
-* `GraftRecords { cell_id: CellId, validate: bool, records: Vec<Record> } -> RecordsGrafted`: "Graft" `Record`s onto the source chain of the specified `CellId`.
-    * **Notes**: Implementations MAY implement this function. This admin call is provided for the purposes of restoring chains from backup. All records must be authored and signed by the same agent; if they are not, the call MUST fail. Caution must be exercised to avoid creating source chain forks, which will occur if the chains in the Conductor store and the new records supplied in this call diverge and have had their `RegisterAgentActivity` operations already published.
-    * **Arguments**:
-        * If `validate` is `true`, then the records MUST be validated before insertion. If `validate` is `false`, then records MUST be inserted as-is.
-        * Records provided are expected to form a valid chain segment (ascending sequence numbers and valid `prev_action` references). If the first record contains a `prev_action` which matches an existing record, then the new records MUST be "grafted" onto the existing chain at that point, and any other records following that point which do not match the new records MUST be discarded. See the note above about the risk of source chain forks when using this call.
-        * If the DNA whose hash is referenced in the `cell_id` argument is not already installed on this conductor, the call MUST fail.
 
 * `GrantZomeCallCapability(GrantZomeCallCapabilityPayload) -> ZomeCallCapabilityGranted`: Attempt to store a capability grant on the source chain of the specified cell, so that a client may make zome calls to that cell.
     * **Notes**: Callers SHOULD construct a grant that uses the strongest security compatible with the use case; if a client is able to construct and store an Ed25519 key pair and use it to sign zome call payloads, a grant using `CapAccess::Assigned` with the client's public key SHOULD be favored.

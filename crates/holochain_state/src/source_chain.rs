@@ -14,7 +14,6 @@ use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
-use holochain_chc::*;
 use holochain_keystore::MetaLairClient;
 use holochain_sqlite::rusqlite;
 use holochain_sqlite::rusqlite::params;
@@ -231,12 +230,42 @@ impl SourceChain {
         .await
     }
 
+    /// Drain the scratch space and persist its contents to the databases.
+    ///
+    /// This drains all actions, entries, scheduled functions, and warrants from the scratch
+    /// and writes them to the authored and DHT databases. The flush proceeds as follows:
+    ///
+    /// 1. Validates countersigning invariants: a countersigning entry must be the only
+    ///    action in the scratch, its chain lock must match and not be expired.
+    /// 2. Performs an "as-at" consistency check against the current persisted chain head.
+    ///    If the head has moved since this [`SourceChain`] was constructed, the behavior
+    ///    depends on the [`ChainTopOrdering`]: under [`ChainTopOrdering::Strict`] the
+    ///    flush fails with [`SourceChainError::HeadMoved`]; under
+    ///    [`ChainTopOrdering::Relaxed`] the actions are rebased onto the new head and
+    ///    the flush is retried recursively.
+    /// 3. Inserts entries, actions, and ops into the authored database in a single
+    ///    transaction. Ops belonging to a countersigning session are marked as withheld
+    ///    from publishing.
+    /// 4. Integrates authored ops into the DHT database according to `storage_arcs`.
+    /// 5. Verifies warrant signatures and inserts valid warrants into the DHT database.
+    ///
+    /// The `storage_arcs` should reflect the current target arcs for authored ops
+    /// integration. Returns an empty vec with zero warrants if the scratch is empty.
+    ///
+    /// # Errors
+    ///
+    /// - [`SourceChainError::HeadMoved`] if the chain head changed and ordering is strict.
+    /// - [`SourceChainError::DirtyCounterSigningWrite`] if a countersigning entry is
+    ///   flushed alongside other actions.
+    /// - [`SourceChainError::ChainLocked`] if the chain is locked for a different session.
+    /// - [`SourceChainError::LockExpired`] if the countersigning lock has expired.
+    /// - [`SourceChainError::CountersigningWriteWithoutSession`] if a countersigning
+    ///   entry is written without an active chain lock.
     #[async_recursion]
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, chc)))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     pub async fn flush(
         &self,
         storage_arcs: Vec<DhtArc>,
-        chc: Option<ChcImpl>,
     ) -> SourceChainResult<(Vec<SignedActionHashed>, u32)> {
         // Nothing to write
         if self.scratch.apply(|s| s.is_empty())? {
@@ -287,7 +316,7 @@ impl SourceChain {
         // before starting any database read/write operations.
         let write_permit = self.vault.acquire_write_permit().await?;
 
-        // If there are records to write, then we need to respect the chain lock and push to the CHC
+        // If there are records to write, then we need to respect the chain lock
         if !records.is_empty() {
             self.vault
                 .read_async({
@@ -323,34 +352,6 @@ impl SourceChain {
                     }
                 })
                 .await?;
-
-            // Sync with CHC, if CHC is present
-            if let Some(chc) = chc.clone() {
-                // Skip the CHC sync if this is a countersigning session.
-                // If the session times out, we might roll the chain back to the previous head, and so
-                // we don't want the record to exist remotely.
-                if is_countersigning_session {
-                    tracing::debug!(
-                        "Skipping CHC push for countersigning session: {:?}",
-                        records
-                    );
-                } else {
-                    let payload = AddRecordPayload::from_records(
-                        self.keystore.clone(),
-                        (*self.author).clone(),
-                        records,
-                    )
-                    .await
-                    .map_err(SourceChainError::other)?;
-
-                    match chc.add_records_request(payload).await {
-                        Err(e @ ChcError::InvalidChain(_, _)) => Err(
-                            SourceChainError::ChcHeadMoved("SourceChain::flush".into(), e),
-                        ),
-                        e => e.map_err(SourceChainError::other),
-                    }?;
-                }
-            }
         }
 
         let chain_flush_result = self
@@ -424,7 +425,7 @@ impl SourceChain {
                             scratch.add_entry(entry, ChainTopOrdering::Relaxed);
                         }
                     })?;
-                    child_chain.flush(storage_arcs, chc).await
+                    child_chain.flush(storage_arcs).await
                 } else {
                     Err(SourceChainError::HeadMoved(
                         actions,
@@ -1170,7 +1171,6 @@ pub async fn genesis(
     dna_hash: DnaHash,
     agent_pubkey: AgentPubKey,
     membrane_proof: Option<MembraneProof>,
-    chc: Option<ChcImpl>,
 ) -> SourceChainResult<()> {
     let dna_action = Action::Dna(Dna {
         author: agent_pubkey.clone(),
@@ -1219,23 +1219,6 @@ pub async fn genesis(
     let agent_entry = agent_entry.into_option();
 
     let mut ops_to_integrate = Vec::new();
-
-    if let Some(chc) = chc {
-        let payload = AddRecordPayload::from_records(
-            keystore.clone(),
-            agent_pubkey.clone(),
-            vec![dna_record, agent_validation_record, agent_record],
-        )
-        .await
-        .map_err(SourceChainError::other)?;
-
-        match chc.add_records_request(payload).await {
-            Err(e @ ChcError::InvalidChain(_, _)) => {
-                Err(SourceChainError::ChcHeadMoved("genesis".into(), e))
-            }
-            e => e.map_err(SourceChainError::other),
-        }?;
-    }
 
     let ops_to_integrate = authored
         .write_async(move |txn| {
@@ -1463,7 +1446,7 @@ mod tests {
             .await?;
 
         let storage_arcs = vec![DhtArc::Empty];
-        chain_1.flush(storage_arcs.clone(), None).await?;
+        chain_1.flush(storage_arcs.clone()).await?;
         let seq = db
             .write_async(move |txn| chain_head_db_nonempty(txn))
             .await?
@@ -1471,7 +1454,7 @@ mod tests {
         assert_eq!(seq, 3);
 
         assert!(matches!(
-            chain_2.flush(storage_arcs.clone(), None).await,
+            chain_2.flush(storage_arcs.clone()).await,
             Err(SourceChainError::HeadMoved(_, _, _, _))
         ));
         let seq = db
@@ -1480,7 +1463,7 @@ mod tests {
             .seq;
         assert_eq!(seq, 3);
 
-        chain_3.flush(storage_arcs, None).await?;
+        chain_3.flush(storage_arcs).await?;
         let seq = db
             .write_async(move |txn| chain_head_db_nonempty(txn))
             .await?
@@ -1543,7 +1526,7 @@ mod tests {
             .unwrap();
 
         let storage_arcs = vec![DhtArc::Empty];
-        chain_1.flush(storage_arcs.clone(), None).await?;
+        chain_1.flush(storage_arcs.clone()).await?;
         let seq = db
             .write_async(move |txn| chain_head_db_nonempty(txn))
             .await?
@@ -1551,11 +1534,11 @@ mod tests {
         assert_eq!(seq, 3);
 
         assert!(matches!(
-            chain_2.flush(storage_arcs.clone(), None).await,
+            chain_2.flush(storage_arcs.clone()).await,
             Err(SourceChainError::HeadMoved(_, _, _, _))
         ));
 
-        chain_3.flush(storage_arcs, None).await?;
+        chain_3.flush(storage_arcs).await?;
         let head = db
             .write_async(move |txn| chain_head_db_nonempty(txn))
             .await?;
@@ -1596,7 +1579,7 @@ mod tests {
 
         let result = chain.delete_valid_agent_pub_key().await;
         assert!(result.is_ok());
-        chain.flush(vec![DhtArc::Empty], None).await.unwrap();
+        chain.flush(vec![DhtArc::Empty]).await.unwrap();
 
         // Valid agent pub key has been deleted. Repeating the operation should fail now as no valid
         // pub key can be found.
@@ -1661,7 +1644,7 @@ mod tests {
                 .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
                 .await?;
 
-            chain.flush(storage_arcs.clone(), None).await.unwrap();
+            chain.flush(storage_arcs.clone()).await.unwrap();
             (action, entry_hash)
         };
 
@@ -1720,7 +1703,7 @@ mod tests {
             let action = chain
                 .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
                 .await?;
-            chain.flush(storage_arcs.clone(), None).await.unwrap();
+            chain.flush(storage_arcs.clone()).await.unwrap();
 
             (action, entry_hash)
         };
@@ -1784,7 +1767,6 @@ mod tests {
                 fake_dna_hash(1),
                 carol.clone(),
                 None,
-                None,
             )
             .await
             .unwrap();
@@ -1811,7 +1793,7 @@ mod tests {
             chain
                 .put_weightless(action_builder, None, ChainTopOrdering::default())
                 .await?;
-            chain.flush(storage_arcs.clone(), None).await.unwrap();
+            chain.flush(storage_arcs.clone()).await.unwrap();
         }
 
         // alice should get her author cap grant as always, independent of
@@ -1863,7 +1845,7 @@ mod tests {
             let action = chain
                 .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
                 .await?;
-            chain.flush(storage_arcs.clone(), None).await.unwrap();
+            chain.flush(storage_arcs.clone()).await.unwrap();
             (action, entry_hash)
         };
 
@@ -1898,7 +1880,6 @@ mod tests {
                     fake_dna_hash(1),
                     bob.clone(),
                     None,
-                    None,
                 )
                 .await
                 .unwrap();
@@ -1926,7 +1907,7 @@ mod tests {
             chain
                 .put_weightless(action_builder, None, ChainTopOrdering::default())
                 .await?;
-            chain.flush(storage_arcs.clone(), None).await.unwrap();
+            chain.flush(storage_arcs.clone()).await.unwrap();
         }
 
         // bob must not get unrestricted cap grant any longer
@@ -1992,7 +1973,7 @@ mod tests {
                 .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
                 .await?;
 
-            chain.flush(storage_arcs, None).await.unwrap();
+            chain.flush(storage_arcs).await.unwrap();
         }
 
         let actual_cap_grant = chain
@@ -2031,7 +2012,6 @@ mod tests {
             fixt!(DnaHash),
             (*author).clone(),
             None,
-            None,
         )
         .await
         .unwrap();
@@ -2062,7 +2042,7 @@ mod tests {
             .put_weightless(create, Some(entry), ChainTopOrdering::default())
             .await
             .unwrap();
-        source_chain.flush(vec![DhtArc::Empty], None).await.unwrap();
+        source_chain.flush(vec![DhtArc::Empty]).await.unwrap();
 
         vault
             .read_async({
@@ -2175,7 +2155,7 @@ mod tests {
                     scratch.add_entry(entry_hashed, ChainTopOrdering::Strict);
                 })
                 .unwrap();
-            chain.flush(vec![DhtArc::Empty], None).await.unwrap();
+            chain.flush(vec![DhtArc::Empty]).await.unwrap();
 
             action
         };
@@ -2335,7 +2315,7 @@ mod tests {
             .await;
         assert!(result.is_ok());
 
-        chain.flush(vec![DhtArc::Empty], None).await.unwrap();
+        chain.flush(vec![DhtArc::Empty]).await.unwrap();
 
         // zomes initialized should be true after init zomes has run
         let zomes_initialized = chain.zomes_initialized().await.unwrap();
@@ -2372,7 +2352,7 @@ mod tests {
             .unwrap();
 
         // Flush should write warrants to DHT database
-        let (actions, warrant_count) = chain.flush(vec![], None).await.unwrap();
+        let (actions, warrant_count) = chain.flush(vec![]).await.unwrap();
         assert!(actions.is_empty());
         assert_eq!(warrant_count, 1);
 
@@ -2408,7 +2388,7 @@ mod tests {
             .unwrap();
 
         // Flush should write warrant to DHT database
-        let (actions, warrant_count) = chain.flush(vec![], None).await.unwrap();
+        let (actions, warrant_count) = chain.flush(vec![]).await.unwrap();
         assert!(actions.is_empty());
         assert_eq!(warrant_count, 1);
 
@@ -2433,7 +2413,7 @@ mod tests {
             .unwrap();
 
         // Flush should not write duplicate warrant to DHT database
-        let (actions, warrant_count) = chain.flush(vec![], None).await.unwrap();
+        let (actions, warrant_count) = chain.flush(vec![]).await.unwrap();
         assert!(actions.is_empty());
         assert_eq!(warrant_count, 1); // rejected inserts are not reported by the insertion method, so this will indicate 1
 
@@ -2477,7 +2457,7 @@ mod tests {
             .unwrap();
 
         // Flush should not write warrant to DHT database
-        let (actions, warrant_count) = chain.flush(vec![], None).await.unwrap();
+        let (actions, warrant_count) = chain.flush(vec![]).await.unwrap();
         assert!(actions.is_empty());
         assert_eq!(warrant_count, 0);
 
@@ -2512,7 +2492,6 @@ mod tests {
                 keystore.clone(),
                 dna_hash,
                 agent_key.clone(),
-                None,
                 None,
             )
             .await

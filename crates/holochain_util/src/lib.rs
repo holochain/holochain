@@ -3,7 +3,7 @@
 #[cfg(feature = "fs")]
 pub mod ffs;
 
-#[cfg(feature = "tokio")]
+#[cfg(feature = "tokio_helper")]
 pub mod tokio_helper;
 
 #[cfg(feature = "pw")]

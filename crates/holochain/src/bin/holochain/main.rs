@@ -99,8 +99,6 @@ async fn async_main() {
             None,
             true,
             0,
-            #[cfg(feature = "chc")]
-            None,
         )
         .inspect_err(|e| tracing::error!("Failed to generate configurations: {}", e))
         .unwrap();

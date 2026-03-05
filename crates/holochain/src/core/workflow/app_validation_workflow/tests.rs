@@ -140,11 +140,7 @@ async fn main_workflow() {
     hc_p2p
         .expect_target_arcs()
         .returning(|_| Box::pin(async move { Ok(vec![]) }));
-    let network = Arc::new(HolochainP2pDna::new(
-        Arc::new(hc_p2p),
-        dna_hash.clone(),
-        None,
-    ));
+    let network = Arc::new(HolochainP2pDna::new(Arc::new(hc_p2p), dna_hash.clone()));
 
     // run validation workflow
     // outcome should be incomplete - delete op is missing the dependent create op
@@ -193,7 +189,6 @@ async fn main_workflow() {
         Arc::new(HolochainP2pDna::new(
             conductor.holochain_p2p().clone(),
             dna_hash.clone(),
-            None,
         )),
         fixt!(AgentPubKey),
     )
@@ -346,7 +341,6 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
         Arc::new(HolochainP2pDna::new(
             conductor.holochain_p2p().clone(),
             dna_hash.clone(),
-            None,
         )),
         fixt!(AgentPubKey),
     )
@@ -487,7 +481,6 @@ async fn validate_ops_in_sequence_must_get_action() {
         Arc::new(holochain_p2p::HolochainP2pDna::new(
             conductor.holochain_p2p().clone(),
             dna_hash.clone(),
-            None,
         )),
         fixt!(AgentPubKey),
     )
@@ -649,7 +642,6 @@ async fn handle_error_in_op_validation() {
         Arc::new(HolochainP2pDna::new(
             conductor.holochain_p2p().clone(),
             dna_hash.clone(),
-            None,
         )),
         fixt!(AgentPubKey),
     )
@@ -1037,7 +1029,6 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
         Arc::new(HolochainP2pDna::new(
             conductor.holochain_p2p().clone(),
             dna_hash.clone(),
-            None,
         )),
         fixt!(AgentPubKey),
     )

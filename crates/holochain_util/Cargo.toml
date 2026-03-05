@@ -1,6 +1,6 @@
 [package]
 name = "holochain_util"
-version = "0.7.0-dev.0"
+version = "0.7.0-dev.1"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 description = "This crate is a collection of various utility functions that are used in the other crates in the holochain repository."
@@ -30,8 +30,9 @@ tracing = "0.1"
 workspace = true
 
 [features]
-default = ["fs", "pw", "time", "tokio", "jsonschema"]
-pw = ["rpassword", "sodoken"]
+default = ["fs", "pw", "time", "tokio_helper", "jsonschema"]
+pw = ["dep:rpassword", "dep:sodoken"]
 fs = []
-time = ["tokio"]
+time = []
+tokio_helper = ["dep:tokio"]
 jsonschema = ["dep:schemars"]
