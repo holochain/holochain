@@ -2039,7 +2039,6 @@ mod app_status_impls {
                     let holochain_p2p_dna = cell.holochain_p2p_dna().clone();
                     let network_readiness = self.network_readiness.clone();
                     let holochain_p2p = self.holochain_p2p.clone();
-                    let shutting_down = self.shutting_down.clone();
                     let running_cells = running_cells_ref.clone();
                     async move {
                         network_readiness.emit(
@@ -2062,7 +2061,6 @@ mod app_status_impls {
                                 network_readiness.start_peer_monitoring(
                                     cell_id.dna_hash().clone(),
                                     holochain_p2p,
-                                    shutting_down,
                                 );
                                 running_cells.share_mut(|cells| {
                                     tracing::debug!(?cell_id, "added cell to running_cells");

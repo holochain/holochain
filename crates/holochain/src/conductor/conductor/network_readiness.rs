@@ -8,7 +8,6 @@ pub use holochain_conductor_api::ConductorNetworkState;
 use holochain_p2p::actor::DynHcP2p;
 use holochain_types::prelude::{AgentPubKey, CellId, DnaHash};
 use std::collections::HashSet;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::{broadcast, RwLock};
 
@@ -237,21 +236,19 @@ impl NetworkReadinessHandle {
         self.state.read().await.failed_cells.get(cell_id).cloned()
     }
 
-    /// Spawn a background task that polls the peer store for `dna_hash` and emits
+    /// Register a listener on the kitsune peer store for `dna_hash` that emits
     /// [`NetworkReadinessEvent::PeerDiscovered`] for every newly-seen agent, then
-    /// [`NetworkReadinessEvent::BootstrapComplete`] once the initial peer set is
-    /// established (or after `BOOTSTRAP_TIMEOUT` if no peers are found).
+    /// [`NetworkReadinessEvent::BootstrapComplete`] once the first peer appears
+    /// (or after `BOOTSTRAP_TIMEOUT` if no peers are found).
     ///
-    /// If a watcher is already running for `dna_hash` this is a no-op.
+    /// If monitoring is already active for `dna_hash` this is a no-op.
     pub(crate) fn start_peer_monitoring(
         &self,
         dna_hash: DnaHash,
         holochain_p2p: DynHcP2p,
-        shutting_down: Arc<AtomicBool>,
     ) {
         let monitoring_dnas = self.monitoring_dnas.clone();
-        let sender = self.sender.clone();
-        let state = self.state.clone();
+        let handle = self.clone();
 
         tokio::spawn(async move {
             // Deduplicate: only one watcher per DNA space.
@@ -263,68 +260,58 @@ impl NetworkReadinessHandle {
                 monitored.insert(dna_hash.clone());
             }
 
-            const BOOTSTRAP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
-            const POLL_INTERVAL: std::time::Duration = std::time::Duration::from_millis(200);
-
-            let mut seen_peers: HashSet<AgentPubKey> = HashSet::new();
-            let mut bootstrap_complete = false;
-            let start = tokio::time::Instant::now();
-
-            loop {
-                if shutting_down.load(Ordering::Relaxed) {
-                    break;
+            let peer_store = match holochain_p2p.peer_store(dna_hash.clone()).await {
+                Ok(ps) => ps,
+                Err(e) => {
+                    tracing::error!(?e, ?dna_hash, "Failed to get peer store for monitoring");
+                    return;
                 }
+            };
 
-                // Query the peer store for this DNA space.
-                match holochain_p2p.peer_store(dna_hash.clone()).await {
-                    Ok(peer_store) => match peer_store.get_all().await {
-                        Ok(peers) => {
-                            for peer_info in peers {
-                                let agent = AgentPubKey::from_k2_agent(&peer_info.agent);
-                                if seen_peers.insert(agent.clone()) {
-                                    // Update state.
-                                    {
-                                        let mut s = state.write().await;
-                                        s.peers_by_dna
-                                            .entry(dna_hash.clone())
-                                            .or_default()
-                                            .insert(agent.clone());
-                                    }
-                                    // Emit event; ignore if no subscribers.
-                                    let _ = sender.send(NetworkReadinessEvent::PeerDiscovered {
-                                        dna_hash: dna_hash.clone(),
-                                        agent,
-                                    });
-                                }
-                            }
+            let seen_peers: Arc<std::sync::Mutex<HashSet<AgentPubKey>>> =
+                Arc::new(std::sync::Mutex::new(HashSet::new()));
+            let first_peer_notify = Arc::new(tokio::sync::Notify::new());
+
+            let listener_handle = handle.clone();
+            let listener_dna = dna_hash.clone();
+            let listener_seen = seen_peers.clone();
+            let listener_notify = first_peer_notify.clone();
+
+            if let Err(e) = peer_store.register_peer_update_listener(Arc::new(
+                move |agent_info: Arc<kitsune2_api::AgentInfoSigned>| {
+                    let handle = listener_handle.clone();
+                    let dna_hash = listener_dna.clone();
+                    let seen_peers = listener_seen.clone();
+                    let notify = listener_notify.clone();
+                    Box::pin(async move {
+                        let agent = AgentPubKey::from_k2_agent(&agent_info.agent);
+                        let is_new = seen_peers
+                            .lock()
+                            .expect("seen_peers lock poisoned")
+                            .insert(agent.clone());
+                        if is_new {
+                            handle.emit(NetworkReadinessEvent::PeerDiscovered { dna_hash, agent });
+                            notify.notify_one();
                         }
-                        Err(e) => {
-                            tracing::warn!(?e, ?dna_hash, "Failed to read peer store");
-                        }
-                    },
-                    Err(e) => {
-                        tracing::warn!(?e, ?dna_hash, "Failed to get peer store");
-                    }
-                }
-
-                // Emit BootstrapComplete once: after the first peer appears, or
-                // after the timeout elapses (meaning we may be the only node).
-                if !bootstrap_complete
-                    && (!seen_peers.is_empty() || start.elapsed() >= BOOTSTRAP_TIMEOUT)
-                {
-                    bootstrap_complete = true;
-                    {
-                        let mut s = state.write().await;
-                        s.bootstrap_complete_dnas.insert(dna_hash.clone());
-                    }
-                    let _ = sender.send(NetworkReadinessEvent::BootstrapComplete {
-                        dna_hash: dna_hash.clone(),
-                        peer_count: seen_peers.len(),
-                    });
-                }
-
-                tokio::time::sleep(POLL_INTERVAL).await;
+                    })
+                },
+            )) {
+                tracing::error!(?e, ?dna_hash, "Failed to register peer update listener");
+                return;
             }
+
+            // Emit BootstrapComplete when the first peer appears or after timeout.
+            const BOOTSTRAP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+            tokio::select! {
+                _ = first_peer_notify.notified() => {}
+                _ = tokio::time::sleep(BOOTSTRAP_TIMEOUT) => {}
+            }
+
+            let peer_count = seen_peers.lock().expect("seen_peers lock poisoned").len();
+            handle.emit(NetworkReadinessEvent::BootstrapComplete {
+                dna_hash,
+                peer_count,
+            });
         });
     }
 }
