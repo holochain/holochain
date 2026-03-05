@@ -6,18 +6,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
-## holochain\_conductor\_api
-
-### Added
-
-- Added `ConductorNetworkState` type and `AdminRequest::GetNetworkState` / `AdminRequest::AwaitCellNetworkReady` endpoints so external clients can query or wait for cell network readiness over the admin WebSocket. [\#5647](https://github.com/holochain/holochain/pull/5647)
-
-## holochain\_client
-
-### Added
-
-- Added `AdminWebsocket::get_network_state()` and `AdminWebsocket::await_cell_network_ready()` to allow clients to query or wait for cell network readiness without retry loops. `ConductorNetworkState` is re-exported from this crate for convenience. [\#5647](https://github.com/holochain/holochain/pull/5647)
-
 ## holochain
 
 ### Added
