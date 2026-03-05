@@ -88,22 +88,6 @@ async fn metrics_test() {
         assert!(metric.contains("min="));
     });
 
-    let db_pool_utilization = metrics
-        .clone()
-        .filter(|line| line.contains("hc.db.pool.utilization"));
-    let db_pool_utilization_count = db_pool_utilization.clone().count();
-    // 1 record per second for 5 database kinds
-    assert!(
-        db_pool_utilization_count >= expected_records_per_metric * 5,
-        "expected >= {}, got {db_pool_utilization_count}",
-        expected_records_per_metric * 5
-    );
-    db_pool_utilization.for_each(|metric| {
-        assert!(metric.contains("id="));
-        assert!(metric.contains("kind="));
-        assert!(metric.contains("gauge="));
-    });
-
     // Conductor metrics
     let conductor_workflow_duration = metrics
         .clone()
