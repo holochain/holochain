@@ -40,3 +40,10 @@ pub fn create_workflow_duration_metric(
         attributes,
     }
 }
+
+pub fn create_ribosome_wasm_usage_metric() -> metrics::Counter<u64> {
+    meter("hc.ribosome.wasm")
+        .u64_counter("hc.ribosome.wasm.usage")
+        .with_description("The metered usage of a wasm ribosome.")
+        .build()
+}

@@ -10,6 +10,7 @@ use super::host_fn::get_agent_activity::get_agent_activity;
 use super::host_fn::HostFnApi;
 use super::HostContext;
 use super::ZomeCallHostAccess;
+use crate::core::metrics::create_ribosome_wasm_usage_metric;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
@@ -96,7 +97,6 @@ use holochain_wasmer_host::prelude::*;
 use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner};
 use must_future::MustBoxFuture;
 use once_cell::sync::Lazy;
-use opentelemetry::global::meter;
 use opentelemetry::metrics::Counter;
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
@@ -121,6 +121,7 @@ use wasmer_sys::*;
 
 #[cfg(feature = "wasmer_wamr")]
 mod wasmer_wamr;
+
 #[cfg(feature = "wasmer_wamr")]
 use wasmer_wamr::*;
 
@@ -229,14 +230,6 @@ impl HostFnBuilder {
 }
 
 impl RealRibosome {
-    pub fn standard_usage_meter() -> Arc<Counter<u64>> {
-        meter("hc.ribosome.wasm")
-            .u64_counter("hc.ribosome.wasm.usage")
-            .with_description("The metered usage of a wasm ribosome.")
-            .build()
-            .into()
-    }
-
     /// Create a new instance
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn new(
@@ -247,7 +240,7 @@ impl RealRibosome {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
-            usage_meter: Self::standard_usage_meter(),
+            usage_meter: create_ribosome_wasm_usage_metric().into(),
             wasmer_module_cache,
         };
 
@@ -339,7 +332,7 @@ impl RealRibosome {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
-            usage_meter: Self::standard_usage_meter(),
+            usage_meter: create_ribosome_wasm_usage_metric().into(),
             wasmer_module_cache: Some(Arc::new(ModuleCacheLock::new(ModuleCache::new(None)))),
         }
     }
@@ -707,7 +700,7 @@ impl RealRibosome {
         zome: Zome,
         fn_name: FunctionName,
     ) -> Result<Option<ExternIO>, RibosomeError> {
-        let mut otel_info = vec![
+        let mut attributes = vec![
             opentelemetry::KeyValue::new("dna", self.dna_file.dna_def_hashed().hash.to_string()),
             opentelemetry::KeyValue::new("zome", zome.zome_name().to_string()),
             opentelemetry::KeyValue::new("fn", fn_name.to_string()),
@@ -719,7 +712,7 @@ impl RealRibosome {
                 .as_ref()
                 .map(|source_chain| source_chain.agent_pubkey().to_string())
         }) {
-            otel_info.push(opentelemetry::KeyValue::new("agent", agent_pubkey));
+            attributes.push(opentelemetry::KeyValue::new("agent", agent_pubkey));
         }
 
         let call_context = CallContext {
@@ -760,7 +753,7 @@ impl RealRibosome {
 
                     // Get metering points consumed in zome call and save to usage_meter
                     let points_used = get_used_metering_points(instance_with_store.clone());
-                    self.usage_meter.add(points_used, &otel_info);
+                    self.usage_meter.add(points_used, &attributes);
 
                     // remove context from map after call
                     {
