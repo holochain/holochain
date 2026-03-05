@@ -1236,12 +1236,12 @@ mod network_impls {
                                 }
                                 network_readiness::NetworkReadinessEvent::JoinFailed {
                                     cell_id: ref event_cell_id,
-                                    error,
+                                    error_message,
                                 } if event_cell_id == cell_id => {
                                     return Err(ConductorApiError::Other(
                                         format!(
                                             "Network join failed for cell {}: {}",
-                                            cell_id, error
+                                            cell_id, error_message
                                         )
                                         .into(),
                                     ));
@@ -2077,7 +2077,7 @@ mod app_status_impls {
                                 network_readiness.emit(
                                     network_readiness::NetworkReadinessEvent::JoinFailed {
                                         cell_id,
-                                        error: e.to_string(),
+                                        error_message: e.to_string(),
                                     },
                                 );
                             }

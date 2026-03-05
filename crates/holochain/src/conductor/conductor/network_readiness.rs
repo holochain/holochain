@@ -38,8 +38,8 @@ pub enum NetworkReadinessEvent {
     JoinFailed {
         /// The cell that failed to join.
         cell_id: CellId,
-        /// The error that occurred.
-        error: String,
+        /// Human-readable description of the join failure.
+        error_message: String,
     },
 
     /// A peer has been discovered in the peer store for a DNA space.
@@ -168,15 +168,23 @@ impl NetworkReadinessHandle {
                     });
                 }
             }
-            NetworkReadinessEvent::JoinFailed { cell_id, error } => {
+            NetworkReadinessEvent::JoinFailed {
+                cell_id,
+                error_message,
+            } => {
                 if let Ok(mut s) = self.state.try_write() {
-                    s.failed_cells.insert(cell_id.clone(), error.clone());
+                    s.failed_cells
+                        .insert(cell_id.clone(), error_message.clone());
                 } else {
                     let state = self.state.clone();
                     let cell_id = cell_id.clone();
-                    let error = error.clone();
+                    let error_message = error_message.clone();
                     tokio::spawn(async move {
-                        state.write().await.failed_cells.insert(cell_id, error);
+                        state
+                            .write()
+                            .await
+                            .failed_cells
+                            .insert(cell_id, error_message);
                     });
                 }
             }
