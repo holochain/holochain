@@ -1,18 +1,18 @@
 use hdk::prelude::*;
-use holochain::conductor::{ConductorNetworkState, NetworkReadinessEvent};
+use holochain::conductor::{ConductorNetworkState, NetworkEvent};
 use holochain::sweettest::*;
 use std::time::Duration;
 
 /// Test that await_cell_network_ready successfully waits for a cell to be ready.
 ///
-/// This demonstrates that cells can be used immediately after awaiting network readiness,
+/// This demonstrates that cells can be used immediately after awaiting network events,
 /// without needing retry loops or arbitrary sleeps.
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(
     not(feature = "transport-iroh"),
     ignore = "requires Iroh transport for stability"
 )]
-async fn test_single_cell_network_readiness() {
+async fn test_single_cell_network_events() {
     holochain_trace::test_run();
 
     let mut conductor = SweetConductor::standard().await;
@@ -43,7 +43,7 @@ async fn test_single_cell_network_readiness() {
     assert_eq!(result, "pong");
 }
 
-/// Test network readiness with multiple cells in the same app.
+/// Test network events with multiple cells in the same app.
 ///
 /// This ensures that all cells in an app can be awaited independently and all
 /// become ready without requiring retry loops.
@@ -52,7 +52,7 @@ async fn test_single_cell_network_readiness() {
     not(feature = "transport-iroh"),
     ignore = "requires Iroh transport for stability"
 )]
-async fn test_multi_cell_network_readiness() {
+async fn test_multi_cell_network_events() {
     holochain_trace::test_run();
 
     let mut conductor = SweetConductor::standard().await;
@@ -94,17 +94,17 @@ async fn test_multi_cell_network_readiness() {
     assert_eq!(result2, "pong2");
 }
 
-/// Test network readiness across multiple conductors without retry loops.
+/// Test network events across multiple conductors without retry loops.
 ///
 /// This is the key test showing that two conductors can discover each other and
-/// make remote calls immediately after awaiting network readiness, eliminating
+/// make remote calls immediately after awaiting network events, eliminating
 /// the need for retry loops that were previously required.
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(
     not(feature = "transport-iroh"),
     ignore = "requires Iroh transport for stability"
 )]
-async fn test_multi_conductor_network_readiness_no_retry() {
+async fn test_multi_conductor_network_events_no_retry() {
     holochain_trace::test_run();
 
     let mut conductors = SweetConductorBatch::standard(2).await;
@@ -175,23 +175,23 @@ async fn test_multi_conductor_network_readiness_no_retry() {
     assert_eq!(result, "pong");
 }
 
-/// Test that network readiness events are emitted correctly.
+/// Test that network events events are emitted correctly.
 ///
-/// This test subscribes to network readiness events and verifies that the
+/// This test subscribes to network events events and verifies that the
 /// expected events (JoinStarted, JoinComplete) are received when cells are enabled.
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(
     not(feature = "transport-iroh"),
     ignore = "requires Iroh transport for stability"
 )]
-async fn test_network_readiness_events_emitted() {
+async fn test_network_events_events_emitted() {
     holochain_trace::test_run();
 
     let mut conductor = SweetConductor::standard().await;
     let agent = SweetAgents::one(conductor.keystore()).await;
 
-    // Subscribe to network readiness events BEFORE enabling the app
-    let mut events = conductor.subscribe_network_readiness();
+    // Subscribe to network events events BEFORE enabling the app
+    let mut events = conductor.subscribe_network_events();
 
     let zome = SweetInlineZomes::new(vec![], 0).function("ping", |_, _: ()| Ok("pong"));
     let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zome).await;
@@ -212,14 +212,10 @@ async fn test_network_readiness_events_emitted() {
         while !received_join_started || !received_join_complete {
             if let Ok(event) = events.recv().await {
                 match event {
-                    NetworkReadinessEvent::JoinStarted { cell_id }
-                        if &cell_id == cell.cell_id() =>
-                    {
+                    NetworkEvent::JoinStarted { cell_id } if &cell_id == cell.cell_id() => {
                         received_join_started = true;
                     }
-                    NetworkReadinessEvent::JoinComplete { cell_id }
-                        if &cell_id == cell.cell_id() =>
-                    {
+                    NetworkEvent::JoinComplete { cell_id } if &cell_id == cell.cell_id() => {
                         received_join_complete = true;
                     }
                     _ => {}
@@ -244,7 +240,7 @@ async fn test_network_readiness_events_emitted() {
 ///
 /// This verifies error handling when waiting for a non-existent cell.
 #[tokio::test(flavor = "multi_thread")]
-async fn test_network_readiness_timeout_for_nonexistent_cell() {
+async fn test_network_events_timeout_for_nonexistent_cell() {
     holochain_trace::test_run();
 
     let conductor = SweetConductor::standard().await;
@@ -265,7 +261,7 @@ async fn test_network_readiness_timeout_for_nonexistent_cell() {
     );
 }
 
-/// Demonstration test showing the BEFORE and AFTER of network readiness.
+/// Demonstration test showing the BEFORE and AFTER of network events.
 ///
 /// This test explicitly shows how the old approach (with sleep) compares to
 /// the new approach (with await_cell_network_ready).
@@ -274,7 +270,7 @@ async fn test_network_readiness_timeout_for_nonexistent_cell() {
     not(feature = "transport-iroh"),
     ignore = "requires Iroh transport for stability"
 )]
-async fn test_network_readiness_vs_sleep_comparison() {
+async fn test_network_events_vs_sleep_comparison() {
     holochain_trace::test_run();
 
     // OLD APPROACH: Using arbitrary sleep (commented out to show the pattern)
@@ -284,7 +280,7 @@ async fn test_network_readiness_vs_sleep_comparison() {
     // tokio::time::sleep(Duration::from_secs(5)).await; // ⚠️ Arbitrary sleep, might not be enough!
     // // Hope the cell is ready now...
 
-    // NEW APPROACH: Using network readiness
+    // NEW APPROACH: Using network events
     let mut conductor = SweetConductor::standard().await;
     let agent = SweetAgents::one(conductor.keystore()).await;
 
@@ -299,7 +295,7 @@ async fn test_network_readiness_vs_sleep_comparison() {
         .unwrap();
     let (cell,) = app.into_tuple();
 
-    // ✅ Explicitly wait for network readiness - no guessing!
+    // ✅ Explicitly wait for network events - no guessing!
     conductor
         .await_cell_network_join_complete(cell.cell_id(), Duration::from_secs(10))
         .await
@@ -317,7 +313,7 @@ async fn test_network_readiness_vs_sleep_comparison() {
     assert_eq!(result, "pong");
 }
 
-/// Test demonstrating the ACTUAL RACE CONDITION that existed before network readiness events.
+/// Test demonstrating the ACTUAL RACE CONDITION that existed before network events events.
 ///
 /// This test shows that without await_cell_network_ready(), attempting to use consistency
 /// checks immediately after enabling cells can be unreliable. The test demonstrates the
@@ -428,7 +424,7 @@ async fn test_demonstrates_race_condition_without_await() {
 
 /// Test showing the OLD workaround pattern with retry loops.
 ///
-/// Before network readiness events, code had to use retry loops to work around
+/// Before network events events, code had to use retry loops to work around
 /// the race condition. This test demonstrates that pattern and shows it eventually
 /// works but is inelegant and arbitrary.
 ///

@@ -121,9 +121,9 @@ mod hc_p2p_handler_impl;
 
 mod state_dump_helpers;
 
-pub(crate) mod network_readiness;
-pub use network_readiness::ConductorNetworkState;
-pub use network_readiness::NetworkReadinessEvent;
+pub(crate) mod network_events;
+pub use network_events::ConductorNetworkState;
+pub use network_events::NetworkEvent;
 
 /// Verify signature of a signed zome call.
 ///
@@ -199,16 +199,15 @@ pub struct Conductor {
     /// Container to connect app signals to app interfaces, by installed app id.
     app_broadcast: AppBroadcast,
 
-    /// Handle for broadcasting and subscribing to network readiness events.
-    network_readiness: network_readiness::NetworkReadinessHandle,
+    /// Handle for broadcasting and subscribing to network events.
+    network_events: network_events::NetworkEventHandle,
 
     /// Live snapshot of network state (joined cells, known peers, bootstrap status),
-    /// updated automatically as network readiness events are emitted.
+    /// updated automatically as network events are emitted.
     ///
-    /// This is an `Arc` into the `NetworkReadinessHandle`'s internal state, so reads always
+    /// This is an `Arc` into the `NetworkEventHandle`'s internal state, so reads always
     /// reflect the latest information without needing to subscribe to events manually.
-    pub network_state:
-        std::sync::Arc<tokio::sync::RwLock<network_readiness::ConductorNetworkState>>,
+    pub network_state: std::sync::Arc<tokio::sync::RwLock<network_events::ConductorNetworkState>>,
 }
 
 impl std::fmt::Debug for Conductor {
@@ -254,7 +253,7 @@ mod startup_shutdown_impls {
                 let _ = std::fs::create_dir_all(&path);
             }
 
-            let nr = network_readiness::NetworkReadinessHandle::new(1000);
+            let nr = network_events::NetworkEventHandle::new(1000);
             let network_state = nr.network_state();
             Self {
                 spaces,
@@ -278,8 +277,8 @@ mod startup_shutdown_impls {
                 wasmer_module_cache: None,
                 app_auth_token_store: RwShare::default(),
                 app_broadcast: AppBroadcast::default(),
-                network_readiness: nr,
-                // Shares the same Arc as network_readiness.state so that both
+                network_events: nr,
+                // Shares the same Arc as network_events.state so that both
                 // fields always reflect the same live data.
                 network_state,
             }
@@ -1146,37 +1145,37 @@ mod network_impls {
             }
         }
 
-        /// Subscribe to network readiness events.
+        /// Subscribe to network events.
         ///
-        /// Returns a receiver that will receive all network readiness events, including
+        /// Returns a receiver that will receive all network events, including
         /// join started/complete/failed events and peer discovery events.
         ///
         /// # Example
         ///
         /// ```rust,ignore
-        /// let mut events = conductor.subscribe_network_readiness();
+        /// let mut events = conductor.subscribe_network_events();
         /// while let Ok(event) = events.recv().await {
         ///     match event {
-        ///         NetworkReadinessEvent::JoinComplete { cell_id } => {
+        ///         NetworkEvent::JoinComplete { cell_id } => {
         ///             println!("Cell {} joined the network!", cell_id);
         ///         }
         ///         _ => {}
         ///     }
         /// }
         /// ```
-        pub fn subscribe_network_readiness(
+        pub fn subscribe_network_events(
             &self,
-        ) -> tokio::sync::broadcast::Receiver<network_readiness::NetworkReadinessEvent> {
-            self.network_readiness.subscribe()
+        ) -> tokio::sync::broadcast::Receiver<network_events::NetworkEvent> {
+            self.network_events.subscribe()
         }
 
         /// Check whether a cell's network join has already resolved (completed or
         /// failed). Returns `Some(result)` if resolved, `None` if still in progress.
         async fn check_join_state(&self, cell_id: &CellId) -> Option<ConductorApiResult<()>> {
-            if self.network_readiness.has_completed_join(cell_id).await {
+            if self.network_events.has_completed_join(cell_id).await {
                 return Some(Ok(()));
             }
-            if let Some(error) = self.network_readiness.has_failed_join(cell_id).await {
+            if let Some(error) = self.network_events.has_failed_join(cell_id).await {
                 return Some(Err(ConductorApiError::Other(
                     format!(
                         "Network join previously failed for cell {}: {}",
@@ -1227,7 +1226,7 @@ mod network_impls {
         ) -> ConductorApiResult<()> {
             // Subscribe to events first, then check state to avoid a race where
             // the join completes between checking and subscribing.
-            let mut rx = self.subscribe_network_readiness();
+            let mut rx = self.subscribe_network_events();
 
             if let Some(result) = self.check_join_state(cell_id).await {
                 return result;
@@ -1238,12 +1237,12 @@ mod network_impls {
                     match rx.recv().await {
                         Ok(event) => {
                             match event {
-                                network_readiness::NetworkReadinessEvent::JoinComplete {
+                                network_events::NetworkEvent::JoinComplete {
                                     cell_id: ref event_cell_id,
                                 } if event_cell_id == cell_id => {
                                     return Ok(());
                                 }
-                                network_readiness::NetworkReadinessEvent::JoinFailed {
+                                network_events::NetworkEvent::JoinFailed {
                                     cell_id: ref event_cell_id,
                                     error_message,
                                 } if event_cell_id == cell_id => {
@@ -1271,7 +1270,7 @@ mod network_impls {
                         Err(_) => {
                             // Channel closed, this shouldn't happen
                             return Err(ConductorApiError::Other(
-                                "Network readiness event channel closed".into(),
+                                "Network event channel closed".into(),
                             ));
                         }
                     }
@@ -2037,15 +2036,13 @@ mod app_status_impls {
                     let cell_id = cell.id().clone();
                     let agent_pubkey = cell_id.agent_pubkey().clone();
                     let holochain_p2p_dna = cell.holochain_p2p_dna().clone();
-                    let network_readiness = self.network_readiness.clone();
+                    let network_events = self.network_events.clone();
                     let holochain_p2p = self.holochain_p2p.clone();
                     let running_cells = running_cells_ref.clone();
                     async move {
-                        network_readiness.emit(
-                            network_readiness::NetworkReadinessEvent::JoinStarted {
-                                cell_id: cell_id.clone(),
-                            },
-                        );
+                        network_events.emit(network_events::NetworkEvent::JoinStarted {
+                            cell_id: cell_id.clone(),
+                        });
 
                         match holochain_p2p_dna
                             .join(agent_pubkey, None, config_override)
@@ -2053,12 +2050,10 @@ mod app_status_impls {
                         {
                             Ok(()) => {
                                 tracing::info!(?cell_id, "Network join completed successfully.");
-                                network_readiness.emit(
-                                    network_readiness::NetworkReadinessEvent::JoinComplete {
-                                        cell_id: cell_id.clone(),
-                                    },
-                                );
-                                network_readiness.start_peer_monitoring(
+                                network_events.emit(network_events::NetworkEvent::JoinComplete {
+                                    cell_id: cell_id.clone(),
+                                });
+                                network_events.start_peer_monitoring(
                                     cell_id.dna_hash().clone(),
                                     holochain_p2p,
                                 );
@@ -2070,12 +2065,10 @@ mod app_status_impls {
                             }
                             Err(e) => {
                                 tracing::error!(?e, ?cell_id, "Network join failed.");
-                                network_readiness.emit(
-                                    network_readiness::NetworkReadinessEvent::JoinFailed {
-                                        cell_id,
-                                        error_message: e.to_string(),
-                                    },
-                                );
+                                network_events.emit(network_events::NetworkEvent::JoinFailed {
+                                    cell_id,
+                                    error_message: e.to_string(),
+                                });
                             }
                         }
                     }

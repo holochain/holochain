@@ -31,5 +31,5 @@ pub use conductor::Conductor;
 pub use conductor::ConductorBuilder;
 pub use conductor::ConductorHandle;
 pub use conductor::ConductorNetworkState;
-pub use conductor::NetworkReadinessEvent;
+pub use conductor::NetworkEvent;
 pub use conductor::{full_integration_dump, integration_dump};

@@ -1,8 +1,8 @@
-//! Network readiness events and utilities.
+//! Network events and utilities.
 //!
-//! This module provides event-driven network readiness signaling to allow downstream
-//! code to wait for cells to be fully ready for network operations, rather than
-//! polling or using arbitrary timeouts.
+//! This module provides event-driven network signaling to allow downstream
+//! code to track cell join progress and peer discovery, rather than polling
+//! or using arbitrary timeouts.
 
 pub use holochain_conductor_api::ConductorNetworkState;
 use holochain_p2p::actor::DynHcP2p;
@@ -11,13 +11,13 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::{broadcast, RwLock};
 
-/// Events related to network readiness during cell activation.
+/// Events emitted during network joining and peer discovery.
 ///
-/// These events allow tracking the progress of network joining and peer discovery,
-/// enabling downstream code to wait for specific readiness conditions rather than
-/// using retry loops or arbitrary timeouts.
+/// These events allow tracking the progress of cell network joining and peer
+/// discovery, enabling downstream code to wait for specific conditions rather
+/// than using retry loops or arbitrary timeouts.
 #[derive(Debug, Clone)]
-pub enum NetworkReadinessEvent {
+pub enum NetworkEvent {
     /// Network joining has started for a cell.
     JoinStarted {
         /// The cell that is joining the network.
@@ -65,7 +65,7 @@ pub enum NetworkReadinessEvent {
     },
 }
 
-impl NetworkReadinessEvent {
+impl NetworkEvent {
     /// Get the cell ID if this event is cell-specific.
     pub fn cell_id(&self) -> Option<&CellId> {
         match self {
@@ -88,11 +88,11 @@ impl NetworkReadinessEvent {
     }
 }
 
-/// Handle for broadcasting and subscribing to network readiness events, and for
+/// Handle for broadcasting and subscribing to network events, and for
 /// querying the current network state.
 #[derive(Clone)]
-pub struct NetworkReadinessHandle {
-    sender: Arc<broadcast::Sender<NetworkReadinessEvent>>,
+pub struct NetworkEventHandle {
+    sender: Arc<broadcast::Sender<NetworkEvent>>,
     /// Consolidated network state, updated as events are emitted.
     state: Arc<RwLock<ConductorNetworkState>>,
     /// DNA spaces that already have a peer-monitoring task running, to avoid
@@ -100,8 +100,8 @@ pub struct NetworkReadinessHandle {
     monitoring_dnas: Arc<tokio::sync::Mutex<HashSet<DnaHash>>>,
 }
 
-impl NetworkReadinessHandle {
-    /// Create a new network readiness handle with the specified channel capacity.
+impl NetworkEventHandle {
+    /// Create a new network event handle with the specified channel capacity.
     pub fn new(capacity: usize) -> Self {
         let (sender, _) = broadcast::channel(capacity);
         Self {
@@ -111,11 +111,11 @@ impl NetworkReadinessHandle {
         }
     }
 
-    /// Subscribe to network readiness events.
+    /// Subscribe to network events.
     ///
     /// Returns a receiver that will receive all future events.
     /// If the receiver falls behind, old events will be dropped.
-    pub fn subscribe(&self) -> broadcast::Receiver<NetworkReadinessEvent> {
+    pub fn subscribe(&self) -> broadcast::Receiver<NetworkEvent> {
         self.sender.subscribe()
     }
 
@@ -125,7 +125,7 @@ impl NetworkReadinessHandle {
         self.state.clone()
     }
 
-    /// Emit a network readiness event to all current subscribers via `sender.send`, and
+    /// Emit a network event to all current subscribers via `sender.send`, and
     /// record terminal states (`JoinComplete`, `JoinFailed`) in `completed_joins` /
     /// `failed_joins` so that late callers of `has_completed_join` can still determine
     /// the outcome without waiting for a future event.
@@ -146,17 +146,17 @@ impl NetworkReadinessHandle {
     /// task may be dropped before it runs, leaving the state in a stale state. This is
     /// acceptable for shutdown scenarios where readiness is no longer relevant.
     ///
-    /// Callers that need a reliable "already completed" check must use the double-check
-    /// pattern implemented in `await_cell_network_ready`: check state, subscribe to the
-    /// channel, check state again, then wait for the event. This bracketing ensures that
+    /// Callers that need a reliable "already completed" check must use the pattern
+    /// implemented in `await_cell_network_join_complete`: subscribe to the channel,
+    /// check state, then wait for the event. This bracketing ensures that
     /// even if the state update races with the subscription, at most one extra event loop
     /// iteration is needed before the correct answer is visible.
-    pub(crate) fn emit(&self, event: NetworkReadinessEvent) {
+    pub(crate) fn emit(&self, event: NetworkEvent) {
         // Update state before broadcasting so that has_completed_join() is consistent
         // with the event when the lock is uncontended. When try_write() fails, fall back
         // to a fire-and-forget spawned task (see doc comment above for ordering implications).
         match &event {
-            NetworkReadinessEvent::JoinComplete { cell_id } => {
+            NetworkEvent::JoinComplete { cell_id } => {
                 if let Ok(mut s) = self.state.try_write() {
                     s.joined_cells.insert(cell_id.clone());
                 } else {
@@ -167,7 +167,7 @@ impl NetworkReadinessHandle {
                     });
                 }
             }
-            NetworkReadinessEvent::JoinFailed {
+            NetworkEvent::JoinFailed {
                 cell_id,
                 error_message,
             } => {
@@ -187,7 +187,7 @@ impl NetworkReadinessHandle {
                     });
                 }
             }
-            NetworkReadinessEvent::PeerDiscovered { dna_hash, agent } => {
+            NetworkEvent::PeerDiscovered { dna_hash, agent } => {
                 if let Ok(mut s) = self.state.try_write() {
                     s.peers_by_dna
                         .entry(dna_hash.clone())
@@ -208,7 +208,7 @@ impl NetworkReadinessHandle {
                     });
                 }
             }
-            NetworkReadinessEvent::BootstrapComplete { dna_hash, .. } => {
+            NetworkEvent::BootstrapComplete { dna_hash, .. } => {
                 if let Ok(mut s) = self.state.try_write() {
                     s.bootstrap_complete_dnas.insert(dna_hash.clone());
                 } else {
@@ -219,7 +219,7 @@ impl NetworkReadinessHandle {
                     });
                 }
             }
-            NetworkReadinessEvent::JoinStarted { .. } => {}
+            NetworkEvent::JoinStarted { .. } => {}
         }
 
         // Broadcast the event; ignore errors when there are no receivers.
@@ -237,16 +237,12 @@ impl NetworkReadinessHandle {
     }
 
     /// Register a listener on the kitsune peer store for `dna_hash` that emits
-    /// [`NetworkReadinessEvent::PeerDiscovered`] for every newly-seen agent, then
-    /// [`NetworkReadinessEvent::BootstrapComplete`] once the first peer appears
+    /// [`NetworkEvent::PeerDiscovered`] for every newly-seen agent, then
+    /// [`NetworkEvent::BootstrapComplete`] once the first peer appears
     /// (or after `BOOTSTRAP_TIMEOUT` if no peers are found).
     ///
     /// If monitoring is already active for `dna_hash` this is a no-op.
-    pub(crate) fn start_peer_monitoring(
-        &self,
-        dna_hash: DnaHash,
-        holochain_p2p: DynHcP2p,
-    ) {
+    pub(crate) fn start_peer_monitoring(&self, dna_hash: DnaHash, holochain_p2p: DynHcP2p) {
         let monitoring_dnas = self.monitoring_dnas.clone();
         let handle = self.clone();
 
@@ -290,7 +286,7 @@ impl NetworkReadinessHandle {
                             .expect("seen_peers lock poisoned")
                             .insert(agent.clone());
                         if is_new {
-                            handle.emit(NetworkReadinessEvent::PeerDiscovered { dna_hash, agent });
+                            handle.emit(NetworkEvent::PeerDiscovered { dna_hash, agent });
                             notify.notify_one();
                         }
                     })
@@ -308,7 +304,7 @@ impl NetworkReadinessHandle {
             }
 
             let peer_count = seen_peers.lock().expect("seen_peers lock poisoned").len();
-            handle.emit(NetworkReadinessEvent::BootstrapComplete {
+            handle.emit(NetworkEvent::BootstrapComplete {
                 dna_hash,
                 peer_count,
             });
@@ -327,7 +323,7 @@ mod tests {
             AgentPubKey::from_raw_36(vec![1; 36]),
         );
 
-        let event = NetworkReadinessEvent::JoinStarted {
+        let event = NetworkEvent::JoinStarted {
             cell_id: cell_id.clone(),
         };
 
@@ -337,7 +333,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_event_broadcasting() {
-        let handle = NetworkReadinessHandle::new(100);
+        let handle = NetworkEventHandle::new(100);
         let mut rx = handle.subscribe();
 
         let cell_id = CellId::new(
@@ -345,7 +341,7 @@ mod tests {
             AgentPubKey::from_raw_36(vec![1; 36]),
         );
 
-        handle.emit(NetworkReadinessEvent::JoinStarted {
+        handle.emit(NetworkEvent::JoinStarted {
             cell_id: cell_id.clone(),
         });
 
@@ -355,14 +351,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_late_subscriber_sees_completed_state() {
-        let handle = NetworkReadinessHandle::new(100);
+        let handle = NetworkEventHandle::new(100);
         let cell_id = CellId::new(
             DnaHash::from_raw_36(vec![0; 36]),
             AgentPubKey::from_raw_36(vec![1; 36]),
         );
 
         // Emit before subscribing.
-        handle.emit(NetworkReadinessEvent::JoinComplete {
+        handle.emit(NetworkEvent::JoinComplete {
             cell_id: cell_id.clone(),
         });
 
