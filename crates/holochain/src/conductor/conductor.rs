@@ -1170,6 +1170,24 @@ mod network_impls {
             self.network_readiness.subscribe()
         }
 
+        /// Check whether a cell's network join has already resolved (completed or
+        /// failed). Returns `Some(result)` if resolved, `None` if still in progress.
+        async fn check_join_state(&self, cell_id: &CellId) -> Option<ConductorApiResult<()>> {
+            if self.network_readiness.has_completed_join(cell_id).await {
+                return Some(Ok(()));
+            }
+            if let Some(error) = self.network_readiness.has_failed_join(cell_id).await {
+                return Some(Err(ConductorApiError::Other(
+                    format!(
+                        "Network join previously failed for cell {}: {}",
+                        cell_id, error
+                    )
+                    .into(),
+                )));
+            }
+            None
+        }
+
         /// Wait for a cell to become ready for network operations.
         ///
         /// This waits for the cell to complete joining the k2 space. Returns immediately
@@ -1211,17 +1229,8 @@ mod network_impls {
             // the join completes between checking and subscribing.
             let mut rx = self.subscribe_network_readiness();
 
-            if self.network_readiness.has_completed_join(cell_id).await {
-                return Ok(());
-            }
-            if let Some(error) = self.network_readiness.has_failed_join(cell_id).await {
-                return Err(ConductorApiError::Other(
-                    format!(
-                        "Network join previously failed for cell {}: {}",
-                        cell_id, error
-                    )
-                    .into(),
-                ));
+            if let Some(result) = self.check_join_state(cell_id).await {
+                return result;
             }
 
             tokio::time::timeout(timeout, async {
@@ -1254,19 +1263,8 @@ mod network_impls {
                         Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
                             // We lagged and may have missed the JoinComplete/JoinFailed event.
                             // Fall back to the state store before continuing to listen.
-                            if self.network_readiness.has_completed_join(cell_id).await {
-                                return Ok(());
-                            }
-                            if let Some(error) =
-                                self.network_readiness.has_failed_join(cell_id).await
-                            {
-                                return Err(ConductorApiError::Other(
-                                    format!(
-                                        "Network join previously failed for cell {}: {}",
-                                        cell_id, error
-                                    )
-                                    .into(),
-                                ));
+                            if let Some(result) = self.check_join_state(cell_id).await {
+                                return result;
                             }
                             continue;
                         }
