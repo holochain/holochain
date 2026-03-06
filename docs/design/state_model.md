@@ -5,7 +5,7 @@
 The Holochain data storage and validation architecture provides:
 
 1. [Action and entry](./data_model.md) data storage for agents' authored chains.
-2. Ops as the unit of validation, with an aggregated validity status for [records]](./data_model.md). 
+2. Ops as the unit of validation, with an aggregated validity status for [records](./data_model.md). 
 3. Validation limbo tables (`LimboChainOp`, `LimboDhtWarrant`) to track pending ops, with shared `DhtAction`/`DhtEntry` tables.
 4. Unified data querying for both obligated and cached data in the DHT database.
 
@@ -71,9 +71,6 @@ CREATE TABLE CapClaim (
     grantor BLOB NOT NULL,
     secret  BLOB NOT NULL
 );
-
-CREATE INDEX idx_cap_claim_tag ON CapClaim(tag);
-CREATE INDEX idx_cap_claim_grantor ON CapClaim(grantor);
 
 -- Chain lock table.
 --
@@ -153,8 +150,8 @@ CREATE TABLE DhtAction (
 
    -- Record validity (aggregated from all ops for this record)
    -- A record is the combination of action + entry (if applicable)
-   -- NULL for records in limbo, 'valid' or 'invalid' after integration
-   record_validity INTEGER -- NULL=pending, 0=valid, 1=invalid
+   -- NULL for records in limbo, 0=valid or 1=rejected after integration
+   record_validity INTEGER -- NULL=pending, 0=valid, 1=rejected
 ) WITHOUT ROWID;
 
 -- DHT entries.
@@ -293,8 +290,6 @@ CREATE TABLE UpdatedRecord (
     FOREIGN KEY(action_hash) REFERENCES DhtAction(hash) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_updated_record_original ON UpdatedRecord(original_action_hash);
-
 -- Delete index table.
 --
 -- For efficient delete queries. Populated at integration time when Delete actions are validated.
@@ -306,7 +301,6 @@ CREATE TABLE DeletedRecord (
     FOREIGN KEY(action_hash) REFERENCES DhtAction(hash) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_deleted_record_deletes ON DeletedRecord(deletes_action_hash);
 ```
 
 ### Rust Structure
@@ -470,11 +464,7 @@ The high-level flow for authoring actions and distributing ops is as follows:
 2. Author new action locally
    ├─> Insert into `Action` table
    ├─> Insert into `Entry` table (if applicable)
-   ├─> Insert into `CapGrant` table (if action is a CapGrant entry)
-   ├─> Insert into `Link` table (if action is CreateLink)
-   └─> Insert into `DeletedLink` table (if action is DeleteLink)
-   └─> Insert into `UpdatedRecord` table (if action is Update)
-   └─> Insert into `DeletedRecord` table (if action is Delete)
+   └─> Insert into `CapGrant` table (if action is a CapGrant entry)
 
 3. Create ops for publishing
    ├─> If this is a countersigning action, skip this step (ops created on session completion)
@@ -484,7 +474,7 @@ The high-level flow for authoring actions and distributing ops is as follows:
 4. Publish DHT Ops Workflow
    ├─> Query ops which are ready for publishing from `AuthoredChainOp` and `AuthoredWarrantOp`
    ├─> Cross-database LEFT JOIN to `DhtChainOp` to check integration status
-   ├─> Publish if: op not in `DhtChainOp` (outside arc) OR op in `DhtChainOp` with `validation_status = 'valid'`
+   ├─> Publish if: op not in `DhtChainOp` (outside arc) OR op in `DhtChainOp` with `validation_status = 0` (valid)
    ├─> Group by `basis_hash` for efficient sending
    ├─> Send ops to DHT authorities over the network
    └─> Update `last_publish_time` in `AuthoredChainOp` (or `AuthoredWarrantOp`)
@@ -620,7 +610,7 @@ WHERE
     AND (AuthoredChainOp.last_publish_time IS NULL
         OR AuthoredChainOp.last_publish_time <= :recency_threshold)
     AND AuthoredChainOp.receipts_complete IS NULL
-    AND (dht.DhtChainOp.hash IS NULL OR dht.DhtChainOp.validation_status = 'valid')
+    AND (dht.DhtChainOp.hash IS NULL OR dht.DhtChainOp.validation_status = 0)
 
 UNION ALL
 
@@ -674,7 +664,7 @@ For each row returned:
    - **Resolution**: Countersigning completion should produce ops from the action/entry instead of clearing a field. No `withhold_publish` field needed in `AuthoredChainOp` table. During the countersigning session, ops are not created at all - they are only created when the session successfully completes, at which point they are immediately publishable. This approach is superior because: (a) entries should not be served during active countersigning sessions since the session may fail, (b) it eliminates intermediate "withheld" state and associated cleanup complexity, (c) op existence semantically means "publishable data", and (d) failed sessions leave no garbage ops in the database.
 
 2. **Missing `when_integrated` field**: The current code checks `DhtChainOp.when_integrated IS NOT NULL` to ensure ops are only published after local validation completes. The new `AuthoredChainOp` schema doesn't track integration.
-   - **Resolution**: Use a read-only cross-database query instead of maintaining duplicate state. The publish query performs a LEFT JOIN with the DHT database's `DhtChainOp` table to check integration status: `LEFT JOIN dht.DhtChainOp ON AuthoredChainOp.hash = dht.DhtChainOp.hash WHERE dht.DhtChainOp.hash IS NULL OR dht.DhtChainOp.validation_status = 'valid'`. This approach is necessary because:
+   - **Resolution**: Use a read-only cross-database query instead of maintaining duplicate state. The publish query performs a LEFT JOIN with the DHT database's `DhtChainOp` table to check integration status: `LEFT JOIN dht.DhtChainOp ON AuthoredChainOp.hash = dht.DhtChainOp.hash WHERE dht.DhtChainOp.hash IS NULL OR dht.DhtChainOp.validation_status = 0`. This approach is necessary because:
      - The agent's storage arc can change over time, making sequencing-based approaches fragile
      - Ops within the agent's arc must be integrated before publishing (so they can be served to peers)
      - Ops outside the agent's arc won't be in `DhtChainOp` at all, but still need to be published
@@ -714,7 +704,7 @@ The validation flow processes incoming DHT ops through several stages, from init
        └─> Issue a warrant, and trigger integration if invalid
 
 3. App Validation Workflow (if sys valid)
-   ├─> Query `LimboChainOp` for ops with `sys_validation_status='valid' AND app_validation_status IS NULL`
+   ├─> Query `LimboChainOp` for ops with `sys_validation_status=0 AND app_validation_status IS NULL`
    ├─> Run WASM validation callbacks
    └─> Update `app_validation_status` in `LimboChainOp`
        └─> Trigger integration if valid
@@ -843,7 +833,7 @@ LIMIT 10000
    - For **valid** ops:
      ```sql
      UPDATE LimboChainOp
-     SET sys_validation_status = 'valid',
+     SET sys_validation_status = 0,
          last_validation_attempt = CURRENT_TIMESTAMP,
          sys_validation_attempts = sys_validation_attempts + 1
      WHERE hash = :op_hash
@@ -851,7 +841,7 @@ LIMIT 10000
    - For **rejected** ops:
      ```sql
      UPDATE LimboChainOp
-     SET sys_validation_status = 'rejected',
+     SET sys_validation_status = 1,
          last_validation_attempt = CURRENT_TIMESTAMP,
          sys_validation_attempts = sys_validation_attempts + 1
      WHERE hash = :op_hash
@@ -889,7 +879,7 @@ SELECT
 FROM LimboChainOp
 JOIN DhtAction ON LimboChainOp.action_hash = DhtAction.hash
 WHERE
-    LimboChainOp.sys_validation_status = 'valid'
+    LimboChainOp.sys_validation_status = 0
     AND LimboChainOp.app_validation_status IS NULL
 ORDER BY app_validation_attempts, DhtAction.seq, when_received
 LIMIT 10000
@@ -898,7 +888,7 @@ LIMIT 10000
 **Workflow Steps:**
 
 1. **Query Pending Ops**
-   - Select ops with `sys_validation_status = 'valid' AND app_validation_status IS NULL`
+   - Select ops with `sys_validation_status = 0 AND app_validation_status IS NULL`
    - Order by app validation attempts (least first), then action sequence, then received time
 
 2. **Execute WASM Validation**
@@ -910,7 +900,7 @@ LIMIT 10000
    - For **valid** ops:
      ```sql
      UPDATE LimboChainOp
-     SET app_validation_status = 'valid',
+     SET app_validation_status = 0,
          last_validation_attempt = CURRENT_TIMESTAMP,
          app_validation_attempts = app_validation_attempts + 1
      WHERE hash = :op_hash
@@ -918,7 +908,7 @@ LIMIT 10000
    - For **rejected** ops:
      ```sql
      UPDATE LimboChainOp
-     SET app_validation_status = 'rejected',
+     SET app_validation_status = 1,
          last_validation_attempt = CURRENT_TIMESTAMP,
          app_validation_attempts = app_validation_attempts + 1
      WHERE hash = :op_hash
@@ -950,10 +940,10 @@ SELECT
 FROM LimboChainOp
 WHERE
     LimboChainOp.abandoned_at IS NOT NULL
-    OR LimboChainOp.sys_validation_status = 'rejected'
+    OR LimboChainOp.sys_validation_status = 1
     OR (
-        LimboChainOp.sys_validation_status = 'valid'
-        AND LimboChainOp.app_validation_status IN ('valid', 'rejected')
+        LimboChainOp.sys_validation_status = 0
+        AND LimboChainOp.app_validation_status IN (0, 1)
     )
 ORDER BY LimboChainOp.when_received
 ```
@@ -987,8 +977,8 @@ ORDER BY LimboChainOp.when_received
        basis_hash,
        storage_center_loc,
        CASE
-           WHEN sys_validation_status = 'valid' AND app_validation_status = 'valid' THEN 'valid'
-           ELSE 'rejected'
+           WHEN sys_validation_status = 0 AND app_validation_status = 0 THEN 0
+           ELSE 1
        END,
        TRUE,  -- locally_validated
        when_received,
@@ -1001,14 +991,14 @@ ORDER BY LimboChainOp.when_received
 3. **Update `DhtAction` with Record Validity**
    - Aggregate `record_validity` from all ops for this action using a single query
    - **Rules (applied in SQL):**
-     - If ANY op for this action is rejected: `record_validity = 'rejected'`
-     - If at least one op is valid and none rejected: `record_validity = 'valid'`
+     - If ANY op for this action is rejected: `record_validity = 1`
+     - If at least one op is valid and none rejected: `record_validity = 0`
    ```sql
    UPDATE DhtAction
    SET record_validity = (
        SELECT CASE
-           WHEN COUNT(CASE WHEN validation_status = 'rejected' THEN 1 END) > 0 THEN 'rejected'
-           WHEN COUNT(CASE WHEN validation_status = 'valid' THEN 1 END) > 0 THEN 'valid'
+           WHEN COUNT(CASE WHEN validation_status = 1 THEN 1 END) > 0 THEN 1
+           WHEN COUNT(CASE WHEN validation_status = 0 THEN 1 END) > 0 THEN 0
            ELSE NULL
        END
        FROM DhtChainOp
@@ -1031,8 +1021,8 @@ ORDER BY LimboChainOp.when_received
        :tag             -- extracted from action_data during integration
    FROM DhtAction AS Action
    WHERE Action.hash = :action_hash
-       AND Action.record_validity = 'valid'
-       AND Action.action_type = 'CreateLink'
+       AND Action.record_validity = 0
+       AND Action.action_type = 8 -- ActionType::CreateLink
    ```
    - If the action is a `CreateLink` and the op is rejected, ensure no row exists in `Link` table for this action:
    ```sql
@@ -1040,7 +1030,7 @@ ORDER BY LimboChainOp.when_received
    WHERE action_hash = :action_hash
    AND :action_hash IN (
        SELECT hash FROM DhtAction
-       WHERE hash = :action_hash AND record_validity = 'rejected'
+       WHERE hash = :action_hash AND record_validity = 1
    );
    ```
    - If the action is a `DeleteLink` and the op is valid, insert into `DeletedLink` table:
@@ -1051,8 +1041,8 @@ ORDER BY LimboChainOp.when_received
        :create_link_hash  -- extracted from action_data during integration
    FROM DhtAction AS Action
    WHERE Action.hash = :action_hash
-       AND Action.record_validity = 'valid'
-       AND Action.action_type = 'DeleteLink'
+       AND Action.record_validity = 0
+       AND Action.action_type = 9 -- ActionType::DeleteLink
    ```
    - If the action is a `DeleteLink` and the op is rejected, ensure no row exists in `DeletedLink` table for this action:
    ```sql
@@ -1060,7 +1050,7 @@ ORDER BY LimboChainOp.when_received
    WHERE action_hash = :action_hash
    AND :action_hash IN (
        SELECT hash FROM DhtAction
-       WHERE hash = :action_hash AND record_validity = 'rejected'
+       WHERE hash = :action_hash AND record_validity = 1
    );
    ```
    - If the action is an `Update` and the op is valid, insert into `UpdatedRecord` table:
@@ -1072,8 +1062,8 @@ ORDER BY LimboChainOp.when_received
        :original_entry_hash    -- extracted from action_data during integration
    FROM DhtAction AS Action
    WHERE Action.hash = :action_hash
-       AND Action.record_validity = 'valid'
-       AND Action.action_type = 'Update'
+       AND Action.record_validity = 0
+       AND Action.action_type = 6 -- ActionType::Update
    ```
    - If the action is an `Update` and the op is rejected, ensure no row exists in `UpdatedRecord` table:
    ```sql
@@ -1081,7 +1071,7 @@ ORDER BY LimboChainOp.when_received
    WHERE action_hash = :action_hash
    AND :action_hash IN (
        SELECT hash FROM DhtAction
-       WHERE hash = :action_hash AND record_validity = 'rejected'
+       WHERE hash = :action_hash AND record_validity = 1
    );
    ```
    - If the action is a `Delete` and the op is valid, insert into `DeletedRecord` table:
@@ -1093,8 +1083,8 @@ ORDER BY LimboChainOp.when_received
        :deletes_entry_hash    -- extracted from action_data during integration
    FROM DhtAction AS Action
    WHERE Action.hash = :action_hash
-       AND Action.record_validity = 'valid'
-       AND Action.action_type = 'Delete'
+       AND Action.record_validity = 0
+       AND Action.action_type = 7 -- ActionType::Delete
    ```
    - If the action is a `Delete` and the op is rejected, ensure no row exists in `DeletedRecord` table:
    ```sql
@@ -1102,7 +1092,7 @@ ORDER BY LimboChainOp.when_received
    WHERE action_hash = :action_hash
    AND :action_hash IN (
        SELECT hash FROM DhtAction
-       WHERE hash = :action_hash AND record_validity = 'rejected'
+       WHERE hash = :action_hash AND record_validity = 1
    );
    ```
 
@@ -1121,11 +1111,11 @@ ORDER BY LimboChainOp.when_received
 ### Record Validity Aggregation
 
 **Rules:**
-1. A record is **INVALID** if ANY known ops for it are rejected.
-2. A record is **VALID** if at least one known op for it is valid and no known ops are rejected.
-3. Records in limbo have a `NULL` value for `record_validity`. After integration of the first op for a record, `record_validity` is `'valid'` or `'rejected'`.
+1. A record is **rejected** (`record_validity = 1`) if ANY known ops for it are rejected.
+2. A record is **valid** (`record_validity = 0`) if at least one known op for it is valid and no known ops are rejected.
+3. Records in limbo have a `NULL` value for `record_validity`. After integration of the first op for a record, `record_validity` is `0` (valid) or `1` (rejected).
 
-The record validity is first set at the time of integrating the first of its ops. If later op integrations find an op to be invalid, the record validity is updated to ``rejected``. Due to the sharding model, a validator may not have all ops for a record - they hold specific op types over specific ranges. This aggregated status is stored with the record itself, eliminating the need for complex joins during queries.
+The record validity is first set at the time of integrating the first of its ops. If later op integrations find an op to be invalid, the record validity is updated to `1` (rejected). Due to the sharding model, a validator may not have all ops for a record - they hold specific op types over specific ranges. This aggregated status is stored with the record itself, eliminating the need for complex joins during queries.
 
 ### Record Validity Correction
 
@@ -1142,7 +1132,7 @@ SELECT Action.*, Entry.*
 FROM DhtAction AS Action
 LEFT JOIN DhtEntry AS Entry ON Action.entry_hash = Entry.hash
 WHERE Action.hash = ?
-  AND Action.record_validity = 'valid'
+  AND Action.record_validity = 0
 ```
 
 ### Get Entry by Hash
@@ -1154,7 +1144,7 @@ SELECT Entry.*, Action.*
 FROM DhtEntry AS Entry
 JOIN DhtAction AS Action ON Action.entry_hash = Entry.hash
 WHERE Entry.hash = ?
-  AND Action.record_validity = 'valid'
+  AND Action.record_validity = 0
 LIMIT 1
 ```
 
@@ -1173,7 +1163,7 @@ JOIN DhtAction AS Action ON Link.action_hash = Action.hash
 LEFT JOIN DeletedLink ON Link.action_hash = DeletedLink.create_link_hash
 WHERE Link.base_hash = ?
   AND DeletedLink.create_link_hash IS NULL
-  AND Action.record_validity = 'valid'
+  AND Action.record_validity = 0
 ORDER BY Action.timestamp, Link.action_hash
 ```
 
@@ -1197,7 +1187,7 @@ LEFT JOIN DeletedLink ON Link.action_hash = DeletedLink.create_link_hash
 JOIN DhtAction AS Action ON Link.action_hash = Action.hash
 WHERE Link.base_hash = ?
   AND DeletedLink.create_link_hash IS NULL
-  AND Action.record_validity = 'valid'
+  AND Action.record_validity = 0
 ```
 
 Additional filters (link_type, tag prefix, author, timestamp) applied as needed.
@@ -1249,7 +1239,7 @@ FROM Action
 LEFT JOIN Entry ON Action.entry_hash = Entry.hash
 WHERE Action.author = ?
   AND Action.seq BETWEEN :start_seq AND :end_seq
-  AND Action.action_type IN ('Create', 'Update', ...)
+  AND Action.action_type IN (5, 6, ...) -- ActionType::Create, ActionType::Update, etc.
   AND Action.entry_hash IN (...)
 ORDER BY Action.seq ASC
 ```
@@ -1374,7 +1364,7 @@ FROM UpdatedRecord
 JOIN DhtAction AS Action ON UpdatedRecord.action_hash = Action.hash
 LEFT JOIN DhtEntry AS Entry ON Action.entry_hash = Entry.hash
 WHERE UpdatedRecord.original_action_hash = ?
-  AND Action.record_validity = 'valid'
+  AND Action.record_validity = 0
 ORDER BY Action.seq
 
 -- Find full update chain (recursive)
@@ -1390,7 +1380,7 @@ WITH RECURSIVE update_chain AS (
   FROM UpdatedRecord
   JOIN DhtAction AS Action ON UpdatedRecord.action_hash = Action.hash
   WHERE UpdatedRecord.original_action_hash = ?
-    AND Action.record_validity = 'valid'
+    AND Action.record_validity = 0
 
   UNION ALL
 
@@ -1405,7 +1395,7 @@ WITH RECURSIVE update_chain AS (
   FROM UpdatedRecord ur
   JOIN DhtAction a ON ur.action_hash = a.hash
   INNER JOIN update_chain uc ON ur.original_action_hash = uc.hash
-  WHERE a.record_validity = 'valid'
+  WHERE a.record_validity = 0
 )
 SELECT uc.*, Entry.*
 FROM update_chain uc
@@ -1434,7 +1424,7 @@ SELECT Action.*
 FROM DeletedRecord
 JOIN DhtAction AS Action ON DeletedRecord.action_hash = Action.hash
 WHERE DeletedRecord.deletes_action_hash = ?
-  AND Action.record_validity = 'valid'
+  AND Action.record_validity = 0
 ORDER BY Action.seq
 ```
 
@@ -1464,13 +1454,13 @@ WITH RECURSIVE record_chain AS (
   FROM UpdatedRecord
   JOIN DhtAction AS Action ON UpdatedRecord.action_hash = Action.hash
   INNER JOIN record_chain rc ON UpdatedRecord.original_action_hash = rc.hash
-  WHERE Action.record_validity = 'valid'
+  WHERE Action.record_validity = 0
 )
 -- Find all deletes for any action in the chain
 SELECT DISTINCT Action.*
 FROM DeletedRecord
 JOIN DhtAction AS Action ON DeletedRecord.action_hash = Action.hash
-WHERE Action.record_validity = 'valid'
+WHERE Action.record_validity = 0
   AND DeletedRecord.deletes_action_hash IN (SELECT hash FROM record_chain)
 ORDER BY Action.seq
 ```
@@ -1494,13 +1484,13 @@ Uses the `DeletedRecord` index table.
 SELECT Action.*, Entry.*
 FROM DhtAction AS Action
 LEFT JOIN DhtEntry AS Entry ON Action.entry_hash = Entry.hash
-WHERE Action.action_type = 'Create'
-  AND Action.record_validity = 'valid'
+WHERE Action.action_type = 5 -- ActionType::Create
+  AND Action.record_validity = 0
   -- Exclude creates that have been deleted
   AND NOT EXISTS (
     SELECT 1 FROM DeletedRecord
     JOIN DhtAction AS DeleteAction ON DeletedRecord.action_hash = DeleteAction.hash
-    WHERE DeleteAction.record_validity = 'valid'
+    WHERE DeleteAction.record_validity = 0
       AND DeletedRecord.deletes_action_hash = Action.hash
   )
 ORDER BY Action.seq
@@ -1523,72 +1513,101 @@ Retrieve a complete record with all updates and deletes, letting the application
 Uses the `UpdatedRecord` and `DeletedRecord` index tables.
 
 ```sql
--- Get the original action
-SELECT 'original' as record_type, Action.*, Entry.*
-FROM DhtAction AS Action
-LEFT JOIN DhtEntry AS Entry ON Action.entry_hash = Entry.hash
-WHERE Action.hash = ?
-  AND Action.record_validity = 'valid'
-
-UNION ALL
-
--- Get all updates in the chain
-WITH RECURSIVE update_chain AS (
+WITH RECURSIVE
+update_chain AS (
+  -- Base case: direct updates of the create
   SELECT
-    UpdatedRecord.action_hash as hash,
+    UpdatedRecord.action_hash AS hash,
     Action.author,
     Action.seq,
+    Action.prev_hash,
     Action.timestamp,
-    Action.entry_hash,
     Action.action_type,
-    1 as depth
+    Action.action_data,
+    Action.entry_hash,
+    Action.record_validity,
+    1 AS depth
   FROM UpdatedRecord
   JOIN DhtAction AS Action ON UpdatedRecord.action_hash = Action.hash
   WHERE UpdatedRecord.original_action_hash = ?
-    AND Action.record_validity = 'valid'
+    AND Action.record_validity = 0
 
   UNION ALL
 
+  -- Recursive case: updates of updates
   SELECT
     ur.action_hash,
     a.author,
     a.seq,
+    a.prev_hash,
     a.timestamp,
-    a.entry_hash,
     a.action_type,
+    a.action_data,
+    a.entry_hash,
+    a.record_validity,
     uc.depth + 1
   FROM UpdatedRecord ur
   JOIN DhtAction a ON ur.action_hash = a.hash
   INNER JOIN update_chain uc ON ur.original_action_hash = uc.hash
-  WHERE a.record_validity = 'valid'
-)
-SELECT 'update' as record_type, uc.*, Entry.*
-FROM update_chain uc
-LEFT JOIN DhtEntry AS Entry ON uc.entry_hash = Entry.hash
-ORDER BY uc.depth, uc.seq
-
-UNION ALL
-
--- Get all deletes for any action in the chain
-WITH RECURSIVE record_chain AS (
-  SELECT hash, 0 as depth
+  WHERE a.record_validity = 0
+),
+record_chain AS (
+  -- Base case: the original create/update
+  SELECT hash, 0 AS depth
   FROM DhtAction
   WHERE hash = ?
 
   UNION ALL
 
+  -- Recursive case: updates of this action
   SELECT ur.action_hash, rc.depth + 1
   FROM UpdatedRecord ur
   JOIN DhtAction AS Action ON ur.action_hash = Action.hash
   INNER JOIN record_chain rc ON ur.original_action_hash = rc.hash
-  WHERE Action.record_validity = 'valid'
+  WHERE Action.record_validity = 0
 )
-SELECT 'delete' as record_type, Action.*, NULL as hash, NULL as blob
+-- Get the original action
+SELECT
+  'original' AS record_type,
+  Action.hash, Action.author, Action.seq, Action.prev_hash,
+  Action.timestamp, Action.action_type, Action.action_data,
+  Action.entry_hash, Action.record_validity,
+  Entry.blob AS entry_blob,
+  0 AS depth
+FROM DhtAction AS Action
+LEFT JOIN DhtEntry AS Entry ON Action.entry_hash = Entry.hash
+WHERE Action.hash = ?
+  AND Action.record_validity = 0
+
+UNION ALL
+
+-- Get all updates in the chain
+SELECT
+  'update' AS record_type,
+  uc.hash, uc.author, uc.seq, uc.prev_hash,
+  uc.timestamp, uc.action_type, uc.action_data,
+  uc.entry_hash, uc.record_validity,
+  Entry.blob AS entry_blob,
+  uc.depth
+FROM update_chain uc
+LEFT JOIN DhtEntry AS Entry ON uc.entry_hash = Entry.hash
+
+UNION ALL
+
+-- Get all deletes for any action in the chain
+SELECT
+  'delete' AS record_type,
+  Action.hash, Action.author, Action.seq, Action.prev_hash,
+  Action.timestamp, Action.action_type, Action.action_data,
+  Action.entry_hash, Action.record_validity,
+  NULL AS entry_blob,
+  0 AS depth
 FROM DeletedRecord
 JOIN DhtAction AS Action ON DeletedRecord.action_hash = Action.hash
-WHERE Action.record_validity = 'valid'
+WHERE Action.record_validity = 0
   AND DeletedRecord.deletes_action_hash IN (SELECT hash FROM record_chain)
-ORDER BY Action.seq
+
+ORDER BY depth, seq
 ```
 
 **Return Structure (Application Layer):**
@@ -1678,14 +1697,14 @@ Warrants use parallel limbo and integrated tables to chain ops (`LimboDhtWarrant
    - If both forked actions are at the same sequence number: warrant is valid (proves fork)
    - If the forked actions do not match the fork condition: warrant is rejected (false claim)
 
-   After validation, update `LimboDhtWarrant.sys_validation_status` to `'valid'` or `'rejected'`.
+   After validation, update `LimboDhtWarrant.sys_validation_status` to `0` (valid) or `1` (rejected).
 
 3. **Warrant Integration Workflow**
    - Query `LimboDhtWarrant` for ops with a terminal state:
    ```sql
    SELECT * FROM LimboDhtWarrant
    WHERE abandoned_at IS NOT NULL
-      OR sys_validation_status IN ('valid', 'rejected')
+      OR sys_validation_status IN (0, 1)
    ORDER BY when_received
    ```
    - For valid warrants, insert into `DhtWarrant`:
@@ -1694,7 +1713,7 @@ Warrants use parallel limbo and integrated tables to chain ops (`LimboDhtWarrant
    SELECT hash, author, timestamp, warrantee, proof, storage_center_loc
    FROM LimboDhtWarrant
    WHERE hash = :warrant_hash
-     AND sys_validation_status = 'valid'
+     AND sys_validation_status = 0
    ```
    - Delete from `LimboDhtWarrant` and commit.
 
@@ -1724,8 +1743,8 @@ The system maintains these invariants:
 
 1. **No chain op exists in both `LimboChainOp` and `DhtChainOp` simultaneously; no warrant exists in both `LimboDhtWarrant` and `DhtWarrant` simultaneously**
 2. **Every `DhtChainOp` has a definite `validation_status` (never `NULL`)**
-3. **`DhtAction` has a `NULL` value for `record_validity` for pending records, 'valid' or 'rejected' for integrated records**
+3. **`DhtAction` has a `NULL` value for `record_validity` for pending records, `0` (valid) or `1` (rejected) for integrated records**
 4. **Ops are moved from limbo to integrated tables atomically with `record_validity` updates**
 5. **Rejected ops in `DhtChainOp` cause their records to be marked 'rejected'**
 6. **Dependencies are resolved before validation proceeds**
-7. **Queries for validated data always check `record_validity IS NOT NULL` or `record_validity = 'valid'`**
+7. **Queries for validated data always check `record_validity IS NOT NULL` or `record_validity = 0`**
