@@ -14,7 +14,6 @@ use holochain_types::prelude::DbKindConductor;
 use holochain_types::prelude::Timestamp;
 use holochain_zome_types::block::Block;
 use holochain_zome_types::block::BlockTargetId;
-use std::collections::HashSet;
 use std::rc::Rc;
 
 /// Insert a block into the database.
@@ -49,34 +48,25 @@ pub fn query_is_blocked(
     )?)
 }
 
-/// Query whether all [`BlockTargetId`]s in the provided vector are blocked at the given timestamp.
-pub fn query_are_all_blocked(
+/// Query whether any [`BlockTargetId`] in the provided vector is blocked at the given timestamp.
+pub fn query_is_any_blocked(
     txn: &Transaction<'_>,
     target_ids: Vec<BlockTargetId>,
     timestamp: Timestamp,
 ) -> DatabaseResult<bool> {
-    // If no targets have been provided, return false.
     if target_ids.is_empty() {
         return Ok(false);
     }
 
-    // Deduplicate to ensure duplicates don't cause false negatives, because the SQL
-    // query depends on counts.
-    let unique_ids: Vec<Value> = {
-        let set: HashSet<BlockTargetId> = target_ids.into_iter().collect();
-        let mut values = Vec::with_capacity(set.len());
-        for block_target_id in set {
-            let value = Value::Blob(SerializedBytes::try_from(block_target_id)?.bytes().to_vec());
-            values.push(value);
-        }
-        values
-    };
+    let ids: Vec<Value> = target_ids
+        .into_iter()
+        .map(|id| SerializedBytes::try_from(id).map(|sb| Value::Blob(sb.bytes().to_vec())))
+        .collect::<Result<_, _>>()?;
 
     Ok(txn.query_row(
-        sql_conductor::ARE_ALL_BLOCKED,
+        sql_conductor::IS_ANY_BLOCKED,
         named_params! {
-            ":ids_len": unique_ids.len() as i64,
-            ":target_ids": Rc::new(unique_ids),
+            ":target_ids": Rc::new(ids),
             ":time_us": timestamp,
         },
         |row| row.get(0),
@@ -245,11 +235,11 @@ mod test {
 
     // Empty target vector returns false.
     #[tokio::test(flavor = "multi_thread")]
-    async fn query_are_all_blocked_empty_input_returns_false() {
+    async fn query_is_any_blocked_empty_input_returns_false() {
         let db = crate::test_utils::test_conductor_db();
 
         let result = db
-            .read_async(move |txn| query_are_all_blocked(txn, Vec::new(), Timestamp(0)))
+            .read_async(move |txn| query_is_any_blocked(txn, Vec::new(), Timestamp(0)))
             .await
             .unwrap();
 
@@ -257,7 +247,7 @@ mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn query_are_all_blocked_true_only_when_all_are_blocked() {
+    async fn query_is_any_blocked_true_when_any_is_blocked() {
         let db = crate::test_utils::test_conductor_db();
 
         // Create two distinct targets: one will be blocked, the other not.
@@ -267,11 +257,11 @@ mod test {
         let target_unblocked =
             BlockTarget::Cell(non_blocked_cell_id.clone(), CellBlockReason::BadCrypto);
 
-        // are_all_blocked should return false initially.
+        // is_any_blocked should return false initially (nothing blocked yet).
         let blocked_cell_id_clone = blocked_cell_id.clone();
-        let are_all_blocked = db
+        let is_any_blocked = db
             .read_async(move |txn| {
-                query_are_all_blocked(
+                query_is_any_blocked(
                     txn,
                     vec![BlockTargetId::Cell(blocked_cell_id_clone)],
                     Timestamp::now(),
@@ -280,8 +270,8 @@ mod test {
             .await
             .unwrap();
         assert!(
-            !are_all_blocked,
-            "are_all_blocked should return false initially"
+            !is_any_blocked,
+            "is_any_blocked should return false initially"
         );
 
         // Block target_blocked for all time.
@@ -295,12 +285,12 @@ mod test {
         .await
         .unwrap();
 
-        // All blocked should return true now for target_blocked.
+        // is_any_blocked should return true now for target_blocked.
         let blocked_cell_id_clone = blocked_cell_id.clone();
-        let are_all_blocked = db
+        let is_any_blocked = db
             .read_async({
                 move |txn| {
-                    query_are_all_blocked(
+                    query_is_any_blocked(
                         txn,
                         vec![BlockTargetId::Cell(blocked_cell_id_clone)],
                         Timestamp::now(),
@@ -310,35 +300,35 @@ mod test {
             .await
             .unwrap();
         assert!(
-            are_all_blocked,
-            "are_all_blocked should return true for blocked target"
+            is_any_blocked,
+            "is_any_blocked should return true for blocked target"
         );
 
-        // All blocked should return false for target_blocked for a timestamp before the interval.
-        let are_all_blocked = db
+        // is_any_blocked should return false for target_blocked queried before the block interval.
+        let is_any_blocked = db
             .read_async({
                 let ids = vec![BlockTargetId::from(target_blocked.clone())];
-                move |txn| query_are_all_blocked(txn, ids, Timestamp(0))
+                move |txn| query_is_any_blocked(txn, ids, Timestamp(0))
             })
             .await
             .unwrap();
         assert!(
-            !are_all_blocked,
-            "are_all_blocked should return false for a timestamp before the interval"
+            !is_any_blocked,
+            "is_any_blocked should return false for a timestamp before the interval"
         );
 
-        // are_all_blocked should return false for target_blocked + target_unblocked.
+        // is_any_blocked should return true for target_blocked + target_unblocked (any match is enough).
         let mixed = db
             .read_async({
                 let ids = vec![
                     BlockTargetId::from(target_blocked.clone()),
                     BlockTargetId::from(target_unblocked.clone()),
                 ];
-                move |txn| query_are_all_blocked(txn, ids, Timestamp::now())
+                move |txn| query_is_any_blocked(txn, ids, Timestamp::now())
             })
             .await
             .unwrap();
-        assert!(!mixed, "Mixed blocked/unblocked should yield false");
+        assert!(mixed, "Mixed blocked/unblocked should yield true");
 
         // Duplicates of a blocked id -> true.
         let dup_blocked = db
@@ -347,7 +337,7 @@ mod test {
                     BlockTargetId::from(target_blocked.clone()),
                     BlockTargetId::from(target_blocked.clone()),
                 ];
-                move |txn| query_are_all_blocked(txn, ids, Timestamp::now())
+                move |txn| query_is_any_blocked(txn, ids, Timestamp::now())
             })
             .await
             .unwrap();
@@ -358,19 +348,19 @@ mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn query_are_all_blocked_false_when_outside_of_interval() {
+    async fn query_is_any_blocked_false_when_outside_of_interval() {
         let db = crate::test_utils::test_conductor_db();
 
         // Create a target to be blocked.
         let blocked_cell_id = fixt!(CellId);
         let target_blocked = BlockTarget::Cell(blocked_cell_id.clone(), CellBlockReason::BadCrypto);
 
-        // All blocked should return false initially.
+        // is_any_blocked should return false initially.
         let blocked_cell_id_clone = blocked_cell_id.clone();
-        let are_all_blocked = db
+        let is_any_blocked = db
             .read_async({
                 move |txn| {
-                    query_are_all_blocked(
+                    query_is_any_blocked(
                         txn,
                         vec![BlockTargetId::Cell(blocked_cell_id_clone)],
                         Timestamp::now(),
@@ -380,8 +370,8 @@ mod test {
             .await
             .unwrap();
         assert!(
-            !are_all_blocked,
-            "are_all_blocked should return false before target has been blocked"
+            !is_any_blocked,
+            "is_any_blocked should return false before target has been blocked"
         );
 
         // Add a block for target_blocked that lies in the past.
@@ -399,12 +389,12 @@ mod test {
         .await
         .unwrap();
 
-        // All blocked should return false when queried for current timestamp.
+        // is_any_blocked should return false when queried for current timestamp (block is in the past).
         let blocked_cell_id_clone = blocked_cell_id.clone();
-        let are_all_blocked = db
+        let is_any_blocked = db
             .read_async({
                 move |txn| {
-                    query_are_all_blocked(
+                    query_is_any_blocked(
                         txn,
                         vec![BlockTargetId::Cell(blocked_cell_id_clone)],
                         Timestamp::now(),
@@ -414,16 +404,16 @@ mod test {
             .await
             .unwrap();
         assert!(
-            !are_all_blocked,
-            "are_all_blocked should return false for current timestamp"
+            !is_any_blocked,
+            "is_any_blocked should return false for current timestamp"
         );
 
-        // All blocked should return true when queried for timestamp in the past.
+        // is_any_blocked should return true when queried for timestamp within the past block interval.
         let blocked_cell_id_clone = blocked_cell_id.clone();
-        let are_all_blocked = db
+        let is_any_blocked = db
             .read_async({
                 move |txn| {
-                    query_are_all_blocked(
+                    query_is_any_blocked(
                         txn,
                         vec![BlockTargetId::Cell(blocked_cell_id_clone)],
                         Timestamp::MIN,
@@ -433,8 +423,8 @@ mod test {
             .await
             .unwrap();
         assert!(
-            are_all_blocked,
-            "are_all_blocked should return true for timestamp in the past"
+            is_any_blocked,
+            "is_any_blocked should return true for timestamp in the past"
         );
     }
 
