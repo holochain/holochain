@@ -405,3 +405,93 @@ async fn connect_multiple_addresses() {
     let apps = admin_ws.list_apps(None).await.unwrap();
     assert!(apps.is_empty());
 }
+
+/// Test that `get_network_state` returns an initially-empty state and then
+/// reflects `joined_cells` after enabling an app.
+#[tokio::test(flavor = "multi_thread")]
+async fn get_network_state_empty_then_joined() {
+    let conductor = SweetConductor::standard().await;
+    let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
+    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{admin_port}"), None)
+        .await
+        .unwrap();
+
+    // Before installing anything the state must be empty.
+    let state = admin_ws.get_network_state().await.unwrap();
+    assert!(state.joined_cells.is_empty(), "no cells joined yet");
+    assert!(state.failed_cells.is_empty(), "no cells failed yet");
+    assert!(state.peers_by_dna.is_empty(), "no peers yet");
+    assert!(state.bootstrap_complete_dnas.is_empty(), "no bootstrap yet");
+
+    // Install and enable an app.
+    let app_id: InstalledAppId = "net-state-test".into();
+    let app_info = admin_ws
+        .install_app(InstallAppPayload {
+            agent_key: None,
+            installed_app_id: Some(app_id.clone()),
+            network_seed: None,
+            roles_settings: None,
+            source: AppBundleSource::Bytes(fixture::get_fixture_app_bundle()),
+            ignore_genesis_failure: false,
+        })
+        .await
+        .unwrap();
+    admin_ws.enable_app(app_id.clone()).await.unwrap();
+
+    let cell_id =
+        if let CellInfo::Provisioned(cell) = &app_info.cell_info.get(ROLE_NAME).unwrap()[0] {
+            cell.cell_id.clone()
+        } else {
+            panic!("expected provisioned cell");
+        };
+
+    // Wait for the cell to join the network via the new admin endpoint.
+    admin_ws
+        .await_cell_network_ready(cell_id.clone(), Some(15_000))
+        .await
+        .expect("cell should become network ready within timeout");
+
+    // After joining, the state must reflect that.
+    let state = admin_ws.get_network_state().await.unwrap();
+    assert!(
+        state.is_joined(&cell_id),
+        "cell must appear in joined_cells after await_cell_network_ready"
+    );
+    assert!(
+        state.joined_cells.contains(&cell_id),
+        "joined_cells must directly contain the cell_id"
+    );
+    assert!(
+        state.join_error(&cell_id).is_none(),
+        "join_error must be None for a successful join"
+    );
+    assert!(
+        state.failed_cells.is_empty(),
+        "failed_cells must be empty for a successful join"
+    );
+}
+
+/// Test that `await_cell_network_ready` times out for a non-existent cell.
+#[tokio::test(flavor = "multi_thread")]
+async fn await_cell_network_ready_timeout() {
+    let conductor = SweetConductor::standard().await;
+    let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
+    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{admin_port}"), None)
+        .await
+        .unwrap();
+
+    use holochain_client::CellId;
+    use holochain_zome_types::prelude::{AgentPubKey, DnaHash};
+
+    let fake_cell_id = CellId::new(
+        DnaHash::from_raw_36(vec![0u8; 36]),
+        AgentPubKey::from_raw_36(vec![1u8; 36]),
+    );
+
+    // Should return an error because the cell never joins within 500 ms.
+    let result = admin_ws
+        .await_cell_network_ready(fake_cell_id, Some(500))
+        .await;
+
+    assert!(result.is_err(), "should error for a non-existent cell");
+}

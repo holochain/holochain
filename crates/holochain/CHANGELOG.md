@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Update kitsune2 dependencies to `0.4.0-dev.3`. #5673
 - Rewrite influxive metric collection using OpenTelemetry SDK. \#5666
+- Added event-driven network readiness signaling (`NetworkReadinessEvent`, `ConductorNetworkState`, `await_cell_network_ready`, `subscribe_network_readiness`) so downstream code can wait for cells to be fully ready for network operations without retry loops or arbitrary timeouts. Readiness is also exposed over the admin WebSocket via `GetNetworkState` and `AwaitCellNetworkReady`. [\#5647](https://github.com/holochain/holochain/pull/5647)
 - Fixed an issue where the `on_signal` method of the client `AppWebsocket` would not handle signals for cloned cells correctly. Since Holochain now outputs signals only on connections associated with the app where they are emitted, filtering in the client is no longer necessary. #5672
 
 ## 0.7.0-dev.14

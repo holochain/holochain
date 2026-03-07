@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+## holochain
+
+### Added
+
+- Added event-driven network readiness signaling (`NetworkReadinessEvent`, `ConductorNetworkState`, `await_cell_network_ready`, `subscribe_network_readiness`) so downstream code can wait for cells to be fully ready for network operations without retry loops or arbitrary timeouts. Readiness is also exposed over the admin WebSocket via `GetNetworkState` and `AwaitCellNetworkReady`. [\#5647](https://github.com/holochain/holochain/pull/5647)
+
 ## Holonix
 
 - Slim down the Rust toolchain [\#2854](https://github.com/holochain/holochain/pull/2854)

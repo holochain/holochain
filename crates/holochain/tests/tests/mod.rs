@@ -19,6 +19,7 @@ mod integrity_zome;
 mod lair_in_proc_restart;
 mod migration;
 mod multi_conductor;
+mod network_events;
 mod new_lair;
 mod paths;
 mod publish;
