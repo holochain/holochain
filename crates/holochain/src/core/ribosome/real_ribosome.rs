@@ -10,7 +10,7 @@ use super::host_fn::get_agent_activity::get_agent_activity;
 use super::host_fn::HostFnApi;
 use super::HostContext;
 use super::ZomeCallHostAccess;
-use crate::core::metrics::create_ribosome_wasm_usage_metric;
+use crate::core::metrics::{create_ribosome_wasm_call_duration_metric, create_ribosome_wasm_usage_metric, WasmCallDurationMetric, WasmUsageMetric};
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
@@ -97,7 +97,6 @@ use holochain_wasmer_host::prelude::*;
 use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner};
 use must_future::MustBoxFuture;
 use once_cell::sync::Lazy;
-use opentelemetry::metrics::Counter;
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
@@ -143,7 +142,11 @@ pub struct RealRibosome {
     /// Dependencies for every zome.
     pub zome_dependencies: Arc<HashMap<ZomeName, Vec<ZomeIndex>>>,
 
-    pub usage_meter: Arc<Counter<u64>>,
+    /// Instrument to measure metered wasm usage.
+    pub usage_meter: Arc<WasmUsageMetric>,
+
+    /// Instrument to measure wasm call duration.
+    pub wasm_call_duration_metric: Arc<WasmCallDurationMetric>,
 
     /// File system and in-memory cache for wasm modules.
     pub wasmer_module_cache: Option<Arc<ModuleCacheLock>>,
@@ -241,6 +244,7 @@ impl RealRibosome {
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
             usage_meter: create_ribosome_wasm_usage_metric().into(),
+            wasm_call_duration_metric: create_ribosome_wasm_call_duration_metric().into(),
             wasmer_module_cache,
         };
 
@@ -333,6 +337,7 @@ impl RealRibosome {
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
             usage_meter: create_ribosome_wasm_usage_metric().into(),
+            wasm_call_duration_metric: create_ribosome_wasm_call_duration_metric().into(),
             wasmer_module_cache: Some(Arc::new(ModuleCacheLock::new(ModuleCache::new(None)))),
         }
     }
@@ -745,11 +750,16 @@ impl RealRibosome {
                     // @todo - is this a problem for large payloads like entries?
                     let input = invocation.clone().host_input()?;
                     let instance_with_store_clone = instance_with_store.clone();
+                    let start = std::time::Instant::now();
                     let result = tokio::task::spawn_blocking(move || {
                         Self::call_zome_fn(input, zome, fn_name, instance_with_store_clone)
                             .map(Some)
                     })
                     .await?;
+
+                    // Record zome call duration
+                    let elapsed = start.elapsed().as_secs_f64();
+                    self.wasm_call_duration_metric.record(elapsed, &attributes);
 
                     // Get metering points consumed in zome call and save to usage_meter
                     let points_used = get_used_metering_points(instance_with_store.clone());
