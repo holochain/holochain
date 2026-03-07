@@ -6,6 +6,18 @@ use serde::Serialize;
 use std::fs::read_to_string;
 use std::time::{Duration, Instant};
 
+// Metrics checked for in this test:
+// - hc.db.connections.use_time
+// - hc.db.write_txn.duration
+// - hc.conductor.workflow.duration
+// - hc.conductor.post_commit.duration
+// - hc.ribosome.wasm.usage
+// - hc.ribosome.zome_call.duration
+// - hc.ribosome.wasm_call.duration
+// - hc.ribosome.host_fn_call.duration
+// - hc.cascade.duration
+// - hc.holochain_p2p.request.duration
+// - hc.holochain_p2p.handle_request.duration
 #[tokio::test(flavor = "multi_thread")]
 async fn metrics() {
     let tmp_file = tempfile::tempdir().unwrap();
@@ -51,17 +63,15 @@ async fn metrics() {
     tokio::time::sleep(Duration::from_secs(1)).await;
 
     // Read metrics from file
+    let metrics = read_to_string(influxive_file).unwrap();
+    println!("{metrics}");
+    let metrics = metrics.lines();
 
     let seconds_elapsed = start.elapsed().as_secs() as usize;
     // It could be that the last record didn't get exported, so seconds_elapsed - 1.
     let expected_records_per_metric = seconds_elapsed - 1;
     println!("{seconds_elapsed} s elapsed");
     println!("Expected {expected_records_per_metric} records per metric");
-    println!();
-
-    let metrics = read_to_string(influxive_file).unwrap();
-    println!("{metrics}");
-    let metrics = metrics.lines();
 
     // METRIC ASSERTIONS
 
@@ -144,6 +154,85 @@ async fn metrics() {
         assert!(metric.contains("min="));
     });
 
+    // Ribosome metrics
+    let ribosome_wasm_usage = metrics
+        .clone()
+        .filter(|line| line.contains("hc.ribosome.wasm.usage"));
+    let ribosome_wasm_usage_count = ribosome_wasm_usage.clone().count();
+    // 10 records per second
+    assert!(
+        ribosome_wasm_usage_count >= expected_records_per_metric * 10,
+        "expected >= {}, got {ribosome_wasm_usage_count}",
+        expected_records_per_metric * 10
+    );
+    ribosome_wasm_usage.for_each(|metric| {
+        assert!(metric.contains("dna="));
+        assert!(metric.contains("zome="));
+        assert!(metric.contains("fn="));
+        assert!(metric.contains("sum="));
+    });
+
+    let ribosome_zome_call_duration = metrics
+        .clone()
+        .filter(|line| line.contains("hc.ribosome.zome_call.duration"));
+    let ribosome_zome_call_duration_count = ribosome_zome_call_duration.clone().count();
+    // 2 records per second (create_post, get_post_network)
+    assert!(
+        ribosome_zome_call_duration_count >= expected_records_per_metric * 2,
+        "expected >= {}, got {ribosome_zome_call_duration_count}",
+        expected_records_per_metric * 2
+    );
+    ribosome_zome_call_duration.for_each(|metric| {
+        assert!(metric.contains("dna="));
+        assert!(metric.contains("zome=create_entry"));
+        assert!(metric.contains("fn="));
+        assert!(metric.contains("count="));
+        assert!(metric.contains("sum="));
+        assert!(metric.contains("max="));
+        assert!(metric.contains("min="));
+    });
+
+    let ribosome_wasm_call_duration = metrics
+        .clone()
+        .filter(|line| line.contains("hc.ribosome.wasm_call.duration"));
+    let ribosome_wasm_call_duration_count = ribosome_wasm_call_duration.clone().count();
+    // 10 records per second
+    assert!(
+        ribosome_wasm_call_duration_count >= expected_records_per_metric * 10,
+        "expected >= {}, got {ribosome_wasm_call_duration_count}",
+        expected_records_per_metric * 10
+    );
+    ribosome_wasm_call_duration.for_each(|metric| {
+        assert!(metric.contains("dna="));
+        assert!(metric.contains("zome=create_entry"));
+        assert!(metric.contains("fn="));
+        assert!(metric.contains("count="));
+        assert!(metric.contains("sum="));
+        assert!(metric.contains("max="));
+        assert!(metric.contains("min="));
+    });
+
+    let ribosome_host_fn_call_duration = metrics
+        .clone()
+        .filter(|line| line.contains("hc.ribosome.host_fn_call.duration"));
+    let ribosome_host_fn_call_duration_count = ribosome_host_fn_call_duration.clone().count();
+    // 7 records per second
+    assert!(
+        ribosome_host_fn_call_duration_count >= expected_records_per_metric * 7,
+        "expected >= {}, got {ribosome_host_fn_call_duration_count}",
+        expected_records_per_metric * 7
+    );
+    ribosome_host_fn_call_duration.for_each(|metric| {
+        assert!(metric.contains("dna="));
+        assert!(metric.contains("zome=create_entry"));
+        assert!(metric.contains("fn="));
+        assert!(metric.contains("host_fn="));
+        assert!(metric.contains("count="));
+        assert!(metric.contains("sum="));
+        assert!(metric.contains("max="));
+        assert!(metric.contains("min="));
+    });
+
     // cascade metrics
     let cascade_duration = metrics
         .clone()
@@ -206,62 +295,4 @@ async fn metrics() {
     // hc.holochain_p2p.handle_request.ignored can't be easily tested, because
     // it records a metric only when concurrent requests are handled and one
     // of them is dropped.
-
-    // Ribosome metrics
-    let ribosome_wasm_usage = metrics
-        .clone()
-        .filter(|line| line.contains("hc.ribosome.wasm.usage"));
-    let ribosome_wasm_usage_count = ribosome_wasm_usage.clone().count();
-    // 10 records per second
-    assert!(
-        ribosome_wasm_usage_count >= expected_records_per_metric * 10,
-        "expected >= {}, got {ribosome_wasm_usage_count}",
-        expected_records_per_metric * 10
-    );
-    ribosome_wasm_usage.for_each(|metric| {
-        assert!(metric.contains("dna="));
-        assert!(metric.contains("zome="));
-        assert!(metric.contains("fn="));
-        assert!(metric.contains("sum="));
-    });
-
-    let ribosome_zome_call_duration = metrics
-        .clone()
-        .filter(|line| line.contains("hc.ribosome.zome_call.duration"));
-    let ribosome_zome_call_duration_count = ribosome_zome_call_duration.clone().count();
-    // 2 records per second (create_post, get_post_network)
-    assert!(
-        ribosome_zome_call_duration_count >= expected_records_per_metric * 2,
-        "expected >= {}, got {ribosome_zome_call_duration_count}",
-        expected_records_per_metric * 2
-    );
-    ribosome_zome_call_duration.for_each(|metric| {
-        assert!(metric.contains("dna="));
-        assert!(metric.contains("zome="));
-        assert!(metric.contains("fn="));
-        assert!(metric.contains("count="));
-        assert!(metric.contains("sum="));
-        assert!(metric.contains("max="));
-        assert!(metric.contains("min="));
-    });
-
-    let ribosome_wasm_call_duration = metrics
-        .clone()
-        .filter(|line| line.contains("hc.ribosome.wasm_call.duration"));
-    let ribosome_wasm_call_duration_count = ribosome_wasm_call_duration.clone().count();
-    // 10 records per second
-    assert!(
-        ribosome_wasm_call_duration_count >= expected_records_per_metric * 10,
-        "expected >= {}, got {ribosome_wasm_call_duration_count}",
-        expected_records_per_metric * 10
-    );
-    ribosome_wasm_call_duration.for_each(|metric| {
-        assert!(metric.contains("dna="));
-        assert!(metric.contains("zome="));
-        assert!(metric.contains("fn="));
-        assert!(metric.contains("count="));
-        assert!(metric.contains("sum="));
-        assert!(metric.contains("max="));
-        assert!(metric.contains("min="));
-    });
 }

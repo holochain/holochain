@@ -11,9 +11,9 @@ use super::host_fn::HostFnApi;
 use super::HostContext;
 use super::ZomeCallHostAccess;
 use crate::core::metrics::{
-    create_ribosome_wasm_call_duration_metric, create_ribosome_wasm_usage_metric,
-    create_ribosome_zome_call_duration_metric, WasmCallDurationMetric, WasmUsageMetric,
-    ZomeCallDurationMetric,
+    create_host_fn_call_duration_metric, create_ribosome_wasm_call_duration_metric,
+    create_ribosome_wasm_usage_metric, create_ribosome_zome_call_duration_metric,
+    HostFnCallDurationMetric, WasmCallDurationMetric, WasmUsageMetric, ZomeCallDurationMetric,
 };
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
@@ -155,6 +155,9 @@ pub struct RealRibosome {
     /// Instrument to measure wasm call duration.
     pub wasm_call_duration_metric: Arc<WasmCallDurationMetric>,
 
+    /// Instrument to measure host function call duration.
+    pub host_fn_call_duration_metric: Arc<HostFnCallDurationMetric>,
+
     /// File system and in-memory cache for wasm modules.
     pub wasmer_module_cache: Option<Arc<ModuleCacheLock>>,
 }
@@ -187,6 +190,8 @@ impl HostFnBuilder {
         O: serde::Serialize + std::fmt::Debug + 'static,
     {
         let ribosome_arc = Arc::clone(&self.ribosome_arc);
+        let host_function_name_clone = host_function_name.to_string();
+        let host_fn_call_duration_metric = self.ribosome_arc.host_fn_call_duration_metric.clone();
         let context_key = self.context_key;
         {
             let mut store_lock = self.store.lock();
@@ -211,7 +216,15 @@ impl HostFnBuilder {
                         };
                         let (env, mut store_mut) = function_env_mut.data_and_store_mut();
                         let result = match env.consume_bytes_from_guest(&mut store_mut, guest_ptr, len) {
-                            Ok(input) => host_function(Arc::clone(&ribosome_arc), context_arc, input),
+                            Ok(input) => {
+                                let attributes = vec![
+                                    opentelemetry::KeyValue::new("dna", ribosome_arc.dna_file.dna_def_hashed().hash.to_string()),opentelemetry::KeyValue::new("zome", context_arc.zome.name.to_string()), opentelemetry::KeyValue::new("fn", context_arc.function_name().to_string()),opentelemetry::KeyValue::new("host_fn", host_function_name_clone.clone())];
+                                let start = std::time::Instant::now();
+                                let result = host_function(Arc::clone(&ribosome_arc), context_arc, input);
+                                let elapsed = start.elapsed().as_secs_f64();
+                                host_fn_call_duration_metric.record(elapsed, &attributes);
+                                result
+                            },
                             Err(runtime_error) => Result::<_, RuntimeError>::Err(runtime_error),
                         };
                         Ok(u64::from_le_bytes(
@@ -253,6 +266,7 @@ impl RealRibosome {
             usage_meter: create_ribosome_wasm_usage_metric().into(),
             zome_call_duration_metric: create_ribosome_zome_call_duration_metric().into(),
             wasm_call_duration_metric: create_ribosome_wasm_call_duration_metric().into(),
+            host_fn_call_duration_metric: create_host_fn_call_duration_metric().into(),
             wasmer_module_cache,
         };
 
@@ -347,6 +361,7 @@ impl RealRibosome {
             usage_meter: create_ribosome_wasm_usage_metric().into(),
             zome_call_duration_metric: create_ribosome_zome_call_duration_metric().into(),
             wasm_call_duration_metric: create_ribosome_wasm_call_duration_metric().into(),
+            host_fn_call_duration_metric: create_host_fn_call_duration_metric().into(),
             wasmer_module_cache: Some(Arc::new(ModuleCacheLock::new(ModuleCache::new(None)))),
         }
     }

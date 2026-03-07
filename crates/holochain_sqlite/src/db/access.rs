@@ -1,4 +1,6 @@
-use super::metrics::{create_connection_use_time_metric, create_write_txn_duration_metric, Histogram};
+use super::metrics::{
+    create_connection_use_time_metric, create_write_txn_duration_metric, Histogram,
+};
 use crate::db::conn::PConn;
 use crate::db::databases::DATABASE_HANDLES;
 use crate::db::guard::{PConnGuard, PTxnGuard};

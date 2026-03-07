@@ -95,7 +95,7 @@
 //! | `hc.conductor.workflow.duration` | `f64_histogram` | `s` | The time spent running a workflow. |- `workflow`: The name of the workflow.<br />- `dna_hash`: The DNA hash that this workflow is running for.<br />- `agent`: (optional) The agent that this workflow is running for if the workflow is cell bound. |
 //! | `hc.cascade.duration` | `f64_histogram` | `s` | The time taken to execute a cascade query. | |
 //! | `hc.db.pool.utilization` | `f64_gauge` (observable) | | The utilization of connections in the pool. |- `kind`: The kind of database such as Conductor, Wasm or Dht etc.<br />- `id`: The unique identifier for this database if multiple instances can exist, such as a Dht database. |
-//! | `hc.db.connections.use_time` | `f64_histogram` | `s` | The time between borrowing a connection and returning it to the pool. |- `kind`: The kind of database such as Conductor, Wasm or Dht etc.<br />- `id`: The unique identifier for this database if multiple instances can exist, such as a Dht database. |
+//! | `hc.db.connections.usegop _time` | `f64_histogram` | `s` | The time between borrowing a connection and returning it to the pool. |- `kind`: The kind of database such as Conductor, Wasm or Dht etc.<br />- `id`: The unique identifier for this database if multiple instances can exist, such as a Dht database. |
 //! | `hc.ribosome.wasm.usage` | `u64_counter` | | The metered usage of a wasm ribosome. | - `dna`: The DNA hash that this wasm is metered for.<br />- `zome`: The zome that this wasm is metered for.<br />- `fn`: The function that this wasm is metered for.<br />- `agent`: The agent that this wasm is metered for (if there is one). |
 
 use std::path::{Path, PathBuf};
@@ -246,7 +246,10 @@ impl HolochainMetricsConfig {
     }
 
     /// Simple config constructor.
-    pub fn with_file(file_path: &Path, report_interval: Option<Duration>) -> HolochainMetricsConfig {
+    pub fn with_file(
+        file_path: &Path,
+        report_interval: Option<Duration>,
+    ) -> HolochainMetricsConfig {
         HolochainMetricsConfig::InfluxiveFile {
             writer_config: influxive::InfluxiveWriterConfig::create_with_influx_file(
                 PathBuf::from(file_path),

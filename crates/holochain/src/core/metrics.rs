@@ -69,3 +69,13 @@ pub fn create_ribosome_zome_call_duration_metric() -> ZomeCallDurationMetric {
         .with_description("The time spent running a zome call.")
         .build()
 }
+
+pub type HostFnCallDurationMetric = metrics::Histogram<f64>;
+
+pub fn create_host_fn_call_duration_metric() -> HostFnCallDurationMetric {
+    meter("hc.ribosome")
+        .f64_histogram("hc.ribosome.host_fn_call.duration")
+        .with_unit("s")
+        .with_description("The time spent executing a host function call.")
+        .build()
+}
