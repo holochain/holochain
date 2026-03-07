@@ -10,7 +10,11 @@ use super::host_fn::get_agent_activity::get_agent_activity;
 use super::host_fn::HostFnApi;
 use super::HostContext;
 use super::ZomeCallHostAccess;
-use crate::core::metrics::{create_ribosome_wasm_call_duration_metric, create_ribosome_wasm_usage_metric, WasmCallDurationMetric, WasmUsageMetric};
+use crate::core::metrics::{
+    create_ribosome_wasm_call_duration_metric, create_ribosome_wasm_usage_metric,
+    create_ribosome_zome_call_duration_metric, WasmCallDurationMetric, WasmUsageMetric,
+    ZomeCallDurationMetric,
+};
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
@@ -145,6 +149,9 @@ pub struct RealRibosome {
     /// Instrument to measure metered wasm usage.
     pub usage_meter: Arc<WasmUsageMetric>,
 
+    /// Instrument to measure zome call duration.
+    pub zome_call_duration_metric: Arc<ZomeCallDurationMetric>,
+
     /// Instrument to measure wasm call duration.
     pub wasm_call_duration_metric: Arc<WasmCallDurationMetric>,
 
@@ -244,6 +251,7 @@ impl RealRibosome {
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
             usage_meter: create_ribosome_wasm_usage_metric().into(),
+            zome_call_duration_metric: create_ribosome_zome_call_duration_metric().into(),
             wasm_call_duration_metric: create_ribosome_wasm_call_duration_metric().into(),
             wasmer_module_cache,
         };
@@ -337,6 +345,7 @@ impl RealRibosome {
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
             usage_meter: create_ribosome_wasm_usage_metric().into(),
+            zome_call_duration_metric: create_ribosome_zome_call_duration_metric().into(),
             wasm_call_duration_metric: create_ribosome_wasm_call_duration_metric().into(),
             wasmer_module_cache: Some(Arc::new(ModuleCacheLock::new(ModuleCache::new(None)))),
         }
@@ -1003,6 +1012,13 @@ impl RibosomeT for RealRibosome {
         let zome_name = invocation.zome.zome_name().clone();
         let fn_name = invocation.fn_name.clone();
 
+        let start = std::time::Instant::now();
+        let attributes = vec![
+            opentelemetry::KeyValue::new("dna", self.dna_file.dna_def_hashed().hash.to_string()),
+            opentelemetry::KeyValue::new("zome", zome_name.to_string()),
+            opentelemetry::KeyValue::new("fn", fn_name.to_string()),
+        ];
+
         let guest_output: ExternIO = match self
             .call_stream(host_access.into(), invocation)
             .next()
@@ -1012,6 +1028,10 @@ impl RibosomeT for RealRibosome {
             Some(Ok((_zome, extern_io))) => extern_io,
             Some(Err((_zome, ribosome_error))) => return Err(ribosome_error),
         };
+
+        // Record call zome duration.
+        let elapsed = start.elapsed().as_secs_f64();
+        self.zome_call_duration_metric.record(elapsed, &attributes);
 
         Ok(ZomeCallResponse::Ok(guest_output))
     }
