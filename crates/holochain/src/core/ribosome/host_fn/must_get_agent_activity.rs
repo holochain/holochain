@@ -1,15 +1,16 @@
+use crate::core::ribosome::host_fn::cascade_from_call_context;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_cascade::CascadeImpl;
+use holochain_p2p::actor::NetworkRequestOptions;
 use holochain_state::mutations::insert_op_cache;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 use wasmer::RuntimeError;
-use holochain_p2p::actor::NetworkRequestOptions;
 
 #[cfg_attr(
     feature = "instrument",
@@ -38,21 +39,23 @@ pub fn must_get_agent_activity(
                 let cascade = match call_context.host_context {
                     HostContext::Validate(ValidateHostAccess { is_inline, .. }) => {
                         if is_inline {
-                            CascadeImpl::from_workspace_and_network(
-                                &workspace,
-                                call_context.host_context.network().clone(),
-                            )
+                            cascade_from_call_context(&call_context)
                         } else {
                             CascadeImpl::from_workspace_stores(workspace.stores(), None)
+                                .with_zome_call_origin(
+                                    call_context.zome.zome_name(),
+                                    call_context.function_name(),
+                                )
                         }
                     }
-                    _ => CascadeImpl::from_workspace_and_network(
-                        &workspace,
-                        call_context.host_context.network().clone(),
-                    ),
+                    _ => cascade_from_call_context(&call_context),
                 };
                 let result = cascade
-                    .must_get_agent_activity(author.clone(), chain_filter.clone(), NetworkRequestOptions::must_get_options())
+                    .must_get_agent_activity(
+                        author.clone(),
+                        chain_filter.clone(),
+                        NetworkRequestOptions::must_get_options(),
+                    )
                     .await
                     .map_err(|cascade_error| -> RuntimeError {
                         wasm_error!(WasmErrorInner::Host(cascade_error.to_string())).into()

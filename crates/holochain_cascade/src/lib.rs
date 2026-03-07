@@ -33,7 +33,6 @@ use holo_hash::EntryHash;
 use holochain_p2p::actor::GetLinksRequestOptions;
 use holochain_p2p::actor::{GetActivityOptions, NetworkRequestOptions};
 use holochain_p2p::{DynHolochainP2pDna, HolochainP2pError};
-use holochain_zome_types::prelude::{FunctionName, ZomeName};
 use holochain_state::host_fn_workspace::HostFnStores;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::mutations::insert_action;
@@ -50,6 +49,7 @@ use holochain_state::query::record_details::GetRecordDetailsQuery;
 use holochain_state::query::DbScratch;
 use holochain_state::query::PrivateDataQuery;
 use holochain_state::scratch::SyncScratch;
+use holochain_zome_types::prelude::{FunctionName, ZomeName};
 use metrics::create_cascade_duration_metric;
 use metrics::CascadeDurationMetric;
 use std::collections::HashMap;
@@ -130,9 +130,9 @@ impl CascadeImpl {
     }
 
     /// Set the zome call origin for metrics attribution.
-    pub fn with_zome_call_origin(self, zome_name: ZomeName, fn_name: FunctionName) -> Self {
+    pub fn with_zome_call_origin(self, zome_name: &ZomeName, fn_name: &FunctionName) -> Self {
         Self {
-            zome_call_origin: Some((zome_name, fn_name)),
+            zome_call_origin: Some((zome_name.clone(), fn_name.clone())),
             ..self
         }
     }
