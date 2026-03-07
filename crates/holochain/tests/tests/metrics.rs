@@ -47,6 +47,9 @@ async fn metrics() {
 
     await_consistency(&apps.cells_flattened()).await.unwrap();
 
+    // Wait for buffered metrics to be flushed.
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
     // Read metrics from file
 
     let seconds_elapsed = start.elapsed().as_secs() as usize;
@@ -214,6 +217,26 @@ async fn metrics() {
     );
     ribosome_wasm_usage.for_each(|metric| {
         assert!(metric.contains("sum="));
+        assert!(metric.contains("dna="));
+        assert!(metric.contains("zome="));
+        assert!(metric.contains("fn="));
+    });
+
+    let ribosome_wasm_call_duration = metrics
+        .clone()
+        .filter(|line| line.contains("hc.ribosome.wasm_call.duration"));
+    let ribosome_wasm_call_duration_count = ribosome_wasm_call_duration.clone().count();
+    // 10 records per second
+    assert!(
+        ribosome_wasm_call_duration_count >= expected_records_per_metric * 10,
+        "expected >= {}, got {ribosome_wasm_call_duration_count}",
+        expected_records_per_metric * 10
+    );
+    ribosome_wasm_call_duration.for_each(|metric| {
+        assert!(metric.contains("count="));
+        assert!(metric.contains("sum="));
+        assert!(metric.contains("max="));
+        assert!(metric.contains("min="));
         assert!(metric.contains("dna="));
         assert!(metric.contains("zome="));
         assert!(metric.contains("fn="));

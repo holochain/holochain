@@ -41,9 +41,20 @@ pub fn create_workflow_duration_metric(
     }
 }
 
-pub fn create_ribosome_wasm_usage_metric() -> metrics::Counter<u64> {
+pub type WasmUsageMetric = metrics::Counter<u64>;
+
+pub fn create_ribosome_wasm_usage_metric() -> WasmUsageMetric {
     meter("hc.ribosome.wasm")
         .u64_counter("hc.ribosome.wasm.usage")
         .with_description("The metered usage of a wasm ribosome.")
+        .build()
+}
+
+pub type WasmCallDurationMetric = metrics::Histogram<f64>;
+pub fn create_ribosome_wasm_call_duration_metric() -> WasmCallDurationMetric {
+    meter("hc.ribosome.wasm")
+        .f64_histogram("hc.ribosome.wasm_call.duration")
+        .with_unit("s")
+        .with_description("The time spent running a wasm call.")
         .build()
 }
