@@ -155,6 +155,9 @@ async fn metrics() {
         "expected >= {get_requests}, got {cascade_duration_count}",
     );
     cascade_duration.for_each(|metric| {
+        // All cascade calls should have been made by the zome calls.
+        assert!(metric.contains("zome_name="));
+        assert!(metric.contains("fn_name="));
         assert!(metric.contains("count="));
         assert!(metric.contains("sum="));
         assert!(metric.contains("max="));

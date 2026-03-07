@@ -33,6 +33,7 @@ use holo_hash::EntryHash;
 use holochain_p2p::actor::GetLinksRequestOptions;
 use holochain_p2p::actor::{GetActivityOptions, NetworkRequestOptions};
 use holochain_p2p::{DynHolochainP2pDna, HolochainP2pError};
+use holochain_zome_types::prelude::{FunctionName, ZomeName};
 use holochain_state::host_fn_workspace::HostFnStores;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::mutations::insert_action;
@@ -115,6 +116,8 @@ pub struct CascadeImpl {
     network: Option<DynHolochainP2pDna>,
     private_data: Option<Arc<AgentPubKey>>,
     duration_metric: &'static CascadeDurationMetric,
+    /// Optional zome call origin for metrics attribution.
+    zome_call_origin: Option<(ZomeName, FunctionName)>,
 }
 
 impl CascadeImpl {
@@ -122,6 +125,14 @@ impl CascadeImpl {
     pub fn with_authored(self, authored: DbRead<DbKindAuthored>) -> Self {
         Self {
             authored: Some(authored),
+            ..self
+        }
+    }
+
+    /// Set the zome call origin for metrics attribution.
+    pub fn with_zome_call_origin(self, zome_name: ZomeName, fn_name: FunctionName) -> Self {
+        Self {
+            zome_call_origin: Some((zome_name, fn_name)),
             ..self
         }
     }
@@ -172,6 +183,7 @@ impl CascadeImpl {
             cache: Some(cache_db),
             network: Some(network),
             duration_metric: create_cascade_duration_metric(),
+            zome_call_origin: self.zome_call_origin,
         }
     }
 
@@ -185,6 +197,7 @@ impl CascadeImpl {
             scratch: None,
             private_data: None,
             duration_metric: create_cascade_duration_metric(),
+            zome_call_origin: None,
         }
     }
 
@@ -212,6 +225,7 @@ impl CascadeImpl {
             scratch,
             network: Some(network),
             duration_metric: create_cascade_duration_metric(),
+            zome_call_origin: None,
         }
     }
 
@@ -231,6 +245,7 @@ impl CascadeImpl {
             network: None,
             private_data: author,
             duration_metric: create_cascade_duration_metric(),
+            zome_call_origin: None,
         }
     }
 
@@ -544,8 +559,16 @@ impl CascadeImpl {
         })
         .await??;
 
+        let mut attributes = Vec::new();
+        if let Some((zome_name, fn_name)) = &self.zome_call_origin {
+            attributes.push(opentelemetry::KeyValue::new(
+                "zome_name",
+                zome_name.to_string(),
+            ));
+            attributes.push(opentelemetry::KeyValue::new("fn_name", fn_name.to_string()));
+        }
         self.duration_metric
-            .record(start.elapsed().as_secs_f64(), &[]);
+            .record(start.elapsed().as_secs_f64(), &attributes);
 
         Ok(results)
     }

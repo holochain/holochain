@@ -3,6 +3,7 @@ use super::RibosomeT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
+use holochain_cascade::CascadeImpl;
 
 /// default size for KeyRefs
 const DEF_REF_SIZE: usize = 32;
@@ -53,6 +54,19 @@ macro_rules! host_fn_api_impls {
             )*
         }
     };
+}
+
+/// Construct a [CascadeImpl] from a zome call context. It has access to the network
+/// and contains the zome name and function name as origin.
+pub fn cascade_from_call_context(call_context: &CallContext) -> CascadeImpl {
+    CascadeImpl::from_workspace_and_network(
+        &call_context.host_context.workspace(),
+        call_context.host_context.network().clone(),
+    )
+        .with_zome_call_origin(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+        )
 }
 
 // All host_fn_api_impls below rely on this import
