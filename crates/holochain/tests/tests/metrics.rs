@@ -216,10 +216,30 @@ async fn metrics() {
         expected_records_per_metric * 10
     );
     ribosome_wasm_usage.for_each(|metric| {
-        assert!(metric.contains("sum="));
         assert!(metric.contains("dna="));
         assert!(metric.contains("zome="));
         assert!(metric.contains("fn="));
+        assert!(metric.contains("sum="));
+    });
+
+    let ribosome_zome_call_duration = metrics
+        .clone()
+        .filter(|line| line.contains("hc.ribosome.zome_call.duration"));
+    let ribosome_zome_call_duration_count = ribosome_zome_call_duration.clone().count();
+    // 2 records per second (create_post, get_post_network)
+    assert!(
+        ribosome_zome_call_duration_count >= expected_records_per_metric * 2,
+        "expected >= {}, got {ribosome_zome_call_duration_count}",
+        expected_records_per_metric * 2
+    );
+    ribosome_zome_call_duration.for_each(|metric| {
+        assert!(metric.contains("dna="));
+        assert!(metric.contains("zome="));
+        assert!(metric.contains("fn="));
+        assert!(metric.contains("count="));
+        assert!(metric.contains("sum="));
+        assert!(metric.contains("max="));
+        assert!(metric.contains("min="));
     });
 
     let ribosome_wasm_call_duration = metrics
@@ -233,12 +253,12 @@ async fn metrics() {
         expected_records_per_metric * 10
     );
     ribosome_wasm_call_duration.for_each(|metric| {
+        assert!(metric.contains("dna="));
+        assert!(metric.contains("zome="));
+        assert!(metric.contains("fn="));
         assert!(metric.contains("count="));
         assert!(metric.contains("sum="));
         assert!(metric.contains("max="));
         assert!(metric.contains("min="));
-        assert!(metric.contains("dna="));
-        assert!(metric.contains("zome="));
-        assert!(metric.contains("fn="));
     });
 }

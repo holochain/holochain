@@ -51,10 +51,21 @@ pub fn create_ribosome_wasm_usage_metric() -> WasmUsageMetric {
 }
 
 pub type WasmCallDurationMetric = metrics::Histogram<f64>;
+
 pub fn create_ribosome_wasm_call_duration_metric() -> WasmCallDurationMetric {
     meter("hc.ribosome.wasm")
         .f64_histogram("hc.ribosome.wasm_call.duration")
         .with_unit("s")
         .with_description("The time spent running a wasm call.")
+        .build()
+}
+
+pub type ZomeCallDurationMetric = metrics::Histogram<f64>;
+
+pub fn create_ribosome_zome_call_duration_metric() -> ZomeCallDurationMetric {
+    meter("hc.ribosome.wasm")
+        .f64_histogram("hc.ribosome.zome_call.duration")
+        .with_unit("s")
+        .with_description("The time spent running a zome call.")
         .build()
 }
