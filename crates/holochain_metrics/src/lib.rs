@@ -87,16 +87,19 @@
 //!
 //! ## Metric Name Registry
 //!
-//! | Full Metric Name | Type | Unit (optional) | Description | Attributes |
-//! | ---------------- | ---- | --------------- | ----------- | ---------- |
-//! | `hc.holochain_p2p.request.duration` | `f64_histogram` | `s` | The time spent sending an outgoing p2p request awaiting the response. |- `dna_hash`: The DNA hash that the request is being sent on behalf of.<br />- `tag`: The name of the host fn requested to the remote peer.<br />- `url`: The remote peer url called.<br />- `error`: Flag indicating if the request failed.|
-//! | `hc.holochain_p2p.handle_request.duration` | `f64_histogram` | `s` | The time spent handling an incoming p2p request. |- `message_type`: The message type.<br />- `dna_hash`: The DNA hash that the request is being sent on behalf of.<br />- `to_agent`: The agent to which the request is made.<br />- `agent`: The agent for which the request is made (in case of `get_agent_activity` and `must_get_agent_activity` requests).<br />|
-//! | `hc.conductor.post_commit.duration` | `f64_histogram` | `s` | The time spent executing a post commit. |- `dna_hash`: The DNA hash that this post commit is running for.<br />- `agent`: The agent running the post commit. |
-//! | `hc.conductor.workflow.duration` | `f64_histogram` | `s` | The time spent running a workflow. |- `workflow`: The name of the workflow.<br />- `dna_hash`: The DNA hash that this workflow is running for.<br />- `agent`: (optional) The agent that this workflow is running for if the workflow is cell bound. |
-//! | `hc.cascade.duration` | `f64_histogram` | `s` | The time taken to execute a cascade query. | |
-//! | `hc.db.pool.utilization` | `f64_gauge` (observable) | | The utilization of connections in the pool. |- `kind`: The kind of database such as Conductor, Wasm or Dht etc.<br />- `id`: The unique identifier for this database if multiple instances can exist, such as a Dht database. |
-//! | `hc.db.connections.usegop _time` | `f64_histogram` | `s` | The time between borrowing a connection and returning it to the pool. |- `kind`: The kind of database such as Conductor, Wasm or Dht etc.<br />- `id`: The unique identifier for this database if multiple instances can exist, such as a Dht database. |
-//! | `hc.ribosome.wasm.usage` | `u64_counter` | | The metered usage of a wasm ribosome. | - `dna`: The DNA hash that this wasm is metered for.<br />- `zome`: The zome that this wasm is metered for.<br />- `fn`: The function that this wasm is metered for.<br />- `agent`: The agent that this wasm is metered for (if there is one). |
+//! These following metrics are defined and recorded in their respective crates.
+//! Do a text search to look up metric type, description and unit
+//!
+//! | Full Metric Name |
+//! | ---------------- |
+//! | `hc.db.connections.use_time` |
+//! | `hc.db.write_txn.duration` |
+//! | `hc.conductor.workflow.duration` |
+//! | `hc.conductor.post_commit.duration` |
+//! | `hc.ribosome.wasm.usage` |
+//! | `hc.ribosome.zome_call.duration` |
+//! | `hc.ribosome.wasm_call.duration` |
+//! | `hc.ribosome.host_fn_call.duration` |
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;

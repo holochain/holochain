@@ -2,7 +2,7 @@ use holo_hash::{AgentPubKey, DnaHash};
 use opentelemetry::{global::meter, metrics, KeyValue};
 use std::sync::Arc;
 
-pub struct Histogram {
+pub(crate) struct Histogram {
     histogram: metrics::Histogram<f64>,
     attributes: Vec<KeyValue>,
 }
@@ -13,9 +13,9 @@ impl Histogram {
     }
 }
 
-pub type WorkflowDurationMetric = Histogram;
+pub(crate) type WorkflowDurationMetric = Histogram;
 
-pub fn create_workflow_duration_metric(
+pub(crate) fn create_workflow_duration_metric(
     workflow_name: String,
     dna_hash: Arc<DnaHash>,
     agent: Option<AgentPubKey>,
@@ -41,16 +41,16 @@ pub fn create_workflow_duration_metric(
     }
 }
 
-pub type WasmUsageMetric = metrics::Counter<u64>;
+pub(crate) type WasmUsageMetric = metrics::Counter<u64>;
 
-pub fn create_ribosome_wasm_usage_metric() -> WasmUsageMetric {
+pub(crate) fn create_ribosome_wasm_usage_metric() -> WasmUsageMetric {
     meter("hc.ribosome.wasm")
         .u64_counter("hc.ribosome.wasm.usage")
         .with_description("The metered usage of a wasm ribosome.")
         .build()
 }
 
-pub type WasmCallDurationMetric = metrics::Histogram<f64>;
+pub(crate) type WasmCallDurationMetric = metrics::Histogram<f64>;
 
 pub fn create_ribosome_wasm_call_duration_metric() -> WasmCallDurationMetric {
     meter("hc.ribosome.wasm")

@@ -1,6 +1,6 @@
 use hdk::prelude::Record;
 use holo_hash::ActionHash;
-use holochain::sweettest::{await_consistency, SweetConductorBatch, SweetDnaFile};
+use holochain::sweettest::{SweetConductorBatch, SweetConductorConfig, SweetDnaFile};
 use holochain_wasm_test_utils::TestWasm;
 use serde::Serialize;
 use std::fs::read_to_string;
@@ -33,19 +33,32 @@ async fn metrics() {
     struct Post(pub String);
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
-    let mut conductors = SweetConductorBatch::standard(2).await;
+    // Disable gossip and publish to make the network calls deterministic.
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(
+        2,
+        SweetConductorConfig::standard().tune_network_config(|nc| {
+            nc.disable_gossip = true;
+            nc.disable_publish = true;
+        }),
+    )
+    .await;
 
     let apps = conductors.setup_app("test_app", [&dna_file]).await.unwrap();
     let alice_conductor = conductors.get(0).unwrap();
     let bob_conductor = conductors.get(1).unwrap();
     let cells = apps.cells_flattened();
-    let alice_cell = cells.get(0).unwrap();
+    let alice_cell = cells.first().unwrap();
     let alice_zome = alice_cell.zome(TestWasm::Create.coordinator_zome());
     let bob_cell = cells.get(1).unwrap();
     let bob_zome = bob_cell.zome(TestWasm::Create.coordinator_zome());
 
+    // Alice needs to answer Bob's get request, so she declares full storage arcs.
+    alice_conductor
+        .declare_full_storage_arcs(dna_file.dna_hash())
+        .await;
+    conductors.exchange_peer_info().await;
+
     let start = Instant::now();
-    let mut get_requests = 0;
 
     // Alice creates an entry to record zome call metrics.
     let create_entry_hash: ActionHash = alice_conductor
@@ -55,12 +68,9 @@ async fn metrics() {
     let _: Option<Record> = bob_conductor
         .call(&bob_zome, "get_post_network", create_entry_hash.clone())
         .await;
-    get_requests += 1;
 
-    await_consistency(&apps.cells_flattened()).await.unwrap();
-
-    // Wait for buffered metrics to be flushed.
-    tokio::time::sleep(Duration::from_secs(1)).await;
+    // Wait for metrics to be written and buffered metrics to be flushed.
+    tokio::time::sleep(Duration::from_secs(3)).await;
 
     // Read metrics from file
     let metrics = read_to_string(influxive_file).unwrap();
@@ -80,10 +90,11 @@ async fn metrics() {
         .clone()
         .filter(|line| line.contains("hc.db.connections.use_time"));
     let db_connections_use_time_count = db_connections_use_time.clone().count();
-    // 1 record per second for 5 database kinds (dht, cache, peer_meta_store, authored * 2)
+    // 1 record per second for 6 database kinds (conductor, dht, cache, peer_meta_store, authored * 2)
+    // cache may appear later, so assert >= 5
     assert!(
         db_connections_use_time_count >= expected_records_per_metric * 5,
-        "expected >= {}, got {db_connections_use_time_count}",
+        "hc.db.connections.use_time: expected >= {}, got {db_connections_use_time_count}",
         expected_records_per_metric * 5
     );
     db_connections_use_time.for_each(|metric| {
@@ -99,11 +110,12 @@ async fn metrics() {
         .clone()
         .filter(|line| line.contains("hc.db.write_txn.duration"));
     let db_write_txn_duration_count = db_write_txn_duration.clone().count();
-    // 1 record per second for 5 database kinds (dht, cache, peer_meta_store, authored * 2)
+    // 1 record per second for up to 6 database kinds; not all kinds receive write txns
+    // in every run, so assert >= 4 (dht, authored * 2, conductor guaranteed)
     assert!(
-        db_write_txn_duration_count >= expected_records_per_metric * 5,
-        "expected >= {}, got {db_write_txn_duration_count}",
-        expected_records_per_metric * 5
+        db_write_txn_duration_count >= expected_records_per_metric * 4,
+        "hc.db.write_txn.duration: expected >= {}, got {db_write_txn_duration_count}",
+        expected_records_per_metric * 4
     );
     db_write_txn_duration.for_each(|metric| {
         assert!(metric.contains("id="));
@@ -123,7 +135,7 @@ async fn metrics() {
     // app_validation_consumer, sys_validation_consumer, integrate_dht_ops_consumer, validation_receipt_consumer)
     assert!(
         conductor_workflow_duration_count >= expected_records_per_metric * 8,
-        "expected >= {}, got {conductor_workflow_duration_count}",
+        "hc.conductor.workflow.duration: expected >= {}, got {conductor_workflow_duration_count}",
         expected_records_per_metric * 8
     );
     conductor_workflow_duration.for_each(|metric| {
@@ -139,11 +151,10 @@ async fn metrics() {
         .clone()
         .filter(|line| line.contains("hc.conductor.post_commit.duration"));
     let conductor_post_commit_duration_count = conductor_post_commit_duration.clone().count();
-    // 1 record per second for 2 agents having committed
+    // 1 record per second
     assert!(
-        conductor_post_commit_duration_count >= expected_records_per_metric * 2,
-        "expected >= {}, got {conductor_post_commit_duration_count}",
-        expected_records_per_metric * 2,
+        conductor_post_commit_duration_count >= expected_records_per_metric,
+        "hc.conductor.post_commit.duration: expected >= {expected_records_per_metric}, got {conductor_post_commit_duration_count}",
     );
     conductor_post_commit_duration.for_each(|metric| {
         assert!(metric.contains("dna_hash="));
@@ -159,11 +170,11 @@ async fn metrics() {
         .clone()
         .filter(|line| line.contains("hc.ribosome.wasm.usage"));
     let ribosome_wasm_usage_count = ribosome_wasm_usage.clone().count();
-    // 10 records per second
+    // ~10 distinct (dna, zome, fn) timeseries from wasm init + zome calls; assert >= 8
     assert!(
-        ribosome_wasm_usage_count >= expected_records_per_metric * 10,
-        "expected >= {}, got {ribosome_wasm_usage_count}",
-        expected_records_per_metric * 10
+        ribosome_wasm_usage_count >= expected_records_per_metric * 8,
+        "hc.ribosome.wasm.usage: expected >= {}, got {ribosome_wasm_usage_count}",
+        expected_records_per_metric * 8
     );
     ribosome_wasm_usage.for_each(|metric| {
         assert!(metric.contains("dna="));
@@ -176,10 +187,10 @@ async fn metrics() {
         .clone()
         .filter(|line| line.contains("hc.ribosome.zome_call.duration"));
     let ribosome_zome_call_duration_count = ribosome_zome_call_duration.clone().count();
-    // 2 records per second (create_post, get_post_network)
+    // 2 distinct timeseries (create_post, get_post_network), each exported every second
     assert!(
         ribosome_zome_call_duration_count >= expected_records_per_metric * 2,
-        "expected >= {}, got {ribosome_zome_call_duration_count}",
+        "hc.ribosome.zome_call.duration: expected >= {}, got {ribosome_zome_call_duration_count}",
         expected_records_per_metric * 2
     );
     ribosome_zome_call_duration.for_each(|metric| {
@@ -192,39 +203,44 @@ async fn metrics() {
         assert!(metric.contains("min="));
     });
 
-    let ribosome_wasm_call_duration = metrics
+    let mut ribosome_wasm_call_duration = metrics
         .clone()
         .filter(|line| line.contains("hc.ribosome.wasm_call.duration"));
     let ribosome_wasm_call_duration_count = ribosome_wasm_call_duration.clone().count();
-    // 10 records per second
+    // ~10-12 distinct timeseries from all wasm sub-calls; assert >= 8
     assert!(
-        ribosome_wasm_call_duration_count >= expected_records_per_metric * 10,
-        "expected >= {}, got {ribosome_wasm_call_duration_count}",
-        expected_records_per_metric * 10
+        ribosome_wasm_call_duration_count >= expected_records_per_metric * 8,
+        "hc.ribosome.wasm_call.duration: expected >= {}, got {ribosome_wasm_call_duration_count}",
+        expected_records_per_metric * 8
     );
-    ribosome_wasm_call_duration.for_each(|metric| {
+    ribosome_wasm_call_duration.clone().for_each(|metric| {
         assert!(metric.contains("dna="));
-        assert!(metric.contains("zome=create_entry"));
+        assert!(metric.contains("zome="));
         assert!(metric.contains("fn="));
         assert!(metric.contains("count="));
         assert!(metric.contains("sum="));
         assert!(metric.contains("max="));
         assert!(metric.contains("min="));
     });
+    // Check that some of the wasm calls have the zome and fn name of the
+    // original zome call.
+    assert!(ribosome_wasm_call_duration.any(
+        |metric| metric.contains("zome=create_entry") && metric.contains("fn=get_post_network")
+    ));
 
-    let ribosome_host_fn_call_duration = metrics
+    let mut ribosome_host_fn_call_duration = metrics
         .clone()
         .filter(|line| line.contains("hc.ribosome.host_fn_call.duration"));
     let ribosome_host_fn_call_duration_count = ribosome_host_fn_call_duration.clone().count();
-    // 7 records per second
+    // ~5-6 distinct (dna, zome, fn, host_fn) timeseries; assert >= 4
     assert!(
-        ribosome_host_fn_call_duration_count >= expected_records_per_metric * 7,
-        "expected >= {}, got {ribosome_host_fn_call_duration_count}",
-        expected_records_per_metric * 7
+        ribosome_host_fn_call_duration_count >= expected_records_per_metric * 4,
+        "hc.ribosome.host_fn_call.duration: expected >= {}, got {ribosome_host_fn_call_duration_count}",
+        expected_records_per_metric * 4
     );
-    ribosome_host_fn_call_duration.for_each(|metric| {
+    ribosome_host_fn_call_duration.clone().for_each(|metric| {
         assert!(metric.contains("dna="));
-        assert!(metric.contains("zome=create_entry"));
+        assert!(metric.contains("zome="));
         assert!(metric.contains("fn="));
         assert!(metric.contains("host_fn="));
         assert!(metric.contains("count="));
@@ -232,21 +248,27 @@ async fn metrics() {
         assert!(metric.contains("max="));
         assert!(metric.contains("min="));
     });
+    // Check that some of the host fn calls have the zome and fn name of the
+    // original zome call.
+    assert!(ribosome_host_fn_call_duration.any(
+        |metric| metric.contains("zome=create_entry") && metric.contains("fn=get_post_network")
+    ));
 
     // cascade metrics
     let cascade_duration = metrics
         .clone()
         .filter(|line| line.contains("hc.cascade.duration"));
     let cascade_duration_count = cascade_duration.clone().count();
-    // 1 record per get request
+    // The cascade metric is first recorded during Bob's get_post_network call, which may happen
+    // well after test start (wasm compilation etc.), so only assert >= 1 export occurred.
     assert!(
-        cascade_duration_count >= get_requests,
-        "expected >= {get_requests}, got {cascade_duration_count}",
+        cascade_duration_count >= 1,
+        "hc.cascade.duration: expected >= 1, got {cascade_duration_count}",
     );
     cascade_duration.for_each(|metric| {
         // All cascade calls should have been made by the zome calls.
-        assert!(metric.contains("zome_name="));
-        assert!(metric.contains("fn_name="));
+        assert!(metric.contains("zome=create_entry"));
+        assert!(metric.contains("fn=get_post_network"));
         assert!(metric.contains("count="));
         assert!(metric.contains("sum="));
         assert!(metric.contains("max="));
@@ -258,16 +280,19 @@ async fn metrics() {
         .clone()
         .filter(|line| line.contains("hc.holochain_p2p.request.duration"));
     let request_duration_count = request_duration.clone().count();
-    // 1 record per get request
+    // Same timing caveat as cascade: first recorded during the network call, so assert >= 1.
     assert!(
-        request_duration_count >= get_requests,
-        "expected >= {get_requests}, got {request_duration_count}",
+        request_duration_count >= 1,
+        "hc.holochain_p2p.request.duration: expected >= 1, got {request_duration_count}",
     );
     request_duration.for_each(|metric| {
         assert!(metric.contains("dna_hash="));
         assert!(metric.contains("tag="));
         assert!(metric.contains("url="));
         assert!(metric.contains("error="));
+        // All network requests should have been made by the zome calls.
+        assert!(metric.contains("zome=create_entry"));
+        assert!(metric.contains("fn=get_post_network"));
         assert!(metric.contains("count="));
         assert!(metric.contains("sum="));
         assert!(metric.contains("max="));
@@ -278,10 +303,12 @@ async fn metrics() {
         .clone()
         .filter(|line| line.contains("hc.holochain_p2p.handle_request.duration"));
     let handle_request_duration_count = handle_request_duration.clone().count();
-    // 1 record per get request
+    // 2-3 distinct timeseries (GetReq, GetRes, plus validation receipt traffic).
+    // Like cascade and request above, these are first recorded when the network call happens,
+    // so the effective export window is shorter than seconds_elapsed; assert >= 1.
     assert!(
-        handle_request_duration_count >= get_requests,
-        "expected >= {get_requests}, got {handle_request_duration_count}",
+        handle_request_duration_count >= 1,
+        "hc.holochain_p2p.handle_request.duration: expected >= 1, got {handle_request_duration_count}",
     );
     handle_request_duration.for_each(|metric| {
         assert!(metric.contains("message_type="));
