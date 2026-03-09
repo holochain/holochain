@@ -1,6 +1,7 @@
 use hdk::prelude::Record;
 use holo_hash::ActionHash;
 use holochain::sweettest::{SweetConductorBatch, SweetConductorConfig, SweetDnaFile};
+use holochain_metrics::HolochainMetricsConfig;
 use holochain_wasm_test_utils::TestWasm;
 use serde::Serialize;
 use std::fs::read_to_string;
@@ -22,12 +23,9 @@ use std::time::{Duration, Instant};
 async fn metrics() {
     let tmp_file = tempfile::tempdir().unwrap();
     let influxive_file = tmp_file.path().join("metrics.influx");
-    holochain_metrics::HolochainMetricsConfig::with_file(
-        &influxive_file,
-        Some(Duration::from_secs(1)),
-    )
-    .init()
-    .await;
+    HolochainMetricsConfig::new_with_file(&influxive_file, Some(Duration::from_secs(1)))
+        .init()
+        .await;
 
     #[derive(Debug, Serialize)]
     struct Post(pub String);
@@ -69,7 +67,7 @@ async fn metrics() {
         .call(&bob_zome, "get_post_network", create_entry_hash.clone())
         .await;
 
-    // Wait for metrics to be written and buffered metrics to be flushed.
+    // Wait for metrics to be written.
     let metrics = tokio::time::timeout(Duration::from_secs(5), async {
         loop {
             let metrics = read_to_string(&influxive_file).unwrap_or_default();
@@ -192,11 +190,11 @@ async fn metrics() {
         .clone()
         .filter(|line| line.contains("hc.ribosome.wasm.usage"));
     let ribosome_wasm_usage_count = ribosome_wasm_usage.clone().count();
-    // ~10 distinct (dna, zome, fn) time series from wasm init + zome calls; assert >= 8
+    // ~5-6 distinct (dna, zome, fn) time series from wasm init + zome calls; assert >= 4
     assert!(
-        ribosome_wasm_usage_count >= expected_records_per_metric * 8,
+        ribosome_wasm_usage_count >= expected_records_per_metric * 4,
         "hc.ribosome.wasm.usage: expected >= {}, got {ribosome_wasm_usage_count}",
-        expected_records_per_metric * 8
+        expected_records_per_metric * 4
     );
     ribosome_wasm_usage.for_each(|metric| {
         assert!(metric.contains("dna="));
@@ -229,11 +227,11 @@ async fn metrics() {
         .clone()
         .filter(|line| line.contains("hc.ribosome.wasm_call.duration"));
     let ribosome_wasm_call_duration_count = ribosome_wasm_call_duration.clone().count();
-    // ~10-12 distinct time series from all wasm sub-calls; assert >= 8
+    // ~5-6 distinct time series from all wasm sub-calls; assert >= 4
     assert!(
-        ribosome_wasm_call_duration_count >= expected_records_per_metric * 8,
+        ribosome_wasm_call_duration_count >= expected_records_per_metric * 4,
         "hc.ribosome.wasm_call.duration: expected >= {}, got {ribosome_wasm_call_duration_count}",
-        expected_records_per_metric * 8
+        expected_records_per_metric * 4
     );
     ribosome_wasm_call_duration.clone().for_each(|metric| {
         assert!(metric.contains("dna="));

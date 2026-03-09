@@ -244,12 +244,12 @@ impl HolochainMetricsConfig {
     ///
     /// The output of this function is largely controlled by environment
     /// variables, please see the [crate-level documentation](crate) for usage.
-    pub fn new(root_path: &Path) -> Self {
+    pub fn new_from_env_vars(root_path: &Path) -> Self {
         Self::from_env(root_path, HolochainMetricsEnv::load())
     }
 
-    /// Simple config constructor.
-    pub fn with_file(
+    /// Construct a config with an Influxive file.
+    pub fn new_with_file(
         file_path: &Path,
         report_interval: Option<Duration>,
     ) -> HolochainMetricsConfig {
@@ -264,12 +264,9 @@ impl HolochainMetricsConfig {
 
     fn from_env(root_path: &Path, env: HolochainMetricsEnv) -> Self {
         match env {
-            HolochainMetricsEnv::InfluxiveFile { filepath } => Self::InfluxiveFile {
-                writer_config: influxive::InfluxiveWriterConfig::create_with_influx_file(
-                    PathBuf::from(filepath),
-                ),
-                otel_config: influxive::InfluxiveMeterProviderConfig::default(),
-            },
+            HolochainMetricsEnv::InfluxiveFile { filepath } => {
+                Self::new_with_file(Path::new(&filepath), None)
+            }
 
             HolochainMetricsEnv::InfluxiveChildSvc => {
                 let mut database_path = PathBuf::from(root_path);
