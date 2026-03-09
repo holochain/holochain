@@ -1,6 +1,7 @@
 //! The workflow and queue consumer for DhtOp integration
 
 use super::*;
+use crate::core::metrics::workflow_integrated_op_metric;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
@@ -106,8 +107,18 @@ pub async fn integrate_dht_ops_workflow(
     let changed = stored_ops.len();
     let ops_ps = changed as f64 / start.elapsed().as_micros() as f64 * 1_000_000.0;
     tracing::debug!(?changed, %ops_ps, "ops integrated");
+    let dna_hash = network.dna_hash().clone();
+
+    // Record integrated ops metric.
+    workflow_integrated_op_metric().add(
+        changed as u64,
+        &[opentelemetry::KeyValue::new(
+            "dna_hash",
+            dna_hash.to_string(),
+        )],
+    );
+
     if changed > 0 {
-        let dna_hash = network.dna_hash().clone();
         network.new_integrated_data(stored_ops).await?;
 
         update_local_authored_status(

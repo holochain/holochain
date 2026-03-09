@@ -1,6 +1,6 @@
 use holo_hash::{AgentPubKey, DnaHash};
 use opentelemetry::{global::meter, metrics, KeyValue};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 pub(crate) struct Histogram {
     histogram: metrics::Histogram<f64>,
@@ -22,11 +22,11 @@ pub(crate) fn create_workflow_duration_metric(
 ) -> WorkflowDurationMetric {
     let mut attributes = vec![
         KeyValue::new("workflow", workflow_name),
-        KeyValue::new("dna_hash", format!("{dna_hash:?}")),
+        KeyValue::new("dna_hash", dna_hash.to_string()),
     ];
 
     if let Some(agent) = agent {
-        attributes.push(KeyValue::new("agent", format!("{agent:?}")));
+        attributes.push(KeyValue::new("agent", agent.to_string()));
     }
 
     let histogram = meter("hc.conductor")
@@ -41,6 +41,19 @@ pub(crate) fn create_workflow_duration_metric(
     }
 }
 
+pub(crate) type IntegratedOpMetric = metrics::Counter<u64>;
+
+static INTEGRATED_OP_METRIC: OnceLock<IntegratedOpMetric> = OnceLock::new();
+
+pub(crate) fn workflow_integrated_op_metric() -> &'static IntegratedOpMetric {
+    INTEGRATED_OP_METRIC.get_or_init(|| {
+        meter("hc.conductor")
+            .u64_counter("hc.conductor.workflow.integrated_ops")
+            .with_description("The number of integrated operations.")
+            .build()
+    })
+}
+
 pub(crate) type WasmUsageMetric = metrics::Counter<u64>;
 
 pub(crate) fn create_ribosome_wasm_usage_metric() -> WasmUsageMetric {
@@ -52,7 +65,7 @@ pub(crate) fn create_ribosome_wasm_usage_metric() -> WasmUsageMetric {
 
 pub(crate) type WasmCallDurationMetric = metrics::Histogram<f64>;
 
-pub fn create_ribosome_wasm_call_duration_metric() -> WasmCallDurationMetric {
+pub(crate) fn create_ribosome_wasm_call_duration_metric() -> WasmCallDurationMetric {
     meter("hc.ribosome.wasm")
         .f64_histogram("hc.ribosome.wasm_call.duration")
         .with_unit("s")
@@ -60,9 +73,9 @@ pub fn create_ribosome_wasm_call_duration_metric() -> WasmCallDurationMetric {
         .build()
 }
 
-pub type ZomeCallDurationMetric = metrics::Histogram<f64>;
+pub(crate) type ZomeCallDurationMetric = metrics::Histogram<f64>;
 
-pub fn create_ribosome_zome_call_duration_metric() -> ZomeCallDurationMetric {
+pub(crate) fn create_ribosome_zome_call_duration_metric() -> ZomeCallDurationMetric {
     meter("hc.ribosome.wasm")
         .f64_histogram("hc.ribosome.zome_call.duration")
         .with_unit("s")
@@ -70,9 +83,9 @@ pub fn create_ribosome_zome_call_duration_metric() -> ZomeCallDurationMetric {
         .build()
 }
 
-pub type HostFnCallDurationMetric = metrics::Histogram<f64>;
+pub(crate) type HostFnCallDurationMetric = metrics::Histogram<f64>;
 
-pub fn create_host_fn_call_duration_metric() -> HostFnCallDurationMetric {
+pub(crate) fn create_host_fn_call_duration_metric() -> HostFnCallDurationMetric {
     meter("hc.ribosome")
         .f64_histogram("hc.ribosome.host_fn_call.duration")
         .with_unit("s")

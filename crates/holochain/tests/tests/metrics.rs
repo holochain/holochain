@@ -147,6 +147,20 @@ async fn metrics() {
         assert!(metric.contains("min="));
     });
 
+    let conductor_workflow_integrated_ops_metric = metrics
+        .clone()
+        .filter(|line| line.contains("hc.conductor.workflow.integrated_ops"));
+    let conductor_workflow_integrated_ops_metric_count = conductor_workflow_integrated_ops_metric.clone().count();
+    // 1 time series per DNA hash, so 1 record per second
+    assert!(
+        conductor_workflow_integrated_ops_metric_count >= expected_records_per_metric,
+        "hc.conductor.workflow.integrated_ops: expected >= {expected_records_per_metric}, got {conductor_workflow_integrated_ops_metric_count}",
+    );
+    conductor_workflow_integrated_ops_metric.for_each(|metric| {
+        assert!(metric.contains("dna_hash="));
+        assert!(metric.contains("sum="));
+    });
+
     let conductor_post_commit_duration = metrics
         .clone()
         .filter(|line| line.contains("hc.conductor.post_commit.duration"));
@@ -170,7 +184,7 @@ async fn metrics() {
         .clone()
         .filter(|line| line.contains("hc.ribosome.wasm.usage"));
     let ribosome_wasm_usage_count = ribosome_wasm_usage.clone().count();
-    // ~10 distinct (dna, zome, fn) timeseries from wasm init + zome calls; assert >= 8
+    // ~10 distinct (dna, zome, fn) time series from wasm init + zome calls; assert >= 8
     assert!(
         ribosome_wasm_usage_count >= expected_records_per_metric * 8,
         "hc.ribosome.wasm.usage: expected >= {}, got {ribosome_wasm_usage_count}",
@@ -187,7 +201,7 @@ async fn metrics() {
         .clone()
         .filter(|line| line.contains("hc.ribosome.zome_call.duration"));
     let ribosome_zome_call_duration_count = ribosome_zome_call_duration.clone().count();
-    // 2 distinct timeseries (create_post, get_post_network), each exported every second
+    // 2 distinct time series (create_post, get_post_network), each exported every second
     assert!(
         ribosome_zome_call_duration_count >= expected_records_per_metric * 2,
         "hc.ribosome.zome_call.duration: expected >= {}, got {ribosome_zome_call_duration_count}",
@@ -207,7 +221,7 @@ async fn metrics() {
         .clone()
         .filter(|line| line.contains("hc.ribosome.wasm_call.duration"));
     let ribosome_wasm_call_duration_count = ribosome_wasm_call_duration.clone().count();
-    // ~10-12 distinct timeseries from all wasm sub-calls; assert >= 8
+    // ~10-12 distinct time series from all wasm sub-calls; assert >= 8
     assert!(
         ribosome_wasm_call_duration_count >= expected_records_per_metric * 8,
         "hc.ribosome.wasm_call.duration: expected >= {}, got {ribosome_wasm_call_duration_count}",
@@ -232,7 +246,7 @@ async fn metrics() {
         .clone()
         .filter(|line| line.contains("hc.ribosome.host_fn_call.duration"));
     let ribosome_host_fn_call_duration_count = ribosome_host_fn_call_duration.clone().count();
-    // ~5-6 distinct (dna, zome, fn, host_fn) timeseries; assert >= 4
+    // ~5-6 distinct (dna, zome, fn, host_fn) time series; assert >= 4
     assert!(
         ribosome_host_fn_call_duration_count >= expected_records_per_metric * 4,
         "hc.ribosome.host_fn_call.duration: expected >= {}, got {ribosome_host_fn_call_duration_count}",
@@ -303,7 +317,7 @@ async fn metrics() {
         .clone()
         .filter(|line| line.contains("hc.holochain_p2p.handle_request.duration"));
     let handle_request_duration_count = handle_request_duration.clone().count();
-    // 2-3 distinct timeseries (GetReq, GetRes, plus validation receipt traffic).
+    // 2-3 distinct time series (GetReq, GetRes, plus validation receipt traffic).
     // Like cascade and request above, these are first recorded when the network call happens,
     // so the effective export window is shorter than seconds_elapsed; assert >= 1.
     assert!(
