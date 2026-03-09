@@ -25,11 +25,12 @@ async fn u64_counter() {
 
     metric.add(1, &[]);
 
-    let result = poll_query(&svc, name, "|> last()", 300, |r| {
-        r.tables.len() == 1 && r.tables[0].rows.len() == 1
+    poll_query(&svc, name, "|> last()", 300, |r| {
+        r.tables.len() == 1
+            && r.tables[0].rows.len() == 1
+            && r.tables[0].get::<u64>(0, "_value") == 1
     })
     .await;
-    assert_eq!(result.tables[0].get::<u64>(0, "_value"), 1);
 
     for _ in 0..5 {
         metric.add(1, &[]);
@@ -39,6 +40,38 @@ async fn u64_counter() {
         r.tables.len() == 1
             && r.tables[0].rows.len() == 1
             && r.tables[0].get::<u64>(0, "_value") == 6
+    })
+    .await;
+
+    svc.shutdown();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn i64_up_down_counter() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (svc, meter_provider) = setup(tmp.path()).await;
+
+    let name = "i64_up_down_counter";
+    let metric = meter_provider
+        .meter("influxive")
+        .i64_up_down_counter(name)
+        .build();
+
+    metric.add(1, &[]);
+
+    poll_query(&svc, name, "|> last()", 300, |r| {
+        r.tables.len() == 1
+            && r.tables[0].rows.len() == 1
+            && r.tables[0].get::<i64>(0, "_value") == 1
+    })
+    .await;
+
+    metric.add(-1, &[]);
+
+    poll_query(&svc, name, "|> last()", 300, |r| {
+        r.tables.len() == 1
+            && r.tables[0].rows.len() == 1
+            && r.tables[0].get::<i64>(0, "_value") == 0
     })
     .await;
 
