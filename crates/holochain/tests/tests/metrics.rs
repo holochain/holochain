@@ -156,70 +156,70 @@ async fn metrics() {
         .clone()
         .filter(|line| line.contains("hc.db.write_txn.duration"))
         .for_each(|metric| {
-        assert!(metric.contains("id="));
-        assert!(metric.contains("kind="));
-        assert!(metric.contains("count="));
-        assert!(metric.contains("sum="));
-        assert!(metric.contains("max="));
-        assert!(metric.contains("min="));
-    });
+            assert!(metric.contains("id="));
+            assert!(metric.contains("kind="));
+            assert!(metric.contains("count="));
+            assert!(metric.contains("sum="));
+            assert!(metric.contains("max="));
+            assert!(metric.contains("min="));
+        });
 
     // conductor metrics
     metrics
         .clone()
         .filter(|line| line.contains("hc.conductor.workflow.duration"))
         .for_each(|metric| {
-        assert!(metric.contains("dna_hash="));
-        assert!(metric.contains("workflow="));
-        assert!(metric.contains("count="));
-        assert!(metric.contains("sum="));
-        assert!(metric.contains("max="));
-        assert!(metric.contains("min="));
-    });
+            assert!(metric.contains("dna_hash="));
+            assert!(metric.contains("workflow="));
+            assert!(metric.contains("count="));
+            assert!(metric.contains("sum="));
+            assert!(metric.contains("max="));
+            assert!(metric.contains("min="));
+        });
 
     metrics
         .clone()
         .filter(|line| line.contains("hc.conductor.workflow.integrated_ops"))
         .for_each(|metric| {
-        assert!(metric.contains("dna_hash="));
-        assert!(metric.contains("sum="));
-    });
+            assert!(metric.contains("dna_hash="));
+            assert!(metric.contains("sum="));
+        });
 
     metrics
         .clone()
         .filter(|line| line.contains("hc.conductor.post_commit.duration"))
         .for_each(|metric| {
-        assert!(metric.contains("dna_hash="));
-        assert!(metric.contains("agent="));
-        assert!(metric.contains("count="));
-        assert!(metric.contains("sum="));
-        assert!(metric.contains("max="));
-        assert!(metric.contains("min="));
-    });
+            assert!(metric.contains("dna_hash="));
+            assert!(metric.contains("agent="));
+            assert!(metric.contains("count="));
+            assert!(metric.contains("sum="));
+            assert!(metric.contains("max="));
+            assert!(metric.contains("min="));
+        });
 
     // Ribosome metrics
     metrics
         .clone()
         .filter(|line| line.contains("hc.ribosome.wasm.usage"))
         .for_each(|metric| {
-        assert!(metric.contains("dna_hash="));
-        assert!(metric.contains("zome="));
-        assert!(metric.contains("fn="));
-        assert!(metric.contains("sum="));
-    });
+            assert!(metric.contains("dna_hash="));
+            assert!(metric.contains("zome="));
+            assert!(metric.contains("fn="));
+            assert!(metric.contains("sum="));
+        });
 
     metrics
         .clone()
         .filter(|line| line.contains("hc.ribosome.zome_call.duration"))
         .for_each(|metric| {
-        assert!(metric.contains("dna_hash="));
-        assert!(metric.contains("zome=create_entry") || metric.contains("zome=emit_signal"));
-        assert!(metric.contains("fn="));
-        assert!(metric.contains("count="));
-        assert!(metric.contains("sum="));
-        assert!(metric.contains("max="));
-        assert!(metric.contains("min="));
-    });
+            assert!(metric.contains("dna_hash="));
+            assert!(metric.contains("zome=create_entry") || metric.contains("zome=emit_signal"));
+            assert!(metric.contains("fn="));
+            assert!(metric.contains("count="));
+            assert!(metric.contains("sum="));
+            assert!(metric.contains("max="));
+            assert!(metric.contains("min="));
+        });
 
     let mut ribosome_wasm_call_duration = metrics
         .clone()
@@ -269,63 +269,65 @@ async fn metrics() {
         .clone()
         .filter(|line| line.contains("hc.ribosome.host_fn.emit_signal.count"))
         .for_each(|metric| {
-        assert!(metric.contains(&format!("cell_id={cell_id_influx}")));
-        assert!(metric.contains("zome=emit_signal"));
-        assert!(metric.contains("sum="));
-    });
+            assert!(metric.contains(&format!("cell_id={cell_id_influx}")));
+            assert!(metric.contains("zome=emit_signal"));
+            // Assert that emit signal was recorded.
+            assert!(metric.contains("sum=1u"));
+        });
 
     metrics
         .clone()
         .filter(|line| line.contains("hc.ribosome.host_fn.send_remote_signal.count"))
         .for_each(|metric| {
-        assert!(metric.contains("dna_hash="));
-        assert!(metric.contains("zome=emit_signal"));
-        assert!(metric.contains("sum="));
-    });
+            assert!(metric.contains("dna_hash="));
+            assert!(metric.contains("zome=emit_signal"));
+            // Assert that remote signal send was recorded.
+            assert!(metric.contains("sum=1u"));
+        });
 
     // cascade metrics
     metrics
         .clone()
         .filter(|line| line.contains("hc.cascade.duration"))
         .for_each(|metric| {
-        // All cascade calls should have been made by the zome calls.
-        assert!(metric.contains("zome=create_entry"));
-        assert!(metric.contains("fn=get_post_network"));
-        assert!(metric.contains("count="));
-        assert!(metric.contains("sum="));
-        assert!(metric.contains("max="));
-        assert!(metric.contains("min="));
-    });
+            // All cascade calls should have been made by the zome calls.
+            assert!(metric.contains("zome=create_entry"));
+            assert!(metric.contains("fn=get_post_network"));
+            assert!(metric.contains("count="));
+            assert!(metric.contains("sum="));
+            assert!(metric.contains("max="));
+            assert!(metric.contains("min="));
+        });
 
     // holochain_p2p metrics
     metrics
         .clone()
         .filter(|line| line.contains("hc.holochain_p2p.request.duration"))
         .for_each(|metric| {
-        assert!(metric.contains("dna_hash="));
-        assert!(metric.contains("tag="));
-        assert!(metric.contains("url="));
-        assert!(metric.contains("error="));
-        // All network requests should have been made by the zome calls.
-        assert!(metric.contains("zome=create_entry"));
-        assert!(metric.contains("fn=get_post_network"));
-        assert!(metric.contains("count="));
-        assert!(metric.contains("sum="));
-        assert!(metric.contains("max="));
-        assert!(metric.contains("min="));
-    });
+            assert!(metric.contains("dna_hash="));
+            assert!(metric.contains("tag="));
+            assert!(metric.contains("url="));
+            assert!(metric.contains("error="));
+            // All network requests should have been made by the zome calls.
+            assert!(metric.contains("zome=create_entry"));
+            assert!(metric.contains("fn=get_post_network"));
+            assert!(metric.contains("count="));
+            assert!(metric.contains("sum="));
+            assert!(metric.contains("max="));
+            assert!(metric.contains("min="));
+        });
 
     metrics
         .clone()
         .filter(|line| line.contains("hc.holochain_p2p.handle_request.duration"))
         .for_each(|metric| {
-        assert!(metric.contains("message_type="));
-        assert!(metric.contains("dna_hash="));
-        assert!(metric.contains("count="));
-        assert!(metric.contains("sum="));
-        assert!(metric.contains("max="));
-        assert!(metric.contains("min="));
-    });
+            assert!(metric.contains("message_type="));
+            assert!(metric.contains("dna_hash="));
+            assert!(metric.contains("count="));
+            assert!(metric.contains("sum="));
+            assert!(metric.contains("max="));
+            assert!(metric.contains("min="));
+        });
 
     // hc.holochain_p2p.handle_request.ignored can't be easily tested, because
     // it records a metric only when concurrent requests are handled and one
@@ -335,7 +337,8 @@ async fn metrics() {
         .clone()
         .filter(|line| line.contains("hc.holochain_p2p.recv_remote_signal.count"))
         .for_each(|metric| {
-        assert!(metric.contains("dna_hash="));
-        assert!(metric.contains("sum="));
-    });
+            assert!(metric.contains("dna_hash="));
+            // Assert that received remote signal was recorded.
+            assert!(metric.contains("sum=1u"));
+        });
 }

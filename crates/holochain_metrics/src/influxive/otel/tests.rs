@@ -60,12 +60,8 @@ async fn f64_histogram() {
 
     // Influx writes u64 values into one table and f64 values into another table.
     // Hence, 2 tables are expected to be present.
-    let result = poll_query(&svc, name, "", 300, |r| {
-        r.tables.len() == 2
-            && !r.tables[0].rows.is_empty()
-            && r.tables[0].rows.len() <= 3
-            && r.tables[1].rows.len() >= 3
-            && r.tables[1].rows.len() <= 5
+    let result = poll_query(&svc, name, "|> last()", 300, |r| {
+        r.tables.len() == 2 && r.tables[0].rows.len() == 1 && r.tables[1].rows.len() == 3
     })
     .await;
 
@@ -86,10 +82,7 @@ async fn f64_histogram() {
         metric.record(f64::from(i), &[]);
     }
 
-    // Expect two rows now per field value, with the updated count visible.
-    // It could happen that the first table contains a second line with
-    // the initial value of 1, so keep polling until the expected count
-    // 11 shows up.
+    // Keep polling until the expected counts 11 and 9.0 show up.
     let result = poll_query(&svc, name, "|> last()", 400, |r| {
         r.tables.len() == 2
             && r.tables[0].rows.len() == 1
