@@ -1,4 +1,4 @@
-use crate::core::metrics::{emit_signal_metric, send_remote_signal_metric};
+use crate::core::metrics::send_remote_signal_metric;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;

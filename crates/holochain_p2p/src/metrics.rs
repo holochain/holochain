@@ -1,4 +1,3 @@
-use holo_hash::DnaHash;
 use opentelemetry::global::meter;
 use opentelemetry::metrics;
 use opentelemetry::metrics::{Counter, Histogram};
