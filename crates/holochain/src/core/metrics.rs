@@ -105,3 +105,16 @@ pub(crate) fn emit_signal_metric() -> &'static EmitSignalMetric {
             .build()
     })
 }
+
+pub(crate) type SendRemoteSignalMetric = metrics::Counter<u64>;
+
+static SEND_REMOTE_SIGNAL_METRIC: OnceLock<SendRemoteSignalMetric> = OnceLock::new();
+
+pub(crate) fn send_remote_signal_metric() -> &'static SendRemoteSignalMetric {
+    SEND_REMOTE_SIGNAL_METRIC.get_or_init(|| {
+        meter("hc.ribosome")
+            .u64_counter("hc.ribosome.host_fn.send_remote_signal.count")
+            .with_description("The number of remote signals sent.")
+            .build()
+    })
+}

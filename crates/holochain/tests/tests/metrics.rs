@@ -1,8 +1,10 @@
 use hdk::prelude::Record;
 use holo_hash::ActionHash;
+use holochain::prelude::ExternIO;
 use holochain::sweettest::{SweetConductorBatch, SweetConductorConfig, SweetDnaFile};
 use holochain_metrics::HolochainMetricsConfig;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::prelude::RemoteSignal;
 use serde::Serialize;
 use std::fs::read_to_string;
 use std::time::{Duration, Instant};
@@ -17,6 +19,8 @@ use std::time::{Duration, Instant};
 // - hc.ribosome.zome_call.duration
 // - hc.ribosome.wasm_call.duration
 // - hc.ribosome.host_fn_call.duration
+// - hc.ribosome.host_fn.emit_signal.count
+// - hc.ribosome.host_fn.send_remote_signal.count
 // - hc.cascade.duration
 // - hc.holochain_p2p.request.duration
 // - hc.holochain_p2p.handle_request.duration
@@ -82,6 +86,17 @@ async fn metrics() {
     let _signal_rx = alice_conductor.subscribe_to_app_signals("test_app".to_string());
     let _: () = alice_conductor
         .call(&alice_emit_signal_zome, "emit", ())
+        .await;
+    // Alice sends a remote signal.
+    let _: () = alice_conductor
+        .call(
+            &alice_emit_signal_zome,
+            "signal_others",
+            RemoteSignal {
+                agents: vec![bob_cell.agent_pubkey().clone()],
+                signal: ExternIO::encode(()).unwrap(),
+            },
+        )
         .await;
 
     // Wait for metrics to be written.
@@ -299,14 +314,15 @@ async fn metrics() {
         |metric| metric.contains("zome=create_entry") && metric.contains("fn=get_post_network")
     ));
 
-    let ribosome_emit_signal_count = metrics
+    // Signals
+    let ribosome_emit_signal = metrics
         .clone()
         .filter(|line| line.contains("hc.ribosome.host_fn.emit_signal.count"));
-    let ribosome_emit_signal_count_count = ribosome_emit_signal_count.clone().count();
+    let ribosome_emit_signal_count = ribosome_emit_signal.clone().count();
     // 1 signal emitted
     assert!(
-        ribosome_emit_signal_count_count >= 1,
-        "hc.ribosome.host_fn.emit_signal.count: expected >= 1, got {ribosome_emit_signal_count_count}",
+        ribosome_emit_signal_count >= 1,
+        "hc.ribosome.host_fn.emit_signal.count: expected >= 1, got {ribosome_emit_signal_count}",
     );
     // In influx line protocol, tag values escape commas and spaces with backslashes.
     let cell_id_influx = alice_cell
@@ -314,8 +330,23 @@ async fn metrics() {
         .to_string()
         .replace(',', "\\,")
         .replace(' ', "\\ ");
-    ribosome_emit_signal_count.clone().for_each(|metric| {
+    ribosome_emit_signal.clone().for_each(|metric| {
         assert!(metric.contains(&format!("cell_id={cell_id_influx}")));
+        assert!(metric.contains("zome=emit_signal"));
+        assert!(metric.contains("sum="));
+    });
+
+    let ribosome_send_remote_signal = metrics
+        .clone()
+        .filter(|line| line.contains("hc.ribosome.host_fn.send_remote_signal.count"));
+    let ribosome_send_remote_signal_count = ribosome_send_remote_signal.clone().count();
+    // 1 remote signal sent
+    assert!(
+        ribosome_send_remote_signal_count >= 1,
+        "hc.ribosome.host_fn.send_remote_signal.count: expected >= 1, got {ribosome_send_remote_signal_count}",
+    );
+    ribosome_send_remote_signal.clone().for_each(|metric| {
+        assert!(metric.contains("dna_hash="));
         assert!(metric.contains("zome=emit_signal"));
         assert!(metric.contains("sum="));
     });

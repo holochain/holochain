@@ -101,6 +101,11 @@
 //! | `hc.ribosome.zome_call.duration` |
 //! | `hc.ribosome.wasm_call.duration` |
 //! | `hc.ribosome.host_fn_call.duration` |
+//! | `hc.ribosome.host_fn.emit_signal.count` |
+//! | `hc.ribosome.host_fn.send_remote_signal.count` |
+//! | `hc.cascade.duration` |
+//! | `hc.holochain_p2p.request.duration` |
+//! | `hc.holochain_p2p.handle_request.duration` |
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
