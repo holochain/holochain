@@ -24,6 +24,7 @@ use std::time::{Duration, Instant};
 // - hc.cascade.duration
 // - hc.holochain_p2p.request.duration
 // - hc.holochain_p2p.handle_request.duration
+// - hc.holochain_p2p.recv_remote_signal.count
 #[tokio::test(flavor = "multi_thread")]
 async fn metrics() {
     let tmp_file = tempfile::tempdir().unwrap();
@@ -87,7 +88,7 @@ async fn metrics() {
     let _: () = alice_conductor
         .call(&alice_emit_signal_zome, "emit", ())
         .await;
-    // Alice sends a remote signal.
+    // Alice sends a remote signal to Bob.
     let _: () = alice_conductor
         .call(
             &alice_emit_signal_zome,
@@ -101,7 +102,7 @@ async fn metrics() {
 
     // Wait for metrics to be written.
     // Wait at least for 1 export.
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_secs(5)).await;
     // Then wait until certain metrics are exported.
     let metrics = tokio::time::timeout(Duration::from_secs(5), async {
         loop {
@@ -110,6 +111,7 @@ async fn metrics() {
                 .matches("hc.holochain_p2p.handle_request.duration")
                 .count()
                 >= 2
+                && metrics.contains("hc.holochain_p2p.recv_remote_signal.count")
             {
                 return metrics;
             }
@@ -419,4 +421,18 @@ async fn metrics() {
     // hc.holochain_p2p.handle_request.ignored can't be easily tested, because
     // it records a metric only when concurrent requests are handled and one
     // of them is dropped.
+
+    let receive_remote_signal = metrics
+        .clone()
+        .filter(|line| line.contains("hc.holochain_p2p.recv_remote_signal.count"));
+    let receive_remote_signal_count = receive_remote_signal.clone().count();
+    // 1 received remote signal
+    assert!(
+        receive_remote_signal_count >= 1,
+        "hc.holochain_p2p.recv_remote_signal.count: expected >= 1, got {receive_remote_signal_count}",
+    );
+    receive_remote_signal.for_each(|metric| {
+        assert!(metric.contains("dna_hash="));
+        assert!(metric.contains("sum="));
+    });
 }

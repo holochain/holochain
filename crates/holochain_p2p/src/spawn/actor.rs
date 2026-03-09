@@ -4,6 +4,7 @@ use crate::actor::{GetLinksRequestOptions, NetworkRequestOptions};
 use crate::metrics::{
     create_p2p_handle_incoming_request_duration_metric,
     create_p2p_handle_incoming_request_ignored_metric, create_p2p_outgoing_request_duration_metric,
+    create_p2p_recv_remote_signal_metric,
 };
 use crate::*;
 use holochain_sqlite::error::{DatabaseError, DatabaseResult};
@@ -249,6 +250,7 @@ pub(crate) struct HolochainP2pActor {
     outgoing_request_duration_metric: metrics::P2pRequestDurationMetric,
     incoming_request_duration_metric: metrics::P2pRequestDurationMetric,
     incoming_request_ignored_metric: metrics::P2pRequestIgnoredMetric,
+    recv_remote_signal_metric: metrics::P2pRecvRemoteSignalMetric,
     pruning_task_abort_handle: AbortHandle,
     request_timeout: Duration,
     incoming_request_concurrency_limit_semaphore: Arc<Semaphore>,
@@ -636,6 +638,7 @@ impl HolochainP2pActor {
             outgoing_request_duration_metric: create_p2p_outgoing_request_duration_metric(),
             incoming_request_duration_metric: create_p2p_handle_incoming_request_duration_metric(),
             incoming_request_ignored_metric: create_p2p_handle_incoming_request_ignored_metric(),
+            recv_remote_signal_metric: create_p2p_recv_remote_signal_metric(),
             pruning_task_abort_handle,
             request_timeout: config.request_timeout,
             incoming_request_concurrency_limit_semaphore: Arc::new(Semaphore::new(
@@ -992,7 +995,8 @@ impl HolochainP2pActor {
         let kitsune = self.kitsune.clone();
         let pending = self.pending.clone();
         let this = self.this.clone();
-        let duration_metric = self.incoming_request_duration_metric.clone();
+        let incoming_request_duration_metric = self.incoming_request_duration_metric.clone();
+        let recv_remote_signal_metric = self.recv_remote_signal_metric.clone();
         tokio::task::spawn(async move {
             use crate::event::HcP2pHandler;
             use crate::wire::WireMessage::*;
@@ -1004,16 +1008,18 @@ impl HolochainP2pActor {
             let dna_hash = DnaHash::from_k2_space(&space_id);
             let dna_hash_cloned = dna_hash.clone();
             let message_type = msg.as_ref().to_string();
-            let record_metric = |additional_attributes: &[opentelemetry::KeyValue]| {
-                let mut attributes = Vec::with_capacity(additional_attributes.len() + 2);
-                attributes.push(opentelemetry::KeyValue::new("message_type", message_type));
-                attributes.push(opentelemetry::KeyValue::new(
-                    "dna_hash",
-                    format!("{dna_hash_cloned:?}"),
-                ));
-                attributes.extend_from_slice(additional_attributes);
-                duration_metric.record(start.elapsed().as_secs_f64(), &attributes);
-            };
+            let record_incoming_request_duration =
+                |additional_attributes: &[opentelemetry::KeyValue]| {
+                    let mut attributes = Vec::with_capacity(additional_attributes.len() + 2);
+                    attributes.push(opentelemetry::KeyValue::new("message_type", message_type));
+                    attributes.push(opentelemetry::KeyValue::new(
+                        "dna_hash",
+                        format!("{dna_hash_cloned:?}"),
+                    ));
+                    attributes.extend_from_slice(additional_attributes);
+                    incoming_request_duration_metric
+                        .record(start.elapsed().as_secs_f64(), &attributes);
+                };
             match msg {
                 ErrorRes { msg_id, .. }
                 | CallRemoteRes { msg_id, .. }
@@ -1026,7 +1032,7 @@ impl HolochainP2pActor {
                     if let Some(resp) = pending.lock().unwrap().respond(msg_id) {
                         let _ = resp.send(msg);
                     }
-                    record_metric(&[]);
+                    record_incoming_request_duration(&[]);
                 }
                 CallRemoteReq {
                     msg_id,
@@ -1062,7 +1068,7 @@ impl HolochainP2pActor {
                     } else {
                         tracing::debug!("HolochainP2pActor has been dropped");
                     }
-                    record_metric(&[opentelemetry::KeyValue::new(
+                    record_incoming_request_duration(&[opentelemetry::KeyValue::new(
                         "to_agent",
                         format!("{to_agent:?}"),
                     )]);
@@ -1094,7 +1100,7 @@ impl HolochainP2pActor {
                     {
                         tracing::debug!(?err, "Error sending get response");
                     }
-                    record_metric(&[opentelemetry::KeyValue::new(
+                    record_incoming_request_duration(&[opentelemetry::KeyValue::new(
                         "to_agent",
                         format!("{to_agent:?}"),
                     )]);
@@ -1127,7 +1133,7 @@ impl HolochainP2pActor {
                     {
                         tracing::debug!(?err, "Error sending get_links response");
                     }
-                    record_metric(&[opentelemetry::KeyValue::new(
+                    record_incoming_request_duration(&[opentelemetry::KeyValue::new(
                         "to_agent",
                         format!("{to_agent:?}"),
                     )]);
@@ -1159,7 +1165,7 @@ impl HolochainP2pActor {
                     {
                         tracing::debug!(?err, "Error sending count_links response");
                     }
-                    record_metric(&[opentelemetry::KeyValue::new(
+                    record_incoming_request_duration(&[opentelemetry::KeyValue::new(
                         "to_agent",
                         format!("{to_agent:?}"),
                     )]);
@@ -1199,7 +1205,7 @@ impl HolochainP2pActor {
                     {
                         tracing::debug!(?err, "Error sending get_agent_activity response");
                     }
-                    record_metric(&[
+                    record_incoming_request_duration(&[
                         opentelemetry::KeyValue::new("to_agent", format!("{to_agent:?}")),
                         opentelemetry::KeyValue::new("agent", format!("{agent:?}")),
                     ]);
@@ -1237,7 +1243,7 @@ impl HolochainP2pActor {
                     {
                         tracing::debug!(?err, "Error sending must_get_agent_activity response");
                     }
-                    record_metric(&[
+                    record_incoming_request_duration(&[
                         opentelemetry::KeyValue::new("to_agent", format!("{to_agent:?}")),
                         opentelemetry::KeyValue::new("agent", format!("{agent:?}")),
                     ]);
@@ -1269,7 +1275,7 @@ impl HolochainP2pActor {
                     {
                         tracing::debug!(?err, "Error sending send_validation_receipts response");
                     }
-                    record_metric(&[opentelemetry::KeyValue::new(
+                    record_incoming_request_duration(&[opentelemetry::KeyValue::new(
                         "to_agent",
                         format!("{to_agent:?}"),
                     )]);
@@ -1285,16 +1291,23 @@ impl HolochainP2pActor {
                         .get()
                         .ok_or_else(|| HolochainP2pError::other(EVT_REG_ERR))?
                         .handle_call_remote(
-                            dna_hash,
+                            dna_hash.clone(),
                             to_agent.clone(),
                             zome_call_params_serialized,
                             signature,
                         )
                         .await;
-                    record_metric(&[opentelemetry::KeyValue::new(
+                    record_incoming_request_duration(&[opentelemetry::KeyValue::new(
                         "to_agent",
                         format!("{to_agent:?}"),
                     )]);
+                    recv_remote_signal_metric.add(
+                        1,
+                        &[opentelemetry::KeyValue::new(
+                            "dna_hash",
+                            dna_hash.to_string(),
+                        )],
+                    );
                 }
                 PublishCountersignEvt { op } => {
                     evt_sender
@@ -1302,7 +1315,7 @@ impl HolochainP2pActor {
                         .ok_or_else(|| HolochainP2pError::other(EVT_REG_ERR))?
                         .handle_publish_countersign(dna_hash, op)
                         .await?;
-                    record_metric(&[]);
+                    record_incoming_request_duration(&[]);
                 }
                 CountersigningSessionNegotiationEvt { to_agent, message } => {
                     evt_sender
@@ -1314,7 +1327,7 @@ impl HolochainP2pActor {
                             message,
                         )
                         .await?;
-                    record_metric(&[opentelemetry::KeyValue::new(
+                    record_incoming_request_duration(&[opentelemetry::KeyValue::new(
                         "to_agent",
                         format!("{to_agent:?}"),
                     )]);

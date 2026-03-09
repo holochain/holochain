@@ -106,6 +106,7 @@
 //! | `hc.cascade.duration` |
 //! | `hc.holochain_p2p.request.duration` |
 //! | `hc.holochain_p2p.handle_request.duration` |
+//! | `hc.holochain_p2p.recv_remote_signal.count` |
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;

@@ -1,4 +1,6 @@
+use holo_hash::DnaHash;
 use opentelemetry::global::meter;
+use opentelemetry::metrics;
 use opentelemetry::metrics::{Counter, Histogram};
 
 /// A histogram metric for measuring the duration of p2p requests.
@@ -31,5 +33,16 @@ pub fn create_p2p_handle_incoming_request_ignored_metric() -> P2pRequestIgnoredM
         .u64_counter("hc.holochain_p2p.handle_request.ignored")
         .with_unit("requests")
         .with_description("The number of incoming p2p requests that have been ignored.")
+        .build()
+}
+
+/// A counter metric for counting received remote signals.
+pub type P2pRecvRemoteSignalMetric = metrics::Counter<u64>;
+
+/// Create a new counter metric for counting received remote signals.
+pub fn create_p2p_recv_remote_signal_metric() -> P2pRecvRemoteSignalMetric {
+    meter("hc.holochain_p2p")
+        .u64_counter("hc.holochain_p2p.recv_remote_signal.count")
+        .with_description("The number of remote signals received.")
         .build()
 }
