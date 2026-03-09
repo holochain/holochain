@@ -11,6 +11,7 @@ use std::time::{Duration, Instant};
 // - hc.db.connections.use_time
 // - hc.db.write_txn.duration
 // - hc.conductor.workflow.duration
+// - hc.conductor.workflow.integrated_ops
 // - hc.conductor.post_commit.duration
 // - hc.ribosome.wasm.usage
 // - hc.ribosome.zome_call.duration
@@ -30,7 +31,9 @@ async fn metrics() {
     #[derive(Debug, Serialize)]
     struct Post(pub String);
 
-    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+    // One wasm for creating entries and one for signaling.
+    let (dna_file, _, _) =
+        SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create, TestWasm::EmitSignal]).await;
     // Disable gossip and publish to make the network calls deterministic.
     let mut conductors = SweetConductorBatch::from_config_rendezvous(
         2,
@@ -46,9 +49,10 @@ async fn metrics() {
     let bob_conductor = conductors.get(1).unwrap();
     let cells = apps.cells_flattened();
     let alice_cell = cells.first().unwrap();
-    let alice_zome = alice_cell.zome(TestWasm::Create.coordinator_zome());
+    let alice_create_entry_zome = alice_cell.zome(TestWasm::Create.coordinator_zome());
+    let alice_emit_signal_zome = alice_cell.zome(TestWasm::EmitSignal.coordinator_zome());
     let bob_cell = cells.get(1).unwrap();
-    let bob_zome = bob_cell.zome(TestWasm::Create.coordinator_zome());
+    let bob_create_entry_zome = bob_cell.zome(TestWasm::Create.coordinator_zome());
 
     // Alice needs to answer Bob's get request, so she declares full storage arcs.
     alice_conductor
@@ -60,18 +64,38 @@ async fn metrics() {
 
     // Alice creates an entry to record zome call metrics.
     let create_entry_hash: ActionHash = alice_conductor
-        .call(&alice_zome, "create_post", Post("test".to_string()))
+        .call(
+            &alice_create_entry_zome,
+            "create_post",
+            Post("test".to_string()),
+        )
         .await;
     // Bob gets Alice's entry to record network request metrics.
     let _: Option<Record> = bob_conductor
-        .call(&bob_zome, "get_post_network", create_entry_hash.clone())
+        .call(
+            &bob_create_entry_zome,
+            "get_post_network",
+            create_entry_hash.clone(),
+        )
+        .await;
+    // Alice emits a signal. For that to record a metric, a subscriber needs to be connected.
+    let _signal_rx = alice_conductor.subscribe_to_app_signals("test_app".to_string());
+    let _: () = alice_conductor
+        .call(&alice_emit_signal_zome, "emit", ())
         .await;
 
     // Wait for metrics to be written.
+    // Wait at least for 1 export.
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    // Then wait until certain metrics are exported.
     let metrics = tokio::time::timeout(Duration::from_secs(5), async {
         loop {
             let metrics = read_to_string(&influxive_file).unwrap_or_default();
-            if metrics.contains("hc.holochain_p2p.handle_request.duration") {
+            if metrics
+                .matches("hc.holochain_p2p.handle_request.duration")
+                .count()
+                >= 2
+            {
                 return metrics;
             }
             tokio::time::sleep(Duration::from_millis(500)).await;
@@ -197,7 +221,7 @@ async fn metrics() {
         expected_records_per_metric * 4
     );
     ribosome_wasm_usage.for_each(|metric| {
-        assert!(metric.contains("dna="));
+        assert!(metric.contains("dna_hash="));
         assert!(metric.contains("zome="));
         assert!(metric.contains("fn="));
         assert!(metric.contains("sum="));
@@ -207,15 +231,16 @@ async fn metrics() {
         .clone()
         .filter(|line| line.contains("hc.ribosome.zome_call.duration"));
     let ribosome_zome_call_duration_count = ribosome_zome_call_duration.clone().count();
-    // 2 distinct time series (create_post, get_post_network), each exported every second
+    // At least 1 time series (create_post) exported every second.
+    // get_post_network may happen late (after wasm compilation), so its time series may
+    // have fewer exports — don't require both for the full duration.
     assert!(
-        ribosome_zome_call_duration_count >= expected_records_per_metric * 2,
-        "hc.ribosome.zome_call.duration: expected >= {}, got {ribosome_zome_call_duration_count}",
-        expected_records_per_metric * 2
+        ribosome_zome_call_duration_count >= expected_records_per_metric,
+        "hc.ribosome.zome_call.duration: expected >= {expected_records_per_metric}, got {ribosome_zome_call_duration_count}",
     );
     ribosome_zome_call_duration.for_each(|metric| {
-        assert!(metric.contains("dna="));
-        assert!(metric.contains("zome=create_entry"));
+        assert!(metric.contains("dna_hash="));
+        assert!(metric.contains("zome=create_entry") || metric.contains("zome=emit_signal"));
         assert!(metric.contains("fn="));
         assert!(metric.contains("count="));
         assert!(metric.contains("sum="));
@@ -234,7 +259,7 @@ async fn metrics() {
         expected_records_per_metric * 4
     );
     ribosome_wasm_call_duration.clone().for_each(|metric| {
-        assert!(metric.contains("dna="));
+        assert!(metric.contains("dna_hash="));
         assert!(metric.contains("zome="));
         assert!(metric.contains("fn="));
         assert!(metric.contains("count="));
@@ -259,7 +284,7 @@ async fn metrics() {
         expected_records_per_metric * 4
     );
     ribosome_host_fn_call_duration.clone().for_each(|metric| {
-        assert!(metric.contains("dna="));
+        assert!(metric.contains("dna_hash="));
         assert!(metric.contains("zome="));
         assert!(metric.contains("fn="));
         assert!(metric.contains("host_fn="));
@@ -273,6 +298,27 @@ async fn metrics() {
     assert!(ribosome_host_fn_call_duration.any(
         |metric| metric.contains("zome=create_entry") && metric.contains("fn=get_post_network")
     ));
+
+    let ribosome_emit_signal_count = metrics
+        .clone()
+        .filter(|line| line.contains("hc.ribosome.host_fn.emit_signal.count"));
+    let ribosome_emit_signal_count_count = ribosome_emit_signal_count.clone().count();
+    // 1 signal emitted
+    assert!(
+        ribosome_emit_signal_count_count >= 1,
+        "hc.ribosome.host_fn.emit_signal.count: expected >= 1, got {ribosome_emit_signal_count_count}",
+    );
+    // In influx line protocol, tag values escape commas and spaces with backslashes.
+    let cell_id_influx = alice_cell
+        .cell_id()
+        .to_string()
+        .replace(',', "\\,")
+        .replace(' ', "\\ ");
+    ribosome_emit_signal_count.clone().for_each(|metric| {
+        assert!(metric.contains(&format!("cell_id={cell_id_influx}")));
+        assert!(metric.contains("zome=emit_signal"));
+        assert!(metric.contains("sum="));
+    });
 
     // cascade metrics
     let cascade_duration = metrics

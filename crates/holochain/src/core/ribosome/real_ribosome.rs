@@ -218,7 +218,11 @@ impl HostFnBuilder {
                         let result = match env.consume_bytes_from_guest(&mut store_mut, guest_ptr, len) {
                             Ok(input) => {
                                 let attributes = vec![
-                                    opentelemetry::KeyValue::new("dna", ribosome_arc.dna_file.dna_def_hashed().hash.to_string()),opentelemetry::KeyValue::new("zome", context_arc.zome.name.to_string()), opentelemetry::KeyValue::new("fn", context_arc.function_name().to_string()),opentelemetry::KeyValue::new("host_fn", host_function_name_clone.clone())];
+                                    opentelemetry::KeyValue::new("dna_hash", ribosome_arc.dna_file.dna_def_hashed().hash.to_string()),
+                                    opentelemetry::KeyValue::new("zome", context_arc.zome.name.to_string()),
+                                    opentelemetry::KeyValue::new("fn", context_arc.function_name().to_string()),
+                                    opentelemetry::KeyValue::new("host_fn", host_function_name_clone.clone())
+                                ];
                                 let start = std::time::Instant::now();
                                 let result = host_function(Arc::clone(&ribosome_arc), context_arc, input);
                                 let elapsed = start.elapsed().as_secs_f64();
@@ -730,7 +734,10 @@ impl RealRibosome {
         fn_name: FunctionName,
     ) -> Result<Option<ExternIO>, RibosomeError> {
         let mut attributes = vec![
-            opentelemetry::KeyValue::new("dna", self.dna_file.dna_def_hashed().hash.to_string()),
+            opentelemetry::KeyValue::new(
+                "dna_hash",
+                self.dna_file.dna_def_hashed().hash.to_string(),
+            ),
             opentelemetry::KeyValue::new("zome", zome.zome_name().to_string()),
             opentelemetry::KeyValue::new("fn", fn_name.to_string()),
         ];
@@ -1029,7 +1036,10 @@ impl RibosomeT for RealRibosome {
 
         let start = std::time::Instant::now();
         let attributes = vec![
-            opentelemetry::KeyValue::new("dna", self.dna_file.dna_def_hashed().hash.to_string()),
+            opentelemetry::KeyValue::new(
+                "dna_hash",
+                self.dna_file.dna_def_hashed().hash.to_string(),
+            ),
             opentelemetry::KeyValue::new("zome", zome_name.to_string()),
             opentelemetry::KeyValue::new("fn", fn_name.to_string()),
         ];

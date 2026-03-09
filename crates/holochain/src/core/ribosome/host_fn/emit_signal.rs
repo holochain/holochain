@@ -1,3 +1,4 @@
+use crate::core::metrics::emit_signal_metric;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
@@ -30,17 +31,32 @@ pub fn emit_signal(
                     .clone(),
             );
             let signal = Signal::App {
-                cell_id,
+                cell_id: cell_id.clone(),
                 zome_name: call_context.zome.zome_name().clone(),
                 signal: input,
             };
-            call_context
+            let result = call_context
                 .host_context()
                 .signal_tx()
                 .send(signal)
                 // Only possible error here is a `SendError` which is expected if no clients are
                 // connected and listening.
                 .ok();
+
+            // Record emitted signal
+            if result.is_some() {
+                emit_signal_metric().add(
+                    1,
+                    &[
+                        opentelemetry::KeyValue::new("cell_id", cell_id.to_string()),
+                        opentelemetry::KeyValue::new(
+                            "zome",
+                            call_context.zome.zome_name().to_string(),
+                        ),
+                    ],
+                );
+            }
+
             Ok(())
         }
         _ => Err(wasm_error!(WasmErrorInner::Host(

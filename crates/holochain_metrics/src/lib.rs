@@ -95,6 +95,7 @@
 //! | `hc.db.connections.use_time` |
 //! | `hc.db.write_txn.duration` |
 //! | `hc.conductor.workflow.duration` |
+//! | `hc.conductor.workflow.integrated_ops` |
 //! | `hc.conductor.post_commit.duration` |
 //! | `hc.ribosome.wasm.usage` |
 //! | `hc.ribosome.zome_call.duration` |

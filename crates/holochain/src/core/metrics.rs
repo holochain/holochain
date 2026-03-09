@@ -92,3 +92,16 @@ pub(crate) fn create_host_fn_call_duration_metric() -> HostFnCallDurationMetric 
         .with_description("The time spent executing a host function call.")
         .build()
 }
+
+pub(crate) type EmitSignalMetric = metrics::Counter<u64>;
+
+static EMIT_SIGNAL_METRIC: OnceLock<EmitSignalMetric> = OnceLock::new();
+
+pub(crate) fn emit_signal_metric() -> &'static EmitSignalMetric {
+    EMIT_SIGNAL_METRIC.get_or_init(|| {
+        meter("hc.ribosome")
+            .u64_counter("hc.ribosome.host_fn.emit_signal.count")
+            .with_description("The number of local signals emitted.")
+            .build()
+    })
+}
