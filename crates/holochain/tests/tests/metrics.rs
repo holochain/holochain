@@ -70,10 +70,17 @@ async fn metrics() {
         .await;
 
     // Wait for metrics to be written and buffered metrics to be flushed.
-    tokio::time::sleep(Duration::from_secs(3)).await;
-
-    // Read metrics from file
-    let metrics = read_to_string(influxive_file).unwrap();
+    let metrics = tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let metrics = read_to_string(&influxive_file).unwrap_or_default();
+            if metrics.contains("hc.holochain_p2p.handle_request.duration") {
+                return metrics;
+            }
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+    })
+    .await
+    .expect("timed out waiting for metrics export");
     println!("{metrics}");
     let metrics = metrics.lines();
 
@@ -150,7 +157,8 @@ async fn metrics() {
     let conductor_workflow_integrated_ops_metric = metrics
         .clone()
         .filter(|line| line.contains("hc.conductor.workflow.integrated_ops"));
-    let conductor_workflow_integrated_ops_metric_count = conductor_workflow_integrated_ops_metric.clone().count();
+    let conductor_workflow_integrated_ops_metric_count =
+        conductor_workflow_integrated_ops_metric.clone().count();
     // 1 time series per DNA hash, so 1 record per second
     assert!(
         conductor_workflow_integrated_ops_metric_count >= expected_records_per_metric,
