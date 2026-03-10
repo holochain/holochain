@@ -1,7 +1,7 @@
 //! The workflow and queue consumer for DhtOp integration
 
 use super::*;
-use crate::core::metrics::workflow_integrated_op_metric;
+use crate::core::metrics::{op_integration_delay_metric, workflow_integrated_op_metric};
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
@@ -35,16 +35,17 @@ pub async fn integrate_dht_ops_workflow(
     >,
 ) -> WorkflowResult<WorkComplete> {
     let start = std::time::Instant::now();
-    let time = holochain_zome_types::prelude::Timestamp::now();
-    let (stored_ops, block_agents, integrated_pairs) = vault
+    let when_integrated = Timestamp::now();
+    let (stored_ops, block_agents, integrated_pairs, when_stored_times) = vault
         .write_async(move |txn| {
             let mut stored_ops = Vec::new();
             let mut block_agents = Vec::new();
             let mut integrated_pairs: Vec<(DhtOpHash, Option<AgentPubKey>)> = Vec::new();
+            let mut when_stored_times: Vec<Option<Timestamp>> = Vec::new();
             let mut stmt = txn.prepare_cached(SET_VALIDATED_OPS_TO_INTEGRATED)?;
             let integrated_ops = stmt.query_map(
                 named_params! {
-                    ":when_integrated": time,
+                    ":when_integrated": when_integrated,
                 },
                 |row| {
                     let op_hash = row.get::<_, DhtOpHash>(0)?;
@@ -55,13 +56,14 @@ pub async fn integrate_dht_ops_workflow(
                         op_id: op_hash.to_located_k2_op_id(&op_basis),
                     };
                     let validation_status = row.get::<_, ValidationStatus>(3)?;
-                    let action_author = row.get::<_, Option<AgentPubKey>>(4)?;
-                    let warrant_author = row.get::<_, Option<AgentPubKey>>(5)?;
-                    let warrantee = row.get::<_, Option<AgentPubKey>>(6)?;
+                    let when_stored = row.get::<_, Option<Timestamp>>(4)?;
+                    let action_author = row.get::<_, Option<AgentPubKey>>(5)?;
+                    let warrant_author = row.get::<_, Option<AgentPubKey>>(6)?;
+                    let warrantee = row.get::<_, Option<AgentPubKey>>(7)?;
                     if let Some(ref warrantee) = warrantee {
                         let Some(ref warrant_author) = warrant_author else {
                             tracing::warn!(?op_hash, "Warrant missing author while integrating");
-                            return Ok((stored_op, op_hash, action_author));
+                            return Ok((stored_op, op_hash, action_author, when_stored));
                         };
 
                         let op_clone_for_block = op_hash.clone();
@@ -92,16 +94,22 @@ pub async fn integrate_dht_ops_workflow(
                         }
                     }
 
-                    Ok((stored_op, op_hash, action_author))
+                    Ok((stored_op, op_hash, action_author, when_stored))
                 },
             )?;
             for integrated_op in integrated_ops {
-                let (stored_op, op_hash, author) = integrated_op?;
+                let (stored_op, op_hash, author, when_stored) = integrated_op?;
                 stored_ops.push(stored_op);
                 integrated_pairs.push((op_hash, author));
+                when_stored_times.push(when_stored);
             }
 
-            WorkflowResult::Ok((stored_ops, block_agents, integrated_pairs))
+            WorkflowResult::Ok((
+                stored_ops,
+                block_agents,
+                integrated_pairs,
+                when_stored_times,
+            ))
         })
         .await?;
     let changed = stored_ops.len();
@@ -118,6 +126,22 @@ pub async fn integrate_dht_ops_workflow(
         )],
     );
 
+    // Record op integration delay metric.
+    let metric = op_integration_delay_metric();
+    for maybe_when_stored in when_stored_times {
+        if let Some(when_stored) = maybe_when_stored {
+            let delay_secs =
+                (when_integrated.as_micros() - when_stored.as_micros()).max(0) as f64 / 1_000_000.0;
+            metric.record(
+                delay_secs,
+                &[opentelemetry::KeyValue::new(
+                    "dna_hash",
+                    dna_hash.to_string(),
+                )],
+            );
+        }
+    }
+
     if changed > 0 {
         network.new_integrated_data(stored_ops).await?;
 
@@ -125,7 +149,7 @@ pub async fn integrate_dht_ops_workflow(
             authored_db_provider.clone(),
             publish_trigger_provider,
             &dna_hash,
-            time,
+            when_integrated,
             integrated_pairs,
         )
         .await?;

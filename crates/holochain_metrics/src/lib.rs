@@ -96,6 +96,7 @@
 //! | `hc.db.write_txn.duration` |
 //! | `hc.conductor.workflow.duration` |
 //! | `hc.conductor.workflow.integrated_ops` |
+//! | `hc.conductor.workflow.integration_delay` |
 //! | `hc.conductor.post_commit.duration` |
 //! | `hc.conductor.uptime` |
 //! | `hc.conductor.app_ws.dropped_signal` |

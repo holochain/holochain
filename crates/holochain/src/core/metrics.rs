@@ -54,6 +54,20 @@ pub(crate) fn workflow_integrated_op_metric() -> &'static IntegratedOpMetric {
     })
 }
 
+pub(crate) type OpIntegrationDelayMetric = metrics::Histogram<f64>;
+
+static OP_INTEGRATION_DELAY_METRIC: OnceLock<OpIntegrationDelayMetric> = OnceLock::new();
+
+pub(crate) fn op_integration_delay_metric() -> &'static OpIntegrationDelayMetric {
+    OP_INTEGRATION_DELAY_METRIC.get_or_init(|| {
+        meter("hc.conductor")
+            .f64_histogram("hc.conductor.workflow.integration_delay")
+            .with_unit("s")
+            .with_description("Time between an op being stored and it being integrated.")
+            .build()
+    })
+}
+
 pub(crate) type WasmUsageMetric = metrics::Counter<u64>;
 
 pub(crate) fn create_ribosome_wasm_usage_metric() -> WasmUsageMetric {

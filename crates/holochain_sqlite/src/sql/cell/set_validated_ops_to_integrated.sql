@@ -11,6 +11,7 @@ RETURNING
   basis_hash,
   authored_timestamp,
   validation_status,
+  when_stored,
   -- Return the action author when the op is an action.
   (
     SELECT

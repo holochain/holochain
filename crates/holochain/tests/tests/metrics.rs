@@ -14,6 +14,7 @@ use std::time::Duration;
 // - hc.db.write_txn.duration
 // - hc.conductor.workflow.duration
 // - hc.conductor.workflow.integrated_ops
+// - hc.conductor.workflow.integration_delay
 // - hc.conductor.post_commit.duration
 // - hc.conductor.uptime
 // - hc.ribosome.wasm.usage
@@ -110,6 +111,10 @@ async fn metrics() {
                     .matches("hc.conductor.workflow.integrated_ops")
                     .count()
                     >= 1
+                && metrics
+                    .matches("hc.conductor.workflow.integration_delay")
+                    .count()
+                    >= 1
                 && metrics.matches("hc.conductor.post_commit.duration").count() >= 1
                 && metrics.matches("hc.conductor.uptime").count() >= 1
                 && metrics.matches("hc.ribosome.wasm.usage").count() >= 4
@@ -120,10 +125,7 @@ async fn metrics() {
                 && metrics.matches("hc.holochain_p2p.request.duration").count() >= 1
                 && metrics.contains("hc.holochain_p2p.handle_request.duration")
                 && metrics.contains("hc.holochain_p2p.recv_remote_signal")
-                && metrics
-                    .matches("hc.ribosome.host_fn.emit_signal")
-                    .count()
-                    >= 1
+                && metrics.matches("hc.ribosome.host_fn.emit_signal").count() >= 1
                 && metrics
                     .matches("hc.ribosome.host_fn.send_remote_signal")
                     .count()
@@ -185,6 +187,17 @@ async fn metrics() {
         .for_each(|metric| {
             assert!(metric.contains("dna_hash="));
             assert!(metric.contains("sum="));
+        });
+
+    metrics
+        .clone()
+        .filter(|line| line.contains("hc.conductor.workflow.integration_delay"))
+        .for_each(|metric| {
+            assert!(metric.contains("dna_hash="));
+            assert!(metric.contains("count="));
+            assert!(metric.contains("sum="));
+            assert!(metric.contains("max="));
+            assert!(metric.contains("min="));
         });
 
     metrics
