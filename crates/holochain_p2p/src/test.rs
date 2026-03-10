@@ -39,6 +39,7 @@ impl Gossip for NoopGossip {
                 accepted_rounds: Default::default(),
                 dht_summary: Default::default(),
                 initiated_round: Default::default(),
+                local_op_count: Default::default(),
                 peer_meta: Default::default(),
             })
         })

@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Update kitsune2 dependencies to `0.4.0-dev.4`.
+  - Implements new required `OpStore::query_total_op_count` method, counting integrated ops across both the DHT and cache databases.
+  - Adds `GossipStateSummary::local_op_count` field to the gossip state summary.
+  - **BREAKING** Adds `HolochainP2pConfig::get_db_cache` callback (required when constructing the p2p config) to supply the cache database handle per space.
+
 ## 0.7.0-dev.15
 
 - Update kitsune2 dependencies to `0.4.0-dev.3`. \#5673
