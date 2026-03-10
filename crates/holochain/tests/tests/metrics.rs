@@ -107,29 +107,20 @@ async fn metrics() {
             if metrics.matches("hc.db.connections.use_time").count() >= 5
                 && metrics.matches("hc.db.write_txn.duration").count() >= 4
                 && metrics.matches("hc.conductor.workflow.duration").count() >= 8
-                && metrics
-                    .matches("hc.conductor.workflow.integrated_ops")
-                    .count()
-                    >= 1
-                && metrics
-                    .matches("hc.conductor.workflow.integration_delay")
-                    .count()
-                    >= 1
-                && metrics.matches("hc.conductor.post_commit.duration").count() >= 1
-                && metrics.matches("hc.conductor.uptime").count() >= 1
+                && metrics.contains("hc.conductor.workflow.integrated_ops")
+                && metrics.contains("hc.conductor.workflow.integration_delay")
+                && metrics.contains("hc.conductor.post_commit.duration")
+                && metrics.contains("hc.conductor.uptime")
                 && metrics.matches("hc.ribosome.wasm.usage").count() >= 4
-                && metrics.matches("hc.ribosome.zome_call.duration").count() >= 1
+                && metrics.contains("hc.ribosome.zome_call.duration")
                 && metrics.matches("hc.ribosome.wasm_call.duration").count() >= 4
                 && metrics.matches("hc.ribosome.host_fn_call.duration").count() >= 4
                 && metrics.contains("hc.cascade.duration")
-                && metrics.matches("hc.holochain_p2p.request.duration").count() >= 1
+                && metrics.contains("hc.holochain_p2p.request.duration")
                 && metrics.contains("hc.holochain_p2p.handle_request.duration")
                 && metrics.contains("hc.holochain_p2p.recv_remote_signal")
-                && metrics.matches("hc.ribosome.host_fn.emit_signal").count() >= 1
-                && metrics
-                    .matches("hc.ribosome.host_fn.send_remote_signal")
-                    .count()
-                    >= 1
+                && metrics.contains("hc.ribosome.host_fn.emit_signal")
+                && metrics.contains("hc.ribosome.host_fn.send_remote_signal")
             {
                 return metrics;
             }
