@@ -97,16 +97,17 @@
 //! | `hc.conductor.workflow.duration` |
 //! | `hc.conductor.workflow.integrated_ops` |
 //! | `hc.conductor.post_commit.duration` |
+//! | `hc.conductor.app_ws.dropped_signal` |
 //! | `hc.ribosome.wasm.usage` |
 //! | `hc.ribosome.zome_call.duration` |
 //! | `hc.ribosome.wasm_call.duration` |
 //! | `hc.ribosome.host_fn_call.duration` |
-//! | `hc.ribosome.host_fn.emit_signal.count` |
-//! | `hc.ribosome.host_fn.send_remote_signal.count` |
+//! | `hc.ribosome.host_fn.emit_signal` |
+//! | `hc.ribosome.host_fn.send_remote_signal` |
 //! | `hc.cascade.duration` |
 //! | `hc.holochain_p2p.request.duration` |
 //! | `hc.holochain_p2p.handle_request.duration` |
-//! | `hc.holochain_p2p.recv_remote_signal.count` |
+//! | `hc.holochain_p2p.recv_remote_signal` |
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;

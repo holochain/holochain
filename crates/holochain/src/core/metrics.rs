@@ -113,7 +113,7 @@ static SEND_REMOTE_SIGNAL_METRIC: OnceLock<SendRemoteSignalMetric> = OnceLock::n
 pub(crate) fn send_remote_signal_metric() -> &'static SendRemoteSignalMetric {
     SEND_REMOTE_SIGNAL_METRIC.get_or_init(|| {
         meter("hc.ribosome")
-            .u64_counter("hc.ribosome.host_fn.send_remote_signal.count")
+            .u64_counter("hc.ribosome.host_fn.send_remote_signal")
             .with_description("The number of remote signals sent.")
             .build()
     })

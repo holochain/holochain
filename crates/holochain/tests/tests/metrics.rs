@@ -19,12 +19,12 @@ use std::time::Duration;
 // - hc.ribosome.zome_call.duration
 // - hc.ribosome.wasm_call.duration
 // - hc.ribosome.host_fn_call.duration
-// - hc.ribosome.host_fn.emit_signal.count
-// - hc.ribosome.host_fn.send_remote_signal.count
+// - hc.ribosome.host_fn.emit_signal
+// - hc.ribosome.host_fn.send_remote_signal
 // - hc.cascade.duration
 // - hc.holochain_p2p.request.duration
 // - hc.holochain_p2p.handle_request.duration
-// - hc.holochain_p2p.recv_remote_signal.count
+// - hc.holochain_p2p.recv_remote_signal
 #[tokio::test(flavor = "multi_thread")]
 async fn metrics() {
     let tmp_file = tempfile::tempdir().unwrap();
@@ -117,13 +117,13 @@ async fn metrics() {
                 && metrics.contains("hc.cascade.duration")
                 && metrics.matches("hc.holochain_p2p.request.duration").count() >= 1
                 && metrics.contains("hc.holochain_p2p.handle_request.duration")
-                && metrics.contains("hc.holochain_p2p.recv_remote_signal.count")
+                && metrics.contains("hc.holochain_p2p.recv_remote_signal")
                 && metrics
-                    .matches("hc.ribosome.host_fn.emit_signal.count")
+                    .matches("hc.ribosome.host_fn.emit_signal")
                     .count()
                     >= 1
                 && metrics
-                    .matches("hc.ribosome.host_fn.send_remote_signal.count")
+                    .matches("hc.ribosome.host_fn.send_remote_signal")
                     .count()
                     >= 1
             {
@@ -267,7 +267,7 @@ async fn metrics() {
         .replace(' ', "\\ ");
     metrics
         .clone()
-        .filter(|line| line.contains("hc.ribosome.host_fn.emit_signal.count"))
+        .filter(|line| line.contains("hc.ribosome.host_fn.emit_signal"))
         .for_each(|metric| {
             assert!(metric.contains(&format!("cell_id={cell_id_influx}")));
             assert!(metric.contains("zome=emit_signal"));
@@ -277,7 +277,7 @@ async fn metrics() {
 
     metrics
         .clone()
-        .filter(|line| line.contains("hc.ribosome.host_fn.send_remote_signal.count"))
+        .filter(|line| line.contains("hc.ribosome.host_fn.send_remote_signal"))
         .for_each(|metric| {
             assert!(metric.contains("dna_hash="));
             assert!(metric.contains("zome=emit_signal"));
@@ -335,10 +335,13 @@ async fn metrics() {
 
     metrics
         .clone()
-        .filter(|line| line.contains("hc.holochain_p2p.recv_remote_signal.count"))
+        .filter(|line| line.contains("hc.holochain_p2p.recv_remote_signal"))
         .for_each(|metric| {
             assert!(metric.contains("dna_hash="));
             // Assert that received remote signal was recorded.
             assert!(metric.contains("sum=1u"));
         });
+
+    // hc.conductor.app_ws.dropped_signal can't be easily tested, because
+    // it records a metric only when signals are dropped due to channel overload.
 }
