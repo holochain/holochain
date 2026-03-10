@@ -2,11 +2,11 @@ use bytes::Bytes;
 use futures::future::BoxFuture;
 use holo_hash::{DhtOpHash, DnaHash, OpBasis};
 use holochain_serialized_bytes::prelude::decode;
-use holochain_sqlite::db::{DbKindDht, DbWrite, ReadAccess};
+use holochain_sqlite::db::{DbKindCache, DbKindDht, DbWrite, ReadAccess};
 use holochain_sqlite::rusqlite::types::Value;
 use holochain_sqlite::sql::sql_dht::{
     CHECK_OP_IDS_PRESENT, EARLIEST_TIMESTAMP, OPS_BY_ID, OP_HASHES_IN_TIME_SLICE,
-    OP_HASHES_SINCE_TIME_BATCH,
+    OP_HASHES_SINCE_TIME_BATCH, TOTAL_OP_COUNT,
 };
 use holochain_state::prelude::{named_params, StateMutationResult};
 use holochain_types::dht_op::DhtOpHashed;
@@ -21,6 +21,8 @@ use std::sync::Arc;
 pub struct HolochainOpStoreFactory {
     /// The database connection getter.
     pub getter: crate::GetDbOpStore,
+    /// The cache database connection getter.
+    pub cache_getter: crate::GetDbCache,
     /// The event handler.
     pub handler: Arc<std::sync::OnceLock<crate::spawn::WrapEvtSender>>,
 }
@@ -46,14 +48,18 @@ impl kitsune2_api::OpStoreFactory for HolochainOpStoreFactory {
         space: kitsune2_api::SpaceId,
     ) -> BoxFut<'static, kitsune2_api::K2Result<kitsune2_api::DynOpStore>> {
         let getter = self.getter.clone();
+        let cache_getter = self.cache_getter.clone();
         let handler = self.handler.clone();
         Box::pin(async move {
             let dna_hash = DnaHash::from_k2_space(&space);
             let db = getter(dna_hash.clone()).await.map_err(|err| {
                 kitsune2_api::K2Error::other_src("failed to get op_store db", err)
             })?;
+            let cache_db = cache_getter(dna_hash.clone())
+                .await
+                .map_err(|err| kitsune2_api::K2Error::other_src("failed to get cache db", err))?;
             let op_store: kitsune2_api::DynOpStore =
-                Arc::new(HolochainOpStore::new(db, dna_hash, handler));
+                Arc::new(HolochainOpStore::new(db, cache_db, dna_hash, handler));
 
             Ok(op_store)
         })
@@ -63,6 +69,7 @@ impl kitsune2_api::OpStoreFactory for HolochainOpStoreFactory {
 /// Holochain implementation of the Kitsune2 [OpStore].
 pub struct HolochainOpStore {
     db: DbWrite<DbKindDht>,
+    cache_db: DbWrite<DbKindCache>,
     dna_hash: DnaHash,
     sender: Arc<std::sync::OnceLock<crate::spawn::WrapEvtSender>>,
 }
@@ -71,6 +78,7 @@ impl Debug for HolochainOpStore {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("HolochainOpStore")
             .field("db", &self.db)
+            .field("cache_db", &self.cache_db)
             .finish()
     }
 }
@@ -79,11 +87,13 @@ impl HolochainOpStore {
     /// Create a new [HolochainOpStore].
     pub fn new(
         db: DbWrite<DbKindDht>,
+        cache_db: DbWrite<DbKindCache>,
         dna_hash: DnaHash,
         sender: Arc<std::sync::OnceLock<crate::spawn::WrapEvtSender>>,
     ) -> HolochainOpStore {
         Self {
             db,
+            cache_db,
             dna_hash,
             sender,
         }
@@ -348,6 +358,29 @@ impl OpStore for HolochainOpStore {
             })
             .await
             .map_err(|e| K2Error::other_src("Failed to retrieve earliest timestamp in arc", e))
+        })
+    }
+
+    fn query_total_op_count(&self) -> BoxFuture<'_, K2Result<u64>> {
+        let db = self.db.clone();
+        let cache_db = self.cache_db.clone();
+
+        Box::pin(async move {
+            let dht_count = db
+                .read_async(move |txn| -> StateMutationResult<u64> {
+                    Ok(txn.query_row(TOTAL_OP_COUNT, [], |row| row.get(0))?)
+                })
+                .await
+                .map_err(|e| K2Error::other_src("Failed to query total op count from dht", e))?;
+
+            let cache_count = cache_db
+                .read_async(move |txn| -> StateMutationResult<u64> {
+                    Ok(txn.query_row(TOTAL_OP_COUNT, [], |row| row.get(0))?)
+                })
+                .await
+                .map_err(|e| K2Error::other_src("Failed to query total op count from cache", e))?;
+
+            Ok(dht_count + cache_count)
         })
     }
 
