@@ -56,6 +56,8 @@ pub mod sql_dht {
     pub const CHECK_OP_IDS_PRESENT: &str = include_str!("sql/dht/check_op_ids_present.sql");
 
     pub const EARLIEST_TIMESTAMP: &str = include_str!("sql/dht/earliest_timestamp.sql");
+
+    pub const TOTAL_OP_COUNT: &str = include_str!("sql/dht/total_op_count.sql");
 }
 
 pub mod sql_conductor {

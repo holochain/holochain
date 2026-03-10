@@ -23,9 +23,17 @@ pub type GetDbPeerMeta = Arc<
         + Sync,
 >;
 
-/// Callback function to retrieve a op store database handle for a dna hash.
+/// Callback function to retrieve an op store database handle for a dna hash.
 pub type GetDbOpStore = Arc<
     dyn Fn(DnaHash) -> BoxFut<'static, HolochainP2pResult<DbWrite<DbKindDht>>>
+        + 'static
+        + Send
+        + Sync,
+>;
+
+/// Callback function to retrieve a cache database handle for a dna hash.
+pub type GetDbCache = Arc<
+    dyn Fn(DnaHash) -> BoxFut<'static, HolochainP2pResult<DbWrite<DbKindCache>>>
         + 'static
         + Send
         + Sync,
@@ -49,6 +57,15 @@ pub enum ReportConfig {
 /// HolochainP2p config struct.
 pub struct HolochainP2pConfig {
     /// Callback function to retrieve a peer meta database handle for a dna hash.
+    ///
+    /// **Must be set explicitly** — the [`Default`] value panics when called. Example:
+    ///
+    /// ```ignore
+    /// get_db_peer_meta: Arc::new(move |dna_hash| {
+    ///     let res = spaces.peer_meta(&dna_hash);
+    ///     Box::pin(async move { res.map_err(HolochainP2pError::other) })
+    /// }),
+    /// ```
     pub get_db_peer_meta: GetDbPeerMeta,
 
     /// Interval for a pruning task to remove expired values from the peer meta store.
@@ -57,9 +74,46 @@ pub struct HolochainP2pConfig {
     pub peer_meta_pruning_interval_ms: u64,
 
     /// Callback function to retrieve an op store database handle for a dna hash.
+    ///
+    /// Called when a new space is created to open the DHT [`DbWrite`] for that DNA. Gossip uses
+    /// the returned handle to read and write ops for that space.
+    ///
+    /// **Must be set explicitly** — the [`Default`] value panics when called. Example:
+    ///
+    /// ```ignore
+    /// get_db_op_store: Arc::new(move |dna_hash| {
+    ///     let res = spaces.dht(&dna_hash);
+    ///     Box::pin(async move { res.map_err(HolochainP2pError::other) })
+    /// }),
+    /// ```
     pub get_db_op_store: GetDbOpStore,
 
+    /// Callback function to retrieve a cache database handle for a dna hash.
+    ///
+    /// Called when a new space is created to open the cache [`DbWrite`] for that DNA.
+    /// The returned handle is used alongside [`get_db_op_store`](Self::get_db_op_store)
+    /// to report the total local op count to gossip.
+    ///
+    /// **Must be set explicitly** — the [`Default`] value panics when called. Example:
+    ///
+    /// ```ignore
+    /// get_db_cache: Arc::new(move |dna_hash| {
+    ///     let res = spaces.cache(&dna_hash);
+    ///     Box::pin(async move { res.map_err(HolochainP2pError::other) })
+    /// }),
+    /// ```
+    pub get_db_cache: GetDbCache,
+
     /// Callback function to retrieve the conductor database handle.
+    ///
+    /// **Must be set explicitly** — the [`Default`] value panics when called. Example:
+    ///
+    /// ```ignore
+    /// get_conductor_db: Arc::new(|| {
+    ///     let res = conductor_db.clone();
+    ///     Box::pin(async move { Ok(res) })
+    /// }),
+    /// ```
     pub get_conductor_db: GetDbConductor,
 
     /// The arc factor to apply to target arc hints.
@@ -141,11 +195,27 @@ impl std::fmt::Debug for HolochainP2pConfig {
 }
 
 impl Default for HolochainP2pConfig {
+    /// Returns a config with placeholder values.
+    ///
+    /// The database callbacks (`get_db_peer_meta`, `get_db_op_store`, `get_db_cache`,
+    /// `get_conductor_db`) all panic with `unimplemented!()` when invoked — they will
+    /// be called the first time a space is created, so **always supply concrete
+    /// implementations** before passing this config to [`spawn_holochain_p2p`].
+    /// Use struct-update syntax rather than relying on this default entirely:
+    ///
+    /// ```ignore
+    /// let config = HolochainP2pConfig {
+    ///     get_db_op_store: Arc::new(move |dna_hash| { ... }),
+    ///     get_db_cache: Arc::new(move |dna_hash| { ... }),
+    ///     ..HolochainP2pConfig::default()
+    /// };
+    /// ```
     fn default() -> Self {
         Self {
             get_db_peer_meta: Arc::new(|_| unimplemented!()),
             peer_meta_pruning_interval_ms: 10_000,
             get_db_op_store: Arc::new(|_| unimplemented!()),
+            get_db_cache: Arc::new(|_| unimplemented!()),
             get_conductor_db: Arc::new(|| unimplemented!()),
             target_arc_factor: 1,
             auth_material: None,

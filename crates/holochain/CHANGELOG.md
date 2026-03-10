@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Update kitsune2 dependencies to `0.4.0-dev.4`.
+    - Implements new required `OpStore::query_total_op_count` method, counting integrated ops across both the DHT and cache databases.
+    - Adds `GossipStateSummary::local_op_count` field to the gossip state summary.
+    - **BREAKING** Adds `HolochainP2pConfig::get_db_cache` callback (required when constructing the p2p config) to supply the cache database handle per space.
 - Update kitsune2 dependencies to `0.4.0-dev.3`. #5673
 - Fixed an issue where the `on_signal` method of the client `AppWebsocket` would not handle signals for cloned cells correctly. Since Holochain now outputs signals only on connections associated with the app where they are emitted, filtering in the client is no longer necessary. #5672
 - Rewrite influxive metric collection using OpenTelemetry SDK. \#5666
