@@ -15,6 +15,7 @@ use std::time::Duration;
 // - hc.conductor.workflow.duration
 // - hc.conductor.workflow.integrated_ops
 // - hc.conductor.post_commit.duration
+// - hc.conductor.uptime
 // - hc.ribosome.wasm.usage
 // - hc.ribosome.zome_call.duration
 // - hc.ribosome.wasm_call.duration
@@ -110,6 +111,7 @@ async fn metrics() {
                     .count()
                     >= 1
                 && metrics.matches("hc.conductor.post_commit.duration").count() >= 1
+                && metrics.matches("hc.conductor.uptime").count() >= 1
                 && metrics.matches("hc.ribosome.wasm.usage").count() >= 4
                 && metrics.matches("hc.ribosome.zome_call.duration").count() >= 1
                 && metrics.matches("hc.ribosome.wasm_call.duration").count() >= 4
@@ -195,6 +197,13 @@ async fn metrics() {
             assert!(metric.contains("sum="));
             assert!(metric.contains("max="));
             assert!(metric.contains("min="));
+        });
+
+    metrics
+        .clone()
+        .filter(|line| line.contains("hc.conductor.uptime"))
+        .for_each(|metric| {
+            assert!(metric.contains("gauge="));
         });
 
     // Ribosome metrics

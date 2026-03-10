@@ -1,5 +1,6 @@
 use opentelemetry::{global::meter, metrics, metrics::Histogram};
 use std::sync::OnceLock;
+use std::time::Instant;
 
 pub type PostCommitDurationMetric = Histogram<f64>;
 
@@ -22,4 +23,21 @@ pub(crate) fn dropped_signal_metric() -> &'static DroppedSignalMetric {
             .with_description("The number of signals dropped from app ws due to channel overload.")
             .build()
     })
+}
+
+pub(crate) type UptimeMetric = metrics::ObservableGauge<f64>;
+
+static UPTIME_METRIC: OnceLock<UptimeMetric> = OnceLock::new();
+
+pub(crate) fn register_uptime_metric(started_at: Instant) {
+    UPTIME_METRIC.get_or_init(|| {
+        meter("hc.conductor")
+            .f64_observable_gauge("hc.conductor.uptime")
+            .with_unit("s")
+            .with_description("The number of seconds the conductor has been running.")
+            .with_callback(move |observer| {
+                observer.observe(started_at.elapsed().as_secs_f64(), &[]);
+            })
+            .build()
+    });
 }

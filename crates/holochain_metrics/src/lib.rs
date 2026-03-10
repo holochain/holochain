@@ -97,6 +97,7 @@
 //! | `hc.conductor.workflow.duration` |
 //! | `hc.conductor.workflow.integrated_ops` |
 //! | `hc.conductor.post_commit.duration` |
+//! | `hc.conductor.uptime` |
 //! | `hc.conductor.app_ws.dropped_signal` |
 //! | `hc.ribosome.wasm.usage` |
 //! | `hc.ribosome.zome_call.duration` |
