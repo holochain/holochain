@@ -83,13 +83,13 @@ jobs:
           target: ${{ matrix.target }}
           influx-token: ${{ secrets.INFLUX_TOKEN }}
 
-  # The `wasmer_wamr` tests are split out into a separate job so we can ignore its failures in the `ci-pass` job.
+    # The `wasmer_wamr` tests are split out into a separate job so we can ignore its failures in the `ci-pass` job.
   # This allows the workflow to pass, while still showing the `test-wasmer_wamr` job as failed in the UI.
   test-wasmer_wamr:
     name: test (wasmer_wamr)
     # Our intended target for wasmer_wamr feature is iOS and Android.
     # For now, wasmer_wamr tests are only run on macos-latest
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
     steps:
@@ -98,22 +98,11 @@ jobs:
 
       - name: "Common Test Setup Actions"
         uses: ./.github/actions/common-pre
-        
-      - name: install build dependencies (macos-latest, wasmer_wamr)
-        run: |
-          brew install llvm
-          echo "PATH=/opt/homebrew/opt/llvm/bin:$PATH" >> "$GITHUB_ENV"
-        
-      - name: llvm & clang
-        if: matrix.os == 'depot-windows-2022-8'
-        uses: KyleMayes/install-llvm-action@v2.0.8
-        with:
-          version: "21"
 
-      - name: "Common Test Actions"
+      - name: "Build workspace and run tests"
         uses: ./.github/actions/common-test
         with:
-          os: "macos-latest"
+          os: "ubuntu-latest"
           target: "wasmer_wamr"
           influx-token: ${{ secrets.INFLUX_TOKEN }}
 
