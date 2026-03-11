@@ -14,6 +14,72 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20260311.132405
+
+## [hcterm-0.6.1-rc.3](crates/hcterm/CHANGELOG.md#0.6.1-rc.3)
+
+## [holochain\_cli-0.6.1-rc.3](crates/holochain_cli/CHANGELOG.md#0.6.1-rc.3)
+
+## [holochain\_cli\_bundle-0.6.1-rc.3](crates/holochain_cli_bundle/CHANGELOG.md#0.6.1-rc.3)
+
+## [holochain\_cli\_sandbox-0.6.1-rc.3](crates/holochain_cli_sandbox/CHANGELOG.md#0.6.1-rc.3)
+
+## [holochain\_client-0.8.1-rc.3](crates/holochain_client/CHANGELOG.md#0.8.1-rc.3)
+
+## [holochain-0.6.1-rc.3](crates/holochain/CHANGELOG.md#0.6.1-rc.3)
+
+- Update kitsune2 dependencies to `0.4.0-dev.4`.
+  - Implements new required `OpStore::query_total_op_count` method, counting integrated ops across both the DHT and cache databases.
+  - Adds `GossipStateSummary::local_op_count` field to the gossip state summary.
+  - **BREAKING** Adds `HolochainP2pConfig::get_db_cache` callback (required when constructing the p2p config) to supply the cache database handle per space.
+- Update kitsune2 dependencies to `0.4.0-dev.3`. \#5673
+- Fixed an issue where the `on_signal` method of the client `AppWebsocket` would not handle signals for cloned cells correctly. Since Holochain now outputs signals only on connections associated with the app where they are emitted, filtering in the client is no longer necessary. \#5672
+- Rewrite influxive metric collection using OpenTelemetry SDK. \#5666
+- Import influxive crates from https://github.com/holochain/influxive into monorepo and update their dependencies.
+- Fix: DbKind display implementation now properly includes the associated CellId or DnaHash of the database, instead of escaped rust code.
+
+## [holochain\_cascade-0.6.1-rc.3](crates/holochain_cascade/CHANGELOG.md#0.6.1-rc.3)
+
+## [holochain\_conductor\_config-0.6.1-rc.3](crates/holochain_conductor_config/CHANGELOG.md#0.6.1-rc.3)
+
+## [holochain\_metrics-0.6.1-rc.1](crates/holochain_metrics/CHANGELOG.md#0.6.1-rc.1)
+
+## [holochain\_test\_wasm\_common-0.6.1-rc.1](crates/holochain_test_wasm_common/CHANGELOG.md#0.6.1-rc.1)
+
+## [holochain\_wasm\_test\_utils-0.6.1-rc.3](crates/holochain_wasm_test_utils/CHANGELOG.md#0.6.1-rc.3)
+
+## [holochain\_websocket-0.6.1-rc.3](crates/holochain_websocket/CHANGELOG.md#0.6.1-rc.3)
+
+## [hdk-0.6.1-rc.1](crates/hdk/CHANGELOG.md#0.6.1-rc.1)
+
+## [holochain\_conductor\_api-0.6.1-rc.3](crates/holochain_conductor_api/CHANGELOG.md#0.6.1-rc.3)
+
+## [holochain\_p2p-0.6.1-rc.3](crates/holochain_p2p/CHANGELOG.md#0.6.1-rc.3)
+
+## [hdi-0.7.1-rc.1](crates/hdi/CHANGELOG.md#0.7.1-rc.1)
+
+## [holochain\_state-0.6.1-rc.3](crates/holochain_state/CHANGELOG.md#0.6.1-rc.3)
+
+## [hdk\_derive-0.6.1-rc.1](crates/hdk_derive/CHANGELOG.md#0.6.1-rc.1)
+
+## [holochain\_chc-0.3.1-rc.3](crates/holochain_chc/CHANGELOG.md#0.3.1-rc.3)
+
+## [holochain\_state\_types-0.6.1-rc.1](crates/holochain_state_types/CHANGELOG.md#0.6.1-rc.1)
+
+## [holochain\_types-0.6.1-rc.3](crates/holochain_types/CHANGELOG.md#0.6.1-rc.3)
+
+## [holochain\_keystore-0.6.1-rc.2](crates/holochain_keystore/CHANGELOG.md#0.6.1-rc.2)
+
+## [holochain\_sqlite-0.6.1-rc.2](crates/holochain_sqlite/CHANGELOG.md#0.6.1-rc.2)
+
+## [holochain\_zome\_types-0.6.1-rc.1](crates/holochain_zome_types/CHANGELOG.md#0.6.1-rc.1)
+
+## [holochain\_integrity\_types-0.6.1-rc.1](crates/holochain_integrity_types/CHANGELOG.md#0.6.1-rc.1)
+
+## [holo\_hash-0.6.1-rc.1](crates/holo_hash/CHANGELOG.md#0.6.1-rc.1)
+
+## [fixt-0.6.1-rc.1](crates/fixt/CHANGELOG.md#0.6.1-rc.1)
+
 # 20260211.135829
 
 ## [hcterm-0.6.1-rc.2](crates/hcterm/CHANGELOG.md#0.6.1-rc.2)
