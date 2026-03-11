@@ -142,43 +142,48 @@ pub async fn integrate_dht_ops_workflow(
     let dna_hash = network.dna_hash().clone();
 
     // Record integrated ops metric.
+    let dna_hash_str = dna_hash.to_string();
     workflow_integrated_op_metric().add(
         changed as u64,
         &[opentelemetry::KeyValue::new(
             "dna_hash",
-            dna_hash.to_string(),
+            dna_hash_str.clone(),
         )],
     );
 
     // Record op integration delay metric.
     let metric = op_integration_delay_metric();
-    for maybe_when_stored in when_stored_times {
-        if let Some(when_stored) = maybe_when_stored {
+    when_stored_times
+        .into_iter()
+        // discard None values
+        .flatten()
+        .for_each(|when_stored| {
             let delay_secs =
                 (when_integrated.as_micros() - when_stored.as_micros()).max(0) as f64 / 1_000_000.0;
             metric.record(
                 delay_secs,
                 &[opentelemetry::KeyValue::new(
                     "dna_hash",
-                    dna_hash.to_string(),
+                    dna_hash_str.clone(),
                 )],
             );
-        }
-    }
+        });
 
     // Record op validation attempts metric.
     let metric = op_validation_attempts_metric();
-    for attempts in validation_attempts {
-        if let Some(attempts) = attempts {
+    validation_attempts
+        .into_iter()
+        // discard None values
+        .flatten()
+        .for_each(|attempts| {
             metric.record(
                 attempts as u64,
                 &[opentelemetry::KeyValue::new(
                     "dna_hash",
-                    dna_hash.to_string(),
+                    dna_hash_str.clone(),
                 )],
             );
-        }
-    }
+        });
 
     if changed > 0 {
         network.new_integrated_data(stored_ops).await?;
