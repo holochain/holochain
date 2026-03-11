@@ -12,6 +12,7 @@ use std::time::Duration;
 // Metrics checked for in this test:
 // - hc.db.connections.use_time
 // - hc.db.write_txn.duration
+// - hc.keystore.lair_request.duration
 // - hc.conductor.workflow.duration
 // - hc.conductor.workflow.integrated_ops
 // - hc.conductor.workflow.integration_delay
@@ -107,6 +108,7 @@ async fn metrics() {
             let metrics = read_to_string(&influxive_file).unwrap();
             if metrics.matches("hc.db.connections.use_time").count() >= 5
                 && metrics.matches("hc.db.write_txn.duration").count() >= 4
+                && metrics.contains("hc.keystore.lair_request.duration")
                 && metrics.matches("hc.conductor.workflow.duration").count() >= 8
                 && metrics.contains("hc.conductor.workflow.integrated_ops")
                 && metrics.contains("hc.conductor.workflow.integration_delay")
@@ -223,6 +225,9 @@ async fn metrics() {
             assert!(metric.contains("gauge="));
         });
 
+    // hc.conductor.app_ws.dropped_signal can't be easily tested, because
+    // it records a metric only when signals are dropped due to channel overload.
+
     // Ribosome metrics
     metrics
         .clone()
@@ -328,6 +333,18 @@ async fn metrics() {
     // hc.cascade.fetch_error can't be easily tested, because
     // it records a metric only when network fetch errors occur.
 
+    // keystore metrics
+    metrics
+        .clone()
+        .filter(|line| line.contains("hc.keystore.lair_request.duration"))
+        .for_each(|metric| {
+            assert!(metric.contains("operation="));
+            assert!(metric.contains("count="));
+            assert!(metric.contains("sum="));
+            assert!(metric.contains("max="));
+            assert!(metric.contains("min="));
+        });
+
     // holochain_p2p metrics
     metrics
         .clone()
@@ -370,7 +387,4 @@ async fn metrics() {
             // Assert that received remote signal was recorded.
             assert!(metric.contains("sum=1u"));
         });
-
-    // hc.conductor.app_ws.dropped_signal can't be easily tested, because
-    // it records a metric only when signals are dropped due to channel overload.
 }

@@ -3286,6 +3286,7 @@ dependencies = [
  "must_future",
  "nanoid",
  "one_err",
+ "opentelemetry 0.31.0",
  "parking_lot",
  "schemars 0.9.0",
  "serde",

@@ -94,6 +94,7 @@
 //! | ---------------- |
 //! | `hc.db.connections.use_time` |
 //! | `hc.db.write_txn.duration` |
+//! | `hc.keystore.lair_request.duration` |
 //! | `hc.conductor.workflow.duration` |
 //! | `hc.conductor.workflow.integrated_ops` |
 //! | `hc.conductor.workflow.integration_delay` |
