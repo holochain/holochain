@@ -2,9 +2,8 @@
 
 use crate::actor::{GetLinksRequestOptions, NetworkRequestOptions};
 use crate::metrics::{
-    create_p2p_handle_incoming_request_duration_metric,
-    create_p2p_handle_incoming_request_ignored_metric, create_p2p_outgoing_request_duration_metric,
-    create_p2p_recv_remote_signal_metric,
+    p2p_handle_incoming_request_duration_metric, p2p_handle_incoming_request_ignored_metric,
+    p2p_outgoing_request_duration_metric, p2p_recv_remote_signal_metric,
 };
 use crate::*;
 use holochain_sqlite::error::{DatabaseError, DatabaseResult};
@@ -247,10 +246,6 @@ pub(crate) struct HolochainP2pActor {
     kitsune2_config: Config,
     blocks_db_getter: GetDbConductor,
     pending: Arc<Mutex<Pending>>,
-    outgoing_request_duration_metric: metrics::P2pRequestDurationMetric,
-    incoming_request_duration_metric: metrics::P2pRequestDurationMetric,
-    incoming_request_ignored_metric: metrics::P2pRequestIgnoredMetric,
-    recv_remote_signal_metric: metrics::P2pRecvRemoteSignalMetric,
     pruning_task_abort_handle: AbortHandle,
     request_timeout: Duration,
     incoming_request_concurrency_limit_semaphore: Arc<Semaphore>,
@@ -294,7 +289,7 @@ impl SpaceHandler for HolochainP2pActor {
                         opentelemetry::KeyValue::new("message_type", msg.as_ref().to_string()),
                         opentelemetry::KeyValue::new("dna_hash", format!("{dna_hash:?}")),
                     ];
-                    self.incoming_request_ignored_metric.add(1, &attributes);
+                    p2p_handle_incoming_request_ignored_metric().add(1, &attributes);
 
                     continue;
                 };
@@ -635,10 +630,6 @@ impl HolochainP2pActor {
             blocks_db_getter: config.get_conductor_db.clone(),
             pending,
             kitsune2_config,
-            outgoing_request_duration_metric: create_p2p_outgoing_request_duration_metric(),
-            incoming_request_duration_metric: create_p2p_handle_incoming_request_duration_metric(),
-            incoming_request_ignored_metric: create_p2p_handle_incoming_request_ignored_metric(),
-            recv_remote_signal_metric: create_p2p_recv_remote_signal_metric(),
             pruning_task_abort_handle,
             request_timeout: config.request_timeout,
             incoming_request_concurrency_limit_semaphore: Arc::new(Semaphore::new(
@@ -912,7 +903,7 @@ impl HolochainP2pActor {
                 attributes.push(opentelemetry::KeyValue::new("zome", zome.to_string()));
                 attributes.push(opentelemetry::KeyValue::new("fn", function.to_string()));
             }
-            self.outgoing_request_duration_metric
+            p2p_outgoing_request_duration_metric()
                 .record(start.elapsed().as_secs_f64(), &attributes);
         };
 
@@ -995,8 +986,6 @@ impl HolochainP2pActor {
         let kitsune = self.kitsune.clone();
         let pending = self.pending.clone();
         let this = self.this.clone();
-        let incoming_request_duration_metric = self.incoming_request_duration_metric.clone();
-        let recv_remote_signal_metric = self.recv_remote_signal_metric.clone();
         tokio::task::spawn(async move {
             use crate::event::HcP2pHandler;
             use crate::wire::WireMessage::*;
@@ -1017,7 +1006,7 @@ impl HolochainP2pActor {
                         format!("{dna_hash_cloned:?}"),
                     ));
                     attributes.extend_from_slice(additional_attributes);
-                    incoming_request_duration_metric
+                    p2p_handle_incoming_request_duration_metric()
                         .record(start.elapsed().as_secs_f64(), &attributes);
                 };
             match msg {
@@ -1301,7 +1290,7 @@ impl HolochainP2pActor {
                         "to_agent",
                         format!("{to_agent:?}"),
                     )]);
-                    recv_remote_signal_metric.add(
+                    p2p_recv_remote_signal_metric().add(
                         1,
                         &[opentelemetry::KeyValue::new(
                             "dna_hash",
