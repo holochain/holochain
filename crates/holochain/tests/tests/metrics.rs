@@ -325,6 +325,9 @@ async fn metrics() {
             assert!(metric.contains("min="));
         });
 
+    // hc.cascade.fetch_error can't be easily tested, because
+    // it records a metric only when network fetch errors occur.
+
     // holochain_p2p metrics
     metrics
         .clone()

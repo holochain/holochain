@@ -50,6 +50,7 @@ use holochain_state::query::DbScratch;
 use holochain_state::query::PrivateDataQuery;
 use holochain_state::scratch::SyncScratch;
 use holochain_zome_types::prelude::{FunctionName, ZomeName};
+use metrics::cascade_fetch_error_metric;
 use metrics::create_cascade_duration_metric;
 use metrics::CascadeDurationMetric;
 use std::collections::HashMap;
@@ -423,6 +424,15 @@ impl CascadeImpl {
         }
     }
 
+    fn record_fetch_error(&self, fetch_type: &'static str) {
+        let mut attrs = vec![opentelemetry::KeyValue::new("fetch_type", fetch_type)];
+        if let Some((zome, fn_name)) = &self.zome_call_origin {
+            attrs.push(opentelemetry::KeyValue::new("zome", zome.to_string()));
+            attrs.push(opentelemetry::KeyValue::new("fn", fn_name.to_string()));
+        }
+        cascade_fetch_error_metric().add(1, &attrs);
+    }
+
     /// Fetch a Record from the network, caching and returning the results
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     pub async fn fetch_record(
@@ -441,7 +451,10 @@ impl CascadeImpl {
                 tracing::info!(?e, "No peers to fetch record from");
                 vec![]
             }
-            Err(e) => return Err(e.into()),
+            Err(e) => {
+                self.record_fetch_error("record");
+                return Err(e.into());
+            }
         };
 
         self.merge_ops_into_cache(results).await?;
@@ -464,7 +477,10 @@ impl CascadeImpl {
                 tracing::debug!(?e, "No peers to fetch links from");
                 vec![]
             }
-            Err(e) => return Err(e.into()),
+            Err(e) => {
+                self.record_fetch_error("links");
+                return Err(e.into());
+            }
         };
 
         self.merge_link_ops_into_cache(results, link_key.clone())
@@ -489,7 +505,10 @@ impl CascadeImpl {
                 tracing::debug!(?e, "No peers to fetch agent activity from");
                 vec![]
             }
-            Err(e) => return Err(e.into()),
+            Err(e) => {
+                self.record_fetch_error("agent_activity");
+                return Err(e.into());
+            }
         };
         Ok(results)
     }
@@ -515,7 +534,10 @@ impl CascadeImpl {
                 tracing::debug!(?e, "No peers to fetch agent activity from");
                 vec![]
             }
-            Err(e) => return Err(e.into()),
+            Err(e) => {
+                self.record_fetch_error("must_get_agent_activity");
+                return Err(e.into());
+            }
         };
 
         self.add_activity_into_cache(results).await

@@ -108,6 +108,7 @@
 //! | `hc.ribosome.host_fn.emit_signal` |
 //! | `hc.ribosome.host_fn.send_remote_signal` |
 //! | `hc.cascade.duration` |
+//! | `hc.cascade.fetch_error` |
 //! | `hc.holochain_p2p.request.duration` |
 //! | `hc.holochain_p2p.handle_request.duration` |
 //! | `hc.holochain_p2p.recv_remote_signal` |
