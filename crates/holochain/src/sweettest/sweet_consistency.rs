@@ -325,7 +325,7 @@ mod tests {
         // No bootstrap service.
         let config = ConductorConfig {
             network: NetworkConfig {
-                mem_bootstrap: false,
+                disable_bootstrap: true,
                 ..Default::default()
             },
             ..Default::default()
