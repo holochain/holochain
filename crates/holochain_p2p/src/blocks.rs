@@ -1,5 +1,5 @@
 use holo_hash::{AgentPubKey, DnaHash};
-use holochain_state::block::{query_are_all_blocked, query_is_blocked};
+use holochain_state::block::{query_is_any_blocked, query_is_blocked};
 use holochain_timestamp::Timestamp;
 use holochain_types::{
     db::{DbKindConductor, DbWrite},
@@ -82,7 +82,7 @@ impl Blocks for HolochainBlocks {
         })
     }
 
-    fn are_all_blocked(&self, targets: Vec<BlockTarget>) -> BoxFut<'static, K2Result<bool>> {
+    fn is_any_blocked(&self, targets: Vec<BlockTarget>) -> BoxFut<'static, K2Result<bool>> {
         let mut cell_ids = Vec::new();
         for target in targets {
             if let BlockTarget::Agent(agent_id) = target {
@@ -94,7 +94,7 @@ impl Blocks for HolochainBlocks {
         }
         let db = self.db.clone();
         Box::pin(async move {
-            db.read_async(|txn| query_are_all_blocked(txn, cell_ids, Timestamp::now()))
+            db.read_async(|txn| query_is_any_blocked(txn, cell_ids, Timestamp::now()))
                 .await
                 .map_err(|err| {
                     K2Error::other_src("failed to query blocks for vector of block targets", err)

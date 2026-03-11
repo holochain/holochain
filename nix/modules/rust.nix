@@ -30,7 +30,7 @@
         in
         {
           defaultTrack = "stable";
-          defaultVersion = "1.88.0";
+          defaultVersion = "1.89.0";
 
           defaultExtensions = [
             "rust-src"

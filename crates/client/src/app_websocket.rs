@@ -200,27 +200,7 @@ impl AppWebsocket {
     }
 
     pub async fn on_signal<F: Fn(Signal) + 'static + Sync + Send>(&self, handler: F) -> String {
-        let app_info = self.app_info.clone();
-        self.inner
-            .on_signal(move |signal| match signal.clone() {
-                Signal::App {
-                    cell_id,
-                    zome_name: _,
-                    signal: _,
-                } => {
-                    if app_info.cell_info.values().any(|cells| {
-                        cells.iter().any(|cell_info| match cell_info {
-                            CellInfo::Provisioned(cell) => cell.cell_id.eq(&cell_id),
-                            CellInfo::Cloned(cell) => cell.cell_id.eq(&cell_id),
-                            _ => false,
-                        })
-                    }) {
-                        handler(signal);
-                    }
-                }
-                Signal::System(_) => handler(signal),
-            })
-            .await
+        self.inner.on_signal(handler).await
     }
 
     pub async fn app_info(&self) -> ConductorApiResult<Option<AppInfo>> {

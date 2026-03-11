@@ -42,13 +42,13 @@ opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 strum = "0.27.2"
 strum_macros = "0.27.2"
 
-kitsune2 = { version = "0.4.0-dev.2", default-features = false }
-kitsune2_bootstrap_srv = { version = "0.4.0-dev.2", default-features = false, optional = true }
-kitsune2_api = "0.4.0-dev.2"
-kitsune2_core = "0.4.0-dev.2"
-kitsune2_gossip = "0.4.0-dev.2"
-kitsune2_transport_iroh = { version = "0.4.0-dev.2", default-features = false, optional = true }
-kitsune2_transport_tx5 = { version = "0.4.0-dev.2", default-features = false, optional = true }
+kitsune2 = { version = "0.4.0-dev.4", default-features = false }
+kitsune2_bootstrap_srv = { version = "0.4.0-dev.4", default-features = false, optional = true }
+kitsune2_api = "0.4.0-dev.4"
+kitsune2_core = "0.4.0-dev.4"
+kitsune2_gossip = "0.4.0-dev.4"
+kitsune2_transport_iroh = { version = "0.4.0-dev.4", default-features = false, optional = true }
+kitsune2_transport_tx5 = { version = "0.4.0-dev.4", default-features = false, optional = true }
 bytes = "1.10"
 holochain_sqlite = { version = "^0.6.1-rc.1", path = "../holochain_sqlite" }
 lair_keystore_api = "=0.6.3"

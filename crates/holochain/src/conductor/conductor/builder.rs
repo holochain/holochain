@@ -209,6 +209,7 @@ impl ConductorBuilder {
 
         let net_spaces1 = spaces.clone();
         let net_spaces2 = spaces.clone();
+        let net_spaces3 = spaces.clone();
         let conductor_db = spaces.conductor_db.clone();
         let p2p_config = holochain_p2p::HolochainP2pConfig {
             auth_material: config
@@ -226,6 +227,10 @@ impl ConductorBuilder {
             }),
             get_db_op_store: Arc::new(move |dna_hash| {
                 let res = net_spaces2.dht_db(&dna_hash);
+                Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
+            }),
+            get_db_cache: Arc::new(move |dna_hash| {
+                let res = net_spaces3.cache(&dna_hash);
                 Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
             }),
             get_conductor_db: Arc::new(move || {
@@ -317,11 +322,11 @@ impl ConductorBuilder {
                     duration_metric.record(
                         start.elapsed().as_secs_f64(),
                         &[
-                            opentelemetry_api::KeyValue::new(
+                            opentelemetry::KeyValue::new(
                                 "dna_hash",
                                 format!("{:?}", cell_id.dna_hash()),
                             ),
-                            opentelemetry_api::KeyValue::new(
+                            opentelemetry::KeyValue::new(
                                 "agent",
                                 format!("{:?}", cell_id.agent_pubkey()),
                             ),
@@ -437,6 +442,7 @@ impl ConductorBuilder {
 
         let net_spaces1 = spaces.clone();
         let net_spaces2 = spaces.clone();
+        let net_spaces3 = spaces.clone();
         let conductor_db = spaces.conductor_db.clone();
         let p2p_config = holochain_p2p::HolochainP2pConfig {
             auth_material: config
@@ -454,6 +460,10 @@ impl ConductorBuilder {
             }),
             get_db_op_store: Arc::new(move |dna_hash| {
                 let res = net_spaces2.dht_db(&dna_hash);
+                Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
+            }),
+            get_db_cache: Arc::new(move |dna_hash| {
+                let res = net_spaces3.cache(&dna_hash);
                 Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
             }),
             get_conductor_db: Arc::new(move || {

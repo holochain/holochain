@@ -109,7 +109,7 @@ impl TestCase {
         Self { conn }
     }
 
-    fn transaction(&mut self) -> Transaction {
+    fn transaction(&mut self) -> Transaction<'_> {
         self.conn
             .transaction_with_behavior(TransactionBehavior::Exclusive)
             .unwrap()
