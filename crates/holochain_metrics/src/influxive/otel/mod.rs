@@ -21,23 +21,7 @@ impl InfluxiveOtelWriter {
         match otel_metric.data() {
             AggregatedMetrics::F64(metric_data) => match metric_data {
                 MetricData::Histogram(histogram) => {
-                    for data_point in histogram.data_points() {
-                        let mut influxive_metric =
-                            super::types::Metric::new(histogram.time(), otel_metric.name())
-                                .with_field("count", data_point.count())
-                                .with_field("sum", data_point.sum());
-                        if let Some(min) = data_point.min() {
-                            influxive_metric = influxive_metric.with_field("min", min);
-                        }
-                        if let Some(max) = data_point.max() {
-                            influxive_metric = influxive_metric.with_field("max", max);
-                        }
-                        for attribute in data_point.attributes() {
-                            influxive_metric = influxive_metric
-                                .with_tag(attribute.key.to_string(), attribute.value.to_string());
-                        }
-                        self.influxive.write_metric(influxive_metric);
-                    }
+                    self.write_histogram(histogram, otel_metric.name());
                 }
                 MetricData::Gauge(gauge) => {
                     for data_point in gauge.data_points() {
@@ -61,6 +45,9 @@ impl InfluxiveOtelWriter {
             AggregatedMetrics::U64(MetricData::Sum(sum)) => {
                 self.write_sum(sum, otel_metric.name());
             }
+            AggregatedMetrics::U64(MetricData::Histogram(histogram)) => {
+                self.write_histogram(histogram, otel_metric.name());
+            }
             unimplemented_metric => {
                 tracing::error!(?unimplemented_metric, "metric not implemented")
             }
@@ -74,6 +61,31 @@ impl InfluxiveOtelWriter {
         for data_point in sum.data_points() {
             let mut influxive_metric =
                 super::types::Metric::new(sum.time(), name).with_field("sum", data_point.value());
+            for attribute in data_point.attributes() {
+                influxive_metric = influxive_metric
+                    .with_tag(attribute.key.to_string(), attribute.value.to_string());
+            }
+            self.influxive.write_metric(influxive_metric);
+        }
+    }
+
+    fn write_histogram<T>(
+        &self,
+        histogram: &opentelemetry_sdk::metrics::data::Histogram<T>,
+        name: &str,
+    ) where
+        T: Copy + Into<super::types::DataType>,
+    {
+        for data_point in histogram.data_points() {
+            let mut influxive_metric = super::types::Metric::new(histogram.time(), name)
+                .with_field("count", data_point.count())
+                .with_field("sum", data_point.sum());
+            if let Some(min) = data_point.min() {
+                influxive_metric = influxive_metric.with_field("min", min);
+            }
+            if let Some(max) = data_point.max() {
+                influxive_metric = influxive_metric.with_field("max", max);
+            }
             for attribute in data_point.attributes() {
                 influxive_metric = influxive_metric
                     .with_tag(attribute.key.to_string(), attribute.value.to_string());

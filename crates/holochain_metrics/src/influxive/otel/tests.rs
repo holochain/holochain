@@ -137,6 +137,60 @@ async fn f64_histogram() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn u64_histogram() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (svc, meter_provider) = setup(tmp.path()).await;
+
+    let name = "u64_histogram";
+    let metric = meter_provider
+        .meter("influxive")
+        .u64_histogram(name)
+        .build();
+
+    metric.record(1, &[]);
+
+    // Influx writes u64 values into one table and f64 values into another table.
+    // Hence, 2 tables are expected to be present.
+    let result = poll_query(&svc, name, "|> last()", 300, |r| {
+        r.tables.len() == 1 && r.tables[0].rows.len() == 4
+    })
+    .await;
+
+    assert_eq!(result.tables[0].get::<String>(0, "_measurement"), name);
+    assert_eq!(result.tables[0].get::<String>(0, "_field"), "count");
+    assert_eq!(result.tables[0].get::<u64>(0, "_value"), 1);
+    assert_eq!(result.tables[0].get::<String>(1, "_field"), "max");
+    assert_eq!(result.tables[0].get::<u64>(0, "_value"), 1);
+    assert_eq!(result.tables[0].get::<String>(2, "_field"), "min");
+    assert_eq!(result.tables[0].get::<u64>(1, "_value"), 1);
+    assert_eq!(result.tables[0].get::<String>(3, "_field"), "sum");
+    assert_eq!(result.tables[0].get::<u64>(2, "_value"), 1);
+
+    // Record many metrics at once
+    for i in 0..10 {
+        metric.record(i, &[]);
+    }
+
+    // Keep polling until the expected counts 11 and 9 show up.
+    let result = poll_query(&svc, name, "|> last()", 1000, |r| {
+        r.tables.len() == 1
+            && r.tables[0].rows.len() == 4
+            && r.tables[0].get::<u64>(0, "_value") == 11
+    })
+    .await;
+
+    assert_eq!(result.tables[0].get::<String>(0, "_field"), "count");
+    assert_eq!(result.tables[0].get::<String>(1, "_field"), "max");
+    assert_eq!(result.tables[0].get::<String>(2, "_field"), "min");
+    assert_eq!(result.tables[0].get::<String>(3, "_field"), "sum");
+    assert_eq!(result.tables[0].get::<u64>(1, "_value"), 9);
+    assert_eq!(result.tables[0].get::<u64>(2, "_value"), 0);
+    assert_eq!(result.tables[0].get::<u64>(3, "_value"), 46);
+
+    svc.shutdown();
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn f64_observable_gauge() {
     let tmp = tempfile::tempdir().unwrap();
     let (svc, meter_provider) = setup(tmp.path()).await;
