@@ -97,6 +97,7 @@
 //! | `hc.conductor.workflow.duration` |
 //! | `hc.conductor.workflow.integrated_ops` |
 //! | `hc.conductor.workflow.integration_delay` |
+//! | `hc.conductor.workflow.validation_attempts` |
 //! | `hc.conductor.post_commit.duration` |
 //! | `hc.conductor.uptime` |
 //! | `hc.conductor.app_ws.dropped_signal` |

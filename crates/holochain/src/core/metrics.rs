@@ -68,6 +68,19 @@ pub(crate) fn op_integration_delay_metric() -> &'static OpIntegrationDelayMetric
     })
 }
 
+pub(crate) type OpValidationAttemptsMetric = metrics::Histogram<u64>;
+
+static OP_VALIDATION_ATTEMPTS_METRIC: OnceLock<OpValidationAttemptsMetric> = OnceLock::new();
+
+pub(crate) fn op_validation_attempts_metric() -> &'static OpValidationAttemptsMetric {
+    OP_VALIDATION_ATTEMPTS_METRIC.get_or_init(|| {
+        meter("hc.conductor")
+            .u64_histogram("hc.conductor.workflow.validation_attempts")
+            .with_description("Number of validation attempts required to integrate an op.")
+            .build()
+    })
+}
+
 pub(crate) type WasmUsageMetric = metrics::Counter<u64>;
 
 pub(crate) fn create_ribosome_wasm_usage_metric() -> WasmUsageMetric {

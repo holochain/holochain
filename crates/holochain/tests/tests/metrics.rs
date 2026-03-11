@@ -15,6 +15,7 @@ use std::time::Duration;
 // - hc.conductor.workflow.duration
 // - hc.conductor.workflow.integrated_ops
 // - hc.conductor.workflow.integration_delay
+// - hc.conductor.workflow.validation_attempts
 // - hc.conductor.post_commit.duration
 // - hc.conductor.uptime
 // - hc.ribosome.wasm.usage
@@ -109,6 +110,7 @@ async fn metrics() {
                 && metrics.matches("hc.conductor.workflow.duration").count() >= 8
                 && metrics.contains("hc.conductor.workflow.integrated_ops")
                 && metrics.contains("hc.conductor.workflow.integration_delay")
+                && metrics.contains("hc.conductor.workflow.validation_attempts")
                 && metrics.contains("hc.conductor.post_commit.duration")
                 && metrics.contains("hc.conductor.uptime")
                 && metrics.matches("hc.ribosome.wasm.usage").count() >= 4
@@ -183,6 +185,17 @@ async fn metrics() {
     metrics
         .clone()
         .filter(|line| line.contains("hc.conductor.workflow.integration_delay"))
+        .for_each(|metric| {
+            assert!(metric.contains("dna_hash="));
+            assert!(metric.contains("count="));
+            assert!(metric.contains("sum="));
+            assert!(metric.contains("max="));
+            assert!(metric.contains("min="));
+        });
+
+    metrics
+        .clone()
+        .filter(|line| line.contains("hc.conductor.workflow.validation_attempts"))
         .for_each(|metric| {
             assert!(metric.contains("dna_hash="));
             assert!(metric.contains("count="));

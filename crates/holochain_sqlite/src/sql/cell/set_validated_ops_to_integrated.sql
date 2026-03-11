@@ -12,6 +12,7 @@ RETURNING
   authored_timestamp,
   validation_status,
   when_stored,
+  num_validation_attempts,
   -- Return the action author when the op is an action.
   (
     SELECT
