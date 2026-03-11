@@ -2,14 +2,18 @@ use opentelemetry::{global::meter, metrics, metrics::Histogram};
 use std::sync::OnceLock;
 use std::time::Instant;
 
-pub type PostCommitDurationMetric = Histogram<f64>;
+pub(crate) type PostCommitDurationMetric = Histogram<f64>;
 
-pub fn create_post_commit_duration_metric() -> PostCommitDurationMetric {
-    meter("hc.conductor")
-        .f64_histogram("hc.conductor.post_commit.duration")
-        .with_unit("s")
-        .with_description("The time spent executing a post commit")
-        .build()
+static POST_COMMIT_DURATION_METRIC: OnceLock<PostCommitDurationMetric> = OnceLock::new();
+
+pub(crate) fn post_commit_duration_metric() -> &'static PostCommitDurationMetric {
+    POST_COMMIT_DURATION_METRIC.get_or_init(|| {
+        meter("hc.conductor")
+            .f64_histogram("hc.conductor.post_commit.duration")
+            .with_unit("s")
+            .with_description("The time spent executing a post commit")
+            .build()
+    })
 }
 
 pub(crate) type DroppedSignalMetric = metrics::Counter<u64>;
