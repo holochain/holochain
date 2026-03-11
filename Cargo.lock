@@ -9512,3 +9512,31 @@ dependencies = [
  "cc",
  "pkg-config",
 ]
+
+[[patch.unused]]
+name = "kitsune2"
+version = "0.4.0-dev.4"
+
+[[patch.unused]]
+name = "kitsune2_api"
+version = "0.4.0-dev.4"
+
+[[patch.unused]]
+name = "kitsune2_bootstrap_client"
+version = "0.4.0-dev.4"
+
+[[patch.unused]]
+name = "kitsune2_bootstrap_srv"
+version = "0.4.0-dev.4"
+
+[[patch.unused]]
+name = "kitsune2_core"
+version = "0.4.0-dev.4"
+
+[[patch.unused]]
+name = "kitsune2_dht"
+version = "0.4.0-dev.4"
+
+[[patch.unused]]
+name = "kitsune2_gossip"
+version = "0.4.0-dev.4"

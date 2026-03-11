@@ -351,6 +351,12 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
     /// Query if an agent is blocked.
     fn is_blocked(&self, target: BlockTargetId) -> BoxFut<'_, HolochainP2pResult<bool>>;
 
+    /// Get the local socket addresses from the underlying transport.
+    /// Used for WebRTC ICE candidate extraction.
+    fn local_socket_addrs(&self) -> BoxFut<'_, HolochainP2pResult<Vec<std::net::SocketAddr>>> {
+        Box::pin(async { Ok(Vec::new()) })
+    }
+
     /// Get the conductor database getter.
     fn conductor_db_getter(&self) -> crate::GetDbConductor;
 }
