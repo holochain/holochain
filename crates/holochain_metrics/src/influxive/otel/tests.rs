@@ -242,8 +242,8 @@ async fn u64_counter_with_attributes() {
     let attributes = vec![KeyValue::new("key", "value1")];
     metric.add(1, &attributes);
 
-    let result = poll_query(&svc, name, "", 300, |r| {
-        r.tables.len() == 1 && !r.tables[0].rows.is_empty() && r.tables[0].rows.len() <= 2
+    let result = poll_query(&svc, name, "|> last()", 300, |r| {
+        r.tables.len() == 1 && r.tables[0].rows.len() == 1
     })
     .await;
     assert_eq!(result.tables[0].get::<u64>(0, "_value"), 1);
