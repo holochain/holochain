@@ -88,7 +88,7 @@
 //! ## Metric Name Registry
 //!
 //! These following metrics are defined and recorded in their respective crates.
-//! Do a text search to look up metric type, description and unit
+//! Do a text search to look up metric type, description and unit.
 //!
 //! | Full Metric Name |
 //! | ---------------- |

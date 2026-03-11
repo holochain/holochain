@@ -11,9 +11,8 @@ use super::host_fn::HostFnApi;
 use super::HostContext;
 use super::ZomeCallHostAccess;
 use crate::core::metrics::{
-    create_host_fn_call_duration_metric, create_ribosome_wasm_call_duration_metric,
-    create_ribosome_wasm_usage_metric, create_ribosome_zome_call_duration_metric,
-    HostFnCallDurationMetric, WasmCallDurationMetric, WasmUsageMetric, ZomeCallDurationMetric,
+    host_fn_call_duration_metric, ribosome_wasm_call_duration_metric,
+    ribosome_wasm_usage_metric, ribosome_zome_call_duration_metric,
 };
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
@@ -146,18 +145,6 @@ pub struct RealRibosome {
     /// Dependencies for every zome.
     pub zome_dependencies: Arc<HashMap<ZomeName, Vec<ZomeIndex>>>,
 
-    /// Instrument to measure metered wasm usage.
-    pub usage_meter: Arc<WasmUsageMetric>,
-
-    /// Instrument to measure zome call duration.
-    pub zome_call_duration_metric: Arc<ZomeCallDurationMetric>,
-
-    /// Instrument to measure wasm call duration.
-    pub wasm_call_duration_metric: Arc<WasmCallDurationMetric>,
-
-    /// Instrument to measure host function call duration.
-    pub host_fn_call_duration_metric: Arc<HostFnCallDurationMetric>,
-
     /// File system and in-memory cache for wasm modules.
     pub wasmer_module_cache: Option<Arc<ModuleCacheLock>>,
 }
@@ -191,7 +178,6 @@ impl HostFnBuilder {
     {
         let ribosome_arc = Arc::clone(&self.ribosome_arc);
         let host_function_name_clone = host_function_name.to_string();
-        let host_fn_call_duration_metric = self.ribosome_arc.host_fn_call_duration_metric.clone();
         let context_key = self.context_key;
         {
             let mut store_lock = self.store.lock();
@@ -226,7 +212,7 @@ impl HostFnBuilder {
                                 let start = std::time::Instant::now();
                                 let result = host_function(Arc::clone(&ribosome_arc), context_arc, input);
                                 let elapsed = start.elapsed().as_secs_f64();
-                                host_fn_call_duration_metric.record(elapsed, &attributes);
+                                host_fn_call_duration_metric().record(elapsed, &attributes);
                                 result
                             },
                             Err(runtime_error) => Result::<_, RuntimeError>::Err(runtime_error),
@@ -267,10 +253,6 @@ impl RealRibosome {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
-            usage_meter: create_ribosome_wasm_usage_metric().into(),
-            zome_call_duration_metric: create_ribosome_zome_call_duration_metric().into(),
-            wasm_call_duration_metric: create_ribosome_wasm_call_duration_metric().into(),
-            host_fn_call_duration_metric: create_host_fn_call_duration_metric().into(),
             wasmer_module_cache,
         };
 
@@ -362,10 +344,6 @@ impl RealRibosome {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
-            usage_meter: create_ribosome_wasm_usage_metric().into(),
-            zome_call_duration_metric: create_ribosome_zome_call_duration_metric().into(),
-            wasm_call_duration_metric: create_ribosome_wasm_call_duration_metric().into(),
-            host_fn_call_duration_metric: create_host_fn_call_duration_metric().into(),
             wasmer_module_cache: Some(Arc::new(ModuleCacheLock::new(ModuleCache::new(None)))),
         }
     }
@@ -790,11 +768,11 @@ impl RealRibosome {
 
                     // Record zome call duration
                     let elapsed = start.elapsed().as_secs_f64();
-                    self.wasm_call_duration_metric.record(elapsed, &attributes);
+                    ribosome_wasm_call_duration_metric().record(elapsed, &attributes);
 
                     // Get metering points consumed in zome call and save to usage_meter
                     let points_used = get_used_metering_points(instance_with_store.clone());
-                    self.usage_meter.add(points_used, &attributes);
+                    ribosome_wasm_usage_metric().add(points_used, &attributes);
 
                     // remove context from map after call
                     {
@@ -1056,7 +1034,7 @@ impl RibosomeT for RealRibosome {
 
         // Record call zome duration.
         let elapsed = start.elapsed().as_secs_f64();
-        self.zome_call_duration_metric.record(elapsed, &attributes);
+        ribosome_zome_call_duration_metric().record(elapsed, &attributes);
 
         Ok(ZomeCallResponse::Ok(guest_output))
     }

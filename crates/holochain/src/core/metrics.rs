@@ -83,41 +83,57 @@ pub(crate) fn op_validation_attempts_metric() -> &'static OpValidationAttemptsMe
 
 pub(crate) type WasmUsageMetric = metrics::Counter<u64>;
 
-pub(crate) fn create_ribosome_wasm_usage_metric() -> WasmUsageMetric {
-    meter("hc.ribosome.wasm")
-        .u64_counter("hc.ribosome.wasm.usage")
-        .with_description("The metered usage of a wasm ribosome.")
-        .build()
+static WASM_USAGE_METRIC: OnceLock<WasmUsageMetric> = OnceLock::new();
+
+pub(crate) fn ribosome_wasm_usage_metric() -> &'static WasmUsageMetric {
+    WASM_USAGE_METRIC.get_or_init(|| {
+        meter("hc.ribosome.wasm")
+            .u64_counter("hc.ribosome.wasm.usage")
+            .with_description("The metered usage of a wasm ribosome.")
+            .build()
+    })
 }
 
 pub(crate) type WasmCallDurationMetric = metrics::Histogram<f64>;
 
-pub(crate) fn create_ribosome_wasm_call_duration_metric() -> WasmCallDurationMetric {
-    meter("hc.ribosome.wasm")
-        .f64_histogram("hc.ribosome.wasm_call.duration")
-        .with_unit("s")
-        .with_description("The time spent running a wasm call.")
-        .build()
+static WASM_CALL_DURATION_METRIC: OnceLock<WasmCallDurationMetric> = OnceLock::new();
+
+pub(crate) fn ribosome_wasm_call_duration_metric() -> &'static WasmCallDurationMetric {
+    WASM_CALL_DURATION_METRIC.get_or_init(|| {
+        meter("hc.ribosome.wasm")
+            .f64_histogram("hc.ribosome.wasm_call.duration")
+            .with_unit("s")
+            .with_description("The time spent running a wasm call.")
+            .build()
+    })
 }
 
 pub(crate) type ZomeCallDurationMetric = metrics::Histogram<f64>;
 
-pub(crate) fn create_ribosome_zome_call_duration_metric() -> ZomeCallDurationMetric {
-    meter("hc.ribosome.wasm")
-        .f64_histogram("hc.ribosome.zome_call.duration")
-        .with_unit("s")
-        .with_description("The time spent running a zome call.")
-        .build()
+static ZOME_CALL_DURATION_METRIC: OnceLock<ZomeCallDurationMetric> = OnceLock::new();
+
+pub(crate) fn ribosome_zome_call_duration_metric() -> &'static ZomeCallDurationMetric {
+    ZOME_CALL_DURATION_METRIC.get_or_init(|| {
+        meter("hc.ribosome.wasm")
+            .f64_histogram("hc.ribosome.zome_call.duration")
+            .with_unit("s")
+            .with_description("The time spent running a zome call.")
+            .build()
+    })
 }
 
 pub(crate) type HostFnCallDurationMetric = metrics::Histogram<f64>;
 
-pub(crate) fn create_host_fn_call_duration_metric() -> HostFnCallDurationMetric {
-    meter("hc.ribosome")
-        .f64_histogram("hc.ribosome.host_fn_call.duration")
-        .with_unit("s")
-        .with_description("The time spent executing a host function call.")
-        .build()
+static HOST_FN_CALL_DURATION_METRIC: OnceLock<HostFnCallDurationMetric> = OnceLock::new();
+
+pub(crate) fn host_fn_call_duration_metric() -> &'static HostFnCallDurationMetric {
+    HOST_FN_CALL_DURATION_METRIC.get_or_init(|| {
+        meter("hc.ribosome")
+            .f64_histogram("hc.ribosome.host_fn_call.duration")
+            .with_unit("s")
+            .with_description("The time spent executing a host function call.")
+            .build()
+    })
 }
 
 pub(crate) type EmitSignalMetric = metrics::Counter<u64>;
