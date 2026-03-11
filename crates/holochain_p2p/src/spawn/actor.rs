@@ -2348,6 +2348,13 @@ impl actor::HcP2p for HolochainP2pActor {
         })
     }
 
+    fn local_socket_addrs(&self) -> BoxFut<'_, HolochainP2pResult<Vec<std::net::SocketAddr>>> {
+        let kitsune = self.kitsune.clone();
+        Box::pin(async move {
+            Ok(kitsune.transport().await?.local_socket_addrs().await?)
+        })
+    }
+
     fn conductor_db_getter(&self) -> GetDbConductor {
         self.blocks_db_getter.clone()
     }
