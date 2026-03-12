@@ -896,7 +896,6 @@ impl HolochainP2pActor {
             let mut attributes = vec![
                 opentelemetry::KeyValue::new("dna_hash", format!("{dna_hash:?}")),
                 opentelemetry::KeyValue::new("tag", tag),
-                opentelemetry::KeyValue::new("url", to_url.as_str().to_string()),
                 opentelemetry::KeyValue::new("error", error),
             ];
             if let Some((zome, function)) = zome_call_origin {

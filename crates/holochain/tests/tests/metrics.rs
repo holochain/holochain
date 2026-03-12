@@ -352,7 +352,6 @@ async fn metrics() {
         .for_each(|metric| {
             assert!(metric.contains("dna_hash="));
             assert!(metric.contains("tag="));
-            assert!(metric.contains("url="));
             assert!(metric.contains("error="));
             // All network requests should have been made by the zome calls.
             assert!(metric.contains("zome=create_entry"));
