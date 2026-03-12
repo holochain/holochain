@@ -90,29 +90,29 @@
 //! These following metrics are defined and recorded in their respective crates.
 //! Do a text search to look up metric type, description and unit.
 //!
-//! | Full Metric Name |
-//! | ---------------- |
-//! | `hc.db.connections.use_time` |
-//! | `hc.db.write_txn.duration` |
-//! | `hc.keystore.lair_request.duration` |
-//! | `hc.conductor.workflow.duration` |
-//! | `hc.conductor.workflow.integrated_ops` |
-//! | `hc.conductor.workflow.integration_delay` |
-//! | `hc.conductor.workflow.validation_attempts` |
-//! | `hc.conductor.post_commit.duration` |
-//! | `hc.conductor.uptime` |
-//! | `hc.conductor.app_ws.dropped_signal` |
-//! | `hc.ribosome.wasm.usage` |
-//! | `hc.ribosome.zome_call.duration` |
-//! | `hc.ribosome.wasm_call.duration` |
-//! | `hc.ribosome.host_fn_call.duration` |
-//! | `hc.ribosome.host_fn.emit_signal` |
-//! | `hc.ribosome.host_fn.send_remote_signal` |
-//! | `hc.cascade.duration` |
-//! | `hc.cascade.fetch_error` |
-//! | `hc.holochain_p2p.request.duration` |
-//! | `hc.holochain_p2p.handle_request.duration` |
-//! | `hc.holochain_p2p.recv_remote_signal` |
+//! | Full Metric Name | Type | Unit (optional) | Description | Attributes |
+//! | ---------------- | ---- | --------------- | ----------- | ---------- |
+//! | `hc.db.connections.use_time` | f64 histogram | s | The time between borrowing a connection and returning it to the pool | `kind`: DB type (authored/dht/cache/…), `id`: DB instance identifier |
+//! | `hc.db.write_txn.duration` | f64 histogram | s | The time spent executing an exclusive write transaction | `kind`: DB type (authored/dht/cache/…), `id`: DB instance identifier |
+//! | `hc.keystore.lair_request.duration` | f64 histogram | s | Duration of signing and encryption requests to Lair | `operation`: cryptographic operation (sign/encrypt/…) |
+//! | `hc.conductor.workflow.duration` | f64 histogram | s | The time spent running a workflow | `workflow`: workflow process name, `dna_hash`: DNA identifier, `agent`: agent public key |
+//! | `hc.conductor.workflow.integrated_ops` | u64 counter | | The number of integrated operations | |
+//! | `hc.conductor.workflow.integration_delay` | f64 histogram | s | Time between an op being stored and it being integrated | |
+//! | `hc.conductor.workflow.validation_attempts` | u64 histogram | | Number of validation attempts required to integrate an op | |
+//! | `hc.conductor.post_commit.duration` | f64 histogram | s | The time spent executing a post commit | `dna_hash`: DNA identifier, `agent`: agent public key |
+//! | `hc.conductor.uptime` | f64 observable gauge | s | The number of seconds the conductor has been running | |
+//! | `hc.conductor.app_ws.dropped_signal` | u64 counter | | The number of signals dropped from app ws due to channel overload | |
+//! | `hc.ribosome.wasm.usage` | u64 counter | | The metered usage of a wasm ribosome | `dna_hash`: DNA identifier, `zome`: zome module name, `fn`: function name, `agent`: agent public key |
+//! | `hc.ribosome.zome_call.duration` | f64 histogram | s | The time spent running a zome call | `dna_hash`: DNA identifier, `zome`: zome module name, `fn`: function name |
+//! | `hc.ribosome.wasm_call.duration` | f64 histogram | s | The time spent running a wasm call | `dna_hash`: DNA identifier, `zome`: zome module name, `fn`: function name, `agent`: agent public key |
+//! | `hc.ribosome.host_fn_call.duration` | f64 histogram | s | The time spent executing a host function call | `dna_hash`: DNA identifier, `zome`: zome module name, `fn`: function name, `host_fn`: host function name |
+//! | `hc.ribosome.host_fn.emit_signal` | u64 counter | | The number of local signals emitted | `cell_id`: cell identifier, `zome`: zome module name |
+//! | `hc.ribosome.host_fn.send_remote_signal` | u64 counter | | The number of remote signals sent | `dna_hash`: DNA identifier, `zome`: zome module name |
+//! | `hc.cascade.duration` | f64 histogram | s | The time taken to execute a cascade query | `zome`: originating zome name, `fn`: originating function name |
+//! | `hc.cascade.fetch_error` | u64 counter | | Number of errors encountered while fetching data from the network | `fetch_type`: type of data fetched, `zome`: originating zome name, `fn`: originating function name |
+//! | `hc.holochain_p2p.request.duration` | f64 histogram | s | The time spent sending an outgoing p2p request awaiting the response | `dna_hash`: DNA identifier, `tag`: request category tag, `url`: remote peer address, `error`: request failed, `zome`: originating zome name, `fn`: originating function name |
+//! | `hc.holochain_p2p.handle_request.duration` | f64 histogram | s | The time spent handling an incoming p2p request | `message_type`: p2p message type, `dna_hash`: DNA identifier |
+//! | `hc.holochain_p2p.recv_remote_signal` | u64 counter | | The number of remote signals received | `dna_hash`: DNA identifier |
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
