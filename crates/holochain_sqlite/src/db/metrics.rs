@@ -1,6 +1,7 @@
 use super::DbKind;
 use opentelemetry::{global::meter, metrics, KeyValue};
 
+/// An OpenTelemetry f64 histogram pre-bound to a fixed set of attributes.
 #[derive(Clone)]
 pub struct Histogram {
     histogram: metrics::Histogram<f64>,
@@ -8,13 +9,16 @@ pub struct Histogram {
 }
 
 impl Histogram {
+    /// Record a value. The pre-bound attributes are used; `_attributes` is ignored.
     pub fn record(&self, value: f64, _attributes: &[KeyValue]) {
         self.histogram.record(value, &self.attributes);
     }
 }
 
+/// Metric for `hc.db.write_txn.duration`.
 pub type WriteTxnDurationMetric = Histogram;
 
+/// Create a [`WriteTxnDurationMetric`] bound to the given [`DbKind`].
 pub fn create_write_txn_duration_metric(kind: DbKind) -> WriteTxnDurationMetric {
     let histogram = meter("hc.db")
         .f64_histogram("hc.db.write_txn.duration")
@@ -31,8 +35,10 @@ pub fn create_write_txn_duration_metric(kind: DbKind) -> WriteTxnDurationMetric 
     }
 }
 
+/// Metric for `hc.db.connections.use_time`.
 pub type ConnectionUseTimeMetric = Histogram;
 
+/// Create a [`ConnectionUseTimeMetric`] bound to the given [`DbKind`].
 pub fn create_connection_use_time_metric(kind: DbKind) -> ConnectionUseTimeMetric {
     let histogram = meter("hc.db")
         .f64_histogram("hc.db.connections.use_time")
