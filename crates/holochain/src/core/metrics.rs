@@ -18,16 +18,11 @@ pub(crate) type WorkflowDurationMetric = Histogram;
 pub(crate) fn create_workflow_duration_metric(
     workflow_name: String,
     dna_hash: Arc<DnaHash>,
-    agent: Option<AgentPubKey>,
 ) -> WorkflowDurationMetric {
     let mut attributes = vec![
         KeyValue::new("workflow", workflow_name),
         KeyValue::new("dna_hash", dna_hash.to_string()),
     ];
-
-    if let Some(agent) = agent {
-        attributes.push(KeyValue::new("agent", agent.to_string()));
-    }
 
     let histogram = meter("hc.conductor")
         .f64_histogram("hc.conductor.workflow.duration")
