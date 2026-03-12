@@ -351,12 +351,7 @@ impl ConductorBuilder {
         let tm = conductor.task_manager();
         let conductor2 = conductor.clone();
         tm.add_conductor_task_unrecoverable("post_commit_receiver", move |stop| {
-            Self::spawn_post_commit(
-                conductor2,
-                post_commit_receiver,
-                stop,
-            )
-            .map(Ok)
+            Self::spawn_post_commit(conductor2, post_commit_receiver, stop).map(Ok)
         });
 
         let configs = config.admin_interfaces.clone().unwrap_or_default();

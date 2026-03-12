@@ -17,7 +17,9 @@ pub fn p2p_outgoing_request_duration_metric() -> &'static P2pRequestDurationMetr
         meter("hc.holochain_p2p")
             .f64_histogram("hc.holochain_p2p.request.duration")
             .with_unit("s")
-            .with_description("The time spent sending an outgoing p2p request awaiting the response")
+            .with_description(
+                "The time spent sending an outgoing p2p request awaiting the response",
+            )
             .build()
     })
 }

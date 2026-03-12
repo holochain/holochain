@@ -11,8 +11,8 @@ use super::host_fn::HostFnApi;
 use super::HostContext;
 use super::ZomeCallHostAccess;
 use crate::core::metrics::{
-    host_fn_call_duration_metric, ribosome_wasm_call_duration_metric,
-    ribosome_wasm_usage_metric, ribosome_zome_call_duration_metric,
+    host_fn_call_duration_metric, ribosome_wasm_call_duration_metric, ribosome_wasm_usage_metric,
+    ribosome_zome_call_duration_metric,
 };
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
