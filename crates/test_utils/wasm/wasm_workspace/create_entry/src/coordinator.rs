@@ -1,6 +1,6 @@
-use std::collections::HashSet;
 use crate::integrity::*;
 use hdk::prelude::*;
+use std::collections::HashSet;
 
 #[hdk_dependent_entry_types]
 enum EntryZomes {
@@ -71,6 +71,11 @@ fn get_post(hash: ActionHash) -> ExternResult<Option<Record>> {
 }
 
 #[hdk_extern]
+fn get_post_network(hash: ActionHash) -> ExternResult<Option<Record>> {
+    get(hash, GetOptions::network())
+}
+
+#[hdk_extern]
 fn create_msg(_: ()) -> ExternResult<ActionHash> {
     use EntryTypes::*;
     use EntryZomes::*;
@@ -90,7 +95,12 @@ fn create_priv_msg(_: ()) -> ExternResult<ActionHash> {
 fn get_activity(
     input: holochain_test_wasm_common::AgentActivitySearch,
 ) -> ExternResult<AgentActivity> {
-    get_agent_activity(input.agent, input.query, input.request, GetOptions::default())
+    get_agent_activity(
+        input.agent,
+        input.query,
+        input.request,
+        GetOptions::default(),
+    )
 }
 
 #[hdk_extern]
@@ -222,4 +232,9 @@ fn get_validation_receipts(
     input: GetValidationReceiptsInput,
 ) -> ExternResult<Vec<ValidationReceiptSet>> {
     hdk::prelude::get_validation_receipts(input)
+}
+
+#[hdk_extern]
+fn post_commit(_: Vec<SignedActionHashed>) -> ExternResult<()> {
+    Ok(())
 }

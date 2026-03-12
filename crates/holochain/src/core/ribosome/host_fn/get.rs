@@ -1,9 +1,9 @@
+use crate::core::ribosome::host_fn::cascade_from_call_context;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use futures::StreamExt;
-use holochain_cascade::CascadeImpl;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
@@ -29,12 +29,9 @@ pub fn get(
                             any_dht_hash,
                             get_options,
                         } = input;
-                        CascadeImpl::from_workspace_and_network(
-                            &call_context.host_context.workspace(),
-                            call_context.host_context.network().clone(),
-                        )
-                        .dht_get(any_dht_hash, get_options)
-                        .await
+                        cascade_from_call_context(&call_context)
+                            .dht_get(any_dht_hash, get_options)
+                            .await
                     }))
                     // Limit concurrent calls to 10 as each call
                     // can spawn multiple connections.

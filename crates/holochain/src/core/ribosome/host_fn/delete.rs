@@ -2,9 +2,9 @@ use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_cascade::error::CascadeError;
-use holochain_cascade::CascadeImpl;
 use holochain_wasmer_host::prelude::*;
 
+use crate::core::ribosome::host_fn::cascade_from_call_context;
 use crate::core::ribosome::HostFnAccess;
 use holo_hash::ActionHash;
 use holo_hash::EntryHash;
@@ -68,11 +68,8 @@ pub(crate) fn get_original_entry_data(
     call_context: Arc<CallContext>,
     address: ActionHash,
 ) -> Result<(EntryHash, EntryType), WasmHostError> {
-    let network = call_context.host_context.network().clone();
-    let workspace = call_context.host_context.workspace();
-
     tokio_helper::block_forever_on(async move {
-        let cascade = CascadeImpl::from_workspace_and_network(&workspace, network);
+        let cascade = cascade_from_call_context(&call_context);
         let maybe_original_record: Option<SignedActionHashed> = cascade
             .get_details(address.clone().into(), GetOptions::local())
             .await?

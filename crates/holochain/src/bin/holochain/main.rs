@@ -120,7 +120,7 @@ async fn async_main() {
 
     let data_root_path: DataRootPath = config.data_root_path_or_die();
 
-    holochain_metrics::HolochainMetricsConfig::new(data_root_path.as_ref())
+    holochain_metrics::HolochainMetricsConfig::new_from_env_vars(data_root_path.as_ref())
         .init()
         .await;
 

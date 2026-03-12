@@ -705,13 +705,13 @@ async fn queue_consumer_main_task_impl<
 >(
     name: String,
     dna_hash: Arc<DnaHash>,
-    agent: Option<AgentPubKey>,
+    _agent: Option<AgentPubKey>,
     (tx, rx): (TriggerSender, TriggerReceiver),
     stop: StopReceiver,
     mut fut: impl 'static + Send + FnMut() -> Fut,
 ) -> ManagedTaskResult {
     let mut triggers = trigger_stream(rx, stop);
-    let duration_metric = create_workflow_duration_metric(name.clone(), dna_hash, agent);
+    let duration_metric = create_workflow_duration_metric(name.clone(), dna_hash);
     loop {
         if let Some(()) = triggers.next().await {
             let start = Instant::now();

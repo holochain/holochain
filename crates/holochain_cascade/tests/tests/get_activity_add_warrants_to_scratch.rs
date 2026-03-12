@@ -31,7 +31,7 @@ async fn get_as_non_authority_adds_warrants_to_scratch() {
         .returning(|_hash| Ok(false));
     network.expect_get_agent_activity().return_once({
         let warrant = signed_warrant.clone();
-        move |agent, _filter, _options| {
+        move |agent, _filter, _options, _zome_call_origin| {
             let agent_activity_response = AgentActivityResponse {
                 agent,
                 highest_observed: None,
