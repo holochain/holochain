@@ -1,4 +1,4 @@
-use holo_hash::{AgentPubKey, DnaHash};
+use holo_hash::DnaHash;
 use opentelemetry::{global::meter, metrics, KeyValue};
 use std::sync::{Arc, OnceLock};
 
@@ -19,7 +19,7 @@ pub(crate) fn create_workflow_duration_metric(
     workflow_name: String,
     dna_hash: Arc<DnaHash>,
 ) -> WorkflowDurationMetric {
-    let mut attributes = vec![
+    let attributes = vec![
         KeyValue::new("workflow", workflow_name),
         KeyValue::new("dna_hash", dna_hash.to_string()),
     ];

@@ -705,7 +705,7 @@ async fn queue_consumer_main_task_impl<
 >(
     name: String,
     dna_hash: Arc<DnaHash>,
-    agent: Option<AgentPubKey>,
+    _agent: Option<AgentPubKey>,
     (tx, rx): (TriggerSender, TriggerReceiver),
     stop: StopReceiver,
     mut fut: impl 'static + Send + FnMut() -> Fut,
