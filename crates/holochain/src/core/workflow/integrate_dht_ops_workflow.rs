@@ -1,6 +1,9 @@
 //! The workflow and queue consumer for DhtOp integration
 
 use super::*;
+use crate::core::metrics::{
+    op_integration_delay_metric, op_validation_attempts_metric, workflow_integrated_op_metric,
+};
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
@@ -34,87 +37,162 @@ pub async fn integrate_dht_ops_workflow(
     >,
 ) -> WorkflowResult<WorkComplete> {
     let start = std::time::Instant::now();
-    let time = holochain_zome_types::prelude::Timestamp::now();
-    let (stored_ops, block_agents, integrated_pairs) = vault
-        .write_async(move |txn| {
-            let mut stored_ops = Vec::new();
-            let mut block_agents = Vec::new();
-            let mut integrated_pairs: Vec<(DhtOpHash, Option<AgentPubKey>)> = Vec::new();
-            let mut stmt = txn.prepare_cached(SET_VALIDATED_OPS_TO_INTEGRATED)?;
-            let integrated_ops = stmt.query_map(
-                named_params! {
-                    ":when_integrated": time,
-                },
-                |row| {
-                    let op_hash = row.get::<_, DhtOpHash>(0)?;
-                    let op_basis = row.get::<_, OpBasis>(1)?;
-                    let created_at = row.get::<_, Timestamp>(2)?;
-                    let stored_op = StoredOp {
-                        created_at: kitsune2_api::Timestamp::from_micros(created_at.as_micros()),
-                        op_id: op_hash.to_located_k2_op_id(&op_basis),
-                    };
-                    let validation_status = row.get::<_, ValidationStatus>(3)?;
-                    let action_author = row.get::<_, Option<AgentPubKey>>(4)?;
-                    let warrant_author = row.get::<_, Option<AgentPubKey>>(5)?;
-                    let warrantee = row.get::<_, Option<AgentPubKey>>(6)?;
-                    if let Some(ref warrantee) = warrantee {
-                        let Some(ref warrant_author) = warrant_author else {
-                            tracing::warn!(?op_hash, "Warrant missing author while integrating");
-                            return Ok((stored_op, op_hash, action_author));
+    let when_integrated = Timestamp::now();
+    let (stored_ops, block_agents, integrated_pairs, when_stored_times, validation_attempts) =
+        vault
+            .write_async(move |txn| {
+                let mut stored_ops = Vec::new();
+                let mut block_agents = Vec::new();
+                let mut integrated_pairs: Vec<(DhtOpHash, Option<AgentPubKey>)> = Vec::new();
+                let mut when_stored_times: Vec<Option<Timestamp>> = Vec::new();
+                let mut validation_attempts: Vec<Option<u32>> = Vec::new();
+                let mut stmt = txn.prepare_cached(SET_VALIDATED_OPS_TO_INTEGRATED)?;
+                let integrated_ops = stmt.query_map(
+                    named_params! {
+                        ":when_integrated": when_integrated,
+                    },
+                    |row| {
+                        let op_hash = row.get::<_, DhtOpHash>(0)?;
+                        let op_basis = row.get::<_, OpBasis>(1)?;
+                        let created_at = row.get::<_, Timestamp>(2)?;
+                        let stored_op = StoredOp {
+                            created_at: kitsune2_api::Timestamp::from_micros(
+                                created_at.as_micros(),
+                            ),
+                            op_id: op_hash.to_located_k2_op_id(&op_basis),
                         };
-
-                        let op_clone_for_block = op_hash.clone();
-                        match validation_status {
-                            ValidationStatus::Valid => {
-                                tracing::info!(
-                                    ?warrantee,
-                                    ?op_hash,
-                                    "Warrant op is valid, will block the warrantee"
-                                );
-                                block_agents.push((warrantee.clone(), op_clone_for_block));
-                            }
-                            ValidationStatus::Rejected => {
-                                tracing::info!(
-                                    ?warrant_author,
-                                    ?op_hash,
-                                    "Warrant op is invalid, will block the author"
-                                );
-                                block_agents.push((warrant_author.clone(), op_clone_for_block));
-                            }
-                            _ => {
+                        let validation_status = row.get::<_, ValidationStatus>(3)?;
+                        let when_stored = row.get::<_, Option<Timestamp>>(4)?;
+                        let num_validation_attempts = row.get::<_, Option<u32>>(5)?;
+                        let action_author = row.get::<_, Option<AgentPubKey>>(6)?;
+                        let warrant_author = row.get::<_, Option<AgentPubKey>>(7)?;
+                        let warrantee = row.get::<_, Option<AgentPubKey>>(8)?;
+                        if let Some(ref warrantee) = warrantee {
+                            let Some(ref warrant_author) = warrant_author else {
                                 tracing::warn!(
-                                    ?validation_status,
                                     ?op_hash,
-                                    "Unexpected validation status for op being integrated"
+                                    "Warrant missing author while integrating"
                                 );
+                                return Ok((
+                                    stored_op,
+                                    op_hash,
+                                    action_author,
+                                    when_stored,
+                                    num_validation_attempts,
+                                ));
+                            };
+
+                            let op_clone_for_block = op_hash.clone();
+                            match validation_status {
+                                ValidationStatus::Valid => {
+                                    tracing::info!(
+                                        ?warrantee,
+                                        ?op_hash,
+                                        "Warrant op is valid, will block the warrantee"
+                                    );
+                                    block_agents.push((warrantee.clone(), op_clone_for_block));
+                                }
+                                ValidationStatus::Rejected => {
+                                    tracing::info!(
+                                        ?warrant_author,
+                                        ?op_hash,
+                                        "Warrant op is invalid, will block the author"
+                                    );
+                                    block_agents.push((warrant_author.clone(), op_clone_for_block));
+                                }
+                                _ => {
+                                    tracing::warn!(
+                                        ?validation_status,
+                                        ?op_hash,
+                                        "Unexpected validation status for op being integrated"
+                                    );
+                                }
                             }
                         }
-                    }
 
-                    Ok((stored_op, op_hash, action_author))
-                },
-            )?;
-            for integrated_op in integrated_ops {
-                let (stored_op, op_hash, author) = integrated_op?;
-                stored_ops.push(stored_op);
-                integrated_pairs.push((op_hash, author));
-            }
+                        Ok((
+                            stored_op,
+                            op_hash,
+                            action_author,
+                            when_stored,
+                            num_validation_attempts,
+                        ))
+                    },
+                )?;
+                for integrated_op in integrated_ops {
+                    let (stored_op, op_hash, author, when_stored, num_attempts) = integrated_op?;
+                    stored_ops.push(stored_op);
+                    integrated_pairs.push((op_hash, author));
+                    when_stored_times.push(when_stored);
+                    validation_attempts.push(num_attempts);
+                }
 
-            WorkflowResult::Ok((stored_ops, block_agents, integrated_pairs))
-        })
-        .await?;
+                WorkflowResult::Ok((
+                    stored_ops,
+                    block_agents,
+                    integrated_pairs,
+                    when_stored_times,
+                    validation_attempts,
+                ))
+            })
+            .await?;
     let changed = stored_ops.len();
     let ops_ps = changed as f64 / start.elapsed().as_micros() as f64 * 1_000_000.0;
-    tracing::info!(?changed, %ops_ps, "ops integrated");
+    tracing::debug!(?changed, %ops_ps, "ops integrated");
+    let dna_hash = network.dna_hash().clone();
+
+    // Record integrated ops metric.
+    let dna_hash_str = dna_hash.to_string();
+    workflow_integrated_op_metric().add(
+        changed as u64,
+        &[opentelemetry::KeyValue::new(
+            "dna_hash",
+            dna_hash_str.clone(),
+        )],
+    );
+
+    // Record op integration delay metric.
+    let metric = op_integration_delay_metric();
+    when_stored_times
+        .into_iter()
+        // discard None values
+        .flatten()
+        .for_each(|when_stored| {
+            let delay_secs =
+                (when_integrated.as_micros() - when_stored.as_micros()).max(0) as f64 / 1_000_000.0;
+            metric.record(
+                delay_secs,
+                &[opentelemetry::KeyValue::new(
+                    "dna_hash",
+                    dna_hash_str.clone(),
+                )],
+            );
+        });
+
+    // Record op validation attempts metric.
+    let metric = op_validation_attempts_metric();
+    validation_attempts
+        .into_iter()
+        // discard None values
+        .flatten()
+        .for_each(|attempts| {
+            metric.record(
+                attempts as u64,
+                &[opentelemetry::KeyValue::new(
+                    "dna_hash",
+                    dna_hash_str.clone(),
+                )],
+            );
+        });
+
     if changed > 0 {
-        let dna_hash = network.dna_hash().clone();
         network.new_integrated_data(stored_ops).await?;
 
         update_local_authored_status(
             authored_db_provider.clone(),
             publish_trigger_provider,
             &dna_hash,
-            time,
+            when_integrated,
             integrated_pairs,
         )
         .await?;

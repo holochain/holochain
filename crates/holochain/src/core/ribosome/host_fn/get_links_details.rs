@@ -1,9 +1,9 @@
+use crate::core::ribosome::host_fn::cascade_from_call_context;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use futures::future::join_all;
-use holochain_cascade::CascadeImpl;
 use holochain_p2p::actor::GetLinksRequestOptions;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
@@ -39,18 +39,15 @@ pub fn get_links_details(
                             before: None,
                             author: None,
                         };
-                        Ok(CascadeImpl::from_workspace_and_network(
-                            &call_context.host_context.workspace(),
-                            call_context.host_context.network().to_owned(),
-                        )
-                        .get_links_details(
-                            key,
-                            GetLinksRequestOptions {
-                                get_options,
-                                ..Default::default()
-                            },
-                        )
-                        .await?)
+                        Ok(cascade_from_call_context(&call_context)
+                            .get_links_details(
+                                key,
+                                GetLinksRequestOptions {
+                                    get_options,
+                                    ..Default::default()
+                                },
+                            )
+                            .await?)
                     }))
                     .await
                 });

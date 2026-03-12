@@ -1,9 +1,9 @@
+use crate::core::ribosome::host_fn::cascade_from_call_context;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use futures::future::join_all;
-use holochain_cascade::CascadeImpl;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
@@ -26,12 +26,9 @@ pub fn get_details(
                             any_dht_hash,
                             get_options,
                         } = input;
-                        CascadeImpl::from_workspace_and_network(
-                            &call_context.host_context.workspace(),
-                            call_context.host_context.network().to_owned(),
-                        )
-                        .get_details(any_dht_hash, get_options)
-                        .await
+                        cascade_from_call_context(&call_context)
+                            .get_details(any_dht_hash, get_options)
+                            .await
                     }))
                     .await
                 });
@@ -93,9 +90,7 @@ pub mod wasm_test {
                         let countree = CounTree::try_from(eb.clone().into_sb()).unwrap();
                         assert_eq!(countree, CounTree(count));
                     }
-                    _ => panic!(
-                        "failed to deserialize {details:?}, {count}, {update}, {delete}"
-                    ),
+                    _ => panic!("failed to deserialize {details:?}, {count}, {update}, {delete}"),
                 }
                 assert_eq!(entry_details.updates.len(), update, "{line}");
                 assert_eq!(entry_details.deletes.len(), delete, "{line}");

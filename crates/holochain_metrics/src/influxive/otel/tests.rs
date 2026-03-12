@@ -25,11 +25,12 @@ async fn u64_counter() {
 
     metric.add(1, &[]);
 
-    let result = poll_query(&svc, name, "|> last()", 300, |r| {
-        r.tables.len() == 1 && r.tables[0].rows.len() == 1
+    poll_query(&svc, name, "|> last()", 300, |r| {
+        r.tables.len() == 1
+            && r.tables[0].rows.len() == 1
+            && r.tables[0].get::<u64>(0, "_value") == 1
     })
     .await;
-    assert_eq!(result.tables[0].get::<u64>(0, "_value"), 1);
 
     for _ in 0..5 {
         metric.add(1, &[]);
@@ -39,6 +40,38 @@ async fn u64_counter() {
         r.tables.len() == 1
             && r.tables[0].rows.len() == 1
             && r.tables[0].get::<u64>(0, "_value") == 6
+    })
+    .await;
+
+    svc.shutdown();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn i64_up_down_counter() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (svc, meter_provider) = setup(tmp.path()).await;
+
+    let name = "i64_up_down_counter";
+    let metric = meter_provider
+        .meter("influxive")
+        .i64_up_down_counter(name)
+        .build();
+
+    metric.add(1, &[]);
+
+    poll_query(&svc, name, "|> last()", 300, |r| {
+        r.tables.len() == 1
+            && r.tables[0].rows.len() == 1
+            && r.tables[0].get::<i64>(0, "_value") == 1
+    })
+    .await;
+
+    metric.add(-1, &[]);
+
+    poll_query(&svc, name, "|> last()", 300, |r| {
+        r.tables.len() == 1
+            && r.tables[0].rows.len() == 1
+            && r.tables[0].get::<i64>(0, "_value") == 0
     })
     .await;
 
@@ -60,12 +93,8 @@ async fn f64_histogram() {
 
     // Influx writes u64 values into one table and f64 values into another table.
     // Hence, 2 tables are expected to be present.
-    let result = poll_query(&svc, name, "", 300, |r| {
-        r.tables.len() == 2
-            && !r.tables[0].rows.is_empty()
-            && r.tables[0].rows.len() <= 3
-            && r.tables[1].rows.len() >= 3
-            && r.tables[1].rows.len() <= 5
+    let result = poll_query(&svc, name, "|> last()", 300, |r| {
+        r.tables.len() == 2 && r.tables[0].rows.len() == 1 && r.tables[1].rows.len() == 3
     })
     .await;
 
@@ -86,10 +115,7 @@ async fn f64_histogram() {
         metric.record(f64::from(i), &[]);
     }
 
-    // Expect two rows now per field value, with the updated count visible.
-    // It could happen that the first table contains a second line with
-    // the initial value of 1, so keep polling until the expected count
-    // 11 shows up.
+    // Keep polling until the expected counts 11 and 9.0 show up.
     let result = poll_query(&svc, name, "|> last()", 400, |r| {
         r.tables.len() == 2
             && r.tables[0].rows.len() == 1
@@ -106,6 +132,60 @@ async fn f64_histogram() {
     assert_eq!(result.tables[1].get::<String>(2, "_field"), "sum");
     assert_eq!(result.tables[1].get::<f64>(1, "_value"), 0.0);
     assert_eq!(result.tables[1].get::<f64>(2, "_value"), 46.0);
+
+    svc.shutdown();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn u64_histogram() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (svc, meter_provider) = setup(tmp.path()).await;
+
+    let name = "u64_histogram";
+    let metric = meter_provider
+        .meter("influxive")
+        .u64_histogram(name)
+        .build();
+
+    metric.record(1, &[]);
+
+    // Influx writes u64 values into one table and f64 values into another table.
+    // Hence, 2 tables are expected to be present.
+    let result = poll_query(&svc, name, "|> last()", 300, |r| {
+        r.tables.len() == 1 && r.tables[0].rows.len() == 4
+    })
+    .await;
+
+    assert_eq!(result.tables[0].get::<String>(0, "_measurement"), name);
+    assert_eq!(result.tables[0].get::<String>(0, "_field"), "count");
+    assert_eq!(result.tables[0].get::<u64>(0, "_value"), 1);
+    assert_eq!(result.tables[0].get::<String>(1, "_field"), "max");
+    assert_eq!(result.tables[0].get::<u64>(0, "_value"), 1);
+    assert_eq!(result.tables[0].get::<String>(2, "_field"), "min");
+    assert_eq!(result.tables[0].get::<u64>(1, "_value"), 1);
+    assert_eq!(result.tables[0].get::<String>(3, "_field"), "sum");
+    assert_eq!(result.tables[0].get::<u64>(2, "_value"), 1);
+
+    // Record many metrics at once
+    for i in 0..10 {
+        metric.record(i, &[]);
+    }
+
+    // Keep polling until the expected counts 11 and 9 show up.
+    let result = poll_query(&svc, name, "|> last()", 1000, |r| {
+        r.tables.len() == 1
+            && r.tables[0].rows.len() == 4
+            && r.tables[0].get::<u64>(0, "_value") == 11
+    })
+    .await;
+
+    assert_eq!(result.tables[0].get::<String>(0, "_field"), "count");
+    assert_eq!(result.tables[0].get::<String>(1, "_field"), "max");
+    assert_eq!(result.tables[0].get::<String>(2, "_field"), "min");
+    assert_eq!(result.tables[0].get::<String>(3, "_field"), "sum");
+    assert_eq!(result.tables[0].get::<u64>(1, "_value"), 9);
+    assert_eq!(result.tables[0].get::<u64>(2, "_value"), 0);
+    assert_eq!(result.tables[0].get::<u64>(3, "_value"), 46);
 
     svc.shutdown();
 }
@@ -162,8 +242,8 @@ async fn u64_counter_with_attributes() {
     let attributes = vec![KeyValue::new("key", "value1")];
     metric.add(1, &attributes);
 
-    let result = poll_query(&svc, name, "", 300, |r| {
-        r.tables.len() == 1 && !r.tables[0].rows.is_empty() && r.tables[0].rows.len() <= 2
+    let result = poll_query(&svc, name, "|> last()", 300, |r| {
+        r.tables.len() == 1 && r.tables[0].rows.len() == 1
     })
     .await;
     assert_eq!(result.tables[0].get::<u64>(0, "_value"), 1);
