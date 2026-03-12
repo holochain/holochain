@@ -149,6 +149,10 @@ async fn execute_call(
                     target_agent,
                     zome_call_payload.bytes,
                     zome_call_payload.signature,
+                    Some((
+                        call_context.zome.zome_name().clone(),
+                        call_context.function_name().clone(),
+                    )),
                 )
                 .await
             {

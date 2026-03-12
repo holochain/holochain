@@ -58,6 +58,7 @@ async fn space_not_recreated_after_shutdown() {
             agent_key.clone(),
             ExternIO(vec![]),
             Signature([0; 64]),
+            None,
         )
         .await;
     assert!(result.is_err());
@@ -77,6 +78,7 @@ async fn space_not_recreated_after_shutdown() {
             dna_hash.clone(),
             ActionHash::from_raw_36(vec![0; 36]).into(),
             Default::default(),
+            None,
         )
         .await;
     assert!(result.is_err());
@@ -94,6 +96,7 @@ async fn space_not_recreated_after_shutdown() {
                 after: None,
             },
             Default::default(),
+            None,
         )
         .await;
     assert!(result.is_err());
@@ -111,6 +114,7 @@ async fn space_not_recreated_after_shutdown() {
                 author: None,
             },
             Default::default(),
+            None,
         )
         .await;
     assert!(result.is_err());
@@ -122,6 +126,7 @@ async fn space_not_recreated_after_shutdown() {
             agent_key.clone(),
             ChainQueryFilter::new(),
             Default::default(),
+            None,
         )
         .await;
     assert!(result.is_err());
@@ -133,6 +138,7 @@ async fn space_not_recreated_after_shutdown() {
             agent_key.clone(),
             ChainFilter::new(ActionHash::from_raw_36(vec![0; 36])),
             Default::default(),
+            None,
         )
         .await;
     assert!(result.is_err());

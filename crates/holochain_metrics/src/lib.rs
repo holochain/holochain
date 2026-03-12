@@ -87,16 +87,35 @@
 //!
 //! ## Metric Name Registry
 //!
+//! These following metrics are defined and recorded in their respective crates.
+//! Do a text search to look up metric type, description and unit.
+//!
 //! | Full Metric Name | Type | Unit (optional) | Description | Attributes |
 //! | ---------------- | ---- | --------------- | ----------- | ---------- |
-//! | `hc.holochain_p2p.request.duration` | `f64_histogram` | `s` | The time spent sending an outgoing p2p request awaiting the response. |- `dna_hash`: The DNA hash that the request is being sent on behalf of.<br />- `tag`: The name of the host fn requested to the remote peer.<br />- `url`: The remote peer url called.<br />- `error`: Flag indicating if the request failed.|
-//! | `hc.holochain_p2p.handle_request.duration` | `f64_histogram` | `s` | The time spent handling an incoming p2p request. |- `message_type`: The message type.<br />- `dna_hash`: The DNA hash that the request is being sent on behalf of.<br />- `to_agent`: The agent to which the request is made.<br />- `agent`: The agent for which the request is made (in case of `get_agent_activity` and `must_get_agent_activity` requests).<br />|
-//! | `hc.conductor.post_commit.duration` | `f64_histogram` | `s` | The time spent executing a post commit. |- `dna_hash`: The DNA hash that this post commit is running for.<br />- `agent`: The agent running the post commit. |
-//! | `hc.conductor.workflow.duration` | `f64_histogram` | `s` | The time spent running a workflow. |- `workflow`: The name of the workflow.<br />- `dna_hash`: The DNA hash that this workflow is running for.<br />- `agent`: (optional) The agent that this workflow is running for if the workflow is cell bound. |
-//! | `hc.cascade.duration` | `f64_histogram` | `s` | The time taken to execute a cascade query. | |
-//! | `hc.db.pool.utilization` | `f64_gauge` (observable) | | The utilization of connections in the pool. |- `kind`: The kind of database such as Conductor, Wasm or Dht etc.<br />- `id`: The unique identifier for this database if multiple instances can exist, such as a Dht database. |
-//! | `hc.db.connections.use_time` | `f64_histogram` | `s` | The time between borrowing a connection and returning it to the pool. |- `kind`: The kind of database such as Conductor, Wasm or Dht etc.<br />- `id`: The unique identifier for this database if multiple instances can exist, such as a Dht database. |
-//! | `hc.ribosome.wasm.usage` | `u64_counter` | | The metered usage of a wasm ribosome. | - `dna`: The DNA hash that this wasm is metered for.<br />- `zome`: The zome that this wasm is metered for.<br />- `fn`: The function that this wasm is metered for.<br />- `agent`: The agent that this wasm is metered for (if there is one). |
+//! | `hc.db.connections.use_time` | f64 histogram | s | The time between borrowing a connection and returning it to the pool | `kind`: DB type (authored/dht/cache/…), `id`: DB instance identifier |
+//! | `hc.db.write_txn.duration` | f64 histogram | s | The time spent executing an exclusive write transaction | `kind`: DB type (authored/dht/cache/…), `id`: DB instance identifier |
+//! | `hc.keystore.lair_request.duration` | f64 histogram | s | Duration of signing and encryption requests to Lair | `operation`: cryptographic operation (sign/encrypt/…) |
+//! | `hc.conductor.workflow.duration` | f64 histogram | s | The time spent running a workflow | `workflow`: workflow process name, `dna_hash`: DNA identifier, `agent`: agent public key |
+//! | `hc.conductor.workflow.integrated_ops` | u64 counter | | The number of integrated operations | |
+//! | `hc.conductor.workflow.integration_delay` | f64 histogram | s | Time between an op being stored and it being integrated | |
+//! | `hc.conductor.workflow.validation_attempts` | u64 histogram | | Number of validation attempts required to integrate an op | |
+//! | `hc.conductor.post_commit.duration` | f64 histogram | s | The time spent executing a post commit | `dna_hash`: DNA identifier, `agent`: agent public key |
+//! | `hc.conductor.uptime` | f64 observable gauge | s | The number of seconds the conductor has been running | |
+//! | `hc.conductor.app_ws.dropped_signal` | u64 counter | | The number of signals dropped from app ws due to channel overload | |
+//! | `hc.ribosome.wasm.usage` | u64 counter | | The metered usage of a wasm ribosome | `dna_hash`: DNA identifier, `zome`: zome module name, `fn`: function name, `agent`: agent public key |
+//! | `hc.ribosome.zome_call.duration` | f64 histogram | s | The time spent running a zome call | `dna_hash`: DNA identifier, `zome`: zome module name, `fn`: function name |
+//! | `hc.ribosome.wasm_call.duration` | f64 histogram | s | The time spent running a wasm call | `dna_hash`: DNA identifier, `zome`: zome module name, `fn`: function name, `agent`: agent public key |
+//! | `hc.ribosome.host_fn_call.duration` | f64 histogram | s | The time spent executing a host function call | `dna_hash`: DNA identifier, `zome`: zome module name, `fn`: function name, `host_fn`: host function name |
+//! | `hc.ribosome.host_fn.emit_signal` | u64 counter | | The number of local signals emitted | `cell_id`: cell identifier, `zome`: zome module name |
+//! | `hc.ribosome.host_fn.send_remote_signal` | u64 counter | | The number of remote signals sent | `dna_hash`: DNA identifier, `zome`: zome module name |
+//! | `hc.cascade.duration` | f64 histogram | s | The time taken to execute a cascade query | `zome`: originating zome name, `fn`: originating function name |
+//! | `hc.cascade.fetch_error` | u64 counter | | Number of errors encountered while fetching data from the network | `fetch_type`: type of data fetched, `zome`: originating zome name, `fn`: originating function name |
+//! | `hc.holochain_p2p.request.duration` | f64 histogram | s | The time spent sending an outgoing p2p request awaiting the response | `dna_hash`: DNA identifier, `tag`: request category tag, `error`: request failed, `zome`: originating zome name, `fn`: originating function name |
+//! | `hc.holochain_p2p.handle_request.duration` | f64 histogram | s | The time spent handling an incoming p2p request | `message_type`: p2p message type, `dna_hash`: DNA identifier |
+//! | `hc.holochain_p2p.recv_remote_signal` | u64 counter | | The number of remote signals received | `dna_hash`: DNA identifier |
+
+use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 pub(crate) mod influxive;
 
@@ -238,21 +257,32 @@ impl HolochainMetricsConfig {
     ///
     /// The output of this function is largely controlled by environment
     /// variables, please see the [crate-level documentation](crate) for usage.
-    pub fn new(root_path: &std::path::Path) -> Self {
+    pub fn new_from_env_vars(root_path: &Path) -> Self {
         Self::from_env(root_path, HolochainMetricsEnv::load())
     }
 
-    fn from_env(root_path: &std::path::Path, env: HolochainMetricsEnv) -> Self {
+    /// Construct a config with an Influxive file.
+    pub fn new_with_file(
+        file_path: &Path,
+        report_interval: Option<Duration>,
+    ) -> HolochainMetricsConfig {
+        HolochainMetricsConfig::InfluxiveFile {
+            writer_config: influxive::InfluxiveWriterConfig::create_with_influx_file(
+                PathBuf::from(file_path),
+            ),
+            otel_config: influxive::InfluxiveMeterProviderConfig::default()
+                .with_report_interval(report_interval),
+        }
+    }
+
+    fn from_env(root_path: &Path, env: HolochainMetricsEnv) -> Self {
         match env {
-            HolochainMetricsEnv::InfluxiveFile { filepath } => Self::InfluxiveFile {
-                writer_config: influxive::InfluxiveWriterConfig::create_with_influx_file(
-                    std::path::PathBuf::from(filepath),
-                ),
-                otel_config: influxive::InfluxiveMeterProviderConfig::default(),
-            },
+            HolochainMetricsEnv::InfluxiveFile { filepath } => {
+                Self::new_with_file(Path::new(&filepath), None)
+            }
 
             HolochainMetricsEnv::InfluxiveChildSvc => {
-                let mut database_path = std::path::PathBuf::from(root_path);
+                let mut database_path = PathBuf::from(root_path);
                 database_path.push("influxive");
                 Self::InfluxiveChildSvc {
                     child_svc_config: Box::new(

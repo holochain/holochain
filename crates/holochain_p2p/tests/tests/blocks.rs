@@ -364,6 +364,7 @@ async fn get_to_blocked_agent_fails() {
             dna_hash.clone(),
             fixt!(ActionHash).into(),
             NetworkRequestOptions::default(),
+            None,
         )
         .await;
     assert!(
@@ -397,6 +398,7 @@ async fn get_to_blocked_agent_fails() {
             dna_hash.clone(),
             fixt!(ActionHash).into(),
             NetworkRequestOptions::default(),
+            None,
         )
         .await;
     assert!(matches!(
@@ -437,6 +439,7 @@ async fn get_by_blocked_agent_fails() {
             dna_hash.clone(),
             fixt!(ActionHash).into(),
             NetworkRequestOptions::default(),
+            None,
         )
         .await;
     assert!(
@@ -466,6 +469,7 @@ async fn get_by_blocked_agent_fails() {
             dna_hash.clone(),
             fixt!(ActionHash).into(),
             NetworkRequestOptions::default(),
+            None,
         )
         .await;
     assert!(response.is_err(), "expected error, got {response:?}");

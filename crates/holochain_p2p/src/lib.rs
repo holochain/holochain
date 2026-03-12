@@ -121,6 +121,7 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
         to_agent: AgentPubKey,
         zome_call_params_serialized: ExternIO,
         signature: Signature,
+        zome_call_origin: Option<(ZomeName, FunctionName)>,
     ) -> HolochainP2pResult<SerializedBytes>;
 
     /// Invoke a zome function on a remote node (if you have been granted the capability).
@@ -152,6 +153,7 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
         &self,
         dht_hash: AnyDhtHash,
         options: NetworkRequestOptions,
+        zome_call_origin: Option<(ZomeName, FunctionName)>,
     ) -> HolochainP2pResult<Vec<WireOps>>;
 
     /// Get links from the DHT.
@@ -159,6 +161,7 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
         &self,
         link_key: WireLinkKey,
         options: GetLinksRequestOptions,
+        zome_call_origin: Option<(ZomeName, FunctionName)>,
     ) -> HolochainP2pResult<Vec<WireLinkOps>>;
 
     /// Get a count of links from the DHT.
@@ -166,6 +169,7 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
         &self,
         query: WireLinkQuery,
         options: NetworkRequestOptions,
+        zome_call_origin: Option<(ZomeName, FunctionName)>,
     ) -> HolochainP2pResult<CountLinksResponse>;
 
     /// Get agent activity from the DHT.
@@ -174,6 +178,7 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
+        zome_call_origin: Option<(ZomeName, FunctionName)>,
     ) -> HolochainP2pResult<Vec<AgentActivityResponse>>;
 
     /// Get agent activity deterministically from the DHT.
@@ -182,6 +187,7 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
         author: AgentPubKey,
         filter: ChainFilter,
         options: NetworkRequestOptions,
+        zome_call_origin: Option<(ZomeName, FunctionName)>,
     ) -> HolochainP2pResult<Vec<MustGetAgentActivityResponse>>;
 
     /// Send a validation receipt to a remote node.
@@ -267,6 +273,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         to_agent: AgentPubKey,
         zome_call_params_serialized: ExternIO,
         signature: Signature,
+        zome_call_origin: Option<(ZomeName, FunctionName)>,
     ) -> HolochainP2pResult<SerializedBytes> {
         self.sender
             .call_remote(
@@ -274,6 +281,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
                 to_agent,
                 zome_call_params_serialized,
                 signature,
+                zome_call_origin,
             )
             .await
     }
@@ -328,21 +336,24 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         &self,
         dht_hash: holo_hash::AnyDhtHash,
         options: NetworkRequestOptions,
+        zome_call_origin: Option<(ZomeName, FunctionName)>,
     ) -> HolochainP2pResult<Vec<WireOps>> {
         self.sender
-            .get(self.dna_hash(), dht_hash, options)
+            .get(self.dna_hash(), dht_hash, options, zome_call_origin)
             .instrument(tracing::debug_span!("HolochainP2p::get"))
             .await
     }
 
     /// Get links from the DHT.
+    /// Optional zome call origin for metrics attribution.
     async fn get_links(
         &self,
         link_key: WireLinkKey,
         options: GetLinksRequestOptions,
+        zome_call_origin: Option<(ZomeName, FunctionName)>,
     ) -> HolochainP2pResult<Vec<WireLinkOps>> {
         self.sender
-            .get_links(self.dna_hash(), link_key, options)
+            .get_links(self.dna_hash(), link_key, options, zome_call_origin)
             .await
     }
 
@@ -351,32 +362,37 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         &self,
         query: WireLinkQuery,
         options: NetworkRequestOptions,
+        zome_call_origin: Option<(ZomeName, FunctionName)>,
     ) -> HolochainP2pResult<CountLinksResponse> {
         self.sender
-            .count_links(self.dna_hash(), query, options)
+            .count_links(self.dna_hash(), query, options, zome_call_origin)
             .await
     }
 
     /// Get agent activity from the DHT.
+    /// Optional zome call origin for metrics attribution.
     async fn get_agent_activity(
         &self,
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
+        zome_call_origin: Option<(ZomeName, FunctionName)>,
     ) -> HolochainP2pResult<Vec<AgentActivityResponse>> {
         self.sender
-            .get_agent_activity(self.dna_hash(), agent, query, options)
+            .get_agent_activity(self.dna_hash(), agent, query, options, zome_call_origin)
             .await
     }
 
+    /// Optional zome call origin for metrics attribution.
     async fn must_get_agent_activity(
         &self,
         author: AgentPubKey,
         filter: holochain_zome_types::chain::ChainFilter,
         options: NetworkRequestOptions,
+        zome_call_origin: Option<(ZomeName, FunctionName)>,
     ) -> HolochainP2pResult<Vec<MustGetAgentActivityResponse>> {
         self.sender
-            .must_get_agent_activity(self.dna_hash(), author, filter, options)
+            .must_get_agent_activity(self.dna_hash(), author, filter, options, zome_call_origin)
             .await
     }
 

@@ -184,7 +184,8 @@ impl MetaLairClient {
     ) -> impl Future<Output = LairResult<Signature>> + 'static + Send {
         let (client, esnd) = self.cli();
         async move {
-            tokio::time::timeout(std::time::Duration::from_secs(30), async move {
+            let start = std::time::Instant::now();
+            let result = tokio::time::timeout(std::time::Duration::from_secs(30), async move {
                 let mut pub_key_2 = [0; 32];
                 pub_key_2.copy_from_slice(pub_key.get_raw_32());
                 let sig = echk!(
@@ -194,7 +195,12 @@ impl MetaLairClient {
                 Ok(Signature(*sig.0))
             })
             .await
-            .map_err(one_err::OneErr::new)?
+            .map_err(one_err::OneErr::new);
+            crate::metrics::lair_request_duration_metric().record(
+                start.elapsed().as_secs_f64(),
+                &[opentelemetry::KeyValue::new("operation", "sign")],
+            );
+            result?
         }
     }
 
@@ -292,10 +298,16 @@ impl MetaLairClient {
     ) -> impl Future<Output = LairResult<([u8; 24], Arc<[u8]>)>> + 'static + Send {
         let (client, esnd) = self.cli();
         async move {
-            Ok(echk!(
-                esnd,
-                client.secretbox_xsalsa_by_tag(tag, None, data).await
-            ))
+            let start = std::time::Instant::now();
+            let result = client.secretbox_xsalsa_by_tag(tag, None, data).await;
+            crate::metrics::lair_request_duration_metric().record(
+                start.elapsed().as_secs_f64(),
+                &[opentelemetry::KeyValue::new(
+                    "operation",
+                    "shared_secret_encrypt",
+                )],
+            );
+            Ok(echk!(esnd, result))
         }
     }
 
@@ -339,12 +351,18 @@ impl MetaLairClient {
     ) -> impl Future<Output = LairResult<([u8; 24], Arc<[u8]>)>> + 'static + Send {
         let (client, esnd) = self.cli();
         async move {
-            Ok(echk!(
-                esnd,
-                client
-                    .crypto_box_xsalsa_by_pub_key(sender_pub_key, recipient_pub_key, None, data)
-                    .await
-            ))
+            let start = std::time::Instant::now();
+            let result = client
+                .crypto_box_xsalsa_by_pub_key(sender_pub_key, recipient_pub_key, None, data)
+                .await;
+            crate::metrics::lair_request_duration_metric().record(
+                start.elapsed().as_secs_f64(),
+                &[opentelemetry::KeyValue::new(
+                    "operation",
+                    "crypto_box_xsalsa",
+                )],
+            );
+            Ok(echk!(esnd, result))
         }
     }
 

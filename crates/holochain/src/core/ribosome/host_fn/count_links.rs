@@ -1,8 +1,8 @@
+use crate::core::ribosome::host_fn::cascade_from_call_context;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
-use holochain_cascade::CascadeImpl;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
@@ -31,15 +31,12 @@ pub fn count_links<'a>(
                 author: query.author,
             };
 
-            CascadeImpl::from_workspace_and_network(
-                &call_context.host_context.workspace(),
-                call_context.host_context.network().to_owned(),
-            )
-            .dht_count_links(wire_query)
-            .await
-            .map_err(|cascade_error| {
-                wasm_error!(WasmErrorInner::Host(cascade_error.to_string())).into()
-            })
+            cascade_from_call_context(&call_context)
+                .dht_count_links(wire_query)
+                .await
+                .map_err(|cascade_error| {
+                    wasm_error!(WasmErrorInner::Host(cascade_error.to_string())).into()
+                })
         }),
         _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
@@ -192,12 +189,9 @@ mod tests {
         let _: ActionHash = conductor.call(&bob, "create_link", ()).await;
 
         // Check that Alice can count her link and Bob's
-        wait_for_link_count(
-            conductor.sweet_handle(),
-            &alice,
-            base.clone(),
-            2,
-        ).await.expect("Timed out waiting for alice to see both links");
+        wait_for_link_count(conductor.sweet_handle(), &alice, base.clone(), 2)
+            .await
+            .expect("Timed out waiting for alice to see both links");
 
         // Get links created before the mid-time (only Alice's)
         let count: usize = conductor
@@ -251,6 +245,6 @@ mod tests {
                 tokio::time::sleep(std::time::Duration::from_millis(50)).await;
             }
         })
-            .await
+        .await
     }
 }

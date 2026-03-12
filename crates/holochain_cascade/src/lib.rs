@@ -49,6 +49,8 @@ use holochain_state::query::record_details::GetRecordDetailsQuery;
 use holochain_state::query::DbScratch;
 use holochain_state::query::PrivateDataQuery;
 use holochain_state::scratch::SyncScratch;
+use holochain_zome_types::prelude::{FunctionName, ZomeName};
+use metrics::cascade_fetch_error_metric;
 use metrics::create_cascade_duration_metric;
 use metrics::CascadeDurationMetric;
 use std::collections::HashMap;
@@ -115,6 +117,8 @@ pub struct CascadeImpl {
     network: Option<DynHolochainP2pDna>,
     private_data: Option<Arc<AgentPubKey>>,
     duration_metric: &'static CascadeDurationMetric,
+    /// Optional zome call origin for metrics attribution.
+    zome_call_origin: Option<(ZomeName, FunctionName)>,
 }
 
 impl CascadeImpl {
@@ -122,6 +126,14 @@ impl CascadeImpl {
     pub fn with_authored(self, authored: DbRead<DbKindAuthored>) -> Self {
         Self {
             authored: Some(authored),
+            ..self
+        }
+    }
+
+    /// Set the zome call origin for metrics attribution.
+    pub fn with_zome_call_origin(self, zome_name: &ZomeName, fn_name: &FunctionName) -> Self {
+        Self {
+            zome_call_origin: Some((zome_name.clone(), fn_name.clone())),
             ..self
         }
     }
@@ -172,6 +184,7 @@ impl CascadeImpl {
             cache: Some(cache_db),
             network: Some(network),
             duration_metric: create_cascade_duration_metric(),
+            zome_call_origin: self.zome_call_origin,
         }
     }
 
@@ -185,6 +198,7 @@ impl CascadeImpl {
             scratch: None,
             private_data: None,
             duration_metric: create_cascade_duration_metric(),
+            zome_call_origin: None,
         }
     }
 
@@ -212,6 +226,7 @@ impl CascadeImpl {
             scratch,
             network: Some(network),
             duration_metric: create_cascade_duration_metric(),
+            zome_call_origin: None,
         }
     }
 
@@ -231,6 +246,7 @@ impl CascadeImpl {
             network: None,
             private_data: author,
             duration_metric: create_cascade_duration_metric(),
+            zome_call_origin: None,
         }
     }
 
@@ -408,6 +424,15 @@ impl CascadeImpl {
         }
     }
 
+    fn record_fetch_error(&self, fetch_type: &'static str) {
+        let mut attrs = vec![opentelemetry::KeyValue::new("fetch_type", fetch_type)];
+        if let Some((zome, fn_name)) = &self.zome_call_origin {
+            attrs.push(opentelemetry::KeyValue::new("zome", zome.to_string()));
+            attrs.push(opentelemetry::KeyValue::new("fn", fn_name.to_string()));
+        }
+        cascade_fetch_error_metric().add(1, &attrs);
+    }
+
     /// Fetch a Record from the network, caching and returning the results
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     pub async fn fetch_record(
@@ -417,7 +442,7 @@ impl CascadeImpl {
     ) -> CascadeResult<()> {
         let network = some_or_return!(self.network.as_ref());
         let results = match network
-            .get(hash, options)
+            .get(hash, options, self.zome_call_origin.clone())
             .instrument(debug_span!("fetch_record::network_get"))
             .await
         {
@@ -426,7 +451,10 @@ impl CascadeImpl {
                 tracing::info!(?e, "No peers to fetch record from");
                 vec![]
             }
-            Err(e) => return Err(e.into()),
+            Err(e) => {
+                self.record_fetch_error("record");
+                return Err(e.into());
+            }
         };
 
         self.merge_ops_into_cache(results).await?;
@@ -440,13 +468,19 @@ impl CascadeImpl {
         options: GetLinksRequestOptions,
     ) -> CascadeResult<()> {
         let network = some_or_return!(self.network.as_ref());
-        let results = match network.get_links(link_key.clone(), options).await {
+        let results = match network
+            .get_links(link_key.clone(), options, self.zome_call_origin.clone())
+            .await
+        {
             Ok(link_ops) => link_ops,
             Err(e @ HolochainP2pError::NoPeersForLocation(_, _)) => {
                 tracing::debug!(?e, "No peers to fetch links from");
                 vec![]
             }
-            Err(e) => return Err(e.into()),
+            Err(e) => {
+                self.record_fetch_error("links");
+                return Err(e.into());
+            }
         };
 
         self.merge_link_ops_into_cache(results, link_key.clone())
@@ -462,13 +496,19 @@ impl CascadeImpl {
         options: GetActivityOptions,
     ) -> CascadeResult<Vec<AgentActivityResponse>> {
         let network = some_or_return!(self.network.as_ref(), Vec::with_capacity(0));
-        let results = match network.get_agent_activity(agent, query, options).await {
+        let results = match network
+            .get_agent_activity(agent, query, options, self.zome_call_origin.clone())
+            .await
+        {
             Ok(response) => response,
             Err(e @ HolochainP2pError::NoPeersForLocation(_, _)) => {
                 tracing::debug!(?e, "No peers to fetch agent activity from");
                 vec![]
             }
-            Err(e) => return Err(e.into()),
+            Err(e) => {
+                self.record_fetch_error("agent_activity");
+                return Err(e.into());
+            }
         };
         Ok(results)
     }
@@ -486,7 +526,7 @@ impl CascadeImpl {
             MustGetAgentActivityResponse::IncompleteChain
         );
         let results = match network
-            .must_get_agent_activity(author, filter, options)
+            .must_get_agent_activity(author, filter, options, self.zome_call_origin.clone())
             .await
         {
             Ok(response) => response,
@@ -494,7 +534,10 @@ impl CascadeImpl {
                 tracing::debug!(?e, "No peers to fetch agent activity from");
                 vec![]
             }
-            Err(e) => return Err(e.into()),
+            Err(e) => {
+                self.record_fetch_error("must_get_agent_activity");
+                return Err(e.into());
+            }
         };
 
         self.add_activity_into_cache(results).await
@@ -544,8 +587,13 @@ impl CascadeImpl {
         })
         .await??;
 
+        let mut attributes = Vec::new();
+        if let Some((zome_name, fn_name)) = &self.zome_call_origin {
+            attributes.push(opentelemetry::KeyValue::new("zome", zome_name.to_string()));
+            attributes.push(opentelemetry::KeyValue::new("fn", fn_name.to_string()));
+        }
         self.duration_metric
-            .record(start.elapsed().as_secs_f64(), &[]);
+            .record(start.elapsed().as_secs_f64(), &attributes);
 
         Ok(results)
     }
@@ -891,7 +939,11 @@ impl CascadeImpl {
         if !self.am_i_an_authority(query.base.clone()).await? {
             if let Some(network) = &self.network {
                 match network
-                    .count_links(query.clone(), NetworkRequestOptions::default())
+                    .count_links(
+                        query.clone(),
+                        NetworkRequestOptions::default(),
+                        self.zome_call_origin.clone(),
+                    )
                     .await
                 {
                     Ok(actions) => {
