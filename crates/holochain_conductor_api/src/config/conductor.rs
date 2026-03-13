@@ -672,8 +672,7 @@ fn webrtc_config_schema(_: &mut schemars::SchemaGenerator) -> Schema {
     // Note that the definitions for this type are not being copied. This type is embedded in the
     // K2 config, so the definitions are already present in the schema.
 
-    Schema::try_from(schema.get("schema").expect("Missing schema field").clone())
-        .expect("Failed to convert schema")
+    schema
 }
 
 #[cfg(feature = "schema")]
@@ -703,7 +702,7 @@ fn kitsune2_config_schema(generator: &mut schemars::SchemaGenerator) -> Schema {
     let schema = schemars::schema_for!(Option<K2Config>);
 
     for (k, v) in schema
-        .get("definitions")
+        .get("$defs")
         .and_then(|d| d.as_object())
         .expect("No definitions")
     {
@@ -716,8 +715,7 @@ fn kitsune2_config_schema(generator: &mut schemars::SchemaGenerator) -> Schema {
         }
     }
 
-    Schema::try_from(schema.get("schema").expect("Missing schema field").clone())
-        .expect("Failed to convert schema")
+    schema
 }
 
 #[cfg(test)]
@@ -1154,5 +1152,17 @@ admin_interfaces:
 
         let cpu_count = u32::MAX as usize;
         assert_eq!(calculate_default_db_max_readers(cpu_count), u16::MAX);
+    }
+
+    #[cfg(feature = "schema")]
+    #[test]
+    fn schema_generation() {
+        let schema = schemars::schema_for!(ConductorConfig);
+        let schema_json = serde_json::to_value(&schema).unwrap();
+
+        let default_config = ConductorConfig::default();
+        let default_config_json = serde_json::to_value(&default_config).unwrap();
+
+        jsonschema::validate(&schema_json, &default_config_json).unwrap();
     }
 }
