@@ -1,9 +1,9 @@
+use crate::core::ribosome::host_fn::cascade_from_call_context;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use futures::StreamExt;
-use holochain_cascade::CascadeImpl;
 use holochain_p2p::actor::GetLinksRequestOptions;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
@@ -47,18 +47,15 @@ pub fn get_links(
                                     before,
                                     author,
                                 };
-                                Ok(CascadeImpl::from_workspace_and_network(
-                                    &call_context.host_context.workspace(),
-                                    call_context.host_context.network().to_owned(),
-                                )
-                                .dht_get_links(
-                                    key,
-                                    GetLinksRequestOptions {
-                                        get_options,
-                                        ..Default::default()
-                                    },
-                                )
-                                .await?)
+                                Ok(cascade_from_call_context(&call_context)
+                                    .dht_get_links(
+                                        key,
+                                        GetLinksRequestOptions {
+                                            get_options,
+                                            ..Default::default()
+                                        },
+                                    )
+                                    .await?)
                             },
                         ),
                     )
@@ -368,9 +365,7 @@ pub mod slow_tests {
             .call(&bob, "create_tagged_link", "b.a".to_string())
             .await;
 
-        await_consistency([&alice_cell, &bob_cell])
-            .await
-            .unwrap();
+        await_consistency([&alice_cell, &bob_cell]).await.unwrap();
 
         // Get the base all the links are attached from
         let base: AnyLinkableHash = conductor.call(&alice, "get_base_hash", ()).await;
@@ -476,9 +471,7 @@ pub mod slow_tests {
             .call(&bob, "create_tagged_link", "d".to_string())
             .await;
 
-        await_consistency([&alice_cell, &bob_cell])
-            .await
-            .unwrap();
+        await_consistency([&alice_cell, &bob_cell]).await.unwrap();
 
         // Get the base all the links are attached from
         let base: AnyLinkableHash = conductor.call(&alice, "get_base_hash", ()).await;

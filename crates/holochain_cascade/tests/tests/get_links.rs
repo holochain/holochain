@@ -128,7 +128,7 @@ async fn links_authoring() {
     // - Not expecting any calls to the network.
     let mut mock = MockHolochainP2pDnaT::new();
     mock.expect_authority_for_hash().returning(|_| Ok(false));
-    mock.expect_get_links().returning(|_, _| {
+    mock.expect_get_links().returning(|_, _, _| {
         Ok(vec![WireLinkOps {
             creates: vec![],
             deletes: vec![],
@@ -194,7 +194,7 @@ async fn test_links_can_match_a_partial_tag() {
     // - Not expecting any calls to the network.
     let mut mock = MockHolochainP2pDnaT::new();
     mock.expect_authority_for_hash().returning(|_| Ok(false));
-    mock.expect_get_links().returning(|_, _| {
+    mock.expect_get_links().returning(|_, _, _| {
         Ok(vec![WireLinkOps {
             creates: vec![],
             deletes: vec![],

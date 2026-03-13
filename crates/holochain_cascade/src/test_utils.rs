@@ -70,6 +70,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         &self,
         dht_hash: holo_hash::AnyDhtHash,
         _options: NetworkRequestOptions,
+        _zome_call_origin: Option<(ZomeName, FunctionName)>,
     ) -> HolochainP2pResult<Vec<WireOps>> {
         let mut out = Vec::new();
         match dht_hash.into_primitive() {
@@ -97,6 +98,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         &self,
         link_key: WireLinkKey,
         options: GetLinksRequestOptions,
+        _zome_call_origin: Option<(ZomeName, FunctionName)>,
     ) -> HolochainP2pResult<Vec<WireLinkOps>> {
         let mut out = Vec::new();
         for db in &self.envs {
@@ -112,6 +114,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         &self,
         query: WireLinkQuery,
         _options: NetworkRequestOptions,
+        _zome_call_origin: Option<(ZomeName, FunctionName)>,
     ) -> HolochainP2pResult<CountLinksResponse> {
         let mut out = HashSet::new();
 
@@ -134,6 +137,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         agent: AgentPubKey,
         query: QueryFilter,
         options: actor::GetActivityOptions,
+        _zome_call_origin: Option<(ZomeName, FunctionName)>,
     ) -> HolochainP2pResult<Vec<AgentActivityResponse>> {
         let mut out = Vec::new();
         for db in &self.envs {
@@ -155,6 +159,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         agent: AgentPubKey,
         filter: ChainFilter,
         _options: NetworkRequestOptions,
+        _zome_call_origin: Option<(ZomeName, FunctionName)>,
     ) -> HolochainP2pResult<Vec<MustGetAgentActivityResponse>> {
         let mut out = Vec::new();
         for db in &self.envs {
@@ -242,6 +247,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         _to_agent: AgentPubKey,
         _zome_call_payload: ExternIO,
         _from_signature: Signature,
+        _zome_call_origin: Option<(ZomeName, FunctionName)>,
     ) -> HolochainP2pResult<holochain_serialized_bytes::SerializedBytes> {
         todo!()
     }

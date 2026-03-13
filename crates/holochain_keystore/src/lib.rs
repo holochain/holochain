@@ -43,6 +43,8 @@ use holochain_serialized_bytes::prelude::*;
 mod error;
 pub use error::*;
 
+mod metrics;
+
 mod meta_lair_client;
 pub use meta_lair_client::*;
 

@@ -1,9 +1,9 @@
 use crate::core::ribosome::error::RibosomeError;
+use crate::core::ribosome::host_fn::cascade_from_call_context;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeT;
 use holochain_cascade::error::CascadeResult;
-use holochain_cascade::CascadeImpl;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
@@ -30,16 +30,14 @@ pub fn delete_link<'a>(
             // it is never valid to have divergent base address for add/remove links
             // the subconscious will validate the base address match but we need to fetch it here to
             // include it in the remove link action
-            let network = call_context.host_context.network().clone();
             let call_context_2 = call_context.clone();
 
             // handle timeouts at the network layer
             let address_2 = address.clone();
             let maybe_add_link: Option<SignedActionHashed> =
                 tokio_helper::block_forever_on(async move {
-                    let workspace = call_context_2.host_context.workspace();
                     CascadeResult::Ok(
-                        CascadeImpl::from_workspace_and_network(&workspace, network)
+                        cascade_from_call_context(&call_context_2)
                             .dht_get(address_2.into(), get_options)
                             .await?
                             .map(|el| el.into_inner().0),

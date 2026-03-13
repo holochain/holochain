@@ -202,12 +202,14 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug + Any {
     ) -> BoxFut<'_, HolochainP2pResult<()>>;
 
     /// Invoke a zome function on a remote node (if you have been granted the capability).
+    /// Optional zome call origin for metrics attribution.
     fn call_remote(
         &self,
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
         zome_call_params_serialized: ExternIO,
         signature: Signature,
+        zome_call_origin: Option<(ZomeName, FunctionName)>,
     ) -> BoxFut<'_, HolochainP2pResult<SerializedBytes>>;
 
     /// Invoke a zome function on a remote node (if you have been granted the capability).
@@ -240,19 +242,23 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug + Any {
     ) -> BoxFut<'_, HolochainP2pResult<()>>;
 
     /// Get an entry from the DHT.
+    /// Optional zome call origin for metrics attribution.
     fn get(
         &self,
         dna_hash: DnaHash,
         dht_hash: AnyDhtHash,
         options: NetworkRequestOptions,
+        zome_call_origin: Option<(ZomeName, FunctionName)>,
     ) -> BoxFut<'_, HolochainP2pResult<Vec<WireOps>>>;
 
     /// Get links from the DHT.
+    /// Optional zome call origin for metrics attribution.
     fn get_links(
         &self,
         dna_hash: DnaHash,
         link_key: WireLinkKey,
         options: GetLinksRequestOptions,
+        zome_call_origin: Option<(ZomeName, FunctionName)>,
     ) -> BoxFut<'_, HolochainP2pResult<Vec<WireLinkOps>>>;
 
     /// Get a count of links from the DHT.
@@ -261,24 +267,29 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug + Any {
         dna_hash: DnaHash,
         query: WireLinkQuery,
         options: NetworkRequestOptions,
+        zome_call_origin: Option<(ZomeName, FunctionName)>,
     ) -> BoxFut<'_, HolochainP2pResult<CountLinksResponse>>;
 
     /// Get agent activity from the DHT.
+    /// Optional zome call origin for metrics attribution.
     fn get_agent_activity(
         &self,
         dna_hash: DnaHash,
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: GetActivityOptions,
+        zome_call_origin: Option<(ZomeName, FunctionName)>,
     ) -> BoxFut<'_, HolochainP2pResult<Vec<AgentActivityResponse>>>;
 
     /// A remote node is requesting agent activity from us.
+    /// Optional zome call origin for metrics attribution.
     fn must_get_agent_activity(
         &self,
         dna_hash: DnaHash,
         author: AgentPubKey,
         filter: holochain_zome_types::chain::ChainFilter,
         options: NetworkRequestOptions,
+        zome_call_origin: Option<(ZomeName, FunctionName)>,
     ) -> BoxFut<'_, HolochainP2pResult<Vec<MustGetAgentActivityResponse>>>;
 
     /// Send a validation receipt to a remote node.
