@@ -39,7 +39,19 @@
 //!       { "urls": ["stun:stun.l.google.com:19302"] }
 //!     ]
 //!   }
+//!
 //! "#;
+//!
+//! // The network config also supports an optional `space_overrides` map,
+//! // keyed by DNA hash (base64), to override bootstrap_url and/or signal_url
+//! // for specific DNA spaces. App manifest overrides take precedence.
+//! // Note: relay_url cannot be overridden per-space because the iroh
+//! // transport is shared across all spaces at the conductor level.
+//! //
+//! // Example:
+//! //   space_overrides:
+//! //     "uhC0k...base64DnaHash...":
+//! //       bootstrap_url: https://special-bootstrap.example.com
 //!
 //!use holochain_conductor_api::conductor::ConductorConfig;
 //!
