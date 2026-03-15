@@ -1,4 +1,4 @@
-use super::metrics::UseTimeMetric;
+use super::metrics::Histogram;
 use crate::db::conn::PConn;
 use crate::error::DatabaseResult;
 use rusqlite::Transaction;
@@ -9,7 +9,7 @@ use tokio::sync::OwnedSemaphorePermit;
 pub(super) struct PConnGuard {
     conn: PConn,
     created: Instant,
-    use_time_metric: UseTimeMetric,
+    use_time_metric: Histogram,
     _permit: OwnedSemaphorePermit,
 }
 
@@ -17,7 +17,7 @@ impl PConnGuard {
     pub(super) fn new(
         conn: PConn,
         permit: OwnedSemaphorePermit,
-        use_time_metric: UseTimeMetric,
+        use_time_metric: Histogram,
     ) -> Self {
         PConnGuard {
             conn,

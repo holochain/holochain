@@ -1,4 +1,6 @@
-use super::metrics::{create_connection_use_time_metric, create_pool_usage_metric, UseTimeMetric};
+use super::metrics::{
+    create_connection_use_time_metric, create_write_txn_duration_metric, Histogram,
+};
 use crate::db::conn::PConn;
 use crate::db::databases::DATABASE_HANDLES;
 use crate::db::guard::{PConnGuard, PTxnGuard};
@@ -108,7 +110,8 @@ pub struct DbRead<Kind: DbKindT> {
     statement_trace_fn: Option<fn(TraceEvent)>,
     max_readers: usize,
     num_readers: Arc<AtomicUsize>,
-    use_time_metric: UseTimeMetric,
+    use_time_metric: Histogram,
+    write_txn_metric: Histogram,
 }
 
 impl<Kind: DbKindT> std::fmt::Debug for DbRead<Kind> {
@@ -324,6 +327,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         crate::table::initialize_database(&mut conn, kind.kind())?;
 
         let use_time_metric = create_connection_use_time_metric(kind.kind());
+        let write_txn_metric = create_write_txn_duration_metric(kind.kind());
 
         let db_read = DbRead {
             write_semaphore: Self::get_write_semaphore(kind.kind()),
@@ -336,16 +340,8 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
             connection_pool: pool,
             statement_trace_fn,
             use_time_metric,
+            write_txn_metric,
         };
-
-        create_pool_usage_metric(
-            kind.kind(),
-            vec![
-                db_read.write_semaphore.clone(),
-                db_read.read_semaphore.clone(),
-                db_read.long_read_semaphore.clone(),
-            ],
-        );
 
         Ok(DbWrite(db_read))
     }
@@ -375,6 +371,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         R: Send + 'static,
     {
         let mut conn = self.get_connection_from_pool()?;
+        let write_txn_metric = self.0.write_txn_metric.clone();
 
         let start = tokio::time::Instant::now();
         let span = tracing::info_span!("spawn_blocking");
@@ -384,7 +381,9 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         tokio::time::timeout(std::time::Duration::from_millis(THREAD_ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)), tokio::task::spawn_blocking(move || {
             let _s = span.enter();
             log_elapsed!([10, 100, 1000], start, "write_async:before-closure");
+            let txn_start = std::time::Instant::now();
             let r = conn.execute_in_exclusive_rw_txn(|txn| f(&mut Txn::from(txn)));
+            write_txn_metric.record(txn_start.elapsed().as_secs_f64(), &[]);
             log_elapsed!([10, 100, 1000], start, "write_async:after-closure");
             r.map(|r| (r, permit))
         }).in_current_span()).in_current_span().await.map_err(|e| {

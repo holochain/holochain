@@ -166,7 +166,7 @@ impl SweetConductor {
         );
 
         if with_metrics {
-            holochain_metrics::HolochainMetricsConfig::new(dir.as_ref())
+            holochain_metrics::HolochainMetricsConfig::new_from_env_vars(dir.as_ref())
                 .init()
                 .await;
         }
