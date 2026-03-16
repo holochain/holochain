@@ -14,6 +14,68 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20260316.002412
+
+## [hcterm-0.7.0-dev.16](crates/hcterm/CHANGELOG.md#0.7.0-dev.16)
+
+## [holochain\_cli-0.7.0-dev.16](crates/holochain_cli/CHANGELOG.md#0.7.0-dev.16)
+
+## [holochain\_cli\_bundle-0.7.0-dev.15](crates/holochain_cli_bundle/CHANGELOG.md#0.7.0-dev.15)
+
+## [holochain\_cli\_client-0.7.0-dev.16](crates/holochain_cli_client/CHANGELOG.md#0.7.0-dev.16)
+
+## [holochain\_cli\_sandbox-0.7.0-dev.16](crates/holochain_cli_sandbox/CHANGELOG.md#0.7.0-dev.16)
+
+## [holochain\_client-0.9.0-dev.16](crates/holochain_client/CHANGELOG.md#0.9.0-dev.16)
+
+## [holochain-0.7.0-dev.16](crates/holochain/CHANGELOG.md#0.7.0-dev.16)
+
+- Record new OpenTelemetry metrics covering conductor, ribosome, network, cascade, and keystore operations.
+- Update kitsune2 dependencies to `0.4.0-dev.4`.
+  - Implements new required `OpStore::query_total_op_count` method, counting integrated ops across both the DHT and cache databases.
+  - Adds `GossipStateSummary::local_op_count` field to the gossip state summary.
+  - **BREAKING** Adds `HolochainP2pConfig::get_db_cache` callback (required when constructing the p2p config) to supply the cache database handle per space.
+
+## [holochain\_cascade-0.7.0-dev.16](crates/holochain_cascade/CHANGELOG.md#0.7.0-dev.16)
+
+## [holochain\_conductor\_config-0.7.0-dev.15](crates/holochain_conductor_config/CHANGELOG.md#0.7.0-dev.15)
+
+## [holochain\_metrics-0.7.0-dev.3](crates/holochain_metrics/CHANGELOG.md#0.7.0-dev.3)
+
+## [holochain\_test\_wasm\_common-0.7.0-dev.10](crates/holochain_test_wasm_common/CHANGELOG.md#0.7.0-dev.10)
+
+## [holochain\_wasm\_test\_utils-0.7.0-dev.16](crates/holochain_wasm_test_utils/CHANGELOG.md#0.7.0-dev.16)
+
+## [holochain\_websocket-0.7.0-dev.15](crates/holochain_websocket/CHANGELOG.md#0.7.0-dev.15)
+
+## [hdk-0.7.0-dev.10](crates/hdk/CHANGELOG.md#0.7.0-dev.10)
+
+## [holochain\_conductor\_api-0.7.0-dev.15](crates/holochain_conductor_api/CHANGELOG.md#0.7.0-dev.15)
+
+## [holochain\_p2p-0.7.0-dev.16](crates/holochain_p2p/CHANGELOG.md#0.7.0-dev.16)
+
+## [hdi-0.8.0-dev.7](crates/hdi/CHANGELOG.md#0.8.0-dev.7)
+
+## [holochain\_state-0.7.0-dev.16](crates/holochain_state/CHANGELOG.md#0.7.0-dev.16)
+
+## [hdk\_derive-0.7.0-dev.7](crates/hdk_derive/CHANGELOG.md#0.7.0-dev.7)
+
+## [holochain\_data-0.7.0-dev.5](crates/holochain_data/CHANGELOG.md#0.7.0-dev.5)
+
+## [holochain\_state\_types-0.7.0-dev.7](crates/holochain_state_types/CHANGELOG.md#0.7.0-dev.7)
+
+## [holochain\_types-0.7.0-dev.15](crates/holochain_types/CHANGELOG.md#0.7.0-dev.15)
+
+## [holochain\_keystore-0.7.0-dev.9](crates/holochain_keystore/CHANGELOG.md#0.7.0-dev.9)
+
+## [holochain\_sqlite-0.7.0-dev.12](crates/holochain_sqlite/CHANGELOG.md#0.7.0-dev.12)
+
+## [holochain\_zome\_types-0.7.0-dev.9](crates/holochain_zome_types/CHANGELOG.md#0.7.0-dev.9)
+
+## [holochain\_integrity\_types-0.7.0-dev.7](crates/holochain_integrity_types/CHANGELOG.md#0.7.0-dev.7)
+
+## [holo\_hash-0.7.0-dev.6](crates/holo_hash/CHANGELOG.md#0.7.0-dev.6)
+
 # 20260309.002048
 
 ## [hcterm-0.7.0-dev.15](crates/hcterm/CHANGELOG.md#0.7.0-dev.15)
