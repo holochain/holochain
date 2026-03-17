@@ -281,6 +281,11 @@ pub struct SpaceNetworkOverride {
     #[serde(default)]
     #[schemars(schema_with = "holochain_util::jsonschema::optional_url2_schema")]
     pub signal_url: Option<url2::Url2>,
+    /// Override the base64-encoded authentication material for bootstrap/signal
+    /// services for this space. Required when the space's bootstrap server
+    /// uses a different auth credential than the conductor default.
+    #[serde(default)]
+    pub base64_auth_material: Option<String>,
 }
 
 /// All the network config information for the conductor.

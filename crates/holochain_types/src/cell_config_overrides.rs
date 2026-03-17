@@ -6,7 +6,7 @@
 /// Overrides for Cell configuration settings.
 ///
 /// This struct holds optional override values for Cell configurations
-/// such as bootstrap URLs and signal server URLs.
+/// such as bootstrap URLs, signal server URLs, and authentication material.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct CellConfigOverrides {
     /// URL of the bootstrap server to use for all Cells created
@@ -17,6 +17,10 @@ pub struct CellConfigOverrides {
     /// for an app. If not overridden, the signal server
     /// specified in the conductor config file will be used.
     pub signal_url: Option<String>,
+    /// Base64-encoded authentication material for bootstrap/signal services.
+    /// If not overridden, the auth material specified in the conductor
+    /// config file will be used.
+    pub base64_auth_material: Option<String>,
 }
 
 impl CellConfigOverrides {
@@ -24,7 +28,9 @@ impl CellConfigOverrides {
     ///
     /// Returns `true` if at least one override field is [`Some`], otherwise returns `false`.
     pub fn is_overriding(&self) -> bool {
-        self.bootstrap_url.is_some() || self.signal_url.is_some()
+        self.bootstrap_url.is_some()
+            || self.signal_url.is_some()
+            || self.base64_auth_material.is_some()
     }
 }
 
@@ -37,24 +43,35 @@ mod tests {
         let overrides = CellConfigOverrides {
             bootstrap_url: None,
             signal_url: None,
+            base64_auth_material: None,
         };
         assert!(!overrides.is_overriding());
 
         let overrides = CellConfigOverrides {
             bootstrap_url: Some("http://localhost:1234".to_string()),
             signal_url: None,
+            base64_auth_material: None,
         };
         assert!(overrides.is_overriding());
 
         let overrides = CellConfigOverrides {
             bootstrap_url: None,
             signal_url: Some("ws://localhost:5678".to_string()),
+            base64_auth_material: None,
         };
         assert!(overrides.is_overriding());
 
         let overrides = CellConfigOverrides {
             bootstrap_url: Some("http://localhost:1234".to_string()),
             signal_url: Some("ws://localhost:5678".to_string()),
+            base64_auth_material: None,
+        };
+        assert!(overrides.is_overriding());
+
+        let overrides = CellConfigOverrides {
+            bootstrap_url: None,
+            signal_url: None,
+            base64_auth_material: Some("dGVzdA==".to_string()),
         };
         assert!(overrides.is_overriding());
     }
