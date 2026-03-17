@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 
 - Per-space bootstrap server overrides from conductor config are now merged into cell config overrides, with app manifest overrides taking precedence.
+## 0.7.0-dev.16
+
 - Record new OpenTelemetry metrics covering conductor, ribosome, network, cascade, and keystore operations.
 - Update kitsune2 dependencies to `0.4.0-dev.4`.
   - Implements new required `OpStore::query_total_op_count` method, counting integrated ops across both the DHT and cache databases.
