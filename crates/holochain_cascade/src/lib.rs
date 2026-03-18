@@ -1047,6 +1047,13 @@ impl CascadeImpl {
         filter: ChainFilter,
         options: NetworkRequestOptions,
     ) -> CascadeResult<MustGetAgentActivityResponse> {
+        // Check that filter take is valid
+        if filter.get_take() == Some(0) {
+            return Err(CascadeError::InvalidInput(
+                "ChainFilter take must be greater than 0".to_string(),
+            ));
+        }
+
         // First, we get the action_seq of the requested chain top Action
         //
         // We check every store until the Action is is found, because it may only be stored in one.

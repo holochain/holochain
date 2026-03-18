@@ -5,6 +5,7 @@ use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_cell::must_get_agent_activity::ACTION_HASH_TO_SEQ;
 use holochain_sqlite::sql::sql_cell::must_get_agent_activity::MUST_GET_AGENT_ACTIVITY;
 use holochain_state::prelude::*;
+use holochain_state::query::StateQueryError;
 use holochain_types::prelude::WarrantOp;
 use std::cmp::Reverse;
 use std::collections::HashMap;
