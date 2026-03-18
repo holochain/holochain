@@ -16,6 +16,7 @@ opentelemetry = "0.31"
 tracing = "0.1"
 
 # influxive dependencies
+hostname = "0.4"
 influxdb = "0.8"
 opentelemetry_sdk = "0.31"
 tempfile = "3"

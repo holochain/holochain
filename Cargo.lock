@@ -3262,6 +3262,7 @@ dependencies = [
  "futures",
  "hex",
  "hex-literal",
+ "hostname",
  "influxdb",
  "opentelemetry 0.31.0",
  "opentelemetry_sdk 0.31.0",
