@@ -298,11 +298,13 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     // return single action as requested chain
     network.expect_must_get_agent_activity().returning({
         let expected_chain_top = expected_chain_top.clone();
+        let expected_until_hash = delete.deletes_address.clone();
         let create_action_signed_hashed = create_action_signed_hashed.clone();
         let delete_action_signed_hashed = delete_action_signed_hashed.clone();
         move |author, filter, _, _| {
             assert_eq!(author, alice);
             assert_eq!(&filter.chain_top, expected_chain_top.as_hash());
+            assert_eq!(filter.get_until_hash(), Some(&expected_until_hash));
 
             Ok(vec![MustGetAgentActivityResponse::activity(vec![
                 RegisterAgentActivity {
