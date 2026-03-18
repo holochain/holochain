@@ -64,7 +64,7 @@ sqlite-encrypted = [
 schema = [
   "kitsune2_gossip/schema",
   "kitsune2_core/schema",
-  "kitsune2_transport_tx5/schema",
+  "kitsune2_transport_tx5?/schema",
   "kitsune2_transport_iroh/schema",
 ]
 sqlite = [

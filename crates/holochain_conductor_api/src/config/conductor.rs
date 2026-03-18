@@ -49,7 +49,7 @@
 use crate::conductor::process::ERROR_CODE;
 use crate::config::conductor::paths::DataRootPath;
 use holochain_types::prelude::DbSyncStrategy;
-#[cfg(feature = "schema")]
+#[cfg(all(feature = "schema", feature = "kitsune2_transport_tx5"))]
 use kitsune2_transport_tx5::WebRtcConfig;
 use schemars::JsonSchema;
 #[cfg(feature = "schema")]
@@ -286,7 +286,10 @@ pub struct NetworkConfig {
     pub request_timeout_s: u64,
 
     /// The Kitsune2 webrtc_config to use for connecting to peers.
-    #[cfg_attr(feature = "schema", schemars(schema_with = "webrtc_config_schema"))]
+    #[cfg_attr(
+        all(feature = "schema", feature = "kitsune2_transport_tx5"),
+        schemars(schema_with = "webrtc_config_schema")
+    )]
     pub webrtc_config: Option<serde_json::Value>,
 
     /// The target arc factor to apply when receiving hints from kitsune2.
@@ -665,7 +668,7 @@ impl Default for ConductorTuningParams {
     }
 }
 
-#[cfg(feature = "schema")]
+#[cfg(all(feature = "schema", feature = "kitsune2_transport_tx5"))]
 fn webrtc_config_schema(_: &mut schemars::SchemaGenerator) -> Schema {
     let schema = schemars::schema_for!(Option<WebRtcConfig>);
 
@@ -693,6 +696,7 @@ fn kitsune2_config_schema(generator: &mut schemars::SchemaGenerator) -> Schema {
         mem_peer_store: Option<kitsune2_core::factories::MemPeerStoreModConfig>,
         #[serde(flatten)]
         k2_gossip: Option<kitsune2_gossip::K2GossipModConfig>,
+        #[cfg(feature = "kitsune2_transport_tx5")]
         #[serde(flatten)]
         tx5_transport: Option<kitsune2_transport_tx5::Tx5TransportModConfig>,
         #[serde(flatten)]
