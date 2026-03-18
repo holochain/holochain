@@ -3,8 +3,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
-use holochain_cascade::{CascadeImpl, CascadeOptions};
-use holochain_p2p::actor::NetworkRequestOptions;
+use holochain_cascade::CascadeImpl;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
@@ -36,11 +35,7 @@ pub fn must_get_valid_record(
                         if is_inline {
                             (
                                 cascade_from_call_context(&call_context),
-                                CascadeOptions {
-                                    network_request_options:
-                                        NetworkRequestOptions::must_get_options(),
-                                    get_options: GetOptions::network(),
-                                },
+                                GetOptions::network(),
                             )
                         } else {
                             (
@@ -49,20 +44,13 @@ pub fn must_get_valid_record(
                                         call_context.zome.zome_name(),
                                         call_context.function_name(),
                                     ),
-                                CascadeOptions {
-                                    network_request_options:
-                                        NetworkRequestOptions::must_get_options(),
-                                    get_options: GetOptions::local(),
-                                },
+                                GetOptions::local(),
                             )
                         }
                     }
                     _ => (
                         cascade_from_call_context(&call_context),
-                        CascadeOptions {
-                            network_request_options: NetworkRequestOptions::must_get_options(),
-                            get_options: GetOptions::network(),
-                        },
+                        GetOptions::network(),
                     ),
                 };
                 match cascade
