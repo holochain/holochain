@@ -1,3 +1,4 @@
+use crate::core::metrics::send_remote_signal_metric;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
@@ -21,7 +22,7 @@ use wasmer::RuntimeError;
     tracing::instrument(skip(_ribosome, call_context, input))
 )]
 pub fn send_remote_signal(
-    _ribosome: Arc<impl RibosomeT>,
+    ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: RemoteSignal,
 ) -> Result<(), RuntimeError> {
@@ -32,8 +33,9 @@ pub fn send_remote_signal(
             ..
         } => {
             const FN_NAME: &str = "recv_remote_signal";
-            let from_agent = super::agent_info::agent_info(_ribosome, call_context.clone(), ())?
-                .agent_initial_pubkey;
+            let from_agent =
+                super::agent_info::agent_info(ribosome.clone(), call_context.clone(), ())?
+                    .agent_initial_pubkey;
             // Timeouts and errors are ignored,
             // this is a send and forget operation.
             let network = call_context.host_context().network().clone();
@@ -42,58 +44,73 @@ pub fn send_remote_signal(
             let fn_name: FunctionName = FN_NAME.into();
 
             tokio::task::spawn(
-                async move {
-                    let mut to_agent_list = Vec::new();
+                {
+                    let dna_hash = ribosome.dna_hash().clone();
+                    async move {
+                        let mut to_agent_list = Vec::new();
 
-                    let (nonce, expires_at) = match fresh_nonce(Timestamp::now()) {
-                        Ok(nonce) => nonce,
-                        Err(e) => {
-                            tracing::info!("Failed to get a fresh nonce because of {:?}", e);
-                            return;
+                        let (nonce, expires_at) = match fresh_nonce(Timestamp::now()) {
+                            Ok(nonce) => nonce,
+                            Err(e) => {
+                                tracing::info!("Failed to get a fresh nonce because of {:?}", e);
+                                return;
+                            }
+                        };
+
+                        for agent in agents {
+                            let zome_call_params = ZomeCallParams {
+                                provenance: from_agent.clone(),
+                                cell_id: CellId::new(network.dna_hash(), agent.clone()),
+                                zome_name: zome_name.clone(),
+                                fn_name: fn_name.clone(),
+                                cap_secret: None,
+                                payload: signal.clone(),
+                                nonce,
+                                expires_at,
+                            };
+                            let (bytes, bytes_hash) = match zome_call_params.serialize_and_hash() {
+                                Ok(bytes_and_hash) => bytes_and_hash,
+                                Err(e) => {
+                                    tracing::info!(
+                                        "Failed to serialize zome call for signal because of {:?}",
+                                        e
+                                    );
+                                    return;
+                                }
+                            };
+
+                            match from_agent
+                                .sign_raw(call_context.host_context.keystore(), bytes_hash.into())
+                                .await
+                            {
+                                Ok(signature) => {
+                                    to_agent_list.push((agent, ExternIO(bytes), signature))
+                                }
+                                Err(e) => {
+                                    tracing::info!(
+                                        "Failed to sign and send remote signals because of {:?}",
+                                        e
+                                    );
+                                    return;
+                                }
+                            };
                         }
-                    };
 
-                    for agent in agents {
-                        let zome_call_params = ZomeCallParams {
-                            provenance: from_agent.clone(),
-                            cell_id: CellId::new(network.dna_hash(), agent.clone()),
-                            zome_name: zome_name.clone(),
-                            fn_name: fn_name.clone(),
-                            cap_secret: None,
-                            payload: signal.clone(),
-                            nonce,
-                            expires_at,
-                        };
-                        let (bytes, bytes_hash) = match zome_call_params.serialize_and_hash() {
-                            Ok(bytes_and_hash) => bytes_and_hash,
-                            Err(e) => {
-                                tracing::info!(
-                                    "Failed to serialize zome call for signal because of {:?}",
-                                    e
-                                );
-                                return;
-                            }
-                        };
-
-                        match from_agent
-                            .sign_raw(call_context.host_context.keystore(), bytes_hash.into())
-                            .await
-                        {
-                            Ok(signature) => {
-                                to_agent_list.push((agent, ExternIO(bytes), signature))
-                            }
-                            Err(e) => {
-                                tracing::info!(
-                                    "Failed to sign and send remote signals because of {:?}",
-                                    e
-                                );
-                                return;
-                            }
-                        };
-                    }
-
-                    if let Err(e) = network.send_remote_signal(to_agent_list).await {
-                        tracing::info!("Failed to send remote signals because of {:?}", e);
+                        if let Err(e) = network.send_remote_signal(to_agent_list).await {
+                            tracing::info!("Failed to send remote signals because of {:?}", e);
+                        } else {
+                            // Record sent remote signal
+                            send_remote_signal_metric().add(
+                                1,
+                                &[
+                                    opentelemetry::KeyValue::new("dna_hash", dna_hash.to_string()),
+                                    opentelemetry::KeyValue::new(
+                                        "zome",
+                                        call_context.zome.zome_name().to_string(),
+                                    ),
+                                ],
+                            );
+                        }
                     }
                 }
                 .in_current_span(),

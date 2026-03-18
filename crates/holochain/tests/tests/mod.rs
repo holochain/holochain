@@ -17,6 +17,7 @@ mod init;
 mod inline_zome_spec;
 mod integrity_zome;
 mod lair_in_proc_restart;
+mod metrics;
 mod migration;
 mod multi_conductor;
 mod network_events;

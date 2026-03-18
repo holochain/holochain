@@ -5,6 +5,7 @@ use super::error::InterfaceResult;
 use crate::conductor::api::{AdminInterfaceApi, AppAuthentication, AppInterfaceApi};
 use crate::conductor::conductor::app_broadcast::AppBroadcast;
 use crate::conductor::manager::TaskManagerClient;
+use crate::conductor::metrics::dropped_signal_metric;
 use holochain_conductor_api::{
     AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest, AppResponse,
     ExternalApiWireError,
@@ -367,6 +368,13 @@ fn spawn_app_signals_handler(
                     // We missed some signals, but the channel is still open
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(dropped)) => {
                         warn!("Holochain app port {port} dropped {dropped} signals. The app '{installed_app_id}' is emitting signals too fast.");
+                        dropped_signal_metric().add(
+                            1,
+                            &[opentelemetry::KeyValue::new(
+                                "app_id",
+                                installed_app_id.to_string(),
+                            )],
+                        );
                         continue;
                     }
                     Ok(item) => return Some((item, rx_from_cell)),

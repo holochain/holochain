@@ -56,6 +56,8 @@ pub mod sql_dht {
     pub const CHECK_OP_IDS_PRESENT: &str = include_str!("sql/dht/check_op_ids_present.sql");
 
     pub const EARLIEST_TIMESTAMP: &str = include_str!("sql/dht/earliest_timestamp.sql");
+
+    pub const TOTAL_OP_COUNT: &str = include_str!("sql/dht/total_op_count.sql");
 }
 
 pub mod sql_conductor {
@@ -64,7 +66,7 @@ pub mod sql_conductor {
     pub const FROM_BLOCK_SPAN_WHERE_OVERLAPPING: &str =
         include_str!("sql/conductor/from_block_span_where_overlapping.sql");
     pub const IS_BLOCKED: &str = include_str!("sql/conductor/is_blocked.sql");
-    pub const ARE_ALL_BLOCKED: &str = include_str!("sql/conductor/are_all_blocked.sql");
+    pub const IS_ANY_BLOCKED: &str = include_str!("sql/conductor/is_any_blocked.sql");
     pub const SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET: &str =
         include_str!("sql/conductor/select_valid_cap_grant_for_cap_secret.sql");
     pub const SELECT_VALID_UNRESTRICTED_CAP_GRANT: &str =

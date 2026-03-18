@@ -7,7 +7,7 @@ use holochain_p2p::event::{
 };
 use holochain_p2p::{HolochainOpStore, HolochainP2pResult};
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_sqlite::db::{DbKindDht, DbWrite};
+use holochain_sqlite::db::{DbKindCache, DbKindDht, DbWrite};
 use holochain_state::prelude::{
     ChainFilter, ExternIO, RecordEntry, Signature, StateMutationResult,
 };
@@ -530,12 +530,13 @@ async fn overwrite_slice_hashes() {
 async fn setup_test() -> (DbWrite<DbKindDht>, HolochainOpStore) {
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
     let db = DbWrite::test_in_mem(DbKindDht(Arc::new(dna_hash.clone()))).unwrap();
+    let cache_db = DbWrite::test_in_mem(DbKindCache(Arc::new(dna_hash.clone()))).unwrap();
 
     let sender: DynHcP2pHandler = Arc::new(StubHost { db: db.clone() });
     let sender_w = Arc::new(std::sync::OnceLock::new());
     sender_w.set(holochain_p2p::WrapEvtSender(sender)).unwrap();
 
-    let op_store = HolochainOpStore::new(db.clone(), dna_hash, sender_w);
+    let op_store = HolochainOpStore::new(db.clone(), cache_db, dna_hash, sender_w);
 
     (db, op_store)
 }

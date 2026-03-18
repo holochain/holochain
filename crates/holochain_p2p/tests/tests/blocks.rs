@@ -13,7 +13,7 @@ use holochain_p2p::{
 use holochain_state::{block::get_all_cell_blocks, prelude::test_conductor_db};
 use holochain_timestamp::{InclusiveTimestampInterval, Timestamp};
 use holochain_types::{
-    db::{DbKindConductor, DbKindDht, DbKindPeerMetaStore, DbWrite},
+    db::{DbKindCache, DbKindConductor, DbKindDht, DbKindPeerMetaStore, DbWrite},
     prelude::{Block, BlockTargetId, CellBlockReason, CellId},
     record::WireRecordOps,
 };
@@ -145,9 +145,9 @@ mod blocks_impl {
             .is_blocked(kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()))
             .await
             .unwrap());
-        assert!(!blocks_module.are_all_blocked(vec![]).await.unwrap());
+        assert!(!blocks_module.is_any_blocked(vec![]).await.unwrap());
         assert!(!blocks_module
-            .are_all_blocked(vec![kitsune2_api::BlockTarget::Agent(agent.to_k2_agent())])
+            .is_any_blocked(vec![kitsune2_api::BlockTarget::Agent(agent.to_k2_agent())])
             .await
             .unwrap());
 
@@ -166,15 +166,15 @@ mod blocks_impl {
             .await
             .unwrap());
         assert!(blocks_module
-            .are_all_blocked(vec![kitsune2_api::BlockTarget::Agent(agent.to_k2_agent())])
+            .is_any_blocked(vec![kitsune2_api::BlockTarget::Agent(agent.to_k2_agent())])
             .await
             .unwrap());
         // Empty target vector is still not blocked.
-        assert!(!blocks_module.are_all_blocked(vec![]).await.unwrap());
+        assert!(!blocks_module.is_any_blocked(vec![]).await.unwrap());
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn are_all_blocked_mixed_then_all_blocked() {
+    async fn is_any_blocked_partial_then_all_blocked() {
         let dna_hash = fixt!(DnaHash);
         let agent_1 = fixt!(AgentPubKey);
         let agent_2 = fixt!(AgentPubKey);
@@ -189,7 +189,7 @@ mod blocks_impl {
 
         // Initially not blocked.
         assert!(!blocks_module
-            .are_all_blocked(vec![
+            .is_any_blocked(vec![
                 kitsune2_api::BlockTarget::Agent(agent_1.to_k2_agent()),
                 kitsune2_api::BlockTarget::Agent(agent_2.to_k2_agent()),
             ])
@@ -205,9 +205,9 @@ mod blocks_impl {
             .await
             .unwrap();
 
-        // Mixed list should yield false.
-        assert!(!blocks_module
-            .are_all_blocked(vec![
+        // Mixed list should yield true: at least one is blocked.
+        assert!(blocks_module
+            .is_any_blocked(vec![
                 kitsune2_api::BlockTarget::Agent(agent_1.to_k2_agent()),
                 kitsune2_api::BlockTarget::Agent(agent_2.to_k2_agent()),
             ])
@@ -223,52 +223,11 @@ mod blocks_impl {
             .await
             .unwrap();
 
-        // Now all should be blocked.
+        // Both blocked: still true.
         assert!(blocks_module
-            .are_all_blocked(vec![
+            .is_any_blocked(vec![
                 kitsune2_api::BlockTarget::Agent(agent_1.to_k2_agent()),
                 kitsune2_api::BlockTarget::Agent(agent_2.to_k2_agent()),
-            ])
-            .await
-            .unwrap());
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn are_all_blocked_with_duplicate_targets() {
-        let dna_hash = fixt!(DnaHash);
-        let agent = fixt!(AgentPubKey);
-        let cell_id = CellId::new(dna_hash.clone(), agent.clone());
-
-        let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
-        let TestActor {
-            actor,
-            blocks_module,
-        } = TestActor::new(&dna_hash, &addr).await;
-
-        // Not blocked initially even with duplicates in query.
-        assert!(!blocks_module
-            .are_all_blocked(vec![
-                kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()),
-                kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()),
-                kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()),
-            ])
-            .await
-            .unwrap());
-
-        // Block the agent.
-        actor
-            .block(Block::new(
-                BlockTarget::Cell(cell_id, CellBlockReason::BadCrypto),
-                InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::max()).unwrap(),
-            ))
-            .await
-            .unwrap();
-
-        // Duplicates in the query should still resolve to true once blocked.
-        assert!(blocks_module
-            .are_all_blocked(vec![
-                kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()),
-                kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()),
             ])
             .await
             .unwrap());
@@ -361,13 +320,13 @@ mod blocks_impl {
             .await
             .unwrap());
 
-        // All-blocked checks respect DNA scoping too.
+        // is_any_blocked checks respect DNA scoping too.
         assert!(blocks_module_1
-            .are_all_blocked(vec![kitsune2_api::BlockTarget::Agent(agent.to_k2_agent())])
+            .is_any_blocked(vec![kitsune2_api::BlockTarget::Agent(agent.to_k2_agent())])
             .await
             .unwrap());
         assert!(!blocks_module_2
-            .are_all_blocked(vec![kitsune2_api::BlockTarget::Agent(agent.to_k2_agent())])
+            .is_any_blocked(vec![kitsune2_api::BlockTarget::Agent(agent.to_k2_agent())])
             .await
             .unwrap());
     }
@@ -405,6 +364,7 @@ async fn get_to_blocked_agent_fails() {
             dna_hash.clone(),
             fixt!(ActionHash).into(),
             NetworkRequestOptions::default(),
+            None,
         )
         .await;
     assert!(
@@ -438,6 +398,7 @@ async fn get_to_blocked_agent_fails() {
             dna_hash.clone(),
             fixt!(ActionHash).into(),
             NetworkRequestOptions::default(),
+            None,
         )
         .await;
     assert!(matches!(
@@ -478,6 +439,7 @@ async fn get_by_blocked_agent_fails() {
             dna_hash.clone(),
             fixt!(ActionHash).into(),
             NetworkRequestOptions::default(),
+            None,
         )
         .await;
     assert!(
@@ -507,6 +469,7 @@ async fn get_by_blocked_agent_fails() {
             dna_hash.clone(),
             fixt!(ActionHash).into(),
             NetworkRequestOptions::default(),
+            None,
         )
         .await;
     assert!(response.is_err(), "expected error, got {response:?}");
@@ -547,6 +510,7 @@ impl TestActor {
         bootstrap_addr: &SocketAddr,
     ) -> Self {
         let op_db = DbWrite::test_in_mem(DbKindDht(Arc::new(dna_hash.clone()))).unwrap();
+        let cache_db = DbWrite::test_in_mem(DbKindCache(Arc::new(dna_hash.clone()))).unwrap();
         let peer_meta_db =
             DbWrite::test_in_mem(DbKindPeerMetaStore(Arc::new(dna_hash.clone()))).unwrap();
         let config = HolochainP2pConfig {
@@ -557,6 +521,10 @@ impl TestActor {
             get_db_op_store: Arc::new(move |_| {
                 let op_db = op_db.clone();
                 Box::pin(async move { Ok(op_db) })
+            }),
+            get_db_cache: Arc::new(move |_| {
+                let cache_db = cache_db.clone();
+                Box::pin(async move { Ok(cache_db) })
             }),
             get_db_peer_meta: Arc::new(move |_| {
                 let peer_meta_db = peer_meta_db.clone();

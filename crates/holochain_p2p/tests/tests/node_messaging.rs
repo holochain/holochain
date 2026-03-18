@@ -168,6 +168,7 @@ async fn test_call_remote() {
                     agent1.clone(),
                     ExternIO(b"hello".to_vec()),
                     Signature([0; 64]),
+                    None,
                 )
                 .await
                 .unwrap();
@@ -199,6 +200,7 @@ async fn test_call_remote() {
             agent2,
             ExternIO(b"world".to_vec()),
             Signature([0; 64]),
+            None,
         )
         .await
         .unwrap();
@@ -375,6 +377,7 @@ async fn test_get() {
                         holo_hash::hash_type::AnyDht::Entry,
                     ),
                     NetworkRequestOptions::default(),
+                    None,
                 )
                 .await
                 .is_ok()
@@ -424,6 +427,7 @@ async fn test_get_with_unresponsive_agents() {
                         holo_hash::hash_type::AnyDht::Entry,
                     ),
                     NetworkRequestOptions::default(),
+                    None,
                 )
                 .await
                 .is_ok()
@@ -475,6 +479,7 @@ async fn test_get_when_not_all_agents_have_data() {
                         holo_hash::hash_type::AnyDht::Entry,
                     ),
                     NetworkRequestOptions::default(),
+                    None,
                 )
                 .await
             {
@@ -538,6 +543,7 @@ async fn test_get_when_not_all_agents_have_data_and_unresponsive_agent() {
                         holo_hash::hash_type::AnyDht::Entry,
                     ),
                     NetworkRequestOptions::default(),
+                    None,
                 )
                 .await
             {
@@ -592,6 +598,7 @@ async fn test_get_empty_data_better_than_no_response() {
                         holo_hash::hash_type::AnyDht::Entry,
                     ),
                     NetworkRequestOptions::default(),
+                    None,
                 )
                 .await
                 .is_ok()
@@ -641,6 +648,7 @@ async fn test_get_links() {
                         author: None,
                     },
                     GetLinksRequestOptions::default(),
+                    None,
                 )
                 .await
                 .is_ok()
@@ -692,6 +700,7 @@ async fn test_get_links_with_unresponsive_agents() {
                         author: None,
                     },
                     GetLinksRequestOptions::default(),
+                    None,
                 )
                 .await
                 .is_ok()
@@ -741,6 +750,7 @@ async fn test_count_links() {
                         author: None,
                     },
                     NetworkRequestOptions::default(),
+                    None,
                 )
                 .await
                 .is_ok()
@@ -792,6 +802,7 @@ async fn test_count_links_with_unresponsive_agents() {
                         author: None,
                     },
                     NetworkRequestOptions::default(),
+                    None,
                 )
                 .await
                 .is_ok()
@@ -838,6 +849,7 @@ async fn test_get_agent_activity() {
                         order_descending: false,
                     },
                     holochain_p2p::actor::GetActivityOptions::default(),
+                    None,
                 )
                 .await
                 .is_ok()
@@ -886,6 +898,7 @@ async fn test_get_agent_activity_with_unresponsive_agents() {
                         order_descending: false,
                     },
                     holochain_p2p::actor::GetActivityOptions::default(),
+                    None,
                 )
                 .await
                 .is_ok()
@@ -929,6 +942,7 @@ async fn test_must_get_agent_activity() {
                         include_cached_entries: false,
                     },
                     NetworkRequestOptions::default(),
+                    None,
                 )
                 .await
                 .is_ok()
@@ -974,6 +988,7 @@ async fn test_must_get_agent_activity_with_unresponsive_agents() {
                         include_cached_entries: false,
                     },
                     NetworkRequestOptions::default(),
+                    None,
                 )
                 .await
                 .is_ok()
@@ -1118,6 +1133,7 @@ async fn bridged_call_remote() {
             agent2,
             ExternIO(b"world".to_vec()),
             Signature([0; 64]),
+            None,
         )
         .await
         .unwrap();
@@ -1212,6 +1228,7 @@ async fn spawn_test(
     let db_peer_meta =
         DbWrite::test_in_mem(DbKindPeerMetaStore(Arc::new(dna_hash.clone()))).unwrap();
     let db_op = DbWrite::test_in_mem(DbKindDht(Arc::new(dna_hash.clone()))).unwrap();
+    let db_cache = DbWrite::test_in_mem(DbKindCache(Arc::new(dna_hash.clone()))).unwrap();
     let conductor_db = DbWrite::test_in_mem(DbKindConductor).unwrap();
     let lair_client = test_keystore();
 
@@ -1226,6 +1243,10 @@ async fn spawn_test(
             get_db_op_store: Arc::new(move |_| {
                 let db_op = db_op.clone();
                 Box::pin(async move { Ok(db_op.clone()) })
+            }),
+            get_db_cache: Arc::new(move |_| {
+                let db_cache = db_cache.clone();
+                Box::pin(async move { Ok(db_cache) })
             }),
             get_conductor_db: Arc::new(move || {
                 let conductor_db = conductor_db.clone();

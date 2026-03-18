@@ -227,6 +227,7 @@ impl Conductor {
 mod startup_shutdown_impls {
     use super::*;
     use crate::conductor::manager::{spawn_task_outcome_handler, OutcomeReceiver, OutcomeSender};
+    use crate::conductor::metrics::register_uptime_metric;
 
     //-----------------------------------------------------------------------------
     /// Methods used by the [ConductorHandle]
@@ -367,6 +368,9 @@ mod startup_shutdown_impls {
             }
 
             info!("Conductor startup: apps enabled.");
+
+            // Start recording conductor uptime
+            register_uptime_metric(std::time::Instant::now());
 
             Ok(())
         }
