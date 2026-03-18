@@ -35,7 +35,7 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
         FlatOp::StoreEntry(e) => match e {
             OpEntry::CreateEntry {
                 app_entry: EntryTypes::SelfAgentsChain(_),
-                action
+                action,
             } => {
                 let _agent_activity = must_get_agent_activity(
                     action.author.to_owned(),
@@ -45,7 +45,7 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             }
             OpEntry::CreateEntry {
                 app_entry: EntryTypes::SelfPrevAgentsChain(_),
-                action
+                action,
             } => {
                 let _agent_activity = must_get_agent_activity(
                     action.author.to_owned(),
@@ -64,7 +64,7 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 app_entry: EntryTypes::AgentsChainRec(AgentsChainRec(author, chain_top)),
                 ..
             } => {
-                let mut filter = ChainFilter::new(chain_top).take(2);
+                let mut filter = ChainFilter::take(chain_top, 2);
                 loop {
                     let chain = must_get_agent_activity(author.clone(), filter.clone())?;
                     if chain.len() > 2 {
@@ -77,8 +77,7 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                             if op.action.action().action_seq() == 0 {
                                 return Ok(ValidateCallbackResult::Valid);
                             } else {
-                                filter =
-                                    ChainFilter::new(op.action.action_address().clone()).take(2);
+                                filter = ChainFilter::take(op.action.action_address().clone(), 2);
                             }
                         }
                         None => {
