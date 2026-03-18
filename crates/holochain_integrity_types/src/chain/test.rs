@@ -14,27 +14,14 @@ fn can_serialize() {
 }
 
 #[test]
-fn take_n_is_min() {
-    assert_eq!(
-        ChainFilter::new(hash(0)).take(0),
-        ChainFilter::new(hash(0)).take(0).take(5)
-    );
-    assert_eq!(
-        ChainFilter::new(hash(0)).take(0),
-        ChainFilter::new(hash(0)).take(5).take(0)
-    );
+fn take_constructor_sets_take_limit() {
+    let filter = ChainFilter::take(hash(0), 3);
+    assert_eq!(filter.get_take(), Some(3));
 }
 
 #[test]
-fn until_hash_is_a_set() {
-    assert_eq!(
-        ChainFilter::new(hash(0))
-            .until_hash(hash(0))
-            .until_hash(hash(1)),
-        ChainFilter::new(hash(0))
-            .until_hash(hash(0))
-            .until_hash(hash(0))
-            .until_hash(hash(1))
-            .until_hash(hash(1)),
-    );
+fn until_hash_constructor_sets_hash_limit() {
+    let hash_limit = hash(1);
+    let filter = ChainFilter::until_hash(hash(0), hash_limit.clone());
+    assert_eq!(filter.get_until_hash(), Some(&hash_limit));
 }
