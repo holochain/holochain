@@ -1,5 +1,9 @@
 use super::*;
-use crate::test_utils::commit_chain;
+use crate::authority::handle_must_get_agent_activity;
+use crate::error::CascadeError;
+use crate::test_utils::{
+    commit_chain, create_activity, create_activity_with_prev, create_warrant_op,
+};
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_sqlite::prelude::DbKindDht;
@@ -12,84 +16,72 @@ use test_case::test_case;
     agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[8]))
     => agent_chain(&[(0, 0..9)]) ; "Extract full chain")]
 #[test_case(
-    agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[8])).take(2)
+    agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::take(action_hash(&[8]), 2)
     => agent_chain(&[(0, 7..9)]) ; "Take 2")]
 #[test_case(
     agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
-    ChainFilter::new(action_hash(&[8])).until_hash(action_hash(&[2]))
+    ChainFilter::until_hash(action_hash(&[8]), action_hash(&[2]))
     => agent_chain(&[(0, 2..9)]) ; "Until 2")]
 #[test_case(
     agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
-    ChainFilter::new(action_hash(&[8])).until_timestamp(Timestamp::from_micros(2000))
+    ChainFilter::until_timestamp(action_hash(&[8]), Timestamp::from_micros(2000))
     => agent_chain(&[(0, 2..9)]) ; "Until timestamp 2000")]
 #[test_case(
     agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
-    ChainFilter::new(action_hash(&[8])).until_timestamp(Timestamp::from_micros(1999))
+    ChainFilter::until_timestamp(action_hash(&[8]), Timestamp::from_micros(1999))
     => agent_chain(&[(0, 2..9)]) ; "Until timestamp 1999")]
 #[test_case(
     agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
-    ChainFilter::new(action_hash(&[8])).until_timestamp(Timestamp::from_micros(2001))
+    ChainFilter::until_timestamp(action_hash(&[8]), Timestamp::from_micros(2001))
     => agent_chain(&[(0, 3..9)]) ; "Until timestamp 2001")]
 #[test_case(
-    agent_chain_doubled(&[(0, 0..10)]), agent_hash(&[0]),
-    ChainFilter::new(action_hash(&[8])).until_timestamp(Timestamp::from_micros(2000))
-    => agent_chain(&[(0, 4..9)]) ; "Until timestamp 2000 doubled")]
+    agent_chain(&[(0, 4..10)]), agent_hash(&[0]),
+    ChainFilter::until_timestamp(action_hash(&[9]), Timestamp::from_micros(7000))
+    => agent_chain(&[(0, 7..10)]) ; "Until timestamp complete when canonical chain precedes boundary in partial chain")]
 #[test_case(
     agent_chain_doubled(&[(0, 0..10)]), agent_hash(&[0]),
-    ChainFilter::new(action_hash(&[8])).until_timestamp(Timestamp::from_micros(1999))
-    => agent_chain(&[(0, 4..9)]) ; "Until timestamp 1999 doubled")]
+    ChainFilter::until_timestamp(action_hash(&[8]), Timestamp::from_micros(2000))
+    => agent_chain_doubled(&[(0, 4..9)]) ; "Until timestamp 2000 doubled")]
+#[test_case(
+    {
+        vec![(
+            agent_hash(&[0]),
+            vec![
+                TestChainItem::with_ts(7, 7000),
+                TestChainItem::with_ts(6, 6000),
+                TestChainItem::with_ts(5, 3000),
+                TestChainItem::with_ts(4, 3000),
+                TestChainItem::with_ts(3, 3000),
+                TestChainItem::with_ts(2, 2000),
+                TestChainItem::with_ts(1, 1000),
+                TestChainItem::with_ts(0, 0),
+            ],
+        )]
+    }, agent_hash(&[0]),
+    ChainFilter::until_timestamp(action_hash(&[7]), Timestamp::from_micros(3000))
+    => {
+        vec![(
+            agent_hash(&[0]),
+            vec![
+                TestChainItem::with_ts(7, 7000),
+                TestChainItem::with_ts(6, 6000),
+                TestChainItem::with_ts(5, 3000),
+                TestChainItem::with_ts(4, 3000),
+                TestChainItem::with_ts(3, 3000),
+            ],
+        )]
+    } ; "Until timestamp includes all identical boundary timestamps")]
 #[test_case(
     agent_chain_doubled(&[(0, 0..10)]), agent_hash(&[0]),
-    ChainFilter::new(action_hash(&[8])).until_timestamp(Timestamp::from_micros(2001))
-    => agent_chain(&[(0, 6..9)]) ; "Until timestamp 2001 doubled")]
+    ChainFilter::until_timestamp(action_hash(&[8]), Timestamp::from_micros(1999))
+    => agent_chain_doubled(&[(0, 4..9)]) ; "Until timestamp 1999 doubled")]
 #[test_case(
-    agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
-    ChainFilter::new(action_hash(&[8])).until_hash(action_hash(&[2])).until_hash(action_hash(&[4]))
-    => agent_chain(&[(0, 4..9)]) ; "Until 2 Until 4")]
-#[test_case(
-    agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
-    ChainFilter::new(action_hash(&[8])).until_timestamp(Timestamp::from_micros(2000)).until_timestamp(Timestamp::from_micros(4000))
-    => agent_chain(&[(0, 4..9)]) ; "Until timestamp 2 Until timestamp 4")]
-#[test_case(
-    agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
-    ChainFilter::new(action_hash(&[8])).until_timestamp(Timestamp::from_micros(2000)).until_hash(action_hash(&[4]))
-    => agent_chain(&[(0, 4..9)]) ; "Until timestamp 2 Until 4")]
-#[test_case(
-    agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
-    ChainFilter::new(action_hash(&[8])).until_hash(action_hash(&[2])).until_timestamp(Timestamp::from_micros(4000))
-    => agent_chain(&[(0, 4..9)]) ; "Until 2 Until timestamp 4")]
-#[test_case(
-    agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
-    ChainFilter::new(action_hash(&[8])).until_hash(action_hash(&[2])).until_hash(action_hash(&[4])).take(3)
-    => agent_chain(&[(0, 6..9)]) ; "Until 2 Until 4 take 3")]
-#[test_case(
-    agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
-    ChainFilter::new(action_hash(&[8])).until_timestamp(Timestamp::from_micros(2000)).until_timestamp(Timestamp::from_micros(4000)).take(3)
-    => agent_chain(&[(0, 6..9)]) ; "Until timestamp 2 Until timestamp 4 take 3")]
-#[test_case(
-    agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
-    ChainFilter::new(action_hash(&[8])).until_hash(action_hash(&[2])).until_hash(action_hash(&[4])).take(1)
-    => agent_chain(&[(0, 8..9)]) ; "Until 2 Until 4 take 1")]
-#[test_case(
-    agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
-    ChainFilter::new(action_hash(&[8])).until_hash(action_hash(&[8])).until_hash(action_hash(&[4])).take(3)
-    => agent_chain(&[(0, 8..9)]) ; "Until 8 Until 4 take 3")]
-#[test_case(
-    agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
-    ChainFilter::new(action_hash(&[8])).until_timestamp(Timestamp::from_micros(8000)).until_hash(action_hash(&[4])).take(3)
-    => agent_chain(&[(0, 8..9)]) ; "Until timestamp 8 Until 4 take 3")]
-#[test_case(
-    agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
-    ChainFilter::new(action_hash(&[8])).until_hash(action_hash(&[8])).until_timestamp(Timestamp::from_micros(4000)).take(3)
-    => agent_chain(&[(0, 8..9)]) ; "Until 8 Until timestamp 4 take 3")]
-#[test_case(
-    agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
-    ChainFilter::new(action_hash(&[8])).until_hash(action_hash(&[3])).until_timestamp(Timestamp::from_micros(4000)).take(8)
-    => agent_chain(&[(0, 4..9)]) ; "Until 3 Until timestamp 4 take 8")]
-/// Extracts the smallest range from the chain filter
-/// and then returns all actions within that range
+    agent_chain_doubled(&[(0, 0..10)]), agent_hash(&[0]),
+    ChainFilter::until_timestamp(action_hash(&[8]), Timestamp::from_micros(2001))
+    => agent_chain_doubled(&[(0, 6..9)]) ; "Until timestamp 2001 doubled")]
+/// Returns the expected action range for the provided chain filter.
 #[tokio::test(flavor = "multi_thread")]
-async fn returns_full_sequence_from_filter(
+async fn returns_expected_filtered_sequence_from_filter(
     chain: Vec<(AgentPubKey, Vec<TestChainItem>)>,
     agent: AgentPubKey,
     filter: ChainFilter,
@@ -98,7 +90,7 @@ async fn returns_full_sequence_from_filter(
         DbKindDht(Arc::new(DnaHash::from_raw_36(vec![0; 36]))),
         chain,
     );
-    let data = must_get_agent_activity(db.clone().into(), agent.clone(), filter)
+    let data = handle_must_get_agent_activity(db.clone().into(), agent.clone(), filter)
         .await
         .unwrap();
     let data = match data {
@@ -110,7 +102,7 @@ async fn returns_full_sequence_from_filter(
                      cached_entry: _,
                  }| TestChainItem {
                     seq: a.hashed.action_seq(),
-                    timestamp: Timestamp(a.hashed.action_seq() as i64 * 1000),
+                    timestamp: a.action().timestamp(),
                     hash: TestChainHash::test(a.as_hash()),
                     prev: a.hashed.prev_action().map(TestChainHash::test),
                 },
@@ -131,33 +123,326 @@ async fn returns_full_sequence_from_filter(
     agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[15]))
     => MustGetAgentActivityResponse::ChainTopNotFound(action_hash(&[15])) ; "Starting chain_top not found")]
 #[test_case(
-    vec![(agent_hash(&[0]), forked_chain(&[0..6, 3..8]))], agent_hash(&[0]), ChainFilter::new(action_hash(&[7, 1])).take(7)
-    => matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 7 ; "Handles forks")]
+    vec![(agent_hash(&[0]), forked_chain(&[0..6, 3..8]))], agent_hash(&[0]), ChainFilter::take(action_hash(&[7, 1]), 7)
+    => matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 7 ; "Excludes forked actions")]
 #[test_case(
-    agent_chain(&[(0, 0..5)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[4])).until_hash(action_hash(&[2, 1]))
-    => matches MustGetAgentActivityResponse::Activity { .. } ; "Until hash not found")]
+    agent_chain(&[(0, 0..5)]), agent_hash(&[0]), ChainFilter::until_hash(action_hash(&[4]), action_hash(&[2, 1]))
+    => MustGetAgentActivityResponse::UntilHashMissing(action_hash(&[2, 1])) ; "Until hash not found")]
 #[test_case(
     vec![(agent_hash(&[0]), forked_chain(&[0..6, 3..8]))], agent_hash(&[0]),
-    ChainFilter::new(action_hash(&[5, 0])).until_hash(action_hash(&[4, 1]))
-    => MustGetAgentActivityResponse::IncompleteChain ; "Unit hash on fork")]
+    ChainFilter::until_hash(action_hash(&[5, 0]), action_hash(&[4, 1]))
+    => MustGetAgentActivityResponse::UntilHashMissing(action_hash(&[4, 1])) ; "Until hash is on an excluded fork branch")]
 #[test_case(
-    agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[8])).until_hash(action_hash(&[9]))
-    => matches MustGetAgentActivityResponse::Activity { .. }; "Until is higher then chain_top")]
+    vec![(agent_hash(&[0]), forked_chain(&[0..6, 3..8]))], agent_hash(&[0]),
+    ChainFilter::until_hash(action_hash(&[5, 0]), action_hash(&[4, 0]))
+    => matches MustGetAgentActivityResponse::Activity { .. } ; "Until hash is on the retained chain")]
 #[test_case(
-    agent_chain(&[(0, 0..2)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[1])).take(0)
-    => MustGetAgentActivityResponse::EmptyRange; "Take nothing produces an empty range")]
+    agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
+    ChainFilter::until_timestamp(action_hash(&[8]), Timestamp::from_micros(9000))
+    => MustGetAgentActivityResponse::UntilTimestampIndeterminate(Timestamp::from_micros(9000)) ; "Until timestamp not found")]
+#[test_case(
+    agent_chain(&[(0, 7..10)]), agent_hash(&[0]),
+    ChainFilter::until_timestamp(action_hash(&[9]), Timestamp::from_micros(7000))
+    => MustGetAgentActivityResponse::UntilTimestampIndeterminate(Timestamp::from_micros(7000)) ; "Until timestamp indeterminate when canonical chain does not precede boundary")]
 /// Check the query returns the appropriate responses.
 #[tokio::test(flavor = "multi_thread")]
-async fn test_responses(
+async fn handle_must_get_agent_activity_ok(
     chain: Vec<(AgentPubKey, Vec<TestChainItem>)>,
     agent: AgentPubKey,
     filter: ChainFilter,
 ) -> MustGetAgentActivityResponse {
+    holochain_trace::test_run();
     let db = commit_chain(
         DbKindDht(Arc::new(DnaHash::from_raw_36(vec![0; 36]))),
         chain,
     );
-    must_get_agent_activity(db.clone().into(), agent.clone(), filter)
+    let res = handle_must_get_agent_activity(db.clone().into(), agent.clone(), filter)
         .await
-        .unwrap()
+        .unwrap();
+
+    res
+}
+
+#[test_case(
+    agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::until_hash(action_hash(&[8]), action_hash(&[9]))
+    => matches CascadeError::QueryError(StateQueryError::InvalidInput(_)); "Until hash is higher then chain_top")]
+#[test_case(
+    agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::take(action_hash(&[8]), 0)
+    => matches CascadeError::InvalidInput(_); "Take is 0")]
+#[tokio::test(flavor = "multi_thread")]
+async fn handle_must_get_agent_activity_err(
+    chain: Vec<(AgentPubKey, Vec<TestChainItem>)>,
+    agent: AgentPubKey,
+    filter: ChainFilter,
+) -> CascadeError {
+    holochain_trace::test_run();
+    let db = commit_chain(
+        DbKindDht(Arc::new(DnaHash::from_raw_36(vec![0; 36]))),
+        chain,
+    );
+    let res = handle_must_get_agent_activity(db.clone().into(), agent.clone(), filter)
+        .await
+        .unwrap_err();
+
+    res
+}
+
+#[test]
+fn exclude_forked_activity_removes_duplicate_seqs() {
+    let hash0 = action_hash(&[0]);
+    let hash1 = action_hash(&[1]);
+    let hash1_fork = action_hash(&[1, 1]);
+    let hash2 = action_hash(&[2]);
+
+    let fork_activity_first = create_activity_with_prev(1, hash1.clone(), hash0.clone());
+
+    // Descending order from chain head.
+    let mut activity = vec![
+        create_activity_with_prev(2, hash2, hash1.clone()),
+        fork_activity_first.clone(),
+        create_activity_with_prev(1, hash1_fork, hash0.clone()), // Fork at seq 1
+        create_activity_with_prev(0, hash0, action_hash(&[9])),
+    ];
+    exclude_forked_activity(&mut activity, &action_hash(&[2]));
+
+    assert_eq!(activity.len(), 3);
+
+    // Removes duplicate seqs
+    let seqs: Vec<u32> = activity.iter().map(|a| a.action.seq()).collect();
+    assert_eq!(seqs, vec![2, 1, 0]);
+
+    // Retains the fork that is linked to by the head.
+    assert_eq!(
+        activity[1].action.hashed.hash,
+        fork_activity_first.action.hashed.hash
+    );
+}
+
+#[test]
+fn exclude_forked_activity_multiple_forks() {
+    let hash0 = action_hash(&[0]);
+    let hash1 = action_hash(&[1]);
+    let hash1_fork = action_hash(&[1, 1]);
+    let hash2 = action_hash(&[2]);
+    let hash2_fork = action_hash(&[2, 1]);
+    let hash2_fork_2 = action_hash(&[2, 2]);
+    let hash3 = action_hash(&[3]);
+
+    let mut activity = vec![
+        create_activity_with_prev(3, hash3, hash2.clone()),
+        create_activity_with_prev(2, hash2.clone(), hash1.clone()),
+        create_activity_with_prev(2, hash2_fork, hash1.clone()), // Fork at seq 2
+        create_activity_with_prev(2, hash2_fork_2, hash1.clone()), // Another fork at seq 2
+        create_activity_with_prev(1, hash1.clone(), hash0.clone()),
+        create_activity_with_prev(1, hash1_fork, hash0.clone()), // Fork at seq 1
+        create_activity_with_prev(0, hash0, action_hash(&[9])),
+    ];
+    exclude_forked_activity(&mut activity, &action_hash(&[3]));
+
+    assert_eq!(activity.len(), 4);
+
+    let seqs: Vec<u32> = activity.iter().map(|a| a.action.seq()).collect();
+
+    assert_eq!(seqs, vec![3, 2, 1, 0]);
+}
+
+#[test]
+fn exclude_forked_activity_no_forks() {
+    let hash0 = action_hash(&[0]);
+    let hash1 = action_hash(&[1]);
+    let hash2 = action_hash(&[2]);
+    let mut activity = vec![
+        create_activity_with_prev(2, hash2, hash1.clone()),
+        create_activity_with_prev(1, hash1, hash0.clone()),
+        create_activity_with_prev(0, hash0, action_hash(&[9])),
+    ];
+    exclude_forked_activity(&mut activity, &action_hash(&[2]));
+
+    assert_eq!(activity.len(), 3);
+}
+
+#[test]
+fn exclude_forked_activity_single_element() {
+    let mut activity = vec![create_activity_with_prev(
+        0,
+        action_hash(&[0]),
+        action_hash(&[9]),
+    )];
+    exclude_forked_activity(&mut activity, &action_hash(&[0]));
+
+    assert_eq!(activity.len(), 1);
+}
+
+#[test]
+fn exclude_forked_activity_empty() {
+    let mut activity = vec![];
+    exclude_forked_activity(&mut activity, &action_hash(&[0]));
+
+    assert_eq!(activity.len(), 0);
+}
+
+#[test_case(
+    vec![
+        vec!["a".to_string(), "b".to_string()],
+        vec!["c".to_string(), "d".to_string()],
+        vec!["e".to_string(), "f".to_string()],
+    ]
+    => vec!["a".to_string(), "b".to_string(), "c".to_string(), "d".to_string(), "e".to_string(), "f".to_string()]; "merges")]
+#[test_case(
+    vec![
+        vec!["c".to_string(), "d".to_string()],
+        vec!["f".to_string(), "e".to_string()],
+        vec!["b".to_string(), "a".to_string()],
+    ]
+    => vec!["a".to_string(), "b".to_string(), "c".to_string(), "d".to_string(), "e".to_string(), "f".to_string()]; "merges and sorts")]
+#[test_case(
+    vec![
+        vec!["q".to_string(), "d".to_string()],
+        vec!["f".to_string(), "e".to_string()],
+        vec!["b".to_string(), "q".to_string()],
+    ]
+    => vec!["b".to_string(), "d".to_string(), "e".to_string(), "f".to_string(), "q".to_string()]; "merges sorts deduplicates")]
+fn flatten_deduplicate_sort_behaves(input: Vec<Vec<String>>) -> Vec<String> {
+    flatten_deduplicate_sort(input, |s| s.clone())
+}
+
+#[test]
+fn merge_agent_activity_deduplicates() {
+    let duplicate_activity = create_activity(1);
+
+    let source1 = vec![create_activity(0), duplicate_activity.clone()];
+    let source2: Vec<RegisterAgentActivity> = vec![
+        duplicate_activity, // Duplicate
+        create_activity(2),
+    ];
+    let source3 = vec![create_activity(3)];
+
+    let merged = merge_agent_activity(vec![source1, source2, source3]);
+
+    assert_eq!(merged.len(), 4);
+
+    let seqs: Vec<u32> = merged.iter().map(|a| a.action.seq()).collect();
+    assert_eq!(seqs, vec![3, 2, 1, 0]);
+}
+
+#[test]
+fn merge_agent_activity_sorts_by_action_seq_descending() {
+    let source1 = vec![create_activity(9), create_activity(4), create_activity(25)];
+    let source2: Vec<RegisterAgentActivity> = vec![create_activity(15)];
+    let source3 = vec![
+        create_activity(2),
+        create_activity(7),
+        create_activity(8),
+        create_activity(10),
+    ];
+
+    let merged = merge_agent_activity(vec![source1, source2, source3]);
+
+    let action_seqs: Vec<u32> = merged.iter().map(|a| a.action.seq()).collect();
+    assert_eq!(action_seqs, vec![25, 15, 10, 9, 8, 7, 4, 2]);
+}
+
+#[test]
+fn merge_agent_activity_empty_lists() {
+    let merged = merge_agent_activity(vec![vec![], vec![], vec![]]);
+    assert_eq!(merged.len(), 0);
+}
+
+#[test]
+fn merge_warrants_deduplicates() {
+    let warrant1 = create_warrant_op();
+    let warrant2 = create_warrant_op();
+
+    let source1 = vec![warrant1.clone(), warrant2.clone()];
+    let source2 = vec![warrant2.clone(), create_warrant_op()];
+
+    let merged = merge_warrants(vec![source1, source2]);
+
+    // Deduplicated
+    assert_eq!(merged.len(), 3);
+
+    // Duplicate warrant only occurs once
+    assert_eq!(
+        merged
+            .iter()
+            .filter(|w| w.to_hash() == warrant2.to_hash())
+            .collect::<Vec<_>>()
+            .len(),
+        1
+    );
+}
+
+#[test]
+fn merge_warrants_deduplicates_multiple() {
+    let warrant1 = create_warrant_op();
+    let warrant2 = create_warrant_op();
+    let warrant3 = create_warrant_op();
+
+    let source1 = vec![warrant1.clone(), warrant2.clone()];
+    let source2 = vec![warrant2.clone(), create_warrant_op(), warrant3.clone()];
+    let source3 = vec![warrant3.clone(), create_warrant_op()];
+
+    let merged = merge_warrants(vec![source1, source2, source3]);
+
+    // Deduplicated
+    assert_eq!(merged.len(), 5);
+
+    // Duplicate warrants only occurs once
+    assert_eq!(
+        merged
+            .iter()
+            .filter(|w| w.to_hash() == warrant2.to_hash())
+            .collect::<Vec<_>>()
+            .len(),
+        1
+    );
+    assert_eq!(
+        merged
+            .iter()
+            .filter(|w| w.to_hash() == warrant3.to_hash())
+            .collect::<Vec<_>>()
+            .len(),
+        1
+    );
+}
+
+#[test]
+fn merge_warrants_sorts_by_warrant_hash_ascending() {
+    let source1 = vec![
+        create_warrant_op(),
+        create_warrant_op(),
+        create_warrant_op(),
+    ];
+    let source2 = vec![
+        create_warrant_op(),
+        create_warrant_op(),
+        create_warrant_op(),
+        create_warrant_op(),
+    ];
+    let source3 = vec![create_warrant_op(), create_warrant_op()];
+
+    let merged = merge_warrants(vec![source1, source2, source3]);
+
+    // Sorted by hash
+    let mut merged_sorted = merged.clone();
+    merged_sorted.sort_unstable_by_key(|w| w.to_hash());
+
+    assert_eq!(merged, merged_sorted);
+}
+
+#[test]
+fn merge_warrants_empty_lists() {
+    let merged = merge_warrants(vec![vec![], vec![], vec![]]);
+    assert_eq!(merged.len(), 0);
+}
+
+#[test]
+fn merge_warrants_single_list() {
+    let warrant = create_warrant_op();
+    let warrants = vec![warrant.clone()];
+
+    let merged = merge_warrants(vec![warrants]);
+
+    assert_eq!(merged.len(), 1);
+    assert_eq!(merged[0].to_hash(), warrant.to_hash());
 }
