@@ -10,8 +10,8 @@ edition = "2021"
 
 # reminder - do not use workspace deps
 [dependencies]
-kitsune2_transport_tx5 = { version = "0.4.0-dev.4", optional = true }
-kitsune2_transport_iroh = { version = "0.4.0-dev.4", optional = true }
+kitsune2_transport_tx5 = { version = "0.4.0-dev.4", optional = true, default-features = false }
+kitsune2_transport_iroh = { version = "0.4.0-dev.4", optional = true, default-features = false }
 derive_more = { version = "2.0", features = ["from"] }
 holo_hash = { version = "^0.7.0-dev.6", path = "../holo_hash", features = [
   "full",
