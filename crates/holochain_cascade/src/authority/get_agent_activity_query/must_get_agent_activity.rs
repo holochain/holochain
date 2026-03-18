@@ -6,6 +6,7 @@ use holochain_sqlite::sql::sql_cell::must_get_agent_activity::ACTION_HASH_TO_SEQ
 use holochain_sqlite::sql::sql_cell::must_get_agent_activity::HAS_ACTION_BELOW_TIMESTAMP;
 use holochain_sqlite::sql::sql_cell::must_get_agent_activity::MUST_GET_AGENT_ACTIVITY;
 use holochain_state::prelude::*;
+use holochain_state::query::StateQueryError;
 use holochain_types::prelude::WarrantOp;
 use std::cmp::Reverse;
 use std::collections::HashMap;
@@ -101,6 +102,13 @@ pub(crate) fn get_filtered_agent_activity_from_scratch(
         }
     }
 
+    // Until hash Action seq must be less than or equal to ChainFilter chain_top Action seq
+    if let Some(until_action_seq) = chain_filter_limit_conditions_until_hash_seq {
+        if until_action_seq > filter_chain_top_action_seq {
+            return Err(StateQueryError::InvalidInput("The largest ChainFilter until hash Action seq must be less than or equal to the ChainFilter chain_top action seq.".to_string()));
+        }
+    }
+
     // Get the agent activity, filtered by the chain top, author, 3 optional lower-bounds, and optional limit size.
     let activity = scratch
         .actions()
@@ -164,6 +172,13 @@ pub(crate) fn get_filtered_agent_activity(
 ) -> StateQueryResult<Vec<RegisterAgentActivity>> {
     // Until hash Action seq must be less than or equal to ChainFilter chain_top Action seq
     if let Some(until_action_seq) = resolved_until_action_seq {
+        if until_action_seq > filter_chain_top_action_seq {
+            return Err(StateQueryError::InvalidInput("The largest ChainFilter until hash Action seq must be less than or equal to the ChainFilter chain_top action seq.".to_string()));
+        }
+    }
+
+    // Until hash Action seq must be less than or equal to ChainFilter chain_top Action seq
+    if let Some(until_action_seq) = chain_filter_limit_conditions_until_hash_seq {
         if until_action_seq > filter_chain_top_action_seq {
             return Err(StateQueryError::InvalidInput("The largest ChainFilter until hash Action seq must be less than or equal to the ChainFilter chain_top action seq.".to_string()));
         }
