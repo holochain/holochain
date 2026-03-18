@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix an issue with the Holochain configuration schema generation which caused a panic. This is now properly tested to prevent regressions. #5683
 - Record new OpenTelemetry metrics covering conductor, ribosome, network, cascade, and keystore operations.
 
 ## 0.6.1-rc.3
