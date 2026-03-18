@@ -49,7 +49,7 @@
 use crate::conductor::process::ERROR_CODE;
 use crate::config::conductor::paths::DataRootPath;
 use holochain_types::prelude::DbSyncStrategy;
-#[cfg(feature = "schema")]
+#[cfg(all(feature = "schema", feature = "kitsune2_transport_tx5"))]
 use kitsune2_transport_tx5::WebRtcConfig;
 use schemars::JsonSchema;
 #[cfg(feature = "schema")]
@@ -286,7 +286,10 @@ pub struct NetworkConfig {
     pub request_timeout_s: u64,
 
     /// The Kitsune2 webrtc_config to use for connecting to peers.
-    #[cfg_attr(feature = "schema", schemars(schema_with = "webrtc_config_schema"))]
+    #[cfg_attr(
+        all(feature = "schema", feature = "kitsune2_transport_tx5"),
+        schemars(schema_with = "webrtc_config_schema")
+    )]
     pub webrtc_config: Option<serde_json::Value>,
 
     /// The target arc factor to apply when receiving hints from kitsune2.
@@ -665,15 +668,14 @@ impl Default for ConductorTuningParams {
     }
 }
 
-#[cfg(feature = "schema")]
+#[cfg(all(feature = "schema", feature = "kitsune2_transport_tx5"))]
 fn webrtc_config_schema(_: &mut schemars::SchemaGenerator) -> Schema {
     let schema = schemars::schema_for!(Option<WebRtcConfig>);
 
     // Note that the definitions for this type are not being copied. This type is embedded in the
     // K2 config, so the definitions are already present in the schema.
 
-    Schema::try_from(schema.get("schema").expect("Missing schema field").clone())
-        .expect("Failed to convert schema")
+    schema
 }
 
 #[cfg(feature = "schema")]
@@ -694,6 +696,7 @@ fn kitsune2_config_schema(generator: &mut schemars::SchemaGenerator) -> Schema {
         mem_peer_store: Option<kitsune2_core::factories::MemPeerStoreModConfig>,
         #[serde(flatten)]
         k2_gossip: Option<kitsune2_gossip::K2GossipModConfig>,
+        #[cfg(feature = "kitsune2_transport_tx5")]
         #[serde(flatten)]
         tx5_transport: Option<kitsune2_transport_tx5::Tx5TransportModConfig>,
         #[serde(flatten)]
@@ -703,7 +706,7 @@ fn kitsune2_config_schema(generator: &mut schemars::SchemaGenerator) -> Schema {
     let schema = schemars::schema_for!(Option<K2Config>);
 
     for (k, v) in schema
-        .get("definitions")
+        .get("$defs")
         .and_then(|d| d.as_object())
         .expect("No definitions")
     {
@@ -716,8 +719,7 @@ fn kitsune2_config_schema(generator: &mut schemars::SchemaGenerator) -> Schema {
         }
     }
 
-    Schema::try_from(schema.get("schema").expect("Missing schema field").clone())
-        .expect("Failed to convert schema")
+    schema
 }
 
 #[cfg(test)]
@@ -1154,5 +1156,17 @@ admin_interfaces:
 
         let cpu_count = u32::MAX as usize;
         assert_eq!(calculate_default_db_max_readers(cpu_count), u16::MAX);
+    }
+
+    #[cfg(feature = "schema")]
+    #[test]
+    fn schema_generation() {
+        let schema = schemars::schema_for!(ConductorConfig);
+        let schema_json = serde_json::to_value(&schema).unwrap();
+
+        let default_config = ConductorConfig::default();
+        let default_config_json = serde_json::to_value(&default_config).unwrap();
+
+        jsonschema::validate(&schema_json, &default_config_json).unwrap();
     }
 }
