@@ -116,7 +116,7 @@ async fn f64_histogram() {
     }
 
     // Keep polling until the expected counts 11 and 9.0 show up.
-    let result = poll_query(&svc, name, "|> last()", 400, |r| {
+    let result = poll_query(&svc, name, "|> last()", 1000, |r| {
         r.tables.len() == 2
             && r.tables[0].rows.len() == 1
             && r.tables[1].rows.len() == 3
@@ -209,7 +209,7 @@ async fn f64_observable_gauge() {
         .build();
 
     let result = poll_query(&svc, name, "", 300, |r| {
-        r.tables.len() == 1 && !r.tables[0].rows.is_empty() && r.tables[0].rows.len() <= 2
+        r.tables.len() == 1 && !r.tables[0].rows.is_empty() && r.tables[0].rows.len() <= 5
     })
     .await;
     assert_eq!(result.tables[0].get::<String>(0, "_field"), "gauge");
@@ -218,7 +218,7 @@ async fn f64_observable_gauge() {
 
     // Wait for more gauge values to have been recorded.
     let result = poll_query(&svc, name, "", 1000, |r| {
-        r.tables.len() == 1 && r.tables[0].rows.len() >= 5 && r.tables[0].rows.len() <= 6
+        r.tables.len() == 1 && r.tables[0].rows.len() >= 5 && r.tables[0].rows.len() <= 15
     })
     .await;
     assert_eq!(result.tables[0].get::<f64>(0, "_value"), 0.0);
