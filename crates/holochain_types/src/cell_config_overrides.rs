@@ -21,6 +21,9 @@ pub struct CellConfigOverrides {
     /// If not overridden, the auth material specified in the conductor
     /// config file will be used.
     pub base64_auth_material: Option<String>,
+    /// Override the relay URL for this space. When set, this relay will be
+    /// dynamically added to the iroh endpoint when the space is created.
+    pub relay_url: Option<String>,
 }
 
 impl CellConfigOverrides {
@@ -31,6 +34,7 @@ impl CellConfigOverrides {
         self.bootstrap_url.is_some()
             || self.signal_url.is_some()
             || self.base64_auth_material.is_some()
+            || self.relay_url.is_some()
     }
 }
 
@@ -44,6 +48,7 @@ mod tests {
             bootstrap_url: None,
             signal_url: None,
             base64_auth_material: None,
+            relay_url: None,
         };
         assert!(!overrides.is_overriding());
 
@@ -51,6 +56,7 @@ mod tests {
             bootstrap_url: Some("http://localhost:1234".to_string()),
             signal_url: None,
             base64_auth_material: None,
+            relay_url: None,
         };
         assert!(overrides.is_overriding());
 
@@ -58,6 +64,7 @@ mod tests {
             bootstrap_url: None,
             signal_url: Some("ws://localhost:5678".to_string()),
             base64_auth_material: None,
+            relay_url: None,
         };
         assert!(overrides.is_overriding());
 
@@ -65,6 +72,7 @@ mod tests {
             bootstrap_url: Some("http://localhost:1234".to_string()),
             signal_url: Some("ws://localhost:5678".to_string()),
             base64_auth_material: None,
+            relay_url: None,
         };
         assert!(overrides.is_overriding());
 
@@ -72,6 +80,15 @@ mod tests {
             bootstrap_url: None,
             signal_url: None,
             base64_auth_material: Some("dGVzdA==".to_string()),
+            relay_url: None,
+        };
+        assert!(overrides.is_overriding());
+
+        let overrides = CellConfigOverrides {
+            bootstrap_url: None,
+            signal_url: None,
+            base64_auth_material: None,
+            relay_url: Some("http://relay.example.com/relay".to_string()),
         };
         assert!(overrides.is_overriding());
     }

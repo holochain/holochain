@@ -286,6 +286,12 @@ pub struct SpaceNetworkOverride {
     /// uses a different auth credential than the conductor default.
     #[serde(default)]
     pub base64_auth_material: Option<String>,
+    /// Override the relay URL for this space. When set, this relay will be
+    /// dynamically added to the iroh endpoint when the space is created,
+    /// allowing spaces with different relay servers to coexist.
+    #[serde(default)]
+    #[schemars(schema_with = "holochain_util::jsonschema::optional_url2_schema")]
+    pub relay_url: Option<url2::Url2>,
 }
 
 /// All the network config information for the conductor.
@@ -1201,9 +1207,13 @@ admin_interfaces:
         "uhC0kDnaHash2":
           bootstrap_url: https://other-boot.tld
           signal_url: wss://other-sig.tld
+        "uhC0kDnaHash3":
+          bootstrap_url: https://authed-boot.tld
+          base64_auth_material: dGVzdA==
+          relay_url: https://authed-relay.tld/relay
     "#;
         let result: ConductorConfig = config_from_yaml(yaml).unwrap();
-        assert_eq!(result.network.space_overrides.len(), 2);
+        assert_eq!(result.network.space_overrides.len(), 3);
 
         let override1 = result.network.space_overrides.get("uhC0kDnaHash1").unwrap();
         assert_eq!(
@@ -1211,6 +1221,7 @@ admin_interfaces:
             "https://special-boot.tld/"
         );
         assert!(override1.signal_url.is_none());
+        assert!(override1.relay_url.is_none());
 
         let override2 = result.network.space_overrides.get("uhC0kDnaHash2").unwrap();
         assert_eq!(
@@ -1220,6 +1231,18 @@ admin_interfaces:
         assert_eq!(
             override2.signal_url.as_ref().unwrap().as_str(),
             "wss://other-sig.tld/"
+        );
+        assert!(override2.relay_url.is_none());
+
+        let override3 = result.network.space_overrides.get("uhC0kDnaHash3").unwrap();
+        assert_eq!(
+            override3.bootstrap_url.as_ref().unwrap().as_str(),
+            "https://authed-boot.tld/"
+        );
+        assert_eq!(override3.base64_auth_material.as_ref().unwrap(), "dGVzdA==");
+        assert_eq!(
+            override3.relay_url.as_ref().unwrap().as_str(),
+            "https://authed-relay.tld/relay"
         );
     }
 

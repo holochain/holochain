@@ -1867,6 +1867,9 @@ mod app_status_impls {
                     if merged.base64_auth_material.is_none() {
                         merged.base64_auth_material = conductor.base64_auth_material.clone();
                     }
+                    if merged.relay_url.is_none() {
+                        merged.relay_url = conductor.relay_url.as_ref().map(|u| u.to_string());
+                    }
                     if merged.is_overriding() {
                         Some(merged)
                     } else {

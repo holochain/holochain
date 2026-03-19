@@ -961,6 +961,14 @@ impl HolochainP2pActor {
             config.set_module_config(&core_bootstrap_config)?;
             override_needed = true;
         }
+        if let Some(relay_url) = space_overrides.relay_url.as_ref() {
+            // get current bootstrap config and override relay_url
+            let mut core_bootstrap_config: kitsune2_core::factories::CoreBootstrapModConfig =
+                config.get_module_config().unwrap_or_default();
+            core_bootstrap_config.core_bootstrap.relay_url = Some(relay_url.clone());
+            config.set_module_config(&core_bootstrap_config)?;
+            override_needed = true;
+        }
         #[cfg(feature = "transport-tx5-backend-go-pion")]
         if let Some(signal_url) = space_overrides.signal_url.as_ref() {
             // get current tx5 transport config and override server_url
@@ -2559,6 +2567,7 @@ mod tests {
             bootstrap_url: Some("http://override:1234".to_string()),
             signal_url: Some("wss://override:5678".to_string()),
             base64_auth_material: None,
+            relay_url: None,
         };
         let overrides = actor_p2p
             .space_config_override(space_overrides)
