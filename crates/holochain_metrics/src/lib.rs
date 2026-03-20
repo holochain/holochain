@@ -33,6 +33,11 @@
 //!   - The influxdb auth token must have permission to write to all buckets
 //!   - Metrics will be set up to report to this already running InfluxDB.
 //!
+//! All metrics modes automatically stamp a `host` tag on every emitted metric so that metrics from
+//! different nodes can be distinguished when multiple Holochain instances write to a shared
+//! InfluxDB. The value defaults to the OS hostname. Override it with:
+//! - `HOLOCHAIN_INFLUXIVE_HOST_TAG=<my-custom-node-name>`
+//!
 //! To set the interval at which recorded metrics are written to Influx,
 //! use `OTEL_METRIC_EXPORT_INTERVAL`. The value is specified as milliseconds.
 //! 10 s is the default. When the report interval is configured in the code,
@@ -252,6 +257,20 @@ pub enum HolochainMetricsConfig {
     },
 }
 
+fn resolve_host_tag() -> Option<String> {
+    const ENV_HOST_TAG: &str = "HOLOCHAIN_INFLUXIVE_HOST_TAG";
+    if let Ok(tag) = std::env::var(ENV_HOST_TAG) {
+        return Some(tag);
+    }
+    match hostname::get() {
+        Ok(name) => Some(name.to_string_lossy().into_owned()),
+        Err(err) => {
+            tracing::info!(?err, "failed to resolve hostname for metrics host tag");
+            None
+        }
+    }
+}
+
 impl HolochainMetricsConfig {
     /// Initialize a new default metrics config.
     ///
@@ -266,20 +285,36 @@ impl HolochainMetricsConfig {
         file_path: &Path,
         report_interval: Option<Duration>,
     ) -> HolochainMetricsConfig {
+        let mut otel_config = influxive::InfluxiveMeterProviderConfig::default()
+            .with_report_interval(report_interval);
+        if let Some(host_tag) = resolve_host_tag() {
+            otel_config = otel_config.with_global_tag("host", host_tag);
+        }
         HolochainMetricsConfig::InfluxiveFile {
             writer_config: influxive::InfluxiveWriterConfig::create_with_influx_file(
                 PathBuf::from(file_path),
             ),
-            otel_config: influxive::InfluxiveMeterProviderConfig::default()
-                .with_report_interval(report_interval),
+            otel_config,
         }
     }
 
     fn from_env(root_path: &Path, env: HolochainMetricsEnv) -> Self {
+        if matches!(env, HolochainMetricsEnv::None) {
+            return Self::Disabled;
+        }
+
+        let mut otel_config = influxive::InfluxiveMeterProviderConfig::default();
+        if let Some(host_tag) = resolve_host_tag() {
+            otel_config = otel_config.with_global_tag("host", host_tag);
+        }
+
         match env {
-            HolochainMetricsEnv::InfluxiveFile { filepath } => {
-                Self::new_with_file(Path::new(&filepath), None)
-            }
+            HolochainMetricsEnv::InfluxiveFile { filepath } => Self::InfluxiveFile {
+                writer_config: influxive::InfluxiveWriterConfig::create_with_influx_file(
+                    PathBuf::from(filepath),
+                ),
+                otel_config,
+            },
 
             HolochainMetricsEnv::InfluxiveChildSvc => {
                 let mut database_path = PathBuf::from(root_path);
@@ -289,7 +324,7 @@ impl HolochainMetricsConfig {
                         influxive::InfluxiveChildSvcConfig::default()
                             .with_database_path(Some(database_path)),
                     ),
-                    otel_config: influxive::InfluxiveMeterProviderConfig::default(),
+                    otel_config,
                 }
             }
 
@@ -299,12 +334,14 @@ impl HolochainMetricsConfig {
                 token,
             } => Self::InfluxiveExternal {
                 writer_config: influxive::InfluxiveWriterConfig::default(),
-                otel_config: influxive::InfluxiveMeterProviderConfig::default(),
+                otel_config,
                 host,
                 bucket,
                 token,
             },
-            HolochainMetricsEnv::None => Self::Disabled,
+
+            // Handled as a guard condition at the top of the method.
+            HolochainMetricsEnv::None => unreachable!(),
         }
     }
 
