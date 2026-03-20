@@ -25,6 +25,12 @@ pub enum StateQueryError {
     ActionError(#[from] holochain_zome_types::prelude::ActionError),
     #[error(transparent)]
     SyncScratchError(#[from] SyncScratchError),
+    /// Returned when query input parameters are inconsistent or invalid.
+    ///
+    /// The string contains human-readable details describing which input
+    /// constraint was violated.
+    #[error("Input parameters are invalid: {0}")]
+    InvalidInput(String),
     #[error("{0}")]
     Other(String),
 }

@@ -2081,7 +2081,15 @@ impl actor::HcP2p for HolochainP2pActor {
                         .await
                     })
                 }),
-                |agent_activity| matches!(agent_activity, MustGetAgentActivityResponse::EmptyRange),
+                |agent_activity| {
+                    matches!(
+                        agent_activity,
+                        MustGetAgentActivityResponse::ChainTopNotFound(_)
+                            | MustGetAgentActivityResponse::IncompleteChain
+                            | MustGetAgentActivityResponse::UntilHashMissing(_)
+                            | MustGetAgentActivityResponse::UntilTimestampIndeterminate(_)
+                    )
+                },
             )
             .await;
 
@@ -3226,7 +3234,7 @@ mod tests {
         // MustGetAgentActivityRes is not limited
         let msg = WireMessage::MustGetAgentActivityRes {
             msg_id: 7,
-            response: MustGetAgentActivityResponse::EmptyRange,
+            response: MustGetAgentActivityResponse::IncompleteChain,
         };
         let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
 

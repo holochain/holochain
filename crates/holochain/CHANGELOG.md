@@ -7,6 +7,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE** `ChainFilter` is now defined via constructors `take`, `until_hash`, `until_timestamp` instead of composable builder chaining.
+- **BREAKING CHANGE** `must_get_agent_activity` error responses have changed:
+  - If the ChainFilter take is 0, then the error is now a `CascadeError::InvalidInput`.
+  - If the ChainFilter has a `LimitConditions::UntilHash` with an until hash sequence greater than the ChainFilter `chain_top` action sequence, then the error is now a `CascadeError::InvalidInput`.
+- **BREAKING CHANGE** `must_get_agent_activity` responses have changed:
+  - Activity results now follow the chain down from the provided `chain_top` hash, any forked actions are excluded.
+  - If the filter is `UntilHash` and that hash is not found the response is `MustGetAgentActivityResponse::UntilHashMissing`. This includes when the hash is on a dropped fork.
+  - If the filter is `UntilTimestamp` and completeness cannot be proven deterministically then the response is `MustGetAgentActivityResponse::UntilTimestampIndeterminate`. This will occur when no action is found with a timestamp less than or equal to the until timestamp, or the actions does not reach genesis.
+  - If there are no limit conditions and the chain does not reach genesis, the response is `MustGetAgentActivityResponse::IncompleteChain`.
+- Refactored `must_get_agent_activity` implementation to improve code clarity and correctness. #5689
 - Fix an issue with the Holochain configuration schema generation which caused a panic. This is now properly tested to prevent regressions. #5683
 
 ## 0.7.0-dev.16
