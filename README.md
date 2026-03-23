@@ -12,7 +12,7 @@ Holochain is an open-source framework to develop peer-to-peer applications with 
 
 ### Code Status
 
-This code is in initial Beta release. It's ready for limited production use. It is still undergoing security reviews and hardening of network protocols. 
+This code is in an initial beta release. It's ready for limited production use. It is still undergoing security reviews and hardening of network protocols. 
 
 ## Running Holochain Applications (hApps)
 
