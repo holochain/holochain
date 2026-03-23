@@ -8,7 +8,7 @@ if you do!
 
 #### 1. Install the Rust toolchain
 
-Get `rustup` from [here](https://www.rust-lang.org/tools/install). Rather than installing a specific Rust version  after
+Get `rustup` from [here](https://www.rust-lang.org/tools/install). Rather than installing a specific Rust version after
 installing `rustup`, we recommend using a toolchain file. You can find an [example file](https://github.com/holochain/holochain/blob/develop/rust-toolchain.toml)
 in the Holochain repository. Place a copy of this file in your project root and Cargo will read it, then install the
 correct Rust version and tools for you.
@@ -63,6 +63,6 @@ and you may want to learn from their experiences and documentation:
 - https://github.com/NextGenSoftwareUK/OASIS-Holochain-hApp
 - https://github.com/holochain-open-dev/wiki/wiki/Installing-Holochain--&-Building-hApps-Natively-On-Windows
 
-There is also the c# client HoloNET which you may want to check out:
+There is also the C# client HoloNET which you may want to check out:
 
 https://github.com/holochain-open-dev/holochain-client-csharp
