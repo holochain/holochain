@@ -35,7 +35,7 @@ For both, this is the complete list of valid variants:
 * _!pre\_minor \<pre-release-suffix\>_ (e.g. `!pre_patch beta`)
 * _!pre\_patch \<pre-release-suffix\>_ (e.g. `!pre_patch alpha`)
 
-**The exclamation mark is required for the values that take a pre-release-suffix**, as the parser relies on [YAML tags for explicit type hints](https://yaml.org/spec/1.2.2/#tags).*
+**The exclamation mark is required for the values that take a pre-release-suffix**, as the parser relies on [YAML tags for explicit type hints](https://yaml.org/spec/1.2.2/#tags).
 
 ### Syntax
 The frontmatter is parsed as YAML and expects a `key: value` attribute format.
@@ -69,7 +69,7 @@ For any of the _pre_ modes, if at the time of release a pre-release suffix is fo
     * if the **existing suffix is the same** as the requested one:
         * if **it is followed** by a dot and an integer: the integer will be incremented by 1
         * if **it is not followed** by a dot and an integer: ".0" will be added to the suffix
-    * if the **existing suffix is different** than the requested one: replace it with `-<pre-release-suffix>.0`
+    * if the **existing suffix is different** from the requested one: replace it with `-<pre-release-suffix>.0`
 
 ### Artificial examples of consecutive releases
 
@@ -77,7 +77,7 @@ For an almost exhaustive list of tested transition cases look at the `fn increme
 
 #### Setting without and with `default_`
 
-The _pre-release-suffix_ pertains no special meaning and is parsed as an arbitrary string.
+The _pre-release-suffix_ pertains to no special meaning and is parsed as an arbitrary string.
 However, it will have an incremental number >= 0 maintained on each consecutive release within the same pre-release-suffix.
 
 Without `default_`:
@@ -194,7 +194,7 @@ EOF
 )
 ```
 
-The `--match-filter` argument takes a regular expression to select to filter the crate names.
+The `--match-filter` argument takes a regular expression to select the crate names.
 The ellipsis give the position of the new YAML code for the frontmatters.
 
 ### Example: initiate a beta-rc cycle
