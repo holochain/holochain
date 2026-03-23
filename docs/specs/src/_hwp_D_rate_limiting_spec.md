@@ -4,19 +4,19 @@
 
 ### Problem: DHTs are a public good so people can take advantage by spamming data
 
-* Flood the network with garbage creating degraded service for other users
-* Force users to hold garbage data indefinitely locking up storage
-* Force authorities to verify garbage data thrashing CPU
+* Flood the network with garbage, creating degraded service for other users
+* Force users to hold garbage data indefinitely, locking up storage
+* Force authorities to verify garbage data, thrashing CPU
 * Fill sequential logic causing delays for back of the queue
 
 ### Solution: Rate limits
 
 * Actions have A units of weight
 * Apps can define their own weights in-wasm for app entries
-* System entry weights and rate limiting is defined by the system
+* System entry weights and rate limiting are defined by the system
 * A bucket of B units may fill to allow bursts of activity
-* Every X millis Y units is restored to the bucket
-* There are many buckets definable by the happ to tailor rate limits to different usage patterns for different system components
+* Every X millis Y units are restored to the bucket
+* There are many buckets definable by the app to tailor rate limits to different usage patterns for different system components
 
 ### Prior art:
 
@@ -37,9 +37,9 @@ There are several reasons to do this in Holochain's core and not assume/rely on 
 
 ### Sybils
 
-Important note that rate limits do nothing to protect against sybils.
+Important note: rate limits do nothing to protect against sybils.
 
-A sybil attack involves generating many agents, _each of whom have their own rate limit_.
+A sybil attack involves generating many agents, _each of whom has their own rate limit_.
 
 As an attacker, if I can create S sybils every Z millis then my Y/X throughput becomes `S/Z * Y/X` throughput, which is probably a lot more than the network can handle if `Z` is small and `S` is large.
 
@@ -478,4 +478,3 @@ Cons:
 - Additional data in headers
 - Additional callbacks
 - More complex than naive option
-
