@@ -6,7 +6,7 @@ So far we have described the necessary components of a scalable coordination and
 
 This specification assumes that the reader has understood context and background provided in the [Holochain Formalization](hwp_4_formal.md).
 
-Given the formal description from that document of our local state model (Source Chain) and shared data model (Graph DHT) we can now present a high-level implementation specification of the different components of the Holochain architecture:
+Given the formal description from that document of our local state model (Source Chain) and shared data model (Graph DHT), we can now present a high-level implementation specification of the different components of the Holochain architecture:
 
 * App Virtual Machine (Ribosome)
 * Workflows
@@ -91,7 +91,7 @@ For any guest functions which are permitted to change source chain state (`init`
 
 1. Prepare a context which includes the aforementioned host function access, as well as the current source chain state and a temporary "scratch space" into which to write new source chain state changes.
 2. Check the state of the source chain; if it does not contain an `InitZomesComplete` action, run the `init` callback and remember any state changes in the scratch space.
-3. If no `init` callbacks fail, proceed to call the guest function, remembering any state changes in the scratch space.
+3. If no `init` callback fails, proceed to call the guest function, remembering any state changes in the scratch space.
 4. Transform the state changes in the scratch space into DHT operations.
 5. Attempt to validate the DHT operations.
 6. If all the DHT operations are valid, persist the Actions in the scratch space to the source chain.
@@ -189,7 +189,7 @@ Many, though not all, actions comprise intentions to create, read, update, or de
     }
     ```
 
-* `Delete`: Marks an existing entry and its creation action as deleted. The entry containing the hashes of the action and entry to be deleted are contained in the action struct.
+* `Delete`: Marks an existing entry and its creation action as deleted. The entry containing the hashes of the action and entry to be deleted is contained in the action struct.
 
     ```rust
     struct Delete {
@@ -299,7 +299,7 @@ enum Entry {
     }
     ```
 
-    Its entry data can be of either `Entry::App` or `Entry::CounterSign`, where the inner data is an arbitrary vector of bytes (typically a serialized data structure). If the data is `Entry::CounterSign`, the bytes are accompanied by a struct that gives the details of the countersigning session (this struct will be dealt with in the [Countersigning] section).
+    Its entry data can be either `Entry::App` or `Entry::CounterSign`, where the inner data is an arbitrary vector of bytes (typically a serialized data structure). If the data is `Entry::CounterSign`, the bytes are accompanied by a struct that gives the details of the countersigning session (this struct will be dealt with in the [Countersigning] section).
 
     Note that in both these cases the data is stored using a serialization that is declared by the `entry_defs()` function of the HDI.
 
@@ -419,7 +419,7 @@ The `Op` types that hold the chain entry data that is published to different por
     }
     ```
 
-* `RegisterDelete`: executed by the entry authorities for the _old_ entry creation and its entry to store metadata that tombstones the data. This opp collapses both the `RegisterDeletedEntryAction` and `RegisterDeletedBy` operations into one. It contains only the delete action.
+* `RegisterDelete`: executed by the entry authorities for the _old_ entry creation and its entry to store metadata that tombstones the data. This op collapses both the `RegisterDeletedEntryAction` and `RegisterDeletedBy` operations into one. It contains only the delete action.
 
     ```rust
     struct RegisterDelete {
@@ -653,7 +653,7 @@ The Conductor MUST also receive calls to these zome functions, enforce capabilit
 
 #### Post-Commit Callback
 
-The HDK MUST allow application developers to define a `post_commit(Vec<SignedAction>) -> ExternResult<()>` callback in their Coordinator Zomes which receives a sequence of Actions committed to the source chain. The purpose of this callback is to provide a way of triggering follow-up activities when an atomic commit has definitively succeeded in persisting new Actions.
+The HDK MUST allow application developers to define a `post_commit(Vec<SignedAction>) -> ExternResult<()>` callback in their Coordinator Zomes that receives a sequence of Actions committed to the source chain. The purpose of this callback is to provide a way of triggering follow-up activities when an atomic commit has definitively succeeded in persisting new Actions.
 
 The Conductor MUST call this callback with all the Actions successfully committed in any guest function that is permitted to persist state changes to the source chain. The Conductor MUST NOT permit this callback to make further state changes, but it MAY allow it to access any other host functions, including calling or scheduling other functions which may make state changes in their own call contexts.
 
