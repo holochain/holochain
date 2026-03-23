@@ -34,10 +34,10 @@ YAML header.
 filters:
   - diagram
 ---
-``**
+```
 
 **Note**: Quarto comes with its own system for diagram generation;
-we recommend to use Quarto's built-in diagram options when
+we recommend using Quarto's built-in diagram options when
 possible, especially for Mermaid diagrams.
 
 ### R Markdown
@@ -112,7 +112,7 @@ Currently supported options:
 
 - `cache-dir`: Sets the directory in which the images are cached.
   The default is to use the `pandoc-diagram-filter` subdir of the
-  a common caching location. This will be, in the order of
+  common caching location. This will be, in the order of
   preference, the value of the `XDG_CACHE_HOME` environment
   variable if it is set, or alternatively `%USERPROFILE%\.cache` on
   Windows and `$HOME/.cache` on all other platforms.
@@ -197,10 +197,10 @@ Security
 
 This filter **should not** be used with **untrusted documents**,
 ***unless*** local configs prevent the setting of filter options
-in the metadata: An attacker that can set the execpath for an
+in the metadata. An attacker that can set the execpath for an
 engine can execute any binary on the system with the user's
 permissions. It is hence recommended to review any document before
-using it with this filter to avoid malicious and misuse of the
+using it with this filter to avoid malicious use and misuse of the
 filter.
 
 The security is improved considerably if the `diagram` metadata
