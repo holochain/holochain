@@ -32,7 +32,7 @@ The Holochain repository contains many Rust crates and some important files:
 
 ### Build and test Holochain
 
-Before changing any code, it's a good idea to check your environment is ready to use. You can do this by building the 
+Before changing any code, it's a good idea to check that your environment is ready to use. You can do this by building the 
 project and running the tests.
 
 To build the project, you can run:
@@ -97,7 +97,7 @@ You'll want to read the next section for instructions to build all the tools you
 
 ### Build CLI tools for manual testing
 
-Some of the tests run in the Holochain repository, run real binaries and check that they interact correctly. For example,
+Some of the tests run in the Holochain repository run real binaries and check that they interact correctly. For example,
 the tests in `crates/hc_sandbox` do this. For these tests to work, you need to have built the CLI tools that are part
 of this repository.
 
