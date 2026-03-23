@@ -56,7 +56,7 @@ For example to run all tests from all the crates, run this from the root folder:
 script-holochain-tests-all
 ```
 
-Or use `script-holochain-tests-unit-all` if you don't want to run the static checks (cargo doc, cargo fmt and cargo clippy), but all of these this will be run on CI.
+Or use `script-holochain-tests-unit-all` if you don't want to run the static checks (cargo doc, cargo fmt and cargo clippy), but all of these will be run on CI.
 
 ### Filtering tests
 
@@ -66,7 +66,7 @@ To run the tests for a specific package you can pass a filter to `nextest`
 env NEXTEST_EXTRA_ARGS="-E 'package(hdk)'" nix build --impure --override-input holochain . .#build-holochain-tests-unit
 ```
 
-Or you can select a test by name
+Or you can select a test by name.
 
 ```shell
 env NEXTEST_EXTRA_ARGS="-E 'test(paths_exists)'" nix build --impure --override-input holochain . .#build-holochain-tests-unit
@@ -98,7 +98,7 @@ The tests can access and call WASM-compiled zomes that are present in the `test_
 - Add the zome's name in TitleCase in the `TestWasm` enum.
 - Add a match arm inside the `impl From<TestWasm> for ZomeName` implementation that points to the folder you have created.
 - Add a new match arm inside the `impl From<TestWasm> for DnaWasm` implementation with the same path as all other arms but with the zome's name.
-3. In the `members` property of the `crates/test_utils/wasm/wasm_worskpace/Cargo.toml` file, add the folder name for your zome.
+3. In the `members` property of the `crates/test_utils/wasm/wasm_workspace/Cargo.toml` file, add the folder name for your zome.
 
 ## Examples
 
