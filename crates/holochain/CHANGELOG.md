@@ -7,8 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- All influxive metrics modes now automatically stamp a `host` tag on every emitted metric, defaulting to the OS hostname. Override with the `HOLOCHAIN_INFLUXIVE_HOST_TAG` environment variable. #5686
-- Fix an issue with the Holochain configuration schema generation which caused a panic. This is now properly tested to prevent regressions. #5683
+## 0.7.0-dev.17
+
+- All influxive metrics modes now automatically stamp a `host` tag on every emitted metric, defaulting to the OS hostname. Override with the `HOLOCHAIN_INFLUXIVE_HOST_TAG` environment variable. \#5686
+- Fix an issue with the Holochain configuration schema generation which caused a panic. This is now properly tested to prevent regressions. \#5683
 
 ## 0.7.0-dev.16
 
