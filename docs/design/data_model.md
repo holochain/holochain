@@ -14,7 +14,7 @@ Each agent is identified by an _AgentPubKey_, which is the public half of a cryp
 
 ### Action
 
-An _Action_ is the fundamental unit of authorship in Holochain. Actions authored by a single agent form a hash chain (a.k.a "source chain") that provides an immutable, tamper-evident record of everything an agent has done. Actions come in several types, each of which carries semantic meaning.
+An _Action_ is the fundamental unit of authorship in Holochain. Actions authored by a single agent form a hash chain (a.k.a. "source chain") that provides an immutable, tamper-evident record of everything an agent has done. Actions come in several types, each of which carries semantic meaning.
 
 ### Entry
 
@@ -97,7 +97,7 @@ The _CreateLink_ and _DeleteLink_ actions provide a mechanism for creating direc
 
 ##### _CreateLink_
 
-The _CreateLink_ action creates a directed link from a base hash to a target hash. These hashes may be of any type, including hashes of actions, entries, agent public keys or even custom hashes. Links are stored on the agent's source chain as an action.
+The _CreateLink_ action creates a directed link from a base hash to a target hash. These hashes may be of any type, including hashes of actions, entries, agent public keys, or even custom hashes. Links are stored on the agent's source chain as an action.
 
 Links are grouped by base hash, so that all links from the same base hash, with the same type, are considered a set.
 
@@ -140,7 +140,7 @@ The following sections describe the additional properties that each action type 
 
 #### InitZomesComplete
 
-No additional properties, this is a marker action.
+No additional properties; this is a marker action.
 
 #### Create
 
@@ -149,7 +149,7 @@ No additional properties, this is a marker action.
 | _entry type_ | `EntryType` | The type of entry being created, which are defined below. |
 | _entry hash_ | `EntryHash` | Hash of the entry content. |
 
-_App_ entry types must be uniquely identifiable within a DNA to enable correct deserialization. Each _App_ entry type is identified an index:
+_App_ entry types must be uniquely identifiable within a DNA to enable correct deserialization. Each _App_ entry type is identified by an index:
 
 - _Zome index_: An 8-bit index identifying which integrity zome defines this entry type
 - _Entry definition index_: An 8-bit index identifying which entry type within that zome
@@ -209,7 +209,7 @@ The _Agent_ entry type contains an agent's public key. An action with this entry
 
 The _App_ entry type represents serialized, application-defined data. This is the most common entry type and contains arbitrary data structured according to the application's needs.
 
-Applications create _App_ entries using _Create_ actions and can update or delete them using _Update_ and _Delete_ actions. The content and structure of _App_ entries is entirely determined by the application.
+Applications create _App_ entries using _Create_ actions and can update or delete them using _Update_ and _Delete_ actions. The content and structure of _App_ entries are entirely determined by the application.
 
 _Size limitation:_ _App_ entries have a maximum size of 4 MB (4,000,000 bytes). This limit is enforced automatically by Holochain. Should an application need to store larger pieces of data, they may consider splitting it across multiple entries or storing references to external content.
 
@@ -280,7 +280,7 @@ Note that every action produces a:
 
 Each chain op contains the source action, and a signature of that action by its author. The _CreateRecord_, _UpdateRecord_, _CreateEntry_, and `_UpdateEntry_ op also contain entry data. Note that the entry data is not signed, but entries are always referenced by their hash in an action so the signature of the action covers the entry data as long as the entry hash is checked.
 
-Whether an entry is included in an op depends on the type of action, content of the action and the type of op. As described for _Action_s and _Record_s above, some _Action_s do not have an associated entry and entries may also be hidden. The _AgentActivity_ op never carries an entry, and neither do the _DeleteRecord_, _DeleteEntry_, _CreateLink_ or _DeleteLink_ op types.
+Whether an entry is included in an op depends on the type of action, content of the action, and the type of op. As described for _Action_s and _Record_s above, some _Action_s do not have an associated entry and entries may also be hidden. The _AgentActivity_ op never carries an entry, and neither do the _DeleteRecord_, _DeleteEntry_, _CreateLink_ or _DeleteLink_ op types.
 
 ### Chain Operations
 
@@ -293,7 +293,7 @@ The _AgentActivity_ operation is sent to the agent activity authority (agents ne
 **Purpose:**
 - Maintain a complete activity history for each agent.
 - Enable queries for all actions by a specific agent.
-- Allows chain forks to be detected by agent authorities.
+- Allow chain forks to be detected by agent authorities.
 
 #### CreateRecord
 
