@@ -259,12 +259,14 @@ pub enum ReportConfig {
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct NetworkConfig {
     /// Authentication material if required by the bootstrap service.
-    /// This material should be specified as a base64 string
+    ///
+    /// This material should be specified as a base64 url-safe, with no padding, string.
     #[serde(default)]
     pub base64_auth_material_bootstrap: Option<String>,
 
     /// Authentication material if required by the relay service.
-    /// This material should be specified as a base64 string
+    ///
+    /// This material should be specified as a base64 url-safe, with no padding, string.
     #[serde(default)]
     pub base64_auth_material_relay: Option<String>,
 
