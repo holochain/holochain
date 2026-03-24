@@ -2,11 +2,11 @@ use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Transaction;
-use holochain_sqlite::sql::sql_cell::must_get_agent_activity::ACTION_HASH_TO_SEQ;
+use holochain_sqlite::sql::sql_cell::must_get_agent_activity::ACTION_HASH_TO_SEQ_AND_TIMESTAMP;
 use holochain_sqlite::sql::sql_cell::must_get_agent_activity::MUST_GET_AGENT_ACTIVITY;
 use holochain_state::prelude::*;
-use holochain_state::query::StateQueryError;
 use holochain_types::prelude::WarrantOp;
+use holochain_zome_types::prelude::Timestamp;
 use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -14,40 +14,49 @@ use std::collections::HashSet;
 #[cfg(test)]
 mod test;
 
-/// Get the ChainFilter chain_top Action seq from a database
-/// If not found, returns Ok(None)
-pub(crate) fn get_action_seq(
+/// Get the Action sequence and timestamp for a given hash from a database.
+/// If not found, returns Ok(None).
+pub(crate) fn get_action_seq_and_timestamp(
     txn: &Transaction,
     author: &AgentPubKey,
     action_hash: &ActionHash,
-) -> StateQueryResult<Option<u32>> {
-    let maybe_chain_top_action_seq: Option<u32> = txn
-        .prepare(ACTION_HASH_TO_SEQ)?
+) -> StateQueryResult<Option<(u32, Timestamp)>> {
+    let maybe_action_data: Option<(u32, i64)> = txn
+        .prepare(ACTION_HASH_TO_SEQ_AND_TIMESTAMP)?
         .query_row(
             named_params! {
                 ":author": author,
                 ":action_hash": action_hash,
                 ":op_type_register_agent_activity": ChainOpType::RegisterAgentActivity,
             },
-            |row| row.get::<&str, u32>("seq"),
+            |row| {
+                let seq: u32 = row.get("seq")?;
+                let timestamp_micros: i64 = row.get("timestamp")?;
+                Ok((seq, timestamp_micros))
+            },
         )
         .optional()?;
 
-    Ok(maybe_chain_top_action_seq)
+    Ok(maybe_action_data
+        .map(|(seq, timestamp_micros)| (seq, Timestamp::from_micros(timestamp_micros))))
 }
 
-/// Get the ChainFilter chain_top Action seq from Scratch
-/// If not found, returns Ok(None)
-pub(crate) fn get_action_seq_from_scratch(
+/// Get the Action sequence and timestamp for a given hash from Scratch.
+/// If not found, returns Ok(None).
+pub(crate) fn get_action_seq_and_timestamp_from_scratch(
     scratch: &mut Scratch,
     author: &AgentPubKey,
     action_hash: &ActionHash,
-) -> StateQueryResult<Option<u32>> {
+) -> StateQueryResult<Option<(u32, Timestamp)>> {
     match scratch
         .actions()
         .find(|a| a.action().author() == author && &a.hashed.hash == action_hash)
     {
-        Some(chain_top_action) => Ok(Some(chain_top_action.seq())),
+        Some(chain_top_action) => {
+            let seq = chain_top_action.seq();
+            let timestamp = chain_top_action.action().timestamp();
+            Ok(Some((seq, timestamp)))
+        }
         None => Ok(None),
     }
 }
@@ -61,13 +70,6 @@ pub(crate) fn get_filtered_agent_activity_from_scratch(
     filter_chain_top_action_seq: u32,
     resolved_until_action_seq: Option<u32>,
 ) -> StateQueryResult<Vec<RegisterAgentActivity>> {
-    // Until hash Action seq must be less than or equal to ChainFilter chain_top Action seq
-    if let Some(until_action_seq) = resolved_until_action_seq {
-        if until_action_seq > filter_chain_top_action_seq {
-            return Err(StateQueryError::InvalidInput("The largest ChainFilter until hash Action seq must be less than or equal to the ChainFilter chain_top action seq.".to_string()));
-        }
-    }
-
     // Get the agent activity filtered by chain top, author, and optional until_hash lower-bound.
     // The until_timestamp lower-bound is applied in-memory after fork exclusion (same as the
     // database path) so that the canonical_chain_precedes_until_timestamp check sees the full canonical chain.
@@ -125,13 +127,6 @@ pub(crate) fn get_filtered_agent_activity(
     filter_chain_top_action_seq: u32,
     resolved_until_action_seq: Option<u32>,
 ) -> StateQueryResult<Vec<RegisterAgentActivity>> {
-    // Until hash Action seq must be less than or equal to ChainFilter chain_top Action seq
-    if let Some(until_action_seq) = resolved_until_action_seq {
-        if until_action_seq > filter_chain_top_action_seq {
-            return Err(StateQueryError::InvalidInput("The largest ChainFilter until hash Action seq must be less than or equal to the ChainFilter chain_top action seq.".to_string()));
-        }
-    }
-
     // Get the agent activity, filtered by the chain top, author, and optional until_hash lower-bound.
     // The until_timestamp lower-bound is applied in-memory after fork exclusion so that the
     // canonical_chain_precedes_until_timestamp check can inspect the full canonical chain (including actions below the boundary).
@@ -210,52 +205,97 @@ pub(crate) fn exclude_forked_activity(
     activity: &mut Vec<RegisterAgentActivity>,
     chain_top: &ActionHash,
 ) {
-    // Short-circuit if there is no activity to filter.
     if activity.is_empty() {
         return;
     }
 
-    // Build a lookup map from action hash to its index in the descending list.
+    let chain_hashes = collect_canonical_chain_hashes(activity, chain_top);
+    activity.retain(|a| chain_hashes.contains(&a.action.hashed.hash));
+}
+
+/// Walk the canonical chain from `chain_top` backwards, collecting hashes.
+///
+/// `activity` must be sorted by action seq descending. The returned set
+/// contains exactly the hashes reachable from `chain_top` via `prev_hash`,
+/// stopping when a predecessor is missing from the list (genesis or gap).
+fn collect_canonical_chain_hashes(
+    activity: &[RegisterAgentActivity],
+    chain_top: &ActionHash,
+) -> HashSet<ActionHash> {
+    // Map each action hash to its position in the descending list.
     let index_by_hash: HashMap<ActionHash, usize> = activity
         .iter()
         .enumerate()
         .map(|(i, a)| (a.action.hashed.hash.clone(), i))
         .collect();
 
-    // Track which action hashes belong to the chosen linear chain.
-    let mut keep_hashes: HashSet<ActionHash> = HashSet::new();
-    // Start from the provided chain top.
-    let Some(&start_index) = index_by_hash.get(chain_top) else {
-        activity.clear();
-        return;
+    let mut chain_hashes: HashSet<ActionHash> = HashSet::new();
+
+    // Start from chain_top; if it's not in the list, nothing is canonical.
+    let Some(&walk_index) = index_by_hash.get(chain_top) else {
+        return chain_hashes;
     };
-    let mut current_index = start_index;
-    // Walk at most the length of the list to avoid infinite loops.
+
+    // Walk backwards through the chain, bounded by list length
+    // to prevent infinite loops on unexpected cycles.
+    let mut walk_index = walk_index;
     for _ in 0..activity.len() {
-        // Select the current action and its hash.
-        let current = &activity[current_index];
+        let current = &activity[walk_index];
         let current_hash = current.action.hashed.hash.clone();
-        // Stop if we have already visited this hash (cycle or duplicate).
-        if !keep_hashes.insert(current_hash) {
+
+        // Stop if we've already visited this hash (cycle or duplicate).
+        if !chain_hashes.insert(current_hash) {
             break;
         }
 
-        // Move to the previous action in the chain if it exists.
+        // Move to the previous action in the chain.
         let Some(prev_hash) = current.action.prev_hash() else {
             break;
         };
 
-        // Look up the index of the previous action; stop if it is missing.
-        let Some(&next_index) = index_by_hash.get(prev_hash) else {
+        // Look up the predecessor; stop if it's not in the list.
+        let Some(&prev_index) = index_by_hash.get(prev_hash) else {
             break;
         };
 
-        // Continue the walk from the previous action.
-        current_index = next_index;
+        walk_index = prev_index;
     }
 
-    // Retain only the actions that are part of the selected chain.
-    activity.retain(|a| keep_hashes.contains(&a.action.hashed.hash));
+    chain_hashes
+}
+
+/// Apply the `until_timestamp` filter to the activity list, trimming actions
+/// below the boundary, and compute whether the canonical chain precedes the
+/// boundary.
+///
+/// These two operations **must** happen in this order: the `precedes_boundary`
+/// check inspects `activity.last()` (the lowest-sequence action on the canonical
+/// chain) *before* trimming. If the trim happened first, a below-boundary action
+/// could be removed, causing the check to return a false negative and the caller
+/// to incorrectly report `UntilTimestampIndeterminate`.
+///
+/// # Returns
+///
+/// `canonical_chain_precedes_until_timestamp` — `true` when at least one action
+/// on the canonical chain has a timestamp below the boundary.
+pub(crate) fn apply_timestamp_filter(
+    activity: &mut Vec<RegisterAgentActivity>,
+    until_timestamp: Option<Timestamp>,
+) -> bool {
+    match until_timestamp {
+        None => false,
+        Some(until_ts) => {
+            // Check the lowest action *before* trimming.
+            let precedes_boundary = activity
+                .last()
+                .map(|a| a.action.action().timestamp() < until_ts)
+                .unwrap_or(false);
+
+            activity.retain(|a| a.action.action().timestamp() >= until_ts);
+
+            precedes_boundary
+        }
+    }
 }
 
 pub(crate) enum MustGetCompleteness {
@@ -297,20 +337,18 @@ pub(crate) fn check_agent_activity_completeness(
             }
         }
         holochain_zome_types::chain::LimitConditions::UntilTimestamp(until_timestamp) => {
-            if !activity
+            let any_satisfies_timestamp = activity
                 .iter()
-                .any(|a| a.action.action().timestamp() >= *until_timestamp)
-            {
-                return MustGetCompleteness::UntilTimestampIndeterminate(*until_timestamp);
-            }
+                .any(|a| a.action.action().timestamp() >= *until_timestamp);
 
-            // Deterministic completeness for until_timestamp requires certainty that
-            // the returned set contains all actions >= until_timestamp.
-            // We have that certainty iff either:
-            // - the returned chain reaches genesis, or
-            // - the local stores contain at least one action below the timestamp
-            //   boundary (for this author and chain range).
-            if !reaches_genesis && !canonical_chain_precedes_until_timestamp {
+            // Deterministic completeness for until_timestamp requires:
+            // 1. At least one action satisfies the timestamp filter, AND
+            // 2. Certainty that the returned set contains ALL actions >= until_timestamp.
+            //    We have that certainty iff either:
+            //    - the returned chain reaches genesis, or
+            //    - the local stores contain at least one action below the timestamp
+            //      boundary (for this author and chain range).
+            if !any_satisfies_timestamp || (!reaches_genesis && !canonical_chain_precedes_until_timestamp) {
                 MustGetCompleteness::UntilTimestampIndeterminate(*until_timestamp)
             } else if has_gap {
                 MustGetCompleteness::IncompleteChain
@@ -321,7 +359,11 @@ pub(crate) fn check_agent_activity_completeness(
         holochain_zome_types::chain::LimitConditions::Take(take) => {
             let take = *take as usize;
             if activity.len() >= take {
-                MustGetCompleteness::Complete
+                if has_gap {
+                    MustGetCompleteness::IncompleteChain
+                } else {
+                    MustGetCompleteness::Complete
+                }
             } else if has_gap || !reaches_genesis {
                 MustGetCompleteness::IncompleteChain
             } else {
