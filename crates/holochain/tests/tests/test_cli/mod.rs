@@ -36,7 +36,7 @@ fn malformed_toml_error_is_friendly() {
 fn invalid_config_error_is_friendly() {
     let tmp = tempfile::tempdir().unwrap();
     let path = tmp.path().join("malformed-config.yml");
-    std::fs::write(&path, "valid:\n  but: wrong").unwrap();
+    std::fs::write(&path, "tracing_override: info").unwrap();
     let mut cmd = Command::new(assert_cmd::cargo_bin!("holochain"));
     let cmd = cmd.args(["-c", &path.display().to_string()]);
     cmd.assert().failure().code(predicate::eq(42));

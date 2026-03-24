@@ -5,6 +5,7 @@ use serde::Serialize;
 
 /// Information neeeded to spawn an admin interface
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct AdminInterfaceConfig {
     /// By what means the interface will be exposed.
     ///
@@ -22,7 +23,7 @@ pub struct AdminInterfaceConfig {
 /// [`ConductorConfig`]: crate::conductor::ConductorConfig
 /// [`ConductorState`]: https://docs.rs/holochain/latest/holochain/conductor/state/struct.ConductorState.html
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum InterfaceDriver {
     /// An interface implemented via websockets
     Websocket {

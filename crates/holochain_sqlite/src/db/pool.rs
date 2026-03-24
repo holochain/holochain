@@ -37,6 +37,7 @@ pub enum DbSyncLevel {
 /// Some databases like the cache can be safely rebuilt if
 /// corruption occurs due to using the faster [`DbSyncLevel::Off`].
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Default, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub enum DbSyncStrategy {
     /// Allows databases that can be wiped and rebuilt to
     /// use the faster [`DbSyncLevel::Off`].
