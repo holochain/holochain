@@ -255,7 +255,7 @@ pub enum ReportConfig {
 }
 
 /// All the network config information for the conductor.
-#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
+#[derive(Clone, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct NetworkConfig {
     /// Authentication material if required by the bootstrap service.
@@ -359,6 +359,41 @@ const fn default_request_timeout_s() -> u64 {
 
 const fn default_target_arc_factor() -> u32 {
     1
+}
+
+impl std::fmt::Debug for NetworkConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut s = f.debug_struct("NetworkConfig");
+        s.field(
+            "base64_auth_material_bootstrap",
+            &self
+                .base64_auth_material_bootstrap
+                .as_ref()
+                .map(|_| "<redacted>"),
+        );
+        s.field(
+            "base64_auth_material_relay",
+            &self
+                .base64_auth_material_relay
+                .as_ref()
+                .map(|_| "<redacted>"),
+        );
+        s.field("bootstrap_url", &self.bootstrap_url);
+        s.field("signal_url", &self.signal_url);
+        s.field("relay_url", &self.relay_url);
+        s.field("request_timeout_s", &self.request_timeout_s);
+        s.field("webrtc_config", &self.webrtc_config);
+        s.field("target_arc_factor", &self.target_arc_factor);
+        s.field("report", &self.report);
+        s.field("advanced", &self.advanced);
+        #[cfg(feature = "test-utils")]
+        {
+            s.field("disable_bootstrap", &self.disable_bootstrap);
+            s.field("disable_publish", &self.disable_publish);
+            s.field("disable_gossip", &self.disable_gossip);
+        }
+        s.finish()
+    }
 }
 
 impl NetworkConfig {

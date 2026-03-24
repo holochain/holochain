@@ -174,8 +174,14 @@ impl std::fmt::Debug for HolochainP2pConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut dbg = f.debug_struct("HolochainP2pConfig");
         dbg.field("compat", &self.compat);
-        dbg.field("auth_material_bootstrap", &self.auth_material_bootstrap);
-        dbg.field("auth_material_relay", &self.auth_material_relay);
+        dbg.field(
+            "auth_material_bootstrap",
+            &self.auth_material_bootstrap.as_ref().map(|_| "<redacted>"),
+        );
+        dbg.field(
+            "auth_material_relay",
+            &self.auth_material_relay.as_ref().map(|_| "<redacted>"),
+        );
         dbg.field("request_timeout", &self.request_timeout);
         dbg.field("target_arc_factor", &self.target_arc_factor);
         dbg.field("network_config", &self.network_config);
