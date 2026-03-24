@@ -20,4 +20,5 @@ pub const KEYSTORE_DIRECTORY: &str = "ks";
     Clone,
     JsonSchema,
 )]
+#[serde(deny_unknown_fields)]
 pub struct KeystorePath(PathBuf);

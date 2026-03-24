@@ -198,8 +198,6 @@ test_utils = [
   "holochain_wasm_test_utils",
   "unwrap_to",
   "dep:kitsune2_bootstrap_srv",
-  "async-once-cell",
-  "get_if_addrs",
   "holo_hash/fixturators",
   "dep:bytes",
 ]

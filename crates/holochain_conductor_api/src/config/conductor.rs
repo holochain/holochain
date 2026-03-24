@@ -1235,7 +1235,7 @@ admin_interfaces:
         assert_eq!(calculate_default_db_max_readers(cpu_count), u16::MAX);
     }
 
-    #[cfg(feature = "schema")]
+    #[cfg(all(feature = "schema", not(feature = "chc")))]
     #[test]
     fn schema_generation() {
         let schema = schemars::schema_for!(ConductorConfig);

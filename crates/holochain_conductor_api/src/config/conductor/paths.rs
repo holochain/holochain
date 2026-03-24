@@ -70,6 +70,7 @@ impl From<ConfigRootPath> for ConfigFilePath {
     Clone,
     JsonSchema,
 )]
+#[serde(deny_unknown_fields)]
 pub struct DataRootPath(PathBuf);
 
 impl TryFrom<DataRootPath> for KeystorePath {
