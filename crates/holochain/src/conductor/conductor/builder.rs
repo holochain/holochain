@@ -212,9 +212,18 @@ impl ConductorBuilder {
         let net_spaces3 = spaces.clone();
         let conductor_db = spaces.conductor_db.clone();
         let p2p_config = holochain_p2p::HolochainP2pConfig {
-            auth_material: config
+            auth_material_bootstrap: config
                 .network
-                .base64_auth_material
+                .base64_auth_material_bootstrap
+                .as_ref()
+                .map(|m| {
+                    use base64::prelude::*;
+                    BASE64_STANDARD.decode(m).map_err(ConductorError::other)
+                })
+                .transpose()?,
+            auth_material_relay: config
+                .network
+                .base64_auth_material_relay
                 .as_ref()
                 .map(|m| {
                     use base64::prelude::*;
@@ -434,9 +443,18 @@ impl ConductorBuilder {
         let net_spaces3 = spaces.clone();
         let conductor_db = spaces.conductor_db.clone();
         let p2p_config = holochain_p2p::HolochainP2pConfig {
-            auth_material: config
+            auth_material_bootstrap: config
                 .network
-                .base64_auth_material
+                .base64_auth_material_bootstrap
+                .as_ref()
+                .map(|m| {
+                    use base64::prelude::*;
+                    BASE64_STANDARD.decode(m).map_err(ConductorError::other)
+                })
+                .transpose()?,
+            auth_material_relay: config
+                .network
+                .base64_auth_material_relay
                 .as_ref()
                 .map(|m| {
                     use base64::prelude::*;

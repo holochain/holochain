@@ -119,8 +119,11 @@ pub struct HolochainP2pConfig {
     /// The arc factor to apply to target arc hints.
     pub target_arc_factor: u32,
 
-    /// Authentication material if required by sbd/signal/bootstrap services.
-    pub auth_material: Option<Vec<u8>>,
+    /// Authentication material if required by the bootstrap service.
+    pub auth_material_bootstrap: Option<Vec<u8>>,
+
+    /// Authentication material if required by the relay service.
+    pub auth_material_relay: Option<Vec<u8>>,
 
     /// Configuration to pass to Kitsune2.
     ///
@@ -171,7 +174,14 @@ impl std::fmt::Debug for HolochainP2pConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut dbg = f.debug_struct("HolochainP2pConfig");
         dbg.field("compat", &self.compat);
-        dbg.field("auth_material", &self.auth_material);
+        dbg.field(
+            "auth_material_bootstrap",
+            &self.auth_material_bootstrap.as_ref().map(|_| "<redacted>"),
+        );
+        dbg.field(
+            "auth_material_relay",
+            &self.auth_material_relay.as_ref().map(|_| "<redacted>"),
+        );
         dbg.field("request_timeout", &self.request_timeout);
         dbg.field("target_arc_factor", &self.target_arc_factor);
         dbg.field("network_config", &self.network_config);
@@ -211,7 +221,8 @@ impl Default for HolochainP2pConfig {
             get_db_cache: Arc::new(|_| unimplemented!()),
             get_conductor_db: Arc::new(|| unimplemented!()),
             target_arc_factor: 1,
-            auth_material: None,
+            auth_material_bootstrap: None,
+            auth_material_relay: None,
             network_config: None,
             compat: Default::default(),
             request_timeout: Duration::from_secs(60),

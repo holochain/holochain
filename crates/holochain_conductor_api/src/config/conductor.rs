@@ -255,13 +255,20 @@ pub enum ReportConfig {
 }
 
 /// All the network config information for the conductor.
-#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
+#[derive(Clone, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct NetworkConfig {
-    /// Authentication material if required by sbd/signal/bootstrap services.
-    /// This material should be specified as a base64 string
+    /// Authentication material if required by the bootstrap service.
+    ///
+    /// This material should be specified as a base64 url-safe, with no padding, string.
     #[serde(default)]
-    pub base64_auth_material: Option<String>,
+    pub base64_auth_material_bootstrap: Option<String>,
+
+    /// Authentication material if required by the relay service.
+    ///
+    /// This material should be specified as a base64 url-safe, with no padding, string.
+    #[serde(default)]
+    pub base64_auth_material_relay: Option<String>,
 
     /// The Kitsune2 bootstrap server to use for WAN discovery.
     #[schemars(schema_with = "holochain_util::jsonschema::url2_schema")]
@@ -328,7 +335,8 @@ pub struct NetworkConfig {
 impl Default for NetworkConfig {
     fn default() -> Self {
         Self {
-            base64_auth_material: None,
+            base64_auth_material_bootstrap: None,
+            base64_auth_material_relay: None,
             bootstrap_url: url2::Url2::parse("https://dev-test-bootstrap2.holochain.org"),
             signal_url: url2::Url2::parse("wss://dev-test-bootstrap2.holochain.org"),
             relay_url: url2::Url2::parse("https://use1-1.relay.n0.iroh-canary.iroh.link./"),
@@ -353,6 +361,41 @@ const fn default_request_timeout_s() -> u64 {
 
 const fn default_target_arc_factor() -> u32 {
     1
+}
+
+impl std::fmt::Debug for NetworkConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut s = f.debug_struct("NetworkConfig");
+        s.field(
+            "base64_auth_material_bootstrap",
+            &self
+                .base64_auth_material_bootstrap
+                .as_ref()
+                .map(|_| "<redacted>"),
+        );
+        s.field(
+            "base64_auth_material_relay",
+            &self
+                .base64_auth_material_relay
+                .as_ref()
+                .map(|_| "<redacted>"),
+        );
+        s.field("bootstrap_url", &self.bootstrap_url);
+        s.field("signal_url", &self.signal_url);
+        s.field("relay_url", &self.relay_url);
+        s.field("request_timeout_s", &self.request_timeout_s);
+        s.field("webrtc_config", &self.webrtc_config);
+        s.field("target_arc_factor", &self.target_arc_factor);
+        s.field("report", &self.report);
+        s.field("advanced", &self.advanced);
+        #[cfg(feature = "test-utils")]
+        {
+            s.field("disable_bootstrap", &self.disable_bootstrap);
+            s.field("disable_publish", &self.disable_publish);
+            s.field("disable_gossip", &self.disable_gossip);
+        }
+        s.finish()
+    }
 }
 
 impl NetworkConfig {
