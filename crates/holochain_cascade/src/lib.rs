@@ -24,10 +24,11 @@
 #![warn(missing_docs)]
 
 use crate::authority::get_agent_activity_query::must_get_agent_activity::{
-    check_agent_activity_completeness, exclude_forked_activity, get_action_seq,
-    get_action_seq_from_scratch, get_filtered_agent_activity,
-    get_filtered_agent_activity_from_scratch, get_warrants_for_agent_from_scratch,
-    merge_agent_activity, merge_warrants, MustGetCompleteness,
+    apply_timestamp_filter, check_agent_activity_completeness, exclude_forked_activity,
+    get_action_seq_and_timestamp, get_action_seq_and_timestamp_from_scratch,
+    get_filtered_agent_activity, get_filtered_agent_activity_from_scratch,
+    get_warrants_for_agent_from_scratch, merge_agent_activity, merge_warrants,
+    MustGetCompleteness,
 };
 use crate::error::CascadeError;
 use crate::get_options_ext::GetOptionsExt;
@@ -378,10 +379,9 @@ impl CascadeImpl {
         &self,
         response: MustGetAgentActivityResponse,
     ) -> CascadeResult<()> {
-        let cache = self
-            .cache
-            .clone()
-            .ok_or(CascadeError::CacheNotInitialized)?;
+        let Some(cache) = self.cache.clone() else {
+            return Ok(());
+        };
 
         // Commit the activity to the chain.
         if let MustGetAgentActivityResponse::Activity { activity, warrants } = response {
@@ -406,33 +406,24 @@ impl CascadeImpl {
         Ok(())
     }
 
-    // Add warrants received from the network to the scratch space to be written
-    // to the DHT database.
-    async fn add_warrants_into_scratch(
-        &self,
-        response: MustGetAgentActivityResponse,
-    ) -> CascadeResult<()> {
+    fn add_warrants_into_scratch(&self, warrants: impl IntoIterator<Item = WarrantOp>) {
         let Some(scratch) = self.scratch.clone() else {
-            return Ok(());
+            return;
         };
 
-        if let MustGetAgentActivityResponse::Activity { warrants, .. } = &response {
-            if let Err(err) = scratch.apply(|scratch| {
-                for warrant in warrants.iter() {
-                    scratch.add_warrant(SignedWarrant::new(
-                        warrant.data().clone(),
-                        warrant.signature().clone(),
-                    ));
-                }
-            }) {
-                tracing::warn!(
-                    ?err,
-                    "Failed to add warrants from network response to scratch"
-                );
-            };
-        };
-
-        Ok(())
+        if let Err(err) = scratch.apply(move |scratch| {
+            for warrant in warrants {
+                scratch.add_warrant(SignedWarrant::new(
+                    warrant.data().clone(),
+                    warrant.signature().clone(),
+                ));
+            }
+        }) {
+            tracing::warn!(
+                ?err,
+                "Failed to add warrants from network response to scratch"
+            );
+        }
     }
 
     fn record_fetch_error(&self, fetch_type: &'static str) {
@@ -581,8 +572,10 @@ impl CascadeImpl {
             Some(selected_response) => {
                 self.add_activity_into_cache(selected_response.clone())
                     .await?;
-                self.add_warrants_into_scratch(selected_response.clone())
-                    .await?;
+
+                if let MustGetAgentActivityResponse::Activity { warrants, .. } = selected_response {
+                    self.add_warrants_into_scratch(warrants.iter().cloned());
+                }
 
                 Ok(selected_response.clone())
             }
@@ -1024,6 +1017,42 @@ impl CascadeImpl {
         Ok(links.len())
     }
 
+    /// Look up an action's sequence and timestamp in local stores.
+    ///
+    /// Checks scratch first, then falls back to DHT databases.
+    /// Returns the first match found, or `None` if the action is not in any store.
+    async fn find_action_in_stores(
+        &self,
+        author: &AgentPubKey,
+        action_hash: &ActionHash,
+    ) -> CascadeResult<Option<(u32, Timestamp)>> {
+        // Try scratch first.
+        if let Some(scratch) = self.scratch.clone() {
+            let result = scratch.apply_and_then(|scratch| {
+                get_action_seq_and_timestamp_from_scratch(scratch, author, action_hash)
+            })?;
+            if result.is_some() {
+                return Ok(result);
+            }
+        }
+
+        // Fall back to DHT databases.
+        let mut txn_guards = self.get_txn_guards().await?;
+        let author = author.clone();
+        let action_hash = action_hash.clone();
+        tokio::task::spawn_blocking(move || {
+            for txn_guard in &mut txn_guards {
+                let txn = txn_guard.transaction()?;
+                let res = get_action_seq_and_timestamp(&txn, &author, &action_hash)?;
+                if res.is_some() {
+                    return CascadeResult::Ok(res);
+                }
+            }
+            CascadeResult::Ok(None)
+        })
+        .await?
+    }
+
     /// Request agent activity for an author and filter.
     ///
     /// This function first attempts to satisfy the request from local stores,
@@ -1034,6 +1063,19 @@ impl CascadeImpl {
     /// optional lower bounds (`until_hash` and `until_timestamp`), and may
     /// include an optional `take` limit.
     ///
+    /// ## Pipeline
+    ///
+    /// 1. Validate `take` is not zero.
+    /// 2. Find `chain_top` action in local stores (scratch, then DHT DBs).
+    /// 3. Validate filter bounds against chain_top (timestamp, until_hash sequence).
+    /// 4. Query filtered activity + warrants from all local stores.
+    /// 5. Merge, deduplicate, and sort activity across stores.
+    /// 6. Exclude forked actions (walk canonical chain from chain_top).
+    /// 7. Apply `until_timestamp` filter and check canonical chain boundary.
+    /// 8. Apply `take` limit.
+    /// 9. Evaluate completeness for the filter type.
+    /// 10. If incomplete and not an authority, attempt network fetch.
+    ///
     /// On success, this returns a [`MustGetAgentActivityResponse`], including
     /// non-activity outcomes such as
     /// [`MustGetAgentActivityResponse::UntilHashMissing`] and
@@ -1041,6 +1083,12 @@ impl CascadeImpl {
     /// lower bound cannot be resolved.
     ///
     /// Returns [`CascadeError::InvalidInput`] when `filter.take == Some(0)`.
+    ///
+    /// Returns specific response variants for impossible filter conditions:
+    /// - [`MustGetAgentActivityResponse::UntilTimestampGreaterThanChainHead`] when
+    ///   `filter.until_timestamp` is greater than `chain_top` action's timestamp
+    /// - [`MustGetAgentActivityResponse::UntilHashAfterChainHead`] when
+    ///   `filter.until_hash` has action sequence greater than `chain_top` action's sequence
     pub async fn must_get_agent_activity(
         &self,
         author: AgentPubKey,
@@ -1054,71 +1102,36 @@ impl CascadeImpl {
             ));
         }
 
-        // First, we get the action_seq of the requested chain top Action
-        //
-        // We check every store until the Action is is found, because it may only be stored in one.
-        let mut maybe_chain_top_action_seq = None;
-        // Try to find chain top action in Scratch
-        if let Some(scratch) = self.scratch.clone() {
-            maybe_chain_top_action_seq = scratch.apply_and_then(|scratch| {
-                get_action_seq_from_scratch(scratch, &author, &filter.chain_top)
-            })?;
-        }
+        // Find chain_top action sequence and timestamp in local stores.
+        let maybe_chain_top_action_data =
+            self.find_action_in_stores(&author, &filter.chain_top).await?;
 
-        // If not found in Scratch, try to find in databases.
-        if maybe_chain_top_action_seq.is_none() {
-            let mut txn_guards = self.get_txn_guards().await?;
-            maybe_chain_top_action_seq = tokio::task::spawn_blocking({
-                let author = author.clone();
-                let chain_top = filter.chain_top.clone();
-                move || {
-                    for txn_guard in &mut txn_guards {
-                        let txn = txn_guard.transaction()?;
-                        let res = get_action_seq(&txn, &author, &chain_top)?;
-                        if res.is_some() {
-                            return CascadeResult::Ok(res);
-                        }
-                    }
-
-                    CascadeResult::Ok(None)
-                }
-            })
-            .await??;
-        }
-
-        let result = match maybe_chain_top_action_seq {
+        let result = match maybe_chain_top_action_data {
             // The chain top Action was not found in database or scratch, so we cannot query for the activity preceding it.
             None => MustGetAgentActivityResponse::ChainTopNotFound(filter.chain_top.clone()),
 
             // The chain top was found, so we can query for the activity preceding it.
-            Some(chain_top_action_seq) => {
-                // Resolve until_hash once across scratch + db stores.
+            Some((chain_top_action_seq, chain_top_timestamp)) => {
+                // Validate until_timestamp against chain_top timestamp
+                if let Some(until_timestamp) = filter.get_until_timestamp() {
+                    if until_timestamp > chain_top_timestamp {
+                        return Ok(MustGetAgentActivityResponse::UntilTimestampGreaterThanChainHead(until_timestamp));
+                    }
+                }
+
+                // Resolve until_hash sequence across local stores.
                 let mut resolved_until_action_seq = None;
                 if let Some(until_hash) = filter.get_until_hash() {
-                    if let Some(scratch) = self.scratch.clone() {
-                        resolved_until_action_seq = scratch.apply_and_then(|scratch| {
-                            get_action_seq_from_scratch(scratch, &author, until_hash)
-                        })?;
-                    }
+                    resolved_until_action_seq = self
+                        .find_action_in_stores(&author, until_hash)
+                        .await?
+                        .map(|(seq, _)| seq);
 
-                    if resolved_until_action_seq.is_none() {
-                        let mut txn_guards = self.get_txn_guards().await?;
-                        resolved_until_action_seq = tokio::task::spawn_blocking({
-                            let author = author.clone();
-                            let until_hash = until_hash.clone();
-                            move || {
-                                for txn_guard in &mut txn_guards {
-                                    let txn = txn_guard.transaction()?;
-                                    let res = get_action_seq(&txn, &author, &until_hash)?;
-                                    if res.is_some() {
-                                        return CascadeResult::Ok(res);
-                                    }
-                                }
-
-                                CascadeResult::Ok(None)
-                            }
-                        })
-                        .await??;
+                    // Validate until_hash sequence against chain_top sequence
+                    if let Some(until_seq) = resolved_until_action_seq {
+                        if until_seq > chain_top_action_seq {
+                            return Ok(MustGetAgentActivityResponse::UntilHashAfterChainHead(until_hash.clone()));
+                        }
                     }
                 }
 
@@ -1173,28 +1186,11 @@ impl CascadeImpl {
                 // Remove forked activity from the results.
                 exclude_forked_activity(&mut merged_activity, &filter.chain_top);
 
-                // merged_activity is fork-excluded and sorted seq DESC.
-                // The last element has the lowest timestamp on the canonical chain.
-                // If it is below the until_timestamp boundary, the canonical chain
-                // precedes the boundary, confirming it exists locally.
-                let canonical_chain_precedes_until_timestamp = filter
-                    .get_until_timestamp()
-                    .map(|until_ts| {
-                        merged_activity
-                            .last()
-                            .map(|a| a.action.action().timestamp() < until_ts)
-                            .unwrap_or(false)
-                    })
-                    .unwrap_or(false);
-
-                // Apply the until_timestamp filter in-memory now that
-                // canonical_chain_precedes_until_timestamp has been computed.
-                // The SQL/scratch queries return all canonical actions so that the
-                // boundary check above can see below-boundary actions; we trim them here before
-                // the completeness check and the response.
-                if let Some(until_ts) = filter.get_until_timestamp() {
-                    merged_activity.retain(|a| a.action.action().timestamp() >= until_ts);
-                }
+                // Apply the until_timestamp filter and compute whether the canonical
+                // chain precedes the boundary. These must happen together — see the
+                // doc comment on `apply_timestamp_filter` for the ordering invariant.
+                let canonical_chain_precedes_until_timestamp =
+                    apply_timestamp_filter(&mut merged_activity, filter.get_until_timestamp());
 
                 // Limit the number of activity results if ChainFilter includes a `take` limit.
                 //
@@ -1212,32 +1208,29 @@ impl CascadeImpl {
                     canonical_chain_precedes_until_timestamp,
                 );
 
-                if !matches!(completeness, MustGetCompleteness::Complete) {
-                    match completeness {
-                        MustGetCompleteness::Complete => unreachable!(),
-                        MustGetCompleteness::IncompleteChain => {
-                            MustGetAgentActivityResponse::IncompleteChain
+                match completeness {
+                    MustGetCompleteness::Complete => {
+                        // Retrieve any Warrants from Scratch that apply to included activity
+                        if let Some(scratch) = self.scratch.clone() {
+                            let warrants_list_from_scratch = scratch.apply_and_then(|scratch| {
+                                get_warrants_for_agent_from_scratch(scratch, &author)
+                            })?;
+                            warrants_lists.push(warrants_list_from_scratch);
                         }
-                        MustGetCompleteness::UntilHashMissing(hash) => {
-                            MustGetAgentActivityResponse::UntilHashMissing(hash)
-                        }
-                        MustGetCompleteness::UntilTimestampIndeterminate(timestamp) => {
-                            MustGetAgentActivityResponse::UntilTimestampIndeterminate(timestamp)
-                        }
-                    }
-                } else {
-                    // Activity list is complete
-                    // Retrieve any Warrants from Scratch that apply to included activity
-                    if let Some(scratch) = self.scratch.clone() {
-                        let warrants_list_from_scratch = scratch.apply_and_then(|scratch| {
-                            get_warrants_for_agent_from_scratch(scratch, &author)
-                        })?;
-                        warrants_lists.push(warrants_list_from_scratch);
-                    }
 
-                    MustGetAgentActivityResponse::Activity {
-                        activity: merged_activity,
-                        warrants: merge_warrants(warrants_lists),
+                        MustGetAgentActivityResponse::Activity {
+                            activity: merged_activity,
+                            warrants: merge_warrants(warrants_lists),
+                        }
+                    }
+                    MustGetCompleteness::IncompleteChain => {
+                        MustGetAgentActivityResponse::IncompleteChain
+                    }
+                    MustGetCompleteness::UntilHashMissing(hash) => {
+                        MustGetAgentActivityResponse::UntilHashMissing(hash)
+                    }
+                    MustGetCompleteness::UntilTimestampIndeterminate(timestamp) => {
+                        MustGetAgentActivityResponse::UntilTimestampIndeterminate(timestamp)
                     }
                 }
             }
@@ -1327,6 +1320,20 @@ impl CascadeImpl {
                 .await?;
             let merged_response: AgentActivityResponse =
                 agent_activity::merge_activities(agent.clone(), &options, results)?;
+
+            // If there is a scratch and warrants were returned, add them to the scratch.
+            // Only warrants coming from the network should be added to the scratch. Locally
+            // found warrants shouldn't be redundantly added to the database.
+            if !authority && !merged_response.warrants.is_empty() {
+                self.add_warrants_into_scratch(
+                    merged_response
+                        .warrants
+                        .iter()
+                        .cloned()
+                        .map(WarrantOp::from),
+                );
+            }
+
             merged_response
         };
 
