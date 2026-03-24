@@ -1143,6 +1143,7 @@ mod app_impls {
         /// Install an app from minimal elements, without needing to construct a whole AppBundle.
         // (This function constructs a bundle under the hood.)
         // This is just a convenience for testing.
+        #[cfg(any(test, feature = "test_utils"))]
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn install_app_minimal(
             self: Arc<Self>,
@@ -1162,6 +1163,7 @@ mod app_impls {
         /// Like [`Self::install_app_minimal`] but with a custom manifest.
         ///
         // This is just a convenience for testing.
+        #[cfg(any(test, feature = "test_utils"))]
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn install_app_with_manifest(
             self: Arc<Self>,
