@@ -522,7 +522,8 @@ impl HolochainP2pActor {
             }
         }
 
-        builder.auth_material = config.auth_material;
+        builder.auth_material_bootstrap = config.auth_material_bootstrap;
+        builder.auth_material_relay = config.auth_material_relay;
 
         let evt_sender = Arc::new(std::sync::OnceLock::new());
 
