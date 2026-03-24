@@ -258,10 +258,15 @@ pub enum ReportConfig {
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct NetworkConfig {
-    /// Authentication material if required by sbd/signal/bootstrap services.
+    /// Authentication material if required by the bootstrap service.
     /// This material should be specified as a base64 string
     #[serde(default)]
-    pub base64_auth_material: Option<String>,
+    pub base64_auth_material_bootstrap: Option<String>,
+
+    /// Authentication material if required by the relay service.
+    /// This material should be specified as a base64 string
+    #[serde(default)]
+    pub base64_auth_material_relay: Option<String>,
 
     /// The Kitsune2 bootstrap server to use for WAN discovery.
     #[schemars(schema_with = "holochain_util::jsonschema::url2_schema")]
@@ -328,7 +333,8 @@ pub struct NetworkConfig {
 impl Default for NetworkConfig {
     fn default() -> Self {
         Self {
-            base64_auth_material: None,
+            base64_auth_material_bootstrap: None,
+            base64_auth_material_relay: None,
             bootstrap_url: url2::Url2::parse("https://dev-test-bootstrap2.holochain.org"),
             signal_url: url2::Url2::parse("wss://dev-test-bootstrap2.holochain.org"),
             relay_url: url2::Url2::parse("https://use1-1.relay.n0.iroh-canary.iroh.link./"),
