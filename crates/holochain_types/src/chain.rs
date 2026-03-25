@@ -36,6 +36,18 @@ pub enum MustGetAgentActivityResponse {
     UntilTimestampIndeterminate(Timestamp),
     /// The requested chain top was not found in the chain.
     ChainTopNotFound(ActionHash),
+    /// The `until_hash` filter specifies an action with a sequence number
+    /// greater than the `chain_top`'s sequence number.
+    ///
+    /// This is an impossible filter condition because `until_hash` must be
+    /// at or before `chain_top` in the chain.
+    UntilHashAfterChainHead(ActionHash),
+    /// The `until_timestamp` filter specifies a timestamp greater than the
+    /// `chain_top` action's timestamp.
+    ///
+    /// This is an impossible filter condition because `until_timestamp` must
+    /// be at or before the `chain_top`'s timestamp.
+    UntilTimestampGreaterThanChainHead(Timestamp),
 }
 
 impl MustGetAgentActivityResponse {

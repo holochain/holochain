@@ -128,6 +128,14 @@ pub fn must_get_agent_activity(
                         "must_get_agent_activity is missing until timestamp {missing_timestamp} for author {author} and filter {chain_filter:?}"
                     )))
                     .into()),
+                    (UntilHashAfterChainHead(until_hash), _) => Err(wasm_error!(WasmErrorInner::Host(format!(
+                        "must_get_agent_activity until_hash {until_hash} has action sequence after chain_top for author {author} and filter {chain_filter:?}"
+                    )))
+                    .into()),
+                    (UntilTimestampGreaterThanChainHead(until_timestamp), _) => Err(wasm_error!(WasmErrorInner::Host(format!(
+                        "must_get_agent_activity until_timestamp {until_timestamp} is greater than chain_top timestamp for author {author} and filter {chain_filter:?}"
+                    )))
+                    .into()),
                 };
 
                 result

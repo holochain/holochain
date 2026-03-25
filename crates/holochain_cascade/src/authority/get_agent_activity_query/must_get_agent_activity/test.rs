@@ -139,11 +139,14 @@ async fn returns_expected_filtered_sequence_from_filter(
 #[test_case(
     agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
     ChainFilter::until_timestamp(action_hash(&[8]), Timestamp::from_micros(9000))
-    => MustGetAgentActivityResponse::UntilTimestampIndeterminate(Timestamp::from_micros(9000)) ; "Until timestamp not found")]
+    => MustGetAgentActivityResponse::UntilTimestampGreaterThanChainHead(Timestamp::from_micros(9000)) ; "Until timestamp greater than chain top")]
 #[test_case(
     agent_chain(&[(0, 7..10)]), agent_hash(&[0]),
     ChainFilter::until_timestamp(action_hash(&[9]), Timestamp::from_micros(7000))
     => MustGetAgentActivityResponse::UntilTimestampIndeterminate(Timestamp::from_micros(7000)) ; "Until timestamp indeterminate when canonical chain does not precede boundary")]
+#[test_case(
+    agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::until_hash(action_hash(&[8]), action_hash(&[9]))
+    => MustGetAgentActivityResponse::UntilHashAfterChainHead(action_hash(&[9])) ; "Until hash is after chain top")]
 /// Check the query returns the appropriate responses.
 #[tokio::test(flavor = "multi_thread")]
 async fn handle_must_get_agent_activity_ok(
@@ -163,9 +166,6 @@ async fn handle_must_get_agent_activity_ok(
     res
 }
 
-#[test_case(
-    agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::until_hash(action_hash(&[8]), action_hash(&[9]))
-    => matches CascadeError::QueryError(StateQueryError::InvalidInput(_)); "Until hash is higher then chain_top")]
 #[test_case(
     agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::take(action_hash(&[8]), 0)
     => matches CascadeError::InvalidInput(_); "Take is 0")]
