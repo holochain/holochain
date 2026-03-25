@@ -348,7 +348,9 @@ pub(crate) fn check_agent_activity_completeness(
             //    - the returned chain reaches genesis, or
             //    - the local stores contain at least one action below the timestamp
             //      boundary (for this author and chain range).
-            if !any_satisfies_timestamp || (!reaches_genesis && !canonical_chain_precedes_until_timestamp) {
+            if !any_satisfies_timestamp
+                || (!reaches_genesis && !canonical_chain_precedes_until_timestamp)
+            {
                 MustGetCompleteness::UntilTimestampIndeterminate(*until_timestamp)
             } else if has_gap {
                 MustGetCompleteness::IncompleteChain
