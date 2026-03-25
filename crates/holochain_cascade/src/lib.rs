@@ -27,7 +27,8 @@ use crate::authority::get_agent_activity_query::must_get_agent_activity::{
     apply_timestamp_filter, check_agent_activity_completeness, exclude_forked_activity,
     get_action_seq_and_timestamp, get_action_seq_and_timestamp_from_scratch,
     get_filtered_agent_activity, get_filtered_agent_activity_from_scratch,
-    get_warrants_for_agent_from_scratch, merge_agent_activity, merge_warrants, MustGetCompleteness,
+    get_warrants_for_agent_from_scratch, merge_agent_activity, merge_warrants,
+    MustGetAgentActivityCompleteness,
 };
 use crate::error::CascadeError;
 use crate::get_options_ext::GetOptionsExt;
@@ -1052,56 +1053,21 @@ impl CascadeImpl {
         .await?
     }
 
-    /// Request agent activity for an author and filter.
-    ///
-    /// This function first attempts to satisfy the request from local stores,
-    /// then falls back to the network when local data is insufficient and this
-    /// node is not an authority for the author.
-    ///
-    /// The query is bounded by [`ChainFilter`], including `chain_top` and any
-    /// optional lower bounds (`until_hash` and `until_timestamp`), and may
-    /// include an optional `take` limit.
-    ///
-    /// ## Pipeline
-    ///
-    /// 1. Validate `take` is not zero.
-    /// 2. Find `chain_top` action in local stores (scratch, then DHT DBs).
-    /// 3. Validate filter bounds against chain_top (timestamp, until_hash sequence).
-    /// 4. Query filtered activity + warrants from all local stores.
-    /// 5. Merge, deduplicate, and sort activity across stores.
-    /// 6. Exclude forked actions (walk canonical chain from chain_top).
-    /// 7. Apply `until_timestamp` filter and check canonical chain boundary.
-    /// 8. Apply `take` limit.
-    /// 9. Evaluate completeness for the filter type.
-    /// 10. If incomplete and not an authority, attempt network fetch.
-    ///
-    /// On success, this returns a [`MustGetAgentActivityResponse`], including
-    /// non-activity outcomes such as
-    /// [`MustGetAgentActivityResponse::UntilHashMissing`] and
-    /// [`MustGetAgentActivityResponse::UntilTimestampIndeterminate`] when a
-    /// lower bound cannot be resolved.
-    ///
-    /// Returns [`CascadeError::InvalidInput`] when `filter.take == Some(0)`.
-    ///
-    /// Returns specific response variants for impossible filter conditions:
-    /// - [`MustGetAgentActivityResponse::UntilTimestampGreaterThanChainHead`] when
-    ///   `filter.until_timestamp` is greater than `chain_top` action's timestamp
-    /// - [`MustGetAgentActivityResponse::UntilHashAfterChainHead`] when
-    ///   `filter.until_hash` has action sequence greater than `chain_top` action's sequence
+    /// Request the chain of agent activity for an author, bounded by a given [`ChainFilter`]
     pub async fn must_get_agent_activity(
         &self,
         author: AgentPubKey,
         filter: ChainFilter,
         options: NetworkRequestOptions,
     ) -> CascadeResult<MustGetAgentActivityResponse> {
-        // Check that filter take is valid
+        // Validate ChainFilter take is not zero.
         if filter.get_take() == Some(0) {
             return Err(CascadeError::InvalidInput(
                 "ChainFilter take must be greater than 0".to_string(),
             ));
         }
 
-        // Find chain_top action sequence and timestamp in local stores.
+        // Retrieve the `chain_top` action
         let maybe_chain_top_action_data = self
             .find_action_in_stores(&author, &filter.chain_top)
             .await?;
@@ -1112,7 +1078,7 @@ impl CascadeImpl {
 
             // The chain top was found, so we can query for the activity preceding it.
             Some((chain_top_action_seq, chain_top_timestamp)) => {
-                // Validate until_timestamp against chain_top timestamp
+                // Validate the until_timestamp is less than the chain_top action's timestamp
                 if let Some(until_timestamp) = filter.get_until_timestamp() {
                     if until_timestamp > chain_top_timestamp {
                         return Ok(
@@ -1131,7 +1097,7 @@ impl CascadeImpl {
                         .await?
                         .map(|(seq, _)| seq);
 
-                    // Validate until_hash sequence against chain_top sequence
+                    // Validate the until_hash action is prior to the chain_top action
                     if let Some(until_seq) = resolved_until_action_seq {
                         if until_seq > chain_top_action_seq {
                             return Ok(MustGetAgentActivityResponse::UntilHashAfterChainHead(
@@ -1141,7 +1107,7 @@ impl CascadeImpl {
                     }
                 }
 
-                // Query for filtered activity and warrants from every database.
+                // Retrieve activity and warrants from db, filtered by the chain top, author, and optional until_hash.
                 let mut txn_guards = self.get_txn_guards().await?;
                 let (mut activity_lists, mut warrants_lists) = tokio::task::spawn_blocking({
                     let author = author.clone();
@@ -1171,7 +1137,7 @@ impl CascadeImpl {
                 })
                 .await??;
 
-                // If Scratch store is available, query for filtered activity from it.
+                // If Scratch store is available, retreive filtered activity from it.
                 if let Some(scratch) = self.scratch.clone() {
                     let activity_list_from_scratch = scratch.apply_and_then(|scratch| {
                         let activity = get_filtered_agent_activity_from_scratch(
@@ -1192,22 +1158,19 @@ impl CascadeImpl {
                 // Remove forked activity from the results.
                 exclude_forked_activity(&mut merged_activity, &filter.chain_top);
 
-                // Apply the until_timestamp filter and compute whether the canonical
-                // chain precedes the boundary. These must happen together — see the
-                // doc comment on `apply_timestamp_filter` for the ordering invariant.
+                // Apply the until_timestamp filter and determine if the result is deterministic,
+                // because we retreived an action with a timestamp less than the until_timestamp,
+                // or we retrieved all actions to genesis.
                 let canonical_chain_precedes_until_timestamp =
                     apply_timestamp_filter(&mut merged_activity, filter.get_until_timestamp());
 
-                // Limit the number of activity results if ChainFilter includes a `take` limit.
-                //
-                // The take limit was already applied in each db query,
-                // but if a single db result was missing any Action sequences,
-                // then the merged result may still have a length larger than the desired take limit.
-                // Thus we must apply the limit again.
+                // Apply the take filter
                 if let Some(take) = filter.get_take() {
                     merged_activity.truncate(take as usize);
                 }
 
+                // Determine if the processed activity list is complete,
+                // and therefold should be returned to the caller.
                 let completeness = check_agent_activity_completeness(
                     &merged_activity,
                     &filter,
@@ -1215,7 +1178,7 @@ impl CascadeImpl {
                 );
 
                 match completeness {
-                    MustGetCompleteness::Complete => {
+                    MustGetAgentActivityCompleteness::Complete => {
                         // Retrieve any Warrants from Scratch that apply to included activity
                         if let Some(scratch) = self.scratch.clone() {
                             let warrants_list_from_scratch = scratch.apply_and_then(|scratch| {
@@ -1229,13 +1192,13 @@ impl CascadeImpl {
                             warrants: merge_warrants(warrants_lists),
                         }
                     }
-                    MustGetCompleteness::IncompleteChain => {
+                    MustGetAgentActivityCompleteness::IncompleteChain => {
                         MustGetAgentActivityResponse::IncompleteChain
                     }
-                    MustGetCompleteness::UntilHashMissing(hash) => {
+                    MustGetAgentActivityCompleteness::UntilHashMissing(hash) => {
                         MustGetAgentActivityResponse::UntilHashMissing(hash)
                     }
-                    MustGetCompleteness::UntilTimestampIndeterminate(timestamp) => {
+                    MustGetAgentActivityCompleteness::UntilTimestampIndeterminate(timestamp) => {
                         MustGetAgentActivityResponse::UntilTimestampIndeterminate(timestamp)
                     }
                 }
