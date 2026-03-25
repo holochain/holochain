@@ -253,7 +253,7 @@ FixtureDataStores {
     ..Default::default()
 },
 agent_hash(&[0]), ChainFilter::until_timestamp(action_hash(&[6]), Timestamp::from_micros(7_i64 * 1000))
-=> MustGetAgentActivityResponse::UntilTimestampIndeterminate(Timestamp::from_micros(7_i64 * 1000)); "until_timestamp not found")]
+=> MustGetAgentActivityResponse::UntilTimestampGreaterThanChainHead(Timestamp::from_micros(7_i64 * 1000)); "until_timestamp greater than chain top")]
 // A non-canonical sibling action below the until_timestamp boundary must NOT cause
 // the result to be reported as Complete. Only the canonical chain (from chain_top,
 // after fork exclusion) is consulted for the canonical_chain_precedes_until_timestamp check.
@@ -334,6 +334,16 @@ FixtureDataStores {
 },
 agent_hash(&[0]), ChainFilter::until_hash(action_hash(&[6]), action_hash(&[15]))
 => MustGetAgentActivityResponse::UntilHashMissing(action_hash(&[15])); "until_hash is not found")]
+#[test_case(
+FixtureDataStores {
+    dht: FixtureData {
+        activity: agent_chain(&[(0, 0..7)]),
+        ..Default::default()
+    },
+    ..Default::default()
+},
+agent_hash(&[0]), ChainFilter::until_hash(action_hash(&[3]), action_hash(&[6]))
+=> MustGetAgentActivityResponse::UntilHashAfterChainHead(action_hash(&[6])); "until_hash greater than chain top")]
 #[test_case(
 FixtureDataStores {
     dht:  FixtureData {
@@ -612,16 +622,6 @@ async fn test_must_get_agent_activity_forks_split_between_db_and_scratch_keeps_c
 }
 
 // Invalid filter input and invalid chain-boundary requests.
-#[test_case(
-FixtureDataStores {
-    dht: FixtureData {
-        activity: agent_chain(&[(0, 0..7)]),
-        ..Default::default()
-    },
-    ..Default::default()
-},
-agent_hash(&[0]), ChainFilter::until_hash(action_hash(&[3]), action_hash(&[6]))
-=> matches CascadeError::InvalidInput(_); "until hash greater than chain top")]
 #[test_case(
 FixtureDataStores {
     dht: FixtureData {

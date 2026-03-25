@@ -10,15 +10,11 @@ use holochain_timestamp::Timestamp;
 #[cfg(test)]
 mod test;
 
-/// Filter source chain items.
-/// Starting from some chain position given as an [`ActionHash`]
-/// the chain is walked backwards to genesis.
-/// The filter can stop early by specifying limit conditions:
-/// A maximum number of items is reached, a given [`ActionHash`] is found, or
-/// a given timestamp has been passed.
-/// When providing a Timestamp, the filter returns all actions with timestamp greater than or equal
-/// to the provided one. If multiple actions have a timestamp exactly equal to the limit
-/// timestamp, all of those actions are included.
+/// Filter the contiguous chain of actions from an agent's source chain.
+///
+/// Starting from a specified `chain_top` [`ActionHash`], the filter walks backwards through
+/// the linear chain path, towards genesis, excluding any forked actions, and bounded by
+/// the specified [`LimitConditions`].
 #[derive(Serialize, Deserialize, SerializedBytes, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct ChainFilter<H: Eq + Ord + std::hash::Hash = ActionHash> {
     /// The starting position of the filter.
@@ -31,17 +27,35 @@ pub struct ChainFilter<H: Eq + Ord + std::hash::Hash = ActionHash> {
     pub include_cached_entries: bool,
 }
 
-/// Specify when to stop walking down the chain.
+/// Specify when to stop walking down the chain from the `chain_top` action.
+///
+/// All variants walk down the chain from the `chain_top` action,
+/// following the linear chain path and excluding any forked actions.
 #[derive(Serialize, Deserialize, Debug, Eq, Clone, Default)]
 pub enum LimitConditions<H: Eq + Ord + std::hash::Hash = ActionHash> {
-    /// Allow all up to genesis.
+    /// Include all actions to the end of the chain.
     #[default]
     ToGenesis,
-    /// Take this many actions (inclusive of the starting position).
+    /// Include exactly the specified number of actions in the chain, or all actions in the chain, whichever is fewer.
+    ///
+    /// A value of `0` is considered invalid and will cause an error.
     Take(u32),
-    /// Take all actions since the given timestamp.
+    /// Include all actions in the chain with timestamps greater than or equal to the given timestamp.
+    ///
+    /// To receive a success response, the query must retrieve an action with a timestamp *less* than the given timestamp,
+    /// *or* retrieve all actions until genesis. Without this we would not know if there are additional
+    /// actions within the timestamp, and so the response would not be deterministic.
+    ///
+    /// A timestamp value that is greater than the `chain_top` timestamp is considered invalid
+    /// and will return `MustGetAgentActivityResponse::UntilTimestampGreaterThanChainHead`.
     UntilTimestamp(Timestamp),
-    /// Take all actions until this ActionHash.
+    /// Include all actions in the chain down to and including the action matching the given hash.
+    ///
+    /// To receive a success response, the query must retrieve an action matching the given hash.
+    ///
+    /// A hash value that maps to an action with a sequence number greater than the
+    /// `chain_top` sequence number is considered invalid
+    /// and will return `MustGetAgentActivityResponse::UntilHashAfterChainHead`.
     UntilHash(H),
 }
 
