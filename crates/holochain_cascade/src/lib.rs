@@ -27,8 +27,7 @@ use crate::authority::get_agent_activity_query::must_get_agent_activity::{
     apply_timestamp_filter, check_agent_activity_completeness, exclude_forked_activity,
     get_action_seq_and_timestamp, get_action_seq_and_timestamp_from_scratch,
     get_filtered_agent_activity, get_filtered_agent_activity_from_scratch,
-    get_warrants_for_agent_from_scratch, merge_agent_activity, merge_warrants,
-    MustGetCompleteness,
+    get_warrants_for_agent_from_scratch, merge_agent_activity, merge_warrants, MustGetCompleteness,
 };
 use crate::error::CascadeError;
 use crate::get_options_ext::GetOptionsExt;
@@ -1103,8 +1102,9 @@ impl CascadeImpl {
         }
 
         // Find chain_top action sequence and timestamp in local stores.
-        let maybe_chain_top_action_data =
-            self.find_action_in_stores(&author, &filter.chain_top).await?;
+        let maybe_chain_top_action_data = self
+            .find_action_in_stores(&author, &filter.chain_top)
+            .await?;
 
         let result = match maybe_chain_top_action_data {
             // The chain top Action was not found in database or scratch, so we cannot query for the activity preceding it.
@@ -1115,7 +1115,11 @@ impl CascadeImpl {
                 // Validate until_timestamp against chain_top timestamp
                 if let Some(until_timestamp) = filter.get_until_timestamp() {
                     if until_timestamp > chain_top_timestamp {
-                        return Ok(MustGetAgentActivityResponse::UntilTimestampGreaterThanChainHead(until_timestamp));
+                        return Ok(
+                            MustGetAgentActivityResponse::UntilTimestampGreaterThanChainHead(
+                                until_timestamp,
+                            ),
+                        );
                     }
                 }
 
@@ -1130,7 +1134,9 @@ impl CascadeImpl {
                     // Validate until_hash sequence against chain_top sequence
                     if let Some(until_seq) = resolved_until_action_seq {
                         if until_seq > chain_top_action_seq {
-                            return Ok(MustGetAgentActivityResponse::UntilHashAfterChainHead(until_hash.clone()));
+                            return Ok(MustGetAgentActivityResponse::UntilHashAfterChainHead(
+                                until_hash.clone(),
+                            ));
                         }
                     }
                 }
