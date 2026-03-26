@@ -1,5 +1,6 @@
 SELECT
-  Action.seq AS seq
+  Action.seq AS seq,
+  DhtOp.authored_timestamp AS timestamp
 FROM
   Action
   JOIN DhtOp ON DhtOp.action_hash = Action.hash

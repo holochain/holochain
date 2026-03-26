@@ -42,7 +42,7 @@ use holochain_zome_types::{
 };
 use matches::assert_matches;
 use parking_lot::RwLock;
-use std::{collections::HashSet, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 // test app validation with a must get action where the original action of
 // a delete is not in the cache db and then added to it
@@ -231,11 +231,11 @@ async fn validation_callback_awaiting_deps_agent_activity() {
         move |api, op: Op| {
             if let Op::RegisterDelete(RegisterDelete { delete }) = op {
                 // chain filter with delete as chain top and create as chain bottom
-                let mut filter_hashes = HashSet::new();
-                filter_hashes.insert(delete.hashed.deletes_address.clone().clone());
                 let chain_filter = ChainFilter {
                     chain_top: delete.as_hash().clone(),
-                    limit_conditions: LimitConditions::UntilHash(filter_hashes),
+                    limit_conditions: LimitConditions::UntilHash(
+                        delete.hashed.deletes_address.clone(),
+                    ),
                     include_cached_entries: false,
                 };
                 let result = api.must_get_agent_activity(MustGetAgentActivityInput {
@@ -298,11 +298,13 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     // return single action as requested chain
     network.expect_must_get_agent_activity().returning({
         let expected_chain_top = expected_chain_top.clone();
+        let expected_until_hash = delete.deletes_address.clone();
         let create_action_signed_hashed = create_action_signed_hashed.clone();
         let delete_action_signed_hashed = delete_action_signed_hashed.clone();
         move |author, filter, _, _| {
             assert_eq!(author, alice);
             assert_eq!(&filter.chain_top, expected_chain_top.as_hash());
+            assert_eq!(filter.get_until_hash(), Some(&expected_until_hash));
 
             Ok(vec![MustGetAgentActivityResponse::activity(vec![
                 RegisterAgentActivity {

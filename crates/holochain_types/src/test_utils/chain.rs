@@ -35,7 +35,8 @@ impl From<i32> for TestChainHash {
 }
 
 impl TestChainHash {
-    fn forked(n: u8, i: u8) -> TestChainHash {
+    /// Generate deterministic TestChainHash for forked chain Action
+    pub fn forked(n: u8, i: u8) -> TestChainHash {
         TestChainHash(u32::from_le_bytes([n, i, 0, 0]))
     }
 }

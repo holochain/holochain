@@ -6,22 +6,15 @@ use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
 use holochain_timestamp::Timestamp;
-use std::collections::HashSet;
 
 #[cfg(test)]
 mod test;
 
-/// Filter source chain items.
-/// Starting from some chain position given as an [`ActionHash`]
-/// the chain is walked backwards to genesis.
-/// The filter can stop early by specifying limit conditions:
-/// A maximum number of items is reached, a given [`ActionHash`] is found, or
-/// a given timestamp has been passed.
-/// Multiple [`ActionHash`]es can be provided. The filter will stop at and take the first one found.
-/// When providing a Timestamp, the filter will stop at and take the oldest action that has a
-/// Timestamp newer than the provided one. In the case of multiple actions having the same
-/// Timestamp as the limit condition, the filter will stop at the action with the lowest sequence.
-/// Multiple limit conditions can be set. Whichever is the smaller set will be kept.
+/// Filter the contiguous chain of actions from an agent's source chain.
+///
+/// Starting from a specified `chain_top` [`ActionHash`], the filter walks backwards through
+/// the linear chain path, towards genesis, excluding any forked actions, and bounded by
+/// the specified [`LimitConditions`].
 #[derive(Serialize, Deserialize, SerializedBytes, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct ChainFilter<H: Eq + Ord + std::hash::Hash = ActionHash> {
     /// The starting position of the filter.
@@ -34,20 +27,36 @@ pub struct ChainFilter<H: Eq + Ord + std::hash::Hash = ActionHash> {
     pub include_cached_entries: bool,
 }
 
-/// Specify when to stop walking down the chain.
+/// Specify when to stop walking down the chain from the `chain_top` action.
+///
+/// All variants walk down the chain from the `chain_top` action,
+/// following the linear chain path and excluding any forked actions.
 #[derive(Serialize, Deserialize, Debug, Eq, Clone, Default)]
 pub enum LimitConditions<H: Eq + Ord + std::hash::Hash = ActionHash> {
-    /// Allow all up to genesis.
+    /// Include all actions to the end of the chain.
     #[default]
     ToGenesis,
-    /// Take this many actions (inclusive of the starting position).
+    /// Include exactly the specified number of actions in the chain, or all actions in the chain, whichever is fewer.
+    ///
+    /// A value of `0` is considered invalid and will cause an error.
     Take(u32),
-    /// Take all actions since the given timestamp.
+    /// Include all actions in the chain with timestamps greater than or equal to the given timestamp.
+    ///
+    /// To receive a success response, the query must retrieve an action with a timestamp *less* than the given timestamp,
+    /// *or* retrieve all actions until genesis. Without this we would not know if there are additional
+    /// actions within the timestamp, and so the response would not be deterministic.
+    ///
+    /// A timestamp value that is greater than the `chain_top` timestamp is considered invalid
+    /// and will return `MustGetAgentActivityResponse::UntilTimestampGreaterThanChainHead`.
     UntilTimestamp(Timestamp),
-    /// Continue until one of these hashes is found.
-    UntilHash(HashSet<H>),
-    /// Combination of Take, UntilTimestamp and UntilHash.
-    Multiple(Option<u32>, HashSet<H>, Option<Timestamp>),
+    /// Include all actions in the chain down to and including the action matching the given hash.
+    ///
+    /// To receive a success response, the query must retrieve an action matching the given hash.
+    ///
+    /// A hash value that maps to an action with a sequence number greater than the
+    /// `chain_top` sequence number is considered invalid
+    /// and will return `MustGetAgentActivityResponse::UntilHashAfterChainHead`.
+    UntilHash(H),
 }
 
 /// Create a deterministic hash to compare [LimitConditions].
@@ -58,18 +67,7 @@ impl<H: Eq + Ord + std::hash::Hash> core::hash::Hash for LimitConditions<H> {
             LimitConditions::ToGenesis => (),
             LimitConditions::Take(t) => t.hash(state),
             LimitConditions::UntilTimestamp(ts) => ts.hash(state),
-            LimitConditions::UntilHash(u) => {
-                let mut u: Vec<_> = u.iter().collect();
-                u.sort_unstable();
-                u.hash(state);
-            }
-            LimitConditions::Multiple(n, u, t) => {
-                let mut u: Vec<_> = u.iter().collect();
-                u.sort_unstable();
-                u.hash(state);
-                n.hash(state);
-                t.hash(state);
-            }
+            LimitConditions::UntilHash(u) => u.hash(state),
         }
     }
 }
@@ -80,20 +78,7 @@ impl<H: Eq + Ord + std::hash::Hash> core::cmp::PartialEq for LimitConditions<H> 
         match (self, other) {
             (Self::Take(l0), Self::Take(r0)) => l0 == r0,
             (Self::UntilTimestamp(l0), Self::UntilTimestamp(r0)) => l0 == r0,
-            (Self::UntilHash(a), Self::UntilHash(b)) => {
-                let mut a: Vec<_> = a.iter().collect();
-                let mut b: Vec<_> = b.iter().collect();
-                a.sort_unstable();
-                b.sort_unstable();
-                a == b
-            }
-            (Self::Multiple(l0, a, t0), Self::Multiple(r0, b, t1)) => {
-                let mut a: Vec<_> = a.iter().collect();
-                let mut b: Vec<_> = b.iter().collect();
-                a.sort_unstable();
-                b.sort_unstable();
-                l0 == r0 && a == b && t0 == t1
-            }
+            (Self::UntilHash(l0), Self::UntilHash(r0)) => l0 == r0,
             _ => core::mem::discriminant(self) == core::mem::discriminant(other),
         }
     }
@@ -121,22 +106,13 @@ impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
         }
     }
 
-    /// Take up to `n` actions including the starting position.
-    /// This may return less than `n` actions.
-    /// If an `n` was already set, the smallest of the two is kept.
-    pub fn take(mut self, n: u32) -> Self {
-        self.limit_conditions = match self.limit_conditions {
-            LimitConditions::ToGenesis => LimitConditions::Take(n),
-            LimitConditions::Take(old_n) => LimitConditions::Take(old_n.min(n)),
-            LimitConditions::UntilTimestamp(t) => {
-                LimitConditions::Multiple(Some(n), HashSet::new(), Some(t))
-            }
-            LimitConditions::UntilHash(u) => LimitConditions::Multiple(Some(n), u, None),
-            LimitConditions::Multiple(old_n, u, t) => {
-                LimitConditions::Multiple(Some(old_n.unwrap_or(u32::MAX).min(n)), u, t)
-            }
-        };
-        self
+    /// Create a filter with a take limit.
+    pub fn take(chain_top: H, n: u32) -> Self {
+        Self {
+            chain_top,
+            limit_conditions: LimitConditions::Take(n),
+            include_cached_entries: false,
+        }
     }
 
     /// Set this filter to include any cached entries
@@ -146,59 +122,28 @@ impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
         self
     }
 
-    /// Take all actions since the given timestamp.
-    ///
-    /// If a timestamp was already set, the later of the two is kept.
-    pub fn until_timestamp(mut self, timestamp: Timestamp) -> Self {
-        self.limit_conditions = match self.limit_conditions {
-            LimitConditions::ToGenesis => LimitConditions::UntilTimestamp(timestamp),
-            LimitConditions::Take(n) => {
-                LimitConditions::Multiple(Some(n), HashSet::new(), Some(timestamp))
-            }
-            LimitConditions::UntilTimestamp(old_ts) => {
-                LimitConditions::UntilTimestamp(timestamp.max(old_ts))
-            }
-            LimitConditions::UntilHash(u) => LimitConditions::Multiple(None, u, Some(timestamp)),
-            LimitConditions::Multiple(n, u, old_ts) => {
-                LimitConditions::Multiple(n, u, Some(old_ts.unwrap_or(Timestamp(0)).max(timestamp)))
-            }
-        };
-        self
+    /// Create a filter with an until-timestamp limit.
+    pub fn until_timestamp(chain_top: H, timestamp: Timestamp) -> Self {
+        Self {
+            chain_top,
+            limit_conditions: LimitConditions::UntilTimestamp(timestamp),
+            include_cached_entries: false,
+        }
     }
 
-    /// Take all actions until this action hash is found.
-    /// Note that all actions specified as `until_hash` hashes must be
-    /// found so this filter can produce deterministic results.
-    /// It is invalid to specify an until hash that is on a different
-    /// fork then the starting position.
-    pub fn until_hash(mut self, action_hash: H) -> Self {
-        self.limit_conditions = match self.limit_conditions {
-            LimitConditions::ToGenesis => {
-                LimitConditions::UntilHash(Some(action_hash).into_iter().collect())
-            }
-            LimitConditions::Take(n) => {
-                LimitConditions::Multiple(Some(n), Some(action_hash).into_iter().collect(), None)
-            }
-            LimitConditions::UntilTimestamp(t) => {
-                LimitConditions::Multiple(None, Some(action_hash).into_iter().collect(), Some(t))
-            }
-            LimitConditions::UntilHash(mut u) => {
-                u.insert(action_hash);
-                LimitConditions::UntilHash(u)
-            }
-            LimitConditions::Multiple(n, mut u, t) => {
-                u.insert(action_hash);
-                LimitConditions::Multiple(n, u, t)
-            }
-        };
-        self
+    /// Create a filter with an until-hash limit.
+    pub fn until_hash(chain_top: H, action_hash: H) -> Self {
+        Self {
+            chain_top,
+            limit_conditions: LimitConditions::UntilHash(action_hash),
+            include_cached_entries: false,
+        }
     }
 
-    /// Get the until hashes if there are any.
-    pub fn get_until_hash(&self) -> Option<&HashSet<H>> {
+    /// Get the until hash if there is one.
+    pub fn get_until_hash(&self) -> Option<&H> {
         match &self.limit_conditions {
             LimitConditions::UntilHash(u) => Some(u),
-            LimitConditions::Multiple(_, u, _) => Some(u),
             _ => None,
         }
     }
@@ -207,7 +152,6 @@ impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
     pub fn get_take(&self) -> Option<u32> {
         match self.limit_conditions {
             LimitConditions::Take(n) => Some(n),
-            LimitConditions::Multiple(n, _, _) => n,
             _ => None,
         }
     }
@@ -216,7 +160,6 @@ impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
     pub fn get_until_timestamp(&self) -> Option<Timestamp> {
         match self.limit_conditions {
             LimitConditions::UntilTimestamp(ts) => Some(ts),
-            LimitConditions::Multiple(_, _, ts) => ts,
             _ => None,
         }
     }
