@@ -1,12 +1,13 @@
 ---
 default_semver_increment_mode: !pre_minor dev
 ---
-
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+
+## 0.7.0-dev.18
 
 - **BREAKING CHANGE:** Split combined auth material into auth material for bootstrap service and auth material for relay service.
 
@@ -141,7 +142,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## 0.7.0-dev.0
 
-- _BREAKING CHANGE_ Unrecognized fields in app and webapp manifests are now rejected. This helps prevent typos and stray fields that have been left behind after manifest schema changes. \#5467
+- *BREAKING CHANGE* Unrecognized fields in app and webapp manifests are now rejected. This helps prevent typos and stray fields that have been left behind after manifest schema changes. \#5467
 - Refactor: Use production transport for all tests instead of in-memory implementations. \#5442
 
 ## 0.6.0
@@ -328,7 +329,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## 0.6.0-dev.23
 
 - Support binding admin and app websocket interfaces on designated listen addresses. \#5271
-- Remove obsolete kitsune_p2p types that were used with the previous version of kitsune.
+- Remove obsolete kitsune\_p2p types that were used with the previous version of kitsune.
 - Add tests for filtered `AgentInfo` calls. \#5293
 
 ## 0.6.0-dev.22
@@ -357,7 +358,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## 0.6.0-dev.19
 
-- Changed holochain_metrics dashboards to match available metrics.
+- Changed holochain\_metrics dashboards to match available metrics.
 - Internal refactor to remove the `same_dht` field of `SysValDeps`. This field was redundant because the `SysValDeps` are always for the same DHT as the cell they are part of. \#5243
 - **BREAKING CHANGE**: The agent activity response has been changed to return warrants as a `Vec<SignedWarrant>` instead of a `Vec<Warrant>`. This change ensures that warrant integrity can be checked and discovered warrants can be validated. Note that this also affects the HDK’s `get_agent_activity` function which will now also return `SignedWarrant`s instead of `Warrant`s. \#5237
 - **BREAKING CHANGE**: Move `ChainOpType` from `holochain_types` to `holochain_zome_types`. \#5236
@@ -391,7 +392,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Fixed issue [\#2145](https://github.com/holochain/holochain/issues/2145) in ([\#5189](https://github.com/holochain/holochain/pull/5189)) by
   - indexing Ribosomes by cell id instead of by dna hash in the in-memory RibosomeStore
   - indexing DnaFiles by cell id instead of by dna hash in the DnaDef database on disk
-  - fixing the update_coordinators() method in the conductor and the associated SQL query to actually update DnaDef’s in the database if a DnaDef already exists in the database for the given cell id.
+  - fixing the update\_coordinators() method in the conductor and the associated SQL query to actually update DnaDef’s in the database if a DnaDef already exists in the database for the given cell id.
 - Panic when attempting to bundle a dna from a DnaFile with inline zomes or when attempting to construct a dna manifest from a DnaDef with inline zomes ([\#5185](https://github.com/holochain/holochain/issues/5185)).
 - Refactor chain head coordinator related tests to not rely on the ability to install dnas by specifying the `installed_hash` in the manifest only ([\#5185](https://github.com/holochain/holochain/issues/5185)).
 - **BREAKING CHANGE** Remove support for installing a dna (as part of an app) only by specifying an `installed_hash` and without bundling the actual dna code ([\#5185](https://github.com/holochain/holochain/issues/5185)).
@@ -401,7 +402,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Removed redundant usages of `register_dna()` in test code and removed unused test utils ([\#5174](https://github.com/holochain/holochain/pull/5174)).
 - Fixes the type of the `expires_at` field in `PeerMetaInfo` returned by the admin API from `Timestamp` to `Option<Timestamp>` ([\#5183](https://github.com/holochain/holochain/pull/5183)).
 - **BREAKING CHANGE**: The admin call `RegisterDna` has been removed ([\#5175](https://github.com/holochain/holochain/pull/5175))
-- As part of the fix below, the Holo hash method `to_k2_op` on a DhtOpHash`has been deprecated and replaced with `to_located_k2_op_id\`.
+- As part of the fix below, the Holo hash method `to_k2_op` on a DhtOpHash` has been deprecated and replaced with  `to\_located\_k2\_op\_id\`.
 - Fixes a bug where the wrong DhtOp location was reported to Kitsune2. This resulted in conductors not being able to sync with each other. This change can upgrade existing conductors and new data should sync correctly. However, part of the DHT model gets persisted and to fix bad data in the persisted model, the model has to be wiped and rebuilt. This will result in a short startup delay when upgrading to this version. After the first startup, the startup time should be back to normal.
 - **BREAKING CHANGE**: `hc-sandbox` API and behavior changes:
   - Remove `--existing-paths` and `--last` options.
@@ -533,7 +534,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## 0.5.0-rc.1
 
-- **_BREAKING_** Kitsune2 Integrated: Holochain has now transitioned from the legacy Kitsune networking implementation, to the new [Kitsune2](https://crates.io/crates/kitsune2). [\#4791](https://github.com/holochain/holochain/pull/4791)
+- ***BREAKING*** Kitsune2 Integrated: Holochain has now transitioned from the legacy Kitsune networking implementation, to the new [Kitsune2](https://crates.io/crates/kitsune2). [\#4791](https://github.com/holochain/holochain/pull/4791)
   - breaking protocol changes
   - differences in the networking section of the conductor config
   - changes to agent info encoding
@@ -566,7 +567,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## 0.5.0-dev.19
 
-- Break dependency from holochain_state to holochain_p2p
+- Break dependency from holochain\_state to holochain\_p2p
 - remove `serde(flatten)` attributes from certain enum variants of enums used in admin payloads (\#4719), thereby fixing an oversight of \#4616.
 
 ## 0.5.0-dev.18
@@ -578,8 +579,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## 0.5.0-dev.17
 
-- added admin_api capability_grant_info for getting a list of grants valid and revoked from the source chain
-- create an independent `Share` type in the holochain crate in order to not depend on the one from kitsune_p2p
+- added admin\_api capability\_grant\_info for getting a list of grants valid and revoked from the source chain
+- create an independent `Share` type in the holochain crate in order to not depend on the one from kitsune\_p2p
 
 ## 0.5.0-dev.16
 
@@ -599,7 +600,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## 0.5.0-dev.14
 
-- Remove support for x86_64-darwin in Holonix. This is becoming hard to support in this version of Holonix. If you are relying on support for a mac with an Intel chip then please migrate to the new [Holonix](https://github.com/holochain/holonix?tab=readme-ov-file#holonix)
+- Remove support for x86\_64-darwin in Holonix. This is becoming hard to support in this version of Holonix. If you are relying on support for a mac with an Intel chip then please migrate to the new [Holonix](https://github.com/holochain/holonix?tab=readme-ov-file#holonix)
 - Add two new commands to the `hc sandbox` for authenticating and making zome calls to a running conductor. See the sandbox documentation for usage instructions. \#4587
 - Update `holochain_wasmer_host`, remove temporary fork of wasmer and update wasmer to 5.x.
 - Disable wasmer module caching when using the feature flag `wasmer_wamr`, as caching is not relevevant when wasms are interpreted.
@@ -622,7 +623,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## 0.5.0-dev.8
 
-- made holo_hash encoding default in hdk cargo.toml for common B64 hashes
+- made holo\_hash encoding default in hdk cargo.toml for common B64 hashes
 
 ## 0.5.0-dev.7
 
@@ -652,15 +653,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - **BREAKING**: As the DPKI feature is unstable and incomplete, it is disabled with default cargo features and put behind a feature called `unstable-dpki`. If this feature is specified at compile time, DPKI is enabled by default.
 - **BREAKING**: Issuing and persisting warrants is behind a feature `unstable-warrants` now. Warrants have not been tested extensively and there is no way to recover from a warrant. Hence the feature is considered unstable and must be explicitly enabled. Note that once warrants are issued some functions or calls may not work correctly.
-- **BREAKING**: Conductor::get_dna_definitions now returns an `IndexMap` to ensure consistent ordering.
+- **BREAKING**: Conductor::get\_dna\_definitions now returns an `IndexMap` to ensure consistent ordering.
 - Add test to make sure sys validation rejects deleting a delete. Unit tests to get zomes to invoke for app validation were removed for these cases of deleting a delete, because the code path cannot be reached by the system.
 - Added a new feature “unstable-sharding” which puts the network sharding behind a feature flag. It will not be possible to configure network sharding unless Holochain is built with this feature enabled. By default, the network tuning parameter `gossip_dynamic_arcs` is ignored, and the parameter `gossip_arc_clamping` must be set to either `"full"` or `"empty"`, the previous default value of `"none"` will prevent the conductor from starting. We intend to stabilise this feature in the future, and it will return to being available without a feature flag. \#4344
 
 ## 0.5.0-dev.3
 
-- Use of WasmZome preserialized_path has been **deprecated**. Please use the wasm interpreter instead.
+- Use of WasmZome preserialized\_path has been **deprecated**. Please use the wasm interpreter instead.
 
-- Conductor::get_dna_definitions now returns an `IndexMap` to ensure consistent ordering.
+- Conductor::get\_dna\_definitions now returns an `IndexMap` to ensure consistent ordering.
 
 ## 0.5.0-dev.2
 
@@ -746,15 +747,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Possible performance improvement: better async handling of wasm function calls which should allow more concurrent throughput system during long-running zome calls \#4111
 - New protections are put in place for apps which are depended upon by other apps via `UseExisting`. Any “protected” inter-app dependency will prevent a dependency app from being uninstalled until the dependent app is also uninstalled, or if the `force` parameter is set to true in the `UninstallApp` call.
 - CountersigningSuccess signal that is emitted when a countersigning session is successfully completed now includes the
-- _BREAKING_ Introduced a new workflow error, `IncompleteCommit`. When inline validation fails with missing dependencies. I.e. Validation for actions that are being committed to the source chain during a zome call discovers missing dependencies. The generic `InvalidCommit` is replaced by this new error. That allows the caller to distinguish between errors that are fatal and errors that can be retried. For now, the only retryable error is caused by missing dependencies. \#4129
+- *BREAKING* Introduced a new workflow error, `IncompleteCommit`. When inline validation fails with missing dependencies. I.e. Validation for actions that are being committed to the source chain during a zome call discovers missing dependencies. The generic `InvalidCommit` is replaced by this new error. That allows the caller to distinguish between errors that are fatal and errors that can be retried. For now, the only retryable error is caused by missing dependencies. \#4129
 - Based on the change above, about adding `IncompleteCommit`, a countersigning session will no longer terminate on missing dependencies. You may retry committing the countersigned entry if you get this error. \#4129
-- _BREAKING_ CountersigningSuccess signal that is emitted when a countersigning session is successfully completed now includes the `app_entry_hash` from the `PreflightRequest` rather than the `EntryHash` that is created when you commit the countersigned entry. This value is easier for clients to get at and use to check that the countersigning session they joined has succeeded. \#4124
+- *BREAKING* CountersigningSuccess signal that is emitted when a countersigning session is successfully completed now includes the `app_entry_hash` from the `PreflightRequest` rather than the `EntryHash` that is created when you commit the countersigned entry. This value is easier for clients to get at and use to check that the countersigning session they joined has succeeded. \#4124
 
 ## 0.4.0-dev.15
 
-- _BREAKING_ Introduced a new workflow error, `IncompleteCommit`. When inline validation fails with missing dependencies. I.e. Validation for actions that are being committed to the source chain during a zome call discovers missing dependencies. The generic `InvalidCommit` is replaced by this new error. That allows the caller to distinguish between errors that are fatal and errors that can be retried. For now, the only retryable error is caused by missing dependencies. \#4129
+- *BREAKING* Introduced a new workflow error, `IncompleteCommit`. When inline validation fails with missing dependencies. I.e. Validation for actions that are being committed to the source chain during a zome call discovers missing dependencies. The generic `InvalidCommit` is replaced by this new error. That allows the caller to distinguish between errors that are fatal and errors that can be retried. For now, the only retryable error is caused by missing dependencies. \#4129
 - Based on the change above, about adding `IncompleteCommit`, a countersigning session will no longer terminate on missing dependencies. You may retry committing the countersigned entry if you get this error. \#4129
-- _BREAKING_ CountersigningSuccess signal that is emitted when a countersigning session is successfully completed now includes the `app_entry_hash` from the `PreflightRequest` rather than the `EntryHash` that is created when you commit the countersigned entry. This value is easier for clients to get at and use to check that the countersigning session they joined has succeeded. \#4124
+- *BREAKING* CountersigningSuccess signal that is emitted when a countersigning session is successfully completed now includes the `app_entry_hash` from the `PreflightRequest` rather than the `EntryHash` that is created when you commit the countersigned entry. This value is easier for clients to get at and use to check that the countersigning session they joined has succeeded. \#4124
 
 ## 0.4.0-dev.14
 
@@ -767,7 +768,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Adds a new app interface method `AppRequest::EnableAfterMemproofsProvided`, which allows enabling an app only if the app is in the `AppStatus::Disabled(DisabledAppReason::NotStartedAfterProvidingMemproofs)` state. Attempting to enable the app from other states (other than Running) will fail.
 - Warrants are used under-the-hood in more places now:
   - When gossiping amongst authorities, if an authority has a warrant for some data being requested, they will send the warrant instead of the data to indicate the invalid status of that data
-  - When requesting data through must_get calls, warrants will be returned with the data. The data returned to the client remains the same, but under the hood any warrants will be cached for later use.
+  - When requesting data through must\_get calls, warrants will be returned with the data. The data returned to the client remains the same, but under the hood any warrants will be cached for later use.
 - Adds a `lineage` field to the DNA manifest, which declares forward compatibility for any hash in that list with this DNA
 - Adds a `AdminRequest::GetCompatibleCells` method which returns CellId for all installed cells which use a DNA that is forward-compatible with a given DNA hash. This can be used to find a compatible cell for use with the `UseExisting` cell provisioning method (still to be implemented)
 
@@ -819,7 +820,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 <!-- end list -->
 
-```rust
+``` rust
 enum Enum {
   Variant1,
   Variant2,
@@ -829,7 +830,7 @@ let value = Enum::Variant1;
 
 was serialized as (JSON representation)
 
-```json
+``` json
 {
   "value": {
     "variant1": null
@@ -839,7 +840,7 @@ was serialized as (JSON representation)
 
 Now it serializes to
 
-```json
+``` json
 {
   "value": "variant1"
 }
@@ -955,12 +956,13 @@ Now it serializes to
 - Fix: Countersigning test `lock_chain` which ensures that source chain is locked while in a countersigning session.
 
 - Major refactor of the sys validation workflow to improve reliability and performance:
+  
   - Reliability: The workflow will now prioritise validating ops that have their dependencies available locally. As soon as it has finished with those it will trigger app validation before dealing with missing dependencies.
   - Reliability: For ops which have dependencies we aren’t holding locally, the network get will now be retried. This was a cause of undesirable behaviour for validation where a failed get would result in validation for ops with missing dependencies not being retried until new ops arrived. The workflow now retries the get on an interval until it finds dependencies and can proceed with validation.
   - Performance and correctness: A feature which captured and processed ops that were discovered during validation has been removed. This had been added as an attempt to avoid deadlocks within validation but if that happens there’s a bug somewhere else. Sys validation needs to trust that Holochain will correctly manage its current arc and that we will get that data eventually through publishing or gossip. This probably wasn’t doing a lot of harm but it was uneccessary and doing database queries so it should be good to have that gone.
   - Performance: In-memory caching for sys validation dependencies. When we have to wait to validate an op because it has a missing dependency, any other actions required by that op will be held in memory rather than being refetched from the database. This has a fairly small memory footprint because actions are relatively small but saves repeatedly hitting the cascade for the same data if it takes a bit of time to find a dependency on the network.
 
-- \*_BREAKING_ CHANGE\*: The `ConductorConfig` has been updated to add a new option for configuring conductor behaviour. This should be compatible with existing conductor config YAML files but if you are creating the struct directly then you will need to include the new field. Currently this just has one setting which controls how fast the sys validation workflow will retry network gets for missing dependencies. It’s likely this option will change in the near future.
+- \**BREAKING* CHANGE\*: The `ConductorConfig` has been updated to add a new option for configuring conductor behaviour. This should be compatible with existing conductor config YAML files but if you are creating the struct directly then you will need to include the new field. Currently this just has one setting which controls how fast the sys validation workflow will retry network gets for missing dependencies. It’s likely this option will change in the near future.
 
 ## 0.3.0-beta-dev.26
 
@@ -1173,7 +1175,7 @@ Now it serializes to
 
 ## 0.0.159
 
-- Updates TLS certificate handling so that multiple conductors can share the same lair, but use different TLS certificates by storing a “tag” in the conductor state database. This should not be a breaking change, but _will_ result in a new TLS certificate being used per conductor. [\#1519](https://github.com/holochain/holochain/pull/1519)
+- Updates TLS certificate handling so that multiple conductors can share the same lair, but use different TLS certificates by storing a “tag” in the conductor state database. This should not be a breaking change, but *will* result in a new TLS certificate being used per conductor. [\#1519](https://github.com/holochain/holochain/pull/1519)
 
 ## 0.0.158
 
@@ -1181,7 +1183,7 @@ Now it serializes to
 
 ## 0.0.156
 
-- Effectively disable Wasm metering by setting the cranelift cost_function to always return 0. This is meant as a temporary stop-gap and give us time to figure out a configurable approach. [\#1535](https://github.com/holochain/holochain/pull/1535)
+- Effectively disable Wasm metering by setting the cranelift cost\_function to always return 0. This is meant as a temporary stop-gap and give us time to figure out a configurable approach. [\#1535](https://github.com/holochain/holochain/pull/1535)
 
 ## 0.0.155
 
@@ -1191,8 +1193,8 @@ Now it serializes to
 ## 0.0.154
 
 - Revert: “Add the `hdi_version_req` key:value field to the output of the `--build-info` argument” because it broke. [\#1521](https://github.com/holochain/holochain/pull/1521)
-
-  Reason: it causes a build failure of the _holochain_ crate on crates.io
+  
+  Reason: it causes a build failure of the *holochain* crate on crates.io
 
 ## 0.0.153
 
@@ -1205,7 +1207,7 @@ Now it serializes to
 ## 0.0.151
 
 - BREAKING CHANGE - Refactor: Property `integrity.uid` of DNA Yaml files renamed to `integrity.network_seed`. Functionality has not changed. [\#1493](https://github.com/holochain/holochain/pull/1493)
-- Allow deterministic bindings (dna_info() & zome_info()) to the genesis self check [\#1491](https://github.com/holochain/holochain/pull/1491).
+- Allow deterministic bindings (dna\_info() & zome\_info()) to the genesis self check [\#1491](https://github.com/holochain/holochain/pull/1491).
 
 ## 0.0.150
 
@@ -1282,11 +1284,11 @@ As Holochain has evolved, the meaning behind these concepts, as well as our unde
 
 ## 0.0.128
 
-- Proxy server chosen from bootstrap server proxy_list [1242](https://github.com/holochain/holochain/pull/1242)
+- Proxy server chosen from bootstrap server proxy\_list [1242](https://github.com/holochain/holochain/pull/1242)
 
 <!-- end list -->
 
-```yaml
+``` yaml
 network:
   transport_pool:
     - type: proxy
@@ -1357,6 +1359,7 @@ network:
 - **BREAKING CHANGE** `entry_defs` added to `zome_info` and referenced by macros [PR1055](https://github.com/holochain/holochain/pull/1055)
 
 - **BREAKING CHANGE**: The notion of “cell nicknames” (“nicks”) and “app slots” has been unified into the notion of “app roles”. This introduces several breaking changes. In general, you will need to rebuild any app bundles you are using, and potentially update some usages of the admin interface. In particular:
+  
   - The `slots` field in App manifests is now called `roles`
   - The `InstallApp` admin method now takes a `role_id` field instead of a `nick` field
   - In the return value for any admin method which lists installed apps, e.g. `ListEnabledApps`, any reference to `"slots"` is now named `"roles"`
@@ -1386,6 +1389,7 @@ network:
 - `call_info` is now implemented [1047](https://github.com/holochain/holochain/pull/1047)
 
 - `dna_info` now returns `DnaInfo` correctly [\#1044](https://github.com/holochain/holochain/pull/1044)
+  
   - `ZomeInfo` no longer includes what is now on `DnaInfo`
   - `ZomeInfo` renames `zome_name` and `zome_id` to `name` and `id`
   - `DnaInfo` includes `name`, `hash`, `properties`
@@ -1398,14 +1402,14 @@ network:
 
 <!-- end list -->
 
-```yaml
+``` yaml
 keystore:
   type: danger_test_keystore
 ```
 
 or
 
-```yaml
+``` yaml
 keystore:
   type: lair_server
   connection_url: "unix:///my/path/socket?k=Foo"
@@ -1424,7 +1428,7 @@ keystore:
 
 Where previously, you might have had:
 
-```yaml
+``` yaml
 use_dangerous_test_keystore: false
 keystore_path: /my/path
 passphrase_service:
@@ -1434,7 +1438,7 @@ passphrase_service:
 
 now you will use:
 
-```yaml
+``` yaml
 keystore:
   type: lair_server_legacy_deprecated
   keystore_path: /my/path
@@ -1443,7 +1447,7 @@ keystore:
 
 or:
 
-```yaml
+``` yaml
 keystore:
   type: danger_test_keystore_legacy_deprecated
 ```
@@ -1514,7 +1518,7 @@ keystore:
 ### Added
 
 - `InstallAppBundle` command added to admin conductor API. [\#665](https://github.com/holochain/holochain/pull/665)
-- `DnaSource` in conductor_api `RegisterDna` call now can take a `DnaBundle` [\#665](https://github.com/holochain/holochain/pull/665)
+- `DnaSource` in conductor\_api `RegisterDna` call now can take a `DnaBundle` [\#665](https://github.com/holochain/holochain/pull/665)
 - New admin interface methods:
   - `EnableApp` (replaces `ActivateApp`)
   - `DisableApp` (replaces `DeactivateApp`)
@@ -1525,7 +1529,7 @@ keystore:
 
 This version contains breaking changes to the conductor API as well as a major upgrade to the underlying Wasm runtime.
 
-**_:exclamation: Performance impact_**
+***:exclamation: Performance impact***
 
 The version of wasmer that is used in this holochain release contains bugs in the scoping of wasmer modules vs. instances, such that it blocks the proper release of memory and slows down execution of concurrent Wasm instances. While we were able to at least mitigate these effects and are coordinating with wasmer to find a proper solution as soon as possible.
 
@@ -1534,12 +1538,12 @@ The severity of these issues increases with cell concurrency, i.e. using multipl
 ### Added
 
 - `InstallAppBundle` command added to admin conductor API. [\#665](https://github.com/holochain/holochain/pull/665)
-- `DnaSource` in conductor_api `RegisterDna` call now can take a `DnaBundle` [\#665](https://github.com/holochain/holochain/pull/665)
+- `DnaSource` in conductor\_api `RegisterDna` call now can take a `DnaBundle` [\#665](https://github.com/holochain/holochain/pull/665)
 
 ### Removed
 
 - BREAKING: `InstallAppDnaPayload` in admin conductor API `InstallApp` command now only accepts a hash. Both properties and path have been removed as per deprecation warning. Use either `RegisterDna` or `InstallAppBundle` instead. [\#665](https://github.com/holochain/holochain/pull/665)
-- BREAKING: `DnaSource(Path)` in conductor_api `RegisterDna` call now must point to `DnaBundle` as created by `hc dna pack` not a `DnaFile` created by `dna_util` [\#665](https://github.com/holochain/holochain/pull/665)
+- BREAKING: `DnaSource(Path)` in conductor\_api `RegisterDna` call now must point to `DnaBundle` as created by `hc dna pack` not a `DnaFile` created by `dna_util` [\#665](https://github.com/holochain/holochain/pull/665)
 
 ### CHANGED
 
@@ -1552,4 +1556,4 @@ This is the first version number for the version of Holochain with a refactored 
 
 ## 0.0.52-alpha2
 
-_Note: Versions 0.0.52-alpha2 and older are belong to previous iterations of the Holochain architecture and are not tracked here._
+*Note: Versions 0.0.52-alpha2 and older are belong to previous iterations of the Holochain architecture and are not tracked here.*
