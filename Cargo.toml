@@ -82,15 +82,16 @@ opt-level = "z"
 lto = true
 
 [patch.crates-io]
-# kitsune2_api = { path = "../kitsune2/crates/api" }
-# kitsune2_core = { path = "../kitsune2/crates/core" }
-# kitsune2 = { path = "../kitsune2/crates/kitsune2" }
-# kitsune2_dht = { path = "../kitsune2/crates/dht" }
-# kitsune2_gossip = { path = "../kitsune2/crates/gossip" }
-# kitsune2_bootstrap_srv = { path = "../kitsune2/crates/bootstrap_srv" }
-# kitsune2_bootstrap_client = { path = "../kitsune2/crates/bootstrap_client" }
-# kitsune2_test_utils = { path = "../kitsune2/crates/test_utils" }
-# kitsune2_transport_tx5 = { path = "../kitsune2/crates/transport_tx5" }
+kitsune2_api = { git = "https://github.com/holochain/kitsune2", branch = "upgrade-iroh-0.97" }
+kitsune2_core = { git = "https://github.com/holochain/kitsune2", branch = "upgrade-iroh-0.97" }
+kitsune2 = { git = "https://github.com/holochain/kitsune2", branch = "upgrade-iroh-0.97" }
+kitsune2_dht = { git = "https://github.com/holochain/kitsune2", branch = "upgrade-iroh-0.97" }
+kitsune2_gossip = { git = "https://github.com/holochain/kitsune2", branch = "upgrade-iroh-0.97" }
+kitsune2_bootstrap_srv = { git = "https://github.com/holochain/kitsune2", branch = "upgrade-iroh-0.97" }
+kitsune2_bootstrap_client = { git = "https://github.com/holochain/kitsune2", branch = "upgrade-iroh-0.97" }
+kitsune2_test_utils = { git = "https://github.com/holochain/kitsune2", branch = "upgrade-iroh-0.97" }
+kitsune2_transport_tx5 = { git = "https://github.com/holochain/kitsune2", branch = "upgrade-iroh-0.97" }
+kitsune2_transport_iroh = { git = "https://github.com/holochain/kitsune2", branch = "upgrade-iroh-0.97" }
 # sbd-server = { path = "../sbd/rust/sbd-server" }
 # sbd-client = { path = "../sbd/rust/sbd-client" }
 # sbd-e2e-crypto-client = { path = "../sbd/rust/sbd-e2e-crypto-client" }
@@ -103,8 +104,8 @@ lto = true
 # holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", rev = "2fc225add8c72cbe49e458a2431c8069c9e405ec" }
 # holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", rev = "2fc225add8c72cbe49e458a2431c8069c9e405ec" }
 # holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", rev = "2fc225add8c72cbe49e458a2431c8069c9e405ec" }
-# holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "proptest" }
-# holochain_serialized_bytes_derive = { git = "https://github.com/holochain/holochain-serialization.git", branch = "develop" }
+holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "update-serde-latest" }
+holochain_serialized_bytes_derive = { git = "https://github.com/holochain/holochain-serialization.git", branch = "update-serde-latest" }
 # lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }
 # lair_keystore = { path = "../lair/crates/lair_keystore" }
 # r2d2_sqlite = { path = "../r2d2-sqlite" }
