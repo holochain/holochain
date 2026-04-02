@@ -24,7 +24,7 @@ holo_hash = { version = "^0.6.1-rc.2", path = "../holo_hash", features = [
 fallible-iterator = "0.3.0"
 holochain_chc = { version = "^0.3.1-rc.4", path = "../holochain_chc" }
 holochain_keystore = { version = "^0.6.1-rc.3", path = "../holochain_keystore" }
-holochain_serialized_bytes = "=0.0.56"
+holochain_serialized_bytes = "=0.0.57"
 holochain_types = { version = "^0.6.1-rc.4", path = "../holochain_types" }
 holochain_zome_types = { version = "^0.6.1-rc.2", path = "../holochain_zome_types", features = [
   "full",
@@ -42,7 +42,7 @@ tracing = "0.1.26"
 cron = "0.15"
 async-recursion = "1.1"
 
-kitsune2_api = "0.4.0-dev.6"
+kitsune2_api = "0.4.0-dev.7"
 
 tempfile = { version = "3.3", optional = true }
 base64 = { version = "0.22", optional = true }

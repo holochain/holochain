@@ -33,11 +33,11 @@ holochain_conductor_api = { version = "^0.6.1-rc.4", path = "../holochain_conduc
 holochain_keystore = { version = "^0.6.1-rc.3", path = "../holochain_keystore", default-features = false }
 holochain_p2p = { version = "^0.6.1-rc.4", default-features = false, path = "../holochain_p2p" }
 holochain_sqlite = { version = "^0.6.1-rc.3", path = "../holochain_sqlite" }
-holochain_serialized_bytes = "=0.0.56"
+holochain_serialized_bytes = "=0.0.57"
 holochain_state = { version = "^0.6.1-rc.4", path = "../holochain_state" }
 holochain_types = { version = "^0.6.1-rc.4", path = "../holochain_types" }
 holochain_util = { version = "^0.6.1-rc.0", path = "../holochain_util" }
-holochain_wasmer_host = { version = "=0.0.101", default-features = false, features = [
+holochain_wasmer_host = { version = "=0.0.102", default-features = false, features = [
   "error_as_host",
 ] }
 holochain_websocket = { version = "^0.6.1-rc.4", path = "../holochain_websocket" }
@@ -50,8 +50,8 @@ holochain_conductor_config = { version = "^0.6.1-rc.4", path = "../holochain_con
 holochain_timestamp = { version = "^0.6.1-rc.0", path = "../timestamp" }
 human-panic = "2.0"
 itertools = { version = "0.14" }
-kitsune2_api = "0.4.0-dev.6"
-kitsune2_core = "0.4.0-dev.6"
+kitsune2_api = "0.4.0-dev.7"
+kitsune2_core = "0.4.0-dev.7"
 mockall = "0.13"
 mr_bundle = { version = "^0.6.1-rc.0", path = "../mr_bundle", features = [
   "fs",
@@ -104,7 +104,7 @@ matches = { version = "0.1.8", optional = true }
 holochain_wasm_test_utils = { version = "^0.6.1-rc.4", path = "../test_utils/wasm", optional = true }
 holochain_test_wasm_common = { version = "^0.6.1-rc.2", path = "../test_utils/wasm_common", optional = true }
 unwrap_to = { version = "0.1.0", optional = true }
-kitsune2_bootstrap_srv = { version = "0.4.0-dev.6", default-features = false, optional = true }
+kitsune2_bootstrap_srv = { version = "0.4.0-dev.7", default-features = false, optional = true }
 schemars = "0.9"
 
 # chc deps
@@ -144,7 +144,7 @@ tokio = { version = "1.36.0", features = ["full", "test-util"] }
 tokio-tungstenite = "0.27"
 predicates = "3.1"
 assert2 = "0.3.15"
-kitsune2_test_utils = "0.4.0-dev.6"
+kitsune2_test_utils = "0.4.0-dev.7"
 rand_dalek = { version = "0.8", package = "rand" }
 
 [build-dependencies]

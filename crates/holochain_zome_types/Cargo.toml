@@ -19,7 +19,7 @@ holochain_integrity_types = { version = "^0.6.1-rc.2", path = "../holochain_inte
   "tracing",
 ] }
 holochain_nonce = { version = "^0.6.1-rc.0", path = "../holochain_nonce" }
-holochain_serialized_bytes = "=0.0.56"
+holochain_serialized_bytes = "=0.0.57"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_bytes = "0.11"
 serde_yaml = { version = "0.9", optional = true }
@@ -28,7 +28,7 @@ strum = "0.27"
 strum_macros = "0.27"
 thiserror = "2.0"
 tracing = "0.1"
-holochain_wasmer_common = "=0.0.101"
+holochain_wasmer_common = "=0.0.102"
 derive_more = { version = "2.0", features = [
   "from",
   "deref",
