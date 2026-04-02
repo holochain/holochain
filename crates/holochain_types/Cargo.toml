@@ -24,7 +24,7 @@ holo_hash = { version = "^0.6.1-rc.2", path = "../holo_hash", features = [
 ] }
 holochain_keystore = { version = "^0.6.1-rc.3", path = "../holochain_keystore" }
 holochain_nonce = { version = "^0.6.1-rc.0", path = "../holochain_nonce" }
-holochain_serialized_bytes = "=0.0.56"
+holochain_serialized_bytes = "=0.0.57"
 holochain_sqlite = { path = "../holochain_sqlite", version = "^0.6.1-rc.3" }
 holochain_trace = { version = "^0.6.1-rc.0", path = "../holochain_trace" }
 holochain_util = { version = "^0.6.1-rc.0", path = "../holochain_util", features = [
@@ -34,7 +34,7 @@ holochain_zome_types = { path = "../holochain_zome_types", version = "^0.6.1-rc.
   "full",
 ] }
 holochain_timestamp = { version = "^0.6.1-rc.0", path = "../timestamp" }
-kitsune2_api = "0.4.0-dev.6"
+kitsune2_api = "0.4.0-dev.7"
 itertools = { version = "0.14" }
 mr_bundle = { path = "../mr_bundle", features = [
   "fs",
