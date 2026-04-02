@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.6.1-rc.5
+
 - Update kitsune2 dependencies to `0.4.0-dev.7`, which bumps `iroh` to v0.97.
 - Update `holochain_serialized_bytes` to v0.0.57.
 - Update `holochain_wasmer` to v0.0.102.
