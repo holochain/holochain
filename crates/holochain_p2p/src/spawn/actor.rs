@@ -5,6 +5,7 @@ use crate::metrics::{
     p2p_handle_incoming_request_duration_metric, p2p_handle_incoming_request_ignored_metric,
     p2p_outgoing_request_duration_metric, p2p_recv_remote_signal_metric,
 };
+use crate::peer_latency_store::PeerLatencyStore;
 use crate::*;
 use holochain_sqlite::error::{DatabaseError, DatabaseResult};
 use holochain_sqlite::helpers::BytesSql;
@@ -14,7 +15,6 @@ use holochain_state::prelude::named_params;
 use holochain_types::cell_config_overrides::CellConfigOverrides;
 use kitsune2_api::*;
 use kitsune2_core::get_responsive_remote_agents_near_location;
-use rand::prelude::IndexedRandom;
 use std::collections::HashMap;
 use std::future::Future;
 use std::rc::Rc;
@@ -246,6 +246,8 @@ pub(crate) struct HolochainP2pActor {
     kitsune2_config: Config,
     blocks_db_getter: GetDbConductor,
     pending: Arc<Mutex<Pending>>,
+    latency_store: Arc<Mutex<PeerLatencyStore>>,
+    ping_semaphore: Arc<Semaphore>,
     pruning_task_abort_handle: AbortHandle,
     request_timeout: Duration,
     incoming_request_concurrency_limit_semaphore: Arc<Semaphore>,
@@ -258,6 +260,27 @@ impl std::fmt::Debug for HolochainP2pActor {
 }
 
 const EVT_REG_ERR: &str = "event handler not registered";
+/// Number of sequential ping samples to collect per peer URL.
+const PING_SAMPLE_COUNT: usize = 10;
+/// Timeout for each individual ping request.
+const PING_TIMEOUT: Duration = Duration::from_secs(5);
+/// Maximum number of concurrent ping tasks across all peer URLs.
+const MAX_CONCURRENT_PING_TASKS: usize = 16;
+
+/// Drop guard that ensures [`PeerLatencyStore::finish_ping`] is called
+/// even if the ping task panics, preventing permanent in-flight leaks.
+struct PingGuard {
+    store: Arc<Mutex<crate::peer_latency_store::PeerLatencyStore>>,
+    url: Url,
+}
+
+impl Drop for PingGuard {
+    fn drop(&mut self) {
+        if let Ok(mut store) = self.store.lock() {
+            store.finish_ping(&self.url);
+        }
+    }
+}
 
 impl SpaceHandler for HolochainP2pActor {
     fn recv_notify(&self, from_peer: Url, space: SpaceId, data: bytes::Bytes) -> K2Result<()> {
@@ -373,7 +396,10 @@ impl kitsune2_api::KitsuneHandler for HolochainP2pActor {
                         None => continue,
                         Some(space) => space,
                     };
-                    space.peer_store().insert(vec![agent]).await?;
+                    space.peer_store().insert(vec![agent.clone()]).await?;
+                    if let Some(url) = agent.url.clone() {
+                        self.schedule_ping_if_needed(space.clone(), url);
+                    }
                 }
             }
 
@@ -619,6 +645,7 @@ impl HolochainP2pActor {
             kitsune2,
             db_getter,
         );
+        let latency_store = Arc::new(Mutex::new(PeerLatencyStore::new()));
 
         Ok(Arc::new_cyclic(|this| Self {
             this: this.clone(),
@@ -630,6 +657,8 @@ impl HolochainP2pActor {
             kitsune,
             blocks_db_getter: config.get_conductor_db.clone(),
             pending,
+            latency_store,
+            ping_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_PING_TASKS)),
             kitsune2_config,
             pruning_task_abort_handle,
             request_timeout: config.request_timeout,
@@ -801,10 +830,28 @@ impl HolochainP2pActor {
             ));
         }
 
-        Ok(agents
-            .choose_multiple(&mut rand::rng(), options.remote_agent_count as usize)
-            .cloned()
-            .collect())
+        // Single lock: collect URLs needing pings and run weighted selection.
+        let (urls_to_ping, selected) = {
+            let mut store = self.latency_store.lock().unwrap();
+            let urls_to_ping: Vec<Url> = agents
+                .iter()
+                .filter(|(_, url)| store.begin_ping(url))
+                .map(|(_, url)| url.clone())
+                .collect();
+            let selected = crate::weighted_selection::select_weighted_peers(
+                &store,
+                &agents,
+                options.remote_agent_count as usize,
+            );
+            (urls_to_ping, selected)
+        };
+
+        // Spawn ping tasks outside the lock.
+        for url in urls_to_ping {
+            self.spawn_ping_task(space.clone(), url);
+        }
+
+        Ok(selected)
     }
 
     /// Check whether a message should be bridged locally to some other agent on this node.
@@ -924,6 +971,80 @@ impl HolochainP2pActor {
         }
     }
 
+    /// Sends a single [`PingReq`](WireMessage::PingReq) to a peer and
+    /// returns the measured round-trip time, or `None` on failure/timeout.
+    async fn send_ping(
+        space: &DynSpace,
+        pending: &Arc<Mutex<Pending>>,
+        to_url: Url,
+    ) -> Option<Duration> {
+        let (msg_id, req) = WireMessage::ping_req();
+        let req = WireMessage::encode_batch(&[&req]).ok()?;
+
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        pending
+            .lock()
+            .unwrap()
+            .register(msg_id, sender, PING_TIMEOUT);
+
+        let start = std::time::Instant::now();
+        if space.send_notify(to_url, req).await.is_err() {
+            return None;
+        }
+
+        match receiver.await {
+            Ok(WireMessage::PingRes { .. }) => Some(start.elapsed()),
+            _ => None,
+        }
+    }
+
+    /// Schedule a ping if the URL needs one. Acquires the latency store lock to call `begin_ping`.
+    fn schedule_ping_if_needed(&self, space: DynSpace, url: Url) {
+        let should_spawn = self.latency_store.lock().unwrap().begin_ping(&url);
+        if !should_spawn {
+            return;
+        }
+        self.spawn_ping_task(space, url);
+    }
+
+    /// Spawns a background ping task for a URL whose [`begin_ping`](PeerLatencyStore::begin_ping)
+    /// has already been called. The task acquires a semaphore permit to limit concurrency and
+    /// uses a [`PingGuard`] to guarantee `finish_ping` is called even on panic.
+    fn spawn_ping_task(&self, space: DynSpace, url: Url) {
+        let latency_store = self.latency_store.clone();
+        let pending = self.pending.clone();
+        let ping_semaphore = self.ping_semaphore.clone();
+        tokio::task::spawn(async move {
+            // Acquire a permit to bound the number of concurrent ping tasks.
+            let _permit = match ping_semaphore.acquire().await {
+                Ok(permit) => permit,
+                Err(_) => {
+                    // Semaphore closed — actor is shutting down.
+                    latency_store.lock().unwrap().finish_ping(&url);
+                    return;
+                }
+            };
+
+            // Guard ensures finish_ping is always called, even on panic.
+            let guard = PingGuard {
+                store: latency_store.clone(),
+                url: url.clone(),
+            };
+
+            for _ in 0..PING_SAMPLE_COUNT {
+                if let Some(rtt) = Self::send_ping(&space, &pending, url.clone()).await {
+                    latency_store
+                        .lock()
+                        .unwrap()
+                        .record_sample(url.clone(), rtt);
+                }
+            }
+
+            // Explicitly drop to run finish_ping before the permit is released.
+            drop(guard);
+        });
+    }
+
     async fn inform_ops_stored(
         &self,
         space_id: SpaceId,
@@ -1017,7 +1138,8 @@ impl HolochainP2pActor {
                 | CountLinksRes { msg_id, .. }
                 | GetAgentActivityRes { msg_id, .. }
                 | MustGetAgentActivityRes { msg_id, .. }
-                | SendValidationReceiptsRes { msg_id } => {
+                | SendValidationReceiptsRes { msg_id }
+                | PingRes { msg_id } => {
                     if let Some(resp) = pending.lock().unwrap().respond(msg_id) {
                         let _ = resp.send(msg);
                     }
@@ -1268,6 +1390,20 @@ impl HolochainP2pActor {
                         "to_agent",
                         format!("{to_agent:?}"),
                     )]);
+                }
+                PingReq { msg_id } => {
+                    let resp = crate::wire::WireMessage::ping_res(msg_id);
+                    let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
+                    if let Err(err) = kitsune
+                        .space_if_exists(space_id)
+                        .await
+                        .ok_or_else(|| HolochainP2pError::other("no such space"))?
+                        .send_notify(from_peer, resp)
+                        .await
+                    {
+                        tracing::debug!(?err, "Error sending ping response");
+                    }
+                    record_incoming_request_duration(&[]);
                 }
                 RemoteSignalEvt {
                     to_agent,
@@ -3244,6 +3380,18 @@ mod tests {
         let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
 
         let msg_receiver = harness.register_pending_message_response_handler(8);
+        harness
+            .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
+            .unwrap();
+
+        // Message was handled
+        assert!(msg_receiver.await.is_ok());
+
+        // PingRes is not limited
+        let msg = WireMessage::PingRes { msg_id: 11 };
+        let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
+
+        let msg_receiver = harness.register_pending_message_response_handler(11);
         harness
             .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
             .unwrap();

@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Add latency-aware peer selection in `holochain_p2p`, using ping-based RTT estimates to prefer lower-latency peers when selecting authorities. \#5602
+- **BREAKING CHANGE:** Bump `HCP2P_PROTO_VER` from 2 to 3 due to new `PingReq`/`PingRes` wire message variants. Nodes running this version are not network-compatible with older versions.
+
 ## 0.7.0-dev.18
 
 - **BREAKING CHANGE:** Split combined auth material into auth material for bootstrap service and auth material for relay service.

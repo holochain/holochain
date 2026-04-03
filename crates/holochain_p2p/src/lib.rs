@@ -20,8 +20,12 @@ pub use spawn::*;
 mod peer_meta_store;
 pub use peer_meta_store::*;
 
+mod peer_latency_store;
+
 mod local_agent;
 pub use local_agent::*;
+
+mod weighted_selection;
 
 mod op_store;
 pub use op_store::*;
