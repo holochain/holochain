@@ -272,8 +272,10 @@ async fn app_validation_workflow_inner(
                         agent_activity_ops.push(agent_activity_op);
                     }
                 }
-                if let Outcome::AwaitingDeps(_) | Outcome::Rejected(_) = &outcome {
+                if let Outcome::Rejected(_) = &outcome {
                     warn!(?outcome, ?dht_op_lite, "DhtOp has failed app validation");
+                } else if let Outcome::AwaitingDeps(_) = &outcome {
+                    debug!(?outcome, ?dht_op_lite, "DhtOp cannot be app validated yet");
                 }
 
                 let accepted_ops = accepted_ops.clone();
