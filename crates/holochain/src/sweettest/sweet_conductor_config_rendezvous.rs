@@ -9,6 +9,11 @@ pub trait SweetRendezvous: 'static + Send + Sync {
 
     /// Get the signal server address.
     fn sig_addr(&self) -> &str;
+
+    /// Get the relay server address (for iroh transport).
+    fn relay_addr(&self) -> &str {
+        self.sig_addr()
+    }
 }
 
 /// Trait object rendezvous.
@@ -19,8 +24,18 @@ pub struct SweetLocalRendezvous {
     bs_addr: String,
     #[cfg(any(feature = "transport-tx5-backend-go-pion", feature = "transport-iroh"))]
     sig_addr: String,
+    #[cfg(all(
+        feature = "transport-iroh",
+        not(feature = "transport-tx5-backend-go-pion")
+    ))]
+    relay_addr: String,
     bootstrap_hnd: Mutex<Option<kitsune2_bootstrap_srv::BootstrapSrv>>,
     bootstrap_addr: SocketAddr,
+    #[cfg(all(
+        feature = "transport-iroh",
+        not(feature = "transport-tx5-backend-go-pion")
+    ))]
+    _relay_server: iroh_relay::server::Server,
 }
 
 impl Drop for SweetLocalRendezvous {
@@ -79,6 +94,23 @@ impl SweetLocalRendezvous {
 
         let bootstrap_hnd = Mutex::new(Some(bootstrap));
 
+        #[cfg(all(
+            feature = "transport-iroh",
+            not(feature = "transport-tx5-backend-go-pion")
+        ))]
+        let (_relay_server, relay_addr) = {
+            let mut relay_config = iroh_relay::server::testing::server_config();
+            if let Some(ref mut relay) = relay_config.relay {
+                relay.tls = None;
+            }
+            relay_config.quic = None;
+            let relay = iroh_relay::server::Server::spawn(relay_config)
+                .await
+                .expect("failed to spawn relay server");
+            let addr = relay.http_addr().expect("relay has no http address");
+            (relay, addr)
+        };
+
         Arc::new(Self {
             bs_addr: format!("http://{bootstrap_addr}"),
             #[cfg(feature = "transport-tx5-backend-go-pion")]
@@ -88,8 +120,18 @@ impl SweetLocalRendezvous {
                 not(feature = "transport-tx5-backend-go-pion")
             ))]
             sig_addr: format!("http://{bootstrap_addr}"),
+            #[cfg(all(
+                feature = "transport-iroh",
+                not(feature = "transport-tx5-backend-go-pion")
+            ))]
+            relay_addr: format!("http://{relay_addr}"),
             bootstrap_hnd,
             bootstrap_addr,
+            #[cfg(all(
+                feature = "transport-iroh",
+                not(feature = "transport-tx5-backend-go-pion")
+            ))]
+            _relay_server,
         })
     }
 
@@ -129,5 +171,23 @@ impl SweetRendezvous for SweetLocalRendezvous {
     /// Get the signal server address.
     fn sig_addr(&self) -> &str {
         self.sig_addr.as_str()
+    }
+
+    /// Get the relay server address (for iroh transport).
+    fn relay_addr(&self) -> &str {
+        #[cfg(all(
+            feature = "transport-iroh",
+            not(feature = "transport-tx5-backend-go-pion")
+        ))]
+        {
+            self.relay_addr.as_str()
+        }
+        #[cfg(not(all(
+            feature = "transport-iroh",
+            not(feature = "transport-tx5-backend-go-pion")
+        )))]
+        {
+            self.sig_addr.as_str()
+        }
     }
 }

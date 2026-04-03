@@ -70,7 +70,7 @@ impl SweetConductorConfig {
         }
 
         if network.relay_url.as_str() == "rendezvous:" {
-            network.relay_url = url2::url2!("{}", rendezvous.sig_addr());
+            network.relay_url = url2::url2!("{}", rendezvous.relay_addr());
         }
 
         self
