@@ -70,7 +70,7 @@ impl Drop for PTxnGuard {
         // TODO record histogram rather than logging a warning on a fixed threshold
         let elapsed_millis = self.1.elapsed().as_millis();
         if elapsed_millis > 50 {
-            tracing::warn!("PTxnGuard was held for {:?}ms", elapsed_millis);
+            tracing::debug!("PTxnGuard was held for {:?}ms", elapsed_millis);
         }
     }
 }
