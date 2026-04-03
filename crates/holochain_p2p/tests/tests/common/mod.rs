@@ -184,8 +184,23 @@ impl HcP2pHandler for Handler {
     }
 }
 
-pub(crate) async fn spawn_test_bootstrap(
-) -> std::io::Result<(kitsune2_bootstrap_srv::BootstrapSrv, SocketAddr)> {
+#[allow(dead_code)]
+pub(crate) struct TestServers {
+    pub bootstrap: kitsune2_bootstrap_srv::BootstrapSrv,
+    pub bootstrap_addr: SocketAddr,
+    #[cfg(all(
+        feature = "transport-iroh",
+        not(feature = "transport-tx5-backend-go-pion")
+    ))]
+    pub relay: iroh_relay::server::Server,
+    #[cfg(all(
+        feature = "transport-iroh",
+        not(feature = "transport-tx5-backend-go-pion")
+    ))]
+    pub relay_addr: SocketAddr,
+}
+
+pub(crate) async fn spawn_test_servers() -> std::io::Result<TestServers> {
     // We have mixed features between ring and aws_lc so the "lookup by crate features" doesn't
     // return a default.
     // If this is called twice due to parallel tests, ignore result, because it'll fail.
@@ -201,8 +216,42 @@ pub(crate) async fn spawn_test_bootstrap(
     .await
     .unwrap()?;
 
-    let addr = *bootstrap.listen_addrs().first().unwrap();
-    tracing::info!(?addr, "Bootstrap server started");
+    let bootstrap_addr = *bootstrap.listen_addrs().first().unwrap();
+    tracing::info!(?bootstrap_addr, "Bootstrap server started");
 
-    Ok((bootstrap, addr))
+    #[cfg(all(
+        feature = "transport-iroh",
+        not(feature = "transport-tx5-backend-go-pion")
+    ))]
+    let (relay, relay_addr) = {
+        let mut relay_config = iroh_relay::server::testing::server_config();
+        // Disable TLS for testing - use plain HTTP only
+        if let Some(ref mut relay) = relay_config.relay {
+            relay.tls = None;
+        }
+        relay_config.quic = None;
+        let relay = iroh_relay::server::Server::spawn(relay_config)
+            .await
+            .map_err(|e| std::io::Error::other(format!("failed to spawn relay: {e}")))?;
+        let relay_addr = relay
+            .http_addr()
+            .ok_or_else(|| std::io::Error::other("relay has no http address"))?;
+        tracing::info!(?relay_addr, "Relay server started");
+        (relay, relay_addr)
+    };
+
+    Ok(TestServers {
+        bootstrap,
+        bootstrap_addr,
+        #[cfg(all(
+            feature = "transport-iroh",
+            not(feature = "transport-tx5-backend-go-pion")
+        ))]
+        relay,
+        #[cfg(all(
+            feature = "transport-iroh",
+            not(feature = "transport-tx5-backend-go-pion")
+        ))]
+        relay_addr,
+    })
 }

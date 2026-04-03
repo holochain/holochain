@@ -1,4 +1,4 @@
-use crate::tests::common::{spawn_test_bootstrap, Handler};
+use crate::tests::common::{spawn_test_servers, Handler, TestServers};
 use holochain_keystore::*;
 use holochain_p2p::actor::{GetLinksRequestOptions, NetworkRequestOptions};
 use holochain_p2p::event::*;
@@ -6,7 +6,6 @@ use holochain_p2p::*;
 use holochain_trace::test_run;
 use holochain_types::prelude::*;
 use kitsune2_api::*;
-use std::net::SocketAddr;
 use std::{sync::Arc, time::Duration};
 
 const UNRESPONSIVE_TIMEOUT: Duration = Duration::from_secs(15);
@@ -118,9 +117,9 @@ async fn test_call_remote() {
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
     let handler = Arc::new(Handler::default());
 
-    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
-    let (agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
-    let (agent2, hc2, _) = spawn_test(dna_hash.clone(), handler, &addr).await;
+    let servers = spawn_test_servers().await.unwrap();
+    let (agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
+    let (agent2, hc2, _) = spawn_test(dna_hash.clone(), handler, &servers).await;
 
     tokio::time::timeout(Duration::from_secs(60), async {
         loop {
@@ -214,9 +213,9 @@ async fn test_remote_signal() {
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
     let handler = Arc::new(Handler::default());
 
-    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
-    let (agent1, _hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
-    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
+    let servers = spawn_test_servers().await.unwrap();
+    let (agent1, _hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
 
     hc2.send_remote_signal(
         dna_hash,
@@ -256,9 +255,9 @@ async fn test_publish() {
     let space = dna_hash.to_k2_space();
     let handler = Arc::new(Handler::default());
 
-    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
-    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
-    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
+    let servers = spawn_test_servers().await.unwrap();
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
 
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
@@ -313,9 +312,9 @@ async fn test_publish_reflect() {
     let space = dna_hash.to_k2_space();
     let handler = Arc::new(Handler::default());
 
-    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
-    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
-    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
+    let servers = spawn_test_servers().await.unwrap();
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
 
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
@@ -357,9 +356,9 @@ async fn test_get() {
     let space = dna_hash.to_k2_space();
     let handler = Arc::new(Handler::default());
 
-    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
-    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
-    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler, &addr).await;
+    let servers = spawn_test_servers().await.unwrap();
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler, &servers).await;
 
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
@@ -403,11 +402,12 @@ async fn test_get_with_unresponsive_agents() {
     ));
     let unresponsive_handler = Arc::new(UnresponsiveHandler);
 
-    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
-    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
-    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), unresponsive_handler.clone(), &addr).await;
-    let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), unresponsive_handler, &addr).await;
-    let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
+    let servers = spawn_test_servers().await.unwrap();
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
+    let (_agent2, hc2, _) =
+        spawn_test(dna_hash.clone(), unresponsive_handler.clone(), &servers).await;
+    let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), unresponsive_handler, &servers).await;
+    let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
 
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
@@ -457,10 +457,10 @@ async fn test_get_when_not_all_agents_have_data() {
     ));
     let empty_handler = Arc::new(Handler::default());
 
-    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
-    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), empty_handler.clone(), &addr).await;
-    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), empty_handler.clone(), &addr).await;
-    let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
+    let servers = spawn_test_servers().await.unwrap();
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), empty_handler.clone(), &servers).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), empty_handler.clone(), &servers).await;
+    let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
 
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
@@ -519,11 +519,12 @@ async fn test_get_when_not_all_agents_have_data_and_unresponsive_agent() {
     let empty_handler = Arc::new(Handler::default());
     let unresponsive_handler = Arc::new(UnresponsiveHandler);
 
-    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
-    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), empty_handler.clone(), &addr).await;
-    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), empty_handler.clone(), &addr).await;
-    let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
-    let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), unresponsive_handler.clone(), &addr).await;
+    let servers = spawn_test_servers().await.unwrap();
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), empty_handler.clone(), &servers).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), empty_handler.clone(), &servers).await;
+    let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
+    let (_agent4, hc4, _) =
+        spawn_test(dna_hash.clone(), unresponsive_handler.clone(), &servers).await;
 
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
@@ -575,10 +576,11 @@ async fn test_get_empty_data_better_than_no_response() {
     let empty_handler = Arc::new(Handler::default());
     let unresponsive_handler = Arc::new(UnresponsiveHandler);
 
-    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
-    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), empty_handler.clone(), &addr).await;
-    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), empty_handler.clone(), &addr).await;
-    let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), unresponsive_handler.clone(), &addr).await;
+    let servers = spawn_test_servers().await.unwrap();
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), empty_handler.clone(), &servers).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), empty_handler.clone(), &servers).await;
+    let (_agent3, hc3, _) =
+        spawn_test(dna_hash.clone(), unresponsive_handler.clone(), &servers).await;
 
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
@@ -620,9 +622,9 @@ async fn test_get_links() {
     let space = dna_hash.to_k2_space();
     let handler = Arc::new(Handler::default());
 
-    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
-    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
-    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler, &addr).await;
+    let servers = spawn_test_servers().await.unwrap();
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler, &servers).await;
 
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
@@ -668,11 +670,12 @@ async fn test_get_links_with_unresponsive_agents() {
     let handler = Arc::new(Handler::default());
     let unresponsive_handler = Arc::new(UnresponsiveHandler);
 
-    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
-    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
-    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
-    let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), unresponsive_handler.clone(), &addr).await;
-    let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), unresponsive_handler, &addr).await;
+    let servers = spawn_test_servers().await.unwrap();
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
+    let (_agent3, hc3, _) =
+        spawn_test(dna_hash.clone(), unresponsive_handler.clone(), &servers).await;
+    let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), unresponsive_handler, &servers).await;
 
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
@@ -722,9 +725,9 @@ async fn test_count_links() {
     let space = dna_hash.to_k2_space();
     let handler = Arc::new(Handler::default());
 
-    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
-    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
-    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler, &addr).await;
+    let servers = spawn_test_servers().await.unwrap();
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler, &servers).await;
 
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
@@ -770,11 +773,12 @@ async fn test_count_links_with_unresponsive_agents() {
     let handler = Arc::new(Handler::default());
     let unresponsive_handler = Arc::new(UnresponsiveHandler);
 
-    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
-    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
-    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
-    let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), unresponsive_handler.clone(), &addr).await;
-    let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), unresponsive_handler, &addr).await;
+    let servers = spawn_test_servers().await.unwrap();
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
+    let (_agent3, hc3, _) =
+        spawn_test(dna_hash.clone(), unresponsive_handler.clone(), &servers).await;
+    let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), unresponsive_handler, &servers).await;
 
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
@@ -824,9 +828,9 @@ async fn test_get_agent_activity() {
     let space = dna_hash.to_k2_space();
     let handler = Arc::new(Handler::default());
 
-    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
-    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
-    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler, &addr).await;
+    let servers = spawn_test_servers().await.unwrap();
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler, &servers).await;
 
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
@@ -869,11 +873,12 @@ async fn test_get_agent_activity_with_unresponsive_agents() {
     let handler = Arc::new(Handler::default());
     let unresponsive_handler = Arc::new(UnresponsiveHandler);
 
-    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
-    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
-    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), unresponsive_handler.clone(), &addr).await;
-    let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), unresponsive_handler, &addr).await;
-    let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
+    let servers = spawn_test_servers().await.unwrap();
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
+    let (_agent2, hc2, _) =
+        spawn_test(dna_hash.clone(), unresponsive_handler.clone(), &servers).await;
+    let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), unresponsive_handler, &servers).await;
+    let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
 
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
@@ -920,9 +925,9 @@ async fn test_must_get_agent_activity() {
     let space = dna_hash.to_k2_space();
     let handler = Arc::new(Handler::default());
 
-    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
-    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
-    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler, &addr).await;
+    let servers = spawn_test_servers().await.unwrap();
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler, &servers).await;
 
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
@@ -962,11 +967,12 @@ async fn test_must_get_agent_activity_with_unresponsive_agents() {
     let handler = Arc::new(Handler::default());
     let unresponsive_handler = Arc::new(UnresponsiveHandler);
 
-    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
-    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
-    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), unresponsive_handler.clone(), &addr).await;
-    let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), unresponsive_handler, &addr).await;
-    let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
+    let servers = spawn_test_servers().await.unwrap();
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
+    let (_agent2, hc2, _) =
+        spawn_test(dna_hash.clone(), unresponsive_handler.clone(), &servers).await;
+    let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), unresponsive_handler, &servers).await;
+    let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
 
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
@@ -1011,9 +1017,9 @@ async fn test_validation_receipts() {
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
     let handler = Arc::new(Handler::default());
 
-    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
-    let (agent1, _hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
-    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
+    let servers = spawn_test_servers().await.unwrap();
+    let (agent1, _hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
 
     hc2.send_validation_receipts(
         dna_hash,
@@ -1044,8 +1050,8 @@ async fn test_authority_for_hash() {
     let space = dna_hash.to_k2_space();
     let handler = Arc::new(Handler::default());
 
-    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
-    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
+    let servers = spawn_test_servers().await.unwrap();
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
     hc1.test_set_full_arcs(space.clone()).await;
 
     assert!(hc1
@@ -1062,8 +1068,8 @@ async fn test_target_arcs() {
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
     let handler = Arc::new(Handler::default());
 
-    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
-    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
+    let servers = spawn_test_servers().await.unwrap();
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
 
     let arcs = hc1.target_arcs(dna_hash).await.unwrap();
     assert_eq!(&[DhtArc::FULL][..], &arcs);
@@ -1077,8 +1083,8 @@ async fn bridged_call_remote() {
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
     let handler = Arc::new(Handler::default());
 
-    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
-    let (_agent1, hc1, lair_client) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
+    let servers = spawn_test_servers().await.unwrap();
+    let (_agent1, hc1, lair_client) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
 
     let agent2 = lair_client.new_sign_keypair_random().await.unwrap();
     let local_agent2 = HolochainP2pLocalAgent::new(agent2.clone(), DhtArc::FULL, 1, lair_client);
@@ -1150,8 +1156,8 @@ async fn bridged_remote_signal() {
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
     let handler = Arc::new(Handler::default());
 
-    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
-    let (_agent1, hc1, lair_client) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
+    let servers = spawn_test_servers().await.unwrap();
+    let (_agent1, hc1, lair_client) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
 
     let agent2 = lair_client.new_sign_keypair_random().await.unwrap();
     let local_agent2 = HolochainP2pLocalAgent::new(agent2.clone(), DhtArc::FULL, 1, lair_client);
@@ -1223,8 +1229,9 @@ async fn bridged_remote_signal() {
 async fn spawn_test(
     dna_hash: DnaHash,
     handler: DynHcP2pHandler,
-    bootstrap_addr: &SocketAddr,
+    servers: &TestServers,
 ) -> (AgentPubKey, actor::DynHcP2p, MetaLairClient) {
+    let bootstrap_addr = &servers.bootstrap_addr;
     let db_peer_meta =
         DbWrite::test_in_mem(DbKindPeerMetaStore(Arc::new(dna_hash.clone()))).unwrap();
     let db_op = DbWrite::test_in_mem(DbKindDht(Arc::new(dna_hash.clone()))).unwrap();
@@ -1273,7 +1280,7 @@ async fn spawn_test(
                     "serverUrl": format!("http://{bootstrap_addr}"),
                 },
                 "irohTransport": {
-                    "relayUrl": format!("http://{bootstrap_addr}"),
+                    "relayUrl": format!("http://{}", servers.relay_addr),
                     "relayAllowPlainText": true,
                 }
             })),
