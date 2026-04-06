@@ -117,6 +117,7 @@
 //! | `hc.cascade.fetch_error` | u64 counter | | Number of errors encountered while fetching data from the network | `fetch_type`: type of data fetched, `zome`: originating zome name, `fn`: originating function name |
 //! | `hc.holochain_p2p.request.duration` | f64 histogram | s | The time spent sending an outgoing p2p request awaiting the response | `dna_hash`: DNA identifier, `tag`: request category tag, `error`: request failed, `zome`: originating zome name, `fn`: originating function name |
 //! | `hc.holochain_p2p.handle_request.duration` | f64 histogram | s | The time spent handling an incoming p2p request | `message_type`: p2p message type, `dna_hash`: DNA identifier |
+//! | `hc.holochain_p2p.handle_request.ignored` | u64 counter | | The number of incoming p2p requests that were ignored | `message_type`: p2p message type, `dna_hash`: DNA identifier |
 //! | `hc.holochain_p2p.recv_remote_signal` | u64 counter | | The number of remote signals received | `dna_hash`: DNA identifier |
 
 use std::path::{Path, PathBuf};
