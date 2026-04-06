@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.7.0-dev.19
+
 ## 0.7.0-dev.18
 
 - **BREAKING CHANGE:** Split combined auth material into auth material for bootstrap service and auth material for relay service.
