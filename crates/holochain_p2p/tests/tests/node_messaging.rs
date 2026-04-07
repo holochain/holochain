@@ -350,6 +350,136 @@ async fn test_publish_reflect() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_publish_returns_error_when_no_targets() {
+    test_run();
+
+    let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
+    let space_id = dna_hash.to_k2_space();
+    let handler = Arc::new(Handler::default());
+
+    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
+    let (_agent, hc, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
+
+    hc.test_set_full_arcs(space_id).await;
+
+    // The publisher is the only node in the network — there are no responsive remote
+    // agents covering the basis, so publish must surface an explicit error rather than
+    // silently report success.
+    let op = test_dht_op(holochain_types::prelude::Timestamp::now());
+    let op_hash = op.as_hash().clone();
+
+    let result = hc
+        .publish(
+            dna_hash.clone(),
+            HoloHash::from_raw_36_and_type(
+                op_hash.get_raw_36().to_vec(),
+                holo_hash::hash_type::AnyLinkable::Action,
+            ),
+            AgentPubKey::from_raw_32(vec![2; 32]),
+            vec![op_hash],
+            None,
+        )
+        .await;
+
+    let err = result.expect_err("publish should fail when no remote peers exist");
+    assert!(
+        err.to_string().contains("No publish targets"),
+        "expected `No publish targets` error, got: {err}",
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_publish_completes_with_unreachable_peer_in_store() {
+    test_run();
+
+    let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
+    let space_id = dna_hash.to_k2_space();
+    let handler = Arc::new(Handler::default());
+
+    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
+    let (_agent, publisher, lair_client) =
+        spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
+
+    publisher.test_set_full_arcs(space_id.clone()).await;
+
+    // Inject a fake responsive remote agent with a URL that nothing is listening on.
+    // After this, the publisher's peer store has exactly one selectable target — the
+    // fake one. publish() must select it, dispatch to it, and complete (rather than
+    // hanging on a connect attempt or returning a "no targets" error).
+    //
+    // Note: this test cannot directly verify the "publish continues to working peers
+    // when one peer fails" semantic. kitsune2_core::CorePublish::publish_ops always
+    // returns Ok(()) — it queues the request to a background worker and any transport
+    // errors are logged from that worker, never surfaced through the API. There is no
+    // failure mode for publish_ops at this boundary, so the partial-failure branch in
+    // HolochainP2pActor::publish is structurally unreachable from a holochain_p2p
+    // integration test. To exercise the partial-failure path you would need either a
+    // kitsune mock that can return errors, or a higher-level sweettest scenario.
+    let fake_pubkey = lair_client.new_sign_keypair_random().await.unwrap();
+    let fake_local_agent =
+        HolochainP2pLocalAgent::new(fake_pubkey.clone(), DhtArc::FULL, 1, lair_client.clone());
+    let fake_url = Url::from_str("ws://127.0.0.1:1").unwrap();
+    let now = kitsune2_api::Timestamp::now();
+    let fake_agent_info = AgentInfoSigned::sign(
+        &fake_local_agent,
+        kitsune2_api::AgentInfo {
+            agent: fake_pubkey.to_k2_agent(),
+            created_at: now,
+            expires_at: kitsune2_api::Timestamp::from_micros(now.as_micros() + 60_000_000),
+            is_tombstone: false,
+            space: space_id.clone(),
+            storage_arc: DhtArc::FULL,
+            url: Some(fake_url),
+        },
+    )
+    .await
+    .unwrap();
+    publisher
+        .test_kitsune()
+        .space(space_id.clone(), None)
+        .await
+        .unwrap()
+        .peer_store()
+        .insert(vec![fake_agent_info])
+        .await
+        .unwrap();
+
+    let op = test_dht_op(holochain_types::prelude::Timestamp::now());
+    let op_hash = op.as_hash().clone();
+
+    // The publish call must complete promptly. Bound it well below the actor's
+    // request_timeout (10s in spawn_test) so that a regression to a hanging-per-peer
+    // implementation would fail the test rather than slowly time out.
+    let publish_result = tokio::time::timeout(
+        Duration::from_secs(5),
+        publisher.publish(
+            dna_hash.clone(),
+            HoloHash::from_raw_36_and_type(
+                op_hash.get_raw_36().to_vec(),
+                holo_hash::hash_type::AnyLinkable::Action,
+            ),
+            AgentPubKey::from_raw_32(vec![2; 32]),
+            vec![op_hash],
+            None,
+        ),
+    )
+    .await
+    .expect("publish must not hang on an unreachable peer");
+
+    // We do not pin down Ok vs Err here. With the current kitsune CorePublish, this
+    // returns Ok because publish_ops is fire-and-forget. If a future kitsune surfaces
+    // the unreachable URL synchronously, the actor's partial-failure path returns Err.
+    // Both outcomes prove the resilience property under test: the call completed,
+    // exercised the fake target, and did not return the "no targets" error.
+    if let Err(err) = &publish_result {
+        assert!(
+            !err.to_string().contains("No publish targets"),
+            "publish should have selected the fake peer, not reported no targets: {err}",
+        );
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_get() {
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
     let space = dna_hash.to_k2_space();
