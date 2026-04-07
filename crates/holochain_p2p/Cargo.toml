@@ -41,12 +41,12 @@ tracing-appender = "0.2.3"
 opentelemetry = "0.31"
 strum_macros = "0.27.2"
 
-kitsune2 = { version = "0.4.0-dev.9", default-features = false }
-kitsune2_bootstrap_srv = { version = "0.4.0-dev.9", default-features = false, optional = true }
-kitsune2_api = "0.4.0-dev.9"
-kitsune2_core = "0.4.0-dev.9"
-kitsune2_transport_iroh = { version = "0.4.0-dev.9", default-features = false, optional = true }
-kitsune2_transport_tx5 = { version = "0.4.0-dev.9", default-features = false, optional = true }
+kitsune2 = { version = "0.4.0-dev.10", default-features = false }
+kitsune2_bootstrap_srv = { version = "0.4.0-dev.10", default-features = false, optional = true }
+kitsune2_api = "0.4.0-dev.10"
+kitsune2_core = "0.4.0-dev.10"
+kitsune2_transport_iroh = { version = "0.4.0-dev.10", default-features = false, optional = true }
+kitsune2_transport_tx5 = { version = "0.4.0-dev.10", default-features = false, optional = true }
 bytes = "1.10"
 holochain_sqlite = { version = "^0.6.1-rc.5", path = "../holochain_sqlite" }
 parking_lot = "0.12.3"
@@ -65,7 +65,7 @@ tempfile = "3.21.0"
 # used for setting default crypto provider with iroh relay
 rustls = "0.23"
 iroh-relay = { version = "0.95.1", features = ["server", "test-utils"] }
-kitsune2_bootstrap_srv = { version = "0.4.0-dev.9", default-features = false }
+kitsune2_bootstrap_srv = { version = "0.4.0-dev.10", default-features = false }
 
 [lints]
 workspace = true
