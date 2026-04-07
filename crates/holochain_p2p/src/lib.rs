@@ -140,7 +140,6 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
         basis_hash: OpBasis,
         source: AgentPubKey,
         op_hash_list: Vec<DhtOpHash>,
-        timeout_ms: Option<u64>,
         reflect_ops: Option<Vec<DhtOp>>,
     ) -> HolochainP2pResult<()>;
 
@@ -305,7 +304,6 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         basis_hash: holo_hash::OpBasis,
         source: AgentPubKey,
         op_hash_list: Vec<DhtOpHash>,
-        timeout_ms: Option<u64>,
         reflect_ops: Option<Vec<DhtOp>>,
     ) -> HolochainP2pResult<()> {
         self.sender
@@ -314,7 +312,6 @@ impl HolochainP2pDnaT for HolochainP2pDna {
                 basis_hash,
                 source,
                 op_hash_list,
-                timeout_ms,
                 reflect_ops,
             )
             .await

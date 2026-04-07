@@ -292,7 +292,6 @@ async fn test_publish() {
                 AgentPubKey::from_raw_32(vec![2; 32]),
                 vec![op_hash.clone()],
                 None,
-                None,
             )
             .await
             .unwrap();
@@ -335,7 +334,6 @@ async fn test_publish_reflect() {
                 ),
                 AgentPubKey::from_raw_32(vec![2; 32]),
                 vec![],
-                None,
                 Some(vec![op.into_content()]),
             )
             .await

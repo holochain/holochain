@@ -229,7 +229,6 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug + Any {
         basis_hash: OpBasis,
         source: AgentPubKey,
         op_hash_list: Vec<DhtOpHash>,
-        timeout_ms: Option<u64>,
         reflect_ops: Option<Vec<DhtOp>>,
     ) -> BoxFut<'_, HolochainP2pResult<()>>;
 

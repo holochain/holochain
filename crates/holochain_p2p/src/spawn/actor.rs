@@ -6,6 +6,7 @@ use crate::metrics::{
     p2p_outgoing_request_duration_metric, p2p_recv_remote_signal_metric,
 };
 use crate::*;
+use futures::{FutureExt, StreamExt};
 use holochain_sqlite::error::{DatabaseError, DatabaseResult};
 use holochain_sqlite::helpers::BytesSql;
 use holochain_sqlite::rusqlite::types::Value;
@@ -1631,7 +1632,6 @@ impl actor::HcP2p for HolochainP2pActor {
         basis_hash: OpBasis,
         _source: AgentPubKey,
         op_hash_list: Vec<DhtOpHash>,
-        _timeout_ms: Option<u64>,
         reflect_ops: Option<Vec<DhtOp>>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
@@ -1677,11 +1677,40 @@ impl actor::HcP2p for HolochainP2pActor {
             })
             .collect();
 
-            for url in urls {
-                space
-                    .publish()
-                    .publish_ops(op_hash_list.clone(), url)
-                    .await?;
+            let publish_results = futures::stream::iter(urls.into_iter().map(|url| {
+                tokio::time::timeout(
+                    self.request_timeout,
+                    space
+                        .publish()
+                        .publish_ops(op_hash_list.clone(), url.clone()),
+                )
+                .map(|result| (url, result))
+            }))
+            .buffer_unordered(5)
+            .collect::<Vec<_>>()
+            .await;
+
+            let (publish_oks, publish_errs): (Vec<_>, Vec<_>) = publish_results
+                .into_iter()
+                .map(|(url, result)| (url, result.map_err(K2Error::other).flatten()))
+                .partition(|(_, r)| r.is_ok());
+
+            if !publish_errs.is_empty() {
+                for (url, result) in &publish_errs {
+                    if let Err(e) = result {
+                        tracing::debug!(%url, ?e, "could not send publish ops");
+                    }
+                }
+
+                return Err(HolochainP2pError::other(format!(
+                    "Failed to send publish ops message to {}/{} selected targets",
+                    publish_errs.len(),
+                    publish_oks.len() + publish_errs.len()
+                )));
+            } else if publish_oks.is_empty() {
+                return Err(HolochainP2pError::other(format!(
+                    "No publish targets for basis: {basis_hash}"
+                )));
             }
 
             Ok(())

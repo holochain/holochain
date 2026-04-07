@@ -61,7 +61,6 @@ pub async fn publish_dht_ops_workflow(
                 basis,
                 agent.clone(),
                 op_hash_list.clone(),
-                None,
                 Some(op_data_list),
             )
             .await
@@ -83,7 +82,7 @@ pub async fn publish_dht_ops_workflow(
     if to_publish_count > 0 {
         info!(
             ?agent,
-            "published {}/{} ops",
+            "Sent publish messages for {}/{} ops",
             success.len(),
             to_publish_count
         );
