@@ -41,13 +41,13 @@ CREATE TABLE Action (
     action_data  BLOB,             -- Serialized ActionData enum, containing action-type fields
    
     -- Reference fields for entry meta
-    entry_hash   BLOB,         -- NULL for non-entry actions
+    entry_hash   BLOB         -- NULL for non-entry actions
 );
 
 -- Authored entries
 CREATE TABLE Entry (
     hash BLOB PRIMARY KEY,
-    blob BLOB NOT NULL,
+    blob BLOB NOT NULL
 );
 
 -- Capability grants lookup table.
@@ -150,8 +150,8 @@ CREATE TABLE DhtAction (
 
    -- Record validity (aggregated from all ops for this record)
    -- A record is the combination of action + entry (if applicable)
-   -- NULL for records in limbo, 0=valid or 1=rejected after integration
-   record_validity INTEGER -- NULL=pending, 0=valid, 1=rejected
+   -- NULL for records in limbo, 0=accepted or 1=rejected after integration
+   record_validity INTEGER -- NULL=pending, 0=accepted, 1=rejected
 ) WITHOUT ROWID;
 
 -- DHT entries.
@@ -174,8 +174,8 @@ CREATE TABLE LimboChainOp (
     storage_center_loc INTEGER NOT NULL,
 
     -- Local validation state
-    sys_validation_status INTEGER, -- NULL=pending, 0=valid, 1=rejected
-    app_validation_status INTEGER, -- NULL=pending, 0=valid, 1=rejected
+    sys_validation_status INTEGER, -- NULL=pending, 0=accepted, 1=rejected
+    app_validation_status INTEGER, -- NULL=pending, 0=accepted, 1=rejected
     abandoned_at          INTEGER,       -- NULL unless validation was abandoned due to unresolvable dependencies
 
     -- Validation receipt requirement
@@ -206,7 +206,7 @@ CREATE TABLE LimboDhtWarrant (
     storage_center_loc INTEGER NOT NULL,
 
     -- Local validation state
-    sys_validation_status INTEGER, -- NULL=pending, 0=valid, 1=rejected
+    sys_validation_status INTEGER, -- NULL=pending, 0=accepted, 1=rejected
     abandoned_at          INTEGER, -- NULL unless validation was abandoned due to unresolvable dependencies
 
     -- Timing and attempt tracking
@@ -229,7 +229,7 @@ CREATE TABLE DhtChainOp (
     storage_center_loc INTEGER NOT NULL,
 
     -- Final validation result
-    validation_status INTEGER NOT NULL, -- 0=valid, 1=rejected
+    validation_status INTEGER NOT NULL, -- 0=accepted, 1=rejected
     locally_validated BOOLEAN NOT NULL, -- whether this op was validated by us, or fetched from an authority
 
     -- Timing
@@ -474,7 +474,7 @@ The high-level flow for authoring actions and distributing ops is as follows:
 4. Publish DHT Ops Workflow
    ├─> Query ops which are ready for publishing from `AuthoredChainOp` and `AuthoredWarrantOp`
    ├─> Cross-database LEFT JOIN to `DhtChainOp` to check integration status
-   ├─> Publish if: op not in `DhtChainOp` (outside arc) OR op in `DhtChainOp` with `validation_status = 0` (valid)
+   ├─> Publish if: op not in `DhtChainOp` (outside arc) OR op in `DhtChainOp` with `validation_status = 0` (accepted)
    ├─> Group by `basis_hash` for efficient sending
    ├─> Send ops to DHT authorities over the network
    └─> Update `last_publish_time` in `AuthoredChainOp` (or `AuthoredWarrantOp`)
@@ -700,17 +700,17 @@ The validation flow processes incoming DHT ops through several stages, from init
    ├─> Check dependencies in `DhtAction`/`DhtEntry`
    ├─> Perform sys validation checks
    └─> Update `sys_validation_status` in `LimboChainOp`
-       └─> Trigger app validation if valid
-       └─> Issue a warrant, and trigger integration if invalid
+       └─> Trigger app validation if accepted
+       └─> Issue a warrant, and trigger integration if rejected
 
-3. App Validation Workflow (if sys valid)
+3. App Validation Workflow (if sys accepted)
    ├─> Query `LimboChainOp` for ops with `sys_validation_status=0 AND app_validation_status IS NULL`
    ├─> Run WASM validation callbacks
    └─> Update `app_validation_status` in `LimboChainOp`
-       └─> Trigger integration if valid
-       └─> Issue a warrant, and trigger integration if invalid
+       └─> Trigger integration if accepted
+       └─> Issue a warrant, and trigger integration if rejected
 
-4. Integration Workflow (if both valid)
+4. Integration Workflow (if both accepted)
    ├─> Query `LimboChainOp` for ops where sys or app validation reached a terminal state
    ├─> Move op from `LimboChainOp` to `DhtChainOp` (set `when_integrated`)
    ├─> Update `DhtAction` `record_validity` with aggregated status
@@ -751,10 +751,16 @@ The incoming DHT ops workflow is the entry point for all DHT ops received from t
      - **Entry hash verification**: For actions with an entry, use `holo_hash` to verify entry content hashes to the entry hash referenced in the action.
    - **Convert to HashedChainOp**: After verification, convert each `ChainOp` to `HashedChainOp` containing the verified hashes. This avoids re-computing hashes during database insertion.
    - **Batch rejection**: If any op fails any check, the entire incoming batch is dropped
-     - This prevents the invalid op from entering the system
+     - This prevents the rejected op from entering the system
      - It also prevents wasting resources processing other ops in the batch
 
-6. **Insert Into Limbo**
+6. **Expand to other op types**
+    - For each record that we've ingested, run the expansion to ops.
+    - Any ops that weren't part of the incoming set, but do fall within our storage arc, should be added to the set.
+    - This may save work fetching ops that we can generate locally, but the primary reason is to make it more difficult
+      for peers to withhold individual op types when publishing a record.
+
+7. **Insert Into Limbo**
    - Insert the batch of ops into tables within a single write transaction
    - For each op in the batch:
      - **If chain op (`DhtOp::ChainOp`)**:
@@ -767,7 +773,7 @@ The incoming DHT ops workflow is the entry point for all DHT ops received from t
        - Insert into `LimboDhtWarrant` with the full warrant content (`hash`, `author`, `timestamp`, `warrantee`, `proof`, `storage_center_loc`)
        - Set initial state: `sys_validation_status = NULL`, `when_received = current_timestamp`, `serialized_size = encoded size`
 
-7. **Trigger Sys Validation**
+8. **Trigger Sys Validation**
    - Send trigger to `sys_validation_workflow` queue consumer
    - Workflow run completes
 
@@ -830,7 +836,7 @@ LIMIT 10000
    - Warrant sys validation is handled by the separate warrant validation workflow (see Warrant Handling)
 
 4. **Update Validation Status**
-   - For **valid** ops:
+   - For **accepted** ops:
      ```sql
      UPDATE LimboChainOp
      SET sys_validation_status = 0,
@@ -894,10 +900,10 @@ LIMIT 10000
 2. **Execute WASM Validation**
    - Load appropriate DNA and ribosome
    - Call `validate(op: Op)` callback for the op
-   - Collect validation outcome (`Valid`, `Rejected`, or dependency request)
+   - Collect validation outcome (`Accepted`, `Rejected`, or dependency request)
 
 3. **Update Validation Status**
-   - For **valid** ops:
+   - For **accepted** ops:
      ```sql
      UPDATE LimboChainOp
      SET app_validation_status = 0,
@@ -921,7 +927,7 @@ LIMIT 10000
      ```
 
 4. **Trigger Integration**
-   - If any ops valid: trigger `integration_workflow`
+   - If any ops accepted: trigger `integration_workflow`
 
 #### Integration Workflow
 
@@ -952,7 +958,7 @@ ORDER BY LimboChainOp.when_received
 
 1. **Query Completed Ops**
    - Select ops where validation was abandoned, sys validation was rejected, or both sys and app validation reached a terminal state.
-   - Valid, rejected, and abandoned ops are all integrated (removed from limbo).
+   - Accepted, rejected, and abandoned ops are all integrated (removed from limbo).
 
 2. **Move Op to DhtChainOp Table**
    - Start a write transaction for each op.
@@ -992,7 +998,7 @@ ORDER BY LimboChainOp.when_received
    - Aggregate `record_validity` from all ops for this action using a single query
    - **Rules (applied in SQL):**
      - If ANY op for this action is rejected: `record_validity = 1`
-     - If at least one op is valid and none rejected: `record_validity = 0`
+     - If at least one op is accepted and none rejected: `record_validity = 0`
    ```sql
    UPDATE DhtAction
    SET record_validity = (
@@ -1010,7 +1016,7 @@ ORDER BY LimboChainOp.when_received
    Note: `DhtAction` rows are inserted during incoming op processing with `record_validity = NULL` and updated here once an op integrates. `DhtEntry` rows are also inserted at incoming time (if the op carries an entry), but `DhtEntry` has no validity field — no entry-specific step is needed during integration.
 
 4. **Update Index Tables** (if applicable)
-   - If the action is a `CreateLink` and the op is valid, insert into `Link` table:
+   - If the action is a `CreateLink` and the op is accepted, insert into `Link` table:
    ```sql
    INSERT INTO Link (action_hash, base_hash, zome_index, link_type, tag)
    SELECT
@@ -1033,7 +1039,7 @@ ORDER BY LimboChainOp.when_received
        WHERE hash = :action_hash AND record_validity = 1
    );
    ```
-   - If the action is a `DeleteLink` and the op is valid, insert into `DeletedLink` table:
+   - If the action is a `DeleteLink` and the op is accepted, insert into `DeletedLink` table:
    ```sql
    INSERT INTO DeletedLink (action_hash, create_link_hash)
    SELECT
@@ -1053,7 +1059,7 @@ ORDER BY LimboChainOp.when_received
        WHERE hash = :action_hash AND record_validity = 1
    );
    ```
-   - If the action is an `Update` and the op is valid, insert into `UpdatedRecord` table:
+   - If the action is an `Update` and the op is accepted, insert into `UpdatedRecord` table:
    ```sql
    INSERT INTO UpdatedRecord (action_hash, original_action_hash, original_entry_hash)
    SELECT
@@ -1074,7 +1080,7 @@ ORDER BY LimboChainOp.when_received
        WHERE hash = :action_hash AND record_validity = 1
    );
    ```
-   - If the action is a `Delete` and the op is valid, insert into `DeletedRecord` table:
+   - If the action is a `Delete` and the op is accepted, insert into `DeletedRecord` table:
    ```sql
    INSERT INTO DeletedRecord (action_hash, deletes_action_hash, deletes_entry_hash)
    SELECT
@@ -1112,10 +1118,10 @@ ORDER BY LimboChainOp.when_received
 
 **Rules:**
 1. A record is **rejected** (`record_validity = 1`) if ANY known ops for it are rejected.
-2. A record is **valid** (`record_validity = 0`) if at least one known op for it is valid and no known ops are rejected.
-3. Records in limbo have a `NULL` value for `record_validity`. After integration of the first op for a record, `record_validity` is `0` (valid) or `1` (rejected).
+2. A record is **accepted** (`record_validity = 0`) if at least one known op for it is accepted and no known ops are rejected.
+3. Records in limbo have a `NULL` value for `record_validity`. After integration of the first op for a record, `record_validity` is `0` (accepted) or `1` (rejected).
 
-The record validity is first set at the time of integrating the first of its ops. If later op integrations find an op to be invalid, the record validity is updated to `1` (rejected). Due to the sharding model, a validator may not have all ops for a record - they hold specific op types over specific ranges. This aggregated status is stored with the record itself, eliminating the need for complex joins during queries.
+The record validity is first set at the time of integrating the first of its ops. If later op integrations find an op to be rejected, the record validity is updated to `1` (rejected). Due to the sharding model, a validator may not have all ops for a record - they hold specific op types over specific ranges. This aggregated status is stored with the record itself, eliminating the need for complex joins during queries.
 
 ### Record Validity Correction
 
@@ -1148,7 +1154,7 @@ WHERE Entry.hash = ?
 LIMIT 1
 ```
 
-Justification for *any*: An entry can be referenced by multiple actions. If at least one action referencing the entry is valid, the entry is considered valid to be served to the network or used.
+Justification for *any*: An entry can be referenced by multiple actions. If at least one action referencing the entry is accepted, the entry is considered accepted to be served to the network or used.
 
 ### Get Links
 
@@ -1208,7 +1214,7 @@ Application code filters for:
 - Specific action_type values
 - Entry types (via action_data deserialization)
 - Sequence ranges
-- Include valid/rejected/warrants based on GetActivityOptions
+- Include accepted/rejected/warrants based on GetActivityOptions
 
 ### Must Get Agent Activity
 
@@ -1270,7 +1276,7 @@ ORDER BY Action.seq ASC
 **ActionHashRange(start_hash, end_hash)**: Hash-bounded range with fork disambiguation
 - Query all actions
 - Walk backwards from `end_hash` following `prev_hash` until reaching `start_hash`
-- Application code performs the chain traversal (cannot be done efficiently in SQL)
+- Application code performs the chain traversal (think this cannot be done efficiently in SQL, experiment with recursive queries at implementation time)
 
 **ActionHashTerminated(end_hash, n)**: Hash-terminated with N preceding records
 - Query all actions
@@ -1689,15 +1695,15 @@ Warrants use parallel limbo and integrated tables to chain ops (`LimboDhtWarrant
 
    **ChainIntegrityWarrant**: Proves an author broke chain rules
    - Stays in `LimboDhtWarrant` until the warranted action is fetched and validated
-   - If warranted action is rejected: warrant is valid (proves the claim)
-   - If warranted action is valid: warrant is rejected (false claim)
+   - If warranted action is rejected: warrant is accepted (proves the claim)
+   - If warranted action is accepted: warrant is rejected (false claim)
 
    **ChainForkWarrant**: Proves an author has forked their chain
    - Stays in `LimboDhtWarrant` until both forked actions are fetched and checked
-   - If both forked actions are at the same sequence number: warrant is valid (proves fork)
+   - If both forked actions are at the same sequence number: warrant is accepted (proves fork)
    - If the forked actions do not match the fork condition: warrant is rejected (false claim)
 
-   After validation, update `LimboDhtWarrant.sys_validation_status` to `0` (valid) or `1` (rejected).
+   After validation, update `LimboDhtWarrant.sys_validation_status` to `0` (accepted) or `1` (rejected).
 
 3. **Warrant Integration Workflow**
    - Query `LimboDhtWarrant` for ops with a terminal state:
@@ -1707,7 +1713,7 @@ Warrants use parallel limbo and integrated tables to chain ops (`LimboDhtWarrant
       OR sys_validation_status IN (0, 1)
    ORDER BY when_received
    ```
-   - For valid warrants, insert into `DhtWarrant`:
+   - For accepted warrants, insert into `DhtWarrant`:
    ```sql
    INSERT INTO DhtWarrant (hash, author, timestamp, warrantee, proof, storage_center_loc)
    SELECT hash, author, timestamp, warrantee, proof, storage_center_loc
@@ -1719,7 +1725,7 @@ Warrants use parallel limbo and integrated tables to chain ops (`LimboDhtWarrant
 
 ### Warrant Query Patterns
 
-Valid warrants can be queried from the `DhtWarrant` table:
+Accepted warrants can be queried from the `DhtWarrant` table:
 
 Find all warrants against a specific agent:
 
@@ -1743,7 +1749,7 @@ The system maintains these invariants:
 
 1. **No chain op exists in both `LimboChainOp` and `DhtChainOp` simultaneously; no warrant exists in both `LimboDhtWarrant` and `DhtWarrant` simultaneously**
 2. **Every `DhtChainOp` has a definite `validation_status` (never `NULL`)**
-3. **`DhtAction` has a `NULL` value for `record_validity` for pending records, `0` (valid) or `1` (rejected) for integrated records**
+3. **`DhtAction` has a `NULL` value for `record_validity` for pending records, `0` (accepted) or `1` (rejected) for integrated records**
 4. **Ops are moved from limbo to integrated tables atomically with `record_validity` updates**
 5. **Rejected ops in `DhtChainOp` cause their records to be marked 'rejected'**
 6. **Dependencies are resolved before validation proceeds**
