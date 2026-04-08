@@ -23,7 +23,7 @@ derive_more = { version = "2.0", features = [
 fallible-iterator = "0.3.0"
 futures = "0.3"
 holo_hash = { path = "../holo_hash", version = "^0.7.0-dev.8" }
-holochain_serialized_bytes = "=0.0.56"
+holochain_serialized_bytes = "=0.0.57"
 holochain_util = { version = "^0.7.0-dev.1", path = "../holochain_util", features = [
   "backtrace",
   "time",
@@ -55,7 +55,7 @@ getrandom = "0.3"
 opentelemetry = "0.31"
 schemars = "0.9"
 
-kitsune2_api = "0.4.0-dev.6"
+kitsune2_api = "0.4.0-dev.10"
 
 rusqlite = { version = "0.37", features = [
   "blob",      # better integration with blob types (Read, Write, etc)

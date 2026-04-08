@@ -26,7 +26,7 @@ holochain_data = { version = "^0.7.0-dev.10", path = "../holochain_data", featur
   "sqlite-encrypted",
 ] }
 holochain_keystore = { version = "^0.7.0-dev.12", path = "../holochain_keystore" }
-holochain_serialized_bytes = "=0.0.56"
+holochain_serialized_bytes = "=0.0.57"
 sqlx = { version = "=0.9.0-alpha.1" }
 holochain_types = { version = "^0.7.0-dev.20", path = "../holochain_types" }
 holochain_zome_types = { version = "^0.7.0-dev.12", path = "../holochain_zome_types", features = [
@@ -45,7 +45,7 @@ tracing = "0.1.26"
 cron = "0.15"
 async-recursion = "1.1"
 
-kitsune2_api = "0.4.0-dev.6"
+kitsune2_api = "0.4.0-dev.10"
 
 tempfile = { version = "3.3", optional = true }
 base64 = { version = "0.22", optional = true }
