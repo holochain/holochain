@@ -32,16 +32,18 @@ always fully stored and accessible.
 ```sql
 -- Authored actions
 CREATE TABLE Action (
-    hash         BLOB PRIMARY KEY,
-    author       BLOB NOT NULL,
-    seq          INTEGER NOT NULL,
-    prev_hash    BLOB,
-    timestamp    INTEGER NOT NULL,
-    action_type  INTEGER NOT NULL, -- ActionType enum variant
-    action_data  BLOB,             -- Serialized ActionData enum, containing action-type fields
-   
+    hash          BLOB PRIMARY KEY,
+    author        BLOB NOT NULL,
+    seq           INTEGER NOT NULL,
+    prev_hash     BLOB,
+    timestamp     INTEGER NOT NULL,
+    action_type   INTEGER NOT NULL, -- ActionType enum variant
+    action_data   BLOB,             -- Serialized ActionData enum, containing action-type fields
+    signature     BLOB NOT NULL,    -- Author's signature over the action
+
     -- Reference fields for entry meta
-    entry_hash   BLOB         -- NULL for non-entry actions
+    entry_hash    BLOB,         -- NULL for non-entry actions
+    private_entry BOOLEAN       -- Cached visibility flag for the referenced entry; NULL for non-entry actions
 );
 
 -- Authored entries
@@ -144,9 +146,11 @@ CREATE TABLE DhtAction (
    timestamp     INTEGER NOT NULL,
    action_type   INTEGER NOT NULL, -- ActionType enum variant
    action_data   BLOB NOT NULL,    -- Serialized ActionData enum
+   signature     BLOB NOT NULL,    -- Author's signature over the action
 
    -- Reference fields for entry meta
    entry_hash    BLOB,         -- NULL for non-entry actions
+   private_entry BOOLEAN,      -- Cached visibility flag for the referenced entry; NULL for non-entry actions
 
    -- Record validity (aggregated from all ops for this record)
    -- A record is the combination of action + entry (if applicable)
@@ -395,6 +399,8 @@ pub enum OpEntry {
     Present(Entry),
     /// The action references a private entry, which is not included
     Hidden,
+    /// The action type doesn't have an associated entry
+    ActionOnly,
 }
 
 /// Chain operations that represent chain data distributed across the network.
@@ -505,13 +511,13 @@ The high-level flow for authoring actions and distributing ops is as follows:
    -- Check if chain is locked
    SELECT * FROM ChainLock
    WHERE author = ?
-     AND expires_at_timestamp > CURRENT_TIMESTAMP;
+     AND expires_at_timestamp > unixepoch();
 
    -- Release lock
    DELETE FROM ChainLock WHERE author = ?;
 
    -- Clean up expired locks
-   DELETE FROM ChainLock WHERE expires_at_timestamp <= CURRENT_TIMESTAMP;
+   DELETE FROM ChainLock WHERE expires_at_timestamp <= unixepoch();
    ```
 ```
 
@@ -572,7 +578,7 @@ Private entries are handled differently in op creation:
 
 **Note:**
 
-The `private_entry` field in the Action table (or the `EntryVisibility` from entry type) is checked during op creation to determine:
+The `private_entry` column on the `Action` table caches the entry's visibility at write time so op creation does not need to deserialize `action_data` or look up the entry type. It is checked during op creation to determine:
 - Whether to create `CreateEntry`/`UpdateEntry`/`DeleteEntry` ops (never for private)
 - Whether to use `OpEntry::Hidden` or `OpEntry::Present` in `CreateRecord` ops
 
@@ -645,12 +651,11 @@ For each row returned:
    - `CreateRecord`: Requires `SignedAction` + `OpEntry`
      - If entry exists and is public: `OpEntry::Present(entry)`
      - If entry exists and is private: `OpEntry::Hidden`
-     - If no entry: `OpEntry::NotStored` (for actions without entries)
+     - If no entry: `OpEntry::ActionOnly` (for actions without entries)
    - `CreateEntry`: Requires `SignedAction` + `Entry` (entry must be present and public)
-   - `AgentActivity`: Requires `SignedAction` + `Option<Entry>`
-     - Entry is Some if `cached_at_agent_activity` is enabled for the entry type
+   - `AgentActivity`: Requires `SignedAction`
    - `UpdateEntry`: Requires `SignedAction` + `Entry` (entry must be present and public)
-   - `UpdateRecord`: Requires `SignedAction` only
+   - `UpdateRecord`: Requires `SignedAction` and the new `OpEntry`
    - `DeleteEntry`: Requires `SignedAction` only
    - `DeleteRecord`: Requires `SignedAction` only
    - `CreateLink`: Requires `SignedAction` only
@@ -840,7 +845,7 @@ LIMIT 10000
      ```sql
      UPDATE LimboChainOp
      SET sys_validation_status = 0,
-         last_validation_attempt = CURRENT_TIMESTAMP,
+         last_validation_attempt = unixepoch(),
          sys_validation_attempts = sys_validation_attempts + 1
      WHERE hash = :op_hash
      ```
@@ -848,14 +853,14 @@ LIMIT 10000
      ```sql
      UPDATE LimboChainOp
      SET sys_validation_status = 1,
-         last_validation_attempt = CURRENT_TIMESTAMP,
+         last_validation_attempt = unixepoch(),
          sys_validation_attempts = sys_validation_attempts + 1
      WHERE hash = :op_hash
      ```
    - For ops with **missing dependencies**: no status change, but increment attempt counter so retry ordering and runaway detection work correctly
      ```sql
      UPDATE LimboChainOp
-     SET last_validation_attempt = CURRENT_TIMESTAMP,
+     SET last_validation_attempt = unixepoch(),
          sys_validation_attempts = sys_validation_attempts + 1
      WHERE hash = :op_hash
      ```
@@ -907,7 +912,7 @@ LIMIT 10000
      ```sql
      UPDATE LimboChainOp
      SET app_validation_status = 0,
-         last_validation_attempt = CURRENT_TIMESTAMP,
+         last_validation_attempt = unixepoch(),
          app_validation_attempts = app_validation_attempts + 1
      WHERE hash = :op_hash
      ```
@@ -915,7 +920,7 @@ LIMIT 10000
      ```sql
      UPDATE LimboChainOp
      SET app_validation_status = 1,
-         last_validation_attempt = CURRENT_TIMESTAMP,
+         last_validation_attempt = unixepoch(),
          app_validation_attempts = app_validation_attempts + 1
      WHERE hash = :op_hash
      ```
@@ -988,7 +993,7 @@ ORDER BY LimboChainOp.when_received
        END,
        TRUE,  -- locally_validated
        when_received,
-       CURRENT_TIMESTAMP,
+       unixepoch(),
        serialized_size  -- calculated when op arrived
    FROM LimboChainOp
    WHERE hash = :op_hash
