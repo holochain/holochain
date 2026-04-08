@@ -14,7 +14,7 @@ The Holochain data storage and validation architecture provides:
 ### Core Principles
 
 1. **Ops are the unit of validation**: All validation happens at the op level.
-2. **Records aggregate op validity**: A record's validity is derived from its derived ops.
+2. **Records aggregate op validity**: A record's validity is derived from the ops produced from it.
 3. **Validation limbo isolates pending ops**: Unvalidated chain ops stay in `LimboChainOp` (warrants in `LimboDhtWarrant`) until validated, with actions and entries in shared `DhtAction`/`DhtEntry` tables marked by NULL `record_validity`.
 4. **Distinct schemas per database type**: Authored and DHT databases have schemas tailored to their needs.
 5. **Unified data storage**: DHT database serves both obligated and cached data. Cached data can be distinguished by arc coverage as required.
@@ -38,7 +38,7 @@ CREATE TABLE Action (
     prev_hash     BLOB,
     timestamp     INTEGER NOT NULL,
     action_type   INTEGER NOT NULL, -- ActionType enum variant
-    action_data   BLOB,             -- Serialized ActionData enum, containing action-type fields
+    action_data   BLOB NOT NULL,    -- Serialized ActionData enum, containing action-type fields
     signature     BLOB NOT NULL,    -- Author's signature over the action
 
     -- Reference fields for entry meta
@@ -537,7 +537,9 @@ For **Create** actions:
 
 For **Update** actions:
 - Always create `AgentActivity(SignedAction)` op
-- Always create `UpdateRecord(SignedAction)` op (stored at original action hash authority)
+- Always create `UpdateRecord(SignedAction, OpEntry)` op (stored at original action hash authority)
+  - For public entries: `OpEntry::Present(entry)`
+  - For private entries: `OpEntry::Hidden`
 - If action has a public entry: create `UpdateEntry(SignedAction, Entry)` op (stored at original entry hash authority)
 - If action has a private entry: do NOT create `UpdateEntry` op
 
@@ -728,8 +730,8 @@ The incoming DHT ops workflow is the entry point for all DHT ops received from t
 
 **Workflow Steps:**
 
-1. **Compute Op Hash**
-   - Use the `holo_hash` crate to compute the op hash from the full op content.
+1. **Compute and Verify Op Hash**
+   - Use the `holo_hash` crate to compute the op hash from the full op content and verify it matches the hash provided with the op.
 
 2. **Location check**
    - Verify that the location of the op hash falls within the current arc set for local agents.
@@ -760,7 +762,7 @@ The incoming DHT ops workflow is the entry point for all DHT ops received from t
      - It also prevents wasting resources processing other ops in the batch
 
 6. **Expand to other op types**
-    - For each record that we've ingested, run the expansion to ops.
+    - For each record in the incoming batch, run the expansion to ops.
     - Any ops that weren't part of the incoming set, but do fall within our storage arc, should be added to the set.
     - This may save work fetching ops that we can generate locally, but the primary reason is to make it more difficult
       for peers to withhold individual op types when publishing a record.
@@ -769,7 +771,7 @@ The incoming DHT ops workflow is the entry point for all DHT ops received from t
    - Insert the batch of ops into tables within a single write transaction
    - For each op in the batch:
      - **If chain op (`DhtOp::ChainOp`)**:
-       - Insert action from `action: SignedActionHashed` into `DhtAction` table with `record_validity = NULL`
+       - Insert action from `action: SignedActionHashed` into `DhtAction` table with `record_validity = NULL`, populating `signature` from the `SignedActionHashed` and `private_entry` from the action's entry visibility (NULL for non-entry actions)
        - Insert entry from `entry: Option<EntryHashed>` (if present) into `DhtEntry` table
        - Insert op metadata into `LimboChainOp` using pre-computed hashes (`op_hash`, `action.hash`, `basis_hash`, `storage_center_loc`)
        - Set initial state: `sys_validation_status = NULL`, `app_validation_status = NULL`, `when_received = current_timestamp`, `serialized_size = encoded size`, `require_receipt = true`
@@ -784,7 +786,7 @@ The incoming DHT ops workflow is the entry point for all DHT ops received from t
 
 **Hash Verification Summary:**
 
-All incoming ops undergo four critical hash verifications during counterfeit checks (step 4):
+All incoming ops undergo four critical hash verifications during counterfeit checks (step 5):
 1. **Op hash**: Verified by `DhtOpHashed::from_content_sync()` - ensures op content matches provided hash
 2. **Action hash**: Verified by `ActionHashed::from_content_sync()` - ensures action content matches action hash in op
 3. **Entry hash**: Verified by `EntryHashed::from_content_sync()` - ensures entry content matches entry hash in action
@@ -792,7 +794,7 @@ All incoming ops undergo four critical hash verifications during counterfeit che
 
 If any verification fails, the entire batch is rejected before database insertion.
 
-After successful verification, each `ChainOp` is converted to `HashedChainOp` containing the verified hashes. This internal representation is used for database insertion (step 5), avoiding the need to re-compute hashes.
+After successful verification, each `ChainOp` is converted to `HashedChainOp` containing the verified hashes. This internal representation is used for database insertion (step 7), avoiding the need to re-compute hashes.
 
 **Error Handling:**
 
@@ -901,6 +903,7 @@ LIMIT 10000
 1. **Query Pending Ops**
    - Select ops with `sys_validation_status = 0 AND app_validation_status IS NULL`
    - Order by app validation attempts (least first), then action sequence, then received time
+   - Limit to 10,000 ops per workflow run
 
 2. **Execute WASM Validation**
    - Load appropriate DNA and ribosome
@@ -924,10 +927,11 @@ LIMIT 10000
          app_validation_attempts = app_validation_attempts + 1
      WHERE hash = :op_hash
      ```
-   - For ops **awaiting dependencies**:
+   - For ops **awaiting dependencies**: no status change, but increment attempt counter and update last attempt time so retry ordering and runaway detection work correctly
      ```sql
      UPDATE LimboChainOp
-     SET app_validation_attempts = app_validation_attempts + 1
+     SET last_validation_attempt = unixepoch(),
+         app_validation_attempts = app_validation_attempts + 1
      WHERE hash = :op_hash
      ```
 
@@ -1130,7 +1134,7 @@ The record validity is first set at the time of integrating the first of its ops
 
 ### Record Validity Correction
 
-TODO: It is a future piece of work to define this logic. When implemented, this logic must also clean up index tables (`Link`, `DeletedLink`, `UpdatedRecord`, `DeletedRecord`, `CapGrant`) when records are invalidated.
+TODO: It is a future piece of work to define this logic. When implemented, this logic must also clean up index tables (`Link`, `DeletedLink`, `UpdatedRecord`, `DeletedRecord`) when records are invalidated.
 
 ## Query Patterns
 
