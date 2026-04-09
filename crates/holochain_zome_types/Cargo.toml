@@ -28,7 +28,7 @@ strum = "0.27"
 strum_macros = "0.27"
 thiserror = "2.0"
 tracing = "0.1"
-holochain_wasmer_common = "=0.0.102"
+holochain_wasmer_common = "=0.0.103"
 derive_more = { version = "2.0", features = [
   "from",
   "deref",
