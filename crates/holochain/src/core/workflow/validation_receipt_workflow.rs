@@ -19,7 +19,7 @@ mod unit_tests;
     feature = "instrument",
     tracing::instrument(skip(vault, network, keystore, apply_block))
 )]
-/// Send validation receipts to their authors in serial and without waiting for responses.
+/// Send validation receipts to their authors in serial, skipping authors not recently online.
 pub async fn validation_receipt_workflow(
     dna_hash: Arc<DnaHash>,
     vault: DbWrite<DbKindDht>,
@@ -63,6 +63,32 @@ pub async fn validation_receipt_workflow(
         .collect::<Vec<(AgentPubKey, Vec<ValidationReceipt>)>>();
 
     for (author, receipts) in grouped_by_author {
+        // Don't need to check online status for our own agents — the self-send
+        // is handled inside sign_and_send_receipts_to_author.
+        if !validators.contains(&author) {
+            // Check if the author was recently online before doing any signing/sending work.
+            // If they're not in the peer store, clear the flag so we don't retry until
+            // a new publish from them re-sets it.
+            let recently_online = match network.was_agent_recently_online(author.clone()).await {
+                Ok(recently_online) => recently_online,
+                Err(e) => {
+                    info!(failed_to_check_agent_online_status = ?e);
+                    continue;
+                }
+            };
+
+            if !recently_online {
+                for receipt in receipts {
+                    vault
+                        .write_async(move |txn| {
+                            set_require_receipt(txn, &receipt.dht_op_hash, false)
+                        })
+                        .await?;
+                }
+                continue;
+            }
+        }
+
         // Try to send the validation receipts
         match sign_and_send_receipts_to_author(
             network.clone(),
