@@ -6,7 +6,7 @@ The Holochain data storage and validation architecture provides:
 
 1. A single per-DNA database storing both agents' authored [action and entry](./data_model.md) chains and DHT data.
 2. Ops as the unit of validation, with an aggregated validity status for [records](./data_model.md). 
-3. Validation limbo tables (`LimboChainOp`, `LimboDhtWarrant`) to track pending ops from the network, with shared `DhtAction`/`DhtEntry` tables.
+3. Validation limbo tables (`LimboChainOp`, `LimboWarrant`) to track pending ops from the network, with shared `Action`/`Entry` tables.
 4. Unified data querying across authored, obligated, and cached data in a single database.
 
 ## Architecture
@@ -15,7 +15,7 @@ The Holochain data storage and validation architecture provides:
 
 1. **Ops are the unit of validation**: All validation happens at the op level.
 2. **Records aggregate op validity**: A record's validity is derived from the ops produced from it.
-3. **Validation limbo isolates pending ops**: Unvalidated ops from the network stay in `LimboChainOp` (warrants in `LimboDhtWarrant`) until validated, with actions and entries in shared `DhtAction`/`DhtEntry` tables marked by NULL `record_validity`. Self-authored ops bypass limbo (pre-validated at authoring time).
+3. **Validation limbo isolates pending ops**: Unvalidated ops from the network stay in `LimboChainOp` (warrants in `LimboWarrant`) until validated, with actions and entries in shared `Action`/`Entry` tables marked by NULL `record_validity`. Self-authored ops bypass limbo (pre-validated at authoring time) but still go through integration to register in the DHT model.
 4. **Single database per DNA**: Each DNA cell uses one database for all chain, DHT, and validation data. Private entries are isolated in a dedicated table for access control auditing.
 5. **Unified data storage**: The database serves authored chain data, obligated DHT data, and cached data. Cached data can be distinguished by arc coverage as required.
 6. **Clear state transitions**: Data moves through well-defined states with no ambiguity.
@@ -33,7 +33,7 @@ Each DNA cell uses a single database for authored chain data, DHT data, and vali
 -- WITHOUT ROWID stores rows in a single B-tree clustered on hash, eliminating the
 -- double-lookup overhead of a regular table (rowid B-tree + primary key index).
 -- All FK references already store the full 32-byte hash, so no downstream changes needed.
-CREATE TABLE DhtAction (
+CREATE TABLE Action (
    hash          BLOB PRIMARY KEY,
    author        BLOB NOT NULL,
    seq           INTEGER NOT NULL,
@@ -56,16 +56,16 @@ CREATE TABLE DhtAction (
 
 -- Public entries.
 --
--- WITHOUT ROWID for the same reason as DhtAction: single clustered B-tree on hash,
+-- WITHOUT ROWID for the same reason as Action: single clustered B-tree on hash,
 -- accessed almost exclusively by primary key.
-CREATE TABLE DhtEntry (
+CREATE TABLE Entry (
    hash BLOB PRIMARY KEY,
    blob BLOB NOT NULL
 ) WITHOUT ROWID;
 
 -- Private entries (author's own private entries only).
 --
--- Kept in a dedicated table separate from DhtEntry so that access to private entry
+-- Kept in a dedicated table separate from Entry so that access to private entry
 -- content is isolated and auditable. Private entries are never distributed to other
 -- agents, so only an author's private entries appear here.
 CREATE TABLE PrivateEntry (
@@ -82,7 +82,7 @@ CREATE TABLE CapGrant (
     cap_access  INTEGER NOT NULL, -- CapAccess enum: 0=unrestricted, 1=transferable, 2=assigned
     tag         TEXT,
 
-    FOREIGN KEY(action_hash) REFERENCES DhtAction(hash)
+    FOREIGN KEY(action_hash) REFERENCES Action(hash)
 );
 
 -- Capability claims table.
@@ -108,7 +108,8 @@ CREATE TABLE ChainLock (
 );
 
 -- Limbo for chain ops received from the network which are in the process of being validated.
--- Self-authored ops bypass limbo and are inserted directly into DhtChainOp.
+-- Self-authored ops bypass limbo and are inserted directly into ChainOp,
+-- but still go through integration to populate index tables.
 CREATE TABLE LimboChainOp (
     hash        BLOB PRIMARY KEY,
     op_type     INTEGER NOT NULL, -- ChainOpType enum variant
@@ -135,12 +136,12 @@ CREATE TABLE LimboChainOp (
     -- Storage tracking
     serialized_size INTEGER NOT NULL,  -- Size in bytes, calculated when op arrives
 
-    FOREIGN KEY(action_hash) REFERENCES DhtAction(hash)
+    FOREIGN KEY(action_hash) REFERENCES Action(hash)
 );
 
 -- Limbo for DHT warrant ops which are in the process of being validated.
 -- Warrants have sys validation only; there is no app validation step.
-CREATE TABLE LimboDhtWarrant (
+CREATE TABLE LimboWarrant (
     hash      BLOB PRIMARY KEY,
     author    BLOB NOT NULL,
     timestamp INTEGER NOT NULL,
@@ -167,7 +168,7 @@ CREATE TABLE LimboDhtWarrant (
 --
 -- Contains both self-authored ops (inserted directly at authoring time) and
 -- network-received ops (moved from LimboChainOp after validation).
-CREATE TABLE DhtChainOp (
+CREATE TABLE ChainOp (
     hash        BLOB PRIMARY KEY,
     op_type     INTEGER NOT NULL, -- ChainOpType enum variant
     action_hash BLOB NOT NULL,
@@ -187,11 +188,20 @@ CREATE TABLE DhtChainOp (
     -- Storage tracking
     serialized_size INTEGER NOT NULL DEFAULT 0, -- size in bytes for storage quota management
 
-    -- Publishing state (populated for locally authored ops; NULL for network-received ops)
+    FOREIGN KEY(action_hash) REFERENCES Action(hash)
+);
+
+-- Publishing state for locally authored chain ops.
+--
+-- Only rows for self-authored ops appear here; network-received ops have no publish state.
+-- Separated from ChainOp to avoid sparse NULL columns in the much larger set of
+-- network-received ops.
+CREATE TABLE ChainOpPublish (
+    op_hash           BLOB PRIMARY KEY,
     last_publish_time INTEGER,
     receipts_complete BOOLEAN,
 
-    FOREIGN KEY(action_hash) REFERENCES DhtAction(hash)
+    FOREIGN KEY(op_hash) REFERENCES ChainOp(hash)
 );
 
 -- Validation receipts for authored ops.
@@ -204,14 +214,14 @@ CREATE TABLE ValidationReceipt (
     signature     BLOB NOT NULL,
     when_received INTEGER NOT NULL,
 
-    FOREIGN KEY(op_hash) REFERENCES DhtChainOp(hash)
+    FOREIGN KEY(op_hash) REFERENCES ChainOp(hash)
 );
 
 -- Integrated DHT warrants.
 --
 -- Contains both self-authored warrants (inserted directly at authoring time) and
--- network-received warrants (moved from LimboDhtWarrant after validation).
-CREATE TABLE DhtWarrant (
+-- network-received warrants (moved from LimboWarrant after validation).
+CREATE TABLE Warrant (
     hash      BLOB PRIMARY KEY,
     author    BLOB NOT NULL,
     timestamp INTEGER NOT NULL,
@@ -219,10 +229,17 @@ CREATE TABLE DhtWarrant (
     proof     BLOB NOT NULL,  -- Serialized WarrantProof (InvalidChainOp or ChainFork)
 
     -- DHT location (stored at warrantee's agent authority)
-    storage_center_loc INTEGER NOT NULL,
+    storage_center_loc INTEGER NOT NULL
+);
 
-    -- Publishing state (populated for locally authored warrants; NULL for network-received warrants)
-    last_publish_time INTEGER
+-- Publishing state for locally authored warrants.
+--
+-- Only rows for self-authored warrants appear here; network-received warrants have no publish state.
+CREATE TABLE WarrantPublish (
+    warrant_hash      BLOB PRIMARY KEY,
+    last_publish_time INTEGER,
+
+    FOREIGN KEY(warrant_hash) REFERENCES Warrant(hash)
 );
 
 -- Link index table.
@@ -235,7 +252,7 @@ CREATE TABLE Link (
     link_type   INTEGER NOT NULL,
     tag         BLOB,
 
-    FOREIGN KEY(action_hash) REFERENCES DhtAction(hash) ON DELETE CASCADE
+    FOREIGN KEY(action_hash) REFERENCES Action(hash) ON DELETE CASCADE
 );
 
 -- Deleted link index table.
@@ -245,7 +262,7 @@ CREATE TABLE DeletedLink (
     action_hash      BLOB PRIMARY KEY,  -- The DeleteLink action
     create_link_hash BLOB NOT NULL,      -- The CreateLink being deleted
 
-    FOREIGN KEY(action_hash) REFERENCES DhtAction(hash) ON DELETE CASCADE
+    FOREIGN KEY(action_hash) REFERENCES Action(hash) ON DELETE CASCADE
 );
 
 -- Update index table.
@@ -256,7 +273,7 @@ CREATE TABLE UpdatedRecord (
     original_action_hash     BLOB NOT NULL,      -- The original Create or Update being updated
     original_entry_hash      BLOB NOT NULL,      -- The original entry being updated
 
-    FOREIGN KEY(action_hash) REFERENCES DhtAction(hash) ON DELETE CASCADE
+    FOREIGN KEY(action_hash) REFERENCES Action(hash) ON DELETE CASCADE
 );
 
 -- Delete index table.
@@ -267,7 +284,7 @@ CREATE TABLE DeletedRecord (
     deletes_action_hash BLOB NOT NULL,      -- The action being deleted
     deletes_entry_hash  BLOB NOT NULL,      -- The entry being deleted
 
-    FOREIGN KEY(action_hash) REFERENCES DhtAction(hash) ON DELETE CASCADE
+    FOREIGN KEY(action_hash) REFERENCES Action(hash) ON DELETE CASCADE
 );
 
 ```
@@ -276,15 +293,15 @@ CREATE TABLE DeletedRecord (
 
 1. **Merged authored and DHT databases**: The current implementation uses separate per-agent authored and per-DNA DHT databases. The new design uses a single per-DNA database. For full-arc nodes (the common case), every authored write already results in a DHT write, so the separate write handle provides no meaningful performance benefit. The single database eliminates cross-database query complexity.
 
-2. **Private entries in dedicated table**: Private entries move from the general `Entry` table to a dedicated `PrivateEntry` table with an `author` column. This makes access control auditable at the schema level — code that queries `DhtEntry` cannot accidentally leak private content.
+2. **Private entries in dedicated table**: Private entries move from the general `Entry` table to a dedicated `PrivateEntry` table with an `author` column. This makes access control auditable at the schema level — code that queries `Entry` cannot accidentally leak private content.
 
-3. **Self-authored ops bypass limbo**: Self-authored ops are pre-validated at authoring time and inserted directly into `DhtChainOp` with `validation_status = 1`. The existing duplicate check in the incoming ops workflow (`SELECT EXISTS(SELECT 1 FROM DhtChainOp WHERE hash = :hash)`) prevents double-processing when the same op arrives from the network.
+3. **Self-authored ops bypass limbo but still integrate**: Self-authored ops are pre-validated at authoring time and inserted directly into `ChainOp` with `validation_status = 1`, bypassing limbo. However, they still go through the integration step (populating index tables like `Link`, `DeletedLink`, `UpdatedRecord`, `DeletedRecord`) so the DHT model reflects the authored data. The existing duplicate check in the incoming ops workflow (`SELECT EXISTS(SELECT 1 FROM ChainOp WHERE hash = :hash)`) prevents double-processing when the same op arrives from the network.
 
-4. **Publishing state on integrated tables**: Publishing fields (`last_publish_time`, `receipts_complete`) move from the removed `AuthoredChainOp` table onto `DhtChainOp`. `DhtWarrant` gets `last_publish_time` only (no receipt tracking for warrants). These fields are NULL for network-received ops and only populated for locally authored ops.
+4. **Publishing state in dedicated tables**: Publishing fields (`last_publish_time`, `receipts_complete`) move from the removed `AuthoredChainOp` table into dedicated `ChainOpPublish` and `WarrantPublish` tables. Only locally authored ops/warrants have rows in these tables, avoiding sparse NULL columns in the much larger set of network-received data.
 
 5. **`CapClaim` gains `author` column**: Since the table is no longer in a per-agent database, an `author` column distinguishes which agent each claim belongs to. All cap claim queries filter by author.
 
-6. **`ValidationReceipt` references `DhtChainOp`**: Receipts now reference the integrated ops table directly instead of the removed `AuthoredChainOp` table.
+6. **`ValidationReceipt` references `ChainOp`**: Receipts now reference the integrated ops table directly instead of the removed `AuthoredChainOp` table.
 
 7. **Removed tables**: `AuthoredChainOp`, `AuthoredWarrantOp`, and the separate authored `Action`/`Entry` tables are removed. Their data is consolidated into the DHT tables.
 
@@ -449,33 +466,35 @@ The high-level flow for authoring actions and distributing ops is as follows:
    └─> On failure: rollback transaction, chain unchanged
 
 2. Author new action locally
-   ├─> Insert into `DhtAction` table with `record_validity = 1` (pre-validated)
-   ├─> Insert into `DhtEntry` (public) or `PrivateEntry` (private) table (if applicable)
+   ├─> Insert into `Action` table with `record_validity = 1` (pre-validated)
+   ├─> Insert into `Entry` (public) or `PrivateEntry` (private) table (if applicable)
    └─> Insert into `CapGrant` table (if action is a CapGrant entry)
 
 3. Create ops for publishing
    ├─> If this is a countersigning action, skip this step (ops created on session completion)
    ├─> Transform action/entry into DHT ops (see "Action to Op Transform" below)
-   └─> Insert directly into `DhtChainOp` with `validation_status = 1`, `locally_validated = TRUE`, publishing state
+   └─> Insert directly into `ChainOp` with `validation_status = 1`, `locally_validated = TRUE`
+   └─> Insert into `ChainOpPublish` with initial publishing state
 
 4. Publish DHT Ops Workflow
-   ├─> Query `DhtChainOp` and `DhtWarrant` for ops authored by the local agent that need publishing
+   ├─> Query `ChainOpPublish` and `WarrantPublish` joined to their parent tables for ops that need publishing
    ├─> Only publish ops with `validation_status = 1` (accepted)
    ├─> Group by `basis_hash` for efficient sending
    ├─> Send ops to DHT authorities over the network
-   └─> Update `last_publish_time` in `DhtChainOp` (or `DhtWarrant`)
+   └─> Update `last_publish_time` in `ChainOpPublish` (or `WarrantPublish`)
 
 5. Validation Receipt Workflow
    ├─> Receive validation receipts from validators
    ├─> Insert into `ValidationReceipt` table
-   └─> Update `receipts_complete` in `DhtChainOp` when sufficient receipts received
+   └─> Update `receipts_complete` in `ChainOpPublish` when sufficient receipts received
 
 6. Countersigning Workflow (if applicable)
    ├─> Lock the chain: Insert into `ChainLock` with session subject and expiration
    ├─> Wait for all participants to sign
    ├─> Verify all participants have signed
    ├─> Create ops from the countersigned action/entry
-   ├─> Insert directly into `DhtChainOp` with `validation_status = 1`, publishing state
+   ├─> Insert directly into `ChainOp` with `validation_status = 1`
+   ├─> Insert into `ChainOpPublish` with initial publishing state
    ├─> Unlock the chain: Delete from `ChainLock` where author = current agent
    └─> Trigger publish workflow
 
@@ -560,41 +579,42 @@ Private entries are handled differently in op creation:
 
 **Note:**
 
-The `private_entry` column on the `DhtAction` table caches the entry's visibility at write time so op creation does not need to deserialize `action_data` or look up the entry type. It is checked during op creation to determine:
+The `private_entry` column on the `Action` table caches the entry's visibility at write time so op creation does not need to deserialize `action_data` or look up the entry type. It is checked during op creation to determine:
 - Whether to create `CreateEntry`/`UpdateEntry`/`DeleteEntry` ops (never for private)
 - Whether to use `OpEntry::Hidden` or `OpEntry::Present` in `CreateRecord` ops
 
 #### Publish Query and Op Construction
 
-The publish workflow queries `DhtChainOp` and `DhtWarrant` for ops authored by the local agent that need publishing, and constructs the full `ChainOp` (wrapped in `DhtOp`) for network transmission.
+The publish workflow queries `ChainOpPublish` and `WarrantPublish` (joined to their parent tables) for ops authored by the local agent that need publishing, and constructs the full `ChainOp` (wrapped in `DhtOp`) for network transmission.
 
 **Query Logic:**
 
-The query selects from `DhtChainOp`, joining to `DhtAction` and optionally `DhtEntry`, filtering to the local agent's accepted ops. A UNION includes warrants from the `DhtWarrant` table:
+The query selects from `ChainOpPublish` joined to `ChainOp`, `Action`, and optionally `Entry`, filtering to the local agent's accepted ops. A UNION includes warrants from `WarrantPublish` joined to `Warrant`:
 
 ```sql
 -- Chain ops
 SELECT
     'chain' as op_category,
-    DhtAction.hash as action_hash,
-    DhtAction.author,
-    DhtAction.timestamp,
-    DhtAction.action_type,
-    DhtAction.action_data,
-    DhtEntry.blob as entry_blob,
-    DhtChainOp.hash as op_hash,
-    DhtChainOp.op_type,
-    DhtChainOp.basis_hash,
-    DhtChainOp.last_publish_time
-FROM DhtChainOp
-JOIN DhtAction ON DhtChainOp.action_hash = DhtAction.hash
-LEFT JOIN DhtEntry ON DhtAction.entry_hash = DhtEntry.hash
+    Action.hash as action_hash,
+    Action.author,
+    Action.timestamp,
+    Action.action_type,
+    Action.action_data,
+    Entry.blob as entry_blob,
+    ChainOp.hash as op_hash,
+    ChainOp.op_type,
+    ChainOp.basis_hash,
+    pub.last_publish_time
+FROM ChainOpPublish pub
+JOIN ChainOp ON pub.op_hash = ChainOp.hash
+JOIN Action ON ChainOp.action_hash = Action.hash
+LEFT JOIN Entry ON Action.entry_hash = Entry.hash
 WHERE
-    DhtAction.author = :author
-    AND DhtChainOp.validation_status = 1
-    AND (DhtChainOp.last_publish_time IS NULL
-        OR DhtChainOp.last_publish_time <= :recency_threshold)
-    AND DhtChainOp.receipts_complete IS NULL
+    Action.author = :author
+    AND ChainOp.validation_status = 1
+    AND (pub.last_publish_time IS NULL
+        OR pub.last_publish_time <= :recency_threshold)
+    AND pub.receipts_complete IS NULL
 
 UNION ALL
 
@@ -602,20 +622,21 @@ UNION ALL
 SELECT
     'warrant' as op_category,
     NULL as action_hash,
-    DhtWarrant.author,
-    DhtWarrant.timestamp,
+    Warrant.author,
+    Warrant.timestamp,
     'Warrant' as action_type,
     NULL as action_data,
     NULL as entry_blob,
-    DhtWarrant.hash as op_hash,
+    Warrant.hash as op_hash,
     'Warrant' as op_type,
-    DhtWarrant.warrantee as basis_hash,  -- Warrants stored at warrantee's authority
-    DhtWarrant.last_publish_time
-FROM DhtWarrant
+    Warrant.warrantee as basis_hash,  -- Warrants stored at warrantee's authority
+    pub.last_publish_time
+FROM WarrantPublish pub
+JOIN Warrant ON pub.warrant_hash = Warrant.hash
 WHERE
-    DhtWarrant.author = :author
-    AND (DhtWarrant.last_publish_time IS NULL
-        OR DhtWarrant.last_publish_time <= :recency_threshold)
+    Warrant.author = :author
+    AND (pub.last_publish_time IS NULL
+        OR pub.last_publish_time <= :recency_threshold)
 
 ORDER BY timestamp, op_type
 ```
@@ -642,9 +663,9 @@ For each row returned:
 
 **Differences to Current Implementation:**
 
-1. **Merged database eliminates cross-database publish query**: The current implementation uses separate authored and DHT databases, requiring a cross-database LEFT JOIN to check integration status before publishing. With the single database, self-authored ops are inserted directly into `DhtChainOp` with `validation_status = 1` at authoring time. The publish query simply filters by `validation_status = 1` within the same database.
+1. **Merged database eliminates cross-database publish query**: The current implementation uses separate authored and DHT databases, requiring a cross-database LEFT JOIN to check integration status before publishing. With the single database, self-authored ops are inserted directly into `ChainOp` with `validation_status = 1` at authoring time. The publish query simply filters by `validation_status = 1` within the same database.
 
-2. **No `withhold_publish` field**: The current code checks `DhtChainOp.withhold_publish IS NULL` to exclude countersigning ops. Countersigning completion produces ops from the action/entry instead of clearing a field. During the countersigning session, ops are not created at all — they are only created when the session successfully completes, at which point they are immediately publishable.
+2. **No `withhold_publish` field**: The current code checks `ChainOp.withhold_publish IS NULL` to exclude countersigning ops. Countersigning completion produces ops from the action/entry instead of clearing a field. During the countersigning session, ops are not created at all — they are only created when the session successfully completes, at which point they are immediately publishable.
 
 3. **No `op_order` field**: The current `OpOrder` combines op type priority with timestamp. The publish query uses `ORDER BY timestamp, op_type` instead, providing consistent chronological ordering across chain ops and warrants with a stable tiebreak.
 
@@ -658,14 +679,14 @@ The validation flow processes incoming DHT ops through several stages, from init
    ├─> Filter duplicate ops already being processed
    ├─> Verify counterfeit checks (signature and hash verification)
    ├─> Convert `ChainOp` to `HashedChainOp` (internal type with checked hashes)
-   ├─> Filter ops already in database (check `DhtChainOp` or `DhtWarrant` table)
-   ├─> Insert action into `DhtAction` with `record_validity=NULL`
-   ├─> Insert entry (if applicable) into `DhtEntry`
+   ├─> Filter ops already in database (check `ChainOp` or `Warrant` table)
+   ├─> Insert action into `Action` with `record_validity=NULL`
+   ├─> Insert entry (if applicable) into `Entry`
    └─> Insert into `LimboChainOp` with `sys_validation_status=NULL`
 
 2. Sys Validation Workflow
    ├─> Query `LimboChainOp` for ops with `sys_validation_status IS NULL`
-   ├─> Check dependencies in `DhtAction`/`DhtEntry`
+   ├─> Check dependencies in `Action`/`Entry`
    ├─> Perform sys validation checks
    └─> Update `sys_validation_status` in `LimboChainOp`
        └─> Trigger app validation if accepted
@@ -680,8 +701,8 @@ The validation flow processes incoming DHT ops through several stages, from init
 
 4. Integration Workflow (if both accepted)
    ├─> Query `LimboChainOp` for ops where sys or app validation reached a terminal state
-   ├─> Move op from `LimboChainOp` to `DhtChainOp` (set `when_integrated`)
-   ├─> Update `DhtAction` `record_validity` with aggregated status
+   ├─> Move op from `LimboChainOp` to `ChainOp` (set `when_integrated`)
+   ├─> Update `Action` `record_validity` with aggregated status
    └─> Delete from `LimboChainOp`
 ```
 
@@ -702,9 +723,9 @@ The incoming DHT ops workflow is the entry point for all DHT ops received from t
    - Skip ops that already exist in the integrated tables:
    ```sql
    -- For chain ops:
-   SELECT EXISTS(SELECT 1 FROM DhtChainOp WHERE hash = :hash)
+   SELECT EXISTS(SELECT 1 FROM ChainOp WHERE hash = :hash)
    -- For warrant ops:
-   SELECT EXISTS(SELECT 1 FROM DhtWarrant WHERE hash = :hash)
+   SELECT EXISTS(SELECT 1 FROM Warrant WHERE hash = :hash)
    ```
 
 4. **Deduplication Check**
@@ -732,13 +753,13 @@ The incoming DHT ops workflow is the entry point for all DHT ops received from t
    - Insert the batch of ops into tables within a single write transaction
    - For each op in the batch:
      - **If chain op (`DhtOp::ChainOp`)**:
-       - Insert action from `action: SignedActionHashed` into `DhtAction` table with `record_validity = NULL`, populating `signature` from the `SignedActionHashed` and `private_entry` from the action's entry visibility (NULL for non-entry actions)
-       - Insert entry from `entry: Option<EntryHashed>` (if present) into `DhtEntry` table
+       - Insert action from `action: SignedActionHashed` into `Action` table with `record_validity = NULL`, populating `signature` from the `SignedActionHashed` and `private_entry` from the action's entry visibility (NULL for non-entry actions)
+       - Insert entry from `entry: Option<EntryHashed>` (if present) into `Entry` table
        - Insert op metadata into `LimboChainOp` using pre-computed hashes (`op_hash`, `action.hash`, `basis_hash`, `storage_center_loc`)
        - Set initial state: `sys_validation_status = NULL`, `app_validation_status = NULL`, `when_received = current_timestamp`, `serialized_size = encoded size`, `require_receipt = true`
      - **If warrant op (`DhtOp::WarrantOp`)**:
        - No action or entry insertion (warrants don't have actions)
-       - Insert into `LimboDhtWarrant` with the full warrant content (`hash`, `author`, `timestamp`, `warrantee`, `proof`, `storage_center_loc`)
+       - Insert into `LimboWarrant` with the full warrant content (`hash`, `author`, `timestamp`, `warrantee`, `proof`, `storage_center_loc`)
        - Set initial state: `sys_validation_status = NULL`, `when_received = current_timestamp`, `serialized_size = encoded size`
 
 8. **Trigger Sys Validation**
@@ -777,13 +798,13 @@ SELECT
     LimboChainOp.op_type,
     LimboChainOp.action_hash,
     LimboChainOp.sys_validation_attempts,
-    DhtAction.author,
-    DhtAction.entry_hash
+    Action.author,
+    Action.entry_hash
 FROM LimboChainOp
-JOIN DhtAction ON LimboChainOp.action_hash = DhtAction.hash
+JOIN Action ON LimboChainOp.action_hash = Action.hash
 WHERE
     LimboChainOp.sys_validation_status IS NULL
-ORDER BY sys_validation_attempts, DhtAction.seq, when_received
+ORDER BY sys_validation_attempts, Action.seq, when_received
 LIMIT 10000
 ```
 
@@ -848,14 +869,14 @@ SELECT
     LimboChainOp.op_type,
     LimboChainOp.action_hash,
     LimboChainOp.app_validation_attempts,
-    DhtAction.author,
-    DhtAction.entry_hash
+    Action.author,
+    Action.entry_hash
 FROM LimboChainOp
-JOIN DhtAction ON LimboChainOp.action_hash = DhtAction.hash
+JOIN Action ON LimboChainOp.action_hash = Action.hash
 WHERE
     LimboChainOp.sys_validation_status = 1
     AND LimboChainOp.app_validation_status IS NULL
-ORDER BY app_validation_attempts, DhtAction.seq, when_received
+ORDER BY app_validation_attempts, Action.seq, when_received
 LIMIT 10000
 ```
 
@@ -868,7 +889,7 @@ LIMIT 10000
 
 2. **Execute WASM Validation**
    - Load appropriate DNA and ribosome
-   - Call `validate(op: Op)` callback for the op
+   - Call `validate(op: DhtOp)` callback for the op
    - Collect validation outcome (`Accepted`, `Rejected`, or dependency request)
 
 3. **Update Validation Status**
@@ -930,11 +951,11 @@ ORDER BY LimboChainOp.when_received
    - Select ops where validation was abandoned, sys validation was rejected, or both sys and app validation reached a terminal state.
    - Accepted, rejected, and abandoned ops are all integrated (removed from limbo).
 
-2. **Move Op to DhtChainOp Table**
+2. **Move Op to ChainOp Table**
    - Start a write transaction for each op.
    - Execute the following insert:
    ```sql
-   INSERT INTO DhtChainOp (
+   INSERT INTO ChainOp (
        hash,
        op_type,
        action_hash,
@@ -964,26 +985,26 @@ ORDER BY LimboChainOp.when_received
    WHERE hash = :op_hash
    ```
 
-3. **Update `DhtAction` with Record Validity**
+3. **Update `Action` with Record Validity**
    - Aggregate `record_validity` from all ops for this action using a single query
    - **Rules (applied in SQL):**
      - If ANY op for this action is rejected: `record_validity = 2`
      - If at least one op is accepted and none rejected: `record_validity = 1`
    ```sql
-   UPDATE DhtAction
+   UPDATE Action
    SET record_validity = (
        SELECT CASE
            WHEN COUNT(CASE WHEN validation_status = 2 THEN 1 END) > 0 THEN 2
            WHEN COUNT(CASE WHEN validation_status = 1 THEN 1 END) > 0 THEN 1
            ELSE NULL
        END
-       FROM DhtChainOp
+       FROM ChainOp
        WHERE action_hash = :action_hash
    )
    WHERE hash = :action_hash
    ```
 
-   Note: For network-received ops, `DhtAction` rows are inserted during incoming op processing with `record_validity = NULL` and updated here once an op integrates. For self-authored ops, `DhtAction` rows are inserted at authoring time with `record_validity = 1` and the corresponding `DhtChainOp` rows bypass limbo. `DhtEntry` rows are also inserted at incoming/authoring time (if the op carries a public entry), but `DhtEntry` has no validity field — no entry-specific step is needed during integration.
+   Note: For network-received ops, `Action` rows are inserted during incoming op processing with `record_validity = NULL` and updated here once an op integrates. For self-authored ops, `Action` rows are inserted at authoring time with `record_validity = 1` and the corresponding `ChainOp` rows bypass limbo but still go through integration to populate index tables and register in the DHT model. `Entry` rows are also inserted at incoming/authoring time (if the op carries a public entry), but `Entry` has no validity field — no entry-specific step is needed during integration.
 
 4. **Update Index Tables** (if applicable)
    - If the action is a `CreateLink` and the op is accepted, insert into `Link` table:
@@ -995,7 +1016,7 @@ ORDER BY LimboChainOp.when_received
        :zome_index,     -- extracted from action_data during integration
        :link_type,      -- extracted from action_data during integration
        :tag             -- extracted from action_data during integration
-   FROM DhtAction AS Action
+   FROM Action
    WHERE Action.hash = :action_hash
        AND Action.record_validity = 1
        AND Action.action_type = 8 -- ActionType::CreateLink
@@ -1005,7 +1026,7 @@ ORDER BY LimboChainOp.when_received
    DELETE FROM Link
    WHERE action_hash = :action_hash
    AND :action_hash IN (
-       SELECT hash FROM DhtAction
+       SELECT hash FROM Action
        WHERE hash = :action_hash AND record_validity = 2
    );
    ```
@@ -1015,7 +1036,7 @@ ORDER BY LimboChainOp.when_received
    SELECT
        Action.hash,
        :create_link_hash  -- extracted from action_data during integration
-   FROM DhtAction AS Action
+   FROM Action
    WHERE Action.hash = :action_hash
        AND Action.record_validity = 1
        AND Action.action_type = 9 -- ActionType::DeleteLink
@@ -1025,7 +1046,7 @@ ORDER BY LimboChainOp.when_received
    DELETE FROM DeletedLink
    WHERE action_hash = :action_hash
    AND :action_hash IN (
-       SELECT hash FROM DhtAction
+       SELECT hash FROM Action
        WHERE hash = :action_hash AND record_validity = 2
    );
    ```
@@ -1036,7 +1057,7 @@ ORDER BY LimboChainOp.when_received
        Action.hash,
        :original_action_hash,  -- extracted from action_data during integration
        :original_entry_hash    -- extracted from action_data during integration
-   FROM DhtAction AS Action
+   FROM Action
    WHERE Action.hash = :action_hash
        AND Action.record_validity = 1
        AND Action.action_type = 6 -- ActionType::Update
@@ -1046,7 +1067,7 @@ ORDER BY LimboChainOp.when_received
    DELETE FROM UpdatedRecord
    WHERE action_hash = :action_hash
    AND :action_hash IN (
-       SELECT hash FROM DhtAction
+       SELECT hash FROM Action
        WHERE hash = :action_hash AND record_validity = 2
    );
    ```
@@ -1057,7 +1078,7 @@ ORDER BY LimboChainOp.when_received
        Action.hash,
        :deletes_action_hash,  -- extracted from action_data during integration
        :deletes_entry_hash    -- extracted from action_data during integration
-   FROM DhtAction AS Action
+   FROM Action
    WHERE Action.hash = :action_hash
        AND Action.record_validity = 1
        AND Action.action_type = 7 -- ActionType::Delete
@@ -1067,7 +1088,7 @@ ORDER BY LimboChainOp.when_received
    DELETE FROM DeletedRecord
    WHERE action_hash = :action_hash
    AND :action_hash IN (
-       SELECT hash FROM DhtAction
+       SELECT hash FROM Action
        WHERE hash = :action_hash AND record_validity = 2
    );
    ```
@@ -1106,8 +1127,8 @@ Retrieve a complete record (action and entry) from the DHT by action hash.
 
 ```sql
 SELECT Action.*, Entry.*
-FROM DhtAction AS Action
-LEFT JOIN DhtEntry AS Entry ON Action.entry_hash = Entry.hash
+FROM Action
+LEFT JOIN Entry ON Action.entry_hash = Entry.hash
 WHERE Action.hash = ?
   AND Action.record_validity = 1
 ```
@@ -1118,8 +1139,8 @@ Retrieve an entry from the DHT using the validation status from any action that 
 
 ```sql
 SELECT Entry.*, Action.*
-FROM DhtEntry AS Entry
-JOIN DhtAction AS Action ON Action.entry_hash = Entry.hash
+FROM Entry
+JOIN Action ON Action.entry_hash = Entry.hash
 WHERE Entry.hash = ?
   AND Action.record_validity = 1
 LIMIT 1
@@ -1136,7 +1157,7 @@ Find non-deleted links from base:
 ```sql
 SELECT Link.*, Action.*
 FROM Link
-JOIN DhtAction AS Action ON Link.action_hash = Action.hash
+JOIN Action ON Link.action_hash = Action.hash
 LEFT JOIN DeletedLink ON Link.action_hash = DeletedLink.create_link_hash
 WHERE Link.base_hash = ?
   AND DeletedLink.create_link_hash IS NULL
@@ -1161,7 +1182,7 @@ Count non-deleted links:
 SELECT COUNT(*)
 FROM Link
 LEFT JOIN DeletedLink ON Link.action_hash = DeletedLink.create_link_hash
-JOIN DhtAction AS Action ON Link.action_hash = Action.hash
+JOIN Action ON Link.action_hash = Action.hash
 WHERE Link.base_hash = ?
   AND DeletedLink.create_link_hash IS NULL
   AND Action.record_validity = 1
@@ -1175,7 +1196,7 @@ Query an agent's chain activity with flexible filtering for action types, entry 
 
 ```sql
 SELECT Action.*
-FROM DhtAction AS Action
+FROM Action
 WHERE Action.author = ?
   AND Action.record_validity IS NOT NULL
 ORDER BY Action.seq
@@ -1195,7 +1216,7 @@ Query with sequence bounds:
 
 ```sql
 SELECT Action.*
-FROM DhtAction AS Action
+FROM Action
 WHERE Action.author = ?
   AND Action.seq BETWEEN ? AND ?
   AND Action.record_validity IS NOT NULL
@@ -1206,14 +1227,14 @@ Application code verifies that there are no gaps in sequence numbers (complete c
 
 ### Query Authored Chain with `ChainQueryFilter`
 
-Query the authored source chain with filtering criteria from `ChainQueryFilter`. The chain is ordered by sequence and typically queried by walking the chain. Both public and private entries are returned for the author's own chain by joining to both `DhtEntry` and `PrivateEntry`.
+Query the authored source chain with filtering criteria from `ChainQueryFilter`. The chain is ordered by sequence and typically queried by walking the chain. Both public and private entries are returned for the author's own chain by joining to both `Entry` and `PrivateEntry`.
 
 Base query with common filters:
 
 ```sql
-SELECT Action.*, COALESCE(DhtEntry.blob, PrivateEntry.blob) as entry_blob
-FROM DhtAction AS Action
-LEFT JOIN DhtEntry ON Action.entry_hash = DhtEntry.hash
+SELECT Action.*, COALESCE(Entry.blob, PrivateEntry.blob) as entry_blob
+FROM Action
+LEFT JOIN Entry ON Action.entry_hash = Entry.hash
 LEFT JOIN PrivateEntry ON Action.entry_hash = PrivateEntry.hash
     AND PrivateEntry.author = :author
 WHERE Action.author = :author
@@ -1228,9 +1249,9 @@ ORDER BY Action.seq ASC
 **Unbounded**: No sequence filtering
 
 ```sql
-SELECT Action.*, COALESCE(DhtEntry.blob, PrivateEntry.blob) as entry_blob
-FROM DhtAction AS Action
-LEFT JOIN DhtEntry ON Action.entry_hash = DhtEntry.hash
+SELECT Action.*, COALESCE(Entry.blob, PrivateEntry.blob) as entry_blob
+FROM Action
+LEFT JOIN Entry ON Action.entry_hash = Entry.hash
 LEFT JOIN PrivateEntry ON Action.entry_hash = PrivateEntry.hash
     AND PrivateEntry.author = :author
 WHERE Action.author = :author
@@ -1240,9 +1261,9 @@ ORDER BY Action.seq ASC
 **ActionSeqRange(start, end)**: Filter by sequence numbers
 
 ```sql
-SELECT Action.*, COALESCE(DhtEntry.blob, PrivateEntry.blob) as entry_blob
-FROM DhtAction AS Action
-LEFT JOIN DhtEntry ON Action.entry_hash = DhtEntry.hash
+SELECT Action.*, COALESCE(Entry.blob, PrivateEntry.blob) as entry_blob
+FROM Action
+LEFT JOIN Entry ON Action.entry_hash = Entry.hash
 LEFT JOIN PrivateEntry ON Action.entry_hash = PrivateEntry.hash
     AND PrivateEntry.author = :author
 WHERE Action.author = :author
@@ -1273,7 +1294,7 @@ Find cap grant by access type (direct lookup, join for other fields):
 ```sql
 SELECT cg.*, Action.*, PrivateEntry.blob as entry_blob
 FROM CapGrant cg
-JOIN DhtAction AS Action ON cg.action_hash = Action.hash
+JOIN Action ON cg.action_hash = Action.hash
 JOIN PrivateEntry ON Action.entry_hash = PrivateEntry.hash
     AND PrivateEntry.author = :author
 WHERE cg.cap_access = ?
@@ -1286,7 +1307,7 @@ Find all grants by an author:
 ```sql
 SELECT cg.*, Action.*, PrivateEntry.blob as entry_blob
 FROM CapGrant cg
-JOIN DhtAction AS Action ON cg.action_hash = Action.hash
+JOIN Action ON cg.action_hash = Action.hash
 JOIN PrivateEntry ON Action.entry_hash = PrivateEntry.hash
     AND PrivateEntry.author = :author
 WHERE Action.author = :author
@@ -1298,7 +1319,7 @@ Find grants by tag:
 ```sql
 SELECT cg.*, Action.*, PrivateEntry.blob as entry_blob
 FROM CapGrant cg
-JOIN DhtAction AS Action ON cg.action_hash = Action.hash
+JOIN Action ON cg.action_hash = Action.hash
 JOIN PrivateEntry ON Action.entry_hash = PrivateEntry.hash
     AND PrivateEntry.author = :author
 WHERE cg.tag = ?
@@ -1328,7 +1349,7 @@ Chain traversal (no BLOB deserialization needed):
 
 ```sql
 SELECT hash, seq, prev_hash, timestamp, action_type
-FROM DhtAction
+FROM Action
 WHERE author = ?
 ORDER BY seq;
 ```
@@ -1336,7 +1357,7 @@ ORDER BY seq;
 Full action retrieval (deserialize BLOB for details):
 
 ```sql
-SELECT * FROM DhtAction WHERE hash = ?;
+SELECT * FROM Action WHERE hash = ?;
 ```
 
 Then deserialize `action_data` BLOB in application.
@@ -1351,8 +1372,8 @@ Uses the `UpdatedRecord` index table populated during integration.
 -- Find direct updates (one hop)
 SELECT Action.*, Entry.*
 FROM UpdatedRecord
-JOIN DhtAction AS Action ON UpdatedRecord.action_hash = Action.hash
-LEFT JOIN DhtEntry AS Entry ON Action.entry_hash = Entry.hash
+JOIN Action ON UpdatedRecord.action_hash = Action.hash
+LEFT JOIN Entry ON Action.entry_hash = Entry.hash
 WHERE UpdatedRecord.original_action_hash = ?
   AND Action.record_validity = 1
 ORDER BY Action.seq
@@ -1368,7 +1389,7 @@ WITH RECURSIVE update_chain AS (
     Action.entry_hash,
     1 as depth
   FROM UpdatedRecord
-  JOIN DhtAction AS Action ON UpdatedRecord.action_hash = Action.hash
+  JOIN Action ON UpdatedRecord.action_hash = Action.hash
   WHERE UpdatedRecord.original_action_hash = ?
     AND Action.record_validity = 1
 
@@ -1383,13 +1404,13 @@ WITH RECURSIVE update_chain AS (
     a.entry_hash,
     uc.depth + 1
   FROM UpdatedRecord ur
-  JOIN DhtAction a ON ur.action_hash = a.hash
+  JOIN Action a ON ur.action_hash = a.hash
   INNER JOIN update_chain uc ON ur.original_action_hash = uc.hash
   WHERE a.record_validity = 1
 )
 SELECT uc.*, Entry.*
 FROM update_chain uc
-LEFT JOIN DhtEntry AS Entry ON uc.entry_hash = Entry.hash
+LEFT JOIN Entry ON uc.entry_hash = Entry.hash
 ORDER BY depth, seq
 ```
 
@@ -1412,7 +1433,7 @@ Uses the `DeletedRecord` index table populated during integration.
 -- Find deletes for a specific action
 SELECT Action.*
 FROM DeletedRecord
-JOIN DhtAction AS Action ON DeletedRecord.action_hash = Action.hash
+JOIN Action ON DeletedRecord.action_hash = Action.hash
 WHERE DeletedRecord.deletes_action_hash = ?
   AND Action.record_validity = 1
 ORDER BY Action.seq
@@ -1434,7 +1455,7 @@ Uses the `UpdatedRecord` and `DeletedRecord` index tables.
 WITH RECURSIVE record_chain AS (
   -- Base case: the original create/update
   SELECT hash, 0 as depth
-  FROM DhtAction
+  FROM Action
   WHERE hash = ?
 
   UNION ALL
@@ -1442,14 +1463,14 @@ WITH RECURSIVE record_chain AS (
   -- Recursive case: updates of this action
   SELECT UpdatedRecord.action_hash, rc.depth + 1
   FROM UpdatedRecord
-  JOIN DhtAction AS Action ON UpdatedRecord.action_hash = Action.hash
+  JOIN Action ON UpdatedRecord.action_hash = Action.hash
   INNER JOIN record_chain rc ON UpdatedRecord.original_action_hash = rc.hash
   WHERE Action.record_validity = 1
 )
 -- Find all deletes for any action in the chain
 SELECT DISTINCT Action.*
 FROM DeletedRecord
-JOIN DhtAction AS Action ON DeletedRecord.action_hash = Action.hash
+JOIN Action ON DeletedRecord.action_hash = Action.hash
 WHERE Action.record_validity = 1
   AND DeletedRecord.deletes_action_hash IN (SELECT hash FROM record_chain)
 ORDER BY Action.seq
@@ -1472,14 +1493,14 @@ Uses the `DeletedRecord` index table.
 ```sql
 -- Get live records by excluding those with deletes
 SELECT Action.*, Entry.*
-FROM DhtAction AS Action
-LEFT JOIN DhtEntry AS Entry ON Action.entry_hash = Entry.hash
+FROM Action
+LEFT JOIN Entry ON Action.entry_hash = Entry.hash
 WHERE Action.action_type = 5 -- ActionType::Create
   AND Action.record_validity = 1
   -- Exclude creates that have been deleted
   AND NOT EXISTS (
     SELECT 1 FROM DeletedRecord
-    JOIN DhtAction AS DeleteAction ON DeletedRecord.action_hash = DeleteAction.hash
+    JOIN Action AS DeleteAction ON DeletedRecord.action_hash = DeleteAction.hash
     WHERE DeleteAction.record_validity = 1
       AND DeletedRecord.deletes_action_hash = Action.hash
   )
@@ -1518,7 +1539,7 @@ update_chain AS (
     Action.record_validity,
     1 AS depth
   FROM UpdatedRecord
-  JOIN DhtAction AS Action ON UpdatedRecord.action_hash = Action.hash
+  JOIN Action ON UpdatedRecord.action_hash = Action.hash
   WHERE UpdatedRecord.original_action_hash = ?
     AND Action.record_validity = 1
 
@@ -1537,14 +1558,14 @@ update_chain AS (
     a.record_validity,
     uc.depth + 1
   FROM UpdatedRecord ur
-  JOIN DhtAction a ON ur.action_hash = a.hash
+  JOIN Action a ON ur.action_hash = a.hash
   INNER JOIN update_chain uc ON ur.original_action_hash = uc.hash
   WHERE a.record_validity = 1
 ),
 record_chain AS (
   -- Base case: the original create/update
   SELECT hash, 0 AS depth
-  FROM DhtAction
+  FROM Action
   WHERE hash = ?
 
   UNION ALL
@@ -1552,7 +1573,7 @@ record_chain AS (
   -- Recursive case: updates of this action
   SELECT ur.action_hash, rc.depth + 1
   FROM UpdatedRecord ur
-  JOIN DhtAction AS Action ON ur.action_hash = Action.hash
+  JOIN Action ON ur.action_hash = Action.hash
   INNER JOIN record_chain rc ON ur.original_action_hash = rc.hash
   WHERE Action.record_validity = 1
 )
@@ -1564,8 +1585,8 @@ SELECT
   Action.entry_hash, Action.record_validity,
   Entry.blob AS entry_blob,
   0 AS depth
-FROM DhtAction AS Action
-LEFT JOIN DhtEntry AS Entry ON Action.entry_hash = Entry.hash
+FROM Action
+LEFT JOIN Entry ON Action.entry_hash = Entry.hash
 WHERE Action.hash = ?
   AND Action.record_validity = 1
 
@@ -1580,7 +1601,7 @@ SELECT
   Entry.blob AS entry_blob,
   uc.depth
 FROM update_chain uc
-LEFT JOIN DhtEntry AS Entry ON uc.entry_hash = Entry.hash
+LEFT JOIN Entry ON uc.entry_hash = Entry.hash
 
 UNION ALL
 
@@ -1593,7 +1614,7 @@ SELECT
   NULL AS entry_blob,
   0 AS depth
 FROM DeletedRecord
-JOIN DhtAction AS Action ON DeletedRecord.action_hash = Action.hash
+JOIN Action ON DeletedRecord.action_hash = Action.hash
 WHERE Action.record_validity = 1
   AND DeletedRecord.deletes_action_hash IN (SELECT hash FROM record_chain)
 
@@ -1665,56 +1686,56 @@ TODO: Design how to track and prune cached ops when storage pressure occurs.
 
 ## Warrant Handling
 
-Warrants use parallel limbo and integrated tables to chain ops (`LimboDhtWarrant` → `DhtWarrant`), but with a simpler validation flow: warrants have sys validation only — there is no app validation step.
+Warrants use parallel limbo and integrated tables to chain ops (`LimboWarrant` → `Warrant`), but with a simpler validation flow: warrants have sys validation only — there is no app validation step.
 
 ### Warrant Processing Flow
 
 1. **Incoming DHT Ops Workflow**
    - Warrant op arrives as `DhtOp::WarrantOp(warrant)`
    - Hash verification and counterfeit checks performed
-   - Inserted into `LimboDhtWarrant` (no action or entry insertion)
+   - Inserted into `LimboWarrant` (no action or entry insertion)
 
 2. **Warrant Sys Validation Workflow**
    - Warrant validation depends on warrant type:
 
    **ChainIntegrityWarrant**: Proves an author broke chain rules
-   - Stays in `LimboDhtWarrant` until the warranted action is fetched and validated
+   - Stays in `LimboWarrant` until the warranted action is fetched and validated
    - If warranted action is rejected: warrant is accepted (proves the claim)
    - If warranted action is accepted: warrant is rejected (false claim)
 
    **ChainForkWarrant**: Proves an author has forked their chain
-   - Stays in `LimboDhtWarrant` until both forked actions are fetched and checked
+   - Stays in `LimboWarrant` until both forked actions are fetched and checked
    - If both forked actions are at the same sequence number: warrant is accepted (proves fork)
    - If the forked actions do not match the fork condition: warrant is rejected (false claim)
 
-   After validation, update `LimboDhtWarrant.sys_validation_status` to `0` (accepted) or `1` (rejected).
+   After validation, update `LimboWarrant.sys_validation_status` to `0` (accepted) or `1` (rejected).
 
 3. **Warrant Integration Workflow**
-   - Query `LimboDhtWarrant` for ops with a terminal state:
+   - Query `LimboWarrant` for ops with a terminal state:
    ```sql
-   SELECT * FROM LimboDhtWarrant
+   SELECT * FROM LimboWarrant
    WHERE abandoned_at IS NOT NULL
       OR sys_validation_status IN (1, 2)
    ORDER BY when_received
    ```
-   - For accepted warrants, insert into `DhtWarrant`:
+   - For accepted warrants, insert into `Warrant`:
    ```sql
-   INSERT INTO DhtWarrant (hash, author, timestamp, warrantee, proof, storage_center_loc)
+   INSERT INTO Warrant (hash, author, timestamp, warrantee, proof, storage_center_loc)
    SELECT hash, author, timestamp, warrantee, proof, storage_center_loc
-   FROM LimboDhtWarrant
+   FROM LimboWarrant
    WHERE hash = :warrant_hash
      AND sys_validation_status = 1
    ```
-   - Delete from `LimboDhtWarrant` and commit.
+   - Delete from `LimboWarrant` and commit.
 
 ### Warrant Query Patterns
 
-Accepted warrants can be queried from the `DhtWarrant` table:
+Accepted warrants can be queried from the `Warrant` table:
 
 Find all warrants against a specific agent:
 
 ```sql
-SELECT * FROM DhtWarrant
+SELECT * FROM Warrant
 WHERE warrantee = ?
 ORDER BY timestamp DESC;
 ```
@@ -1723,7 +1744,7 @@ Check if a specific warrant exists:
 
 ```sql
 SELECT EXISTS(
-    SELECT 1 FROM DhtWarrant WHERE hash = ?
+    SELECT 1 FROM Warrant WHERE hash = ?
 );
 ```
 
@@ -1731,13 +1752,13 @@ SELECT EXISTS(
 
 The system maintains these invariants:
 
-1. **No chain op exists in both `LimboChainOp` and `DhtChainOp` simultaneously; no warrant exists in both `LimboDhtWarrant` and `DhtWarrant` simultaneously**
-2. **Self-authored ops are never in limbo**: They are inserted directly into `DhtChainOp`/`DhtWarrant` at authoring time
-3. **Every `DhtChainOp` has a definite `validation_status` (never `NULL`)**
-4. **`DhtAction.record_validity` is `1` for self-authored records, `NULL` for pending network-received records, `1` (accepted) or `2` (rejected) after integration**
+1. **No chain op exists in both `LimboChainOp` and `ChainOp` simultaneously; no warrant exists in both `LimboWarrant` and `Warrant` simultaneously**
+2. **Self-authored ops are never in limbo**: They are inserted directly into `ChainOp`/`Warrant` at authoring time, but still go through integration to populate index tables
+3. **Every `ChainOp` has a definite `validation_status` (never `NULL`)**
+4. **`Action.record_validity` is `1` for self-authored records, `NULL` for pending network-received records, `1` (accepted) or `2` (rejected) after integration**
 5. **Network-received ops are moved from limbo to integrated tables atomically with `record_validity` updates**
-6. **Rejected ops in `DhtChainOp` cause their records to be marked 'rejected'**
+6. **Rejected ops in `ChainOp` cause their records to be marked 'rejected'**
 7. **Dependencies are resolved before validation proceeds**
 8. **Queries for validated data always check `record_validity IS NOT NULL` or `record_validity = 1`**
 9. **No validation status uses 0**: Accepted=1, rejected=2 across all status fields. A default or uninitialized 0 value is never treated as a valid state
-10. **Private entries exist only in `PrivateEntry`, never in `DhtEntry`**: The `private_entry` flag on `DhtAction` determines which table receives the entry at write time
+10. **Private entries exist only in `PrivateEntry`, never in `Entry`**: The `private_entry` flag on `Action` determines which table receives the entry at write time
