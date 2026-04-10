@@ -209,6 +209,10 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         todo!()
     }
 
+    async fn was_agent_recently_online(&self, _agent: AgentPubKey) -> HolochainP2pResult<bool> {
+        Ok(false)
+    }
+
     async fn send_validation_receipts(
         &self,
         _to_agent: AgentPubKey,
