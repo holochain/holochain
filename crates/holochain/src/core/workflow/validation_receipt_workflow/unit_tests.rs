@@ -104,6 +104,8 @@ async fn block_invalid_op_author() {
 
     // We'll still send a validation receipt, but we should also block them
     let mut dna = MockHolochainP2pDnaT::new();
+    dna.expect_was_agent_recently_online()
+        .return_once(|_| Ok(true));
     dna.expect_send_validation_receipts()
         .return_once(|_, _| Ok(()));
     let dna = Arc::new(dna);
@@ -145,6 +147,8 @@ async fn continues_if_receipt_cannot_be_signed() {
         .unwrap();
 
     let mut dna = MockHolochainP2pDnaT::new();
+    dna.expect_was_agent_recently_online()
+        .return_once(|_| Ok(true));
     dna.expect_send_validation_receipts().never();
     let dna = Arc::new(dna);
 
@@ -183,6 +187,8 @@ async fn send_validation_receipt() {
         .unwrap();
 
     let mut dna = MockHolochainP2pDnaT::new();
+    dna.expect_was_agent_recently_online()
+        .return_once(|_| Ok(true));
     dna.expect_send_validation_receipts()
         .return_once(|_, _| Ok(()));
     let dna = Arc::new(dna);
@@ -227,6 +233,8 @@ async fn errors_for_some_ops_does_not_prevent_the_workflow_proceeding() {
         .unwrap();
 
     let mut dna = MockHolochainP2pDnaT::new();
+    dna.expect_was_agent_recently_online()
+        .returning(|_| Ok(true));
     let mut seq = mockall::Sequence::new();
     dna.expect_send_validation_receipts()
         .times(1)
@@ -267,6 +275,72 @@ async fn errors_for_some_ops_does_not_prevent_the_workflow_proceeding() {
     // But even after we got the above error, we proceeded to
     // send the receipt for the second author which DID work,
     // so its flag is cleared.
+    assert!(!get_requires_receipt(vault.clone(), op_hash2).await);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn skips_authors_not_recently_online_and_clears_require_receipt() {
+    holochain_trace::test_run();
+
+    let test_db = holochain_state::test_utils::test_dht_db();
+    let vault = test_db.to_db();
+    let keystore = holochain_keystore::test_keystore();
+
+    // Create ops from two different authors
+    let (author1, op_hash1) = create_op_with_status(vault.clone(), None, ValidationStatus::Valid)
+        .await
+        .unwrap();
+
+    let (author2, op_hash2) = create_op_with_status(vault.clone(), None, ValidationStatus::Valid)
+        .await
+        .unwrap();
+
+    let author1_clone = author1.clone();
+    let mut dna = MockHolochainP2pDnaT::new();
+
+    // Author1 is not recently online, author2 is
+    dna.expect_was_agent_recently_online()
+        .times(2)
+        .returning(move |agent| Ok(agent != author1_clone));
+
+    // Author1 was not recently online, so no receipts should be sent to them
+    let author1_clone2 = author1.clone();
+    dna.expect_send_validation_receipts()
+        .never()
+        .withf(move |author: &AgentPubKey, _| *author == author1_clone2);
+
+    // Author2 was recently online, so receipts should be sent
+    dna.expect_send_validation_receipts()
+        .times(1)
+        .withf(move |author: &AgentPubKey, _| *author == author2)
+        .returning(|_, _| Ok(()));
+
+    let dna = Arc::new(dna);
+
+    let dna_hash = fixt!(DnaHash);
+
+    let validator = CellId::new(
+        dna_hash.clone(),
+        keystore.new_sign_keypair_random().await.unwrap(),
+    );
+
+    let work_complete = validation_receipt_workflow(
+        Arc::new(dna_hash),
+        vault.clone(),
+        dna,
+        keystore,
+        vec![validator].into_iter().collect(),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(WorkComplete::Complete, work_complete);
+
+    // Author1 was not recently online, so require_receipt should be cleared
+    // without attempting to send. A new publish will re-set it.
+    assert!(!get_requires_receipt(vault.clone(), op_hash1).await);
+
+    // Author2 was online and sending succeeded, so require_receipt is also cleared.
     assert!(!get_requires_receipt(vault.clone(), op_hash2).await);
 }
 

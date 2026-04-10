@@ -2092,6 +2092,39 @@ impl actor::HcP2p for HolochainP2pActor {
         })
     }
 
+    fn was_agent_recently_online(
+        &self,
+        dna_hash: DnaHash,
+        agent: AgentPubKey,
+    ) -> BoxFut<'_, HolochainP2pResult<bool>> {
+        Box::pin(async move {
+            let space_id = dna_hash.to_k2_space();
+            let space = self
+                .kitsune
+                .space_if_exists(space_id.clone())
+                .await
+                .ok_or(HolochainP2pError::K2SpaceNotFound(space_id))?;
+
+            let agent_id = agent.to_k2_agent();
+            let agent_url = space
+                .peer_store()
+                .get(agent_id)
+                .await?
+                .and_then(|i| i.url.clone());
+
+            if let Some(agent_url) = agent_url {
+                let unresponsive = space.peer_meta_store().get_unresponsive(agent_url).await?;
+
+                // We have a peer URL and haven't marked this peer as unresponsive, so as far as we know,
+                // they're online and will accept a connection.
+                Ok(unresponsive.is_none())
+            } else {
+                // No peer URL available, we have no evidence the agent is online.
+                Ok(false)
+            }
+        })
+    }
+
     fn send_validation_receipts(
         &self,
         dna_hash: DnaHash,
