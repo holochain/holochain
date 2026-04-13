@@ -2054,7 +2054,7 @@ impl actor::HcP2p for HolochainP2pActor {
                 .kitsune
                 .space_if_exists(space_id.clone())
                 .await
-                .ok_or(HolochainP2pError::K2SpaceNotFound(space_id))?;
+                .ok_or_else(|| K2Error::other(format!("No space found for: {dna_hash:?}")))?;
 
             let agent_id = agent.to_k2_agent();
             let agent_url = space
