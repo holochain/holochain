@@ -1,6 +1,6 @@
 [package]
 name = "holochain_state"
-version = "0.7.0-dev.19"
+version = "0.7.0-dev.20"
 description = "Holochain persisted state datatypes and functions"
 license = "Apache-2.0"
 repository = "https://github.com/holochain/holochain"
@@ -22,13 +22,13 @@ holo_hash = { version = "^0.7.0-dev.8", path = "../holo_hash", features = [
   "full",
 ] }
 fallible-iterator = "0.3.0"
-holochain_data = { version = "^0.7.0-dev.8", path = "../holochain_data", features = [
+holochain_data = { version = "^0.7.0-dev.9", path = "../holochain_data", features = [
   "sqlite-encrypted",
 ] }
 holochain_keystore = { version = "^0.7.0-dev.11", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.56"
 sqlx = { version = "=0.9.0-alpha.1" }
-holochain_types = { version = "^0.7.0-dev.18", path = "../holochain_types" }
+holochain_types = { version = "^0.7.0-dev.19", path = "../holochain_types" }
 holochain_zome_types = { version = "^0.7.0-dev.11", path = "../holochain_zome_types", features = [
   "full",
 ] }

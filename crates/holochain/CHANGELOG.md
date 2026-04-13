@@ -7,9 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- When Holochain attempts to prepare validation receipts but the author of the data has not been recently online, by being
-  present in our peer store, then clear the receipt request and skip attempting to send. The author may request validation
-  receipts again by republishing their content.
+## 0.7.0-dev.20
+
+- When Holochain attempts to prepare validation receipts but the author of the data has not been recently online, by being present in our peer store, then clear the receipt request and skip attempting to send. The author may request validation receipts again by republishing their content.
 
 ## 0.7.0-dev.19
 
