@@ -1066,3 +1066,70 @@ impl TestCase {
         .await
     }
 }
+
+/// Regression test: `retrieve_dependencies` must bound its concurrent cascade
+/// fetches so that a large op backlog cannot fan out thousands of parallel
+/// reads against the cache DB (which caused sustained "Database read connection
+/// is saturated. Util NNNNN%" log spam at startup and provided no throughput
+/// benefit, since SQLite concurrency is already bounded by the reader pool).
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn retrieve_dependencies_bounds_concurrent_cascade_calls() {
+    use super::validation_deps::ValidationDependencyType;
+    use super::{retrieve_dependencies, DEP_FETCH_CONCURRENCY};
+    use futures::FutureExt;
+    use holo_hash::fixt::ActionHashFixturator;
+    use holochain_cascade::MockCascade;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let in_flight = Arc::new(AtomicUsize::new(0));
+    let peak = Arc::new(AtomicUsize::new(0));
+    let calls = Arc::new(AtomicUsize::new(0));
+
+    let mut cascade = MockCascade::new();
+    {
+        let in_flight = in_flight.clone();
+        let peak = peak.clone();
+        let calls = calls.clone();
+        cascade.expect_retrieve_action().returning(move |_, _| {
+            let in_flight = in_flight.clone();
+            let peak = peak.clone();
+            let calls = calls.clone();
+            async move {
+                calls.fetch_add(1, Ordering::Relaxed);
+                let n = in_flight.fetch_add(1, Ordering::Relaxed) + 1;
+                peak.fetch_max(n, Ordering::Relaxed);
+                // Hold the slot long enough that many would-be concurrent
+                // callers would pile up without a bound.
+                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+                in_flight.fetch_sub(1, Ordering::Relaxed);
+                Ok(None)
+            }
+            .boxed()
+        });
+    }
+
+    let deps = SysValDeps::default();
+    // Use far more deps than the cap so that if the cap is absent the peak
+    // would be ~N_OPS rather than ~DEP_FETCH_CONCURRENCY.
+    const N_OPS: usize = 500;
+    let hashes: Vec<_> = (0..N_OPS)
+        .map(|_| (fixt!(ActionHash), ValidationDependencyType::Action))
+        .collect();
+
+    retrieve_dependencies(deps, Arc::new(cascade), hashes.into_iter()).await;
+
+    assert_eq!(calls.load(Ordering::Relaxed), N_OPS, "all deps fetched");
+
+    let peak_val = peak.load(Ordering::Relaxed);
+    assert!(
+        peak_val <= DEP_FETCH_CONCURRENCY,
+        "peak concurrent cascade calls {} exceeded cap {}",
+        peak_val,
+        DEP_FETCH_CONCURRENCY
+    );
+    // With N_OPS >> cap and non-trivial per-call latency, the cap should be reached.
+    assert_eq!(
+        peak_val, DEP_FETCH_CONCURRENCY,
+        "expected concurrent fetches to saturate cap"
+    );
+}

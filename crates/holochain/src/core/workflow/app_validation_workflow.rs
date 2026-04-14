@@ -93,6 +93,7 @@
 
 use super::error::WorkflowResult;
 use super::sys_validation_workflow::validation_query;
+use super::sys_validation_workflow::DEP_FETCH_CONCURRENCY;
 use crate::conductor::entry_def_store::get_entry_def;
 use crate::conductor::Conductor;
 use crate::conductor::ConductorHandle;
@@ -799,8 +800,16 @@ async fn run_validation_callback(
                     }
                 }
             });
-            // await all fetches in a separate task in the background
-            tokio::spawn(async { futures::future::join_all(fetches).await });
+            // await all fetches in a separate task in the background, bounding
+            // concurrency so a large dependency set cannot fan thousands of
+            // parallel cascade reads at the cache DB (see DEP_FETCH_CONCURRENCY
+            // in sys_validation_workflow for rationale).
+            tokio::spawn(async {
+                use futures::stream::StreamExt;
+                futures::stream::iter(fetches)
+                    .for_each_concurrent(DEP_FETCH_CONCURRENCY, |fut| fut)
+                    .await
+            });
             Ok(Outcome::AwaitingDeps(hashes))
         }
         ValidateResult::UnresolvedDependencies(UnresolvedDependencies::AgentActivity(
