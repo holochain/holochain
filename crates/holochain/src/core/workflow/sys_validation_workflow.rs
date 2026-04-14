@@ -128,6 +128,19 @@ pub mod types;
 pub mod validation_deps;
 pub mod validation_query;
 
+/// Maximum number of validation-dependency fetches allowed to run concurrently.
+///
+/// **Why:** Each dependency fetch goes through the cascade, which reads from the
+/// authored, DHT, and cache databases. With a large op backlog (e.g. after startup
+/// or a big gossip batch), an unbounded `join_all` here fanned thousands of concurrent
+/// reads at the cache DB, massively exceeding its reader pool and producing log-spam
+/// ("Database read connection is saturated. Util NNNNN%") without improving throughput,
+/// since SQLite concurrency is already capped by the pool.
+///
+/// Sized at a few times the cache DB's default `max_readers` so the pool stays
+/// saturated but the queue doesn't explode.
+pub(super) const DEP_FETCH_CONCURRENCY: usize = 16;
+
 #[cfg(test)]
 mod chain_test;
 #[cfg(test)]
@@ -667,7 +680,9 @@ async fn retrieve_dependencies(
                 .boxed()
         });
 
-    let new_deps: ValidationDependencies = ValidationDependencies::new_from_iter(futures::future::join_all(dependency_fetches)
+    let new_deps: ValidationDependencies = ValidationDependencies::new_from_iter(futures::stream::iter(dependency_fetches)
+        .buffer_unordered(DEP_FETCH_CONCURRENCY)
+        .collect::<Vec<_>>()
         .await
         .into_iter()
         .filter_map(|r| {

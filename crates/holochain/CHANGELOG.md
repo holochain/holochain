@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Bound concurrent cascade dependency fetches in the sys and app validation workflows to prevent thousands of queued cache DB reads (and the resulting `"Database read connection is saturated"` log spam) when a large op backlog is being validated.
+
 ## 0.7.0-dev.20
 
 - When Holochain attempts to prepare validation receipts but the author of the data has not been recently online, by being present in our peer store, then clear the receipt request and skip attempting to send. The author may request validation receipts again by republishing their content.
