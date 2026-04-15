@@ -15,7 +15,7 @@ async fn space_shutdown() {
 
     let dht_db = test_dht_db().to_db();
     let cache_db = test_cache_db_with_dna_hash(dna_hash.clone()).to_db();
-    let conductor_db = test_conductor_db().to_db();
+    let conductor_db = holochain_data::test_open_db(holochain_data::kind::Conductor).await.unwrap();
     let peer_meta_db = test_peer_meta_store_db(dna_hash.clone()).to_db();
 
     let keystore = test_keystore();

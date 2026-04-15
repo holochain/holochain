@@ -190,12 +190,13 @@ impl Spaces {
             .await
             .map_err(ConductorError::other)?;
 
-        let conductor_db = holochain_data::setup_holochain_data(
+        let conductor_db = holochain_data::open_db(
             root_db_dir.as_ref(),
             holochain_data::kind::Conductor,
             holochain_data::HolochainDataConfig {
                 key: Some(data_db_key.clone()),
                 sync_level: db_sync,
+                max_readers: config.db_max_readers,
             },
         )
         .await
@@ -282,18 +283,18 @@ impl Spaces {
             return Ok(true);
         }
 
-        // Check if all the cell_ids are blocked
+        // Check if any of the cell_ids are blocked
         let cell_targets: Vec<BlockTargetId> =
             cell_ids.into_iter().map(BlockTargetId::Cell).collect();
 
-        let all_cells_blocked = self
+        let any_cells_blocked = self
             .conductor_db
             .as_ref()
-            .are_all_blocked(cell_targets, timestamp)
+            .is_any_blocked(cell_targets, timestamp)
             .await
             .map_err(|e| ConductorError::other(e))?;
 
-        Ok(all_cells_blocked)
+        Ok(any_cells_blocked)
     }
 
     /// Get the holochain conductor state

@@ -21,10 +21,19 @@ pub mod kind;
 pub mod models;
 pub mod wasm;
 
-/// Embedded migrations compiled into the binary.
-///
-/// This macro embeds all SQL files from the `migrations/` directory at compile time.
-static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
+/// Embedded migrations for the Wasm database.
+static WASM_MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations/wasm");
+
+/// Embedded migrations for the Conductor database.
+static CONDUCTOR_MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations/conductor");
+
+/// Select the appropriate migrator for a database kind.
+fn migrator_for(db_kind: kind::DbKind) -> &'static sqlx::migrate::Migrator {
+    match db_kind {
+        kind::DbKind::Wasm => &WASM_MIGRATOR,
+        kind::DbKind::Conductor => &CONDUCTOR_MIGRATOR,
+    }
+}
 
 /// SQLite synchronous level configuration.
 ///
@@ -99,6 +108,7 @@ impl HolochainDataConfig {
 
 pub trait DatabaseIdentifier: Clone {
     fn database_id(&self) -> &str;
+    fn db_kind(&self) -> kind::DbKind;
 }
 
 #[derive(Debug)]
@@ -129,8 +139,8 @@ pub async fn open_db<I: DatabaseIdentifier>(
     let db_file = path.join(database_id.database_id());
     let pool = connect_database(&db_file, config).await?;
 
-    // Run migrations
-    MIGRATOR.run(&pool).await?;
+    // Run migrations for this database kind
+    migrator_for(database_id.db_kind()).run(&pool).await?;
 
     Ok(DbWrite::new(pool, database_id))
 }
@@ -139,8 +149,8 @@ pub async fn open_db<I: DatabaseIdentifier>(
 pub async fn test_open_db<I: DatabaseIdentifier>(database_id: I) -> sqlx::Result<DbWrite<I>> {
     let pool = connect_database_memory(HolochainDataConfig::default()).await?;
 
-    // Run migrations
-    MIGRATOR.run(&pool).await?;
+    // Run migrations for this database kind
+    migrator_for(database_id.db_kind()).run(&pool).await?;
 
     Ok(DbWrite::new(pool, database_id))
 }
@@ -209,50 +219,82 @@ async fn create_pool(opts: SqliteConnectOptions, max_readers: u16) -> sqlx::Resu
 #[cfg(all(test, feature = "test-utils"))]
 mod tests {
     use super::*;
-    use sqlx::Row;
+
+    use kind::DbKind;
 
     #[derive(Debug, Clone)]
-    struct TestDbId;
+    struct TestWasmDbId;
 
-    impl DatabaseIdentifier for TestDbId {
+    impl DatabaseIdentifier for TestWasmDbId {
         fn database_id(&self) -> &str {
-            "test_db"
+            "test_wasm_db"
+        }
+
+        fn db_kind(&self) -> DbKind {
+            DbKind::Wasm
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    struct TestConductorDbId;
+
+    impl DatabaseIdentifier for TestConductorDbId {
+        fn database_id(&self) -> &str {
+            "test_conductor_db"
+        }
+
+        fn db_kind(&self) -> DbKind {
+            DbKind::Conductor
         }
     }
 
     #[tokio::test]
-    async fn in_memory_database_with_migrations() {
-        // Set up in-memory database
-        let db = test_open_db(TestDbId)
+    async fn wasm_migrations_applied() {
+        let db = test_open_db(TestWasmDbId)
             .await
             .expect("Failed to set up test database");
 
-        // Verify migrations ran by checking the sample_data table exists
-        let row = sqlx::query("SELECT name FROM sqlite_master WHERE type='table' AND name='Wasm'")
-            .fetch_one(db.pool())
+        // Verify Wasm tables exist
+        let tables = sqlx::query_scalar::<_, String>(
+            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name",
+        )
+        .fetch_all(db.pool())
+        .await
+        .expect("Failed to query sqlite_master");
+
+        assert!(tables.contains(&"Wasm".to_string()));
+        assert!(tables.contains(&"DnaDef".to_string()));
+        assert!(tables.contains(&"IntegrityZome".to_string()));
+        assert!(tables.contains(&"CoordinatorZome".to_string()));
+        assert!(tables.contains(&"EntryDef".to_string()));
+
+        // Verify Conductor tables do NOT exist
+        assert!(!tables.contains(&"Conductor".to_string()));
+        assert!(!tables.contains(&"InstalledApp".to_string()));
+    }
+
+    #[tokio::test]
+    async fn conductor_migrations_applied() {
+        let db = test_open_db(TestConductorDbId)
             .await
-            .expect("Failed to query sqlite_master");
+            .expect("Failed to set up test database");
 
-        let table_name: String = row.get(0);
-        assert_eq!(table_name, "Wasm");
+        // Verify Conductor tables exist
+        let tables = sqlx::query_scalar::<_, String>(
+            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name",
+        )
+        .fetch_all(db.pool())
+        .await
+        .expect("Failed to query sqlite_master");
 
-        // Test inserting and querying data
-        sqlx::query("INSERT INTO sample_data (name, value) VALUES (?, ?)")
-            .bind("test_name")
-            .bind("test_value")
-            .execute(db.pool())
-            .await
-            .expect("Failed to insert data");
+        assert!(tables.contains(&"Conductor".to_string()));
+        assert!(tables.contains(&"InstalledApp".to_string()));
+        assert!(tables.contains(&"AppRole".to_string()));
+        assert!(tables.contains(&"Nonce".to_string()));
+        assert!(tables.contains(&"BlockSpan".to_string()));
 
-        let row = sqlx::query("SELECT name, value FROM sample_data WHERE name = ?")
-            .bind("test_name")
-            .fetch_one(db.pool())
-            .await
-            .expect("Failed to query data");
-
-        let name: String = row.get(0);
-        let value: Option<String> = row.get(1);
-        assert_eq!(name, "test_name");
-        assert_eq!(value, Some("test_value".to_string()));
+        // Verify Wasm tables do NOT exist
+        assert!(!tables.contains(&"Wasm".to_string()));
+        assert!(!tables.contains(&"DnaDef".to_string()));
     }
 }

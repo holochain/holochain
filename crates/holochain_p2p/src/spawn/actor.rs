@@ -2546,11 +2546,9 @@ impl actor::HcP2p for HolochainP2pActor {
             let target = block.target().clone();
             let db = self.conductor_db_getter()().await;
             // Write block to database.
-            holochain_state::block::block(&db, block)
-                .await
-                .map_err(|err| {
-                    HolochainP2pError::other(format!("Could not write block to database: {err}"))
-                })?;
+            db.block(block).await.map_err(|err| {
+                HolochainP2pError::other(format!("Could not write block to database: {err}"))
+            })?;
 
             if let holochain_zome_types::block::BlockTarget::Cell(cell_id, _) = target {
                 // Best-effort removal: do not error if the space is missing or removal fails.
@@ -2587,17 +2585,12 @@ impl actor::HcP2p for HolochainP2pActor {
     fn is_blocked(&self, target: BlockTargetId) -> BoxFut<'_, HolochainP2pResult<bool>> {
         Box::pin(async move {
             let db = self.conductor_db_getter()().await;
-            db.read_async(|txn| {
-                holochain_state::block::query_is_blocked(
-                    txn,
-                    target,
-                    holochain_timestamp::Timestamp::now(),
-                )
-            })
-            .await
-            .map_err(|err| {
-                HolochainP2pError::other(format!("Could not read block from database: {err}"))
-            })
+            db.as_ref()
+                .is_blocked(target, holochain_timestamp::Timestamp::now())
+                .await
+                .map_err(|err| {
+                    HolochainP2pError::other(format!("Could not read block from database: {err}"))
+                })
         })
     }
 }

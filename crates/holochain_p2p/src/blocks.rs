@@ -1,8 +1,6 @@
 use holo_hash::{AgentPubKey, DnaHash};
-use holochain_state::block::{query_is_any_blocked, query_is_blocked};
 use holochain_timestamp::Timestamp;
 use holochain_types::{
-    db::{DbKindConductor, DbWrite},
     prelude::{BlockTargetId, CellId},
 };
 use kitsune2_api::{
@@ -56,12 +54,12 @@ impl BlocksFactory for HolochainBlocksFactory {
 #[derive(Debug)]
 pub struct HolochainBlocks {
     dna_hash: DnaHash,
-    db: DbWrite<DbKindConductor>,
+    db: holochain_data::DbWrite<holochain_data::kind::Conductor>,
 }
 
 impl HolochainBlocks {
     /// Create a new [`HolochainBlocks`].
-    pub fn new(dna_hash: DnaHash, db: DbWrite<DbKindConductor>) -> Self {
+    pub fn new(dna_hash: DnaHash, db: holochain_data::DbWrite<holochain_data::kind::Conductor>) -> Self {
         Self { dna_hash, db }
     }
 }
@@ -74,11 +72,10 @@ impl Blocks for HolochainBlocks {
         let db = self.db.clone();
         let cell_id = CellId::new(self.dna_hash.clone(), AgentPubKey::from_k2_agent(&agent_id));
         Box::pin(async move {
-            db.read_async(|txn| {
-                query_is_blocked(txn, BlockTargetId::Cell(cell_id), Timestamp::now())
-            })
-            .await
-            .map_err(|err| K2Error::other_src("failed to query block for agent", err))
+            db.as_ref()
+                .is_blocked(BlockTargetId::Cell(cell_id), Timestamp::now())
+                .await
+                .map_err(|err| K2Error::other_src("failed to query block for agent", err))
         })
     }
 
@@ -94,7 +91,8 @@ impl Blocks for HolochainBlocks {
         }
         let db = self.db.clone();
         Box::pin(async move {
-            db.read_async(|txn| query_is_any_blocked(txn, cell_ids, Timestamp::now()))
+            db.as_ref()
+                .is_any_blocked(cell_ids, Timestamp::now())
                 .await
                 .map_err(|err| {
                     K2Error::other_src("failed to query blocks for vector of block targets", err)

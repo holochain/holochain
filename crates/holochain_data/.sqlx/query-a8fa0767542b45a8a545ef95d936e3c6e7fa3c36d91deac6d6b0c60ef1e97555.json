@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT hash as \"hash!\", code as \"code!\" FROM Wasm WHERE hash = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "hash!",
+        "ordinal": 0,
+        "type_info": "Blob",
+        "origin": {
+          "Table": {
+            "table": "Wasm",
+            "name": "hash"
+          }
+        }
+      },
+      {
+        "name": "code!",
+        "ordinal": 1,
+        "type_info": "Blob",
+        "origin": {
+          "Table": {
+            "table": "Wasm",
+            "name": "code"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true,
+      false
+    ]
+  },
+  "hash": "a8fa0767542b45a8a545ef95d936e3c6e7fa3c36d91deac6d6b0c60ef1e97555"
+}

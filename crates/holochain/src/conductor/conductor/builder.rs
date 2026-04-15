@@ -210,8 +210,8 @@ impl ConductorBuilder {
         let net_spaces1 = spaces.clone();
         let net_spaces2 = spaces.clone();
         let net_spaces3 = spaces.clone();
-        let conductor_sqlite_db = spaces.conductor_sqlite_db.clone();
-        letp2p_config = holochain_p2p::HolochainP2pConfig {
+        let conductor_db = spaces.conductor_db.clone();
+        let p2p_config = holochain_p2p::HolochainP2pConfig {
             auth_material_bootstrap: config
                 .network
                 .base64_auth_material_bootstrap
@@ -243,18 +243,8 @@ impl ConductorBuilder {
                 Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
             }),
             get_conductor_db: Arc::new(move || {
-                Box::pin(async move {
-                    // Create a minimal stub database in a temporary location
-                    // This is only used for Kitsune2 blocks interface compatibility
-                    // Actual blocking operations are handled through conductor methods
-                    let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
-                    holochain_sqlite::prelude::DbWrite::open_with_pool_config(
-                        temp_dir.path(),
-                        holochain_types::db::DbKindConductor,
-                        holochain_sqlite::prelude::PoolConfig::default(),
-                    )
-                    .expect("Failed to create stub conductor DB")
-                })
+                let conductor_db = conductor_db.clone();
+                Box::pin(async move { conductor_db })
             }),
             target_arc_factor: config.network.target_arc_factor,
             network_config: Some(config.network.to_k2_config()?),
@@ -451,8 +441,8 @@ impl ConductorBuilder {
         let net_spaces1 = spaces.clone();
         let net_spaces2 = spaces.clone();
         let net_spaces3 = spaces.clone();
-        let conductor_sqlite_db = spaces.conductor_sqlite_db.clone();
-        letp2p_config = holochain_p2p::HolochainP2pConfig {
+        let conductor_db = spaces.conductor_db.clone();
+        let p2p_config = holochain_p2p::HolochainP2pConfig {
             auth_material_bootstrap: config
                 .network
                 .base64_auth_material_bootstrap
@@ -480,13 +470,12 @@ impl ConductorBuilder {
                 Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
             }),
             get_db_cache: Arc::new(move |dna_hash| {
-                let res = net_spaces3.cache(&dna_hash);Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
+                let res = net_spaces3.cache(&dna_hash);
+                Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
             }),
             get_conductor_db: Arc::new(move || {
-                // TODO: Replace with new conductor database wrapper
-                Box::pin(
-                    async move { unimplemented!("get_conductor_db needs migration to new DB") },
-                )
+               let conductor_db = conductor_db.clone();
+                Box::pin(async move { conductor_db })
             }),
             target_arc_factor: config.network.target_arc_factor,
             network_config: Some(config.network.to_k2_config()?),

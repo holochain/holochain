@@ -50,6 +50,7 @@ bytes = "1.10"
 holochain_sqlite = { version = "^0.7.0-dev.16", path = "../holochain_sqlite" }
 parking_lot = "0.12.3"
 holochain_state = { version = "^0.7.0-dev.21", path = "../holochain_state" }
+holochain_data = { version = "^0.7.0-dev.10", path = "../holochain_data" }
 holochain_timestamp = { version = "^0.7.0-dev.0", path = "../timestamp" }
 
 [dev-dependencies]

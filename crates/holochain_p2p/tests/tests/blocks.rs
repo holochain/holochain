@@ -10,10 +10,10 @@ use holochain_p2p::{
     actor::DynHcP2p, event::MockHcP2pHandler, spawn_holochain_p2p, HolochainP2pConfig,
     HolochainP2pError, HolochainP2pLocalAgent,
 };
-use holochain_state::{block::get_all_cell_blocks, prelude::test_conductor_db};
+use holochain_state::block::get_all_cell_blocks;
 use holochain_timestamp::{InclusiveTimestampInterval, Timestamp};
 use holochain_types::{
-    db::{DbKindCache, DbKindConductor, DbKindDht, DbKindPeerMetaStore, DbWrite},
+    db::{DbKindCache, DbKindDht, DbKindPeerMetaStore, DbWrite},
     prelude::{Block, BlockTargetId, CellBlockReason, CellId},
     record::WireRecordOps,
 };
@@ -24,7 +24,7 @@ use std::{sync::Arc, time::Duration};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn cell_blocks_are_committed_to_database() {
-    let conductor_db = DbWrite::test_in_mem(DbKindConductor).unwrap();
+    let conductor_db = holochain_data::test_open_db(holochain_data::kind::Conductor);
     let dna_hash = fixt!(DnaHash);
     let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
     let TestActor { actor, .. } =
@@ -47,7 +47,7 @@ async fn cell_blocks_are_committed_to_database() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn agent_is_blocked() {
-    let conductor_db = DbWrite::test_in_mem(DbKindConductor).unwrap();
+    let conductor_db = holochain_data::test_open_db(holochain_data::kind::Conductor);
     let dna_hash = fixt!(DnaHash);
     let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
     let TestActor { actor, .. } =
@@ -278,7 +278,7 @@ mod blocks_impl {
         let dna_hash_2 = fixt!(DnaHash);
         let cell_id_1 = CellId::new(dna_hash_1.clone(), agent.clone());
 
-        let conductor_db = test_conductor_db().to_db();
+        let conductor_db = holochain_data::test_open_db(holochain_data::kind::Conductor);
         let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
         let TestActor {
             actor: actor_1,
@@ -482,13 +482,13 @@ struct TestActor {
 
 impl TestActor {
     async fn new(dna_hash: &DnaHash, bootstrap_addr: &SocketAddr) -> Self {
-        let conductor_db = DbWrite::test_in_mem(DbKindConductor).unwrap();
+        let conductor_db = holochain_data::test_open_db(holochain_data::kind::Conductor).await.unwrap();
         Self::create_test_case(dna_hash, conductor_db, test_keystore(), bootstrap_addr).await
     }
 
     async fn new_with_conductor_db(
         dna_hash: &DnaHash,
-        conductor_db: DbWrite<DbKindConductor>,
+        conductor_db: holochain_data::DbWrite<holochain_data::kind::Conductor>,
         bootstrap_addr: &SocketAddr,
     ) -> Self {
         Self::create_test_case(dna_hash, conductor_db, test_keystore(), bootstrap_addr).await
@@ -499,13 +499,13 @@ impl TestActor {
         keystore: &MetaLairClient,
         bootstrap_addr: &SocketAddr,
     ) -> Self {
-        let conductor_db = DbWrite::test_in_mem(DbKindConductor).unwrap();
+        let conductor_db = holochain_data::test_open_db(holochain_data::kind::Conductor).await.unwrap();
         Self::create_test_case(dna_hash, conductor_db, keystore.clone(), bootstrap_addr).await
     }
 
     async fn create_test_case(
         dna_hash: &DnaHash,
-        conductor_db: DbWrite<DbKindConductor>,
+        conductor_db: holochain_data::DbWrite<holochain_data::kind::Conductor>,
         keystore: MetaLairClient,
         bootstrap_addr: &SocketAddr,
     ) -> Self {

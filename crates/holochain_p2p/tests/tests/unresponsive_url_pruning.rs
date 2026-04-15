@@ -235,7 +235,7 @@ impl TestCase {
             DbWrite::test(&db_dir, DbKindPeerMetaStore(Arc::new(dna_hash.clone()))).unwrap();
         let db_op = DbWrite::test_in_mem(DbKindDht(Arc::new(dna_hash.clone()))).unwrap();
         let db_cache = DbWrite::test_in_mem(DbKindCache(Arc::new(dna_hash.clone()))).unwrap();
-        let db_conductor = DbWrite::test_in_mem(DbKindConductor).unwrap();
+        let db_conductor = holochain_data::test_open_db(holochain_data::kind::Conductor).await.unwrap();
         let lair_client = test_keystore();
         let db_peer_meta2 = db_peer_meta.clone();
         let p2p = spawn_holochain_p2p(

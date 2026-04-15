@@ -1,107 +1,68 @@
-//! Example demonstrating sqlx query patterns for mapping Rust types to database.
+//! Examples demonstrating compile-time checked sqlx query patterns.
+//!
+//! These examples exercise the `query!` and `query_as!` macros against both
+//! the wasm and conductor schemas, ensuring `sqlx prepare` keeps the offline
+//! query cache up to date.
 
-use sqlx::{FromRow, Row};
+use sqlx::FromRow;
 
-/// Example struct representing a row in the sample_data table.
-///
-/// This uses the `FromRow` derive to automatically map database columns to struct fields.
+// --- Wasm schema examples ---
+
+/// Example struct mapped from the Wasm table.
 #[derive(Debug, Clone, FromRow)]
-pub struct SampleData {
-    pub id: i64,
-    pub name: String,
-    pub value: Option<String>,
-    pub created_at: i64,
+pub struct WasmRow {
+    pub hash: Vec<u8>,
+    pub code: Vec<u8>,
 }
 
-/// Example of inserting data using sqlx::query with bind parameters.
-pub async fn insert_sample_data<I: crate::DatabaseIdentifier>(
-    conn: &crate::DbWrite<I>,
-    name: &str,
-    value: Option<&str>,
-) -> sqlx::Result<i64> {
-    let result = sqlx::query!(
-        "INSERT INTO sample_data (name, value) VALUES (?, ?)",
-        name,
-        value
+/// Compile-time checked insert into the Wasm table.
+pub async fn insert_wasm(
+    pool: &sqlx::Pool<sqlx::Sqlite>,
+    hash: &[u8],
+    code: &[u8],
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        "INSERT OR IGNORE INTO Wasm (hash, code) VALUES (?, ?)",
+        hash,
+        code
     )
-    .execute(conn.pool())
+    .execute(pool)
     .await?;
-
-    Ok(result.last_insert_rowid())
+    Ok(())
 }
 
-/// Example of selecting data using sqlx::query_as with automatic struct mapping.
-pub async fn get_sample_data_by_id<I: crate::DatabaseIdentifier>(
-    conn: &impl AsRef<crate::DbRead<I>>,
-    id: i64,
-) -> sqlx::Result<Option<SampleData>> {
-    let result = sqlx::query_as!(
-        SampleData,
-        "SELECT id, name, value, created_at FROM sample_data WHERE id = ?",
-        id
+/// Compile-time checked select from the Wasm table.
+pub async fn get_wasm(
+    pool: &sqlx::Pool<sqlx::Sqlite>,
+    hash: &[u8],
+) -> sqlx::Result<Option<WasmRow>> {
+    let row = sqlx::query_as!(
+        WasmRow,
+        r#"SELECT hash as "hash!", code as "code!" FROM Wasm WHERE hash = ?"#,
+        hash
     )
-    .fetch_optional(conn.as_ref().pool())
+    .fetch_optional(pool)
     .await?;
-
-    Ok(result)
+    Ok(row)
 }
 
-/// Example of selecting multiple rows.
-pub async fn get_all_sample_data<I: crate::DatabaseIdentifier>(
-    conn: &impl AsRef<crate::DbRead<I>>,
-) -> sqlx::Result<Vec<SampleData>> {
-    let results = sqlx::query_as!(
-        SampleData,
-        "SELECT id, name, value, created_at FROM sample_data ORDER BY created_at DESC"
+// --- Conductor schema examples ---
+
+/// Compile-time checked read of the conductor tag.
+pub async fn get_conductor_tag(pool: &sqlx::Pool<sqlx::Sqlite>) -> sqlx::Result<Option<String>> {
+    let row = sqlx::query!("SELECT tag FROM Conductor WHERE id = 1")
+        .fetch_optional(pool)
+        .await?;
+    Ok(row.map(|r| r.tag))
+}
+
+/// Compile-time checked upsert of the conductor tag.
+pub async fn set_conductor_tag(pool: &sqlx::Pool<sqlx::Sqlite>, tag: &str) -> sqlx::Result<()> {
+    sqlx::query!(
+        "INSERT INTO Conductor (id, tag) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET tag = excluded.tag",
+        tag
     )
-    .fetch_all(conn.as_ref().pool())
+    .execute(pool)
     .await?;
-
-    Ok(results)
-}
-
-/// Example of manual row mapping (useful when you need fine control).
-pub async fn get_sample_data_manual<I: crate::DatabaseIdentifier>(
-    conn: &impl AsRef<crate::DbRead<I>>,
-    id: i64,
-) -> sqlx::Result<Option<SampleData>> {
-    let row = sqlx::query("SELECT id, name, value, created_at FROM sample_data WHERE id = ?")
-        .bind(id)
-        .fetch_optional(conn.as_ref().pool())
-        .await?;
-
-    Ok(row.map(|r| SampleData {
-        id: r.get(0),
-        name: r.get(1),
-        value: r.get(2),
-        created_at: r.get(3),
-    }))
-}
-
-/// Example of updating data.
-pub async fn update_sample_data<I: crate::DatabaseIdentifier>(
-    conn: &crate::DbWrite<I>,
-    id: i64,
-    new_value: &str,
-) -> sqlx::Result<u64> {
-    let result = sqlx::query("UPDATE sample_data SET value = ? WHERE id = ?")
-        .bind(new_value)
-        .bind(id)
-        .execute(conn.pool())
-        .await?;
-
-    Ok(result.rows_affected())
-}
-
-/// Example of deleting data.
-pub async fn delete_sample_data<I: crate::DatabaseIdentifier>(
-    conn: &crate::DbWrite<I>,
-    id: i64,
-) -> sqlx::Result<u64> {
-    let result = sqlx::query("DELETE FROM sample_data WHERE id = ?")
-        .bind(id)
-        .execute(conn.pool())
-        .await?;
-
-    Ok(result.rows_affected())
+    Ok(())
 }

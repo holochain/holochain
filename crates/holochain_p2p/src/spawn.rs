@@ -40,8 +40,12 @@ pub type GetDbCache = Arc<
 >;
 
 /// Callback function to retrieve a conductor database.
-pub type GetDbConductor =
-    Arc<dyn Fn() -> BoxFut<'static, DbWrite<DbKindConductor>> + 'static + Send + Sync>;
+pub type GetDbConductor = Arc<
+    dyn Fn() -> BoxFut<'static, holochain_data::DbWrite<holochain_data::kind::Conductor>>
+        + 'static
+        + Send
+        + Sync,
+>;
 
 /// Configure reporting.
 #[derive(Default)]

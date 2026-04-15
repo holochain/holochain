@@ -51,14 +51,7 @@ pub async fn load_conductor_state(
 
         // Get signal subscriptions for this interface
         let subs_data = db
-            .get_signal_subscriptions(
-                model.port,
-                model
-                    .id
-                    .as_ref()
-                    .filter(|s| !s.is_empty())
-                    .map(|s| s.as_str()),
-            )
+            .get_signal_subscriptions(model.port, &model.id)
             .await
             .map_err(ConductorError::other)?;
 
@@ -83,16 +76,11 @@ pub async fn load_conductor_state(
         // Reconstruct AppInterfaceId
         let interface_id = if model.port == 0 {
             // Port 0 case - must have an ID
-            let id = model
-                .id
-                .filter(|s| !s.is_empty())
-                .ok_or_else(|| ConductorError::other("Port 0 interface missing ID"))?;
-            // Use private fields via a constructor we need to add
-            // For now, we'll use `new` and manually update the id
-            // This is a limitation - we may need to expose a constructor
-            AppInterfaceId::from_parts(0, Some(id))
+            if model.id.is_empty() {
+                return Err(ConductorError::other("Port 0 interface missing ID"));
+            }
+            AppInterfaceId::from_parts(0, Some(model.id.clone()))
         } else {
-            // For non-zero ports, ignore the empty string id from database
             AppInterfaceId::new(model.port as u16)
         };
         app_interfaces.insert(interface_id, config);
@@ -131,21 +119,15 @@ pub async fn save_conductor_state(
         )
         .map_err(ConductorError::other)?;
 
-        db.put_app_interface(
-            interface_id.port() as i64,
-            interface_id.id().as_deref().or(Some("")),
-            &model,
-        )
-        .await
-        .map_err(ConductorError::other)?;
+        let id_str = interface_id.id().as_deref().unwrap_or("");
+        db.put_app_interface(interface_id.port() as i64, id_str, &model)
+            .await
+            .map_err(ConductorError::other)?;
 
         // Clear existing signal subscriptions for this interface
-        db.delete_signal_subscriptions(
-            interface_id.port() as i64,
-            interface_id.id().as_deref().or(Some("")),
-        )
-        .await
-        .map_err(ConductorError::other)?;
+        db.delete_signal_subscriptions(interface_id.port() as i64, id_str)
+            .await
+            .map_err(ConductorError::other)?;
 
         // Save signal subscriptions
         for (app_id, subscription) in &config.signal_subscriptions {
@@ -154,7 +136,7 @@ pub async fn save_conductor_state(
             })?;
             db.put_signal_subscription(
                 interface_id.port() as i64,
-                interface_id.id().as_deref().or(Some("")),
+                id_str,
                 app_id.as_ref(),
                 &filters_blob,
             )
@@ -197,17 +179,16 @@ pub async fn save_conductor_state(
     // Delete interfaces that are no longer in state
     for model in existing_interfaces {
         let interface_id = if model.port == 0 {
-            let id = model
-                .id
-                .clone()
-                .ok_or_else(|| ConductorError::other("Port 0 interface missing ID"))?;
-            AppInterfaceId::from_parts(0, Some(id))
+            if model.id.is_empty() {
+                return Err(ConductorError::other("Port 0 interface missing ID"));
+            }
+            AppInterfaceId::from_parts(0, Some(model.id.clone()))
         } else {
             AppInterfaceId::new(model.port as u16)
         };
 
         if !state.app_interfaces.contains_key(&interface_id) {
-            db.delete_app_interface(model.port, model.id.as_deref())
+            db.delete_app_interface(model.port, &model.id)
                 .await
                 .map_err(ConductorError::other)?;
         }
@@ -220,7 +201,6 @@ pub async fn save_conductor_state(
 mod tests {
     use super::*;
     use crate::conductor::state::AppInterfaceConfig;
-    use holochain_data::setup_holochain_data;
     use holochain_types::websocket::AllowedOrigins;
 
     #[tokio::test(flavor = "multi_thread")]
