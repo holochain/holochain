@@ -21,32 +21,33 @@ pub enum MustGetAgentActivityResponse {
         /// Any warrants issued to the agent for this activity.
         warrants: Vec<WarrantOp>,
     },
-    /// The requested chain top was found, but the
-    /// actions found within the filtered range
-    /// were incomplete.
+    /// The requested chain top and filter conditions were successfully met, but there were missing
+    /// actions within the filtered range that prevented building a complete chain section.
     IncompleteChain,
-    /// The requested until hash was not found in the retained chain range.
+    /// While walking the chain in reverse order, the requested until hash was not found.
+    ///
+    /// This either means that there is data missing for this chain, or the requested hash does not
+    /// below to the queried chain.
     UntilHashMissing(ActionHash),
     /// The requested until timestamp range could not be proven complete.
     ///
-    /// This includes the case where no returned actions satisfy the timestamp,
-    /// and the case where actions satisfy it but there is no deterministic
-    /// lower-bound witness (an action with timestamp below the limit) and the
-    /// returned chain does not reach genesis.
+    /// This includes the case where no returned actions satisfy the timestamp, and the case where
+    /// actions satisfy it but there is no deterministic lower-bound witness (an action with
+    /// timestamp below the limit) and the returned chain does not reach genesis.
     UntilTimestampIndeterminate(Timestamp),
     /// The requested chain top was not found in the chain.
     ChainTopNotFound(ActionHash),
-    /// The `until_hash` filter specifies an action with a sequence number
-    /// greater than the `chain_top`'s sequence number.
+    /// The `until_hash` filter specifies an action with a sequence number greater than the
+    /// `chain_top`'s sequence number.
     ///
-    /// This is an impossible filter condition because `until_hash` must be
+    /// This is an impossible filter condition to create a response to because `until_hash` must be
     /// at or before `chain_top` in the chain.
     UntilHashAfterChainHead(ActionHash),
-    /// The `until_timestamp` filter specifies a timestamp greater than the
-    /// `chain_top` action's timestamp.
+    /// The `until_timestamp` filter specifies a timestamp greater than the `chain_top` action's
+    /// timestamp.
     ///
-    /// This is an impossible filter condition because `until_timestamp` must
-    /// be at or before the `chain_top`'s timestamp.
+    /// This is an impossible filter condition to create a response to because `until_timestamp`
+    /// must be at or before the `chain_top`'s timestamp.
     UntilTimestampGreaterThanChainHead(Timestamp),
 }
 

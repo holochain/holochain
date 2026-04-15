@@ -30,7 +30,7 @@ use holochain_types::{
 use holochain_wasm_test_utils::TestWasm;
 use holochain_wasmer_host::module::ModuleCache;
 use holochain_zome_types::{
-    chain::{ChainFilter, LimitConditions, MustGetAgentActivityInput},
+    chain::{ChainFilter, MustGetAgentActivityInput},
     dependencies::holochain_integrity_types::{UnresolvedDependencies, ValidateCallbackResult},
     entry::MustGetActionInput,
     fixt::{CreateFixturator, DeleteFixturator, SignatureFixturator},
@@ -231,13 +231,10 @@ async fn validation_callback_awaiting_deps_agent_activity() {
         move |api, op: Op| {
             if let Op::RegisterDelete(RegisterDelete { delete }) = op {
                 // chain filter with delete as chain top and create as chain bottom
-                let chain_filter = ChainFilter {
-                    chain_top: delete.as_hash().clone(),
-                    limit_conditions: LimitConditions::UntilHash(
-                        delete.hashed.deletes_address.clone(),
-                    ),
-                    include_cached_entries: false,
-                };
+                let chain_filter = ChainFilter::until_hash(
+                    delete.as_hash().clone(),
+                    delete.hashed.deletes_address.clone(),
+                );
                 let result = api.must_get_agent_activity(MustGetAgentActivityInput {
                     author: delete.hashed.author.clone(),
                     chain_filter: chain_filter.clone(),

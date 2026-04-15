@@ -33,18 +33,21 @@ pub struct ChainFilter<H: Eq + Ord + std::hash::Hash = ActionHash> {
 /// following the linear chain path and excluding any forked actions.
 #[derive(Serialize, Deserialize, Debug, Eq, Clone, Default)]
 pub enum LimitConditions<H: Eq + Ord + std::hash::Hash = ActionHash> {
-    /// Include all actions to the end of the chain.
+    /// Include all actions to the start of the chain.
     #[default]
     ToGenesis,
-    /// Include exactly the specified number of actions in the chain, or all actions in the chain, whichever is fewer.
+    /// Include exactly the specified number of actions in the chain, or all actions in the chain,
+    /// whichever is fewer.
     ///
     /// A value of `0` is considered invalid and will cause an error.
     Take(u32),
-    /// Include all actions in the chain with timestamps greater than or equal to the given timestamp.
+    /// Include all actions in the chain with timestamps greater than or equal to the given
+    /// timestamp.
     ///
-    /// To receive a success response, the query must retrieve an action with a timestamp *less* than the given timestamp,
-    /// *or* retrieve all actions until genesis. Without this we would not know if there are additional
-    /// actions within the timestamp, and so the response would not be deterministic.
+    /// To receive a success response, the query must retrieve an action with a timestamp *older*
+    /// than the given timestamp, *or* retrieve all actions until genesis. Without this we would
+    /// not know if there are additional actions after the timestamp, and so the response would
+    /// not be deterministic.
     ///
     /// A timestamp value that is greater than the `chain_top` timestamp is considered invalid
     /// and will return `MustGetAgentActivityResponse::UntilTimestampGreaterThanChainHead`.
@@ -53,9 +56,9 @@ pub enum LimitConditions<H: Eq + Ord + std::hash::Hash = ActionHash> {
     ///
     /// To receive a success response, the query must retrieve an action matching the given hash.
     ///
-    /// A hash value that maps to an action with a sequence number greater than the
-    /// `chain_top` sequence number is considered invalid
-    /// and will return `MustGetAgentActivityResponse::UntilHashAfterChainHead`.
+    /// A hash value that maps to an action with a sequence number greater than the `chain_top`
+    /// sequence number is considered invalid and will return
+    /// `MustGetAgentActivityResponse::UntilHashAfterChainHead`.
     UntilHash(H),
 }
 

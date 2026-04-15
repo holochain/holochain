@@ -13,8 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **BREAKING CHANGE** `must_get_agent_activity` responses have changed:
   - Activity results now follow the chain down from the provided `chain_top` hash, any forked actions are excluded.
   - If the filter is `UntilHash` and that hash is not found the response is `MustGetAgentActivityResponse::UntilHashMissing`. This includes when the hash is on a dropped fork.
-  - If the filter is `UntilHash` with an until hash sequence greater than the ChainFilter `chain_top` action sequence, the response is `MustGetAgentActivityResponse::UntilHashAfterChainHead`.
-  - If the filter is `UntilTimestamp` and no action is found with a timestamp less than the provided timestamp, then the response is `MustGetAgentActivityResponse::UntilTimestampIndeterminate`. This is to ensure that responses are always deterministic.
+  - If the filter is `UntilHash` with an until hash that has a sequence number greater than that of the ChainFilter `chain_top` action sequence, the response is `MustGetAgentActivityResponse::UntilHashAfterChainHead`.
+  - If the filter is `UntilTimestamp` and no action is found with a timestamp less than the provided timestamp and the genesis actions are not found to be after the timestamp, then the response is `MustGetAgentActivityResponse::UntilTimestampIndeterminate`. This is to ensure that responses are always deterministic.
   - If the filter is `UntilTimestamp` with a timestamp greater than the ChainFilter `chain_top` action timestamp, the response is `MustGetAgentActivityResponse::UntilTimestampGreaterThanChainHead`.
   - If the filter is `ToGenesis` and the chain does not reach genesis, the response is `MustGetAgentActivityResponse::IncompleteChain`.
   - If the filter is `Take(n)` and fewer than `n` actions are available and the chain does not reach genesis, the response is `MustGetAgentActivityResponse::IncompleteChain`. Previously this could return `Activity` if no gaps were detected, but completeness cannot be guaranteed without reaching genesis.

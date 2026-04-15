@@ -543,31 +543,9 @@ impl CascadeImpl {
             }
         };
 
-        // TODO: Handle conflict and/or merge the responses.
-        //
-        // For now we just pick a single response.
-        let selected_response = if responses
-            .iter()
-            .all(|r| r == responses.first().unwrap_or(r))
-        {
-            // All responses are the same, pick the first.
-            responses.first()
-        } else if let Some(response) = responses
-            .iter()
-            .find(|a| matches!(a, MustGetAgentActivityResponse::Activity { .. }))
-        {
-            // Responses are different, pick the first that contains Activity.
-            tracing::info!(
-                "Got different must_get_agent_activity responses from different authorities"
-            );
-
-            Some(response)
-        } else {
-            // Responses are different and none of them contain Activity, pick the first.
-            responses.first()
-        };
-
-        match selected_response {
+        // The network calls multiple peers but currently only returns a single response to here,
+        // the first one it considers to be "non-empty".
+        match responses.first() {
             None => Err(HolochainP2pError::Other("Received no responses".into()).into()),
             Some(selected_response) => {
                 self.add_activity_into_cache(selected_response.clone())
@@ -1294,13 +1272,18 @@ impl CascadeImpl {
             // Only warrants coming from the network should be added to the scratch. Locally
             // found warrants shouldn't be redundantly added to the database.
             if !authority && !merged_response.warrants.is_empty() {
-                self.add_warrants_into_scratch(
-                    merged_response
-                        .warrants
-                        .iter()
-                        .cloned()
-                        .map(WarrantOp::from),
-                );
+                if let Some(scratch) = &self.scratch {
+                    if let Err(err) = scratch.apply(|scratch| {
+                        for warrant in merged_response.warrants.iter() {
+                            scratch.add_warrant(warrant.clone());
+                        }
+                    }) {
+                        tracing::warn!(
+                            ?err,
+                            "Failed to add warrants from network response to scratch"
+                        );
+                    };
+                }
             }
 
             merged_response

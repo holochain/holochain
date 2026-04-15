@@ -198,10 +198,10 @@ fn exclude_forked_activity_removes_duplicate_seqs() {
 
     // Descending order from chain head.
     let mut activity = vec![
-        create_activity_with_prev(2, hash2, hash1.clone()),
+        create_activity_with_prev(2, hash2.clone(), hash1.clone()),
         fork_activity_first.clone(),
         create_activity_with_prev(1, hash1_fork, hash0.clone()), // Fork at seq 1
-        create_activity_with_prev(0, hash0, action_hash(&[9])),
+        create_activity_with_prev(0, hash0.clone(), action_hash(&[9])),
     ];
     exclude_forked_activity(&mut activity, &action_hash(&[2]));
 
@@ -210,6 +210,13 @@ fn exclude_forked_activity_removes_duplicate_seqs() {
     // Removes duplicate seqs
     let seqs: Vec<u32> = activity.iter().map(|a| a.action.seq()).collect();
     assert_eq!(seqs, vec![2, 1, 0]);
+
+    // The expected hashes are produced, not including the forked action hash
+    let hashes: Vec<ActionHash> = activity
+        .iter()
+        .map(|a| a.action.hashed.hash.clone())
+        .collect();
+    assert_eq!(hashes, vec![hash2, hash1, hash0]);
 
     // Retains the fork that is linked to by the head.
     assert_eq!(
@@ -229,21 +236,26 @@ fn exclude_forked_activity_multiple_forks() {
     let hash3 = action_hash(&[3]);
 
     let mut activity = vec![
-        create_activity_with_prev(3, hash3, hash2.clone()),
+        create_activity_with_prev(3, hash3.clone(), hash2.clone()),
         create_activity_with_prev(2, hash2.clone(), hash1.clone()),
         create_activity_with_prev(2, hash2_fork, hash1.clone()), // Fork at seq 2
         create_activity_with_prev(2, hash2_fork_2, hash1.clone()), // Another fork at seq 2
         create_activity_with_prev(1, hash1.clone(), hash0.clone()),
         create_activity_with_prev(1, hash1_fork, hash0.clone()), // Fork at seq 1
-        create_activity_with_prev(0, hash0, action_hash(&[9])),
+        create_activity_with_prev(0, hash0.clone(), action_hash(&[9])),
     ];
     exclude_forked_activity(&mut activity, &action_hash(&[3]));
 
     assert_eq!(activity.len(), 4);
 
     let seqs: Vec<u32> = activity.iter().map(|a| a.action.seq()).collect();
-
     assert_eq!(seqs, vec![3, 2, 1, 0]);
+
+    let actions: Vec<ActionHash> = activity
+        .iter()
+        .map(|a| a.action.hashed.hash.clone())
+        .collect();
+    assert_eq!(actions, vec![hash3, hash2, hash1, hash0]);
 }
 
 #[test]
@@ -252,13 +264,19 @@ fn exclude_forked_activity_no_forks() {
     let hash1 = action_hash(&[1]);
     let hash2 = action_hash(&[2]);
     let mut activity = vec![
-        create_activity_with_prev(2, hash2, hash1.clone()),
-        create_activity_with_prev(1, hash1, hash0.clone()),
-        create_activity_with_prev(0, hash0, action_hash(&[9])),
+        create_activity_with_prev(2, hash2.clone(), hash1.clone()),
+        create_activity_with_prev(1, hash1.clone(), hash0.clone()),
+        create_activity_with_prev(0, hash0.clone(), action_hash(&[9])),
     ];
     exclude_forked_activity(&mut activity, &action_hash(&[2]));
 
     assert_eq!(activity.len(), 3);
+
+    let hashes: Vec<ActionHash> = activity
+        .iter()
+        .map(|a| a.action.hashed.hash.clone())
+        .collect();
+    assert_eq!(vec! {hash2, hash1, hash0}, hashes);
 }
 
 #[test]
