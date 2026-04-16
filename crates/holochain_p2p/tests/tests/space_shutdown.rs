@@ -2,9 +2,7 @@ use crate::tests::common::Handler;
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_keystore::test_keystore;
 use holochain_p2p::{spawn_holochain_p2p, HolochainP2pConfig};
-use holochain_state::prelude::{
-    test_cache_db_with_dna_hash, test_conductor_db, test_dht_db, test_peer_meta_store_db,
-};
+use holochain_state::prelude::{test_cache_db_with_dna_hash, test_dht_db, test_peer_meta_store_db};
 use kitsune2_api::LocalAgent;
 use std::sync::Arc;
 
@@ -15,7 +13,9 @@ async fn space_shutdown() {
 
     let dht_db = test_dht_db().to_db();
     let cache_db = test_cache_db_with_dna_hash(dna_hash.clone()).to_db();
-    let conductor_db = holochain_data::test_open_db(holochain_data::kind::Conductor).await.unwrap();
+    let conductor_db = holochain_data::test_open_db(holochain_data::kind::Conductor)
+        .await
+        .unwrap();
     let peer_meta_db = test_peer_meta_store_db(dna_hash.clone()).to_db();
 
     let keystore = test_keystore();

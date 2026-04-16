@@ -5,7 +5,7 @@ use holochain_p2p::{
     HolochainP2pLocalAgent,
 };
 use holochain_state::prelude::{named_params, test_db_dir};
-use holochain_types::db::{DbKindCache, DbKindConductor, DbKindDht, DbKindPeerMetaStore, DbWrite};
+use holochain_types::db::{DbKindCache, DbKindDht, DbKindPeerMetaStore, DbWrite};
 use kitsune2_api::{
     AgentInfo, AgentInfoSigned, DhtArc, DynPeerMetaStore, SpaceId, Timestamp, Url, KEY_PREFIX_ROOT,
     META_KEY_UNRESPONSIVE,
@@ -235,7 +235,9 @@ impl TestCase {
             DbWrite::test(&db_dir, DbKindPeerMetaStore(Arc::new(dna_hash.clone()))).unwrap();
         let db_op = DbWrite::test_in_mem(DbKindDht(Arc::new(dna_hash.clone()))).unwrap();
         let db_cache = DbWrite::test_in_mem(DbKindCache(Arc::new(dna_hash.clone()))).unwrap();
-        let db_conductor = holochain_data::test_open_db(holochain_data::kind::Conductor).await.unwrap();
+        let db_conductor = holochain_data::test_open_db(holochain_data::kind::Conductor)
+            .await
+            .unwrap();
         let lair_client = test_keystore();
         let db_peer_meta2 = db_peer_meta.clone();
         let p2p = spawn_holochain_p2p(

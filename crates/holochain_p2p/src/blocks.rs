@@ -1,8 +1,6 @@
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_timestamp::Timestamp;
-use holochain_types::{
-    prelude::{BlockTargetId, CellId},
-};
+use holochain_types::prelude::{BlockTargetId, CellId};
 use kitsune2_api::{
     BlockTarget, Blocks, BlocksFactory, BoxFut, Builder, Config, DynBlocks, K2Error, K2Result,
     SpaceId,
@@ -59,7 +57,10 @@ pub struct HolochainBlocks {
 
 impl HolochainBlocks {
     /// Create a new [`HolochainBlocks`].
-    pub fn new(dna_hash: DnaHash, db: holochain_data::DbWrite<holochain_data::kind::Conductor>) -> Self {
+    pub fn new(
+        dna_hash: DnaHash,
+        db: holochain_data::DbWrite<holochain_data::kind::Conductor>,
+    ) -> Self {
         Self { dna_hash, db }
     }
 }

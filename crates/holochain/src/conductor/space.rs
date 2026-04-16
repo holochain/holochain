@@ -166,19 +166,6 @@ impl Spaces {
             DbSyncStrategy::Resilient => DbSyncLevel::Normal,
         };
 
-        let conductor_db = tokio::task::block_in_place(|| {
-            let conductor_db = DbWrite::open_with_pool_config(
-                root_db_dir.as_ref(),
-                DbKindConductor,
-                PoolConfig {
-                    synchronous_level: db_sync_level,
-                    key: db_key.clone(),
-                    max_readers: config.db_max_readers,
-                },
-            )?;
-            ConductorResult::Ok(conductor_db)
-        })?;
-
         let db_sync = match db_sync_level {
             DbSyncLevel::Off => holochain_data::DbSyncLevel::Off,
             DbSyncLevel::Normal => holochain_data::DbSyncLevel::Normal,
@@ -277,7 +264,7 @@ impl Spaces {
             .as_ref()
             .is_blocked(target_id.clone(), timestamp)
             .await
-            .map_err(|e| ConductorError::other(e))?;
+            .map_err(ConductorError::other)?;
 
         if target_blocked {
             return Ok(true);
@@ -292,7 +279,7 @@ impl Spaces {
             .as_ref()
             .is_any_blocked(cell_targets, timestamp)
             .await
-            .map_err(|e| ConductorError::other(e))?;
+            .map_err(ConductorError::other)?;
 
         Ok(any_cells_blocked)
     }

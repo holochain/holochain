@@ -1229,7 +1229,9 @@ async fn spawn_test(
         DbWrite::test_in_mem(DbKindPeerMetaStore(Arc::new(dna_hash.clone()))).unwrap();
     let db_op = DbWrite::test_in_mem(DbKindDht(Arc::new(dna_hash.clone()))).unwrap();
     let db_cache = DbWrite::test_in_mem(DbKindCache(Arc::new(dna_hash.clone()))).unwrap();
-    let conductor_db = holochain_data::test_open_db(holochain_data::kind::Conductor).await.unwrap();
+    let conductor_db = holochain_data::test_open_db(holochain_data::kind::Conductor)
+        .await
+        .unwrap();
     let lair_client = test_keystore();
 
     let agent = lair_client.new_sign_keypair_random().await.unwrap();

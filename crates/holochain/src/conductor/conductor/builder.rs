@@ -474,7 +474,7 @@ impl ConductorBuilder {
                 Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
             }),
             get_conductor_db: Arc::new(move || {
-               let conductor_db = conductor_db.clone();
+                let conductor_db = conductor_db.clone();
                 Box::pin(async move { conductor_db })
             }),
             target_arc_factor: config.network.target_arc_factor,

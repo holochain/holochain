@@ -51,8 +51,7 @@ CREATE TABLE IF NOT EXISTS AppInterface (
     danger_bind_addr TEXT,
     allowed_origins_blob BLOB,
     installed_app_id TEXT,
-    PRIMARY KEY (port, id),
-    FOREIGN KEY (installed_app_id) REFERENCES InstalledApp(app_id) ON DELETE SET NULL
+    PRIMARY KEY (port, id)
 ) STRICT;
 
 -- Signal subscriptions per app per interface

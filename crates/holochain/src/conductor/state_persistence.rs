@@ -207,7 +207,7 @@ mod tests {
     async fn test_state_persistence_round_trip() {
         // Create a temporary database
         let tmpdir = tempfile::tempdir().unwrap();
-        let db_write = setup_holochain_data(
+        let db_write = holochain_data::open_db(
             tmpdir.path(),
             holochain_data::kind::Conductor,
             holochain_data::HolochainDataConfig::default(),
@@ -226,7 +226,7 @@ mod tests {
         save_conductor_state(&db_write, &state).await.unwrap();
 
         // Load the state back
-        let loaded_state = load_conductor_state(&db_read).await.unwrap().unwrap();
+        let loaded_state = load_conductor_state(db_read).await.unwrap().unwrap();
 
         // Verify the tag matches
         assert_eq!(loaded_state.tag().0.as_ref(), "test-conductor");
@@ -238,7 +238,7 @@ mod tests {
     async fn test_app_interface_persistence() {
         // Create a temporary database
         let tmpdir = tempfile::tempdir().unwrap();
-        let db_write = setup_holochain_data(
+        let db_write = holochain_data::open_db(
             tmpdir.path(),
             holochain_data::kind::Conductor,
             holochain_data::HolochainDataConfig::default(),
@@ -263,7 +263,7 @@ mod tests {
         save_conductor_state(&db_write, &state).await.unwrap();
 
         // Load the state back
-        let loaded_state = load_conductor_state(&db_read).await.unwrap().unwrap();
+        let loaded_state = load_conductor_state(db_read).await.unwrap().unwrap();
 
         // Verify the interface was persisted
         assert_eq!(loaded_state.app_interfaces.len(), 1);
@@ -275,7 +275,7 @@ mod tests {
     async fn test_deletion_of_stale_interfaces() {
         // Create a temporary database
         let tmpdir = tempfile::tempdir().unwrap();
-        let db_write = setup_holochain_data(
+        let db_write = holochain_data::open_db(
             tmpdir.path(),
             holochain_data::kind::Conductor,
             holochain_data::HolochainDataConfig::default(),
@@ -307,7 +307,7 @@ mod tests {
         save_conductor_state(&db_write, &new_state).await.unwrap();
 
         // Load and verify only one interface remains
-        let loaded_state = load_conductor_state(&db_read).await.unwrap().unwrap();
+        let loaded_state = load_conductor_state(db_read).await.unwrap().unwrap();
         assert_eq!(loaded_state.app_interfaces.len(), 1);
         assert!(loaded_state
             .app_interfaces

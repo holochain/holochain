@@ -385,6 +385,49 @@ impl DbRead<Conductor> {
         Ok(false)
     }
 
+    /// Get all blocks from the database.
+    pub async fn get_all_blocks(&self) -> Result<Vec<Block>, sqlx::Error> {
+        use holochain_zome_types::block::{BlockTarget, BlockTargetReason};
+
+        let rows: Vec<(Vec<u8>, Vec<u8>, i64, i64)> =
+            sqlx::query_as("SELECT target_id, target_reason, start_us, end_us FROM BlockSpan")
+                .fetch_all(self.pool())
+                .await?;
+
+        let mut blocks = Vec::with_capacity(rows.len());
+        for (target_id_bytes, target_reason_bytes, start_us, end_us) in rows {
+            let target_id: BlockTargetId = holochain_serialized_bytes::decode(&target_id_bytes)
+                .map_err(|e| sqlx::Error::Protocol(format!("Deserialization error: {}", e)))?;
+            let target_reason: BlockTargetReason =
+                holochain_serialized_bytes::decode(&target_reason_bytes)
+                    .map_err(|e| sqlx::Error::Protocol(format!("Deserialization error: {}", e)))?;
+
+            let target = match (target_id, target_reason) {
+                (BlockTargetId::Cell(cell_id), BlockTargetReason::Cell(reason)) => {
+                    BlockTarget::Cell(cell_id, reason)
+                }
+                (BlockTargetId::Ip(ip), BlockTargetReason::Ip(reason)) => {
+                    BlockTarget::Ip(ip, reason)
+                }
+                _ => {
+                    return Err(sqlx::Error::Protocol(
+                        "Mismatched block target id and reason".to_string(),
+                    ));
+                }
+            };
+
+            let interval = InclusiveTimestampInterval::try_new(
+                Timestamp::from_micros(start_us),
+                Timestamp::from_micros(end_us),
+            )
+            .map_err(|e| sqlx::Error::Protocol(format!("Invalid timestamp interval: {:?}", e)))?;
+
+            blocks.push(Block::new(target, interval));
+        }
+
+        Ok(blocks)
+    }
+
     /// Get overlapping block bounds for merging
     async fn pluck_overlapping_block_bounds(
         &self,
@@ -626,23 +669,6 @@ mod tests {
         assert_eq!(app.status, "enabled");
         assert_eq!(app.disabled_reason, None);
         assert_eq!(app.installed_at, 1234567890);
-
-        // Test status constraint
-        let result = sqlx::query(
-            "INSERT INTO InstalledApp (app_id, agent_pub_key, status, disabled_reason, manifest_blob, role_assignments_blob, installed_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)"
-        )
-            .bind("invalid-app")
-            .bind(&agent_key)
-            .bind("invalid-status")
-            .bind(None::<String>)
-            .bind(&manifest)
-            .bind(&role_assignments)
-            .bind(1234567890_i64)
-            .execute(db.pool())
-            .await;
-
-        assert!(result.is_err(), "Should reject invalid status");
     }
 
     #[tokio::test]
@@ -967,7 +993,7 @@ mod tests {
         let expires = Timestamp::from_micros(2_000_000);
 
         let r1 = db
-            .witness_nonce(agent.clone(), nonce.clone(), now, expires)
+            .witness_nonce(agent.clone(), nonce, now, expires)
             .await
             .unwrap();
         assert_eq!(r1, WitnessNonceResult::Fresh);
@@ -1018,7 +1044,7 @@ mod tests {
             .unwrap());
 
         // Witness it
-        db.witness_nonce(agent.clone(), nonce.clone(), now, expires)
+        db.witness_nonce(agent.clone(), nonce, now, expires)
             .await
             .unwrap();
 

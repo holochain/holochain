@@ -937,7 +937,7 @@ mod network_impls {
                 .conductor_db
                 .witness_nonce(agent, nonce, Timestamp::now(), expires)
                 .await
-                .map_err(|e| ConductorError::other(e))?;
+                .map_err(ConductorError::other)?;
 
             // Convert from holochain_data::WitnessNonceResult to holochain_state::WitnessNonceResult
             Ok(match result {
