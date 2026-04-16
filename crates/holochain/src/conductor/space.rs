@@ -322,7 +322,7 @@ impl Spaces {
         O: Send + 'static,
     {
         timed!([1, 10, 1000], "update_state_prime", {
-            // Load current state from normalized tables
+            // Load the current state
             let state = crate::conductor::state_persistence::load_conductor_state(
                 self.conductor_db.as_ref(),
             )
@@ -332,7 +332,7 @@ impl Spaces {
             // Apply the transformation
             let (new_state, output) = f(state)?;
 
-            // Save new state to normalized tables
+            // Save the new state
             crate::conductor::state_persistence::save_conductor_state(
                 &self.conductor_db,
                 &new_state,

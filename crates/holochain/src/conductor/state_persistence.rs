@@ -204,7 +204,7 @@ mod tests {
     use holochain_types::websocket::AllowedOrigins;
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn test_state_persistence_round_trip() {
+    async fn state_persistence_round_trip() {
         // Create a temporary database
         let tmpdir = tempfile::tempdir().unwrap();
         let db_write = holochain_data::open_db(
@@ -235,7 +235,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn test_app_interface_persistence() {
+    async fn app_interface_persistence() {
         // Create a temporary database
         let tmpdir = tempfile::tempdir().unwrap();
         let db_write = holochain_data::open_db(
@@ -272,7 +272,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn test_deletion_of_stale_interfaces() {
+    async fn deletion_of_stale_interfaces() {
         // Create a temporary database
         let tmpdir = tempfile::tempdir().unwrap();
         let db_write = holochain_data::open_db(
