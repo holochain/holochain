@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE** switch from `holochain_sqlite`/`holochain_state` for the conductor database, to the new one defined by `holochain_data`.
+  There is no migration path for existing installs of Holochain, and startup errors would be expected if the data state is not cleared.
+
 ## 0.7.0-dev.21
 
 - **BREAKING CHANGE** `ChainFilter` is now defined via constructors `take`, `until_hash`, `until_timestamp` instead of composable builder chaining.
