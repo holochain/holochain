@@ -3,7 +3,6 @@
 //! This module provides database operations for the conductor database,
 //! which stores the conductor's state including installed apps, roles, and interfaces.
 
-use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::prelude::*;
 
 pub use crate::models::conductor::{
@@ -14,27 +13,648 @@ pub use holochain_nonce::Nonce256Bits;
 pub use holochain_timestamp::InclusiveTimestampInterval;
 pub use holochain_zome_types::block::{Block, BlockTargetId};
 
-use crate::handles::{DbRead, DbWrite};
+use crate::handles::{DbRead, DbWrite, TxRead, TxWrite};
 use crate::kind::Conductor;
+use sqlx::{Acquire, Executor, Sqlite};
+
+// ============================================================================
+// Conductor / App / Interface operations
+// ============================================================================
+
+/// Get the conductor tag.
+async fn get_conductor_tag<'e, E>(executor: E) -> sqlx::Result<Option<String>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let tag: Option<String> = sqlx::query_scalar("SELECT tag FROM Conductor WHERE id = 1")
+        .fetch_optional(executor)
+        .await?;
+    Ok(tag)
+}
+
+/// Get all app interfaces.
+async fn get_all_app_interfaces<'e, E>(executor: E) -> sqlx::Result<Vec<AppInterfaceModel>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let models: Vec<AppInterfaceModel> = sqlx::query_as(
+        "SELECT port, id, driver_type, websocket_port, danger_bind_addr, allowed_origins_blob, installed_app_id FROM AppInterface",
+    )
+    .fetch_all(executor)
+    .await?;
+
+    Ok(models)
+}
+
+/// Get signal subscriptions for a specific app interface.
+async fn get_signal_subscriptions<'e, E>(
+    executor: E,
+    port: i64,
+    id: &str,
+) -> sqlx::Result<Vec<(String, Vec<u8>)>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    #[derive(sqlx::FromRow)]
+    struct Row {
+        app_id: String,
+        filters_blob: Option<Vec<u8>>,
+    }
+
+    let rows: Vec<Row> = sqlx::query_as(
+        "SELECT app_id, filters_blob FROM SignalSubscription WHERE interface_port = ? AND interface_id = ?",
+    )
+    .bind(port)
+    .bind(id)
+    .fetch_all(executor)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .filter_map(|r| r.filters_blob.map(|blob| (r.app_id, blob)))
+        .collect())
+}
+
+/// Get an installed app by ID.
+async fn get_installed_app<'e, E>(
+    executor: E,
+    app_id: &str,
+) -> sqlx::Result<Option<(InstalledAppCommon, AppStatus)>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let model: Option<InstalledAppModel> = sqlx::query_as(
+        "SELECT app_id, agent_pub_key, status, disabled_reason, manifest_blob, role_assignments_blob, installed_at FROM InstalledApp WHERE app_id = ?",
+    )
+    .bind(app_id)
+    .fetch_optional(executor)
+    .await?;
+
+    match model {
+        Some(model) => model.to_installed_app().map(Some).map_err(|e| {
+            sqlx::Error::Decode(Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                e,
+            )))
+        }),
+        None => Ok(None),
+    }
+}
+
+/// Get all installed apps.
+async fn get_all_installed_apps<'e, E>(
+    executor: E,
+) -> sqlx::Result<Vec<(String, InstalledAppCommon, AppStatus)>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let models: Vec<InstalledAppModel> = sqlx::query_as(
+        "SELECT app_id, agent_pub_key, status, disabled_reason, manifest_blob, role_assignments_blob, installed_at FROM InstalledApp",
+    )
+    .fetch_all(executor)
+    .await?;
+
+    let mut apps = Vec::new();
+    for model in models {
+        let app_id = model.app_id.clone();
+        let (app, status) = model.to_installed_app().map_err(|e| {
+            sqlx::Error::Decode(Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                e,
+            )))
+        })?;
+        apps.push((app_id, app, status));
+    }
+    Ok(apps)
+}
+
+/// Set the conductor tag.
+async fn set_conductor_tag<'e, E>(executor: E, tag: &str) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query("INSERT INTO Conductor (id, tag) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET tag = excluded.tag")
+        .bind(tag)
+        .execute(executor)
+        .await?;
+    Ok(())
+}
+
+/// Insert or update an app interface.
+async fn put_app_interface<'e, E>(
+    executor: E,
+    port: i64,
+    id: &str,
+    model: &AppInterfaceModel,
+) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query(
+        "INSERT INTO AppInterface (port, id, driver_type, websocket_port, danger_bind_addr, allowed_origins_blob, installed_app_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(port, id) DO UPDATE SET
+            driver_type = excluded.driver_type,
+            websocket_port = excluded.websocket_port,
+            danger_bind_addr = excluded.danger_bind_addr,
+            allowed_origins_blob = excluded.allowed_origins_blob,
+            installed_app_id = excluded.installed_app_id",
+    )
+    .bind(port)
+    .bind(id)
+    .bind(&model.driver_type)
+    .bind(model.websocket_port)
+    .bind(&model.danger_bind_addr)
+    .bind(&model.allowed_origins_blob)
+    .bind(&model.installed_app_id)
+    .execute(executor)
+    .await?;
+    Ok(())
+}
+
+/// Save a signal subscription for an app interface.
+async fn put_signal_subscription<'e, E>(
+    executor: E,
+    interface_port: i64,
+    interface_id: &str,
+    app_id: &str,
+    filters_blob: &[u8],
+) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query(
+        "INSERT INTO SignalSubscription (interface_port, interface_id, app_id, filters_blob)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(interface_port, interface_id, app_id) DO UPDATE SET
+            filters_blob = excluded.filters_blob",
+    )
+    .bind(interface_port)
+    .bind(interface_id)
+    .bind(app_id)
+    .bind(filters_blob)
+    .execute(executor)
+    .await?;
+    Ok(())
+}
+
+/// Delete all signal subscriptions for an app interface.
+async fn delete_signal_subscriptions<'e, E>(
+    executor: E,
+    interface_port: i64,
+    interface_id: &str,
+) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query("DELETE FROM SignalSubscription WHERE interface_port = ? AND interface_id = ?")
+        .bind(interface_port)
+        .bind(interface_id)
+        .execute(executor)
+        .await?;
+    Ok(())
+}
+
+/// Delete an app interface.
+async fn delete_app_interface<'e, E>(executor: E, port: i64, id: &str) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    // Signal subscriptions will be deleted via CASCADE
+    sqlx::query("DELETE FROM AppInterface WHERE port = ? AND id = ?")
+        .bind(port)
+        .bind(id)
+        .execute(executor)
+        .await?;
+    Ok(())
+}
+
+/// Insert or update an installed app.
+async fn put_installed_app<'e, E>(
+    executor: E,
+    app_id: &str,
+    app: &InstalledAppCommon,
+    status: &AppStatus,
+) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let model = InstalledAppModel::from_installed_app(app_id, app, status).map_err(|e| {
+        sqlx::Error::Decode(Box::new(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            e,
+        )))
+    })?;
+
+    sqlx::query(
+        "INSERT INTO InstalledApp (app_id, agent_pub_key, status, disabled_reason, manifest_blob, role_assignments_blob, installed_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(app_id) DO UPDATE SET
+            agent_pub_key = excluded.agent_pub_key,
+            status = excluded.status,
+            disabled_reason = excluded.disabled_reason,
+            manifest_blob = excluded.manifest_blob,
+            role_assignments_blob = excluded.role_assignments_blob,
+            installed_at = excluded.installed_at",
+    )
+    .bind(&model.app_id)
+    .bind(&model.agent_pub_key)
+    .bind(&model.status)
+    .bind(&model.disabled_reason)
+    .bind(&model.manifest_blob)
+    .bind(&model.role_assignments_blob)
+    .bind(model.installed_at)
+    .execute(executor)
+    .await?;
+    Ok(())
+}
+
+/// Delete an installed app.
+async fn delete_installed_app<'e, E>(executor: E, app_id: &str) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query("DELETE FROM InstalledApp WHERE app_id = ?")
+        .bind(app_id)
+        .execute(executor)
+        .await?;
+    Ok(())
+}
+
+// ============================================================================
+// Nonce Witnessing Operations
+// ============================================================================
+
+/// Check if a nonce has already been seen
+async fn nonce_already_seen<'e, E>(
+    executor: E,
+    agent: &AgentPubKey,
+    nonce: &Nonce256Bits,
+    now: Timestamp,
+) -> Result<bool, sqlx::Error>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let agent_bytes = agent.get_raw_36();
+    let nonce_bytes = nonce.as_ref();
+    let now_micros = now.as_micros();
+
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(1) FROM Nonce WHERE agent = ? AND nonce = ? AND expires > ?",
+    )
+    .bind(agent_bytes)
+    .bind(nonce_bytes)
+    .bind(now_micros)
+    .fetch_one(executor)
+    .await?;
+
+    Ok(count > 0)
+}
+
+/// Witness a nonce (check if it's fresh and record it).
+///
+/// Acquires a single connection and runs the DELETE-expired, duplicate-check,
+/// and INSERT sequence on it.
+async fn witness_nonce<'c, A>(
+    conn: A,
+    agent: AgentPubKey,
+    nonce: Nonce256Bits,
+    now: Timestamp,
+    expires: Timestamp,
+) -> Result<WitnessNonceResult, sqlx::Error>
+where
+    A: Acquire<'c, Database = Sqlite>,
+{
+    // Treat expired but also very far future expiries as stale as we cannot trust the time
+    if expires <= now {
+        return Ok(WitnessNonceResult::Expired);
+    }
+
+    let future_limit = (now + WITNESSABLE_EXPIRY_DURATION)
+        .map_err(|_| sqlx::Error::Protocol("Timestamp overflow".to_string()))?;
+
+    if expires > future_limit {
+        return Ok(WitnessNonceResult::Future);
+    }
+
+    let mut conn = conn.acquire().await?;
+
+    // Delete expired nonces first
+    sqlx::query("DELETE FROM Nonce WHERE expires <= ?")
+        .bind(now.as_micros())
+        .execute(&mut *conn)
+        .await?;
+
+    // Check if already seen
+    if nonce_already_seen(&mut *conn, &agent, &nonce, now).await? {
+        return Ok(WitnessNonceResult::Duplicate);
+    }
+
+    // Insert the new nonce
+    let agent_bytes = agent.get_raw_36();
+    let nonce_bytes = nonce.as_ref();
+
+    sqlx::query(
+        "INSERT INTO Nonce (agent, nonce, expires) VALUES (?, ?, ?) ON CONFLICT DO NOTHING",
+    )
+    .bind(agent_bytes)
+    .bind(nonce_bytes)
+    .bind(expires.as_micros())
+    .execute(&mut *conn)
+    .await?;
+
+    Ok(WitnessNonceResult::Fresh)
+}
+
+// ============================================================================
+// Block/Unblock Operations
+// ============================================================================
+
+/// Check whether a given target is blocked at the given time
+async fn is_blocked<'e, E>(
+    executor: E,
+    target_id: BlockTargetId,
+    timestamp: Timestamp,
+) -> Result<bool, sqlx::Error>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let target_bytes = holochain_serialized_bytes::encode(&target_id)
+        .map_err(|e| sqlx::Error::Protocol(format!("Serialization error: {}", e)))?;
+    let time_micros = timestamp.as_micros();
+
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(1) > 0 FROM BlockSpan WHERE target_id = ? AND start_us <= ? AND ? <= end_us",
+    )
+    .bind(&target_bytes)
+    .bind(time_micros)
+    .bind(time_micros)
+    .fetch_one(executor)
+    .await?;
+
+    Ok(count > 0)
+}
+
+/// Query whether any BlockTargetId in the provided vector is blocked at the given timestamp.
+///
+/// Acquires a single connection for the loop of per-target queries.
+async fn is_any_blocked<'c, A>(
+    conn: A,
+    target_ids: Vec<BlockTargetId>,
+    timestamp: Timestamp,
+) -> Result<bool, sqlx::Error>
+where
+    A: Acquire<'c, Database = Sqlite>,
+{
+    if target_ids.is_empty() {
+        return Ok(false);
+    }
+
+    let mut conn = conn.acquire().await?;
+    let time_micros = timestamp.as_micros();
+
+    for target_id in target_ids {
+        let target_bytes: Vec<u8> = holochain_serialized_bytes::encode(&target_id)
+            .map_err(|e| sqlx::Error::Protocol(format!("Serialization error: {}", e)))?;
+        let found: i64 = sqlx::query_scalar(
+            "SELECT COUNT(1) > 0 FROM BlockSpan WHERE target_id = ? AND start_us <= ? AND ? <= end_us",
+        )
+        .bind(&target_bytes)
+        .bind(time_micros)
+        .bind(time_micros)
+        .fetch_one(&mut *conn)
+        .await?;
+
+        if found != 0 {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
+}
+
+/// Get all blocks from the database.
+async fn get_all_blocks<'e, E>(executor: E) -> Result<Vec<Block>, sqlx::Error>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    use holochain_zome_types::block::{BlockTarget, BlockTargetReason};
+
+    let rows: Vec<(Vec<u8>, Vec<u8>, i64, i64)> =
+        sqlx::query_as("SELECT target_id, target_reason, start_us, end_us FROM BlockSpan")
+            .fetch_all(executor)
+            .await?;
+
+    let mut blocks = Vec::with_capacity(rows.len());
+    for (target_id_bytes, target_reason_bytes, start_us, end_us) in rows {
+        let target_id: BlockTargetId = holochain_serialized_bytes::decode(&target_id_bytes)
+            .map_err(|e| sqlx::Error::Protocol(format!("Deserialization error: {}", e)))?;
+        let target_reason: BlockTargetReason =
+            holochain_serialized_bytes::decode(&target_reason_bytes)
+                .map_err(|e| sqlx::Error::Protocol(format!("Deserialization error: {}", e)))?;
+
+        let target = match (target_id, target_reason) {
+            (BlockTargetId::Cell(cell_id), BlockTargetReason::Cell(reason)) => {
+                BlockTarget::Cell(cell_id, reason)
+            }
+            (BlockTargetId::Ip(ip), BlockTargetReason::Ip(reason)) => BlockTarget::Ip(ip, reason),
+            _ => {
+                return Err(sqlx::Error::Protocol(
+                    "Mismatched block target id and reason".to_string(),
+                ));
+            }
+        };
+
+        let interval = InclusiveTimestampInterval::try_new(
+            Timestamp::from_micros(start_us),
+            Timestamp::from_micros(end_us),
+        )
+        .map_err(|e| sqlx::Error::Protocol(format!("Invalid timestamp interval: {:?}", e)))?;
+
+        blocks.push(Block::new(target, interval));
+    }
+
+    Ok(blocks)
+}
+
+/// Get overlapping block bounds for merging
+async fn pluck_overlapping_block_bounds<'e, E>(
+    executor: E,
+    block: &Block,
+) -> Result<(Option<i64>, Option<i64>), sqlx::Error>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let target_id = BlockTargetId::from(block.target().clone());
+    let target_bytes: Vec<u8> = holochain_serialized_bytes::encode(&target_id)
+        .map_err(|e| sqlx::Error::Protocol(format!("Serialization error: {}", e)))?;
+    let start_us = block.start().as_micros();
+    let end_us = block.end().as_micros();
+
+    let result: Option<(Option<i64>, Option<i64>)> = sqlx::query_as(
+        "SELECT MIN(start_us), MAX(end_us) FROM BlockSpan \
+         WHERE target_id = ? AND start_us <= ? AND ? <= end_us",
+    )
+    .bind(&target_bytes)
+    .bind(end_us)
+    .bind(start_us)
+    .fetch_optional(executor)
+    .await?;
+
+    Ok(result.unwrap_or((None, None)))
+}
+
+/// Insert a block span into the database
+async fn insert_block_inner<'e, E>(executor: E, block: Block) -> Result<(), sqlx::Error>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let target_id = BlockTargetId::from(block.target().clone());
+    let target_id_bytes: Vec<u8> = holochain_serialized_bytes::encode(&target_id)
+        .map_err(|e| sqlx::Error::Protocol(format!("Serialization error: {}", e)))?;
+    use holochain_zome_types::block::BlockTargetReason;
+    let target_reason = BlockTargetReason::from(block.target().clone());
+    let target_reason_bytes: Vec<u8> = holochain_serialized_bytes::encode(&target_reason)
+        .map_err(|e| sqlx::Error::Protocol(format!("Serialization error: {}", e)))?;
+
+    sqlx::query(
+        "INSERT INTO BlockSpan (target_id, target_reason, start_us, end_us) VALUES (?, ?, ?, ?)",
+    )
+    .bind(target_id_bytes)
+    .bind(target_reason_bytes)
+    .bind(block.start().as_micros())
+    .bind(block.end().as_micros())
+    .execute(executor)
+    .await?;
+
+    Ok(())
+}
+
+/// Insert a block into the database, merging with overlapping blocks.
+///
+/// Acquires a single connection and runs the pluck, delete, and insert
+/// sequence on it.
+async fn block<'c, A>(conn: A, input: Block) -> Result<(), sqlx::Error>
+where
+    A: Acquire<'c, Database = Sqlite>,
+{
+    let mut conn = conn.acquire().await?;
+
+    let maybe_min_maybe_max = pluck_overlapping_block_bounds(&mut *conn, &input).await?;
+
+    // Delete overlapping blocks
+    let target_id = BlockTargetId::from(input.target().clone());
+    let target_id_bytes: Vec<u8> = holochain_serialized_bytes::encode(&target_id)
+        .map_err(|e| sqlx::Error::Protocol(format!("Serialization error: {}", e)))?;
+
+    sqlx::query("DELETE FROM BlockSpan WHERE target_id = ? AND start_us <= ? AND ? <= end_us")
+        .bind(&target_id_bytes)
+        .bind(input.end().as_micros())
+        .bind(input.start().as_micros())
+        .execute(&mut *conn)
+        .await?;
+
+    // Build one new block from the extremums
+    let merged_block = Block::new(
+        input.target().clone(),
+        InclusiveTimestampInterval::try_new(
+            maybe_min_maybe_max
+                .0
+                .map(Timestamp)
+                .map(|min| std::cmp::min(min, input.start()))
+                .unwrap_or(input.start()),
+            maybe_min_maybe_max
+                .1
+                .map(Timestamp)
+                .map(|max| std::cmp::max(max, input.end()))
+                .unwrap_or(input.end()),
+        )
+        .map_err(|e| sqlx::Error::Protocol(format!("Timestamp error: {}", e)))?,
+    );
+
+    insert_block_inner(&mut *conn, merged_block).await
+}
+
+/// Insert an unblock into the database, splitting existing blocks as needed.
+///
+/// Acquires a single connection and runs the pluck, delete, and re-insert
+/// sequence on it.
+async fn unblock<'c, A>(conn: A, input: Block) -> Result<(), sqlx::Error>
+where
+    A: Acquire<'c, Database = Sqlite>,
+{
+    let mut conn = conn.acquire().await?;
+
+    let maybe_min_maybe_max = pluck_overlapping_block_bounds(&mut *conn, &input).await?;
+
+    // Delete overlapping blocks
+    let target_id = BlockTargetId::from(input.target().clone());
+    let target_id_bytes: Vec<u8> = holochain_serialized_bytes::encode(&target_id)
+        .map_err(|e| sqlx::Error::Protocol(format!("Serialization error: {}", e)))?;
+
+    sqlx::query("DELETE FROM BlockSpan WHERE target_id = ? AND start_us <= ? AND ? <= end_us")
+        .bind(&target_id_bytes)
+        .bind(input.end().as_micros())
+        .bind(input.start().as_micros())
+        .execute(&mut *conn)
+        .await?;
+
+    // Reinstate anything before the unblock
+    if let (Some(min), _) = maybe_min_maybe_max {
+        let preblock_start = Timestamp(min);
+        // Unblocks are inclusive so we reinstate the preblock up to but not including the unblock start
+        if let Ok(preblock_end) = input.start() - std::time::Duration::from_micros(1) {
+            if preblock_start <= preblock_end {
+                insert_block_inner(
+                    &mut *conn,
+                    Block::new(
+                        input.target().clone(),
+                        InclusiveTimestampInterval::try_new(preblock_start, preblock_end).map_err(
+                            |e| sqlx::Error::Protocol(format!("Timestamp error: {}", e)),
+                        )?,
+                    ),
+                )
+                .await?;
+            }
+        }
+    }
+
+    // Reinstate anything after the unblock
+    if let (_, Some(max)) = maybe_min_maybe_max {
+        let postblock_end = Timestamp(max);
+        if let Ok(postblock_start) = input.end() + std::time::Duration::from_micros(1) {
+            if postblock_start <= postblock_end {
+                insert_block_inner(
+                    &mut *conn,
+                    Block::new(
+                        input.target().clone(),
+                        InclusiveTimestampInterval::try_new(postblock_start, postblock_end)
+                            .map_err(|e| {
+                                sqlx::Error::Protocol(format!("Timestamp error: {}", e))
+                            })?,
+                    ),
+                )
+                .await?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+// ============================================================================
+// DbRead / DbWrite wrappers
+// ============================================================================
 
 impl DbRead<Conductor> {
     /// Get the conductor tag.
     pub async fn get_conductor_tag(&self) -> sqlx::Result<Option<String>> {
-        let tag: Option<String> = sqlx::query_scalar("SELECT tag FROM Conductor WHERE id = 1")
-            .fetch_optional(self.pool())
-            .await?;
-        Ok(tag)
+        get_conductor_tag(self.pool()).await
     }
 
     /// Get all app interfaces.
     pub async fn get_all_app_interfaces(&self) -> sqlx::Result<Vec<AppInterfaceModel>> {
-        let models: Vec<AppInterfaceModel> = sqlx::query_as(
-            "SELECT port, id, driver_type, websocket_port, danger_bind_addr, allowed_origins_blob, installed_app_id FROM AppInterface",
-        )
-        .fetch_all(self.pool())
-        .await?;
-
-        Ok(models)
+        get_all_app_interfaces(self.pool()).await
     }
 
     /// Get signal subscriptions for a specific app interface.
@@ -43,24 +663,7 @@ impl DbRead<Conductor> {
         port: i64,
         id: &str,
     ) -> sqlx::Result<Vec<(String, Vec<u8>)>> {
-        #[derive(sqlx::FromRow)]
-        struct Row {
-            app_id: String,
-            filters_blob: Option<Vec<u8>>,
-        }
-
-        let rows: Vec<Row> = sqlx::query_as(
-            "SELECT app_id, filters_blob FROM SignalSubscription WHERE interface_port = ? AND interface_id = ?",
-        )
-        .bind(port)
-        .bind(id)
-        .fetch_all(self.pool())
-        .await?;
-
-        Ok(rows
-            .into_iter()
-            .filter_map(|r| r.filters_blob.map(|blob| (r.app_id, blob)))
-            .collect())
+        get_signal_subscriptions(self.pool(), port, id).await
     }
 
     /// Get an installed app by ID.
@@ -68,57 +671,54 @@ impl DbRead<Conductor> {
         &self,
         app_id: &str,
     ) -> sqlx::Result<Option<(InstalledAppCommon, AppStatus)>> {
-        let model: Option<InstalledAppModel> = sqlx::query_as(
-            "SELECT app_id, agent_pub_key, status, disabled_reason, manifest_blob, role_assignments_blob, installed_at FROM InstalledApp WHERE app_id = ?",
-        )
-        .bind(app_id)
-        .fetch_optional(self.pool())
-        .await?;
-
-        match model {
-            Some(model) => model.to_installed_app().map(Some).map_err(|e| {
-                sqlx::Error::Decode(Box::new(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    e,
-                )))
-            }),
-            None => Ok(None),
-        }
+        get_installed_app(self.pool(), app_id).await
     }
 
     /// Get all installed apps.
     pub async fn get_all_installed_apps(
         &self,
     ) -> sqlx::Result<Vec<(String, InstalledAppCommon, AppStatus)>> {
-        let models: Vec<InstalledAppModel> = sqlx::query_as(
-            "SELECT app_id, agent_pub_key, status, disabled_reason, manifest_blob, role_assignments_blob, installed_at FROM InstalledApp",
-        )
-        .fetch_all(self.pool())
-        .await?;
+        get_all_installed_apps(self.pool()).await
+    }
 
-        let mut apps = Vec::new();
-        for model in models {
-            let app_id = model.app_id.clone();
-            let (app, status) = model.to_installed_app().map_err(|e| {
-                sqlx::Error::Decode(Box::new(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    e,
-                )))
-            })?;
-            apps.push((app_id, app, status));
-        }
-        Ok(apps)
+    /// Check if a nonce has already been seen
+    pub async fn nonce_already_seen(
+        &self,
+        agent: &AgentPubKey,
+        nonce: &Nonce256Bits,
+        now: Timestamp,
+    ) -> Result<bool, sqlx::Error> {
+        nonce_already_seen(self.pool(), agent, nonce, now).await
+    }
+
+    /// Check whether a given target is blocked at the given time
+    pub async fn is_blocked(
+        &self,
+        target_id: BlockTargetId,
+        timestamp: Timestamp,
+    ) -> Result<bool, sqlx::Error> {
+        is_blocked(self.pool(), target_id, timestamp).await
+    }
+
+    /// Query whether any BlockTargetId in the provided vector is blocked at the given timestamp
+    pub async fn is_any_blocked(
+        &self,
+        target_ids: Vec<BlockTargetId>,
+        timestamp: Timestamp,
+    ) -> Result<bool, sqlx::Error> {
+        is_any_blocked(self.pool(), target_ids, timestamp).await
+    }
+
+    /// Get all blocks from the database.
+    pub async fn get_all_blocks(&self) -> Result<Vec<Block>, sqlx::Error> {
+        get_all_blocks(self.pool()).await
     }
 }
 
 impl DbWrite<Conductor> {
     /// Set the conductor tag.
     pub async fn set_conductor_tag(&self, tag: &str) -> sqlx::Result<()> {
-        sqlx::query("INSERT INTO Conductor (id, tag) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET tag = excluded.tag")
-            .bind(tag)
-            .execute(self.pool())
-            .await?;
-        Ok(())
+        set_conductor_tag(self.pool(), tag).await
     }
 
     /// Insert or update an app interface.
@@ -128,26 +728,7 @@ impl DbWrite<Conductor> {
         id: &str,
         model: &AppInterfaceModel,
     ) -> sqlx::Result<()> {
-        sqlx::query(
-            "INSERT INTO AppInterface (port, id, driver_type, websocket_port, danger_bind_addr, allowed_origins_blob, installed_app_id)
-             VALUES (?, ?, ?, ?, ?, ?, ?)
-             ON CONFLICT(port, id) DO UPDATE SET
-                driver_type = excluded.driver_type,
-                websocket_port = excluded.websocket_port,
-                danger_bind_addr = excluded.danger_bind_addr,
-                allowed_origins_blob = excluded.allowed_origins_blob,
-                installed_app_id = excluded.installed_app_id",
-        )
-        .bind(port)
-        .bind(id)
-        .bind(&model.driver_type)
-        .bind(model.websocket_port)
-        .bind(&model.danger_bind_addr)
-        .bind(&model.allowed_origins_blob)
-        .bind(&model.installed_app_id)
-        .execute(self.pool())
-        .await?;
-        Ok(())
+        put_app_interface(self.pool(), port, id, model).await
     }
 
     /// Save a signal subscription for an app interface.
@@ -158,19 +739,14 @@ impl DbWrite<Conductor> {
         app_id: &str,
         filters_blob: &[u8],
     ) -> sqlx::Result<()> {
-        sqlx::query(
-            "INSERT INTO SignalSubscription (interface_port, interface_id, app_id, filters_blob)
-             VALUES (?, ?, ?, ?)
-             ON CONFLICT(interface_port, interface_id, app_id) DO UPDATE SET
-                filters_blob = excluded.filters_blob",
+        put_signal_subscription(
+            self.pool(),
+            interface_port,
+            interface_id,
+            app_id,
+            filters_blob,
         )
-        .bind(interface_port)
-        .bind(interface_id)
-        .bind(app_id)
-        .bind(filters_blob)
-        .execute(self.pool())
-        .await?;
-        Ok(())
+        .await
     }
 
     /// Delete all signal subscriptions for an app interface.
@@ -179,23 +755,12 @@ impl DbWrite<Conductor> {
         interface_port: i64,
         interface_id: &str,
     ) -> sqlx::Result<()> {
-        sqlx::query("DELETE FROM SignalSubscription WHERE interface_port = ? AND interface_id = ?")
-            .bind(interface_port)
-            .bind(interface_id)
-            .execute(self.pool())
-            .await?;
-        Ok(())
+        delete_signal_subscriptions(self.pool(), interface_port, interface_id).await
     }
 
     /// Delete an app interface.
     pub async fn delete_app_interface(&self, port: i64, id: &str) -> sqlx::Result<()> {
-        // Signal subscriptions will be deleted via CASCADE
-        sqlx::query("DELETE FROM AppInterface WHERE port = ? AND id = ?")
-            .bind(port)
-            .bind(id)
-            .execute(self.pool())
-            .await?;
-        Ok(())
+        delete_app_interface(self.pool(), port, id).await
     }
 
     /// Insert or update an installed app.
@@ -205,76 +770,14 @@ impl DbWrite<Conductor> {
         app: &InstalledAppCommon,
         status: &AppStatus,
     ) -> sqlx::Result<()> {
-        let model = InstalledAppModel::from_installed_app(app_id, app, status).map_err(|e| {
-            sqlx::Error::Decode(Box::new(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                e,
-            )))
-        })?;
-
-        sqlx::query(
-            "INSERT INTO InstalledApp (app_id, agent_pub_key, status, disabled_reason, manifest_blob, role_assignments_blob, installed_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)
-             ON CONFLICT(app_id) DO UPDATE SET
-                agent_pub_key = excluded.agent_pub_key,
-                status = excluded.status,
-                disabled_reason = excluded.disabled_reason,
-                manifest_blob = excluded.manifest_blob,
-                role_assignments_blob = excluded.role_assignments_blob,
-                installed_at = excluded.installed_at",
-        )
-        .bind(&model.app_id)
-        .bind(&model.agent_pub_key)
-        .bind(&model.status)
-        .bind(&model.disabled_reason)
-        .bind(&model.manifest_blob)
-        .bind(&model.role_assignments_blob)
-        .bind(model.installed_at)
-        .execute(self.pool())
-        .await?;
-        Ok(())
+        put_installed_app(self.pool(), app_id, app, status).await
     }
 
     /// Delete an installed app.
     pub async fn delete_installed_app(&self, app_id: &str) -> sqlx::Result<()> {
-        sqlx::query("DELETE FROM InstalledApp WHERE app_id = ?")
-            .bind(app_id)
-            .execute(self.pool())
-            .await?;
-        Ok(())
+        delete_installed_app(self.pool(), app_id).await
     }
-}
 
-// ============================================================================
-// Nonce Witnessing Operations
-// ============================================================================
-
-impl DbRead<Conductor> {
-    /// Check if a nonce has already been seen
-    pub async fn nonce_already_seen(
-        &self,
-        agent: &AgentPubKey,
-        nonce: &Nonce256Bits,
-        now: Timestamp,
-    ) -> Result<bool, sqlx::Error> {
-        let agent_bytes = agent.get_raw_36();
-        let nonce_bytes = nonce.as_ref();
-        let now_micros = now.as_micros();
-
-        let count: i64 = sqlx::query_scalar(
-            "SELECT COUNT(1) FROM Nonce WHERE agent = ? AND nonce = ? AND expires > ?",
-        )
-        .bind(agent_bytes)
-        .bind(nonce_bytes)
-        .bind(now_micros)
-        .fetch_one(self.pool())
-        .await?;
-
-        Ok(count > 0)
-    }
-}
-
-impl DbWrite<Conductor> {
     /// Witness a nonce (check if it's fresh and record it)
     pub async fn witness_nonce(
         &self,
@@ -283,291 +786,171 @@ impl DbWrite<Conductor> {
         now: Timestamp,
         expires: Timestamp,
     ) -> Result<WitnessNonceResult, sqlx::Error> {
-        // Treat expired but also very far future expiries as stale as we cannot trust the time
-        if expires <= now {
-            return Ok(WitnessNonceResult::Expired);
-        }
-
-        let future_limit = (now + WITNESSABLE_EXPIRY_DURATION)
-            .map_err(|_| sqlx::Error::Protocol("Timestamp overflow".to_string()))?;
-
-        if expires > future_limit {
-            return Ok(WitnessNonceResult::Future);
-        }
-
-        // Delete expired nonces first
-        sqlx::query("DELETE FROM Nonce WHERE expires <= ?")
-            .bind(now.as_micros())
-            .execute(self.pool())
-            .await?;
-
-        // Check if already seen
-        let db_read: &DbRead<Conductor> = self.as_ref();
-        if db_read.nonce_already_seen(&agent, &nonce, now).await? {
-            return Ok(WitnessNonceResult::Duplicate);
-        }
-
-        // Insert the new nonce
-        let agent_bytes = agent.get_raw_36();
-        let nonce_bytes = nonce.as_ref();
-
-        sqlx::query(
-            "INSERT INTO Nonce (agent, nonce, expires) VALUES (?, ?, ?) ON CONFLICT DO NOTHING",
-        )
-        .bind(agent_bytes)
-        .bind(nonce_bytes)
-        .bind(expires.as_micros())
-        .execute(self.pool())
-        .await?;
-
-        Ok(WitnessNonceResult::Fresh)
-    }
-}
-
-// ============================================================================
-// Block/Unblock Operations
-// ============================================================================
-
-impl DbRead<Conductor> {
-    /// Check whether a given target is blocked at the given time
-    pub async fn is_blocked(
-        &self,
-        target_id: BlockTargetId,
-        timestamp: Timestamp,
-    ) -> Result<bool, sqlx::Error> {
-        let target_bytes = SerializedBytes::try_from(target_id)
-            .map_err(|e| sqlx::Error::Protocol(format!("Serialization error: {}", e)))?
-            .bytes()
-            .to_vec();
-        let time_micros = timestamp.as_micros();
-
-        let count: i64 = sqlx::query_scalar(
-            "SELECT COUNT(1) > 0 FROM BlockSpan WHERE target_id = ? AND start_us <= ? AND ? <= end_us",
-        )
-        .bind(&target_bytes)
-        .bind(time_micros)
-        .bind(time_micros)
-        .fetch_one(self.pool())
-        .await?;
-
-        Ok(count > 0)
-    }
-
-    /// Query whether any BlockTargetId in the provided vector is blocked at the given timestamp
-    pub async fn is_any_blocked(
-        &self,
-        target_ids: Vec<BlockTargetId>,
-        timestamp: Timestamp,
-    ) -> Result<bool, sqlx::Error> {
-        if target_ids.is_empty() {
-            return Ok(false);
-        }
-
-        let time_micros = timestamp.as_micros();
-
-        for target_id in target_ids {
-            let target_bytes: Vec<u8> = holochain_serialized_bytes::encode(&target_id)
-                .map_err(|e| sqlx::Error::Protocol(format!("Serialization error: {}", e)))?;
-            let found: i64 = sqlx::query_scalar(
-                "SELECT COUNT(1) > 0 FROM BlockSpan WHERE target_id = ? AND start_us <= ? AND ? <= end_us",
-            )
-            .bind(&target_bytes)
-            .bind(time_micros)
-            .bind(time_micros)
-            .fetch_one(self.pool())
-            .await?;
-
-            if found != 0 {
-                return Ok(true);
-            }
-        }
-
-        Ok(false)
-    }
-
-    /// Get all blocks from the database.
-    pub async fn get_all_blocks(&self) -> Result<Vec<Block>, sqlx::Error> {
-        use holochain_zome_types::block::{BlockTarget, BlockTargetReason};
-
-        let rows: Vec<(Vec<u8>, Vec<u8>, i64, i64)> =
-            sqlx::query_as("SELECT target_id, target_reason, start_us, end_us FROM BlockSpan")
-                .fetch_all(self.pool())
-                .await?;
-
-        let mut blocks = Vec::with_capacity(rows.len());
-        for (target_id_bytes, target_reason_bytes, start_us, end_us) in rows {
-            let target_id: BlockTargetId = holochain_serialized_bytes::decode(&target_id_bytes)
-                .map_err(|e| sqlx::Error::Protocol(format!("Deserialization error: {}", e)))?;
-            let target_reason: BlockTargetReason =
-                holochain_serialized_bytes::decode(&target_reason_bytes)
-                    .map_err(|e| sqlx::Error::Protocol(format!("Deserialization error: {}", e)))?;
-
-            let target = match (target_id, target_reason) {
-                (BlockTargetId::Cell(cell_id), BlockTargetReason::Cell(reason)) => {
-                    BlockTarget::Cell(cell_id, reason)
-                }
-                (BlockTargetId::Ip(ip), BlockTargetReason::Ip(reason)) => {
-                    BlockTarget::Ip(ip, reason)
-                }
-                _ => {
-                    return Err(sqlx::Error::Protocol(
-                        "Mismatched block target id and reason".to_string(),
-                    ));
-                }
-            };
-
-            let interval = InclusiveTimestampInterval::try_new(
-                Timestamp::from_micros(start_us),
-                Timestamp::from_micros(end_us),
-            )
-            .map_err(|e| sqlx::Error::Protocol(format!("Invalid timestamp interval: {:?}", e)))?;
-
-            blocks.push(Block::new(target, interval));
-        }
-
-        Ok(blocks)
-    }
-
-    /// Get overlapping block bounds for merging
-    async fn pluck_overlapping_block_bounds(
-        &self,
-        block: &Block,
-    ) -> Result<(Option<i64>, Option<i64>), sqlx::Error> {
-        let target_id = BlockTargetId::from(block.target().clone());
-        let target_bytes: Vec<u8> = holochain_serialized_bytes::encode(&target_id)
-            .map_err(|e| sqlx::Error::Protocol(format!("Serialization error: {}", e)))?;
-        let start_us = block.start().as_micros();
-        let end_us = block.end().as_micros();
-
-        let result: Option<(Option<i64>, Option<i64>)> = sqlx::query_as(
-            "SELECT MIN(start_us), MAX(end_us) FROM BlockSpan \
-             WHERE target_id = ? AND start_us <= ? AND ? <= end_us",
-        )
-        .bind(&target_bytes)
-        .bind(end_us)
-        .bind(start_us)
-        .fetch_optional(self.pool())
-        .await?;
-
-        Ok(result.unwrap_or((None, None)))
-    }
-}
-
-impl DbWrite<Conductor> {
-    /// Insert a block span into the database
-    async fn insert_block_inner(&self, block: Block) -> Result<(), sqlx::Error> {
-        let target_id = BlockTargetId::from(block.target().clone());
-        let target_id_bytes: Vec<u8> = holochain_serialized_bytes::encode(&target_id)
-            .map_err(|e| sqlx::Error::Protocol(format!("Serialization error: {}", e)))?;
-        use holochain_zome_types::block::BlockTargetReason;
-        let target_reason = BlockTargetReason::from(block.target().clone());
-        let target_reason_bytes: Vec<u8> = holochain_serialized_bytes::encode(&target_reason)
-            .map_err(|e| sqlx::Error::Protocol(format!("Serialization error: {}", e)))?;
-
-        sqlx::query(
-            "INSERT INTO BlockSpan (target_id, target_reason, start_us, end_us) VALUES (?, ?, ?, ?)",
-        )
-        .bind(target_id_bytes)
-        .bind(target_reason_bytes)
-        .bind(block.start().as_micros())
-        .bind(block.end().as_micros())
-        .execute(self.pool())
-        .await?;
-
-        Ok(())
+        witness_nonce(self.pool(), agent, nonce, now, expires).await
     }
 
     /// Insert a block into the database, merging with overlapping blocks
     pub async fn block(&self, input: Block) -> Result<(), sqlx::Error> {
-        let maybe_min_maybe_max = self.as_ref().pluck_overlapping_block_bounds(&input).await?;
-
-        // Delete overlapping blocks
-        let target_id = BlockTargetId::from(input.target().clone());
-        let target_id_bytes: Vec<u8> = holochain_serialized_bytes::encode(&target_id)
-            .map_err(|e| sqlx::Error::Protocol(format!("Serialization error: {}", e)))?;
-
-        sqlx::query("DELETE FROM BlockSpan WHERE target_id = ? AND start_us <= ? AND ? <= end_us")
-            .bind(&target_id_bytes)
-            .bind(input.end().as_micros())
-            .bind(input.start().as_micros())
-            .execute(self.pool())
-            .await?;
-
-        // Build one new block from the extremums
-        let merged_block = Block::new(
-            input.target().clone(),
-            InclusiveTimestampInterval::try_new(
-                maybe_min_maybe_max
-                    .0
-                    .map(Timestamp)
-                    .map(|min| std::cmp::min(min, input.start()))
-                    .unwrap_or(input.start()),
-                maybe_min_maybe_max
-                    .1
-                    .map(Timestamp)
-                    .map(|max| std::cmp::max(max, input.end()))
-                    .unwrap_or(input.end()),
-            )
-            .map_err(|e| sqlx::Error::Protocol(format!("Timestamp error: {}", e)))?,
-        );
-
-        self.insert_block_inner(merged_block).await
+        block(self.pool(), input).await
     }
 
     /// Insert an unblock into the database, splitting existing blocks as needed
-    pub async fn unblock(&self, unblock: Block) -> Result<(), sqlx::Error> {
-        let maybe_min_maybe_max = self
-            .as_ref()
-            .pluck_overlapping_block_bounds(&unblock)
-            .await?;
+    pub async fn unblock(&self, input: Block) -> Result<(), sqlx::Error> {
+        unblock(self.pool(), input).await
+    }
+}
 
-        // Delete overlapping blocks
-        let target_id = BlockTargetId::from(unblock.target().clone());
-        let target_id_bytes: Vec<u8> = holochain_serialized_bytes::encode(&target_id)
-            .map_err(|e| sqlx::Error::Protocol(format!("Serialization error: {}", e)))?;
+impl TxRead<Conductor> {
+    /// Get the conductor tag.
+    pub async fn get_conductor_tag(&mut self) -> sqlx::Result<Option<String>> {
+        get_conductor_tag(self.conn_mut()).await
+    }
 
-        sqlx::query("DELETE FROM BlockSpan WHERE target_id = ? AND start_us <= ? AND ? <= end_us")
-            .bind(&target_id_bytes)
-            .bind(unblock.end().as_micros())
-            .bind(unblock.start().as_micros())
-            .execute(self.pool())
-            .await?;
+    /// Get all app interfaces.
+    pub async fn get_all_app_interfaces(&mut self) -> sqlx::Result<Vec<AppInterfaceModel>> {
+        get_all_app_interfaces(self.conn_mut()).await
+    }
 
-        // Reinstate anything before the unblock
-        if let (Some(min), _) = maybe_min_maybe_max {
-            let preblock_start = Timestamp(min);
-            // Unblocks are inclusive so we reinstate the preblock up to but not including the unblock start
-            if let Ok(preblock_end) = unblock.start() - std::time::Duration::from_micros(1) {
-                if preblock_start <= preblock_end {
-                    self.insert_block_inner(Block::new(
-                        unblock.target().clone(),
-                        InclusiveTimestampInterval::try_new(preblock_start, preblock_end).map_err(
-                            |e| sqlx::Error::Protocol(format!("Timestamp error: {}", e)),
-                        )?,
-                    ))
-                    .await?;
-                }
-            }
-        }
+    /// Get signal subscriptions for a specific app interface.
+    pub async fn get_signal_subscriptions(
+        &mut self,
+        port: i64,
+        id: &str,
+    ) -> sqlx::Result<Vec<(String, Vec<u8>)>> {
+        get_signal_subscriptions(self.conn_mut(), port, id).await
+    }
 
-        // Reinstate anything after the unblock
-        if let (_, Some(max)) = maybe_min_maybe_max {
-            let postblock_end = Timestamp(max);
-            if let Ok(postblock_start) = unblock.end() + std::time::Duration::from_micros(1) {
-                if postblock_start <= postblock_end {
-                    self.insert_block_inner(Block::new(
-                        unblock.target().clone(),
-                        InclusiveTimestampInterval::try_new(postblock_start, postblock_end)
-                            .map_err(|e| {
-                                sqlx::Error::Protocol(format!("Timestamp error: {}", e))
-                            })?,
-                    ))
-                    .await?;
-                }
-            }
-        }
+    /// Get an installed app by ID.
+    pub async fn get_installed_app(
+        &mut self,
+        app_id: &str,
+    ) -> sqlx::Result<Option<(InstalledAppCommon, AppStatus)>> {
+        get_installed_app(self.conn_mut(), app_id).await
+    }
 
-        Ok(())
+    /// Get all installed apps.
+    pub async fn get_all_installed_apps(
+        &mut self,
+    ) -> sqlx::Result<Vec<(String, InstalledAppCommon, AppStatus)>> {
+        get_all_installed_apps(self.conn_mut()).await
+    }
+
+    /// Check if a nonce has already been seen.
+    pub async fn nonce_already_seen(
+        &mut self,
+        agent: &AgentPubKey,
+        nonce: &Nonce256Bits,
+        now: Timestamp,
+    ) -> Result<bool, sqlx::Error> {
+        nonce_already_seen(self.conn_mut(), agent, nonce, now).await
+    }
+
+    /// Check whether a given target is blocked at the given time.
+    pub async fn is_blocked(
+        &mut self,
+        target_id: BlockTargetId,
+        timestamp: Timestamp,
+    ) -> Result<bool, sqlx::Error> {
+        is_blocked(self.conn_mut(), target_id, timestamp).await
+    }
+
+    /// Query whether any BlockTargetId in the provided vector is blocked at the given timestamp.
+    pub async fn is_any_blocked(
+        &mut self,
+        target_ids: Vec<BlockTargetId>,
+        timestamp: Timestamp,
+    ) -> Result<bool, sqlx::Error> {
+        is_any_blocked(self.tx_mut(), target_ids, timestamp).await
+    }
+
+    /// Get all blocks from the database.
+    pub async fn get_all_blocks(&mut self) -> Result<Vec<Block>, sqlx::Error> {
+        get_all_blocks(self.conn_mut()).await
+    }
+}
+
+impl TxWrite<Conductor> {
+    /// Set the conductor tag.
+    pub async fn set_conductor_tag(&mut self, tag: &str) -> sqlx::Result<()> {
+        set_conductor_tag(self.conn_mut(), tag).await
+    }
+
+    /// Insert or update an app interface.
+    pub async fn put_app_interface(
+        &mut self,
+        port: i64,
+        id: &str,
+        model: &AppInterfaceModel,
+    ) -> sqlx::Result<()> {
+        put_app_interface(self.conn_mut(), port, id, model).await
+    }
+
+    /// Save a signal subscription for an app interface.
+    pub async fn put_signal_subscription(
+        &mut self,
+        interface_port: i64,
+        interface_id: &str,
+        app_id: &str,
+        filters_blob: &[u8],
+    ) -> sqlx::Result<()> {
+        put_signal_subscription(
+            self.conn_mut(),
+            interface_port,
+            interface_id,
+            app_id,
+            filters_blob,
+        )
+        .await
+    }
+
+    /// Delete all signal subscriptions for an app interface.
+    pub async fn delete_signal_subscriptions(
+        &mut self,
+        interface_port: i64,
+        interface_id: &str,
+    ) -> sqlx::Result<()> {
+        delete_signal_subscriptions(self.conn_mut(), interface_port, interface_id).await
+    }
+
+    /// Delete an app interface.
+    pub async fn delete_app_interface(&mut self, port: i64, id: &str) -> sqlx::Result<()> {
+        delete_app_interface(self.conn_mut(), port, id).await
+    }
+
+    /// Insert or update an installed app.
+    pub async fn put_installed_app(
+        &mut self,
+        app_id: &str,
+        app: &InstalledAppCommon,
+        status: &AppStatus,
+    ) -> sqlx::Result<()> {
+        put_installed_app(self.conn_mut(), app_id, app, status).await
+    }
+
+    /// Delete an installed app.
+    pub async fn delete_installed_app(&mut self, app_id: &str) -> sqlx::Result<()> {
+        delete_installed_app(self.conn_mut(), app_id).await
+    }
+
+    /// Witness a nonce (check if it's fresh and record it).
+    pub async fn witness_nonce(
+        &mut self,
+        agent: AgentPubKey,
+        nonce: Nonce256Bits,
+        now: Timestamp,
+        expires: Timestamp,
+    ) -> Result<WitnessNonceResult, sqlx::Error> {
+        witness_nonce(self.tx_mut(), agent, nonce, now, expires).await
+    }
+
+    /// Insert a block into the database, merging with overlapping blocks.
+    pub async fn block(&mut self, input: Block) -> Result<(), sqlx::Error> {
+        block(self.tx_mut(), input).await
+    }
+
+    /// Insert an unblock into the database, splitting existing blocks as needed.
+    pub async fn unblock(&mut self, input: Block) -> Result<(), sqlx::Error> {
+        unblock(self.tx_mut(), input).await
     }
 }
 
@@ -1206,6 +1589,101 @@ mod tests {
         assert!(!db
             .as_ref()
             .is_any_blocked(vec![other_target], ts)
+            .await
+            .unwrap());
+    }
+
+    #[tokio::test]
+    async fn tx_commit_persists() {
+        let db = test_open_db(Conductor).await.unwrap();
+
+        let mut tx = db.begin().await.unwrap();
+        tx.set_conductor_tag("from-tx").await.unwrap();
+        // Read-your-own-writes inside the transaction (reads on TxWrite go through as_mut).
+        assert_eq!(
+            tx.as_mut().get_conductor_tag().await.unwrap(),
+            Some("from-tx".to_string())
+        );
+        tx.commit().await.unwrap();
+
+        assert_eq!(
+            db.as_ref().get_conductor_tag().await.unwrap(),
+            Some("from-tx".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn tx_read_only_snapshot() {
+        // A read-only transaction from DbRead::begin(), exercising TxRead.
+        let db = test_open_db(Conductor).await.unwrap();
+        db.set_conductor_tag("initial").await.unwrap();
+
+        let db_read: DbRead<Conductor> = db.clone().into();
+        let mut tx = db_read.begin().await.unwrap();
+
+        // Outside writes don't affect the snapshot-consistent transaction view.
+        // (We don't strictly assert isolation semantics — WAL gives consistent
+        // reads but sqlite's default DEFERRED mode means the snapshot starts
+        // at first read. We just verify the read API works.)
+        assert_eq!(
+            tx.get_conductor_tag().await.unwrap(),
+            Some("initial".to_string())
+        );
+        tx.commit().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn tx_rollback_discards() {
+        let db = test_open_db(Conductor).await.unwrap();
+
+        let mut tx = db.begin().await.unwrap();
+        tx.set_conductor_tag("not-persisted").await.unwrap();
+        tx.rollback().await.unwrap();
+
+        assert_eq!(db.as_ref().get_conductor_tag().await.unwrap(), None);
+    }
+
+    #[tokio::test]
+    async fn tx_drop_without_commit_rolls_back() {
+        let db = test_open_db(Conductor).await.unwrap();
+
+        {
+            let mut tx = db.begin().await.unwrap();
+            tx.set_conductor_tag("dropped").await.unwrap();
+            // drop without commit
+        }
+
+        assert_eq!(db.as_ref().get_conductor_tag().await.unwrap(), None);
+    }
+
+    #[tokio::test]
+    async fn tx_block_atomic_with_witness_nonce() {
+        // Verifies multi-statement ops (block, witness_nonce) share the tx.
+        let db = test_open_db(Conductor).await.unwrap();
+        let agent = test_agent();
+        let nonce = test_nonce(42);
+        let now = Timestamp::from_micros(1_000_000);
+        let expires = Timestamp::from_micros(2_000_000);
+
+        let mut tx = db.begin().await.unwrap();
+        tx.block(test_block(100, 1000)).await.unwrap();
+        let witness = tx
+            .witness_nonce(agent.clone(), nonce, now, expires)
+            .await
+            .unwrap();
+        assert_eq!(witness, WitnessNonceResult::Fresh);
+        tx.rollback().await.unwrap();
+
+        // Neither the block nor the witnessed nonce survived the rollback.
+        let target = test_block_target_id();
+        assert!(!db
+            .as_ref()
+            .is_blocked(target, Timestamp::from_micros(500))
+            .await
+            .unwrap());
+        assert!(!db
+            .as_ref()
+            .nonce_already_seen(&agent, &nonce, now)
             .await
             .unwrap());
     }

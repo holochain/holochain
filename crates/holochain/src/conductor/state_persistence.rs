@@ -1,19 +1,20 @@
 //! Functions for persisting and loading ConductorState to/from the normalized database.
 //!
-//! This bridges between `holochain_data` operations and the `ConductorState` type.
+//! This bridges between the conductor store and the `ConductorState` type.
 
 use super::error::{ConductorError, ConductorResult};
 use crate::conductor::state::{AppInterfaceConfig, AppInterfaceId};
 use crate::conductor::state::{ConductorState, ConductorStateTag};
 use holochain_conductor_api::signal_subscription::SignalSubscription;
+use holochain_state::conductor::{ConductorStore, ConductorStoreRead};
 use holochain_types::prelude::*;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-/// Load ConductorState from normalized holochain_data tables
+/// Load ConductorState from the normalized conductor store.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn load_conductor_state(
-    db: &holochain_data::DbRead<holochain_data::kind::Conductor>,
+    db: &ConductorStoreRead,
 ) -> ConductorResult<Option<ConductorState>> {
     // Get conductor tag
     let tag = db
@@ -93,10 +94,10 @@ pub async fn load_conductor_state(
     )))
 }
 
-/// Save ConductorState to normalized holochain_data tables
+/// Save ConductorState to the normalized conductor store.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn save_conductor_state(
-    db: &holochain_data::DbWrite<holochain_data::kind::Conductor>,
+    db: &ConductorStore,
     state: &ConductorState,
 ) -> ConductorResult<()> {
     // Save conductor tag
@@ -146,7 +147,7 @@ pub async fn save_conductor_state(
     }
 
     // Delete apps and interfaces that are no longer in the state
-    let db_read: &holochain_data::DbRead<holochain_data::kind::Conductor> = db.as_ref();
+    let db_read = db.as_read();
 
     // Get all existing app IDs from database
     let existing_apps = db_read
@@ -207,14 +208,16 @@ mod tests {
     async fn state_persistence_round_trip() {
         // Create a temporary database
         let tmpdir = tempfile::tempdir().unwrap();
-        let db_write = holochain_data::open_db(
-            tmpdir.path(),
-            holochain_data::kind::Conductor,
-            holochain_data::HolochainDataConfig::default(),
-        )
-        .await
-        .unwrap();
-        let db_read = db_write.as_ref();
+        let db_write = ConductorStore::new(
+            holochain_data::open_db(
+                tmpdir.path(),
+                holochain_data::kind::Conductor,
+                holochain_data::HolochainDataConfig::default(),
+            )
+            .await
+            .unwrap(),
+        );
+        let db_read = db_write.as_read();
 
         // Create a test state
         let tag = ConductorStateTag(Arc::from("test-conductor"));
@@ -226,7 +229,7 @@ mod tests {
         save_conductor_state(&db_write, &state).await.unwrap();
 
         // Load the state back
-        let loaded_state = load_conductor_state(db_read).await.unwrap().unwrap();
+        let loaded_state = load_conductor_state(&db_read).await.unwrap().unwrap();
 
         // Verify the tag matches
         assert_eq!(loaded_state.tag().0.as_ref(), "test-conductor");
@@ -238,14 +241,16 @@ mod tests {
     async fn app_interface_persistence() {
         // Create a temporary database
         let tmpdir = tempfile::tempdir().unwrap();
-        let db_write = holochain_data::open_db(
-            tmpdir.path(),
-            holochain_data::kind::Conductor,
-            holochain_data::HolochainDataConfig::default(),
-        )
-        .await
-        .unwrap();
-        let db_read = db_write.as_ref();
+        let db_write = ConductorStore::new(
+            holochain_data::open_db(
+                tmpdir.path(),
+                holochain_data::kind::Conductor,
+                holochain_data::HolochainDataConfig::default(),
+            )
+            .await
+            .unwrap(),
+        );
+        let db_read = db_write.as_read();
 
         // Create a test state with an app interface
         let tag = ConductorStateTag(Arc::from("test-conductor"));
@@ -263,7 +268,7 @@ mod tests {
         save_conductor_state(&db_write, &state).await.unwrap();
 
         // Load the state back
-        let loaded_state = load_conductor_state(db_read).await.unwrap().unwrap();
+        let loaded_state = load_conductor_state(&db_read).await.unwrap().unwrap();
 
         // Verify the interface was persisted
         assert_eq!(loaded_state.app_interfaces.len(), 1);
@@ -275,14 +280,16 @@ mod tests {
     async fn deletion_of_stale_interfaces() {
         // Create a temporary database
         let tmpdir = tempfile::tempdir().unwrap();
-        let db_write = holochain_data::open_db(
-            tmpdir.path(),
-            holochain_data::kind::Conductor,
-            holochain_data::HolochainDataConfig::default(),
-        )
-        .await
-        .unwrap();
-        let db_read = db_write.as_ref();
+        let db_write = ConductorStore::new(
+            holochain_data::open_db(
+                tmpdir.path(),
+                holochain_data::kind::Conductor,
+                holochain_data::HolochainDataConfig::default(),
+            )
+            .await
+            .unwrap(),
+        );
+        let db_read = db_write.as_read();
 
         // Create initial state with two interfaces
         let tag = ConductorStateTag(Arc::from("test-conductor"));
@@ -307,7 +314,7 @@ mod tests {
         save_conductor_state(&db_write, &new_state).await.unwrap();
 
         // Load and verify only one interface remains
-        let loaded_state = load_conductor_state(db_read).await.unwrap().unwrap();
+        let loaded_state = load_conductor_state(&db_read).await.unwrap().unwrap();
         assert_eq!(loaded_state.app_interfaces.len(), 1);
         assert!(loaded_state
             .app_interfaces

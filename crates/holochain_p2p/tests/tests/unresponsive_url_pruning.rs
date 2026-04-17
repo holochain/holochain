@@ -235,7 +235,7 @@ impl TestCase {
             DbWrite::test(&db_dir, DbKindPeerMetaStore(Arc::new(dna_hash.clone()))).unwrap();
         let db_op = DbWrite::test_in_mem(DbKindDht(Arc::new(dna_hash.clone()))).unwrap();
         let db_cache = DbWrite::test_in_mem(DbKindCache(Arc::new(dna_hash.clone()))).unwrap();
-        let db_conductor = holochain_data::test_open_db(holochain_data::kind::Conductor)
+        let conductor_store = holochain_state::conductor::ConductorStore::new_test()
             .await
             .unwrap();
         let lair_client = test_keystore();
@@ -255,9 +255,9 @@ impl TestCase {
                     let db_cache = db_cache.clone();
                     Box::pin(async move { Ok(db_cache) })
                 }),
-                get_conductor_db: Arc::new(move || {
-                    let db_conductor = db_conductor.clone();
-                    Box::pin(async move { db_conductor })
+                get_conductor_store: Arc::new(move || {
+                    let conductor_store = conductor_store.clone();
+                    Box::pin(async move { conductor_store })
                 }),
                 network_config: Some(serde_json::json!({
                     "coreBootstrap": {

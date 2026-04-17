@@ -73,6 +73,7 @@ default = []
 fuzzing = ["holochain_types/fuzzing", "holochain_zome_types/fuzzing"]
 
 test_utils = [
+  "holochain_data/test-utils",
   "holochain_keystore/test_utils",
   "holochain_types/test_utils",
   "holochain_zome_types/test_utils",
@@ -91,6 +92,7 @@ sqlite-encrypted = [
   "holochain_keystore/sqlite-encrypted",
   "holochain_types/sqlite-encrypted",
   "holochain_zome_types/sqlite-encrypted",
+  "holochain_data/sqlite-encrypted",
 ]
 sqlite = [
   "holo_hash/sqlite",

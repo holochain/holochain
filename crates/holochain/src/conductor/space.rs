@@ -44,8 +44,8 @@ pub struct Spaces {
     pub(crate) config: Arc<ConductorConfig>,
     /// The map of running queue consumer workflows.
     pub(crate) queue_consumer_map: QueueConsumerMap,
-    /// Conductor database (holochain_data) for normalized ConductorState
-    pub(crate) conductor_db: holochain_data::DbWrite<holochain_data::kind::Conductor>,
+    /// Conductor database for normalized ConductorState
+    pub(crate) conductor_store: holochain_state::conductor::ConductorStore,
     pub(crate) wasm_store: holochain_state::wasm::WasmStore,
     pub(crate) dna_def_store: holochain_state::dna_def::DnaDefStore,
     pub(crate) entry_def_store: holochain_state::entry_def::EntryDefStore,
@@ -188,6 +188,7 @@ impl Spaces {
         )
         .await
         .map_err(|e| std::io::Error::other(e.to_string()))?;
+        let conductor_store = holochain_state::conductor::ConductorStore::new(conductor_db);
 
         let wasm_db = holochain_data::open_db(
             root_db_dir.as_ref(),
@@ -211,7 +212,7 @@ impl Spaces {
             db_dir: Arc::new(root_db_dir),
             config,
             queue_consumer_map: QueueConsumerMap::new(),
-            conductor_db,
+            conductor_store,
             wasm_store,
             dna_def_store,
             entry_def_store,
@@ -221,7 +222,7 @@ impl Spaces {
 
     /// Unblock some target.
     pub async fn unblock(&self, input: Block) -> DatabaseResult<()> {
-        self.conductor_db
+        self.conductor_store
             .unblock(input)
             .await
             .map_err(|e| DatabaseError::Other(e.into()))
@@ -229,7 +230,7 @@ impl Spaces {
 
     /// Block some target.
     pub async fn block(&self, input: Block) -> DatabaseResult<()> {
-        self.conductor_db
+        self.conductor_store
             .block(input)
             .await
             .map_err(|e| DatabaseError::Other(e.into()))
@@ -260,8 +261,8 @@ impl Spaces {
 
         // Check if the target_id itself is directly blocked
         let target_blocked = self
-            .conductor_db
-            .as_ref()
+            .conductor_store
+            .as_read()
             .is_blocked(target_id.clone(), timestamp)
             .await
             .map_err(ConductorError::other)?;
@@ -275,8 +276,8 @@ impl Spaces {
             cell_ids.into_iter().map(BlockTargetId::Cell).collect();
 
         let any_cells_blocked = self
-            .conductor_db
-            .as_ref()
+            .conductor_store
+            .as_read()
             .is_any_blocked(cell_targets, timestamp)
             .await
             .map_err(ConductorError::other)?;
@@ -289,7 +290,7 @@ impl Spaces {
     pub async fn get_state(&self) -> ConductorResult<ConductorState> {
         timed!([1, 10, 1000], "get_state", {
             match crate::conductor::state_persistence::load_conductor_state(
-                self.conductor_db.as_ref(),
+                &self.conductor_store.as_read(),
             )
             .await?
             {
@@ -324,7 +325,7 @@ impl Spaces {
         timed!([1, 10, 1000], "update_state_prime", {
             // Load the current state
             let state = crate::conductor::state_persistence::load_conductor_state(
-                self.conductor_db.as_ref(),
+                &self.conductor_store.as_read(),
             )
             .await?
             .unwrap_or_default();
@@ -334,7 +335,7 @@ impl Spaces {
 
             // Save the new state
             crate::conductor::state_persistence::save_conductor_state(
-                &self.conductor_db,
+                &self.conductor_store,
                 &new_state,
             )
             .await?;

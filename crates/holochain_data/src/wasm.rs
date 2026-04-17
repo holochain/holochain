@@ -2,7 +2,7 @@
 //!
 //! The Wasm database stores DNA definitions, WASM bytecode, and entry definitions.
 
-use crate::handles::{DbRead, DbWrite};
+use crate::handles::{DbRead, DbWrite, TxRead, TxWrite};
 use crate::kind::Wasm;
 use crate::models::wasm::{
     CoordinatorZomeModel, DnaDefModel, EntryDefModel, IntegrityZomeModel, WasmModel,
@@ -13,362 +13,534 @@ use holochain_integrity_types::prelude::EntryDef;
 use holochain_types::prelude::CellId;
 use holochain_types::prelude::{DnaDef, DnaWasmHashed};
 use holochain_zome_types::zome::{WasmZome, ZomeDef};
+use sqlx::{Acquire, Executor, Sqlite};
 
+// ============================================================================
 // Read operations
-impl DbRead<Wasm> {
-    /// Check if WASM bytecode exists in the database.
-    pub async fn wasm_exists(&self, hash: &WasmHash) -> sqlx::Result<bool> {
-        let hash_bytes = hash.get_raw_32();
-        let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM Wasm WHERE hash = ?)")
-            .bind(hash_bytes)
-            .fetch_one(self.pool())
-            .await?;
-        Ok(exists)
-    }
+// ============================================================================
 
-    /// Get WASM bytecode by hash.
-    pub async fn get_wasm(&self, hash: &WasmHash) -> sqlx::Result<Option<DnaWasmHashed>> {
-        let hash_bytes = hash.get_raw_32();
-        let model: Option<WasmModel> = sqlx::query_as("SELECT hash, code FROM Wasm WHERE hash = ?")
-            .bind(hash_bytes)
-            .fetch_optional(self.pool())
-            .await?;
+/// Check if WASM bytecode exists in the database.
+async fn wasm_exists<'e, E>(executor: E, hash: &WasmHash) -> sqlx::Result<bool>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let hash_bytes = hash.get_raw_32();
+    let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM Wasm WHERE hash = ?)")
+        .bind(hash_bytes)
+        .fetch_one(executor)
+        .await?;
+    Ok(exists)
+}
 
-        match model {
-            Some(model) => {
-                let wasm_hash = model.wasm_hash();
-                Ok(Some(DnaWasmHashed::with_pre_hashed(
-                    model.code.into(),
-                    wasm_hash,
-                )))
-            }
-            None => Ok(None),
+/// Get WASM bytecode by hash.
+async fn get_wasm<'e, E>(executor: E, hash: &WasmHash) -> sqlx::Result<Option<DnaWasmHashed>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let hash_bytes = hash.get_raw_32();
+    let model: Option<WasmModel> = sqlx::query_as("SELECT hash, code FROM Wasm WHERE hash = ?")
+        .bind(hash_bytes)
+        .fetch_optional(executor)
+        .await?;
+
+    match model {
+        Some(model) => {
+            let wasm_hash = model.wasm_hash();
+            Ok(Some(DnaWasmHashed::with_pre_hashed(
+                model.code.into(),
+                wasm_hash,
+            )))
         }
+        None => Ok(None),
     }
+}
 
-    /// Check if a DNA definition exists in the database.
-    pub async fn dna_def_exists(&self, cell_id: &CellId) -> sqlx::Result<bool> {
-        let hash_bytes = cell_id.dna_hash().get_raw_32();
-        let agent_bytes = cell_id.agent_pubkey().get_raw_32();
+/// Check if a DNA definition exists in the database.
+async fn dna_def_exists<'e, E>(executor: E, cell_id: &CellId) -> sqlx::Result<bool>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let hash_bytes = cell_id.dna_hash().get_raw_32();
+    let agent_bytes = cell_id.agent_pubkey().get_raw_32();
 
-        let exists: bool =
-            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM DnaDef WHERE hash = ? AND agent = ?)")
-                .bind(hash_bytes)
-                .bind(agent_bytes)
-                .fetch_one(self.pool())
-                .await?;
-        Ok(exists)
-    }
-
-    /// Get a DNA definition by hash.
-    pub async fn get_dna_def(&self, cell_id: &CellId) -> sqlx::Result<Option<DnaDef>> {
-        let hash_bytes = cell_id.dna_hash().get_raw_32();
-        let agent_bytes = cell_id.agent_pubkey().get_raw_32();
-
-        // Fetch the DnaDef model
-        let dna_model: Option<DnaDefModel> = sqlx::query_as(
-            "SELECT hash, agent, name, network_seed, properties, lineage FROM DnaDef WHERE hash = ? AND agent = ?",
-        )
-        .bind(hash_bytes)
-        .bind(agent_bytes)
-        .fetch_optional(self.pool())
-        .await?;
-
-        let dna_model = match dna_model {
-            Some(m) => m,
-            None => return Ok(None),
-        };
-
-        // Fetch integrity zomes
-        let integrity_zomes: Vec<IntegrityZomeModel> = sqlx::query_as(
-            "SELECT dna_hash, agent, zome_index, zome_name, wasm_hash, dependencies FROM IntegrityZome WHERE dna_hash = ? AND agent = ? ORDER BY zome_index",
-        )
-        .bind(hash_bytes)
-        .bind(agent_bytes)
-        .fetch_all(self.pool())
-        .await?;
-
-        // Fetch coordinator zomes
-        let coordinator_zomes: Vec<CoordinatorZomeModel> = sqlx::query_as(
-            "SELECT dna_hash, agent, zome_index, zome_name, wasm_hash, dependencies FROM CoordinatorZome WHERE dna_hash = ? AND agent = ? ORDER BY zome_index",
-        )
-        .bind(hash_bytes)
-        .bind(agent_bytes)
-        .fetch_all(self.pool())
-        .await?;
-
-        // Convert to DnaDef
-        dna_model
-            .to_dna_def(integrity_zomes, coordinator_zomes)
-            .map(Some)
-            .map_err(|e| {
-                sqlx::Error::Decode(Box::new(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    e,
-                )))
-            })
-    }
-
-    /// Check if an entry definition exists in the database.
-    pub async fn entry_def_exists(&self, key: &[u8]) -> sqlx::Result<bool> {
-        let exists: bool =
-            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM EntryDef WHERE key = ?)")
-                .bind(key)
-                .fetch_one(self.pool())
-                .await?;
-        Ok(exists)
-    }
-
-    /// Get an entry definition by key.
-    pub async fn get_entry_def(&self, _key: &[u8]) -> sqlx::Result<Option<EntryDef>> {
-        let model: Option<EntryDefModel> = sqlx::query_as(
-            "SELECT key, entry_def_id, entry_def_id_type, visibility, required_validations FROM EntryDef WHERE key = ?",
-        )
-        .bind(_key)
-        .fetch_optional(self.pool())
-        .await?;
-
-        match model {
-            Some(model) => model.to_entry_def().map(Some).map_err(|e| {
-                sqlx::Error::Decode(Box::new(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    e,
-                )))
-            }),
-            None => Ok(None),
-        }
-    }
-
-    /// Get all entry definitions.
-    pub async fn get_all_entry_defs(&self) -> sqlx::Result<Vec<(Vec<u8>, EntryDef)>> {
-        let models: Vec<EntryDefModel> = sqlx::query_as(
-            "SELECT key, entry_def_id, entry_def_id_type, visibility, required_validations FROM EntryDef",
-        )
-        .fetch_all(self.pool())
-        .await?;
-
-        models
-            .into_iter()
-            .map(|model| {
-                let key = model.key.clone();
-                model
-                    .to_entry_def()
-                    .map(|entry_def| (key, entry_def))
-                    .map_err(|e| {
-                        sqlx::Error::Decode(Box::new(std::io::Error::new(
-                            std::io::ErrorKind::InvalidData,
-                            e,
-                        )))
-                    })
-            })
-            .collect()
-    }
-
-    /// Get all DNA definitions with their associated cell IDs.
-    pub async fn get_all_dna_defs(&self) -> sqlx::Result<Vec<(CellId, DnaDef)>> {
-        // First, fetch all DnaDef records
-        let dna_models: Vec<DnaDefModel> = sqlx::query_as(
-            "SELECT hash, agent, name, network_seed, properties, lineage FROM DnaDef",
-        )
-        .fetch_all(self.pool())
-        .await?;
-
-        let mut results = Vec::new();
-
-        for dna_model in dna_models {
-            let hash_bytes = dna_model.hash.clone();
-            let agent_bytes = dna_model.agent.clone();
-
-            // Fetch integrity zomes for this DNA
-            let integrity_zomes: Vec<IntegrityZomeModel> = sqlx::query_as(
-                "SELECT dna_hash, agent, zome_index, zome_name, wasm_hash, dependencies FROM IntegrityZome WHERE dna_hash = ? AND agent = ? ORDER BY zome_index",
-            )
-            .bind(&hash_bytes)
-            .bind(&agent_bytes)
-            .fetch_all(self.pool())
+    let exists: bool =
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM DnaDef WHERE hash = ? AND agent = ?)")
+            .bind(hash_bytes)
+            .bind(agent_bytes)
+            .fetch_one(executor)
             .await?;
+    Ok(exists)
+}
 
-            // Fetch coordinator zomes for this DNA
-            let coordinator_zomes: Vec<CoordinatorZomeModel> = sqlx::query_as(
-                "SELECT dna_hash, agent, zome_index, zome_name, wasm_hash, dependencies FROM CoordinatorZome WHERE dna_hash = ? AND agent = ? ORDER BY zome_index",
-            )
-            .bind(&hash_bytes)
-            .bind(&agent_bytes)
-            .fetch_all(self.pool())
-            .await?;
+/// Get a DNA definition by hash.
+///
+/// Acquires a single connection for the DnaDef + IntegrityZome + CoordinatorZome queries.
+async fn get_dna_def<'c, A>(conn: A, cell_id: &CellId) -> sqlx::Result<Option<DnaDef>>
+where
+    A: Acquire<'c, Database = Sqlite>,
+{
+    let mut conn = conn.acquire().await?;
 
-            // Convert to DnaDef
-            let dna_def = dna_model
-                .to_dna_def(integrity_zomes, coordinator_zomes)
+    let hash_bytes = cell_id.dna_hash().get_raw_32();
+    let agent_bytes = cell_id.agent_pubkey().get_raw_32();
+
+    // Fetch the DnaDef model
+    let dna_model: Option<DnaDefModel> = sqlx::query_as(
+        "SELECT hash, agent, name, network_seed, properties, lineage FROM DnaDef WHERE hash = ? AND agent = ?",
+    )
+    .bind(hash_bytes)
+    .bind(agent_bytes)
+    .fetch_optional(&mut *conn)
+    .await?;
+
+    let dna_model = match dna_model {
+        Some(m) => m,
+        None => return Ok(None),
+    };
+
+    // Fetch integrity zomes
+    let integrity_zomes: Vec<IntegrityZomeModel> = sqlx::query_as(
+        "SELECT dna_hash, agent, zome_index, zome_name, wasm_hash, dependencies FROM IntegrityZome WHERE dna_hash = ? AND agent = ? ORDER BY zome_index",
+    )
+    .bind(hash_bytes)
+    .bind(agent_bytes)
+    .fetch_all(&mut *conn)
+    .await?;
+
+    // Fetch coordinator zomes
+    let coordinator_zomes: Vec<CoordinatorZomeModel> = sqlx::query_as(
+        "SELECT dna_hash, agent, zome_index, zome_name, wasm_hash, dependencies FROM CoordinatorZome WHERE dna_hash = ? AND agent = ? ORDER BY zome_index",
+    )
+    .bind(hash_bytes)
+    .bind(agent_bytes)
+    .fetch_all(&mut *conn)
+    .await?;
+
+    // Convert to DnaDef
+    dna_model
+        .to_dna_def(integrity_zomes, coordinator_zomes)
+        .map(Some)
+        .map_err(|e| {
+            sqlx::Error::Decode(Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                e,
+            )))
+        })
+}
+
+/// Check if an entry definition exists in the database.
+async fn entry_def_exists<'e, E>(executor: E, key: &[u8]) -> sqlx::Result<bool>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM EntryDef WHERE key = ?)")
+        .bind(key)
+        .fetch_one(executor)
+        .await?;
+    Ok(exists)
+}
+
+/// Get an entry definition by key.
+async fn get_entry_def<'e, E>(executor: E, key: &[u8]) -> sqlx::Result<Option<EntryDef>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let model: Option<EntryDefModel> = sqlx::query_as(
+        "SELECT key, entry_def_id, entry_def_id_type, visibility, required_validations FROM EntryDef WHERE key = ?",
+    )
+    .bind(key)
+    .fetch_optional(executor)
+    .await?;
+
+    match model {
+        Some(model) => model.to_entry_def().map(Some).map_err(|e| {
+            sqlx::Error::Decode(Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                e,
+            )))
+        }),
+        None => Ok(None),
+    }
+}
+
+/// Get all entry definitions.
+async fn get_all_entry_defs<'e, E>(executor: E) -> sqlx::Result<Vec<(Vec<u8>, EntryDef)>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let models: Vec<EntryDefModel> = sqlx::query_as(
+        "SELECT key, entry_def_id, entry_def_id_type, visibility, required_validations FROM EntryDef",
+    )
+    .fetch_all(executor)
+    .await?;
+
+    models
+        .into_iter()
+        .map(|model| {
+            let key = model.key.clone();
+            model
+                .to_entry_def()
+                .map(|entry_def| (key, entry_def))
                 .map_err(|e| {
                     sqlx::Error::Decode(Box::new(std::io::Error::new(
                         std::io::ErrorKind::InvalidData,
                         e,
                     )))
-                })?;
+                })
+        })
+        .collect()
+}
 
-            // Create CellId from the hash and agent
-            let cell_id = dna_model.to_cell_id();
+/// Get all DNA definitions with their associated cell IDs.
+///
+/// Acquires a single connection for the outer scan and per-row zome queries.
+async fn get_all_dna_defs<'c, A>(conn: A) -> sqlx::Result<Vec<(CellId, DnaDef)>>
+where
+    A: Acquire<'c, Database = Sqlite>,
+{
+    let mut conn = conn.acquire().await?;
 
-            results.push((cell_id, dna_def));
-        }
+    // First, fetch all DnaDef records
+    let dna_models: Vec<DnaDefModel> =
+        sqlx::query_as("SELECT hash, agent, name, network_seed, properties, lineage FROM DnaDef")
+            .fetch_all(&mut *conn)
+            .await?;
 
-        Ok(results)
+    let mut results = Vec::new();
+
+    for dna_model in dna_models {
+        let hash_bytes = dna_model.hash.clone();
+        let agent_bytes = dna_model.agent.clone();
+
+        // Fetch integrity zomes for this DNA
+        let integrity_zomes: Vec<IntegrityZomeModel> = sqlx::query_as(
+            "SELECT dna_hash, agent, zome_index, zome_name, wasm_hash, dependencies FROM IntegrityZome WHERE dna_hash = ? AND agent = ? ORDER BY zome_index",
+        )
+        .bind(&hash_bytes)
+        .bind(&agent_bytes)
+        .fetch_all(&mut *conn)
+        .await?;
+
+        // Fetch coordinator zomes for this DNA
+        let coordinator_zomes: Vec<CoordinatorZomeModel> = sqlx::query_as(
+            "SELECT dna_hash, agent, zome_index, zome_name, wasm_hash, dependencies FROM CoordinatorZome WHERE dna_hash = ? AND agent = ? ORDER BY zome_index",
+        )
+        .bind(&hash_bytes)
+        .bind(&agent_bytes)
+        .fetch_all(&mut *conn)
+        .await?;
+
+        // Convert to DnaDef
+        let dna_def = dna_model
+            .to_dna_def(integrity_zomes, coordinator_zomes)
+            .map_err(|e| {
+                sqlx::Error::Decode(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    e,
+                )))
+            })?;
+
+        // Create CellId from the hash and agent
+        let cell_id = dna_model.to_cell_id();
+
+        results.push((cell_id, dna_def));
+    }
+
+    Ok(results)
+}
+
+// ============================================================================
+// Write operations
+// ============================================================================
+
+/// Store WASM bytecode.
+async fn put_wasm<'e, E>(executor: E, wasm: DnaWasmHashed) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let (wasm, hash) = wasm.into_inner();
+    let hash_bytes = hash.get_raw_32();
+    let code = wasm.code.to_vec();
+
+    sqlx::query("INSERT OR REPLACE INTO Wasm (hash, code) VALUES (?, ?)")
+        .bind(hash_bytes)
+        .bind(code)
+        .execute(executor)
+        .await?;
+
+    Ok(())
+}
+
+/// Store a DNA definition and its associated zomes.
+///
+/// This operation is transactional — either all data is stored or none is.
+/// When called with `&Pool`, a new transaction is started. When called with
+/// `&mut Transaction`, a savepoint is used so the outer transaction remains
+/// in control.
+async fn put_dna_def<'c, A>(conn: A, cell_id: &CellId, dna_def: &DnaDef) -> sqlx::Result<()>
+where
+    A: Acquire<'c, Database = Sqlite>,
+{
+    let mut tx = conn.begin().await?;
+
+    let hash = dna_def.to_hash();
+    let hash_bytes = hash.get_raw_32();
+    let agent_bytes = cell_id.agent_pubkey().get_raw_32();
+    let name = dna_def.name.clone();
+    let network_seed = dna_def.modifiers.network_seed.clone();
+    let properties = dna_def.modifiers.properties.bytes().to_vec();
+
+    // Serialize lineage if present
+    #[cfg(feature = "unstable-migration")]
+    let lineage_json = Some(sqlx::types::Json(&dna_def.lineage));
+    #[cfg(not(feature = "unstable-migration"))]
+    let lineage_json: Option<
+        sqlx::types::Json<&std::collections::HashSet<holochain_types::dna::DnaHash>>,
+    > = None;
+
+    // Insert DnaDef
+    sqlx::query(
+        "INSERT OR REPLACE INTO DnaDef (hash, agent, name, network_seed, properties, lineage) VALUES (?, ?, ?, ?, ?, ?)",
+    )
+        .bind(hash_bytes)
+        .bind(agent_bytes)
+        .bind(name)
+        .bind(network_seed)
+        .bind(properties)
+        .bind(lineage_json)
+        .execute(&mut *tx)
+        .await?;
+
+    // Delete existing zomes for this DNA to avoid orphans when updating
+    sqlx::query("DELETE FROM IntegrityZome WHERE dna_hash = ? AND agent = ?")
+        .bind(hash_bytes)
+        .bind(agent_bytes)
+        .execute(&mut *tx)
+        .await?;
+
+    sqlx::query("DELETE FROM CoordinatorZome WHERE dna_hash = ? AND agent = ?")
+        .bind(hash_bytes)
+        .bind(agent_bytes)
+        .execute(&mut *tx)
+        .await?;
+
+    // Insert integrity zomes
+    for (zome_index, (zome_name, zome_def)) in dna_def.integrity_zomes.iter().enumerate() {
+        let wasm_hash = zome_def.wasm_hash(zome_name).map_err(|e| {
+            sqlx::Error::Encode(Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                e.to_string(),
+            )))
+        })?;
+        let wasm_hash_bytes = wasm_hash.get_raw_32();
+
+        // Extract dependencies from the ZomeDef
+        let dependencies = match zome_def.as_any_zome_def() {
+            ZomeDef::Wasm(WasmZome { dependencies, .. }) => dependencies
+                .iter()
+                .map(|n| n.0.as_ref().to_string())
+                .collect::<Vec<_>>(),
+            ZomeDef::Inline { dependencies, .. } => dependencies
+                .iter()
+                .map(|n| n.0.as_ref().to_string())
+                .collect::<Vec<_>>(),
+        };
+
+        sqlx::query(
+            "INSERT OR REPLACE INTO IntegrityZome (dna_hash, agent, zome_index, zome_name, wasm_hash, dependencies) VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .bind(hash_bytes)
+        .bind(agent_bytes)
+        .bind(zome_index as i64)
+        .bind(&zome_name.0)
+        .bind(wasm_hash_bytes)
+        .bind(sqlx::types::Json(&dependencies))
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    // Insert coordinator zomes
+    for (zome_index, (zome_name, zome_def)) in dna_def.coordinator_zomes.iter().enumerate() {
+        let wasm_hash = zome_def.wasm_hash(zome_name).map_err(|e| {
+            sqlx::Error::Encode(Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                e.to_string(),
+            )))
+        })?;
+        let wasm_hash_bytes = wasm_hash.get_raw_32();
+
+        // Extract dependencies from the ZomeDef
+        let dependencies = match zome_def.as_any_zome_def() {
+            ZomeDef::Wasm(WasmZome { dependencies, .. }) => dependencies
+                .iter()
+                .map(|n| n.0.as_ref().to_string())
+                .collect::<Vec<_>>(),
+            ZomeDef::Inline { dependencies, .. } => dependencies
+                .iter()
+                .map(|n| n.0.as_ref().to_string())
+                .collect::<Vec<_>>(),
+        };
+
+        sqlx::query(
+            "INSERT OR REPLACE INTO CoordinatorZome (dna_hash, agent, zome_index, zome_name, wasm_hash, dependencies) VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .bind(hash_bytes)
+        .bind(agent_bytes)
+        .bind(zome_index as i64)
+        .bind(&zome_name.0)
+        .bind(wasm_hash_bytes)
+        .bind(sqlx::types::Json(&dependencies))
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    tx.commit().await?;
+    Ok(())
+}
+
+/// Store an entry definition.
+async fn put_entry_def<'e, E>(executor: E, key: Vec<u8>, entry_def: &EntryDef) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let model = EntryDefModel::from_entry_def(key, entry_def);
+    sqlx::query(
+        "INSERT OR REPLACE INTO EntryDef (key, entry_def_id, entry_def_id_type, visibility, required_validations) VALUES (?, ?, ?, ?, ?)",
+    )
+    .bind(model.key)
+    .bind(model.entry_def_id)
+    .bind(model.entry_def_id_type)
+    .bind(model.visibility)
+    .bind(model.required_validations)
+    .execute(executor)
+    .await?;
+    Ok(())
+}
+
+// ============================================================================
+// DbRead / DbWrite wrappers
+// ============================================================================
+
+impl DbRead<Wasm> {
+    /// Check if WASM bytecode exists in the database.
+    pub async fn wasm_exists(&self, hash: &WasmHash) -> sqlx::Result<bool> {
+        wasm_exists(self.pool(), hash).await
+    }
+
+    /// Get WASM bytecode by hash.
+    pub async fn get_wasm(&self, hash: &WasmHash) -> sqlx::Result<Option<DnaWasmHashed>> {
+        get_wasm(self.pool(), hash).await
+    }
+
+    /// Check if a DNA definition exists in the database.
+    pub async fn dna_def_exists(&self, cell_id: &CellId) -> sqlx::Result<bool> {
+        dna_def_exists(self.pool(), cell_id).await
+    }
+
+    /// Get a DNA definition by hash.
+    pub async fn get_dna_def(&self, cell_id: &CellId) -> sqlx::Result<Option<DnaDef>> {
+        get_dna_def(self.pool(), cell_id).await
+    }
+
+    /// Check if an entry definition exists in the database.
+    pub async fn entry_def_exists(&self, key: &[u8]) -> sqlx::Result<bool> {
+        entry_def_exists(self.pool(), key).await
+    }
+
+    /// Get an entry definition by key.
+    pub async fn get_entry_def(&self, key: &[u8]) -> sqlx::Result<Option<EntryDef>> {
+        get_entry_def(self.pool(), key).await
+    }
+
+    /// Get all entry definitions.
+    pub async fn get_all_entry_defs(&self) -> sqlx::Result<Vec<(Vec<u8>, EntryDef)>> {
+        get_all_entry_defs(self.pool()).await
+    }
+
+    /// Get all DNA definitions with their associated cell IDs.
+    pub async fn get_all_dna_defs(&self) -> sqlx::Result<Vec<(CellId, DnaDef)>> {
+        get_all_dna_defs(self.pool()).await
     }
 }
 
-// Write operations
 impl DbWrite<Wasm> {
     /// Store WASM bytecode.
     pub async fn put_wasm(&self, wasm: DnaWasmHashed) -> sqlx::Result<()> {
-        let (wasm, hash) = wasm.into_inner();
-        let hash_bytes = hash.get_raw_32();
-        let code = wasm.code.to_vec();
-
-        sqlx::query("INSERT OR REPLACE INTO Wasm (hash, code) VALUES (?, ?)")
-            .bind(hash_bytes)
-            .bind(code)
-            .execute(self.pool())
-            .await?;
-
-        Ok(())
+        put_wasm(self.pool(), wasm).await
     }
 
     /// Store a DNA definition and its associated zomes.
     ///
     /// This operation is transactional - either all data is stored or none is.
     pub async fn put_dna_def(&self, cell_id: &CellId, dna_def: &DnaDef) -> sqlx::Result<()> {
-        let mut tx = self.pool().begin().await?;
-
-        let hash = dna_def.to_hash();
-        let hash_bytes = hash.get_raw_32();
-        let agent_bytes = cell_id.agent_pubkey().get_raw_32();
-        let name = dna_def.name.clone();
-        let network_seed = dna_def.modifiers.network_seed.clone();
-        let properties = dna_def.modifiers.properties.bytes().to_vec();
-
-        // Serialize lineage if present
-        #[cfg(feature = "unstable-migration")]
-        let lineage_json = Some(sqlx::types::Json(&dna_def.lineage));
-        #[cfg(not(feature = "unstable-migration"))]
-        let lineage_json: Option<
-            sqlx::types::Json<&std::collections::HashSet<holochain_types::dna::DnaHash>>,
-        > = None;
-
-        // Insert DnaDef
-        sqlx::query(
-            "INSERT OR REPLACE INTO DnaDef (hash, agent, name, network_seed, properties, lineage) VALUES (?, ?, ?, ?, ?, ?)",
-        )
-            .bind(hash_bytes)
-            .bind(agent_bytes)
-            .bind(name)
-            .bind(network_seed)
-            .bind(properties)
-            .bind(lineage_json)
-            .execute(&mut *tx)
-            .await?;
-
-        // Delete existing zomes for this DNA to avoid orphans when updating
-        sqlx::query("DELETE FROM IntegrityZome WHERE dna_hash = ? AND agent = ?")
-            .bind(hash_bytes)
-            .bind(agent_bytes)
-            .execute(&mut *tx)
-            .await?;
-
-        sqlx::query("DELETE FROM CoordinatorZome WHERE dna_hash = ? AND agent = ?")
-            .bind(hash_bytes)
-            .bind(agent_bytes)
-            .execute(&mut *tx)
-            .await?;
-
-        // Insert integrity zomes
-        for (zome_index, (zome_name, zome_def)) in dna_def.integrity_zomes.iter().enumerate() {
-            let wasm_hash = zome_def.wasm_hash(zome_name).map_err(|e| {
-                sqlx::Error::Encode(Box::new(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    e.to_string(),
-                )))
-            })?;
-            let wasm_hash_bytes = wasm_hash.get_raw_32();
-
-            // Extract dependencies from the ZomeDef
-            let dependencies = match zome_def.as_any_zome_def() {
-                ZomeDef::Wasm(WasmZome { dependencies, .. }) => dependencies
-                    .iter()
-                    .map(|n| n.0.as_ref().to_string())
-                    .collect::<Vec<_>>(),
-                ZomeDef::Inline { dependencies, .. } => dependencies
-                    .iter()
-                    .map(|n| n.0.as_ref().to_string())
-                    .collect::<Vec<_>>(),
-            };
-
-            sqlx::query(
-                "INSERT OR REPLACE INTO IntegrityZome (dna_hash, agent, zome_index, zome_name, wasm_hash, dependencies) VALUES (?, ?, ?, ?, ?, ?)",
-            )
-            .bind(hash_bytes)
-            .bind(agent_bytes)
-            .bind(zome_index as i64)
-            .bind(&zome_name.0)
-            .bind(wasm_hash_bytes)
-            .bind(sqlx::types::Json(&dependencies))
-            .execute(&mut *tx)
-            .await?;
-        }
-
-        // Insert coordinator zomes
-        for (zome_index, (zome_name, zome_def)) in dna_def.coordinator_zomes.iter().enumerate() {
-            let wasm_hash = zome_def.wasm_hash(zome_name).map_err(|e| {
-                sqlx::Error::Encode(Box::new(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    e.to_string(),
-                )))
-            })?;
-            let wasm_hash_bytes = wasm_hash.get_raw_32();
-
-            // Extract dependencies from the ZomeDef
-            let dependencies = match zome_def.as_any_zome_def() {
-                ZomeDef::Wasm(WasmZome { dependencies, .. }) => dependencies
-                    .iter()
-                    .map(|n| n.0.as_ref().to_string())
-                    .collect::<Vec<_>>(),
-                ZomeDef::Inline { dependencies, .. } => dependencies
-                    .iter()
-                    .map(|n| n.0.as_ref().to_string())
-                    .collect::<Vec<_>>(),
-            };
-
-            sqlx::query(
-                "INSERT OR REPLACE INTO CoordinatorZome (dna_hash, agent, zome_index, zome_name, wasm_hash, dependencies) VALUES (?, ?, ?, ?, ?, ?)",
-            )
-            .bind(hash_bytes)
-            .bind(agent_bytes)
-            .bind(zome_index as i64)
-            .bind(&zome_name.0)
-            .bind(wasm_hash_bytes)
-            .bind(sqlx::types::Json(&dependencies))
-            .execute(&mut *tx)
-            .await?;
-        }
-
-        tx.commit().await?;
-        Ok(())
+        put_dna_def(self.pool(), cell_id, dna_def).await
     }
 
     /// Store an entry definition.
-    pub async fn put_entry_def(&self, _key: Vec<u8>, _entry_def: &EntryDef) -> sqlx::Result<()> {
-        let model = EntryDefModel::from_entry_def(_key, _entry_def);
-        sqlx::query(
-            "INSERT OR REPLACE INTO EntryDef (key, entry_def_id, entry_def_id_type, visibility, required_validations) VALUES (?, ?, ?, ?, ?)",
-        )
-        .bind(model.key)
-        .bind(model.entry_def_id)
-        .bind(model.entry_def_id_type)
-        .bind(model.visibility)
-        .bind(model.required_validations)
-        .execute(self.pool())
-        .await?;
-        Ok(())
+    pub async fn put_entry_def(&self, key: Vec<u8>, entry_def: &EntryDef) -> sqlx::Result<()> {
+        put_entry_def(self.pool(), key, entry_def).await
+    }
+}
+
+impl TxRead<Wasm> {
+    /// Check if WASM bytecode exists in the database.
+    pub async fn wasm_exists(&mut self, hash: &WasmHash) -> sqlx::Result<bool> {
+        wasm_exists(self.conn_mut(), hash).await
+    }
+
+    /// Get WASM bytecode by hash.
+    pub async fn get_wasm(&mut self, hash: &WasmHash) -> sqlx::Result<Option<DnaWasmHashed>> {
+        get_wasm(self.conn_mut(), hash).await
+    }
+
+    /// Check if a DNA definition exists in the database.
+    pub async fn dna_def_exists(&mut self, cell_id: &CellId) -> sqlx::Result<bool> {
+        dna_def_exists(self.conn_mut(), cell_id).await
+    }
+
+    /// Get a DNA definition by hash.
+    pub async fn get_dna_def(&mut self, cell_id: &CellId) -> sqlx::Result<Option<DnaDef>> {
+        get_dna_def(self.tx_mut(), cell_id).await
+    }
+
+    /// Check if an entry definition exists in the database.
+    pub async fn entry_def_exists(&mut self, key: &[u8]) -> sqlx::Result<bool> {
+        entry_def_exists(self.conn_mut(), key).await
+    }
+
+    /// Get an entry definition by key.
+    pub async fn get_entry_def(&mut self, key: &[u8]) -> sqlx::Result<Option<EntryDef>> {
+        get_entry_def(self.conn_mut(), key).await
+    }
+
+    /// Get all entry definitions.
+    pub async fn get_all_entry_defs(&mut self) -> sqlx::Result<Vec<(Vec<u8>, EntryDef)>> {
+        get_all_entry_defs(self.conn_mut()).await
+    }
+
+    /// Get all DNA definitions with their associated cell IDs.
+    pub async fn get_all_dna_defs(&mut self) -> sqlx::Result<Vec<(CellId, DnaDef)>> {
+        get_all_dna_defs(self.tx_mut()).await
+    }
+}
+
+impl TxWrite<Wasm> {
+    /// Store WASM bytecode.
+    pub async fn put_wasm(&mut self, wasm: DnaWasmHashed) -> sqlx::Result<()> {
+        put_wasm(self.conn_mut(), wasm).await
+    }
+
+    /// Store a DNA definition and its associated zomes.
+    ///
+    /// Within a [`TxWrite`], this runs as a SAVEPOINT nested inside the
+    /// outer transaction — it is atomic with the rest of the transaction.
+    pub async fn put_dna_def(&mut self, cell_id: &CellId, dna_def: &DnaDef) -> sqlx::Result<()> {
+        put_dna_def(self.tx_mut(), cell_id, dna_def).await
+    }
+
+    /// Store an entry definition.
+    pub async fn put_entry_def(&mut self, key: Vec<u8>, entry_def: &EntryDef) -> sqlx::Result<()> {
+        put_entry_def(self.conn_mut(), key, entry_def).await
     }
 }
 

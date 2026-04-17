@@ -793,10 +793,10 @@ mod network_impls {
     use futures::future::join_all;
     use holochain_conductor_api::ZomeCallParamsSigned;
     use holochain_conductor_api::{DnaStorageInfo, StorageBlob, StorageInfo};
-    use holochain_data::conductor::WitnessNonceResult;
     use holochain_sqlite::helpers::BytesSql;
     use holochain_sqlite::sql::sql_peer_meta_store;
     use holochain_sqlite::stats::{get_size_on_disk, get_used_size};
+    use holochain_state::conductor::WitnessNonceResult;
     use holochain_zome_types::block::Block;
     use holochain_zome_types::block::BlockTargetId;
     use kitsune2_api::Url;
@@ -933,7 +933,7 @@ mod network_impls {
             expires: Timestamp,
         ) -> ConductorResult<WitnessNonceResult> {
             self.spaces
-                .conductor_db
+                .conductor_store
                 .witness_nonce(agent, nonce, Timestamp::now(), expires)
                 .await
                 .map_err(ConductorError::other)

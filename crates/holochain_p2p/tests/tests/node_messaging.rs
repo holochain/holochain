@@ -1229,7 +1229,7 @@ async fn spawn_test(
         DbWrite::test_in_mem(DbKindPeerMetaStore(Arc::new(dna_hash.clone()))).unwrap();
     let db_op = DbWrite::test_in_mem(DbKindDht(Arc::new(dna_hash.clone()))).unwrap();
     let db_cache = DbWrite::test_in_mem(DbKindCache(Arc::new(dna_hash.clone()))).unwrap();
-    let conductor_db = holochain_data::test_open_db(holochain_data::kind::Conductor)
+    let conductor_store = holochain_state::conductor::ConductorStore::new_test()
         .await
         .unwrap();
     let lair_client = test_keystore();
@@ -1250,9 +1250,9 @@ async fn spawn_test(
                 let db_cache = db_cache.clone();
                 Box::pin(async move { Ok(db_cache) })
             }),
-            get_conductor_db: Arc::new(move || {
-                let conductor_db = conductor_db.clone();
-                Box::pin(async move { conductor_db })
+            get_conductor_store: Arc::new(move || {
+                let conductor_store = conductor_store.clone();
+                Box::pin(async move { conductor_store })
             }),
             #[cfg(feature = "transport-tx5-backend-go-pion")]
             network_config: Some(serde_json::json!({

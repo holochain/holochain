@@ -15,7 +15,7 @@ pub use key::DbKey;
 
 pub mod example;
 mod handles;
-pub use handles::{DbRead, DbWrite};
+pub use handles::{DbRead, DbWrite, TxRead, TxWrite};
 pub mod conductor;
 pub mod kind;
 pub mod models;

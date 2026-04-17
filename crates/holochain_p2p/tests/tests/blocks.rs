@@ -23,13 +23,13 @@ use std::{sync::Arc, time::Duration};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn cell_blocks_are_committed_to_database() {
-    let conductor_db = holochain_data::test_open_db(holochain_data::kind::Conductor)
+    let conductor_store = holochain_state::conductor::ConductorStore::new_test()
         .await
         .unwrap();
     let dna_hash = fixt!(DnaHash);
     let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
     let TestActor { actor, .. } =
-        TestActor::new_with_conductor_db(&dna_hash, conductor_db.clone(), &addr).await;
+        TestActor::new_with_conductor_store(&dna_hash, conductor_store.clone(), &addr).await;
     let cell_id = CellId::new(dna_hash, fixt!(AgentPubKey));
     let cell_block_reason = CellBlockReason::InvalidOp(fixt!(DhtOpHash));
     let block = Block::new(
@@ -39,7 +39,7 @@ async fn cell_blocks_are_committed_to_database() {
 
     actor.block(block).await.unwrap();
 
-    let blocks = conductor_db.as_ref().get_all_blocks().await.unwrap();
+    let blocks = conductor_store.as_read().get_all_blocks().await.unwrap();
     assert_eq!(blocks.len(), 1);
     assert!(
         matches!(blocks[0].target(), BlockTarget::Cell(id, reason) if id == &cell_id && reason == &cell_block_reason)
@@ -48,13 +48,13 @@ async fn cell_blocks_are_committed_to_database() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn agent_is_blocked() {
-    let conductor_db = holochain_data::test_open_db(holochain_data::kind::Conductor)
+    let conductor_store = holochain_state::conductor::ConductorStore::new_test()
         .await
         .unwrap();
     let dna_hash = fixt!(DnaHash);
     let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
     let TestActor { actor, .. } =
-        TestActor::new_with_conductor_db(&dna_hash, conductor_db.clone(), &addr).await;
+        TestActor::new_with_conductor_store(&dna_hash, conductor_store.clone(), &addr).await;
     let agent = fixt!(AgentPubKey);
     let cell_id = CellId::new(dna_hash, agent.clone());
     let cell_block_reason = CellBlockReason::InvalidOp(fixt!(DhtOpHash));
@@ -281,18 +281,18 @@ mod blocks_impl {
         let dna_hash_2 = fixt!(DnaHash);
         let cell_id_1 = CellId::new(dna_hash_1.clone(), agent.clone());
 
-        let conductor_db = holochain_data::test_open_db(holochain_data::kind::Conductor)
+        let conductor_store = holochain_state::conductor::ConductorStore::new_test()
             .await
             .unwrap();
         let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
         let TestActor {
             actor: actor_1,
             blocks_module: blocks_module_1,
-        } = TestActor::new_with_conductor_db(&dna_hash_1, conductor_db.clone(), &addr).await;
+        } = TestActor::new_with_conductor_store(&dna_hash_1, conductor_store.clone(), &addr).await;
         let TestActor {
             blocks_module: blocks_module_2,
             ..
-        } = TestActor::new_with_conductor_db(&dna_hash_2, conductor_db, &addr).await;
+        } = TestActor::new_with_conductor_store(&dna_hash_2, conductor_store, &addr).await;
 
         // Initially not blocked in either DNA.
         assert!(!blocks_module_1
@@ -487,18 +487,18 @@ struct TestActor {
 
 impl TestActor {
     async fn new(dna_hash: &DnaHash, bootstrap_addr: &SocketAddr) -> Self {
-        let conductor_db = holochain_data::test_open_db(holochain_data::kind::Conductor)
+        let conductor_store = holochain_state::conductor::ConductorStore::new_test()
             .await
             .unwrap();
-        Self::create_test_case(dna_hash, conductor_db, test_keystore(), bootstrap_addr).await
+        Self::create_test_case(dna_hash, conductor_store, test_keystore(), bootstrap_addr).await
     }
 
-    async fn new_with_conductor_db(
+    async fn new_with_conductor_store(
         dna_hash: &DnaHash,
-        conductor_db: holochain_data::DbWrite<holochain_data::kind::Conductor>,
+        conductor_store: holochain_state::conductor::ConductorStore,
         bootstrap_addr: &SocketAddr,
     ) -> Self {
-        Self::create_test_case(dna_hash, conductor_db, test_keystore(), bootstrap_addr).await
+        Self::create_test_case(dna_hash, conductor_store, test_keystore(), bootstrap_addr).await
     }
 
     async fn new_with_keystore(
@@ -506,15 +506,15 @@ impl TestActor {
         keystore: &MetaLairClient,
         bootstrap_addr: &SocketAddr,
     ) -> Self {
-        let conductor_db = holochain_data::test_open_db(holochain_data::kind::Conductor)
+        let conductor_store = holochain_state::conductor::ConductorStore::new_test()
             .await
             .unwrap();
-        Self::create_test_case(dna_hash, conductor_db, keystore.clone(), bootstrap_addr).await
+        Self::create_test_case(dna_hash, conductor_store, keystore.clone(), bootstrap_addr).await
     }
 
     async fn create_test_case(
         dna_hash: &DnaHash,
-        conductor_db: holochain_data::DbWrite<holochain_data::kind::Conductor>,
+        conductor_store: holochain_state::conductor::ConductorStore,
         keystore: MetaLairClient,
         bootstrap_addr: &SocketAddr,
     ) -> Self {
@@ -523,9 +523,9 @@ impl TestActor {
         let peer_meta_db =
             DbWrite::test_in_mem(DbKindPeerMetaStore(Arc::new(dna_hash.clone()))).unwrap();
         let config = HolochainP2pConfig {
-            get_conductor_db: Arc::new(move || {
-                let conductor_db = conductor_db.clone();
-                Box::pin(async move { conductor_db })
+            get_conductor_store: Arc::new(move || {
+                let conductor_store = conductor_store.clone();
+                Box::pin(async move { conductor_store })
             }),
             get_db_op_store: Arc::new(move |_| {
                 let op_db = op_db.clone();

@@ -13,7 +13,7 @@ async fn space_shutdown() {
 
     let dht_db = test_dht_db().to_db();
     let cache_db = test_cache_db_with_dna_hash(dna_hash.clone()).to_db();
-    let conductor_db = holochain_data::test_open_db(holochain_data::kind::Conductor)
+    let conductor_store = holochain_state::conductor::ConductorStore::new_test()
         .await
         .unwrap();
     let peer_meta_db = test_peer_meta_store_db(dna_hash.clone()).to_db();
@@ -40,9 +40,9 @@ async fn space_shutdown() {
                 let cache_db = cache_db.clone();
                 Box::pin(async move { Ok(cache_db) })
             }),
-            get_conductor_db: Arc::new(move || {
-                let conductor_db = conductor_db.clone();
-                Box::pin(async move { conductor_db })
+            get_conductor_store: Arc::new(move || {
+                let conductor_store = conductor_store.clone();
+                Box::pin(async move { conductor_store })
             }),
             get_db_peer_meta: Arc::new(move |_space| {
                 let peer_meta_db = peer_meta_db.clone();
