@@ -42,9 +42,8 @@ impl<I: DatabaseIdentifier> DbRead<I> {
     /// The returned [`TxRead`] exposes the same read operations as this
     /// handle but runs them on a single connection inside a SQL
     /// transaction, giving a consistent snapshot across multiple reads.
-    /// Call [`TxRead::commit`] or [`TxRead::rollback`] to end the
-    /// transaction; dropping it without committing rolls back (a no-op
-    /// for a read-only transaction, but releases the connection).
+    /// Call [`TxRead::close`] to release the connection promptly;
+    /// dropping has the same effect (sqlx rolls back on return).
     pub async fn begin(&self) -> sqlx::Result<TxRead<I>> {
         let tx = self.pool.begin().await?;
         Ok(TxRead::new(tx, self.identifier.clone()))
@@ -97,11 +96,11 @@ impl<I: DatabaseIdentifier> DbWrite<I> {
 /// [`AsRef`] / [`AsMut`]. Exposes the same read operations as
 /// [`DbRead`], but every operation runs on a single connection inside
 /// a real SQL transaction — useful for multi-read snapshots. Call
-/// [`TxRead::commit`] or [`TxRead::rollback`] to end the transaction;
-/// dropping without committing rolls back (with a warning logged).
+/// [`TxRead::close`] to release the connection, or simply drop it
+/// (sqlx rolls back on connection return).
 pub struct TxRead<I: DatabaseIdentifier> {
-    // `None` once `commit` or `rollback` has taken it. Drop checks this
-    // to warn about transactions abandoned without an explicit end.
+    // `None` once `close` has taken it. Drop falls back to sqlx's
+    // automatic rollback on connection return.
     tx: Option<Transaction<'static, Sqlite>>,
     identifier: I,
 }
@@ -119,17 +118,12 @@ impl<I: DatabaseIdentifier> TxRead<I> {
         &self.identifier
     }
 
-    /// Commit the transaction.
-    pub async fn commit(mut self) -> sqlx::Result<()> {
-        self.tx
-            .take()
-            .expect("transaction already consumed")
-            .commit()
-            .await
-    }
-
-    /// Roll back the transaction.
-    pub async fn rollback(mut self) -> sqlx::Result<()> {
+    /// Close the transaction and release the connection back to the pool.
+    ///
+    /// Rolls back the underlying transaction; for a read-only transaction
+    /// there is nothing to persist, so this is equivalent to dropping
+    /// except that any rollback error is surfaced.
+    pub async fn close(mut self) -> sqlx::Result<()> {
         self.tx
             .take()
             .expect("transaction already consumed")
@@ -143,18 +137,6 @@ impl<I: DatabaseIdentifier> TxRead<I> {
 
     pub(crate) fn tx_mut(&mut self) -> &mut Transaction<'static, Sqlite> {
         self.tx.as_mut().expect("transaction already consumed")
-    }
-}
-
-impl<I: DatabaseIdentifier> Drop for TxRead<I> {
-    fn drop(&mut self) {
-        if self.tx.is_some() {
-            tracing::warn!(
-                database_id = self.identifier.database_id(),
-                "Transaction dropped without commit or rollback; \
-                 sqlx will roll back on connection return.",
-            );
-        }
     }
 }
 
@@ -174,13 +156,23 @@ impl<I: DatabaseIdentifier> TxWrite<I> {
     }
 
     /// Commit the transaction, persisting all changes.
-    pub async fn commit(self) -> sqlx::Result<()> {
-        self.0.commit().await
+    pub async fn commit(mut self) -> sqlx::Result<()> {
+        self.0
+            .tx
+            .take()
+            .expect("transaction already consumed")
+            .commit()
+            .await
     }
 
     /// Roll back the transaction, discarding all changes.
-    pub async fn rollback(self) -> sqlx::Result<()> {
-        self.0.rollback().await
+    pub async fn rollback(mut self) -> sqlx::Result<()> {
+        self.0
+            .tx
+            .take()
+            .expect("transaction already consumed")
+            .rollback()
+            .await
     }
 
     pub(crate) fn conn_mut(&mut self) -> &mut SqliteConnection {

@@ -112,7 +112,7 @@ pub struct HolochainP2pConfig {
     /// ```ignore
     /// get_conductor_store: Arc::new(|| {
     ///     let res = conductor_store.clone();
-    ///     Box::pin(async move { Ok(res) })
+    ///     Box::pin(async move { res })
     /// }),
     /// ```
     pub get_conductor_store: GetConductorStore,

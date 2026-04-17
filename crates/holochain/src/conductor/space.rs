@@ -187,7 +187,7 @@ impl Spaces {
             },
         )
         .await
-        .map_err(|e| std::io::Error::other(e.to_string()))?;
+        .map_err(ConductorError::other)?;
         let conductor_store = holochain_state::conductor::ConductorStore::new(conductor_db);
 
         let wasm_db = holochain_data::open_db(
@@ -200,7 +200,7 @@ impl Spaces {
             },
         )
         .await
-        .map_err(|e| std::io::Error::other(e.to_string()))?;
+        .map_err(ConductorError::other)?;
 
         // Create store instances from the wasm database
         let wasm_store = holochain_state::wasm::WasmStore::new(wasm_db.clone());

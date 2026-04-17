@@ -1,5 +1,5 @@
 //! Helpers for converting between the in-memory [`ConductorState`] type and
-//! the [`ConductorStateSnapshot`] wire format used by the conductor store.
+//! the [`ConductorStateSnapshot`] storage representation used by the conductor store.
 //!
 //! Persistence itself (loading a consistent snapshot, atomic read/modify/write)
 //! lives on [`ConductorStore`]; this module just handles the type conversion
@@ -83,7 +83,7 @@ pub fn state_to_snapshot(state: &ConductorState) -> ConductorResult<ConductorSta
 
     let mut app_interfaces = Vec::with_capacity(state.app_interfaces.len());
     for (interface_id, config) in &state.app_interfaces {
-        let model = holochain_data::conductor::AppInterfaceModel::from_driver(
+        let mut model = holochain_data::conductor::AppInterfaceModel::from_driver(
             &config.driver,
             config.installed_app_id.as_ref().map(|id| id.to_string()),
         )
@@ -98,7 +98,6 @@ pub fn state_to_snapshot(state: &ConductorState) -> ConductorResult<ConductorSta
         }
 
         // Keep the port/id on the model in sync with the interface_id.
-        let mut model = model;
         model.port = interface_id.port() as i64;
         model.id = interface_id.id().as_deref().unwrap_or("").to_string();
 
@@ -136,7 +135,7 @@ mod tests {
         f(state, loaded);
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn state_persistence_round_trip() {
         let tag = ConductorStateTag(Arc::from("test-conductor"));
         let state = ConductorState::from_parts(tag, InstalledAppMap::new(), HashMap::new());
@@ -149,7 +148,7 @@ mod tests {
         .await;
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn app_interface_persistence() {
         let tag = ConductorStateTag(Arc::from("test-conductor"));
 
@@ -169,7 +168,7 @@ mod tests {
         .await;
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn deletion_of_stale_interfaces() {
         let store = ConductorStore::new_test().await.unwrap();
         let tag = ConductorStateTag(Arc::from("test-conductor"));

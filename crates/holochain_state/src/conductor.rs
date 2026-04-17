@@ -4,7 +4,7 @@
 //! state: outside of tests, performing state read/write directly against
 //! [`holochain_data`] is discouraged. Using the types defined there (e.g.
 //! [`AppInterfaceModel`], [`WitnessNonceResult`]) is fine — they are the
-//! wire format for this data.
+//! storage representation of this data.
 
 use holo_hash::AgentPubKey;
 use holochain_data::conductor::{AppInterfaceModel, Block, BlockTargetId, Nonce256Bits};
@@ -55,9 +55,11 @@ pub struct ConductorStateSnapshot {
 #[derive(Clone)]
 pub struct ConductorStore<Db = holochain_data::DbWrite<Conductor>> {
     db: Db,
-    // Serializes `update_state` calls so concurrent read-modify-write
-    // cycles cannot interleave. Shared across clones so any two handles
-    // that refer to the same conductor database also share the lock.
+    // Serializes `update_state` calls on this store (and its clones) so
+    // concurrent read-modify-write cycles cannot interleave. Callers should
+    // construct the `ConductorStore` once per conductor database and clone
+    // it to share — independent `ConductorStore::new(db)` calls against the
+    // same underlying handle produce separate locks and are not coordinated.
     update_lock: Arc<tokio::sync::Mutex<()>>,
 }
 
@@ -125,7 +127,7 @@ impl ConductorStore<holochain_data::DbRead<Conductor>> {
     pub async fn load_state(&self) -> ConductorStoreResult<Option<ConductorStateSnapshot>> {
         let mut tx = self.db.begin().await?;
         let snapshot = load_snapshot_in_tx(&mut tx).await?;
-        tx.commit().await?;
+        tx.close().await?;
         Ok(snapshot)
     }
 
@@ -341,13 +343,13 @@ async fn save_snapshot_in_tx(
 mod tests {
     use super::*;
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn load_state_returns_none_when_unset() {
         let store = ConductorStore::new_test().await.unwrap();
         assert!(store.as_read().load_state().await.unwrap().is_none());
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn update_state_initializes_and_roundtrips() {
         let store = ConductorStore::new_test().await.unwrap();
 
@@ -373,7 +375,7 @@ mod tests {
         assert!(loaded.app_interfaces.is_empty());
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn update_state_deletes_stale_interfaces() {
         let store = ConductorStore::new_test().await.unwrap();
 
@@ -424,7 +426,7 @@ mod tests {
         assert_eq!(loaded.app_interfaces[0].0.port, 1111);
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn update_state_rolls_back_on_closure_error() {
         let store = ConductorStore::new_test().await.unwrap();
 
@@ -512,7 +514,7 @@ mod tests {
         assert_eq!(loaded_ports, expected);
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn conductor_tag_roundtrip() {
         let store = ConductorStore::new_test().await.unwrap();
         assert_eq!(store.as_read().get_conductor_tag().await.unwrap(), None);

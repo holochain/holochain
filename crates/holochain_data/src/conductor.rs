@@ -345,16 +345,14 @@ where
         .execute(&mut *conn)
         .await?;
 
-    // Check if already seen
-    if nonce_already_seen(&mut *conn, &agent, &nonce, now).await? {
-        return Ok(WitnessNonceResult::Duplicate);
-    }
-
-    // Insert the new nonce
+    // Attempt to record the nonce; rely on the insert's rows_affected to
+    // determine the outcome so concurrent callers never both see Fresh.
+    // ON CONFLICT DO NOTHING on the (agent, nonce) primary key makes this
+    // a single atomic "claim or fail" regardless of interleaving.
     let agent_bytes = agent.get_raw_36();
     let nonce_bytes = nonce.as_ref();
 
-    sqlx::query(
+    let result = sqlx::query(
         "INSERT INTO Nonce (agent, nonce, expires) VALUES (?, ?, ?) ON CONFLICT DO NOTHING",
     )
     .bind(agent_bytes)
@@ -363,7 +361,11 @@ where
     .execute(&mut *conn)
     .await?;
 
-    Ok(WitnessNonceResult::Fresh)
+    if result.rows_affected() == 0 {
+        Ok(WitnessNonceResult::Duplicate)
+    } else {
+        Ok(WitnessNonceResult::Fresh)
+    }
 }
 
 // ============================================================================
@@ -1629,7 +1631,7 @@ mod tests {
             tx.get_conductor_tag().await.unwrap(),
             Some("initial".to_string())
         );
-        tx.commit().await.unwrap();
+        tx.close().await.unwrap();
     }
 
     #[tokio::test]
