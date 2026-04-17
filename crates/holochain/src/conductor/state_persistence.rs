@@ -2,8 +2,8 @@
 //! the [`ConductorStateSnapshot`] storage representation used by the conductor store.
 //!
 //! Persistence itself (loading a consistent snapshot, atomic read/modify/write)
-//! lives on [`ConductorStore`]; this module just handles the type conversion
-//! either side of those operations.
+//! lives on [`holochain_state::conductor::ConductorStore`]; this module just
+//! handles the type conversion either side of those operations.
 
 use super::error::{ConductorError, ConductorResult};
 use crate::conductor::state::{AppInterfaceConfig, AppInterfaceId};
