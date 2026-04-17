@@ -43,7 +43,7 @@ impl DnaDefStore<holochain_data::DbWrite<holochain_data::kind::Wasm>> {
 
     /// Convert this writable store into a read-only store.
     pub fn into_read(self) -> DnaDefStoreRead {
-        DnaDefStore::new(self.db.as_ref().clone())
+        DnaDefStore::new(self.db.into())
     }
 }
 

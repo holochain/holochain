@@ -274,7 +274,7 @@ pub(crate) struct HolochainP2pActor {
     lair_client: holochain_keystore::MetaLairClient,
     kitsune: DynKitsune,
     kitsune2_config: Config,
-    blocks_db_getter: GetConductorStore,
+    get_conductor_store: GetConductorStore,
     pending: Arc<Mutex<Pending>>,
     latency_service: PeerLatencyService,
     pruning_task_abort_handle: AbortHandle,
@@ -671,7 +671,7 @@ impl HolochainP2pActor {
             evt_sender,
             lair_client,
             kitsune,
-            blocks_db_getter: config.get_conductor_store.clone(),
+            get_conductor_store: config.get_conductor_store.clone(),
             pending,
             latency_service,
             kitsune2_config,
@@ -2537,7 +2537,7 @@ impl actor::HcP2p for HolochainP2pActor {
     }
 
     fn conductor_store_getter(&self) -> GetConductorStore {
-        self.blocks_db_getter.clone()
+        self.get_conductor_store.clone()
     }
 
     fn block(&self, block: Block) -> BoxFut<'_, HolochainP2pResult<()>> {

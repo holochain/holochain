@@ -1,8 +1,10 @@
 //! A wrapper around the conductor database for managing conductor state.
 //!
-//! This is the preferred way for higher layers to access the conductor
-//! database: direct use of [`holochain_data`] from outside this crate is
-//! discouraged.
+//! This is the preferred way for higher layers to read and write conductor
+//! state: outside of tests, performing state read/write directly against
+//! [`holochain_data`] is discouraged. Using the types defined there (e.g.
+//! [`AppInterfaceModel`], [`WitnessNonceResult`]) is fine — they are the
+//! wire format for this data.
 
 use holo_hash::AgentPubKey;
 use holochain_data::conductor::{AppInterfaceModel, Block, BlockTargetId, Nonce256Bits};
@@ -190,7 +192,7 @@ impl ConductorStore<holochain_data::DbWrite<holochain_data::kind::Conductor>> {
 
     /// Convert this writable store into a read-only store.
     pub fn into_read(self) -> ConductorStoreRead {
-        ConductorStore::new(self.db.as_ref().clone())
+        ConductorStore::new(self.db.into())
     }
 }
 
