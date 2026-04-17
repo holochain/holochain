@@ -147,6 +147,12 @@ impl ConductorError {
     }
 }
 
+impl From<holochain_state::conductor::ConductorStoreError> for ConductorError {
+    fn from(e: holochain_state::conductor::ConductorStoreError) -> Self {
+        Self::other(e)
+    }
+}
+
 impl From<one_err::OneErr> for ConductorError {
     fn from(e: one_err::OneErr) -> Self {
         Self::other(e)

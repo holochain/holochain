@@ -1,60 +1,33 @@
-//! Functions for persisting and loading ConductorState to/from the normalized database.
+//! Helpers for converting between the in-memory [`ConductorState`] type and
+//! the [`ConductorStateSnapshot`] wire format used by the conductor store.
 //!
-//! This bridges between the conductor store and the `ConductorState` type.
+//! Persistence itself (loading a consistent snapshot, atomic read/modify/write)
+//! lives on [`ConductorStore`]; this module just handles the type conversion
+//! either side of those operations.
 
 use super::error::{ConductorError, ConductorResult};
 use crate::conductor::state::{AppInterfaceConfig, AppInterfaceId};
 use crate::conductor::state::{ConductorState, ConductorStateTag};
 use holochain_conductor_api::signal_subscription::SignalSubscription;
-use holochain_state::conductor::{ConductorStore, ConductorStoreRead};
+use holochain_state::conductor::ConductorStateSnapshot;
 use holochain_types::prelude::*;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-/// Load ConductorState from the normalized conductor store.
-#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-pub async fn load_conductor_state(
-    db: &ConductorStoreRead,
-) -> ConductorResult<Option<ConductorState>> {
-    // Get conductor tag
-    let tag = db
-        .get_conductor_tag()
-        .await
-        .map_err(ConductorError::other)?;
-    let tag = match tag {
-        Some(tag) => ConductorStateTag(Arc::from(tag.as_str())),
-        None => return Ok(None),
-    };
-
-    // Get all installed apps
-    let installed_apps_vec = db
-        .get_all_installed_apps()
-        .await
-        .map_err(ConductorError::other)?;
+/// Build a [`ConductorState`] from a persisted snapshot.
+pub fn snapshot_to_state(snapshot: ConductorStateSnapshot) -> ConductorResult<ConductorState> {
+    let tag = ConductorStateTag(Arc::from(snapshot.tag.as_str()));
 
     let mut installed_apps = InstalledAppMap::new();
-    for (app_id, app_common, status) in installed_apps_vec {
+    for (app_id, app_common, status) in snapshot.installed_apps {
         let mut installed_app = InstalledApp::new_fresh(app_common);
         installed_app.status = status;
-        installed_apps.insert(InstalledAppId::from(app_id.clone()), installed_app);
+        installed_apps.insert(InstalledAppId::from(app_id), installed_app);
     }
 
-    // Get all app interfaces
-    let interface_models = db
-        .get_all_app_interfaces()
-        .await
-        .map_err(ConductorError::other)?;
-
     let mut app_interfaces = HashMap::new();
-    for model in interface_models {
-        // Convert model to AppInterfaceConfig
+    for (model, subs_data) in snapshot.app_interfaces {
         let driver = model.to_driver().map_err(ConductorError::other)?;
-
-        // Get signal subscriptions for this interface
-        let subs_data = db
-            .get_signal_subscriptions(model.port, &model.id)
-            .await
-            .map_err(ConductorError::other)?;
 
         let mut signal_subscriptions = HashMap::new();
         for (app_id, filters_blob) in subs_data {
@@ -70,13 +43,11 @@ pub async fn load_conductor_state(
 
         let config = AppInterfaceConfig {
             signal_subscriptions,
-            installed_app_id: model.installed_app_id,
+            installed_app_id: model.installed_app_id.clone(),
             driver,
         };
 
-        // Reconstruct AppInterfaceId
         let interface_id = if model.port == 0 {
-            // Port 0 case - must have an ID
             if model.id.is_empty() {
                 return Err(ConductorError::other("Port 0 interface missing ID"));
             }
@@ -87,32 +58,26 @@ pub async fn load_conductor_state(
         app_interfaces.insert(interface_id, config);
     }
 
-    Ok(Some(ConductorState::from_parts(
-        tag,
-        installed_apps,
-        app_interfaces,
-    )))
+    Ok(ConductorState::from_parts(tag, installed_apps, app_interfaces))
 }
 
-/// Save ConductorState to the normalized conductor store.
-#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-pub async fn save_conductor_state(
-    db: &ConductorStore,
-    state: &ConductorState,
-) -> ConductorResult<()> {
-    // Save conductor tag
-    db.set_conductor_tag(&state.tag().0)
-        .await
-        .map_err(ConductorError::other)?;
+/// Build a persisted [`ConductorStateSnapshot`] from a [`ConductorState`].
+pub fn state_to_snapshot(state: &ConductorState) -> ConductorResult<ConductorStateSnapshot> {
+    let tag = state.tag().0.as_ref().to_string();
 
-    // Save all installed apps
-    for (app_id, installed_app) in state.installed_apps() {
-        db.put_installed_app(app_id.as_ref(), installed_app, &installed_app.status)
-            .await
-            .map_err(ConductorError::other)?;
-    }
+    let installed_apps = state
+        .installed_apps()
+        .iter()
+        .map(|(app_id, installed_app)| {
+            (
+                app_id.to_string(),
+                installed_app.as_ref().clone(),
+                installed_app.status.clone(),
+            )
+        })
+        .collect();
 
-    // Save all app interfaces
+    let mut app_interfaces = Vec::with_capacity(state.app_interfaces.len());
     for (interface_id, config) in &state.app_interfaces {
         let model = holochain_data::conductor::AppInterfaceModel::from_driver(
             &config.driver,
@@ -120,141 +85,69 @@ pub async fn save_conductor_state(
         )
         .map_err(ConductorError::other)?;
 
-        let id_str = interface_id.id().as_deref().unwrap_or("");
-        db.put_app_interface(interface_id.port() as i64, id_str, &model)
-            .await
-            .map_err(ConductorError::other)?;
-
-        // Clear existing signal subscriptions for this interface
-        db.delete_signal_subscriptions(interface_id.port() as i64, id_str)
-            .await
-            .map_err(ConductorError::other)?;
-
-        // Save signal subscriptions
+        let mut subscriptions = Vec::with_capacity(config.signal_subscriptions.len());
         for (app_id, subscription) in &config.signal_subscriptions {
             let filters_blob = serde_json::to_vec(subscription).map_err(|e| {
                 ConductorError::other(format!("Failed to serialize signal subscription: {}", e))
             })?;
-            db.put_signal_subscription(
-                interface_id.port() as i64,
-                id_str,
-                app_id.as_ref(),
-                &filters_blob,
-            )
-            .await
-            .map_err(ConductorError::other)?;
+            subscriptions.push((app_id.to_string(), filters_blob));
         }
+
+        // Keep the port/id on the model in sync with the interface_id.
+        let mut model = model;
+        model.port = interface_id.port() as i64;
+        model.id = interface_id.id().as_deref().unwrap_or("").to_string();
+
+        app_interfaces.push((model, subscriptions));
     }
 
-    // Delete apps and interfaces that are no longer in the state
-    let db_read = db.as_read();
-
-    // Get all existing app IDs from database
-    let existing_apps = db_read
-        .get_all_installed_apps()
-        .await
-        .map_err(ConductorError::other)?;
-    let existing_app_ids: Vec<String> = existing_apps
-        .into_iter()
-        .map(|(app_id, _, _)| app_id)
-        .collect();
-
-    // Delete apps that are no longer in state
-    for app_id in existing_app_ids {
-        if !state
-            .installed_apps()
-            .contains_key(&InstalledAppId::from(app_id.clone()))
-        {
-            db.delete_installed_app(&app_id)
-                .await
-                .map_err(ConductorError::other)?;
-        }
-    }
-
-    // Get all existing app interfaces from database
-    let existing_interfaces = db_read
-        .get_all_app_interfaces()
-        .await
-        .map_err(ConductorError::other)?;
-
-    // Delete interfaces that are no longer in state
-    for model in existing_interfaces {
-        let interface_id = if model.port == 0 {
-            if model.id.is_empty() {
-                return Err(ConductorError::other("Port 0 interface missing ID"));
-            }
-            AppInterfaceId::from_parts(0, Some(model.id.clone()))
-        } else {
-            AppInterfaceId::new(model.port as u16)
-        };
-
-        if !state.app_interfaces.contains_key(&interface_id) {
-            db.delete_app_interface(model.port, &model.id)
-                .await
-                .map_err(ConductorError::other)?;
-        }
-    }
-
-    Ok(())
+    Ok(ConductorStateSnapshot {
+        tag,
+        installed_apps,
+        app_interfaces,
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::conductor::state::AppInterfaceConfig;
+    use holochain_state::conductor::ConductorStore;
     use holochain_types::websocket::AllowedOrigins;
+
+    async fn run_in_store<F>(state: ConductorState, f: F)
+    where
+        F: FnOnce(ConductorState, ConductorState),
+    {
+        let store = ConductorStore::new_test().await.unwrap();
+        let snapshot = state_to_snapshot(&state).unwrap();
+        store
+            .update_state(|_| -> ConductorResult<_> { Ok((snapshot, ())) })
+            .await
+            .unwrap();
+
+        let loaded_snapshot = store.as_read().load_state().await.unwrap().unwrap();
+        let loaded = snapshot_to_state(loaded_snapshot).unwrap();
+
+        f(state, loaded);
+    }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn state_persistence_round_trip() {
-        // Create a temporary database
-        let tmpdir = tempfile::tempdir().unwrap();
-        let db_write = ConductorStore::new(
-            holochain_data::open_db(
-                tmpdir.path(),
-                holochain_data::kind::Conductor,
-                holochain_data::HolochainDataConfig::default(),
-            )
-            .await
-            .unwrap(),
-        );
-        let db_read = db_write.as_read();
-
-        // Create a test state
         let tag = ConductorStateTag(Arc::from("test-conductor"));
-        let installed_apps = InstalledAppMap::new();
-        let app_interfaces = HashMap::new();
-        let state = ConductorState::from_parts(tag.clone(), installed_apps, app_interfaces);
+        let state = ConductorState::from_parts(tag, InstalledAppMap::new(), HashMap::new());
 
-        // Save the state
-        save_conductor_state(&db_write, &state).await.unwrap();
-
-        // Load the state back
-        let loaded_state = load_conductor_state(&db_read).await.unwrap().unwrap();
-
-        // Verify the tag matches
-        assert_eq!(loaded_state.tag().0.as_ref(), "test-conductor");
-        assert_eq!(loaded_state.installed_apps().len(), 0);
-        assert_eq!(loaded_state.app_interfaces.len(), 0);
+        run_in_store(state, |_, loaded| {
+            assert_eq!(loaded.tag().0.as_ref(), "test-conductor");
+            assert_eq!(loaded.installed_apps().len(), 0);
+            assert_eq!(loaded.app_interfaces.len(), 0);
+        })
+        .await;
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn app_interface_persistence() {
-        // Create a temporary database
-        let tmpdir = tempfile::tempdir().unwrap();
-        let db_write = ConductorStore::new(
-            holochain_data::open_db(
-                tmpdir.path(),
-                holochain_data::kind::Conductor,
-                holochain_data::HolochainDataConfig::default(),
-            )
-            .await
-            .unwrap(),
-        );
-        let db_read = db_write.as_read();
-
-        // Create a test state with an app interface
         let tag = ConductorStateTag(Arc::from("test-conductor"));
-        let installed_apps = InstalledAppMap::new();
 
         let mut app_interfaces = HashMap::new();
         let interface_config =
@@ -262,61 +155,57 @@ mod tests {
         let interface_id = AppInterfaceId::new(12345);
         app_interfaces.insert(interface_id, interface_config);
 
-        let state = ConductorState::from_parts(tag, installed_apps, app_interfaces);
+        let state = ConductorState::from_parts(tag, InstalledAppMap::new(), app_interfaces);
 
-        // Save the state
-        save_conductor_state(&db_write, &state).await.unwrap();
-
-        // Load the state back
-        let loaded_state = load_conductor_state(&db_read).await.unwrap().unwrap();
-
-        // Verify the interface was persisted
-        assert_eq!(loaded_state.app_interfaces.len(), 1);
-        let loaded_interface = loaded_state.app_interfaces.values().next().unwrap();
-        assert_eq!(loaded_interface.driver.port(), 12345);
+        run_in_store(state, |_, loaded| {
+            assert_eq!(loaded.app_interfaces.len(), 1);
+            let loaded_interface = loaded.app_interfaces.values().next().unwrap();
+            assert_eq!(loaded_interface.driver.port(), 12345);
+        })
+        .await;
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn deletion_of_stale_interfaces() {
-        // Create a temporary database
-        let tmpdir = tempfile::tempdir().unwrap();
-        let db_write = ConductorStore::new(
-            holochain_data::open_db(
-                tmpdir.path(),
-                holochain_data::kind::Conductor,
-                holochain_data::HolochainDataConfig::default(),
-            )
-            .await
-            .unwrap(),
-        );
-        let db_read = db_write.as_read();
-
-        // Create initial state with two interfaces
+        let store = ConductorStore::new_test().await.unwrap();
         let tag = ConductorStateTag(Arc::from("test-conductor"));
-        let installed_apps = InstalledAppMap::new();
 
+        // Initial state with two interfaces.
         let mut app_interfaces = HashMap::new();
-        let interface1 = AppInterfaceConfig::websocket(12345, None, AllowedOrigins::Any, None);
-        let interface2 = AppInterfaceConfig::websocket(12346, None, AllowedOrigins::Any, None);
-        app_interfaces.insert(AppInterfaceId::new(12345), interface1);
-        app_interfaces.insert(AppInterfaceId::new(12346), interface2);
+        app_interfaces.insert(
+            AppInterfaceId::new(12345),
+            AppInterfaceConfig::websocket(12345, None, AllowedOrigins::Any, None),
+        );
+        app_interfaces.insert(
+            AppInterfaceId::new(12346),
+            AppInterfaceConfig::websocket(12346, None, AllowedOrigins::Any, None),
+        );
+        let state =
+            ConductorState::from_parts(tag.clone(), InstalledAppMap::new(), app_interfaces);
+        let snapshot = state_to_snapshot(&state).unwrap();
+        store
+            .update_state(|_| -> ConductorResult<_> { Ok((snapshot, ())) })
+            .await
+            .unwrap();
 
-        let state = ConductorState::from_parts(tag.clone(), installed_apps.clone(), app_interfaces);
-        save_conductor_state(&db_write, &state).await.unwrap();
-
-        // Now create a new state with only one interface
+        // Replace with only one interface.
         let mut app_interfaces = HashMap::new();
-        let interface1 = AppInterfaceConfig::websocket(12345, None, AllowedOrigins::Any, None);
-        app_interfaces.insert(AppInterfaceId::new(12345), interface1);
-        let new_state = ConductorState::from_parts(tag, installed_apps, app_interfaces);
+        app_interfaces.insert(
+            AppInterfaceId::new(12345),
+            AppInterfaceConfig::websocket(12345, None, AllowedOrigins::Any, None),
+        );
+        let new_state = ConductorState::from_parts(tag, InstalledAppMap::new(), app_interfaces);
+        let snapshot = state_to_snapshot(&new_state).unwrap();
+        store
+            .update_state(|_| -> ConductorResult<_> { Ok((snapshot, ())) })
+            .await
+            .unwrap();
 
-        // Save the new state (should delete interface 12346)
-        save_conductor_state(&db_write, &new_state).await.unwrap();
-
-        // Load and verify only one interface remains
-        let loaded_state = load_conductor_state(&db_read).await.unwrap().unwrap();
-        assert_eq!(loaded_state.app_interfaces.len(), 1);
-        assert!(loaded_state
+        // Loaded state has only the surviving interface.
+        let loaded_snapshot = store.as_read().load_state().await.unwrap().unwrap();
+        let loaded = snapshot_to_state(loaded_snapshot).unwrap();
+        assert_eq!(loaded.app_interfaces.len(), 1);
+        assert!(loaded
             .app_interfaces
             .contains_key(&AppInterfaceId::new(12345)));
     }
