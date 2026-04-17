@@ -30,6 +30,12 @@ pub enum ConductorStoreError {
 /// Convenience alias for [`ConductorStore`] results.
 pub type ConductorStoreResult<T> = Result<T, ConductorStoreError>;
 
+/// A single signal subscription row: `(app_id, filters_blob)`.
+pub type SignalSubscriptionRow = (String, Vec<u8>);
+
+/// An app interface and its associated signal subscriptions.
+pub type AppInterfaceEntry = (AppInterfaceModel, Vec<SignalSubscriptionRow>);
+
 /// A point-in-time view of the persisted conductor state.
 ///
 /// Used as the read/write unit for atomic state updates via
@@ -42,10 +48,7 @@ pub struct ConductorStateSnapshot {
     /// All installed apps and their statuses, keyed by app id.
     pub installed_apps: Vec<(String, InstalledAppCommon, AppStatus)>,
     /// All app interfaces paired with their signal subscriptions.
-    ///
-    /// Each entry contains the interface model and a list of
-    /// `(app_id, filters_blob)` subscription rows.
-    pub app_interfaces: Vec<(AppInterfaceModel, Vec<(String, Vec<u8>)>)>,
+    pub app_interfaces: Vec<AppInterfaceEntry>,
 }
 
 /// A wrapper around the conductor database.
@@ -93,7 +96,7 @@ impl ConductorStore<holochain_data::DbRead<Conductor>> {
         &self,
         port: i64,
         id: &str,
-    ) -> ConductorStoreResult<Vec<(String, Vec<u8>)>> {
+    ) -> ConductorStoreResult<Vec<SignalSubscriptionRow>> {
         Ok(self.db.get_signal_subscriptions(port, id).await?)
     }
 
@@ -498,8 +501,11 @@ mod tests {
         }
 
         let loaded = store.as_read().load_state().await.unwrap().unwrap();
-        let mut loaded_ports: Vec<i64> =
-            loaded.app_interfaces.into_iter().map(|(m, _)| m.port).collect();
+        let mut loaded_ports: Vec<i64> = loaded
+            .app_interfaces
+            .into_iter()
+            .map(|(m, _)| m.port)
+            .collect();
         loaded_ports.sort();
         let mut expected = ports;
         expected.sort();

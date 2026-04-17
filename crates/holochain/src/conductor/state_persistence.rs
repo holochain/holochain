@@ -58,7 +58,11 @@ pub fn snapshot_to_state(snapshot: ConductorStateSnapshot) -> ConductorResult<Co
         app_interfaces.insert(interface_id, config);
     }
 
-    Ok(ConductorState::from_parts(tag, installed_apps, app_interfaces))
+    Ok(ConductorState::from_parts(
+        tag,
+        installed_apps,
+        app_interfaces,
+    ))
 }
 
 /// Build a persisted [`ConductorStateSnapshot`] from a [`ConductorState`].
@@ -180,8 +184,7 @@ mod tests {
             AppInterfaceId::new(12346),
             AppInterfaceConfig::websocket(12346, None, AllowedOrigins::Any, None),
         );
-        let state =
-            ConductorState::from_parts(tag.clone(), InstalledAppMap::new(), app_interfaces);
+        let state = ConductorState::from_parts(tag.clone(), InstalledAppMap::new(), app_interfaces);
         let snapshot = state_to_snapshot(&state).unwrap();
         store
             .update_state(|_| -> ConductorResult<_> { Ok((snapshot, ())) })
