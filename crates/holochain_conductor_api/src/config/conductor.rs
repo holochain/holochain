@@ -742,6 +742,7 @@ fn kitsune2_config_schema(generator: &mut schemars::SchemaGenerator) -> Schema {
         #[cfg(feature = "kitsune2_transport_tx5")]
         #[serde(flatten)]
         tx5_transport: Option<kitsune2_transport_tx5::Tx5TransportModConfig>,
+        #[cfg(feature = "kitsune2_transport_iroh")]
         #[serde(flatten)]
         iroh_transport: Option<kitsune2_transport_iroh::IrohTransportModConfig>,
     }
