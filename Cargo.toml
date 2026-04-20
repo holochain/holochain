@@ -92,6 +92,16 @@ lto = true
 # kitsune2_bootstrap_client = { path = "../kitsune2/crates/bootstrap_client" }
 # kitsune2_test_utils = { path = "../kitsune2/crates/test_utils" }
 # kitsune2_transport_tx5 = { path = "../kitsune2/crates/transport_tx5" }
+kitsune2_api = { git = "https://github.com/holochain/kitsune2", branch = "fix/491-stabilize-the-iroh-relay-hosted-in-bootstrap_srv" }
+kitsune2_core = { git = "https://github.com/holochain/kitsune2", branch = "fix/491-stabilize-the-iroh-relay-hosted-in-bootstrap_srv" }
+kitsune2 = { git = "https://github.com/holochain/kitsune2", branch = "fix/491-stabilize-the-iroh-relay-hosted-in-bootstrap_srv" }
+kitsune2_dht = { git = "https://github.com/holochain/kitsune2", branch = "fix/491-stabilize-the-iroh-relay-hosted-in-bootstrap_srv" }
+kitsune2_gossip = { git = "https://github.com/holochain/kitsune2", branch = "fix/491-stabilize-the-iroh-relay-hosted-in-bootstrap_srv" }
+kitsune2_bootstrap_srv = { git = "https://github.com/holochain/kitsune2", branch = "fix/491-stabilize-the-iroh-relay-hosted-in-bootstrap_srv" }
+kitsune2_bootstrap_client = { git = "https://github.com/holochain/kitsune2", branch = "fix/491-stabilize-the-iroh-relay-hosted-in-bootstrap_srv" }
+kitsune2_test_utils = { git = "https://github.com/holochain/kitsune2", branch = "fix/491-stabilize-the-iroh-relay-hosted-in-bootstrap_srv" }
+kitsune2_transport_tx5 = { git = "https://github.com/holochain/kitsune2", branch = "fix/491-stabilize-the-iroh-relay-hosted-in-bootstrap_srv" }
+kitsune2_transport_iroh = { git = "https://github.com/holochain/kitsune2", branch = "fix/491-stabilize-the-iroh-relay-hosted-in-bootstrap_srv" }
 # sbd-server = { path = "../sbd/rust/sbd-server" }
 # sbd-client = { path = "../sbd/rust/sbd-client" }
 # sbd-e2e-crypto-client = { path = "../sbd/rust/sbd-e2e-crypto-client" }

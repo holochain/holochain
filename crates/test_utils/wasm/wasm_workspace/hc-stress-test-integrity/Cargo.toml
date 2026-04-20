@@ -13,4 +13,4 @@ name = "files_integrity"
 hdi = { path = "../../../../hdi" }
 
 serde = "1.0"
-holochain_serialized_bytes = "0.0.56"
+holochain_serialized_bytes = "0.0.57"
