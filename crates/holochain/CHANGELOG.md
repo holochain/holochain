@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.7.0-dev.21
+
 - **BREAKING CHANGE** `ChainFilter` is now defined via constructors `take`, `until_hash`, `until_timestamp` instead of composable builder chaining.
 - **BREAKING CHANGE** `must_get_agent_activity` error responses have changed:
   - If the ChainFilter has a `LimitConditions::Take(0)`, then the error is now a `CascadeError::InvalidInput`.
@@ -18,7 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - If the filter is `UntilTimestamp` with a timestamp greater than the ChainFilter `chain_top` action timestamp, the response is `MustGetAgentActivityResponse::UntilTimestampGreaterThanChainHead`.
   - If the filter is `ToGenesis` and the chain does not reach genesis, the response is `MustGetAgentActivityResponse::IncompleteChain`.
   - If the filter is `Take(n)` and fewer than `n` actions are available and the chain does not reach genesis, the response is `MustGetAgentActivityResponse::IncompleteChain`. Previously this could return `Activity` if no gaps were detected, but completeness cannot be guaranteed without reaching genesis.
-- Refactored `must_get_agent_activity` implementation to improve code clarity and correctness. #5689
+- Refactored `must_get_agent_activity` implementation to improve code clarity and correctness. \#5689
 
 ## 0.7.0-dev.20
 
