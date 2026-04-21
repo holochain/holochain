@@ -139,6 +139,7 @@ pub enum WasmBackend {
     Wasmi,
 }
 
+#[cfg(feature = "test_utils")]
 impl WasmBackend {
     pub(crate) fn new() -> Self {
         cfg_select! {
@@ -344,7 +345,7 @@ impl RealRibosome {
             .collect::<RibosomeResult<Vec<_>>>()?;
 
         // Create the global zome types from the totals.
-        let map = GlobalZomeTypes::from_ordered_iterator(items.into_iter());
+        let map = GlobalZomeTypes::from_ordered_iterator(items);
 
         ribosome.zome_types = Arc::new(map?);
 

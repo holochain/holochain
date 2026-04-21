@@ -3127,13 +3127,10 @@ impl Conductor {
             // open.
             let dht_db = self.spaces.dht_db(dna_hash)?;
             let cache_db = self.spaces.cache(dna_hash)?;
-            futures::future::join_all(
-                [
-                    dht_db.write_async(|txn| purge_data(txn)).boxed(),
-                    cache_db.write_async(|txn| purge_data(txn)).boxed(),
-                ]
-                .into_iter(),
-            )
+            futures::future::join_all([
+                dht_db.write_async(|txn| purge_data(txn)).boxed(),
+                cache_db.write_async(|txn| purge_data(txn)).boxed(),
+            ])
             .await
             .into_iter()
             .collect::<Result<Vec<()>, _>>()?;
