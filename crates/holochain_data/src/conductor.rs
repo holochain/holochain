@@ -15,7 +15,7 @@ pub use holochain_zome_types::block::{Block, BlockTargetId};
 
 use crate::handles::{DbRead, DbWrite, TxRead, TxWrite};
 use crate::kind::Conductor;
-use sqlx::{Acquire, Executor, Sqlite};
+use sqlx::{Acquire, Executor, Sqlite, SqliteConnection};
 
 // ============================================================================
 // Conductor / App / Interface operations
@@ -534,14 +534,11 @@ where
 
 /// Insert a block into the database, merging with overlapping blocks.
 ///
-/// Acquires a single connection and runs the pluck, delete, and insert
-/// sequence on it.
-async fn block<'c, A>(conn: A, input: Block) -> Result<(), sqlx::Error>
-where
-    A: Acquire<'c, Database = Sqlite>,
-{
-    let mut conn = conn.acquire().await?;
-
+/// Runs the pluck, delete, and insert sequence on the caller's connection.
+/// The caller is responsible for wrapping this in a transaction so the
+/// DELETE and INSERT commit together; otherwise a mid-sequence failure can
+/// delete overlapping spans without inserting the merged replacement.
+async fn block(conn: &mut SqliteConnection, input: Block) -> Result<(), sqlx::Error> {
     let maybe_min_maybe_max = pluck_overlapping_block_bounds(&mut *conn, &input).await?;
 
     // Delete overlapping blocks
@@ -579,14 +576,12 @@ where
 
 /// Insert an unblock into the database, splitting existing blocks as needed.
 ///
-/// Acquires a single connection and runs the pluck, delete, and re-insert
-/// sequence on it.
-async fn unblock<'c, A>(conn: A, input: Block) -> Result<(), sqlx::Error>
-where
-    A: Acquire<'c, Database = Sqlite>,
-{
-    let mut conn = conn.acquire().await?;
-
+/// Runs the pluck, delete, and re-insert sequence on the caller's connection.
+/// The caller is responsible for wrapping this in a transaction so the
+/// DELETE and re-insert(s) commit together; otherwise a mid-sequence failure
+/// can clear an overlapping block without reinstating its non-unblocked
+/// fragments.
+async fn unblock(conn: &mut SqliteConnection, input: Block) -> Result<(), sqlx::Error> {
     let maybe_min_maybe_max = pluck_overlapping_block_bounds(&mut *conn, &input).await?;
 
     // Delete overlapping blocks
@@ -793,12 +788,16 @@ impl DbWrite<Conductor> {
 
     /// Insert a block into the database, merging with overlapping blocks
     pub async fn block(&self, input: Block) -> Result<(), sqlx::Error> {
-        block(self.pool(), input).await
+        let mut tx = self.pool().begin().await?;
+        block(&mut tx, input).await?;
+        tx.commit().await
     }
 
     /// Insert an unblock into the database, splitting existing blocks as needed
     pub async fn unblock(&self, input: Block) -> Result<(), sqlx::Error> {
-        unblock(self.pool(), input).await
+        let mut tx = self.pool().begin().await?;
+        unblock(&mut tx, input).await?;
+        tx.commit().await
     }
 }
 
@@ -947,12 +946,12 @@ impl TxWrite<Conductor> {
 
     /// Insert a block into the database, merging with overlapping blocks.
     pub async fn block(&mut self, input: Block) -> Result<(), sqlx::Error> {
-        block(self.tx_mut(), input).await
+        block(self.conn_mut(), input).await
     }
 
     /// Insert an unblock into the database, splitting existing blocks as needed.
     pub async fn unblock(&mut self, input: Block) -> Result<(), sqlx::Error> {
-        unblock(self.tx_mut(), input).await
+        unblock(self.conn_mut(), input).await
     }
 }
 
