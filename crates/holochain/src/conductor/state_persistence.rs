@@ -118,38 +118,39 @@ mod tests {
     use holochain_state::conductor::ConductorStore;
     use holochain_types::websocket::AllowedOrigins;
 
-    async fn run_in_store<F>(state: ConductorState, f: F)
-    where
-        F: FnOnce(ConductorState, ConductorState),
-    {
-        let store = ConductorStore::new_test().await.unwrap();
-        let snapshot = state_to_snapshot(&state).unwrap();
+    async fn state_to_store(
+        store: &ConductorStore,
+        state: ConductorState,
+    ) -> ConductorResult<ConductorState> {
+        let snapshot = state_to_snapshot(&state)?;
         store
             .update_state(|_| -> ConductorResult<_> { Ok((snapshot, ())) })
-            .await
-            .unwrap();
+            .await?;
 
-        let loaded_snapshot = store.as_read().load_state().await.unwrap().unwrap();
-        let loaded = snapshot_to_state(loaded_snapshot).unwrap();
+        let loaded_snapshot = store.as_read().load_state().await?.unwrap();
+        let loaded = snapshot_to_state(loaded_snapshot)?;
 
-        f(state, loaded);
+        Ok(loaded)
     }
 
     #[tokio::test]
     async fn state_persistence_round_trip() {
+        let store = ConductorStore::new_test().await.unwrap();
+
         let tag = ConductorStateTag(Arc::from("test-conductor"));
         let state = ConductorState::from_parts(tag, InstalledAppMap::new(), HashMap::new());
 
-        run_in_store(state, |_, loaded| {
-            assert_eq!(loaded.tag().0.as_ref(), "test-conductor");
-            assert_eq!(loaded.installed_apps().len(), 0);
-            assert_eq!(loaded.app_interfaces.len(), 0);
-        })
-        .await;
+        let loaded = state_to_store(&store, state).await.unwrap();
+
+        assert_eq!(loaded.tag().0.as_ref(), "test-conductor");
+        assert_eq!(loaded.installed_apps().len(), 0);
+        assert_eq!(loaded.app_interfaces.len(), 0);
     }
 
     #[tokio::test]
     async fn app_interface_persistence() {
+        let store = ConductorStore::new_test().await.unwrap();
+
         let tag = ConductorStateTag(Arc::from("test-conductor"));
 
         let mut app_interfaces = HashMap::new();
@@ -160,12 +161,11 @@ mod tests {
 
         let state = ConductorState::from_parts(tag, InstalledAppMap::new(), app_interfaces);
 
-        run_in_store(state, |_, loaded| {
-            assert_eq!(loaded.app_interfaces.len(), 1);
-            let loaded_interface = loaded.app_interfaces.values().next().unwrap();
-            assert_eq!(loaded_interface.driver.port(), 12345);
-        })
-        .await;
+        let loaded = state_to_store(&store, state).await.unwrap();
+
+        assert_eq!(loaded.app_interfaces.len(), 1);
+        let loaded_interface = loaded.app_interfaces.values().next().unwrap();
+        assert_eq!(loaded_interface.driver.port(), 12345);
     }
 
     #[tokio::test]
@@ -184,11 +184,8 @@ mod tests {
             AppInterfaceConfig::websocket(12346, None, AllowedOrigins::Any, None),
         );
         let state = ConductorState::from_parts(tag.clone(), InstalledAppMap::new(), app_interfaces);
-        let snapshot = state_to_snapshot(&state).unwrap();
-        store
-            .update_state(|_| -> ConductorResult<_> { Ok((snapshot, ())) })
-            .await
-            .unwrap();
+
+        let _ = state_to_store(&store, state).await.unwrap();
 
         // Replace with only one interface.
         let mut app_interfaces = HashMap::new();
@@ -197,15 +194,10 @@ mod tests {
             AppInterfaceConfig::websocket(12345, None, AllowedOrigins::Any, None),
         );
         let new_state = ConductorState::from_parts(tag, InstalledAppMap::new(), app_interfaces);
-        let snapshot = state_to_snapshot(&new_state).unwrap();
-        store
-            .update_state(|_| -> ConductorResult<_> { Ok((snapshot, ())) })
-            .await
-            .unwrap();
+
+        let loaded = state_to_store(&store, new_state).await.unwrap();
 
         // Loaded state has only the surviving interface.
-        let loaded_snapshot = store.as_read().load_state().await.unwrap().unwrap();
-        let loaded = snapshot_to_state(loaded_snapshot).unwrap();
         assert_eq!(loaded.app_interfaces.len(), 1);
         assert!(loaded
             .app_interfaces
