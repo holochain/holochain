@@ -220,14 +220,6 @@ impl Spaces {
         })
     }
 
-    /// Unblock some target.
-    pub async fn unblock(&self, input: Block) -> DatabaseResult<()> {
-        self.conductor_store
-            .unblock(input)
-            .await
-            .map_err(|e| DatabaseError::Other(e.into()))
-    }
-
     /// Block some target.
     pub async fn block(&self, input: Block) -> DatabaseResult<()> {
         self.conductor_store

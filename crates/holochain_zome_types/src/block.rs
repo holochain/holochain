@@ -133,7 +133,6 @@ impl From<BlockTarget> for BlockTargetReason {
 }
 
 /// Represents a block.
-/// Also can represent an unblock.
 /// NOT serializable and NOT pub fields by design. `try_new` MUST be the only
 /// entrypoint to build a `Block` as this enforces that the start/end times are
 /// valid according to invariants the SQL queries rely on to avoid corrupting the

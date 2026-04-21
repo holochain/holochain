@@ -211,14 +211,9 @@ impl ConductorStore<holochain_data::DbWrite<Conductor>> {
         Ok(self.db.witness_nonce(agent, nonce, now, expires).await?)
     }
 
-    /// Insert a block into the database, merging with overlapping blocks.
+    /// Insert a block into the database.
     pub async fn block(&self, input: Block) -> ConductorStoreResult<()> {
         Ok(self.db.block(input).await?)
-    }
-
-    /// Insert an unblock into the database, splitting existing blocks as needed.
-    pub async fn unblock(&self, input: Block) -> ConductorStoreResult<()> {
-        Ok(self.db.unblock(input).await?)
     }
 
     /// Downgrade this writable store to a read-only store.

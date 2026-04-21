@@ -15,7 +15,7 @@ pub use holochain_zome_types::block::{Block, BlockTargetId};
 
 use crate::handles::{DbRead, DbWrite, TxRead, TxWrite};
 use crate::kind::Conductor;
-use sqlx::{Acquire, Executor, Sqlite, SqliteConnection};
+use sqlx::{Acquire, Executor, Sqlite};
 
 // ============================================================================
 // Conductor / App / Interface operations
@@ -479,43 +479,21 @@ where
     Ok(blocks)
 }
 
-/// Get overlapping block bounds for merging
-async fn pluck_overlapping_block_bounds<'e, E>(
-    executor: E,
-    block: &Block,
-) -> Result<(Option<i64>, Option<i64>), sqlx::Error>
+/// Append a block to the database.
+///
+/// Blocks are stored as independent rows and never merged. Overlapping blocks
+/// on the same target accumulate as separate rows; `is_blocked` returns true
+/// if any row covers the queried timestamp.
+async fn block<'e, E>(executor: E, input: Block) -> Result<(), sqlx::Error>
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    let target_id = BlockTargetId::from(block.target().clone());
-    let target_bytes: Vec<u8> = holochain_serialized_bytes::encode(&target_id)
-        .map_err(|e| sqlx::Error::Protocol(format!("Serialization error: {}", e)))?;
-    let start_us = block.start().as_micros();
-    let end_us = block.end().as_micros();
+    use holochain_zome_types::block::BlockTargetReason;
 
-    let result: Option<(Option<i64>, Option<i64>)> = sqlx::query_as(
-        "SELECT MIN(start_us), MAX(end_us) FROM BlockSpan \
-         WHERE target_id = ? AND start_us <= ? AND ? <= end_us",
-    )
-    .bind(&target_bytes)
-    .bind(end_us)
-    .bind(start_us)
-    .fetch_optional(executor)
-    .await?;
-
-    Ok(result.unwrap_or((None, None)))
-}
-
-/// Insert a block span into the database
-async fn insert_block_inner<'e, E>(executor: E, block: Block) -> Result<(), sqlx::Error>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    let target_id = BlockTargetId::from(block.target().clone());
+    let target_id = BlockTargetId::from(input.target().clone());
     let target_id_bytes: Vec<u8> = holochain_serialized_bytes::encode(&target_id)
         .map_err(|e| sqlx::Error::Protocol(format!("Serialization error: {}", e)))?;
-    use holochain_zome_types::block::BlockTargetReason;
-    let target_reason = BlockTargetReason::from(block.target().clone());
+    let target_reason = BlockTargetReason::from(input.target().clone());
     let target_reason_bytes: Vec<u8> = holochain_serialized_bytes::encode(&target_reason)
         .map_err(|e| sqlx::Error::Protocol(format!("Serialization error: {}", e)))?;
 
@@ -524,117 +502,10 @@ where
     )
     .bind(target_id_bytes)
     .bind(target_reason_bytes)
-    .bind(block.start().as_micros())
-    .bind(block.end().as_micros())
+    .bind(input.start().as_micros())
+    .bind(input.end().as_micros())
     .execute(executor)
     .await?;
-
-    Ok(())
-}
-
-/// Insert a block into the database, merging with overlapping blocks.
-///
-/// Runs the pluck, delete, and insert sequence on the caller's connection.
-/// The caller is responsible for wrapping this in a transaction so the
-/// DELETE and INSERT commit together; otherwise a mid-sequence failure can
-/// delete overlapping spans without inserting the merged replacement.
-async fn block(conn: &mut SqliteConnection, input: Block) -> Result<(), sqlx::Error> {
-    let maybe_min_maybe_max = pluck_overlapping_block_bounds(&mut *conn, &input).await?;
-
-    // Delete overlapping blocks
-    let target_id = BlockTargetId::from(input.target().clone());
-    let target_id_bytes: Vec<u8> = holochain_serialized_bytes::encode(&target_id)
-        .map_err(|e| sqlx::Error::Protocol(format!("Serialization error: {}", e)))?;
-
-    sqlx::query("DELETE FROM BlockSpan WHERE target_id = ? AND start_us <= ? AND ? <= end_us")
-        .bind(&target_id_bytes)
-        .bind(input.end().as_micros())
-        .bind(input.start().as_micros())
-        .execute(&mut *conn)
-        .await?;
-
-    // Build one new block from the extremums
-    let merged_block = Block::new(
-        input.target().clone(),
-        InclusiveTimestampInterval::try_new(
-            maybe_min_maybe_max
-                .0
-                .map(Timestamp)
-                .map(|min| std::cmp::min(min, input.start()))
-                .unwrap_or(input.start()),
-            maybe_min_maybe_max
-                .1
-                .map(Timestamp)
-                .map(|max| std::cmp::max(max, input.end()))
-                .unwrap_or(input.end()),
-        )
-        .map_err(|e| sqlx::Error::Protocol(format!("Timestamp error: {}", e)))?,
-    );
-
-    insert_block_inner(&mut *conn, merged_block).await
-}
-
-/// Insert an unblock into the database, splitting existing blocks as needed.
-///
-/// Runs the pluck, delete, and re-insert sequence on the caller's connection.
-/// The caller is responsible for wrapping this in a transaction so the
-/// DELETE and re-insert(s) commit together; otherwise a mid-sequence failure
-/// can clear an overlapping block without reinstating its non-unblocked
-/// fragments.
-async fn unblock(conn: &mut SqliteConnection, input: Block) -> Result<(), sqlx::Error> {
-    let maybe_min_maybe_max = pluck_overlapping_block_bounds(&mut *conn, &input).await?;
-
-    // Delete overlapping blocks
-    let target_id = BlockTargetId::from(input.target().clone());
-    let target_id_bytes: Vec<u8> = holochain_serialized_bytes::encode(&target_id)
-        .map_err(|e| sqlx::Error::Protocol(format!("Serialization error: {}", e)))?;
-
-    sqlx::query("DELETE FROM BlockSpan WHERE target_id = ? AND start_us <= ? AND ? <= end_us")
-        .bind(&target_id_bytes)
-        .bind(input.end().as_micros())
-        .bind(input.start().as_micros())
-        .execute(&mut *conn)
-        .await?;
-
-    // Reinstate anything before the unblock
-    if let (Some(min), _) = maybe_min_maybe_max {
-        let preblock_start = Timestamp(min);
-        // Unblocks are inclusive so we reinstate the preblock up to but not including the unblock start
-        if let Ok(preblock_end) = input.start() - std::time::Duration::from_micros(1) {
-            if preblock_start <= preblock_end {
-                insert_block_inner(
-                    &mut *conn,
-                    Block::new(
-                        input.target().clone(),
-                        InclusiveTimestampInterval::try_new(preblock_start, preblock_end).map_err(
-                            |e| sqlx::Error::Protocol(format!("Timestamp error: {}", e)),
-                        )?,
-                    ),
-                )
-                .await?;
-            }
-        }
-    }
-
-    // Reinstate anything after the unblock
-    if let (_, Some(max)) = maybe_min_maybe_max {
-        let postblock_end = Timestamp(max);
-        if let Ok(postblock_start) = input.end() + std::time::Duration::from_micros(1) {
-            if postblock_start <= postblock_end {
-                insert_block_inner(
-                    &mut *conn,
-                    Block::new(
-                        input.target().clone(),
-                        InclusiveTimestampInterval::try_new(postblock_start, postblock_end)
-                            .map_err(|e| {
-                                sqlx::Error::Protocol(format!("Timestamp error: {}", e))
-                            })?,
-                    ),
-                )
-                .await?;
-            }
-        }
-    }
 
     Ok(())
 }
@@ -786,18 +657,9 @@ impl DbWrite<Conductor> {
         witness_nonce(self.pool(), agent, nonce, now, expires).await
     }
 
-    /// Insert a block into the database, merging with overlapping blocks
+    /// Append a block to the database.
     pub async fn block(&self, input: Block) -> Result<(), sqlx::Error> {
-        let mut tx = self.pool().begin().await?;
-        block(&mut tx, input).await?;
-        tx.commit().await
-    }
-
-    /// Insert an unblock into the database, splitting existing blocks as needed
-    pub async fn unblock(&self, input: Block) -> Result<(), sqlx::Error> {
-        let mut tx = self.pool().begin().await?;
-        unblock(&mut tx, input).await?;
-        tx.commit().await
+        block(self.pool(), input).await
     }
 }
 
@@ -944,14 +806,9 @@ impl TxWrite<Conductor> {
         witness_nonce(self.tx_mut(), agent, nonce, now, expires).await
     }
 
-    /// Insert a block into the database, merging with overlapping blocks.
+    /// Append a block to the database.
     pub async fn block(&mut self, input: Block) -> Result<(), sqlx::Error> {
         block(self.conn_mut(), input).await
-    }
-
-    /// Insert an unblock into the database, splitting existing blocks as needed.
-    pub async fn unblock(&mut self, input: Block) -> Result<(), sqlx::Error> {
-        unblock(self.conn_mut(), input).await
     }
 }
 
@@ -1440,7 +1297,7 @@ mod tests {
     }
 
     // ========================================================================
-    // Block/unblock operations
+    // Block operations
     // ========================================================================
 
     fn test_cell_id() -> CellId {
@@ -1489,27 +1346,30 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn block_merges_overlapping() {
+    async fn overlapping_blocks_accumulate_as_rows() {
         let db = test_open_db(Conductor).await.unwrap();
         let target = test_block_target_id();
 
-        // Block 100..500 then 400..900 — should merge to 100..900
+        // Two overlapping blocks are recorded as independent rows; the target
+        // is blocked across the union of their ranges.
         db.block(test_block(100, 500)).await.unwrap();
         db.block(test_block(400, 900)).await.unwrap();
 
-        // Blocked at 200 (original range)
         assert!(db
             .as_ref()
             .is_blocked(target.clone(), Timestamp::from_micros(200))
             .await
             .unwrap());
-        // Blocked at 700 (extended range)
+        assert!(db
+            .as_ref()
+            .is_blocked(target.clone(), Timestamp::from_micros(450))
+            .await
+            .unwrap());
         assert!(db
             .as_ref()
             .is_blocked(target.clone(), Timestamp::from_micros(700))
             .await
             .unwrap());
-        // Not blocked outside merged range
         assert!(!db
             .as_ref()
             .is_blocked(target.clone(), Timestamp::from_micros(50))
@@ -1523,32 +1383,48 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn unblock_splits_range() {
+    async fn blocks_with_different_reasons_are_independent() {
         let db = test_open_db(Conductor).await.unwrap();
         let target = test_block_target_id();
 
-        // Block 100..1000
-        db.block(test_block(100, 1000)).await.unwrap();
+        let bad_crypto = Block::new(
+            BlockTarget::Cell(test_cell_id(), CellBlockReason::BadCrypto),
+            InclusiveTimestampInterval::try_new(
+                Timestamp::from_micros(100),
+                Timestamp::from_micros(500),
+            )
+            .unwrap(),
+        );
+        let invalid_op = Block::new(
+            BlockTarget::Cell(
+                test_cell_id(),
+                CellBlockReason::InvalidOp(DhtOpHash::from_raw_36(vec![2u8; 36])),
+            ),
+            InclusiveTimestampInterval::try_new(
+                Timestamp::from_micros(600),
+                Timestamp::from_micros(900),
+            )
+            .unwrap(),
+        );
 
-        // Unblock 400..600 — should leave 100..399 and 601..1000
-        db.unblock(test_block(400, 600)).await.unwrap();
+        db.block(bad_crypto).await.unwrap();
+        db.block(invalid_op).await.unwrap();
 
-        // Before the hole: still blocked
+        // Both rows contribute to `is_blocked` on the shared target id.
         assert!(db
             .as_ref()
             .is_blocked(target.clone(), Timestamp::from_micros(200))
             .await
             .unwrap());
-        // Inside the hole: not blocked
-        assert!(!db
-            .as_ref()
-            .is_blocked(target.clone(), Timestamp::from_micros(500))
-            .await
-            .unwrap());
-        // After the hole: still blocked
         assert!(db
             .as_ref()
-            .is_blocked(target.clone(), Timestamp::from_micros(800))
+            .is_blocked(target.clone(), Timestamp::from_micros(700))
+            .await
+            .unwrap());
+        // Outside both ranges: not blocked.
+        assert!(!db
+            .as_ref()
+            .is_blocked(target.clone(), Timestamp::from_micros(550))
             .await
             .unwrap());
     }
