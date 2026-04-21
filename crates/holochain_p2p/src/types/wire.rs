@@ -132,6 +132,14 @@ pub enum WireMessage {
         to_agent: AgentPubKey,
         message: event::CountersigningSessionNegotiationMessage,
     },
+    /// Lightweight ping request for measuring peer round-trip latency.
+    PingReq {
+        msg_id: u64,
+    },
+    /// Response to a [`PingReq`](Self::PingReq), sent immediately upon receipt.
+    PingRes {
+        msg_id: u64,
+    },
 }
 
 fn next_msg_id() -> u64 {
@@ -168,6 +176,8 @@ impl WireMessage {
             WireMessage::MustGetAgentActivityRes { msg_id, .. } => Some(*msg_id),
             WireMessage::SendValidationReceiptsReq { msg_id, .. } => Some(*msg_id),
             WireMessage::SendValidationReceiptsRes { msg_id, .. } => Some(*msg_id),
+            WireMessage::PingReq { msg_id, .. } => Some(*msg_id),
+            WireMessage::PingRes { msg_id, .. } => Some(*msg_id),
             _ => None,
         }
     }
@@ -351,5 +361,16 @@ impl WireMessage {
         message: event::CountersigningSessionNegotiationMessage,
     ) -> WireMessage {
         Self::CountersigningSessionNegotiationEvt { to_agent, message }
+    }
+
+    /// Outgoing "Ping" request for latency measurement.
+    pub fn ping_req() -> (u64, WireMessage) {
+        let msg_id = next_msg_id();
+        (msg_id, Self::PingReq { msg_id })
+    }
+
+    /// Incoming "Ping" response.
+    pub fn ping_res(msg_id: u64) -> WireMessage {
+        Self::PingRes { msg_id }
     }
 }

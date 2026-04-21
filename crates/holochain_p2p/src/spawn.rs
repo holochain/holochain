@@ -238,7 +238,7 @@ impl Default for HolochainP2pConfig {
     }
 }
 
-/// See [NetworkCompatParams::proto_ver].
+/// See [`NetworkCompatParams::proto_ver`].
 pub const HCP2P_PROTO_VER: u32 = 2;
 
 /// Some parameters used as part of a protocol compatibility check during tx5 preflight

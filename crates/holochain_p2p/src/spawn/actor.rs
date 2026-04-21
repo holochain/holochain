@@ -5,6 +5,7 @@ use crate::metrics::{
     p2p_handle_incoming_request_duration_metric, p2p_handle_incoming_request_ignored_metric,
     p2p_outgoing_request_duration_metric, p2p_recv_remote_signal_metric,
 };
+use crate::peer_latency_store::{PeerLatencyService, PingFn};
 use crate::*;
 use holochain_sqlite::error::{DatabaseError, DatabaseResult};
 use holochain_sqlite::helpers::BytesSql;
@@ -14,7 +15,6 @@ use holochain_state::prelude::named_params;
 use holochain_types::cell_config_overrides::CellConfigOverrides;
 use kitsune2_api::*;
 use kitsune2_core::get_responsive_remote_agents_near_location;
-use rand::prelude::IndexedRandom;
 use std::collections::HashMap;
 use std::future::Future;
 use std::rc::Rc;
@@ -217,6 +217,10 @@ type Respond = tokio::sync::oneshot::Sender<crate::wire::WireMessage>;
 struct Pending {
     this: Weak<Mutex<Self>>,
     map: HashMap<u64, Respond>,
+    /// Maps `msg_id` to the expected responder URL for outbound pings.
+    /// Used to drop `PingRes` responses whose `from_peer` does not match
+    /// the pinged URL, preventing latency poisoning via `msg_id` race.
+    ping_expected: HashMap<u64, Url>,
 }
 
 impl Pending {
@@ -230,8 +234,34 @@ impl Pending {
         }
     }
 
+    /// Registers an outbound ping, recording the URL we expect the
+    /// `PingRes` to come from. See [`Self::respond_ping`].
+    fn register_ping(&mut self, msg_id: u64, expected_url: Url, resp: Respond, timeout: Duration) {
+        self.ping_expected.insert(msg_id, expected_url);
+        self.register(msg_id, resp, timeout);
+    }
+
     fn respond(&mut self, msg_id: u64) -> Option<Respond> {
+        self.ping_expected.remove(&msg_id);
         self.map.remove(&msg_id)
+    }
+
+    /// Resolves a `PingRes` only if `from_peer` matches the URL that was
+    /// pinged for this `msg_id`. Drops the response otherwise.
+    fn respond_ping(&mut self, msg_id: u64, from_peer: &Url) -> Option<Respond> {
+        match self.ping_expected.remove(&msg_id) {
+            Some(expected) if &expected == from_peer => self.map.remove(&msg_id),
+            Some(expected) => {
+                tracing::warn!(
+                    ?msg_id,
+                    %expected,
+                    %from_peer,
+                    "PingRes from unexpected peer, dropping"
+                );
+                None
+            }
+            None => None,
+        }
     }
 }
 
@@ -246,6 +276,7 @@ pub(crate) struct HolochainP2pActor {
     kitsune2_config: Config,
     blocks_db_getter: GetDbConductor,
     pending: Arc<Mutex<Pending>>,
+    latency_service: PeerLatencyService,
     pruning_task_abort_handle: AbortHandle,
     request_timeout: Duration,
     incoming_request_concurrency_limit_semaphore: Arc<Semaphore>,
@@ -258,6 +289,8 @@ impl std::fmt::Debug for HolochainP2pActor {
 }
 
 const EVT_REG_ERR: &str = "event handler not registered";
+/// Timeout for each individual ping request.
+const PING_TIMEOUT: Duration = Duration::from_secs(5);
 
 impl SpaceHandler for HolochainP2pActor {
     fn recv_notify(&self, from_peer: Url, space: SpaceId, data: bytes::Bytes) -> K2Result<()> {
@@ -373,7 +406,10 @@ impl kitsune2_api::KitsuneHandler for HolochainP2pActor {
                         None => continue,
                         Some(space) => space,
                     };
-                    space.peer_store().insert(vec![agent]).await?;
+                    space.peer_store().insert(vec![agent.clone()]).await?;
+                    if let Some(url) = agent.url.clone() {
+                        self.latency_service.touch(url, space.clone());
+                    }
                 }
             }
 
@@ -607,6 +643,7 @@ impl HolochainP2pActor {
             Mutex::new(Pending {
                 this: this.clone(),
                 map: HashMap::new(),
+                ping_expected: HashMap::new(),
             })
         });
 
@@ -619,6 +656,12 @@ impl HolochainP2pActor {
             kitsune2,
             db_getter,
         );
+        let ping_pending = pending.clone();
+        let ping_fn: PingFn = Arc::new(move |space: DynSpace, url: Url| {
+            let pending = Arc::clone(&ping_pending);
+            Box::pin(async move { Self::send_ping(&space, &pending, url).await })
+        });
+        let latency_service = PeerLatencyService::new(ping_fn);
 
         Ok(Arc::new_cyclic(|this| Self {
             this: this.clone(),
@@ -630,6 +673,7 @@ impl HolochainP2pActor {
             kitsune,
             blocks_db_getter: config.get_conductor_db.clone(),
             pending,
+            latency_service,
             kitsune2_config,
             pruning_task_abort_handle,
             request_timeout: config.request_timeout,
@@ -782,11 +826,11 @@ impl HolochainP2pActor {
             .collect::<Vec<_>>())
     }
 
-    /// Randomly selects and returns [`PARALLEL_GET_AGENTS_COUNT`] agents with a peer URL whose
-    /// storage arcs contain the given location.
+    /// Selects agents whose storage arcs contain the given location, using
+    /// latency-weighted random selection to prefer lower-latency peers.
     ///
     /// Returns an error if failed to get peers or no peers are found.
-    async fn get_random_peers_for_location(
+    async fn get_peers_for_location_weighted(
         &self,
         tag: &'static str,
         space: &DynSpace,
@@ -801,10 +845,47 @@ impl HolochainP2pActor {
             ));
         }
 
-        Ok(agents
-            .choose_multiple(&mut rand::rng(), options.remote_agent_count as usize)
-            .cloned()
-            .collect())
+        // Touch all peer URLs so the latency service tracks them.
+        for (_, url) in &agents {
+            self.latency_service.touch(url.clone(), space.clone());
+        }
+
+        // Deduplicate by URL, run weighted selection, then map back to
+        // (AgentPubKey, Url) pairs.
+        let url_to_agent: HashMap<Url, AgentPubKey> =
+            agents
+                .iter()
+                .fold(HashMap::new(), |mut by_url, (agent, url)| {
+                    by_url.entry(url.clone()).or_insert_with(|| agent.clone());
+                    by_url
+                });
+        let unique_urls: Vec<Url> = url_to_agent.keys().cloned().collect();
+
+        let selected_urls = {
+            let store = self.latency_service.store();
+            let data = store.lock().expect("latency data lock poisoned");
+            crate::weighted_selection::select_weighted_urls(
+                &data,
+                &unique_urls,
+                options.remote_agent_count as usize,
+            )
+        };
+
+        // `select_weighted_urls` filters out URLs with failed pings; if every
+        // candidate has failed pings we treat this as no peers available.
+        if selected_urls.is_empty() {
+            return Err(HolochainP2pError::NoPeersForLocation(
+                String::from(tag),
+                loc,
+            ));
+        }
+
+        let selected = selected_urls
+            .into_iter()
+            .filter_map(|url| url_to_agent.get(&url).map(|agent| (agent.clone(), url)))
+            .collect();
+
+        Ok(selected)
     }
 
     /// Check whether a message should be bridged locally to some other agent on this node.
@@ -924,6 +1005,33 @@ impl HolochainP2pActor {
         }
     }
 
+    /// Sends a single [`PingReq`](WireMessage::PingReq) to a peer and
+    /// returns the measured round-trip time, or `None` on failure/timeout.
+    async fn send_ping(
+        space: &DynSpace,
+        pending: &Arc<Mutex<Pending>>,
+        to_url: Url,
+    ) -> Option<Duration> {
+        let (msg_id, req) = WireMessage::ping_req();
+        let req = WireMessage::encode_batch(&[&req]).ok()?;
+
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        pending
+            .lock()
+            .expect("pending lock poisoned")
+            .register_ping(msg_id, to_url.clone(), sender, PING_TIMEOUT);
+
+        let start = std::time::Instant::now();
+        if space.send_notify(to_url, req).await.is_err() {
+            return None;
+        }
+
+        match receiver.await {
+            Ok(WireMessage::PingRes { .. }) => Some(start.elapsed()),
+            _ => None,
+        }
+    }
+
     async fn inform_ops_stored(
         &self,
         space_id: SpaceId,
@@ -1019,6 +1127,15 @@ impl HolochainP2pActor {
                 | MustGetAgentActivityRes { msg_id, .. }
                 | SendValidationReceiptsRes { msg_id } => {
                     if let Some(resp) = pending.lock().unwrap().respond(msg_id) {
+                        let _ = resp.send(msg);
+                    }
+                    record_incoming_request_duration(&[]);
+                }
+                PingRes { msg_id } => {
+                    // Only resolve PingRes if the responder URL matches the
+                    // peer we pinged — otherwise a racing peer could poison
+                    // the RTT recorded for the target URL.
+                    if let Some(resp) = pending.lock().unwrap().respond_ping(msg_id, &from_peer) {
                         let _ = resp.send(msg);
                     }
                     record_incoming_request_duration(&[]);
@@ -1268,6 +1385,20 @@ impl HolochainP2pActor {
                         "to_agent",
                         format!("{to_agent:?}"),
                     )]);
+                }
+                PingReq { msg_id } => {
+                    let resp = crate::wire::WireMessage::ping_res(msg_id);
+                    let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
+                    if let Err(err) = kitsune
+                        .space_if_exists(space_id)
+                        .await
+                        .ok_or_else(|| HolochainP2pError::other("no such space"))?
+                        .send_notify(from_peer, resp)
+                        .await
+                    {
+                        tracing::debug!(?err, "Error sending ping response");
+                    }
+                    record_incoming_request_duration(&[]);
                 }
                 RemoteSignalEvt {
                     to_agent,
@@ -1760,7 +1891,7 @@ impl actor::HcP2p for HolochainP2pActor {
 
             let loc = dht_hash.get_loc();
             let agents = self
-                .get_random_peers_for_location("get", &space, loc, &options)
+                .get_peers_for_location_weighted("get", &space, loc, &options)
                 .await?;
 
             let start = std::time::Instant::now();
@@ -1840,7 +1971,7 @@ impl actor::HcP2p for HolochainP2pActor {
                 .ok_or(HolochainP2pError::K2SpaceNotFound(space_id))?;
             let loc = link_key.base.get_loc();
             let agents = self
-                .get_random_peers_for_location(
+                .get_peers_for_location_weighted(
                     "get_links",
                     &space,
                     loc,
@@ -1908,7 +2039,7 @@ impl actor::HcP2p for HolochainP2pActor {
                 .ok_or(HolochainP2pError::K2SpaceNotFound(space_id))?;
             let loc = query.base.get_loc();
             let agents = self
-                .get_random_peers_for_location("count_links", &space, loc, &options)
+                .get_peers_for_location_weighted("count_links", &space, loc, &options)
                 .await?;
 
             let start = std::time::Instant::now();
@@ -1966,7 +2097,7 @@ impl actor::HcP2p for HolochainP2pActor {
                 .ok_or(HolochainP2pError::K2SpaceNotFound(space_id))?;
             let loc = agent.get_loc();
             let agents = self
-                .get_random_peers_for_location(
+                .get_peers_for_location_weighted(
                     "get_agent_activity",
                     &space,
                     loc,
@@ -2046,7 +2177,7 @@ impl actor::HcP2p for HolochainP2pActor {
                 .ok_or(HolochainP2pError::K2SpaceNotFound(space_id))?;
             let loc = author.get_loc();
             let agents = self
-                .get_random_peers_for_location("must_get_agent_activity", &space, loc, &options)
+                .get_peers_for_location_weighted("must_get_agent_activity", &space, loc, &options)
                 .await?;
 
             let start = std::time::Instant::now();
@@ -2894,6 +3025,21 @@ mod tests {
                 .register(msg_id, s, Duration::from_secs(60));
             r
         }
+
+        fn register_pending_ping_response_handler(
+            &self,
+            msg_id: u64,
+            expected_url: kitsune2_api::Url,
+        ) -> tokio::sync::oneshot::Receiver<WireMessage> {
+            let (s, r) = tokio::sync::oneshot::channel();
+            self.actor.pending.lock().unwrap().register_ping(
+                msg_id,
+                expected_url,
+                s,
+                Duration::from_secs(60),
+            );
+            r
+        }
     }
 
     fn create_encode_wire_message_get_req(msg_id: u64) -> bytes::Bytes {
@@ -3292,6 +3438,18 @@ mod tests {
         // Message was handled
         assert!(msg_receiver.await.is_ok());
 
+        // PingRes is not limited
+        let msg = WireMessage::PingRes { msg_id: 11 };
+        let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
+
+        let msg_receiver = harness.register_pending_ping_response_handler(11, from_peer.clone());
+        harness
+            .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
+            .unwrap();
+
+        // Message was handled
+        assert!(msg_receiver.await.is_ok());
+
         // CallRemoteReq is not limited
         let msg = WireMessage::CallRemoteReq {
             msg_id: 9,
@@ -3520,5 +3678,108 @@ mod tests {
 
         // The non limited message is handled
         assert!(unlimited_message_reciever.await.is_ok());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn ping_req_is_not_concurrency_limited() {
+        let dna_hash = DnaHash::from_raw_32(vec![0; 32]);
+        let space_id = dna_hash.to_k2_space();
+        let from_peer = kitsune2_api::Url::from_str("ws://test:80/1").unwrap();
+
+        // Use a concurrency limit of 1 so the single GetReq saturates it.
+        let harness = TestP2pActorHarness::new(1).await;
+
+        // Saturate the concurrency limit with a blocking GetReq.
+        let msg_data = create_encode_wire_message_get_req(1);
+        harness
+            .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
+            .unwrap();
+
+        let is_handled = retry_fn_until_timeout(
+            async || {
+                let count = harness.event_handler.handle_get_count.lock().unwrap();
+                *count == 1
+            },
+            None,
+            None,
+        )
+        .await;
+        assert!(is_handled.is_ok());
+
+        // All concurrency permits are now taken.
+        assert_eq!(
+            harness
+                .actor
+                .incoming_request_concurrency_limit_semaphore
+                .available_permits(),
+            0
+        );
+
+        // PingReq should still be accepted (not concurrency-limited).
+        // It will fail to send a response (no real space), but it must not
+        // block or consume a concurrency permit.
+        let msg = WireMessage::PingReq { msg_id: 42 };
+        let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
+        harness
+            .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
+            .unwrap();
+
+        // Verify permits are still exhausted (PingReq did not take one).
+        assert_eq!(
+            harness
+                .actor
+                .incoming_request_concurrency_limit_semaphore
+                .available_permits(),
+            0
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn ping_res_from_expected_peer_resolves() {
+        let dna_hash = DnaHash::from_raw_32(vec![0; 32]);
+        let space_id = dna_hash.to_k2_space();
+        let expected_peer = kitsune2_api::Url::from_str("ws://expected:80/1").unwrap();
+        let harness = TestP2pActorHarness::new(10).await;
+
+        let msg_receiver =
+            harness.register_pending_ping_response_handler(42, expected_peer.clone());
+
+        let msg = WireMessage::PingRes { msg_id: 42 };
+        let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
+        harness
+            .recv_notify(expected_peer, space_id, msg_data)
+            .unwrap();
+
+        let result = tokio::time::timeout(Duration::from_millis(500), msg_receiver).await;
+        let received = result.expect("receiver should resolve before timeout");
+        assert!(
+            matches!(received, Ok(WireMessage::PingRes { msg_id: 42 })),
+            "expected matching PingRes, got {received:?}"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn ping_res_from_wrong_peer_is_dropped() {
+        let dna_hash = DnaHash::from_raw_32(vec![0; 32]);
+        let space_id = dna_hash.to_k2_space();
+        let expected_peer = kitsune2_api::Url::from_str("ws://expected:80/1").unwrap();
+        let wrong_peer = kitsune2_api::Url::from_str("ws://attacker:80/2").unwrap();
+        let harness = TestP2pActorHarness::new(10).await;
+
+        // Register a ping for msg_id 99 targeting `expected_peer`.
+        let msg_receiver =
+            harness.register_pending_ping_response_handler(99, expected_peer.clone());
+
+        // A PingRes with the same msg_id arrives from a different peer.
+        let msg = WireMessage::PingRes { msg_id: 99 };
+        let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
+        harness.recv_notify(wrong_peer, space_id, msg_data).unwrap();
+
+        // The receiver should not resolve — the response was dropped.
+        let result = tokio::time::timeout(Duration::from_millis(200), msg_receiver).await;
+        assert!(
+            result.is_err(),
+            "PingRes from wrong peer should not resolve the pending ping"
+        );
     }
 }
