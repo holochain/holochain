@@ -45,10 +45,9 @@ pub mod prelude {
     pub use kitsune_p2p::{NOISE, *};
 }
 
-#[cfg(all(feature = "wasmer_sys", feature = "wasmer_wamr"))]
-compile_error!(
-    "feature \"wasmer_sys\" and feature \"wasmer_wamr\" cannot be enabled at the same time"
-);
-
-#[cfg(all(not(feature = "wasmer_sys"), not(feature = "wasmer_wamr"),))]
-compile_error!("One of: `wasmer_sys`, `wasmer_wamr` features must be enabled. Please, pick one.");
+#[cfg(not(any(
+    feature = "wasmer-sys-cranelift",
+    feature = "wasmer-sys-llvm",
+    feature = "wasmer-wasmi"
+)))]
+compile_error!("One of: `wasmer-sys-cranelift`, `wasmer-sys-llvm` or `wasmer-wasmi` features must be enabled. Please, pick one.");

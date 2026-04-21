@@ -67,7 +67,7 @@ use crate::core::queue_consumer::QueueTriggers;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
 use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CHANNEL_BOUND;
 use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CONCURRENT_LIMIT;
-use crate::core::ribosome::real_ribosome::ModuleCacheLock;
+use crate::core::ribosome::real_ribosome::{ModuleCacheLock, WasmBackend};
 use crate::core::ribosome::RibosomeT;
 use crate::core::workflow::ZomeCallResult;
 use crate::{
@@ -95,8 +95,6 @@ use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::*;
 use holochain_state::source_chain;
 pub use holochain_types::share;
-#[cfg(feature = "wasmer_sys")]
-use holochain_wasmer_host::module::ModuleCache;
 use holochain_zome_types::prelude::{AppCapGrantInfo, ClonedCell, Signature, Timestamp};
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -177,13 +175,16 @@ pub struct Conductor {
 
     scheduler: Arc<parking_lot::Mutex<Option<tokio::task::JoinHandle<()>>>>,
 
+    /// The WASM backend that is in use for this conductor.
+    wasm_backend: WasmBackend,
+
     /// Cache for wasmer modules, both on disk and in memory.
     ///
     /// This cache serves as a central storage location for wasmer modules,
     /// shared across all ribosomes. The cache is optional and can be disabled by
     /// setting it to `None`.
     ///
-    /// Note: When using the `wasmer_wamr` feature, it's recommended to disable
+    /// Note: When using the `wasmer-wasmi` feature, it's recommended to disable
     /// this cache since modules are interpreted at runtime rather than compiled,
     /// making caching unnecessary.
     pub(crate) wasmer_module_cache: Option<Arc<ModuleCacheLock>>,
@@ -212,6 +213,7 @@ mod startup_shutdown_impls {
     use super::*;
     use crate::conductor::manager::{spawn_task_outcome_handler, OutcomeReceiver, OutcomeSender};
     use crate::conductor::metrics::register_uptime_metric;
+    use crate::core::ribosome::real_ribosome::{make_module_cache, WasmBackend};
 
     //-----------------------------------------------------------------------------
     /// Methods used by the [ConductorHandle]
@@ -238,6 +240,40 @@ mod startup_shutdown_impls {
                 let _ = std::fs::create_dir_all(&path);
             }
 
+            let wasm_backend = match &config.wasm_backend {
+                Some(wasm_backend) => match wasm_backend {
+                    holochain_conductor_api::conductor::WasmBackend::Cranelift => {
+                        #[cfg(not(feature = "wasmer-sys-cranelift"))]
+                        panic!("Conductor is configured to use the Cranelift WASM backend but this binary does not support it");
+
+                        #[cfg(feature = "wasmer-sys-cranelift")]
+                        WasmBackend::Cranelift
+                    }
+                    holochain_conductor_api::conductor::WasmBackend::Llvm => {
+                        #[cfg(not(feature = "wasmer-sys-llvm"))]
+                        panic!("Conductor is configured to use the LLVM WASM backend but this binary does not support it");
+
+                        #[cfg(feature = "wasmer-sys-llvm")]
+                        WasmBackend::Llvm
+                    }
+                    holochain_conductor_api::conductor::WasmBackend::Wasmi => {
+                        #[cfg(not(feature = "wasmer-wasmi"))]
+                        panic!("Conductor is configured to use the wasmi WASM backend but this binary does not support it");
+
+                        #[cfg(feature = "wasmer-wasmi")]
+                        WasmBackend::Wasmi
+                    }
+                },
+                None => {
+                    cfg_select! {
+                        feature = "wasmer-sys-cranelift" => WasmBackend::Cranelift,
+                        feature = "wasmer-wasmi" => WasmBackend::Wasmi,
+                        feature = "wasmer-sys-llvm" => WasmBackend::LLVM,
+                    }
+                }
+            };
+            info!("Using the {wasm_backend:?} WASM backend");
+
             Self {
                 spaces,
                 running_cells: RwShare::new(IndexMap::new()),
@@ -252,12 +288,11 @@ mod startup_shutdown_impls {
                 keystore,
                 holochain_p2p,
                 post_commit,
-                #[cfg(feature = "wasmer_sys")]
-                wasmer_module_cache: Some(Arc::new(ModuleCacheLock::new(ModuleCache::new(
+                wasm_backend,
+                wasmer_module_cache: make_module_cache(
+                    wasm_backend,
                     maybe_data_root_path.map(|p| p.join(WASM_CACHE)),
-                )))),
-                #[cfg(feature = "wasmer_wamr")]
-                wasmer_module_cache: None,
+                ),
                 app_auth_token_store: RwShare::default(),
                 app_broadcast: AppBroadcast::default(),
             }
@@ -655,11 +690,12 @@ mod dna_impls {
                     .map(|((cell_id, dna_def), wasms)| async move {
                         let dna_file = DnaFile::new(dna_def, wasms).await;
 
-                        #[cfg(feature = "wasmer_sys")]
-                        let ribosome =
-                            RealRibosome::new(dna_file, self.wasmer_module_cache.clone()).await?;
-                        #[cfg(feature = "wasmer_wamr")]
-                        let ribosome = RealRibosome::new(dna_file, None).await?;
+                        let ribosome = RealRibosome::new(
+                            self.wasm_backend,
+                            dna_file,
+                            self.wasmer_module_cache.clone(),
+                        )
+                        .await?;
 
                         ConductorResult::Ok((cell_id, ribosome))
                     });
@@ -769,7 +805,12 @@ mod dna_impls {
                 return Ok(());
             }
 
-            let ribosome = RealRibosome::new(dna_file, self.wasmer_module_cache.clone()).await?;
+            let ribosome = RealRibosome::new(
+                self.wasm_backend,
+                dna_file,
+                self.wasmer_module_cache.clone(),
+            )
+            .await?;
 
             let entry_defs = self
                 .register_dna_wasm(cell_id.clone(), ribosome.clone())
@@ -1034,7 +1075,7 @@ mod network_impls {
 
         /// List all host functions provided by this conductor for wasms.
         pub async fn list_wasm_host_functions(&self) -> ConductorApiResult<Vec<String>> {
-            Ok(RealRibosome::tooling_imports().await?)
+            Ok(RealRibosome::tooling_imports(self.wasm_backend).await?)
         }
 
         /// Handle a zome call coming from outside of the conductor, e.g. through the ConductorApi.
@@ -1760,7 +1801,7 @@ mod clone_cell_impls {
                         let app_role = app.primary_role(&clone_id.as_base_role_name())?;
                         let original_dna_hash = app_role.dna_hash().clone();
                         let ribosome = conductor.get_ribosome(&cell_id)?;
-                        let dna_def = ribosome.dna_file.dna_def();
+                        let dna_def = ribosome.dna_file().dna_def();
                         let dna_modifiers = dna_def.modifiers.clone();
                         let name = dna_def.name.clone();
                         let enabled_cell = ClonedCell {
@@ -2708,7 +2749,7 @@ mod misc_impls {
                         None => Err(ConductorError::CellMissing(cell_id.clone())),
                     })?;
             let _old_wasms = ribosome
-                .dna_file
+                .dna_file_mut()
                 .update_coordinators(coordinator_zomes.clone(), wasms.clone())
                 .await?;
 

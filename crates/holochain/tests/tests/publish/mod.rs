@@ -19,8 +19,12 @@ use {
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(
-    not(any(target_os = "linux", all(target_os = "macos", feature = "wasmer_sys"))),
-    ignore = "flaky on macos+wasmer_wamr and windows"
+    not(any(
+        target_os = "linux",
+        all(target_os = "macos", feature = "wasmer-sys-cranelift"),
+        all(target_os = "macos", feature = "wasmer-sys-llvm")
+    )),
+    ignore = "flaky on macos+wasmer_wasmi and windows"
 )]
 async fn publish_terminates_after_receiving_required_validation_receipts() {
     use holochain::test_utils::retry_fn_until_timeout;

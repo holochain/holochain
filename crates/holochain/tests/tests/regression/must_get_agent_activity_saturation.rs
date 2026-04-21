@@ -10,6 +10,10 @@ use rand::{rng, Rng};
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 #[cfg_attr(target_os = "windows", ignore = "flaky")]
+#[cfg_attr(
+    feature = "wasmer-wasmi",
+    ignore = "Waiting for a fix https://github.com/wasmerio/wasmer/issues/6397"
+)]
 async fn must_get_agent_activity_saturation() {
     use holochain::sweettest::await_consistency_s;
 

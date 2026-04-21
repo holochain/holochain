@@ -25,5 +25,5 @@ strum = "0.27"
 strum_macros = "0.27"
 
 [build-dependencies]
-toml = "0.8"
+toml = "1.1"
 walkdir = "2.3.1"

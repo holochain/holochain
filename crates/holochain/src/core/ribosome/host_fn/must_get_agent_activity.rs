@@ -200,6 +200,8 @@ pub mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[cfg_attr(feature = "wasmer-wasmi", ignore = "Waiting for a fix https://github.com/wasmerio/wasmer/issues/6397")]
+    #[cfg(not(feature = "wasmer-wasmi"))]
     async fn ribosome_must_get_agent_activity() {
         holochain_trace::test_run();
         let RibosomeTestFixture {

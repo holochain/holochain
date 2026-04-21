@@ -86,7 +86,7 @@ pub mod test {
         );
     }
 
-    #[cfg(feature = "wasmer_sys")]
+    #[cfg(any(feature = "wasmer-sys-cranelift", feature = "wasmer-sys-llvm"))]
     #[tokio::test(flavor = "multi_thread")]
     async fn zome_info_extern_fns_test() {
         holochain_trace::test_run();
@@ -116,7 +116,7 @@ pub mod test {
 
 
     // Same test, but excluding wasmer metering extern fns
-    #[cfg(feature = "wasmer_wamr")]
+    #[cfg(feature = "wasmer-wasmi")]
     #[tokio::test(flavor = "multi_thread")]
     async fn zome_info_extern_fns_test() {
         holochain_trace::test_run();

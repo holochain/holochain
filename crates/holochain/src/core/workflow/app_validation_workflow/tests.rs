@@ -511,6 +511,10 @@ async fn validate_ops_in_sequence_must_get_action() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(
+    feature = "wasmer-wasmi",
+    ignore = "Waiting for a fix https://github.com/wasmerio/wasmer/issues/6397"
+)]
 async fn multi_create_link_validation() {
     holochain_trace::test_run();
 

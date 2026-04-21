@@ -1,4 +1,4 @@
-use crate::holochain_wasmer_host::module::WASM_METERING_LIMIT;
+use crate::holochain_wasmer_host::module::sys::WASM_METERING_LIMIT;
 use holochain_wasmer_host::module::InstanceWithStore;
 use std::sync::Arc;
 use wasmer::AsStoreMut;

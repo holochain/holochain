@@ -91,8 +91,6 @@ use futures::FutureExt;
 use holochain_types::prelude::*;
 use holochain_types::zome_types::GlobalZomeTypes;
 use holochain_types::zome_types::ZomeTypesError;
-use holochain_util::timed;
-use holochain_wasmer_host::module::build_module as build_wasmer_module;
 use holochain_wasmer_host::module::CacheKey;
 use holochain_wasmer_host::module::InstanceWithStore;
 use holochain_wasmer_host::module::ModuleCache;
@@ -101,6 +99,7 @@ use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner};
 use must_future::MustBoxFuture;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use tokio_stream::StreamExt;
@@ -116,37 +115,87 @@ use wasmer::RuntimeError;
 use wasmer::Store;
 use wasmer::Type;
 
-#[cfg(feature = "wasmer_sys")]
+#[cfg(any(feature = "wasmer-sys-cranelift", feature = "wasmer-sys-llvm"))]
 mod wasmer_sys;
-#[cfg(feature = "wasmer_sys")]
+#[cfg(any(feature = "wasmer-sys-cranelift", feature = "wasmer-sys-llvm"))]
 use wasmer_sys::*;
 
-#[cfg(feature = "wasmer_wamr")]
+#[cfg(feature = "wasmer-wasmi")]
 mod wasmer_wamr;
 
-#[cfg(feature = "wasmer_wamr")]
+#[cfg(feature = "wasmer-wasmi")]
 use wasmer_wamr::*;
 
 pub(crate) type ModuleCacheLock = parking_lot::RwLock<ModuleCache>;
 
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[non_exhaustive]
+pub enum WasmBackend {
+    #[cfg(feature = "wasmer-sys-cranelift")]
+    Cranelift,
+    #[cfg(feature = "wasmer-sys-llvm")]
+    Llvm,
+    #[cfg(feature = "wasmer-wasmi")]
+    Wasmi,
+}
+
+impl WasmBackend {
+    pub(crate) fn new() -> Self {
+        cfg_select! {
+            feature = "wasmer-sys-cranelift" => { WasmBackend::Cranelift }
+            feature = "wasmer-sys-llvm" => { WasmBackend::Llvm }
+            feature = "wasmer-wasmi" => { WasmBackend::Wasmi }
+        }
+    }
+}
+
+pub(crate) fn make_module_cache(
+    backend: WasmBackend,
+    filesystem_path: Option<PathBuf>,
+) -> Option<Arc<ModuleCacheLock>> {
+    match backend {
+        #[cfg(feature = "wasmer-sys-cranelift")]
+        WasmBackend::Cranelift => Some(Arc::new(ModuleCacheLock::new(ModuleCache::new(
+            holochain_wasmer_host::module::sys::make_cranelift_engine,
+            holochain_wasmer_host::module::sys::make_runtime_engine,
+            filesystem_path,
+        )))),
+        #[cfg(feature = "wasmer-sys-llvm")]
+        WasmBackend::Llvm => Some(Arc::new(ModuleCacheLock::new(ModuleCache::new(
+            holochain_wasmer_host::module::sys::make_llvm_engine,
+            holochain_wasmer_host::module::sys::make_runtime_engine,
+            filesystem_path,
+        )))),
+        #[cfg(feature = "wasmer-wasmi")]
+        WasmBackend::Wasmi => {
+            let _file_system_path = filesystem_path;
+            None
+        }
+    }
+}
+
 /// The only RealRibosome is a Wasm ribosome.
-/// note that this is cloned on every invocation so keep clones cheap!
+///
+/// Note that this is cloned on every invocation so keep clones cheap!
 #[derive(Clone, Debug)]
 pub struct RealRibosome {
+    backend: WasmBackend,
+
     // NOTE - Currently taking a full DnaFile here.
     //      - It would be an optimization to pre-ensure the WASM bytecode
     //      - is already in the wasm cache, and only include the DnaDef portion
     //      - here in the ribosome.
-    pub dna_file: DnaFile,
+    dna_file: DnaFile,
 
     /// Entry and link types for each integrity zome.
-    pub zome_types: Arc<GlobalZomeTypes>,
+    zome_types: Arc<GlobalZomeTypes>,
 
     /// Dependencies for every zome.
-    pub zome_dependencies: Arc<HashMap<ZomeName, Vec<ZomeIndex>>>,
+    zome_dependencies: Arc<HashMap<ZomeName, Vec<ZomeIndex>>>,
 
     /// File system and in-memory cache for wasm modules.
-    pub wasmer_module_cache: Option<Arc<ModuleCacheLock>>,
+    #[cfg_attr(feature = "wasmer-wasmi", allow(unused))]
+    wasmer_module_cache: Option<Arc<ModuleCacheLock>>,
 }
 
 type ContextMap = Lazy<Arc<Mutex<HashMap<u64, Arc<CallContext>>>>>;
@@ -246,10 +295,12 @@ impl RealRibosome {
     /// Create a new instance
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn new(
+        backend: WasmBackend,
         dna_file: DnaFile,
         wasmer_module_cache: Option<Arc<ModuleCacheLock>>,
     ) -> RibosomeResult<Self> {
         let mut ribosome = Self {
+            backend,
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
@@ -338,13 +389,22 @@ impl RealRibosome {
         Ok(ribosome)
     }
 
+    pub fn dna_file(&self) -> &DnaFile {
+        &self.dna_file
+    }
+
+    pub fn dna_file_mut(&mut self) -> &mut DnaFile {
+        &mut self.dna_file
+    }
+
     #[cfg(any(test, feature = "test_utils"))]
-    pub fn empty(dna_file: DnaFile) -> Self {
+    pub fn empty(backend: WasmBackend, dna_file: DnaFile) -> Self {
         Self {
+            backend,
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
-            wasmer_module_cache: Some(Arc::new(ModuleCacheLock::new(ModuleCache::new(None)))),
+            wasmer_module_cache: make_module_cache(backend, None),
         }
     }
 
@@ -352,17 +412,35 @@ impl RealRibosome {
     pub async fn build_module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
         let wasm = self.dna_file.get_wasm_for_zome(zome_name)?.clone().code();
 
+        match self.backend {
+            #[cfg(feature = "wasmer-sys-cranelift")]
+            WasmBackend::Cranelift => self.get_from_cache_or_build(zome_name, wasm).await,
+            #[cfg(feature = "wasmer-sys-llvm")]
+            WasmBackend::Llvm => self.get_from_cache_or_build(zome_name, wasm).await,
+            #[cfg(feature = "wasmer-wasmi")]
+            WasmBackend::Wasmi => Ok(holochain_wasmer_host::module::wasmi::build_module(&wasm)?),
+        }
+    }
+
+    #[cfg(any(feature = "wasmer-sys-cranelift", feature = "wasmer-sys-llvm"))]
+    async fn get_from_cache_or_build(
+        &self,
+        zome_name: &ZomeName,
+        wasm: bytes::Bytes,
+    ) -> RibosomeResult<Arc<Module>> {
         if self.wasmer_module_cache.is_some() {
             let cache_key = self.get_module_cache_key(zome_name)?;
             let cache_lock = self.wasmer_module_cache.clone().unwrap();
 
             tokio::task::spawn_blocking(move || {
+                use holochain_util::timed;
+
                 let cache = timed!([1, 10, 1000], cache_lock.write());
                 Ok(timed!([1, 1000, 10_000], cache.get(cache_key, &wasm))?)
             })
             .await?
         } else {
-            Ok(build_wasmer_module(&wasm)?)
+            panic!("Missing module cache")
         }
     }
 
@@ -395,7 +473,14 @@ impl RealRibosome {
         context_key: u64,
         name: &str,
     ) -> RibosomeResult<Arc<InstanceWithStore>> {
-        let store = Arc::new(Mutex::new(Store::default()));
+        #[allow(unreachable_patterns)]
+        let store = Arc::new(Mutex::new(match self.backend {
+            #[cfg(feature = "wasmer-wasmi")]
+            WasmBackend::Wasmi => {
+                Store::new(holochain_wasmer_host::module::wasmi::make_runtime_engine())
+            }
+            _ => Store::default(),
+        }));
         let function_env = FunctionEnv::new(&mut store.lock().as_store_mut(), Env::default());
         let (function_env, imports) = Self::imports(self, context_key, store.clone(), function_env);
         let instance;
@@ -452,7 +537,7 @@ impl RealRibosome {
         CONTEXT_KEY.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
     }
 
-    pub async fn tooling_imports() -> RibosomeResult<Vec<String>> {
+    pub async fn tooling_imports(backend: WasmBackend) -> RibosomeResult<Vec<String>> {
         let empty_dna_def = DnaDef {
             name: Default::default(),
             modifiers: DnaModifiers {
@@ -465,13 +550,17 @@ impl RealRibosome {
             lineage: Default::default(),
         };
         let empty_dna_file = DnaFile::new(empty_dna_def, vec![]).await;
-        let empty_ribosome = RealRibosome::new(
-            empty_dna_file,
-            Some(Arc::new(ModuleCacheLock::new(ModuleCache::new(None)))),
-        )
-        .await?;
+        let empty_ribosome =
+            RealRibosome::new(backend, empty_dna_file, make_module_cache(backend, None)).await?;
         let context_key = RealRibosome::next_context_key();
-        let mut store = Store::default();
+        #[allow(unreachable_patterns)]
+        let mut store = match backend {
+            #[cfg(feature = "wasmer-wasmi")]
+            WasmBackend::Wasmi => {
+                Store::new(holochain_wasmer_host::module::wasmi::make_runtime_engine())
+            }
+            _ => Store::default(),
+        };
         // We just leave this Env uninitialized as default because we never make it
         // to an instance that needs to run on this code path.
         let function_env = FunctionEnv::new(&mut store.as_store_mut(), Env::default());
@@ -1130,8 +1219,8 @@ impl RibosomeT for RealRibosome {
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
-pub mod wasm_test {
-    use crate::core::ribosome::real_ribosome::CONTEXT_MAP;
+mod test {
+    use super::*;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetConductorConfig;
     use crate::sweettest::SweetDnaFile;
@@ -1223,12 +1312,12 @@ pub mod wasm_test {
                 .collect::<Result<Vec<_>, _>>()
                 .unwrap();
 
-            // With the `wasmer_wamr` feature, we expect zome calls to take longer,
-            // because the wasm is interpreted instead of compiled.
-            #[cfg(feature = "wasmer_wamr")]
+            // With the `wasmer-wasmi` feature, we expect zome calls to take longer,
+            // because the WASM is interpreted instead of compiled.
+            #[cfg(feature = "wasmer-wasmi")]
             let maximum_response_time_ms = Duration::from_millis(150);
 
-            #[cfg(not(feature = "wasmer_wamr"))]
+            #[cfg(not(feature = "wasmer-wasmi"))]
             let maximum_response_time_ms = Duration::from_millis(50);
 
             assert!(
@@ -1369,7 +1458,19 @@ pub mod wasm_test {
             .into_iter()
             .map(|s| s.to_string())
             .collect::<Vec<String>>(),
-            super::RealRibosome::tooling_imports().await.unwrap()
+            super::RealRibosome::tooling_imports(cfg_select! {
+                feature = "wasmer-sys-cranelift" => {
+                    WasmBackend::Cranelift
+                }
+                feature = "wasmer-sys-llvm" => {
+                    WasmBackend::Llvm
+                }
+                feature = "wasmer-wasmi" => {
+                    WasmBackend::Wasmi
+                }
+            })
+            .await
+            .unwrap()
         );
     }
 

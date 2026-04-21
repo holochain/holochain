@@ -1,6 +1,6 @@
 # holochain Makefile
 
-# All default features of binaries excluding mutually exclusive features wasmer_sys & wasmer_wamr
+# All default features of binaries excluding mutually exclusive features wasmer-sys-cranelift & wasmer-wasmi
 # and tx5 transport and iroh transport
 COMMON_DEFAULT_FEATURES=slow_tests,build_wasms,sqlite-encrypted
 DEFAULT_FEATURES=transport-iroh,$(COMMON_DEFAULT_FEATURES)
@@ -10,17 +10,18 @@ UNSTABLE_FEATURES=unstable-sharding,unstable-functions,unstable-migration,$(DEFA
 # mark everything as phony because it doesn't represent a file-system output
 .PHONY: default \
 	static-all static-fmt static-toml static-clippy static-clippy-unstable \
-	static-doc build-workspace-wasmer_sys build-workspace-wasmer_wamr \
-	test-workspace-wasmer_sys test-workspace-wasmer_wamr \
-	build-workspace-wasmer_sys-unstable \
-	test-workspace-wasmer_sys-unstable \
+	static-doc build-workspace-wasmer-sys-cranelift build-workspace-wasmer-wasmi \
+	build-workspace-wasmer-sys-llvm test-workspace-wasmer-sys-cranelift \
+	test-workspace-wasmer-sys-llvm test-workspace-wasmer-wasmi \
+	build-workspace-wasmer-sys-cranelift-unstable \
+	test-workspace-wasmer-sys-cranelift-unstable \
 	toml-fix
 
 # default to running everything (first rule)
-default: build-workspace-wasmer_sys \
-	test-workspace-wasmer_sys \
-	build-workspace-wasmer_wamr \
-	test-workspace-wasmer_wamr
+default: build-workspace-wasmer-sys-cranelift \
+	test-workspace-wasmer-sys-cranelift \
+	build-workspace-wasmer_wasmi \
+	test-workspace-wasmer_wasmi
 
 # execute all static code validation
 static-all: static-fmt static-toml static-clippy static-clippy-unstable static-doc
@@ -31,13 +32,13 @@ static-fmt:
 
 # lint our toml files
 static-toml:
-	cargo install taplo-cli@0.9.0
+	cargo install taplo-cli@0.10.0
 	taplo format --check ./*.toml
 	taplo format --check ./crates/**/*.toml
 
 # fix our toml files
 toml-fix:
-	cargo install taplo-cli@0.9.0
+	cargo install taplo-cli@0.10.0
 	taplo format ./*.toml
 	taplo format ./crates/**/*.toml
 
@@ -57,69 +58,85 @@ static-doc:
 # but also ensures targets like benchmarks remain buildable.
 # NOTE: excludes must match test-workspace nextest params,
 #       otherwise some rebuilding will occur due to resolver = "2"
-build-workspace-wasmer_sys:
+build-workspace-wasmer-sys-cranelift:
 	cargo build \
 		--workspace \
 		--locked \
 		--all-targets \
 		--no-default-features \
-		--features $(DEFAULT_FEATURES),wasmer_sys
+		--features $(DEFAULT_FEATURES),wasmer-sys-cranelift
 
-build-workspace-wasmer_sys-unstable:
+build-workspace-wasmer-sys-cranelift-unstable:
 	cargo build \
 		--workspace \
 		--locked \
 		--all-targets \
 		--no-default-features \
-		--features $(UNSTABLE_FEATURES),wasmer_sys
+		--features $(UNSTABLE_FEATURES),wasmer-sys-cranelift
 
-build-workspace-wasmer_wamr:
+build-workspace-wasmer-sys-llvm:
 	cargo build \
 		--workspace \
 		--locked \
 		--all-targets \
 		--no-default-features \
-		--features $(DEFAULT_FEATURES),wasmer_wamr
+		--features $(DEFAULT_FEATURES),wasmer-sys-llvm
 
-build-workspace-wasmer_sys-transport_tx5:
+build-workspace-wasmer-wasmi:
 	cargo build \
 		--workspace \
 		--locked \
 		--all-targets \
 		--no-default-features \
-		--features $(DEFAULT_FEATURES_TRANSPORT_TX5),wasmer_sys
+		--features $(DEFAULT_FEATURES),wasmer-wasmi
 
-# execute tests on all crates with wasmer compiler and iroh transport
-test-workspace-wasmer_sys:
+build-workspace-wasmer-sys-cranelift-transport_tx5:
+	cargo build \
+		--workspace \
+		--locked \
+		--all-targets \
+		--no-default-features \
+		--features $(DEFAULT_FEATURES_TRANSPORT_TX5),wasmer-sys-cranelift
+
+# execute tests on all crates with the cranelift wasmer compiler and iroh transport
+test-workspace-wasmer-sys-cranelift:
 	RUST_BACKTRACE=1 cargo nextest run \
 		--workspace \
 		--locked \
 		--no-default-features \
-		--features $(DEFAULT_FEATURES),wasmer_sys
+		--features $(DEFAULT_FEATURES),wasmer-sys-cranelift
+
+# execute tests on all crates with the LLVM wasmer compiler and iroh transport
+test-workspace-wasmer-sys-llvm:
+	RUST_BACKTRACE=1 cargo nextest run \
+		--workspace \
+		--locked \
+		--no-default-features \
+		--features $(DEFAULT_FEATURES),wasmer-sys-llvm
 
 # executes tests on all crates with wasmer compiler
-test-workspace-wasmer_sys-unstable:
+test-workspace-wasmer-sys-cranelift-unstable:
 	RUST_BACKTRACE=1 cargo nextest run \
 		--workspace \
 		--locked \
 		--no-default-features \
-		--features $(UNSTABLE_FEATURES),wasmer_sys
+		--features $(UNSTABLE_FEATURES),wasmer-sys-cranelift
 
 # execute tests on all crates with wasmer interpreter
-test-workspace-wasmer_wamr:
+test-workspace-wasmer-wasmi:
 	RUST_BACKTRACE=1 cargo nextest run \
 		--workspace \
 		--locked \
 		--no-default-features \
-		--features $(DEFAULT_FEATURES),wasmer_wamr
+		--features $(DEFAULT_FEATURES),wasmer-wasmi
 
 # execute tests on all crates with wasmer compiler and tx5 transport
-test-workspace-wasmer_sys-transport_tx5:
+test-workspace-wasmer-sys-cranelift-transport_tx5:
 	RUST_BACKTRACE=1 cargo nextest run \
 		--workspace \
 		--locked \
 		--no-default-features \
-		--features $(DEFAULT_FEATURES_TRANSPORT_TX5),wasmer_sys
+		--features $(DEFAULT_FEATURES_TRANSPORT_TX5),wasmer-sys-cranelift
 
 clean:
 	cargo clean

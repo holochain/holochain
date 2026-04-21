@@ -34,10 +34,6 @@
           perl
           pkg-config
           go
-          # These packages and env vars are required to build holochain with the 'wasmer_wamr' feature 
-          clang
-          llvmPackages.libclang.lib
-          ninja
         ])
         ++ lib.optionals pkgs.stdenv.isDarwin
           (with pkgs; [ xcbuild libiconv ]);

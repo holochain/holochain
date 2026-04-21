@@ -1,3 +1,4 @@
+use crate::core::ribosome::real_ribosome::{make_module_cache, WasmBackend};
 use crate::{
     conductor::space::TestSpace,
     core::{
@@ -28,7 +29,6 @@ use holochain_types::{
     record::WireRecordOps,
 };
 use holochain_wasm_test_utils::TestWasm;
-use holochain_wasmer_host::module::ModuleCache;
 use holochain_zome_types::{
     chain::{ChainFilter, MustGetAgentActivityInput},
     dependencies::holochain_integrity_types::{UnresolvedDependencies, ValidateCallbackResult},
@@ -41,7 +41,6 @@ use holochain_zome_types::{
     Action,
 };
 use matches::assert_matches;
-use parking_lot::RwLock;
 use std::{sync::Arc, time::Duration};
 
 // test app validation with a must get action where the original action of
@@ -349,18 +348,20 @@ async fn validation_callback_awaiting_deps_agent_activity() {
 
 // An op under validation that depends on an invalid op should be rejected.
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(
+    feature = "wasmer-wasmi",
+    ignore = "Waiting for a fix https://github.com/wasmerio/wasmer/issues/6397"
+)]
 async fn validation_callback_rejects_op_depending_on_invalid_op() {
     holochain_trace::test_run();
     let (dna_file, integrity_zomes, _) =
         SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Link]).await;
     let zomes_to_invoke = ZomesToInvoke::OneIntegrity(integrity_zomes[0].clone());
     let dna_hash = dna_file.dna_hash().clone();
-    let ribosome = RealRibosome::new(
-        dna_file.clone(),
-        Some(Arc::new(RwLock::new(ModuleCache::new(None)))),
-    )
-    .await
-    .unwrap();
+    let backend = WasmBackend::new();
+    let ribosome = RealRibosome::new(backend, dna_file.clone(), make_module_cache(backend, None))
+        .await
+        .unwrap();
     let test_space = TestSpace::new(dna_hash.clone());
     let alice = fixt!(AgentPubKey);
     let workspace = HostFnWorkspaceRead::new(
@@ -440,12 +441,11 @@ impl TestCase {
         let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
         let zomes_to_invoke = ZomesToInvoke::OneIntegrity(integrity_zomes[0].clone());
         let dna_hash = dna_file.dna_hash().clone();
-        let ribosome = RealRibosome::new(
-            dna_file.clone(),
-            Some(Arc::new(RwLock::new(ModuleCache::new(None)))),
-        )
-        .await
-        .unwrap();
+        let backend = WasmBackend::new();
+        let ribosome =
+            RealRibosome::new(backend, dna_file.clone(), make_module_cache(backend, None))
+                .await
+                .unwrap();
         let test_space = TestSpace::new(dna_hash.clone());
         let alice = fixt!(AgentPubKey);
         let bob = fixt!(AgentPubKey);
