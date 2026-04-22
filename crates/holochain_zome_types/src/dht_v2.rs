@@ -18,6 +18,16 @@ pub use crate::warrant::SignedWarrant;
 
 /// Map the existing `ChainOpType` enum onto the schema `op_type` INTEGER
 /// column (1..=9). `0` is reserved.
+// ChainOpType numeric mapping (aligned with docs/design/state_model.md):
+//   1 = StoreRecord                 (CreateRecord,  action authority)
+//   2 = StoreEntry                  (CreateEntry,   entry authority)
+//   3 = RegisterAgentActivity       (AgentActivity, agent authority)
+//   4 = RegisterUpdatedContent      (UpdateEntry,   entry authority)
+//   5 = RegisterUpdatedRecord       (UpdateRecord,  action authority)
+//   6 = RegisterDeletedEntryAction  (DeleteEntry,   entry authority)
+//   7 = RegisterDeletedBy           (DeleteRecord,  action authority)
+//   8 = RegisterAddLink             (CreateLink)
+//   9 = RegisterRemoveLink          (DeleteLink)
 pub fn chain_op_type_to_i64(t: ChainOpType) -> i64 {
     match t {
         ChainOpType::StoreRecord => 1,
@@ -32,6 +42,7 @@ pub fn chain_op_type_to_i64(t: ChainOpType) -> i64 {
     }
 }
 
+/// Inverse of [`chain_op_type_to_i64`]. Returns `None` for `0` and any value outside `1..=9`.
 pub fn chain_op_type_from_i64(n: i64) -> Option<ChainOpType> {
     Some(match n {
         1 => ChainOpType::StoreRecord,
@@ -53,19 +64,22 @@ mod tests {
 
     #[test]
     fn chain_op_type_i64_roundtrip() {
-        for t in [
-            ChainOpType::StoreRecord,
-            ChainOpType::StoreEntry,
-            ChainOpType::RegisterAgentActivity,
-            ChainOpType::RegisterUpdatedContent,
-            ChainOpType::RegisterUpdatedRecord,
-            ChainOpType::RegisterDeletedBy,
-            ChainOpType::RegisterDeletedEntryAction,
-            ChainOpType::RegisterAddLink,
-            ChainOpType::RegisterRemoveLink,
-        ] {
-            let n = chain_op_type_to_i64(t);
-            assert_eq!(chain_op_type_from_i64(n).unwrap(), t);
+        // Pinned forward-direction mapping. If a future change reorders
+        // variants (e.g. a 6/7 swap) this will fail compilation or assertion.
+        let expected = [
+            (ChainOpType::StoreRecord, 1_i64),
+            (ChainOpType::StoreEntry, 2),
+            (ChainOpType::RegisterAgentActivity, 3),
+            (ChainOpType::RegisterUpdatedContent, 4),
+            (ChainOpType::RegisterUpdatedRecord, 5),
+            (ChainOpType::RegisterDeletedEntryAction, 6),
+            (ChainOpType::RegisterDeletedBy, 7),
+            (ChainOpType::RegisterAddLink, 8),
+            (ChainOpType::RegisterRemoveLink, 9),
+        ];
+        for (variant, n) in expected {
+            assert_eq!(chain_op_type_to_i64(variant), n);
+            assert_eq!(chain_op_type_from_i64(n).unwrap(), variant);
         }
         assert!(chain_op_type_from_i64(0).is_none());
         assert!(chain_op_type_from_i64(10).is_none());
