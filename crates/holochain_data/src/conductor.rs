@@ -1534,7 +1534,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn tx_block_atomic_with_witness_nonce() {
+    async fn tx_with_block_and_witness_nonce_can_be_rolled_back() {
         // Verifies multi-statement ops (block, witness_nonce) share the tx.
         let db = test_open_db(Conductor).await.unwrap();
         let agent = test_agent();
