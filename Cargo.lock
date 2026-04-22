@@ -3175,7 +3175,7 @@ dependencies = [
  "lair_keystore_api",
  "mr_bundle",
  "parking_lot",
- "rand 0.8.6",
+ "rand 0.9.4",
  "serde",
  "serde_yaml",
  "thiserror 2.0.18",

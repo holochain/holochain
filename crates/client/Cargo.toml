@@ -29,7 +29,7 @@ holochain_zome_types = { version = "^0.7.0-dev.12", path = "../holochain_zome_ty
 kitsune2_api = "0.4.0-dev.6"
 lair_keystore_api = { version = "0.6.3", optional = true }
 parking_lot = "0.12.1"
-rand = { version = "0.8" }
+rand = { version = "0.9" }
 serde = "1.0"
 thiserror = "2.0"
 tokio = { version = "1.36", features = ["rt"] }
