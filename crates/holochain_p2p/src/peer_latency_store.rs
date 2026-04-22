@@ -731,6 +731,9 @@ mod tests {
             fn blocks(&self) -> &DynBlocks {
                 unimplemented!("stub")
             }
+            fn known_peers(&self) -> &DynKnownPeers {
+                unimplemented!("stub")
+            }
             fn current_url(&self) -> Option<Url> {
                 None
             }
