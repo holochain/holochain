@@ -143,10 +143,7 @@ impl DbRead<Dht> {
     }
 
     /// Fetch all actions for a given author, ordered by `action_seq` ascending.
-    pub async fn get_actions_by_author(
-        &self,
-        author: AgentPubKey,
-    ) -> sqlx::Result<Vec<Action>> {
+    pub async fn get_actions_by_author(&self, author: AgentPubKey) -> sqlx::Result<Vec<Action>> {
         get_actions_by_author_impl(self.pool(), author).await
     }
 }
@@ -182,11 +179,7 @@ impl TxRead<Dht> {
 // Entry / PrivateEntry operations
 // ============================================================================
 
-async fn insert_entry_impl<'e, E>(
-    executor: E,
-    hash: &EntryHash,
-    entry: &Entry,
-) -> sqlx::Result<()>
+async fn insert_entry_impl<'e, E>(executor: E, hash: &EntryHash, entry: &Entry) -> sqlx::Result<()>
 where
     E: Executor<'e, Database = Sqlite>,
 {
@@ -200,19 +193,14 @@ where
     Ok(())
 }
 
-async fn get_entry_impl<'e, E>(
-    executor: E,
-    hash: EntryHash,
-) -> sqlx::Result<Option<Entry>>
+async fn get_entry_impl<'e, E>(executor: E, hash: EntryHash) -> sqlx::Result<Option<Entry>>
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    let row: Option<EntryRow> = sqlx::query_as(
-        "SELECT hash, blob FROM Entry WHERE hash = ?",
-    )
-    .bind(hash.get_raw_36())
-    .fetch_optional(executor)
-    .await?;
+    let row: Option<EntryRow> = sqlx::query_as("SELECT hash, blob FROM Entry WHERE hash = ?")
+        .bind(hash.get_raw_36())
+        .fetch_optional(executor)
+        .await?;
     row.map(|r| {
         holochain_serialized_bytes::decode::<_, Entry>(&r.blob).map_err(|e| {
             sqlx::Error::Decode(Box::new(std::io::Error::new(
@@ -252,13 +240,12 @@ async fn get_private_entry_impl<'e, E>(
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    let row: Option<PrivateEntryRow> = sqlx::query_as(
-        "SELECT hash, author, blob FROM PrivateEntry WHERE author = ? AND hash = ?",
-    )
-    .bind(author.get_raw_36())
-    .bind(hash.get_raw_36())
-    .fetch_optional(executor)
-    .await?;
+    let row: Option<PrivateEntryRow> =
+        sqlx::query_as("SELECT hash, author, blob FROM PrivateEntry WHERE author = ? AND hash = ?")
+            .bind(author.get_raw_36())
+            .bind(hash.get_raw_36())
+            .fetch_optional(executor)
+            .await?;
     row.map(|r| {
         holochain_serialized_bytes::decode::<_, Entry>(&r.blob).map_err(|e| {
             sqlx::Error::Decode(Box::new(std::io::Error::new(
@@ -604,10 +591,7 @@ where
     .await
 }
 
-async fn release_chain_lock_impl<'e, E>(
-    executor: E,
-    author: &AgentPubKey,
-) -> sqlx::Result<()>
+async fn release_chain_lock_impl<'e, E>(executor: E, author: &AgentPubKey) -> sqlx::Result<()>
 where
     E: Executor<'e, Database = Sqlite>,
 {
@@ -618,10 +602,7 @@ where
     Ok(())
 }
 
-async fn prune_expired_chain_locks_impl<'e, E>(
-    executor: E,
-    now: Timestamp,
-) -> sqlx::Result<()>
+async fn prune_expired_chain_locks_impl<'e, E>(executor: E, now: Timestamp) -> sqlx::Result<()>
 where
     E: Executor<'e, Database = Sqlite>,
 {
@@ -804,10 +785,7 @@ where
     .await
 }
 
-async fn delete_limbo_chain_op_impl<'e, E>(
-    executor: E,
-    hash: DhtOpHash,
-) -> sqlx::Result<()>
+async fn delete_limbo_chain_op_impl<'e, E>(executor: E, hash: DhtOpHash) -> sqlx::Result<()>
 where
     E: Executor<'e, Database = Sqlite>,
 {
@@ -1034,10 +1012,7 @@ where
     .await
 }
 
-async fn delete_limbo_warrant_impl<'e, E>(
-    executor: E,
-    hash: DhtOpHash,
-) -> sqlx::Result<()>
+async fn delete_limbo_warrant_impl<'e, E>(executor: E, hash: DhtOpHash) -> sqlx::Result<()>
 where
     E: Executor<'e, Database = Sqlite>,
 {
@@ -1190,10 +1165,7 @@ where
     Ok(())
 }
 
-async fn get_warrant_impl<'e, E>(
-    executor: E,
-    hash: DhtOpHash,
-) -> sqlx::Result<Option<WarrantRow>>
+async fn get_warrant_impl<'e, E>(executor: E, hash: DhtOpHash) -> sqlx::Result<Option<WarrantRow>>
 where
     E: Executor<'e, Database = Sqlite>,
 {
@@ -1213,12 +1185,10 @@ async fn get_warrants_by_warrantee_impl<'e, E>(
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    sqlx::query_as(
-        "SELECT * FROM Warrant WHERE warrantee = ? ORDER BY timestamp DESC",
-    )
-    .bind(warrantee.get_raw_36())
-    .fetch_all(executor)
-    .await
+    sqlx::query_as("SELECT * FROM Warrant WHERE warrantee = ? ORDER BY timestamp DESC")
+        .bind(warrantee.get_raw_36())
+        .fetch_all(executor)
+        .await
 }
 
 impl DbWrite<Dht> {
@@ -1246,10 +1216,7 @@ impl DbWrite<Dht> {
 }
 
 impl DbRead<Dht> {
-    pub async fn get_warrant(
-        &self,
-        hash: DhtOpHash,
-    ) -> sqlx::Result<Option<WarrantRow>> {
+    pub async fn get_warrant(&self, hash: DhtOpHash) -> sqlx::Result<Option<WarrantRow>> {
         get_warrant_impl(self.pool(), hash).await
     }
 
@@ -1286,10 +1253,7 @@ impl TxWrite<Dht> {
 }
 
 impl TxRead<Dht> {
-    pub async fn get_warrant(
-        &mut self,
-        hash: DhtOpHash,
-    ) -> sqlx::Result<Option<WarrantRow>> {
+    pub async fn get_warrant(&mut self, hash: DhtOpHash) -> sqlx::Result<Option<WarrantRow>> {
         get_warrant_impl(self.conn_mut(), hash).await
     }
 
@@ -1344,10 +1308,7 @@ where
     Ok(())
 }
 
-async fn get_chain_op_impl<'e, E>(
-    executor: E,
-    hash: DhtOpHash,
-) -> sqlx::Result<Option<ChainOpRow>>
+async fn get_chain_op_impl<'e, E>(executor: E, hash: DhtOpHash) -> sqlx::Result<Option<ChainOpRow>>
 where
     E: Executor<'e, Database = Sqlite>,
 {
@@ -1369,12 +1330,10 @@ async fn get_chain_ops_by_basis_impl<'e, E>(
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    sqlx::query_as(
-        "SELECT * FROM ChainOp WHERE basis_hash = ? ORDER BY when_integrated",
-    )
-    .bind(basis.get_raw_36())
-    .fetch_all(executor)
-    .await
+    sqlx::query_as("SELECT * FROM ChainOp WHERE basis_hash = ? ORDER BY when_integrated")
+        .bind(basis.get_raw_36())
+        .fetch_all(executor)
+        .await
 }
 
 async fn get_chain_ops_for_action_impl<'e, E>(
@@ -1384,12 +1343,10 @@ async fn get_chain_ops_for_action_impl<'e, E>(
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    sqlx::query_as(
-        "SELECT * FROM ChainOp WHERE action_hash = ? ORDER BY op_type",
-    )
-    .bind(action_hash.get_raw_36())
-    .fetch_all(executor)
-    .await
+    sqlx::query_as("SELECT * FROM ChainOp WHERE action_hash = ? ORDER BY op_type")
+        .bind(action_hash.get_raw_36())
+        .fetch_all(executor)
+        .await
 }
 
 impl DbWrite<Dht> {
@@ -1425,17 +1382,11 @@ impl DbWrite<Dht> {
 }
 
 impl DbRead<Dht> {
-    pub async fn get_chain_op(
-        &self,
-        hash: DhtOpHash,
-    ) -> sqlx::Result<Option<ChainOpRow>> {
+    pub async fn get_chain_op(&self, hash: DhtOpHash) -> sqlx::Result<Option<ChainOpRow>> {
         get_chain_op_impl(self.pool(), hash).await
     }
 
-    pub async fn get_chain_ops_by_basis(
-        &self,
-        basis: AnyDhtHash,
-    ) -> sqlx::Result<Vec<ChainOpRow>> {
+    pub async fn get_chain_ops_by_basis(&self, basis: AnyDhtHash) -> sqlx::Result<Vec<ChainOpRow>> {
         get_chain_ops_by_basis_impl(self.pool(), basis).await
     }
 
@@ -1480,10 +1431,7 @@ impl TxWrite<Dht> {
 }
 
 impl TxRead<Dht> {
-    pub async fn get_chain_op(
-        &mut self,
-        hash: DhtOpHash,
-    ) -> sqlx::Result<Option<ChainOpRow>> {
+    pub async fn get_chain_op(&mut self, hash: DhtOpHash) -> sqlx::Result<Option<ChainOpRow>> {
         get_chain_op_impl(self.conn_mut(), hash).await
     }
 
@@ -1551,13 +1499,11 @@ async fn insert_warrant_publish_impl<'e, E>(
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    sqlx::query(
-        "INSERT INTO WarrantPublish (warrant_hash, last_publish_time) VALUES (?, ?)",
-    )
-    .bind(warrant_hash.get_raw_36())
-    .bind(last_publish_time.map(|t| t.as_micros()))
-    .execute(executor)
-    .await?;
+    sqlx::query("INSERT INTO WarrantPublish (warrant_hash, last_publish_time) VALUES (?, ?)")
+        .bind(warrant_hash.get_raw_36())
+        .bind(last_publish_time.map(|t| t.as_micros()))
+        .execute(executor)
+        .await?;
     Ok(())
 }
 
@@ -1624,13 +1570,8 @@ impl DbWrite<Dht> {
         last_publish_time: Option<Timestamp>,
         receipts_complete: Option<bool>,
     ) -> sqlx::Result<()> {
-        insert_chain_op_publish_impl(
-            self.pool(),
-            op_hash,
-            last_publish_time,
-            receipts_complete,
-        )
-        .await
+        insert_chain_op_publish_impl(self.pool(), op_hash, last_publish_time, receipts_complete)
+            .await
     }
 
     pub async fn insert_warrant_publish(
@@ -1910,7 +1851,15 @@ impl DbWrite<Dht> {
         link_type: u8,
         tag: Option<&[u8]>,
     ) -> sqlx::Result<()> {
-        insert_link_impl(self.pool(), action_hash, base_hash, zome_index, link_type, tag).await
+        insert_link_impl(
+            self.pool(),
+            action_hash,
+            base_hash,
+            zome_index,
+            link_type,
+            tag,
+        )
+        .await
     }
 
     pub async fn insert_deleted_link(
@@ -1953,10 +1902,7 @@ impl DbWrite<Dht> {
 }
 
 impl DbRead<Dht> {
-    pub async fn get_links_by_base(
-        &self,
-        base: AnyLinkableHash,
-    ) -> sqlx::Result<Vec<LinkRow>> {
+    pub async fn get_links_by_base(&self, base: AnyLinkableHash) -> sqlx::Result<Vec<LinkRow>> {
         get_links_by_base_impl(self.pool(), base).await
     }
 
@@ -2042,10 +1988,7 @@ impl TxWrite<Dht> {
 }
 
 impl TxRead<Dht> {
-    pub async fn get_links_by_base(
-        &mut self,
-        base: AnyLinkableHash,
-    ) -> sqlx::Result<Vec<LinkRow>> {
+    pub async fn get_links_by_base(&mut self, base: AnyLinkableHash) -> sqlx::Result<Vec<LinkRow>> {
         get_links_by_base_impl(self.conn_mut(), base).await
     }
 
@@ -2153,11 +2096,9 @@ mod tests {
     use holo_hash::EntryHash;
 
     fn sample_entry(seed: u8) -> (EntryHash, Entry) {
-        let entry = Entry::App(
-            holochain_integrity_types::entry::AppEntryBytes(
-                holochain_serialized_bytes::UnsafeBytes::from(vec![seed; 16]).into(),
-            ),
-        );
+        let entry = Entry::App(holochain_integrity_types::entry::AppEntryBytes(
+            holochain_serialized_bytes::UnsafeBytes::from(vec![seed; 16]).into(),
+        ));
         let hash = EntryHash::from_raw_36(vec![seed; 36]);
         (hash, entry)
     }
@@ -2176,7 +2117,9 @@ mod tests {
         let db = test_open_db(dht_db_id()).await.unwrap();
         let (hash, entry) = sample_entry(11);
         let author = AgentPubKey::from_raw_36(vec![2u8; 36]);
-        db.insert_private_entry(&hash, &author, &entry).await.unwrap();
+        db.insert_private_entry(&hash, &author, &entry)
+            .await
+            .unwrap();
         let fetched = db
             .as_ref()
             .get_private_entry(author.clone(), hash.clone())
@@ -2190,7 +2133,9 @@ mod tests {
         let db = test_open_db(dht_db_id()).await.unwrap();
         let (hash, entry) = sample_entry(13);
         let author = AgentPubKey::from_raw_36(vec![3u8; 36]);
-        db.insert_private_entry(&hash, &author, &entry).await.unwrap();
+        db.insert_private_entry(&hash, &author, &entry)
+            .await
+            .unwrap();
         // Not visible via the public Entry read.
         assert_eq!(db.as_ref().get_entry(hash.clone()).await.unwrap(), None);
     }
@@ -2210,18 +2155,8 @@ mod tests {
         tx.insert_entry(&entry_hash, &entry).await.unwrap();
         tx.rollback().await.unwrap();
 
-        assert!(db
-            .as_ref()
-            .get_action(action.hash)
-            .await
-            .unwrap()
-            .is_none());
-        assert!(db
-            .as_ref()
-            .get_entry(entry_hash)
-            .await
-            .unwrap()
-            .is_none());
+        assert!(db.as_ref().get_action(action.hash).await.unwrap().is_none());
+        assert!(db.as_ref().get_entry(entry_hash).await.unwrap().is_none());
     }
 
     #[tokio::test]
@@ -2491,7 +2426,14 @@ mod tests {
             .unwrap()
             .expect("missing");
         assert_eq!(row.warrantee, warrantee.get_raw_36().to_vec());
-        assert!(db.as_ref().limbo_warrants_pending_sys(10).await.unwrap().len() == 1);
+        assert!(
+            db.as_ref()
+                .limbo_warrants_pending_sys(10)
+                .await
+                .unwrap()
+                .len()
+                == 1
+        );
         assert!(db
             .as_ref()
             .limbo_warrants_ready_for_integration(10)
@@ -2524,9 +2466,16 @@ mod tests {
         let author = AgentPubKey::from_raw_36(vec![3u8; 36]);
         let warrantee = AgentPubKey::from_raw_36(vec![4u8; 36]);
 
-        db.insert_warrant(&hash, &author, Timestamp::from_micros(1), &warrantee, &[9u8; 32], 88)
-            .await
-            .unwrap();
+        db.insert_warrant(
+            &hash,
+            &author,
+            Timestamp::from_micros(1),
+            &warrantee,
+            &[9u8; 32],
+            88,
+        )
+        .await
+        .unwrap();
 
         let row = db
             .as_ref()
@@ -2552,10 +2501,19 @@ mod tests {
         let basis = sample_basis(5);
 
         db.insert_chain_op(
-            &op_hash, &action_hash, 1, &basis, 99,
-            RecordValidity::Accepted, true,
-            Timestamp::from_micros(10), Timestamp::from_micros(20), 512,
-        ).await.unwrap();
+            &op_hash,
+            &action_hash,
+            1,
+            &basis,
+            99,
+            RecordValidity::Accepted,
+            true,
+            Timestamp::from_micros(10),
+            Timestamp::from_micros(20),
+            512,
+        )
+        .await
+        .unwrap();
 
         let row = db
             .as_ref()
@@ -2584,9 +2542,16 @@ mod tests {
         let missing = ActionHash::from_raw_36(vec![0xEE; 36]);
         let err = db
             .insert_chain_op(
-                &op_hash, &missing, 1, &sample_basis(0), 0,
-                RecordValidity::Accepted, true,
-                Timestamp::from_micros(10), Timestamp::from_micros(20), 0,
+                &op_hash,
+                &missing,
+                1,
+                &sample_basis(0),
+                0,
+                RecordValidity::Accepted,
+                true,
+                Timestamp::from_micros(10),
+                Timestamp::from_micros(20),
+                0,
             )
             .await
             .unwrap_err()
@@ -2594,16 +2559,20 @@ mod tests {
         assert!(err.to_lowercase().contains("foreign key"), "got: {err}");
     }
 
-    async fn seed_chain_op(
-        db: &crate::handles::DbWrite<Dht>,
-        seed: u8,
-    ) -> (DhtOpHash, ActionHash) {
+    async fn seed_chain_op(db: &crate::handles::DbWrite<Dht>, seed: u8) -> (DhtOpHash, ActionHash) {
         let action_hash = seed_action_for_op(db, seed).await;
         let op_hash = DhtOpHash::from_raw_36(vec![0xF0 + seed; 36]);
         db.insert_chain_op(
-            &op_hash, &action_hash, 1, &sample_basis(seed), 0,
-            RecordValidity::Accepted, true,
-            Timestamp::from_micros(1), Timestamp::from_micros(2), 0,
+            &op_hash,
+            &action_hash,
+            1,
+            &sample_basis(seed),
+            0,
+            RecordValidity::Accepted,
+            true,
+            Timestamp::from_micros(1),
+            Timestamp::from_micros(2),
+            0,
         )
         .await
         .unwrap();
@@ -2614,7 +2583,9 @@ mod tests {
     async fn chain_op_publish_roundtrip() {
         let db = test_open_db(dht_db_id()).await.unwrap();
         let (op_hash, _) = seed_chain_op(&db, 0).await;
-        db.insert_chain_op_publish(&op_hash, None, None).await.unwrap();
+        db.insert_chain_op_publish(&op_hash, None, None)
+            .await
+            .unwrap();
 
         let row = db
             .as_ref()
@@ -2632,9 +2603,16 @@ mod tests {
         let hash = DhtOpHash::from_raw_36(vec![0x11; 36]);
         let author = AgentPubKey::from_raw_36(vec![1u8; 36]);
         let warrantee = AgentPubKey::from_raw_36(vec![2u8; 36]);
-        db.insert_warrant(&hash, &author, Timestamp::from_micros(1), &warrantee, &[0u8; 32], 0)
-            .await
-            .unwrap();
+        db.insert_warrant(
+            &hash,
+            &author,
+            Timestamp::from_micros(1),
+            &warrantee,
+            &[0u8; 32],
+            0,
+        )
+        .await
+        .unwrap();
         db.insert_warrant_publish(&hash, Some(Timestamp::from_micros(10)))
             .await
             .unwrap();
@@ -2654,16 +2632,16 @@ mod tests {
         let (op_hash, _) = seed_chain_op(&db, 1).await;
         let receipt_hash = DhtOpHash::from_raw_36(vec![0x22; 36]);
         db.insert_validation_receipt(
-            &receipt_hash, &op_hash, &[1u8; 16], &[2u8; 64], Timestamp::from_micros(42),
+            &receipt_hash,
+            &op_hash,
+            &[1u8; 16],
+            &[2u8; 64],
+            Timestamp::from_micros(42),
         )
         .await
         .unwrap();
 
-        let rows = db
-            .as_ref()
-            .get_validation_receipts(op_hash)
-            .await
-            .unwrap();
+        let rows = db.as_ref().get_validation_receipts(op_hash).await.unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].hash, receipt_hash.get_raw_36().to_vec());
     }
@@ -2698,11 +2676,7 @@ mod tests {
             .execute(db.pool())
             .await
             .unwrap();
-        let rows = db
-            .as_ref()
-            .get_links_by_base(sample_base(5))
-            .await
-            .unwrap();
+        let rows = db.as_ref().get_links_by_base(sample_base(5)).await.unwrap();
         assert!(rows.is_empty());
     }
 
@@ -2711,7 +2685,9 @@ mod tests {
         let db = test_open_db(dht_db_id()).await.unwrap();
         let delete_action = seed_action_for_op(&db, 1).await;
         let create_link = ActionHash::from_raw_36(vec![0x55; 36]);
-        db.insert_deleted_link(&delete_action, &create_link).await.unwrap();
+        db.insert_deleted_link(&delete_action, &create_link)
+            .await
+            .unwrap();
         let rows = db.as_ref().get_deleted_links(create_link).await.unwrap();
         assert_eq!(rows.len(), 1);
     }
@@ -2731,7 +2707,10 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].original_entry_hash, original_entry.get_raw_36().to_vec());
+        assert_eq!(
+            rows[0].original_entry_hash,
+            original_entry.get_raw_36().to_vec()
+        );
     }
 
     #[tokio::test]
@@ -2778,38 +2757,71 @@ mod tests {
         let entry_type = holochain_integrity_types::EntryType::AgentPubKey;
 
         let cases: Vec<(u8, ActionData)> = vec![
-            (1, ActionData::Dna(DnaData { dna_hash: DnaHash::from_raw_36(vec![0u8; 36]) })),
-            (2, ActionData::AgentValidationPkg(AgentValidationPkgData { membrane_proof: None })),
+            (
+                1,
+                ActionData::Dna(DnaData {
+                    dna_hash: DnaHash::from_raw_36(vec![0u8; 36]),
+                }),
+            ),
+            (
+                2,
+                ActionData::AgentValidationPkg(AgentValidationPkgData {
+                    membrane_proof: None,
+                }),
+            ),
             (3, ActionData::InitZomesComplete(InitZomesCompleteData {})),
-            (4, ActionData::Create(CreateData { entry_type: entry_type.clone(), entry_hash: entry_hash.clone() })),
-            (5, ActionData::Update(UpdateData {
-                original_action_address: action_hash.clone(),
-                original_entry_address: entry_hash.clone(),
-                entry_type: entry_type.clone(),
-                entry_hash: entry_hash.clone(),
-            })),
-            (6, ActionData::Delete(DeleteData {
-                deletes_address: action_hash.clone(),
-                deletes_entry_address: entry_hash.clone(),
-            })),
-            (7, ActionData::CreateLink(CreateLinkData {
-                base_address: any_link.clone(),
-                target_address: any_link.clone(),
-                zome_index: holochain_integrity_types::action::ZomeIndex(0),
-                link_type: holochain_integrity_types::link::LinkType(0),
-                tag: holochain_integrity_types::link::LinkTag(vec![]),
-            })),
-            (8, ActionData::DeleteLink(DeleteLinkData {
-                base_address: any_link,
-                link_add_address: action_hash,
-            })),
+            (
+                4,
+                ActionData::Create(CreateData {
+                    entry_type: entry_type.clone(),
+                    entry_hash: entry_hash.clone(),
+                }),
+            ),
+            (
+                5,
+                ActionData::Update(UpdateData {
+                    original_action_address: action_hash.clone(),
+                    original_entry_address: entry_hash.clone(),
+                    entry_type: entry_type.clone(),
+                    entry_hash: entry_hash.clone(),
+                }),
+            ),
+            (
+                6,
+                ActionData::Delete(DeleteData {
+                    deletes_address: action_hash.clone(),
+                    deletes_entry_address: entry_hash.clone(),
+                }),
+            ),
+            (
+                7,
+                ActionData::CreateLink(CreateLinkData {
+                    base_address: any_link.clone(),
+                    target_address: any_link.clone(),
+                    zome_index: holochain_integrity_types::action::ZomeIndex(0),
+                    link_type: holochain_integrity_types::link::LinkType(0),
+                    tag: holochain_integrity_types::link::LinkTag(vec![]),
+                }),
+            ),
+            (
+                8,
+                ActionData::DeleteLink(DeleteLinkData {
+                    base_address: any_link,
+                    link_add_address: action_hash,
+                }),
+            ),
         ];
 
         let db = test_open_db(dht_db_id()).await.unwrap();
         for (seed, data) in cases {
             let (action, signature) = sample_action_with_data(seed, data);
             db.insert_action(&action, &signature, None).await.unwrap();
-            let fetched = db.as_ref().get_action(action.hash.clone()).await.unwrap().unwrap();
+            let fetched = db
+                .as_ref()
+                .get_action(action.hash.clone())
+                .await
+                .unwrap()
+                .unwrap();
             assert_eq!(fetched, action);
             assert_eq!(i64::from(fetched.data.action_type()), seed as i64);
         }

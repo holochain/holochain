@@ -72,15 +72,16 @@ impl TryFrom<i64> for ActionType {
     }
 }
 
-use crate::{EntryType, link::{LinkTag, LinkType}, MembraneProof};
+use crate::action::ZomeIndex;
+use crate::{
+    link::{LinkTag, LinkType},
+    EntryType, MembraneProof,
+};
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, DnaHash, EntryHash};
 use holochain_timestamp::Timestamp;
-use crate::action::ZomeIndex;
 
 /// Common header fields shared by all action types.
-#[derive(
-    Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes,
-)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 pub struct ActionHeader {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -89,36 +90,26 @@ pub struct ActionHeader {
     pub prev_action: Option<ActionHash>,
 }
 
-#[derive(
-    Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes,
-)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 pub struct DnaData {
     pub dna_hash: DnaHash,
 }
 
-#[derive(
-    Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes,
-)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 pub struct AgentValidationPkgData {
     pub membrane_proof: Option<MembraneProof>,
 }
 
-#[derive(
-    Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes,
-)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 pub struct InitZomesCompleteData {}
 
-#[derive(
-    Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes,
-)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 pub struct CreateData {
     pub entry_type: EntryType,
     pub entry_hash: EntryHash,
 }
 
-#[derive(
-    Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes,
-)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 pub struct UpdateData {
     pub original_action_address: ActionHash,
     pub original_entry_address: EntryHash,
@@ -126,17 +117,13 @@ pub struct UpdateData {
     pub entry_hash: EntryHash,
 }
 
-#[derive(
-    Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes,
-)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 pub struct DeleteData {
     pub deletes_address: ActionHash,
     pub deletes_entry_address: EntryHash,
 }
 
-#[derive(
-    Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes,
-)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 pub struct CreateLinkData {
     pub base_address: AnyLinkableHash,
     pub target_address: AnyLinkableHash,
@@ -145,9 +132,7 @@ pub struct CreateLinkData {
     pub tag: LinkTag,
 }
 
-#[derive(
-    Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes,
-)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 pub struct DeleteLinkData {
     pub base_address: AnyLinkableHash,
     pub link_add_address: ActionHash,
@@ -157,9 +142,7 @@ use holo_hash::{HashableContent, HashableContentBytes};
 
 /// Per-variant action data, stored serialized in the `Action.action_data`
 /// BLOB column.
-#[derive(
-    Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes,
-)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 #[serde(tag = "type")]
 pub enum ActionData {
     Dna(DnaData),
@@ -225,8 +208,7 @@ impl HashableContent for Action {
             data: &self.data,
         };
         let sb = SerializedBytes::from(UnsafeBytes::from(
-            holochain_serialized_bytes::encode(&content)
-                .expect("Could not serialize v2 Action"),
+            holochain_serialized_bytes::encode(&content).expect("Could not serialize v2 Action"),
         ));
         HashableContentBytes::Content(sb)
     }
@@ -269,14 +251,18 @@ mod tests {
     #[test]
     fn data_structs_construct() {
         // Sanity check that each struct has the expected shape by constructing one.
-        let _ = DnaData { dna_hash: DnaHash::from_raw_36(vec![0u8; 36]) };
+        let _ = DnaData {
+            dna_hash: DnaHash::from_raw_36(vec![0u8; 36]),
+        };
         let _ = InitZomesCompleteData {};
     }
 
     #[test]
     fn action_data_serde_roundtrip() {
         let cases: Vec<ActionData> = vec![
-            ActionData::Dna(DnaData { dna_hash: DnaHash::from_raw_36(vec![1u8; 36]) }),
+            ActionData::Dna(DnaData {
+                dna_hash: DnaHash::from_raw_36(vec![1u8; 36]),
+            }),
             ActionData::InitZomesComplete(InitZomesCompleteData {}),
             ActionData::Create(CreateData {
                 entry_type: EntryType::AgentPubKey,

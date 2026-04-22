@@ -350,10 +350,23 @@ mod tests {
         .expect("Failed to query sqlite_master");
 
         for expected in [
-            "Action", "CapClaim", "CapGrant", "ChainLock", "ChainOp",
-            "ChainOpPublish", "DeletedLink", "DeletedRecord", "Entry",
-            "Link", "LimboChainOp", "LimboWarrant", "PrivateEntry",
-            "UpdatedRecord", "ValidationReceipt", "Warrant", "WarrantPublish",
+            "Action",
+            "CapClaim",
+            "CapGrant",
+            "ChainLock",
+            "ChainOp",
+            "ChainOpPublish",
+            "DeletedLink",
+            "DeletedRecord",
+            "Entry",
+            "Link",
+            "LimboChainOp",
+            "LimboWarrant",
+            "PrivateEntry",
+            "UpdatedRecord",
+            "ValidationReceipt",
+            "Warrant",
+            "WarrantPublish",
         ] {
             assert!(
                 tables.iter().any(|t| t == expected),
