@@ -6,7 +6,7 @@
 use crate::handles::{DbRead, DbWrite, TxRead, TxWrite};
 use crate::kind::Dht;
 use crate::models::dht::*;
-use holo_hash::{ActionHash, AgentPubKey, EntryHash};
+use holo_hash::{ActionHash, AgentPubKey, AnyDhtHash, DhtOpHash, EntryHash};
 use holochain_integrity_types::dht_v2::{Action, ActionData, ActionHeader, RecordValidity};
 use holochain_integrity_types::entry::Entry;
 use holochain_integrity_types::entry_def::EntryVisibility;
@@ -690,6 +690,258 @@ impl TxRead<Dht> {
     }
 }
 
+// ============================================================================
+// LimboChainOp operations
+// ============================================================================
+
+#[allow(clippy::too_many_arguments)]
+async fn insert_limbo_chain_op_impl<'e, E>(
+    executor: E,
+    op_hash: &DhtOpHash,
+    action_hash: &ActionHash,
+    op_type: i64,
+    basis_hash: &AnyDhtHash,
+    storage_center_loc: u32,
+    require_receipt: bool,
+    when_received: Timestamp,
+    serialized_size: u32,
+) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query(
+        "INSERT INTO LimboChainOp
+            (hash, op_type, action_hash, basis_hash, storage_center_loc,
+             require_receipt, when_received, serialized_size)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(op_hash.get_raw_36())
+    .bind(op_type)
+    .bind(action_hash.get_raw_36())
+    .bind(basis_hash.get_raw_36())
+    .bind(storage_center_loc as i64)
+    .bind(require_receipt as i64)
+    .bind(when_received.as_micros())
+    .bind(serialized_size as i64)
+    .execute(executor)
+    .await?;
+    Ok(())
+}
+
+async fn get_limbo_chain_op_impl<'e, E>(
+    executor: E,
+    hash: DhtOpHash,
+) -> sqlx::Result<Option<LimboChainOpRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT hash, op_type, action_hash, basis_hash, storage_center_loc,
+                sys_validation_status, app_validation_status, abandoned_at,
+                require_receipt, when_received, sys_validation_attempts,
+                app_validation_attempts, last_validation_attempt, serialized_size
+         FROM LimboChainOp WHERE hash = ?",
+    )
+    .bind(hash.get_raw_36())
+    .fetch_optional(executor)
+    .await
+}
+
+async fn limbo_chain_ops_pending_sys_impl<'e, E>(
+    executor: E,
+    limit: i64,
+) -> sqlx::Result<Vec<LimboChainOpRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT * FROM LimboChainOp
+         WHERE sys_validation_status IS NULL AND abandoned_at IS NULL
+         ORDER BY sys_validation_attempts, when_received
+         LIMIT ?",
+    )
+    .bind(limit)
+    .fetch_all(executor)
+    .await
+}
+
+async fn limbo_chain_ops_pending_app_impl<'e, E>(
+    executor: E,
+    limit: i64,
+) -> sqlx::Result<Vec<LimboChainOpRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT * FROM LimboChainOp
+         WHERE sys_validation_status = 1 AND app_validation_status IS NULL
+           AND abandoned_at IS NULL
+         ORDER BY app_validation_attempts, when_received
+         LIMIT ?",
+    )
+    .bind(limit)
+    .fetch_all(executor)
+    .await
+}
+
+async fn limbo_chain_ops_ready_for_integration_impl<'e, E>(
+    executor: E,
+    limit: i64,
+) -> sqlx::Result<Vec<LimboChainOpRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT * FROM LimboChainOp
+         WHERE abandoned_at IS NOT NULL
+            OR sys_validation_status = 2
+            OR (sys_validation_status = 1 AND app_validation_status IN (1, 2))
+         ORDER BY when_received
+         LIMIT ?",
+    )
+    .bind(limit)
+    .fetch_all(executor)
+    .await
+}
+
+async fn delete_limbo_chain_op_impl<'e, E>(
+    executor: E,
+    hash: DhtOpHash,
+) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query("DELETE FROM LimboChainOp WHERE hash = ?")
+        .bind(hash.get_raw_36())
+        .execute(executor)
+        .await?;
+    Ok(())
+}
+
+impl DbWrite<Dht> {
+    #[allow(clippy::too_many_arguments)]
+    pub async fn insert_limbo_chain_op(
+        &self,
+        op_hash: &DhtOpHash,
+        action_hash: &ActionHash,
+        op_type: i64,
+        basis_hash: &AnyDhtHash,
+        storage_center_loc: u32,
+        require_receipt: bool,
+        when_received: Timestamp,
+        serialized_size: u32,
+    ) -> sqlx::Result<()> {
+        insert_limbo_chain_op_impl(
+            self.pool(),
+            op_hash,
+            action_hash,
+            op_type,
+            basis_hash,
+            storage_center_loc,
+            require_receipt,
+            when_received,
+            serialized_size,
+        )
+        .await
+    }
+
+    pub async fn delete_limbo_chain_op(&self, hash: DhtOpHash) -> sqlx::Result<()> {
+        delete_limbo_chain_op_impl(self.pool(), hash).await
+    }
+}
+
+impl DbRead<Dht> {
+    pub async fn get_limbo_chain_op(
+        &self,
+        hash: DhtOpHash,
+    ) -> sqlx::Result<Option<LimboChainOpRow>> {
+        get_limbo_chain_op_impl(self.pool(), hash).await
+    }
+
+    pub async fn limbo_chain_ops_pending_sys(
+        &self,
+        limit: i64,
+    ) -> sqlx::Result<Vec<LimboChainOpRow>> {
+        limbo_chain_ops_pending_sys_impl(self.pool(), limit).await
+    }
+
+    pub async fn limbo_chain_ops_pending_app(
+        &self,
+        limit: i64,
+    ) -> sqlx::Result<Vec<LimboChainOpRow>> {
+        limbo_chain_ops_pending_app_impl(self.pool(), limit).await
+    }
+
+    pub async fn limbo_chain_ops_ready_for_integration(
+        &self,
+        limit: i64,
+    ) -> sqlx::Result<Vec<LimboChainOpRow>> {
+        limbo_chain_ops_ready_for_integration_impl(self.pool(), limit).await
+    }
+}
+
+impl TxWrite<Dht> {
+    #[allow(clippy::too_many_arguments)]
+    pub async fn insert_limbo_chain_op(
+        &mut self,
+        op_hash: &DhtOpHash,
+        action_hash: &ActionHash,
+        op_type: i64,
+        basis_hash: &AnyDhtHash,
+        storage_center_loc: u32,
+        require_receipt: bool,
+        when_received: Timestamp,
+        serialized_size: u32,
+    ) -> sqlx::Result<()> {
+        insert_limbo_chain_op_impl(
+            self.conn_mut(),
+            op_hash,
+            action_hash,
+            op_type,
+            basis_hash,
+            storage_center_loc,
+            require_receipt,
+            when_received,
+            serialized_size,
+        )
+        .await
+    }
+
+    pub async fn delete_limbo_chain_op(&mut self, hash: DhtOpHash) -> sqlx::Result<()> {
+        delete_limbo_chain_op_impl(self.conn_mut(), hash).await
+    }
+}
+
+impl TxRead<Dht> {
+    pub async fn get_limbo_chain_op(
+        &mut self,
+        hash: DhtOpHash,
+    ) -> sqlx::Result<Option<LimboChainOpRow>> {
+        get_limbo_chain_op_impl(self.conn_mut(), hash).await
+    }
+
+    pub async fn limbo_chain_ops_pending_sys(
+        &mut self,
+        limit: i64,
+    ) -> sqlx::Result<Vec<LimboChainOpRow>> {
+        limbo_chain_ops_pending_sys_impl(self.conn_mut(), limit).await
+    }
+
+    pub async fn limbo_chain_ops_pending_app(
+        &mut self,
+        limit: i64,
+    ) -> sqlx::Result<Vec<LimboChainOpRow>> {
+        limbo_chain_ops_pending_app_impl(self.conn_mut(), limit).await
+    }
+
+    pub async fn limbo_chain_ops_ready_for_integration(
+        &mut self,
+        limit: i64,
+    ) -> sqlx::Result<Vec<LimboChainOpRow>> {
+        limbo_chain_ops_ready_for_integration_impl(self.conn_mut(), limit).await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -995,6 +1247,88 @@ mod tests {
         assert!(db
             .as_ref()
             .get_chain_lock(author, Timestamp::from_micros(200))
+            .await
+            .unwrap()
+            .is_none());
+    }
+
+    use holo_hash::{AnyDhtHash, DhtOpHash};
+
+    async fn seed_action_for_op(db: &crate::handles::DbWrite<Dht>, seed: u8) -> ActionHash {
+        let (action, signature) = sample_action(seed);
+        db.insert_action(&action, &signature, None).await.unwrap();
+        action.hash
+    }
+
+    fn sample_basis(seed: u8) -> AnyDhtHash {
+        AnyDhtHash::from_raw_36_and_type(vec![seed; 36], holo_hash::hash_type::AnyDht::Entry)
+    }
+
+    #[tokio::test]
+    async fn limbo_chain_op_roundtrip_and_state_filters() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let action_hash = seed_action_for_op(&db, 0).await;
+        let op_hash = DhtOpHash::from_raw_36(vec![0xAA; 36]);
+
+        db.insert_limbo_chain_op(
+            &op_hash,
+            &action_hash,
+            1,
+            &sample_basis(1),
+            42,
+            true,
+            Timestamp::from_micros(100),
+            256,
+        )
+        .await
+        .unwrap();
+
+        let row = db
+            .as_ref()
+            .get_limbo_chain_op(op_hash.clone())
+            .await
+            .unwrap()
+            .expect("row missing");
+        assert_eq!(row.op_type, 1);
+        assert_eq!(row.require_receipt, 1);
+        assert_eq!(row.sys_validation_status, None);
+
+        // Appears in pending_sys.
+        let pending = db.as_ref().limbo_chain_ops_pending_sys(10).await.unwrap();
+        assert_eq!(pending.len(), 1);
+
+        // Does not appear in pending_app (sys is still NULL).
+        let app_pending = db.as_ref().limbo_chain_ops_pending_app(10).await.unwrap();
+        assert!(app_pending.is_empty());
+
+        // Flip sys to accepted via raw query so the test doesn't need an
+        // update helper (workflows will add one later).
+        sqlx::query("UPDATE LimboChainOp SET sys_validation_status = 1 WHERE hash = ?")
+            .bind(op_hash.get_raw_36())
+            .execute(db.pool())
+            .await
+            .unwrap();
+
+        let app_pending = db.as_ref().limbo_chain_ops_pending_app(10).await.unwrap();
+        assert_eq!(app_pending.len(), 1);
+
+        // Ready for integration when sys=reject, or sys=accept + app terminal.
+        sqlx::query("UPDATE LimboChainOp SET app_validation_status = 1 WHERE hash = ?")
+            .bind(op_hash.get_raw_36())
+            .execute(db.pool())
+            .await
+            .unwrap();
+        let ready = db
+            .as_ref()
+            .limbo_chain_ops_ready_for_integration(10)
+            .await
+            .unwrap();
+        assert_eq!(ready.len(), 1);
+
+        db.delete_limbo_chain_op(op_hash.clone()).await.unwrap();
+        assert!(db
+            .as_ref()
+            .get_limbo_chain_op(op_hash)
             .await
             .unwrap()
             .is_none());
