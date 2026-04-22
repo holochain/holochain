@@ -11,6 +11,7 @@ use holochain_integrity_types::dht_v2::{Action, ActionData, ActionHeader, Record
 use holochain_integrity_types::entry::Entry;
 use holochain_integrity_types::entry_def::EntryVisibility;
 use holochain_integrity_types::signature::Signature;
+use holochain_timestamp::Timestamp;
 use sqlx::{Executor, Sqlite};
 
 // ============================================================================
@@ -557,6 +558,138 @@ impl TxRead<Dht> {
     }
 }
 
+// ============================================================================
+// ChainLock operations
+// ============================================================================
+
+async fn acquire_chain_lock_impl<'e, E>(
+    executor: E,
+    author: &AgentPubKey,
+    subject: &[u8],
+    expires_at: Timestamp,
+) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query(
+        "INSERT INTO ChainLock (author, subject, expires_at_timestamp)
+         VALUES (?, ?, ?)
+         ON CONFLICT(author) DO UPDATE SET
+            subject = excluded.subject,
+            expires_at_timestamp = excluded.expires_at_timestamp",
+    )
+    .bind(author.get_raw_36())
+    .bind(subject)
+    .bind(expires_at.as_micros())
+    .execute(executor)
+    .await?;
+    Ok(())
+}
+
+async fn get_chain_lock_impl<'e, E>(
+    executor: E,
+    author: AgentPubKey,
+    now: Timestamp,
+) -> sqlx::Result<Option<ChainLockRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT author, subject, expires_at_timestamp FROM ChainLock
+         WHERE author = ? AND expires_at_timestamp > ?",
+    )
+    .bind(author.get_raw_36())
+    .bind(now.as_micros())
+    .fetch_optional(executor)
+    .await
+}
+
+async fn release_chain_lock_impl<'e, E>(
+    executor: E,
+    author: &AgentPubKey,
+) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query("DELETE FROM ChainLock WHERE author = ?")
+        .bind(author.get_raw_36())
+        .execute(executor)
+        .await?;
+    Ok(())
+}
+
+async fn prune_expired_chain_locks_impl<'e, E>(
+    executor: E,
+    now: Timestamp,
+) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query("DELETE FROM ChainLock WHERE expires_at_timestamp <= ?")
+        .bind(now.as_micros())
+        .execute(executor)
+        .await?;
+    Ok(())
+}
+
+impl DbWrite<Dht> {
+    pub async fn acquire_chain_lock(
+        &self,
+        author: &AgentPubKey,
+        subject: &[u8],
+        expires_at: Timestamp,
+    ) -> sqlx::Result<()> {
+        acquire_chain_lock_impl(self.pool(), author, subject, expires_at).await
+    }
+
+    pub async fn release_chain_lock(&self, author: &AgentPubKey) -> sqlx::Result<()> {
+        release_chain_lock_impl(self.pool(), author).await
+    }
+
+    pub async fn prune_expired_chain_locks(&self, now: Timestamp) -> sqlx::Result<()> {
+        prune_expired_chain_locks_impl(self.pool(), now).await
+    }
+}
+
+impl DbRead<Dht> {
+    pub async fn get_chain_lock(
+        &self,
+        author: AgentPubKey,
+        now: Timestamp,
+    ) -> sqlx::Result<Option<ChainLockRow>> {
+        get_chain_lock_impl(self.pool(), author, now).await
+    }
+}
+
+impl TxWrite<Dht> {
+    pub async fn acquire_chain_lock(
+        &mut self,
+        author: &AgentPubKey,
+        subject: &[u8],
+        expires_at: Timestamp,
+    ) -> sqlx::Result<()> {
+        acquire_chain_lock_impl(self.conn_mut(), author, subject, expires_at).await
+    }
+
+    pub async fn release_chain_lock(&mut self, author: &AgentPubKey) -> sqlx::Result<()> {
+        release_chain_lock_impl(self.conn_mut(), author).await
+    }
+
+    pub async fn prune_expired_chain_locks(&mut self, now: Timestamp) -> sqlx::Result<()> {
+        prune_expired_chain_locks_impl(self.conn_mut(), now).await
+    }
+}
+
+impl TxRead<Dht> {
+    pub async fn get_chain_lock(
+        &mut self,
+        author: AgentPubKey,
+        now: Timestamp,
+    ) -> sqlx::Result<Option<ChainLockRow>> {
+        get_chain_lock_impl(self.conn_mut(), author, now).await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -776,5 +909,94 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(err.to_lowercase().contains("foreign key"), "got: {err}");
+    }
+
+    #[tokio::test]
+    async fn chain_lock_acquire_and_read() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let author = AgentPubKey::from_raw_36(vec![7u8; 36]);
+        let subject = vec![1u8; 32];
+
+        db.acquire_chain_lock(&author, &subject, Timestamp::from_micros(10_000))
+            .await
+            .unwrap();
+
+        let lock = db
+            .as_ref()
+            .get_chain_lock(author.clone(), Timestamp::from_micros(5_000))
+            .await
+            .unwrap()
+            .expect("expected active lock");
+        assert_eq!(lock.subject, subject);
+    }
+
+    #[tokio::test]
+    async fn chain_lock_upsert_replaces_subject() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let author = AgentPubKey::from_raw_36(vec![7u8; 36]);
+        db.acquire_chain_lock(&author, &[1u8; 32], Timestamp::from_micros(10_000))
+            .await
+            .unwrap();
+        db.acquire_chain_lock(&author, &[2u8; 32], Timestamp::from_micros(20_000))
+            .await
+            .unwrap();
+
+        let lock = db
+            .as_ref()
+            .get_chain_lock(author, Timestamp::from_micros(5_000))
+            .await
+            .unwrap()
+            .expect("expected lock");
+        assert_eq!(lock.subject, vec![2u8; 32]);
+        assert_eq!(lock.expires_at_timestamp, 20_000);
+    }
+
+    #[tokio::test]
+    async fn chain_lock_release_and_prune() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let a = AgentPubKey::from_raw_36(vec![1u8; 36]);
+        let b = AgentPubKey::from_raw_36(vec![2u8; 36]);
+
+        db.acquire_chain_lock(&a, &[1u8; 32], Timestamp::from_micros(100))
+            .await
+            .unwrap();
+        db.acquire_chain_lock(&b, &[2u8; 32], Timestamp::from_micros(1_000))
+            .await
+            .unwrap();
+
+        db.release_chain_lock(&a).await.unwrap();
+        assert!(db
+            .as_ref()
+            .get_chain_lock(a.clone(), Timestamp::from_micros(50))
+            .await
+            .unwrap()
+            .is_none());
+
+        // Prune anything expired at t=500; b's lock (expires 1000) should survive.
+        db.prune_expired_chain_locks(Timestamp::from_micros(500))
+            .await
+            .unwrap();
+        assert!(db
+            .as_ref()
+            .get_chain_lock(b, Timestamp::from_micros(200))
+            .await
+            .unwrap()
+            .is_some());
+    }
+
+    #[tokio::test]
+    async fn chain_lock_expired_is_not_returned() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let author = AgentPubKey::from_raw_36(vec![9u8; 36]);
+        db.acquire_chain_lock(&author, &[3u8; 32], Timestamp::from_micros(100))
+            .await
+            .unwrap();
+        // Now is past expiry.
+        assert!(db
+            .as_ref()
+            .get_chain_lock(author, Timestamp::from_micros(200))
+            .await
+            .unwrap()
+            .is_none());
     }
 }
