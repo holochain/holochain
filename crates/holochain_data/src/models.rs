@@ -10,6 +10,9 @@ pub mod conductor;
 /// WASM-related models (WASM bytecode, DNA definitions, zomes, entry definitions)
 pub mod wasm;
 
+/// DHT database row models.
+pub mod dht;
+
 // Re-export conductor models for convenience
 pub use conductor::{
     AppInterfaceModel, AppRoleModel, CloneCellModel, ConductorModel, InstalledAppModel,
