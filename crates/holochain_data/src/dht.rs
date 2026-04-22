@@ -1158,6 +1158,207 @@ impl TxRead<Dht> {
     }
 }
 
+// ============================================================================
+// ChainOp operations
+// ============================================================================
+
+#[allow(clippy::too_many_arguments)]
+async fn insert_chain_op_impl<'e, E>(
+    executor: E,
+    op_hash: &DhtOpHash,
+    action_hash: &ActionHash,
+    op_type: i64,
+    basis_hash: &AnyDhtHash,
+    storage_center_loc: u32,
+    validation_status: RecordValidity,
+    locally_validated: bool,
+    when_received: Timestamp,
+    when_integrated: Timestamp,
+    serialized_size: u32,
+) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query(
+        "INSERT INTO ChainOp
+            (hash, op_type, action_hash, basis_hash, storage_center_loc,
+             validation_status, locally_validated, when_received, when_integrated,
+             serialized_size)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(op_hash.get_raw_36())
+    .bind(op_type)
+    .bind(action_hash.get_raw_36())
+    .bind(basis_hash.get_raw_36())
+    .bind(storage_center_loc as i64)
+    .bind(i64::from(validation_status))
+    .bind(locally_validated as i64)
+    .bind(when_received.as_micros())
+    .bind(when_integrated.as_micros())
+    .bind(serialized_size as i64)
+    .execute(executor)
+    .await?;
+    Ok(())
+}
+
+async fn get_chain_op_impl<'e, E>(
+    executor: E,
+    hash: DhtOpHash,
+) -> sqlx::Result<Option<ChainOpRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT hash, op_type, action_hash, basis_hash, storage_center_loc,
+                validation_status, locally_validated, when_received, when_integrated,
+                serialized_size
+         FROM ChainOp WHERE hash = ?",
+    )
+    .bind(hash.get_raw_36())
+    .fetch_optional(executor)
+    .await
+}
+
+async fn get_chain_ops_by_basis_impl<'e, E>(
+    executor: E,
+    basis: AnyDhtHash,
+) -> sqlx::Result<Vec<ChainOpRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT * FROM ChainOp WHERE basis_hash = ? ORDER BY when_integrated",
+    )
+    .bind(basis.get_raw_36())
+    .fetch_all(executor)
+    .await
+}
+
+async fn get_chain_ops_for_action_impl<'e, E>(
+    executor: E,
+    action_hash: ActionHash,
+) -> sqlx::Result<Vec<ChainOpRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT * FROM ChainOp WHERE action_hash = ? ORDER BY op_type",
+    )
+    .bind(action_hash.get_raw_36())
+    .fetch_all(executor)
+    .await
+}
+
+impl DbWrite<Dht> {
+    #[allow(clippy::too_many_arguments)]
+    pub async fn insert_chain_op(
+        &self,
+        op_hash: &DhtOpHash,
+        action_hash: &ActionHash,
+        op_type: i64,
+        basis_hash: &AnyDhtHash,
+        storage_center_loc: u32,
+        validation_status: RecordValidity,
+        locally_validated: bool,
+        when_received: Timestamp,
+        when_integrated: Timestamp,
+        serialized_size: u32,
+    ) -> sqlx::Result<()> {
+        insert_chain_op_impl(
+            self.pool(),
+            op_hash,
+            action_hash,
+            op_type,
+            basis_hash,
+            storage_center_loc,
+            validation_status,
+            locally_validated,
+            when_received,
+            when_integrated,
+            serialized_size,
+        )
+        .await
+    }
+}
+
+impl DbRead<Dht> {
+    pub async fn get_chain_op(
+        &self,
+        hash: DhtOpHash,
+    ) -> sqlx::Result<Option<ChainOpRow>> {
+        get_chain_op_impl(self.pool(), hash).await
+    }
+
+    pub async fn get_chain_ops_by_basis(
+        &self,
+        basis: AnyDhtHash,
+    ) -> sqlx::Result<Vec<ChainOpRow>> {
+        get_chain_ops_by_basis_impl(self.pool(), basis).await
+    }
+
+    pub async fn get_chain_ops_for_action(
+        &self,
+        action_hash: ActionHash,
+    ) -> sqlx::Result<Vec<ChainOpRow>> {
+        get_chain_ops_for_action_impl(self.pool(), action_hash).await
+    }
+}
+
+impl TxWrite<Dht> {
+    #[allow(clippy::too_many_arguments)]
+    pub async fn insert_chain_op(
+        &mut self,
+        op_hash: &DhtOpHash,
+        action_hash: &ActionHash,
+        op_type: i64,
+        basis_hash: &AnyDhtHash,
+        storage_center_loc: u32,
+        validation_status: RecordValidity,
+        locally_validated: bool,
+        when_received: Timestamp,
+        when_integrated: Timestamp,
+        serialized_size: u32,
+    ) -> sqlx::Result<()> {
+        insert_chain_op_impl(
+            self.conn_mut(),
+            op_hash,
+            action_hash,
+            op_type,
+            basis_hash,
+            storage_center_loc,
+            validation_status,
+            locally_validated,
+            when_received,
+            when_integrated,
+            serialized_size,
+        )
+        .await
+    }
+}
+
+impl TxRead<Dht> {
+    pub async fn get_chain_op(
+        &mut self,
+        hash: DhtOpHash,
+    ) -> sqlx::Result<Option<ChainOpRow>> {
+        get_chain_op_impl(self.conn_mut(), hash).await
+    }
+
+    pub async fn get_chain_ops_by_basis(
+        &mut self,
+        basis: AnyDhtHash,
+    ) -> sqlx::Result<Vec<ChainOpRow>> {
+        get_chain_ops_by_basis_impl(self.conn_mut(), basis).await
+    }
+
+    pub async fn get_chain_ops_for_action(
+        &mut self,
+        action_hash: ActionHash,
+    ) -> sqlx::Result<Vec<ChainOpRow>> {
+        get_chain_ops_for_action_impl(self.conn_mut(), action_hash).await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1602,5 +1803,55 @@ mod tests {
 
         db.delete_limbo_warrant(hash.clone()).await.unwrap();
         assert!(db.as_ref().get_limbo_warrant(hash).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn chain_op_roundtrip() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let action_hash = seed_action_for_op(&db, 2).await;
+        let op_hash = DhtOpHash::from_raw_36(vec![0xCC; 36]);
+        let basis = sample_basis(5);
+
+        db.insert_chain_op(
+            &op_hash, &action_hash, 1, &basis, 99,
+            RecordValidity::Accepted, true,
+            Timestamp::from_micros(10), Timestamp::from_micros(20), 512,
+        ).await.unwrap();
+
+        let row = db
+            .as_ref()
+            .get_chain_op(op_hash.clone())
+            .await
+            .unwrap()
+            .expect("missing");
+        assert_eq!(row.validation_status, 1);
+        assert_eq!(row.locally_validated, 1);
+
+        let by_basis = db.as_ref().get_chain_ops_by_basis(basis).await.unwrap();
+        assert_eq!(by_basis.len(), 1);
+
+        let for_action = db
+            .as_ref()
+            .get_chain_ops_for_action(action_hash)
+            .await
+            .unwrap();
+        assert_eq!(for_action.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn chain_op_requires_action_fk() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let op_hash = DhtOpHash::from_raw_36(vec![0xDD; 36]);
+        let missing = ActionHash::from_raw_36(vec![0xEE; 36]);
+        let err = db
+            .insert_chain_op(
+                &op_hash, &missing, 1, &sample_basis(0), 0,
+                RecordValidity::Accepted, true,
+                Timestamp::from_micros(10), Timestamp::from_micros(20), 0,
+            )
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(err.to_lowercase().contains("foreign key"), "got: {err}");
     }
 }
