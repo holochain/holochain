@@ -942,6 +942,222 @@ impl TxRead<Dht> {
     }
 }
 
+// ============================================================================
+// LimboWarrant operations
+// ============================================================================
+
+#[allow(clippy::too_many_arguments)]
+async fn insert_limbo_warrant_impl<'e, E>(
+    executor: E,
+    hash: &DhtOpHash,
+    author: &AgentPubKey,
+    timestamp: Timestamp,
+    warrantee: &AgentPubKey,
+    proof: &[u8],
+    storage_center_loc: u32,
+    when_received: Timestamp,
+    serialized_size: u32,
+) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query(
+        "INSERT INTO LimboWarrant
+            (hash, author, timestamp, warrantee, proof, storage_center_loc,
+             when_received, serialized_size)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(hash.get_raw_36())
+    .bind(author.get_raw_36())
+    .bind(timestamp.as_micros())
+    .bind(warrantee.get_raw_36())
+    .bind(proof)
+    .bind(storage_center_loc as i64)
+    .bind(when_received.as_micros())
+    .bind(serialized_size as i64)
+    .execute(executor)
+    .await?;
+    Ok(())
+}
+
+async fn get_limbo_warrant_impl<'e, E>(
+    executor: E,
+    hash: DhtOpHash,
+) -> sqlx::Result<Option<LimboWarrantRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT hash, author, timestamp, warrantee, proof, storage_center_loc,
+                sys_validation_status, abandoned_at, when_received,
+                sys_validation_attempts, last_validation_attempt, serialized_size
+         FROM LimboWarrant WHERE hash = ?",
+    )
+    .bind(hash.get_raw_36())
+    .fetch_optional(executor)
+    .await
+}
+
+async fn limbo_warrants_pending_sys_impl<'e, E>(
+    executor: E,
+    limit: i64,
+) -> sqlx::Result<Vec<LimboWarrantRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT * FROM LimboWarrant
+         WHERE sys_validation_status IS NULL AND abandoned_at IS NULL
+         ORDER BY sys_validation_attempts, when_received
+         LIMIT ?",
+    )
+    .bind(limit)
+    .fetch_all(executor)
+    .await
+}
+
+async fn limbo_warrants_ready_for_integration_impl<'e, E>(
+    executor: E,
+    limit: i64,
+) -> sqlx::Result<Vec<LimboWarrantRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT * FROM LimboWarrant
+         WHERE abandoned_at IS NOT NULL OR sys_validation_status IN (1, 2)
+         ORDER BY when_received
+         LIMIT ?",
+    )
+    .bind(limit)
+    .fetch_all(executor)
+    .await
+}
+
+async fn delete_limbo_warrant_impl<'e, E>(
+    executor: E,
+    hash: DhtOpHash,
+) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query("DELETE FROM LimboWarrant WHERE hash = ?")
+        .bind(hash.get_raw_36())
+        .execute(executor)
+        .await?;
+    Ok(())
+}
+
+impl DbWrite<Dht> {
+    #[allow(clippy::too_many_arguments)]
+    pub async fn insert_limbo_warrant(
+        &self,
+        hash: &DhtOpHash,
+        author: &AgentPubKey,
+        timestamp: Timestamp,
+        warrantee: &AgentPubKey,
+        proof: &[u8],
+        storage_center_loc: u32,
+        when_received: Timestamp,
+        serialized_size: u32,
+    ) -> sqlx::Result<()> {
+        insert_limbo_warrant_impl(
+            self.pool(),
+            hash,
+            author,
+            timestamp,
+            warrantee,
+            proof,
+            storage_center_loc,
+            when_received,
+            serialized_size,
+        )
+        .await
+    }
+
+    pub async fn delete_limbo_warrant(&self, hash: DhtOpHash) -> sqlx::Result<()> {
+        delete_limbo_warrant_impl(self.pool(), hash).await
+    }
+}
+
+impl DbRead<Dht> {
+    pub async fn get_limbo_warrant(
+        &self,
+        hash: DhtOpHash,
+    ) -> sqlx::Result<Option<LimboWarrantRow>> {
+        get_limbo_warrant_impl(self.pool(), hash).await
+    }
+
+    pub async fn limbo_warrants_pending_sys(
+        &self,
+        limit: i64,
+    ) -> sqlx::Result<Vec<LimboWarrantRow>> {
+        limbo_warrants_pending_sys_impl(self.pool(), limit).await
+    }
+
+    pub async fn limbo_warrants_ready_for_integration(
+        &self,
+        limit: i64,
+    ) -> sqlx::Result<Vec<LimboWarrantRow>> {
+        limbo_warrants_ready_for_integration_impl(self.pool(), limit).await
+    }
+}
+
+impl TxWrite<Dht> {
+    #[allow(clippy::too_many_arguments)]
+    pub async fn insert_limbo_warrant(
+        &mut self,
+        hash: &DhtOpHash,
+        author: &AgentPubKey,
+        timestamp: Timestamp,
+        warrantee: &AgentPubKey,
+        proof: &[u8],
+        storage_center_loc: u32,
+        when_received: Timestamp,
+        serialized_size: u32,
+    ) -> sqlx::Result<()> {
+        insert_limbo_warrant_impl(
+            self.conn_mut(),
+            hash,
+            author,
+            timestamp,
+            warrantee,
+            proof,
+            storage_center_loc,
+            when_received,
+            serialized_size,
+        )
+        .await
+    }
+
+    pub async fn delete_limbo_warrant(&mut self, hash: DhtOpHash) -> sqlx::Result<()> {
+        delete_limbo_warrant_impl(self.conn_mut(), hash).await
+    }
+}
+
+impl TxRead<Dht> {
+    pub async fn get_limbo_warrant(
+        &mut self,
+        hash: DhtOpHash,
+    ) -> sqlx::Result<Option<LimboWarrantRow>> {
+        get_limbo_warrant_impl(self.conn_mut(), hash).await
+    }
+
+    pub async fn limbo_warrants_pending_sys(
+        &mut self,
+        limit: i64,
+    ) -> sqlx::Result<Vec<LimboWarrantRow>> {
+        limbo_warrants_pending_sys_impl(self.conn_mut(), limit).await
+    }
+
+    pub async fn limbo_warrants_ready_for_integration(
+        &mut self,
+        limit: i64,
+    ) -> sqlx::Result<Vec<LimboWarrantRow>> {
+        limbo_warrants_ready_for_integration_impl(self.conn_mut(), limit).await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1332,5 +1548,59 @@ mod tests {
             .await
             .unwrap()
             .is_none());
+    }
+
+    #[tokio::test]
+    async fn limbo_warrant_roundtrip() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let hash = DhtOpHash::from_raw_36(vec![0xBB; 36]);
+        let author = AgentPubKey::from_raw_36(vec![1u8; 36]);
+        let warrantee = AgentPubKey::from_raw_36(vec![2u8; 36]);
+        let proof = vec![0u8; 64];
+
+        db.insert_limbo_warrant(
+            &hash,
+            &author,
+            Timestamp::from_micros(10),
+            &warrantee,
+            &proof,
+            77,
+            Timestamp::from_micros(100),
+            128,
+        )
+        .await
+        .unwrap();
+
+        let row = db
+            .as_ref()
+            .get_limbo_warrant(hash.clone())
+            .await
+            .unwrap()
+            .expect("missing");
+        assert_eq!(row.warrantee, warrantee.get_raw_36().to_vec());
+        assert!(db.as_ref().limbo_warrants_pending_sys(10).await.unwrap().len() == 1);
+        assert!(db
+            .as_ref()
+            .limbo_warrants_ready_for_integration(10)
+            .await
+            .unwrap()
+            .is_empty());
+
+        sqlx::query("UPDATE LimboWarrant SET sys_validation_status = 1 WHERE hash = ?")
+            .bind(hash.get_raw_36())
+            .execute(db.pool())
+            .await
+            .unwrap();
+        assert_eq!(
+            db.as_ref()
+                .limbo_warrants_ready_for_integration(10)
+                .await
+                .unwrap()
+                .len(),
+            1
+        );
+
+        db.delete_limbo_warrant(hash.clone()).await.unwrap();
+        assert!(db.as_ref().get_limbo_warrant(hash).await.unwrap().is_none());
     }
 }
