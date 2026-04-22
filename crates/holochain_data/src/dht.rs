@@ -6,7 +6,7 @@
 use crate::handles::{DbRead, DbWrite, TxRead, TxWrite};
 use crate::kind::Dht;
 use crate::models::dht::*;
-use holo_hash::{ActionHash, AgentPubKey, AnyDhtHash, DhtOpHash, EntryHash};
+use holo_hash::{ActionHash, AgentPubKey, AnyDhtHash, AnyLinkableHash, DhtOpHash, EntryHash};
 use holochain_integrity_types::dht_v2::{Action, ActionData, ActionHeader, RecordValidity};
 use holochain_integrity_types::entry::Entry;
 use holochain_integrity_types::entry_def::EntryVisibility;
@@ -1751,6 +1751,326 @@ impl TxRead<Dht> {
     }
 }
 
+// ============================================================================
+// Link / DeletedLink / UpdatedRecord / DeletedRecord operations
+// ============================================================================
+
+async fn insert_link_impl<'e, E>(
+    executor: E,
+    action_hash: &ActionHash,
+    base_hash: &AnyLinkableHash,
+    zome_index: u8,
+    link_type: u8,
+    tag: Option<&[u8]>,
+) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query(
+        "INSERT INTO Link (action_hash, base_hash, zome_index, link_type, tag)
+         VALUES (?, ?, ?, ?, ?)",
+    )
+    .bind(action_hash.get_raw_36())
+    .bind(base_hash.get_raw_36())
+    .bind(zome_index as i64)
+    .bind(link_type as i64)
+    .bind(tag)
+    .execute(executor)
+    .await?;
+    Ok(())
+}
+
+async fn get_links_by_base_impl<'e, E>(
+    executor: E,
+    base: AnyLinkableHash,
+) -> sqlx::Result<Vec<LinkRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT action_hash, base_hash, zome_index, link_type, tag
+         FROM Link WHERE base_hash = ?",
+    )
+    .bind(base.get_raw_36())
+    .fetch_all(executor)
+    .await
+}
+
+async fn insert_deleted_link_impl<'e, E>(
+    executor: E,
+    action_hash: &ActionHash,
+    create_link_hash: &ActionHash,
+) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query("INSERT INTO DeletedLink (action_hash, create_link_hash) VALUES (?, ?)")
+        .bind(action_hash.get_raw_36())
+        .bind(create_link_hash.get_raw_36())
+        .execute(executor)
+        .await?;
+    Ok(())
+}
+
+async fn get_deleted_links_impl<'e, E>(
+    executor: E,
+    create_link_hash: ActionHash,
+) -> sqlx::Result<Vec<DeletedLinkRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT action_hash, create_link_hash FROM DeletedLink WHERE create_link_hash = ?",
+    )
+    .bind(create_link_hash.get_raw_36())
+    .fetch_all(executor)
+    .await
+}
+
+async fn insert_updated_record_impl<'e, E>(
+    executor: E,
+    action_hash: &ActionHash,
+    original_action_hash: &ActionHash,
+    original_entry_hash: &EntryHash,
+) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query(
+        "INSERT INTO UpdatedRecord (action_hash, original_action_hash, original_entry_hash)
+         VALUES (?, ?, ?)",
+    )
+    .bind(action_hash.get_raw_36())
+    .bind(original_action_hash.get_raw_36())
+    .bind(original_entry_hash.get_raw_36())
+    .execute(executor)
+    .await?;
+    Ok(())
+}
+
+async fn get_updated_records_impl<'e, E>(
+    executor: E,
+    original_action_hash: ActionHash,
+) -> sqlx::Result<Vec<UpdatedRecordRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT action_hash, original_action_hash, original_entry_hash
+         FROM UpdatedRecord WHERE original_action_hash = ?",
+    )
+    .bind(original_action_hash.get_raw_36())
+    .fetch_all(executor)
+    .await
+}
+
+async fn insert_deleted_record_impl<'e, E>(
+    executor: E,
+    action_hash: &ActionHash,
+    deletes_action_hash: &ActionHash,
+    deletes_entry_hash: &EntryHash,
+) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query(
+        "INSERT INTO DeletedRecord (action_hash, deletes_action_hash, deletes_entry_hash)
+         VALUES (?, ?, ?)",
+    )
+    .bind(action_hash.get_raw_36())
+    .bind(deletes_action_hash.get_raw_36())
+    .bind(deletes_entry_hash.get_raw_36())
+    .execute(executor)
+    .await?;
+    Ok(())
+}
+
+async fn get_deleted_records_impl<'e, E>(
+    executor: E,
+    deletes_action_hash: ActionHash,
+) -> sqlx::Result<Vec<DeletedRecordRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT action_hash, deletes_action_hash, deletes_entry_hash
+         FROM DeletedRecord WHERE deletes_action_hash = ?",
+    )
+    .bind(deletes_action_hash.get_raw_36())
+    .fetch_all(executor)
+    .await
+}
+
+impl DbWrite<Dht> {
+    pub async fn insert_link(
+        &self,
+        action_hash: &ActionHash,
+        base_hash: &AnyLinkableHash,
+        zome_index: u8,
+        link_type: u8,
+        tag: Option<&[u8]>,
+    ) -> sqlx::Result<()> {
+        insert_link_impl(self.pool(), action_hash, base_hash, zome_index, link_type, tag).await
+    }
+
+    pub async fn insert_deleted_link(
+        &self,
+        action_hash: &ActionHash,
+        create_link_hash: &ActionHash,
+    ) -> sqlx::Result<()> {
+        insert_deleted_link_impl(self.pool(), action_hash, create_link_hash).await
+    }
+
+    pub async fn insert_updated_record(
+        &self,
+        action_hash: &ActionHash,
+        original_action_hash: &ActionHash,
+        original_entry_hash: &EntryHash,
+    ) -> sqlx::Result<()> {
+        insert_updated_record_impl(
+            self.pool(),
+            action_hash,
+            original_action_hash,
+            original_entry_hash,
+        )
+        .await
+    }
+
+    pub async fn insert_deleted_record(
+        &self,
+        action_hash: &ActionHash,
+        deletes_action_hash: &ActionHash,
+        deletes_entry_hash: &EntryHash,
+    ) -> sqlx::Result<()> {
+        insert_deleted_record_impl(
+            self.pool(),
+            action_hash,
+            deletes_action_hash,
+            deletes_entry_hash,
+        )
+        .await
+    }
+}
+
+impl DbRead<Dht> {
+    pub async fn get_links_by_base(
+        &self,
+        base: AnyLinkableHash,
+    ) -> sqlx::Result<Vec<LinkRow>> {
+        get_links_by_base_impl(self.pool(), base).await
+    }
+
+    pub async fn get_deleted_links(
+        &self,
+        create_link_hash: ActionHash,
+    ) -> sqlx::Result<Vec<DeletedLinkRow>> {
+        get_deleted_links_impl(self.pool(), create_link_hash).await
+    }
+
+    pub async fn get_updated_records(
+        &self,
+        original_action_hash: ActionHash,
+    ) -> sqlx::Result<Vec<UpdatedRecordRow>> {
+        get_updated_records_impl(self.pool(), original_action_hash).await
+    }
+
+    pub async fn get_deleted_records(
+        &self,
+        deletes_action_hash: ActionHash,
+    ) -> sqlx::Result<Vec<DeletedRecordRow>> {
+        get_deleted_records_impl(self.pool(), deletes_action_hash).await
+    }
+}
+
+impl TxWrite<Dht> {
+    pub async fn insert_link(
+        &mut self,
+        action_hash: &ActionHash,
+        base_hash: &AnyLinkableHash,
+        zome_index: u8,
+        link_type: u8,
+        tag: Option<&[u8]>,
+    ) -> sqlx::Result<()> {
+        insert_link_impl(
+            self.conn_mut(),
+            action_hash,
+            base_hash,
+            zome_index,
+            link_type,
+            tag,
+        )
+        .await
+    }
+
+    pub async fn insert_deleted_link(
+        &mut self,
+        action_hash: &ActionHash,
+        create_link_hash: &ActionHash,
+    ) -> sqlx::Result<()> {
+        insert_deleted_link_impl(self.conn_mut(), action_hash, create_link_hash).await
+    }
+
+    pub async fn insert_updated_record(
+        &mut self,
+        action_hash: &ActionHash,
+        original_action_hash: &ActionHash,
+        original_entry_hash: &EntryHash,
+    ) -> sqlx::Result<()> {
+        insert_updated_record_impl(
+            self.conn_mut(),
+            action_hash,
+            original_action_hash,
+            original_entry_hash,
+        )
+        .await
+    }
+
+    pub async fn insert_deleted_record(
+        &mut self,
+        action_hash: &ActionHash,
+        deletes_action_hash: &ActionHash,
+        deletes_entry_hash: &EntryHash,
+    ) -> sqlx::Result<()> {
+        insert_deleted_record_impl(
+            self.conn_mut(),
+            action_hash,
+            deletes_action_hash,
+            deletes_entry_hash,
+        )
+        .await
+    }
+}
+
+impl TxRead<Dht> {
+    pub async fn get_links_by_base(
+        &mut self,
+        base: AnyLinkableHash,
+    ) -> sqlx::Result<Vec<LinkRow>> {
+        get_links_by_base_impl(self.conn_mut(), base).await
+    }
+
+    pub async fn get_deleted_links(
+        &mut self,
+        create_link_hash: ActionHash,
+    ) -> sqlx::Result<Vec<DeletedLinkRow>> {
+        get_deleted_links_impl(self.conn_mut(), create_link_hash).await
+    }
+
+    pub async fn get_updated_records(
+        &mut self,
+        original_action_hash: ActionHash,
+    ) -> sqlx::Result<Vec<UpdatedRecordRow>> {
+        get_updated_records_impl(self.conn_mut(), original_action_hash).await
+    }
+
+    pub async fn get_deleted_records(
+        &mut self,
+        deletes_action_hash: ActionHash,
+    ) -> sqlx::Result<Vec<DeletedRecordRow>> {
+        get_deleted_records_impl(self.conn_mut(), deletes_action_hash).await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2346,5 +2666,88 @@ mod tests {
             .unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].hash, receipt_hash.get_raw_36().to_vec());
+    }
+
+    use holo_hash::AnyLinkableHash;
+
+    fn sample_base(seed: u8) -> AnyLinkableHash {
+        AnyLinkableHash::from_raw_36_and_type(
+            vec![seed; 36],
+            holo_hash::hash_type::AnyLinkable::Entry,
+        )
+    }
+
+    #[tokio::test]
+    async fn link_roundtrip_and_cascade() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let action_hash = seed_action_for_op(&db, 0).await;
+        let base = sample_base(5);
+        db.insert_link(&action_hash, &base, 3, 7, Some(b"tag-bytes"))
+            .await
+            .unwrap();
+
+        let rows = db.as_ref().get_links_by_base(base).await.unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].zome_index, 3);
+        assert_eq!(rows[0].link_type, 7);
+        assert_eq!(rows[0].tag, Some(b"tag-bytes".to_vec()));
+
+        // CASCADE: deleting the parent Action removes the Link row.
+        sqlx::query("DELETE FROM Action WHERE hash = ?")
+            .bind(action_hash.get_raw_36())
+            .execute(db.pool())
+            .await
+            .unwrap();
+        let rows = db
+            .as_ref()
+            .get_links_by_base(sample_base(5))
+            .await
+            .unwrap();
+        assert!(rows.is_empty());
+    }
+
+    #[tokio::test]
+    async fn deleted_link_roundtrip() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let delete_action = seed_action_for_op(&db, 1).await;
+        let create_link = ActionHash::from_raw_36(vec![0x55; 36]);
+        db.insert_deleted_link(&delete_action, &create_link).await.unwrap();
+        let rows = db.as_ref().get_deleted_links(create_link).await.unwrap();
+        assert_eq!(rows.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn updated_record_roundtrip() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let update_action = seed_action_for_op(&db, 2).await;
+        let original = ActionHash::from_raw_36(vec![0x66; 36]);
+        let original_entry = EntryHash::from_raw_36(vec![0x77; 36]);
+        db.insert_updated_record(&update_action, &original, &original_entry)
+            .await
+            .unwrap();
+        let rows = db
+            .as_ref()
+            .get_updated_records(original.clone())
+            .await
+            .unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].original_entry_hash, original_entry.get_raw_36().to_vec());
+    }
+
+    #[tokio::test]
+    async fn deleted_record_roundtrip() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let delete_action = seed_action_for_op(&db, 3).await;
+        let deletes_action = ActionHash::from_raw_36(vec![0x88; 36]);
+        let deletes_entry = EntryHash::from_raw_36(vec![0x99; 36]);
+        db.insert_deleted_record(&delete_action, &deletes_action, &deletes_entry)
+            .await
+            .unwrap();
+        let rows = db
+            .as_ref()
+            .get_deleted_records(deletes_action)
+            .await
+            .unwrap();
+        assert_eq!(rows.len(), 1);
     }
 }
