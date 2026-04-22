@@ -27,6 +27,8 @@ pub mod clone;
 pub mod countersigning;
 #[allow(missing_docs)]
 pub mod crdt;
+#[allow(missing_docs)]
+pub mod dht_v2;
 pub mod dna_def;
 pub mod entry;
 #[allow(missing_docs)]
