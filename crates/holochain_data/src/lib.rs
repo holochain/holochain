@@ -17,6 +17,7 @@ pub mod example;
 mod handles;
 pub use handles::{DbRead, DbWrite, TxRead, TxWrite};
 pub mod conductor;
+pub mod dht;
 pub mod kind;
 pub mod models;
 pub mod peer_meta_store;
