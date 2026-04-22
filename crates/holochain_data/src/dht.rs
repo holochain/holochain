@@ -6,8 +6,9 @@
 use crate::handles::{DbRead, DbWrite, TxRead, TxWrite};
 use crate::kind::Dht;
 use crate::models::dht::*;
-use holo_hash::{ActionHash, AgentPubKey};
+use holo_hash::{ActionHash, AgentPubKey, EntryHash};
 use holochain_integrity_types::dht_v2::{Action, ActionData, ActionHeader, RecordValidity};
+use holochain_integrity_types::entry::Entry;
 use holochain_integrity_types::entry_def::EntryVisibility;
 use holochain_integrity_types::signature::Signature;
 use sqlx::{Executor, Sqlite};
@@ -176,6 +177,156 @@ impl TxRead<Dht> {
     }
 }
 
+// ============================================================================
+// Entry / PrivateEntry operations
+// ============================================================================
+
+async fn insert_entry_impl<'e, E>(
+    executor: E,
+    hash: &EntryHash,
+    entry: &Entry,
+) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let blob = holochain_serialized_bytes::encode(entry)
+        .map_err(|e| sqlx::Error::Protocol(format!("encode Entry: {e}")))?;
+    sqlx::query("INSERT INTO Entry (hash, blob) VALUES (?, ?)")
+        .bind(hash.get_raw_36())
+        .bind(blob)
+        .execute(executor)
+        .await?;
+    Ok(())
+}
+
+async fn get_entry_impl<'e, E>(
+    executor: E,
+    hash: EntryHash,
+) -> sqlx::Result<Option<Entry>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let row: Option<EntryRow> = sqlx::query_as(
+        "SELECT hash, blob FROM Entry WHERE hash = ?",
+    )
+    .bind(hash.get_raw_36())
+    .fetch_optional(executor)
+    .await?;
+    row.map(|r| {
+        holochain_serialized_bytes::decode::<_, Entry>(&r.blob).map_err(|e| {
+            sqlx::Error::Decode(Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("decode Entry: {e}"),
+            )))
+        })
+    })
+    .transpose()
+}
+
+async fn insert_private_entry_impl<'e, E>(
+    executor: E,
+    hash: &EntryHash,
+    author: &AgentPubKey,
+    entry: &Entry,
+) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let blob = holochain_serialized_bytes::encode(entry)
+        .map_err(|e| sqlx::Error::Protocol(format!("encode Entry: {e}")))?;
+    sqlx::query("INSERT INTO PrivateEntry (hash, author, blob) VALUES (?, ?, ?)")
+        .bind(hash.get_raw_36())
+        .bind(author.get_raw_36())
+        .bind(blob)
+        .execute(executor)
+        .await?;
+    Ok(())
+}
+
+async fn get_private_entry_impl<'e, E>(
+    executor: E,
+    author: AgentPubKey,
+    hash: EntryHash,
+) -> sqlx::Result<Option<Entry>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let row: Option<PrivateEntryRow> = sqlx::query_as(
+        "SELECT hash, author, blob FROM PrivateEntry WHERE author = ? AND hash = ?",
+    )
+    .bind(author.get_raw_36())
+    .bind(hash.get_raw_36())
+    .fetch_optional(executor)
+    .await?;
+    row.map(|r| {
+        holochain_serialized_bytes::decode::<_, Entry>(&r.blob).map_err(|e| {
+            sqlx::Error::Decode(Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("decode Entry: {e}"),
+            )))
+        })
+    })
+    .transpose()
+}
+
+impl DbWrite<Dht> {
+    pub async fn insert_entry(&self, hash: &EntryHash, entry: &Entry) -> sqlx::Result<()> {
+        insert_entry_impl(self.pool(), hash, entry).await
+    }
+
+    pub async fn insert_private_entry(
+        &self,
+        hash: &EntryHash,
+        author: &AgentPubKey,
+        entry: &Entry,
+    ) -> sqlx::Result<()> {
+        insert_private_entry_impl(self.pool(), hash, author, entry).await
+    }
+}
+
+impl DbRead<Dht> {
+    pub async fn get_entry(&self, hash: EntryHash) -> sqlx::Result<Option<Entry>> {
+        get_entry_impl(self.pool(), hash).await
+    }
+
+    pub async fn get_private_entry(
+        &self,
+        author: AgentPubKey,
+        hash: EntryHash,
+    ) -> sqlx::Result<Option<Entry>> {
+        get_private_entry_impl(self.pool(), author, hash).await
+    }
+}
+
+impl TxWrite<Dht> {
+    pub async fn insert_entry(&mut self, hash: &EntryHash, entry: &Entry) -> sqlx::Result<()> {
+        insert_entry_impl(self.conn_mut(), hash, entry).await
+    }
+
+    pub async fn insert_private_entry(
+        &mut self,
+        hash: &EntryHash,
+        author: &AgentPubKey,
+        entry: &Entry,
+    ) -> sqlx::Result<()> {
+        insert_private_entry_impl(self.conn_mut(), hash, author, entry).await
+    }
+}
+
+impl TxRead<Dht> {
+    pub async fn get_entry(&mut self, hash: EntryHash) -> sqlx::Result<Option<Entry>> {
+        get_entry_impl(self.conn_mut(), hash).await
+    }
+
+    pub async fn get_private_entry(
+        &mut self,
+        author: AgentPubKey,
+        hash: EntryHash,
+    ) -> sqlx::Result<Option<Entry>> {
+        get_private_entry_impl(self.conn_mut(), author, hash).await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -253,5 +404,79 @@ mod tests {
         for (i, action) in actions.iter().enumerate() {
             assert_eq!(action.header.action_seq, i as u32);
         }
+    }
+
+    use holo_hash::EntryHash;
+
+    fn sample_entry(seed: u8) -> (EntryHash, Entry) {
+        let entry = Entry::App(
+            holochain_integrity_types::entry::AppEntryBytes(
+                holochain_serialized_bytes::UnsafeBytes::from(vec![seed; 16]).into(),
+            ),
+        );
+        let hash = EntryHash::from_raw_36(vec![seed; 36]);
+        (hash, entry)
+    }
+
+    #[tokio::test]
+    async fn entry_roundtrip() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let (hash, entry) = sample_entry(7);
+        db.insert_entry(&hash, &entry).await.unwrap();
+        let fetched = db.as_ref().get_entry(hash.clone()).await.unwrap();
+        assert_eq!(fetched, Some(entry));
+    }
+
+    #[tokio::test]
+    async fn private_entry_roundtrip() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let (hash, entry) = sample_entry(11);
+        let author = AgentPubKey::from_raw_36(vec![2u8; 36]);
+        db.insert_private_entry(&hash, &author, &entry).await.unwrap();
+        let fetched = db
+            .as_ref()
+            .get_private_entry(author.clone(), hash.clone())
+            .await
+            .unwrap();
+        assert_eq!(fetched, Some(entry));
+    }
+
+    #[tokio::test]
+    async fn private_entry_isolated_from_entry() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let (hash, entry) = sample_entry(13);
+        let author = AgentPubKey::from_raw_36(vec![3u8; 36]);
+        db.insert_private_entry(&hash, &author, &entry).await.unwrap();
+        // Not visible via the public Entry read.
+        assert_eq!(db.as_ref().get_entry(hash.clone()).await.unwrap(), None);
+    }
+
+    /// Verifies that a TxWrite bundling an Action + Entry insert can be rolled back
+    /// and neither survives. Also exercises the Tx* wrapper methods.
+    #[tokio::test]
+    async fn tx_action_and_entry_rollback_discards() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let (action, signature) = sample_action(0);
+        let (entry_hash, entry) = sample_entry(42);
+
+        let mut tx = db.begin().await.unwrap();
+        tx.insert_action(&action, &signature, Some(RecordValidity::Accepted))
+            .await
+            .unwrap();
+        tx.insert_entry(&entry_hash, &entry).await.unwrap();
+        tx.rollback().await.unwrap();
+
+        assert!(db
+            .as_ref()
+            .get_action(action.hash)
+            .await
+            .unwrap()
+            .is_none());
+        assert!(db
+            .as_ref()
+            .get_entry(entry_hash)
+            .await
+            .unwrap()
+            .is_none());
     }
 }
