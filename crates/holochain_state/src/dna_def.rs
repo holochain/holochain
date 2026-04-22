@@ -1,5 +1,6 @@
 use crate::prelude::StateMutationResult;
 use crate::prelude::StateQueryResult;
+use holo_hash::AgentPubKey;
 use holochain_types::prelude::CellId;
 use holochain_types::prelude::DnaDef;
 
@@ -31,8 +32,8 @@ impl DnaDefStore<holochain_data::DbRead<holochain_data::kind::Wasm>> {
 
 impl DnaDefStore<holochain_data::DbWrite<holochain_data::kind::Wasm>> {
     /// Store or update a DNA definition in the database.
-    pub async fn put(&self, cell_id: &CellId, dna_def: &DnaDef) -> StateMutationResult<()> {
-        self.db.put_dna_def(cell_id, dna_def).await?;
+    pub async fn put(&self, agent: &AgentPubKey, dna_def: &DnaDef) -> StateMutationResult<()> {
+        self.db.put_dna_def(agent, dna_def).await?;
         Ok(())
     }
 

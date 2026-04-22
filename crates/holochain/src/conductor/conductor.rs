@@ -741,7 +741,7 @@ mod dna_impls {
 
             self.spaces
                 .dna_def_store
-                .put(&cell_id, &dna_def_hashed.into_content())
+                .put(cell_id.agent_pubkey(), &dna_def_hashed.into_content())
                 .await?;
 
             Ok(zome_defs)

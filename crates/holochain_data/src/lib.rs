@@ -106,8 +106,22 @@ impl HolochainDataConfig {
     }
 }
 
+/// Identifies a specific database file and the schema it expects.
+///
+/// Implementors pair a unique filename ([`database_id`](Self::database_id))
+/// with a schema kind ([`db_kind`](Self::db_kind)) — the pair must stay in
+/// sync, since `db_kind` is what [`open_db`] uses to pick the migration set
+/// applied to the file.
 pub trait DatabaseIdentifier: Clone {
+    /// The stable filename for this database, relative to the databases
+    /// directory.
     fn database_id(&self) -> &str;
+
+    /// The schema kind for this database.
+    ///
+    /// Controls which migration set is applied when the database is opened,
+    /// so this must match the schema expected at
+    /// [`database_id`](Self::database_id).
     fn db_kind(&self) -> kind::DbKind;
 }
 

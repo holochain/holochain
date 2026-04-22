@@ -7,6 +7,7 @@ use crate::kind::Wasm;
 use crate::models::wasm::{
     CoordinatorZomeModel, DnaDefModel, EntryDefModel, IntegrityZomeModel, WasmModel,
 };
+use holo_hash::AgentPubKey;
 use holo_hash::HashableContentExtSync;
 use holo_hash::WasmHash;
 use holochain_integrity_types::prelude::EntryDef;
@@ -277,7 +278,7 @@ where
 /// When called with `&Pool`, a new transaction is started. When called with
 /// `&mut Transaction`, a savepoint is used so the outer transaction remains
 /// in control.
-async fn put_dna_def<'c, A>(conn: A, cell_id: &CellId, dna_def: &DnaDef) -> sqlx::Result<()>
+async fn put_dna_def<'c, A>(conn: A, agent: &AgentPubKey, dna_def: &DnaDef) -> sqlx::Result<()>
 where
     A: Acquire<'c, Database = Sqlite>,
 {
@@ -285,7 +286,7 @@ where
 
     let hash = dna_def.to_hash();
     let hash_bytes = hash.get_raw_32();
-    let agent_bytes = cell_id.agent_pubkey().get_raw_32();
+    let agent_bytes = agent.get_raw_32();
     let name = dna_def.name.clone();
     let network_seed = dna_def.modifiers.network_seed.clone();
     let properties = dna_def.modifiers.properties.bytes().to_vec();
@@ -472,8 +473,8 @@ impl DbWrite<Wasm> {
     /// Store a DNA definition and its associated zomes.
     ///
     /// This operation is transactional - either all data is stored or none is.
-    pub async fn put_dna_def(&self, cell_id: &CellId, dna_def: &DnaDef) -> sqlx::Result<()> {
-        put_dna_def(self.pool(), cell_id, dna_def).await
+    pub async fn put_dna_def(&self, agent: &AgentPubKey, dna_def: &DnaDef) -> sqlx::Result<()> {
+        put_dna_def(self.pool(), agent, dna_def).await
     }
 
     /// Store an entry definition.
@@ -534,8 +535,8 @@ impl TxWrite<Wasm> {
     ///
     /// Within a [`TxWrite`], this runs as a SAVEPOINT nested inside the
     /// outer transaction — it is atomic with the rest of the transaction.
-    pub async fn put_dna_def(&mut self, cell_id: &CellId, dna_def: &DnaDef) -> sqlx::Result<()> {
-        put_dna_def(self.tx_mut(), cell_id, dna_def).await
+    pub async fn put_dna_def(&mut self, agent: &AgentPubKey, dna_def: &DnaDef) -> sqlx::Result<()> {
+        put_dna_def(self.tx_mut(), agent, dna_def).await
     }
 
     /// Store an entry definition.
@@ -657,7 +658,9 @@ mod tests {
         assert!(db.as_ref().get_dna_def(&cell_id).await.unwrap().is_none());
 
         // Store DNA definition
-        db.put_dna_def(&cell_id, &dna_def).await.unwrap();
+        db.put_dna_def(cell_id.agent_pubkey(), &dna_def)
+            .await
+            .unwrap();
 
         // Should exist now
         assert!(db.as_ref().dna_def_exists(&cell_id).await.unwrap());
@@ -774,7 +777,9 @@ mod tests {
         let cell_id = test_cell_id(&hash);
 
         // Store and retrieve
-        db.put_dna_def(&cell_id, &dna_def).await.unwrap();
+        db.put_dna_def(cell_id.agent_pubkey(), &dna_def)
+            .await
+            .unwrap();
         let retrieved = db.as_ref().get_dna_def(&cell_id).await.unwrap().unwrap();
 
         // Verify structure
@@ -903,7 +908,9 @@ mod tests {
 
         let hash = dna_def_v1.to_hash();
         let cell_id = test_cell_id(&hash);
-        db.put_dna_def(&cell_id, &dna_def_v1).await.unwrap();
+        db.put_dna_def(cell_id.agent_pubkey(), &dna_def_v1)
+            .await
+            .unwrap();
 
         // Verify initial state
         let retrieved_v1 = db.as_ref().get_dna_def(&cell_id).await.unwrap().unwrap();
@@ -956,7 +963,9 @@ mod tests {
         assert_ne!(hash, hash_v2, "Hash should change when zomes change");
 
         // Update the DNA definition
-        db.put_dna_def(&cell_id_v2, &dna_def_v2).await.unwrap();
+        db.put_dna_def(cell_id_v2.agent_pubkey(), &dna_def_v2)
+            .await
+            .unwrap();
 
         // Verify old DNA still has original zomes
         let retrieved_v1 = db.as_ref().get_dna_def(&cell_id).await.unwrap().unwrap();
@@ -1050,7 +1059,9 @@ mod tests {
         };
         let hash1 = dna_def1.to_hash();
         let cell_id1 = test_cell_id(&hash1);
-        db.put_dna_def(&cell_id1, &dna_def1).await.unwrap();
+        db.put_dna_def(cell_id1.agent_pubkey(), &dna_def1)
+            .await
+            .unwrap();
 
         // Create second DNA with different agent
         let agent2 = AgentPubKey::from_raw_32(vec![1u8; 32]);
@@ -1075,7 +1086,9 @@ mod tests {
         };
         let hash2 = dna_def2.to_hash();
         let cell_id2 = CellId::new(hash2.clone(), agent2);
-        db.put_dna_def(&cell_id2, &dna_def2).await.unwrap();
+        db.put_dna_def(cell_id2.agent_pubkey(), &dna_def2)
+            .await
+            .unwrap();
 
         // Get all DNA definitions
         let all_dnas = db.as_ref().get_all_dna_defs().await.unwrap();
