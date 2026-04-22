@@ -153,6 +153,85 @@ pub struct DeleteLinkData {
     pub link_add_address: ActionHash,
 }
 
+use holo_hash::{HashableContent, HashableContentBytes};
+
+/// Per-variant action data, stored serialized in the `Action.action_data`
+/// BLOB column.
+#[derive(
+    Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes,
+)]
+#[serde(tag = "type")]
+pub enum ActionData {
+    Dna(DnaData),
+    AgentValidationPkg(AgentValidationPkgData),
+    InitZomesComplete(InitZomesCompleteData),
+    Create(CreateData),
+    Update(UpdateData),
+    Delete(DeleteData),
+    CreateLink(CreateLinkData),
+    DeleteLink(DeleteLinkData),
+}
+
+impl ActionData {
+    pub fn action_type(&self) -> ActionType {
+        match self {
+            ActionData::Dna(_) => ActionType::Dna,
+            ActionData::AgentValidationPkg(_) => ActionType::AgentValidationPkg,
+            ActionData::InitZomesComplete(_) => ActionType::InitZomesComplete,
+            ActionData::Create(_) => ActionType::Create,
+            ActionData::Update(_) => ActionType::Update,
+            ActionData::Delete(_) => ActionType::Delete,
+            ActionData::CreateLink(_) => ActionType::CreateLink,
+            ActionData::DeleteLink(_) => ActionType::DeleteLink,
+        }
+    }
+
+    /// The action's referenced entry hash, if any.
+    pub fn entry_hash(&self) -> Option<&EntryHash> {
+        match self {
+            ActionData::Create(d) => Some(&d.entry_hash),
+            ActionData::Update(d) => Some(&d.entry_hash),
+            _ => None,
+        }
+    }
+}
+
+/// Full action: hash + header + per-variant data.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
+pub struct Action {
+    pub hash: ActionHash,
+    pub header: ActionHeader,
+    pub data: ActionData,
+}
+
+impl HashableContent for Action {
+    type HashType = holo_hash::hash_type::Action;
+
+    fn hash_type(&self) -> Self::HashType {
+        use holo_hash::PrimitiveHashType;
+        Self::HashType::new()
+    }
+
+    fn hashable_content(&self) -> HashableContentBytes {
+        // Hash over the action's header + data — not the stored `hash` field,
+        // which is derived from the rest of the content.
+        #[derive(Debug, Serialize)]
+        struct Hashable<'a> {
+            header: &'a ActionHeader,
+            data: &'a ActionData,
+        }
+        let content = Hashable {
+            header: &self.header,
+            data: &self.data,
+        };
+        let sb = SerializedBytes::from(UnsafeBytes::from(
+            holochain_serialized_bytes::encode(&content)
+                .expect("Could not serialize v2 Action"),
+        ));
+        HashableContentBytes::Content(sb)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -192,5 +271,22 @@ mod tests {
         // Sanity check that each struct has the expected shape by constructing one.
         let _ = DnaData { dna_hash: DnaHash::from_raw_36(vec![0u8; 36]) };
         let _ = InitZomesCompleteData {};
+    }
+
+    #[test]
+    fn action_data_serde_roundtrip() {
+        let cases: Vec<ActionData> = vec![
+            ActionData::Dna(DnaData { dna_hash: DnaHash::from_raw_36(vec![1u8; 36]) }),
+            ActionData::InitZomesComplete(InitZomesCompleteData {}),
+            ActionData::Create(CreateData {
+                entry_type: EntryType::AgentPubKey,
+                entry_hash: EntryHash::from_raw_36(vec![2u8; 36]),
+            }),
+        ];
+        for data in cases {
+            let bytes = holochain_serialized_bytes::encode(&data).unwrap();
+            let decoded: ActionData = holochain_serialized_bytes::decode(&bytes).unwrap();
+            assert_eq!(decoded.action_type(), data.action_type());
+        }
     }
 }
