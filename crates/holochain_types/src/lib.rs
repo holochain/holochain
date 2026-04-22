@@ -21,6 +21,7 @@ pub mod combinators;
 pub mod countersigning;
 pub mod db;
 pub mod dht_op;
+pub mod dht_v2;
 pub mod dna;
 pub mod entry;
 pub mod link;
