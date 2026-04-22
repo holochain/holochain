@@ -1502,6 +1502,255 @@ impl TxRead<Dht> {
     }
 }
 
+// ============================================================================
+// Publish state and validation receipts
+// ============================================================================
+
+async fn insert_chain_op_publish_impl<'e, E>(
+    executor: E,
+    op_hash: &DhtOpHash,
+    last_publish_time: Option<Timestamp>,
+    receipts_complete: Option<bool>,
+) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query(
+        "INSERT INTO ChainOpPublish (op_hash, last_publish_time, receipts_complete)
+         VALUES (?, ?, ?)",
+    )
+    .bind(op_hash.get_raw_36())
+    .bind(last_publish_time.map(|t| t.as_micros()))
+    .bind(receipts_complete.map(|b| b as i64))
+    .execute(executor)
+    .await?;
+    Ok(())
+}
+
+async fn get_chain_op_publish_impl<'e, E>(
+    executor: E,
+    op_hash: DhtOpHash,
+) -> sqlx::Result<Option<ChainOpPublishRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT op_hash, last_publish_time, receipts_complete
+         FROM ChainOpPublish WHERE op_hash = ?",
+    )
+    .bind(op_hash.get_raw_36())
+    .fetch_optional(executor)
+    .await
+}
+
+async fn insert_warrant_publish_impl<'e, E>(
+    executor: E,
+    warrant_hash: &DhtOpHash,
+    last_publish_time: Option<Timestamp>,
+) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query(
+        "INSERT INTO WarrantPublish (warrant_hash, last_publish_time) VALUES (?, ?)",
+    )
+    .bind(warrant_hash.get_raw_36())
+    .bind(last_publish_time.map(|t| t.as_micros()))
+    .execute(executor)
+    .await?;
+    Ok(())
+}
+
+async fn get_warrant_publish_impl<'e, E>(
+    executor: E,
+    warrant_hash: DhtOpHash,
+) -> sqlx::Result<Option<WarrantPublishRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT warrant_hash, last_publish_time FROM WarrantPublish WHERE warrant_hash = ?",
+    )
+    .bind(warrant_hash.get_raw_36())
+    .fetch_optional(executor)
+    .await
+}
+
+async fn insert_validation_receipt_impl<'e, E>(
+    executor: E,
+    hash: &DhtOpHash,
+    op_hash: &DhtOpHash,
+    validators: &[u8],
+    signature: &[u8],
+    when_received: Timestamp,
+) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query(
+        "INSERT INTO ValidationReceipt (hash, op_hash, validators, signature, when_received)
+         VALUES (?, ?, ?, ?, ?)",
+    )
+    .bind(hash.get_raw_36())
+    .bind(op_hash.get_raw_36())
+    .bind(validators)
+    .bind(signature)
+    .bind(when_received.as_micros())
+    .execute(executor)
+    .await?;
+    Ok(())
+}
+
+async fn get_validation_receipts_impl<'e, E>(
+    executor: E,
+    op_hash: DhtOpHash,
+) -> sqlx::Result<Vec<ValidationReceiptRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT hash, op_hash, validators, signature, when_received
+         FROM ValidationReceipt WHERE op_hash = ? ORDER BY when_received",
+    )
+    .bind(op_hash.get_raw_36())
+    .fetch_all(executor)
+    .await
+}
+
+impl DbWrite<Dht> {
+    pub async fn insert_chain_op_publish(
+        &self,
+        op_hash: &DhtOpHash,
+        last_publish_time: Option<Timestamp>,
+        receipts_complete: Option<bool>,
+    ) -> sqlx::Result<()> {
+        insert_chain_op_publish_impl(
+            self.pool(),
+            op_hash,
+            last_publish_time,
+            receipts_complete,
+        )
+        .await
+    }
+
+    pub async fn insert_warrant_publish(
+        &self,
+        warrant_hash: &DhtOpHash,
+        last_publish_time: Option<Timestamp>,
+    ) -> sqlx::Result<()> {
+        insert_warrant_publish_impl(self.pool(), warrant_hash, last_publish_time).await
+    }
+
+    pub async fn insert_validation_receipt(
+        &self,
+        hash: &DhtOpHash,
+        op_hash: &DhtOpHash,
+        validators: &[u8],
+        signature: &[u8],
+        when_received: Timestamp,
+    ) -> sqlx::Result<()> {
+        insert_validation_receipt_impl(
+            self.pool(),
+            hash,
+            op_hash,
+            validators,
+            signature,
+            when_received,
+        )
+        .await
+    }
+}
+
+impl DbRead<Dht> {
+    pub async fn get_chain_op_publish(
+        &self,
+        op_hash: DhtOpHash,
+    ) -> sqlx::Result<Option<ChainOpPublishRow>> {
+        get_chain_op_publish_impl(self.pool(), op_hash).await
+    }
+
+    pub async fn get_warrant_publish(
+        &self,
+        warrant_hash: DhtOpHash,
+    ) -> sqlx::Result<Option<WarrantPublishRow>> {
+        get_warrant_publish_impl(self.pool(), warrant_hash).await
+    }
+
+    pub async fn get_validation_receipts(
+        &self,
+        op_hash: DhtOpHash,
+    ) -> sqlx::Result<Vec<ValidationReceiptRow>> {
+        get_validation_receipts_impl(self.pool(), op_hash).await
+    }
+}
+
+impl TxWrite<Dht> {
+    pub async fn insert_chain_op_publish(
+        &mut self,
+        op_hash: &DhtOpHash,
+        last_publish_time: Option<Timestamp>,
+        receipts_complete: Option<bool>,
+    ) -> sqlx::Result<()> {
+        insert_chain_op_publish_impl(
+            self.conn_mut(),
+            op_hash,
+            last_publish_time,
+            receipts_complete,
+        )
+        .await
+    }
+
+    pub async fn insert_warrant_publish(
+        &mut self,
+        warrant_hash: &DhtOpHash,
+        last_publish_time: Option<Timestamp>,
+    ) -> sqlx::Result<()> {
+        insert_warrant_publish_impl(self.conn_mut(), warrant_hash, last_publish_time).await
+    }
+
+    pub async fn insert_validation_receipt(
+        &mut self,
+        hash: &DhtOpHash,
+        op_hash: &DhtOpHash,
+        validators: &[u8],
+        signature: &[u8],
+        when_received: Timestamp,
+    ) -> sqlx::Result<()> {
+        insert_validation_receipt_impl(
+            self.conn_mut(),
+            hash,
+            op_hash,
+            validators,
+            signature,
+            when_received,
+        )
+        .await
+    }
+}
+
+impl TxRead<Dht> {
+    pub async fn get_chain_op_publish(
+        &mut self,
+        op_hash: DhtOpHash,
+    ) -> sqlx::Result<Option<ChainOpPublishRow>> {
+        get_chain_op_publish_impl(self.conn_mut(), op_hash).await
+    }
+
+    pub async fn get_warrant_publish(
+        &mut self,
+        warrant_hash: DhtOpHash,
+    ) -> sqlx::Result<Option<WarrantPublishRow>> {
+        get_warrant_publish_impl(self.conn_mut(), warrant_hash).await
+    }
+
+    pub async fn get_validation_receipts(
+        &mut self,
+        op_hash: DhtOpHash,
+    ) -> sqlx::Result<Vec<ValidationReceiptRow>> {
+        get_validation_receipts_impl(self.conn_mut(), op_hash).await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2023,5 +2272,79 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(err.to_lowercase().contains("foreign key"), "got: {err}");
+    }
+
+    async fn seed_chain_op(
+        db: &crate::handles::DbWrite<Dht>,
+        seed: u8,
+    ) -> (DhtOpHash, ActionHash) {
+        let action_hash = seed_action_for_op(db, seed).await;
+        let op_hash = DhtOpHash::from_raw_36(vec![0xF0 + seed; 36]);
+        db.insert_chain_op(
+            &op_hash, &action_hash, 1, &sample_basis(seed), 0,
+            RecordValidity::Accepted, true,
+            Timestamp::from_micros(1), Timestamp::from_micros(2), 0,
+        )
+        .await
+        .unwrap();
+        (op_hash, action_hash)
+    }
+
+    #[tokio::test]
+    async fn chain_op_publish_roundtrip() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let (op_hash, _) = seed_chain_op(&db, 0).await;
+        db.insert_chain_op_publish(&op_hash, None, None).await.unwrap();
+
+        let row = db
+            .as_ref()
+            .get_chain_op_publish(op_hash)
+            .await
+            .unwrap()
+            .expect("missing");
+        assert!(row.last_publish_time.is_none());
+        assert!(row.receipts_complete.is_none());
+    }
+
+    #[tokio::test]
+    async fn warrant_publish_roundtrip() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let hash = DhtOpHash::from_raw_36(vec![0x11; 36]);
+        let author = AgentPubKey::from_raw_36(vec![1u8; 36]);
+        let warrantee = AgentPubKey::from_raw_36(vec![2u8; 36]);
+        db.insert_warrant(&hash, &author, Timestamp::from_micros(1), &warrantee, &[0u8; 32], 0)
+            .await
+            .unwrap();
+        db.insert_warrant_publish(&hash, Some(Timestamp::from_micros(10)))
+            .await
+            .unwrap();
+
+        let row = db
+            .as_ref()
+            .get_warrant_publish(hash)
+            .await
+            .unwrap()
+            .expect("missing");
+        assert_eq!(row.last_publish_time, Some(10));
+    }
+
+    #[tokio::test]
+    async fn validation_receipt_roundtrip() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let (op_hash, _) = seed_chain_op(&db, 1).await;
+        let receipt_hash = DhtOpHash::from_raw_36(vec![0x22; 36]);
+        db.insert_validation_receipt(
+            &receipt_hash, &op_hash, &[1u8; 16], &[2u8; 64], Timestamp::from_micros(42),
+        )
+        .await
+        .unwrap();
+
+        let rows = db
+            .as_ref()
+            .get_validation_receipts(op_hash)
+            .await
+            .unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].hash, receipt_hash.get_raw_36().to_vec());
     }
 }
