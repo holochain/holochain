@@ -1159,6 +1159,149 @@ impl TxRead<Dht> {
 }
 
 // ============================================================================
+// Warrant operations
+// ============================================================================
+
+#[allow(clippy::too_many_arguments)]
+async fn insert_warrant_impl<'e, E>(
+    executor: E,
+    hash: &DhtOpHash,
+    author: &AgentPubKey,
+    timestamp: Timestamp,
+    warrantee: &AgentPubKey,
+    proof: &[u8],
+    storage_center_loc: u32,
+) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query(
+        "INSERT INTO Warrant (hash, author, timestamp, warrantee, proof, storage_center_loc)
+         VALUES (?, ?, ?, ?, ?, ?)",
+    )
+    .bind(hash.get_raw_36())
+    .bind(author.get_raw_36())
+    .bind(timestamp.as_micros())
+    .bind(warrantee.get_raw_36())
+    .bind(proof)
+    .bind(storage_center_loc as i64)
+    .execute(executor)
+    .await?;
+    Ok(())
+}
+
+async fn get_warrant_impl<'e, E>(
+    executor: E,
+    hash: DhtOpHash,
+) -> sqlx::Result<Option<WarrantRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT hash, author, timestamp, warrantee, proof, storage_center_loc
+         FROM Warrant WHERE hash = ?",
+    )
+    .bind(hash.get_raw_36())
+    .fetch_optional(executor)
+    .await
+}
+
+async fn get_warrants_by_warrantee_impl<'e, E>(
+    executor: E,
+    warrantee: AgentPubKey,
+) -> sqlx::Result<Vec<WarrantRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT * FROM Warrant WHERE warrantee = ? ORDER BY timestamp DESC",
+    )
+    .bind(warrantee.get_raw_36())
+    .fetch_all(executor)
+    .await
+}
+
+impl DbWrite<Dht> {
+    #[allow(clippy::too_many_arguments)]
+    pub async fn insert_warrant(
+        &self,
+        hash: &DhtOpHash,
+        author: &AgentPubKey,
+        timestamp: Timestamp,
+        warrantee: &AgentPubKey,
+        proof: &[u8],
+        storage_center_loc: u32,
+    ) -> sqlx::Result<()> {
+        insert_warrant_impl(
+            self.pool(),
+            hash,
+            author,
+            timestamp,
+            warrantee,
+            proof,
+            storage_center_loc,
+        )
+        .await
+    }
+}
+
+impl DbRead<Dht> {
+    pub async fn get_warrant(
+        &self,
+        hash: DhtOpHash,
+    ) -> sqlx::Result<Option<WarrantRow>> {
+        get_warrant_impl(self.pool(), hash).await
+    }
+
+    pub async fn get_warrants_by_warrantee(
+        &self,
+        warrantee: AgentPubKey,
+    ) -> sqlx::Result<Vec<WarrantRow>> {
+        get_warrants_by_warrantee_impl(self.pool(), warrantee).await
+    }
+}
+
+impl TxWrite<Dht> {
+    #[allow(clippy::too_many_arguments)]
+    pub async fn insert_warrant(
+        &mut self,
+        hash: &DhtOpHash,
+        author: &AgentPubKey,
+        timestamp: Timestamp,
+        warrantee: &AgentPubKey,
+        proof: &[u8],
+        storage_center_loc: u32,
+    ) -> sqlx::Result<()> {
+        insert_warrant_impl(
+            self.conn_mut(),
+            hash,
+            author,
+            timestamp,
+            warrantee,
+            proof,
+            storage_center_loc,
+        )
+        .await
+    }
+}
+
+impl TxRead<Dht> {
+    pub async fn get_warrant(
+        &mut self,
+        hash: DhtOpHash,
+    ) -> sqlx::Result<Option<WarrantRow>> {
+        get_warrant_impl(self.conn_mut(), hash).await
+    }
+
+    pub async fn get_warrants_by_warrantee(
+        &mut self,
+        warrantee: AgentPubKey,
+    ) -> sqlx::Result<Vec<WarrantRow>> {
+        get_warrants_by_warrantee_impl(self.conn_mut(), warrantee).await
+    }
+}
+
+// ============================================================================
 // ChainOp operations
 // ============================================================================
 
@@ -1803,6 +1946,33 @@ mod tests {
 
         db.delete_limbo_warrant(hash.clone()).await.unwrap();
         assert!(db.as_ref().get_limbo_warrant(hash).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn warrant_roundtrip() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let hash = DhtOpHash::from_raw_36(vec![0xAB; 36]);
+        let author = AgentPubKey::from_raw_36(vec![3u8; 36]);
+        let warrantee = AgentPubKey::from_raw_36(vec![4u8; 36]);
+
+        db.insert_warrant(&hash, &author, Timestamp::from_micros(1), &warrantee, &[9u8; 32], 88)
+            .await
+            .unwrap();
+
+        let row = db
+            .as_ref()
+            .get_warrant(hash.clone())
+            .await
+            .unwrap()
+            .expect("missing");
+        assert_eq!(row.warrantee, warrantee.get_raw_36().to_vec());
+
+        let by_warrantee = db
+            .as_ref()
+            .get_warrants_by_warrantee(warrantee)
+            .await
+            .unwrap();
+        assert_eq!(by_warrantee.len(), 1);
     }
 
     #[tokio::test]
