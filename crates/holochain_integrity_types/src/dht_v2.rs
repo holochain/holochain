@@ -72,6 +72,87 @@ impl TryFrom<i64> for ActionType {
     }
 }
 
+use crate::{EntryType, link::{LinkTag, LinkType}, MembraneProof};
+use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, DnaHash, EntryHash};
+use holochain_timestamp::Timestamp;
+use crate::action::ZomeIndex;
+
+/// Common header fields shared by all action types.
+#[derive(
+    Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes,
+)]
+pub struct ActionHeader {
+    pub author: AgentPubKey,
+    pub timestamp: Timestamp,
+    pub action_seq: u32,
+    /// `None` for the genesis `Dna` action only.
+    pub prev_action: Option<ActionHash>,
+}
+
+#[derive(
+    Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes,
+)]
+pub struct DnaData {
+    pub dna_hash: DnaHash,
+}
+
+#[derive(
+    Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes,
+)]
+pub struct AgentValidationPkgData {
+    pub membrane_proof: Option<MembraneProof>,
+}
+
+#[derive(
+    Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes,
+)]
+pub struct InitZomesCompleteData {}
+
+#[derive(
+    Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes,
+)]
+pub struct CreateData {
+    pub entry_type: EntryType,
+    pub entry_hash: EntryHash,
+}
+
+#[derive(
+    Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes,
+)]
+pub struct UpdateData {
+    pub original_action_address: ActionHash,
+    pub original_entry_address: EntryHash,
+    pub entry_type: EntryType,
+    pub entry_hash: EntryHash,
+}
+
+#[derive(
+    Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes,
+)]
+pub struct DeleteData {
+    pub deletes_address: ActionHash,
+    pub deletes_entry_address: EntryHash,
+}
+
+#[derive(
+    Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes,
+)]
+pub struct CreateLinkData {
+    pub base_address: AnyLinkableHash,
+    pub target_address: AnyLinkableHash,
+    pub zome_index: ZomeIndex,
+    pub link_type: LinkType,
+    pub tag: LinkTag,
+}
+
+#[derive(
+    Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes,
+)]
+pub struct DeleteLinkData {
+    pub base_address: AnyLinkableHash,
+    pub link_add_address: ActionHash,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -104,5 +185,12 @@ mod tests {
         }
         assert!(ActionType::try_from(0).is_err());
         assert!(ActionType::try_from(9).is_err());
+    }
+
+    #[test]
+    fn data_structs_construct() {
+        // Sanity check that each struct has the expected shape by constructing one.
+        let _ = DnaData { dna_hash: DnaHash::from_raw_36(vec![0u8; 36]) };
+        let _ = InitZomesCompleteData {};
     }
 }
