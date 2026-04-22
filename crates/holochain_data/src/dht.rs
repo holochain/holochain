@@ -2750,4 +2750,68 @@ mod tests {
             .unwrap();
         assert_eq!(rows.len(), 1);
     }
+
+    fn sample_action_with_data(seed: u8, data: ActionData) -> (Action, Signature) {
+        let action = Action {
+            hash: ActionHash::from_raw_36(vec![seed; 36]),
+            header: ActionHeader {
+                author: AgentPubKey::from_raw_36(vec![0xAB; 36]),
+                timestamp: Timestamp::from_micros(seed as i64 + 1),
+                action_seq: seed as u32,
+                prev_action: Some(ActionHash::from_raw_36(vec![seed.wrapping_sub(1); 36])),
+            },
+            data,
+        };
+        (action, Signature([seed; 64]))
+    }
+
+    #[tokio::test]
+    async fn every_action_variant_roundtrips() {
+        use holochain_integrity_types::dht_v2::*;
+
+        let entry_hash = EntryHash::from_raw_36(vec![9u8; 36]);
+        let action_hash = ActionHash::from_raw_36(vec![10u8; 36]);
+        let any_link = AnyLinkableHash::from_raw_36_and_type(
+            vec![11u8; 36],
+            holo_hash::hash_type::AnyLinkable::Entry,
+        );
+        let entry_type = holochain_integrity_types::EntryType::AgentPubKey;
+
+        let cases: Vec<(u8, ActionData)> = vec![
+            (1, ActionData::Dna(DnaData { dna_hash: DnaHash::from_raw_36(vec![0u8; 36]) })),
+            (2, ActionData::AgentValidationPkg(AgentValidationPkgData { membrane_proof: None })),
+            (3, ActionData::InitZomesComplete(InitZomesCompleteData {})),
+            (4, ActionData::Create(CreateData { entry_type: entry_type.clone(), entry_hash: entry_hash.clone() })),
+            (5, ActionData::Update(UpdateData {
+                original_action_address: action_hash.clone(),
+                original_entry_address: entry_hash.clone(),
+                entry_type: entry_type.clone(),
+                entry_hash: entry_hash.clone(),
+            })),
+            (6, ActionData::Delete(DeleteData {
+                deletes_address: action_hash.clone(),
+                deletes_entry_address: entry_hash.clone(),
+            })),
+            (7, ActionData::CreateLink(CreateLinkData {
+                base_address: any_link.clone(),
+                target_address: any_link.clone(),
+                zome_index: holochain_integrity_types::action::ZomeIndex(0),
+                link_type: holochain_integrity_types::link::LinkType(0),
+                tag: holochain_integrity_types::link::LinkTag(vec![]),
+            })),
+            (8, ActionData::DeleteLink(DeleteLinkData {
+                base_address: any_link,
+                link_add_address: action_hash,
+            })),
+        ];
+
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        for (seed, data) in cases {
+            let (action, signature) = sample_action_with_data(seed, data);
+            db.insert_action(&action, &signature, None).await.unwrap();
+            let fetched = db.as_ref().get_action(action.hash.clone()).await.unwrap().unwrap();
+            assert_eq!(fetched, action);
+            assert_eq!(i64::from(fetched.data.action_type()), seed as i64);
+        }
+    }
 }
