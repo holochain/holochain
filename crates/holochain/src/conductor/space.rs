@@ -19,10 +19,10 @@ use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::DynHcP2p;
 use holochain_sqlite::prelude::{
-    DatabaseResult, DbKey, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbSyncLevel,
-    DbSyncStrategy, DbWrite, PoolConfig, ReadAccess,
+    DatabaseResult, DbKey, DbKindAuthored, DbKindCache, DbKindDht, DbSyncLevel, DbSyncStrategy,
+    DbWrite, PoolConfig,
 };
-use holochain_state::{host_fn_workspace::SourceChainWorkspace, mutations, prelude::*};
+use holochain_state::{host_fn_workspace::SourceChainWorkspace, prelude::*};
 use holochain_util::timed;
 use lair_keystore_api::prelude::SharedLockedArray;
 use rusqlite::OptionalExtension;
@@ -44,7 +44,8 @@ pub struct Spaces {
     pub(crate) config: Arc<ConductorConfig>,
     /// The map of running queue consumer workflows.
     pub(crate) queue_consumer_map: QueueConsumerMap,
-    pub(crate) conductor_db: DbWrite<DbKindConductor>,
+    /// Conductor database for normalized ConductorState
+    pub(crate) conductor_store: holochain_state::conductor::ConductorStore,
     pub(crate) wasm_store: holochain_state::wasm::WasmStore,
     pub(crate) dna_def_store: holochain_state::dna_def::DnaDefStore,
     pub(crate) entry_def_store: holochain_state::entry_def::EntryDefStore,
@@ -165,19 +166,6 @@ impl Spaces {
             DbSyncStrategy::Resilient => DbSyncLevel::Normal,
         };
 
-        let conductor_db = tokio::task::block_in_place(|| {
-            let conductor_db = DbWrite::open_with_pool_config(
-                root_db_dir.as_ref(),
-                DbKindConductor,
-                PoolConfig {
-                    synchronous_level: db_sync_level,
-                    key: db_key.clone(),
-                    max_readers: config.db_max_readers,
-                },
-            )?;
-            ConductorResult::Ok(conductor_db)
-        })?;
-
         let db_sync = match db_sync_level {
             DbSyncLevel::Off => holochain_data::DbSyncLevel::Off,
             DbSyncLevel::Normal => holochain_data::DbSyncLevel::Normal,
@@ -189,6 +177,19 @@ impl Spaces {
             .await
             .map_err(ConductorError::other)?;
 
+        let conductor_db = holochain_data::open_db(
+            root_db_dir.as_ref(),
+            holochain_data::kind::Conductor,
+            holochain_data::HolochainDataConfig {
+                key: Some(data_db_key.clone()),
+                sync_level: db_sync,
+                max_readers: config.db_max_readers,
+            },
+        )
+        .await
+        .map_err(ConductorError::other)?;
+        let conductor_store = holochain_state::conductor::ConductorStore::new(conductor_db);
+
         let wasm_db = holochain_data::open_db(
             root_db_dir.as_ref(),
             holochain_data::kind::Wasm,
@@ -199,7 +200,7 @@ impl Spaces {
             },
         )
         .await
-        .map_err(|e| std::io::Error::other(e.to_string()))?;
+        .map_err(ConductorError::other)?;
 
         // Create store instances from the wasm database
         let wasm_store = holochain_state::wasm::WasmStore::new(wasm_db.clone());
@@ -211,7 +212,7 @@ impl Spaces {
             db_dir: Arc::new(root_db_dir),
             config,
             queue_consumer_map: QueueConsumerMap::new(),
-            conductor_db,
+            conductor_store,
             wasm_store,
             dna_def_store,
             entry_def_store,
@@ -219,9 +220,12 @@ impl Spaces {
         })
     }
 
-    /// Unblock some target.
-    pub async fn unblock(&self, input: Block) -> DatabaseResult<()> {
-        holochain_state::block::unblock(&self.conductor_db, input).await
+    /// Block some target.
+    pub async fn block(&self, input: Block) -> DatabaseResult<()> {
+        self.conductor_store
+            .block(input)
+            .await
+            .map_err(|e| DatabaseError::Other(e.into()))
     }
 
     /// Check if some target is blocked.
@@ -247,38 +251,40 @@ impl Spaces {
             return Ok(false);
         }
 
-        self.conductor_db
-            .read_async(move |txn| {
-                Ok(
-                    // If the target_id is directly blocked then we always return true.
-                    holochain_state::block::query_is_blocked(txn, target_id, timestamp)?
-            // If there are zero unblocked cells then return true.
-            || {
-                let mut all_blocked_cell_ids = true;
-                for cell_id in cell_ids {
-                    if !holochain_state::block::query_is_blocked(
-                        txn,
-                        BlockTargetId::Cell(cell_id), timestamp)? {
-                            all_blocked_cell_ids = false;
-                            break;
-                        }
-                }
-                all_blocked_cell_ids
-            },
-                )
-            })
+        // Check if the target_id itself is directly blocked
+        let target_blocked = self
+            .conductor_store
+            .as_read()
+            .is_blocked(target_id.clone(), timestamp)
             .await
+            .map_err(ConductorError::other)?;
+
+        if target_blocked {
+            return Ok(true);
+        }
+
+        // Check if any of the cell_ids are blocked
+        let cell_targets: Vec<BlockTargetId> =
+            cell_ids.into_iter().map(BlockTargetId::Cell).collect();
+
+        let any_cells_blocked = self
+            .conductor_store
+            .as_read()
+            .is_any_blocked(cell_targets, timestamp)
+            .await
+            .map_err(ConductorError::other)?;
+
+        Ok(any_cells_blocked)
     }
 
     /// Get the holochain conductor state
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn get_state(&self) -> ConductorResult<ConductorState> {
         timed!([1, 10, 1000], "get_state", {
-            match query_conductor_state(&self.conductor_db).await? {
-                Some(state) => Ok(state),
-                // update_state will again try to read the state. It's a little
-                // inefficient in the infrequent case where we haven't saved the
-                // state yet, but more atomic, so worth it.
+            match self.conductor_store.as_read().load_state().await? {
+                Some(snapshot) => crate::conductor::state_persistence::snapshot_to_state(snapshot),
+                // Initialize by running an identity update — writes the default
+                // state atomically on first access.
                 None => self.update_state(Ok).await,
             }
         })
@@ -296,7 +302,12 @@ impl Spaces {
 
     /// Update the internal state with a pure function mapping old state to new,
     /// which may also produce an output value which will be the output of
-    /// this function
+    /// this function.
+    ///
+    /// The load, transform, and save steps run atomically inside a single
+    /// database transaction on the conductor store, and concurrent callers
+    /// are serialized — so no read-modify-write interleaving can silently
+    /// drop updates.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn update_state_prime<F, O>(&self, f: F) -> ConductorResult<(ConductorState, O)>
     where
@@ -304,20 +315,18 @@ impl Spaces {
         O: Send + 'static,
     {
         timed!([1, 10, 1000], "update_state_prime", {
-            self.conductor_db
-                .write_async(move |txn| {
-                    let state = txn
-                        .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
-                            row.get("blob")
-                        })
-                        .optional()?;
-                    let state = match state {
-                        Some(state) => from_blob(state)?,
+            self.conductor_store
+                .update_state(move |snapshot| -> ConductorResult<_> {
+                    let state = match snapshot {
+                        Some(snapshot) => {
+                            crate::conductor::state_persistence::snapshot_to_state(snapshot)?
+                        }
                         None => ConductorState::default(),
                     };
                     let (new_state, output) = f(state)?;
-                    mutations::insert_conductor_state(txn, (&new_state).try_into()?)?;
-                    Result::<_, ConductorError>::Ok((new_state, output))
+                    let new_snapshot =
+                        crate::conductor::state_persistence::state_to_snapshot(&new_state)?;
+                    Ok((new_snapshot, (new_state, output)))
                 })
                 .await
         })

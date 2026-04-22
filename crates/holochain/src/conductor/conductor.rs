@@ -92,8 +92,6 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::sql::sql_cell::state_dump;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
-use holochain_state::nonce::witness_nonce;
-use holochain_state::nonce::WitnessNonceResult;
 use holochain_state::prelude::*;
 use holochain_state::source_chain;
 pub use holochain_types::share;
@@ -743,7 +741,7 @@ mod dna_impls {
 
             self.spaces
                 .dna_def_store
-                .put(&cell_id, &dna_def_hashed.into_content())
+                .put(cell_id.agent_pubkey(), &dna_def_hashed.into_content())
                 .await?;
 
             Ok(zome_defs)
@@ -798,7 +796,7 @@ mod network_impls {
     use holochain_sqlite::helpers::BytesSql;
     use holochain_sqlite::sql::sql_peer_meta_store;
     use holochain_sqlite::stats::{get_size_on_disk, get_used_size};
-    use holochain_zome_types::block::Block;
+    use holochain_state::conductor::WitnessNonceResult;
     use holochain_zome_types::block::BlockTargetId;
     use kitsune2_api::Url;
     use zome_call_signature_verification::is_valid_signature;
@@ -933,19 +931,11 @@ mod network_impls {
             nonce: Nonce256Bits,
             expires: Timestamp,
         ) -> ConductorResult<WitnessNonceResult> {
-            Ok(witness_nonce(
-                &self.spaces.conductor_db,
-                agent,
-                nonce,
-                Timestamp::now(),
-                expires,
-            )
-            .await?)
-        }
-
-        /// Unblock some target.
-        pub async fn unblock(&self, input: Block) -> DatabaseResult<()> {
-            self.spaces.unblock(input).await
+            self.spaces
+                .conductor_store
+                .witness_nonce(agent, nonce, Timestamp::now(), expires)
+                .await
+                .map_err(ConductorError::other)
         }
 
         /// Check if some target is blocked.

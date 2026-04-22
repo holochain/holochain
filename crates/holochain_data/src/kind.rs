@@ -9,6 +9,15 @@ use holo_hash::{AgentPubKey, DnaHash};
 use holochain_zome_types::cell::CellId;
 use std::sync::Arc;
 
+/// The kind of database, used to select the appropriate migration set.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum DbKind {
+    /// Wasm bytecode and DNA definitions.
+    Wasm,
+    /// Conductor state, installed apps, and related metadata.
+    Conductor,
+}
+
 /// Specifies the database used for authoring data by a specific cell.
 ///
 /// Each cell (DNA/Agent pair) has its own authored database.
@@ -21,6 +30,10 @@ pub struct Authored {
 impl DatabaseIdentifier for Authored {
     fn database_id(&self) -> &str {
         &self.id
+    }
+
+    fn db_kind(&self) -> DbKind {
+        todo!("Authored migrations not yet implemented")
     }
 }
 
@@ -55,6 +68,10 @@ impl DatabaseIdentifier for Dht {
     fn database_id(&self) -> &str {
         &self.id
     }
+
+    fn db_kind(&self) -> DbKind {
+        todo!("Dht migrations not yet implemented")
+    }
 }
 
 impl Dht {
@@ -83,7 +100,11 @@ pub struct Conductor;
 
 impl DatabaseIdentifier for Conductor {
     fn database_id(&self) -> &str {
-        "conductor"
+        "conductor_v2.db"
+    }
+
+    fn db_kind(&self) -> DbKind {
+        DbKind::Conductor
     }
 }
 
@@ -96,6 +117,10 @@ pub struct Wasm;
 impl DatabaseIdentifier for Wasm {
     fn database_id(&self) -> &str {
         "wasm"
+    }
+
+    fn db_kind(&self) -> DbKind {
+        DbKind::Wasm
     }
 }
 
@@ -111,6 +136,10 @@ pub struct PeerMetaStore {
 impl DatabaseIdentifier for PeerMetaStore {
     fn database_id(&self) -> &str {
         &self.id
+    }
+
+    fn db_kind(&self) -> DbKind {
+        todo!("PeerMetaStore migrations not yet implemented")
     }
 }
 

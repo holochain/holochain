@@ -1,3 +1,4 @@
+use holochain_data::kind::DbKind;
 use holochain_data::DbKey;
 use holochain_data::{open_db, DatabaseIdentifier};
 use sqlx::Row;
@@ -9,6 +10,10 @@ struct TestDbId(String);
 impl DatabaseIdentifier for TestDbId {
     fn database_id(&self) -> &str {
         &self.0
+    }
+
+    fn db_kind(&self) -> DbKind {
+        DbKind::Wasm
     }
 }
 
@@ -279,77 +284,6 @@ async fn migrations_applied() {
         .expect("Failed to query foreign_keys pragma");
     let fk_enabled: i32 = row.get(0);
     assert_eq!(fk_enabled, 1, "Expected foreign_keys to be enabled (1)");
-}
-
-#[tokio::test]
-async fn example_query_patterns() {
-    use holochain_data::example::*;
-
-    let tmp_dir = tempfile::TempDir::new().unwrap();
-    let db_id = TestDbId("example_test_database".to_string());
-
-    let config = holochain_data::HolochainDataConfig::new();
-    let db_conn = open_db(&tmp_dir, db_id, config)
-        .await
-        .expect("Failed to create database");
-
-    // Test insert
-    let id1 = insert_sample_data(&db_conn, "test_item_1", Some("value_1"))
-        .await
-        .expect("Failed to insert data");
-    assert!(id1 > 0);
-
-    let id2 = insert_sample_data(&db_conn, "test_item_2", None)
-        .await
-        .expect("Failed to insert data");
-    assert!(id2 > 0);
-
-    // Test query_as pattern (automatic struct mapping)
-    let result = get_sample_data_by_id(&db_conn, id1)
-        .await
-        .expect("Failed to query data");
-    assert!(result.is_some());
-    let data = result.unwrap();
-    assert_eq!(data.name, "test_item_1");
-    assert_eq!(data.value, Some("value_1".to_string()));
-
-    // Test manual mapping pattern
-    let result = get_sample_data_manual(&db_conn, id2)
-        .await
-        .expect("Failed to query data manually");
-    assert!(result.is_some());
-    let data = result.unwrap();
-    assert_eq!(data.name, "test_item_2");
-    assert_eq!(data.value, None);
-
-    // Test get all
-    let all_data = get_all_sample_data(&db_conn)
-        .await
-        .expect("Failed to get all data");
-    assert_eq!(all_data.len(), 2);
-
-    // Test update
-    let rows_affected = update_sample_data(&db_conn, id1, "updated_value")
-        .await
-        .expect("Failed to update data");
-    assert_eq!(rows_affected, 1);
-
-    let updated = get_sample_data_by_id(&db_conn, id1)
-        .await
-        .expect("Failed to query updated data")
-        .unwrap();
-    assert_eq!(updated.value, Some("updated_value".to_string()));
-
-    // Test delete
-    let rows_affected = delete_sample_data(&db_conn, id1)
-        .await
-        .expect("Failed to delete data");
-    assert_eq!(rows_affected, 1);
-
-    let deleted = get_sample_data_by_id(&db_conn, id1)
-        .await
-        .expect("Failed to query deleted data");
-    assert!(deleted.is_none());
 }
 
 #[tokio::test]

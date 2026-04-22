@@ -1,22 +1,19 @@
 use holo_hash::{AgentPubKey, DnaHash};
-use holochain_state::block::{query_is_any_blocked, query_is_blocked};
+use holochain_state::conductor::ConductorStore;
 use holochain_timestamp::Timestamp;
-use holochain_types::{
-    db::{DbKindConductor, DbWrite},
-    prelude::{BlockTargetId, CellId},
-};
+use holochain_types::prelude::{BlockTargetId, CellId};
 use kitsune2_api::{
     BlockTarget, Blocks, BlocksFactory, BoxFut, Builder, Config, DynBlocks, K2Error, K2Result,
     SpaceId,
 };
 use std::sync::Arc;
 
-/// Factory for constructing kitsune2_api Blocks backed by the conductor DB.
-/// Uses GetDbConductor to query and persist block state (agents, DNAs, cells, spaces),
+/// Factory for constructing kitsune2_api Blocks backed by the conductor store.
+/// Uses GetConductorStore to query and persist block state (agents, DNAs, cells, spaces),
 /// enabling enforcement of block rules across a SpaceId via the BlocksFactory trait.
 pub struct HolochainBlocksFactory {
-    /// The conductor database connection getter.
-    pub getter: crate::GetDbConductor,
+    /// The conductor store getter.
+    pub getter: crate::GetConductorStore,
 }
 
 impl std::fmt::Debug for HolochainBlocksFactory {
@@ -51,18 +48,18 @@ impl BlocksFactory for HolochainBlocksFactory {
 /// Block implementation in Holochain.
 ///
 /// Holds the target [`DnaHash`] to construct cell IDs for target agents,
-/// and a write handle to the conductor database,
+/// and a handle to the conductor store,
 /// enabling queries and mutations of block state for this DNA within the networking layer.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct HolochainBlocks {
     dna_hash: DnaHash,
-    db: DbWrite<DbKindConductor>,
+    store: ConductorStore,
 }
 
 impl HolochainBlocks {
     /// Create a new [`HolochainBlocks`].
-    pub fn new(dna_hash: DnaHash, db: DbWrite<DbKindConductor>) -> Self {
-        Self { dna_hash, db }
+    pub fn new(dna_hash: DnaHash, store: ConductorStore) -> Self {
+        Self { dna_hash, store }
     }
 }
 
@@ -71,14 +68,14 @@ impl Blocks for HolochainBlocks {
         let BlockTarget::Agent(agent_id) = target else {
             return Box::pin(async move { Ok(false) });
         };
-        let db = self.db.clone();
+        let store = self.store.clone();
         let cell_id = CellId::new(self.dna_hash.clone(), AgentPubKey::from_k2_agent(&agent_id));
         Box::pin(async move {
-            db.read_async(|txn| {
-                query_is_blocked(txn, BlockTargetId::Cell(cell_id), Timestamp::now())
-            })
-            .await
-            .map_err(|err| K2Error::other_src("failed to query block for agent", err))
+            store
+                .as_read()
+                .is_blocked(BlockTargetId::Cell(cell_id), Timestamp::now())
+                .await
+                .map_err(|err| K2Error::other_src("failed to query block for agent", err))
         })
     }
 
@@ -92,9 +89,11 @@ impl Blocks for HolochainBlocks {
                 )));
             }
         }
-        let db = self.db.clone();
+        let store = self.store.clone();
         Box::pin(async move {
-            db.read_async(|txn| query_is_any_blocked(txn, cell_ids, Timestamp::now()))
+            store
+                .as_read()
+                .is_any_blocked(cell_ids, Timestamp::now())
                 .await
                 .map_err(|err| {
                     K2Error::other_src("failed to query blocks for vector of block targets", err)
@@ -103,7 +102,7 @@ impl Blocks for HolochainBlocks {
     }
 
     fn block(&self, _target: BlockTarget) -> BoxFut<'static, K2Result<()>> {
-        // Holochain can insert blocks directly into the conductor database. Blocks created by Kitsune2 are not yet supported
+        // Holochain can insert blocks directly into the conductor store. Blocks created by Kitsune2 are not yet supported
         Box::pin(async move { Ok(()) })
     }
 }

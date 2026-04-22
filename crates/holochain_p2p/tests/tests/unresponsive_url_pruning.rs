@@ -5,7 +5,7 @@ use holochain_p2p::{
     HolochainP2pLocalAgent,
 };
 use holochain_state::prelude::{named_params, test_db_dir};
-use holochain_types::db::{DbKindCache, DbKindConductor, DbKindDht, DbKindPeerMetaStore, DbWrite};
+use holochain_types::db::{DbKindCache, DbKindDht, DbKindPeerMetaStore, DbWrite};
 use kitsune2_api::{
     AgentInfo, AgentInfoSigned, DhtArc, DynPeerMetaStore, SpaceId, Timestamp, Url, KEY_PREFIX_ROOT,
     META_KEY_UNRESPONSIVE,
@@ -235,7 +235,9 @@ impl TestCase {
             DbWrite::test(&db_dir, DbKindPeerMetaStore(Arc::new(dna_hash.clone()))).unwrap();
         let db_op = DbWrite::test_in_mem(DbKindDht(Arc::new(dna_hash.clone()))).unwrap();
         let db_cache = DbWrite::test_in_mem(DbKindCache(Arc::new(dna_hash.clone()))).unwrap();
-        let db_conductor = DbWrite::test_in_mem(DbKindConductor).unwrap();
+        let conductor_store = holochain_state::conductor::ConductorStore::new_test()
+            .await
+            .unwrap();
         let lair_client = test_keystore();
         let db_peer_meta2 = db_peer_meta.clone();
         let p2p = spawn_holochain_p2p(
@@ -253,9 +255,9 @@ impl TestCase {
                     let db_cache = db_cache.clone();
                     Box::pin(async move { Ok(db_cache) })
                 }),
-                get_conductor_db: Arc::new(move || {
-                    let db_conductor = db_conductor.clone();
-                    Box::pin(async move { db_conductor })
+                get_conductor_store: Arc::new(move || {
+                    let conductor_store = conductor_store.clone();
+                    Box::pin(async move { conductor_store })
                 }),
                 network_config: Some(serde_json::json!({
                     "coreBootstrap": {

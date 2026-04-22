@@ -39,9 +39,10 @@ pub type GetDbCache = Arc<
         + Sync,
 >;
 
-/// Callback function to retrieve a conductor database.
-pub type GetDbConductor =
-    Arc<dyn Fn() -> BoxFut<'static, DbWrite<DbKindConductor>> + 'static + Send + Sync>;
+/// Callback function to retrieve a conductor store.
+pub type GetConductorStore = Arc<
+    dyn Fn() -> BoxFut<'static, holochain_state::conductor::ConductorStore> + 'static + Send + Sync,
+>;
 
 /// Configure reporting.
 #[derive(Default)]
@@ -104,17 +105,17 @@ pub struct HolochainP2pConfig {
     /// ```
     pub get_db_cache: GetDbCache,
 
-    /// Callback function to retrieve the conductor database handle.
+    /// Callback function to retrieve the conductor store.
     ///
     /// **Must be set explicitly** — the [`Default`] value panics when called. Example:
     ///
     /// ```ignore
-    /// get_conductor_db: Arc::new(|| {
-    ///     let res = conductor_db.clone();
-    ///     Box::pin(async move { Ok(res) })
+    /// get_conductor_store: Arc::new(|| {
+    ///     let res = conductor_store.clone();
+    ///     Box::pin(async move { res })
     /// }),
     /// ```
-    pub get_conductor_db: GetDbConductor,
+    pub get_conductor_store: GetConductorStore,
 
     /// The arc factor to apply to target arc hints.
     pub target_arc_factor: u32,
@@ -201,7 +202,7 @@ impl Default for HolochainP2pConfig {
     /// Returns a config with placeholder values.
     ///
     /// The database callbacks (`get_db_peer_meta`, `get_db_op_store`, `get_db_cache`,
-    /// `get_conductor_db`) all panic with `unimplemented!()` when invoked — they will
+    /// `get_conductor_store`) all panic with `unimplemented!()` when invoked — they will
     /// be called the first time a space is created, so **always supply concrete
     /// implementations** before passing this config to [`spawn_holochain_p2p`].
     /// Use struct-update syntax rather than relying on this default entirely:
@@ -219,7 +220,7 @@ impl Default for HolochainP2pConfig {
             peer_meta_pruning_interval_ms: 10_000,
             get_db_op_store: Arc::new(|_| unimplemented!()),
             get_db_cache: Arc::new(|_| unimplemented!()),
-            get_conductor_db: Arc::new(|| unimplemented!()),
+            get_conductor_store: Arc::new(|| unimplemented!()),
             target_arc_factor: 1,
             auth_material_bootstrap: None,
             auth_material_relay: None,

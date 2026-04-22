@@ -274,7 +274,7 @@ pub(crate) struct HolochainP2pActor {
     lair_client: holochain_keystore::MetaLairClient,
     kitsune: DynKitsune,
     kitsune2_config: Config,
-    blocks_db_getter: GetDbConductor,
+    get_conductor_store: GetConductorStore,
     pending: Arc<Mutex<Pending>>,
     latency_service: PeerLatencyService,
     pruning_task_abort_handle: AbortHandle,
@@ -565,7 +565,7 @@ impl HolochainP2pActor {
             builder.report = HcReportFactory::create(lair_client.clone());
         }
         builder.blocks = Arc::new(HolochainBlocksFactory {
-            getter: config.get_conductor_db.clone(),
+            getter: config.get_conductor_store.clone(),
         });
         builder.peer_meta_store = Arc::new(HolochainPeerMetaStoreFactory {
             getter: config.get_db_peer_meta.clone(),
@@ -671,7 +671,7 @@ impl HolochainP2pActor {
             evt_sender,
             lair_client,
             kitsune,
-            blocks_db_getter: config.get_conductor_db.clone(),
+            get_conductor_store: config.get_conductor_store.clone(),
             pending,
             latency_service,
             kitsune2_config,
@@ -2536,21 +2536,19 @@ impl actor::HcP2p for HolochainP2pActor {
         })
     }
 
-    fn conductor_db_getter(&self) -> GetDbConductor {
-        self.blocks_db_getter.clone()
+    fn conductor_store_getter(&self) -> GetConductorStore {
+        self.get_conductor_store.clone()
     }
 
     fn block(&self, block: Block) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
             // Capture the target up front so we can move `block` into the DB call without cloning.
             let target = block.target().clone();
-            let db = self.conductor_db_getter()().await;
+            let store = self.conductor_store_getter()().await;
             // Write block to database.
-            holochain_state::block::block(&db, block)
-                .await
-                .map_err(|err| {
-                    HolochainP2pError::other(format!("Could not write block to database: {err}"))
-                })?;
+            store.block(block).await.map_err(|err| {
+                HolochainP2pError::other(format!("Could not write block to database: {err}"))
+            })?;
 
             if let holochain_zome_types::block::BlockTarget::Cell(cell_id, _) = target {
                 // Best-effort removal: do not error if the space is missing or removal fails.
@@ -2586,18 +2584,14 @@ impl actor::HcP2p for HolochainP2pActor {
 
     fn is_blocked(&self, target: BlockTargetId) -> BoxFut<'_, HolochainP2pResult<bool>> {
         Box::pin(async move {
-            let db = self.conductor_db_getter()().await;
-            db.read_async(|txn| {
-                holochain_state::block::query_is_blocked(
-                    txn,
-                    target,
-                    holochain_timestamp::Timestamp::now(),
-                )
-            })
-            .await
-            .map_err(|err| {
-                HolochainP2pError::other(format!("Could not read block from database: {err}"))
-            })
+            let store = self.conductor_store_getter()().await;
+            store
+                .as_read()
+                .is_blocked(target, holochain_timestamp::Timestamp::now())
+                .await
+                .map_err(|err| {
+                    HolochainP2pError::other(format!("Could not read block from database: {err}"))
+                })
         })
     }
 }

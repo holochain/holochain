@@ -1,15 +1,3 @@
--- Add up migration script here
-
--- Sample table for testing
-CREATE TABLE IF NOT EXISTS sample_data (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    value TEXT,
-    created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
-);
-
-CREATE INDEX idx_sample_data_name ON sample_data(name);
-
 -- Wasm database schema for Holochain
 
 -- Wasm bytecode storage

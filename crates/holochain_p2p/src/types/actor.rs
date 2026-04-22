@@ -346,8 +346,8 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug + Any {
     /// Query if an agent is blocked.
     fn is_blocked(&self, target: BlockTargetId) -> BoxFut<'_, HolochainP2pResult<bool>>;
 
-    /// Get the conductor database getter.
-    fn conductor_db_getter(&self) -> crate::GetDbConductor;
+    /// Get the conductor store getter.
+    fn conductor_store_getter(&self) -> crate::GetConductorStore;
 }
 
 /// Trait-object HcP2p
