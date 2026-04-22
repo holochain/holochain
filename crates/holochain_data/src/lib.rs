@@ -32,12 +32,16 @@ static CONDUCTOR_MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migration
 static PEER_META_STORE_MIGRATOR: sqlx::migrate::Migrator =
     sqlx::migrate!("./migrations/peer_meta_store");
 
+/// Embedded migrations for the DHT database.
+static DHT_MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations/dht");
+
 /// Select the appropriate migrator for a database kind.
 fn migrator_for(db_kind: kind::DbKind) -> &'static sqlx::migrate::Migrator {
     match db_kind {
         kind::DbKind::Wasm => &WASM_MIGRATOR,
         kind::DbKind::Conductor => &CONDUCTOR_MIGRATOR,
         kind::DbKind::PeerMetaStore => &PEER_META_STORE_MIGRATOR,
+        kind::DbKind::Dht => &DHT_MIGRATOR,
     }
 }
 
@@ -316,5 +320,48 @@ mod tests {
         // Verify Wasm tables do NOT exist
         assert!(!tables.contains(&"Wasm".to_string()));
         assert!(!tables.contains(&"DnaDef".to_string()));
+    }
+
+    #[derive(Debug, Clone)]
+    struct TestDhtDbId;
+
+    impl DatabaseIdentifier for TestDhtDbId {
+        fn database_id(&self) -> &str {
+            "test_dht_db"
+        }
+
+        fn db_kind(&self) -> DbKind {
+            DbKind::Dht
+        }
+    }
+
+    #[tokio::test]
+    async fn dht_migrations_applied() {
+        let db = test_open_db(TestDhtDbId)
+            .await
+            .expect("Failed to set up test database");
+
+        let tables = sqlx::query_scalar::<_, String>(
+            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name",
+        )
+        .fetch_all(db.pool())
+        .await
+        .expect("Failed to query sqlite_master");
+
+        for expected in [
+            "Action", "CapClaim", "CapGrant", "ChainLock", "ChainOp",
+            "ChainOpPublish", "DeletedLink", "DeletedRecord", "Entry",
+            "Link", "LimboChainOp", "LimboWarrant", "PrivateEntry",
+            "UpdatedRecord", "ValidationReceipt", "Warrant", "WarrantPublish",
+        ] {
+            assert!(
+                tables.iter().any(|t| t == expected),
+                "missing table {expected}; have: {:?}",
+                tables
+            );
+        }
+
+        assert!(!tables.contains(&"Conductor".to_string()));
+        assert!(!tables.contains(&"Wasm".to_string()));
     }
 }

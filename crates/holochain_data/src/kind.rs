@@ -18,6 +18,8 @@ pub enum DbKind {
     Conductor,
     /// Peer metadata for a specific DNA.
     PeerMetaStore,
+    /// DHT data for a specific DNA.
+    Dht,
 }
 
 /// Specifies the database used for authoring data by a specific cell.
@@ -72,7 +74,7 @@ impl DatabaseIdentifier for Dht {
     }
 
     fn db_kind(&self) -> DbKind {
-        todo!("Dht migrations not yet implemented")
+        DbKind::Dht
     }
 }
 
