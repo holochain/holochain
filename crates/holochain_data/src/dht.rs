@@ -327,6 +327,236 @@ impl TxRead<Dht> {
     }
 }
 
+// ============================================================================
+// CapGrant / CapClaim operations
+// ============================================================================
+
+async fn insert_cap_grant_impl<'e, E>(
+    executor: E,
+    action_hash: &ActionHash,
+    cap_access: i64,
+    tag: Option<&str>,
+) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query("INSERT INTO CapGrant (action_hash, cap_access, tag) VALUES (?, ?, ?)")
+        .bind(action_hash.get_raw_36())
+        .bind(cap_access)
+        .bind(tag)
+        .execute(executor)
+        .await?;
+    Ok(())
+}
+
+async fn get_cap_grants_by_access_impl<'e, E>(
+    executor: E,
+    author: AgentPubKey,
+    cap_access: i64,
+) -> sqlx::Result<Vec<CapGrantRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT cg.action_hash, cg.cap_access, cg.tag
+         FROM CapGrant cg
+         JOIN Action ON cg.action_hash = Action.hash
+         WHERE cg.cap_access = ? AND Action.author = ?
+         ORDER BY Action.seq",
+    )
+    .bind(cap_access)
+    .bind(author.get_raw_36())
+    .fetch_all(executor)
+    .await
+}
+
+async fn get_cap_grants_by_tag_impl<'e, E>(
+    executor: E,
+    author: AgentPubKey,
+    tag: &str,
+) -> sqlx::Result<Vec<CapGrantRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT cg.action_hash, cg.cap_access, cg.tag
+         FROM CapGrant cg
+         JOIN Action ON cg.action_hash = Action.hash
+         WHERE cg.tag = ? AND Action.author = ?
+         ORDER BY Action.seq",
+    )
+    .bind(tag)
+    .bind(author.get_raw_36())
+    .fetch_all(executor)
+    .await
+}
+
+async fn insert_cap_claim_impl<'e, E>(
+    executor: E,
+    author: &AgentPubKey,
+    tag: &str,
+    grantor: &AgentPubKey,
+    secret: &[u8],
+) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query("INSERT INTO CapClaim (author, tag, grantor, secret) VALUES (?, ?, ?, ?)")
+        .bind(author.get_raw_36())
+        .bind(tag)
+        .bind(grantor.get_raw_36())
+        .bind(secret)
+        .execute(executor)
+        .await?;
+    Ok(())
+}
+
+async fn get_cap_claims_by_grantor_impl<'e, E>(
+    executor: E,
+    author: AgentPubKey,
+    grantor: AgentPubKey,
+) -> sqlx::Result<Vec<CapClaimRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT id, author, tag, grantor, secret FROM CapClaim
+         WHERE author = ? AND grantor = ? ORDER BY id",
+    )
+    .bind(author.get_raw_36())
+    .bind(grantor.get_raw_36())
+    .fetch_all(executor)
+    .await
+}
+
+async fn get_cap_claims_by_tag_impl<'e, E>(
+    executor: E,
+    author: AgentPubKey,
+    tag: &str,
+) -> sqlx::Result<Vec<CapClaimRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT id, author, tag, grantor, secret FROM CapClaim
+         WHERE author = ? AND tag = ? ORDER BY id",
+    )
+    .bind(author.get_raw_36())
+    .bind(tag)
+    .fetch_all(executor)
+    .await
+}
+
+impl DbWrite<Dht> {
+    pub async fn insert_cap_grant(
+        &self,
+        action_hash: &ActionHash,
+        cap_access: i64,
+        tag: Option<&str>,
+    ) -> sqlx::Result<()> {
+        insert_cap_grant_impl(self.pool(), action_hash, cap_access, tag).await
+    }
+
+    pub async fn insert_cap_claim(
+        &self,
+        author: &AgentPubKey,
+        tag: &str,
+        grantor: &AgentPubKey,
+        secret: &[u8],
+    ) -> sqlx::Result<()> {
+        insert_cap_claim_impl(self.pool(), author, tag, grantor, secret).await
+    }
+}
+
+impl DbRead<Dht> {
+    pub async fn get_cap_grants_by_access(
+        &self,
+        author: AgentPubKey,
+        cap_access: i64,
+    ) -> sqlx::Result<Vec<CapGrantRow>> {
+        get_cap_grants_by_access_impl(self.pool(), author, cap_access).await
+    }
+
+    pub async fn get_cap_grants_by_tag(
+        &self,
+        author: AgentPubKey,
+        tag: &str,
+    ) -> sqlx::Result<Vec<CapGrantRow>> {
+        get_cap_grants_by_tag_impl(self.pool(), author, tag).await
+    }
+
+    pub async fn get_cap_claims_by_grantor(
+        &self,
+        author: AgentPubKey,
+        grantor: AgentPubKey,
+    ) -> sqlx::Result<Vec<CapClaimRow>> {
+        get_cap_claims_by_grantor_impl(self.pool(), author, grantor).await
+    }
+
+    pub async fn get_cap_claims_by_tag(
+        &self,
+        author: AgentPubKey,
+        tag: &str,
+    ) -> sqlx::Result<Vec<CapClaimRow>> {
+        get_cap_claims_by_tag_impl(self.pool(), author, tag).await
+    }
+}
+
+impl TxWrite<Dht> {
+    pub async fn insert_cap_grant(
+        &mut self,
+        action_hash: &ActionHash,
+        cap_access: i64,
+        tag: Option<&str>,
+    ) -> sqlx::Result<()> {
+        insert_cap_grant_impl(self.conn_mut(), action_hash, cap_access, tag).await
+    }
+
+    pub async fn insert_cap_claim(
+        &mut self,
+        author: &AgentPubKey,
+        tag: &str,
+        grantor: &AgentPubKey,
+        secret: &[u8],
+    ) -> sqlx::Result<()> {
+        insert_cap_claim_impl(self.conn_mut(), author, tag, grantor, secret).await
+    }
+}
+
+impl TxRead<Dht> {
+    pub async fn get_cap_grants_by_access(
+        &mut self,
+        author: AgentPubKey,
+        cap_access: i64,
+    ) -> sqlx::Result<Vec<CapGrantRow>> {
+        get_cap_grants_by_access_impl(self.conn_mut(), author, cap_access).await
+    }
+
+    pub async fn get_cap_grants_by_tag(
+        &mut self,
+        author: AgentPubKey,
+        tag: &str,
+    ) -> sqlx::Result<Vec<CapGrantRow>> {
+        get_cap_grants_by_tag_impl(self.conn_mut(), author, tag).await
+    }
+
+    pub async fn get_cap_claims_by_grantor(
+        &mut self,
+        author: AgentPubKey,
+        grantor: AgentPubKey,
+    ) -> sqlx::Result<Vec<CapClaimRow>> {
+        get_cap_claims_by_grantor_impl(self.conn_mut(), author, grantor).await
+    }
+
+    pub async fn get_cap_claims_by_tag(
+        &mut self,
+        author: AgentPubKey,
+        tag: &str,
+    ) -> sqlx::Result<Vec<CapClaimRow>> {
+        get_cap_claims_by_tag_impl(self.conn_mut(), author, tag).await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -478,5 +708,73 @@ mod tests {
             .await
             .unwrap()
             .is_none());
+    }
+
+    #[tokio::test]
+    async fn cap_grant_roundtrip() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        // Seed the parent Action (FK).
+        let (action, signature) = sample_action(0);
+        db.insert_action(&action, &signature, Some(RecordValidity::Accepted))
+            .await
+            .unwrap();
+
+        let author = action.header.author.clone();
+        db.insert_cap_grant(&action.hash, 1 /* Transferable */, Some("my-tag"))
+            .await
+            .unwrap();
+
+        let by_access = db
+            .as_ref()
+            .get_cap_grants_by_access(author.clone(), 1)
+            .await
+            .unwrap();
+        assert_eq!(by_access.len(), 1);
+        assert_eq!(by_access[0].action_hash, action.hash.get_raw_36().to_vec());
+
+        let by_tag = db
+            .as_ref()
+            .get_cap_grants_by_tag(author, "my-tag")
+            .await
+            .unwrap();
+        assert_eq!(by_tag.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn cap_claim_roundtrip() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let author = AgentPubKey::from_raw_36(vec![5u8; 36]);
+        let grantor = AgentPubKey::from_raw_36(vec![6u8; 36]);
+
+        db.insert_cap_claim(&author, "claim-tag", &grantor, &[9u8; 32])
+            .await
+            .unwrap();
+
+        let by_grantor = db
+            .as_ref()
+            .get_cap_claims_by_grantor(author.clone(), grantor)
+            .await
+            .unwrap();
+        assert_eq!(by_grantor.len(), 1);
+        assert_eq!(by_grantor[0].tag, "claim-tag");
+
+        let by_tag = db
+            .as_ref()
+            .get_cap_claims_by_tag(author, "claim-tag")
+            .await
+            .unwrap();
+        assert_eq!(by_tag.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn cap_grant_requires_action_fk() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let missing = ActionHash::from_raw_36(vec![42u8; 36]);
+        let err = db
+            .insert_cap_grant(&missing, 0, None)
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(err.to_lowercase().contains("foreign key"), "got: {err}");
     }
 }
