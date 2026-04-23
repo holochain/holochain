@@ -249,7 +249,7 @@ transport-tx5-backend-go-pion = [
 ]
 
 # Extremely verbose wasm memory read/write logging
-wasmer_debug_memory = ["holochain_wasmer_host/debug-memory"]
+wasmer-debug-memory = ["holochain_wasmer_host/debug-memory"]
 
 # Enable wasm compiler
 wasmer-sys = ["dep:wasmer-middlewares", "wasmer/sys-default"]

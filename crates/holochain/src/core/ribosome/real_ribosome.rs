@@ -121,10 +121,10 @@ mod wasmer_sys;
 use wasmer_sys::*;
 
 #[cfg(feature = "wasmer-wasmi")]
-mod wasmer_wamr;
+mod wasmer_wasmi;
 
 #[cfg(feature = "wasmer-wasmi")]
-use wasmer_wamr::*;
+use wasmer_wasmi::*;
 
 pub(crate) type ModuleCacheLock = parking_lot::RwLock<ModuleCache>;
 
