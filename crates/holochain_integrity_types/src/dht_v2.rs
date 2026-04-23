@@ -1,7 +1,25 @@
 //! Redesigned DHT state-model types (transitional module — see
 //! `docs/design/state_model.md`).
+//!
+//! These types replace the per-action variant enum of the v1 model with a
+//! common [`ActionHeader`] + per-variant `*Data` struct, pulled together by
+//! a tagged [`ActionData`] enum. The resulting [`Action`] is content-only
+//! and always hashed via [`holo_hash::HoloHashed`] / [`SignedHashed`] at
+//! call sites, so the stored hash is invariant with the content.
+//!
+//! [`SignedHashed`]: crate::record::SignedHashed
 
+use crate::action::ZomeIndex;
+use crate::{
+    link::{LinkTag, LinkType},
+    EntryType, MembraneProof,
+};
+use holo_hash::{
+    ActionHash, AgentPubKey, AnyLinkableHash, DnaHash, EntryHash, HashableContent,
+    HashableContentBytes,
+};
 use holochain_serialized_bytes::prelude::*;
+use holochain_timestamp::Timestamp;
 
 /// Record-level validation outcome stored in `Action.record_validity`.
 ///
@@ -38,13 +56,21 @@ impl TryFrom<i64> for RecordValidity {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[repr(i64)]
 pub enum ActionType {
+    /// Genesis DNA action. Always `action_seq == 0` and `prev_action == None`.
     Dna = 1,
+    /// Agent validation package (membership proof) action.
     AgentValidationPkg = 2,
+    /// Marker action emitted once all init zomes have completed.
     InitZomesComplete = 3,
+    /// Creates a new entry on the chain.
     Create = 4,
+    /// Updates an existing entry with new content.
     Update = 5,
+    /// Deletes an existing entry.
     Delete = 6,
+    /// Creates a link between two linkable addresses.
     CreateLink = 7,
+    /// Deletes an existing `CreateLink` action.
     DeleteLink = 8,
 }
 
@@ -72,90 +98,121 @@ impl TryFrom<i64> for ActionType {
     }
 }
 
-use crate::action::ZomeIndex;
-use crate::{
-    link::{LinkTag, LinkType},
-    EntryType, MembraneProof,
-};
-use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, DnaHash, EntryHash};
-use holochain_timestamp::Timestamp;
-
-/// Common header fields shared by all action types.
+/// Common header fields shared by every action variant.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 pub struct ActionHeader {
+    /// The agent who authored this action.
     pub author: AgentPubKey,
+    /// Microsecond timestamp at which the action was authored.
     pub timestamp: Timestamp,
+    /// The action's position on the authoring agent's source chain.
     pub action_seq: u32,
-    /// `None` for the genesis `Dna` action only.
+    /// The preceding action's hash on the source chain.
+    ///
+    /// `None` only for the genesis [`ActionData::Dna`] action.
     pub prev_action: Option<ActionHash>,
 }
 
+/// Per-variant data for [`ActionType::Dna`].
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 pub struct DnaData {
+    /// Hash of the DNA that this chain is an instance of.
     pub dna_hash: DnaHash,
 }
 
+/// Per-variant data for [`ActionType::AgentValidationPkg`].
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 pub struct AgentValidationPkgData {
+    /// Optional membrane proof provided when joining the network.
     pub membrane_proof: Option<MembraneProof>,
 }
 
+/// Per-variant data for [`ActionType::InitZomesComplete`].
+///
+/// Carries no payload — the variant alone signals that all init zomes ran.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 pub struct InitZomesCompleteData {}
 
+/// Per-variant data for [`ActionType::Create`].
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 pub struct CreateData {
+    /// Application-defined entry type (including visibility).
     pub entry_type: EntryType,
+    /// Hash of the entry content being created.
     pub entry_hash: EntryHash,
 }
 
+/// Per-variant data for [`ActionType::Update`].
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 pub struct UpdateData {
+    /// Hash of the action being updated.
     pub original_action_address: ActionHash,
+    /// Hash of the original entry being updated.
     pub original_entry_address: EntryHash,
+    /// Application-defined entry type of the new entry.
     pub entry_type: EntryType,
+    /// Hash of the new entry content.
     pub entry_hash: EntryHash,
 }
 
+/// Per-variant data for [`ActionType::Delete`].
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 pub struct DeleteData {
+    /// Hash of the action being deleted.
     pub deletes_address: ActionHash,
+    /// Hash of the entry referenced by the deleted action.
     pub deletes_entry_address: EntryHash,
 }
 
+/// Per-variant data for [`ActionType::CreateLink`].
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 pub struct CreateLinkData {
+    /// The hash the link points from.
     pub base_address: AnyLinkableHash,
+    /// The hash the link points to.
     pub target_address: AnyLinkableHash,
+    /// Index of the zome that defined this link type.
     pub zome_index: ZomeIndex,
+    /// Link type identifier within the zome.
     pub link_type: LinkType,
+    /// Opaque tag attached to the link.
     pub tag: LinkTag,
 }
 
+/// Per-variant data for [`ActionType::DeleteLink`].
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 pub struct DeleteLinkData {
+    /// The base address of the link being removed.
     pub base_address: AnyLinkableHash,
+    /// Hash of the `CreateLink` action being deleted.
     pub link_add_address: ActionHash,
 }
-
-use holo_hash::{HashableContent, HashableContentBytes};
 
 /// Per-variant action data, stored serialized in the `Action.action_data`
 /// BLOB column.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 #[serde(tag = "type")]
 pub enum ActionData {
+    /// Genesis DNA action.
     Dna(DnaData),
+    /// Agent validation package.
     AgentValidationPkg(AgentValidationPkgData),
+    /// Signals that init zomes have completed.
     InitZomesComplete(InitZomesCompleteData),
+    /// Creates a new entry.
     Create(CreateData),
+    /// Updates an existing entry.
     Update(UpdateData),
+    /// Deletes an existing entry.
     Delete(DeleteData),
+    /// Creates a link between two addresses.
     CreateLink(CreateLinkData),
+    /// Deletes a previously created link.
     DeleteLink(DeleteLinkData),
 }
 
 impl ActionData {
+    /// The [`ActionType`] discriminant of this variant.
     pub fn action_type(&self) -> ActionType {
         match self {
             ActionData::Dna(_) => ActionType::Dna,
@@ -179,11 +236,16 @@ impl ActionData {
     }
 }
 
-/// Full action: hash + header + per-variant data.
+/// Full action content: header + per-variant data.
+///
+/// The hash is not stored on the struct — use [`holo_hash::HoloHashed<Action>`]
+/// (or [`crate::record::SignedHashed<Action>`]) at call sites so the hash is
+/// always derived from the content.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 pub struct Action {
-    pub hash: ActionHash,
+    /// Header fields common to every action variant.
     pub header: ActionHeader,
+    /// The per-variant payload.
     pub data: ActionData,
 }
 
@@ -196,21 +258,9 @@ impl HashableContent for Action {
     }
 
     fn hashable_content(&self) -> HashableContentBytes {
-        // Hash over the action's header + data — not the stored `hash` field,
-        // which is derived from the rest of the content.
-        #[derive(Debug, Serialize)]
-        struct Hashable<'a> {
-            header: &'a ActionHeader,
-            data: &'a ActionData,
-        }
-        let content = Hashable {
-            header: &self.header,
-            data: &self.data,
-        };
-        let sb = SerializedBytes::from(UnsafeBytes::from(
-            holochain_serialized_bytes::encode(&content).expect("Could not serialize v2 Action"),
-        ));
-        HashableContentBytes::Content(sb)
+        HashableContentBytes::Content(
+            SerializedBytes::try_from(self).expect("Could not serialize v2 Action"),
+        )
     }
 }
 

@@ -1,4 +1,9 @@
 //! Redesigned DHT state-model types (transitional — see `docs/design/state_model.md`).
+//!
+//! Re-exports the integrity-layer v2 types and adds the zome-layer aliases
+//! [`SignedAction`] (data + signature) and [`SignedActionHashed`]
+//! (content-addressed + signed). Also exposes the `op_type` INTEGER mapping
+//! used by the DHT schema.
 
 pub use holochain_integrity_types::dht_v2::*;
 
@@ -6,28 +11,32 @@ use crate::op::ChainOpType;
 use crate::signature::Signed;
 use holochain_integrity_types::record::SignedHashed;
 
-/// A v2 `Action` with its signature.
+/// A v2 [`Action`] with its [`crate::signature::Signature`] (no hash).
 pub type SignedAction = Signed<Action>;
 
-/// A v2 `Action` that is both hashed and signed.
+/// A v2 [`Action`] that is both hashed and signed.
 pub type SignedActionHashed = SignedHashed<Action>;
 
 /// A `Warrant` with its signature. Re-uses the existing `Warrant` type
 /// from `holochain_zome_types::warrant` — unchanged by the v2 redesign.
 pub use crate::warrant::SignedWarrant;
 
-/// Map the existing `ChainOpType` enum onto the schema `op_type` INTEGER
-/// column (1..=9). `0` is reserved.
-// ChainOpType numeric mapping (aligned with docs/design/state_model.md):
-//   1 = StoreRecord                 (CreateRecord,  action authority)
-//   2 = StoreEntry                  (CreateEntry,   entry authority)
-//   3 = RegisterAgentActivity       (AgentActivity, agent authority)
-//   4 = RegisterUpdatedContent      (UpdateEntry,   entry authority)
-//   5 = RegisterUpdatedRecord       (UpdateRecord,  action authority)
-//   6 = RegisterDeletedEntryAction  (DeleteEntry,   entry authority)
-//   7 = RegisterDeletedBy           (DeleteRecord,  action authority)
-//   8 = RegisterAddLink             (CreateLink)
-//   9 = RegisterRemoveLink          (DeleteLink)
+/// Map the existing [`ChainOpType`] enum onto the schema `op_type` INTEGER
+/// column (`1..=9`). `0` is reserved.
+///
+/// Variant ordering is pinned to `docs/design/state_model.md`:
+///
+/// | `op_type` | [`ChainOpType`] variant         | Semantic name  | Authority       |
+/// |-----------|---------------------------------|----------------|-----------------|
+/// | 1         | `StoreRecord`                   | CreateRecord   | action          |
+/// | 2         | `StoreEntry`                    | CreateEntry    | entry           |
+/// | 3         | `RegisterAgentActivity`         | AgentActivity  | agent           |
+/// | 4         | `RegisterUpdatedContent`        | UpdateEntry    | entry           |
+/// | 5         | `RegisterUpdatedRecord`         | UpdateRecord   | action          |
+/// | 6         | `RegisterDeletedEntryAction`    | DeleteEntry    | entry           |
+/// | 7         | `RegisterDeletedBy`             | DeleteRecord   | action          |
+/// | 8         | `RegisterAddLink`               | CreateLink     | link base       |
+/// | 9         | `RegisterRemoveLink`            | DeleteLink     | link base       |
 pub fn chain_op_type_to_i64(t: ChainOpType) -> i64 {
     match t {
         ChainOpType::StoreRecord => 1,

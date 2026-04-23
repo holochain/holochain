@@ -7,8 +7,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Add DHT database schema (17 tables per `docs/design/state_model.md`) with `DbKind::Dht`, migrations, row models, and single-table insert/read primitives. Domain types are added in `dht_v2` modules across `holochain_integrity_types`, `holochain_zome_types`, and `holochain_types`. Workflow-level compound operations are not included and will land in `holochain_state`.
-
 ## 0.7.0-dev.11
 
 ## 0.7.0-dev.10

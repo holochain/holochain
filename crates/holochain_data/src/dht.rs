@@ -6,12 +6,16 @@
 use crate::handles::{DbRead, DbWrite, TxRead, TxWrite};
 use crate::kind::Dht;
 use crate::models::dht::*;
-use holo_hash::{ActionHash, AgentPubKey, AnyDhtHash, AnyLinkableHash, DhtOpHash, EntryHash};
+use holo_hash::{
+    ActionHash, AgentPubKey, AnyDhtHash, AnyLinkableHash, DhtOpHash, EntryHash, HoloHashed,
+};
 use holochain_integrity_types::dht_v2::{Action, ActionData, ActionHeader, RecordValidity};
 use holochain_integrity_types::entry::Entry;
 use holochain_integrity_types::entry_def::EntryVisibility;
+use holochain_integrity_types::record::SignedHashed;
 use holochain_integrity_types::signature::Signature;
 use holochain_timestamp::Timestamp;
+use holochain_zome_types::dht_v2::SignedActionHashed;
 use sqlx::{Executor, Sqlite};
 
 // ============================================================================
@@ -20,20 +24,24 @@ use sqlx::{Executor, Sqlite};
 
 /// Insert an `Action` row. `record_validity` is `Some(Accepted)` for
 /// self-authored actions and `None` for incoming network actions.
+///
+/// The stored hash is taken from `action.as_hash()` — the caller is
+/// responsible for constructing the [`SignedActionHashed`] with the correct
+/// hash (via [`SignedHashed::new_unchecked`] or equivalent).
 async fn insert_action_impl<'e, E>(
     executor: E,
-    action: &Action,
-    signature: &Signature,
+    action: &SignedActionHashed,
     record_validity: Option<RecordValidity>,
 ) -> sqlx::Result<()>
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    let action_data_blob = holochain_serialized_bytes::encode(&action.data)
+    let inner: &Action = &action.hashed.content;
+    let action_data_blob = holochain_serialized_bytes::encode(&inner.data)
         .map_err(|e| sqlx::Error::Protocol(format!("encode ActionData: {e}")))?;
 
-    let entry_hash_bytes = action.data.entry_hash().map(|h| h.get_raw_36().to_vec());
-    let private_entry = match &action.data {
+    let entry_hash_bytes = inner.data.entry_hash().map(|h| h.get_raw_36().to_vec());
+    let private_entry = match &inner.data {
         ActionData::Create(d) => Some(*d.entry_type.visibility() == EntryVisibility::Private),
         ActionData::Update(d) => Some(*d.entry_type.visibility() == EntryVisibility::Private),
         _ => None,
@@ -46,20 +54,20 @@ where
                              record_validity)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
-    .bind(action.hash.get_raw_36())
-    .bind(action.header.author.get_raw_36())
-    .bind(action.header.action_seq as i64)
+    .bind(action.as_hash().get_raw_36())
+    .bind(inner.header.author.get_raw_36())
+    .bind(inner.header.action_seq as i64)
     .bind(
-        action
+        inner
             .header
             .prev_action
             .as_ref()
             .map(|h| h.get_raw_36().to_vec()),
     )
-    .bind(action.header.timestamp.as_micros())
-    .bind(i64::from(action.data.action_type()))
+    .bind(inner.header.timestamp.as_micros())
+    .bind(i64::from(inner.data.action_type()))
     .bind(action_data_blob)
-    .bind(signature.0.as_slice())
+    .bind(action.signature().0.as_slice())
     .bind(entry_hash_bytes)
     .bind(private_entry)
     .bind(record_validity.map(i64::from))
@@ -68,15 +76,14 @@ where
     Ok(())
 }
 
-fn row_to_action(row: ActionRow) -> sqlx::Result<Action> {
+fn row_to_signed_action_hashed(row: ActionRow) -> sqlx::Result<SignedActionHashed> {
     let data: ActionData = holochain_serialized_bytes::decode(&row.action_data).map_err(|e| {
         sqlx::Error::Decode(Box::new(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
             format!("decode ActionData: {e}"),
         )))
     })?;
-    Ok(Action {
-        hash: ActionHash::from_raw_36(row.hash),
+    let action = Action {
         header: ActionHeader {
             author: AgentPubKey::from_raw_36(row.author),
             timestamp: holochain_timestamp::Timestamp::from_micros(row.timestamp),
@@ -84,10 +91,24 @@ fn row_to_action(row: ActionRow) -> sqlx::Result<Action> {
             prev_action: row.prev_hash.map(ActionHash::from_raw_36),
         },
         data,
-    })
+    };
+    let sig_bytes: [u8; 64] = row.signature.as_slice().try_into().map_err(|_| {
+        sqlx::Error::Decode(Box::new(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!(
+                "signature column has {} bytes, expected 64",
+                row.signature.len()
+            ),
+        )))
+    })?;
+    let hashed = HoloHashed::with_pre_hashed(action, ActionHash::from_raw_36(row.hash));
+    Ok(SignedHashed::with_presigned(hashed, Signature(sig_bytes)))
 }
 
-async fn get_action_impl<'e, E>(executor: E, hash: ActionHash) -> sqlx::Result<Option<Action>>
+async fn get_action_impl<'e, E>(
+    executor: E,
+    hash: ActionHash,
+) -> sqlx::Result<Option<SignedActionHashed>>
 where
     E: Executor<'e, Database = Sqlite>,
 {
@@ -99,13 +120,13 @@ where
     .bind(hash.get_raw_36())
     .fetch_optional(executor)
     .await?;
-    row.map(row_to_action).transpose()
+    row.map(row_to_signed_action_hashed).transpose()
 }
 
 async fn get_actions_by_author_impl<'e, E>(
     executor: E,
     author: AgentPubKey,
-) -> sqlx::Result<Vec<Action>>
+) -> sqlx::Result<Vec<SignedActionHashed>>
 where
     E: Executor<'e, Database = Sqlite>,
 {
@@ -117,7 +138,7 @@ where
     .bind(author.get_raw_36())
     .fetch_all(executor)
     .await?;
-    rows.into_iter().map(row_to_action).collect()
+    rows.into_iter().map(row_to_signed_action_hashed).collect()
 }
 
 // ============================================================================
@@ -125,44 +146,50 @@ where
 // ============================================================================
 
 impl DbWrite<Dht> {
-    /// Insert an `Action` row.
+    /// Insert an `Action` row, storing its signature and pre-computed hash.
     pub async fn insert_action(
         &self,
-        action: &Action,
-        signature: &Signature,
+        action: &SignedActionHashed,
         record_validity: Option<RecordValidity>,
     ) -> sqlx::Result<()> {
-        insert_action_impl(self.pool(), action, signature, record_validity).await
+        insert_action_impl(self.pool(), action, record_validity).await
     }
 }
 
 impl DbRead<Dht> {
-    /// Fetch a single `Action` by hash.
-    pub async fn get_action(&self, hash: ActionHash) -> sqlx::Result<Option<Action>> {
+    /// Fetch a single action by hash, returning it with its stored signature
+    /// and hash as a [`SignedActionHashed`].
+    pub async fn get_action(&self, hash: ActionHash) -> sqlx::Result<Option<SignedActionHashed>> {
         get_action_impl(self.pool(), hash).await
     }
 
     /// Fetch all actions for a given author, ordered by `action_seq` ascending.
-    pub async fn get_actions_by_author(&self, author: AgentPubKey) -> sqlx::Result<Vec<Action>> {
+    pub async fn get_actions_by_author(
+        &self,
+        author: AgentPubKey,
+    ) -> sqlx::Result<Vec<SignedActionHashed>> {
         get_actions_by_author_impl(self.pool(), author).await
     }
 }
 
 impl TxWrite<Dht> {
-    /// Insert an `Action` row.
+    /// Insert an `Action` row, storing its signature and pre-computed hash.
     pub async fn insert_action(
         &mut self,
-        action: &Action,
-        signature: &Signature,
+        action: &SignedActionHashed,
         record_validity: Option<RecordValidity>,
     ) -> sqlx::Result<()> {
-        insert_action_impl(self.conn_mut(), action, signature, record_validity).await
+        insert_action_impl(self.conn_mut(), action, record_validity).await
     }
 }
 
 impl TxRead<Dht> {
-    /// Fetch a single `Action` by hash.
-    pub async fn get_action(&mut self, hash: ActionHash) -> sqlx::Result<Option<Action>> {
+    /// Fetch a single action by hash, returning it with its stored signature
+    /// and hash as a [`SignedActionHashed`].
+    pub async fn get_action(
+        &mut self,
+        hash: ActionHash,
+    ) -> sqlx::Result<Option<SignedActionHashed>> {
         get_action_impl(self.conn_mut(), hash).await
     }
 
@@ -170,7 +197,7 @@ impl TxRead<Dht> {
     pub async fn get_actions_by_author(
         &mut self,
         author: AgentPubKey,
-    ) -> sqlx::Result<Vec<Action>> {
+    ) -> sqlx::Result<Vec<SignedActionHashed>> {
         get_actions_by_author_impl(self.conn_mut(), author).await
     }
 }
@@ -549,28 +576,42 @@ impl TxRead<Dht> {
 // ChainLock operations
 // ============================================================================
 
+/// Try to acquire the chain lock for `author`.
+///
+/// Succeeds (returns `Ok(true)`) when there is no existing lock, when the
+/// existing lock has expired (relative to `now`), or when the existing lock's
+/// `subject` matches — the last case lets the current holder extend or
+/// re-acquire their own lock.
+///
+/// Returns `Ok(false)` when a different subject still holds an unexpired lock,
+/// leaving the existing row untouched. This prevents silent lock stealing.
 async fn acquire_chain_lock_impl<'e, E>(
     executor: E,
     author: &AgentPubKey,
     subject: &[u8],
     expires_at: Timestamp,
-) -> sqlx::Result<()>
+    now: Timestamp,
+) -> sqlx::Result<bool>
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    sqlx::query(
+    let rows_affected = sqlx::query(
         "INSERT INTO ChainLock (author, subject, expires_at_timestamp)
-         VALUES (?, ?, ?)
+         VALUES (?1, ?2, ?3)
          ON CONFLICT(author) DO UPDATE SET
             subject = excluded.subject,
-            expires_at_timestamp = excluded.expires_at_timestamp",
+            expires_at_timestamp = excluded.expires_at_timestamp
+         WHERE ChainLock.expires_at_timestamp <= ?4
+            OR ChainLock.subject = excluded.subject",
     )
     .bind(author.get_raw_36())
     .bind(subject)
     .bind(expires_at.as_micros())
+    .bind(now.as_micros())
     .execute(executor)
-    .await?;
-    Ok(())
+    .await?
+    .rows_affected();
+    Ok(rows_affected > 0)
 }
 
 async fn get_chain_lock_impl<'e, E>(
@@ -614,13 +655,17 @@ where
 }
 
 impl DbWrite<Dht> {
+    /// Try to acquire the chain lock for `author`. See
+    /// [`acquire_chain_lock_impl`] for the full rule set. Returns `true` when
+    /// the caller now holds the lock.
     pub async fn acquire_chain_lock(
         &self,
         author: &AgentPubKey,
         subject: &[u8],
         expires_at: Timestamp,
-    ) -> sqlx::Result<()> {
-        acquire_chain_lock_impl(self.pool(), author, subject, expires_at).await
+        now: Timestamp,
+    ) -> sqlx::Result<bool> {
+        acquire_chain_lock_impl(self.pool(), author, subject, expires_at, now).await
     }
 
     pub async fn release_chain_lock(&self, author: &AgentPubKey) -> sqlx::Result<()> {
@@ -643,13 +688,17 @@ impl DbRead<Dht> {
 }
 
 impl TxWrite<Dht> {
+    /// Try to acquire the chain lock for `author`. See
+    /// [`acquire_chain_lock_impl`] for the full rule set. Returns `true` when
+    /// the caller now holds the lock.
     pub async fn acquire_chain_lock(
         &mut self,
         author: &AgentPubKey,
         subject: &[u8],
         expires_at: Timestamp,
-    ) -> sqlx::Result<()> {
-        acquire_chain_lock_impl(self.conn_mut(), author, subject, expires_at).await
+        now: Timestamp,
+    ) -> sqlx::Result<bool> {
+        acquire_chain_lock_impl(self.conn_mut(), author, subject, expires_at, now).await
     }
 
     pub async fn release_chain_lock(&mut self, author: &AgentPubKey) -> sqlx::Result<()> {
@@ -730,7 +779,7 @@ where
 
 async fn limbo_chain_ops_pending_sys_impl<'e, E>(
     executor: E,
-    limit: i64,
+    limit: u32,
 ) -> sqlx::Result<Vec<LimboChainOpRow>>
 where
     E: Executor<'e, Database = Sqlite>,
@@ -741,14 +790,14 @@ where
          ORDER BY sys_validation_attempts, when_received
          LIMIT ?",
     )
-    .bind(limit)
+    .bind(limit as i64)
     .fetch_all(executor)
     .await
 }
 
 async fn limbo_chain_ops_pending_app_impl<'e, E>(
     executor: E,
-    limit: i64,
+    limit: u32,
 ) -> sqlx::Result<Vec<LimboChainOpRow>>
 where
     E: Executor<'e, Database = Sqlite>,
@@ -760,14 +809,14 @@ where
          ORDER BY app_validation_attempts, when_received
          LIMIT ?",
     )
-    .bind(limit)
+    .bind(limit as i64)
     .fetch_all(executor)
     .await
 }
 
 async fn limbo_chain_ops_ready_for_integration_impl<'e, E>(
     executor: E,
-    limit: i64,
+    limit: u32,
 ) -> sqlx::Result<Vec<LimboChainOpRow>>
 where
     E: Executor<'e, Database = Sqlite>,
@@ -780,7 +829,7 @@ where
          ORDER BY when_received
          LIMIT ?",
     )
-    .bind(limit)
+    .bind(limit as i64)
     .fetch_all(executor)
     .await
 }
@@ -838,21 +887,21 @@ impl DbRead<Dht> {
 
     pub async fn limbo_chain_ops_pending_sys(
         &self,
-        limit: i64,
+        limit: u32,
     ) -> sqlx::Result<Vec<LimboChainOpRow>> {
         limbo_chain_ops_pending_sys_impl(self.pool(), limit).await
     }
 
     pub async fn limbo_chain_ops_pending_app(
         &self,
-        limit: i64,
+        limit: u32,
     ) -> sqlx::Result<Vec<LimboChainOpRow>> {
         limbo_chain_ops_pending_app_impl(self.pool(), limit).await
     }
 
     pub async fn limbo_chain_ops_ready_for_integration(
         &self,
-        limit: i64,
+        limit: u32,
     ) -> sqlx::Result<Vec<LimboChainOpRow>> {
         limbo_chain_ops_ready_for_integration_impl(self.pool(), limit).await
     }
@@ -900,21 +949,21 @@ impl TxRead<Dht> {
 
     pub async fn limbo_chain_ops_pending_sys(
         &mut self,
-        limit: i64,
+        limit: u32,
     ) -> sqlx::Result<Vec<LimboChainOpRow>> {
         limbo_chain_ops_pending_sys_impl(self.conn_mut(), limit).await
     }
 
     pub async fn limbo_chain_ops_pending_app(
         &mut self,
-        limit: i64,
+        limit: u32,
     ) -> sqlx::Result<Vec<LimboChainOpRow>> {
         limbo_chain_ops_pending_app_impl(self.conn_mut(), limit).await
     }
 
     pub async fn limbo_chain_ops_ready_for_integration(
         &mut self,
-        limit: i64,
+        limit: u32,
     ) -> sqlx::Result<Vec<LimboChainOpRow>> {
         limbo_chain_ops_ready_for_integration_impl(self.conn_mut(), limit).await
     }
@@ -978,7 +1027,7 @@ where
 
 async fn limbo_warrants_pending_sys_impl<'e, E>(
     executor: E,
-    limit: i64,
+    limit: u32,
 ) -> sqlx::Result<Vec<LimboWarrantRow>>
 where
     E: Executor<'e, Database = Sqlite>,
@@ -989,14 +1038,14 @@ where
          ORDER BY sys_validation_attempts, when_received
          LIMIT ?",
     )
-    .bind(limit)
+    .bind(limit as i64)
     .fetch_all(executor)
     .await
 }
 
 async fn limbo_warrants_ready_for_integration_impl<'e, E>(
     executor: E,
-    limit: i64,
+    limit: u32,
 ) -> sqlx::Result<Vec<LimboWarrantRow>>
 where
     E: Executor<'e, Database = Sqlite>,
@@ -1007,7 +1056,7 @@ where
          ORDER BY when_received
          LIMIT ?",
     )
-    .bind(limit)
+    .bind(limit as i64)
     .fetch_all(executor)
     .await
 }
@@ -1065,14 +1114,14 @@ impl DbRead<Dht> {
 
     pub async fn limbo_warrants_pending_sys(
         &self,
-        limit: i64,
+        limit: u32,
     ) -> sqlx::Result<Vec<LimboWarrantRow>> {
         limbo_warrants_pending_sys_impl(self.pool(), limit).await
     }
 
     pub async fn limbo_warrants_ready_for_integration(
         &self,
-        limit: i64,
+        limit: u32,
     ) -> sqlx::Result<Vec<LimboWarrantRow>> {
         limbo_warrants_ready_for_integration_impl(self.pool(), limit).await
     }
@@ -1120,14 +1169,14 @@ impl TxRead<Dht> {
 
     pub async fn limbo_warrants_pending_sys(
         &mut self,
-        limit: i64,
+        limit: u32,
     ) -> sqlx::Result<Vec<LimboWarrantRow>> {
         limbo_warrants_pending_sys_impl(self.conn_mut(), limit).await
     }
 
     pub async fn limbo_warrants_ready_for_integration(
         &mut self,
-        limit: i64,
+        limit: u32,
     ) -> sqlx::Result<Vec<LimboWarrantRow>> {
         limbo_warrants_ready_for_integration_impl(self.conn_mut(), limit).await
     }
@@ -2030,9 +2079,8 @@ mod tests {
         Dht::new(Arc::new(DnaHash::from_raw_36(vec![0u8; 36])))
     }
 
-    fn sample_action(seed: u8) -> (Action, Signature) {
+    fn sample_action(seed: u8) -> SignedActionHashed {
         let action = Action {
-            hash: ActionHash::from_raw_36(vec![seed; 36]),
             header: ActionHeader {
                 author: AgentPubKey::from_raw_36(vec![1u8; 36]),
                 timestamp: Timestamp::from_micros(1_000_000 + seed as i64),
@@ -2051,22 +2099,22 @@ mod tests {
                 ActionData::InitZomesComplete(InitZomesCompleteData {})
             },
         };
-        let signature = Signature([seed; 64]);
-        (action, signature)
+        let hashed = HoloHashed::with_pre_hashed(action, ActionHash::from_raw_36(vec![seed; 36]));
+        SignedHashed::with_presigned(hashed, Signature([seed; 64]))
     }
 
     #[tokio::test]
     async fn action_roundtrip() {
         let db = test_open_db(dht_db_id()).await.unwrap();
-        let (action, signature) = sample_action(0);
+        let action = sample_action(0);
 
-        db.insert_action(&action, &signature, Some(RecordValidity::Accepted))
+        db.insert_action(&action, Some(RecordValidity::Accepted))
             .await
             .unwrap();
 
         let fetched = db
             .as_ref()
-            .get_action(action.hash.clone())
+            .get_action(action.as_hash().clone())
             .await
             .unwrap()
             .expect("action not found");
@@ -2078,8 +2126,8 @@ mod tests {
     async fn actions_by_author() {
         let db = test_open_db(dht_db_id()).await.unwrap();
         for seed in 0..3u8 {
-            let (action, signature) = sample_action(seed);
-            db.insert_action(&action, &signature, Some(RecordValidity::Accepted))
+            let action = sample_action(seed);
+            db.insert_action(&action, Some(RecordValidity::Accepted))
                 .await
                 .unwrap();
         }
@@ -2087,9 +2135,10 @@ mod tests {
         let author = AgentPubKey::from_raw_36(vec![1u8; 36]);
         let actions = db.as_ref().get_actions_by_author(author).await.unwrap();
         assert_eq!(actions.len(), 3);
-        // Ordered by seq ascending.
+        // Ordered by seq ascending, with signatures preserved.
         for (i, action) in actions.iter().enumerate() {
-            assert_eq!(action.header.action_seq, i as u32);
+            assert_eq!(action.hashed.content.header.action_seq, i as u32);
+            assert_eq!(action.signature().0, [i as u8; 64]);
         }
     }
 
@@ -2145,17 +2194,22 @@ mod tests {
     #[tokio::test]
     async fn tx_action_and_entry_rollback_discards() {
         let db = test_open_db(dht_db_id()).await.unwrap();
-        let (action, signature) = sample_action(0);
+        let action = sample_action(0);
         let (entry_hash, entry) = sample_entry(42);
 
         let mut tx = db.begin().await.unwrap();
-        tx.insert_action(&action, &signature, Some(RecordValidity::Accepted))
+        tx.insert_action(&action, Some(RecordValidity::Accepted))
             .await
             .unwrap();
         tx.insert_entry(&entry_hash, &entry).await.unwrap();
         tx.rollback().await.unwrap();
 
-        assert!(db.as_ref().get_action(action.hash).await.unwrap().is_none());
+        assert!(db
+            .as_ref()
+            .get_action(action.as_hash().clone())
+            .await
+            .unwrap()
+            .is_none());
         assert!(db.as_ref().get_entry(entry_hash).await.unwrap().is_none());
     }
 
@@ -2163,13 +2217,14 @@ mod tests {
     async fn cap_grant_roundtrip() {
         let db = test_open_db(dht_db_id()).await.unwrap();
         // Seed the parent Action (FK).
-        let (action, signature) = sample_action(0);
-        db.insert_action(&action, &signature, Some(RecordValidity::Accepted))
+        let action = sample_action(0);
+        db.insert_action(&action, Some(RecordValidity::Accepted))
             .await
             .unwrap();
 
-        let author = action.header.author.clone();
-        db.insert_cap_grant(&action.hash, 1 /* Transferable */, Some("my-tag"))
+        let author = action.hashed.content.header.author.clone();
+        let action_hash = action.as_hash().clone();
+        db.insert_cap_grant(&action_hash, 1 /* Transferable */, Some("my-tag"))
             .await
             .unwrap();
 
@@ -2179,7 +2234,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(by_access.len(), 1);
-        assert_eq!(by_access[0].action_hash, action.hash.get_raw_36().to_vec());
+        assert_eq!(by_access[0].action_hash, action_hash.get_raw_36().to_vec());
 
         let by_tag = db
             .as_ref()
@@ -2233,9 +2288,16 @@ mod tests {
         let author = AgentPubKey::from_raw_36(vec![7u8; 36]);
         let subject = vec![1u8; 32];
 
-        db.acquire_chain_lock(&author, &subject, Timestamp::from_micros(10_000))
+        let acquired = db
+            .acquire_chain_lock(
+                &author,
+                &subject,
+                Timestamp::from_micros(10_000),
+                Timestamp::from_micros(0),
+            )
             .await
             .unwrap();
+        assert!(acquired);
 
         let lock = db
             .as_ref()
@@ -2247,15 +2309,30 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn chain_lock_upsert_replaces_subject() {
+    async fn chain_lock_same_subject_can_extend() {
         let db = test_open_db(dht_db_id()).await.unwrap();
         let author = AgentPubKey::from_raw_36(vec![7u8; 36]);
-        db.acquire_chain_lock(&author, &[1u8; 32], Timestamp::from_micros(10_000))
+        let subject = vec![1u8; 32];
+
+        assert!(db
+            .acquire_chain_lock(
+                &author,
+                &subject,
+                Timestamp::from_micros(10_000),
+                Timestamp::from_micros(0),
+            )
             .await
-            .unwrap();
-        db.acquire_chain_lock(&author, &[2u8; 32], Timestamp::from_micros(20_000))
+            .unwrap());
+        // Same holder extends the expiry while the lock is still active.
+        assert!(db
+            .acquire_chain_lock(
+                &author,
+                &subject,
+                Timestamp::from_micros(20_000),
+                Timestamp::from_micros(5_000),
+            )
             .await
-            .unwrap();
+            .unwrap());
 
         let lock = db
             .as_ref()
@@ -2263,8 +2340,83 @@ mod tests {
             .await
             .unwrap()
             .expect("expected lock");
-        assert_eq!(lock.subject, vec![2u8; 32]);
+        assert_eq!(lock.subject, subject);
         assert_eq!(lock.expires_at_timestamp, 20_000);
+    }
+
+    #[tokio::test]
+    async fn chain_lock_different_subject_cannot_steal_active_lock() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let author = AgentPubKey::from_raw_36(vec![7u8; 36]);
+
+        assert!(db
+            .acquire_chain_lock(
+                &author,
+                &[1u8; 32],
+                Timestamp::from_micros(10_000),
+                Timestamp::from_micros(0),
+            )
+            .await
+            .unwrap());
+
+        // A different subject cannot steal the unexpired lock.
+        let stole = db
+            .acquire_chain_lock(
+                &author,
+                &[2u8; 32],
+                Timestamp::from_micros(20_000),
+                Timestamp::from_micros(5_000),
+            )
+            .await
+            .unwrap();
+        assert!(!stole);
+
+        // Existing lock is untouched.
+        let lock = db
+            .as_ref()
+            .get_chain_lock(author, Timestamp::from_micros(5_000))
+            .await
+            .unwrap()
+            .expect("expected lock");
+        assert_eq!(lock.subject, vec![1u8; 32]);
+        assert_eq!(lock.expires_at_timestamp, 10_000);
+    }
+
+    #[tokio::test]
+    async fn chain_lock_new_subject_can_acquire_after_expiry() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let author = AgentPubKey::from_raw_36(vec![7u8; 36]);
+
+        assert!(db
+            .acquire_chain_lock(
+                &author,
+                &[1u8; 32],
+                Timestamp::from_micros(10_000),
+                Timestamp::from_micros(0),
+            )
+            .await
+            .unwrap());
+
+        // At `now = 10_000`, the previous lock is expired (expires_at <= now), so
+        // a different subject may take over.
+        assert!(db
+            .acquire_chain_lock(
+                &author,
+                &[2u8; 32],
+                Timestamp::from_micros(30_000),
+                Timestamp::from_micros(10_000),
+            )
+            .await
+            .unwrap());
+
+        let lock = db
+            .as_ref()
+            .get_chain_lock(author, Timestamp::from_micros(20_000))
+            .await
+            .unwrap()
+            .expect("expected lock");
+        assert_eq!(lock.subject, vec![2u8; 32]);
+        assert_eq!(lock.expires_at_timestamp, 30_000);
     }
 
     #[tokio::test]
@@ -2273,12 +2425,24 @@ mod tests {
         let a = AgentPubKey::from_raw_36(vec![1u8; 36]);
         let b = AgentPubKey::from_raw_36(vec![2u8; 36]);
 
-        db.acquire_chain_lock(&a, &[1u8; 32], Timestamp::from_micros(100))
+        assert!(db
+            .acquire_chain_lock(
+                &a,
+                &[1u8; 32],
+                Timestamp::from_micros(100),
+                Timestamp::from_micros(0),
+            )
             .await
-            .unwrap();
-        db.acquire_chain_lock(&b, &[2u8; 32], Timestamp::from_micros(1_000))
+            .unwrap());
+        assert!(db
+            .acquire_chain_lock(
+                &b,
+                &[2u8; 32],
+                Timestamp::from_micros(1_000),
+                Timestamp::from_micros(0),
+            )
             .await
-            .unwrap();
+            .unwrap());
 
         db.release_chain_lock(&a).await.unwrap();
         assert!(db
@@ -2304,9 +2468,14 @@ mod tests {
     async fn chain_lock_expired_is_not_returned() {
         let db = test_open_db(dht_db_id()).await.unwrap();
         let author = AgentPubKey::from_raw_36(vec![9u8; 36]);
-        db.acquire_chain_lock(&author, &[3u8; 32], Timestamp::from_micros(100))
-            .await
-            .unwrap();
+        db.acquire_chain_lock(
+            &author,
+            &[3u8; 32],
+            Timestamp::from_micros(100),
+            Timestamp::from_micros(0),
+        )
+        .await
+        .unwrap();
         // Now is past expiry.
         assert!(db
             .as_ref()
@@ -2319,9 +2488,9 @@ mod tests {
     use holo_hash::{AnyDhtHash, DhtOpHash};
 
     async fn seed_action_for_op(db: &crate::handles::DbWrite<Dht>, seed: u8) -> ActionHash {
-        let (action, signature) = sample_action(seed);
-        db.insert_action(&action, &signature, None).await.unwrap();
-        action.hash
+        let action = sample_action(seed);
+        db.insert_action(&action, None).await.unwrap();
+        action.as_hash().clone()
     }
 
     fn sample_basis(seed: u8) -> AnyDhtHash {
@@ -2730,9 +2899,8 @@ mod tests {
         assert_eq!(rows.len(), 1);
     }
 
-    fn sample_action_with_data(seed: u8, data: ActionData) -> (Action, Signature) {
+    fn sample_action_with_data(seed: u8, data: ActionData) -> SignedActionHashed {
         let action = Action {
-            hash: ActionHash::from_raw_36(vec![seed; 36]),
             header: ActionHeader {
                 author: AgentPubKey::from_raw_36(vec![0xAB; 36]),
                 timestamp: Timestamp::from_micros(seed as i64 + 1),
@@ -2741,7 +2909,8 @@ mod tests {
             },
             data,
         };
-        (action, Signature([seed; 64]))
+        let hashed = HoloHashed::with_pre_hashed(action, ActionHash::from_raw_36(vec![seed; 36]));
+        SignedHashed::with_presigned(hashed, Signature([seed; 64]))
     }
 
     #[tokio::test]
@@ -2814,16 +2983,20 @@ mod tests {
 
         let db = test_open_db(dht_db_id()).await.unwrap();
         for (seed, data) in cases {
-            let (action, signature) = sample_action_with_data(seed, data);
-            db.insert_action(&action, &signature, None).await.unwrap();
+            let action = sample_action_with_data(seed, data);
+            db.insert_action(&action, None).await.unwrap();
             let fetched = db
                 .as_ref()
-                .get_action(action.hash.clone())
+                .get_action(action.as_hash().clone())
                 .await
                 .unwrap()
                 .unwrap();
             assert_eq!(fetched, action);
-            assert_eq!(i64::from(fetched.data.action_type()), seed as i64);
+            assert_eq!(
+                i64::from(fetched.hashed.content.data.action_type()),
+                seed as i64
+            );
+            assert_eq!(fetched.signature().0, [seed; 64]);
         }
     }
 }
