@@ -27,11 +27,16 @@ static WASM_MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations/was
 /// Embedded migrations for the Conductor database.
 static CONDUCTOR_MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations/conductor");
 
+/// Embedded migrations for the [`kind::DbKind::PeerMetaStore`] database.
+static PEER_META_STORE_MIGRATOR: sqlx::migrate::Migrator =
+    sqlx::migrate!("./migrations/peer_meta_store");
+
 /// Select the appropriate migrator for a database kind.
 fn migrator_for(db_kind: kind::DbKind) -> &'static sqlx::migrate::Migrator {
     match db_kind {
         kind::DbKind::Wasm => &WASM_MIGRATOR,
         kind::DbKind::Conductor => &CONDUCTOR_MIGRATOR,
+        kind::DbKind::PeerMetaStore => &PEER_META_STORE_MIGRATOR,
     }
 }
 
