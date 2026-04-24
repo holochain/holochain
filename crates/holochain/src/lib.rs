@@ -50,4 +50,4 @@ pub mod prelude {
     feature = "wasmer-sys-llvm",
     feature = "wasmer-wasmi"
 )))]
-compile_error!("One of: `wasmer-sys-cranelift`, `wasmer-sys-llvm` or `wasmer-wasmi` features must be enabled. Please, pick one.");
+compile_error!("At least one of: `wasmer-sys-cranelift`, `wasmer-sys-llvm` or `wasmer-wasmi` features must be enabled.");

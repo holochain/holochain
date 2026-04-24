@@ -268,7 +268,7 @@ mod startup_shutdown_impls {
                     cfg_select! {
                         feature = "wasmer-sys-cranelift" => WasmBackend::Cranelift,
                         feature = "wasmer-wasmi" => WasmBackend::Wasmi,
-                        feature = "wasmer-sys-llvm" => WasmBackend::LLVM,
+                        feature = "wasmer-sys-llvm" => WasmBackend::Llvm,
                     }
                 }
             };

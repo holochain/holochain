@@ -20,8 +20,8 @@ UNSTABLE_FEATURES=unstable-sharding,unstable-functions,unstable-migration,$(DEFA
 # default to running everything (first rule)
 default: build-workspace-wasmer-sys-cranelift \
 	test-workspace-wasmer-sys-cranelift \
-	build-workspace-wasmer_wasmi \
-	test-workspace-wasmer_wasmi
+	build-workspace-wasmer-wasmi \
+	test-workspace-wasmer-wasmi
 
 # execute all static code validation
 static-all: static-fmt static-toml static-clippy static-clippy-unstable static-doc

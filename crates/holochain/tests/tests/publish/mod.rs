@@ -24,7 +24,7 @@ use {
         all(target_os = "macos", feature = "wasmer-sys-cranelift"),
         all(target_os = "macos", feature = "wasmer-sys-llvm")
     )),
-    ignore = "flaky on macos+wasmer_wasmi and windows"
+    ignore = "flaky on macos+wasmer-wasmi and windows"
 )]
 async fn publish_terminates_after_receiving_required_validation_receipts() {
     use holochain::test_utils::retry_fn_until_timeout;
