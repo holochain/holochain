@@ -19,6 +19,7 @@ pub use handles::{DbRead, DbWrite, TxRead, TxWrite};
 pub mod conductor;
 pub mod kind;
 pub mod models;
+pub mod peer_meta_store;
 pub mod wasm;
 
 /// Embedded migrations for the Wasm database.
