@@ -42,4 +42,22 @@ mod tests {
 
         assert!(tables.contains(&"peer_meta".to_string()));
     }
+
+    #[tokio::test]
+    async fn expires_at_index_is_partial() {
+        let db = test_open_db(test_db_id()).await.unwrap();
+
+        let partial: Option<i64> = sqlx::query_scalar(
+            "SELECT partial FROM pragma_index_list('peer_meta') WHERE name = 'expires_at_idx'",
+        )
+        .fetch_optional(db.pool())
+        .await
+        .unwrap();
+
+        assert_eq!(
+            partial,
+            Some(1),
+            "expires_at_idx should exist and be a partial index"
+        );
+    }
 }
