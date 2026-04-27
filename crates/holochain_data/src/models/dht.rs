@@ -1,10 +1,11 @@
 //! `sqlx::FromRow` row structs for the DHT database.
 //!
 //! Each struct mirrors one table. BLOBs are `Vec<u8>`; NULL-able columns are
-//! `Option<T>`; booleans are stored as `i64` (0/1). Integer enum discriminants
-//! follow the conventions in `migrations/dht/*.up.sql` (e.g. `action_type`
-//! `1..=8`, `op_type` `1..=9`, `cap_access` `0..=2`; `NULL = pending`,
-//! `1 = accepted`, `2 = rejected` for validation status columns).
+//! `Option<T>`; booleans are stored as `i64` (0/1). For integer-encoded
+//! enum columns, the mapping lives on the corresponding enum's
+//! `From<T> for i64` / `TryFrom<i64> for T` impl (see
+//! [`holochain_integrity_types::dht_v2`] and
+//! [`holochain_zome_types::dht_v2`]).
 
 /// Row from the `Action` table.
 #[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
@@ -19,7 +20,7 @@ pub struct ActionRow {
     pub prev_hash: Option<Vec<u8>>,
     /// Microsecond authoring timestamp.
     pub timestamp: i64,
-    /// [`ActionType`](holochain_integrity_types::dht_v2::ActionType) discriminant (1..=8).
+    /// Encoded [`ActionType`](holochain_integrity_types::dht_v2::ActionType).
     pub action_type: i64,
     /// Serialized [`ActionData`](holochain_integrity_types::dht_v2::ActionData) blob.
     pub action_data: Vec<u8>,
@@ -29,7 +30,8 @@ pub struct ActionRow {
     pub entry_hash: Option<Vec<u8>>,
     /// `1` when the entry is private, `0` when public; `NULL` for actions without an entry.
     pub private_entry: Option<i64>,
-    /// Record-level validation outcome; `NULL = pending`, `1 = accepted`, `2 = rejected`.
+    /// Encoded [`RecordValidity`](holochain_integrity_types::dht_v2::RecordValidity);
+    /// `NULL` represents pending.
     pub record_validity: Option<i64>,
 }
 
@@ -58,7 +60,7 @@ pub struct PrivateEntryRow {
 pub struct CapGrantRow {
     /// Hash of the `CapGrant` action (primary key).
     pub action_hash: Vec<u8>,
-    /// Access mode: `0 = Unrestricted`, `1 = Transferable`, `2 = Assigned`.
+    /// Encoded [`CapAccess`](holochain_integrity_types::dht_v2::CapAccess).
     pub cap_access: i64,
     /// Optional human-readable tag.
     pub tag: Option<String>,
@@ -95,7 +97,7 @@ pub struct ChainLockRow {
 pub struct LimboChainOpRow {
     /// DHT op hash (primary key).
     pub hash: Vec<u8>,
-    /// [`ChainOpType`](holochain_zome_types::op::ChainOpType) discriminant (1..=9).
+    /// Encoded [`ChainOpType`](holochain_zome_types::op::ChainOpType).
     pub op_type: i64,
     /// Hash of the associated action.
     pub action_hash: Vec<u8>,
@@ -103,9 +105,11 @@ pub struct LimboChainOpRow {
     pub basis_hash: Vec<u8>,
     /// Numeric storage center derived from `basis_hash`.
     pub storage_center_loc: i64,
-    /// System validation outcome; `NULL = pending`, `1 = accepted`, `2 = rejected`.
+    /// Encoded [`RecordValidity`](holochain_integrity_types::dht_v2::RecordValidity);
+    /// `NULL` represents pending.
     pub sys_validation_status: Option<i64>,
-    /// App validation outcome; `NULL = pending`, `1 = accepted`, `2 = rejected`.
+    /// Encoded [`RecordValidity`](holochain_integrity_types::dht_v2::RecordValidity);
+    /// `NULL` represents pending.
     pub app_validation_status: Option<i64>,
     /// Microsecond timestamp at which validation was abandoned; `NULL` if not abandoned.
     pub abandoned_at: Option<i64>,
@@ -138,7 +142,8 @@ pub struct LimboWarrantRow {
     pub proof: Vec<u8>,
     /// Numeric storage center derived from the warrantee.
     pub storage_center_loc: i64,
-    /// System validation outcome; `NULL = pending`, `1 = accepted`, `2 = rejected`.
+    /// Encoded [`RecordValidity`](holochain_integrity_types::dht_v2::RecordValidity);
+    /// `NULL` represents pending.
     pub sys_validation_status: Option<i64>,
     /// Microsecond timestamp at which validation was abandoned; `NULL` if not abandoned.
     pub abandoned_at: Option<i64>,
@@ -157,7 +162,7 @@ pub struct LimboWarrantRow {
 pub struct ChainOpRow {
     /// DHT op hash (primary key).
     pub hash: Vec<u8>,
-    /// [`ChainOpType`](holochain_zome_types::op::ChainOpType) discriminant (1..=9).
+    /// Encoded [`ChainOpType`](holochain_zome_types::op::ChainOpType).
     pub op_type: i64,
     /// Hash of the associated action.
     pub action_hash: Vec<u8>,
@@ -165,7 +170,7 @@ pub struct ChainOpRow {
     pub basis_hash: Vec<u8>,
     /// Numeric storage center derived from `basis_hash`.
     pub storage_center_loc: i64,
-    /// Final validation outcome; `1 = accepted`, `2 = rejected`.
+    /// Encoded [`RecordValidity`](holochain_integrity_types::dht_v2::RecordValidity).
     pub validation_status: i64,
     /// `1` when this authority locally validated the op, `0` when accepted via receipts.
     pub locally_validated: i64,

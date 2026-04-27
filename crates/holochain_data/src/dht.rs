@@ -1,2078 +1,44 @@
 //! DHT database operations.
 //!
-//! Free-standing `async fn`s over `Executor` / `Acquire`, mirrored onto
-//! the `Dht` database handles (`DbRead` / `DbWrite` / `TxRead` / `TxWrite`).
-
-use crate::handles::{DbRead, DbWrite, TxRead, TxWrite};
-use crate::kind::Dht;
-use crate::models::dht::*;
-use holo_hash::{
-    ActionHash, AgentPubKey, AnyDhtHash, AnyLinkableHash, DhtOpHash, EntryHash, HoloHashed,
-};
-use holochain_integrity_types::dht_v2::{Action, ActionData, ActionHeader, RecordValidity};
-use holochain_integrity_types::entry::Entry;
-use holochain_integrity_types::entry_def::EntryVisibility;
-use holochain_integrity_types::record::SignedHashed;
-use holochain_integrity_types::signature::Signature;
-use holochain_timestamp::Timestamp;
-use holochain_zome_types::dht_v2::SignedActionHashed;
-use sqlx::{Executor, Sqlite};
-
-// ============================================================================
-// Action operations
-// ============================================================================
-
-/// Insert an `Action` row. `record_validity` is `Some(Accepted)` for
-/// self-authored actions and `None` for incoming network actions.
-///
-/// The stored hash is taken from `action.as_hash()` — the caller is
-/// responsible for constructing the [`SignedActionHashed`] with the correct
-/// hash (via [`SignedHashed::new_unchecked`] or equivalent).
-async fn insert_action_impl<'e, E>(
-    executor: E,
-    action: &SignedActionHashed,
-    record_validity: Option<RecordValidity>,
-) -> sqlx::Result<()>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    let inner: &Action = &action.hashed.content;
-    let action_data_blob = holochain_serialized_bytes::encode(&inner.data)
-        .map_err(|e| sqlx::Error::Protocol(format!("encode ActionData: {e}")))?;
-
-    let entry_hash_bytes = inner.data.entry_hash().map(|h| h.get_raw_36().to_vec());
-    let private_entry = match &inner.data {
-        ActionData::Create(d) => Some(*d.entry_type.visibility() == EntryVisibility::Private),
-        ActionData::Update(d) => Some(*d.entry_type.visibility() == EntryVisibility::Private),
-        _ => None,
-    }
-    .map(|b| b as i64);
-
-    sqlx::query(
-        "INSERT INTO Action (hash, author, seq, prev_hash, timestamp, action_type,
-                             action_data, signature, entry_hash, private_entry,
-                             record_validity)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    )
-    .bind(action.as_hash().get_raw_36())
-    .bind(inner.header.author.get_raw_36())
-    .bind(inner.header.action_seq as i64)
-    .bind(
-        inner
-            .header
-            .prev_action
-            .as_ref()
-            .map(|h| h.get_raw_36().to_vec()),
-    )
-    .bind(inner.header.timestamp.as_micros())
-    .bind(i64::from(inner.data.action_type()))
-    .bind(action_data_blob)
-    .bind(action.signature().0.as_slice())
-    .bind(entry_hash_bytes)
-    .bind(private_entry)
-    .bind(record_validity.map(i64::from))
-    .execute(executor)
-    .await?;
-    Ok(())
-}
-
-fn row_to_signed_action_hashed(row: ActionRow) -> sqlx::Result<SignedActionHashed> {
-    let data: ActionData = holochain_serialized_bytes::decode(&row.action_data).map_err(|e| {
-        sqlx::Error::Decode(Box::new(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            format!("decode ActionData: {e}"),
-        )))
-    })?;
-    let action = Action {
-        header: ActionHeader {
-            author: AgentPubKey::from_raw_36(row.author),
-            timestamp: holochain_timestamp::Timestamp::from_micros(row.timestamp),
-            action_seq: row.seq as u32,
-            prev_action: row.prev_hash.map(ActionHash::from_raw_36),
-        },
-        data,
-    };
-    let sig_bytes: [u8; 64] = row.signature.as_slice().try_into().map_err(|_| {
-        sqlx::Error::Decode(Box::new(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            format!(
-                "signature column has {} bytes, expected 64",
-                row.signature.len()
-            ),
-        )))
-    })?;
-    let hashed = HoloHashed::with_pre_hashed(action, ActionHash::from_raw_36(row.hash));
-    Ok(SignedHashed::with_presigned(hashed, Signature(sig_bytes)))
-}
-
-async fn get_action_impl<'e, E>(
-    executor: E,
-    hash: ActionHash,
-) -> sqlx::Result<Option<SignedActionHashed>>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    let row: Option<ActionRow> = sqlx::query_as(
-        "SELECT hash, author, seq, prev_hash, timestamp, action_type,
-                action_data, signature, entry_hash, private_entry, record_validity
-         FROM Action WHERE hash = ?",
-    )
-    .bind(hash.get_raw_36())
-    .fetch_optional(executor)
-    .await?;
-    row.map(row_to_signed_action_hashed).transpose()
-}
-
-async fn get_actions_by_author_impl<'e, E>(
-    executor: E,
-    author: AgentPubKey,
-) -> sqlx::Result<Vec<SignedActionHashed>>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    let rows: Vec<ActionRow> = sqlx::query_as(
-        "SELECT hash, author, seq, prev_hash, timestamp, action_type,
-                action_data, signature, entry_hash, private_entry, record_validity
-         FROM Action WHERE author = ? ORDER BY seq ASC",
-    )
-    .bind(author.get_raw_36())
-    .fetch_all(executor)
-    .await?;
-    rows.into_iter().map(row_to_signed_action_hashed).collect()
-}
-
-// ============================================================================
-// DbRead / DbWrite / TxRead / TxWrite wrappers
-// ============================================================================
-
-impl DbWrite<Dht> {
-    /// Insert an `Action` row, storing its signature and pre-computed hash.
-    pub async fn insert_action(
-        &self,
-        action: &SignedActionHashed,
-        record_validity: Option<RecordValidity>,
-    ) -> sqlx::Result<()> {
-        insert_action_impl(self.pool(), action, record_validity).await
-    }
-}
-
-impl DbRead<Dht> {
-    /// Fetch a single action by hash, returning it with its stored signature
-    /// and hash as a [`SignedActionHashed`].
-    pub async fn get_action(&self, hash: ActionHash) -> sqlx::Result<Option<SignedActionHashed>> {
-        get_action_impl(self.pool(), hash).await
-    }
-
-    /// Fetch all actions for a given author, ordered by `action_seq` ascending.
-    pub async fn get_actions_by_author(
-        &self,
-        author: AgentPubKey,
-    ) -> sqlx::Result<Vec<SignedActionHashed>> {
-        get_actions_by_author_impl(self.pool(), author).await
-    }
-}
-
-impl TxWrite<Dht> {
-    /// Insert an `Action` row, storing its signature and pre-computed hash.
-    pub async fn insert_action(
-        &mut self,
-        action: &SignedActionHashed,
-        record_validity: Option<RecordValidity>,
-    ) -> sqlx::Result<()> {
-        insert_action_impl(self.conn_mut(), action, record_validity).await
-    }
-}
-
-impl TxRead<Dht> {
-    /// Fetch a single action by hash, returning it with its stored signature
-    /// and hash as a [`SignedActionHashed`].
-    pub async fn get_action(
-        &mut self,
-        hash: ActionHash,
-    ) -> sqlx::Result<Option<SignedActionHashed>> {
-        get_action_impl(self.conn_mut(), hash).await
-    }
-
-    /// Fetch all actions for a given author, ordered by `action_seq` ascending.
-    pub async fn get_actions_by_author(
-        &mut self,
-        author: AgentPubKey,
-    ) -> sqlx::Result<Vec<SignedActionHashed>> {
-        get_actions_by_author_impl(self.conn_mut(), author).await
-    }
-}
-
-// ============================================================================
-// Entry / PrivateEntry operations
-// ============================================================================
-
-async fn insert_entry_impl<'e, E>(executor: E, hash: &EntryHash, entry: &Entry) -> sqlx::Result<()>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    let blob = holochain_serialized_bytes::encode(entry)
-        .map_err(|e| sqlx::Error::Protocol(format!("encode Entry: {e}")))?;
-    sqlx::query("INSERT INTO Entry (hash, blob) VALUES (?, ?)")
-        .bind(hash.get_raw_36())
-        .bind(blob)
-        .execute(executor)
-        .await?;
-    Ok(())
-}
-
-async fn get_entry_impl<'e, E>(executor: E, hash: EntryHash) -> sqlx::Result<Option<Entry>>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    let row: Option<EntryRow> = sqlx::query_as("SELECT hash, blob FROM Entry WHERE hash = ?")
-        .bind(hash.get_raw_36())
-        .fetch_optional(executor)
-        .await?;
-    row.map(|r| {
-        holochain_serialized_bytes::decode::<_, Entry>(&r.blob).map_err(|e| {
-            sqlx::Error::Decode(Box::new(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                format!("decode Entry: {e}"),
-            )))
-        })
-    })
-    .transpose()
-}
-
-async fn insert_private_entry_impl<'e, E>(
-    executor: E,
-    hash: &EntryHash,
-    author: &AgentPubKey,
-    entry: &Entry,
-) -> sqlx::Result<()>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    let blob = holochain_serialized_bytes::encode(entry)
-        .map_err(|e| sqlx::Error::Protocol(format!("encode Entry: {e}")))?;
-    sqlx::query("INSERT INTO PrivateEntry (hash, author, blob) VALUES (?, ?, ?)")
-        .bind(hash.get_raw_36())
-        .bind(author.get_raw_36())
-        .bind(blob)
-        .execute(executor)
-        .await?;
-    Ok(())
-}
-
-async fn get_private_entry_impl<'e, E>(
-    executor: E,
-    author: AgentPubKey,
-    hash: EntryHash,
-) -> sqlx::Result<Option<Entry>>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    let row: Option<PrivateEntryRow> =
-        sqlx::query_as("SELECT hash, author, blob FROM PrivateEntry WHERE author = ? AND hash = ?")
-            .bind(author.get_raw_36())
-            .bind(hash.get_raw_36())
-            .fetch_optional(executor)
-            .await?;
-    row.map(|r| {
-        holochain_serialized_bytes::decode::<_, Entry>(&r.blob).map_err(|e| {
-            sqlx::Error::Decode(Box::new(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                format!("decode Entry: {e}"),
-            )))
-        })
-    })
-    .transpose()
-}
-
-impl DbWrite<Dht> {
-    pub async fn insert_entry(&self, hash: &EntryHash, entry: &Entry) -> sqlx::Result<()> {
-        insert_entry_impl(self.pool(), hash, entry).await
-    }
-
-    pub async fn insert_private_entry(
-        &self,
-        hash: &EntryHash,
-        author: &AgentPubKey,
-        entry: &Entry,
-    ) -> sqlx::Result<()> {
-        insert_private_entry_impl(self.pool(), hash, author, entry).await
-    }
-}
-
-impl DbRead<Dht> {
-    pub async fn get_entry(&self, hash: EntryHash) -> sqlx::Result<Option<Entry>> {
-        get_entry_impl(self.pool(), hash).await
-    }
-
-    pub async fn get_private_entry(
-        &self,
-        author: AgentPubKey,
-        hash: EntryHash,
-    ) -> sqlx::Result<Option<Entry>> {
-        get_private_entry_impl(self.pool(), author, hash).await
-    }
-}
-
-impl TxWrite<Dht> {
-    pub async fn insert_entry(&mut self, hash: &EntryHash, entry: &Entry) -> sqlx::Result<()> {
-        insert_entry_impl(self.conn_mut(), hash, entry).await
-    }
-
-    pub async fn insert_private_entry(
-        &mut self,
-        hash: &EntryHash,
-        author: &AgentPubKey,
-        entry: &Entry,
-    ) -> sqlx::Result<()> {
-        insert_private_entry_impl(self.conn_mut(), hash, author, entry).await
-    }
-}
-
-impl TxRead<Dht> {
-    pub async fn get_entry(&mut self, hash: EntryHash) -> sqlx::Result<Option<Entry>> {
-        get_entry_impl(self.conn_mut(), hash).await
-    }
-
-    pub async fn get_private_entry(
-        &mut self,
-        author: AgentPubKey,
-        hash: EntryHash,
-    ) -> sqlx::Result<Option<Entry>> {
-        get_private_entry_impl(self.conn_mut(), author, hash).await
-    }
-}
-
-// ============================================================================
-// CapGrant / CapClaim operations
-// ============================================================================
-
-async fn insert_cap_grant_impl<'e, E>(
-    executor: E,
-    action_hash: &ActionHash,
-    cap_access: i64,
-    tag: Option<&str>,
-) -> sqlx::Result<()>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query("INSERT INTO CapGrant (action_hash, cap_access, tag) VALUES (?, ?, ?)")
-        .bind(action_hash.get_raw_36())
-        .bind(cap_access)
-        .bind(tag)
-        .execute(executor)
-        .await?;
-    Ok(())
-}
-
-async fn get_cap_grants_by_access_impl<'e, E>(
-    executor: E,
-    author: AgentPubKey,
-    cap_access: i64,
-) -> sqlx::Result<Vec<CapGrantRow>>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query_as(
-        "SELECT cg.action_hash, cg.cap_access, cg.tag
-         FROM CapGrant cg
-         JOIN Action ON cg.action_hash = Action.hash
-         WHERE cg.cap_access = ? AND Action.author = ?
-         ORDER BY Action.seq",
-    )
-    .bind(cap_access)
-    .bind(author.get_raw_36())
-    .fetch_all(executor)
-    .await
-}
-
-async fn get_cap_grants_by_tag_impl<'e, E>(
-    executor: E,
-    author: AgentPubKey,
-    tag: &str,
-) -> sqlx::Result<Vec<CapGrantRow>>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query_as(
-        "SELECT cg.action_hash, cg.cap_access, cg.tag
-         FROM CapGrant cg
-         JOIN Action ON cg.action_hash = Action.hash
-         WHERE cg.tag = ? AND Action.author = ?
-         ORDER BY Action.seq",
-    )
-    .bind(tag)
-    .bind(author.get_raw_36())
-    .fetch_all(executor)
-    .await
-}
-
-async fn insert_cap_claim_impl<'e, E>(
-    executor: E,
-    author: &AgentPubKey,
-    tag: &str,
-    grantor: &AgentPubKey,
-    secret: &[u8],
-) -> sqlx::Result<()>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query("INSERT INTO CapClaim (author, tag, grantor, secret) VALUES (?, ?, ?, ?)")
-        .bind(author.get_raw_36())
-        .bind(tag)
-        .bind(grantor.get_raw_36())
-        .bind(secret)
-        .execute(executor)
-        .await?;
-    Ok(())
-}
-
-async fn get_cap_claims_by_grantor_impl<'e, E>(
-    executor: E,
-    author: AgentPubKey,
-    grantor: AgentPubKey,
-) -> sqlx::Result<Vec<CapClaimRow>>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query_as(
-        "SELECT id, author, tag, grantor, secret FROM CapClaim
-         WHERE author = ? AND grantor = ? ORDER BY id",
-    )
-    .bind(author.get_raw_36())
-    .bind(grantor.get_raw_36())
-    .fetch_all(executor)
-    .await
-}
-
-async fn get_cap_claims_by_tag_impl<'e, E>(
-    executor: E,
-    author: AgentPubKey,
-    tag: &str,
-) -> sqlx::Result<Vec<CapClaimRow>>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query_as(
-        "SELECT id, author, tag, grantor, secret FROM CapClaim
-         WHERE author = ? AND tag = ? ORDER BY id",
-    )
-    .bind(author.get_raw_36())
-    .bind(tag)
-    .fetch_all(executor)
-    .await
-}
-
-impl DbWrite<Dht> {
-    pub async fn insert_cap_grant(
-        &self,
-        action_hash: &ActionHash,
-        cap_access: i64,
-        tag: Option<&str>,
-    ) -> sqlx::Result<()> {
-        insert_cap_grant_impl(self.pool(), action_hash, cap_access, tag).await
-    }
-
-    pub async fn insert_cap_claim(
-        &self,
-        author: &AgentPubKey,
-        tag: &str,
-        grantor: &AgentPubKey,
-        secret: &[u8],
-    ) -> sqlx::Result<()> {
-        insert_cap_claim_impl(self.pool(), author, tag, grantor, secret).await
-    }
-}
-
-impl DbRead<Dht> {
-    pub async fn get_cap_grants_by_access(
-        &self,
-        author: AgentPubKey,
-        cap_access: i64,
-    ) -> sqlx::Result<Vec<CapGrantRow>> {
-        get_cap_grants_by_access_impl(self.pool(), author, cap_access).await
-    }
-
-    pub async fn get_cap_grants_by_tag(
-        &self,
-        author: AgentPubKey,
-        tag: &str,
-    ) -> sqlx::Result<Vec<CapGrantRow>> {
-        get_cap_grants_by_tag_impl(self.pool(), author, tag).await
-    }
-
-    pub async fn get_cap_claims_by_grantor(
-        &self,
-        author: AgentPubKey,
-        grantor: AgentPubKey,
-    ) -> sqlx::Result<Vec<CapClaimRow>> {
-        get_cap_claims_by_grantor_impl(self.pool(), author, grantor).await
-    }
-
-    pub async fn get_cap_claims_by_tag(
-        &self,
-        author: AgentPubKey,
-        tag: &str,
-    ) -> sqlx::Result<Vec<CapClaimRow>> {
-        get_cap_claims_by_tag_impl(self.pool(), author, tag).await
-    }
-}
-
-impl TxWrite<Dht> {
-    pub async fn insert_cap_grant(
-        &mut self,
-        action_hash: &ActionHash,
-        cap_access: i64,
-        tag: Option<&str>,
-    ) -> sqlx::Result<()> {
-        insert_cap_grant_impl(self.conn_mut(), action_hash, cap_access, tag).await
-    }
-
-    pub async fn insert_cap_claim(
-        &mut self,
-        author: &AgentPubKey,
-        tag: &str,
-        grantor: &AgentPubKey,
-        secret: &[u8],
-    ) -> sqlx::Result<()> {
-        insert_cap_claim_impl(self.conn_mut(), author, tag, grantor, secret).await
-    }
-}
-
-impl TxRead<Dht> {
-    pub async fn get_cap_grants_by_access(
-        &mut self,
-        author: AgentPubKey,
-        cap_access: i64,
-    ) -> sqlx::Result<Vec<CapGrantRow>> {
-        get_cap_grants_by_access_impl(self.conn_mut(), author, cap_access).await
-    }
-
-    pub async fn get_cap_grants_by_tag(
-        &mut self,
-        author: AgentPubKey,
-        tag: &str,
-    ) -> sqlx::Result<Vec<CapGrantRow>> {
-        get_cap_grants_by_tag_impl(self.conn_mut(), author, tag).await
-    }
-
-    pub async fn get_cap_claims_by_grantor(
-        &mut self,
-        author: AgentPubKey,
-        grantor: AgentPubKey,
-    ) -> sqlx::Result<Vec<CapClaimRow>> {
-        get_cap_claims_by_grantor_impl(self.conn_mut(), author, grantor).await
-    }
-
-    pub async fn get_cap_claims_by_tag(
-        &mut self,
-        author: AgentPubKey,
-        tag: &str,
-    ) -> sqlx::Result<Vec<CapClaimRow>> {
-        get_cap_claims_by_tag_impl(self.conn_mut(), author, tag).await
-    }
-}
-
-// ============================================================================
-// ChainLock operations
-// ============================================================================
-
-/// Try to acquire the chain lock for `author`.
-///
-/// Succeeds (returns `Ok(true)`) when there is no existing lock, when the
-/// existing lock has expired (relative to `now`), or when the existing lock's
-/// `subject` matches — the last case lets the current holder extend or
-/// re-acquire their own lock.
-///
-/// Returns `Ok(false)` when a different subject still holds an unexpired lock,
-/// leaving the existing row untouched. This prevents silent lock stealing.
-async fn acquire_chain_lock_impl<'e, E>(
-    executor: E,
-    author: &AgentPubKey,
-    subject: &[u8],
-    expires_at: Timestamp,
-    now: Timestamp,
-) -> sqlx::Result<bool>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    let rows_affected = sqlx::query(
-        "INSERT INTO ChainLock (author, subject, expires_at_timestamp)
-         VALUES (?1, ?2, ?3)
-         ON CONFLICT(author) DO UPDATE SET
-            subject = excluded.subject,
-            expires_at_timestamp = excluded.expires_at_timestamp
-         WHERE ChainLock.expires_at_timestamp <= ?4
-            OR ChainLock.subject = excluded.subject",
-    )
-    .bind(author.get_raw_36())
-    .bind(subject)
-    .bind(expires_at.as_micros())
-    .bind(now.as_micros())
-    .execute(executor)
-    .await?
-    .rows_affected();
-    Ok(rows_affected > 0)
-}
-
-async fn get_chain_lock_impl<'e, E>(
-    executor: E,
-    author: AgentPubKey,
-    now: Timestamp,
-) -> sqlx::Result<Option<ChainLockRow>>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query_as(
-        "SELECT author, subject, expires_at_timestamp FROM ChainLock
-         WHERE author = ? AND expires_at_timestamp > ?",
-    )
-    .bind(author.get_raw_36())
-    .bind(now.as_micros())
-    .fetch_optional(executor)
-    .await
-}
-
-async fn release_chain_lock_impl<'e, E>(executor: E, author: &AgentPubKey) -> sqlx::Result<()>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query("DELETE FROM ChainLock WHERE author = ?")
-        .bind(author.get_raw_36())
-        .execute(executor)
-        .await?;
-    Ok(())
-}
-
-async fn prune_expired_chain_locks_impl<'e, E>(executor: E, now: Timestamp) -> sqlx::Result<()>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query("DELETE FROM ChainLock WHERE expires_at_timestamp <= ?")
-        .bind(now.as_micros())
-        .execute(executor)
-        .await?;
-    Ok(())
-}
-
-impl DbWrite<Dht> {
-    /// Try to acquire the chain lock for `author`. See
-    /// [`acquire_chain_lock_impl`] for the full rule set. Returns `true` when
-    /// the caller now holds the lock.
-    pub async fn acquire_chain_lock(
-        &self,
-        author: &AgentPubKey,
-        subject: &[u8],
-        expires_at: Timestamp,
-        now: Timestamp,
-    ) -> sqlx::Result<bool> {
-        acquire_chain_lock_impl(self.pool(), author, subject, expires_at, now).await
-    }
-
-    pub async fn release_chain_lock(&self, author: &AgentPubKey) -> sqlx::Result<()> {
-        release_chain_lock_impl(self.pool(), author).await
-    }
-
-    pub async fn prune_expired_chain_locks(&self, now: Timestamp) -> sqlx::Result<()> {
-        prune_expired_chain_locks_impl(self.pool(), now).await
-    }
-}
-
-impl DbRead<Dht> {
-    pub async fn get_chain_lock(
-        &self,
-        author: AgentPubKey,
-        now: Timestamp,
-    ) -> sqlx::Result<Option<ChainLockRow>> {
-        get_chain_lock_impl(self.pool(), author, now).await
-    }
-}
-
-impl TxWrite<Dht> {
-    /// Try to acquire the chain lock for `author`. See
-    /// [`acquire_chain_lock_impl`] for the full rule set. Returns `true` when
-    /// the caller now holds the lock.
-    pub async fn acquire_chain_lock(
-        &mut self,
-        author: &AgentPubKey,
-        subject: &[u8],
-        expires_at: Timestamp,
-        now: Timestamp,
-    ) -> sqlx::Result<bool> {
-        acquire_chain_lock_impl(self.conn_mut(), author, subject, expires_at, now).await
-    }
-
-    pub async fn release_chain_lock(&mut self, author: &AgentPubKey) -> sqlx::Result<()> {
-        release_chain_lock_impl(self.conn_mut(), author).await
-    }
-
-    pub async fn prune_expired_chain_locks(&mut self, now: Timestamp) -> sqlx::Result<()> {
-        prune_expired_chain_locks_impl(self.conn_mut(), now).await
-    }
-}
-
-impl TxRead<Dht> {
-    pub async fn get_chain_lock(
-        &mut self,
-        author: AgentPubKey,
-        now: Timestamp,
-    ) -> sqlx::Result<Option<ChainLockRow>> {
-        get_chain_lock_impl(self.conn_mut(), author, now).await
-    }
-}
-
-// ============================================================================
-// LimboChainOp operations
-// ============================================================================
-
-#[allow(clippy::too_many_arguments)]
-async fn insert_limbo_chain_op_impl<'e, E>(
-    executor: E,
-    op_hash: &DhtOpHash,
-    action_hash: &ActionHash,
-    op_type: i64,
-    basis_hash: &AnyDhtHash,
-    storage_center_loc: u32,
-    require_receipt: bool,
-    when_received: Timestamp,
-    serialized_size: u32,
-) -> sqlx::Result<()>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query(
-        "INSERT INTO LimboChainOp
-            (hash, op_type, action_hash, basis_hash, storage_center_loc,
-             require_receipt, when_received, serialized_size)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-    )
-    .bind(op_hash.get_raw_36())
-    .bind(op_type)
-    .bind(action_hash.get_raw_36())
-    .bind(basis_hash.get_raw_36())
-    .bind(storage_center_loc as i64)
-    .bind(require_receipt as i64)
-    .bind(when_received.as_micros())
-    .bind(serialized_size as i64)
-    .execute(executor)
-    .await?;
-    Ok(())
-}
-
-async fn get_limbo_chain_op_impl<'e, E>(
-    executor: E,
-    hash: DhtOpHash,
-) -> sqlx::Result<Option<LimboChainOpRow>>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query_as(
-        "SELECT hash, op_type, action_hash, basis_hash, storage_center_loc,
-                sys_validation_status, app_validation_status, abandoned_at,
-                require_receipt, when_received, sys_validation_attempts,
-                app_validation_attempts, last_validation_attempt, serialized_size
-         FROM LimboChainOp WHERE hash = ?",
-    )
-    .bind(hash.get_raw_36())
-    .fetch_optional(executor)
-    .await
-}
-
-async fn limbo_chain_ops_pending_sys_impl<'e, E>(
-    executor: E,
-    limit: u32,
-) -> sqlx::Result<Vec<LimboChainOpRow>>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query_as(
-        "SELECT * FROM LimboChainOp
-         WHERE sys_validation_status IS NULL AND abandoned_at IS NULL
-         ORDER BY sys_validation_attempts, when_received
-         LIMIT ?",
-    )
-    .bind(limit as i64)
-    .fetch_all(executor)
-    .await
-}
-
-async fn limbo_chain_ops_pending_app_impl<'e, E>(
-    executor: E,
-    limit: u32,
-) -> sqlx::Result<Vec<LimboChainOpRow>>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query_as(
-        "SELECT * FROM LimboChainOp
-         WHERE sys_validation_status = 1 AND app_validation_status IS NULL
-           AND abandoned_at IS NULL
-         ORDER BY app_validation_attempts, when_received
-         LIMIT ?",
-    )
-    .bind(limit as i64)
-    .fetch_all(executor)
-    .await
-}
-
-async fn limbo_chain_ops_ready_for_integration_impl<'e, E>(
-    executor: E,
-    limit: u32,
-) -> sqlx::Result<Vec<LimboChainOpRow>>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query_as(
-        "SELECT * FROM LimboChainOp
-         WHERE abandoned_at IS NOT NULL
-            OR sys_validation_status = 2
-            OR (sys_validation_status = 1 AND app_validation_status IN (1, 2))
-         ORDER BY when_received
-         LIMIT ?",
-    )
-    .bind(limit as i64)
-    .fetch_all(executor)
-    .await
-}
-
-async fn delete_limbo_chain_op_impl<'e, E>(executor: E, hash: DhtOpHash) -> sqlx::Result<()>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query("DELETE FROM LimboChainOp WHERE hash = ?")
-        .bind(hash.get_raw_36())
-        .execute(executor)
-        .await?;
-    Ok(())
-}
-
-impl DbWrite<Dht> {
-    #[allow(clippy::too_many_arguments)]
-    pub async fn insert_limbo_chain_op(
-        &self,
-        op_hash: &DhtOpHash,
-        action_hash: &ActionHash,
-        op_type: i64,
-        basis_hash: &AnyDhtHash,
-        storage_center_loc: u32,
-        require_receipt: bool,
-        when_received: Timestamp,
-        serialized_size: u32,
-    ) -> sqlx::Result<()> {
-        insert_limbo_chain_op_impl(
-            self.pool(),
-            op_hash,
-            action_hash,
-            op_type,
-            basis_hash,
-            storage_center_loc,
-            require_receipt,
-            when_received,
-            serialized_size,
-        )
-        .await
-    }
-
-    pub async fn delete_limbo_chain_op(&self, hash: DhtOpHash) -> sqlx::Result<()> {
-        delete_limbo_chain_op_impl(self.pool(), hash).await
-    }
-}
-
-impl DbRead<Dht> {
-    pub async fn get_limbo_chain_op(
-        &self,
-        hash: DhtOpHash,
-    ) -> sqlx::Result<Option<LimboChainOpRow>> {
-        get_limbo_chain_op_impl(self.pool(), hash).await
-    }
-
-    pub async fn limbo_chain_ops_pending_sys(
-        &self,
-        limit: u32,
-    ) -> sqlx::Result<Vec<LimboChainOpRow>> {
-        limbo_chain_ops_pending_sys_impl(self.pool(), limit).await
-    }
-
-    pub async fn limbo_chain_ops_pending_app(
-        &self,
-        limit: u32,
-    ) -> sqlx::Result<Vec<LimboChainOpRow>> {
-        limbo_chain_ops_pending_app_impl(self.pool(), limit).await
-    }
-
-    pub async fn limbo_chain_ops_ready_for_integration(
-        &self,
-        limit: u32,
-    ) -> sqlx::Result<Vec<LimboChainOpRow>> {
-        limbo_chain_ops_ready_for_integration_impl(self.pool(), limit).await
-    }
-}
-
-impl TxWrite<Dht> {
-    #[allow(clippy::too_many_arguments)]
-    pub async fn insert_limbo_chain_op(
-        &mut self,
-        op_hash: &DhtOpHash,
-        action_hash: &ActionHash,
-        op_type: i64,
-        basis_hash: &AnyDhtHash,
-        storage_center_loc: u32,
-        require_receipt: bool,
-        when_received: Timestamp,
-        serialized_size: u32,
-    ) -> sqlx::Result<()> {
-        insert_limbo_chain_op_impl(
-            self.conn_mut(),
-            op_hash,
-            action_hash,
-            op_type,
-            basis_hash,
-            storage_center_loc,
-            require_receipt,
-            when_received,
-            serialized_size,
-        )
-        .await
-    }
-
-    pub async fn delete_limbo_chain_op(&mut self, hash: DhtOpHash) -> sqlx::Result<()> {
-        delete_limbo_chain_op_impl(self.conn_mut(), hash).await
-    }
-}
-
-impl TxRead<Dht> {
-    pub async fn get_limbo_chain_op(
-        &mut self,
-        hash: DhtOpHash,
-    ) -> sqlx::Result<Option<LimboChainOpRow>> {
-        get_limbo_chain_op_impl(self.conn_mut(), hash).await
-    }
-
-    pub async fn limbo_chain_ops_pending_sys(
-        &mut self,
-        limit: u32,
-    ) -> sqlx::Result<Vec<LimboChainOpRow>> {
-        limbo_chain_ops_pending_sys_impl(self.conn_mut(), limit).await
-    }
-
-    pub async fn limbo_chain_ops_pending_app(
-        &mut self,
-        limit: u32,
-    ) -> sqlx::Result<Vec<LimboChainOpRow>> {
-        limbo_chain_ops_pending_app_impl(self.conn_mut(), limit).await
-    }
-
-    pub async fn limbo_chain_ops_ready_for_integration(
-        &mut self,
-        limit: u32,
-    ) -> sqlx::Result<Vec<LimboChainOpRow>> {
-        limbo_chain_ops_ready_for_integration_impl(self.conn_mut(), limit).await
-    }
-}
-
-// ============================================================================
-// LimboWarrant operations
-// ============================================================================
-
-#[allow(clippy::too_many_arguments)]
-async fn insert_limbo_warrant_impl<'e, E>(
-    executor: E,
-    hash: &DhtOpHash,
-    author: &AgentPubKey,
-    timestamp: Timestamp,
-    warrantee: &AgentPubKey,
-    proof: &[u8],
-    storage_center_loc: u32,
-    when_received: Timestamp,
-    serialized_size: u32,
-) -> sqlx::Result<()>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query(
-        "INSERT INTO LimboWarrant
-            (hash, author, timestamp, warrantee, proof, storage_center_loc,
-             when_received, serialized_size)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-    )
-    .bind(hash.get_raw_36())
-    .bind(author.get_raw_36())
-    .bind(timestamp.as_micros())
-    .bind(warrantee.get_raw_36())
-    .bind(proof)
-    .bind(storage_center_loc as i64)
-    .bind(when_received.as_micros())
-    .bind(serialized_size as i64)
-    .execute(executor)
-    .await?;
-    Ok(())
-}
-
-async fn get_limbo_warrant_impl<'e, E>(
-    executor: E,
-    hash: DhtOpHash,
-) -> sqlx::Result<Option<LimboWarrantRow>>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query_as(
-        "SELECT hash, author, timestamp, warrantee, proof, storage_center_loc,
-                sys_validation_status, abandoned_at, when_received,
-                sys_validation_attempts, last_validation_attempt, serialized_size
-         FROM LimboWarrant WHERE hash = ?",
-    )
-    .bind(hash.get_raw_36())
-    .fetch_optional(executor)
-    .await
-}
-
-async fn limbo_warrants_pending_sys_impl<'e, E>(
-    executor: E,
-    limit: u32,
-) -> sqlx::Result<Vec<LimboWarrantRow>>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query_as(
-        "SELECT * FROM LimboWarrant
-         WHERE sys_validation_status IS NULL AND abandoned_at IS NULL
-         ORDER BY sys_validation_attempts, when_received
-         LIMIT ?",
-    )
-    .bind(limit as i64)
-    .fetch_all(executor)
-    .await
-}
-
-async fn limbo_warrants_ready_for_integration_impl<'e, E>(
-    executor: E,
-    limit: u32,
-) -> sqlx::Result<Vec<LimboWarrantRow>>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query_as(
-        "SELECT * FROM LimboWarrant
-         WHERE abandoned_at IS NOT NULL OR sys_validation_status IN (1, 2)
-         ORDER BY when_received
-         LIMIT ?",
-    )
-    .bind(limit as i64)
-    .fetch_all(executor)
-    .await
-}
-
-async fn delete_limbo_warrant_impl<'e, E>(executor: E, hash: DhtOpHash) -> sqlx::Result<()>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query("DELETE FROM LimboWarrant WHERE hash = ?")
-        .bind(hash.get_raw_36())
-        .execute(executor)
-        .await?;
-    Ok(())
-}
-
-impl DbWrite<Dht> {
-    #[allow(clippy::too_many_arguments)]
-    pub async fn insert_limbo_warrant(
-        &self,
-        hash: &DhtOpHash,
-        author: &AgentPubKey,
-        timestamp: Timestamp,
-        warrantee: &AgentPubKey,
-        proof: &[u8],
-        storage_center_loc: u32,
-        when_received: Timestamp,
-        serialized_size: u32,
-    ) -> sqlx::Result<()> {
-        insert_limbo_warrant_impl(
-            self.pool(),
-            hash,
-            author,
-            timestamp,
-            warrantee,
-            proof,
-            storage_center_loc,
-            when_received,
-            serialized_size,
-        )
-        .await
-    }
-
-    pub async fn delete_limbo_warrant(&self, hash: DhtOpHash) -> sqlx::Result<()> {
-        delete_limbo_warrant_impl(self.pool(), hash).await
-    }
-}
-
-impl DbRead<Dht> {
-    pub async fn get_limbo_warrant(
-        &self,
-        hash: DhtOpHash,
-    ) -> sqlx::Result<Option<LimboWarrantRow>> {
-        get_limbo_warrant_impl(self.pool(), hash).await
-    }
-
-    pub async fn limbo_warrants_pending_sys(
-        &self,
-        limit: u32,
-    ) -> sqlx::Result<Vec<LimboWarrantRow>> {
-        limbo_warrants_pending_sys_impl(self.pool(), limit).await
-    }
-
-    pub async fn limbo_warrants_ready_for_integration(
-        &self,
-        limit: u32,
-    ) -> sqlx::Result<Vec<LimboWarrantRow>> {
-        limbo_warrants_ready_for_integration_impl(self.pool(), limit).await
-    }
-}
-
-impl TxWrite<Dht> {
-    #[allow(clippy::too_many_arguments)]
-    pub async fn insert_limbo_warrant(
-        &mut self,
-        hash: &DhtOpHash,
-        author: &AgentPubKey,
-        timestamp: Timestamp,
-        warrantee: &AgentPubKey,
-        proof: &[u8],
-        storage_center_loc: u32,
-        when_received: Timestamp,
-        serialized_size: u32,
-    ) -> sqlx::Result<()> {
-        insert_limbo_warrant_impl(
-            self.conn_mut(),
-            hash,
-            author,
-            timestamp,
-            warrantee,
-            proof,
-            storage_center_loc,
-            when_received,
-            serialized_size,
-        )
-        .await
-    }
-
-    pub async fn delete_limbo_warrant(&mut self, hash: DhtOpHash) -> sqlx::Result<()> {
-        delete_limbo_warrant_impl(self.conn_mut(), hash).await
-    }
-}
-
-impl TxRead<Dht> {
-    pub async fn get_limbo_warrant(
-        &mut self,
-        hash: DhtOpHash,
-    ) -> sqlx::Result<Option<LimboWarrantRow>> {
-        get_limbo_warrant_impl(self.conn_mut(), hash).await
-    }
-
-    pub async fn limbo_warrants_pending_sys(
-        &mut self,
-        limit: u32,
-    ) -> sqlx::Result<Vec<LimboWarrantRow>> {
-        limbo_warrants_pending_sys_impl(self.conn_mut(), limit).await
-    }
-
-    pub async fn limbo_warrants_ready_for_integration(
-        &mut self,
-        limit: u32,
-    ) -> sqlx::Result<Vec<LimboWarrantRow>> {
-        limbo_warrants_ready_for_integration_impl(self.conn_mut(), limit).await
-    }
-}
-
-// ============================================================================
-// Warrant operations
-// ============================================================================
-
-#[allow(clippy::too_many_arguments)]
-async fn insert_warrant_impl<'e, E>(
-    executor: E,
-    hash: &DhtOpHash,
-    author: &AgentPubKey,
-    timestamp: Timestamp,
-    warrantee: &AgentPubKey,
-    proof: &[u8],
-    storage_center_loc: u32,
-) -> sqlx::Result<()>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query(
-        "INSERT INTO Warrant (hash, author, timestamp, warrantee, proof, storage_center_loc)
-         VALUES (?, ?, ?, ?, ?, ?)",
-    )
-    .bind(hash.get_raw_36())
-    .bind(author.get_raw_36())
-    .bind(timestamp.as_micros())
-    .bind(warrantee.get_raw_36())
-    .bind(proof)
-    .bind(storage_center_loc as i64)
-    .execute(executor)
-    .await?;
-    Ok(())
-}
-
-async fn get_warrant_impl<'e, E>(executor: E, hash: DhtOpHash) -> sqlx::Result<Option<WarrantRow>>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query_as(
-        "SELECT hash, author, timestamp, warrantee, proof, storage_center_loc
-         FROM Warrant WHERE hash = ?",
-    )
-    .bind(hash.get_raw_36())
-    .fetch_optional(executor)
-    .await
-}
-
-async fn get_warrants_by_warrantee_impl<'e, E>(
-    executor: E,
-    warrantee: AgentPubKey,
-) -> sqlx::Result<Vec<WarrantRow>>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query_as("SELECT * FROM Warrant WHERE warrantee = ? ORDER BY timestamp DESC")
-        .bind(warrantee.get_raw_36())
-        .fetch_all(executor)
-        .await
-}
-
-impl DbWrite<Dht> {
-    #[allow(clippy::too_many_arguments)]
-    pub async fn insert_warrant(
-        &self,
-        hash: &DhtOpHash,
-        author: &AgentPubKey,
-        timestamp: Timestamp,
-        warrantee: &AgentPubKey,
-        proof: &[u8],
-        storage_center_loc: u32,
-    ) -> sqlx::Result<()> {
-        insert_warrant_impl(
-            self.pool(),
-            hash,
-            author,
-            timestamp,
-            warrantee,
-            proof,
-            storage_center_loc,
-        )
-        .await
-    }
-}
-
-impl DbRead<Dht> {
-    pub async fn get_warrant(&self, hash: DhtOpHash) -> sqlx::Result<Option<WarrantRow>> {
-        get_warrant_impl(self.pool(), hash).await
-    }
-
-    pub async fn get_warrants_by_warrantee(
-        &self,
-        warrantee: AgentPubKey,
-    ) -> sqlx::Result<Vec<WarrantRow>> {
-        get_warrants_by_warrantee_impl(self.pool(), warrantee).await
-    }
-}
-
-impl TxWrite<Dht> {
-    #[allow(clippy::too_many_arguments)]
-    pub async fn insert_warrant(
-        &mut self,
-        hash: &DhtOpHash,
-        author: &AgentPubKey,
-        timestamp: Timestamp,
-        warrantee: &AgentPubKey,
-        proof: &[u8],
-        storage_center_loc: u32,
-    ) -> sqlx::Result<()> {
-        insert_warrant_impl(
-            self.conn_mut(),
-            hash,
-            author,
-            timestamp,
-            warrantee,
-            proof,
-            storage_center_loc,
-        )
-        .await
-    }
-}
-
-impl TxRead<Dht> {
-    pub async fn get_warrant(&mut self, hash: DhtOpHash) -> sqlx::Result<Option<WarrantRow>> {
-        get_warrant_impl(self.conn_mut(), hash).await
-    }
-
-    pub async fn get_warrants_by_warrantee(
-        &mut self,
-        warrantee: AgentPubKey,
-    ) -> sqlx::Result<Vec<WarrantRow>> {
-        get_warrants_by_warrantee_impl(self.conn_mut(), warrantee).await
-    }
-}
-
-// ============================================================================
-// ChainOp operations
-// ============================================================================
-
-#[allow(clippy::too_many_arguments)]
-async fn insert_chain_op_impl<'e, E>(
-    executor: E,
-    op_hash: &DhtOpHash,
-    action_hash: &ActionHash,
-    op_type: i64,
-    basis_hash: &AnyDhtHash,
-    storage_center_loc: u32,
-    validation_status: RecordValidity,
-    locally_validated: bool,
-    when_received: Timestamp,
-    when_integrated: Timestamp,
-    serialized_size: u32,
-) -> sqlx::Result<()>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query(
-        "INSERT INTO ChainOp
-            (hash, op_type, action_hash, basis_hash, storage_center_loc,
-             validation_status, locally_validated, when_received, when_integrated,
-             serialized_size)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    )
-    .bind(op_hash.get_raw_36())
-    .bind(op_type)
-    .bind(action_hash.get_raw_36())
-    .bind(basis_hash.get_raw_36())
-    .bind(storage_center_loc as i64)
-    .bind(i64::from(validation_status))
-    .bind(locally_validated as i64)
-    .bind(when_received.as_micros())
-    .bind(when_integrated.as_micros())
-    .bind(serialized_size as i64)
-    .execute(executor)
-    .await?;
-    Ok(())
-}
-
-async fn get_chain_op_impl<'e, E>(executor: E, hash: DhtOpHash) -> sqlx::Result<Option<ChainOpRow>>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query_as(
-        "SELECT hash, op_type, action_hash, basis_hash, storage_center_loc,
-                validation_status, locally_validated, when_received, when_integrated,
-                serialized_size
-         FROM ChainOp WHERE hash = ?",
-    )
-    .bind(hash.get_raw_36())
-    .fetch_optional(executor)
-    .await
-}
-
-async fn get_chain_ops_by_basis_impl<'e, E>(
-    executor: E,
-    basis: AnyDhtHash,
-) -> sqlx::Result<Vec<ChainOpRow>>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query_as("SELECT * FROM ChainOp WHERE basis_hash = ? ORDER BY when_integrated")
-        .bind(basis.get_raw_36())
-        .fetch_all(executor)
-        .await
-}
-
-async fn get_chain_ops_for_action_impl<'e, E>(
-    executor: E,
-    action_hash: ActionHash,
-) -> sqlx::Result<Vec<ChainOpRow>>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query_as("SELECT * FROM ChainOp WHERE action_hash = ? ORDER BY op_type")
-        .bind(action_hash.get_raw_36())
-        .fetch_all(executor)
-        .await
-}
-
-impl DbWrite<Dht> {
-    #[allow(clippy::too_many_arguments)]
-    pub async fn insert_chain_op(
-        &self,
-        op_hash: &DhtOpHash,
-        action_hash: &ActionHash,
-        op_type: i64,
-        basis_hash: &AnyDhtHash,
-        storage_center_loc: u32,
-        validation_status: RecordValidity,
-        locally_validated: bool,
-        when_received: Timestamp,
-        when_integrated: Timestamp,
-        serialized_size: u32,
-    ) -> sqlx::Result<()> {
-        insert_chain_op_impl(
-            self.pool(),
-            op_hash,
-            action_hash,
-            op_type,
-            basis_hash,
-            storage_center_loc,
-            validation_status,
-            locally_validated,
-            when_received,
-            when_integrated,
-            serialized_size,
-        )
-        .await
-    }
-}
-
-impl DbRead<Dht> {
-    pub async fn get_chain_op(&self, hash: DhtOpHash) -> sqlx::Result<Option<ChainOpRow>> {
-        get_chain_op_impl(self.pool(), hash).await
-    }
-
-    pub async fn get_chain_ops_by_basis(&self, basis: AnyDhtHash) -> sqlx::Result<Vec<ChainOpRow>> {
-        get_chain_ops_by_basis_impl(self.pool(), basis).await
-    }
-
-    pub async fn get_chain_ops_for_action(
-        &self,
-        action_hash: ActionHash,
-    ) -> sqlx::Result<Vec<ChainOpRow>> {
-        get_chain_ops_for_action_impl(self.pool(), action_hash).await
-    }
-}
-
-impl TxWrite<Dht> {
-    #[allow(clippy::too_many_arguments)]
-    pub async fn insert_chain_op(
-        &mut self,
-        op_hash: &DhtOpHash,
-        action_hash: &ActionHash,
-        op_type: i64,
-        basis_hash: &AnyDhtHash,
-        storage_center_loc: u32,
-        validation_status: RecordValidity,
-        locally_validated: bool,
-        when_received: Timestamp,
-        when_integrated: Timestamp,
-        serialized_size: u32,
-    ) -> sqlx::Result<()> {
-        insert_chain_op_impl(
-            self.conn_mut(),
-            op_hash,
-            action_hash,
-            op_type,
-            basis_hash,
-            storage_center_loc,
-            validation_status,
-            locally_validated,
-            when_received,
-            when_integrated,
-            serialized_size,
-        )
-        .await
-    }
-}
-
-impl TxRead<Dht> {
-    pub async fn get_chain_op(&mut self, hash: DhtOpHash) -> sqlx::Result<Option<ChainOpRow>> {
-        get_chain_op_impl(self.conn_mut(), hash).await
-    }
-
-    pub async fn get_chain_ops_by_basis(
-        &mut self,
-        basis: AnyDhtHash,
-    ) -> sqlx::Result<Vec<ChainOpRow>> {
-        get_chain_ops_by_basis_impl(self.conn_mut(), basis).await
-    }
-
-    pub async fn get_chain_ops_for_action(
-        &mut self,
-        action_hash: ActionHash,
-    ) -> sqlx::Result<Vec<ChainOpRow>> {
-        get_chain_ops_for_action_impl(self.conn_mut(), action_hash).await
-    }
-}
-
-// ============================================================================
-// Publish state and validation receipts
-// ============================================================================
-
-async fn insert_chain_op_publish_impl<'e, E>(
-    executor: E,
-    op_hash: &DhtOpHash,
-    last_publish_time: Option<Timestamp>,
-    receipts_complete: Option<bool>,
-) -> sqlx::Result<()>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query(
-        "INSERT INTO ChainOpPublish (op_hash, last_publish_time, receipts_complete)
-         VALUES (?, ?, ?)",
-    )
-    .bind(op_hash.get_raw_36())
-    .bind(last_publish_time.map(|t| t.as_micros()))
-    .bind(receipts_complete.map(|b| b as i64))
-    .execute(executor)
-    .await?;
-    Ok(())
-}
-
-async fn get_chain_op_publish_impl<'e, E>(
-    executor: E,
-    op_hash: DhtOpHash,
-) -> sqlx::Result<Option<ChainOpPublishRow>>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query_as(
-        "SELECT op_hash, last_publish_time, receipts_complete
-         FROM ChainOpPublish WHERE op_hash = ?",
-    )
-    .bind(op_hash.get_raw_36())
-    .fetch_optional(executor)
-    .await
-}
-
-async fn insert_warrant_publish_impl<'e, E>(
-    executor: E,
-    warrant_hash: &DhtOpHash,
-    last_publish_time: Option<Timestamp>,
-) -> sqlx::Result<()>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query("INSERT INTO WarrantPublish (warrant_hash, last_publish_time) VALUES (?, ?)")
-        .bind(warrant_hash.get_raw_36())
-        .bind(last_publish_time.map(|t| t.as_micros()))
-        .execute(executor)
-        .await?;
-    Ok(())
-}
-
-async fn get_warrant_publish_impl<'e, E>(
-    executor: E,
-    warrant_hash: DhtOpHash,
-) -> sqlx::Result<Option<WarrantPublishRow>>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query_as(
-        "SELECT warrant_hash, last_publish_time FROM WarrantPublish WHERE warrant_hash = ?",
-    )
-    .bind(warrant_hash.get_raw_36())
-    .fetch_optional(executor)
-    .await
-}
-
-async fn insert_validation_receipt_impl<'e, E>(
-    executor: E,
-    hash: &DhtOpHash,
-    op_hash: &DhtOpHash,
-    validators: &[u8],
-    signature: &[u8],
-    when_received: Timestamp,
-) -> sqlx::Result<()>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query(
-        "INSERT INTO ValidationReceipt (hash, op_hash, validators, signature, when_received)
-         VALUES (?, ?, ?, ?, ?)",
-    )
-    .bind(hash.get_raw_36())
-    .bind(op_hash.get_raw_36())
-    .bind(validators)
-    .bind(signature)
-    .bind(when_received.as_micros())
-    .execute(executor)
-    .await?;
-    Ok(())
-}
-
-async fn get_validation_receipts_impl<'e, E>(
-    executor: E,
-    op_hash: DhtOpHash,
-) -> sqlx::Result<Vec<ValidationReceiptRow>>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query_as(
-        "SELECT hash, op_hash, validators, signature, when_received
-         FROM ValidationReceipt WHERE op_hash = ? ORDER BY when_received",
-    )
-    .bind(op_hash.get_raw_36())
-    .fetch_all(executor)
-    .await
-}
-
-impl DbWrite<Dht> {
-    pub async fn insert_chain_op_publish(
-        &self,
-        op_hash: &DhtOpHash,
-        last_publish_time: Option<Timestamp>,
-        receipts_complete: Option<bool>,
-    ) -> sqlx::Result<()> {
-        insert_chain_op_publish_impl(self.pool(), op_hash, last_publish_time, receipts_complete)
-            .await
-    }
-
-    pub async fn insert_warrant_publish(
-        &self,
-        warrant_hash: &DhtOpHash,
-        last_publish_time: Option<Timestamp>,
-    ) -> sqlx::Result<()> {
-        insert_warrant_publish_impl(self.pool(), warrant_hash, last_publish_time).await
-    }
-
-    pub async fn insert_validation_receipt(
-        &self,
-        hash: &DhtOpHash,
-        op_hash: &DhtOpHash,
-        validators: &[u8],
-        signature: &[u8],
-        when_received: Timestamp,
-    ) -> sqlx::Result<()> {
-        insert_validation_receipt_impl(
-            self.pool(),
-            hash,
-            op_hash,
-            validators,
-            signature,
-            when_received,
-        )
-        .await
-    }
-}
-
-impl DbRead<Dht> {
-    pub async fn get_chain_op_publish(
-        &self,
-        op_hash: DhtOpHash,
-    ) -> sqlx::Result<Option<ChainOpPublishRow>> {
-        get_chain_op_publish_impl(self.pool(), op_hash).await
-    }
-
-    pub async fn get_warrant_publish(
-        &self,
-        warrant_hash: DhtOpHash,
-    ) -> sqlx::Result<Option<WarrantPublishRow>> {
-        get_warrant_publish_impl(self.pool(), warrant_hash).await
-    }
-
-    pub async fn get_validation_receipts(
-        &self,
-        op_hash: DhtOpHash,
-    ) -> sqlx::Result<Vec<ValidationReceiptRow>> {
-        get_validation_receipts_impl(self.pool(), op_hash).await
-    }
-}
-
-impl TxWrite<Dht> {
-    pub async fn insert_chain_op_publish(
-        &mut self,
-        op_hash: &DhtOpHash,
-        last_publish_time: Option<Timestamp>,
-        receipts_complete: Option<bool>,
-    ) -> sqlx::Result<()> {
-        insert_chain_op_publish_impl(
-            self.conn_mut(),
-            op_hash,
-            last_publish_time,
-            receipts_complete,
-        )
-        .await
-    }
-
-    pub async fn insert_warrant_publish(
-        &mut self,
-        warrant_hash: &DhtOpHash,
-        last_publish_time: Option<Timestamp>,
-    ) -> sqlx::Result<()> {
-        insert_warrant_publish_impl(self.conn_mut(), warrant_hash, last_publish_time).await
-    }
-
-    pub async fn insert_validation_receipt(
-        &mut self,
-        hash: &DhtOpHash,
-        op_hash: &DhtOpHash,
-        validators: &[u8],
-        signature: &[u8],
-        when_received: Timestamp,
-    ) -> sqlx::Result<()> {
-        insert_validation_receipt_impl(
-            self.conn_mut(),
-            hash,
-            op_hash,
-            validators,
-            signature,
-            when_received,
-        )
-        .await
-    }
-}
-
-impl TxRead<Dht> {
-    pub async fn get_chain_op_publish(
-        &mut self,
-        op_hash: DhtOpHash,
-    ) -> sqlx::Result<Option<ChainOpPublishRow>> {
-        get_chain_op_publish_impl(self.conn_mut(), op_hash).await
-    }
-
-    pub async fn get_warrant_publish(
-        &mut self,
-        warrant_hash: DhtOpHash,
-    ) -> sqlx::Result<Option<WarrantPublishRow>> {
-        get_warrant_publish_impl(self.conn_mut(), warrant_hash).await
-    }
-
-    pub async fn get_validation_receipts(
-        &mut self,
-        op_hash: DhtOpHash,
-    ) -> sqlx::Result<Vec<ValidationReceiptRow>> {
-        get_validation_receipts_impl(self.conn_mut(), op_hash).await
-    }
-}
-
-// ============================================================================
-// Link / DeletedLink / UpdatedRecord / DeletedRecord operations
-// ============================================================================
-
-async fn insert_link_impl<'e, E>(
-    executor: E,
-    action_hash: &ActionHash,
-    base_hash: &AnyLinkableHash,
-    zome_index: u8,
-    link_type: u8,
-    tag: Option<&[u8]>,
-) -> sqlx::Result<()>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query(
-        "INSERT INTO Link (action_hash, base_hash, zome_index, link_type, tag)
-         VALUES (?, ?, ?, ?, ?)",
-    )
-    .bind(action_hash.get_raw_36())
-    .bind(base_hash.get_raw_36())
-    .bind(zome_index as i64)
-    .bind(link_type as i64)
-    .bind(tag)
-    .execute(executor)
-    .await?;
-    Ok(())
-}
-
-async fn get_links_by_base_impl<'e, E>(
-    executor: E,
-    base: AnyLinkableHash,
-) -> sqlx::Result<Vec<LinkRow>>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query_as(
-        "SELECT action_hash, base_hash, zome_index, link_type, tag
-         FROM Link WHERE base_hash = ?",
-    )
-    .bind(base.get_raw_36())
-    .fetch_all(executor)
-    .await
-}
-
-async fn insert_deleted_link_impl<'e, E>(
-    executor: E,
-    action_hash: &ActionHash,
-    create_link_hash: &ActionHash,
-) -> sqlx::Result<()>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query("INSERT INTO DeletedLink (action_hash, create_link_hash) VALUES (?, ?)")
-        .bind(action_hash.get_raw_36())
-        .bind(create_link_hash.get_raw_36())
-        .execute(executor)
-        .await?;
-    Ok(())
-}
-
-async fn get_deleted_links_impl<'e, E>(
-    executor: E,
-    create_link_hash: ActionHash,
-) -> sqlx::Result<Vec<DeletedLinkRow>>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query_as(
-        "SELECT action_hash, create_link_hash FROM DeletedLink WHERE create_link_hash = ?",
-    )
-    .bind(create_link_hash.get_raw_36())
-    .fetch_all(executor)
-    .await
-}
-
-async fn insert_updated_record_impl<'e, E>(
-    executor: E,
-    action_hash: &ActionHash,
-    original_action_hash: &ActionHash,
-    original_entry_hash: &EntryHash,
-) -> sqlx::Result<()>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query(
-        "INSERT INTO UpdatedRecord (action_hash, original_action_hash, original_entry_hash)
-         VALUES (?, ?, ?)",
-    )
-    .bind(action_hash.get_raw_36())
-    .bind(original_action_hash.get_raw_36())
-    .bind(original_entry_hash.get_raw_36())
-    .execute(executor)
-    .await?;
-    Ok(())
-}
-
-async fn get_updated_records_impl<'e, E>(
-    executor: E,
-    original_action_hash: ActionHash,
-) -> sqlx::Result<Vec<UpdatedRecordRow>>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query_as(
-        "SELECT action_hash, original_action_hash, original_entry_hash
-         FROM UpdatedRecord WHERE original_action_hash = ?",
-    )
-    .bind(original_action_hash.get_raw_36())
-    .fetch_all(executor)
-    .await
-}
-
-async fn insert_deleted_record_impl<'e, E>(
-    executor: E,
-    action_hash: &ActionHash,
-    deletes_action_hash: &ActionHash,
-    deletes_entry_hash: &EntryHash,
-) -> sqlx::Result<()>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query(
-        "INSERT INTO DeletedRecord (action_hash, deletes_action_hash, deletes_entry_hash)
-         VALUES (?, ?, ?)",
-    )
-    .bind(action_hash.get_raw_36())
-    .bind(deletes_action_hash.get_raw_36())
-    .bind(deletes_entry_hash.get_raw_36())
-    .execute(executor)
-    .await?;
-    Ok(())
-}
-
-async fn get_deleted_records_impl<'e, E>(
-    executor: E,
-    deletes_action_hash: ActionHash,
-) -> sqlx::Result<Vec<DeletedRecordRow>>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query_as(
-        "SELECT action_hash, deletes_action_hash, deletes_entry_hash
-         FROM DeletedRecord WHERE deletes_action_hash = ?",
-    )
-    .bind(deletes_action_hash.get_raw_36())
-    .fetch_all(executor)
-    .await
-}
-
-impl DbWrite<Dht> {
-    pub async fn insert_link(
-        &self,
-        action_hash: &ActionHash,
-        base_hash: &AnyLinkableHash,
-        zome_index: u8,
-        link_type: u8,
-        tag: Option<&[u8]>,
-    ) -> sqlx::Result<()> {
-        insert_link_impl(
-            self.pool(),
-            action_hash,
-            base_hash,
-            zome_index,
-            link_type,
-            tag,
-        )
-        .await
-    }
-
-    pub async fn insert_deleted_link(
-        &self,
-        action_hash: &ActionHash,
-        create_link_hash: &ActionHash,
-    ) -> sqlx::Result<()> {
-        insert_deleted_link_impl(self.pool(), action_hash, create_link_hash).await
-    }
-
-    pub async fn insert_updated_record(
-        &self,
-        action_hash: &ActionHash,
-        original_action_hash: &ActionHash,
-        original_entry_hash: &EntryHash,
-    ) -> sqlx::Result<()> {
-        insert_updated_record_impl(
-            self.pool(),
-            action_hash,
-            original_action_hash,
-            original_entry_hash,
-        )
-        .await
-    }
-
-    pub async fn insert_deleted_record(
-        &self,
-        action_hash: &ActionHash,
-        deletes_action_hash: &ActionHash,
-        deletes_entry_hash: &EntryHash,
-    ) -> sqlx::Result<()> {
-        insert_deleted_record_impl(
-            self.pool(),
-            action_hash,
-            deletes_action_hash,
-            deletes_entry_hash,
-        )
-        .await
-    }
-}
-
-impl DbRead<Dht> {
-    pub async fn get_links_by_base(&self, base: AnyLinkableHash) -> sqlx::Result<Vec<LinkRow>> {
-        get_links_by_base_impl(self.pool(), base).await
-    }
-
-    pub async fn get_deleted_links(
-        &self,
-        create_link_hash: ActionHash,
-    ) -> sqlx::Result<Vec<DeletedLinkRow>> {
-        get_deleted_links_impl(self.pool(), create_link_hash).await
-    }
-
-    pub async fn get_updated_records(
-        &self,
-        original_action_hash: ActionHash,
-    ) -> sqlx::Result<Vec<UpdatedRecordRow>> {
-        get_updated_records_impl(self.pool(), original_action_hash).await
-    }
-
-    pub async fn get_deleted_records(
-        &self,
-        deletes_action_hash: ActionHash,
-    ) -> sqlx::Result<Vec<DeletedRecordRow>> {
-        get_deleted_records_impl(self.pool(), deletes_action_hash).await
-    }
-}
-
-impl TxWrite<Dht> {
-    pub async fn insert_link(
-        &mut self,
-        action_hash: &ActionHash,
-        base_hash: &AnyLinkableHash,
-        zome_index: u8,
-        link_type: u8,
-        tag: Option<&[u8]>,
-    ) -> sqlx::Result<()> {
-        insert_link_impl(
-            self.conn_mut(),
-            action_hash,
-            base_hash,
-            zome_index,
-            link_type,
-            tag,
-        )
-        .await
-    }
-
-    pub async fn insert_deleted_link(
-        &mut self,
-        action_hash: &ActionHash,
-        create_link_hash: &ActionHash,
-    ) -> sqlx::Result<()> {
-        insert_deleted_link_impl(self.conn_mut(), action_hash, create_link_hash).await
-    }
-
-    pub async fn insert_updated_record(
-        &mut self,
-        action_hash: &ActionHash,
-        original_action_hash: &ActionHash,
-        original_entry_hash: &EntryHash,
-    ) -> sqlx::Result<()> {
-        insert_updated_record_impl(
-            self.conn_mut(),
-            action_hash,
-            original_action_hash,
-            original_entry_hash,
-        )
-        .await
-    }
-
-    pub async fn insert_deleted_record(
-        &mut self,
-        action_hash: &ActionHash,
-        deletes_action_hash: &ActionHash,
-        deletes_entry_hash: &EntryHash,
-    ) -> sqlx::Result<()> {
-        insert_deleted_record_impl(
-            self.conn_mut(),
-            action_hash,
-            deletes_action_hash,
-            deletes_entry_hash,
-        )
-        .await
-    }
-}
-
-impl TxRead<Dht> {
-    pub async fn get_links_by_base(&mut self, base: AnyLinkableHash) -> sqlx::Result<Vec<LinkRow>> {
-        get_links_by_base_impl(self.conn_mut(), base).await
-    }
-
-    pub async fn get_deleted_links(
-        &mut self,
-        create_link_hash: ActionHash,
-    ) -> sqlx::Result<Vec<DeletedLinkRow>> {
-        get_deleted_links_impl(self.conn_mut(), create_link_hash).await
-    }
-
-    pub async fn get_updated_records(
-        &mut self,
-        original_action_hash: ActionHash,
-    ) -> sqlx::Result<Vec<UpdatedRecordRow>> {
-        get_updated_records_impl(self.conn_mut(), original_action_hash).await
-    }
-
-    pub async fn get_deleted_records(
-        &mut self,
-        deletes_action_hash: ActionHash,
-    ) -> sqlx::Result<Vec<DeletedRecordRow>> {
-        get_deleted_records_impl(self.conn_mut(), deletes_action_hash).await
-    }
-}
+//! Internally split into three layers:
+//!
+//! - [`inner`]: free-standing `async fn`s over `sqlx::Executor` per DHT
+//!   table (one submodule per table).
+//! - [`db_operations`]: thin `DbRead<Dht>` / `DbWrite<Dht>` method wrappers
+//!   that acquire a pool executor and delegate into [`inner`].
+//! - [`tx_operations`]: thin `TxRead<Dht>` / `TxWrite<Dht>` method wrappers
+//!   that delegate into [`inner`] using the in-flight transaction.
+//!
+//! Public API is exposed only via methods on the four handle types
+//! ([`crate::DbRead`] / [`crate::DbWrite`] / [`crate::TxRead`] /
+//! [`crate::TxWrite`]) plus the parameter structs re-exported here.
+
+mod db_operations;
+mod inner;
+mod tx_operations;
+
+pub use inner::chain_op::InsertChainOp;
+pub use inner::limbo_chain_op::InsertLimboChainOp;
+pub use inner::limbo_warrant::InsertLimboWarrant;
+pub use inner::warrant::InsertWarrant;
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::kind::Dht;
     use crate::test_open_db;
-    use holo_hash::{ActionHash, AgentPubKey, DnaHash};
-    use holochain_integrity_types::dht_v2::{
-        ActionData, ActionHeader, DnaData, InitZomesCompleteData,
+    use holo_hash::{
+        ActionHash, AgentPubKey, AnyDhtHash, AnyLinkableHash, DhtOpHash, DnaHash, EntryHash,
+        HoloHashed,
     };
+    use holochain_integrity_types::dht_v2::{
+        Action, ActionData, ActionHeader, DnaData, InitZomesCompleteData, RecordValidity,
+    };
+    use holochain_integrity_types::entry::Entry;
+    use holochain_integrity_types::record::SignedHashed;
+    use holochain_integrity_types::signature::Signature;
     use holochain_timestamp::Timestamp;
+    use holochain_zome_types::dht_v2::SignedActionHashed;
     use std::sync::Arc;
 
     fn dht_db_id() -> Dht {
@@ -2142,8 +108,6 @@ mod tests {
         }
     }
 
-    use holo_hash::EntryHash;
-
     fn sample_entry(seed: u8) -> (EntryHash, Entry) {
         let entry = Entry::App(holochain_integrity_types::entry::AppEntryBytes(
             holochain_serialized_bytes::UnsafeBytes::from(vec![seed; 16]).into(),
@@ -2157,7 +121,7 @@ mod tests {
         let db = test_open_db(dht_db_id()).await.unwrap();
         let (hash, entry) = sample_entry(7);
         db.insert_entry(&hash, &entry).await.unwrap();
-        let fetched = db.as_ref().get_entry(hash.clone()).await.unwrap();
+        let fetched = db.as_ref().get_entry(hash.clone(), None).await.unwrap();
         assert_eq!(fetched, Some(entry));
     }
 
@@ -2171,7 +135,7 @@ mod tests {
             .unwrap();
         let fetched = db
             .as_ref()
-            .get_private_entry(author.clone(), hash.clone())
+            .get_entry(hash.clone(), Some(&author))
             .await
             .unwrap();
         assert_eq!(fetched, Some(entry));
@@ -2185,8 +149,28 @@ mod tests {
         db.insert_private_entry(&hash, &author, &entry)
             .await
             .unwrap();
-        // Not visible via the public Entry read.
-        assert_eq!(db.as_ref().get_entry(hash.clone()).await.unwrap(), None);
+        // Not visible via the public Entry read (no author context).
+        assert_eq!(
+            db.as_ref().get_entry(hash.clone(), None).await.unwrap(),
+            None
+        );
+        // Not visible to a different author.
+        let other = AgentPubKey::from_raw_36(vec![4u8; 36]);
+        assert_eq!(
+            db.as_ref()
+                .get_entry(hash.clone(), Some(&other))
+                .await
+                .unwrap(),
+            None
+        );
+        // Visible to the owning author.
+        assert_eq!(
+            db.as_ref()
+                .get_entry(hash.clone(), Some(&author))
+                .await
+                .unwrap(),
+            Some(entry)
+        );
     }
 
     /// Verifies that a TxWrite bundling an Action + Entry insert can be rolled back
@@ -2210,7 +194,12 @@ mod tests {
             .await
             .unwrap()
             .is_none());
-        assert!(db.as_ref().get_entry(entry_hash).await.unwrap().is_none());
+        assert!(db
+            .as_ref()
+            .get_entry(entry_hash, None)
+            .await
+            .unwrap()
+            .is_none());
     }
 
     #[tokio::test]
@@ -2485,8 +474,6 @@ mod tests {
             .is_none());
     }
 
-    use holo_hash::{AnyDhtHash, DhtOpHash};
-
     async fn seed_action_for_op(db: &crate::handles::DbWrite<Dht>, seed: u8) -> ActionHash {
         let action = sample_action(seed);
         db.insert_action(&action, None).await.unwrap();
@@ -2503,16 +490,16 @@ mod tests {
         let action_hash = seed_action_for_op(&db, 0).await;
         let op_hash = DhtOpHash::from_raw_36(vec![0xAA; 36]);
 
-        db.insert_limbo_chain_op(
-            &op_hash,
-            &action_hash,
-            1,
-            &sample_basis(1),
-            42,
-            true,
-            Timestamp::from_micros(100),
-            256,
-        )
+        db.insert_limbo_chain_op(InsertLimboChainOp {
+            op_hash: &op_hash,
+            action_hash: &action_hash,
+            op_type: 1,
+            basis_hash: &sample_basis(1),
+            storage_center_loc: 42,
+            require_receipt: true,
+            when_received: Timestamp::from_micros(100),
+            serialized_size: 256,
+        })
         .await
         .unwrap();
 
@@ -2527,11 +514,19 @@ mod tests {
         assert_eq!(row.sys_validation_status, None);
 
         // Appears in pending_sys.
-        let pending = db.as_ref().limbo_chain_ops_pending_sys(10).await.unwrap();
+        let pending = db
+            .as_ref()
+            .limbo_chain_ops_pending_sys_validation(10)
+            .await
+            .unwrap();
         assert_eq!(pending.len(), 1);
 
         // Does not appear in pending_app (sys is still NULL).
-        let app_pending = db.as_ref().limbo_chain_ops_pending_app(10).await.unwrap();
+        let app_pending = db
+            .as_ref()
+            .limbo_chain_ops_pending_app_validation(10)
+            .await
+            .unwrap();
         assert!(app_pending.is_empty());
 
         // Flip sys to accepted via raw query so the test doesn't need an
@@ -2542,7 +537,11 @@ mod tests {
             .await
             .unwrap();
 
-        let app_pending = db.as_ref().limbo_chain_ops_pending_app(10).await.unwrap();
+        let app_pending = db
+            .as_ref()
+            .limbo_chain_ops_pending_app_validation(10)
+            .await
+            .unwrap();
         assert_eq!(app_pending.len(), 1);
 
         // Ready for integration when sys=reject, or sys=accept + app terminal.
@@ -2575,16 +574,16 @@ mod tests {
         let warrantee = AgentPubKey::from_raw_36(vec![2u8; 36]);
         let proof = vec![0u8; 64];
 
-        db.insert_limbo_warrant(
-            &hash,
-            &author,
-            Timestamp::from_micros(10),
-            &warrantee,
-            &proof,
-            77,
-            Timestamp::from_micros(100),
-            128,
-        )
+        db.insert_limbo_warrant(InsertLimboWarrant {
+            hash: &hash,
+            author: &author,
+            timestamp: Timestamp::from_micros(10),
+            warrantee: &warrantee,
+            proof: &proof,
+            storage_center_loc: 77,
+            when_received: Timestamp::from_micros(100),
+            serialized_size: 128,
+        })
         .await
         .unwrap();
 
@@ -2597,7 +596,7 @@ mod tests {
         assert_eq!(row.warrantee, warrantee.get_raw_36().to_vec());
         assert!(
             db.as_ref()
-                .limbo_warrants_pending_sys(10)
+                .limbo_warrants_pending_sys_validation(10)
                 .await
                 .unwrap()
                 .len()
@@ -2635,14 +634,14 @@ mod tests {
         let author = AgentPubKey::from_raw_36(vec![3u8; 36]);
         let warrantee = AgentPubKey::from_raw_36(vec![4u8; 36]);
 
-        db.insert_warrant(
-            &hash,
-            &author,
-            Timestamp::from_micros(1),
-            &warrantee,
-            &[9u8; 32],
-            88,
-        )
+        db.insert_warrant(InsertWarrant {
+            hash: &hash,
+            author: &author,
+            timestamp: Timestamp::from_micros(1),
+            warrantee: &warrantee,
+            proof: &[9u8; 32],
+            storage_center_loc: 88,
+        })
         .await
         .unwrap();
 
@@ -2669,18 +668,18 @@ mod tests {
         let op_hash = DhtOpHash::from_raw_36(vec![0xCC; 36]);
         let basis = sample_basis(5);
 
-        db.insert_chain_op(
-            &op_hash,
-            &action_hash,
-            1,
-            &basis,
-            99,
-            RecordValidity::Accepted,
-            true,
-            Timestamp::from_micros(10),
-            Timestamp::from_micros(20),
-            512,
-        )
+        db.insert_chain_op(InsertChainOp {
+            op_hash: &op_hash,
+            action_hash: &action_hash,
+            op_type: 1,
+            basis_hash: &basis,
+            storage_center_loc: 99,
+            validation_status: RecordValidity::Accepted,
+            locally_validated: true,
+            when_received: Timestamp::from_micros(10),
+            when_integrated: Timestamp::from_micros(20),
+            serialized_size: 512,
+        })
         .await
         .unwrap();
 
@@ -2710,18 +709,18 @@ mod tests {
         let op_hash = DhtOpHash::from_raw_36(vec![0xDD; 36]);
         let missing = ActionHash::from_raw_36(vec![0xEE; 36]);
         let err = db
-            .insert_chain_op(
-                &op_hash,
-                &missing,
-                1,
-                &sample_basis(0),
-                0,
-                RecordValidity::Accepted,
-                true,
-                Timestamp::from_micros(10),
-                Timestamp::from_micros(20),
-                0,
-            )
+            .insert_chain_op(InsertChainOp {
+                op_hash: &op_hash,
+                action_hash: &missing,
+                op_type: 1,
+                basis_hash: &sample_basis(0),
+                storage_center_loc: 0,
+                validation_status: RecordValidity::Accepted,
+                locally_validated: true,
+                when_received: Timestamp::from_micros(10),
+                when_integrated: Timestamp::from_micros(20),
+                serialized_size: 0,
+            })
             .await
             .unwrap_err()
             .to_string();
@@ -2731,18 +730,18 @@ mod tests {
     async fn seed_chain_op(db: &crate::handles::DbWrite<Dht>, seed: u8) -> (DhtOpHash, ActionHash) {
         let action_hash = seed_action_for_op(db, seed).await;
         let op_hash = DhtOpHash::from_raw_36(vec![0xF0 + seed; 36]);
-        db.insert_chain_op(
-            &op_hash,
-            &action_hash,
-            1,
-            &sample_basis(seed),
-            0,
-            RecordValidity::Accepted,
-            true,
-            Timestamp::from_micros(1),
-            Timestamp::from_micros(2),
-            0,
-        )
+        db.insert_chain_op(InsertChainOp {
+            op_hash: &op_hash,
+            action_hash: &action_hash,
+            op_type: 1,
+            basis_hash: &sample_basis(seed),
+            storage_center_loc: 0,
+            validation_status: RecordValidity::Accepted,
+            locally_validated: true,
+            when_received: Timestamp::from_micros(1),
+            when_integrated: Timestamp::from_micros(2),
+            serialized_size: 0,
+        })
         .await
         .unwrap();
         (op_hash, action_hash)
@@ -2772,14 +771,14 @@ mod tests {
         let hash = DhtOpHash::from_raw_36(vec![0x11; 36]);
         let author = AgentPubKey::from_raw_36(vec![1u8; 36]);
         let warrantee = AgentPubKey::from_raw_36(vec![2u8; 36]);
-        db.insert_warrant(
-            &hash,
-            &author,
-            Timestamp::from_micros(1),
-            &warrantee,
-            &[0u8; 32],
-            0,
-        )
+        db.insert_warrant(InsertWarrant {
+            hash: &hash,
+            author: &author,
+            timestamp: Timestamp::from_micros(1),
+            warrantee: &warrantee,
+            proof: &[0u8; 32],
+            storage_center_loc: 0,
+        })
         .await
         .unwrap();
         db.insert_warrant_publish(&hash, Some(Timestamp::from_micros(10)))
@@ -2815,8 +814,6 @@ mod tests {
         assert_eq!(rows[0].hash, receipt_hash.get_raw_36().to_vec());
     }
 
-    use holo_hash::AnyLinkableHash;
-
     fn sample_base(seed: u8) -> AnyLinkableHash {
         AnyLinkableHash::from_raw_36_and_type(
             vec![seed; 36],
@@ -2829,9 +826,12 @@ mod tests {
         let db = test_open_db(dht_db_id()).await.unwrap();
         let action_hash = seed_action_for_op(&db, 0).await;
         let base = sample_base(5);
-        db.insert_link(&action_hash, &base, 3, 7, Some(b"tag-bytes"))
+
+        let mut tx = db.begin().await.unwrap();
+        tx.insert_link_index(&action_hash, &base, 3, 7, Some(b"tag-bytes"))
             .await
             .unwrap();
+        tx.commit().await.unwrap();
 
         let rows = db.as_ref().get_links_by_base(base).await.unwrap();
         assert_eq!(rows.len(), 1);
@@ -2854,9 +854,13 @@ mod tests {
         let db = test_open_db(dht_db_id()).await.unwrap();
         let delete_action = seed_action_for_op(&db, 1).await;
         let create_link = ActionHash::from_raw_36(vec![0x55; 36]);
-        db.insert_deleted_link(&delete_action, &create_link)
+
+        let mut tx = db.begin().await.unwrap();
+        tx.insert_deleted_link_index(&delete_action, &create_link)
             .await
             .unwrap();
+        tx.commit().await.unwrap();
+
         let rows = db.as_ref().get_deleted_links(create_link).await.unwrap();
         assert_eq!(rows.len(), 1);
     }
@@ -2867,9 +871,13 @@ mod tests {
         let update_action = seed_action_for_op(&db, 2).await;
         let original = ActionHash::from_raw_36(vec![0x66; 36]);
         let original_entry = EntryHash::from_raw_36(vec![0x77; 36]);
-        db.insert_updated_record(&update_action, &original, &original_entry)
+
+        let mut tx = db.begin().await.unwrap();
+        tx.insert_updated_record_index(&update_action, &original, &original_entry)
             .await
             .unwrap();
+        tx.commit().await.unwrap();
+
         let rows = db
             .as_ref()
             .get_updated_records(original.clone())
@@ -2888,9 +896,13 @@ mod tests {
         let delete_action = seed_action_for_op(&db, 3).await;
         let deletes_action = ActionHash::from_raw_36(vec![0x88; 36]);
         let deletes_entry = EntryHash::from_raw_36(vec![0x99; 36]);
-        db.insert_deleted_record(&delete_action, &deletes_action, &deletes_entry)
+
+        let mut tx = db.begin().await.unwrap();
+        tx.insert_deleted_record_index(&delete_action, &deletes_action, &deletes_entry)
             .await
             .unwrap();
+        tx.commit().await.unwrap();
+
         let rows = db
             .as_ref()
             .get_deleted_records(deletes_action)

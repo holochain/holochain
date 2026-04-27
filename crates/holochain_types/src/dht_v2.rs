@@ -85,15 +85,3 @@ impl HashedChainOp {
         self.entry.as_ref().map(|e| e.as_hash())
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn hashed_chain_op_accessors_compile() {
-        fn _assert(h: &HashedChainOp) -> (&ActionHash, Option<&EntryHash>) {
-            (h.action_hash(), h.entry_hash())
-        }
-    }
-}

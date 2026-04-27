@@ -21,6 +21,8 @@ CREATE TABLE Action (
     action_data     BLOB    NOT NULL,         -- serialized ActionData
     signature       BLOB    NOT NULL,
 
+    -- No FK to Entry: private entries live in PrivateEntry, and public
+    -- entries may not yet have arrived when the action is inserted.
     entry_hash      BLOB,
     private_entry   INTEGER,                  -- 0/1, NULL when no entry
 

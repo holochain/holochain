@@ -21,8 +21,8 @@ pub type SignedActionHashed = SignedHashed<Action>;
 /// from `holochain_zome_types::warrant` — unchanged by the v2 redesign.
 pub use crate::warrant::SignedWarrant;
 
-/// Map the existing [`ChainOpType`] enum onto the schema `op_type` INTEGER
-/// column (`1..=9`). `0` is reserved.
+/// Maps [`ChainOpType`] onto the schema `op_type` INTEGER column (`1..=9`).
+/// `0` is reserved and never written.
 ///
 /// Variant ordering is pinned to `docs/design/state_model.md`:
 ///
@@ -37,34 +37,41 @@ pub use crate::warrant::SignedWarrant;
 /// | 7         | `RegisterDeletedBy`             | DeleteRecord   | action          |
 /// | 8         | `RegisterAddLink`               | CreateLink     | link base       |
 /// | 9         | `RegisterRemoveLink`            | DeleteLink     | link base       |
-pub fn chain_op_type_to_i64(t: ChainOpType) -> i64 {
-    match t {
-        ChainOpType::StoreRecord => 1,
-        ChainOpType::StoreEntry => 2,
-        ChainOpType::RegisterAgentActivity => 3,
-        ChainOpType::RegisterUpdatedContent => 4,
-        ChainOpType::RegisterUpdatedRecord => 5,
-        ChainOpType::RegisterDeletedEntryAction => 6,
-        ChainOpType::RegisterDeletedBy => 7,
-        ChainOpType::RegisterAddLink => 8,
-        ChainOpType::RegisterRemoveLink => 9,
+impl From<ChainOpType> for i64 {
+    fn from(t: ChainOpType) -> Self {
+        match t {
+            ChainOpType::StoreRecord => 1,
+            ChainOpType::StoreEntry => 2,
+            ChainOpType::RegisterAgentActivity => 3,
+            ChainOpType::RegisterUpdatedContent => 4,
+            ChainOpType::RegisterUpdatedRecord => 5,
+            ChainOpType::RegisterDeletedEntryAction => 6,
+            ChainOpType::RegisterDeletedBy => 7,
+            ChainOpType::RegisterAddLink => 8,
+            ChainOpType::RegisterRemoveLink => 9,
+        }
     }
 }
 
-/// Inverse of [`chain_op_type_to_i64`]. Returns `None` for `0` and any value outside `1..=9`.
-pub fn chain_op_type_from_i64(n: i64) -> Option<ChainOpType> {
-    Some(match n {
-        1 => ChainOpType::StoreRecord,
-        2 => ChainOpType::StoreEntry,
-        3 => ChainOpType::RegisterAgentActivity,
-        4 => ChainOpType::RegisterUpdatedContent,
-        5 => ChainOpType::RegisterUpdatedRecord,
-        6 => ChainOpType::RegisterDeletedEntryAction,
-        7 => ChainOpType::RegisterDeletedBy,
-        8 => ChainOpType::RegisterAddLink,
-        9 => ChainOpType::RegisterRemoveLink,
-        _ => return None,
-    })
+/// Inverse of [`From<ChainOpType> for i64`]. Returns `Err(v)` for `0` and any
+/// value outside `1..=9`.
+impl TryFrom<i64> for ChainOpType {
+    type Error = i64;
+
+    fn try_from(n: i64) -> Result<Self, Self::Error> {
+        Ok(match n {
+            1 => ChainOpType::StoreRecord,
+            2 => ChainOpType::StoreEntry,
+            3 => ChainOpType::RegisterAgentActivity,
+            4 => ChainOpType::RegisterUpdatedContent,
+            5 => ChainOpType::RegisterUpdatedRecord,
+            6 => ChainOpType::RegisterDeletedEntryAction,
+            7 => ChainOpType::RegisterDeletedBy,
+            8 => ChainOpType::RegisterAddLink,
+            9 => ChainOpType::RegisterRemoveLink,
+            other => return Err(other),
+        })
+    }
 }
 
 #[cfg(test)]
@@ -87,10 +94,10 @@ mod tests {
             (ChainOpType::RegisterRemoveLink, 9),
         ];
         for (variant, n) in expected {
-            assert_eq!(chain_op_type_to_i64(variant), n);
-            assert_eq!(chain_op_type_from_i64(n).unwrap(), variant);
+            assert_eq!(i64::from(variant), n);
+            assert_eq!(ChainOpType::try_from(n).unwrap(), variant);
         }
-        assert!(chain_op_type_from_i64(0).is_none());
-        assert!(chain_op_type_from_i64(10).is_none());
+        assert!(ChainOpType::try_from(0).is_err());
+        assert!(ChainOpType::try_from(10).is_err());
     }
 }

@@ -21,10 +21,7 @@ use holo_hash::{
 use holochain_serialized_bytes::prelude::*;
 use holochain_timestamp::Timestamp;
 
-/// Record-level validation outcome stored in `Action.record_validity`.
-///
-/// Schema column is `INTEGER`: `NULL = pending`, `1 = Accepted`, `2 = Rejected`.
-/// `0` is never used.
+/// Record-level validation outcome.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[repr(i64)]
 pub enum RecordValidity {
@@ -34,12 +31,19 @@ pub enum RecordValidity {
     Rejected = 2,
 }
 
+/// Maps [`RecordValidity`] onto the `record_validity` /
+/// `sys_validation_status` / `app_validation_status` INTEGER columns
+/// (`1 = Accepted`, `2 = Rejected`). `0` is reserved and never written.
+/// `NULL` represents pending and is decoded at the column boundary, not
+/// via this impl.
 impl From<RecordValidity> for i64 {
     fn from(v: RecordValidity) -> Self {
         v as i64
     }
 }
 
+/// Inverse of [`From<RecordValidity> for i64`]. Returns `Err(v)` for any
+/// value outside `1..=2` (including `0`).
 impl TryFrom<i64> for RecordValidity {
     type Error = i64;
     fn try_from(v: i64) -> Result<Self, Self::Error> {
@@ -51,8 +55,7 @@ impl TryFrom<i64> for RecordValidity {
     }
 }
 
-/// Integer-backed action-type discriminant mapping to the schema
-/// `Action.action_type` column. `0` is reserved and never written.
+/// Action-type discriminant.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[repr(i64)]
 pub enum ActionType {
@@ -74,12 +77,16 @@ pub enum ActionType {
     DeleteLink = 8,
 }
 
+/// Maps [`ActionType`] onto the schema `Action.action_type` INTEGER column
+/// (`1..=8`). `0` is reserved and never written.
 impl From<ActionType> for i64 {
     fn from(t: ActionType) -> Self {
         t as i64
     }
 }
 
+/// Inverse of [`From<ActionType> for i64`]. Returns `Err(v)` for any value
+/// outside `1..=8` (including `0`).
 impl TryFrom<i64> for ActionType {
     type Error = i64;
     fn try_from(v: i64) -> Result<Self, Self::Error> {
@@ -93,6 +100,40 @@ impl TryFrom<i64> for ActionType {
             6 => Ok(Delete),
             7 => Ok(CreateLink),
             8 => Ok(DeleteLink),
+            other => Err(other),
+        }
+    }
+}
+
+/// Capability-grant access mode.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[repr(i64)]
+pub enum CapAccess {
+    /// No restrictions; any caller may invoke the granted function.
+    Unrestricted = 0,
+    /// Caller must present a matching secret token.
+    Transferable = 1,
+    /// Caller must be on the agent allow-list and present the secret.
+    Assigned = 2,
+}
+
+/// Maps [`CapAccess`] onto the `CapGrant.cap_access` INTEGER column
+/// (`0..=2`). All three variants are valid, including `0`.
+impl From<CapAccess> for i64 {
+    fn from(a: CapAccess) -> Self {
+        a as i64
+    }
+}
+
+/// Inverse of [`From<CapAccess> for i64`]. Returns `Err(v)` for any value
+/// outside `0..=2`.
+impl TryFrom<i64> for CapAccess {
+    type Error = i64;
+    fn try_from(v: i64) -> Result<Self, Self::Error> {
+        match v {
+            0 => Ok(CapAccess::Unrestricted),
+            1 => Ok(CapAccess::Transferable),
+            2 => Ok(CapAccess::Assigned),
             other => Err(other),
         }
     }
@@ -296,6 +337,20 @@ mod tests {
         }
         assert!(ActionType::try_from(0).is_err());
         assert!(ActionType::try_from(9).is_err());
+    }
+
+    #[test]
+    fn cap_access_i64_roundtrip() {
+        for v in [
+            CapAccess::Unrestricted,
+            CapAccess::Transferable,
+            CapAccess::Assigned,
+        ] {
+            let n: i64 = v.into();
+            assert_eq!(CapAccess::try_from(n).unwrap(), v);
+        }
+        assert!(CapAccess::try_from(-1).is_err());
+        assert!(CapAccess::try_from(3).is_err());
     }
 
     #[test]
