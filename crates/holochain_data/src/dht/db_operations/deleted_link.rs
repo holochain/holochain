@@ -1,7 +1,4 @@
 //! `DbRead<Dht>` API for the `DeletedLink` table.
-//!
-//! `insert_deleted_link_index` is intentionally only on `TxWrite<Dht>` — see
-//! [`super::super::tx_operations::deleted_link`].
 
 use super::super::inner::deleted_link;
 use crate::handles::DbRead;

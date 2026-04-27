@@ -1,7 +1,4 @@
 //! `DbRead<Dht>` API for the `DeletedRecord` table.
-//!
-//! `insert_deleted_record_index` is intentionally only on `TxWrite<Dht>` —
-//! see [`super::super::tx_operations::deleted_record`].
 
 use super::super::inner::deleted_record;
 use crate::handles::DbRead;

@@ -1,7 +1,4 @@
 //! `DbRead<Dht>` API for the `UpdatedRecord` table.
-//!
-//! `insert_updated_record_index` is intentionally only on `TxWrite<Dht>` —
-//! see [`super::super::tx_operations::updated_record`].
 
 use super::super::inner::updated_record;
 use crate::handles::DbRead;
