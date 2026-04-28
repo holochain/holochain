@@ -65,9 +65,6 @@ pub struct Space {
     /// There is one per unique Dna.
     pub cache_db: DbWrite<DbKindCache>,
 
-    /// The conductor database. There is only one of these.
-    pub conductor_db: DbWrite<DbKindConductor>,
-
     /// The authored databases. These are per-agent.
     /// There is one per unique combination of Dna and AgentPubKey.
     pub authored_dbs: Arc<parking_lot::Mutex<HashMap<AgentPubKey, DbWrite<DbKindAuthored>>>>,
@@ -486,46 +483,36 @@ impl Space {
             DbSyncStrategy::Resilient => DbSyncLevel::Normal,
         };
 
-        let (cache, dht_db, peer_meta_store_db, conductor_db) =
-            tokio::task::block_in_place(|| {
-                let cache = DbWrite::open_with_pool_config(
-                    root_db_dir.as_ref(),
-                    DbKindCache(dna_hash.clone()),
-                    PoolConfig {
-                        synchronous_level: db_sync_level,
-                        key: db_key.clone(),
-                        max_readers: db_max_readers,
-                    },
-                )?;
-                let dht_db = DbWrite::open_with_pool_config(
-                    root_db_dir.as_ref(),
-                    DbKindDht(dna_hash.clone()),
-                    PoolConfig {
-                        synchronous_level: db_sync_level,
-                        key: db_key.clone(),
-                        max_readers: db_max_readers,
-                    },
-                )?;
-                let peer_meta_store_db = DbWrite::open_with_pool_config(
-                    root_db_dir.as_ref(),
-                    DbKindPeerMetaStore(dna_hash.clone()),
-                    PoolConfig {
-                        synchronous_level: db_sync_level,
-                        key: db_key.clone(),
-                        max_readers: db_max_readers,
-                    },
-                )?;
-                let conductor_db: DbWrite<DbKindConductor> = DbWrite::open_with_pool_config(
-                    root_db_dir.as_ref(),
-                    DbKindConductor,
-                    PoolConfig {
-                        synchronous_level: db_sync_level,
-                        key: db_key.clone(),
-                        max_readers: db_max_readers,
-                    },
-                )?;
-                DatabaseResult::Ok((cache, dht_db, peer_meta_store_db, conductor_db))
-            })?;
+        let (cache, dht_db, peer_meta_store_db) = tokio::task::block_in_place(|| {
+            let cache = DbWrite::open_with_pool_config(
+                root_db_dir.as_ref(),
+                DbKindCache(dna_hash.clone()),
+                PoolConfig {
+                    synchronous_level: db_sync_level,
+                    key: db_key.clone(),
+                    max_readers: db_max_readers,
+                },
+            )?;
+            let dht_db = DbWrite::open_with_pool_config(
+                root_db_dir.as_ref(),
+                DbKindDht(dna_hash.clone()),
+                PoolConfig {
+                    synchronous_level: db_sync_level,
+                    key: db_key.clone(),
+                    max_readers: db_max_readers,
+                },
+            )?;
+            let peer_meta_store_db = DbWrite::open_with_pool_config(
+                root_db_dir.as_ref(),
+                DbKindPeerMetaStore(dna_hash.clone()),
+                PoolConfig {
+                    synchronous_level: db_sync_level,
+                    key: db_key.clone(),
+                    max_readers: db_max_readers,
+                },
+            )?;
+            DatabaseResult::Ok((cache, dht_db, peer_meta_store_db))
+        })?;
 
         let witnessing_workspace = WitnessingWorkspace::default();
         let incoming_op_hashes = IncomingOpHashes::default();
@@ -540,7 +527,6 @@ impl Space {
             witnessing_workspace,
             incoming_op_hashes,
             incoming_ops_batch,
-            conductor_db,
             root_db_dir: Arc::new(root_db_dir),
             db_key,
             db_max_readers,
