@@ -15,7 +15,7 @@ pub struct PeerMetaEntry {
     pub meta_key: String,
     /// The raw metadata value.
     pub meta_value: Vec<u8>,
-    /// Expiry time in microseconds since the Unix epoch, [`None`] if the entry never expires.
+    /// Expiry time in seconds since the Unix epoch, [`None`] if the entry never expires.
     pub expires_at: Option<i64>,
 }
 

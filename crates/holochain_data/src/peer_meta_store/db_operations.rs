@@ -25,14 +25,16 @@ impl DbRead<PeerMetaStore> {
 
 impl DbWrite<PeerMetaStore> {
     /// Insert or replace a peer metadata entry.
+    ///
+    /// `expires_at` is seconds since the Unix epoch.
     pub async fn put(
         &self,
         peer_url: &str,
         meta_key: &str,
         meta_value: &[u8],
-        expires_at: Option<i64>,
+        expires_at_secs: Option<i64>,
     ) -> sqlx::Result<()> {
-        inner::put(self.pool(), peer_url, meta_key, meta_value, expires_at).await
+        inner::put(self.pool(), peer_url, meta_key, meta_value, expires_at_secs).await
     }
 
     /// Delete a specific peer metadata entry.
