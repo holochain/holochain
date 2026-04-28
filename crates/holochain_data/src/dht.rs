@@ -2,12 +2,12 @@
 //!
 //! Internally split into three layers:
 //!
-//! - [`inner`]: free-standing `async fn`s over `sqlx::Executor` per DHT
+//! - `inner`: free-standing `async fn`s over `sqlx::Executor` per DHT
 //!   table (one submodule per table).
-//! - [`db_operations`]: thin `DbRead<Dht>` / `DbWrite<Dht>` method wrappers
-//!   that acquire a pool executor and delegate into [`inner`].
-//! - [`tx_operations`]: thin `TxRead<Dht>` / `TxWrite<Dht>` method wrappers
-//!   that delegate into [`inner`] using the in-flight transaction.
+//! - `db_operations`: thin `DbRead<Dht>` / `DbWrite<Dht>` method wrappers
+//!   that acquire a pool executor and delegate into `inner`.
+//! - `tx_operations`: thin `TxRead<Dht>` / `TxWrite<Dht>` method wrappers
+//!   that delegate into `inner` using the in-flight transaction.
 //!
 //! Public API is exposed only via methods on the four handle types
 //! ([`crate::DbRead`] / [`crate::DbWrite`] / [`crate::TxRead`] /

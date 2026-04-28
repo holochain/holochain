@@ -8,9 +8,9 @@ use holo_hash::AgentPubKey;
 use holochain_timestamp::Timestamp;
 
 impl DbWrite<Dht> {
-    /// Try to acquire the chain lock for `author`. See
-    /// [`super::super::inner::chain_lock::acquire_chain_lock`] for the
-    /// full rule set. Returns `true` when the caller now holds the lock.
+    /// Try to acquire the chain lock for `author`. See the inner
+    /// `chain_lock::acquire_chain_lock` for the full rule set. Returns `true`
+    /// when the caller now holds the lock.
     pub async fn acquire_chain_lock(
         &self,
         author: &AgentPubKey,
