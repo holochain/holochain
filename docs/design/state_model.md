@@ -186,7 +186,7 @@ CREATE TABLE ChainOp (
     when_integrated INTEGER NOT NULL, -- set at authoring time for self-authored ops, or when moved out of LimboChainOp
 
     -- Storage tracking
-    serialized_size INTEGER NOT NULL DEFAULT 0, -- size in bytes for storage quota management
+    serialized_size INTEGER NOT NULL, -- size in bytes for storage quota management
 
     FOREIGN KEY(action_hash) REFERENCES Action(hash)
 );

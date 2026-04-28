@@ -108,6 +108,54 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn actions_by_author_excludes_other_authors() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        // Seed two actions for author A.
+        for seed in 0..2u8 {
+            let action = sample_action(seed);
+            db.insert_action(&action, None).await.unwrap();
+        }
+        // Seed one action for a different author.
+        let other_author = AgentPubKey::from_raw_36(vec![0x99; 36]);
+        let other = SignedHashed::with_presigned(
+            HoloHashed::with_pre_hashed(
+                Action {
+                    header: ActionHeader {
+                        author: other_author.clone(),
+                        timestamp: Timestamp::from_micros(2_000_000),
+                        action_seq: 0,
+                        prev_action: None,
+                    },
+                    data: ActionData::Dna(DnaData {
+                        dna_hash: DnaHash::from_raw_36(vec![0u8; 36]),
+                    }),
+                },
+                ActionHash::from_raw_36(vec![0xCC; 36]),
+            ),
+            Signature([0xCC; 64]),
+        );
+        db.insert_action(&other, None).await.unwrap();
+
+        let a_results = db
+            .as_ref()
+            .get_actions_by_author(AgentPubKey::from_raw_36(vec![1u8; 36]))
+            .await
+            .unwrap();
+        assert_eq!(a_results.len(), 2);
+        assert!(a_results
+            .iter()
+            .all(|a| a.hashed.content.header.author == AgentPubKey::from_raw_36(vec![1u8; 36])));
+
+        let b_results = db
+            .as_ref()
+            .get_actions_by_author(other_author.clone())
+            .await
+            .unwrap();
+        assert_eq!(b_results.len(), 1);
+        assert_eq!(b_results[0].hashed.content.header.author, other_author);
+    }
+
     fn sample_entry(seed: u8) -> (EntryHash, Entry) {
         let entry = Entry::App(holochain_integrity_types::entry::AppEntryBytes(
             holochain_serialized_bytes::UnsafeBytes::from(vec![seed; 16]).into(),
@@ -231,6 +279,41 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(by_tag.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn cap_grants_ordered_by_action_seq() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        // Insert parent Actions and grants in non-seq insertion order, so the
+        // ORDER BY actually has work to do.
+        for seed in [3u8, 1, 2] {
+            let action = sample_action(seed);
+            db.insert_action(&action, None).await.unwrap();
+            db.insert_cap_grant(action.as_hash(), 1, Some("shared-tag"))
+                .await
+                .unwrap();
+        }
+
+        let author = AgentPubKey::from_raw_36(vec![1u8; 36]);
+        let by_access = db
+            .as_ref()
+            .get_cap_grants_by_access(author.clone(), 1)
+            .await
+            .unwrap();
+        assert_eq!(by_access.len(), 3);
+        assert_eq!(by_access[0].action_hash, vec![1u8; 36]);
+        assert_eq!(by_access[1].action_hash, vec![2u8; 36]);
+        assert_eq!(by_access[2].action_hash, vec![3u8; 36]);
+
+        let by_tag = db
+            .as_ref()
+            .get_cap_grants_by_tag(author, "shared-tag")
+            .await
+            .unwrap();
+        assert_eq!(by_tag.len(), 3);
+        assert_eq!(by_tag[0].action_hash, vec![1u8; 36]);
+        assert_eq!(by_tag[1].action_hash, vec![2u8; 36]);
+        assert_eq!(by_tag[2].action_hash, vec![3u8; 36]);
     }
 
     #[tokio::test]

@@ -9,6 +9,14 @@
 --   sys_validation_status /
 --   app_validation_status: NULL=pending, 1=accepted, 2=rejected
 --   Booleans           : stored as INTEGER 0/1
+--
+-- Foreign-key delete behaviour:
+--   Index tables (Link, DeletedLink, UpdatedRecord, DeletedRecord) cascade on
+--   delete of the referenced Action — the index is derivative and must follow
+--   the parent. All other FKs (CapGrant, LimboChainOp, ChainOp, ChainOpPublish,
+--   ValidationReceipt, WarrantPublish) intentionally do NOT cascade: deletes
+--   must be done explicitly by workflow code, so accidental loss of first-class
+--   state can't happen via parent removal.
 
 -- Actions: both self-authored and network-received.
 CREATE TABLE Action (
@@ -125,7 +133,7 @@ CREATE TABLE ChainOp (
     when_received      INTEGER NOT NULL,
     when_integrated    INTEGER NOT NULL,
 
-    serialized_size    INTEGER NOT NULL DEFAULT 0,
+    serialized_size    INTEGER NOT NULL,
 
     FOREIGN KEY(action_hash) REFERENCES Action(hash)
 ) STRICT, WITHOUT ROWID;
