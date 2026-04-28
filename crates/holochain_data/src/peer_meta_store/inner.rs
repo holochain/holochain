@@ -37,7 +37,7 @@ where
     let value: Option<Vec<u8>> = sqlx::query_scalar(
         "SELECT meta_value FROM peer_meta
          WHERE peer_url = ? AND meta_key = ?
-         AND (expires_at IS NULL OR expires_at >= unixepoch() * 1000000)",
+         AND (expires_at IS NULL OR expires_at > unixepoch() * 1000000)",
     )
     .bind(peer_url)
     .bind(meta_key)
@@ -64,7 +64,7 @@ where
     let rows: Vec<Row> = sqlx::query_as(
         "SELECT peer_url, meta_value FROM peer_meta
          WHERE meta_key = ?
-         AND (expires_at IS NULL OR expires_at >= unixepoch() * 1000000)",
+         AND (expires_at IS NULL OR expires_at > unixepoch() * 1000000)",
     )
     .bind(meta_key)
     .fetch_all(executor)
@@ -87,7 +87,7 @@ where
     let entries: Vec<PeerMetaEntry> = sqlx::query_as(
         "SELECT meta_key, meta_value, expires_at FROM peer_meta
          WHERE peer_url = ?
-         AND (expires_at IS NULL OR expires_at >= unixepoch() * 1000000)",
+         AND (expires_at IS NULL OR expires_at > unixepoch() * 1000000)",
     )
     .bind(peer_url)
     .fetch_all(executor)
@@ -115,7 +115,7 @@ pub(super) async fn prune<'e, E>(executor: E) -> sqlx::Result<u64>
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    let result = sqlx::query("DELETE FROM peer_meta WHERE expires_at < unixepoch() * 1000000")
+    let result = sqlx::query("DELETE FROM peer_meta WHERE expires_at <= unixepoch() * 1000000")
         .execute(executor)
         .await?;
 
