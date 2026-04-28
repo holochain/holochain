@@ -252,14 +252,19 @@ transport-tx5-backend-go-pion = [
 wasmer-debug-memory = ["holochain_wasmer_host/debug-memory"]
 
 # Enable wasm compiler
-wasmer-sys = ["dep:wasmer-middlewares", "wasmer/sys-default"]
+wasmer-sys = ["dep:wasmer-middlewares", "wasmer/sys"]
 
 wasmer-sys-cranelift = [
   "wasmer-sys",
+  "wasmer/cranelift",
   "holochain_wasmer_host/wasmer-sys-cranelift",
 ]
 
-wasmer-sys-llvm = ["wasmer-sys", "holochain_wasmer_host/wasmer-sys-llvm"]
+wasmer-sys-llvm = [
+  "wasmer-sys",
+  "wasmer/llvm",
+  "holochain_wasmer_host/wasmer-sys-llvm",
+]
 
 # Enable the wasmi interpreter
 wasmer-wasmi = ["holochain_wasmer_host/wasmer-wasmi"]
