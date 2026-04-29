@@ -1,4 +1,5 @@
 use crate::tests::common::{spawn_test_bootstrap, Handler};
+use holochain_data::kind::PeerMetaStore;
 use holochain_keystore::*;
 use holochain_p2p::actor::{GetLinksRequestOptions, NetworkRequestOptions};
 use holochain_p2p::event::*;
@@ -1180,8 +1181,9 @@ async fn spawn_test(
     handler: DynHcP2pHandler,
     bootstrap_addr: &SocketAddr,
 ) -> (AgentPubKey, actor::DynHcP2p, MetaLairClient) {
-    let db_peer_meta =
-        DbWrite::test_in_mem(DbKindPeerMetaStore(Arc::new(dna_hash.clone()))).unwrap();
+    let db_peer_meta = holochain_data::test_open_db(PeerMetaStore::new(Arc::new(dna_hash.clone())))
+        .await
+        .unwrap();
     let db_op = DbWrite::test_in_mem(DbKindDht(Arc::new(dna_hash.clone()))).unwrap();
     let db_cache = DbWrite::test_in_mem(DbKindCache(Arc::new(dna_hash.clone()))).unwrap();
     let conductor_store = holochain_state::conductor::ConductorStore::new_test()

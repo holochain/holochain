@@ -1,11 +1,12 @@
 use holo_hash::DnaHash;
+use holochain_data::kind::PeerMetaStore;
 use holochain_keystore::{test_keystore, MetaLairClient};
 use holochain_p2p::{
     actor::DynHcP2p, event::MockHcP2pHandler, spawn_holochain_p2p, HolochainP2pConfig,
     HolochainP2pLocalAgent,
 };
-use holochain_state::prelude::{named_params, test_db_dir};
-use holochain_types::db::{DbKindCache, DbKindDht, DbKindPeerMetaStore, DbWrite};
+use holochain_state::prelude::test_db_dir;
+use holochain_types::db::{DbKindCache, DbKindDht, DbWrite};
 use kitsune2_api::{
     AgentInfo, AgentInfoSigned, DhtArc, DynPeerMetaStore, SpaceId, Timestamp, Url, KEY_PREFIX_ROOT,
     META_KEY_UNRESPONSIVE,
@@ -22,15 +23,17 @@ async fn urls_are_pruned_at_an_interval() {
     } = TestCase::spawn().await;
 
     // Insert an unresponsive URL into peer meta store.
+    // Expiry time needs to be more than 1 second in the future as we might be on the boundary of
+    // this second.
     let unresponsive_peer = Url::from_str("ws://nowhere.land:80").unwrap();
-    let expiry = Timestamp::from_micros(Timestamp::now().as_micros() + 500_000); // 500 ms from now
+    let expiry = Timestamp::now() + Duration::from_secs(2);
     let when = Timestamp::now();
     peer_meta_store
         .set_unresponsive(unresponsive_peer.clone(), expiry, when)
         .await
         .unwrap();
 
-    // Waiting until the next pruning, but before the expiry, to make sure expiry is respected.
+    // Waiting until the next pruning, but before the expiry, to make sure it has not expired yet.
     tokio::time::sleep(Duration::from_millis(100)).await;
     let when_peer_set_unresponsive = peer_meta_store
         .get_unresponsive(unresponsive_peer.clone())
@@ -38,12 +41,10 @@ async fn urls_are_pruned_at_an_interval() {
         .unwrap();
     assert_eq!(when_peer_set_unresponsive, Some(when));
 
-    let unresponsive_urls = count_rows_in_peer_meta_store(db_peer_meta.clone());
+    let unresponsive_urls = count_rows_in_peer_meta_store(&db_peer_meta).await;
     assert_eq!(unresponsive_urls, 1);
 
-    // Waiting until the next pruning, after expiry.
-    // Test has to wait at least until the next second, because the expiry is compared with the unixepoch function in SQLite which returns
-    // the timestamp in full seconds, plus the pruning interval.
+    // The entries should be pruned after their expiry, keep checking up until the expiry time.
     tokio::time::timeout(Duration::from_secs(2), async {
         loop {
             tokio::time::sleep(Duration::from_millis(100)).await;
@@ -53,7 +54,7 @@ async fn urls_are_pruned_at_an_interval() {
                 .await
                 .unwrap();
             // Check the row has actually been deleted from the table.
-            let unresponsive_urls = count_rows_in_peer_meta_store(db_peer_meta.clone());
+            let unresponsive_urls = count_rows_in_peer_meta_store(&db_peer_meta).await;
             if when_peer_marked_unresponsive.is_none() && unresponsive_urls == 0 {
                 break;
             }
@@ -144,7 +145,7 @@ async fn urls_are_pruned_when_updated_agent_info_available() {
         loop {
             tokio::time::sleep(Duration::from_millis(100)).await;
 
-            let peer_meta_store_count = count_rows_in_peer_meta_store(db_peer_meta.clone());
+            let peer_meta_store_count = count_rows_in_peer_meta_store(&db_peer_meta).await;
             if peer_meta_store_count == 2 {
                 break;
             }
@@ -161,7 +162,7 @@ async fn urls_are_pruned_when_updated_agent_info_available() {
         .is_some());
 
     // Alice and Bob's URLs should still be in the peer meta store.
-    let peer_meta_store_count = count_rows_in_peer_meta_store(db_peer_meta.clone());
+    let peer_meta_store_count = count_rows_in_peer_meta_store(&db_peer_meta).await;
     assert_eq!(peer_meta_store_count, 2);
 
     // Insert Alice's updated AgentInfo into peer store.
@@ -202,7 +203,7 @@ async fn urls_are_pruned_when_updated_agent_info_available() {
 
             // Alice's URL should have been removed from the store
             // and Bob's URL should still be in the store.
-            let peer_meta_store_count = count_rows_in_peer_meta_store(db_peer_meta.clone());
+            let peer_meta_store_count = count_rows_in_peer_meta_store(&db_peer_meta).await;
             if maybe_alice_entry.is_none() && peer_meta_store_count == 1 {
                 break;
             }
@@ -217,7 +218,7 @@ struct TestCase {
     space_id: SpaceId,
     lair_client: MetaLairClient,
     peer_meta_store: DynPeerMetaStore,
-    db_peer_meta: DbWrite<DbKindPeerMetaStore>,
+    db_peer_meta: holochain_data::DbWrite<PeerMetaStore>,
 }
 
 impl TestCase {
@@ -230,9 +231,14 @@ impl TestCase {
         // The DB logic expects the folder to have a parent folder.
         let dir = test_db_dir();
         let db_dir = dir.path().join("tmp_database");
-        std::fs::create_dir(db_dir.clone()).unwrap();
-        let db_peer_meta =
-            DbWrite::test(&db_dir, DbKindPeerMetaStore(Arc::new(dna_hash.clone()))).unwrap();
+        std::fs::create_dir(&db_dir).unwrap();
+        let db_peer_meta = holochain_data::open_db(
+            &db_dir,
+            PeerMetaStore::new(Arc::new(dna_hash.clone())),
+            holochain_data::HolochainDataConfig::default(),
+        )
+        .await
+        .unwrap();
         let db_op = DbWrite::test_in_mem(DbKindDht(Arc::new(dna_hash.clone()))).unwrap();
         let db_cache = DbWrite::test_in_mem(DbKindCache(Arc::new(dna_hash.clone()))).unwrap();
         let conductor_store = holochain_state::conductor::ConductorStore::new_test()
@@ -285,6 +291,7 @@ impl TestCase {
             .unwrap()
             .peer_meta_store()
             .clone();
+
         Self {
             p2p,
             space_id,
@@ -295,15 +302,12 @@ impl TestCase {
     }
 }
 
-fn count_rows_in_peer_meta_store(db: DbWrite<DbKindPeerMetaStore>) -> usize {
-    db.test_read(|txn| {
-        let mut stmt = txn
-            .prepare("SELECT COUNT(*) FROM peer_meta WHERE meta_key = :meta_key")
-            .unwrap();
-        stmt.query_row(
-            named_params! {":meta_key": format!("{KEY_PREFIX_ROOT}:{META_KEY_UNRESPONSIVE}")},
-            |row| row.get::<_, usize>(0),
-        )
-        .unwrap()
-    })
+async fn count_rows_in_peer_meta_store(db: &holochain_data::DbWrite<PeerMetaStore>) -> usize {
+    let key = format!("{KEY_PREFIX_ROOT}:{META_KEY_UNRESPONSIVE}");
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM peer_meta WHERE meta_key = ?")
+        .bind(&key)
+        .fetch_one(db.pool())
+        .await
+        .unwrap();
+    count as usize
 }

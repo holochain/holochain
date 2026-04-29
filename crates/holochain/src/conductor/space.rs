@@ -50,6 +50,7 @@ pub struct Spaces {
     pub(crate) dna_def_store: holochain_state::dna_def::DnaDefStore,
     pub(crate) entry_def_store: holochain_state::entry_def::EntryDefStore,
     db_key: DbKey,
+    data_db_key: holochain_data::DbKey,
 }
 
 /// This is the set of data required at the
@@ -74,7 +75,7 @@ pub struct Space {
     pub dht_db: DbWrite<DbKindDht>,
 
     /// The peer meta store database. One per unique Dna.
-    pub peer_meta_store_db: DbWrite<DbKindPeerMetaStore>,
+    pub peer_meta_store_db: holochain_data::DbWrite<holochain_data::kind::PeerMetaStore>,
 
     /// Countersigning workspace for session state.
     pub countersigning_workspaces:
@@ -191,7 +192,7 @@ impl Spaces {
             root_db_dir.as_ref(),
             holochain_data::kind::Wasm,
             holochain_data::HolochainDataConfig {
-                key: Some(data_db_key),
+                key: Some(data_db_key.clone()),
                 sync_level: db_sync,
                 max_readers: config.db_max_readers,
             },
@@ -214,6 +215,7 @@ impl Spaces {
             dna_def_store,
             entry_def_store,
             db_key,
+            data_db_key,
         })
     }
 
@@ -357,6 +359,7 @@ impl Spaces {
                             self.config.db_sync_strategy,
                             self.db_key.clone(),
                             self.config.db_max_readers,
+                            Some(self.data_db_key.clone()),
                         )?;
 
                         let r = f(&space);
@@ -412,7 +415,7 @@ impl Spaces {
     pub fn peer_meta_store_db(
         &self,
         dna_hash: &DnaHash,
-    ) -> DatabaseResult<DbWrite<DbKindPeerMetaStore>> {
+    ) -> DatabaseResult<holochain_data::DbWrite<holochain_data::kind::PeerMetaStore>> {
         self.get_or_create_space_ref(dna_hash, |space| space.peer_meta_store_db.clone())
     }
 
@@ -477,10 +480,11 @@ impl Space {
         db_sync_strategy: DbSyncStrategy,
         db_key: DbKey,
         db_max_readers: u16,
+        data_db_key: Option<holochain_data::DbKey>,
     ) -> DatabaseResult<Self> {
-        let db_sync_level = match db_sync_strategy {
-            DbSyncStrategy::Fast => DbSyncLevel::Off,
-            DbSyncStrategy::Resilient => DbSyncLevel::Normal,
+        let (db_sync_level, data_db_sync_level) = match db_sync_strategy {
+            DbSyncStrategy::Fast => (DbSyncLevel::Off, holochain_data::DbSyncLevel::Off),
+            DbSyncStrategy::Resilient => (DbSyncLevel::Normal, holochain_data::DbSyncLevel::Normal),
         };
 
         let (cache, dht_db, peer_meta_store_db) = tokio::task::block_in_place(|| {
@@ -502,15 +506,17 @@ impl Space {
                     max_readers: db_max_readers,
                 },
             )?;
-            let peer_meta_store_db = DbWrite::open_with_pool_config(
-                root_db_dir.as_ref(),
-                DbKindPeerMetaStore(dna_hash.clone()),
-                PoolConfig {
-                    synchronous_level: db_sync_level,
-                    key: db_key.clone(),
-                    max_readers: db_max_readers,
-                },
-            )?;
+            let peer_meta_store_db = tokio::runtime::Handle::current()
+                .block_on(holochain_data::open_db(
+                    &root_db_dir,
+                    holochain_data::kind::PeerMetaStore::new(dna_hash.clone()),
+                    holochain_data::HolochainDataConfig {
+                        key: data_db_key,
+                        sync_level: data_db_sync_level,
+                        max_readers: db_max_readers,
+                    },
+                ))
+                .map_err(|e| holochain_sqlite::error::DatabaseError::Other(e.into()))?;
             DatabaseResult::Ok((cache, dht_db, peer_meta_store_db))
         })?;
 
@@ -688,6 +694,7 @@ impl TestSpace {
                 Default::default(),
                 Default::default(),
                 ConductorConfig::default().db_max_readers,
+                None,
             )
             .unwrap(),
             _temp_dir: temp_dir,

@@ -61,6 +61,7 @@ holochain_sqlite = { version = "^0.7.0-dev.18", path = "../holochain_sqlite", fe
   "test_utils",
 ] }
 holochain_state = { path = "../holochain_state", features = ["test_utils"] }
+sqlx = "0.9.0-alpha.1"
 tempfile = "3.21.0"
 # used for setting default crypto provider with iroh relay
 rustls = "0.23"
