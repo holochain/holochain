@@ -21,7 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## 0.7.0-dev.22
 
 - **BREAKING CHANGE** switch from `holochain_sqlite`/`holochain_state` for the conductor database, to the new store defined by `holochain_data`. There is no migration path for existing installs of Holochain, and startup errors would be expected if the data state is not cleared.
-- Add peer metadata store database table to `holochain_data` along with full CRUD API. \#5732
+- Add peer metadata store database table to `holochain_data` along with full CRUD API. \#5746
   - In the new peer metadata store database, the entries now store `expires_at` as seconds from the Unix epoch instead of microseconds and they correctly expire at the `expires_at` time instead of just after.
 - **BREAKING CHANGE** switch peer metadata store database from `holochain_sqlite` for the new one defined by `holochain_data`. There is no migration path for existing installs of Holochain, and startup errors would be expected if the data state is not cleared. \#5748
 
