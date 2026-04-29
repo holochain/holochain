@@ -9,9 +9,7 @@ use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitHostAccess;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateHostAccess;
-#[cfg(feature = "wasmer_sys")]
-use crate::core::ribosome::real_ribosome::ModuleCacheLock;
-use crate::core::ribosome::real_ribosome::RealRibosome;
+use crate::core::ribosome::real_ribosome::{make_module_cache, RealRibosome, WasmBackend};
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContext;
@@ -31,8 +29,6 @@ use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 pub use holochain_types::fixt::*;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
-#[cfg(feature = "wasmer_sys")]
-use holochain_wasmer_host::module::ModuleCache;
 use rand::rng;
 use rand::seq::IteratorRandom;
 use rand::Rng;
@@ -47,8 +43,13 @@ pub struct Zomes(pub Vec<TestWasm>);
 newtype_fixturator!(FnComponents<Vec<String>>);
 
 fixturator!(
+    WasmBackend;
+    constructor fn new();
+);
+
+fixturator!(
     RealRibosome;
-    constructor fn empty(DnaFile);
+    constructor fn empty(WasmBackend, DnaFile);
 );
 
 impl Iterator for RealRibosomeFixturator<Zomes> {
@@ -61,13 +62,18 @@ impl Iterator for RealRibosomeFixturator<Zomes> {
             SweetDnaFile::from_test_wasms(uuid, input, Default::default()).await
         });
 
-        #[cfg(feature = "wasmer_wamr")]
-        let module_cache = None;
-        #[cfg(feature = "wasmer_sys")]
-        let module_cache = Some(Arc::new(ModuleCacheLock::new(ModuleCache::new(None))));
+        let backend = cfg_select! {
+            feature = "wasmer-sys-cranelift" => { WasmBackend::Cranelift }
+            feature = "wasmer-sys-llvm" => { WasmBackend::Llvm }
+            feature = "wasmer-wasmi" => { WasmBackend::Wasmi }
+        };
 
-        let ribosome =
-            tokio_helper::block_forever_on(RealRibosome::new(dna_file, module_cache)).unwrap();
+        let ribosome = tokio_helper::block_forever_on(RealRibosome::new(
+            backend,
+            dna_file,
+            make_module_cache(backend, None),
+        ))
+        .unwrap();
 
         // warm the module cache for each wasm in the ribosome
         for zome in self.0.curve.0.clone() {

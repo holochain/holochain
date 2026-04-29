@@ -737,7 +737,7 @@ impl Store for Txns<'_, '_> {
         let mut warrants = vec![];
         for txn in &self.txns {
             let r = txn.get_warrants_for_agent(agent_key, check_validity)?;
-            warrants.extend(r.into_iter());
+            warrants.extend(r);
         }
         Ok(warrants)
     }

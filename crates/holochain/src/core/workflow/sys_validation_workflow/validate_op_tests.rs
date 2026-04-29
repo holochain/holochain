@@ -14,7 +14,6 @@ use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::fixt::EntryHashFixturator;
 use holochain_cascade::CascadeSource;
 use holochain_cascade::MockCascade;
-use holochain_serialized_bytes::prelude::SerializedBytes;
 use std::collections::HashMap;
 use std::sync::Arc;
 

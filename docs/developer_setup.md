@@ -82,7 +82,7 @@ You would have to check which CI checks are failing, but as an example, you migh
 runtime, from the root of the repository:
 
 ```shell
-make test-workspace-wasmer_sys
+make test-workspace-wasmer-sys-cranelift
 ```
 
 ### Verifying changes and reproducing issues

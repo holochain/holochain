@@ -12,7 +12,6 @@ use holochain_websocket::{
     self as ws, ConnectRequest, WebsocketConfig, WebsocketReceiver, WebsocketResult,
     WebsocketSender,
 };
-use serde_json::json;
 use std::future::Future;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
@@ -575,6 +574,8 @@ async fn generate_sandbox_with_tx5_network_type() {
 #[cfg(feature = "transport-iroh")]
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_with_iroh_network_type() {
+    use serde_json::json;
+
     let temp_dir = tempfile::TempDir::new().unwrap();
     package_fixture_if_not_packaged().await;
     let app_path = std::env::current_dir()

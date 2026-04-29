@@ -174,7 +174,7 @@ impl HcSandbox {
                     .force_admin_ports
                     .clone()
                     .into_iter()
-                    .zip(paths.clone().into_iter())
+                    .zip(paths.clone())
                 {
                     crate::force_admin_port(path, port)?;
                 }

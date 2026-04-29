@@ -17,7 +17,7 @@ holo_hash = { version = "^0.7.0-dev.8", path = "../holo_hash", features = [
 ] }
 holochain_sqlite = { version = "^0.7.0-dev.17", path = "../holochain_sqlite" }
 holochain_p2p = { version = "^0.7.0-dev.22", default-features = false, path = "../holochain_p2p" }
-holochain_serialized_bytes = "=0.0.56"
+holochain_serialized_bytes = "=0.0.57"
 holochain_state = { version = "^0.7.0-dev.22", path = "../holochain_state" }
 holochain_types = { version = "^0.7.0-dev.21", path = "../holochain_types" }
 holochain_trace = { version = "^0.7.0-dev.1", path = "../holochain_trace" }
@@ -29,7 +29,7 @@ thiserror = "2.0"
 tracing = "0.1"
 opentelemetry = "0.31"
 
-kitsune2_api = "0.4.0-dev.6"
+kitsune2_api = "0.5.0-dev.1"
 
 async-trait = "0.1"
 mockall = { version = "0.13", optional = true }

@@ -91,6 +91,7 @@ lto = true
 # kitsune2_bootstrap_srv = { path = "../kitsune2/crates/bootstrap_srv" }
 # kitsune2_bootstrap_client = { path = "../kitsune2/crates/bootstrap_client" }
 # kitsune2_test_utils = { path = "../kitsune2/crates/test_utils" }
+# kitsune2_transport_iroh = { path = "../kitsune2/crates/transport_iroh" }
 # kitsune2_transport_tx5 = { path = "../kitsune2/crates/transport_tx5" }
 # sbd-server = { path = "../sbd/rust/sbd-server" }
 # sbd-client = { path = "../sbd/rust/sbd-client" }
@@ -101,6 +102,8 @@ lto = true
 # influxive-child-svc = { path = "../influxive/crates/influxive-child-svc" }
 # influxive-otel = { path = "../influxive/crates/influxive-otel" }
 # holochain_wasmer_host = { path = "../holochain-wasmer/crates/host" }
+# holochain_wasmer_guest = { path = "../holochain-wasmer/crates/guest" }
+# holochain_wasmer_common = { path = "../holochain-wasmer/crates/common" }
 # holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", rev = "2fc225add8c72cbe49e458a2431c8069c9e405ec" }
 # holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", rev = "2fc225add8c72cbe49e458a2431c8069c9e405ec" }
 # holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", rev = "2fc225add8c72cbe49e458a2431c8069c9e405ec" }

@@ -1,6 +1,6 @@
 use crate::conductor::space::TestSpaces;
 use crate::conductor::Conductor;
-use crate::core::ribosome::real_ribosome::{ModuleCacheLock, RealRibosome};
+use crate::core::ribosome::real_ribosome::{make_module_cache, RealRibosome, WasmBackend};
 use crate::core::workflow::incoming_dht_ops_workflow::op_exists;
 use crate::sweettest::SweetConductorConfig;
 use crate::test_utils::fake_valid_dna_file;
@@ -11,7 +11,6 @@ use holochain_p2p::HolochainP2pDna;
 use holochain_state::prelude::*;
 use holochain_trace::test_run;
 use holochain_types::cell_config_overrides::CellConfigOverrides;
-use holochain_wasmer_host::module::ModuleCache;
 use holochain_zome_types::action;
 use std::sync::Arc;
 use tokio::sync::broadcast;
@@ -53,11 +52,10 @@ async fn test_cell_handle_publish() {
         .register_dna_file(cell_id.clone(), dna_file.clone())
         .await
         .unwrap();
-    let wasmer_module_cache = Some(Arc::new(ModuleCacheLock::new(ModuleCache::new(Some(
-        db_dir.join("wasm-cache"),
-    )))));
+    let backend = WasmBackend::new();
+    let wasmer_module_cache = make_module_cache(backend, Some(db_dir.join("wasm-cache")));
 
-    let ribosome = RealRibosome::new(dna_file, wasmer_module_cache)
+    let ribosome = RealRibosome::new(backend, dna_file, wasmer_module_cache)
         .await
         .unwrap();
 

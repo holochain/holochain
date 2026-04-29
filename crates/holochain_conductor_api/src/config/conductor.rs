@@ -79,6 +79,12 @@ pub struct ConductorConfig {
     #[serde(default)]
     pub tracing_override: Option<String>,
 
+    /// The WASM backend to use.
+    ///
+    /// Only needs to be set if multiple WASM backends are available to Holochain, otherwise it
+    /// will default to the enabled backend.
+    pub wasm_backend: Option<WasmBackend>,
+
     /// The path to the data root for this conductor;
     /// This can be `None` while building up the config programatically but MUST
     /// be set by the time the config is used to build a conductor.
@@ -164,6 +170,7 @@ impl Default for ConductorConfig {
     fn default() -> Self {
         Self {
             tracing_override: None,
+            wasm_backend: None,
             data_root_path: None,
             keystore: KeystoreConfig::default(),
             admin_interfaces: None,
@@ -230,6 +237,34 @@ impl ConductorConfig {
     pub fn conductor_tuning_params(&self) -> ConductorTuningParams {
         self.tuning_params.clone().unwrap_or_default()
     }
+}
+
+/// The WASM backend to use.
+///
+/// Note that the backend must be available in the Holochain binary, otherwise it will reject the
+/// configuration at startup.
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub enum WasmBackend {
+    /// Use the cranelift WASM compiler.
+    ///
+    /// Recommended as the default for users.
+    #[serde(rename = "cranelift")]
+    Cranelift,
+
+    /// Use the LLVM WASM compiler.
+    ///
+    /// Recommended for service conductors, where the LLVM toolchain can be provided and improved
+    /// WASM execution time is wanted.
+    #[serde(rename = "LLVM")]
+    Llvm,
+
+    /// Use the wasmi WASM compiler.
+    ///
+    /// Recommended where neither cranelift nor LLVM can be used. This is known to be the case on
+    /// iOS where compilation on the fly is not permitted.
+    #[serde(rename = "wasmi")]
+    Wasmi,
 }
 
 /// Configure Kitsune2 Reporting.
@@ -804,6 +839,7 @@ mod tests {
             result,
             ConductorConfig {
                 tracing_override: None,
+                wasm_backend: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 network: NetworkConfig::default(),
                 keystore: KeystoreConfig::DangerTestKeystore,
@@ -982,6 +1018,7 @@ admin_interfaces:
             result.unwrap(),
             ConductorConfig {
                 tracing_override: None,
+                wasm_backend: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 keystore: KeystoreConfig::LairServerInProc { lair_root: None },
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
@@ -1014,6 +1051,7 @@ admin_interfaces:
             result.unwrap(),
             ConductorConfig {
                 tracing_override: None,
+                wasm_backend: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 network: NetworkConfig::default(),
                 keystore: KeystoreConfig::LairServer {

@@ -299,10 +299,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
                         }
 
                         // Now that we've taken the appropriate action we can try again.
-                        match Self::check_database_file(&path, &pool_config) {
-                            Ok(path) => path,
-                            Err(e) => return Err(e.into()),
-                        }
+                        Self::check_database_file(&path, &pool_config)?
                     }
                 }
             }

@@ -5,7 +5,7 @@
     let
       rustToolchain = config.rustHelper.mkRust {
         track = "stable";
-        version = "1.91.1";
+        version = "1.95.0";
       };
 
       craneLib = (inputs.crane.mkLib pkgs).overrideToolchain rustToolchain;
@@ -34,10 +34,6 @@
           perl
           pkg-config
           go
-          # These packages and env vars are required to build holochain with the 'wasmer_wamr' feature 
-          clang
-          llvmPackages.libclang.lib
-          ninja
         ])
         ++ lib.optionals pkgs.stdenv.isDarwin
           (with pkgs; [ xcbuild libiconv ]);

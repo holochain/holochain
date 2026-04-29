@@ -199,6 +199,8 @@ pub mod test {
             .await;
     }
 
+    // Excluded under `wasmer-wasmi` until https://github.com/wasmerio/wasmer/issues/6397 is fixed.
+    #[cfg(not(feature = "wasmer-wasmi"))]
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_must_get_agent_activity() {
         holochain_trace::test_run();
