@@ -16,6 +16,8 @@ pub enum DbKind {
     Wasm,
     /// Conductor state, installed apps, and related metadata.
     Conductor,
+    /// Peer metadata for a specific DNA.
+    PeerMetaStore,
 }
 
 /// Specifies the database used for authoring data by a specific cell.
@@ -139,7 +141,7 @@ impl DatabaseIdentifier for PeerMetaStore {
     }
 
     fn db_kind(&self) -> DbKind {
-        todo!("PeerMetaStore migrations not yet implemented")
+        DbKind::PeerMetaStore
     }
 }
 
