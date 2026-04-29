@@ -749,18 +749,16 @@ impl HolochainP2pActor {
                             let timestamp: kitsune2_api::Timestamp =
                                 serde_json::from_slice(&meta_value)
                                     .map_err(HolochainP2pError::other)?;
-                            if let Some(agent) = agents
-                                .iter()
-                                .find(|agent| agent.url == Some(peer_url.clone()))
-                            {
-                                if agent.created_at > timestamp {
-                                    db.delete(peer_url.as_str(), &unresponsive_key)
-                                        .await
-                                        .map_err(HolochainP2pError::other)?;
-                                    tracing::debug!(
-                                        "Pruned {KEY_PREFIX_ROOT}:{META_KEY_UNRESPONSIVE} row for {peer_url} from peer meta store because we have newer agent info"
-                                    );
-                                }
+                            if agents.iter().any(|agent| {
+                                agent.url == Some(peer_url.clone())
+                                    && agent.created_at > timestamp
+                            }) {
+                                db.delete(peer_url.as_str(), &unresponsive_key)
+                                    .await
+                                    .map_err(HolochainP2pError::other)?;
+                                tracing::debug!(
+                                    "Pruned {KEY_PREFIX_ROOT}:{META_KEY_UNRESPONSIVE} row for {peer_url} from peer meta store because we have newer agent info"
+                                );
                             }
                         }
 

@@ -203,6 +203,96 @@ async fn urls_are_pruned_when_updated_agent_info_available() {
     .unwrap();
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn new_agent_with_same_url_prunes_old_unresponsive_entry() {
+    holochain_trace::test_run();
+    let TestCase {
+        p2p,
+        space_id,
+        lair_client,
+        peer_meta_store,
+        db_peer_meta,
+        _dir,
+    } = TestCase::spawn().await;
+
+    let max_expiry = Timestamp::from_micros(i64::MAX);
+    let shared_url = Url::from_str("ws://shared:80").unwrap();
+
+    // Mark the shared URL as unresponsive now.
+    let unresponsive_at = Timestamp::now();
+    peer_meta_store
+        .set_unresponsive(shared_url.clone(), max_expiry, unresponsive_at)
+        .await
+        .unwrap();
+
+    // Agent 1 has `created_at` before the unresponsive timestamp.
+    let pubkey1 = lair_client.new_sign_keypair_random().await.unwrap();
+    let agent1 = HolochainP2pLocalAgent::new(pubkey1.clone(), DhtArc::FULL, 1, lair_client.clone());
+    let agent1_info = AgentInfoSigned::sign(
+        &agent1,
+        AgentInfo {
+            agent: pubkey1.to_k2_agent(),
+            created_at: (unresponsive_at - Duration::from_secs(1)).unwrap(),
+            expires_at: max_expiry,
+            is_tombstone: false,
+            space: space_id.clone(),
+            storage_arc: DhtArc::FULL,
+            url: Some(shared_url.clone()),
+        },
+    )
+    .await
+    .unwrap();
+
+    // Agent 2 has `created_at` after the unresponsive timestamp.
+    let pubkey2 = lair_client.new_sign_keypair_random().await.unwrap();
+    let agent2 = HolochainP2pLocalAgent::new(pubkey2.clone(), DhtArc::FULL, 1, lair_client.clone());
+    let agent2_info = AgentInfoSigned::sign(
+        &agent2,
+        AgentInfo {
+            agent: pubkey2.to_k2_agent(),
+            created_at: unresponsive_at + Duration::from_secs(1),
+            expires_at: max_expiry,
+            is_tombstone: false,
+            space: space_id.clone(),
+            storage_arc: DhtArc::FULL,
+            url: Some(shared_url.clone()),
+        },
+    )
+    .await
+    .unwrap();
+
+    // Insert the older agent 1.
+    p2p.test_kitsune()
+        .space_if_exists(space_id.clone())
+        .await
+        .unwrap()
+        .peer_store()
+        .insert(vec![agent1_info])
+        .await
+        .unwrap();
+
+    // Check that the URL is marked as unresponsive.
+    let unresponsive_urls = count_rows_in_peer_meta_store(&db_peer_meta).await;
+    assert_eq!(unresponsive_urls, 1);
+
+    // Insert the new agent 2 that was created after the unresponsive_at time.
+    p2p.test_kitsune()
+        .space_if_exists(space_id.clone())
+        .await
+        .unwrap()
+        .peer_store()
+        .insert(vec![agent2_info])
+        .await
+        .unwrap();
+
+    // Allow the pruning to happen after a new agent is added with the previously unresponsive URL.
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    // Check that the URL is marked as unresponsive.
+    let unresponsive_urls = count_rows_in_peer_meta_store(&db_peer_meta).await;
+    assert_eq!(unresponsive_urls, 0);
+}
+
 struct TestCase {
     p2p: DynHcP2p,
     space_id: SpaceId,
