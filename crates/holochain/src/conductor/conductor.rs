@@ -834,8 +834,6 @@ mod network_impls {
     use futures::future::join_all;
     use holochain_conductor_api::ZomeCallParamsSigned;
     use holochain_conductor_api::{DnaStorageInfo, StorageBlob, StorageInfo};
-    use holochain_sqlite::helpers::BytesSql;
-    use holochain_sqlite::sql::sql_peer_meta_store;
     use holochain_sqlite::stats::{get_size_on_disk, get_used_size};
     use holochain_state::conductor::WitnessNonceResult;
     use holochain_zome_types::block::BlockTargetId;
@@ -922,43 +920,25 @@ mod network_impls {
 
             for dna_hash in space_ids {
                 let db = self.spaces.peer_meta_store_db(&dna_hash)?;
-                let url2 = url.clone();
+                let entries = db
+                    .as_ref()
+                    .get_all_by_url(url.as_str())
+                    .await
+                    .map_err(|e| ConductorApiError::Other(e.into()))?;
 
-                let infos = db
-                    .read_async(
-                        move |txn| -> DatabaseResult<BTreeMap<String, PeerMetaInfo>> {
-                            let mut infos: BTreeMap<String, PeerMetaInfo> = BTreeMap::new();
-
-                            let mut stmt = txn.prepare(sql_peer_meta_store::GET_ALL_BY_URL)?;
-                            let mut rows = stmt.query(named_params! {
-                                ":peer_url": url2.as_str()
-                            })?;
-
-                            while let Some(row) = rows.next()? {
-                                let meta_key = row.get::<_, String>(0)?;
-                                let meta_value: serde_json::Value =
-                                    serde_json::from_slice(&(row.get::<_, BytesSql>(1)?.0))
-                                        .map_err(|e| {
-                                            rusqlite::Error::FromSqlConversionFailure(
-                                                2,
-                                                rusqlite::types::Type::Blob,
-                                                e.into(),
-                                            )
-                                        })?;
-                                let expires_at = row.get::<_, Option<i64>>(2)?;
-
-                                let peer_meta_info = PeerMetaInfo {
-                                    meta_value,
-                                    expires_at: expires_at.map(Timestamp),
-                                };
-
-                                infos.insert(meta_key, peer_meta_info);
-                            }
-
-                            Ok(infos)
-                        },
-                    )
-                    .await?;
+                let mut infos = BTreeMap::new();
+                for entry in entries {
+                    let meta_value: serde_json::Value =
+                        serde_json::from_slice(&entry.meta_value)
+                            .map_err(|e| ConductorApiError::Other(e.into()))?;
+                    let peer_meta_info = PeerMetaInfo {
+                        meta_value,
+                        expires_at: entry
+                            .expires_at
+                            .map(|seconds| Timestamp::from_micros(seconds * 1_000_000)),
+                    };
+                    infos.insert(entry.meta_key, peer_meta_info);
+                }
 
                 all_infos.insert(dna_hash, infos);
             }
