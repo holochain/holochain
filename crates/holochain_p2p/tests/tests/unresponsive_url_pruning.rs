@@ -19,6 +19,7 @@ async fn urls_are_pruned_at_an_interval() {
     let TestCase {
         peer_meta_store,
         db_peer_meta,
+        _dir,
         ..
     } = TestCase::spawn().await;
 
@@ -73,6 +74,7 @@ async fn urls_are_pruned_when_updated_agent_info_available() {
         lair_client,
         peer_meta_store,
         db_peer_meta,
+        _dir,
     } = TestCase::spawn().await;
 
     let earliest_timestamp = Timestamp::from_micros(Timestamp::now().as_micros() - 10_000_000); // 10s ago
@@ -219,6 +221,7 @@ struct TestCase {
     lair_client: MetaLairClient,
     peer_meta_store: DynPeerMetaStore,
     db_peer_meta: holochain_data::DbWrite<PeerMetaStore>,
+    _dir: tempfile::TempDir,
 }
 
 impl TestCase {
@@ -298,6 +301,7 @@ impl TestCase {
             lair_client,
             peer_meta_store,
             db_peer_meta,
+            _dir: dir,
         }
     }
 }
