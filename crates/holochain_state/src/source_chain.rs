@@ -438,13 +438,24 @@ impl SourceChain {
             Ok((actions, permit)) => {
                 drop(permit);
 
-                authored_ops_to_dht_db(
+                let not_copied_hashes = authored_ops_to_dht_db(
                     storage_arcs,
                     ops_to_integrate,
                     self.vault.clone().into(),
                     self.dht_db.clone(),
                 )
                 .await?;
+
+                // Any ops that didn't get copied to the DHT are outside our local storage arcs.
+                // Therefore, integration won't run and set these ops to integrated. Do it directly.
+                self.vault.write_async(|txn| -> StateMutationResult<()> {
+                    let now = Timestamp::now();
+                    for publish_hash in not_copied_hashes {
+                        set_when_integrated(txn, &publish_hash, now)?;
+                    }
+
+                    Ok(())
+                }).await?;
 
                 // Insert warrants into DHT database.
                 // Check signatures first
