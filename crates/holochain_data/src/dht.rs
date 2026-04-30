@@ -91,32 +91,27 @@ mod tests {
     #[tokio::test]
     async fn actions_by_author() {
         let db = test_open_db(dht_db_id()).await.unwrap();
-        for seed in 0..3u8 {
-            let action = sample_action(seed);
-            db.insert_action(&action, Some(RecordValidity::Accepted))
+        let inserted: Vec<_> = (0..3u8).map(sample_action).collect();
+        for action in &inserted {
+            db.insert_action(action, Some(RecordValidity::Accepted))
                 .await
                 .unwrap();
         }
 
         let author = AgentPubKey::from_raw_36(vec![1u8; 36]);
         let actions = db.as_ref().get_actions_by_author(author).await.unwrap();
-        assert_eq!(actions.len(), 3);
-        // Ordered by seq ascending, with signatures preserved.
-        for (i, action) in actions.iter().enumerate() {
-            assert_eq!(action.hashed.content.header.action_seq, i as u32);
-            assert_eq!(action.signature().0, [i as u8; 64]);
-        }
+        assert_eq!(actions, inserted);
     }
 
     #[tokio::test]
     async fn actions_by_author_excludes_other_authors() {
         let db = test_open_db(dht_db_id()).await.unwrap();
-        // Seed two actions for author A.
-        for seed in 0..2u8 {
-            let action = sample_action(seed);
-            db.insert_action(&action, None).await.unwrap();
+        let author_a = AgentPubKey::from_raw_36(vec![1u8; 36]);
+        let a_inserted: Vec<_> = (0..2u8).map(sample_action).collect();
+        for action in &a_inserted {
+            db.insert_action(action, None).await.unwrap();
         }
-        // Seed one action for a different author.
+
         let other_author = AgentPubKey::from_raw_36(vec![0x99; 36]);
         let other = SignedHashed::with_presigned(
             HoloHashed::with_pre_hashed(
@@ -137,23 +132,15 @@ mod tests {
         );
         db.insert_action(&other, None).await.unwrap();
 
-        let a_results = db
-            .as_ref()
-            .get_actions_by_author(AgentPubKey::from_raw_36(vec![1u8; 36]))
-            .await
-            .unwrap();
-        assert_eq!(a_results.len(), 2);
-        assert!(a_results
-            .iter()
-            .all(|a| a.hashed.content.header.author == AgentPubKey::from_raw_36(vec![1u8; 36])));
+        let a_results = db.as_ref().get_actions_by_author(author_a).await.unwrap();
+        assert_eq!(a_results, a_inserted);
 
         let b_results = db
             .as_ref()
-            .get_actions_by_author(other_author.clone())
+            .get_actions_by_author(other_author)
             .await
             .unwrap();
-        assert_eq!(b_results.len(), 1);
-        assert_eq!(b_results[0].hashed.content.header.author, other_author);
+        assert_eq!(b_results, vec![other]);
     }
 
     fn sample_entry(seed: u8) -> (EntryHash, Entry) {
