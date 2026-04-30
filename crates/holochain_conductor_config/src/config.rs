@@ -37,7 +37,7 @@ pub fn write_config(
     let config_file_path: ConfigFilePath = config_root_path.into();
     std::fs::write(
         config_file_path.as_ref(),
-        yaml_serde::to_string(&config).unwrap(),
+        yaml_serde::to_string(&config).context("Failed to serialize config")?,
     )
     .context("Failed to write config")?;
     Ok(config_file_path)
@@ -47,6 +47,10 @@ pub fn write_config(
 pub fn read_config(config_root_path: ConfigRootPath) -> anyhow::Result<Option<ConductorConfig>> {
     match std::fs::read_to_string(ConfigFilePath::from(config_root_path).as_ref()) {
         Ok(yaml) => Ok(Some(yaml_serde::from_str(&yaml)?)),
-        Err(_) => Ok(None),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => {
+            tracing::warn!("Failed to read config file: {}", e);
+            Ok(None)
+        },
     }
 }
