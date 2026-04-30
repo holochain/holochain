@@ -661,6 +661,27 @@ async fn bob_makes_a_large_link(
         )
         .await;
 
+    // The next step calls `update_entry`, which uses the cascade to look up the original
+    // action's `StoreRecord` op. The cascade query requires `when_integrated IS NOT NULL`, but
+    // this test bypasses the normal author-flush-then-integrate flow, so manually mark Bob's
+    // just-flushed ops as integrated in his authored DB so the cascade can find them. This
+    // matches the invariant the test was written against and keeps publish/integrate as a
+    // single batch at the end.
+    let bob_authored_db = handle
+        .spaces
+        .get_or_create_authored_db(dna_file.dna_hash(), bob_cell_id.agent_pubkey().clone())
+        .unwrap();
+    bob_authored_db
+        .write_async(|txn| -> DatabaseResult<()> {
+            txn.execute(
+                "UPDATE DhtOp SET when_integrated = :now WHERE when_integrated IS NULL",
+                named_params! { ":now": Timestamp::now() },
+            )?;
+            Ok(())
+        })
+        .await
+        .unwrap();
+
     // 9
     // Commit a bad update entry
     let bad_update_action = call_data
