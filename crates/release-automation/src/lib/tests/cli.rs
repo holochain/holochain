@@ -629,7 +629,7 @@ fn multiple_subsequent_releases() {
                         &root.join(format!("crates/{}/CHANGELOG.md", crt)),
                     )
                     .set_front_matter(
-                        &yaml_serde::from_str(
+                        &serde_yaml::from_str(
                             indoc::formatdoc!(
                                 r#"
                                 default_semver_increment_mode: !pre_major rc
@@ -695,7 +695,7 @@ fn multiple_subsequent_releases() {
                         &root.join(format!("crates/{}/CHANGELOG.md", crt)),
                     )
                     .set_front_matter(
-                        &yaml_serde::from_str(
+                        &serde_yaml::from_str(
                             indoc::formatdoc!(
                                 r#"
                                 semver_increment_mode: major
