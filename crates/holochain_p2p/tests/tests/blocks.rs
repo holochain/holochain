@@ -4,6 +4,7 @@ use holo_hash::{
     fixt::{ActionHashFixturator, AgentPubKeyFixturator, DhtOpHashFixturator, DnaHashFixturator},
     DnaHash,
 };
+use holochain_data::kind::PeerMetaStore as PeerMetaStoreKind;
 use holochain_keystore::{test_keystore, MetaLairClient};
 use holochain_p2p::actor::NetworkRequestOptions;
 use holochain_p2p::{
@@ -12,7 +13,7 @@ use holochain_p2p::{
 };
 use holochain_timestamp::{InclusiveTimestampInterval, Timestamp};
 use holochain_types::{
-    db::{DbKindCache, DbKindDht, DbKindPeerMetaStore, DbWrite},
+    db::{DbKindCache, DbKindDht, DbWrite},
     prelude::{Block, BlockTargetId, CellBlockReason, CellId},
     record::WireRecordOps,
 };
@@ -521,7 +522,9 @@ impl TestActor {
         let op_db = DbWrite::test_in_mem(DbKindDht(Arc::new(dna_hash.clone()))).unwrap();
         let cache_db = DbWrite::test_in_mem(DbKindCache(Arc::new(dna_hash.clone()))).unwrap();
         let peer_meta_db =
-            DbWrite::test_in_mem(DbKindPeerMetaStore(Arc::new(dna_hash.clone()))).unwrap();
+            holochain_data::test_open_db(PeerMetaStoreKind::new(Arc::new(dna_hash.clone())))
+                .await
+                .unwrap();
         let config = HolochainP2pConfig {
             get_conductor_store: Arc::new(move || {
                 let conductor_store = conductor_store.clone();

@@ -1,16 +1,12 @@
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use holochain_sqlite::db::DbWrite;
-use holochain_sqlite::error::{DatabaseError, DatabaseResult};
-use holochain_sqlite::helpers::BytesSql;
-use holochain_sqlite::prelude::DbKindPeerMetaStore;
-use holochain_sqlite::rusqlite::named_params;
-use holochain_sqlite::sql::sql_peer_meta_store;
+use holochain_data::kind::PeerMetaStore as PeerMetaStoreKind;
+use holochain_data::DbWrite;
 use kitsune2_api::{BoxFut, K2Error, K2Result, PeerMetaStore, Timestamp, Url};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-/// Holochain implementation of the Kitsune2 [kitsune2_api::OpStoreFactory].
+/// Holochain implementation of the Kitsune2 [kitsune2_api::PeerMetaStoreFactory].
 pub struct HolochainPeerMetaStoreFactory {
     /// The database connection getter.
     pub getter: crate::GetDbPeerMeta,
@@ -56,19 +52,18 @@ impl kitsune2_api::PeerMetaStoreFactory for HolochainPeerMetaStoreFactory {
 /// Holochain implementation of a Kitsune2 [PeerMetaStore].
 #[derive(Debug)]
 pub struct HolochainPeerMetaStore {
-    db: DbWrite<DbKindPeerMetaStore>,
+    db: DbWrite<PeerMetaStoreKind>,
 }
 
 impl HolochainPeerMetaStore {
     /// Create a new [HolochainPeerMetaStore] from a database handle.
-    pub async fn create(db: DbWrite<DbKindPeerMetaStore>) -> DatabaseResult<Self> {
+    pub async fn create(db: DbWrite<PeerMetaStoreKind>) -> K2Result<Self> {
         // Prune any expired entries on startup.
-        db.write_async(|txn| -> DatabaseResult<()> {
-            let prune_count = txn.execute(sql_peer_meta_store::PRUNE, [])?;
-            tracing::debug!("pruned {prune_count} rows from peer meta store");
-            Ok(())
-        })
-        .await?;
+        let prune_count = db
+            .prune()
+            .await
+            .map_err(|e| K2Error::other_src("Failed to prune peer meta store on startup", e))?;
+        tracing::debug!("pruned {prune_count} rows from peer meta store");
 
         Ok(Self { db })
     }
@@ -83,21 +78,13 @@ impl PeerMetaStore for HolochainPeerMetaStore {
         expiry: Option<Timestamp>,
     ) -> BoxFuture<'_, K2Result<()>> {
         let db = self.db.clone();
-
         Box::pin(async move {
-            db.write_async(move |txn| -> DatabaseResult<()> {
-                txn.execute(
-                    sql_peer_meta_store::INSERT,
-                    named_params! {
-                        ":peer_url": peer.as_str(),
-                        ":meta_key": key,
-                        ":meta_value": BytesSql(value),
-                        ":expires_at": expiry.map(|e| e.as_micros()),
-                    },
-                )?;
-
-                Ok(())
-            })
+            db.put(
+                peer.as_str(),
+                &key,
+                &value,
+                expiry.map(|expiry| expiry.as_micros() / 1_000_000),
+            )
             .await
             .map_err(|e| K2Error::other_src("Failed to put peer meta", e))
         })
@@ -105,66 +92,39 @@ impl PeerMetaStore for HolochainPeerMetaStore {
 
     fn get(&self, peer: Url, key: String) -> BoxFuture<'_, K2Result<Option<Bytes>>> {
         let db = self.db.clone();
-
         Box::pin(async move {
-            db.read_async(move |txn| -> DatabaseResult<Option<Bytes>> {
-                let value = match txn.query_row(
-                    sql_peer_meta_store::GET,
-                    named_params! {
-                        ":peer_url": peer.as_str(),
-                        ":meta_key": key,
-                    },
-                    |row| row.get::<_, BytesSql>(0),
-                ) {
-                    Ok(value) => Some(value.0),
-                    Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) => None,
-                    Err(e) => return Err(e.into()),
-                };
-
-                Ok(value)
-            })
-            .await
-            .map_err(|e| K2Error::other_src("Failed to get peer meta", e))
+            db.as_ref()
+                .get(peer.as_str(), &key)
+                .await
+                .map(|value| value.map(Bytes::from))
+                .map_err(|e| K2Error::other_src("Failed to get peer meta", e))
         })
     }
 
     fn get_all_by_key(&self, key: String) -> BoxFuture<'_, K2Result<HashMap<Url, Bytes>>> {
         let db = self.db.clone();
         Box::pin(async move {
-            db.read_async(move |txn| -> DatabaseResult<HashMap<Url, Bytes>> {
-                let mut stmt = txn.prepare(sql_peer_meta_store::GET_ALL_BY_KEY)?;
-                let mut rows = stmt.query(named_params! {":meta_key": key})?;
-                let mut all_values = HashMap::new();
-                while let Some(row) = rows.next()? {
-                    let peer_url = Url::from_str(row.get::<_, String>(0)?)
-                        .map_err(|err| DatabaseError::Other(err.into()))?;
-                    let value = row.get::<_, BytesSql>(1)?;
-                    all_values.insert(peer_url, value.0);
-                }
-                Ok(all_values)
-            })
-            .await
-            .map_err(|e| K2Error::other_src("Failed to get all values", e))
+            let entries = db
+                .as_ref()
+                .get_all_by_key(&key)
+                .await
+                .map_err(|e| K2Error::other_src("Failed to get all values", e))?;
+            let mut map = HashMap::with_capacity(entries.len());
+            for (url_str, value) in entries {
+                let url = Url::from_str(url_str)
+                    .map_err(|e| K2Error::other_src("Invalid peer URL in peer meta store", e))?;
+                map.insert(url, Bytes::from(value));
+            }
+            Ok(map)
         })
     }
 
     fn delete(&self, peer: Url, key: String) -> BoxFuture<'_, K2Result<()>> {
         let db = self.db.clone();
-
         Box::pin(async move {
-            db.write_async(move |txn| -> DatabaseResult<()> {
-                txn.execute(
-                    sql_peer_meta_store::DELETE,
-                    named_params! {
-                        ":peer_url": peer.as_str(),
-                        ":meta_key": key,
-                    },
-                )?;
-
-                Ok(())
-            })
-            .await
-            .map_err(|e| K2Error::other_src("Failed to delete peer meta", e))
+            db.delete(peer.as_str(), &key)
+                .await
+                .map_err(|e| K2Error::other_src("Failed to delete peer meta", e))
         })
     }
 }

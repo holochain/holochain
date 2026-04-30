@@ -17,7 +17,12 @@ pub async fn spawn_holochain_p2p(
 
 /// Callback function to retrieve a peer meta database handle for a dna hash.
 pub type GetDbPeerMeta = Arc<
-    dyn Fn(DnaHash) -> BoxFut<'static, HolochainP2pResult<DbWrite<DbKindPeerMetaStore>>>
+    dyn Fn(
+            DnaHash,
+        ) -> BoxFut<
+            'static,
+            HolochainP2pResult<holochain_data::DbWrite<holochain_data::kind::PeerMetaStore>>,
+        >
         + 'static
         + Send
         + Sync,
