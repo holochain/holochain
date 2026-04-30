@@ -4,6 +4,13 @@ use sqlx::{Acquire, Executor, Sqlite};
 
 use crate::models::wasm::EntryDefModel;
 
+fn new_encode_error(e: holochain_types::prelude::ZomeError) -> sqlx::Error {
+    sqlx::Error::Encode(Box::new(std::io::Error::new(
+        std::io::ErrorKind::InvalidData,
+        e.to_string(),
+    )))
+}
+
 /// Store WASM bytecode.
 pub(super) async fn put_wasm<'e, E>(executor: E, wasm: DnaWasmHashed) -> sqlx::Result<()>
 where
@@ -81,12 +88,7 @@ where
 
     // Insert integrity zomes
     for (zome_index, (zome_name, zome_def)) in dna_def.integrity_zomes.iter().enumerate() {
-        let wasm_hash = zome_def.wasm_hash(zome_name).map_err(|e| {
-            sqlx::Error::Encode(Box::new(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                e.to_string(),
-            )))
-        })?;
+        let wasm_hash = zome_def.wasm_hash(zome_name).map_err(new_encode_error)?;
         let wasm_hash_bytes = wasm_hash.get_raw_32();
 
         // Extract dependencies from the ZomeDef
@@ -116,12 +118,7 @@ where
 
     // Insert coordinator zomes
     for (zome_index, (zome_name, zome_def)) in dna_def.coordinator_zomes.iter().enumerate() {
-        let wasm_hash = zome_def.wasm_hash(zome_name).map_err(|e| {
-            sqlx::Error::Encode(Box::new(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                e.to_string(),
-            )))
-        })?;
+        let wasm_hash = zome_def.wasm_hash(zome_name).map_err(new_encode_error)?;
         let wasm_hash_bytes = wasm_hash.get_raw_32();
 
         // Extract dependencies from the ZomeDef
