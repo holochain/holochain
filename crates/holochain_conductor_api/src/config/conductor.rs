@@ -43,7 +43,7 @@
 //!
 //!use holochain_conductor_api::conductor::ConductorConfig;
 //!
-//!let _: ConductorConfig = serde_yaml::from_str(yaml).unwrap();
+//!let _: ConductorConfig = yaml_serde::from_str(yaml).unwrap();
 //! ```
 
 use crate::conductor::process::ERROR_CODE;
@@ -189,7 +189,7 @@ fn config_from_yaml<T>(yaml: &str) -> ConductorConfigResult<T>
 where
     T: DeserializeOwned,
 {
-    serde_yaml::from_str(yaml).map_err(ConductorConfigError::SerializationError)
+    yaml_serde::from_str(yaml).map_err(ConductorConfigError::SerializationError)
 }
 
 impl ConductorConfig {

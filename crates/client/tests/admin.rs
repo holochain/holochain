@@ -332,7 +332,7 @@ async fn install_app_with_roles_settings() {
     let agent_key = admin_ws.generate_agent_pub_key().await.unwrap();
 
     let custom_network_seed = String::from("modified seed");
-    let custom_properties = YamlProperties::new(serde_yaml::Value::String(String::from(
+    let custom_properties = YamlProperties::new(yaml_serde::Value::String(String::from(
         "some properties provided at install time",
     )));
 

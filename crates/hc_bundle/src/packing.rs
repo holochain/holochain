@@ -35,7 +35,7 @@ pub async fn expand_unknown_bundle(
     force: bool,
 ) -> HcBundleResult<PathBuf> {
     let bundle_path = ffs::canonicalize(bundle_path).await?;
-    let bundle = FileSystemBundler::load_from::<serde_yaml::Value>(&bundle_path).await?;
+    let bundle = FileSystemBundler::load_from::<yaml_serde::Value>(&bundle_path).await?;
 
     let target_dir = if let Some(d) = target_dir {
         d

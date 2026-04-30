@@ -429,7 +429,7 @@ fn test_all_dna_manifests_match_schema() {
         };
         if file_name.eq("dna.yaml") && should_check {
             let manifest_content = ffs::sync::read_to_string(entry.path()).unwrap();
-            let manifest: Value = serde_yaml::from_str(manifest_content.as_str()).unwrap();
+            let manifest: Value = yaml_serde::from_str(manifest_content.as_str()).unwrap();
 
             validate_schema(&schema, &manifest, file_name.as_ref());
         }
@@ -448,7 +448,7 @@ fn test_default_dna_manifest_matches_schema() {
     );
 
     let default_manifest: Value =
-        serde_yaml::from_str(&serde_yaml::to_string(&default_manifest).unwrap()).unwrap();
+        yaml_serde::from_str(&yaml_serde::to_string(&default_manifest).unwrap()).unwrap();
 
     let schema = get_schema::<DnaManifest>();
     validate_schema(&schema, &default_manifest, "default manifest");
@@ -467,7 +467,7 @@ fn test_default_dna_manifest_matches_schema() {
     );
 
     let default_manifest: Value =
-        serde_yaml::from_str(&serde_yaml::to_string(&default_manifest).unwrap()).unwrap();
+        yaml_serde::from_str(&yaml_serde::to_string(&default_manifest).unwrap()).unwrap();
 
     let schema = get_schema::<DnaManifest>();
     validate_schema(&schema, &default_manifest, "default manifest");
@@ -484,7 +484,7 @@ fn test_all_app_manifests_match_schema() {
         let file_name = entry.file_name().to_string_lossy();
         if file_name.eq("happ.yaml") {
             let manifest_content = ffs::sync::read_to_string(entry.path()).unwrap();
-            let manifest: Value = serde_yaml::from_str(manifest_content.as_str()).unwrap();
+            let manifest: Value = yaml_serde::from_str(manifest_content.as_str()).unwrap();
 
             validate_schema(&schema, &manifest, file_name.as_ref());
         }
@@ -503,7 +503,7 @@ fn test_default_app_manifest_matches_schema() {
         .into();
 
     let default_manifest: Value =
-        serde_yaml::from_str(&serde_yaml::to_string(&default_manifest).unwrap()).unwrap();
+        yaml_serde::from_str(&yaml_serde::to_string(&default_manifest).unwrap()).unwrap();
 
     let schema = get_schema::<AppManifest>();
     validate_schema(&schema, &default_manifest, "default manifest");
@@ -520,7 +520,7 @@ fn test_all_web_app_manifests_match_schema() {
         let file_name = entry.file_name().to_string_lossy();
         if file_name.eq("web-happ.yaml") {
             let manifest_content = ffs::sync::read_to_string(entry.path()).unwrap();
-            let manifest: Value = serde_yaml::from_str(manifest_content.as_str()).unwrap();
+            let manifest: Value = yaml_serde::from_str(manifest_content.as_str()).unwrap();
 
             validate_schema(&schema, &manifest, file_name.as_ref());
         }
@@ -532,7 +532,7 @@ fn test_default_web_app_manifest_matches_schema() {
     let default_manifest = WebAppManifest::current("test-web-app".to_string());
 
     let default_manifest: Value =
-        serde_yaml::from_str(&serde_yaml::to_string(&default_manifest).unwrap()).unwrap();
+        yaml_serde::from_str(&yaml_serde::to_string(&default_manifest).unwrap()).unwrap();
 
     let schema = get_schema::<WebAppManifest>();
     validate_schema(&schema, &default_manifest, "default manifest");
