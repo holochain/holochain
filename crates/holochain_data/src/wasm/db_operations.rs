@@ -26,7 +26,7 @@ impl DbRead<Wasm> {
         inner_reads::dna_def_exists(self.pool(), cell_id).await
     }
 
-    /// Get a DNA definition by hash.
+    /// Get a DNA definition for the passed [`CellId`].
     pub async fn get_dna_def(&self, cell_id: &CellId) -> sqlx::Result<Option<DnaDef>> {
         inner_reads::get_dna_def(self.pool(), cell_id).await
     }
