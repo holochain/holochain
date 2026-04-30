@@ -1,0 +1,34 @@
+//! `DbRead<Dht>` / `DbWrite<Dht>` API for the `ChainOpPublish` table.
+
+use super::super::inner::chain_op_publish;
+use crate::handles::{DbRead, DbWrite};
+use crate::kind::Dht;
+use crate::models::dht::ChainOpPublishRow;
+use holo_hash::DhtOpHash;
+use holochain_timestamp::Timestamp;
+
+impl DbWrite<Dht> {
+    pub async fn insert_chain_op_publish(
+        &self,
+        op_hash: &DhtOpHash,
+        last_publish_time: Option<Timestamp>,
+        receipts_complete: Option<bool>,
+    ) -> sqlx::Result<()> {
+        chain_op_publish::insert_chain_op_publish(
+            self.pool(),
+            op_hash,
+            last_publish_time,
+            receipts_complete,
+        )
+        .await
+    }
+}
+
+impl DbRead<Dht> {
+    pub async fn get_chain_op_publish(
+        &self,
+        op_hash: DhtOpHash,
+    ) -> sqlx::Result<Option<ChainOpPublishRow>> {
+        chain_op_publish::get_chain_op_publish(self.pool(), op_hash).await
+    }
+}
