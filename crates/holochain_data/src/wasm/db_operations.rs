@@ -1,3 +1,7 @@
+//! Database handle operations for the Wasm database table.
+//!
+//! Provides [`DbRead`] and [`DbWrite`] impls for querying and mutating the Wasm database table.
+
 use holo_hash::{AgentPubKey, WasmHash};
 use holochain_types::prelude::{CellId, DnaDef, DnaWasmHashed, EntryDef};
 
