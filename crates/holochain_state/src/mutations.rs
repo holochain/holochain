@@ -270,7 +270,6 @@ pub fn insert_op_lite_into_authored(
     set_validation_status(txn, hash, ValidationStatus::Valid)?;
     set_when_sys_validated(txn, hash, Timestamp::now())?;
     set_when_app_validated(txn, hash, Timestamp::now())?;
-    set_when_integrated(txn, hash, Timestamp::now())?;
     Ok(())
 }
 

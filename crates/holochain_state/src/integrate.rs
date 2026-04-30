@@ -16,18 +16,25 @@ pub async fn authored_ops_to_dht_db(
     hashes: Vec<(DhtOpHash, AnyLinkableHash)>,
     authored_db: DbRead<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
-) -> StateMutationResult<()> {
+) -> StateMutationResult<Vec<DhtOpHash>> {
     // Check if any agents in this space are an authority for these hashes.
     let mut should_hold_hashes = Vec::new();
+    // For hashes of ops that won't go to the DHT, we should publish those ops by directly setting
+    // them to integrated.
+    let mut should_publish_hashes = Vec::new();
 
     for (op_hash, basis) in hashes {
         if storage_arcs.iter().any(|arc| arc.contains(basis.get_loc())) {
             should_hold_hashes.push(op_hash);
+        } else {
+            should_publish_hashes.push(op_hash);
         }
     }
 
     // Clone the ops into the dht db for the hashes that should be held.
-    authored_ops_to_dht_db_without_check(should_hold_hashes, authored_db, dht_db).await
+    authored_ops_to_dht_db_without_check(should_hold_hashes, authored_db, dht_db).await?;
+
+    Ok(should_publish_hashes)
 }
 
 /// Insert any authored ops that have been locally validated
