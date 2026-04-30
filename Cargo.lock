@@ -3232,6 +3232,7 @@ dependencies = [
  "serde",
  "sodoken",
  "tempfile",
+ "tracing",
  "url2",
  "yaml_serde",
 ]
