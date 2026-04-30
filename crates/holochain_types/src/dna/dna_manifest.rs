@@ -176,7 +176,7 @@ mod tests {
             }
         }
 
-        let s = serde_yaml::to_string(&manifest).unwrap();
+        let s = yaml_serde::to_string(&manifest).unwrap();
         println!("{s}");
     }
 }

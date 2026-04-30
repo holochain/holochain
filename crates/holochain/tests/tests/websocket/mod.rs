@@ -69,7 +69,7 @@ async fn call_admin() {
 
     // Make properties
     let properties = holochain_zome_types::properties::YamlProperties::new(
-        serde_yaml::from_str(
+        yaml_serde::from_str(
             r#"
 test: "example"
 how_many: 42

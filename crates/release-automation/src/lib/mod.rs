@@ -175,7 +175,7 @@ pub mod cli {
             .split(',')
             .filter(|s| !s.is_empty())
             .map(|sim| {
-                serde_yaml::from_str(sim).map_err(|_| {
+                yaml_serde::from_str(sim).map_err(|_| {
                     anyhow::anyhow!("could not parse '{}' as SemverIncrementMode", input)
                 })
             })

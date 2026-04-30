@@ -39,7 +39,7 @@ holochain_util = { version = "^0.7.0-dev.1", path = "../holochain_util", feature
 ] }
 holochain_trace = { version = "^0.7.0-dev.1", path = "../holochain_trace" }
 serde = { version = "1.0", features = ["derive"] }
-serde_yaml = "0.9"
+yaml_serde = "0.10"
 serde_json = "1.0"
 sodoken = "0.1.0"
 tokio = { version = "1.36.0", features = ["full"] }

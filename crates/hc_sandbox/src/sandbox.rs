@@ -51,7 +51,7 @@ async fn install_app_bundle(
     let roles_settings = match roles_settings {
         Some(path) => {
             let yaml_string = std::fs::read_to_string(path)?;
-            let roles_settings_yaml = serde_yaml::from_str::<RoleSettingsMapYaml>(&yaml_string)?;
+            let roles_settings_yaml = yaml_serde::from_str::<RoleSettingsMapYaml>(&yaml_string)?;
             let mut roles_settings: RoleSettingsMap = HashMap::new();
             for (k, v) in roles_settings_yaml.into_iter() {
                 roles_settings.insert(k, v.into());

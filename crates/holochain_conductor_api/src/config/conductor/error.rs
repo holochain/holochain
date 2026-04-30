@@ -9,7 +9,7 @@ pub enum ConductorConfigError {
     ConfigMissing(PathBuf),
 
     #[error("Config deserialization error: {0}")]
-    SerializationError(#[from] serde_yaml::Error),
+    SerializationError(#[from] yaml_serde::Error),
 
     #[error("Error while performing IO for the Conductor: {0}")]
     IoError(#[from] std::io::Error),

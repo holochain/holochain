@@ -37,7 +37,7 @@ pub fn write_config(
     let config_file_path: ConfigFilePath = config_root_path.into();
     std::fs::write(
         config_file_path.as_ref(),
-        serde_yaml::to_string(&config).unwrap(),
+        yaml_serde::to_string(&config).unwrap(),
     )
     .context("Failed to write config")?;
     Ok(config_file_path)
@@ -46,7 +46,7 @@ pub fn write_config(
 /// Read the [`ConductorConfig`] from the file [`CONDUCTOR_CONFIG`](`holochain_conductor_api::config::conductor::paths::CONDUCTOR_CONFIG`) in the provided path.
 pub fn read_config(config_root_path: ConfigRootPath) -> anyhow::Result<Option<ConductorConfig>> {
     match std::fs::read_to_string(ConfigFilePath::from(config_root_path).as_ref()) {
-        Ok(yaml) => Ok(Some(serde_yaml::from_str(&yaml)?)),
+        Ok(yaml) => Ok(Some(yaml_serde::from_str(&yaml)?)),
         Err(_) => Ok(None),
     }
 }
