@@ -6,6 +6,13 @@ use crate::models::wasm::{
     CoordinatorZomeModel, DnaDefModel, EntryDefModel, IntegrityZomeModel, WasmModel,
 };
 
+fn new_decode_error(e: String) -> sqlx::Error {
+    sqlx::Error::Decode(Box::new(std::io::Error::new(
+        std::io::ErrorKind::InvalidData,
+        e,
+    )))
+}
+
 /// Check if WASM bytecode exists in the database.
 pub(super) async fn wasm_exists<'e, E>(executor: E, hash: &WasmHash) -> sqlx::Result<bool>
 where
@@ -110,12 +117,7 @@ where
     dna_model
         .to_dna_def(integrity_zomes, coordinator_zomes)
         .map(Some)
-        .map_err(|e| {
-            sqlx::Error::Decode(Box::new(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                e,
-            )))
-        })
+        .map_err(new_decode_error)
 }
 
 /// Check if an entry definition exists in the database.
@@ -143,12 +145,7 @@ where
     .await?;
 
     match model {
-        Some(model) => model.to_entry_def().map(Some).map_err(|e| {
-            sqlx::Error::Decode(Box::new(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                e,
-            )))
-        }),
+        Some(model) => model.to_entry_def().map(Some).map_err(new_decode_error),
         None => Ok(None),
     }
 }
@@ -171,12 +168,7 @@ where
             model
                 .to_entry_def()
                 .map(|entry_def| (key, entry_def))
-                .map_err(|e| {
-                    sqlx::Error::Decode(Box::new(std::io::Error::new(
-                        std::io::ErrorKind::InvalidData,
-                        e,
-                    )))
-                })
+                .map_err(new_decode_error)
         })
         .collect()
 }
@@ -223,12 +215,7 @@ where
         // Convert to DnaDef
         let dna_def = dna_model
             .to_dna_def(integrity_zomes, coordinator_zomes)
-            .map_err(|e| {
-                sqlx::Error::Decode(Box::new(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    e,
-                )))
-            })?;
+            .map_err(new_decode_error)?;
 
         // Create CellId from the hash and agent
         let cell_id = dna_model.to_cell_id();
