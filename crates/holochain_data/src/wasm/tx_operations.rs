@@ -8,7 +8,7 @@ use holochain_types::prelude::{CellId, DnaDef, DnaWasmHashed, EntryDef};
 use crate::handles::{TxRead, TxWrite};
 use crate::kind::Wasm;
 
-use super::{inner_writes, reads};
+use super::{reads, writes};
 
 impl TxRead<Wasm> {
     /// Check if WASM bytecode exists in the database.
@@ -55,7 +55,7 @@ impl TxRead<Wasm> {
 impl TxWrite<Wasm> {
     /// Store WASM bytecode.
     pub async fn put_wasm(&mut self, wasm: DnaWasmHashed) -> sqlx::Result<()> {
-        inner_writes::put_wasm(self.conn_mut(), wasm).await
+        writes::put_wasm(self.conn_mut(), wasm).await
     }
 
     /// Store a DNA definition and its associated zomes.
@@ -63,11 +63,11 @@ impl TxWrite<Wasm> {
     /// Within a [`TxWrite`], this runs as a SAVEPOINT nested inside the
     /// outer transaction — it is atomic with the rest of the transaction.
     pub async fn put_dna_def(&mut self, agent: &AgentPubKey, dna_def: &DnaDef) -> sqlx::Result<()> {
-        inner_writes::put_dna_def(self.tx_mut(), agent, dna_def).await
+        writes::put_dna_def(self.tx_mut(), agent, dna_def).await
     }
 
     /// Store an entry definition.
     pub async fn put_entry_def(&mut self, key: Vec<u8>, entry_def: &EntryDef) -> sqlx::Result<()> {
-        inner_writes::put_entry_def(self.conn_mut(), key, entry_def).await
+        writes::put_entry_def(self.conn_mut(), key, entry_def).await
     }
 }

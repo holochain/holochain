@@ -8,7 +8,7 @@ use holochain_types::prelude::{CellId, DnaDef, DnaWasmHashed, EntryDef};
 use crate::handles::{DbRead, DbWrite};
 use crate::kind::Wasm;
 
-use super::{inner_writes, reads};
+use super::{reads, writes};
 
 impl DbRead<Wasm> {
     /// Check if WASM bytecode exists in the database.
@@ -55,19 +55,19 @@ impl DbRead<Wasm> {
 impl DbWrite<Wasm> {
     /// Store WASM bytecode.
     pub async fn put_wasm(&self, wasm: DnaWasmHashed) -> sqlx::Result<()> {
-        inner_writes::put_wasm(self.pool(), wasm).await
+        writes::put_wasm(self.pool(), wasm).await
     }
 
     /// Store a DNA definition and its associated zomes.
     ///
     /// This operation is transactional - either all data is stored or none is.
     pub async fn put_dna_def(&self, agent: &AgentPubKey, dna_def: &DnaDef) -> sqlx::Result<()> {
-        inner_writes::put_dna_def(self.pool(), agent, dna_def).await
+        writes::put_dna_def(self.pool(), agent, dna_def).await
     }
 
     /// Store an entry definition.
     pub async fn put_entry_def(&self, key: Vec<u8>, entry_def: &EntryDef) -> sqlx::Result<()> {
-        inner_writes::put_entry_def(self.pool(), key, entry_def).await
+        writes::put_entry_def(self.pool(), key, entry_def).await
     }
 }
 
