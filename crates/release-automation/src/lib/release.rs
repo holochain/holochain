@@ -815,7 +815,7 @@ pub fn do_publish_to_crates_io<'a>(
                     let line = line.to_str_lossy();
                     details += &line;
                 }
-    
+
                 let error = PublishError::with_str(crt.name(), crt.version().to_string(), details);
     
                 if match &error {

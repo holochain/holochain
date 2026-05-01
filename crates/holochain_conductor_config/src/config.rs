@@ -51,6 +51,6 @@ pub fn read_config(config_root_path: ConfigRootPath) -> anyhow::Result<Option<Co
         Err(e) => {
             tracing::warn!("Failed to read config file: {}", e);
             Ok(None)
-        },
+        }
     }
 }
