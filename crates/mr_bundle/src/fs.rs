@@ -54,7 +54,7 @@ impl FileSystemBundler {
                     e,
                 )
             })?;
-        let mut manifest: M = serde_yaml::from_str(&manifest_yaml)?;
+        let mut manifest: M = yaml_serde::from_str(&manifest_yaml)?;
 
         let manifest_dir = manifest_path
             .parent()
@@ -182,7 +182,7 @@ impl FileSystemBundler {
         })?;
 
         // Write the manifest to the target directory.
-        let yaml_str = serde_yaml::to_string(bundle.manifest())?;
+        let yaml_str = yaml_serde::to_string(bundle.manifest())?;
         let manifest_path = target_dir.join(manifest_file_name);
         tokio::fs::write(&manifest_path, yaml_str.as_bytes())
             .await

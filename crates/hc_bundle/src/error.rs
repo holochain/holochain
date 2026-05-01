@@ -24,9 +24,9 @@ pub enum HcBundleError {
     #[error("Internal serialization error: {0}")]
     SerializedBytesError(#[from] SerializedBytesError),
 
-    /// serde_yaml::Error
+    /// yaml_serde::Error
     #[error("YAML serialization error: {0}")]
-    SerdeYamlError(#[from] serde_yaml::Error),
+    SerdeYamlError(#[from] yaml_serde::Error),
 
     /// anything else
     #[error("Unknown error: {0}")]

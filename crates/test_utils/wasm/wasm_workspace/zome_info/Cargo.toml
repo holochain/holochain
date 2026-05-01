@@ -19,7 +19,7 @@ crate-type = ["cdylib", "rlib"]
 hdk = { path = "../../../../hdk", features = ["properties"] }
 serde = "1.0"
 holochain_serialized_bytes = "0.0.57"
-serde_yaml = "0.9"
+yaml_serde = "0.10"
 hdi = { path = "../../../../hdi" }
 
 [dev-dependencies]

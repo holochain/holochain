@@ -56,7 +56,7 @@ fn run_test_keystore(dir: &std::path::Path) -> (Proc, url2::Url2) {
         connection_url: url2::Url2,
     }
 
-    let conf: Conf = serde_yaml::from_str(&yaml).unwrap();
+    let conf: Conf = yaml_serde::from_str(&yaml).unwrap();
 
     (Proc(cmd), conf.connection_url)
 }

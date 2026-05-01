@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Switch from `serde_yaml` to `yaml_serde`, to stay with the actively supported fork of the now deprecated library.
 - Added the per-DNA DHT v2 database schema and skeleton read/write API surface in `holochain_data`, with transitional DHT v2 domain types exposed across the Holochain type crates (`holochain_integrity_types`, `holochain_zome_types`, `holochain_types`). #5743
 - **BREAKING CHANGE** Switch from WAMR to Wasmi as the interpreter backend. This is a temporary change and Wasmi will also be replaced. Please do not use it.
 - **BREAKING CHANGE** Upgrade Wasmer from version 6 to 7, Kitsune2 from 0.4.x to 0.5.x, holochain_serialized_bytes to 0.0.57, Lair from 0.6.x to 0.7.x

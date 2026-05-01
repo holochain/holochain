@@ -304,7 +304,7 @@ mod tests {
             name: "name".into(),
             integrity: IntegrityManifest {
                 network_seed: Some("original network seed".to_string()),
-                properties: Some(serde_yaml::Value::Null.into()),
+                properties: Some(yaml_serde::Value::Null.into()),
                 zomes: vec![
                     ZomeManifest {
                         name: "zome1".into(),
@@ -356,7 +356,7 @@ mod tests {
         assert_eq!(dna_file.code().len(), 2);
 
         // - Check that properties and UUID can be overridden
-        let properties: YamlProperties = serde_yaml::Value::from(42).into();
+        let properties: YamlProperties = yaml_serde::Value::from(42).into();
         let bundle: DnaBundle = Bundle::new(manifest.try_into().unwrap(), resources)
             .unwrap()
             .into();

@@ -30,7 +30,7 @@ pub enum MrBundleError {
     #[cfg(feature = "fs")]
     #[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
     #[error(transparent)]
-    YamlError(#[from] serde_yaml::Error),
+    YamlError(#[from] yaml_serde::Error),
 
     /// A path with no parent directory
     #[cfg(feature = "fs")]

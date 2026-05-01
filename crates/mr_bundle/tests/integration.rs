@@ -94,7 +94,7 @@ async fn file_system_bundler() {
 
     // Write the manifest to disk
     let manifest_path = dir.path().join(TestManifest::file_name());
-    tokio::fs::write(&manifest_path, serde_yaml::to_string(&manifest).unwrap())
+    tokio::fs::write(&manifest_path, yaml_serde::to_string(&manifest).unwrap())
         .await
         .unwrap();
 
@@ -161,7 +161,7 @@ async fn file_system_bundler_with_raw_bundle() {
 
     // Write the manifest to disk
     let manifest_path = dir.path().join(TestManifest::file_name());
-    tokio::fs::write(&manifest_path, serde_yaml::to_string(&manifest).unwrap())
+    tokio::fs::write(&manifest_path, yaml_serde::to_string(&manifest).unwrap())
         .await
         .unwrap();
 
@@ -186,7 +186,7 @@ async fn file_system_bundler_with_raw_bundle() {
     .unwrap();
 
     // Read and unpack the bundle
-    let bundle = Bundle::<serde_yaml::Value>::unpack(bundle_bytes.as_slice()).unwrap();
+    let bundle = Bundle::<yaml_serde::Value>::unpack(bundle_bytes.as_slice()).unwrap();
 
     let unpacked_dir = dir.path().join("unpacked");
     FileSystemBundler::expand_named_to(&bundle, "unknown.yaml", &unpacked_dir, false)
@@ -199,7 +199,7 @@ async fn file_system_bundler_with_raw_bundle() {
     // Force updating resource ids so that it would be expected to match the written content.
     manifest.generate_resource_ids();
     assert_eq!(
-        serde_yaml::to_string(&manifest).unwrap(),
+        yaml_serde::to_string(&manifest).unwrap(),
         std::fs::read_to_string(unpacked_dir.join("unknown.yaml")).unwrap()
     );
 

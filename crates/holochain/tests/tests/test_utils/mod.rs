@@ -390,7 +390,7 @@ pub fn create_config(port: u16, data_root_path: DataRootPath) -> ConductorConfig
 
 pub fn write_config(mut path: PathBuf, config: &ConductorConfig) -> PathBuf {
     path.push("conductor_config.yml");
-    std::fs::write(path.clone(), serde_yaml::to_string(&config).unwrap()).unwrap();
+    std::fs::write(path.clone(), yaml_serde::to_string(&config).unwrap()).unwrap();
     path
 }
 
