@@ -610,8 +610,8 @@ fn multiple_subsequent_releases() {
         (
             "add a pre-release for crate_b",
             vec![("crate_b", "1.0.0-rc.0"), ("crate_a", "0.1.3"), ("crate_e", "0.0.2")],
-            // allowed missing dependencies
-            vec![],
+            // crate_g isn't being released so we allow it to be missing from crates.io
+            vec!["crate_g"],
             true,
             None,
             Box::new(|args: A| {
@@ -651,8 +651,8 @@ fn multiple_subsequent_releases() {
         (
             "do another pre-release for crate_b",
             vec![("crate_b", "1.0.0-rc.1"), ("crate_a", "0.1.4"), ("crate_e", "0.0.2")],
-            // allowed missing dependencies
-            vec![],
+            // crate_g isn't being released so we allow it to be missing from crates.io
+            vec!["crate_g"],
             true,
             None,
             Box::new(|args: A| {
@@ -676,8 +676,8 @@ fn multiple_subsequent_releases() {
         (
             "do major release for crate_b",
             vec![("crate_b", "1.0.0"), ("crate_a", "0.1.5"), ("crate_e", "0.0.2")],
-            // allowed missing dependencies
-            vec![],
+            // crate_g isn't being released so we allow it to be missing from crates.io
+            vec!["crate_g"],
             true,
             None,
             Box::new(|args: A| {
@@ -717,8 +717,8 @@ fn multiple_subsequent_releases() {
         (
             "and a default patch release for crate_b again",
             vec![("crate_b", "1.0.1"), ("crate_a", "0.1.6"), ("crate_e", "0.0.2")],
-            // allowed missing dependencies
-            vec![],
+            // crate_g isn't being released so we allow it to be missing from crates.io
+            vec!["crate_g"],
             true,
             None,
             Box::new(|args: A| {
