@@ -7,14 +7,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Added the per-DNA DHT v2 database schema and skeleton read/write API surface in `holochain_data`, with transitional DHT v2 domain types exposed across the Holochain type crates (`holochain_integrity_types`, `holochain_zome_types`, `holochain_types`). #5743
+## 0.7.0-dev.23
+
+- Added the per-DNA DHT v2 database schema and skeleton read/write API surface in `holochain_data`, with transitional DHT v2 domain types exposed across the Holochain type crates (`holochain_integrity_types`, `holochain_zome_types`, `holochain_types`). \#5743
 - **BREAKING CHANGE** Switch from WAMR to Wasmi as the interpreter backend. This is a temporary change and Wasmi will also be replaced. Please do not use it.
-- **BREAKING CHANGE** Upgrade Wasmer from version 6 to 7, Kitsune2 from 0.4.x to 0.5.x, holochain_serialized_bytes to 0.0.57, Lair from 0.6.x to 0.7.x
+- **BREAKING CHANGE** Upgrade Wasmer from version 6 to 7, Kitsune2 from 0.4.x to 0.5.x, holochain\_serialized\_bytes to 0.0.57, Lair from 0.6.x to 0.7.x
 - **BREAKING CHANGE** Rename feature flags for Wasmer. The `wasmer_sys` feature flag is now `wasmer-sys-cranelift`. There is an additional `wasmer-sys-llvm` option. The `wasmer_wamr` feature flag is replaced by a roughly equivalent `wasmer-wasmi` feature flag which has fewer build-time requirements. The two control flags for wasmer have been renamed too, so `error_as_host` has become `error-as-host` and `wasmer_debug_memory` has become `wasmer-debug-memory`.
-- It's no longer the case that the Wasmer backends are disallowed from being enabled together. You must enable at least one but if you build with multiple enabled, then the conductor will pick one at runtime. You can also configure which one to pick with the new `wasm_backend` conductor configuration option. It accepts `"cranelift"`, `"LLVM"` or `"wasmi"`.
+- It’s no longer the case that the Wasmer backends are disallowed from being enabled together. You must enable at least one but if you build with multiple enabled, then the conductor will pick one at runtime. You can also configure which one to pick with the new `wasm_backend` conductor configuration option. It accepts `"cranelift"`, `"LLVM"` or `"wasmi"`.
 
 ## 0.7.0-dev.22
- 
+
 - **BREAKING CHANGE** switch from `holochain_sqlite`/`holochain_state` for the conductor database, to the new store defined by `holochain_data`. There is no migration path for existing installs of Holochain, and startup errors would be expected if the data state is not cleared.
 - Add peer metadata store database table to `holochain_data` along with full CRUD API. \#5732
   - In the new peer metadata store database, the entries now store `expires_at` as seconds from the Unix epoch instead of microseconds and they correctly expire at the `expires_at` time instead of just after.
