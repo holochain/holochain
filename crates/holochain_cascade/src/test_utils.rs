@@ -197,7 +197,6 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         _source: AgentPubKey,
         _op_hash_list: Vec<DhtOpHash>,
         _timeout_ms: Option<u64>,
-        _reflect_ops: Option<Vec<crate::DhtOp>>,
     ) -> HolochainP2pResult<()> {
         todo!()
     }
