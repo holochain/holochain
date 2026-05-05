@@ -94,7 +94,7 @@ pub mod test {
 
         let yaml = "foo: bar";
         let (conductor, alice) = test_conductor(
-            YamlProperties::new(serde_yaml::from_str(yaml).unwrap())
+            YamlProperties::new(yaml_serde::from_str(yaml).unwrap())
                 .try_into()
                 .unwrap(),
         )
@@ -113,7 +113,7 @@ pub mod test {
 
         let yaml = "foo: 1\nbar: bing";
         let (conductor, alice) = test_conductor(
-            YamlProperties::new(serde_yaml::from_str(yaml).unwrap())
+            YamlProperties::new(yaml_serde::from_str(yaml).unwrap())
                 .try_into()
                 .unwrap(),
         )
@@ -132,7 +132,7 @@ pub mod test {
 
         let yaml = "baz: \n  foo: \n   bar: 1";
         let (conductor, alice) = test_conductor(
-            YamlProperties::new(serde_yaml::from_str(yaml).unwrap())
+            YamlProperties::new(yaml_serde::from_str(yaml).unwrap())
                 .try_into()
                 .unwrap(),
         )

@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use crate::integrity::*;
 use hdi::prelude::__hc__dna_info_1;
 use hdk::prelude::*;
-use serde_yaml::Value;
+use yaml_serde::Value;
 
 #[hdk_extern]
 fn set_access(_: ()) -> ExternResult<()> {
@@ -78,7 +78,7 @@ fn dna_info(_: ()) -> ExternResult<DnaInfo> {
     hdk::prelude::dna_info()
 }
 
-/// `serde_yaml::Value` approach to handling properties.
+/// `yaml_serde::Value` approach to handling properties.
 /// As yaml is much more loosely typed then Rust is, everything in the yaml
 /// ends up in a generic nested `Value` enum. Consider the following yaml:
 ///
@@ -95,7 +95,7 @@ fn dna_info(_: ()) -> ExternResult<DnaInfo> {
 ///
 /// For well known or relatively simple properties it may be ergonomic to
 /// define a native Rust struct for the happ. For poorly defined or complex
-/// properties it may be easier to use `serde_yaml::Value` directly. This does
+/// properties it may be easier to use `yaml_serde::Value` directly. This does
 /// several things that you will end up reinventing ad-hoc when your properties
 /// become sufficiently complex:
 ///
@@ -107,14 +107,14 @@ fn dna_info(_: ()) -> ExternResult<DnaInfo> {
 /// The main two drawbacks:
 ///
 /// - Loss of a declarative/typed structure that can be inspected visually/IDE
-/// - Inclusion of an additional dependency on `serde_yaml` in the WASM
+/// - Inclusion of an additional dependency on `yaml_serde` in the WASM
 ///
 /// The other option is to use `rmpv::Value` from the `rmpv` crate, but many
 /// types supported by messagepack are not supported by yaml anyway. Also the
 /// traversal support for moving through yaml mappings and using floats for
-/// keys is relatively poor in `rmpv` compared to `serde_yaml`.
+/// keys is relatively poor in `rmpv` compared to `yaml_serde`.
 #[hdk_extern]
-fn dna_info_value(k: String) -> ExternResult<serde_yaml::Value> {
+fn dna_info_value(k: String) -> ExternResult<yaml_serde::Value> {
     Ok(
         YamlProperties::try_from(hdk::prelude::dna_info()?.modifiers.properties)
             .map_err(|e| wasm_error!(e))?
@@ -138,7 +138,7 @@ enum Foo {
 /// The main benefits of taking the time to define this:
 ///
 /// - The struct is declarative, showing how properties must be defined
-/// - There are no additional dependencies if `serde_yaml::Value` is not used
+/// - There are no additional dependencies if `yaml_serde::Value` is not used
 #[derive(Deserialize, Serialize, Debug)]
 struct PropertiesDirect {
     /// To enable a property to NOT be present it requires `#[serde(default)]`.

@@ -459,7 +459,7 @@ pub async fn get_dna_name(manifest_path: &Path) -> HcBundleResult<String> {
     let manifest_path = manifest_path.to_path_buf();
     let manifest_path = manifest_path.join(ValidatedDnaManifest::file_name());
     let manifest_yaml = ffs::read_to_string(&manifest_path).await?;
-    let manifest: DnaManifest = serde_yaml::from_str(&manifest_yaml)?;
+    let manifest: DnaManifest = yaml_serde::from_str(&manifest_yaml)?;
     Ok(manifest.name())
 }
 
@@ -468,7 +468,7 @@ pub async fn get_app_name(manifest_path: &Path) -> HcBundleResult<String> {
     let manifest_path = manifest_path.to_path_buf();
     let manifest_path = manifest_path.join(AppManifest::file_name());
     let manifest_yaml = ffs::read_to_string(&manifest_path).await?;
-    let manifest: AppManifest = serde_yaml::from_str(&manifest_yaml)?;
+    let manifest: AppManifest = yaml_serde::from_str(&manifest_yaml)?;
     Ok(manifest.app_name().to_string())
 }
 
@@ -477,7 +477,7 @@ pub async fn get_web_app_name(manifest_path: &Path) -> HcBundleResult<String> {
     let manifest_path = manifest_path.to_path_buf();
     let manifest_path = manifest_path.join(WebAppManifest::file_name());
     let manifest_yaml = ffs::read_to_string(&manifest_path).await?;
-    let manifest: WebAppManifest = serde_yaml::from_str(&manifest_yaml)?;
+    let manifest: WebAppManifest = yaml_serde::from_str(&manifest_yaml)?;
     Ok(manifest.app_name().to_string())
 }
 
@@ -488,7 +488,7 @@ pub async fn web_app_pack_recursive(web_app_workdir_path: &PathBuf) -> anyhow::R
     let web_app_manifest_path = canonical_web_app_workdir_path.join(WebAppManifest::file_name());
 
     let web_app_manifest: WebAppManifest =
-        serde_yaml::from_reader(std::fs::File::open(&web_app_manifest_path)?)?;
+        yaml_serde::from_reader(std::fs::File::open(&web_app_manifest_path)?)?;
 
     let app_bundle_location = web_app_manifest.happ_bundle_location();
 
@@ -520,7 +520,7 @@ pub async fn app_pack_recursive(app_workdir_path: &PathBuf) -> anyhow::Result<()
     let app_manifest_path = app_workdir_path.join(AppManifest::file_name());
     let f = std::fs::File::open(&app_manifest_path)?;
 
-    let manifest: AppManifest = serde_yaml::from_reader(f)?;
+    let manifest: AppManifest = yaml_serde::from_reader(f)?;
 
     let dnas_workdir_locations =
         bundled_dnas_workdir_locations(&app_manifest_path, &manifest).await?;

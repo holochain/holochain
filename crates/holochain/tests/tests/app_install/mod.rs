@@ -13,7 +13,7 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
     let path = format!("{}", dna.dna_hash());
 
     let manifest_network_seed = String::from("initial seed from the manifest");
-    let manifest_properties = YamlProperties::new(serde_yaml::Value::String(String::from(
+    let manifest_properties = YamlProperties::new(yaml_serde::Value::String(String::from(
         "some properties in the manifest",
     )));
 
@@ -63,7 +63,7 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
     //- Test that installing with custom modifiers correctly overwrites the values and that the dna hash
     //  differs from the dna hash when installed without custom modifiers
     let custom_network_seed = String::from("modified seed");
-    let custom_properties = YamlProperties::new(serde_yaml::Value::String(String::from(
+    let custom_properties = YamlProperties::new(yaml_serde::Value::String(String::from(
         "some properties provided at install time",
     )));
 
@@ -191,7 +191,7 @@ async fn install_app_with_custom_modifier_fields_none_does_not_override_existing
     let path = format!("{}", dna.dna_hash());
 
     let manifest_network_seed = String::from("initial seed from the manifest");
-    let manifest_properties = YamlProperties::new(serde_yaml::Value::String(String::from(
+    let manifest_properties = YamlProperties::new(yaml_serde::Value::String(String::from(
         "some properties in the manifest",
     )));
 

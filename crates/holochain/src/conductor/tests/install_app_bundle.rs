@@ -88,7 +88,7 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
                     role_name: "name".into(),
                     modifiers: DnaModifiersOpt::none()
                         .with_network_seed("1".into())
-                        .with_properties(YamlProperties::new(serde_yaml::Value::String(
+                        .with_properties(YamlProperties::new(yaml_serde::Value::String(
                             "foo".into(),
                         ))),
                     membrane_proof: None,
@@ -113,7 +113,7 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
                     role_name: "name".into(),
                     modifiers: DnaModifiersOpt::none()
                         .with_network_seed("1".into())
-                        .with_properties(YamlProperties::new(serde_yaml::Value::String(
+                        .with_properties(YamlProperties::new(yaml_serde::Value::String(
                             "foo".into(),
                         ))),
                     membrane_proof: None,

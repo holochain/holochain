@@ -113,7 +113,7 @@ pub(crate) fn init_lair_inner(
         connection_url: url2::Url2,
     }
 
-    let conf: Conf = serde_yaml::from_slice(&conf)?;
+    let conf: Conf = yaml_serde::from_slice(&conf)?;
 
     Ok(conf.connection_url)
 }
