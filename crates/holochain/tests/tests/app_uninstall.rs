@@ -49,7 +49,6 @@ async fn space_removed_on_uninstall() {
             cell.agent_pubkey().clone(),
             vec![],
             None,
-            None,
         )
         .await;
 
