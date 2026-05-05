@@ -1612,19 +1612,8 @@ impl actor::HcP2p for HolochainP2pActor {
         _source: AgentPubKey,
         op_hash_list: Vec<DhtOpHash>,
         _timeout_ms: Option<u64>,
-        reflect_ops: Option<Vec<DhtOp>>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
-            use crate::types::event::HcP2pHandler;
-
-            if let Some(reflect_ops) = reflect_ops {
-                self.evt_sender
-                    .get()
-                    .ok_or_else(|| HolochainP2pError::other(EVT_REG_ERR))?
-                    .handle_publish(dna_hash.clone(), reflect_ops)
-                    .await?;
-            }
-
             let space = dna_hash.to_k2_space();
 
             let space = self.kitsune.space(space, None).await?;

@@ -261,12 +261,10 @@ async fn publish_loop() {
     .unwrap();
     let mut dna_network = MockHolochainP2pDnaT::new();
     let (tx, mut op_published) = tokio::sync::mpsc::channel(100);
-    dna_network
-        .expect_publish()
-        .returning(move |_, _, _, _, _| {
-            tx.try_send(()).unwrap();
-            Ok(())
-        });
+    dna_network.expect_publish().returning(move |_, _, _, _| {
+        tx.try_send(()).unwrap();
+        Ok(())
+    });
     let dna_network = Arc::new(dna_network);
 
     let (ts, mut trigger_recv) =
