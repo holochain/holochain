@@ -14,21 +14,10 @@ use holochain_types::prelude::{AppStatus, InstalledAppCommon, Timestamp};
 use std::collections::HashSet;
 use std::sync::Arc;
 
+use crate::mutations::StateMutationResult;
+use crate::prelude::StateMutationError;
+use crate::query::StateQueryResult;
 pub use holochain_data::conductor::{WitnessNonceResult, WITNESSABLE_EXPIRY_DURATION};
-
-/// Errors produced by [`ConductorStore`] operations.
-///
-/// Wraps the underlying data-layer error so callers do not need to depend on
-/// `sqlx` directly.
-#[derive(thiserror::Error, Debug)]
-pub enum ConductorStoreError {
-    /// An underlying database operation failed.
-    #[error(transparent)]
-    Db(#[from] sqlx::Error),
-}
-
-/// Convenience alias for [`ConductorStore`] results.
-pub type ConductorStoreResult<T> = Result<T, ConductorStoreError>;
 
 /// A single signal subscription row: `(app_id, filters_blob)`.
 pub type SignalSubscriptionRow = (String, Vec<u8>);
@@ -84,12 +73,12 @@ impl<Db> ConductorStore<Db> {
 
 impl ConductorStore<holochain_data::DbRead<Conductor>> {
     /// Get the conductor tag.
-    pub async fn get_conductor_tag(&self) -> ConductorStoreResult<Option<String>> {
+    pub async fn get_conductor_tag(&self) -> StateQueryResult<Option<String>> {
         Ok(self.db.get_conductor_tag().await?)
     }
 
     /// Get all app interfaces.
-    pub async fn get_all_app_interfaces(&self) -> ConductorStoreResult<Vec<AppInterfaceModel>> {
+    pub async fn get_all_app_interfaces(&self) -> StateQueryResult<Vec<AppInterfaceModel>> {
         Ok(self.db.get_all_app_interfaces().await?)
     }
 
@@ -98,7 +87,7 @@ impl ConductorStore<holochain_data::DbRead<Conductor>> {
         &self,
         port: i64,
         id: &str,
-    ) -> ConductorStoreResult<Vec<SignalSubscriptionRow>> {
+    ) -> StateQueryResult<Vec<SignalSubscriptionRow>> {
         Ok(self.db.get_signal_subscriptions(port, id).await?)
     }
 
@@ -106,14 +95,14 @@ impl ConductorStore<holochain_data::DbRead<Conductor>> {
     pub async fn get_installed_app(
         &self,
         app_id: &str,
-    ) -> ConductorStoreResult<Option<(InstalledAppCommon, AppStatus)>> {
+    ) -> StateQueryResult<Option<(InstalledAppCommon, AppStatus)>> {
         Ok(self.db.get_installed_app(app_id).await?)
     }
 
     /// Get all installed apps.
     pub async fn get_all_installed_apps(
         &self,
-    ) -> ConductorStoreResult<Vec<(String, InstalledAppCommon, AppStatus)>> {
+    ) -> StateQueryResult<Vec<(String, InstalledAppCommon, AppStatus)>> {
         Ok(self.db.get_all_installed_apps().await?)
     }
 
@@ -124,7 +113,7 @@ impl ConductorStore<holochain_data::DbRead<Conductor>> {
     /// [`ConductorStateSnapshot`] read within a single transaction so
     /// the tag, apps, interfaces, and subscriptions are all consistent
     /// with each other.
-    pub async fn load_state(&self) -> ConductorStoreResult<Option<ConductorStateSnapshot>> {
+    pub async fn load_state(&self) -> StateQueryResult<Option<ConductorStateSnapshot>> {
         let mut tx = self.db.begin().await?;
         let snapshot = load_snapshot_in_tx(&mut tx).await?;
         tx.close().await?;
@@ -137,7 +126,7 @@ impl ConductorStore<holochain_data::DbRead<Conductor>> {
         agent: &AgentPubKey,
         nonce: &Nonce256Bits,
         now: Timestamp,
-    ) -> ConductorStoreResult<bool> {
+    ) -> StateQueryResult<bool> {
         Ok(self.db.nonce_already_seen(agent, nonce, now).await?)
     }
 
@@ -146,7 +135,7 @@ impl ConductorStore<holochain_data::DbRead<Conductor>> {
         &self,
         target_id: BlockTargetId,
         timestamp: Timestamp,
-    ) -> ConductorStoreResult<bool> {
+    ) -> StateQueryResult<bool> {
         Ok(self.db.is_blocked(target_id, timestamp).await?)
     }
 
@@ -155,12 +144,12 @@ impl ConductorStore<holochain_data::DbRead<Conductor>> {
         &self,
         target_ids: Vec<BlockTargetId>,
         timestamp: Timestamp,
-    ) -> ConductorStoreResult<bool> {
+    ) -> StateQueryResult<bool> {
         Ok(self.db.is_any_blocked(target_ids, timestamp).await?)
     }
 
     /// Get all blocks from the database.
-    pub async fn get_all_blocks(&self) -> ConductorStoreResult<Vec<Block>> {
+    pub async fn get_all_blocks(&self) -> StateQueryResult<Vec<Block>> {
         Ok(self.db.get_all_blocks().await?)
     }
 }
@@ -179,24 +168,18 @@ impl ConductorStore<holochain_data::DbWrite<Conductor>> {
     pub async fn update_state<F, O, E>(&self, f: F) -> Result<O, E>
     where
         F: FnOnce(Option<ConductorStateSnapshot>) -> Result<(ConductorStateSnapshot, O), E>,
-        E: From<ConductorStoreError>,
+        E: From<StateMutationError>,
     {
         let _guard = self.update_lock.lock().await;
-        let mut tx = self
-            .db
-            .begin()
-            .await
-            .map_err(|e| E::from(ConductorStoreError::from(e)))?;
+        let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
         let current = load_snapshot_in_tx(tx.as_mut())
             .await
-            .map_err(|e| E::from(ConductorStoreError::from(e)))?;
+            .map_err(StateMutationError::from)?;
         let (new_snapshot, output) = f(current)?;
         save_snapshot_in_tx(&mut tx, &new_snapshot)
             .await
-            .map_err(|e| E::from(ConductorStoreError::from(e)))?;
-        tx.commit()
-            .await
-            .map_err(|e| E::from(ConductorStoreError::from(e)))?;
+            .map_err(StateMutationError::from)?;
+        tx.commit().await.map_err(StateMutationError::from)?;
         Ok(output)
     }
 
@@ -207,12 +190,12 @@ impl ConductorStore<holochain_data::DbWrite<Conductor>> {
         nonce: Nonce256Bits,
         now: Timestamp,
         expires: Timestamp,
-    ) -> ConductorStoreResult<WitnessNonceResult> {
+    ) -> StateMutationResult<WitnessNonceResult> {
         Ok(self.db.witness_nonce(agent, nonce, now, expires).await?)
     }
 
     /// Insert a block into the database.
-    pub async fn block(&self, input: Block) -> ConductorStoreResult<()> {
+    pub async fn block(&self, input: Block) -> StateMutationResult<()> {
         Ok(self.db.block(input).await?)
     }
 
@@ -246,7 +229,7 @@ where
 #[cfg(any(test, feature = "test_utils"))]
 impl ConductorStore<holochain_data::DbWrite<Conductor>> {
     /// Create an in-memory conductor store for testing.
-    pub async fn new_test() -> ConductorStoreResult<Self> {
+    pub async fn new_test() -> StateQueryResult<Self> {
         let db = holochain_data::test_open_db(Conductor).await?;
         Ok(Self::new(db))
     }
@@ -350,7 +333,7 @@ mod tests {
 
         // Initialize with a tag
         store
-            .update_state(|snap| -> Result<_, ConductorStoreError> {
+            .update_state(|snap| -> StateMutationResult<_> {
                 assert!(snap.is_none());
                 Ok((
                     ConductorStateSnapshot {
@@ -386,7 +369,7 @@ mod tests {
 
         // Save two interfaces.
         store
-            .update_state(|_| -> Result<_, ConductorStoreError> {
+            .update_state(|_| -> StateMutationResult<_> {
                 Ok((
                     ConductorStateSnapshot {
                         tag: "t".to_string(),
@@ -401,7 +384,7 @@ mod tests {
 
         // Replace with just one interface.
         store
-            .update_state(|snap| -> Result<_, ConductorStoreError> {
+            .update_state(|snap| -> StateMutationResult<_> {
                 let snap = snap.unwrap();
                 assert_eq!(snap.app_interfaces.len(), 2);
                 Ok((
@@ -427,7 +410,7 @@ mod tests {
 
         // Seed a known state.
         store
-            .update_state(|_| -> Result<_, ConductorStoreError> {
+            .update_state(|_| -> StateMutationResult<_> {
                 Ok((
                     ConductorStateSnapshot {
                         tag: "seed".to_string(),
@@ -443,8 +426,8 @@ mod tests {
         // Closure returns an error — tx must roll back.
         #[derive(Debug)]
         struct Boom;
-        impl From<ConductorStoreError> for Boom {
-            fn from(_: ConductorStoreError) -> Self {
+        impl From<StateMutationError> for Boom {
+            fn from(_: StateMutationError) -> Self {
                 Boom
             }
         }
@@ -471,7 +454,7 @@ mod tests {
             let store = store.clone();
             joins.push(tokio::spawn(async move {
                 store
-                    .update_state(move |snap| -> Result<_, ConductorStoreError> {
+                    .update_state(move |snap| -> StateMutationResult<_> {
                         let mut snap = snap.unwrap_or_default();
                         if snap.tag.is_empty() {
                             snap.tag = "t".to_string();
@@ -515,7 +498,7 @@ mod tests {
         assert_eq!(store.as_read().get_conductor_tag().await.unwrap(), None);
 
         store
-            .update_state(|_| -> Result<_, ConductorStoreError> {
+            .update_state(|_| -> StateMutationResult<_> {
                 Ok((
                     ConductorStateSnapshot {
                         tag: "hello".to_string(),
