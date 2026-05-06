@@ -8,66 +8,66 @@ use holochain_types::prelude::{CellId, DnaDef, DnaWasmHashed, EntryDef};
 use crate::handles::{DbRead, DbWrite};
 use crate::kind::Wasm;
 
-use super::{inner_reads, inner_writes};
+use super::{reads, writes};
 
 impl DbRead<Wasm> {
     /// Check if WASM bytecode exists in the database.
     pub async fn wasm_exists(&self, hash: &WasmHash) -> sqlx::Result<bool> {
-        inner_reads::wasm_exists(self.pool(), hash).await
+        reads::wasm_exists(self.pool(), hash).await
     }
 
     /// Get WASM bytecode by hash.
     pub async fn get_wasm(&self, hash: &WasmHash) -> sqlx::Result<Option<DnaWasmHashed>> {
-        inner_reads::get_wasm(self.pool(), hash).await
+        reads::get_wasm(self.pool(), hash).await
     }
 
     /// Check if a DNA definition exists in the database.
     pub async fn dna_def_exists(&self, cell_id: &CellId) -> sqlx::Result<bool> {
-        inner_reads::dna_def_exists(self.pool(), cell_id).await
+        reads::dna_def_exists(self.pool(), cell_id).await
     }
 
     /// Get a DNA definition for the passed [`CellId`].
     pub async fn get_dna_def(&self, cell_id: &CellId) -> sqlx::Result<Option<DnaDef>> {
-        inner_reads::get_dna_def(self.pool(), cell_id).await
+        reads::get_dna_def(self.pool(), cell_id).await
     }
 
     /// Check if an entry definition exists in the database.
     pub async fn entry_def_exists(&self, key: &[u8]) -> sqlx::Result<bool> {
-        inner_reads::entry_def_exists(self.pool(), key).await
+        reads::entry_def_exists(self.pool(), key).await
     }
 
     /// Get an entry definition by key.
     pub async fn get_entry_def(&self, key: &[u8]) -> sqlx::Result<Option<EntryDef>> {
-        inner_reads::get_entry_def(self.pool(), key).await
+        reads::get_entry_def(self.pool(), key).await
     }
 
     /// Get all entry definitions.
     pub async fn get_all_entry_defs(&self) -> sqlx::Result<Vec<(Vec<u8>, EntryDef)>> {
-        inner_reads::get_all_entry_defs(self.pool()).await
+        reads::get_all_entry_defs(self.pool()).await
     }
 
     /// Get all DNA definitions with their associated cell IDs.
     pub async fn get_all_dna_defs(&self) -> sqlx::Result<Vec<(CellId, DnaDef)>> {
-        inner_reads::get_all_dna_defs(self.pool()).await
+        reads::get_all_dna_defs(self.pool()).await
     }
 }
 
 impl DbWrite<Wasm> {
     /// Store WASM bytecode.
     pub async fn put_wasm(&self, wasm: DnaWasmHashed) -> sqlx::Result<()> {
-        inner_writes::put_wasm(self.pool(), wasm).await
+        writes::put_wasm(self.pool(), wasm).await
     }
 
     /// Store a DNA definition and its associated zomes.
     ///
     /// This operation is transactional - either all data is stored or none is.
     pub async fn put_dna_def(&self, agent: &AgentPubKey, dna_def: &DnaDef) -> sqlx::Result<()> {
-        inner_writes::put_dna_def(self.pool(), agent, dna_def).await
+        writes::put_dna_def(self.pool(), agent, dna_def).await
     }
 
     /// Store an entry definition.
     pub async fn put_entry_def(&self, key: Vec<u8>, entry_def: &EntryDef) -> sqlx::Result<()> {
-        inner_writes::put_entry_def(self.pool(), key, entry_def).await
+        writes::put_entry_def(self.pool(), key, entry_def).await
     }
 }
 
