@@ -14,7 +14,9 @@ use holochain_types::prelude::{AppStatus, InstalledAppCommon, Timestamp};
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use crate::query::{StateQueryError, StateQueryResult};
+use crate::mutations::StateMutationResult;
+use crate::prelude::StateMutationError;
+use crate::query::StateQueryResult;
 pub use holochain_data::conductor::{WitnessNonceResult, WITNESSABLE_EXPIRY_DURATION};
 
 /// A single signal subscription row: `(app_id, filters_blob)`.
@@ -166,18 +168,18 @@ impl ConductorStore<holochain_data::DbWrite<Conductor>> {
     pub async fn update_state<F, O, E>(&self, f: F) -> Result<O, E>
     where
         F: FnOnce(Option<ConductorStateSnapshot>) -> Result<(ConductorStateSnapshot, O), E>,
-        E: From<StateQueryError>,
+        E: From<StateMutationError>,
     {
         let _guard = self.update_lock.lock().await;
-        let mut tx = self.db.begin().await.map_err(StateQueryError::from)?;
+        let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
         let current = load_snapshot_in_tx(tx.as_mut())
             .await
-            .map_err(StateQueryError::from)?;
+            .map_err(StateMutationError::from)?;
         let (new_snapshot, output) = f(current)?;
         save_snapshot_in_tx(&mut tx, &new_snapshot)
             .await
-            .map_err(StateQueryError::from)?;
-        tx.commit().await.map_err(StateQueryError::from)?;
+            .map_err(StateMutationError::from)?;
+        tx.commit().await.map_err(StateMutationError::from)?;
         Ok(output)
     }
 
@@ -188,12 +190,12 @@ impl ConductorStore<holochain_data::DbWrite<Conductor>> {
         nonce: Nonce256Bits,
         now: Timestamp,
         expires: Timestamp,
-    ) -> StateQueryResult<WitnessNonceResult> {
+    ) -> StateMutationResult<WitnessNonceResult> {
         Ok(self.db.witness_nonce(agent, nonce, now, expires).await?)
     }
 
     /// Insert a block into the database.
-    pub async fn block(&self, input: Block) -> StateQueryResult<()> {
+    pub async fn block(&self, input: Block) -> StateMutationResult<()> {
         Ok(self.db.block(input).await?)
     }
 
@@ -331,7 +333,7 @@ mod tests {
 
         // Initialize with a tag
         store
-            .update_state(|snap| -> StateQueryResult<_> {
+            .update_state(|snap| -> StateMutationResult<_> {
                 assert!(snap.is_none());
                 Ok((
                     ConductorStateSnapshot {
@@ -367,7 +369,7 @@ mod tests {
 
         // Save two interfaces.
         store
-            .update_state(|_| -> StateQueryResult<_> {
+            .update_state(|_| -> StateMutationResult<_> {
                 Ok((
                     ConductorStateSnapshot {
                         tag: "t".to_string(),
@@ -382,7 +384,7 @@ mod tests {
 
         // Replace with just one interface.
         store
-            .update_state(|snap| -> StateQueryResult<_> {
+            .update_state(|snap| -> StateMutationResult<_> {
                 let snap = snap.unwrap();
                 assert_eq!(snap.app_interfaces.len(), 2);
                 Ok((
@@ -408,7 +410,7 @@ mod tests {
 
         // Seed a known state.
         store
-            .update_state(|_| -> StateQueryResult<_> {
+            .update_state(|_| -> StateMutationResult<_> {
                 Ok((
                     ConductorStateSnapshot {
                         tag: "seed".to_string(),
@@ -424,8 +426,8 @@ mod tests {
         // Closure returns an error — tx must roll back.
         #[derive(Debug)]
         struct Boom;
-        impl From<StateQueryError> for Boom {
-            fn from(_: StateQueryError) -> Self {
+        impl From<StateMutationError> for Boom {
+            fn from(_: StateMutationError) -> Self {
                 Boom
             }
         }
@@ -452,7 +454,7 @@ mod tests {
             let store = store.clone();
             joins.push(tokio::spawn(async move {
                 store
-                    .update_state(move |snap| -> StateQueryResult<_> {
+                    .update_state(move |snap| -> StateMutationResult<_> {
                         let mut snap = snap.unwrap_or_default();
                         if snap.tag.is_empty() {
                             snap.tag = "t".to_string();
@@ -496,7 +498,7 @@ mod tests {
         assert_eq!(store.as_read().get_conductor_tag().await.unwrap(), None);
 
         store
-            .update_state(|_| -> StateQueryResult<_> {
+            .update_state(|_| -> StateMutationResult<_> {
                 Ok((
                     ConductorStateSnapshot {
                         tag: "hello".to_string(),
