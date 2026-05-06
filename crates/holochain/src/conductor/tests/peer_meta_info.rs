@@ -42,10 +42,10 @@ async fn peer_meta_info() {
     // Write a 1-2 peer meta entries into each space's peer meta store
     let db1 = conductor
         .spaces
-        .peer_meta_store_db(dna1.dna_hash())
+        .peer_meta_store(dna1.dna_hash())
         .unwrap();
 
-    let peer_meta_store1 = Arc::new(HolochainPeerMetaStore::create(db1.clone()).await.unwrap());
+    let peer_meta_store1 = Arc::new(HolochainPeerMetaStore::create(db1).await.unwrap());
     peer_meta_store1
         .put(
             url.clone(),
@@ -66,10 +66,10 @@ async fn peer_meta_info() {
 
     let db2 = conductor
         .spaces
-        .peer_meta_store_db(dna2.dna_hash())
+        .peer_meta_store(dna2.dna_hash())
         .unwrap();
 
-    let peer_meta_store2 = Arc::new(HolochainPeerMetaStore::create(db2.clone()).await.unwrap());
+    let peer_meta_store2 = Arc::new(HolochainPeerMetaStore::create(db2).await.unwrap());
     peer_meta_store2
         .put(
             url.clone(),
@@ -172,10 +172,10 @@ async fn app_peer_meta_info() {
     // Write a peer meta entry into app1's peer meta store
     let db1 = conductor
         .spaces
-        .peer_meta_store_db(dna1.dna_hash())
+        .peer_meta_store(dna1.dna_hash())
         .unwrap();
 
-    let peer_meta_store1 = Arc::new(HolochainPeerMetaStore::create(db1.clone()).await.unwrap());
+    let peer_meta_store1 = Arc::new(HolochainPeerMetaStore::create(db1).await.unwrap());
     peer_meta_store1
         .put(
             url.clone(),

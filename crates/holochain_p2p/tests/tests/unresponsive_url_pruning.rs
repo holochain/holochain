@@ -310,7 +310,7 @@ struct TestCase {
     space_id: SpaceId,
     lair_client: MetaLairClient,
     peer_meta_store: DynPeerMetaStore,
-    db_peer_meta: holochain_data::DbWrite<PeerMetaStore>,
+    db_peer_meta: holochain_state::peer_metadata_store::PeerMetaStore,
     _dir: tempfile::TempDir,
 }
 
@@ -325,13 +325,15 @@ impl TestCase {
         let dir = test_db_dir();
         let db_dir = dir.path().join("tmp_database");
         std::fs::create_dir(&db_dir).unwrap();
-        let db_peer_meta = holochain_data::open_db(
-            &db_dir,
-            PeerMetaStore::new(Arc::new(dna_hash.clone())),
-            holochain_data::HolochainDataConfig::default(),
-        )
-        .await
-        .unwrap();
+        let db_peer_meta = holochain_state::peer_metadata_store::PeerMetaStore::new(
+            holochain_data::open_db(
+                &db_dir,
+                PeerMetaStore::new(Arc::new(dna_hash.clone())),
+                holochain_data::HolochainDataConfig::default(),
+            )
+            .await
+            .unwrap(),
+        );
         let db_op = DbWrite::test_in_mem(DbKindDht(Arc::new(dna_hash.clone()))).unwrap();
         let db_cache = DbWrite::test_in_mem(DbKindCache(Arc::new(dna_hash.clone()))).unwrap();
         let conductor_store = holochain_state::conductor::ConductorStore::new_test()
@@ -396,11 +398,13 @@ impl TestCase {
     }
 }
 
-async fn count_rows_in_peer_meta_store(db: &holochain_data::DbWrite<PeerMetaStore>) -> usize {
+async fn count_rows_in_peer_meta_store(
+    db: &holochain_state::peer_metadata_store::PeerMetaStore,
+) -> usize {
     let key = format!("{KEY_PREFIX_ROOT}:{META_KEY_UNRESPONSIVE}");
     let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM peer_meta WHERE meta_key = ?")
         .bind(&key)
-        .fetch_one(db.pool())
+        .fetch_one(db.raw_db_read().pool())
         .await
         .unwrap();
     count as usize

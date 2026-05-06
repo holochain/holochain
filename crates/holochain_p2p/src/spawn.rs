@@ -15,13 +15,13 @@ pub async fn spawn_holochain_p2p(
     actor::HolochainP2pActor::create(config, lair_client).await
 }
 
-/// Callback function to retrieve a peer meta database handle for a dna hash.
+/// Callback function to retrieve a peer meta store for a dna hash.
 pub type GetDbPeerMeta = Arc<
     dyn Fn(
             DnaHash,
         ) -> BoxFut<
             'static,
-            HolochainP2pResult<holochain_data::DbWrite<holochain_data::kind::PeerMetaStore>>,
+            HolochainP2pResult<holochain_state::peer_metadata_store::PeerMetaStore>,
         >
         + 'static
         + Send
@@ -62,13 +62,13 @@ pub enum ReportConfig {
 
 /// HolochainP2p config struct.
 pub struct HolochainP2pConfig {
-    /// Callback function to retrieve a peer meta database handle for a dna hash.
+    /// Callback function to retrieve a [`holochain_state::peer_metadata_store::PeerMetaStore`] for a dna hash.
     ///
     /// **Must be set explicitly** — the [`Default`] value panics when called. Example:
     ///
     /// ```ignore
     /// get_db_peer_meta: Arc::new(move |dna_hash| {
-    ///     let res = spaces.peer_meta(&dna_hash);
+    ///     let res = spaces.peer_meta_store(&dna_hash);
     ///     Box::pin(async move { res.map_err(HolochainP2pError::other) })
     /// }),
     /// ```

@@ -738,7 +738,7 @@ impl HolochainP2pActor {
                         let unresponsive_key =
                             format!("{KEY_PREFIX_ROOT}:{META_KEY_UNRESPONSIVE}");
                         let unresponsive_entries = db
-                            .as_ref()
+                            .as_read()
                             .get_all_by_key(&unresponsive_key)
                             .await
                             .map_err(HolochainP2pError::other)?;

@@ -919,9 +919,9 @@ mod network_impls {
             let mut all_infos = BTreeMap::new();
 
             for dna_hash in space_ids {
-                let db = self.spaces.peer_meta_store_db(&dna_hash)?;
-                let entries = db
-                    .as_ref()
+                let store = self.spaces.peer_meta_store(&dna_hash)?;
+                let entries = store
+                    .as_read()
                     .get_all_by_url(url.as_str())
                     .await
                     .map_err(|e| ConductorApiError::Other(e.into()))?;

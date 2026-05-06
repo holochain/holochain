@@ -17,9 +17,11 @@ async fn space_shutdown() {
     let conductor_store = holochain_state::conductor::ConductorStore::new_test()
         .await
         .unwrap();
-    let peer_meta_db = holochain_data::test_open_db(PeerMetaStore::new(Arc::new(dna_hash.clone())))
-        .await
-        .unwrap();
+    let peer_meta_db = holochain_state::peer_metadata_store::PeerMetaStore::new(
+        holochain_data::test_open_db(PeerMetaStore::new(Arc::new(dna_hash.clone())))
+            .await
+            .unwrap(),
+    );
 
     let keystore = test_keystore();
 

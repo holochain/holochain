@@ -1,7 +1,6 @@
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use holochain_data::kind::PeerMetaStore;
-use holochain_data::DbWrite;
+use holochain_state::peer_metadata_store::PeerMetaStore;
 use kitsune2_api::{BoxFut, K2Error, K2Result, Timestamp, Url};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -34,13 +33,13 @@ impl kitsune2_api::PeerMetaStoreFactory for HolochainPeerMetaStoreFactory {
     ) -> BoxFut<'static, kitsune2_api::K2Result<kitsune2_api::DynPeerMetaStore>> {
         let getter = self.getter.clone();
         Box::pin(async move {
-            let db = getter(holo_hash::DnaHash::from_k2_space(&space))
+            let store = getter(holo_hash::DnaHash::from_k2_space(&space))
                 .await
                 .map_err(|err| {
-                    kitsune2_api::K2Error::other_src("failed to get peer_meta_store db", err)
+                    kitsune2_api::K2Error::other_src("failed to get peer_meta_store", err)
                 })?;
             let peer_meta_store: kitsune2_api::DynPeerMetaStore =
-                Arc::new(HolochainPeerMetaStore::create(db).await.map_err(|err| {
+                Arc::new(HolochainPeerMetaStore::create(store).await.map_err(|err| {
                     K2Error::other_src("failed to connect to peer store database", err)
                 })?);
 
@@ -52,12 +51,12 @@ impl kitsune2_api::PeerMetaStoreFactory for HolochainPeerMetaStoreFactory {
 /// Holochain implementation of a Kitsune2 [kitsune2_api::PeerMetaStore].
 #[derive(Debug)]
 pub struct HolochainPeerMetaStore {
-    db: DbWrite<PeerMetaStore>,
+    db: PeerMetaStore,
 }
 
 impl HolochainPeerMetaStore {
-    /// Create a new [HolochainPeerMetaStore] from a database handle.
-    pub async fn create(db: DbWrite<PeerMetaStore>) -> K2Result<Self> {
+    /// Create a new [HolochainPeerMetaStore] from a [`PeerMetaStore`].
+    pub async fn create(db: PeerMetaStore) -> K2Result<Self> {
         // Prune any expired entries on startup.
         let prune_count = db
             .prune()
@@ -93,7 +92,7 @@ impl kitsune2_api::PeerMetaStore for HolochainPeerMetaStore {
     fn get(&self, peer: Url, key: String) -> BoxFuture<'_, K2Result<Option<Bytes>>> {
         let db = self.db.clone();
         Box::pin(async move {
-            db.as_ref()
+            db.as_read()
                 .get(peer.as_str(), &key)
                 .await
                 .map(|value| value.map(Bytes::from))
@@ -105,7 +104,7 @@ impl kitsune2_api::PeerMetaStore for HolochainPeerMetaStore {
         let db = self.db.clone();
         Box::pin(async move {
             let entries = db
-                .as_ref()
+                .as_read()
                 .get_all_by_key(&key)
                 .await
                 .map_err(|e| K2Error::other_src("Failed to get all values", e))?;

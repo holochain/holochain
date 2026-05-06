@@ -74,8 +74,8 @@ pub struct Space {
     /// There is one per unique Dna.
     pub dht_db: DbWrite<DbKindDht>,
 
-    /// The peer meta store database. One per unique Dna.
-    pub peer_meta_store_db: holochain_data::DbWrite<holochain_data::kind::PeerMetaStore>,
+    /// The peer meta store. One per unique Dna.
+    pub peer_meta_store: holochain_state::peer_metadata_store::PeerMetaStore,
 
     /// Countersigning workspace for session state.
     pub countersigning_workspaces:
@@ -411,12 +411,12 @@ impl Spaces {
         self.get_or_create_space_ref(dna_hash, |space| space.dht_db.clone())
     }
 
-    /// Get the peer_meta_store database.
-    pub fn peer_meta_store_db(
+    /// Get the peer meta store for a DNA space.
+    pub fn peer_meta_store(
         &self,
         dna_hash: &DnaHash,
-    ) -> DatabaseResult<holochain_data::DbWrite<holochain_data::kind::PeerMetaStore>> {
-        self.get_or_create_space_ref(dna_hash, |space| space.peer_meta_store_db.clone())
+    ) -> DatabaseResult<holochain_state::peer_metadata_store::PeerMetaStore> {
+        self.get_or_create_space_ref(dna_hash, |space| space.peer_meta_store.clone())
     }
 
     /// we are receiving a "publish" event from the network.
@@ -487,7 +487,7 @@ impl Space {
             DbSyncStrategy::Resilient => (DbSyncLevel::Normal, holochain_data::DbSyncLevel::Normal),
         };
 
-        let (cache, dht_db, peer_meta_store_db) = tokio::task::block_in_place(|| {
+        let (cache, dht_db, peer_meta_store) = tokio::task::block_in_place(|| {
             let cache = DbWrite::open_with_pool_config(
                 root_db_dir.as_ref(),
                 DbKindCache(dna_hash.clone()),
@@ -517,7 +517,9 @@ impl Space {
                     },
                 ))
                 .map_err(|e| holochain_sqlite::error::DatabaseError::Other(e.into()))?;
-            DatabaseResult::Ok((cache, dht_db, peer_meta_store_db))
+            let peer_meta_store =
+                holochain_state::peer_metadata_store::PeerMetaStore::new(peer_meta_store_db);
+            DatabaseResult::Ok((cache, dht_db, peer_meta_store))
         })?;
 
         let witnessing_workspace = WitnessingWorkspace::default();
@@ -528,7 +530,7 @@ impl Space {
             cache_db: cache,
             authored_dbs: Arc::new(parking_lot::Mutex::new(HashMap::new())),
             dht_db,
-            peer_meta_store_db,
+            peer_meta_store,
             countersigning_workspaces: Default::default(),
             witnessing_workspace,
             incoming_op_hashes,

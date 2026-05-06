@@ -521,10 +521,11 @@ impl TestActor {
     ) -> Self {
         let op_db = DbWrite::test_in_mem(DbKindDht(Arc::new(dna_hash.clone()))).unwrap();
         let cache_db = DbWrite::test_in_mem(DbKindCache(Arc::new(dna_hash.clone()))).unwrap();
-        let peer_meta_db =
+        let peer_meta_db = holochain_state::peer_metadata_store::PeerMetaStore::new(
             holochain_data::test_open_db(PeerMetaStore::new(Arc::new(dna_hash.clone())))
                 .await
-                .unwrap();
+                .unwrap(),
+        );
         let config = HolochainP2pConfig {
             get_conductor_store: Arc::new(move || {
                 let conductor_store = conductor_store.clone();

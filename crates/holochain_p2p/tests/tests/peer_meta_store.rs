@@ -14,7 +14,11 @@ fn test_db_id() -> PeerMetaStore {
 async fn peer_meta_crd() {
     let db = holochain_data::test_open_db(test_db_id()).await.unwrap();
 
-    let store = HolochainPeerMetaStore::create(db).await.unwrap();
+    let store = HolochainPeerMetaStore::create(
+        holochain_state::peer_metadata_store::PeerMetaStore::new(db),
+    )
+    .await
+    .unwrap();
 
     let peer_url = Url::from_str("ws://test:80/1").unwrap();
     let key = "test".to_string();
@@ -44,7 +48,11 @@ async fn peer_meta_crd() {
 #[tokio::test]
 async fn get_all_urls_by_key() {
     let db = holochain_data::test_open_db(test_db_id()).await.unwrap();
-    let store = HolochainPeerMetaStore::create(db).await.unwrap();
+    let store = HolochainPeerMetaStore::create(
+        holochain_state::peer_metadata_store::PeerMetaStore::new(db),
+    )
+    .await
+    .unwrap();
 
     // Insert 2 URLs with a key into the store.
     let key = "key".to_string();
@@ -84,7 +92,11 @@ async fn get_all_urls_by_key() {
 #[tokio::test]
 async fn get_all_unresponsive_urls_by_key() {
     let db = holochain_data::test_open_db(test_db_id()).await.unwrap();
-    let store = HolochainPeerMetaStore::create(db).await.unwrap();
+    let store = HolochainPeerMetaStore::create(
+        holochain_state::peer_metadata_store::PeerMetaStore::new(db),
+    )
+    .await
+    .unwrap();
 
     // Insert 2 unresponsive URLs into store.
     let unresponsive_url_1 = Url::from_str("ws://test:80/1").unwrap();
@@ -134,7 +146,11 @@ async fn prune_on_create() {
     let db = holochain_data::test_open_db(test_db_id()).await.unwrap();
 
     {
-        let store = HolochainPeerMetaStore::create(db.clone()).await.unwrap();
+        let store = HolochainPeerMetaStore::create(
+            holochain_state::peer_metadata_store::PeerMetaStore::new(db.clone()),
+        )
+        .await
+        .unwrap();
 
         let peer_url = Url::from_str("ws://test:80/1").unwrap();
         let key = "test".to_string();
@@ -158,7 +174,11 @@ async fn prune_on_create() {
     }
 
     // Setting up a new store should clear expired values
-    HolochainPeerMetaStore::create(db.clone()).await.unwrap();
+    HolochainPeerMetaStore::create(holochain_state::peer_metadata_store::PeerMetaStore::new(
+        db.clone(),
+    ))
+    .await
+    .unwrap();
 
     let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM peer_meta")
         .fetch_one(db.pool())
@@ -171,7 +191,13 @@ async fn prune_on_create() {
 #[tokio::test]
 async fn set_peer_unresponsive_in_peer_meta_store() {
     let db = holochain_data::test_open_db(test_db_id()).await.unwrap();
-    let store = Arc::new(HolochainPeerMetaStore::create(db.clone()).await.unwrap());
+    let store = Arc::new(
+        HolochainPeerMetaStore::create(holochain_state::peer_metadata_store::PeerMetaStore::new(
+            db.clone(),
+        ))
+        .await
+        .unwrap(),
+    );
     let peer_url = Url::from_str("ws://test:80/1").unwrap();
     let when_peer_set_unresponsive = store.get_unresponsive(peer_url.clone()).await.unwrap();
     assert!(when_peer_set_unresponsive.is_none());
@@ -191,7 +217,13 @@ async fn set_peer_unresponsive_in_peer_meta_store() {
 )]
 async fn unresponsive_peers_are_removed_from_store_after_expiry() {
     let db = holochain_data::test_open_db(test_db_id()).await.unwrap();
-    let store = Arc::new(HolochainPeerMetaStore::create(db.clone()).await.unwrap());
+    let store = Arc::new(
+        HolochainPeerMetaStore::create(holochain_state::peer_metadata_store::PeerMetaStore::new(
+            db.clone(),
+        ))
+        .await
+        .unwrap(),
+    );
 
     let peer_url = Url::from_str("ws://test:80/1").unwrap();
     // Expiry time needs to be more than 1 second in the future as we might be on the boundary of
@@ -213,7 +245,13 @@ async fn unresponsive_peers_are_removed_from_store_after_expiry() {
 
     // Manually trigger pruning by recreating the store (which prunes on startup).
     drop(store);
-    let store = Arc::new(HolochainPeerMetaStore::create(db.clone()).await.unwrap());
+    let store = Arc::new(
+        HolochainPeerMetaStore::create(holochain_state::peer_metadata_store::PeerMetaStore::new(
+            db.clone(),
+        ))
+        .await
+        .unwrap(),
+    );
 
     let when_peer_set_unresponsive = store.get_unresponsive(peer_url).await.unwrap();
     assert!(when_peer_set_unresponsive.is_none());
