@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Remove the custom `ConductorStoreError` and `ConductorStoreResult` from `holochain_state`, use the `StateQueryError` and `StateQueryResult` instead.
 - Switch from `serde_yaml` to `yaml_serde`, to stay with the actively supported fork of the now deprecated library.
 
 ## 0.7.0-dev.23
