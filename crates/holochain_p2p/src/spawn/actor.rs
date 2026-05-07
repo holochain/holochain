@@ -1043,6 +1043,15 @@ impl HolochainP2pActor {
             config.set_module_config(&core_bootstrap_config)?;
             override_needed = true;
         }
+        #[cfg(feature = "transport-iroh")]
+        if let Some(relay_url) = space_overrides.relay_url.as_ref() {
+            // get current iroh transport config and override relay_url
+            let mut iroh_transport_config: kitsune2_transport_iroh::IrohTransportModConfig =
+                config.get_module_config().unwrap_or_default();
+            iroh_transport_config.iroh_transport.relay_url = Some(relay_url.clone());
+            config.set_module_config(&iroh_transport_config)?;
+            override_needed = true;
+        }
         #[cfg(feature = "transport-tx5-backend-go-pion")]
         if let Some(signal_url) = space_overrides.signal_url.as_ref() {
             // get current tx5 transport config and override server_url
