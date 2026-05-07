@@ -116,7 +116,7 @@ fn should_get_override_config_with_bootstrap_url() {
 }
 
 #[test]
-fn should_get_override_config_with_bootstrap_url_and_signal_url() {
+fn should_get_override_config_with_bootstrap_url_and_relay_url() {
     let manifest = AppManifest::V0(AppManifestV0 {
         allow_deferred_memproofs: false,
         description: None,
