@@ -2711,6 +2711,41 @@ mod tests {
         );
     }
 
+    #[tokio::test(flavor = "multi_thread")]
+    #[cfg(feature = "transport-iroh")]
+    async fn should_get_overrides_for_space_with_iroh_relay_url() {
+        let actor = test_p2p_actor_iroh().await;
+        let actor_p2p: Arc<HolochainP2pActor> =
+            Arc::downcast(actor).expect("failed to downcast actor");
+
+        let space_overrides = CellConfigOverrides {
+            bootstrap_url: Some("http://override:1234".to_string()),
+            relay_url: Some("wss://override:5678".to_string()),
+        };
+        let overrides = actor_p2p
+            .space_config_override(space_overrides)
+            .expect("failed to get overrides")
+            .expect("overrides should be some");
+
+        let bootstrap_config: kitsune2_core::factories::CoreBootstrapModConfig = overrides
+            .get_module_config()
+            .expect("failed to get bootstrap config");
+        assert_eq!(
+            bootstrap_config.core_bootstrap.server_url,
+            Some("http://override:1234".to_string()),
+            "bootstrap_url should match"
+        );
+
+        let iroh_transport_config: kitsune2_transport_iroh::IrohTransportModConfig = overrides
+            .get_module_config()
+            .expect("failed to get iroh transport config");
+        assert_eq!(
+            iroh_transport_config.iroh_transport.relay_url,
+            Some("wss://override:5678".to_string()),
+            "relay_url should match"
+        );
+    }
+
     #[cfg(feature = "kitsune2_transport_tx5")]
     async fn test_p2p_actor() -> Arc<dyn HcP2p> {
         use kitsune2_core::factories::{CoreBootstrapConfig, CoreBootstrapModConfig};
@@ -2736,6 +2771,36 @@ mod tests {
             .expect("failed to set config");
         kitsune_config
             .set_module_config(&tx_config)
+            .expect("failed to set config");
+
+        let kitsune_config_json =
+            serde_json::to_value(&kitsune_config).expect("failed to serialize kitsune config");
+
+        let config = HolochainP2pConfig {
+            network_config: Some(kitsune_config_json),
+            ..Default::default()
+        };
+
+        HolochainP2pActor::create(config, holochain_keystore::test_keystore())
+            .await
+            .expect("failed to create actor")
+    }
+
+    #[cfg(feature = "transport-iroh")]
+    async fn test_p2p_actor_iroh() -> Arc<dyn HcP2p> {
+        use kitsune2_core::factories::{CoreBootstrapConfig, CoreBootstrapModConfig};
+
+        let bootstrap = CoreBootstrapModConfig {
+            core_bootstrap: CoreBootstrapConfig {
+                server_url: None,
+                auth_material_base64: None,
+                backoff_max_ms: 5_000,
+                backoff_min_ms: 100,
+            },
+        };
+        let kitsune_config = Config::default();
+        kitsune_config
+            .set_module_config(&bootstrap)
             .expect("failed to set config");
 
         let kitsune_config_json =
