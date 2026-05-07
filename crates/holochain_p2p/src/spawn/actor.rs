@@ -2686,7 +2686,7 @@ mod tests {
         // should not override if default
         let space_overrides = CellConfigOverrides {
             bootstrap_url: Some("http://override:1234".to_string()),
-            signal_url: Some("wss://override:5678".to_string()),
+            relay_url: Some("wss://override:5678".to_string()),
         };
         let overrides = actor_p2p
             .space_config_override(space_overrides)

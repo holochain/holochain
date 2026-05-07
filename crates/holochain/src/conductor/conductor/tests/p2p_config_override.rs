@@ -37,7 +37,7 @@ async fn should_override_space_config() {
         name: "dummy".to_string(),
         roles: vec![],
         bootstrap_url: Some(bootstrap_server_url.clone()),
-        signal_url: None,
+        relay_url: None,
     });
 
     conductor
@@ -90,7 +90,7 @@ fn should_not_get_override_configuration_if_no_urls() {
         name: "dummy".to_string(),
         roles: vec![],
         bootstrap_url: None,
-        signal_url: None,
+        relay_url: None,
     });
     let config = Conductor::p2p_config_overrides(&manifest);
 
@@ -105,7 +105,7 @@ fn should_get_override_config_with_bootstrap_url() {
         name: "dummy".to_string(),
         roles: vec![],
         bootstrap_url: Some("http://localhost:1234".to_string()),
-        signal_url: None,
+        relay_url: None,
     });
     let config = Conductor::p2p_config_overrides(&manifest).expect("no config override returned");
 
@@ -123,7 +123,7 @@ fn should_get_override_config_with_bootstrap_url_and_signal_url() {
         name: "dummy".to_string(),
         roles: vec![],
         bootstrap_url: Some("http://localhost:1234".to_string()),
-        signal_url: Some("http://localhost:5678".to_string()),
+        relay_url: Some("http://localhost:5678".to_string()),
     });
     let config = Conductor::p2p_config_overrides(&manifest).expect("no config override returned");
 
@@ -131,5 +131,5 @@ fn should_get_override_config_with_bootstrap_url_and_signal_url() {
         config.bootstrap_url.as_deref(),
         Some("http://localhost:1234")
     );
-    assert_eq!(config.signal_url.as_deref(), Some("http://localhost:5678"));
+    assert_eq!(config.relay_url.as_deref(), Some("http://localhost:5678"));
 }

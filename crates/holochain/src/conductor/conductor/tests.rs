@@ -75,7 +75,7 @@ async fn app_ids_are_unique() {
             name: "".to_string(),
             roles: vec![],
             bootstrap_url: None,
-            signal_url: None,
+            relay_url: None,
         }),
         Timestamp::now(),
     )
@@ -116,7 +116,7 @@ async fn role_names_must_be_unique() {
             roles: vec![],
             allow_deferred_memproofs: false,
             bootstrap_url: None,
-            signal_url: None,
+            relay_url: None,
         }),
         Timestamp::now(),
     );
@@ -146,7 +146,7 @@ async fn role_names_must_be_unique() {
             roles: vec![],
             allow_deferred_memproofs: false,
             bootstrap_url: None,
-            signal_url: None,
+            relay_url: None,
         }),
         Timestamp::now(),
     );

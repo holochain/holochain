@@ -37,7 +37,7 @@ async fn should_not_allow_installing_apps_with_same_dna_but_different_overrides(
         name: "dummy".to_string(),
         roles: vec![],
         bootstrap_url: Some(bootstrap_server_url.clone()),
-        signal_url: None,
+        relay_url: None,
     });
 
     conductor
@@ -64,7 +64,7 @@ async fn should_not_allow_installing_apps_with_same_dna_but_different_overrides(
         name: "dummy".to_string(),
         roles: vec![],
         bootstrap_url: Some(bootstrap_server_url.clone()),
-        signal_url: Some("wss://different:5678".to_string()), // different signal url
+        relay_url: Some("wss://different:5678".to_string()), // different signal url
     });
 
     conductor
@@ -113,7 +113,7 @@ async fn should_install_apps_with_same_dna_and_same_overrides() {
         name: "dummy".to_string(),
         roles: vec![],
         bootstrap_url: Some(bootstrap_server_url.clone()),
-        signal_url: None,
+        relay_url: None,
     });
 
     conductor
@@ -140,7 +140,7 @@ async fn should_install_apps_with_same_dna_and_same_overrides() {
         name: "dummy".to_string(),
         roles: vec![],
         bootstrap_url: Some(bootstrap_server_url.clone()),
-        signal_url: None,
+        relay_url: None,
     });
 
     conductor

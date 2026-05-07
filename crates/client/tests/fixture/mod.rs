@@ -72,7 +72,7 @@ fn make_fixture_app_bundle() -> Bytes {
             },
         }],
         bootstrap_url: None,
-        signal_url: None,
+        relay_url: None,
     });
 
     let app = AppBundle::new(app_manifest, vec![("test.dna".to_string(), dna_bundle)]).unwrap();
