@@ -26,7 +26,6 @@ use holochain_state::prelude::SourceChainResult;
 use holochain_state::prelude::StateQueryResult;
 use holochain_state::source_chain;
 use holochain_types::prelude::*;
-use holochain_types::test_utils::fake_dna_file;
 use holochain_types::test_utils::fake_dna_zomes;
 use holochain_wasm_test_utils::TestWasm;
 pub use itertools;
@@ -515,25 +514,34 @@ pub fn fake_valid_dna_file(network_seed: &str) -> DnaFile {
 }
 
 /// Run genesis on the source chain for testing.
+///
+/// `dna_hash` must match the DNA the caller's `dht_db` was opened for; the
+/// helper reuses it for the genesis `Action::Dna` and for the new-DB
+/// `DhtStore` so the legacy and mirrored writes land in the same DNA space.
 pub async fn fake_genesis(
     vault: DbWrite<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
+    dna_hash: DnaHash,
     keystore: MetaLairClient,
 ) -> SourceChainResult<()> {
-    fake_genesis_for_agent(vault, dht_db, fake_agent_pubkey_1(), keystore).await
+    fake_genesis_for_agent(vault, dht_db, dna_hash, fake_agent_pubkey_1(), keystore).await
 }
 
 /// Run genesis on the source chain for a specific agent for testing.
+///
+/// `dna_hash` must match the DNA the caller's `dht_db` was opened for; the
+/// helper reuses it for the genesis `Action::Dna` and for the new-DB
+/// `DhtStore` so the legacy and mirrored writes land in the same DNA space.
 pub async fn fake_genesis_for_agent(
     vault: DbWrite<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
+    dna_hash: DnaHash,
     agent: AgentPubKey,
     keystore: MetaLairClient,
 ) -> SourceChainResult<()> {
-    let dna = fake_dna_file("cool dna");
-    let dna_hash = dna.dna_hash().clone();
+    let dht_store = holochain_state::test_utils::test_dht_store(dna_hash.clone()).await;
 
-    source_chain::genesis(vault, dht_db.clone(), keystore, dna_hash, agent, None).await
+    source_chain::genesis(vault, dht_db, dht_store, keystore, dna_hash, agent, None).await
 }
 
 /// Force all dht ops without enough validation receipts to be published.

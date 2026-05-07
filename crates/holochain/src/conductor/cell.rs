@@ -124,9 +124,13 @@ impl Cell {
         // check if genesis has been run
         let has_genesis = {
             // check if genesis ran.
-            GenesisWorkspace::new(authored_db.clone(), space.dht_db.clone())
-                .has_genesis(id.agent_pubkey().clone())
-                .await?
+            GenesisWorkspace::new(
+                authored_db.clone(),
+                space.dht_db.clone(),
+                space.dht_store.clone(),
+            )
+            .has_genesis(id.agent_pubkey().clone())
+            .await?
         };
 
         if has_genesis {
@@ -167,6 +171,7 @@ impl Cell {
         conductor_handle: ConductorHandle,
         authored_db: DbWrite<DbKindAuthored>,
         dht_db: DbWrite<DbKindDht>,
+        dht_store: holochain_state::dht_store::DhtStore,
         ribosome: Ribosome,
         membrane_proof: Option<MembraneProof>,
     ) -> CellResult<()>
@@ -176,7 +181,7 @@ impl Cell {
         let conductor_api = CellConductorApi::new(conductor_handle.clone(), cell_id.clone());
 
         // run genesis
-        let workspace = GenesisWorkspace::new(authored_db, dht_db);
+        let workspace = GenesisWorkspace::new(authored_db, dht_db, dht_store);
 
         // exit early if genesis has already run
         if workspace
@@ -260,6 +265,21 @@ impl Cell {
                 error!("error calling scheduled fn: {:?}", e);
             }
             Ok(live_fns) => {
+                let author_for_new_db = self.id.agent_pubkey().clone();
+                if let Err(e) = self
+                    .space
+                    .dht_store
+                    .delete_live_ephemeral_scheduled_functions(&author_for_new_db, now)
+                    .await
+                {
+                    error!("error deleting live ephemeral scheduled functions: {:?}", e);
+                }
+
+                self.space
+                    .dht_store
+                    .reschedule_expired_persisted(&author_for_new_db, now)
+                    .await;
+
                 let mut tasks = vec![];
                 let mut dispatched: Vec<(ScheduledFn, bool)> = Vec::with_capacity(live_fns.len());
                 for (scheduled_fn, schedule, ephemeral) in &live_fns {
@@ -303,6 +323,43 @@ impl Cell {
                 }
                 let results: Vec<CellResult<ZomeCallResult>> =
                     futures::future::join_all(tasks).await;
+
+                // Pre-compute what each dispatched function should do in the new DHT DB,
+                // mirroring the decisions the legacy `write_async` block will make below.
+                // `None`         => skip (ephemeral fn, no persistent state to update)
+                // `Some(None)`   => delete (unschedule the persisted fn)
+                // `Some(Some(s))`=> insert/upsert with schedule `s`
+                let new_db_decisions: Vec<(ScheduledFn, Option<Option<Schedule>>)> = dispatched
+                    .iter()
+                    .zip(results.iter())
+                    .map(|((scheduled_fn, ephemeral), result)| {
+                        let action = match result {
+                            Ok(Ok(ZomeCallResponse::Ok(extern_io))) => {
+                                match extern_io.decode::<Option<Schedule>>() {
+                                    Ok(Some(s)) => Some(Some(s)),
+                                    // Persisted fn returned None or failed to decode →
+                                    // legacy will unschedule it.
+                                    Ok(None) | Err(_) => {
+                                        if *ephemeral {
+                                            None
+                                        } else {
+                                            Some(None)
+                                        }
+                                    }
+                                }
+                            }
+                            // Any error in the zome call → legacy unschedules persisted fns.
+                            _ => {
+                                if *ephemeral {
+                                    None
+                                } else {
+                                    Some(None)
+                                }
+                            }
+                        };
+                        (scheduled_fn.clone(), action)
+                    })
+                    .collect();
 
                 let author = self.id.agent_pubkey().clone();
                 // In case of an error, a persisted fn needs to be unscheduled.
@@ -353,6 +410,45 @@ impl Cell {
                         Result::<(), DatabaseError>::Ok(())
                     })
                     .await;
+
+                // Mirror the legacy unschedule/reschedule decisions in the new DHT DB.
+                for (scheduled_fn, action) in new_db_decisions {
+                    match action {
+                        // Ephemeral fn: no persistent state to update.
+                        None => {}
+                        // Persisted fn with no next schedule or a failed zome call: remove it.
+                        Some(None) => {
+                            if let Err(e) = self
+                                .space
+                                .dht_store
+                                .unschedule_function(&author_for_new_db, &scheduled_fn)
+                                .await
+                            {
+                                error!("error unscheduling function {:?}: {:?}", scheduled_fn, e);
+                            }
+                        }
+                        // Persisted fn with a new schedule: upsert.
+                        Some(Some(next_schedule)) => {
+                            let maybe_schedule = Some(next_schedule);
+                            if let Err(e) = self
+                                .space
+                                .dht_store
+                                .upsert_scheduled_function(
+                                    &author_for_new_db,
+                                    &scheduled_fn,
+                                    &maybe_schedule,
+                                    now,
+                                )
+                                .await
+                            {
+                                error!(
+                                    "error upserting scheduled function {:?}: {:?}",
+                                    scheduled_fn, e
+                                );
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -574,6 +670,7 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
                 );
 
                 let receipt_op_hash = receipt.receipt.dht_op_hash.clone();
+                let receipt_op_hash_for_new_db = receipt_op_hash.clone();
 
                 let receipt_count = self
                     .space
@@ -621,6 +718,13 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
                             set_receipts_complete(txn, &receipt_op_hash, true)
                         })
                         .await?;
+
+                    // Mirror: set receipts_complete in the new DHT DB.
+                    self.space
+                        .dht_store
+                        .mark_chain_op_receipts_complete(&receipt_op_hash_for_new_db)
+                        .await
+                        .map_err(|e| CellError::from(HolochainP2pError::other(e)))?;
                 }
             }
 
@@ -744,6 +848,7 @@ impl Cell {
                 SourceChainWorkspace::new(
                     self.get_or_create_authored_db()?,
                     self.dht_db().clone(),
+                    self.space.dht_store.clone(),
                     self.cache().clone(),
                     keystore.clone(),
                     self.id.agent_pubkey().clone(),
@@ -794,6 +899,7 @@ impl Cell {
         let workspace = SourceChainWorkspace::init_as_root(
             self.get_or_create_authored_db()?,
             self.dht_db().clone(),
+            self.space.dht_store.clone(),
             self.cache().clone(),
             keystore.clone(),
             id.agent_pubkey().clone(),

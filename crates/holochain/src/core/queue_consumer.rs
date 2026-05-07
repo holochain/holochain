@@ -135,6 +135,7 @@ pub async fn spawn_queue_consumer_tasks(
             AppValidationWorkspace::new(
                 authored_db.clone(),
                 dht_db.clone(),
+                space.dht_store.clone(),
                 cache.clone(),
                 keystore.clone(),
             ),

@@ -152,9 +152,11 @@ mod tests {
     use std::sync::Arc;
 
     async fn get_chain(cell: &SweetCell, keystore: MetaLairClient) -> SourceChain {
+        let dht_store = holochain_state::test_utils::test_dht_store(cell.dna_hash().clone()).await;
         SourceChain::new(
             cell.authored_db().clone(),
             cell.dht_db().clone(),
+            dht_store,
             keystore,
             cell.agent_pubkey().clone(),
         )
@@ -171,18 +173,25 @@ mod tests {
         let db = test_db.to_db();
         let author = fake_agent_pubkey_1();
 
-        // Genesis
-        fake_genesis(db.clone(), test_dht.to_db(), keystore.clone())
-            .await
-            .unwrap();
-
         let dna_def = DnaDefFixturator::new(Unpredictable).next().unwrap();
         let dna_def_hashed = DnaDefHashed::from_content_sync(dna_def.clone());
         let dna_hash = dna_def_hashed.hash.clone();
 
+        // Genesis
+        fake_genesis(
+            db.clone(),
+            test_dht.to_db(),
+            dna_hash.clone(),
+            keystore.clone(),
+        )
+        .await
+        .unwrap();
+
+        let dht_store = holochain_state::test_utils::test_dht_store(dna_hash.clone()).await;
         let workspace = SourceChainWorkspace::new(
             db.clone(),
             test_dht.to_db(),
+            dht_store,
             test_cache.to_db(),
             keystore,
             author.clone(),

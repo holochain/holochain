@@ -371,6 +371,7 @@ async fn validation_callback_rejects_op_depending_on_invalid_op() {
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
+        test_space.space.dht_store.clone(),
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
@@ -456,6 +457,7 @@ impl TestCase {
                 .unwrap()
                 .into(),
             test_space.space.dht_db.clone().into(),
+            test_space.space.dht_store.clone(),
             test_space.space.cache_db.clone(),
             fixt!(MetaLairClient),
             None,

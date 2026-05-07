@@ -85,6 +85,7 @@ async fn main_workflow() {
             .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
             .unwrap(),
         conductor.get_dht_db(&dna_hash).unwrap(),
+        conductor.get_dht_store(&dna_hash).unwrap(),
         conductor.get_cache_db(&cell_id).await.unwrap(),
         conductor.keystore(),
     ));
@@ -300,6 +301,7 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
             .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
             .unwrap(),
         conductor.get_dht_db(&dna_hash).unwrap(),
+        conductor.get_dht_store(&dna_hash).unwrap(),
         conductor.get_cache_db(&cell_id).await.unwrap(),
         conductor.keystore(),
     ));
@@ -420,6 +422,7 @@ async fn validate_ops_in_sequence_must_get_action() {
             .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
             .unwrap(),
         conductor.get_dht_db(&dna_hash).unwrap(),
+        conductor.get_dht_store(&dna_hash).unwrap(),
         conductor.get_cache_db(&cell_id).await.unwrap(),
         conductor.keystore(),
     ));
@@ -592,6 +595,7 @@ async fn handle_error_in_op_validation() {
             .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
             .unwrap(),
         conductor.get_dht_db(&dna_hash).unwrap(),
+        conductor.get_dht_store(&dna_hash).unwrap(),
         conductor.get_cache_db(&cell_id).await.unwrap(),
         conductor.keystore(),
     ));
@@ -980,6 +984,7 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
             .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
             .unwrap(),
         conductor.get_dht_db(&dna_hash).unwrap(),
+        conductor.get_dht_store(&dna_hash).unwrap(),
         conductor.get_cache_db(&cell_id).await.unwrap(),
         conductor.keystore(),
     ));
