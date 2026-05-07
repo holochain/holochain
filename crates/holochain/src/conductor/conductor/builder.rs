@@ -231,7 +231,7 @@ impl ConductorBuilder {
                 })
                 .transpose()?,
             get_db_peer_meta: Arc::new(move |dna_hash| {
-                let res = net_spaces1.peer_meta_store_db(&dna_hash);
+                let res = net_spaces1.peer_meta_store(&dna_hash);
                 Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
             }),
             get_db_op_store: Arc::new(move |dna_hash| {
@@ -462,7 +462,7 @@ impl ConductorBuilder {
                 })
                 .transpose()?,
             get_db_peer_meta: Arc::new(move |dna_hash| {
-                let res = net_spaces1.peer_meta_store_db(&dna_hash);
+                let res = net_spaces1.peer_meta_store(&dna_hash);
                 Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
             }),
             get_db_op_store: Arc::new(move |dna_hash| {
