@@ -2547,6 +2547,7 @@ mod tests {
                 server_url: None,
                 backoff_max_ms: 5_000,
                 backoff_min_ms: 100,
+                auth_material_base64: None,
             },
         };
         let tx_config = kitsune2_transport_tx5::Tx5TransportModConfig {
