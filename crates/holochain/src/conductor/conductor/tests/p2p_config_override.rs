@@ -91,11 +91,8 @@ async fn should_override_space_config_with_relay_url() {
     .await;
 
     let rendezvous = SweetLocalRendezvous::new().await;
-    let mut conductor = SweetConductor::from_config_rendezvous(
-        ConductorConfig::default(),
-        rendezvous,
-    )
-    .await;
+    let mut conductor =
+        SweetConductor::from_config_rendezvous(ConductorConfig::default(), rendezvous).await;
 
     let role_name = "role".to_string();
     let override_relay_url = "wss://override-relay.test:5678".to_string();
