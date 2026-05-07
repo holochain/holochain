@@ -70,6 +70,16 @@ pub fn test_peer_meta_store_db(dna_hash: DnaHash) -> TestDb<DbKindPeerMetaStore>
     test_db(DbKindPeerMetaStore(Arc::new(dna_hash)))
 }
 
+/// Create an in-memory [`crate::dht_store::DhtStore`] for use in tests.
+///
+/// The underlying database is ephemeral and will be lost when the store is dropped.
+pub async fn test_dht_store(dna_hash: DnaHash) -> crate::dht_store::DhtStore {
+    let db = holochain_data::test_open_db(holochain_data::kind::Dht::new(Arc::new(dna_hash)))
+        .await
+        .expect("Failed to open test DHT database");
+    crate::dht_store::DhtStore::new(db)
+}
+
 fn test_db<Kind: DbKindT>(kind: Kind) -> TestDb<Kind> {
     let tmpdir = tempfile::Builder::new()
         .prefix("holochain-test-environments-")

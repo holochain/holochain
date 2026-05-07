@@ -39,12 +39,13 @@ impl SourceChainWorkspace {
     pub async fn new(
         authored: DbWrite<DbKindAuthored>,
         dht: DbWrite<DbKindDht>,
+        dht_store: DhtStore,
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         author: AgentPubKey,
     ) -> SourceChainResult<Self> {
         let source_chain =
-            SourceChain::new(authored.clone(), dht.clone(), keystore, author).await?;
+            SourceChain::new(authored.clone(), dht.clone(), dht_store, keystore, author).await?;
         Self::new_inner(authored, dht, cache, source_chain, false)
     }
 
@@ -52,12 +53,13 @@ impl SourceChainWorkspace {
     pub async fn init_as_root(
         authored: DbWrite<DbKindAuthored>,
         dht: DbWrite<DbKindDht>,
+        dht_store: DhtStore,
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         author: AgentPubKey,
     ) -> SourceChainResult<Self> {
         let source_chain =
-            SourceChain::new(authored.clone(), dht.clone(), keystore, author).await?;
+            SourceChain::new(authored.clone(), dht.clone(), dht_store, keystore, author).await?;
         Self::new_inner(authored, dht, cache, source_chain, true)
     }
 
@@ -68,12 +70,14 @@ impl SourceChainWorkspace {
     pub async fn raw_empty(
         authored: DbWrite<DbKindAuthored>,
         dht: DbWrite<DbKindDht>,
+        dht_store: DhtStore,
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         author: AgentPubKey,
     ) -> SourceChainResult<Self> {
         let source_chain =
-            SourceChain::raw_empty(authored.clone(), dht.clone(), keystore, author).await?;
+            SourceChain::raw_empty(authored.clone(), dht.clone(), dht_store, keystore, author)
+                .await?;
         Self::new_inner(authored, dht, cache, source_chain, false)
     }
 
@@ -111,14 +115,16 @@ where
     pub async fn new(
         authored: SourceChainDb,
         dht: SourceChainDht,
+        dht_store: DhtStore,
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         author: Option<AgentPubKey>,
     ) -> SourceChainResult<Self> {
         let source_chain = match author {
-            Some(author) => {
-                Some(SourceChain::new(authored.clone(), dht.clone(), keystore, author).await?)
-            }
+            Some(author) => Some(
+                SourceChain::new(authored.clone(), dht.clone(), dht_store, keystore, author)
+                    .await?,
+            ),
             None => None,
         };
         Ok(Self {

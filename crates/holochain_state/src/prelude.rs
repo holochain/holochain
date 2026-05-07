@@ -1,3 +1,4 @@
+pub use crate::dht_store::*;
 pub use crate::mutations::*;
 pub use crate::query::prelude::*;
 pub use crate::scratch::*;
