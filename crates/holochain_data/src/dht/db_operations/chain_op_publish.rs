@@ -22,6 +22,11 @@ impl DbWrite<Dht> {
         )
         .await
     }
+
+    /// Mark receipts as complete for the given op. Returns the number of rows updated.
+    pub async fn set_chain_op_receipts_complete(&self, op_hash: &DhtOpHash) -> sqlx::Result<u64> {
+        chain_op_publish::set_receipts_complete(self.pool(), op_hash).await
+    }
 }
 
 impl DbRead<Dht> {

@@ -41,3 +41,19 @@ where
     .fetch_optional(executor)
     .await
 }
+
+/// Mark receipts as complete for the given op. Receipts can never transition
+/// back to incomplete, so no flag is needed.
+pub(crate) async fn set_receipts_complete<'e, E>(
+    executor: E,
+    op_hash: &DhtOpHash,
+) -> sqlx::Result<u64>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let result = sqlx::query("UPDATE ChainOpPublish SET receipts_complete = 1 WHERE op_hash = ?")
+        .bind(op_hash.get_raw_36())
+        .execute(executor)
+        .await?;
+    Ok(result.rows_affected())
+}

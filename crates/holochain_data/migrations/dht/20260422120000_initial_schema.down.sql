@@ -1,3 +1,4 @@
+DROP TABLE IF EXISTS ScheduledFunction;
 DROP TABLE IF EXISTS DeletedRecord;
 DROP TABLE IF EXISTS UpdatedRecord;
 DROP TABLE IF EXISTS DeletedLink;

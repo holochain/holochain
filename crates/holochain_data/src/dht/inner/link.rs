@@ -4,29 +4,40 @@ use crate::models::dht::LinkRow;
 use holo_hash::{ActionHash, AnyLinkableHash};
 use sqlx::{Executor, Sqlite};
 
-pub(crate) async fn insert_link_index<'e, E>(
+/// Parameters for inserting a row into the `Link` index table.
+pub struct InsertLink<'a> {
+    /// Hash of the CreateLink action (primary key).
+    pub action_hash: &'a ActionHash,
+    /// DHT basis hash for this link.
+    pub base_hash: &'a AnyLinkableHash,
+    /// Zome index discriminant.
+    pub zome_index: u8,
+    /// Link type discriminant.
+    pub link_type: u8,
+    /// Optional tag bytes.
+    pub tag: Option<&'a [u8]>,
+}
+
+/// Insert a row into the `Link` index table. Returns the number of rows inserted.
+pub(crate) async fn insert_link_index<'a, 'e, E>(
     executor: E,
-    action_hash: &ActionHash,
-    base_hash: &AnyLinkableHash,
-    zome_index: u8,
-    link_type: u8,
-    tag: Option<&[u8]>,
-) -> sqlx::Result<()>
+    link: InsertLink<'a>,
+) -> sqlx::Result<u64>
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    sqlx::query(
+    let result = sqlx::query(
         "INSERT INTO Link (action_hash, base_hash, zome_index, link_type, tag)
          VALUES (?, ?, ?, ?, ?)",
     )
-    .bind(action_hash.get_raw_36())
-    .bind(base_hash.get_raw_36())
-    .bind(zome_index as i64)
-    .bind(link_type as i64)
-    .bind(tag)
+    .bind(link.action_hash.get_raw_36())
+    .bind(link.base_hash.get_raw_36())
+    .bind(link.zome_index as i64)
+    .bind(link.link_type as i64)
+    .bind(link.tag)
     .execute(executor)
     .await?;
-    Ok(())
+    Ok(result.rows_affected())
 }
 
 pub(crate) async fn get_links_by_base<'e, E>(
