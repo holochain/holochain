@@ -82,6 +82,64 @@ async fn should_override_space_config() {
     );
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn should_override_space_config_with_relay_url() {
+    holochain_trace::test_run();
+    let (dna, _, _) = crate::conductor::conductor::tests::mk_dna(
+        crate::test_utils::inline_zomes::simple_crud_zome(),
+    )
+    .await;
+
+    let rendezvous = SweetLocalRendezvous::new().await;
+    let mut conductor = SweetConductor::from_config_rendezvous(
+        ConductorConfig::default(),
+        rendezvous,
+    )
+    .await;
+
+    let role_name = "role".to_string();
+    let override_relay_url = "wss://override-relay.test:5678".to_string();
+
+    let app_id = "app_id".to_string();
+    let manifest = AppManifest::V0(AppManifestV0 {
+        allow_deferred_memproofs: false,
+        description: None,
+        name: "dummy".to_string(),
+        roles: vec![],
+        bootstrap_url: None,
+        relay_url: Some(override_relay_url.clone()),
+    });
+
+    conductor
+        .install_app_with_manifest(&app_id, None, [&(role_name.clone(), dna)], None, manifest)
+        .await
+        .expect("failed to install app");
+
+    conductor
+        .enable_app(app_id.clone())
+        .await
+        .expect("failed to enable app");
+
+    let cell_id = conductor
+        .running_cell_ids()
+        .iter()
+        .next()
+        .cloned()
+        .expect("should have cell");
+    let cell = conductor
+        .cell_by_id(&cell_id)
+        .await
+        .expect("should get cell");
+    assert_eq!(
+        cell.overrides()
+            .relay_url
+            .as_deref()
+            .expect("should have relay url override"),
+        override_relay_url.as_str(),
+        "cell relay url should be overridden by app manifest"
+    );
+}
+
 #[test]
 fn should_not_get_override_configuration_if_no_urls() {
     let manifest = AppManifest::V0(AppManifestV0 {
