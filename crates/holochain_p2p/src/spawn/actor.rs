@@ -1053,11 +1053,11 @@ impl HolochainP2pActor {
             override_needed = true;
         }
         #[cfg(feature = "transport-tx5-backend-go-pion")]
-        if let Some(signal_url) = space_overrides.signal_url.as_ref() {
+        if let Some(relay_url) = space_overrides.relay_url.as_ref() {
             // get current tx5 transport config and override server_url
             let mut tx5_transport_config: kitsune2_transport_tx5::Tx5TransportModConfig =
                 config.get_module_config().unwrap_or_default();
-            tx5_transport_config.tx5_transport.server_url = signal_url.clone();
+            tx5_transport_config.tx5_transport.server_url = relay_url.clone();
             config.set_module_config(&tx5_transport_config)?;
             override_needed = true;
         }
@@ -2716,7 +2716,7 @@ mod tests {
             .expect("failed to get tx5 transport config");
         assert_eq!(
             tx5_transport_config.tx5_transport.server_url, "wss://override:5678",
-            "signal_url should match"
+            "relay_url should match"
         );
     }
 
@@ -2763,6 +2763,7 @@ mod tests {
         let bootstrap = CoreBootstrapModConfig {
             core_bootstrap: CoreBootstrapConfig {
                 server_url: None,
+                auth_material_base64: None,
                 backoff_max_ms: 5_000,
                 backoff_min_ms: 100,
             },
