@@ -188,7 +188,8 @@ async fn warrant_is_published() {
             .await
             .unwrap()
             .transport_stats
-            .peer_urls[0]
+            .peer_urls
+            .first()
     );
     println!(
         "1 bob   {} url {:?}",
@@ -198,7 +199,8 @@ async fn warrant_is_published() {
             .await
             .unwrap()
             .transport_stats
-            .peer_urls[0]
+            .peer_urls
+            .first()
     );
     println!(
         "2 carol {} url {:?}",
@@ -208,7 +210,8 @@ async fn warrant_is_published() {
             .await
             .unwrap()
             .transport_stats
-            .peer_urls[0]
+            .peer_urls
+            .first()
     );
 
     await_consistency([&alice, &bob, &carol]).await.unwrap();

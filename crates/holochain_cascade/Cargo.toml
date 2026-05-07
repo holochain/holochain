@@ -30,7 +30,7 @@ thiserror = "2.0"
 tracing = "0.1"
 opentelemetry = "0.31"
 
-kitsune2_api = "0.4.0-dev.10"
+kitsune2_api = "0.4.1"
 
 async-trait = "0.1"
 mockall = { version = "0.13", optional = true }
