@@ -26,7 +26,7 @@ pub struct InsertScheduledFunction<'a> {
 /// Upsert a scheduled-function row, updating existing fields when the
 /// `(author, zome_name, scheduled_fn)` primary key already exists.
 /// Returns the number of rows written (1 on insert or update, 0 on no-op).
-pub(crate) async fn insert_scheduled_function<'a, 'e, E>(
+pub(crate) async fn upsert_scheduled_function<'a, 'e, E>(
     executor: E,
     f: InsertScheduledFunction<'a>,
 ) -> sqlx::Result<u64>
@@ -55,7 +55,8 @@ where
     Ok(result.rows_affected())
 }
 
-/// Delete the scheduled-function row for the given `(author, zome_name, scheduled_fn)` triple.
+/// Delete the scheduled-function row for the given `(author, zome_name, scheduled_fn)` tuple.
+///
 /// Returns the number of rows deleted (0 if the row did not exist).
 pub(crate) async fn delete_scheduled_function<'e, E>(
     executor: E,
@@ -155,7 +156,7 @@ mod tests {
         let payload = b"schedule-blob";
 
         // Initial insert.
-        db.insert_scheduled_function(InsertScheduledFunction {
+        db.upsert_scheduled_function(InsertScheduledFunction {
             author: &author,
             zome_name: "z",
             scheduled_fn: "f",
@@ -169,7 +170,7 @@ mod tests {
 
         // Same key — the upsert clause should replace the row, not error
         // with a PK conflict.
-        db.insert_scheduled_function(InsertScheduledFunction {
+        db.upsert_scheduled_function(InsertScheduledFunction {
             author: &author,
             zome_name: "z",
             scheduled_fn: "f",
@@ -186,7 +187,7 @@ mod tests {
             .unwrap();
 
         // Re-insert succeeds, confirming delete removed the row.
-        db.insert_scheduled_function(InsertScheduledFunction {
+        db.upsert_scheduled_function(InsertScheduledFunction {
             author: &author,
             zome_name: "z",
             scheduled_fn: "f",
@@ -206,8 +207,10 @@ mod tests {
         let bob = agent(2);
         let payload = b"";
 
+        let now_time = Timestamp::from_micros(200);
+
         // Alice: persisted, expired (end_at=100, now=200).
-        db.insert_scheduled_function(InsertScheduledFunction {
+        db.upsert_scheduled_function(InsertScheduledFunction {
             author: &alice,
             zome_name: "z",
             scheduled_fn: "f",
@@ -219,8 +222,8 @@ mod tests {
         .await
         .unwrap();
 
-        // Alice: persisted, not yet expired (end_at=300).
-        db.insert_scheduled_function(InsertScheduledFunction {
+        // Alice: persisted, not yet expired (end_at=300, now=200).
+        db.upsert_scheduled_function(InsertScheduledFunction {
             author: &alice,
             zome_name: "z",
             scheduled_fn: "g",
@@ -233,7 +236,7 @@ mod tests {
         .unwrap();
 
         // Alice: ephemeral, "expired" (must NOT be returned — query is non-ephemeral only).
-        db.insert_scheduled_function(InsertScheduledFunction {
+        db.upsert_scheduled_function(InsertScheduledFunction {
             author: &alice,
             zome_name: "z",
             scheduled_fn: "e",
@@ -246,7 +249,7 @@ mod tests {
         .unwrap();
 
         // Bob: persisted, expired but different author (must NOT be returned).
-        db.insert_scheduled_function(InsertScheduledFunction {
+        db.upsert_scheduled_function(InsertScheduledFunction {
             author: &bob,
             zome_name: "z",
             scheduled_fn: "f",
@@ -259,7 +262,8 @@ mod tests {
         .unwrap();
 
         let result = db
-            .get_expired_persisted_scheduled_functions(&alice, Timestamp::from_micros(200))
+            .as_ref()
+            .get_expired_persisted_scheduled_functions(&alice, now_time)
             .await
             .unwrap();
         assert_eq!(result.len(), 1);
@@ -275,7 +279,7 @@ mod tests {
         let payload = b"";
 
         // Alice: ephemeral start_at=100 (eligible at now=150).
-        db.insert_scheduled_function(InsertScheduledFunction {
+        db.upsert_scheduled_function(InsertScheduledFunction {
             author: &alice,
             zome_name: "z",
             scheduled_fn: "f",
@@ -287,7 +291,7 @@ mod tests {
         .await
         .unwrap();
         // Alice: non-ephemeral (must NOT be deleted).
-        db.insert_scheduled_function(InsertScheduledFunction {
+        db.upsert_scheduled_function(InsertScheduledFunction {
             author: &alice,
             zome_name: "z",
             scheduled_fn: "g",
@@ -299,7 +303,7 @@ mod tests {
         .await
         .unwrap();
         // Bob: ephemeral but different author (must NOT be deleted).
-        db.insert_scheduled_function(InsertScheduledFunction {
+        db.upsert_scheduled_function(InsertScheduledFunction {
             author: &bob,
             zome_name: "z",
             scheduled_fn: "f",
@@ -317,7 +321,7 @@ mod tests {
 
         // Spot-check by re-inserting Alice's ephemeral row to confirm it was
         // gone (otherwise PK conflict would error).
-        db.insert_scheduled_function(InsertScheduledFunction {
+        db.upsert_scheduled_function(InsertScheduledFunction {
             author: &alice,
             zome_name: "z",
             scheduled_fn: "f",

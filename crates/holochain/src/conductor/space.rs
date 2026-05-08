@@ -539,7 +539,7 @@ impl Space {
                 holochain_state::peer_metadata_store::PeerMetaStore::new(peer_meta_store_db);
             let new_dht_db = tokio::runtime::Handle::current()
                 .block_on(holochain_data::open_db(
-                    AsRef::<std::path::Path>::as_ref(&root_db_dir),
+                    &root_db_dir,
                     holochain_data::kind::Dht::new(dna_hash.clone()),
                     space_data_config.clone(),
                 ))

@@ -95,6 +95,7 @@ impl DhtStore<DbWrite<Dht>> {
     pub async fn reschedule_expired_persisted(&self, author: &AgentPubKey, now: Timestamp) -> () {
         let expired = match self
             .db
+            .as_ref()
             .get_expired_persisted_scheduled_functions(author, now)
             .await
         {
@@ -149,7 +150,7 @@ impl DhtStore<DbWrite<Dht>> {
                 Ok(Some((start_at, end_at, ephemeral))) => {
                     if let Err(e) = self
                         .db
-                        .insert_scheduled_function(InsertScheduledFunction {
+                        .upsert_scheduled_function(InsertScheduledFunction {
                             author,
                             zome_name: &zome_name,
                             scheduled_fn: &scheduled_fn_name,
@@ -203,7 +204,7 @@ impl DhtStore<DbWrite<Dht>> {
             }
             Some((start_at, end_at, ephemeral)) => Ok(self
                 .db
-                .insert_scheduled_function(InsertScheduledFunction {
+                .upsert_scheduled_function(InsertScheduledFunction {
                     author,
                     zome_name,
                     scheduled_fn: fn_name,
@@ -348,7 +349,7 @@ mod tests {
         // Insert an ephemeral row with start_at <= now so it is "live".
         store
             .db
-            .insert_scheduled_function(InsertScheduledFunction {
+            .upsert_scheduled_function(InsertScheduledFunction {
                 author: &author,
                 zome_name: "z",
                 scheduled_fn: "f",
@@ -382,7 +383,7 @@ mod tests {
         // Seed a persisted row.
         store
             .db
-            .insert_scheduled_function(InsertScheduledFunction {
+            .upsert_scheduled_function(InsertScheduledFunction {
                 author: &author,
                 zome_name: "z",
                 scheduled_fn: "f",
@@ -439,7 +440,7 @@ mod tests {
         // ScheduledFunction.
         store
             .db
-            .insert_scheduled_function(InsertScheduledFunction {
+            .upsert_scheduled_function(InsertScheduledFunction {
                 author: &author,
                 zome_name: "z",
                 scheduled_fn: "f",

@@ -25,10 +25,10 @@ impl TxWrite<Dht> {
         &mut self,
         f: InsertScheduledFunction<'_>,
     ) -> sqlx::Result<u64> {
-        scheduled_function::insert_scheduled_function(self.conn_mut(), f).await
+        scheduled_function::upsert_scheduled_function(self.conn_mut(), f).await
     }
 
-    /// Delete the scheduled-function row for the given `(author, zome_name, scheduled_fn)` triple.
+    /// Delete the scheduled-function row for the given `(author, zome_name, scheduled_fn)` tuple.
     /// Returns the number of rows deleted.
     pub async fn delete_scheduled_function(
         &mut self,

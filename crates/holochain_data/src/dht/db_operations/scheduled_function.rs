@@ -20,26 +20,15 @@ impl DbRead<Dht> {
 }
 
 impl DbWrite<Dht> {
-    /// Fetch persisted (non-ephemeral) scheduled-function rows for `author` whose
-    /// `end_at` is before `now`. Returns `(zome_name, scheduled_fn, maybe_schedule_blob)` tuples.
-    pub async fn get_expired_persisted_scheduled_functions(
-        &self,
-        author: &AgentPubKey,
-        now: Timestamp,
-    ) -> sqlx::Result<Vec<(String, String, Vec<u8>)>> {
-        scheduled_function::get_expired_persisted_scheduled_functions(self.pool(), author, now)
-            .await
-    }
-
     /// Upsert a scheduled-function row. Returns the number of rows written.
-    pub async fn insert_scheduled_function(
+    pub async fn upsert_scheduled_function(
         &self,
         f: InsertScheduledFunction<'_>,
     ) -> sqlx::Result<u64> {
-        scheduled_function::insert_scheduled_function(self.pool(), f).await
+        scheduled_function::upsert_scheduled_function(self.pool(), f).await
     }
 
-    /// Delete the scheduled-function row for the given `(author, zome_name, scheduled_fn)` triple.
+    /// Delete the scheduled-function row for the given `(author, zome_name, scheduled_fn)` tuple.
     /// Returns the number of rows deleted.
     pub async fn delete_scheduled_function(
         &self,

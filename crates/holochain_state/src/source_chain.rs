@@ -319,12 +319,7 @@ impl SourceChain {
         // cheap (Vec<HoloHashed<_>> / Vec<ScheduledFn>).
         let entries_for_new_db = entries.clone();
         let actions_for_new_db = actions.clone();
-        let ops_for_new_db = ops
-            .iter()
-            .map(|(op, op_hash, op_order, ts, dep)| {
-                (op.clone(), op_hash.clone(), *op_order, *ts, dep.clone())
-            })
-            .collect::<Vec<_>>();
+        let ops_for_new_db = ops.clone();
         let scheduled_fns_for_new_db = scheduled_fns.clone();
 
         // Take out a write lock as late as possible, after doing everything we can in memory and
