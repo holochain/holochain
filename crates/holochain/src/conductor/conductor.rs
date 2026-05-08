@@ -2036,7 +2036,7 @@ mod app_status_impls {
             match manifest {
                 AppManifest::V0(manifest) => {
                     overrides.bootstrap_url = manifest.bootstrap_url.clone();
-                    overrides.signal_url = manifest.signal_url.clone();
+                    overrides.relay_url = manifest.relay_url.clone();
                 }
             }
             if overrides.is_overriding() {
