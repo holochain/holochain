@@ -59,3 +59,37 @@ where
         .await?;
     Ok(result.rows_affected())
 }
+
+/// Update `last_publish_time` for the given op. Returns the number of rows updated.
+pub(crate) async fn set_last_publish_time<'e, E>(
+    executor: E,
+    op_hash: &DhtOpHash,
+    when: Timestamp,
+) -> sqlx::Result<u64>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let result =
+        sqlx::query("UPDATE ChainOpPublish SET last_publish_time = ? WHERE op_hash = ?")
+            .bind(when.as_micros())
+            .bind(op_hash.get_raw_36())
+            .execute(executor)
+            .await?;
+    Ok(result.rows_affected())
+}
+
+/// Clear `withhold_publish` (set to NULL) for the given op. Returns the number of rows updated.
+pub(crate) async fn clear_withhold_publish<'e, E>(
+    executor: E,
+    op_hash: &DhtOpHash,
+) -> sqlx::Result<u64>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let result =
+        sqlx::query("UPDATE ChainOpPublish SET withhold_publish = NULL WHERE op_hash = ?")
+            .bind(op_hash.get_raw_36())
+            .execute(executor)
+            .await?;
+    Ok(result.rows_affected())
+}
