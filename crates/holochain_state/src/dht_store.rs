@@ -654,6 +654,28 @@ impl DhtStore<DbWrite<Dht>> {
         Ok(promoted)
     }
 
+    /// Set `require_receipt = false` for each of the given op hashes on
+    /// `LimboChainOp`.
+    ///
+    /// If a hash no longer has a `LimboChainOp` row (e.g. the op has already
+    /// been promoted to `ChainOp`), the update matches 0 rows and is silently
+    /// ignored — that is correct, not a bug, because `require_receipt` only
+    /// exists on the limbo table.
+    pub async fn clear_require_receipt(
+        &self,
+        op_hashes: Vec<DhtOpHash>,
+    ) -> StateMutationResult<()> {
+        let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
+        for hash in op_hashes {
+            // Returns rows_affected; ignored — see doc note above.
+            tx.set_limbo_chain_op_require_receipt(&hash, false)
+                .await
+                .map_err(StateMutationError::from)?;
+        }
+        tx.commit().await.map_err(StateMutationError::from)?;
+        Ok(())
+    }
+
     /// Downgrade this writable store to a read-only store.
     pub fn as_read(&self) -> DhtStoreRead {
         DhtStore::new(self.db.as_ref().clone())
@@ -1235,6 +1257,43 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(count, 1);
+    }
+
+    // ---------------------------------------------------------------------------
+    // clear_require_receipt tests
+    // ---------------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn clear_require_receipt_clears_limbo_row() {
+        let store = DhtStore::new_test(dht_id()).await.unwrap();
+        let op = build_test_store_record_op_hashed(70);
+        store.record_incoming_ops(vec![op.clone()]).await.unwrap();
+        // Pre: require_receipt = 1 (set by record_incoming_ops).
+        let row = store.db().as_ref().get_limbo_chain_op(op.as_hash().clone()).await.unwrap().unwrap();
+        assert_eq!(row.require_receipt, 1);
+
+        store.clear_require_receipt(vec![op.as_hash().clone()]).await.unwrap();
+
+        let row = store.db().as_ref().get_limbo_chain_op(op.as_hash().clone()).await.unwrap().unwrap();
+        assert_eq!(row.require_receipt, 0);
+    }
+
+    #[tokio::test]
+    async fn clear_require_receipt_no_op_for_integrated() {
+        // Once promoted, the op is in ChainOp which has no require_receipt column.
+        // The method should succeed (no error) with no observable effect.
+        let store = DhtStore::new_test(dht_id()).await.unwrap();
+        let op = build_test_store_record_op_hashed(71);
+        store.record_incoming_ops(vec![op.clone()]).await.unwrap();
+        store.record_sys_validation_outcome(vec![(op.as_hash().clone(), SysOutcome::Accepted)]).await.unwrap();
+        store.record_app_validation_outcome(vec![(op.as_hash().clone(), AppOutcome::Accepted)]).await.unwrap();
+        store.integrate_ready_ops(Timestamp::from_micros(1)).await.unwrap();
+        // Op is now in ChainOp.
+        assert!(store.db().as_ref().get_limbo_chain_op(op.as_hash().clone()).await.unwrap().is_none());
+        assert!(store.db().as_ref().get_chain_op(op.as_hash().clone()).await.unwrap().is_some());
+
+        // No-op; should not error.
+        store.clear_require_receipt(vec![op.as_hash().clone()]).await.unwrap();
     }
 
     #[tokio::test]
