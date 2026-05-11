@@ -541,6 +541,61 @@ impl DhtStore<DbWrite<Dht>> {
         Ok(())
     }
 
+    /// Promote all limbo ops that satisfy the schema's ready-for-integration
+    /// predicate into their integrated tables in a single transaction.
+    ///
+    /// Chain ops are moved from `LimboChainOp` → `ChainOp` with the terminal
+    /// `validation_status` computed from the captured sys/app outcomes.
+    /// Warrants are moved from `LimboWarrant` → `Warrant` (no timestamp
+    /// column on `Warrant`).
+    ///
+    /// Returns the set of promoted op hashes (chain ops and warrant hashes
+    /// together).  A generous batch limit is used; if more than that are ready
+    /// in a single tick, the next tick handles the remainder.
+    pub async fn integrate_ready_ops(
+        &self,
+        when_integrated: Timestamp,
+    ) -> StateMutationResult<Vec<DhtOpHash>> {
+        let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
+        let mut promoted = Vec::new();
+
+        let chain_ready = tx
+            .as_mut()
+            .limbo_chain_ops_ready_for_integration(10_000)
+            .await
+            .map_err(StateMutationError::from)?;
+        for row in chain_ready {
+            let op_hash = DhtOpHash::from_raw_36(row.hash.clone());
+            let validation_status = compute_chain_op_validation_status(&row);
+            let promoted_ok = tx
+                .promote_limbo_chain_op(&op_hash, validation_status, when_integrated)
+                .await
+                .map_err(StateMutationError::from)?;
+            if promoted_ok {
+                promoted.push(op_hash);
+            }
+        }
+
+        let warrant_ready = tx
+            .as_mut()
+            .limbo_warrants_ready_for_integration(10_000)
+            .await
+            .map_err(StateMutationError::from)?;
+        for row in warrant_ready {
+            let hash = DhtOpHash::from_raw_36(row.hash.clone());
+            let promoted_ok = tx
+                .promote_limbo_warrant(&hash)
+                .await
+                .map_err(StateMutationError::from)?;
+            if promoted_ok {
+                promoted.push(hash);
+            }
+        }
+
+        tx.commit().await.map_err(StateMutationError::from)?;
+        Ok(promoted)
+    }
+
     /// Downgrade this writable store to a read-only store.
     pub fn as_read(&self) -> DhtStoreRead {
         DhtStore::new(self.db.as_ref().clone())
@@ -560,6 +615,31 @@ fn action_hash_to_entry_hash(
         .entry_hash()
         .cloned()
         .ok_or_else(|| StateMutationError::Other("op carries entry but action has no entry_hash".into()))
+}
+
+/// Compute the terminal [`RecordValidity`](holochain_zome_types::dht_v2::RecordValidity)
+/// for a limbo chain op row.
+///
+/// The schema's ready-for-integration predicate accepts a row when:
+///   - `abandoned_at IS NOT NULL`; or
+///   - `sys_validation_status = 2` (rejected at sys); or
+///   - `sys_validation_status = 1 AND app_validation_status IN (1, 2)`.
+///
+/// Any rejection or abandonment maps to `Rejected`; otherwise `Accepted`.
+fn compute_chain_op_validation_status(
+    row: &holochain_data::models::dht::LimboChainOpRow,
+) -> holochain_zome_types::dht_v2::RecordValidity {
+    use holochain_zome_types::dht_v2::RecordValidity;
+    if row.abandoned_at.is_some() {
+        return RecordValidity::Rejected;
+    }
+    if row.sys_validation_status == Some(2) {
+        return RecordValidity::Rejected;
+    }
+    if row.app_validation_status == Some(2) {
+        return RecordValidity::Rejected;
+    }
+    RecordValidity::Accepted
 }
 
 impl From<DhtStore<DbWrite<Dht>>> for DhtStoreRead {
@@ -986,6 +1066,63 @@ mod tests {
         // Exactly one row still exists.
         let row = store.db.as_ref().get_limbo_chain_op(op_hash).await.unwrap();
         assert!(row.is_some(), "LimboChainOp row should still be present");
+    }
+
+    // ---------------------------------------------------------------------------
+    // integrate_ready_ops tests
+    // ---------------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn integrate_ready_ops_promotes_ready_chain_op() {
+        let store = DhtStore::new_test(dht_id()).await.unwrap();
+        let op = build_test_store_record_op_hashed(50);
+        store.record_incoming_ops(vec![op.clone()]).await.unwrap();
+        // Mark ready: sys=1, app=1.
+        store.record_sys_validation_outcome(vec![
+            (op.as_hash().clone(), SysOutcome::Accepted),
+        ]).await.unwrap();
+        store.record_app_validation_outcome(vec![
+            (op.as_hash().clone(), AppOutcome::Accepted),
+        ]).await.unwrap();
+
+        let promoted = store.integrate_ready_ops(Timestamp::from_micros(999)).await.unwrap();
+        assert_eq!(promoted, vec![op.as_hash().clone()]);
+
+        assert!(store.db().as_ref().get_limbo_chain_op(op.as_hash().clone()).await.unwrap().is_none());
+        let row = store.db().as_ref().get_chain_op(op.as_hash().clone()).await.unwrap().unwrap();
+        assert_eq!(row.when_integrated, 999);
+        assert_eq!(row.validation_status, i64::from(holochain_zome_types::dht_v2::RecordValidity::Accepted));
+    }
+
+    #[tokio::test]
+    async fn integrate_ready_ops_skips_unready() {
+        let store = DhtStore::new_test(dht_id()).await.unwrap();
+        let op = build_test_store_record_op_hashed(51);
+        store.record_incoming_ops(vec![op.clone()]).await.unwrap();
+        // No validation outcomes recorded — sys/app are NULL, not ready.
+        let promoted = store.integrate_ready_ops(Timestamp::from_micros(999)).await.unwrap();
+        assert!(promoted.is_empty());
+
+        // Op still in limbo, not in ChainOp.
+        assert!(store.db().as_ref().get_limbo_chain_op(op.as_hash().clone()).await.unwrap().is_some());
+        assert!(store.db().as_ref().get_chain_op(op.as_hash().clone()).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn integrate_ready_ops_promotes_warrant() {
+        let store = DhtStore::new_test(dht_id()).await.unwrap();
+        let warrant = build_test_warrant_op_hashed(52);
+        store.record_incoming_ops(vec![warrant.clone()]).await.unwrap();
+        // Mark sys=1 (warrants have no app validation).
+        store.record_sys_validation_outcome(vec![
+            (warrant.as_hash().clone(), SysOutcome::Accepted),
+        ]).await.unwrap();
+
+        let promoted = store.integrate_ready_ops(Timestamp::from_micros(999)).await.unwrap();
+        assert_eq!(promoted, vec![warrant.as_hash().clone()]);
+
+        assert!(store.db().as_ref().get_limbo_warrant(warrant.as_hash().clone()).await.unwrap().is_none());
+        assert!(store.db().as_ref().get_warrant(warrant.as_hash().clone()).await.unwrap().is_some());
     }
 
     // ---------------------------------------------------------------------------
