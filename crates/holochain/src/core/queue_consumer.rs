@@ -153,6 +153,7 @@ pub async fn spawn_queue_consumer_tasks(
             SysValidationWorkspace::new(
                 authored_db.clone(),
                 dht_db.clone(),
+                space.dht_store.clone(),
                 cache.clone(),
                 cell_id.dna_hash().clone(),
                 conductor

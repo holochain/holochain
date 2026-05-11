@@ -304,7 +304,7 @@ async fn sys_validation_workflow_inner(
         }
     }
 
-    let (mut summary, invalid_ops, _forked_pairs) = workspace
+    let (mut summary, invalid_ops, _forked_pairs, sys_outcomes) = workspace
         .dht_db
         .write_async(move |txn| {
             let mut summary = OutcomeSummary {
@@ -313,6 +313,7 @@ async fn sys_validation_workflow_inner(
             };
             let mut invalid_ops = vec![];
             let mut forked_pairs: Vec<(AgentPubKey, ForkedPair)> = Vec::with_capacity(0);
+            let mut sys_outcomes: Vec<(DhtOpHash, SysOutcome)> = Vec::new();
 
             for (hashed_op, outcome) in validation_outcomes {
                 let (op, op_hash) = hashed_op.into_inner();
@@ -337,6 +338,7 @@ async fn sys_validation_workflow_inner(
                 match outcome {
                     Outcome::Accepted => {
                         summary.accepted += 1;
+                        sys_outcomes.push((op_hash.clone(), SysOutcome::Accepted));
                         match op_type {
                             DhtOpType::Chain(_) => {
                                 put_validation_limbo(txn, &op_hash, ValidationStage::SysValidated)?
@@ -348,11 +350,13 @@ async fn sys_validation_workflow_inner(
                     }
                     Outcome::MissingDhtDep => {
                         summary.missing += 1;
+                        sys_outcomes.push((op_hash.clone(), SysOutcome::AwaitingDeps));
                         let status = ValidationStage::AwaitingSysDeps;
                         put_validation_limbo(txn, &op_hash, status)?;
                     }
                     Outcome::Rejected(_) => {
                         invalid_ops.push((op_hash.clone(), op.clone()));
+                        sys_outcomes.push((op_hash.clone(), SysOutcome::Rejected));
 
                         match op {
                             DhtOp::ChainOp(_) => {
@@ -367,8 +371,13 @@ async fn sys_validation_workflow_inner(
                     }
                 }
             }
-            WorkflowResult::Ok((summary, invalid_ops, forked_pairs))
+            WorkflowResult::Ok((summary, invalid_ops, forked_pairs, sys_outcomes))
         })
+        .await?;
+
+    workspace
+        .dht_store
+        .record_sys_validation_outcome(sys_outcomes)
         .await?;
 
     {
@@ -446,6 +455,8 @@ async fn sys_validation_workflow_inner(
                 StateMutationResult::Ok(warranted)
             })
             .await?;
+        // Clone warrants before the legacy write so we can mirror them into the new DB after.
+        let warrants_for_new_db: Vec<DhtOpHashed> = warrants.clone();
         // "self-publish" warrants, i.e. insert them into the DHT DB.
         // This works around the problem that the commonly used function [`holochain_state::integrate::authored_ops_to_dht_db`]
         // joins on the Action table to filter out private entries.
@@ -457,6 +468,10 @@ async fn sys_validation_workflow_inner(
                 }
                 StateMutationResult::Ok(())
             })
+            .await?;
+        workspace
+            .dht_store
+            .record_locally_validated_warrants(warrants_for_new_db)
             .await?;
 
         summary.warranted = warranted;
@@ -1461,6 +1476,7 @@ pub struct SysValidationWorkspace {
     // Authored DB is writeable because warrants may be written.
     authored_db: DbWrite<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
+    dht_store: DhtStore,
     cache: DbWrite<DbKindCache>,
     dna_hash: DnaHash,
     sys_validation_retry_delay: Duration,
@@ -1470,6 +1486,7 @@ impl SysValidationWorkspace {
     pub fn new(
         authored_db: DbWrite<DbKindAuthored>,
         dht_db: DbWrite<DbKindDht>,
+        dht_store: DhtStore,
         cache: DbWrite<DbKindCache>,
         dna_hash: DnaHash,
         sys_validation_retry_delay: Duration,
@@ -1478,6 +1495,7 @@ impl SysValidationWorkspace {
             scratch: None,
             authored_db,
             dht_db,
+            dht_store,
             cache,
             dna_hash,
             sys_validation_retry_delay,
