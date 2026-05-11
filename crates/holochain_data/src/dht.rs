@@ -1423,6 +1423,57 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn set_chain_op_last_publish_time_updates() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let (op_hash, _) = seed_chain_op(&db, 0).await;
+        db.insert_chain_op_publish(&op_hash, None, None, None)
+            .await
+            .unwrap();
+
+        let updated = db
+            .set_chain_op_last_publish_time(&op_hash, Timestamp::from_micros(42))
+            .await
+            .unwrap();
+        assert_eq!(updated, 1);
+
+        let row = db
+            .as_ref()
+            .get_chain_op_publish(op_hash)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.last_publish_time, Some(42));
+    }
+
+    #[tokio::test]
+    async fn clear_chain_op_withhold_publish_round_trip() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let (op_hash, _) = seed_chain_op(&db, 0).await;
+        db.insert_chain_op_publish(&op_hash, None, None, Some(true))
+            .await
+            .unwrap();
+
+        let row = db
+            .as_ref()
+            .get_chain_op_publish(op_hash.clone())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.withhold_publish, Some(1));
+
+        let updated = db.clear_chain_op_withhold_publish(&op_hash).await.unwrap();
+        assert_eq!(updated, 1);
+
+        let row = db
+            .as_ref()
+            .get_chain_op_publish(op_hash)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.withhold_publish, None);
+    }
+
+    #[tokio::test]
     async fn set_chain_op_receipts_complete_round_trip() {
         let db = test_open_db(dht_db_id()).await.unwrap();
 
