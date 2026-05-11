@@ -716,6 +716,36 @@ impl DhtStore<DbWrite<Dht>> {
         Ok(())
     }
 
+    /// Force-reject a chain op. Used by host fns that detect a validation
+    /// failure outside the validation workflows. Tries `ChainOp` first; if no
+    /// row matches (the op is still in limbo), marks both sys and app validation
+    /// status as Rejected on `LimboChainOp`.
+    pub async fn reject_chain_op(
+        &self,
+        op_hashes: Vec<DhtOpHash>,
+    ) -> StateMutationResult<()> {
+        use holochain_zome_types::dht_v2::RecordValidity;
+
+        let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
+        for hash in op_hashes {
+            let updated = tx
+                .set_chain_op_validation_status(&hash, RecordValidity::Rejected)
+                .await
+                .map_err(StateMutationError::from)?;
+            if updated == 0 {
+                // Op is not in ChainOp; try LimboChainOp.
+                tx.set_limbo_chain_op_sys_validation_status(&hash, Some(2))
+                    .await
+                    .map_err(StateMutationError::from)?;
+                tx.set_limbo_chain_op_app_validation_status(&hash, Some(2))
+                    .await
+                    .map_err(StateMutationError::from)?;
+            }
+        }
+        tx.commit().await.map_err(StateMutationError::from)?;
+        Ok(())
+    }
+
     /// Downgrade this writable store to a read-only store.
     pub fn as_read(&self) -> DhtStoreRead {
         DhtStore::new(self.db.as_ref().clone())
@@ -1425,6 +1455,43 @@ mod tests {
 
         let row = store.db().as_ref().get_chain_op_publish(op.as_hash().clone()).await.unwrap().unwrap();
         assert_eq!(row.last_publish_time, Some(42));
+    }
+
+    // ---------------------------------------------------------------------------
+    // reject_chain_op tests
+    // ---------------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn reject_chain_op_rejects_integrated_op() {
+        use holochain_zome_types::dht_v2::RecordValidity;
+        let store = DhtStore::new_test(dht_id()).await.unwrap();
+        let op = build_test_store_record_op_hashed(100);
+        store.record_incoming_ops(vec![op.clone()]).await.unwrap();
+        store.record_sys_validation_outcome(vec![(op.as_hash().clone(), SysOutcome::Accepted)]).await.unwrap();
+        store.record_app_validation_outcome(vec![(op.as_hash().clone(), AppOutcome::Accepted)]).await.unwrap();
+        store.integrate_ready_ops(Timestamp::from_micros(1)).await.unwrap();
+        // Pre: validation_status is Accepted.
+        let row = store.db().as_ref().get_chain_op(op.as_hash().clone()).await.unwrap().unwrap();
+        assert_eq!(row.validation_status, i64::from(RecordValidity::Accepted));
+
+        store.reject_chain_op(vec![op.as_hash().clone()]).await.unwrap();
+
+        let row = store.db().as_ref().get_chain_op(op.as_hash().clone()).await.unwrap().unwrap();
+        assert_eq!(row.validation_status, i64::from(RecordValidity::Rejected));
+    }
+
+    #[tokio::test]
+    async fn reject_chain_op_rejects_limbo_op() {
+        let store = DhtStore::new_test(dht_id()).await.unwrap();
+        let op = build_test_store_record_op_hashed(101);
+        store.record_incoming_ops(vec![op.clone()]).await.unwrap();
+        // Op is in limbo with sys=NULL, app=NULL.
+
+        store.reject_chain_op(vec![op.as_hash().clone()]).await.unwrap();
+
+        let row = store.db().as_ref().get_limbo_chain_op(op.as_hash().clone()).await.unwrap().unwrap();
+        assert_eq!(row.sys_validation_status, Some(2));
+        assert_eq!(row.app_validation_status, Some(2));
     }
 
     #[tokio::test]
