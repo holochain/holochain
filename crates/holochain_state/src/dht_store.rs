@@ -676,6 +676,27 @@ impl DhtStore<DbWrite<Dht>> {
         Ok(())
     }
 
+    /// Update `ChainOpPublish.last_publish_time = now` for each given op hash.
+    ///
+    /// Matches the legacy `set_last_publish_time` on the authored DB; the new
+    /// schema's `ChainOpPublish` row owns this field instead of the authored
+    /// DB's `DhtOp` row. Called from `publish_dht_ops_workflow` after the ops
+    /// have been forwarded to the network.
+    pub async fn record_published_op_hashes(
+        &self,
+        op_hashes: Vec<DhtOpHash>,
+        now: Timestamp,
+    ) -> StateMutationResult<()> {
+        let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
+        for hash in op_hashes {
+            tx.set_chain_op_last_publish_time(&hash, now)
+                .await
+                .map_err(StateMutationError::from)?;
+        }
+        tx.commit().await.map_err(StateMutationError::from)?;
+        Ok(())
+    }
+
     /// Apply a successful countersigning completion: clear `withhold_publish`
     /// on the matching `ChainOpPublish` rows so the publish workflow can pick
     /// them up. The author / action_hash that the legacy site uses to filter
@@ -1378,6 +1399,32 @@ mod tests {
             .apply_countersigning_success(vec![dummy_hash])
             .await
             .unwrap();
+    }
+
+    // ---------------------------------------------------------------------------
+    // record_published_op_hashes tests
+    // ---------------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn record_published_op_hashes_updates_publish_time() {
+        let store = DhtStore::new_test(dht_id()).await.unwrap();
+        // Seed an op in ChainOp via the standard pipeline.
+        let op = build_test_store_record_op_hashed(90);
+        store.record_incoming_ops(vec![op.clone()]).await.unwrap();
+        store.record_sys_validation_outcome(vec![(op.as_hash().clone(), SysOutcome::Accepted)]).await.unwrap();
+        store.record_app_validation_outcome(vec![(op.as_hash().clone(), AppOutcome::Accepted)]).await.unwrap();
+        store.integrate_ready_ops(Timestamp::from_micros(1)).await.unwrap();
+
+        // Insert a ChainOpPublish row with NULL last_publish_time.
+        store.db().insert_chain_op_publish(op.as_hash(), None, None, None).await.unwrap();
+
+        store.record_published_op_hashes(
+            vec![op.as_hash().clone()],
+            Timestamp::from_micros(42),
+        ).await.unwrap();
+
+        let row = store.db().as_ref().get_chain_op_publish(op.as_hash().clone()).await.unwrap().unwrap();
+        assert_eq!(row.last_publish_time, Some(42));
     }
 
     #[tokio::test]
