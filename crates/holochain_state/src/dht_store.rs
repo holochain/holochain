@@ -27,6 +27,17 @@ pub enum SysOutcome {
     AwaitingDeps,
 }
 
+/// Result of app validation for a single DHT op.
+#[derive(Debug, Clone, Copy)]
+pub enum AppOutcome {
+    /// Accepted — `app_validation_status = 1`.
+    Accepted,
+    /// Rejected — `app_validation_status = 2`.
+    Rejected,
+    /// Awaiting dependencies — status remains NULL (i.e. pending).
+    AwaitingDeps,
+}
+
 /// Errors produced by [`DhtStore`] operations.
 ///
 /// Wraps the underlying database and schedule errors so callers do not need to
@@ -466,6 +477,29 @@ impl DhtStore<DbWrite<Dht>> {
         Ok(())
     }
 
+    /// Mirror app validation outcomes from the validation workflow.  For each
+    /// (op_hash, outcome) pair, update `app_validation_status` on the matching
+    /// `LimboChainOp` row.  Warrants have no `app_validation_status` column, so
+    /// only chain ops are updated here.
+    pub async fn record_app_validation_outcome(
+        &self,
+        outcomes: Vec<(DhtOpHash, AppOutcome)>,
+    ) -> StateMutationResult<()> {
+        let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
+        for (hash, outcome) in outcomes {
+            let status: Option<i64> = match outcome {
+                AppOutcome::Accepted => Some(1),
+                AppOutcome::Rejected => Some(2),
+                AppOutcome::AwaitingDeps => None,
+            };
+            tx.set_limbo_chain_op_app_validation_status(&hash, status)
+                .await
+                .map_err(StateMutationError::from)?;
+        }
+        tx.commit().await.map_err(StateMutationError::from)?;
+        Ok(())
+    }
+
     /// Downgrade this writable store to a read-only store.
     pub fn as_read(&self) -> DhtStoreRead {
         DhtStore::new(self.db.as_ref().clone())
@@ -860,6 +894,41 @@ mod tests {
             .unwrap()
             .expect("LimboWarrant row not found after update");
         assert_eq!(row.sys_validation_status, Some(2));
+    }
+
+    // ---------------------------------------------------------------------------
+    // record_app_validation_outcome tests
+    // ---------------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn record_app_validation_outcome_accepted() {
+        let store = DhtStore::new_test(dht_id()).await.unwrap();
+        let op = build_test_store_record_op_hashed(11);
+        store.record_incoming_ops(vec![op.clone()]).await.unwrap();
+        // Pre-state: app_validation_status should be NULL.
+        let row = store.db().as_ref().get_limbo_chain_op(op.as_hash().clone()).await.unwrap().unwrap();
+        assert_eq!(row.app_validation_status, None);
+
+        store.record_app_validation_outcome(vec![
+            (op.as_hash().clone(), AppOutcome::Accepted),
+        ]).await.unwrap();
+
+        let row = store.db().as_ref().get_limbo_chain_op(op.as_hash().clone()).await.unwrap().unwrap();
+        assert_eq!(row.app_validation_status, Some(1));
+    }
+
+    #[tokio::test]
+    async fn record_app_validation_outcome_rejected() {
+        let store = DhtStore::new_test(dht_id()).await.unwrap();
+        let op = build_test_store_record_op_hashed(12);
+        store.record_incoming_ops(vec![op.clone()]).await.unwrap();
+
+        store.record_app_validation_outcome(vec![
+            (op.as_hash().clone(), AppOutcome::Rejected),
+        ]).await.unwrap();
+
+        let row = store.db().as_ref().get_limbo_chain_op(op.as_hash().clone()).await.unwrap().unwrap();
+        assert_eq!(row.app_validation_status, Some(2));
     }
 
     #[tokio::test]
