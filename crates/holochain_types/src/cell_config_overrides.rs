@@ -55,13 +55,6 @@ mod tests {
         assert!(overrides.is_overriding());
 
         let overrides = CellConfigOverrides {
-            bootstrap_url: None,
-            base64_auth_material: None,
-            relay_url: None,
-        };
-        assert!(overrides.is_overriding());
-
-        let overrides = CellConfigOverrides {
             bootstrap_url: Some("http://localhost:1234".to_string()),
             base64_auth_material: None,
             relay_url: None,
