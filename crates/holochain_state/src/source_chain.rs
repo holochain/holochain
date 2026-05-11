@@ -1768,7 +1768,7 @@ pub async fn dump_state(
 /// original (the v2 hash is content-derived, so re-hashing would change it;
 /// the pre-hashed constructor preserves the existing hash as the canonical
 /// identity during the dual-write transition).
-fn legacy_to_dht_v2_signed_action(
+pub(crate) fn legacy_to_dht_v2_signed_action(
     shh: &SignedActionHashed,
 ) -> holochain_zome_types::dht_v2::SignedActionHashed {
     use holochain_zome_types::dht_v2::{
@@ -1901,7 +1901,7 @@ fn serialize_maybe_schedule_none(
 /// (if any) is looked up by `Action::entry_hash` in `entries`. Returns `0`
 /// only if the op cannot be reconstructed because the action is missing —
 /// which would indicate a programming error in the caller.
-fn encoded_chain_op_size(
+pub(crate) fn encoded_chain_op_size(
     op: &holochain_types::dht_op::ChainOpLite,
     actions: &[SignedActionHashed],
     entries: &[holochain_types::EntryHashed],
