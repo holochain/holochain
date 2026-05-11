@@ -33,6 +33,16 @@ impl TxWrite<Dht> {
     ) -> sqlx::Result<u64> {
         limbo_warrant::set_abandoned_at(self.conn_mut(), hash, when).await
     }
+
+    /// Atomically promote a `LimboWarrant` row to the `Warrant` table using
+    /// the current transaction.
+    ///
+    /// Returns `true` if the limbo row existed and was promoted, `false` if it
+    /// did not exist.  The caller's transaction is used — commit or rollback is
+    /// the caller's responsibility.
+    pub async fn promote_limbo_warrant(&mut self, hash: &DhtOpHash) -> sqlx::Result<bool> {
+        limbo_warrant::promote_to_warrant(self.conn_mut(), hash).await
+    }
 }
 
 impl TxRead<Dht> {

@@ -33,6 +33,18 @@ impl DbWrite<Dht> {
     ) -> sqlx::Result<u64> {
         limbo_warrant::set_abandoned_at(self.pool(), hash, when).await
     }
+
+    /// Atomically promote a `LimboWarrant` row to the `Warrant` table.
+    ///
+    /// Begins a transaction, delegates to the inner promotion helper, and
+    /// commits on success.  Returns `true` if the limbo row existed and was
+    /// promoted, `false` if it did not exist.
+    pub async fn promote_limbo_warrant(&self, hash: &DhtOpHash) -> sqlx::Result<bool> {
+        let mut tx = self.begin().await?;
+        let result = limbo_warrant::promote_to_warrant(tx.conn_mut(), hash).await?;
+        tx.commit().await?;
+        Ok(result)
+    }
 }
 
 impl DbRead<Dht> {

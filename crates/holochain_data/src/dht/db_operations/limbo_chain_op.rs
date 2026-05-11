@@ -5,6 +5,7 @@ use crate::handles::{DbRead, DbWrite};
 use crate::kind::Dht;
 use crate::models::dht::LimboChainOpRow;
 use holo_hash::DhtOpHash;
+use holochain_integrity_types::dht_v2::RecordValidity;
 use holochain_timestamp::Timestamp;
 
 impl DbWrite<Dht> {
@@ -50,6 +51,29 @@ impl DbWrite<Dht> {
         require_receipt: bool,
     ) -> sqlx::Result<u64> {
         limbo_chain_op::set_require_receipt(self.pool(), op_hash, require_receipt).await
+    }
+
+    /// Atomically promote a `LimboChainOp` row to the `ChainOp` table.
+    ///
+    /// Begins a transaction, delegates to the inner promotion helper, and
+    /// commits on success.  Returns `true` if the limbo row existed and was
+    /// promoted, `false` if it did not exist.
+    pub async fn promote_limbo_chain_op(
+        &self,
+        op_hash: &DhtOpHash,
+        validation_status: RecordValidity,
+        when_integrated: Timestamp,
+    ) -> sqlx::Result<bool> {
+        let mut tx = self.begin().await?;
+        let result = limbo_chain_op::promote_to_chain_op(
+            tx.conn_mut(),
+            op_hash,
+            validation_status,
+            when_integrated,
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(result)
     }
 }
 

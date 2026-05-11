@@ -2,8 +2,9 @@
 
 use crate::models::dht::LimboChainOpRow;
 use holo_hash::{ActionHash, AnyDhtHash, DhtOpHash};
+use holochain_integrity_types::dht_v2::RecordValidity;
 use holochain_timestamp::Timestamp;
-use sqlx::{Executor, Sqlite};
+use sqlx::{Executor, Sqlite, SqliteConnection};
 
 /// Parameters for inserting a row into `LimboChainOp`.
 pub struct InsertLimboChainOp<'a> {
@@ -209,4 +210,66 @@ where
         .execute(executor)
         .await?;
     Ok(())
+}
+
+/// Promote a `LimboChainOp` row to the `ChainOp` table in a single atomic step.
+///
+/// Reads the limbo row, inserts into `ChainOp` with the supplied
+/// `validation_status` and `when_integrated`, then deletes the limbo row.
+/// All three statements run on the given connection; the caller is responsible
+/// for wrapping them inside a transaction.
+///
+/// Returns `true` if the limbo row existed and was promoted, `false` if it
+/// did not exist.
+pub(crate) async fn promote_to_chain_op(
+    conn: &mut SqliteConnection,
+    op_hash: &DhtOpHash,
+    validation_status: RecordValidity,
+    when_integrated: Timestamp,
+) -> sqlx::Result<bool> {
+    // SELECT the limbo row's payload.
+    let row: Option<LimboChainOpRow> = sqlx::query_as(
+        "SELECT hash, op_type, action_hash, basis_hash, storage_center_loc,
+                sys_validation_status, app_validation_status, abandoned_at,
+                require_receipt, when_received, sys_validation_attempts,
+                app_validation_attempts, last_validation_attempt, serialized_size
+         FROM LimboChainOp WHERE hash = ?",
+    )
+    .bind(op_hash.get_raw_36())
+    .fetch_optional(&mut *conn)
+    .await?;
+
+    let limbo = match row {
+        Some(r) => r,
+        None => return Ok(false),
+    };
+
+    // INSERT into ChainOp.
+    sqlx::query(
+        "INSERT INTO ChainOp
+            (hash, op_type, action_hash, basis_hash, storage_center_loc,
+             validation_status, locally_validated, when_received, when_integrated,
+             serialized_size)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&limbo.hash)
+    .bind(limbo.op_type)
+    .bind(&limbo.action_hash)
+    .bind(&limbo.basis_hash)
+    .bind(limbo.storage_center_loc)
+    .bind(i64::from(validation_status))
+    .bind(0_i64) // locally_validated = false for network-received ops
+    .bind(limbo.when_received)
+    .bind(when_integrated.as_micros())
+    .bind(limbo.serialized_size)
+    .execute(&mut *conn)
+    .await?;
+
+    // DELETE the limbo row.
+    sqlx::query("DELETE FROM LimboChainOp WHERE hash = ?")
+        .bind(op_hash.get_raw_36())
+        .execute(&mut *conn)
+        .await?;
+
+    Ok(true)
 }

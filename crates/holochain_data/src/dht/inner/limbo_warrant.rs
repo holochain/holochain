@@ -3,7 +3,7 @@
 use crate::models::dht::LimboWarrantRow;
 use holo_hash::{AgentPubKey, DhtOpHash};
 use holochain_timestamp::Timestamp;
-use sqlx::{Executor, Sqlite};
+use sqlx::{Executor, Sqlite, SqliteConnection};
 
 /// Parameters for inserting a row into `LimboWarrant`.
 pub struct InsertLimboWarrant<'a> {
@@ -150,4 +150,58 @@ where
         .execute(executor)
         .await?;
     Ok(())
+}
+
+/// Promote a `LimboWarrant` row to the `Warrant` table in a single atomic step.
+///
+/// Reads the limbo row, inserts into `Warrant` with the carried fields, then
+/// deletes the limbo row.  All three statements run on the given connection;
+/// the caller is responsible for wrapping them inside a transaction.
+///
+/// Returns `true` if the limbo row existed and was promoted, `false` if it
+/// did not exist.
+///
+/// Note: the `Warrant` table has no `when_integrated` column, so no
+/// integration timestamp is stored.
+pub(crate) async fn promote_to_warrant(
+    conn: &mut SqliteConnection,
+    hash: &DhtOpHash,
+) -> sqlx::Result<bool> {
+    // SELECT the limbo row's payload.
+    let row: Option<LimboWarrantRow> = sqlx::query_as(
+        "SELECT hash, author, timestamp, warrantee, proof, storage_center_loc,
+                sys_validation_status, abandoned_at, when_received,
+                sys_validation_attempts, last_validation_attempt, serialized_size
+         FROM LimboWarrant WHERE hash = ?",
+    )
+    .bind(hash.get_raw_36())
+    .fetch_optional(&mut *conn)
+    .await?;
+
+    let limbo = match row {
+        Some(r) => r,
+        None => return Ok(false),
+    };
+
+    // INSERT into Warrant.
+    sqlx::query(
+        "INSERT INTO Warrant (hash, author, timestamp, warrantee, proof, storage_center_loc)
+         VALUES (?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&limbo.hash)
+    .bind(&limbo.author)
+    .bind(limbo.timestamp)
+    .bind(&limbo.warrantee)
+    .bind(&limbo.proof)
+    .bind(limbo.storage_center_loc)
+    .execute(&mut *conn)
+    .await?;
+
+    // DELETE the limbo row.
+    sqlx::query("DELETE FROM LimboWarrant WHERE hash = ?")
+        .bind(hash.get_raw_36())
+        .execute(&mut *conn)
+        .await?;
+
+    Ok(true)
 }
