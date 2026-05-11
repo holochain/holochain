@@ -291,51 +291,6 @@ async fn test_publish() {
                 AgentPubKey::from_raw_32(vec![2; 32]),
                 vec![op_hash.clone()],
                 None,
-                None,
-            )
-            .await
-            .unwrap();
-
-            if let Some(res) = handler.calls.lock().unwrap().first() {
-                assert_eq!("publish", res);
-                break;
-            }
-        }
-    })
-    .await
-    .unwrap();
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn test_publish_reflect() {
-    let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
-    let space = dna_hash.to_k2_space();
-    let handler = Arc::new(Handler::default());
-
-    let servers = spawn_test_servers().await.unwrap();
-    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
-    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler.clone(), &servers).await;
-
-    hc1.test_set_full_arcs(space.clone()).await;
-    hc2.test_set_full_arcs(space.clone()).await;
-
-    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
-        loop {
-            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
-
-            let op = test_dht_op(holochain_types::prelude::Timestamp::now());
-            let op_hash = op.as_hash();
-
-            hc2.publish(
-                dna_hash.clone(),
-                HoloHash::from_raw_36_and_type(
-                    op_hash.get_raw_36().to_vec(),
-                    holo_hash::hash_type::AnyLinkable::Action,
-                ),
-                AgentPubKey::from_raw_32(vec![2; 32]),
-                vec![],
-                None,
-                Some(vec![op.into_content()]),
             )
             .await
             .unwrap();

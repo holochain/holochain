@@ -142,7 +142,6 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
         source: AgentPubKey,
         op_hash_list: Vec<DhtOpHash>,
         timeout_ms: Option<u64>,
-        reflect_ops: Option<Vec<DhtOp>>,
     ) -> HolochainP2pResult<()>;
 
     /// Publish a countersigning op.
@@ -318,7 +317,6 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         source: AgentPubKey,
         op_hash_list: Vec<DhtOpHash>,
         timeout_ms: Option<u64>,
-        reflect_ops: Option<Vec<DhtOp>>,
     ) -> HolochainP2pResult<()> {
         self.sender
             .publish(
@@ -327,7 +325,6 @@ impl HolochainP2pDnaT for HolochainP2pDna {
                 source,
                 op_hash_list,
                 timeout_ms,
-                reflect_ops,
             )
             .await
     }

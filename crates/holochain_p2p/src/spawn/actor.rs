@@ -951,12 +951,21 @@ impl HolochainP2pActor {
             config.set_module_config(&core_bootstrap_config)?;
             override_needed = true;
         }
+        #[cfg(feature = "transport-iroh")]
+        if let Some(relay_url) = space_overrides.relay_url.as_ref() {
+            // get current iroh transport config and override relay_url
+            let mut iroh_transport_config: kitsune2_transport_iroh::IrohTransportModConfig =
+                config.get_module_config().unwrap_or_default();
+            iroh_transport_config.iroh_transport.relay_url = Some(relay_url.clone());
+            config.set_module_config(&iroh_transport_config)?;
+            override_needed = true;
+        }
         #[cfg(feature = "transport-tx5-backend-go-pion")]
-        if let Some(signal_url) = space_overrides.signal_url.as_ref() {
+        if let Some(relay_url) = space_overrides.relay_url.as_ref() {
             // get current tx5 transport config and override server_url
             let mut tx5_transport_config: kitsune2_transport_tx5::Tx5TransportModConfig =
                 config.get_module_config().unwrap_or_default();
-            tx5_transport_config.tx5_transport.server_url = signal_url.clone();
+            tx5_transport_config.tx5_transport.server_url = relay_url.clone();
             config.set_module_config(&tx5_transport_config)?;
             override_needed = true;
         }
@@ -1612,19 +1621,8 @@ impl actor::HcP2p for HolochainP2pActor {
         _source: AgentPubKey,
         op_hash_list: Vec<DhtOpHash>,
         _timeout_ms: Option<u64>,
-        reflect_ops: Option<Vec<DhtOp>>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
-            use crate::types::event::HcP2pHandler;
-
-            if let Some(reflect_ops) = reflect_ops {
-                self.evt_sender
-                    .get()
-                    .ok_or_else(|| HolochainP2pError::other(EVT_REG_ERR))?
-                    .handle_publish(dna_hash.clone(), reflect_ops)
-                    .await?;
-            }
-
             let space = dna_hash.to_k2_space();
 
             let space = self.kitsune.space(space, None).await?;
@@ -2512,7 +2510,7 @@ mod tests {
         // should not override if default
         let space_overrides = CellConfigOverrides {
             bootstrap_url: Some("http://override:1234".to_string()),
-            signal_url: Some("wss://override:5678".to_string()),
+            relay_url: Some("wss://override:5678".to_string()),
         };
         let overrides = actor_p2p
             .space_config_override(space_overrides)
@@ -2533,7 +2531,42 @@ mod tests {
             .expect("failed to get tx5 transport config");
         assert_eq!(
             tx5_transport_config.tx5_transport.server_url, "wss://override:5678",
-            "signal_url should match"
+            "relay_url should match"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[cfg(feature = "transport-iroh")]
+    async fn should_get_overrides_for_space_with_iroh_relay_url() {
+        let actor = test_p2p_actor_iroh().await;
+        let actor_p2p: Arc<HolochainP2pActor> =
+            Arc::downcast(actor).expect("failed to downcast actor");
+
+        let space_overrides = CellConfigOverrides {
+            bootstrap_url: Some("http://override:1234".to_string()),
+            relay_url: Some("wss://override:5678".to_string()),
+        };
+        let overrides = actor_p2p
+            .space_config_override(space_overrides)
+            .expect("failed to get overrides")
+            .expect("overrides should be some");
+
+        let bootstrap_config: kitsune2_core::factories::CoreBootstrapModConfig = overrides
+            .get_module_config()
+            .expect("failed to get bootstrap config");
+        assert_eq!(
+            bootstrap_config.core_bootstrap.server_url,
+            Some("http://override:1234".to_string()),
+            "bootstrap_url should match"
+        );
+
+        let iroh_transport_config: kitsune2_transport_iroh::IrohTransportModConfig = overrides
+            .get_module_config()
+            .expect("failed to get iroh transport config");
+        assert_eq!(
+            iroh_transport_config.iroh_transport.relay_url,
+            Some("wss://override:5678".to_string()),
+            "relay_url should match"
         );
     }
 
@@ -2545,9 +2578,9 @@ mod tests {
         let bootstrap = CoreBootstrapModConfig {
             core_bootstrap: CoreBootstrapConfig {
                 server_url: None,
+                auth_material_base64: None,
                 backoff_max_ms: 5_000,
                 backoff_min_ms: 100,
-                auth_material_base64: None,
             },
         };
         let tx_config = kitsune2_transport_tx5::Tx5TransportModConfig {
@@ -2563,6 +2596,36 @@ mod tests {
             .expect("failed to set config");
         kitsune_config
             .set_module_config(&tx_config)
+            .expect("failed to set config");
+
+        let kitsune_config_json =
+            serde_json::to_value(&kitsune_config).expect("failed to serialize kitsune config");
+
+        let config = HolochainP2pConfig {
+            network_config: Some(kitsune_config_json),
+            ..Default::default()
+        };
+
+        HolochainP2pActor::create(config, holochain_keystore::test_keystore())
+            .await
+            .expect("failed to create actor")
+    }
+
+    #[cfg(feature = "transport-iroh")]
+    async fn test_p2p_actor_iroh() -> Arc<dyn HcP2p> {
+        use kitsune2_core::factories::{CoreBootstrapConfig, CoreBootstrapModConfig};
+
+        let bootstrap = CoreBootstrapModConfig {
+            core_bootstrap: CoreBootstrapConfig {
+                server_url: None,
+                auth_material_base64: None,
+                backoff_max_ms: 5_000,
+                backoff_min_ms: 100,
+            },
+        };
+        let kitsune_config = Config::default();
+        kitsune_config
+            .set_module_config(&bootstrap)
             .expect("failed to set config");
 
         let kitsune_config_json =

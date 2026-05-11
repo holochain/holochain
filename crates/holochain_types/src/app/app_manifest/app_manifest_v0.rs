@@ -62,12 +62,12 @@ pub struct AppManifestV0 {
     #[builder(default)]
     pub bootstrap_url: Option<String>,
 
-    /// URL of the signal server to use for all Cells created
-    /// for this app. If not provided here, the signal server
+    /// URL of the relay server to use for all Cells created
+    /// for this app. If not provided here, the relay server
     /// specified in the conductor config file will be used.
     #[serde(default)]
     #[builder(default)]
-    pub signal_url: Option<String>,
+    pub relay_url: Option<String>,
 }
 
 /// Description of an app "role" defined by this app.
@@ -240,7 +240,7 @@ impl AppManifestV0 {
             description: _,
             allow_deferred_memproofs: _,
             bootstrap_url: _,
-            signal_url: _,
+            relay_url: _,
         } = self;
         let roles = roles
             .into_iter()
@@ -338,7 +338,7 @@ pub mod tests {
             roles,
             allow_deferred_memproofs: false,
             bootstrap_url: Some("https://bootstrap.test".to_string()),
-            signal_url: Some("wss://sbd.test".to_string()),
+            relay_url: Some("wss://sbd.test".to_string()),
         }
     }
 
@@ -406,7 +406,7 @@ roles:
             roles: vec![],
             allow_deferred_memproofs: false,
             bootstrap_url: None,
-            signal_url: None,
+            relay_url: None,
         };
         manifest.roles = vec![
             AppRoleManifest {

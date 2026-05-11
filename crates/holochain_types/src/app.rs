@@ -931,7 +931,7 @@ mod tests {
                 description: None,
                 roles: vec![],
                 allow_deferred_memproofs: false,
-                signal_url: None,
+                relay_url: None,
                 bootstrap_url: None,
             }),
             Timestamp::now(),
@@ -952,7 +952,7 @@ mod tests {
             description: None,
             roles: vec![],
             allow_deferred_memproofs: false,
-            signal_url: None,
+            relay_url: None,
             bootstrap_url: None,
         });
         let mut app = InstalledAppCommon::new(
@@ -1052,7 +1052,7 @@ mod tests {
             roles: vec![],
             allow_deferred_memproofs: false,
             bootstrap_url: None,
-            signal_url: None,
+            relay_url: None,
         });
         let mut app = InstalledAppCommon::new(
             "app",
