@@ -92,6 +92,23 @@ where
         .await
 }
 
+/// Update `validation_status` for the given op. Returns the number of rows updated.
+pub(crate) async fn set_validation_status<'e, E>(
+    executor: E,
+    op_hash: &DhtOpHash,
+    validation_status: RecordValidity,
+) -> sqlx::Result<u64>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let result = sqlx::query("UPDATE ChainOp SET validation_status = ? WHERE hash = ?")
+        .bind(i64::from(validation_status))
+        .bind(op_hash.get_raw_36())
+        .execute(executor)
+        .await?;
+    Ok(result.rows_affected())
+}
+
 pub(crate) async fn get_chain_ops_for_action<'e, E>(
     executor: E,
     action_hash: ActionHash,
