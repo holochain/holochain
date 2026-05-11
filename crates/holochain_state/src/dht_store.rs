@@ -15,6 +15,18 @@ use holochain_zome_types::schedule::ScheduleError;
 
 use crate::mutations::{StateMutationError, StateMutationResult};
 
+/// Result of system validation for a single DHT op, expressed in terms the
+/// new schema understands.
+#[derive(Debug, Clone, Copy)]
+pub enum SysOutcome {
+    /// Accepted — `sys_validation_status = 1`.
+    Accepted,
+    /// Rejected — `sys_validation_status = 2`.
+    Rejected,
+    /// Awaiting dependencies — status remains NULL (i.e. pending).
+    AwaitingDeps,
+}
+
 /// Errors produced by [`DhtStore`] operations.
 ///
 /// Wraps the underlying database and schedule errors so callers do not need to
@@ -425,6 +437,35 @@ impl DhtStore<DbWrite<Dht>> {
         Ok(())
     }
 
+    /// Mirror sys validation outcomes from the legacy workflow. For each
+    /// (op_hash, outcome) pair, update `sys_validation_status` on the
+    /// matching limbo row. Each pair is tried first on `LimboChainOp`;
+    /// if no row matches there, `LimboWarrant` is tried.
+    pub async fn record_sys_validation_outcome(
+        &self,
+        outcomes: Vec<(DhtOpHash, SysOutcome)>,
+    ) -> StateMutationResult<()> {
+        let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
+        for (hash, outcome) in outcomes {
+            let status: Option<i64> = match outcome {
+                SysOutcome::Accepted => Some(1),
+                SysOutcome::Rejected => Some(2),
+                SysOutcome::AwaitingDeps => None,
+            };
+            let updated = tx
+                .set_limbo_chain_op_sys_validation_status(&hash, status)
+                .await
+                .map_err(StateMutationError::from)?;
+            if updated == 0 {
+                tx.set_limbo_warrant_sys_validation_status(&hash, status)
+                    .await
+                    .map_err(StateMutationError::from)?;
+            }
+        }
+        tx.commit().await.map_err(StateMutationError::from)?;
+        Ok(())
+    }
+
     /// Downgrade this writable store to a read-only store.
     pub fn as_read(&self) -> DhtStoreRead {
         DhtStore::new(self.db.as_ref().clone())
@@ -747,6 +788,78 @@ mod tests {
         assert!(row.is_some(), "LimboWarrant row not found after record_incoming_ops");
         let row = row.unwrap();
         assert!(row.serialized_size > 0, "serialized_size should be > 0");
+    }
+
+    // ---------------------------------------------------------------------------
+    // record_sys_validation_outcome tests
+    // ---------------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn record_sys_validation_outcome_chain_op() {
+        let store = DhtStore::new_test(dht_id()).await.unwrap();
+
+        // Seed a LimboChainOp row by calling record_incoming_ops (reusing the C1 helper).
+        let op = build_test_store_record_op_hashed(10);
+        let op_hash = op.as_hash().clone();
+        store.record_incoming_ops(vec![op]).await.unwrap();
+
+        // Confirm sys_validation_status starts as NULL.
+        let row_before = store
+            .db
+            .as_ref()
+            .get_limbo_chain_op(op_hash.clone())
+            .await
+            .unwrap()
+            .expect("LimboChainOp row not found after seed");
+        assert_eq!(row_before.sys_validation_status, None);
+
+        store
+            .record_sys_validation_outcome(vec![(op_hash.clone(), SysOutcome::Accepted)])
+            .await
+            .unwrap();
+
+        let row = store
+            .db
+            .as_ref()
+            .get_limbo_chain_op(op_hash)
+            .await
+            .unwrap()
+            .expect("LimboChainOp row not found after update");
+        assert_eq!(row.sys_validation_status, Some(1));
+    }
+
+    #[tokio::test]
+    async fn record_sys_validation_outcome_warrant() {
+        let store = DhtStore::new_test(dht_id()).await.unwrap();
+
+        // Seed a LimboWarrant row by calling record_incoming_ops (reusing the C1 helper).
+        let op = build_test_warrant_op_hashed(20);
+        let op_hash = op.as_hash().clone();
+        store.record_incoming_ops(vec![op]).await.unwrap();
+
+        // Confirm sys_validation_status starts as NULL.
+        let row_before = store
+            .db
+            .as_ref()
+            .get_limbo_warrant(op_hash.clone())
+            .await
+            .unwrap()
+            .expect("LimboWarrant row not found after seed");
+        assert_eq!(row_before.sys_validation_status, None);
+
+        store
+            .record_sys_validation_outcome(vec![(op_hash.clone(), SysOutcome::Rejected)])
+            .await
+            .unwrap();
+
+        let row = store
+            .db
+            .as_ref()
+            .get_limbo_warrant(op_hash)
+            .await
+            .unwrap()
+            .expect("LimboWarrant row not found after update");
+        assert_eq!(row.sys_validation_status, Some(2));
     }
 
     #[tokio::test]
