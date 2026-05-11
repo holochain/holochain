@@ -144,6 +144,7 @@ CREATE TABLE ChainOpPublish (
     op_hash           BLOB    PRIMARY KEY ON CONFLICT IGNORE,
     last_publish_time INTEGER,
     receipts_complete INTEGER,
+    withhold_publish  INTEGER,
     FOREIGN KEY(op_hash) REFERENCES ChainOp(hash)
 ) STRICT, WITHOUT ROWID;
 

@@ -13,12 +13,14 @@ impl DbWrite<Dht> {
         op_hash: &DhtOpHash,
         last_publish_time: Option<Timestamp>,
         receipts_complete: Option<bool>,
+        withhold_publish: Option<bool>,
     ) -> sqlx::Result<()> {
         chain_op_publish::insert_chain_op_publish(
             self.pool(),
             op_hash,
             last_publish_time,
             receipts_complete,
+            withhold_publish,
         )
         .await
     }
