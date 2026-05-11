@@ -5,12 +5,15 @@
 //! obtain a reference from [`Space`](crate) and invoke named methods; they do
 //! not need to interact with the underlying handle directly.
 
-use holo_hash::{AgentPubKey, DhtOpHash};
-use holochain_data::dht::InsertScheduledFunction;
+use holo_hash::{AgentPubKey, AnyDhtHash, DhtOpHash, HasHash};
+use holochain_data::dht::{InsertLimboChainOp, InsertLimboWarrant, InsertScheduledFunction};
 use holochain_data::kind::Dht;
 use holochain_data::DbWrite;
+use holochain_types::dht_op::{DhtOp, DhtOpHashed};
 use holochain_types::prelude::{Schedule, ScheduledFn, Timestamp};
 use holochain_zome_types::schedule::ScheduleError;
+
+use crate::mutations::{StateMutationError, StateMutationResult};
 
 /// Errors produced by [`DhtStore`] operations.
 ///
@@ -306,10 +309,141 @@ impl DhtStore<DbWrite<Dht>> {
         Ok(())
     }
 
+    /// Mirror network-received ops into the limbo tables.
+    ///
+    /// For each [`DhtOpHashed`], the parent `Action` (and any associated
+    /// `Entry`) is inserted into the DHT database first, then the op itself
+    /// is inserted into `LimboChainOp` (chain ops) or `LimboWarrant` (warrant
+    /// ops).  `require_receipt = true`; `serialized_size` is computed from the
+    /// encoded op.
+    ///
+    /// All writes happen in a single transaction.  The `Action` and both limbo
+    /// tables use `PRIMARY KEY ON CONFLICT IGNORE`, so duplicate ops are
+    /// silently skipped.
+    pub async fn record_incoming_ops(
+        &self,
+        ops: Vec<DhtOpHashed>,
+    ) -> StateMutationResult<()> {
+        let mut tx = self
+            .db
+            .begin()
+            .await
+            .map_err(StateMutationError::from)?;
+        let now = Timestamp::now();
+        for op in ops {
+            let op_hash = op.as_hash().clone();
+            let serialized_size = holochain_serialized_bytes::encode(op.as_content())
+                .map_err(StateMutationError::from)?
+                .len() as u32;
+            match op.into_inner().0 {
+                DhtOp::ChainOp(chain_op) => {
+                    let signed_action = chain_op.signed_action();
+                    let action_hash =
+                        holo_hash::ActionHash::with_data_sync(signed_action.action());
+                    let sah = holochain_zome_types::record::SignedActionHashed::with_presigned(
+                        holo_hash::HoloHashed::with_pre_hashed(
+                            signed_action.action().clone(),
+                            action_hash.clone(),
+                        ),
+                        signed_action.signature().clone(),
+                    );
+                    let new_sah =
+                        crate::source_chain::legacy_to_dht_v2_signed_action(&sah);
+                    tx.insert_action(&new_sah, None)
+                        .await
+                        .map_err(StateMutationError::from)?;
+
+                    // Insert entry if present.
+                    use holochain_zome_types::entry_def::EntryVisibility;
+                    if let holochain_types::prelude::RecordEntryRef::Present(entry) =
+                        chain_op.entry()
+                    {
+                        let entry_hash = action_hash_to_entry_hash(&chain_op)?;
+                        let is_private = matches!(
+                            chain_op.action().entry_visibility(),
+                            Some(EntryVisibility::Private)
+                        );
+                        if is_private {
+                            let author = chain_op.author().clone();
+                            tx.insert_private_entry(&entry_hash, &author, entry)
+                                .await
+                                .map_err(StateMutationError::from)?;
+                        } else {
+                            tx.insert_entry(&entry_hash, entry)
+                                .await
+                                .map_err(StateMutationError::from)?;
+                        }
+                    }
+
+                    // Compute basis hash and storage_center_loc.
+                    let linkable_basis = chain_op.dht_basis();
+                    let storage_center_loc = linkable_basis.get_loc();
+                    let basis_hash: AnyDhtHash =
+                        AnyDhtHash::try_from(linkable_basis).map_err(|e| {
+                            StateMutationError::Other(format!(
+                                "cannot convert op basis to AnyDhtHash: {e:?}"
+                            ))
+                        })?;
+
+                    tx.insert_limbo_chain_op(InsertLimboChainOp {
+                        op_hash: &op_hash,
+                        action_hash: &action_hash,
+                        op_type: i64::from(chain_op.get_type()),
+                        basis_hash: &basis_hash,
+                        storage_center_loc,
+                        require_receipt: true,
+                        when_received: now,
+                        serialized_size,
+                    })
+                    .await
+                    .map_err(StateMutationError::from)?;
+                }
+                DhtOp::WarrantOp(warrant_op) => {
+                    let author = &warrant_op.author;
+                    let timestamp = warrant_op.timestamp;
+                    let warrantee = &warrant_op.warrantee;
+                    let storage_center_loc = warrantee.get_loc();
+                    let proof_bytes = holochain_serialized_bytes::encode(&warrant_op.proof)
+                        .map_err(StateMutationError::from)?;
+
+                    tx.insert_limbo_warrant(InsertLimboWarrant {
+                        hash: &op_hash,
+                        author,
+                        timestamp,
+                        warrantee,
+                        proof: &proof_bytes,
+                        storage_center_loc,
+                        when_received: now,
+                        serialized_size,
+                    })
+                    .await
+                    .map_err(StateMutationError::from)?;
+                }
+            }
+        }
+        tx.commit().await.map_err(StateMutationError::from)?;
+        Ok(())
+    }
+
     /// Downgrade this writable store to a read-only store.
     pub fn as_read(&self) -> DhtStoreRead {
         DhtStore::new(self.db.as_ref().clone())
     }
+}
+
+/// Extract the `EntryHash` from a `ChainOp` that is known to carry an entry.
+///
+/// Returns an error if the action does not reference an entry hash, which
+/// would indicate a programmer error (calling this for a `RecordEntry::NA`
+/// variant).
+fn action_hash_to_entry_hash(
+    chain_op: &holochain_types::dht_op::ChainOp,
+) -> StateMutationResult<holo_hash::EntryHash> {
+    chain_op
+        .action()
+        .entry_hash()
+        .cloned()
+        .ok_or_else(|| StateMutationError::Other("op carries entry but action has no entry_hash".into()))
 }
 
 impl From<DhtStore<DbWrite<Dht>>> for DhtStoreRead {
@@ -484,5 +618,150 @@ mod tests {
             let count: i64 = sqlx::query_scalar(sql).fetch_one(pool).await.unwrap();
             assert_eq!(count, 0, "{table} not empty after purge_all");
         }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Helpers for record_incoming_ops tests
+    // ---------------------------------------------------------------------------
+
+    /// Build a `StoreRecord` chain op for a `Create` action carrying a public
+    /// entry.  `seed` is used to make each call produce distinct keys /
+    /// hashes (it drives the raw bytes of the author key and entry hash).
+    fn build_test_store_record_op_hashed(seed: u8) -> DhtOpHashed {
+        use holo_hash::{ActionHash, EntryHash};
+        use holochain_serialized_bytes::UnsafeBytes;
+        use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
+        use holochain_types::prelude::{AppEntryBytes, Entry, RecordEntry, Signature};
+        use holochain_zome_types::action::{Action, Create, EntryType};
+        use holochain_zome_types::entry_def::EntryVisibility;
+        use holochain_zome_types::prelude::AppEntryDef;
+
+        let author = AgentPubKey::from_raw_36(vec![seed; 36]);
+        let entry_hash = EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]);
+        let entry = Entry::App(AppEntryBytes(
+            holochain_serialized_bytes::SerializedBytes::try_from(UnsafeBytes::from(
+                vec![seed; 8],
+            ))
+            .unwrap(),
+        ));
+        let sig = Signature::from([seed; 64]);
+        let action = Action::Create(Create {
+            author: author.clone(),
+            timestamp: Timestamp::from_micros(seed as i64 * 1000),
+            action_seq: 1,
+            prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36]),
+            entry_type: EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
+            entry_hash: entry_hash.clone(),
+            weight: Default::default(),
+        });
+        let op = DhtOp::ChainOp(Box::new(ChainOp::StoreRecord(
+            sig,
+            action,
+            RecordEntry::Present(entry),
+        )));
+        DhtOpHashed::from_content_sync(op)
+    }
+
+    /// Build a `WarrantOp` (`ChainIntegrityWarrant::InvalidChainOp`) for
+    /// testing.  `seed` drives distinct key bytes.
+    fn build_test_warrant_op_hashed(seed: u8) -> DhtOpHashed {
+        use holochain_types::dht_op::{DhtOp, DhtOpHashed};
+        use holochain_types::warrant::WarrantOp;
+        use holochain_zome_types::prelude::{
+            ChainIntegrityWarrant, Signature, SignedWarrant, Warrant, WarrantProof,
+        };
+        use holochain_zome_types::op::ChainOpType;
+
+        let action_author = AgentPubKey::from_raw_36(vec![seed; 36]);
+        let warrantee = AgentPubKey::from_raw_36(vec![seed.wrapping_add(50); 36]);
+        let action_hash = holo_hash::ActionHash::from_raw_36(vec![seed.wrapping_add(100); 36]);
+        let warrant = SignedWarrant::new(
+            Warrant::new(
+                WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+                    action_author: action_author.clone(),
+                    action: (action_hash, Signature::from([seed; 64])),
+                    chain_op_type: ChainOpType::StoreRecord,
+                }),
+                AgentPubKey::from_raw_36(vec![seed.wrapping_add(10); 36]),
+                Timestamp::from_micros(seed as i64 * 1000),
+                warrantee,
+            ),
+            Signature::from([seed.wrapping_add(1); 64]),
+        );
+        let op = DhtOp::WarrantOp(Box::new(WarrantOp::from(warrant)));
+        DhtOpHashed::from_content_sync(op)
+    }
+
+    // ---------------------------------------------------------------------------
+    // record_incoming_ops tests
+    // ---------------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn record_incoming_ops_inserts_limbo_chain_op() {
+        let store = DhtStore::new_test(dht_id()).await.unwrap();
+        let op = build_test_store_record_op_hashed(1);
+        let op_hash = op.as_hash().clone();
+
+        // Extract the action hash before consuming `op`.
+        let action_hash = {
+            let action = op.as_content().as_chain_op().unwrap().action();
+            holo_hash::ActionHash::with_data_sync(&action)
+        };
+
+        store.record_incoming_ops(vec![op]).await.unwrap();
+
+        // Action row was inserted.
+        let found = store
+            .db
+            .as_ref()
+            .get_action(action_hash)
+            .await
+            .unwrap();
+        assert!(found.is_some(), "Action row not found after record_incoming_ops");
+
+        // LimboChainOp row has require_receipt=true and a positive serialized_size.
+        let row = store
+            .db
+            .as_ref()
+            .get_limbo_chain_op(op_hash)
+            .await
+            .unwrap()
+            .expect("LimboChainOp row not found");
+        assert_eq!(row.require_receipt, 1, "require_receipt should be 1 (true)");
+        assert!(row.serialized_size > 0, "serialized_size should be > 0");
+    }
+
+    #[tokio::test]
+    async fn record_incoming_ops_inserts_limbo_warrant() {
+        let store = DhtStore::new_test(dht_id()).await.unwrap();
+        let warrant_op = build_test_warrant_op_hashed(1);
+        let op_hash = warrant_op.as_hash().clone();
+
+        store.record_incoming_ops(vec![warrant_op]).await.unwrap();
+
+        let row = store.db.as_ref().get_limbo_warrant(op_hash).await.unwrap();
+        assert!(row.is_some(), "LimboWarrant row not found after record_incoming_ops");
+        let row = row.unwrap();
+        assert!(row.serialized_size > 0, "serialized_size should be > 0");
+    }
+
+    #[tokio::test]
+    async fn record_incoming_ops_dedupes_on_conflict() {
+        let store = DhtStore::new_test(dht_id()).await.unwrap();
+        let op = build_test_store_record_op_hashed(2);
+        let op_hash = op.as_hash().clone();
+
+        // First insert.
+        store.record_incoming_ops(vec![op.clone()]).await.unwrap();
+        // Re-insert: ON CONFLICT IGNORE means no error and no duplicate row.
+        store.record_incoming_ops(vec![op]).await.unwrap();
+
+        // Exactly one row still exists.
+        let row = store.db.as_ref().get_limbo_chain_op(op_hash).await.unwrap();
+        assert!(row.is_some(), "LimboChainOp row should still be present");
     }
 }
