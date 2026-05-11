@@ -5,19 +5,13 @@ use crate::metrics::{
     p2p_handle_incoming_request_duration_metric, p2p_handle_incoming_request_ignored_metric,
     p2p_outgoing_request_duration_metric, p2p_recv_remote_signal_metric,
 };
+use crate::peer_latency_store::{PeerLatencyService, PingFn};
 use crate::*;
-use holochain_sqlite::error::{DatabaseError, DatabaseResult};
-use holochain_sqlite::helpers::BytesSql;
-use holochain_sqlite::rusqlite::types::Value;
-use holochain_sqlite::sql::sql_peer_meta_store;
-use holochain_state::prelude::named_params;
 use holochain_types::cell_config_overrides::CellConfigOverrides;
 use kitsune2_api::*;
 use kitsune2_core::get_responsive_remote_agents_near_location;
-use rand::prelude::IndexedRandom;
 use std::collections::HashMap;
 use std::future::Future;
-use std::rc::Rc;
 use std::sync::{Mutex, Weak};
 use std::time::Duration;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
@@ -217,6 +211,10 @@ type Respond = tokio::sync::oneshot::Sender<crate::wire::WireMessage>;
 struct Pending {
     this: Weak<Mutex<Self>>,
     map: HashMap<u64, Respond>,
+    /// Maps `msg_id` to the expected responder URL for outbound pings.
+    /// Used to drop `PingRes` responses whose `from_peer` does not match
+    /// the pinged URL, preventing latency poisoning via `msg_id` race.
+    ping_expected: HashMap<u64, Url>,
 }
 
 impl Pending {
@@ -230,8 +228,34 @@ impl Pending {
         }
     }
 
+    /// Registers an outbound ping, recording the URL we expect the
+    /// `PingRes` to come from. See [`Self::respond_ping`].
+    fn register_ping(&mut self, msg_id: u64, expected_url: Url, resp: Respond, timeout: Duration) {
+        self.ping_expected.insert(msg_id, expected_url);
+        self.register(msg_id, resp, timeout);
+    }
+
     fn respond(&mut self, msg_id: u64) -> Option<Respond> {
+        self.ping_expected.remove(&msg_id);
         self.map.remove(&msg_id)
+    }
+
+    /// Resolves a `PingRes` only if `from_peer` matches the URL that was
+    /// pinged for this `msg_id`. Drops the response otherwise.
+    fn respond_ping(&mut self, msg_id: u64, from_peer: &Url) -> Option<Respond> {
+        match self.ping_expected.remove(&msg_id) {
+            Some(expected) if &expected == from_peer => self.map.remove(&msg_id),
+            Some(expected) => {
+                tracing::warn!(
+                    ?msg_id,
+                    %expected,
+                    %from_peer,
+                    "PingRes from unexpected peer, dropping"
+                );
+                None
+            }
+            None => None,
+        }
     }
 }
 
@@ -244,8 +268,9 @@ pub(crate) struct HolochainP2pActor {
     lair_client: holochain_keystore::MetaLairClient,
     kitsune: DynKitsune,
     kitsune2_config: Config,
-    blocks_db_getter: GetDbConductor,
+    get_conductor_store: GetConductorStore,
     pending: Arc<Mutex<Pending>>,
+    latency_service: PeerLatencyService,
     pruning_task_abort_handle: AbortHandle,
     request_timeout: Duration,
     incoming_request_concurrency_limit_semaphore: Arc<Semaphore>,
@@ -258,6 +283,8 @@ impl std::fmt::Debug for HolochainP2pActor {
 }
 
 const EVT_REG_ERR: &str = "event handler not registered";
+/// Timeout for each individual ping request.
+const PING_TIMEOUT: Duration = Duration::from_secs(5);
 
 impl SpaceHandler for HolochainP2pActor {
     fn recv_notify(&self, from_peer: Url, space: SpaceId, data: bytes::Bytes) -> K2Result<()> {
@@ -373,7 +400,10 @@ impl kitsune2_api::KitsuneHandler for HolochainP2pActor {
                         None => continue,
                         Some(space) => space,
                     };
-                    space.peer_store().insert(vec![agent]).await?;
+                    space.peer_store().insert(vec![agent.clone()]).await?;
+                    if let Some(url) = agent.url.clone() {
+                        self.latency_service.touch(url, space.clone());
+                    }
                 }
             }
 
@@ -520,7 +550,8 @@ impl HolochainP2pActor {
             }
         }
 
-        builder.auth_material = config.auth_material;
+        builder.auth_material_bootstrap = config.auth_material_bootstrap;
+        builder.auth_material_relay = config.auth_material_relay;
 
         let evt_sender = Arc::new(std::sync::OnceLock::new());
 
@@ -528,7 +559,7 @@ impl HolochainP2pActor {
             builder.report = HcReportFactory::create(lair_client.clone());
         }
         builder.blocks = Arc::new(HolochainBlocksFactory {
-            getter: config.get_conductor_db.clone(),
+            getter: config.get_conductor_store.clone(),
         });
         builder.peer_meta_store = Arc::new(HolochainPeerMetaStoreFactory {
             getter: config.get_db_peer_meta.clone(),
@@ -606,6 +637,7 @@ impl HolochainP2pActor {
             Mutex::new(Pending {
                 this: this.clone(),
                 map: HashMap::new(),
+                ping_expected: HashMap::new(),
             })
         });
 
@@ -618,6 +650,12 @@ impl HolochainP2pActor {
             kitsune2,
             db_getter,
         );
+        let ping_pending = pending.clone();
+        let ping_fn: PingFn = Arc::new(move |space: DynSpace, url: Url| {
+            let pending = Arc::clone(&ping_pending);
+            Box::pin(async move { Self::send_ping(&space, &pending, url).await })
+        });
+        let latency_service = PeerLatencyService::new(ping_fn);
 
         Ok(Arc::new_cyclic(|this| Self {
             this: this.clone(),
@@ -627,8 +665,9 @@ impl HolochainP2pActor {
             evt_sender,
             lair_client,
             kitsune,
-            blocks_db_getter: config.get_conductor_db.clone(),
+            get_conductor_store: config.get_conductor_store.clone(),
             pending,
+            latency_service,
             kitsune2_config,
             pruning_task_abort_handle,
             request_timeout: config.request_timeout,
@@ -673,79 +712,66 @@ impl HolochainP2pActor {
                 tokio::time::sleep(Duration::from_millis(interval_ms)).await;
 
                 let spaces = kitsune2.list_spaces();
-                let pruning_futs =
-                    spaces.into_iter().map(|space_id| {
-                        let db_getter = db_getter.clone();
-                        let kitsune2 = kitsune2.clone();
-                        async move {
-                            let Some(space) = kitsune2.clone().space_if_exists(space_id.clone()).await else {
-                                tracing::warn!("Cannot prune expired URLs from peer meta store for k2 space that does not exist with space id {space_id}");
-                                return Ok::<_, HolochainP2pError>(());
-                            };
+                let pruning_futs = spaces.into_iter().map(|space_id| {
+                    let db_getter = db_getter.clone();
+                    let kitsune2 = kitsune2.clone();
+                    async move {
+                        let Some(space) = kitsune2.clone().space_if_exists(space_id.clone()).await
+                        else {
+                            tracing::warn!("Cannot prune expired URLs from peer meta store for k2 space that does not exist with space id {space_id}");
+                            return Ok::<_, HolochainP2pError>(());
+                        };
 
-                            let peer_store = space.peer_store().clone();
-                            let db = db_getter(DnaHash::from_k2_space(&space_id)).await?;
-                            // Prune any expired entries.
-                            db.write_async(|txn| -> DatabaseResult<()> {
-                                let prune_count = txn.execute(sql_peer_meta_store::PRUNE, [])?;
-                                tracing::debug!("Pruned {prune_count} expired rows from peer meta store");
-                                Ok(())
-                            })
-                                .await
+                        let peer_store = space.peer_store().clone();
+                        let db = db_getter(DnaHash::from_k2_space(&space_id)).await?;
+
+                        // Prune any expired entries.
+                        let prune_count = db.prune().await.map_err(HolochainP2pError::other)?;
+                        tracing::debug!(
+                            "Pruned {prune_count} expired rows from peer meta store"
+                        );
+
+                        // Get agent infos from peer store and compare if there are any up-to-date
+                        // ones with any of the unresponsive URLs. That would indicate that the URL
+                        // was unresponsive temporarily and has since become responsive again.
+                        let agents = peer_store.get_all().await?;
+                        let unresponsive_key =
+                            format!("{KEY_PREFIX_ROOT}:{META_KEY_UNRESPONSIVE}");
+                        let unresponsive_entries = db
+                            .as_read()
+                            .get_all_by_key(&unresponsive_key)
+                            .await
+                            .map_err(HolochainP2pError::other)?;
+
+                        for (peer_url_str, meta_value) in unresponsive_entries {
+                            let peer_url = Url::from_str(peer_url_str)
                                 .map_err(HolochainP2pError::other)?;
-
-                            // Get agent infos from peer store and compare if there are any up-to-date ones with
-                            // any of the unresponsive URLs.
-                            // That would indicate that the URL was unresponsive temporarily and has become
-                            // responsive again.
-                            let agents = peer_store.get_all().await?;
-                            let urls_to_prune = db
-                                .read_async(move |txn| -> DatabaseResult<Vec<Value>> {
-                                    let mut stmt = txn.prepare(sql_peer_meta_store::GET_ALL_BY_KEY)?;
-                                    let mut rows = stmt.query(
-                                        named_params! {":meta_key":format!("{KEY_PREFIX_ROOT}:{META_KEY_UNRESPONSIVE}")},
-                                    )?;
-                                    let mut urls = Vec::new();
-                                    while let Some(row) = rows.next()? {
-                                        // Expecting is safe here, because the inserted values must have been URLs.
-                                        let peer_url = Url::from_str(row.get::<_, String>(0)?).map_err(|err| DatabaseError::Other(err.into()))?;
-                                        let meta_value = row.get::<_, BytesSql>("meta_value")?;
-                                        let timestamp: kitsune2_api::Timestamp = serde_json::from_slice(&meta_value.0).map_err(|err| DatabaseError::Other(err.into()))?;
-                                        if let Some(agent) = agents
-                                            .iter()
-                                            .find(|agent| agent.url == Some(peer_url.clone()))
-                                        {
-                                            if agent.created_at > timestamp {
-                                                urls.push(Value::Text(peer_url.to_string()));
-                                            }
-                                        }
-                                    }
-                                    Ok(urls)
-                                })
-                                .await
-                                .map_err(HolochainP2pError::other)?;
-
-                            // Delete all urls to be pruned from the table.
-                            db.write_async(|txn| -> DatabaseResult<()> {
-                                let values = Rc::new(urls_to_prune);
-                                let mut stmt = txn.prepare(sql_peer_meta_store::DELETE_URLS)?;
-                                stmt.execute(named_params! {":urls": values, ":meta_key": format!("{KEY_PREFIX_ROOT}:{META_KEY_UNRESPONSIVE}")})?;
-                                tracing::debug!("Pruned {} unexpired {KEY_PREFIX_ROOT}:{META_KEY_UNRESPONSIVE} rows from peer meta store because we have newer agent info", values.len());
-                                Ok(())
-                            })
-                                .await
-                                .map_err(HolochainP2pError::other)?;
-
-                            Ok::<_, HolochainP2pError>(())
+                            let timestamp: kitsune2_api::Timestamp =
+                                serde_json::from_slice(&meta_value)
+                                    .map_err(HolochainP2pError::other)?;
+                            if agents.iter().any(|agent| {
+                                agent.url == Some(peer_url.clone())
+                                    && agent.created_at > timestamp
+                            }) {
+                                db.delete(peer_url.as_str(), &unresponsive_key)
+                                    .await
+                                    .map_err(HolochainP2pError::other)?;
+                                tracing::debug!(
+                                    "Pruned {KEY_PREFIX_ROOT}:{META_KEY_UNRESPONSIVE} row for {peer_url} from peer meta store because we have newer agent info"
+                                );
+                            }
                         }
-                    });
+
+                        Ok::<_, HolochainP2pError>(())
+                    }
+                });
                 let results = futures::future::join_all(pruning_futs).await;
                 for err in results.into_iter().filter_map(Result::err) {
                     tracing::warn!("Pruning peer meta store failed: {err}");
                 }
             }
         })
-            .abort_handle()
+        .abort_handle()
     }
 
     async fn get_peers_for_location(
@@ -781,11 +807,11 @@ impl HolochainP2pActor {
             .collect::<Vec<_>>())
     }
 
-    /// Randomly selects and returns [`PARALLEL_GET_AGENTS_COUNT`] agents with a peer URL whose
-    /// storage arcs contain the given location.
+    /// Selects agents whose storage arcs contain the given location, using
+    /// latency-weighted random selection to prefer lower-latency peers.
     ///
     /// Returns an error if failed to get peers or no peers are found.
-    async fn get_random_peers_for_location(
+    async fn get_peers_for_location_weighted(
         &self,
         tag: &'static str,
         space: &DynSpace,
@@ -800,10 +826,47 @@ impl HolochainP2pActor {
             ));
         }
 
-        Ok(agents
-            .choose_multiple(&mut rand::rng(), options.remote_agent_count as usize)
-            .cloned()
-            .collect())
+        // Touch all peer URLs so the latency service tracks them.
+        for (_, url) in &agents {
+            self.latency_service.touch(url.clone(), space.clone());
+        }
+
+        // Deduplicate by URL, run weighted selection, then map back to
+        // (AgentPubKey, Url) pairs.
+        let url_to_agent: HashMap<Url, AgentPubKey> =
+            agents
+                .iter()
+                .fold(HashMap::new(), |mut by_url, (agent, url)| {
+                    by_url.entry(url.clone()).or_insert_with(|| agent.clone());
+                    by_url
+                });
+        let unique_urls: Vec<Url> = url_to_agent.keys().cloned().collect();
+
+        let selected_urls = {
+            let store = self.latency_service.store();
+            let data = store.lock().expect("latency data lock poisoned");
+            crate::weighted_selection::select_weighted_urls(
+                &data,
+                &unique_urls,
+                options.remote_agent_count as usize,
+            )
+        };
+
+        // `select_weighted_urls` filters out URLs with failed pings; if every
+        // candidate has failed pings we treat this as no peers available.
+        if selected_urls.is_empty() {
+            return Err(HolochainP2pError::NoPeersForLocation(
+                String::from(tag),
+                loc,
+            ));
+        }
+
+        let selected = selected_urls
+            .into_iter()
+            .filter_map(|url| url_to_agent.get(&url).map(|agent| (agent.clone(), url)))
+            .collect();
+
+        Ok(selected)
     }
 
     /// Check whether a message should be bridged locally to some other agent on this node.
@@ -923,6 +986,33 @@ impl HolochainP2pActor {
         }
     }
 
+    /// Sends a single [`PingReq`](WireMessage::PingReq) to a peer and
+    /// returns the measured round-trip time, or `None` on failure/timeout.
+    async fn send_ping(
+        space: &DynSpace,
+        pending: &Arc<Mutex<Pending>>,
+        to_url: Url,
+    ) -> Option<Duration> {
+        let (msg_id, req) = WireMessage::ping_req();
+        let req = WireMessage::encode_batch(&[&req]).ok()?;
+
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        pending
+            .lock()
+            .expect("pending lock poisoned")
+            .register_ping(msg_id, to_url.clone(), sender, PING_TIMEOUT);
+
+        let start = std::time::Instant::now();
+        if space.send_notify(to_url, req).await.is_err() {
+            return None;
+        }
+
+        match receiver.await {
+            Ok(WireMessage::PingRes { .. }) => Some(start.elapsed()),
+            _ => None,
+        }
+    }
+
     async fn inform_ops_stored(
         &self,
         space_id: SpaceId,
@@ -953,6 +1043,15 @@ impl HolochainP2pActor {
             config.set_module_config(&core_bootstrap_config)?;
             override_needed = true;
         }
+        #[cfg(feature = "transport-iroh")]
+        if let Some(relay_url) = space_overrides.relay_url.as_ref() {
+            // get current iroh transport config and override relay_url
+            let mut iroh_transport_config: kitsune2_transport_iroh::IrohTransportModConfig =
+                config.get_module_config().unwrap_or_default();
+            iroh_transport_config.iroh_transport.relay_url = Some(relay_url.clone());
+            config.set_module_config(&iroh_transport_config)?;
+            override_needed = true;
+        }
         if let Some(auth_material) = space_overrides.base64_auth_material.as_ref() {
             // get current bootstrap config and override auth_material_base64
             let mut core_bootstrap_config: kitsune2_core::factories::CoreBootstrapModConfig =
@@ -961,20 +1060,12 @@ impl HolochainP2pActor {
             config.set_module_config(&core_bootstrap_config)?;
             override_needed = true;
         }
-        if let Some(relay_url) = space_overrides.relay_url.as_ref() {
-            // get current bootstrap config and override relay_url
-            let mut core_bootstrap_config: kitsune2_core::factories::CoreBootstrapModConfig =
-                config.get_module_config().unwrap_or_default();
-            core_bootstrap_config.core_bootstrap.relay_url = Some(relay_url.clone());
-            config.set_module_config(&core_bootstrap_config)?;
-            override_needed = true;
-        }
         #[cfg(feature = "transport-tx5-backend-go-pion")]
-        if let Some(signal_url) = space_overrides.signal_url.as_ref() {
+        if let Some(relay_url) = space_overrides.relay_url.as_ref() {
             // get current tx5 transport config and override server_url
             let mut tx5_transport_config: kitsune2_transport_tx5::Tx5TransportModConfig =
                 config.get_module_config().unwrap_or_default();
-            tx5_transport_config.tx5_transport.server_url = signal_url.clone();
+            tx5_transport_config.tx5_transport.server_url = relay_url.clone();
             config.set_module_config(&tx5_transport_config)?;
             override_needed = true;
         }
@@ -1034,6 +1125,15 @@ impl HolochainP2pActor {
                 | MustGetAgentActivityRes { msg_id, .. }
                 | SendValidationReceiptsRes { msg_id } => {
                     if let Some(resp) = pending.lock().unwrap().respond(msg_id) {
+                        let _ = resp.send(msg);
+                    }
+                    record_incoming_request_duration(&[]);
+                }
+                PingRes { msg_id } => {
+                    // Only resolve PingRes if the responder URL matches the
+                    // peer we pinged — otherwise a racing peer could poison
+                    // the RTT recorded for the target URL.
+                    if let Some(resp) = pending.lock().unwrap().respond_ping(msg_id, &from_peer) {
                         let _ = resp.send(msg);
                     }
                     record_incoming_request_duration(&[]);
@@ -1283,6 +1383,20 @@ impl HolochainP2pActor {
                         "to_agent",
                         format!("{to_agent:?}"),
                     )]);
+                }
+                PingReq { msg_id } => {
+                    let resp = crate::wire::WireMessage::ping_res(msg_id);
+                    let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
+                    if let Err(err) = kitsune
+                        .space_if_exists(space_id)
+                        .await
+                        .ok_or_else(|| HolochainP2pError::other("no such space"))?
+                        .send_notify(from_peer, resp)
+                        .await
+                    {
+                        tracing::debug!(?err, "Error sending ping response");
+                    }
+                    record_incoming_request_duration(&[]);
                 }
                 RemoteSignalEvt {
                     to_agent,
@@ -1647,19 +1761,8 @@ impl actor::HcP2p for HolochainP2pActor {
         _source: AgentPubKey,
         op_hash_list: Vec<DhtOpHash>,
         _timeout_ms: Option<u64>,
-        reflect_ops: Option<Vec<DhtOp>>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
-            use crate::types::event::HcP2pHandler;
-
-            if let Some(reflect_ops) = reflect_ops {
-                self.evt_sender
-                    .get()
-                    .ok_or_else(|| HolochainP2pError::other(EVT_REG_ERR))?
-                    .handle_publish(dna_hash.clone(), reflect_ops)
-                    .await?;
-            }
-
             let space_id = dna_hash.to_k2_space();
 
             let space = self
@@ -1775,7 +1878,7 @@ impl actor::HcP2p for HolochainP2pActor {
 
             let loc = dht_hash.get_loc();
             let agents = self
-                .get_random_peers_for_location("get", &space, loc, &options)
+                .get_peers_for_location_weighted("get", &space, loc, &options)
                 .await?;
 
             let start = std::time::Instant::now();
@@ -1855,7 +1958,7 @@ impl actor::HcP2p for HolochainP2pActor {
                 .ok_or(HolochainP2pError::K2SpaceNotFound(space_id))?;
             let loc = link_key.base.get_loc();
             let agents = self
-                .get_random_peers_for_location(
+                .get_peers_for_location_weighted(
                     "get_links",
                     &space,
                     loc,
@@ -1923,7 +2026,7 @@ impl actor::HcP2p for HolochainP2pActor {
                 .ok_or(HolochainP2pError::K2SpaceNotFound(space_id))?;
             let loc = query.base.get_loc();
             let agents = self
-                .get_random_peers_for_location("count_links", &space, loc, &options)
+                .get_peers_for_location_weighted("count_links", &space, loc, &options)
                 .await?;
 
             let start = std::time::Instant::now();
@@ -1981,7 +2084,7 @@ impl actor::HcP2p for HolochainP2pActor {
                 .ok_or(HolochainP2pError::K2SpaceNotFound(space_id))?;
             let loc = agent.get_loc();
             let agents = self
-                .get_random_peers_for_location(
+                .get_peers_for_location_weighted(
                     "get_agent_activity",
                     &space,
                     loc,
@@ -2061,7 +2164,7 @@ impl actor::HcP2p for HolochainP2pActor {
                 .ok_or(HolochainP2pError::K2SpaceNotFound(space_id))?;
             let loc = author.get_loc();
             let agents = self
-                .get_random_peers_for_location("must_get_agent_activity", &space, loc, &options)
+                .get_peers_for_location_weighted("must_get_agent_activity", &space, loc, &options)
                 .await?;
 
             let start = std::time::Instant::now();
@@ -2097,13 +2200,54 @@ impl actor::HcP2p for HolochainP2pActor {
                         .await
                     })
                 }),
-                |agent_activity| matches!(agent_activity, MustGetAgentActivityResponse::EmptyRange),
+                |agent_activity| {
+                    matches!(
+                        agent_activity,
+                        MustGetAgentActivityResponse::ChainTopNotFound(_)
+                            | MustGetAgentActivityResponse::IncompleteChain
+                            | MustGetAgentActivityResponse::UntilHashMissing(_)
+                            | MustGetAgentActivityResponse::UntilTimestampIndeterminate(_)
+                    )
+                },
             )
             .await;
 
             timing_trace_out!(out, start, a = "send_must_get_agent_activity");
 
             out.map(|x| vec![x])
+        })
+    }
+
+    fn was_agent_recently_online(
+        &self,
+        dna_hash: DnaHash,
+        agent: AgentPubKey,
+    ) -> BoxFut<'_, HolochainP2pResult<bool>> {
+        Box::pin(async move {
+            let space_id = dna_hash.to_k2_space();
+            let space = self
+                .kitsune
+                .space_if_exists(space_id.clone())
+                .await
+                .ok_or(HolochainP2pError::K2SpaceNotFound(space_id))?;
+
+            let agent_id = agent.to_k2_agent();
+            let agent_url = space
+                .peer_store()
+                .get(agent_id)
+                .await?
+                .and_then(|i| i.url.clone());
+
+            if let Some(agent_url) = agent_url {
+                let unresponsive = space.peer_meta_store().get_unresponsive(agent_url).await?;
+
+                // We have a peer URL and haven't marked this peer as unresponsive, so as far as we know,
+                // they're online and will accept a connection.
+                Ok(unresponsive.is_none())
+            } else {
+                // No peer URL available, we have no evidence the agent is online.
+                Ok(false)
+            }
         })
     }
 
@@ -2379,21 +2523,19 @@ impl actor::HcP2p for HolochainP2pActor {
         })
     }
 
-    fn conductor_db_getter(&self) -> GetDbConductor {
-        self.blocks_db_getter.clone()
+    fn conductor_store_getter(&self) -> GetConductorStore {
+        self.get_conductor_store.clone()
     }
 
     fn block(&self, block: Block) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
             // Capture the target up front so we can move `block` into the DB call without cloning.
             let target = block.target().clone();
-            let db = self.conductor_db_getter()().await;
+            let store = self.conductor_store_getter()().await;
             // Write block to database.
-            holochain_state::block::block(&db, block)
-                .await
-                .map_err(|err| {
-                    HolochainP2pError::other(format!("Could not write block to database: {err}"))
-                })?;
+            store.block(block).await.map_err(|err| {
+                HolochainP2pError::other(format!("Could not write block to database: {err}"))
+            })?;
 
             if let holochain_zome_types::block::BlockTarget::Cell(cell_id, _) = target {
                 // Best-effort removal: do not error if the space is missing or removal fails.
@@ -2429,18 +2571,14 @@ impl actor::HcP2p for HolochainP2pActor {
 
     fn is_blocked(&self, target: BlockTargetId) -> BoxFut<'_, HolochainP2pResult<bool>> {
         Box::pin(async move {
-            let db = self.conductor_db_getter()().await;
-            db.read_async(|txn| {
-                holochain_state::block::query_is_blocked(
-                    txn,
-                    target,
-                    holochain_timestamp::Timestamp::now(),
-                )
-            })
-            .await
-            .map_err(|err| {
-                HolochainP2pError::other(format!("Could not read block from database: {err}"))
-            })
+            let store = self.conductor_store_getter()().await;
+            store
+                .as_read()
+                .is_blocked(target, holochain_timestamp::Timestamp::now())
+                .await
+                .map_err(|err| {
+                    HolochainP2pError::other(format!("Could not read block from database: {err}"))
+                })
         })
     }
 }
@@ -2565,9 +2703,8 @@ mod tests {
         // should not override if default
         let space_overrides = CellConfigOverrides {
             bootstrap_url: Some("http://override:1234".to_string()),
-            signal_url: Some("wss://override:5678".to_string()),
+            relay_url: Some("wss://override:5678".to_string()),
             base64_auth_material: None,
-            relay_url: None,
         };
         let overrides = actor_p2p
             .space_config_override(space_overrides)
@@ -2588,7 +2725,42 @@ mod tests {
             .expect("failed to get tx5 transport config");
         assert_eq!(
             tx5_transport_config.tx5_transport.server_url, "wss://override:5678",
-            "signal_url should match"
+            "relay_url should match"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[cfg(feature = "transport-iroh")]
+    async fn should_get_overrides_for_space_with_iroh_relay_url() {
+        let actor = test_p2p_actor_iroh().await;
+        let actor_p2p: Arc<HolochainP2pActor> =
+            Arc::downcast(actor).expect("failed to downcast actor");
+
+        let space_overrides = CellConfigOverrides {
+            bootstrap_url: Some("http://override:1234".to_string()),
+            relay_url: Some("wss://override:5678".to_string()),
+        };
+        let overrides = actor_p2p
+            .space_config_override(space_overrides)
+            .expect("failed to get overrides")
+            .expect("overrides should be some");
+
+        let bootstrap_config: kitsune2_core::factories::CoreBootstrapModConfig = overrides
+            .get_module_config()
+            .expect("failed to get bootstrap config");
+        assert_eq!(
+            bootstrap_config.core_bootstrap.server_url,
+            Some("http://override:1234".to_string()),
+            "bootstrap_url should match"
+        );
+
+        let iroh_transport_config: kitsune2_transport_iroh::IrohTransportModConfig = overrides
+            .get_module_config()
+            .expect("failed to get iroh transport config");
+        assert_eq!(
+            iroh_transport_config.iroh_transport.relay_url,
+            Some("wss://override:5678".to_string()),
+            "relay_url should match"
         );
     }
 
@@ -2600,6 +2772,7 @@ mod tests {
         let bootstrap = CoreBootstrapModConfig {
             core_bootstrap: CoreBootstrapConfig {
                 server_url: None,
+                auth_material_base64: None,
                 backoff_max_ms: 5_000,
                 backoff_min_ms: 100,
             },
@@ -2617,6 +2790,36 @@ mod tests {
             .expect("failed to set config");
         kitsune_config
             .set_module_config(&tx_config)
+            .expect("failed to set config");
+
+        let kitsune_config_json =
+            serde_json::to_value(&kitsune_config).expect("failed to serialize kitsune config");
+
+        let config = HolochainP2pConfig {
+            network_config: Some(kitsune_config_json),
+            ..Default::default()
+        };
+
+        HolochainP2pActor::create(config, holochain_keystore::test_keystore())
+            .await
+            .expect("failed to create actor")
+    }
+
+    #[cfg(feature = "transport-iroh")]
+    async fn test_p2p_actor_iroh() -> Arc<dyn HcP2p> {
+        use kitsune2_core::factories::{CoreBootstrapConfig, CoreBootstrapModConfig};
+
+        let bootstrap = CoreBootstrapModConfig {
+            core_bootstrap: CoreBootstrapConfig {
+                server_url: None,
+                auth_material_base64: None,
+                backoff_max_ms: 5_000,
+                backoff_min_ms: 100,
+            },
+        };
+        let kitsune_config = Config::default();
+        kitsune_config
+            .set_module_config(&bootstrap)
             .expect("failed to set config");
 
         let kitsune_config_json =
@@ -2868,6 +3071,21 @@ mod tests {
                 .lock()
                 .unwrap()
                 .register(msg_id, s, Duration::from_secs(60));
+            r
+        }
+
+        fn register_pending_ping_response_handler(
+            &self,
+            msg_id: u64,
+            expected_url: kitsune2_api::Url,
+        ) -> tokio::sync::oneshot::Receiver<WireMessage> {
+            let (s, r) = tokio::sync::oneshot::channel();
+            self.actor.pending.lock().unwrap().register_ping(
+                msg_id,
+                expected_url,
+                s,
+                Duration::from_secs(60),
+            );
             r
         }
     }
@@ -3244,7 +3462,7 @@ mod tests {
         // MustGetAgentActivityRes is not limited
         let msg = WireMessage::MustGetAgentActivityRes {
             msg_id: 7,
-            response: MustGetAgentActivityResponse::EmptyRange,
+            response: MustGetAgentActivityResponse::IncompleteChain,
         };
         let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
 
@@ -3261,6 +3479,18 @@ mod tests {
         let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
 
         let msg_receiver = harness.register_pending_message_response_handler(8);
+        harness
+            .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
+            .unwrap();
+
+        // Message was handled
+        assert!(msg_receiver.await.is_ok());
+
+        // PingRes is not limited
+        let msg = WireMessage::PingRes { msg_id: 11 };
+        let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
+
+        let msg_receiver = harness.register_pending_ping_response_handler(11, from_peer.clone());
         harness
             .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
             .unwrap();
@@ -3496,5 +3726,108 @@ mod tests {
 
         // The non limited message is handled
         assert!(unlimited_message_reciever.await.is_ok());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn ping_req_is_not_concurrency_limited() {
+        let dna_hash = DnaHash::from_raw_32(vec![0; 32]);
+        let space_id = dna_hash.to_k2_space();
+        let from_peer = kitsune2_api::Url::from_str("ws://test:80/1").unwrap();
+
+        // Use a concurrency limit of 1 so the single GetReq saturates it.
+        let harness = TestP2pActorHarness::new(1).await;
+
+        // Saturate the concurrency limit with a blocking GetReq.
+        let msg_data = create_encode_wire_message_get_req(1);
+        harness
+            .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
+            .unwrap();
+
+        let is_handled = retry_fn_until_timeout(
+            async || {
+                let count = harness.event_handler.handle_get_count.lock().unwrap();
+                *count == 1
+            },
+            None,
+            None,
+        )
+        .await;
+        assert!(is_handled.is_ok());
+
+        // All concurrency permits are now taken.
+        assert_eq!(
+            harness
+                .actor
+                .incoming_request_concurrency_limit_semaphore
+                .available_permits(),
+            0
+        );
+
+        // PingReq should still be accepted (not concurrency-limited).
+        // It will fail to send a response (no real space), but it must not
+        // block or consume a concurrency permit.
+        let msg = WireMessage::PingReq { msg_id: 42 };
+        let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
+        harness
+            .recv_notify(from_peer.clone(), space_id.clone(), msg_data)
+            .unwrap();
+
+        // Verify permits are still exhausted (PingReq did not take one).
+        assert_eq!(
+            harness
+                .actor
+                .incoming_request_concurrency_limit_semaphore
+                .available_permits(),
+            0
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn ping_res_from_expected_peer_resolves() {
+        let dna_hash = DnaHash::from_raw_32(vec![0; 32]);
+        let space_id = dna_hash.to_k2_space();
+        let expected_peer = kitsune2_api::Url::from_str("ws://expected:80/1").unwrap();
+        let harness = TestP2pActorHarness::new(10).await;
+
+        let msg_receiver =
+            harness.register_pending_ping_response_handler(42, expected_peer.clone());
+
+        let msg = WireMessage::PingRes { msg_id: 42 };
+        let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
+        harness
+            .recv_notify(expected_peer, space_id, msg_data)
+            .unwrap();
+
+        let result = tokio::time::timeout(Duration::from_millis(500), msg_receiver).await;
+        let received = result.expect("receiver should resolve before timeout");
+        assert!(
+            matches!(received, Ok(WireMessage::PingRes { msg_id: 42 })),
+            "expected matching PingRes, got {received:?}"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn ping_res_from_wrong_peer_is_dropped() {
+        let dna_hash = DnaHash::from_raw_32(vec![0; 32]);
+        let space_id = dna_hash.to_k2_space();
+        let expected_peer = kitsune2_api::Url::from_str("ws://expected:80/1").unwrap();
+        let wrong_peer = kitsune2_api::Url::from_str("ws://attacker:80/2").unwrap();
+        let harness = TestP2pActorHarness::new(10).await;
+
+        // Register a ping for msg_id 99 targeting `expected_peer`.
+        let msg_receiver =
+            harness.register_pending_ping_response_handler(99, expected_peer.clone());
+
+        // A PingRes with the same msg_id arrives from a different peer.
+        let msg = WireMessage::PingRes { msg_id: 99 };
+        let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();
+        harness.recv_notify(wrong_peer, space_id, msg_data).unwrap();
+
+        // The receiver should not resolve — the response was dropped.
+        let result = tokio::time::timeout(Duration::from_millis(200), msg_receiver).await;
+        assert!(
+            result.is_err(),
+            "PingRes from wrong peer should not resolve the pending ping"
+        );
     }
 }

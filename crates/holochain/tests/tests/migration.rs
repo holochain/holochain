@@ -45,12 +45,12 @@ async fn migrate_dna_with_second_app_install() {
         .await;
 
     // Prepare the DNA for the new app version
-    let mut mapping = serde_yaml::Mapping::new();
+    let mut mapping = yaml_serde::Mapping::new();
     mapping.insert(
         "prev_dna_hash".into(),
-        serde_yaml::Value::String(dna.dna_hash().clone().to_string()),
+        yaml_serde::Value::String(dna.dna_hash().clone().to_string()),
     );
-    let properties = YamlProperties::new(serde_yaml::Value::Mapping(mapping));
+    let properties = YamlProperties::new(yaml_serde::Value::Mapping(mapping));
     let (new_dna, _, _) = SweetDnaFile::from_test_wasms(
         random_network_seed(),
         vec![TestWasm::MigrateNew],

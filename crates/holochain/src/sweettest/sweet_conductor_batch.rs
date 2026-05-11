@@ -133,7 +133,7 @@ impl SweetConductorBatch {
         let apps = self
             .0
             .iter_mut()
-            .zip(agents.into_iter())
+            .zip(agents)
             .map(|(conductor, agent)| {
                 conductor.setup_app_for_agent(installed_app_id, agent.clone(), dna_files.clone())
             })

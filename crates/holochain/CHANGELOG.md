@@ -8,6 +8,57 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 
 - Per-space bootstrap server overrides from conductor config are now merged into cell config overrides, with app manifest overrides taking precedence.
+## 0.7.0-dev.24
+
+- **BREAKING CHANGE** switch peer metadata store from using the database from `holochain_sqlite` to using the new one defined in `holochain_state`. There is no migration path for existing installs of Holochain, and startup errors would be expected if the data state is not cleared. \#5748
+- Add peer metadata store in `holochain_state` that wraps the database added in `holochain_data`. \#5748
+- Remove the custom `ConductorStoreError` and `ConductorStoreResult` from `holochain_state`, use the `StateQueryError` and `StateQueryResult` instead.
+- Switch from `serde_yaml` to `yaml_serde`, to stay with the actively supported fork of the now deprecated library.
+
+## 0.7.0-dev.23
+
+- Added the per-DNA DHT v2 database schema and skeleton read/write API surface in `holochain_data`, with transitional DHT v2 domain types exposed across the Holochain type crates (`holochain_integrity_types`, `holochain_zome_types`, `holochain_types`). \#5743
+- Add peer metadata store database table to `holochain_data` along with full CRUD API. \#5746
+  - In the new peer metadata store database, the entries now store `expires_at` as seconds from the Unix epoch instead of microseconds and they correctly expire at the `expires_at` time instead of just after.
+- **BREAKING CHANGE** Switch from WAMR to Wasmi as the interpreter backend. This is a temporary change and Wasmi will also be replaced. Please do not use it.
+- **BREAKING CHANGE** Upgrade Wasmer from version 6 to 7, Kitsune2 from 0.4.x to 0.5.x, holochain\_serialized\_bytes to 0.0.57, Lair from 0.6.x to 0.7.x
+- **BREAKING CHANGE** Rename feature flags for Wasmer. The `wasmer_sys` feature flag is now `wasmer-sys-cranelift`. There is an additional `wasmer-sys-llvm` option. The `wasmer_wamr` feature flag is replaced by a roughly equivalent `wasmer-wasmi` feature flag which has fewer build-time requirements. The two control flags for wasmer have been renamed too, so `error_as_host` has become `error-as-host` and `wasmer_debug_memory` has become `wasmer-debug-memory`.
+- It’s no longer the case that the Wasmer backends are disallowed from being enabled together. You must enable at least one but if you build with multiple enabled, then the conductor will pick one at runtime. You can also configure which one to pick with the new `wasm_backend` conductor configuration option. It accepts `"cranelift"`, `"LLVM"` or `"wasmi"`.
+
+## 0.7.0-dev.22
+
+- **BREAKING CHANGE** switch from `holochain_sqlite`/`holochain_state` for the conductor database, to the new store defined by `holochain_data`. There is no migration path for existing installs of Holochain, and startup errors would be expected if the data state is not cleared.
+
+## 0.7.0-dev.21
+
+- **BREAKING CHANGE** `ChainFilter` is now defined via constructors `take`, `until_hash`, `until_timestamp` instead of composable builder chaining.
+- **BREAKING CHANGE** `must_get_agent_activity` error responses have changed:
+  - If the ChainFilter has a `LimitConditions::Take(0)`, then the error is now a `CascadeError::InvalidInput`.
+- **BREAKING CHANGE** `must_get_agent_activity` responses have changed:
+  - Activity results now follow the chain down from the provided `chain_top` hash, any forked actions are excluded.
+  - If the filter is `UntilHash` and that hash is not found the response is `MustGetAgentActivityResponse::UntilHashMissing`. This includes when the hash is on a dropped fork.
+  - If the filter is `UntilHash` with an until hash that has a sequence number greater than that of the ChainFilter `chain_top` action sequence, the response is `MustGetAgentActivityResponse::UntilHashAfterChainHead`.
+  - If the filter is `UntilTimestamp` and no action is found with a timestamp less than the provided timestamp and the genesis actions are not found to be after the timestamp, then the response is `MustGetAgentActivityResponse::UntilTimestampIndeterminate`. This is to ensure that responses are always deterministic.
+  - If the filter is `UntilTimestamp` with a timestamp greater than the ChainFilter `chain_top` action timestamp, the response is `MustGetAgentActivityResponse::UntilTimestampGreaterThanChainHead`.
+  - If the filter is `ToGenesis` and the chain does not reach genesis, the response is `MustGetAgentActivityResponse::IncompleteChain`.
+  - If the filter is `Take(n)` and fewer than `n` actions are available and the chain does not reach genesis, the response is `MustGetAgentActivityResponse::IncompleteChain`. Previously this could return `Activity` if no gaps were detected, but completeness cannot be guaranteed without reaching genesis.
+- Refactored `must_get_agent_activity` implementation to improve code clarity and correctness. \#5689
+
+## 0.7.0-dev.20
+
+- When Holochain attempts to prepare validation receipts but the author of the data has not been recently online, by being present in our peer store, then clear the receipt request and skip attempting to send. The author may request validation receipts again by republishing their content.
+
+## 0.7.0-dev.19
+
+## 0.7.0-dev.18
+
+- **BREAKING CHANGE:** Split combined auth material into auth material for bootstrap service and auth material for relay service.
+
+## 0.7.0-dev.17
+
+- All influxive metrics modes now automatically stamp a `host` tag on every emitted metric, defaulting to the OS hostname. Override with the `HOLOCHAIN_INFLUXIVE_HOST_TAG` environment variable. \#5686
+- Fix an issue with the Holochain configuration schema generation which caused a panic. This is now properly tested to prevent regressions. \#5683
+
 ## 0.7.0-dev.16
 
 - Record new OpenTelemetry metrics covering conductor, ribosome, network, cascade, and keystore operations.
@@ -954,7 +1005,7 @@ Now it serializes to
   - Performance and correctness: A feature which captured and processed ops that were discovered during validation has been removed. This had been added as an attempt to avoid deadlocks within validation but if that happens there’s a bug somewhere else. Sys validation needs to trust that Holochain will correctly manage its current arc and that we will get that data eventually through publishing or gossip. This probably wasn’t doing a lot of harm but it was uneccessary and doing database queries so it should be good to have that gone.
   - Performance: In-memory caching for sys validation dependencies. When we have to wait to validate an op because it has a missing dependency, any other actions required by that op will be held in memory rather than being refetched from the database. This has a fairly small memory footprint because actions are relatively small but saves repeatedly hitting the cascade for the same data if it takes a bit of time to find a dependency on the network.
 
-- **BREAKING* CHANGE*: The `ConductorConfig` has been updated to add a new option for configuring conductor behaviour. This should be compatible with existing conductor config YAML files but if you are creating the struct directly then you will need to include the new field. Currently this just has one setting which controls how fast the sys validation workflow will retry network gets for missing dependencies. It’s likely this option will change in the near future.
+- \**BREAKING* CHANGE\*: The `ConductorConfig` has been updated to add a new option for configuring conductor behaviour. This should be compatible with existing conductor config YAML files but if you are creating the struct directly then you will need to include the new field. Currently this just has one setting which controls how fast the sys validation workflow will retry network gets for missing dependencies. It’s likely this option will change in the near future.
 
 ## 0.3.0-beta-dev.26
 
@@ -1075,7 +1126,7 @@ Now it serializes to
 - When uninstalling an app, local data is now cleaned up where appropriate. [\#1805](https://github.com/holochain/holochain/pull/1805)
   - Detail: any time an app is uninstalled, if the removal of that app’s cells would cause there to be no cell installed which uses a given DNA, the databases for that DNA space are deleted. So, if you have an app installed twice under two different agents and uninstall one of them, no data will be removed, but if you uninstall both, then all local data will be cleaned up. If any of your data was gossiped to other peers though, it will live on in the DHT, and even be gossiped back to you if you reinstall that same app with a new agent.
 - Renames `OpType` to `FlatOp`, and `Op::to_type()` to `Op::flattened()`. Aliases for the old names still exist, so this is not a breaking change. [\#1909](https://github.com/holochain/holochain/pull/1909)
-- Fixed a [problem with validation of Ops with private entry data](https://github.com/holochain/holochain/issues/1861), where  `Op::to_type()` would fail for private `StoreEntry` ops. [\#1910](https://github.com/holochain/holochain/pull/1910)
+- Fixed a [problem with validation of Ops with private entry data](https://github.com/holochain/holochain/issues/1861), where `Op::to_type()` would fail for private `StoreEntry` ops. [\#1910](https://github.com/holochain/holochain/pull/1910)
 
 ## 0.1.0
 
@@ -1186,7 +1237,7 @@ Now it serializes to
 
 - Revert: “Add the `hdi_version_req` key:value field to the output of the `--build-info` argument” because it broke. [\#1521](https://github.com/holochain/holochain/pull/1521)
   
-  Reason: it causes a build failure of the *holochain*  crate on crates.io
+  Reason: it causes a build failure of the *holochain* crate on crates.io
 
 ## 0.0.153
 
@@ -1534,7 +1585,7 @@ The severity of these issues increases with cell concurrency, i.e. using multipl
 
 ### Removed
 
-- BREAKING:  `InstallAppDnaPayload` in admin conductor API `InstallApp` command now only accepts a hash.  Both properties and path have been removed as per deprecation warning.  Use either `RegisterDna` or `InstallAppBundle` instead. [\#665](https://github.com/holochain/holochain/pull/665)
+- BREAKING: `InstallAppDnaPayload` in admin conductor API `InstallApp` command now only accepts a hash. Both properties and path have been removed as per deprecation warning. Use either `RegisterDna` or `InstallAppBundle` instead. [\#665](https://github.com/holochain/holochain/pull/665)
 - BREAKING: `DnaSource(Path)` in conductor\_api `RegisterDna` call now must point to `DnaBundle` as created by `hc dna pack` not a `DnaFile` created by `dna_util` [\#665](https://github.com/holochain/holochain/pull/665)
 
 ### CHANGED

@@ -27,7 +27,7 @@ pub fn get_links(
                 tokio_helper::block_forever_on(async move {
                     let call_context_iter = std::iter::from_fn(|| Some(call_context.clone()));
                     futures::stream::iter(
-                        std::iter::zip(inputs.into_iter(), call_context_iter).map(
+                        std::iter::zip(inputs, call_context_iter).map(
                             |(input, call_context)| async move {
                                 let GetLinksInput {
                                     base_address,

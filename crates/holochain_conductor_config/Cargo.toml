@@ -1,6 +1,6 @@
 [package]
 name = "holochain_conductor_config"
-version = "0.7.0-dev.15"
+version = "0.7.0-dev.23"
 description = "Provides utilities for generating holochain conductor configuration."
 repository = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_conductor_config"
@@ -14,10 +14,10 @@ license = "Apache-2.0"
 [dependencies]
 anyhow = "1.0"
 ansi_term = "0.12"
-holochain_conductor_api = { version = "^0.7.0-dev.15", path = "../holochain_conductor_api", default-features = false, features = [
+holochain_conductor_api = { version = "^0.7.0-dev.23", path = "../holochain_conductor_api", default-features = false, features = [
   "sqlite",
 ] }
-holochain_types = { version = "^0.7.0-dev.15", path = "../holochain_types", features = [
+holochain_types = { version = "^0.7.0-dev.23", path = "../holochain_types", features = [
   "sqlite",
 ] }
 holochain_util = { version = "^0.7.0-dev.1", path = "../holochain_util", default-features = false, features = [
@@ -25,9 +25,10 @@ holochain_util = { version = "^0.7.0-dev.1", path = "../holochain_util", default
 ] }
 nanoid = "0.4"
 serde = { version = "1.0", features = ["derive"] }
-serde_yaml = "0.9"
+yaml_serde = "0.10"
 sodoken = "0.1.0"
 url2 = "0.0.6"
+tracing = "0.1"
 
 [dev-dependencies]
 tempfile = "3.15"

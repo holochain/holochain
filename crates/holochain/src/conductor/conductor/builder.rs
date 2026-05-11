@@ -210,11 +210,20 @@ impl ConductorBuilder {
         let net_spaces1 = spaces.clone();
         let net_spaces2 = spaces.clone();
         let net_spaces3 = spaces.clone();
-        let conductor_db = spaces.conductor_db.clone();
+        let conductor_store = spaces.conductor_store.clone();
         let p2p_config = holochain_p2p::HolochainP2pConfig {
-            auth_material: config
+            auth_material_bootstrap: config
                 .network
-                .base64_auth_material
+                .base64_auth_material_bootstrap
+                .as_ref()
+                .map(|m| {
+                    use base64::prelude::*;
+                    BASE64_STANDARD.decode(m).map_err(ConductorError::other)
+                })
+                .transpose()?,
+            auth_material_relay: config
+                .network
+                .base64_auth_material_relay
                 .as_ref()
                 .map(|m| {
                     use base64::prelude::*;
@@ -222,7 +231,7 @@ impl ConductorBuilder {
                 })
                 .transpose()?,
             get_db_peer_meta: Arc::new(move |dna_hash| {
-                let res = net_spaces1.peer_meta_store_db(&dna_hash);
+                let res = net_spaces1.peer_meta_store(&dna_hash);
                 Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
             }),
             get_db_op_store: Arc::new(move |dna_hash| {
@@ -233,9 +242,9 @@ impl ConductorBuilder {
                 let res = net_spaces3.cache(&dna_hash);
                 Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
             }),
-            get_conductor_db: Arc::new(move || {
-                let conductor_db = conductor_db.clone();
-                Box::pin(async move { conductor_db })
+            get_conductor_store: Arc::new(move || {
+                let conductor_store = conductor_store.clone();
+                Box::pin(async move { conductor_store })
             }),
             target_arc_factor: config.network.target_arc_factor,
             network_config: Some(config.network.to_k2_config()?),
@@ -432,11 +441,20 @@ impl ConductorBuilder {
         let net_spaces1 = spaces.clone();
         let net_spaces2 = spaces.clone();
         let net_spaces3 = spaces.clone();
-        let conductor_db = spaces.conductor_db.clone();
+        let conductor_store = spaces.conductor_store.clone();
         let p2p_config = holochain_p2p::HolochainP2pConfig {
-            auth_material: config
+            auth_material_bootstrap: config
                 .network
-                .base64_auth_material
+                .base64_auth_material_bootstrap
+                .as_ref()
+                .map(|m| {
+                    use base64::prelude::*;
+                    BASE64_STANDARD.decode(m).map_err(ConductorError::other)
+                })
+                .transpose()?,
+            auth_material_relay: config
+                .network
+                .base64_auth_material_relay
                 .as_ref()
                 .map(|m| {
                     use base64::prelude::*;
@@ -444,7 +462,7 @@ impl ConductorBuilder {
                 })
                 .transpose()?,
             get_db_peer_meta: Arc::new(move |dna_hash| {
-                let res = net_spaces1.peer_meta_store_db(&dna_hash);
+                let res = net_spaces1.peer_meta_store(&dna_hash);
                 Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
             }),
             get_db_op_store: Arc::new(move |dna_hash| {
@@ -455,9 +473,9 @@ impl ConductorBuilder {
                 let res = net_spaces3.cache(&dna_hash);
                 Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
             }),
-            get_conductor_db: Arc::new(move || {
-                let conductor_db = conductor_db.clone();
-                Box::pin(async move { conductor_db })
+            get_conductor_store: Arc::new(move || {
+                let conductor_store = conductor_store.clone();
+                Box::pin(async move { conductor_store })
             }),
             target_arc_factor: config.network.target_arc_factor,
             network_config: Some(config.network.to_k2_config()?),

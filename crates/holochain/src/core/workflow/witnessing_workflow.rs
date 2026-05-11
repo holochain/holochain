@@ -284,7 +284,7 @@ mod tests {
         }
 
         // - Put the ops in the workspace with expiry set to one hour from now.
-        for (op_h, op) in op_hashes.into_iter().zip(ops.into_iter()) {
+        for (op_h, op) in op_hashes.into_iter().zip(ops) {
             let expires = (Timestamp::now() + std::time::Duration::from_secs(60 * 60)).unwrap();
             workspace.put(
                 entry_hash.clone(),

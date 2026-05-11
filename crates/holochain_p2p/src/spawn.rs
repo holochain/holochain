@@ -15,9 +15,14 @@ pub async fn spawn_holochain_p2p(
     actor::HolochainP2pActor::create(config, lair_client).await
 }
 
-/// Callback function to retrieve a peer meta database handle for a dna hash.
+/// Callback function to retrieve a peer meta store for a dna hash.
 pub type GetDbPeerMeta = Arc<
-    dyn Fn(DnaHash) -> BoxFut<'static, HolochainP2pResult<DbWrite<DbKindPeerMetaStore>>>
+    dyn Fn(
+            DnaHash,
+        ) -> BoxFut<
+            'static,
+            HolochainP2pResult<holochain_state::peer_metadata_store::PeerMetaStore>,
+        >
         + 'static
         + Send
         + Sync,
@@ -39,9 +44,10 @@ pub type GetDbCache = Arc<
         + Sync,
 >;
 
-/// Callback function to retrieve a conductor database.
-pub type GetDbConductor =
-    Arc<dyn Fn() -> BoxFut<'static, DbWrite<DbKindConductor>> + 'static + Send + Sync>;
+/// Callback function to retrieve a conductor store.
+pub type GetConductorStore = Arc<
+    dyn Fn() -> BoxFut<'static, holochain_state::conductor::ConductorStore> + 'static + Send + Sync,
+>;
 
 /// Configure reporting.
 #[derive(Default)]
@@ -56,13 +62,13 @@ pub enum ReportConfig {
 
 /// HolochainP2p config struct.
 pub struct HolochainP2pConfig {
-    /// Callback function to retrieve a peer meta database handle for a dna hash.
+    /// Callback function to retrieve a [`holochain_state::peer_metadata_store::PeerMetaStore`] for a dna hash.
     ///
     /// **Must be set explicitly** — the [`Default`] value panics when called. Example:
     ///
     /// ```ignore
     /// get_db_peer_meta: Arc::new(move |dna_hash| {
-    ///     let res = spaces.peer_meta(&dna_hash);
+    ///     let res = spaces.peer_meta_store(&dna_hash);
     ///     Box::pin(async move { res.map_err(HolochainP2pError::other) })
     /// }),
     /// ```
@@ -104,23 +110,26 @@ pub struct HolochainP2pConfig {
     /// ```
     pub get_db_cache: GetDbCache,
 
-    /// Callback function to retrieve the conductor database handle.
+    /// Callback function to retrieve the conductor store.
     ///
     /// **Must be set explicitly** — the [`Default`] value panics when called. Example:
     ///
     /// ```ignore
-    /// get_conductor_db: Arc::new(|| {
-    ///     let res = conductor_db.clone();
-    ///     Box::pin(async move { Ok(res) })
+    /// get_conductor_store: Arc::new(|| {
+    ///     let res = conductor_store.clone();
+    ///     Box::pin(async move { res })
     /// }),
     /// ```
-    pub get_conductor_db: GetDbConductor,
+    pub get_conductor_store: GetConductorStore,
 
     /// The arc factor to apply to target arc hints.
     pub target_arc_factor: u32,
 
-    /// Authentication material if required by sbd/signal/bootstrap services.
-    pub auth_material: Option<Vec<u8>>,
+    /// Authentication material if required by the bootstrap service.
+    pub auth_material_bootstrap: Option<Vec<u8>>,
+
+    /// Authentication material if required by the relay service.
+    pub auth_material_relay: Option<Vec<u8>>,
 
     /// Configuration to pass to Kitsune2.
     ///
@@ -171,7 +180,14 @@ impl std::fmt::Debug for HolochainP2pConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut dbg = f.debug_struct("HolochainP2pConfig");
         dbg.field("compat", &self.compat);
-        dbg.field("auth_material", &self.auth_material);
+        dbg.field(
+            "auth_material_bootstrap",
+            &self.auth_material_bootstrap.as_ref().map(|_| "<redacted>"),
+        );
+        dbg.field(
+            "auth_material_relay",
+            &self.auth_material_relay.as_ref().map(|_| "<redacted>"),
+        );
         dbg.field("request_timeout", &self.request_timeout);
         dbg.field("target_arc_factor", &self.target_arc_factor);
         dbg.field("network_config", &self.network_config);
@@ -191,7 +207,7 @@ impl Default for HolochainP2pConfig {
     /// Returns a config with placeholder values.
     ///
     /// The database callbacks (`get_db_peer_meta`, `get_db_op_store`, `get_db_cache`,
-    /// `get_conductor_db`) all panic with `unimplemented!()` when invoked — they will
+    /// `get_conductor_store`) all panic with `unimplemented!()` when invoked — they will
     /// be called the first time a space is created, so **always supply concrete
     /// implementations** before passing this config to [`spawn_holochain_p2p`].
     /// Use struct-update syntax rather than relying on this default entirely:
@@ -209,9 +225,10 @@ impl Default for HolochainP2pConfig {
             peer_meta_pruning_interval_ms: 10_000,
             get_db_op_store: Arc::new(|_| unimplemented!()),
             get_db_cache: Arc::new(|_| unimplemented!()),
-            get_conductor_db: Arc::new(|| unimplemented!()),
+            get_conductor_store: Arc::new(|| unimplemented!()),
             target_arc_factor: 1,
-            auth_material: None,
+            auth_material_bootstrap: None,
+            auth_material_relay: None,
             network_config: None,
             compat: Default::default(),
             request_timeout: Duration::from_secs(60),
@@ -227,7 +244,7 @@ impl Default for HolochainP2pConfig {
     }
 }
 
-/// See [NetworkCompatParams::proto_ver].
+/// See [`NetworkCompatParams::proto_ver`].
 pub const HCP2P_PROTO_VER: u32 = 2;
 
 /// Some parameters used as part of a protocol compatibility check during tx5 preflight

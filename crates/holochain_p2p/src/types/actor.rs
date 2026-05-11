@@ -70,7 +70,7 @@ pub struct GetLinksRequestOptions {
 ///
 /// Fields tagged with `[Network]` are network-level controls.
 /// Fields tagged with `[Remote]` are controls that will be forwarded to the
-/// remote agent processing this `GetLinks` request.
+/// remote agent processing this `GetAgentActivity` request.
 #[derive(Debug, Clone)]
 pub struct GetActivityOptions {
     /// The base network options to use for this call.
@@ -230,7 +230,6 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug + Any {
         source: AgentPubKey,
         op_hash_list: Vec<DhtOpHash>,
         timeout_ms: Option<u64>,
-        reflect_ops: Option<Vec<DhtOp>>,
     ) -> BoxFut<'_, HolochainP2pResult<()>>;
 
     /// Publish a countersigning op.
@@ -292,6 +291,13 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug + Any {
         zome_call_origin: Option<(ZomeName, FunctionName)>,
     ) -> BoxFut<'_, HolochainP2pResult<Vec<MustGetAgentActivityResponse>>>;
 
+    /// Check if an agent was recently online in this network.
+    fn was_agent_recently_online(
+        &self,
+        dna_hash: DnaHash,
+        agent: AgentPubKey,
+    ) -> BoxFut<'_, HolochainP2pResult<bool>>;
+
     /// Send a validation receipt to a remote node.
     fn send_validation_receipts(
         &self,
@@ -339,8 +345,8 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug + Any {
     /// Query if an agent is blocked.
     fn is_blocked(&self, target: BlockTargetId) -> BoxFut<'_, HolochainP2pResult<bool>>;
 
-    /// Get the conductor database getter.
-    fn conductor_db_getter(&self) -> crate::GetDbConductor;
+    /// Get the conductor store getter.
+    fn conductor_store_getter(&self) -> crate::GetConductorStore;
 }
 
 /// Trait-object HcP2p

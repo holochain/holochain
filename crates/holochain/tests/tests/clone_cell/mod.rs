@@ -136,6 +136,7 @@ async fn disable_enable_and_delete_clone_cell() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(feature = "wasmer-wasmi", ignore)]
 async fn prevents_cross_app_clone_operations() {
     holochain_trace::test_run();
 

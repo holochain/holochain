@@ -19,8 +19,12 @@ use {
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(
-    not(any(target_os = "linux", all(target_os = "macos", feature = "wasmer_sys"))),
-    ignore = "flaky on macos+wasmer_wamr and windows"
+    not(any(
+        target_os = "linux",
+        all(target_os = "macos", feature = "wasmer-sys-cranelift"),
+        all(target_os = "macos", feature = "wasmer-sys-llvm")
+    )),
+    ignore = "flaky on macos+wasmer-wasmi and windows"
 )]
 async fn publish_terminates_after_receiving_required_validation_receipts() {
     use holochain::test_utils::retry_fn_until_timeout;
@@ -188,7 +192,8 @@ async fn warrant_is_published() {
             .await
             .unwrap()
             .transport_stats
-            .peer_urls[0]
+            .peer_urls
+            .first()
     );
     println!(
         "1 bob   {} url {:?}",
@@ -198,7 +203,8 @@ async fn warrant_is_published() {
             .await
             .unwrap()
             .transport_stats
-            .peer_urls[0]
+            .peer_urls
+            .first()
     );
     println!(
         "2 carol {} url {:?}",
@@ -208,7 +214,8 @@ async fn warrant_is_published() {
             .await
             .unwrap()
             .transport_stats
-            .peer_urls[0]
+            .peer_urls
+            .first()
     );
 
     await_consistency([&alice, &bob, &carol]).await.unwrap();

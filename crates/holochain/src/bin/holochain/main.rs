@@ -238,7 +238,7 @@ fn display_friendly_missing_config_message(maybe_config_root_path: Option<&Confi
 
 fn display_friendly_malformed_config_message(
     config_root_path: &ConfigRootPath,
-    error: serde_yaml::Error,
+    error: yaml_serde::Error,
 ) {
     println!(
         "

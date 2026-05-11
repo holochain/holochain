@@ -54,16 +54,9 @@ pub async fn publish_dht_ops_workflow(
 
     // Commit to the network
     let mut success = Vec::with_capacity(to_publish.len());
-    for (basis, list) in to_publish {
-        let (op_hash_list, op_data_list): (Vec<_>, Vec<_>) = list.into_iter().unzip();
+    for (basis, op_hash_list) in to_publish {
         match network
-            .publish(
-                basis,
-                agent.clone(),
-                op_hash_list.clone(),
-                None,
-                Some(op_data_list),
-            )
+            .publish(basis, agent.clone(), op_hash_list.clone(), None)
             .await
         {
             Err(e) => {
@@ -121,17 +114,17 @@ pub async fn publish_dht_ops_workflow_inner(
     db: DbRead<DbKindAuthored>,
     agent: AgentPubKey,
     min_publish_interval: Duration,
-) -> WorkflowResult<HashMap<OpBasis, Vec<(DhtOpHash, crate::prelude::DhtOp)>>> {
+) -> WorkflowResult<HashMap<OpBasis, Vec<DhtOpHash>>> {
     // Ops to publish by basis
     let mut to_publish = HashMap::new();
 
-    for (basis, op_hash, op) in get_ops_to_publish(agent, &db, min_publish_interval).await? {
+    for (basis, op_hash) in get_ops_to_publish(agent, &db, min_publish_interval).await? {
         // For every op publish a request
         // Collect and sort ops by basis
         to_publish
             .entry(basis)
             .or_insert_with(Vec::new)
-            .push((op_hash, op));
+            .push(op_hash);
     }
 
     Ok(to_publish)

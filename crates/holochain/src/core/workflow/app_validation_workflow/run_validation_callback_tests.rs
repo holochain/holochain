@@ -1,3 +1,4 @@
+use crate::core::ribosome::real_ribosome::{make_module_cache, WasmBackend};
 use crate::{
     conductor::space::TestSpace,
     core::{
@@ -28,9 +29,8 @@ use holochain_types::{
     record::WireRecordOps,
 };
 use holochain_wasm_test_utils::TestWasm;
-use holochain_wasmer_host::module::ModuleCache;
 use holochain_zome_types::{
-    chain::{ChainFilter, LimitConditions, MustGetAgentActivityInput},
+    chain::{ChainFilter, MustGetAgentActivityInput},
     dependencies::holochain_integrity_types::{UnresolvedDependencies, ValidateCallbackResult},
     entry::MustGetActionInput,
     fixt::{CreateFixturator, DeleteFixturator, SignatureFixturator},
@@ -41,8 +41,7 @@ use holochain_zome_types::{
     Action,
 };
 use matches::assert_matches;
-use parking_lot::RwLock;
-use std::{collections::HashSet, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 // test app validation with a must get action where the original action of
 // a delete is not in the cache db and then added to it
@@ -231,13 +230,10 @@ async fn validation_callback_awaiting_deps_agent_activity() {
         move |api, op: Op| {
             if let Op::RegisterDelete(RegisterDelete { delete }) = op {
                 // chain filter with delete as chain top and create as chain bottom
-                let mut filter_hashes = HashSet::new();
-                filter_hashes.insert(delete.hashed.deletes_address.clone().clone());
-                let chain_filter = ChainFilter {
-                    chain_top: delete.as_hash().clone(),
-                    limit_conditions: LimitConditions::UntilHash(filter_hashes),
-                    include_cached_entries: false,
-                };
+                let chain_filter = ChainFilter::until_hash(
+                    delete.as_hash().clone(),
+                    delete.hashed.deletes_address.clone(),
+                );
                 let result = api.must_get_agent_activity(MustGetAgentActivityInput {
                     author: delete.hashed.author.clone(),
                     chain_filter: chain_filter.clone(),
@@ -298,11 +294,13 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     // return single action as requested chain
     network.expect_must_get_agent_activity().returning({
         let expected_chain_top = expected_chain_top.clone();
+        let expected_until_hash = delete.deletes_address.clone();
         let create_action_signed_hashed = create_action_signed_hashed.clone();
         let delete_action_signed_hashed = delete_action_signed_hashed.clone();
         move |author, filter, _, _| {
             assert_eq!(author, alice);
             assert_eq!(&filter.chain_top, expected_chain_top.as_hash());
+            assert_eq!(filter.get_until_hash(), Some(&expected_until_hash));
 
             Ok(vec![MustGetAgentActivityResponse::activity(vec![
                 RegisterAgentActivity {
@@ -350,18 +348,20 @@ async fn validation_callback_awaiting_deps_agent_activity() {
 
 // An op under validation that depends on an invalid op should be rejected.
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(
+    feature = "wasmer-wasmi",
+    ignore = "Waiting for a fix https://github.com/wasmerio/wasmer/issues/6397"
+)]
 async fn validation_callback_rejects_op_depending_on_invalid_op() {
     holochain_trace::test_run();
     let (dna_file, integrity_zomes, _) =
         SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Link]).await;
     let zomes_to_invoke = ZomesToInvoke::OneIntegrity(integrity_zomes[0].clone());
     let dna_hash = dna_file.dna_hash().clone();
-    let ribosome = RealRibosome::new(
-        dna_file.clone(),
-        Some(Arc::new(RwLock::new(ModuleCache::new(None)))),
-    )
-    .await
-    .unwrap();
+    let backend = WasmBackend::new();
+    let ribosome = RealRibosome::new(backend, dna_file.clone(), make_module_cache(backend, None))
+        .await
+        .unwrap();
     let test_space = TestSpace::new(dna_hash.clone());
     let alice = fixt!(AgentPubKey);
     let workspace = HostFnWorkspaceRead::new(
@@ -441,12 +441,11 @@ impl TestCase {
         let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
         let zomes_to_invoke = ZomesToInvoke::OneIntegrity(integrity_zomes[0].clone());
         let dna_hash = dna_file.dna_hash().clone();
-        let ribosome = RealRibosome::new(
-            dna_file.clone(),
-            Some(Arc::new(RwLock::new(ModuleCache::new(None)))),
-        )
-        .await
-        .unwrap();
+        let backend = WasmBackend::new();
+        let ribosome =
+            RealRibosome::new(backend, dna_file.clone(), make_module_cache(backend, None))
+                .await
+                .unwrap();
         let test_space = TestSpace::new(dna_hash.clone());
         let alice = fixt!(AgentPubKey);
         let bob = fixt!(AgentPubKey);

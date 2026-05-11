@@ -39,7 +39,6 @@ impl RibosomeStore {
     pub fn list_dna_hashes(&self) -> HashSet<DnaHash> {
         self.ribosomes
             .keys()
-            .cloned()
             .map(|c| c.dna_hash().clone())
             .collect()
     }

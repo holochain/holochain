@@ -1,11 +1,12 @@
 use holo_hash::DnaHash;
+use holochain_data::kind::PeerMetaStore;
 use holochain_keystore::{test_keystore, MetaLairClient};
 use holochain_p2p::{
     actor::DynHcP2p, event::MockHcP2pHandler, spawn_holochain_p2p, HolochainP2pConfig,
     HolochainP2pLocalAgent,
 };
-use holochain_state::prelude::{named_params, test_db_dir};
-use holochain_types::db::{DbKindCache, DbKindConductor, DbKindDht, DbKindPeerMetaStore, DbWrite};
+use holochain_state::prelude::test_db_dir;
+use holochain_types::db::{DbKindCache, DbKindDht, DbWrite};
 use kitsune2_api::{
     AgentInfo, AgentInfoSigned, DhtArc, DynPeerMetaStore, SpaceId, Timestamp, Url, KEY_PREFIX_ROOT,
     META_KEY_UNRESPONSIVE,
@@ -18,19 +19,22 @@ async fn urls_are_pruned_at_an_interval() {
     let TestCase {
         peer_meta_store,
         db_peer_meta,
+        _dir,
         ..
     } = TestCase::spawn().await;
 
     // Insert an unresponsive URL into peer meta store.
+    // Expiry time needs to be more than 1 second in the future as we might be on the boundary of
+    // this second.
     let unresponsive_peer = Url::from_str("ws://nowhere.land:80").unwrap();
-    let expiry = Timestamp::from_micros(Timestamp::now().as_micros() + 500_000); // 500 ms from now
+    let expiry = Timestamp::now() + Duration::from_secs(2);
     let when = Timestamp::now();
     peer_meta_store
         .set_unresponsive(unresponsive_peer.clone(), expiry, when)
         .await
         .unwrap();
 
-    // Waiting until the next pruning, but before the expiry, to make sure expiry is respected.
+    // Waiting until the next pruning, but before the expiry, to make sure it has not expired yet.
     tokio::time::sleep(Duration::from_millis(100)).await;
     let when_peer_set_unresponsive = peer_meta_store
         .get_unresponsive(unresponsive_peer.clone())
@@ -38,12 +42,10 @@ async fn urls_are_pruned_at_an_interval() {
         .unwrap();
     assert_eq!(when_peer_set_unresponsive, Some(when));
 
-    let unresponsive_urls = count_rows_in_peer_meta_store(db_peer_meta.clone());
+    let unresponsive_urls = count_rows_in_peer_meta_store(&db_peer_meta).await;
     assert_eq!(unresponsive_urls, 1);
 
-    // Waiting until the next pruning, after expiry.
-    // Test has to wait at least until the next second, because the expiry is compared with the unixepoch function in SQLite which returns
-    // the timestamp in full seconds, plus the pruning interval.
+    // The entries should be pruned after their expiry, keep checking up until the expiry time.
     tokio::time::timeout(Duration::from_secs(2), async {
         loop {
             tokio::time::sleep(Duration::from_millis(100)).await;
@@ -53,7 +55,7 @@ async fn urls_are_pruned_at_an_interval() {
                 .await
                 .unwrap();
             // Check the row has actually been deleted from the table.
-            let unresponsive_urls = count_rows_in_peer_meta_store(db_peer_meta.clone());
+            let unresponsive_urls = count_rows_in_peer_meta_store(&db_peer_meta).await;
             if when_peer_marked_unresponsive.is_none() && unresponsive_urls == 0 {
                 break;
             }
@@ -72,6 +74,7 @@ async fn urls_are_pruned_when_updated_agent_info_available() {
         lair_client,
         peer_meta_store,
         db_peer_meta,
+        _dir,
     } = TestCase::spawn().await;
 
     let earliest_timestamp = Timestamp::from_micros(Timestamp::now().as_micros() - 10_000_000); // 10s ago
@@ -144,7 +147,7 @@ async fn urls_are_pruned_when_updated_agent_info_available() {
         loop {
             tokio::time::sleep(Duration::from_millis(100)).await;
 
-            let peer_meta_store_count = count_rows_in_peer_meta_store(db_peer_meta.clone());
+            let peer_meta_store_count = count_rows_in_peer_meta_store(&db_peer_meta).await;
             if peer_meta_store_count == 2 {
                 break;
             }
@@ -161,7 +164,7 @@ async fn urls_are_pruned_when_updated_agent_info_available() {
         .is_some());
 
     // Alice and Bob's URLs should still be in the peer meta store.
-    let peer_meta_store_count = count_rows_in_peer_meta_store(db_peer_meta.clone());
+    let peer_meta_store_count = count_rows_in_peer_meta_store(&db_peer_meta).await;
     assert_eq!(peer_meta_store_count, 2);
 
     // Insert Alice's updated AgentInfo into peer store.
@@ -202,7 +205,7 @@ async fn urls_are_pruned_when_updated_agent_info_available() {
 
             // Alice's URL should have been removed from the store
             // and Bob's URL should still be in the store.
-            let peer_meta_store_count = count_rows_in_peer_meta_store(db_peer_meta.clone());
+            let peer_meta_store_count = count_rows_in_peer_meta_store(&db_peer_meta).await;
             if maybe_alice_entry.is_none() && peer_meta_store_count == 1 {
                 break;
             }
@@ -212,12 +215,103 @@ async fn urls_are_pruned_when_updated_agent_info_available() {
     .unwrap();
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn new_agent_with_same_url_prunes_old_unresponsive_entry() {
+    holochain_trace::test_run();
+    let TestCase {
+        p2p,
+        space_id,
+        lair_client,
+        peer_meta_store,
+        db_peer_meta,
+        _dir,
+    } = TestCase::spawn().await;
+
+    let max_expiry = Timestamp::from_micros(i64::MAX);
+    let shared_url = Url::from_str("ws://shared:80").unwrap();
+
+    // Mark the shared URL as unresponsive now.
+    let unresponsive_at = Timestamp::now();
+    peer_meta_store
+        .set_unresponsive(shared_url.clone(), max_expiry, unresponsive_at)
+        .await
+        .unwrap();
+
+    // Agent 1 has `created_at` before the unresponsive timestamp.
+    let pubkey1 = lair_client.new_sign_keypair_random().await.unwrap();
+    let agent1 = HolochainP2pLocalAgent::new(pubkey1.clone(), DhtArc::FULL, 1, lair_client.clone());
+    let agent1_info = AgentInfoSigned::sign(
+        &agent1,
+        AgentInfo {
+            agent: pubkey1.to_k2_agent(),
+            created_at: (unresponsive_at - Duration::from_secs(1)).unwrap(),
+            expires_at: max_expiry,
+            is_tombstone: false,
+            space: space_id.clone(),
+            storage_arc: DhtArc::FULL,
+            url: Some(shared_url.clone()),
+        },
+    )
+    .await
+    .unwrap();
+
+    // Agent 2 has `created_at` after the unresponsive timestamp.
+    let pubkey2 = lair_client.new_sign_keypair_random().await.unwrap();
+    let agent2 = HolochainP2pLocalAgent::new(pubkey2.clone(), DhtArc::FULL, 1, lair_client.clone());
+    let agent2_info = AgentInfoSigned::sign(
+        &agent2,
+        AgentInfo {
+            agent: pubkey2.to_k2_agent(),
+            created_at: unresponsive_at + Duration::from_secs(1),
+            expires_at: max_expiry,
+            is_tombstone: false,
+            space: space_id.clone(),
+            storage_arc: DhtArc::FULL,
+            url: Some(shared_url.clone()),
+        },
+    )
+    .await
+    .unwrap();
+
+    // Insert the older agent 1.
+    p2p.test_kitsune()
+        .space_if_exists(space_id.clone())
+        .await
+        .unwrap()
+        .peer_store()
+        .insert(vec![agent1_info])
+        .await
+        .unwrap();
+
+    // Check that the URL is marked as unresponsive.
+    let unresponsive_urls = count_rows_in_peer_meta_store(&db_peer_meta).await;
+    assert_eq!(unresponsive_urls, 1);
+
+    // Insert the new agent 2 that was created after the unresponsive_at time.
+    p2p.test_kitsune()
+        .space_if_exists(space_id.clone())
+        .await
+        .unwrap()
+        .peer_store()
+        .insert(vec![agent2_info])
+        .await
+        .unwrap();
+
+    // Allow the pruning to happen after a new agent is added with the previously unresponsive URL.
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    // Check that the URL is marked as unresponsive.
+    let unresponsive_urls = count_rows_in_peer_meta_store(&db_peer_meta).await;
+    assert_eq!(unresponsive_urls, 0);
+}
+
 struct TestCase {
     p2p: DynHcP2p,
     space_id: SpaceId,
     lair_client: MetaLairClient,
     peer_meta_store: DynPeerMetaStore,
-    db_peer_meta: DbWrite<DbKindPeerMetaStore>,
+    db_peer_meta: holochain_state::peer_metadata_store::PeerMetaStore,
+    _dir: tempfile::TempDir,
 }
 
 impl TestCase {
@@ -230,12 +324,21 @@ impl TestCase {
         // The DB logic expects the folder to have a parent folder.
         let dir = test_db_dir();
         let db_dir = dir.path().join("tmp_database");
-        std::fs::create_dir(db_dir.clone()).unwrap();
-        let db_peer_meta =
-            DbWrite::test(&db_dir, DbKindPeerMetaStore(Arc::new(dna_hash.clone()))).unwrap();
+        std::fs::create_dir(&db_dir).unwrap();
+        let db_peer_meta = holochain_state::peer_metadata_store::PeerMetaStore::new(
+            holochain_data::open_db(
+                &db_dir,
+                PeerMetaStore::new(Arc::new(dna_hash.clone())),
+                holochain_data::HolochainDataConfig::default(),
+            )
+            .await
+            .unwrap(),
+        );
         let db_op = DbWrite::test_in_mem(DbKindDht(Arc::new(dna_hash.clone()))).unwrap();
         let db_cache = DbWrite::test_in_mem(DbKindCache(Arc::new(dna_hash.clone()))).unwrap();
-        let db_conductor = DbWrite::test_in_mem(DbKindConductor).unwrap();
+        let conductor_store = holochain_state::conductor::ConductorStore::new_test()
+            .await
+            .unwrap();
         let lair_client = test_keystore();
         let db_peer_meta2 = db_peer_meta.clone();
         let p2p = spawn_holochain_p2p(
@@ -253,9 +356,9 @@ impl TestCase {
                     let db_cache = db_cache.clone();
                     Box::pin(async move { Ok(db_cache) })
                 }),
-                get_conductor_db: Arc::new(move || {
-                    let db_conductor = db_conductor.clone();
-                    Box::pin(async move { db_conductor })
+                get_conductor_store: Arc::new(move || {
+                    let conductor_store = conductor_store.clone();
+                    Box::pin(async move { conductor_store })
                 }),
                 network_config: Some(serde_json::json!({
                     "coreBootstrap": {
@@ -283,25 +386,26 @@ impl TestCase {
             .unwrap()
             .peer_meta_store()
             .clone();
+
         Self {
             p2p,
             space_id,
             lair_client,
             peer_meta_store,
             db_peer_meta,
+            _dir: dir,
         }
     }
 }
 
-fn count_rows_in_peer_meta_store(db: DbWrite<DbKindPeerMetaStore>) -> usize {
-    db.test_read(|txn| {
-        let mut stmt = txn
-            .prepare("SELECT COUNT(*) FROM peer_meta WHERE meta_key = :meta_key")
-            .unwrap();
-        stmt.query_row(
-            named_params! {":meta_key": format!("{KEY_PREFIX_ROOT}:{META_KEY_UNRESPONSIVE}")},
-            |row| row.get::<_, usize>(0),
-        )
-        .unwrap()
-    })
+async fn count_rows_in_peer_meta_store(
+    db: &holochain_state::peer_metadata_store::PeerMetaStore,
+) -> usize {
+    let key = format!("{KEY_PREFIX_ROOT}:{META_KEY_UNRESPONSIVE}");
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM peer_meta WHERE meta_key = ?")
+        .bind(&key)
+        .fetch_one(db.raw_db_read().pool())
+        .await
+        .unwrap();
+    count as usize
 }

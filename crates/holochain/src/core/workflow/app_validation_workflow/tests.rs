@@ -264,8 +264,10 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
         move |api, op: Op| {
             if let Op::RegisterDelete(RegisterDelete { delete }) = op {
                 // chain filter goes from delete action until create action
-                let chain_filter = ChainFilter::new(delete.hashed.content.clone().to_hash())
-                    .until_hash(delete.hashed.deletes_address.clone());
+                let chain_filter = ChainFilter::until_hash(
+                    delete.hashed.content.clone().to_hash(),
+                    delete.hashed.deletes_address.clone(),
+                );
                 let result = api.must_get_agent_activity(MustGetAgentActivityInput {
                     author: agent.clone(),
                     chain_filter: chain_filter.clone(),
@@ -509,6 +511,10 @@ async fn validate_ops_in_sequence_must_get_action() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(
+    feature = "wasmer-wasmi",
+    ignore = "Waiting for a fix https://github.com/wasmerio/wasmer/issues/6397"
+)]
 async fn multi_create_link_validation() {
     holochain_trace::test_run();
 

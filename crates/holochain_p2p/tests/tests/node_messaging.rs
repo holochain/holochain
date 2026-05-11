@@ -1,4 +1,5 @@
 use crate::tests::common::{spawn_test_bootstrap, Handler};
+use holochain_data::kind::PeerMetaStore;
 use holochain_keystore::*;
 use holochain_p2p::actor::{GetLinksRequestOptions, NetworkRequestOptions};
 use holochain_p2p::event::*;
@@ -292,51 +293,6 @@ async fn test_publish() {
                 AgentPubKey::from_raw_32(vec![2; 32]),
                 vec![op_hash.clone()],
                 None,
-                None,
-            )
-            .await
-            .unwrap();
-
-            if let Some(res) = handler.calls.lock().unwrap().first() {
-                assert_eq!("publish", res);
-                break;
-            }
-        }
-    })
-    .await
-    .unwrap();
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn test_publish_reflect() {
-    let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
-    let space = dna_hash.to_k2_space();
-    let handler = Arc::new(Handler::default());
-
-    let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
-    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
-    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
-
-    hc1.test_set_full_arcs(space.clone()).await;
-    hc2.test_set_full_arcs(space.clone()).await;
-
-    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
-        loop {
-            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
-
-            let op = test_dht_op(holochain_types::prelude::Timestamp::now());
-            let op_hash = op.as_hash();
-
-            hc2.publish(
-                dna_hash.clone(),
-                HoloHash::from_raw_36_and_type(
-                    op_hash.get_raw_36().to_vec(),
-                    holo_hash::hash_type::AnyLinkable::Action,
-                ),
-                AgentPubKey::from_raw_32(vec![2; 32]),
-                vec![],
-                None,
-                Some(vec![op.into_content()]),
             )
             .await
             .unwrap();
@@ -1225,11 +1181,16 @@ async fn spawn_test(
     handler: DynHcP2pHandler,
     bootstrap_addr: &SocketAddr,
 ) -> (AgentPubKey, actor::DynHcP2p, MetaLairClient) {
-    let db_peer_meta =
-        DbWrite::test_in_mem(DbKindPeerMetaStore(Arc::new(dna_hash.clone()))).unwrap();
+    let db_peer_meta = holochain_state::peer_metadata_store::PeerMetaStore::new(
+        holochain_data::test_open_db(PeerMetaStore::new(Arc::new(dna_hash.clone())))
+            .await
+            .unwrap(),
+    );
     let db_op = DbWrite::test_in_mem(DbKindDht(Arc::new(dna_hash.clone()))).unwrap();
     let db_cache = DbWrite::test_in_mem(DbKindCache(Arc::new(dna_hash.clone()))).unwrap();
-    let conductor_db = DbWrite::test_in_mem(DbKindConductor).unwrap();
+    let conductor_store = holochain_state::conductor::ConductorStore::new_test()
+        .await
+        .unwrap();
     let lair_client = test_keystore();
 
     let agent = lair_client.new_sign_keypair_random().await.unwrap();
@@ -1248,9 +1209,9 @@ async fn spawn_test(
                 let db_cache = db_cache.clone();
                 Box::pin(async move { Ok(db_cache) })
             }),
-            get_conductor_db: Arc::new(move || {
-                let conductor_db = conductor_db.clone();
-                Box::pin(async move { conductor_db })
+            get_conductor_store: Arc::new(move || {
+                let conductor_store = conductor_store.clone();
+                Box::pin(async move { conductor_store })
             }),
             #[cfg(feature = "transport-tx5-backend-go-pion")]
             network_config: Some(serde_json::json!({

@@ -62,12 +62,12 @@ pub struct AppManifestV0 {
     #[builder(default)]
     pub bootstrap_url: Option<String>,
 
-    /// URL of the signal server to use for all Cells created
-    /// for this app. If not provided here, the signal server
+    /// URL of the relay server to use for all Cells created
+    /// for this app. If not provided here, the relay server
     /// specified in the conductor config file will be used.
     #[serde(default)]
     #[builder(default)]
-    pub signal_url: Option<String>,
+    pub relay_url: Option<String>,
 }
 
 /// Description of an app "role" defined by this app.
@@ -240,7 +240,7 @@ impl AppManifestV0 {
             description: _,
             allow_deferred_memproofs: _,
             bootstrap_url: _,
-            signal_url: _,
+            relay_url: _,
         } = self;
         let roles = roles
             .into_iter()
@@ -310,7 +310,7 @@ pub mod tests {
 
     pub fn app_manifest_properties_fixture() -> YamlProperties {
         YamlProperties::new(
-            serde_yaml::to_value(Props {
+            yaml_serde::to_value(Props {
                 salad: "bar".to_string(),
             })
             .unwrap(),
@@ -338,7 +338,7 @@ pub mod tests {
             roles,
             allow_deferred_memproofs: false,
             bootstrap_url: Some("https://bootstrap.test".to_string()),
-            signal_url: Some("wss://sbd.test".to_string()),
+            relay_url: Some("wss://sbd.test".to_string()),
         }
     }
 
@@ -352,8 +352,8 @@ pub mod tests {
         let installed_hash = fixt!(DnaHash);
         let manifest = app_manifest_fixture(file, installed_hash.clone(), modifiers).await;
         let manifest = AppManifest::from(manifest);
-        let manifest_yaml = serde_yaml::to_string(&manifest).unwrap();
-        let manifest_roundtrip = serde_yaml::from_str(&manifest_yaml).unwrap();
+        let manifest_yaml = yaml_serde::to_string(&manifest).unwrap();
+        let manifest_roundtrip = yaml_serde::from_str(&manifest_yaml).unwrap();
 
         assert_eq!(manifest, manifest_roundtrip);
 
@@ -379,17 +379,17 @@ roles:
 
         "#
         );
-        let actual = serde_yaml::to_value(&manifest).unwrap();
-        let expected: serde_yaml::Value = serde_yaml::from_str(&expected_yaml).unwrap();
+        let actual = yaml_serde::to_value(&manifest).unwrap();
+        let expected: yaml_serde::Value = yaml_serde::from_str(&expected_yaml).unwrap();
 
         // Check a handful of fields. Order matters in YAML, so to check the
         // entire structure would be too fragile for testing.
 
         for getter in [
-            |v: &serde_yaml::Value| v["roles"][0]["name"].clone(),
-            |v: &serde_yaml::Value| v["roles"][0]["provisioning"]["deferred"].clone(),
-            |v: &serde_yaml::Value| v["roles"][0]["dna"]["installed_hash"].clone(),
-            |v: &serde_yaml::Value| v["roles"][0]["dna"]["modifiers"]["properties"].clone(),
+            |v: &yaml_serde::Value| v["roles"][0]["name"].clone(),
+            |v: &yaml_serde::Value| v["roles"][0]["provisioning"]["deferred"].clone(),
+            |v: &yaml_serde::Value| v["roles"][0]["dna"]["installed_hash"].clone(),
+            |v: &yaml_serde::Value| v["roles"][0]["dna"]["modifiers"]["properties"].clone(),
         ] {
             let left = getter(&actual);
             let right = getter(&expected);
@@ -406,7 +406,7 @@ roles:
             roles: vec![],
             allow_deferred_memproofs: false,
             bootstrap_url: None,
-            signal_url: None,
+            relay_url: None,
         };
         manifest.roles = vec![
             AppRoleManifest {

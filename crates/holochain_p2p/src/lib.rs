@@ -20,8 +20,12 @@ pub use spawn::*;
 mod peer_meta_store;
 pub use peer_meta_store::*;
 
+mod peer_latency_store;
+
 mod local_agent;
 pub use local_agent::*;
+
+mod weighted_selection;
 
 mod op_store;
 pub use op_store::*;
@@ -141,7 +145,6 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
         source: AgentPubKey,
         op_hash_list: Vec<DhtOpHash>,
         timeout_ms: Option<u64>,
-        reflect_ops: Option<Vec<DhtOp>>,
     ) -> HolochainP2pResult<()>;
 
     /// Publish a countersigning op.
@@ -189,6 +192,12 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
         options: NetworkRequestOptions,
         zome_call_origin: Option<(ZomeName, FunctionName)>,
     ) -> HolochainP2pResult<Vec<MustGetAgentActivityResponse>>;
+
+    /// Check if an agent was recently online in this network.
+    ///
+    /// Returns `true` if the agent has a known URL in the peer store and that URL is not marked as
+    /// unresponsive in the peer meta store.
+    async fn was_agent_recently_online(&self, agent: AgentPubKey) -> HolochainP2pResult<bool>;
 
     /// Send a validation receipt to a remote node.
     async fn send_validation_receipts(
@@ -306,7 +315,6 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         source: AgentPubKey,
         op_hash_list: Vec<DhtOpHash>,
         timeout_ms: Option<u64>,
-        reflect_ops: Option<Vec<DhtOp>>,
     ) -> HolochainP2pResult<()> {
         self.sender
             .publish(
@@ -315,7 +323,6 @@ impl HolochainP2pDnaT for HolochainP2pDna {
                 source,
                 op_hash_list,
                 timeout_ms,
-                reflect_ops,
             )
             .await
     }
@@ -393,6 +400,12 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     ) -> HolochainP2pResult<Vec<MustGetAgentActivityResponse>> {
         self.sender
             .must_get_agent_activity(self.dna_hash(), author, filter, options, zome_call_origin)
+            .await
+    }
+
+    async fn was_agent_recently_online(&self, agent: AgentPubKey) -> HolochainP2pResult<bool> {
+        self.sender
+            .was_agent_recently_online(self.dna_hash(), agent)
             .await
     }
 

@@ -26,6 +26,7 @@ use holochain_types::test_utils::ActionRefMut;
 use holochain_types::validation_receipt::ValidationReceiptBundle;
 use kitsune2_api::AgentInfoSigned;
 use kitsune2_api::StoredOp;
+pub use must_get_agent_activity_test_data::*;
 pub use record_test_data::*;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -35,6 +36,7 @@ use ValidationStatus;
 
 mod activity_test_data;
 mod entry_test_data;
+mod must_get_agent_activity_test_data;
 mod record_test_data;
 
 /// A network implementation which routes to the local databases,
@@ -195,7 +197,6 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         _source: AgentPubKey,
         _op_hash_list: Vec<DhtOpHash>,
         _timeout_ms: Option<u64>,
-        _reflect_ops: Option<Vec<crate::DhtOp>>,
     ) -> HolochainP2pResult<()> {
         todo!()
     }
@@ -206,6 +207,10 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         _op: ChainOp,
     ) -> HolochainP2pResult<()> {
         todo!()
+    }
+
+    async fn was_agent_recently_online(&self, _agent: AgentPubKey) -> HolochainP2pResult<bool> {
+        Ok(false)
     }
 
     async fn send_validation_receipts(

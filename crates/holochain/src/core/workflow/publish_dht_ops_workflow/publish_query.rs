@@ -4,7 +4,6 @@ use holo_hash::DhtOpHash;
 use holochain_sqlite::db::DbKindAuthored;
 use holochain_sqlite::prelude::ReadAccess;
 use holochain_state::prelude::*;
-use holochain_state::query::map_sql_dht_op;
 use rusqlite::named_params;
 use rusqlite::Transaction;
 use std::time::Duration;
@@ -19,7 +18,7 @@ pub async fn get_ops_to_publish<AuthorDb>(
     agent: AgentPubKey,
     db: &AuthorDb,
     min_publish_interval: Duration,
-) -> WorkflowResult<Vec<(OpBasis, DhtOpHash, DhtOp)>>
+) -> WorkflowResult<Vec<(OpBasis, DhtOpHash)>>
 where
     AuthorDb: ReadAccess<DbKindAuthored>,
 {
@@ -34,16 +33,8 @@ where
         let mut stmt = txn.prepare(
             "
             SELECT
-            Action.blob as action_blob,
-            Action.author as author,
-            LENGTH(Action.blob) AS action_size,
-            CASE
-              WHEN DhtOp.type IN ('StoreEntry', 'StoreRecord') THEN LENGTH(Entry.blob)
-              ELSE 0
-            END AS entry_size,
-            Entry.blob as entry_blob,
-            DhtOp.type as dht_type,
             DhtOp.hash as dht_hash,
+            DhtOp.basis_hash as basis_hash,
             DhtOp.op_order as op_order
             FROM Action
             JOIN
@@ -67,13 +58,8 @@ where
             ALL
 
             SELECT
-            Warrant.blob as action_blob,
-            Warrant.author as author,
-            LENGTH(Warrant.blob) AS action_size,
-            0 AS entry_size,
-            NULL as entry_blob,
-            DhtOp.type as dht_type,
             DhtOp.hash as dht_hash,
+            DhtOp.basis_hash as basis_hash,
             DhtOp.op_order as op_order
             FROM Warrant
             JOIN
@@ -95,10 +81,9 @@ where
                 ":store_entry": ChainOpType::StoreEntry,
             },
             |row| {
-                let op = map_sql_dht_op(false, "dht_type", row)?;
+                let basis: OpBasis = row.get("basis_hash")?;
                 let op_hash: DhtOpHash = row.get("dht_hash")?;
-                let basis = op.dht_basis();
-                WorkflowResult::Ok((basis, op_hash, op))
+                WorkflowResult::Ok((basis, op_hash))
             },
         )?;
         WorkflowResult::Ok(r.collect::<Result<Vec<_>, _>>())
@@ -449,7 +434,10 @@ mod tests {
             },
         )
         .content;
+        let chain_op_hash = DhtOpHashed::from_content_sync_exact(chain_op);
+
         let warrant_op = insert_invalid_chain_op_warrant_op(&db, &agent).content;
+        let warrant_op_hash = DhtOpHashed::from_content_sync_exact(warrant_op);
 
         let agent_clone = agent.clone();
         let num_to_publish = db
@@ -465,9 +453,15 @@ mod tests {
         .await
         .unwrap()
         .into_iter()
-        .map(|(_, _, op)| op)
+        .map(|(_, hash)| hash.get_raw_39().to_owned())
         .collect::<Vec<_>>();
-        assert_eq!(ops_to_publish, vec![chain_op, warrant_op]);
+        assert_eq!(
+            ops_to_publish,
+            vec![
+                chain_op_hash.hash.get_raw_39().to_owned(),
+                warrant_op_hash.hash.get_raw_39().to_owned()
+            ]
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]

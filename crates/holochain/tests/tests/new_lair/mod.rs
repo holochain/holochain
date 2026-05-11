@@ -54,7 +54,7 @@ async fn test_new_lair_conductor_integration() {
     };
 
     // write the conductor config
-    let conductor_config = serde_yaml::to_string(&conductor_config).unwrap();
+    let conductor_config = yaml_serde::to_string(&conductor_config).unwrap();
     let mut cc_path = tmp.path().to_owned();
     cc_path.push("conductor_config.yml");
     tokio::fs::write(&cc_path, &conductor_config).await.unwrap();

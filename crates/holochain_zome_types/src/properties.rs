@@ -5,21 +5,21 @@ use holochain_serialized_bytes::prelude::*;
 
 /// A type to allow yaml values to be used as [`derive@SerializedBytes`]
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-pub struct YamlProperties(serde_yaml::Value);
+pub struct YamlProperties(yaml_serde::Value);
 
 impl YamlProperties {
     /// Create new properties from yaml value
-    pub fn new(properties: serde_yaml::Value) -> Self {
+    pub fn new(properties: yaml_serde::Value) -> Self {
         Self(properties)
     }
 
     /// Create a null set of properties
     pub fn empty() -> Self {
-        Self(serde_yaml::Value::Null)
+        Self(yaml_serde::Value::Null)
     }
 
     /// Consumes struct into inner value.
-    pub fn into_inner(self) -> serde_yaml::Value {
+    pub fn into_inner(self) -> yaml_serde::Value {
         self.0
     }
 }
@@ -30,8 +30,8 @@ impl From<()> for YamlProperties {
     }
 }
 
-impl From<serde_yaml::Value> for YamlProperties {
-    fn from(v: serde_yaml::Value) -> Self {
+impl From<yaml_serde::Value> for YamlProperties {
+    fn from(v: yaml_serde::Value) -> Self {
         Self(v)
     }
 }

@@ -6,15 +6,26 @@ A wrapper around sqlx configured for Holochain's needs, providing SQLite databas
 
 - **SQLCipher encryption** - Full database encryption with secure key management
 - **WAL mode** - Write-Ahead Logging enabled for better concurrency
-- **Embedded migrations** - Migration files compiled into the binary
+- **Per-database-type migrations** - Separate migration sets for each database kind
 - **Connection pooling** - Automatic pool sizing based on CPU count
 - **Configurable sync levels** - Control SQLite's durability guarantees
 
+## Database Types
+
+Each database type has its own migration set under `migrations/`:
+
+| Kind | Migration directory | Purpose |
+|------|-------------------|---------|
+| `Wasm` | `migrations/wasm/` | WASM bytecode, DNA definitions, entry definitions |
+| `Conductor` | `migrations/conductor/` | Conductor state, installed apps, interfaces, nonces, blocks |
+
+Each `DatabaseIdentifier` implementation returns a `DbKind` which selects the appropriate migration set at database open time. Additional database kinds (Authored, Dht, PeerMetaStore) will get their own migration directories when their schemas are added.
+
 ## Query Patterns
 
-sqlx provides several approaches for mapping Rust types to database queries. See `src/example.rs` for detailed examples.
+sqlx provides several approaches for mapping Rust types to database queries. See `src/example.rs` for compile-time checked examples.
 
-### 1. `query_as` with `FromRow` derive (Recommended)
+### 1. `query_as` with `FromRow` derive
 
 The most ergonomic approach for most use cases:
 
@@ -22,16 +33,15 @@ The most ergonomic approach for most use cases:
 use sqlx::FromRow;
 
 #[derive(FromRow)]
-struct SampleData {
-    id: i64,
-    name: String,
-    value: Option<String>,
+struct WasmRow {
+    hash: Vec<u8>,
+    code: Vec<u8>,
 }
 
-let data = sqlx::query_as::<_, SampleData>(
-    "SELECT id, name, value FROM sample_data WHERE id = ?"
+let data = sqlx::query_as::<_, WasmRow>(
+    "SELECT hash, code FROM Wasm WHERE hash = ?"
 )
-.bind(id)
+.bind(hash)
 .fetch_one(&pool)
 .await?;
 ```
@@ -50,13 +60,13 @@ let data = sqlx::query_as::<_, SampleData>(
 Direct access to row data by index:
 
 ```rust
-let row = sqlx::query("SELECT id, name FROM sample_data WHERE id = ?")
-    .bind(id)
+let row = sqlx::query("SELECT hash, code FROM Wasm WHERE hash = ?")
+    .bind(hash)
     .fetch_one(&pool)
     .await?;
 
-let id: i64 = row.get(0);
-let name: String = row.get(1);
+let hash: Vec<u8> = row.get(0);
+let code: Vec<u8> = row.get(1);
 ```
 
 **Pros:**
@@ -75,9 +85,9 @@ let name: String = row.get(1);
 
 ```rust
 let data = sqlx::query_as!(
-    SampleData,
-    "SELECT id, name, value FROM sample_data WHERE id = ?",
-    id
+    WasmRow,
+    r#"SELECT hash as "hash!", code as "code!" FROM Wasm WHERE hash = ?"#,
+    hash
 )
 .fetch_one(&pool)
 .await?;
@@ -95,23 +105,29 @@ let data = sqlx::query_as!(
 
 ## Development Setup
 
-For compile-time query verification to work, you need to maintain prepared query metadata:
+### Preparing query metadata
+
+Since migrations are split per database type, `sqlx prepare` needs a combined database containing all schemas. Create it by applying each migration set to a temporary database:
 
 ```bash
-# Initial setup (or after schema changes)
 cd crates/holochain_data
 
-# Create/update the database schema
-DATABASE_URL=sqlite:$(pwd)/dev.db sqlx database create
-DATABASE_URL=sqlite:$(pwd)/dev.db sqlx migrate run
+# Build a combined database for prepare
+rm -f /tmp/holochain_prepare.db
+sqlite3 /tmp/holochain_prepare.db < migrations/wasm/*.up.sql
+sqlite3 /tmp/holochain_prepare.db < migrations/conductor/*.up.sql
 
 # Generate query metadata for offline compilation
-DATABASE_URL=sqlite:$(pwd)/dev.db cargo sqlx prepare -- --lib
+DATABASE_URL=sqlite:///tmp/holochain_prepare.db cargo sqlx prepare
 ```
 
 The `.sqlx/` directory contains query metadata and should be committed to version control.
 
-**Note:** The `DATABASE_URL` environment variable must point to the development database using inline syntax as shown above.
+### Verifying query metadata is up to date
+
+```bash
+DATABASE_URL=sqlite:///tmp/holochain_prepare.db cargo sqlx prepare --check
+```
 
 ## CI Integration
 
@@ -122,7 +138,7 @@ In CI, queries are verified without needing a database connection:
 cargo check -p holochain_data
 ```
 
-When schema changes, developers must run `cargo sqlx prepare` locally and commit the updated `.sqlx/` files.
+When schema or queries change, developers must run `cargo sqlx prepare` locally and commit the updated `.sqlx/` files.
 
 ## Recommendation for Holochain
 
@@ -156,23 +172,8 @@ let config = HolochainDataConfig::new()
 
 let db = open_db(path, db_id, config).await?;
 
-// Migrations run automatically
+// Migrations for the database kind are applied automatically
 // Now use the connection pool for queries
 ```
 
 See `tests/integration.rs` for comprehensive examples.
-
-## Validating SQL Queries
-
-This crate uses sqlx's compile-time query checking to validate all SQL queries against the schema. The `.sqlx/` directory contains prepared query metadata that allows offline verification.
-
-To regenerate the query metadata after schema or query changes:
-
-```bash
-cd crates/holochain_data
-DATABASE_URL=sqlite:$(pwd)/dev.db sqlx database create
-DATABASE_URL=sqlite:$(pwd)/dev.db sqlx migrate run
-DATABASE_URL=sqlite:$(pwd)/dev.db cargo sqlx prepare -- --lib
-```
-
-In CI, queries are validated using the committed `.sqlx/` metadata without requiring a live database connection.

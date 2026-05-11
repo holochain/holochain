@@ -71,7 +71,7 @@ impl EntryDefStore<holochain_data::DbWrite<holochain_data::kind::Wasm>> {
 
     /// Convert this writable store into a read-only store.
     pub fn into_read(self) -> EntryDefStoreRead {
-        EntryDefStore::new(self.db.as_ref().clone())
+        EntryDefStore::new(self.db.into())
     }
 }
 

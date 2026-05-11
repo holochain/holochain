@@ -470,7 +470,7 @@ impl SourceChain {
                 }
 
                 // Write warrants to DHT database
-                let total_inserted_warrants = self
+                let total_inserted_warrants = match self
                     .dht_db
                     .write_async(|txn| -> DatabaseResult<u32> {
                         let mut inserted_warrants = 0;
@@ -496,8 +496,16 @@ impl SourceChain {
                         }
                         Ok(inserted_warrants)
                     })
-                    .await
-                    .unwrap(); // unwrap is safe here because no errors are returned from the closure
+                    .await {
+                        Ok(count) => count,
+                        Err(err) => {
+                            tracing::warn!(
+                                ?err,
+                                "Error inserting warrants from scratch space into DHT database"
+                            );
+                            0
+                        }
+                    };
 
                 SourceChainResult::Ok((actions, total_inserted_warrants))
             }

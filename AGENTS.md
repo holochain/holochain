@@ -10,7 +10,7 @@
 ## Build, Test, and Development Commands
 - `make static-all` - to run all static checks
 - `cargo test -p <crate-name>` - run focused tests for a single crate while iterating locally.
-- `make test-workspace-wasmer_sys` - to run all the tests from the root of the workspace.
+- `make test-workspace-wasmer-sys-cranelift` - to run all the tests from the root of the workspace.
 
 ## Coding Style & Naming Conventions
 - Run `cargo fmt --all` before submitting; formatting follows upstream Rust defaults.

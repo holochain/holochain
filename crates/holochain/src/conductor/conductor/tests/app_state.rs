@@ -90,7 +90,7 @@ async fn can_update_state() {
             description: None,
             roles: vec![],
             bootstrap_url: None,
-            signal_url: None,
+            relay_url: None,
         }),
         Timestamp::now(),
     )

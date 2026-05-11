@@ -256,7 +256,7 @@ mod slow_tests {
             .next()
             .unwrap();
         let mut init_invocation = InitInvocationFixturator::new(::fixt::Empty).next().unwrap();
-        init_invocation.dna_def = ribosome.dna_file.dna_def().clone();
+        init_invocation.dna_def = ribosome.dna_file().dna_def().clone();
 
         let host_access = fixt!(InitHostAccess);
         let result = ribosome
@@ -272,7 +272,7 @@ mod slow_tests {
             .next()
             .unwrap();
         let mut init_invocation = InitInvocationFixturator::new(::fixt::Empty).next().unwrap();
-        init_invocation.dna_def = ribosome.dna_file.dna_def().clone();
+        init_invocation.dna_def = ribosome.dna_file().dna_def().clone();
 
         let host_access = fixt!(InitHostAccess);
         let result = ribosome
@@ -288,7 +288,7 @@ mod slow_tests {
             .next()
             .unwrap();
         let mut init_invocation = InitInvocationFixturator::new(::fixt::Empty).next().unwrap();
-        init_invocation.dna_def = ribosome.dna_file.dna_def().clone();
+        init_invocation.dna_def = ribosome.dna_file().dna_def().clone();
 
         let host_access = fixt!(InitHostAccess);
         let result = ribosome
@@ -308,7 +308,7 @@ mod slow_tests {
                 .next()
                 .unwrap();
         let mut init_invocation = InitInvocationFixturator::new(::fixt::Empty).next().unwrap();
-        init_invocation.dna_def = ribosome.dna_file.dna_def().clone();
+        init_invocation.dna_def = ribosome.dna_file().dna_def().clone();
 
         let host_access = fixt!(InitHostAccess);
         let result = ribosome
@@ -375,7 +375,7 @@ mod slow_tests {
             .next()
             .unwrap();
         let mut init_invocation = InitInvocationFixturator::new(::fixt::Empty).next().unwrap();
-        init_invocation.dna_def = ribosome.dna_file.dna_def().clone();
+        init_invocation.dna_def = ribosome.dna_file().dna_def().clone();
 
         let host_access = fixt!(InitHostAccess);
         let err = ribosome

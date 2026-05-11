@@ -26,13 +26,14 @@
 
 pub mod block;
 pub mod chain_lock;
+pub mod conductor;
 #[allow(missing_docs)]
 pub mod dna_def;
 pub mod entry_def;
 pub mod host_fn_workspace;
 pub mod integrate;
 pub mod mutations;
-pub mod nonce;
+pub mod peer_metadata_store;
 #[allow(missing_docs)]
 pub mod prelude;
 pub mod query;

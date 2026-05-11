@@ -55,13 +55,13 @@
 //!
 //!use holochain_conductor_api::conductor::ConductorConfig;
 //!
-//!let _: ConductorConfig = serde_yaml::from_str(yaml).unwrap();
+//!let _: ConductorConfig = yaml_serde::from_str(yaml).unwrap();
 //! ```
 
 use crate::conductor::process::ERROR_CODE;
 use crate::config::conductor::paths::DataRootPath;
 use holochain_types::prelude::DbSyncStrategy;
-#[cfg(feature = "schema")]
+#[cfg(all(feature = "schema", feature = "kitsune2_transport_tx5"))]
 use kitsune2_transport_tx5::WebRtcConfig;
 use schemars::JsonSchema;
 #[cfg(feature = "schema")]
@@ -91,6 +91,12 @@ pub struct ConductorConfig {
     /// Override the environment specified tracing config.
     #[serde(default)]
     pub tracing_override: Option<String>,
+
+    /// The WASM backend to use.
+    ///
+    /// Only needs to be set if multiple WASM backends are available to Holochain, otherwise it
+    /// will default to the enabled backend.
+    pub wasm_backend: Option<WasmBackend>,
 
     /// The path to the data root for this conductor;
     /// This can be `None` while building up the config programatically but MUST
@@ -177,6 +183,7 @@ impl Default for ConductorConfig {
     fn default() -> Self {
         Self {
             tracing_override: None,
+            wasm_backend: None,
             data_root_path: None,
             keystore: KeystoreConfig::default(),
             admin_interfaces: None,
@@ -195,7 +202,7 @@ fn config_from_yaml<T>(yaml: &str) -> ConductorConfigResult<T>
 where
     T: DeserializeOwned,
 {
-    serde_yaml::from_str(yaml).map_err(ConductorConfigError::SerializationError)
+    yaml_serde::from_str(yaml).map_err(ConductorConfigError::SerializationError)
 }
 
 impl ConductorConfig {
@@ -243,6 +250,34 @@ impl ConductorConfig {
     pub fn conductor_tuning_params(&self) -> ConductorTuningParams {
         self.tuning_params.clone().unwrap_or_default()
     }
+}
+
+/// The WASM backend to use.
+///
+/// Note that the backend must be available in the Holochain binary, otherwise it will reject the
+/// configuration at startup.
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub enum WasmBackend {
+    /// Use the cranelift WASM compiler.
+    ///
+    /// Recommended as the default for users.
+    #[serde(rename = "cranelift")]
+    Cranelift,
+
+    /// Use the LLVM WASM compiler.
+    ///
+    /// Recommended for service conductors, where the LLVM toolchain can be provided and improved
+    /// WASM execution time is wanted.
+    #[serde(rename = "LLVM")]
+    Llvm,
+
+    /// Use the wasmi WASM compiler.
+    ///
+    /// Recommended where neither cranelift nor LLVM can be used. This is known to be the case on
+    /// iOS where compilation on the fly is not permitted.
+    #[serde(rename = "wasmi")]
+    Wasmi,
 }
 
 /// Configure Kitsune2 Reporting.
@@ -295,13 +330,20 @@ pub struct SpaceNetworkOverride {
 }
 
 /// All the network config information for the conductor.
-#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
+#[derive(Clone, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct NetworkConfig {
-    /// Authentication material if required by sbd/signal/bootstrap services.
-    /// This material should be specified as a base64 string
+    /// Authentication material if required by the bootstrap service.
+    ///
+    /// This material should be specified as a base64 url-safe, with no padding, string.
     #[serde(default)]
-    pub base64_auth_material: Option<String>,
+    pub base64_auth_material_bootstrap: Option<String>,
+
+    /// Authentication material if required by the relay service.
+    ///
+    /// This material should be specified as a base64 url-safe, with no padding, string.
+    #[serde(default)]
+    pub base64_auth_material_relay: Option<String>,
 
     /// The Kitsune2 bootstrap server to use for WAN discovery.
     #[schemars(schema_with = "holochain_util::jsonschema::url2_schema")]
@@ -326,7 +368,10 @@ pub struct NetworkConfig {
     pub request_timeout_s: u64,
 
     /// The Kitsune2 webrtc_config to use for connecting to peers.
-    #[cfg_attr(feature = "schema", schemars(schema_with = "webrtc_config_schema"))]
+    #[cfg_attr(
+        all(feature = "schema", feature = "kitsune2_transport_tx5"),
+        schemars(schema_with = "webrtc_config_schema")
+    )]
     pub webrtc_config: Option<serde_json::Value>,
 
     /// The target arc factor to apply when receiving hints from kitsune2.
@@ -383,7 +428,8 @@ pub struct NetworkConfig {
 impl Default for NetworkConfig {
     fn default() -> Self {
         Self {
-            base64_auth_material: None,
+            base64_auth_material_bootstrap: None,
+            base64_auth_material_relay: None,
             bootstrap_url: url2::Url2::parse("https://dev-test-bootstrap2.holochain.org"),
             signal_url: url2::Url2::parse("wss://dev-test-bootstrap2.holochain.org"),
             relay_url: url2::Url2::parse("https://use1-1.relay.n0.iroh-canary.iroh.link./"),
@@ -409,6 +455,41 @@ const fn default_request_timeout_s() -> u64 {
 
 const fn default_target_arc_factor() -> u32 {
     1
+}
+
+impl std::fmt::Debug for NetworkConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut s = f.debug_struct("NetworkConfig");
+        s.field(
+            "base64_auth_material_bootstrap",
+            &self
+                .base64_auth_material_bootstrap
+                .as_ref()
+                .map(|_| "<redacted>"),
+        );
+        s.field(
+            "base64_auth_material_relay",
+            &self
+                .base64_auth_material_relay
+                .as_ref()
+                .map(|_| "<redacted>"),
+        );
+        s.field("bootstrap_url", &self.bootstrap_url);
+        s.field("signal_url", &self.signal_url);
+        s.field("relay_url", &self.relay_url);
+        s.field("request_timeout_s", &self.request_timeout_s);
+        s.field("webrtc_config", &self.webrtc_config);
+        s.field("target_arc_factor", &self.target_arc_factor);
+        s.field("report", &self.report);
+        s.field("advanced", &self.advanced);
+        #[cfg(feature = "test-utils")]
+        {
+            s.field("disable_bootstrap", &self.disable_bootstrap);
+            s.field("disable_publish", &self.disable_publish);
+            s.field("disable_gossip", &self.disable_gossip);
+        }
+        s.finish()
+    }
 }
 
 impl NetworkConfig {
@@ -724,15 +805,14 @@ impl Default for ConductorTuningParams {
     }
 }
 
-#[cfg(feature = "schema")]
+#[cfg(all(feature = "schema", feature = "kitsune2_transport_tx5"))]
 fn webrtc_config_schema(_: &mut schemars::SchemaGenerator) -> Schema {
     let schema = schemars::schema_for!(Option<WebRtcConfig>);
 
     // Note that the definitions for this type are not being copied. This type is embedded in the
     // K2 config, so the definitions are already present in the schema.
 
-    Schema::try_from(schema.get("schema").expect("Missing schema field").clone())
-        .expect("Failed to convert schema")
+    schema
 }
 
 #[cfg(feature = "schema")]
@@ -753,8 +833,10 @@ fn kitsune2_config_schema(generator: &mut schemars::SchemaGenerator) -> Schema {
         mem_peer_store: Option<kitsune2_core::factories::MemPeerStoreModConfig>,
         #[serde(flatten)]
         k2_gossip: Option<kitsune2_gossip::K2GossipModConfig>,
+        #[cfg(feature = "kitsune2_transport_tx5")]
         #[serde(flatten)]
         tx5_transport: Option<kitsune2_transport_tx5::Tx5TransportModConfig>,
+        #[cfg(feature = "kitsune2_transport_iroh")]
         #[serde(flatten)]
         iroh_transport: Option<kitsune2_transport_iroh::IrohTransportModConfig>,
     }
@@ -762,7 +844,7 @@ fn kitsune2_config_schema(generator: &mut schemars::SchemaGenerator) -> Schema {
     let schema = schemars::schema_for!(Option<K2Config>);
 
     for (k, v) in schema
-        .get("definitions")
+        .get("$defs")
         .and_then(|d| d.as_object())
         .expect("No definitions")
     {
@@ -775,8 +857,7 @@ fn kitsune2_config_schema(generator: &mut schemars::SchemaGenerator) -> Schema {
         }
     }
 
-    Schema::try_from(schema.get("schema").expect("Missing schema field").clone())
-        .expect("Failed to convert schema")
+    schema
 }
 
 #[cfg(test)]
@@ -817,6 +898,7 @@ mod tests {
             result,
             ConductorConfig {
                 tracing_override: None,
+                wasm_backend: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 network: NetworkConfig::default(),
                 keystore: KeystoreConfig::DangerTestKeystore,
@@ -995,6 +1077,7 @@ admin_interfaces:
             result.unwrap(),
             ConductorConfig {
                 tracing_override: None,
+                wasm_backend: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 keystore: KeystoreConfig::LairServerInProc { lair_root: None },
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
@@ -1027,6 +1110,7 @@ admin_interfaces:
             result.unwrap(),
             ConductorConfig {
                 tracing_override: None,
+                wasm_backend: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 network: NetworkConfig::default(),
                 keystore: KeystoreConfig::LairServer {
@@ -1284,5 +1368,17 @@ admin_interfaces:
 
         let cpu_count = u32::MAX as usize;
         assert_eq!(calculate_default_db_max_readers(cpu_count), u16::MAX);
+    }
+
+    #[cfg(feature = "schema")]
+    #[test]
+    fn schema_generation() {
+        let schema = schemars::schema_for!(ConductorConfig);
+        let schema_json = serde_json::to_value(&schema).unwrap();
+
+        let default_config = ConductorConfig::default();
+        let default_config_json = serde_json::to_value(&default_config).unwrap();
+
+        jsonschema::validate(&schema_json, &default_config_json).unwrap();
     }
 }

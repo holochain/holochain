@@ -12,7 +12,6 @@ use holochain_websocket::{
     self as ws, ConnectRequest, WebsocketConfig, WebsocketReceiver, WebsocketResult,
     WebsocketSender,
 };
-use serde_json::json;
 use std::future::Future;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
@@ -466,7 +465,7 @@ async fn generate_sandbox_with_roles_settings_override() {
             );
             assert_eq!(
                 role1.dna.modifiers.properties.unwrap(),
-                YamlProperties::new(serde_yaml::Value::String(String::from(
+                YamlProperties::new(yaml_serde::Value::String(String::from(
                     "some properties in the manifest",
                 )))
             );
@@ -483,7 +482,7 @@ async fn generate_sandbox_with_roles_settings_override() {
             );
             assert_eq!(
                 role2.dna.modifiers.properties.unwrap(),
-                YamlProperties::new(serde_yaml::Value::String(String::from(
+                YamlProperties::new(yaml_serde::Value::String(String::from(
                     "some properties in the manifest",
                 )))
             );
@@ -501,7 +500,7 @@ async fn generate_sandbox_with_roles_settings_override() {
             );
             assert_eq!(
                 role3.dna.modifiers.properties.unwrap(),
-                YamlProperties::new(serde_yaml::Value::String(String::from(
+                YamlProperties::new(yaml_serde::Value::String(String::from(
                     "should remain untouched by roles settings test",
                 )))
             );
@@ -575,6 +574,8 @@ async fn generate_sandbox_with_tx5_network_type() {
 #[cfg(feature = "transport-iroh")]
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_with_iroh_network_type() {
+    use serde_json::json;
+
     let temp_dir = tempfile::TempDir::new().unwrap();
     package_fixture_if_not_packaged().await;
     let app_path = std::env::current_dir()

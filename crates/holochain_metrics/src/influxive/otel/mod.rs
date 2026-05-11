@@ -14,9 +14,17 @@ mod tests;
 /// The writer
 pub struct InfluxiveOtelWriter {
     influxive: DynMetricWriter,
+    global_tags: Vec<(String, String)>,
 }
 
 impl InfluxiveOtelWriter {
+    fn apply_global_tags(&self, mut metric: super::types::Metric) -> super::types::Metric {
+        for (k, v) in &self.global_tags {
+            metric = metric.with_tag(k.clone(), v.clone());
+        }
+        metric
+    }
+
     fn write(&self, otel_metric: &Metric) {
         match otel_metric.data() {
             AggregatedMetrics::F64(metric_data) => match metric_data {
@@ -32,6 +40,7 @@ impl InfluxiveOtelWriter {
                             influxive_metric = influxive_metric
                                 .with_tag(attribute.key.to_string(), attribute.value.to_string());
                         }
+                        influxive_metric = self.apply_global_tags(influxive_metric);
                         self.influxive.write_metric(influxive_metric);
                     }
                 }
@@ -65,6 +74,7 @@ impl InfluxiveOtelWriter {
                 influxive_metric = influxive_metric
                     .with_tag(attribute.key.to_string(), attribute.value.to_string());
             }
+            influxive_metric = self.apply_global_tags(influxive_metric);
             self.influxive.write_metric(influxive_metric);
         }
     }
@@ -90,6 +100,7 @@ impl InfluxiveOtelWriter {
                 influxive_metric = influxive_metric
                     .with_tag(attribute.key.to_string(), attribute.value.to_string());
             }
+            influxive_metric = self.apply_global_tags(influxive_metric);
             self.influxive.write_metric(influxive_metric);
         }
     }
@@ -135,6 +146,11 @@ pub struct InfluxiveMeterProviderConfig {
     ///
     /// Defaults to None, which results in a 10 second interval.
     pub report_interval: Option<std::time::Duration>,
+
+    /// Tags stamped on every metric written by this provider.
+    ///
+    /// Use [`InfluxiveMeterProviderConfig::with_global_tag`] to add entries.
+    pub global_tags: Vec<(String, String)>,
 }
 
 impl Default for InfluxiveMeterProviderConfig {
@@ -148,7 +164,10 @@ impl Default for InfluxiveMeterProviderConfig {
             // If env var isn't set, default to 10 seconds.
             Some(std::time::Duration::from_secs(10))
         };
-        Self { report_interval }
+        Self {
+            report_interval,
+            global_tags: Vec::new(),
+        }
     }
 }
 
@@ -156,6 +175,12 @@ impl InfluxiveMeterProviderConfig {
     /// Apply [`InfluxiveMeterProviderConfig::report_interval`].
     pub fn with_report_interval(mut self, report_interval: Option<std::time::Duration>) -> Self {
         self.report_interval = report_interval;
+        self
+    }
+
+    /// Add a tag that will be stamped on every metric written by this provider.
+    pub fn with_global_tag(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.global_tags.push((key.into(), value.into()));
         self
     }
 }
@@ -166,7 +191,10 @@ pub fn create_meter_provider(
     config: InfluxiveMeterProviderConfig,
     influxive: DynMetricWriter,
 ) -> SdkMeterProvider {
-    let exporter = InfluxiveOtelWriter { influxive };
+    let exporter = InfluxiveOtelWriter {
+        influxive,
+        global_tags: config.global_tags,
+    };
     let mut reader_builder = PeriodicReader::builder(exporter);
     if let Some(interval) = config.report_interval {
         reader_builder = reader_builder.with_interval(interval);

@@ -1,10 +1,9 @@
 use crate::tests::common::Handler;
 use holo_hash::{AgentPubKey, DnaHash};
+use holochain_data::kind::PeerMetaStore;
 use holochain_keystore::test_keystore;
 use holochain_p2p::{spawn_holochain_p2p, HolochainP2pConfig};
-use holochain_state::prelude::{
-    test_cache_db_with_dna_hash, test_conductor_db, test_dht_db, test_peer_meta_store_db,
-};
+use holochain_state::prelude::{test_cache_db_with_dna_hash, test_dht_db};
 use kitsune2_api::LocalAgent;
 use std::sync::Arc;
 
@@ -15,8 +14,14 @@ async fn space_shutdown() {
 
     let dht_db = test_dht_db().to_db();
     let cache_db = test_cache_db_with_dna_hash(dna_hash.clone()).to_db();
-    let conductor_db = test_conductor_db().to_db();
-    let peer_meta_db = test_peer_meta_store_db(dna_hash.clone()).to_db();
+    let conductor_store = holochain_state::conductor::ConductorStore::new_test()
+        .await
+        .unwrap();
+    let peer_meta_db = holochain_state::peer_metadata_store::PeerMetaStore::new(
+        holochain_data::test_open_db(PeerMetaStore::new(Arc::new(dna_hash.clone())))
+            .await
+            .unwrap(),
+    );
 
     let keystore = test_keystore();
 
@@ -40,9 +45,9 @@ async fn space_shutdown() {
                 let cache_db = cache_db.clone();
                 Box::pin(async move { Ok(cache_db) })
             }),
-            get_conductor_db: Arc::new(move || {
-                let conductor_db = conductor_db.clone();
-                Box::pin(async move { conductor_db })
+            get_conductor_store: Arc::new(move || {
+                let conductor_store = conductor_store.clone();
+                Box::pin(async move { conductor_store })
             }),
             get_db_peer_meta: Arc::new(move |_space| {
                 let peer_meta_db = peer_meta_db.clone();

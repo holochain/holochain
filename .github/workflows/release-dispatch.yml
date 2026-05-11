@@ -13,7 +13,9 @@ jobs:
       fail-fast: false
       matrix:
         # Add repositories here to trigger their `workflow_dispatch` event when Holochain releases.
-        target: ["holochain/holonix"]
+        target:
+        - "holochain/holonix"
+        - "holochain/binaries"
     steps:
       - name: dispatch
         env:

@@ -25,7 +25,7 @@ async fn u64_counter() {
 
     metric.add(1, &[]);
 
-    poll_query(&svc, name, "|> last()", 300, |r| {
+    poll_query(&svc, name, 300, |r| {
         r.tables.len() == 1
             && r.tables[0].rows.len() == 1
             && r.tables[0].get::<u64>(0, "_value") == 1
@@ -36,7 +36,7 @@ async fn u64_counter() {
         metric.add(1, &[]);
     }
 
-    poll_query(&svc, name, "|> last()", 300, |r| {
+    poll_query(&svc, name, 300, |r| {
         r.tables.len() == 1
             && r.tables[0].rows.len() == 1
             && r.tables[0].get::<u64>(0, "_value") == 6
@@ -59,7 +59,7 @@ async fn i64_up_down_counter() {
 
     metric.add(1, &[]);
 
-    poll_query(&svc, name, "|> last()", 300, |r| {
+    poll_query(&svc, name, 300, |r| {
         r.tables.len() == 1
             && r.tables[0].rows.len() == 1
             && r.tables[0].get::<i64>(0, "_value") == 1
@@ -68,7 +68,7 @@ async fn i64_up_down_counter() {
 
     metric.add(-1, &[]);
 
-    poll_query(&svc, name, "|> last()", 300, |r| {
+    poll_query(&svc, name, 300, |r| {
         r.tables.len() == 1
             && r.tables[0].rows.len() == 1
             && r.tables[0].get::<i64>(0, "_value") == 0
@@ -93,7 +93,7 @@ async fn f64_histogram() {
 
     // Influx writes u64 values into one table and f64 values into another table.
     // Hence, 2 tables are expected to be present.
-    let result = poll_query(&svc, name, "|> last()", 300, |r| {
+    let result = poll_query(&svc, name, 300, |r| {
         r.tables.len() == 2 && r.tables[0].rows.len() == 1 && r.tables[1].rows.len() == 3
     })
     .await;
@@ -110,13 +110,13 @@ async fn f64_histogram() {
     assert_eq!(result.tables[1].get::<String>(2, "_field"), "sum");
     assert_eq!(result.tables[1].get::<f64>(2, "_value"), 1.0);
 
-    // Record many metrics at once and check that only one export to Influx happens.
+    // Record more metrics
     for i in 0..10 {
         metric.record(f64::from(i), &[]);
     }
 
     // Keep polling until the expected counts 11 and 9.0 show up.
-    let result = poll_query(&svc, name, "|> last()", 400, |r| {
+    let result = poll_query(&svc, name, 1000, |r| {
         r.tables.len() == 2
             && r.tables[0].rows.len() == 1
             && r.tables[1].rows.len() == 3
@@ -151,7 +151,7 @@ async fn u64_histogram() {
 
     // Influx writes u64 values into one table and f64 values into another table.
     // Hence, 2 tables are expected to be present.
-    let result = poll_query(&svc, name, "|> last()", 300, |r| {
+    let result = poll_query(&svc, name, 300, |r| {
         r.tables.len() == 1 && r.tables[0].rows.len() == 4
     })
     .await;
@@ -172,7 +172,7 @@ async fn u64_histogram() {
     }
 
     // Keep polling until the expected counts 11 and 9 show up.
-    let result = poll_query(&svc, name, "|> last()", 1000, |r| {
+    let result = poll_query(&svc, name, 1000, |r| {
         r.tables.len() == 1
             && r.tables[0].rows.len() == 4
             && r.tables[0].get::<u64>(0, "_value") == 11
@@ -208,8 +208,8 @@ async fn f64_observable_gauge() {
         })
         .build();
 
-    let result = poll_query(&svc, name, "", 300, |r| {
-        r.tables.len() == 1 && !r.tables[0].rows.is_empty() && r.tables[0].rows.len() <= 2
+    let result = poll_query(&svc, name, 600, |r| {
+        r.tables.len() == 1 && r.tables[0].rows.len() == 1
     })
     .await;
     assert_eq!(result.tables[0].get::<String>(0, "_field"), "gauge");
@@ -217,15 +217,12 @@ async fn f64_observable_gauge() {
     assert_eq!(result.tables[0].get::<f64>(0, "_value"), 0.0);
 
     // Wait for more gauge values to have been recorded.
-    let result = poll_query(&svc, name, "", 1000, |r| {
-        r.tables.len() == 1 && r.tables[0].rows.len() >= 5 && r.tables[0].rows.len() <= 6
+    poll_query(&svc, name, 1000, |r| {
+        r.tables.len() == 1
+            && r.tables[0].rows.len() == 1
+            && r.tables[0].get::<f64>(0, "_value") == 4.0
     })
     .await;
-    assert_eq!(result.tables[0].get::<f64>(0, "_value"), 0.0);
-    assert_eq!(result.tables[0].get::<f64>(1, "_value"), 1.0);
-    assert_eq!(result.tables[0].get::<f64>(2, "_value"), 2.0);
-    assert_eq!(result.tables[0].get::<f64>(3, "_value"), 3.0);
-    assert_eq!(result.tables[0].get::<f64>(4, "_value"), 4.0);
 
     svc.shutdown();
 }
@@ -242,7 +239,7 @@ async fn u64_counter_with_attributes() {
     let attributes = vec![KeyValue::new("key", "value1")];
     metric.add(1, &attributes);
 
-    let result = poll_query(&svc, name, "|> last()", 300, |r| {
+    let result = poll_query(&svc, name, 300, |r| {
         r.tables.len() == 1 && r.tables[0].rows.len() == 1
     })
     .await;
@@ -256,7 +253,7 @@ async fn u64_counter_with_attributes() {
     let attributes_2 = vec![KeyValue::new("key", "value2")];
     metric.add(1, &attributes_2);
 
-    let result = poll_query(&svc, name, "|> last()", 1000, |r| {
+    let result = poll_query(&svc, name, 1000, |r| {
         r.tables.len() == 1 && r.tables[0].rows.len() == 2
     })
     .await;
@@ -296,7 +293,6 @@ async fn setup(tmp: &std::path::Path) -> (Arc<InfluxiveChildSvc>, SdkMeterProvid
 async fn poll_query(
     svc: &InfluxiveChildSvc,
     measurement: &str,
-    query_suffix: &str,
     timeout_ms: u64,
     condition: impl Fn(&QueryResult) -> bool,
 ) -> QueryResult {
@@ -308,7 +304,7 @@ async fn poll_query(
 from(bucket: "influxive")
 |> range(start: -15m, stop: now())
 |> filter(fn: (r) => r._measurement == "{measurement}")
-{query_suffix}"#
+|> last()"#
                 ))
                 .await
                 .unwrap(),

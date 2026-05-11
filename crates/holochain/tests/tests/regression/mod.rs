@@ -1,5 +1,5 @@
 use holo_hash::ActionHash;
-#[cfg(not(feature = "wasmer_wamr"))]
+#[cfg(any(feature = "wasmer-sys-cranelift", feature = "wasmer-sys-llvm"))]
 use holochain::conductor::conductor::WASM_CACHE;
 use holochain::{sweettest::*, test_utils::retry_fn_until_timeout};
 use holochain_wasm_test_utils::TestWasm;
@@ -7,15 +7,14 @@ use holochain_wasm_test_utils::TestWasm;
 mod dht_location;
 mod enable_clone_cell_by_dna_hash;
 pub mod must_get_agent_activity_saturation;
-mod shutdown;
 mod two_apps_same_dna_hash_different_coordinators;
 mod zome_call_atomic;
 
-// Make sure the wasm cache at least creates files.
-// This is not run with the `wasmer_wamr` feature flag,
+// Make sure the WASM cache at least creates files.
+// This is not run with the `wasmer-wasmi` feature flag,
 // as the cache is not used.
 #[tokio::test(flavor = "multi_thread")]
-#[cfg(not(feature = "wasmer_wamr"))]
+#[cfg(any(feature = "wasmer-sys-cranelift", feature = "wasmer-sys-llvm"))]
 async fn wasm_disk_cache() {
     holochain_trace::test_run();
     let mut conductor = SweetConductor::standard().await;

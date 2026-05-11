@@ -1,6 +1,6 @@
 [package]
 name = "mr_bundle"
-version = "0.7.0-dev.1"
+version = "0.7.0-dev.2"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 description = "Implements the un-/packing of bundles that either embed or reference a set of resources"
@@ -26,7 +26,7 @@ thiserror = "2.0"
 bytes = { version = "1.10.1", features = ["serde"] }
 
 # Feature: fs
-serde_yaml = { version = "0.9", optional = true }
+yaml_serde = { version = "0.10", optional = true }
 tokio = { version = "1.44", default-features = false, features = [
   "fs",
 ], optional = true }
@@ -35,7 +35,7 @@ dunce = { version = "1.0", optional = true }
 [dev-dependencies]
 mr_bundle = { path = ".", features = ["fs"] }
 
-serde_yaml = "0.9"
+yaml_serde = "0.10"
 tokio = { version = "1.36.0", features = ["full"] }
 tempfile = "3"
 
@@ -43,4 +43,4 @@ tempfile = "3"
 workspace = true
 
 [features]
-fs = ["dep:serde_yaml", "dep:tokio", "dep:dunce"]
+fs = ["dep:yaml_serde", "dep:tokio", "dep:dunce"]

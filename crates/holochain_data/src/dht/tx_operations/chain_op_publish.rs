@@ -1,0 +1,34 @@
+//! `TxRead<Dht>` / `TxWrite<Dht>` API for the `ChainOpPublish` table.
+
+use super::super::inner::chain_op_publish;
+use crate::handles::{TxRead, TxWrite};
+use crate::kind::Dht;
+use crate::models::dht::ChainOpPublishRow;
+use holo_hash::DhtOpHash;
+use holochain_timestamp::Timestamp;
+
+impl TxWrite<Dht> {
+    pub async fn insert_chain_op_publish(
+        &mut self,
+        op_hash: &DhtOpHash,
+        last_publish_time: Option<Timestamp>,
+        receipts_complete: Option<bool>,
+    ) -> sqlx::Result<()> {
+        chain_op_publish::insert_chain_op_publish(
+            self.conn_mut(),
+            op_hash,
+            last_publish_time,
+            receipts_complete,
+        )
+        .await
+    }
+}
+
+impl TxRead<Dht> {
+    pub async fn get_chain_op_publish(
+        &mut self,
+        op_hash: DhtOpHash,
+    ) -> sqlx::Result<Option<ChainOpPublishRow>> {
+        chain_op_publish::get_chain_op_publish(self.conn_mut(), op_hash).await
+    }
+}
