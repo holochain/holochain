@@ -260,6 +260,64 @@ impl DhtStore<DbWrite<Dht>> {
             .await?)
     }
 
+    /// Insert a [`SignedValidationReceipt`] into the `ValidationReceipt` table
+    /// and return the current receipt count for the underlying op.
+    ///
+    /// The receipt hash is derived by serializing the full
+    /// `SignedValidationReceipt` with `holochain_serialized_bytes` and then
+    /// computing a `blake2b_256` digest over the resulting bytes, matching the
+    /// legacy `add_if_unique` / `insert_validation_receipt_when` path.  The new
+    /// schema's `ValidationReceipt` table has `hash` as PRIMARY KEY ON CONFLICT
+    /// IGNORE, so duplicate inserts are silently dropped — same de-dupe
+    /// semantics as the legacy table.
+    pub async fn record_validation_receipt(
+        &self,
+        receipt: &holochain_types::prelude::SignedValidationReceipt,
+    ) -> StateMutationResult<u64> {
+        use holo_hash::encode::blake2b_256;
+
+        // Derive the receipt hash the same way the legacy `add_if_unique` does:
+        // serialize the whole SignedValidationReceipt, then take blake2b_256.
+        let bytes = holochain_serialized_bytes::encode(receipt)
+            .map_err(StateMutationError::from)?;
+        let hash_bytes = blake2b_256(&bytes);
+        let receipt_hash = DhtOpHash::from_raw_32(hash_bytes);
+
+        let op_hash = receipt.receipt.dht_op_hash.clone();
+
+        // Serialize validators and signatures as individual blobs.
+        let validators_bytes = holochain_serialized_bytes::encode(&receipt.receipt.validators)
+            .map_err(StateMutationError::from)?;
+        let signature_bytes =
+            holochain_serialized_bytes::encode(&receipt.validators_signatures)
+                .map_err(StateMutationError::from)?;
+
+        let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
+
+        tx.insert_validation_receipt(
+            &receipt_hash,
+            &op_hash,
+            &validators_bytes,
+            &signature_bytes,
+            holochain_types::prelude::Timestamp::now(),
+        )
+        .await
+        .map_err(StateMutationError::from)?;
+
+        tx.commit().await.map_err(StateMutationError::from)?;
+
+        let op_hash_bytes = op_hash.get_raw_36().to_vec();
+        let count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM ValidationReceipt WHERE op_hash = ?",
+        )
+        .bind(&op_hash_bytes)
+        .fetch_one(self.db.pool())
+        .await
+        .map_err(StateMutationError::from)?;
+
+        Ok(count as u64)
+    }
+
     /// Mark the receipts for `op_hash` as complete. Returns
     /// [`DhtStoreError::ChainOpPublishMissing`] if no matching row exists,
     /// which indicates the flush mirror failed to insert a `ChainOpPublish`
@@ -1128,6 +1186,56 @@ mod tests {
     // ---------------------------------------------------------------------------
     // record_locally_validated_warrants tests
     // ---------------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn record_validation_receipt_inserts_and_counts() {
+        use holochain_types::prelude::{
+            SignedValidationReceipt, ValidationReceipt, ValidationStatus,
+        };
+        use holochain_types::prelude::Signature;
+
+        let store = DhtStore::new_test(dht_id()).await.unwrap();
+
+        // Seed a chain op and promote it to ChainOp so the FK is satisfied.
+        let op = build_test_store_record_op_hashed(60);
+        store.record_incoming_ops(vec![op.clone()]).await.unwrap();
+        store
+            .record_sys_validation_outcome(vec![(op.as_hash().clone(), SysOutcome::Accepted)])
+            .await
+            .unwrap();
+        store
+            .record_app_validation_outcome(vec![(op.as_hash().clone(), AppOutcome::Accepted)])
+            .await
+            .unwrap();
+        store
+            .integrate_ready_ops(Timestamp::from_micros(1))
+            .await
+            .unwrap();
+
+        let receipt = SignedValidationReceipt {
+            receipt: ValidationReceipt {
+                dht_op_hash: op.as_hash().clone(),
+                validation_status: ValidationStatus::Valid,
+                validators: vec![AgentPubKey::from_raw_36(vec![5u8; 36])],
+                when_integrated: Timestamp::from_micros(1),
+            },
+            validators_signatures: vec![Signature([0u8; 64])],
+        };
+
+        let count = store
+            .record_validation_receipt(&receipt)
+            .await
+            .unwrap();
+        assert_eq!(count, 1);
+
+        // Inserting the same receipt again should be a no-op (ON CONFLICT IGNORE)
+        // and return count of 1 again.
+        let count = store
+            .record_validation_receipt(&receipt)
+            .await
+            .unwrap();
+        assert_eq!(count, 1);
+    }
 
     #[tokio::test]
     async fn record_locally_validated_warrants_inserts_warrant() {
