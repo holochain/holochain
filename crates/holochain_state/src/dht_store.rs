@@ -278,8 +278,8 @@ impl DhtStore<DbWrite<Dht>> {
 
         // Derive the receipt hash the same way the legacy `add_if_unique` does:
         // serialize the whole SignedValidationReceipt, then take blake2b_256.
-        let bytes = holochain_serialized_bytes::encode(receipt)
-            .map_err(StateMutationError::from)?;
+        let bytes =
+            holochain_serialized_bytes::encode(receipt).map_err(StateMutationError::from)?;
         let hash_bytes = blake2b_256(&bytes);
         let receipt_hash = DhtOpHash::from_raw_32(hash_bytes);
 
@@ -288,9 +288,8 @@ impl DhtStore<DbWrite<Dht>> {
         // Serialize validators and signatures as individual blobs.
         let validators_bytes = holochain_serialized_bytes::encode(&receipt.receipt.validators)
             .map_err(StateMutationError::from)?;
-        let signature_bytes =
-            holochain_serialized_bytes::encode(&receipt.validators_signatures)
-                .map_err(StateMutationError::from)?;
+        let signature_bytes = holochain_serialized_bytes::encode(&receipt.validators_signatures)
+            .map_err(StateMutationError::from)?;
 
         let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
 
@@ -307,13 +306,12 @@ impl DhtStore<DbWrite<Dht>> {
         tx.commit().await.map_err(StateMutationError::from)?;
 
         let op_hash_bytes = op_hash.get_raw_36().to_vec();
-        let count: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM ValidationReceipt WHERE op_hash = ?",
-        )
-        .bind(&op_hash_bytes)
-        .fetch_one(self.db.pool())
-        .await
-        .map_err(StateMutationError::from)?;
+        let count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM ValidationReceipt WHERE op_hash = ?")
+                .bind(&op_hash_bytes)
+                .fetch_one(self.db.pool())
+                .await
+                .map_err(StateMutationError::from)?;
 
         Ok(count as u64)
     }
@@ -401,15 +399,8 @@ impl DhtStore<DbWrite<Dht>> {
     /// All writes happen in a single transaction.  The `Action` and both limbo
     /// tables use `PRIMARY KEY ON CONFLICT IGNORE`, so duplicate ops are
     /// silently skipped.
-    pub async fn record_incoming_ops(
-        &self,
-        ops: Vec<DhtOpHashed>,
-    ) -> StateMutationResult<()> {
-        let mut tx = self
-            .db
-            .begin()
-            .await
-            .map_err(StateMutationError::from)?;
+    pub async fn record_incoming_ops(&self, ops: Vec<DhtOpHashed>) -> StateMutationResult<()> {
+        let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
         let now = Timestamp::now();
         for op in ops {
             let op_hash = op.as_hash().clone();
@@ -419,8 +410,7 @@ impl DhtStore<DbWrite<Dht>> {
             match op.into_inner().0 {
                 DhtOp::ChainOp(chain_op) => {
                     let signed_action = chain_op.signed_action();
-                    let action_hash =
-                        holo_hash::ActionHash::with_data_sync(signed_action.action());
+                    let action_hash = holo_hash::ActionHash::with_data_sync(signed_action.action());
                     let sah = holochain_zome_types::record::SignedActionHashed::with_presigned(
                         holo_hash::HoloHashed::with_pre_hashed(
                             signed_action.action().clone(),
@@ -428,8 +418,7 @@ impl DhtStore<DbWrite<Dht>> {
                         ),
                         signed_action.signature().clone(),
                     );
-                    let new_sah =
-                        crate::source_chain::legacy_to_dht_v2_signed_action(&sah);
+                    let new_sah = crate::source_chain::legacy_to_dht_v2_signed_action(&sah);
                     tx.insert_action(&new_sah, None)
                         .await
                         .map_err(StateMutationError::from)?;
@@ -720,10 +709,7 @@ impl DhtStore<DbWrite<Dht>> {
     /// failure outside the validation workflows. Tries `ChainOp` first; if no
     /// row matches (the op is still in limbo), marks both sys and app validation
     /// status as Rejected on `LimboChainOp`.
-    pub async fn reject_chain_op(
-        &self,
-        op_hashes: Vec<DhtOpHash>,
-    ) -> StateMutationResult<()> {
+    pub async fn reject_chain_op(&self, op_hashes: Vec<DhtOpHash>) -> StateMutationResult<()> {
         use holochain_zome_types::dht_v2::RecordValidity;
 
         let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
@@ -760,11 +746,9 @@ impl DhtStore<DbWrite<Dht>> {
 fn action_hash_to_entry_hash(
     chain_op: &holochain_types::dht_op::ChainOp,
 ) -> StateMutationResult<holo_hash::EntryHash> {
-    chain_op
-        .action()
-        .entry_hash()
-        .cloned()
-        .ok_or_else(|| StateMutationError::Other("op carries entry but action has no entry_hash".into()))
+    chain_op.action().entry_hash().cloned().ok_or_else(|| {
+        StateMutationError::Other("op carries entry but action has no entry_hash".into())
+    })
 }
 
 /// Compute the terminal [`RecordValidity`](holochain_zome_types::dht_v2::RecordValidity)
@@ -985,10 +969,8 @@ mod tests {
         let author = AgentPubKey::from_raw_36(vec![seed; 36]);
         let entry_hash = EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]);
         let entry = Entry::App(AppEntryBytes(
-            holochain_serialized_bytes::SerializedBytes::try_from(UnsafeBytes::from(
-                vec![seed; 8],
-            ))
-            .unwrap(),
+            holochain_serialized_bytes::SerializedBytes::try_from(UnsafeBytes::from(vec![seed; 8]))
+                .unwrap(),
         ));
         let sig = Signature::from([seed; 64]);
         let action = Action::Create(Create {
@@ -1017,10 +999,10 @@ mod tests {
     fn build_test_warrant_op_hashed(seed: u8) -> DhtOpHashed {
         use holochain_types::dht_op::{DhtOp, DhtOpHashed};
         use holochain_types::warrant::WarrantOp;
+        use holochain_zome_types::op::ChainOpType;
         use holochain_zome_types::prelude::{
             ChainIntegrityWarrant, Signature, SignedWarrant, Warrant, WarrantProof,
         };
-        use holochain_zome_types::op::ChainOpType;
 
         let action_author = AgentPubKey::from_raw_36(vec![seed; 36]);
         let warrantee = AgentPubKey::from_raw_36(vec![seed.wrapping_add(50); 36]);
@@ -1061,13 +1043,11 @@ mod tests {
         store.record_incoming_ops(vec![op]).await.unwrap();
 
         // Action row was inserted.
-        let found = store
-            .db
-            .as_ref()
-            .get_action(action_hash)
-            .await
-            .unwrap();
-        assert!(found.is_some(), "Action row not found after record_incoming_ops");
+        let found = store.db.as_ref().get_action(action_hash).await.unwrap();
+        assert!(
+            found.is_some(),
+            "Action row not found after record_incoming_ops"
+        );
 
         // LimboChainOp row has require_receipt=true and a positive serialized_size.
         let row = store
@@ -1090,7 +1070,10 @@ mod tests {
         store.record_incoming_ops(vec![warrant_op]).await.unwrap();
 
         let row = store.db.as_ref().get_limbo_warrant(op_hash).await.unwrap();
-        assert!(row.is_some(), "LimboWarrant row not found after record_incoming_ops");
+        assert!(
+            row.is_some(),
+            "LimboWarrant row not found after record_incoming_ops"
+        );
         let row = row.unwrap();
         assert!(row.serialized_size > 0, "serialized_size should be > 0");
     }
@@ -1177,14 +1160,27 @@ mod tests {
         let op = build_test_store_record_op_hashed(11);
         store.record_incoming_ops(vec![op.clone()]).await.unwrap();
         // Pre-state: app_validation_status should be NULL.
-        let row = store.db().as_ref().get_limbo_chain_op(op.as_hash().clone()).await.unwrap().unwrap();
+        let row = store
+            .db()
+            .as_ref()
+            .get_limbo_chain_op(op.as_hash().clone())
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(row.app_validation_status, None);
 
-        store.record_app_validation_outcome(vec![
-            (op.as_hash().clone(), AppOutcome::Accepted),
-        ]).await.unwrap();
+        store
+            .record_app_validation_outcome(vec![(op.as_hash().clone(), AppOutcome::Accepted)])
+            .await
+            .unwrap();
 
-        let row = store.db().as_ref().get_limbo_chain_op(op.as_hash().clone()).await.unwrap().unwrap();
+        let row = store
+            .db()
+            .as_ref()
+            .get_limbo_chain_op(op.as_hash().clone())
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(row.app_validation_status, Some(1));
     }
 
@@ -1194,11 +1190,18 @@ mod tests {
         let op = build_test_store_record_op_hashed(12);
         store.record_incoming_ops(vec![op.clone()]).await.unwrap();
 
-        store.record_app_validation_outcome(vec![
-            (op.as_hash().clone(), AppOutcome::Rejected),
-        ]).await.unwrap();
+        store
+            .record_app_validation_outcome(vec![(op.as_hash().clone(), AppOutcome::Rejected)])
+            .await
+            .unwrap();
 
-        let row = store.db().as_ref().get_limbo_chain_op(op.as_hash().clone()).await.unwrap().unwrap();
+        let row = store
+            .db()
+            .as_ref()
+            .get_limbo_chain_op(op.as_hash().clone())
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(row.app_validation_status, Some(2));
     }
 
@@ -1228,20 +1231,40 @@ mod tests {
         let op = build_test_store_record_op_hashed(50);
         store.record_incoming_ops(vec![op.clone()]).await.unwrap();
         // Mark ready: sys=1, app=1.
-        store.record_sys_validation_outcome(vec![
-            (op.as_hash().clone(), SysOutcome::Accepted),
-        ]).await.unwrap();
-        store.record_app_validation_outcome(vec![
-            (op.as_hash().clone(), AppOutcome::Accepted),
-        ]).await.unwrap();
+        store
+            .record_sys_validation_outcome(vec![(op.as_hash().clone(), SysOutcome::Accepted)])
+            .await
+            .unwrap();
+        store
+            .record_app_validation_outcome(vec![(op.as_hash().clone(), AppOutcome::Accepted)])
+            .await
+            .unwrap();
 
-        let promoted = store.integrate_ready_ops(Timestamp::from_micros(999)).await.unwrap();
+        let promoted = store
+            .integrate_ready_ops(Timestamp::from_micros(999))
+            .await
+            .unwrap();
         assert_eq!(promoted, vec![op.as_hash().clone()]);
 
-        assert!(store.db().as_ref().get_limbo_chain_op(op.as_hash().clone()).await.unwrap().is_none());
-        let row = store.db().as_ref().get_chain_op(op.as_hash().clone()).await.unwrap().unwrap();
+        assert!(store
+            .db()
+            .as_ref()
+            .get_limbo_chain_op(op.as_hash().clone())
+            .await
+            .unwrap()
+            .is_none());
+        let row = store
+            .db()
+            .as_ref()
+            .get_chain_op(op.as_hash().clone())
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(row.when_integrated, 999);
-        assert_eq!(row.validation_status, i64::from(holochain_zome_types::dht_v2::RecordValidity::Accepted));
+        assert_eq!(
+            row.validation_status,
+            i64::from(holochain_zome_types::dht_v2::RecordValidity::Accepted)
+        );
     }
 
     #[tokio::test]
@@ -1250,29 +1273,63 @@ mod tests {
         let op = build_test_store_record_op_hashed(51);
         store.record_incoming_ops(vec![op.clone()]).await.unwrap();
         // No validation outcomes recorded — sys/app are NULL, not ready.
-        let promoted = store.integrate_ready_ops(Timestamp::from_micros(999)).await.unwrap();
+        let promoted = store
+            .integrate_ready_ops(Timestamp::from_micros(999))
+            .await
+            .unwrap();
         assert!(promoted.is_empty());
 
         // Op still in limbo, not in ChainOp.
-        assert!(store.db().as_ref().get_limbo_chain_op(op.as_hash().clone()).await.unwrap().is_some());
-        assert!(store.db().as_ref().get_chain_op(op.as_hash().clone()).await.unwrap().is_none());
+        assert!(store
+            .db()
+            .as_ref()
+            .get_limbo_chain_op(op.as_hash().clone())
+            .await
+            .unwrap()
+            .is_some());
+        assert!(store
+            .db()
+            .as_ref()
+            .get_chain_op(op.as_hash().clone())
+            .await
+            .unwrap()
+            .is_none());
     }
 
     #[tokio::test]
     async fn integrate_ready_ops_promotes_warrant() {
         let store = DhtStore::new_test(dht_id()).await.unwrap();
         let warrant = build_test_warrant_op_hashed(52);
-        store.record_incoming_ops(vec![warrant.clone()]).await.unwrap();
+        store
+            .record_incoming_ops(vec![warrant.clone()])
+            .await
+            .unwrap();
         // Mark sys=1 (warrants have no app validation).
-        store.record_sys_validation_outcome(vec![
-            (warrant.as_hash().clone(), SysOutcome::Accepted),
-        ]).await.unwrap();
+        store
+            .record_sys_validation_outcome(vec![(warrant.as_hash().clone(), SysOutcome::Accepted)])
+            .await
+            .unwrap();
 
-        let promoted = store.integrate_ready_ops(Timestamp::from_micros(999)).await.unwrap();
+        let promoted = store
+            .integrate_ready_ops(Timestamp::from_micros(999))
+            .await
+            .unwrap();
         assert_eq!(promoted, vec![warrant.as_hash().clone()]);
 
-        assert!(store.db().as_ref().get_limbo_warrant(warrant.as_hash().clone()).await.unwrap().is_none());
-        assert!(store.db().as_ref().get_warrant(warrant.as_hash().clone()).await.unwrap().is_some());
+        assert!(store
+            .db()
+            .as_ref()
+            .get_limbo_warrant(warrant.as_hash().clone())
+            .await
+            .unwrap()
+            .is_none());
+        assert!(store
+            .db()
+            .as_ref()
+            .get_warrant(warrant.as_hash().clone())
+            .await
+            .unwrap()
+            .is_some());
     }
 
     // ---------------------------------------------------------------------------
@@ -1281,10 +1338,10 @@ mod tests {
 
     #[tokio::test]
     async fn record_validation_receipt_inserts_and_counts() {
+        use holochain_types::prelude::Signature;
         use holochain_types::prelude::{
             SignedValidationReceipt, ValidationReceipt, ValidationStatus,
         };
-        use holochain_types::prelude::Signature;
 
         let store = DhtStore::new_test(dht_id()).await.unwrap();
 
@@ -1314,18 +1371,12 @@ mod tests {
             validators_signatures: vec![Signature([0u8; 64])],
         };
 
-        let count = store
-            .record_validation_receipt(&receipt)
-            .await
-            .unwrap();
+        let count = store.record_validation_receipt(&receipt).await.unwrap();
         assert_eq!(count, 1);
 
         // Inserting the same receipt again should be a no-op (ON CONFLICT IGNORE)
         // and return count of 1 again.
-        let count = store
-            .record_validation_receipt(&receipt)
-            .await
-            .unwrap();
+        let count = store.record_validation_receipt(&receipt).await.unwrap();
         assert_eq!(count, 1);
     }
 
@@ -1339,12 +1390,27 @@ mod tests {
         let op = build_test_store_record_op_hashed(70);
         store.record_incoming_ops(vec![op.clone()]).await.unwrap();
         // Pre: require_receipt = 1 (set by record_incoming_ops).
-        let row = store.db().as_ref().get_limbo_chain_op(op.as_hash().clone()).await.unwrap().unwrap();
+        let row = store
+            .db()
+            .as_ref()
+            .get_limbo_chain_op(op.as_hash().clone())
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(row.require_receipt, 1);
 
-        store.clear_require_receipt(vec![op.as_hash().clone()]).await.unwrap();
+        store
+            .clear_require_receipt(vec![op.as_hash().clone()])
+            .await
+            .unwrap();
 
-        let row = store.db().as_ref().get_limbo_chain_op(op.as_hash().clone()).await.unwrap().unwrap();
+        let row = store
+            .db()
+            .as_ref()
+            .get_limbo_chain_op(op.as_hash().clone())
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(row.require_receipt, 0);
     }
 
@@ -1355,15 +1421,39 @@ mod tests {
         let store = DhtStore::new_test(dht_id()).await.unwrap();
         let op = build_test_store_record_op_hashed(71);
         store.record_incoming_ops(vec![op.clone()]).await.unwrap();
-        store.record_sys_validation_outcome(vec![(op.as_hash().clone(), SysOutcome::Accepted)]).await.unwrap();
-        store.record_app_validation_outcome(vec![(op.as_hash().clone(), AppOutcome::Accepted)]).await.unwrap();
-        store.integrate_ready_ops(Timestamp::from_micros(1)).await.unwrap();
+        store
+            .record_sys_validation_outcome(vec![(op.as_hash().clone(), SysOutcome::Accepted)])
+            .await
+            .unwrap();
+        store
+            .record_app_validation_outcome(vec![(op.as_hash().clone(), AppOutcome::Accepted)])
+            .await
+            .unwrap();
+        store
+            .integrate_ready_ops(Timestamp::from_micros(1))
+            .await
+            .unwrap();
         // Op is now in ChainOp.
-        assert!(store.db().as_ref().get_limbo_chain_op(op.as_hash().clone()).await.unwrap().is_none());
-        assert!(store.db().as_ref().get_chain_op(op.as_hash().clone()).await.unwrap().is_some());
+        assert!(store
+            .db()
+            .as_ref()
+            .get_limbo_chain_op(op.as_hash().clone())
+            .await
+            .unwrap()
+            .is_none());
+        assert!(store
+            .db()
+            .as_ref()
+            .get_chain_op(op.as_hash().clone())
+            .await
+            .unwrap()
+            .is_some());
 
         // No-op; should not error.
-        store.clear_require_receipt(vec![op.as_hash().clone()]).await.unwrap();
+        store
+            .clear_require_receipt(vec![op.as_hash().clone()])
+            .await
+            .unwrap();
     }
 
     // ---------------------------------------------------------------------------
@@ -1441,19 +1531,38 @@ mod tests {
         // Seed an op in ChainOp via the standard pipeline.
         let op = build_test_store_record_op_hashed(90);
         store.record_incoming_ops(vec![op.clone()]).await.unwrap();
-        store.record_sys_validation_outcome(vec![(op.as_hash().clone(), SysOutcome::Accepted)]).await.unwrap();
-        store.record_app_validation_outcome(vec![(op.as_hash().clone(), AppOutcome::Accepted)]).await.unwrap();
-        store.integrate_ready_ops(Timestamp::from_micros(1)).await.unwrap();
+        store
+            .record_sys_validation_outcome(vec![(op.as_hash().clone(), SysOutcome::Accepted)])
+            .await
+            .unwrap();
+        store
+            .record_app_validation_outcome(vec![(op.as_hash().clone(), AppOutcome::Accepted)])
+            .await
+            .unwrap();
+        store
+            .integrate_ready_ops(Timestamp::from_micros(1))
+            .await
+            .unwrap();
 
         // Insert a ChainOpPublish row with NULL last_publish_time.
-        store.db().insert_chain_op_publish(op.as_hash(), None, None, None).await.unwrap();
+        store
+            .db()
+            .insert_chain_op_publish(op.as_hash(), None, None, None)
+            .await
+            .unwrap();
 
-        store.record_published_op_hashes(
-            vec![op.as_hash().clone()],
-            Timestamp::from_micros(42),
-        ).await.unwrap();
+        store
+            .record_published_op_hashes(vec![op.as_hash().clone()], Timestamp::from_micros(42))
+            .await
+            .unwrap();
 
-        let row = store.db().as_ref().get_chain_op_publish(op.as_hash().clone()).await.unwrap().unwrap();
+        let row = store
+            .db()
+            .as_ref()
+            .get_chain_op_publish(op.as_hash().clone())
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(row.last_publish_time, Some(42));
     }
 
@@ -1467,16 +1576,40 @@ mod tests {
         let store = DhtStore::new_test(dht_id()).await.unwrap();
         let op = build_test_store_record_op_hashed(100);
         store.record_incoming_ops(vec![op.clone()]).await.unwrap();
-        store.record_sys_validation_outcome(vec![(op.as_hash().clone(), SysOutcome::Accepted)]).await.unwrap();
-        store.record_app_validation_outcome(vec![(op.as_hash().clone(), AppOutcome::Accepted)]).await.unwrap();
-        store.integrate_ready_ops(Timestamp::from_micros(1)).await.unwrap();
+        store
+            .record_sys_validation_outcome(vec![(op.as_hash().clone(), SysOutcome::Accepted)])
+            .await
+            .unwrap();
+        store
+            .record_app_validation_outcome(vec![(op.as_hash().clone(), AppOutcome::Accepted)])
+            .await
+            .unwrap();
+        store
+            .integrate_ready_ops(Timestamp::from_micros(1))
+            .await
+            .unwrap();
         // Pre: validation_status is Accepted.
-        let row = store.db().as_ref().get_chain_op(op.as_hash().clone()).await.unwrap().unwrap();
+        let row = store
+            .db()
+            .as_ref()
+            .get_chain_op(op.as_hash().clone())
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(row.validation_status, i64::from(RecordValidity::Accepted));
 
-        store.reject_chain_op(vec![op.as_hash().clone()]).await.unwrap();
+        store
+            .reject_chain_op(vec![op.as_hash().clone()])
+            .await
+            .unwrap();
 
-        let row = store.db().as_ref().get_chain_op(op.as_hash().clone()).await.unwrap().unwrap();
+        let row = store
+            .db()
+            .as_ref()
+            .get_chain_op(op.as_hash().clone())
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(row.validation_status, i64::from(RecordValidity::Rejected));
     }
 
@@ -1487,9 +1620,18 @@ mod tests {
         store.record_incoming_ops(vec![op.clone()]).await.unwrap();
         // Op is in limbo with sys=NULL, app=NULL.
 
-        store.reject_chain_op(vec![op.as_hash().clone()]).await.unwrap();
+        store
+            .reject_chain_op(vec![op.as_hash().clone()])
+            .await
+            .unwrap();
 
-        let row = store.db().as_ref().get_limbo_chain_op(op.as_hash().clone()).await.unwrap().unwrap();
+        let row = store
+            .db()
+            .as_ref()
+            .get_limbo_chain_op(op.as_hash().clone())
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(row.sys_validation_status, Some(2));
         assert_eq!(row.app_validation_status, Some(2));
     }

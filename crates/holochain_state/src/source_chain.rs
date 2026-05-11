@@ -631,7 +631,14 @@ impl SourceChain {
 
                         // Always insert a ChainOpPublish row for self-authored ops so the
                         // publish workflow can track them without a separate lookup.
-                        tx.insert_chain_op_publish(op_hash, None, None, None)
+                        // Mirror the legacy authored-DB behaviour: countersigning ops are
+                        // withheld from publishing until the session succeeds.
+                        let withhold = if is_countersigning_session {
+                            Some(true)
+                        } else {
+                            None
+                        };
+                        tx.insert_chain_op_publish(op_hash, None, None, withhold)
                             .await
                             .map_err(SourceChainError::other)?;
                     }
@@ -1951,7 +1958,7 @@ mod tests {
     use ::fixt::fixt;
     use ::fixt::prelude::*;
     use holo_hash::fixt::DnaHashFixturator;
-    use holo_hash::fixt::{ActionHashFixturator, AgentPubKeyFixturator};
+    use holo_hash::fixt::{ActionHashFixturator, AgentPubKeyFixturator, EntryHashFixturator};
     use holochain_keystore::test_keystore;
     use holochain_zome_types::Entry;
     use matches::assert_matches;
@@ -3078,6 +3085,91 @@ mod tests {
                 .unwrap()
         });
         assert!(actual_warrants.is_empty());
+    }
+
+    /// Flush of a countersigning op writes `withhold_publish = 1` to `ChainOpPublish`
+    /// in the new DHT schema, mirroring the legacy authored-DB behaviour.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn flush_countersigning_op_sets_withhold_publish() {
+        use holochain_zome_types::countersigning::{
+            CounterSigningAgentState, CounterSigningSessionData, CounterSigningSessionTimes,
+            PreflightRequest,
+        };
+        use std::time::Duration;
+
+        let TestCase {
+            chain,
+            agent_key: alice,
+            dht_store,
+            keystore,
+            ..
+        } = TestCase::new().await;
+
+        // Second signing agent — exists only as a key; no local chain needed.
+        let bob = keystore.new_sign_keypair_random().await.unwrap();
+
+        // Build a preflight request for alice (index 0) and bob (index 1).
+        let app_entry_hash = fixt!(EntryHash);
+        let app_entry_type = EntryType::App(AppEntryDef::new(
+            EntryDefIndex(0),
+            0.into(),
+            EntryVisibility::Public,
+        ));
+        let start = Timestamp::now();
+        let end = (start + Duration::from_secs(60)).unwrap();
+        let session_times = CounterSigningSessionTimes::try_new(start, end).unwrap();
+        let preflight_request = PreflightRequest::try_new(
+            app_entry_hash,
+            vec![(alice.clone(), vec![]), (bob.clone(), vec![])],
+            vec![],
+            0,
+            false,
+            session_times,
+            ActionBase::Create(CreateBase::new(app_entry_type.clone())),
+            PreflightBytes(vec![]),
+        )
+        .unwrap();
+
+        // Alice accepts — this locks her chain and returns her agent state.
+        let alice_agent_state = chain
+            .accept_countersigning_preflight_request(preflight_request.clone(), 0)
+            .await
+            .unwrap();
+
+        // Build a fake Bob agent state (index 1). The test only cares that
+        // the flush path sets `withhold_publish`; full signature verification
+        // is not exercised here.
+        let bob_agent_state = CounterSigningAgentState::new(1, fixt!(ActionHash), 2);
+
+        let session_data = CounterSigningSessionData::try_new(
+            preflight_request,
+            vec![
+                (alice_agent_state, fixt!(Signature)),
+                (bob_agent_state, fixt!(Signature)),
+            ],
+            vec![],
+        )
+        .unwrap();
+
+        let entry = Entry::CounterSign(Box::new(session_data), fixt!(AppEntryBytes));
+        chain
+            .put_countersigned(entry, ChainTopOrdering::Strict, EntryRateWeight::default())
+            .await
+            .unwrap();
+
+        chain.flush(vec![DhtArc::Empty]).await.unwrap();
+
+        // Assert that at least one ChainOpPublish row carries withhold_publish = 1.
+        let withheld_count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM ChainOpPublish WHERE withhold_publish = 1")
+                .fetch_one(dht_store.db().pool())
+                .await
+                .unwrap();
+        assert!(
+            withheld_count > 0,
+            "expected at least one ChainOpPublish row with withhold_publish=1 \
+             after countersigning flush, got 0"
+        );
     }
 
     struct TestCase {
