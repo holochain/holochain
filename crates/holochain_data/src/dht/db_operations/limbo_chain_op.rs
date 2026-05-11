@@ -42,6 +42,15 @@ impl DbWrite<Dht> {
     ) -> sqlx::Result<u64> {
         limbo_chain_op::set_abandoned_at(self.pool(), op_hash, when).await
     }
+
+    /// Set the `require_receipt` flag for the given op. Returns the number of rows updated.
+    pub async fn set_limbo_chain_op_require_receipt(
+        &self,
+        op_hash: &DhtOpHash,
+        require_receipt: bool,
+    ) -> sqlx::Result<u64> {
+        limbo_chain_op::set_require_receipt(self.pool(), op_hash, require_receipt).await
+    }
 }
 
 impl DbRead<Dht> {
