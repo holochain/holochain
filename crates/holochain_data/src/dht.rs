@@ -1474,6 +1474,25 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn set_chain_op_validation_status_updates() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let (op_hash, _) = seed_chain_op(&db, 0).await;
+        // seed_chain_op already inserts with Accepted; flip to Rejected.
+        let updated = db
+            .set_chain_op_validation_status(&op_hash, RecordValidity::Rejected)
+            .await
+            .unwrap();
+        assert_eq!(updated, 1);
+        let row = db
+            .as_ref()
+            .get_chain_op(op_hash)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.validation_status, i64::from(RecordValidity::Rejected));
+    }
+
+    #[tokio::test]
     async fn set_chain_op_receipts_complete_round_trip() {
         let db = test_open_db(dht_db_id()).await.unwrap();
 
