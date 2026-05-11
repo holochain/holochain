@@ -182,6 +182,24 @@ where
     Ok(result.rows_affected())
 }
 
+pub(crate) async fn set_require_receipt<'e, E>(
+    executor: E,
+    op_hash: &DhtOpHash,
+    require_receipt: bool,
+) -> sqlx::Result<u64>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let result = sqlx::query(
+        "UPDATE LimboChainOp SET require_receipt = ? WHERE hash = ?",
+    )
+    .bind(require_receipt as i64)
+    .bind(op_hash.get_raw_36())
+    .execute(executor)
+    .await?;
+    Ok(result.rows_affected())
+}
+
 pub(crate) async fn delete_limbo_chain_op<'e, E>(executor: E, hash: DhtOpHash) -> sqlx::Result<()>
 where
     E: Executor<'e, Database = Sqlite>,
