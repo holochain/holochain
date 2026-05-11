@@ -191,6 +191,8 @@ pub struct ChainOpPublishRow {
     pub last_publish_time: Option<i64>,
     /// `1` when enough validation receipts have been collected, `0`/`NULL` otherwise.
     pub receipts_complete: Option<i64>,
+    /// `1` to suppress publishing (e.g. pending countersigning), `NULL` otherwise.
+    pub withhold_publish: Option<i64>,
 }
 
 /// Row from the `ValidationReceipt` table.

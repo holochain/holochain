@@ -631,7 +631,7 @@ impl SourceChain {
 
                         // Always insert a ChainOpPublish row for self-authored ops so the
                         // publish workflow can track them without a separate lookup.
-                        tx.insert_chain_op_publish(op_hash, None, None)
+                        tx.insert_chain_op_publish(op_hash, None, None, None)
                             .await
                             .map_err(SourceChainError::other)?;
                     }
@@ -1600,7 +1600,7 @@ pub async fn genesis(
             .await
             .map_err(SourceChainError::other)?;
 
-            tx.insert_chain_op_publish(op_hash, None, None)
+            tx.insert_chain_op_publish(op_hash, None, None, None)
                 .await
                 .map_err(SourceChainError::other)?;
         }

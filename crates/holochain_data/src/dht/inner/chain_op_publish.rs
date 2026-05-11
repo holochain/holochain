@@ -10,17 +10,19 @@ pub(crate) async fn insert_chain_op_publish<'e, E>(
     op_hash: &DhtOpHash,
     last_publish_time: Option<Timestamp>,
     receipts_complete: Option<bool>,
+    withhold_publish: Option<bool>,
 ) -> sqlx::Result<()>
 where
     E: Executor<'e, Database = Sqlite>,
 {
     sqlx::query(
-        "INSERT INTO ChainOpPublish (op_hash, last_publish_time, receipts_complete)
-         VALUES (?, ?, ?)",
+        "INSERT INTO ChainOpPublish (op_hash, last_publish_time, receipts_complete, withhold_publish)
+         VALUES (?, ?, ?, ?)",
     )
     .bind(op_hash.get_raw_36())
     .bind(last_publish_time.map(|t| t.as_micros()))
     .bind(receipts_complete.map(|b| b as i64))
+    .bind(withhold_publish.map(|b| b as i64))
     .execute(executor)
     .await?;
     Ok(())
@@ -34,7 +36,7 @@ where
     E: Executor<'e, Database = Sqlite>,
 {
     sqlx::query_as(
-        "SELECT op_hash, last_publish_time, receipts_complete
+        "SELECT op_hash, last_publish_time, receipts_complete, withhold_publish
          FROM ChainOpPublish WHERE op_hash = ?",
     )
     .bind(op_hash.get_raw_36())

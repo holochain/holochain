@@ -826,7 +826,7 @@ mod tests {
     async fn chain_op_publish_roundtrip() {
         let db = test_open_db(dht_db_id()).await.unwrap();
         let (op_hash, _) = seed_chain_op(&db, 0).await;
-        db.insert_chain_op_publish(&op_hash, None, None)
+        db.insert_chain_op_publish(&op_hash, None, None, None)
             .await
             .unwrap();
 
@@ -838,6 +838,7 @@ mod tests {
             .expect("missing");
         assert!(row.last_publish_time.is_none());
         assert!(row.receipts_complete.is_none());
+        assert!(row.withhold_publish.is_none());
     }
 
     #[tokio::test]
@@ -1136,7 +1137,7 @@ mod tests {
         .await
         .unwrap();
 
-        db.insert_chain_op_publish(&op_hash, None, None)
+        db.insert_chain_op_publish(&op_hash, None, None, None)
             .await
             .unwrap();
         let _ = db.set_chain_op_receipts_complete(&op_hash).await.unwrap();
