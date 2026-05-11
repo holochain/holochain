@@ -1248,6 +1248,73 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn set_limbo_warrant_sys_validation_status_updates() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let hash = DhtOpHash::from_raw_36(vec![0xBB; 36]);
+        let author = AgentPubKey::from_raw_36(vec![1u8; 36]);
+        let warrantee = AgentPubKey::from_raw_36(vec![2u8; 36]);
+        db.insert_limbo_warrant(InsertLimboWarrant {
+            hash: &hash,
+            author: &author,
+            timestamp: Timestamp::from_micros(10),
+            warrantee: &warrantee,
+            proof: &vec![0u8; 64],
+            storage_center_loc: 77,
+            when_received: Timestamp::from_micros(100),
+            serialized_size: 128,
+        })
+        .await
+        .unwrap();
+
+        let updated = db
+            .set_limbo_warrant_sys_validation_status(&hash, Some(1))
+            .await
+            .unwrap();
+        assert_eq!(updated, 1);
+
+        let row = db
+            .as_ref()
+            .get_limbo_warrant(hash)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.sys_validation_status, Some(1));
+    }
+
+    #[tokio::test]
+    async fn set_limbo_warrant_abandoned_at_updates() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let hash = DhtOpHash::from_raw_36(vec![0xBC; 36]);
+        let author = AgentPubKey::from_raw_36(vec![1u8; 36]);
+        let warrantee = AgentPubKey::from_raw_36(vec![2u8; 36]);
+        db.insert_limbo_warrant(InsertLimboWarrant {
+            hash: &hash,
+            author: &author,
+            timestamp: Timestamp::from_micros(10),
+            warrantee: &warrantee,
+            proof: &vec![0u8; 64],
+            storage_center_loc: 77,
+            when_received: Timestamp::from_micros(100),
+            serialized_size: 128,
+        })
+        .await
+        .unwrap();
+
+        let updated = db
+            .set_limbo_warrant_abandoned_at(&hash, Timestamp::from_micros(500))
+            .await
+            .unwrap();
+        assert_eq!(updated, 1);
+        let row = db
+            .as_ref()
+            .get_limbo_warrant(hash)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.abandoned_at, Some(500));
+    }
+
+    #[tokio::test]
     async fn set_chain_op_receipts_complete_round_trip() {
         let db = test_open_db(dht_db_id()).await.unwrap();
 
