@@ -919,6 +919,7 @@ impl TestCase {
                 .get_or_create_authored_db(agent.clone())
                 .unwrap(),
             self.test_space.space.dht_db.clone(),
+            self.test_space.space.dht_store.clone(),
             self.test_space.space.cache_db.clone(),
             self.dna_hash.hash.clone(),
             std::time::Duration::from_secs(10),
