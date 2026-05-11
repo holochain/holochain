@@ -68,7 +68,10 @@ impl Drop for OpsClaim {
 }
 
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(txn, ops)))]
-fn batch_process_entry(txn: &mut Txn<DbKindDht>, ops: Vec<DhtOpHashed>) -> WorkflowResult<()> {
+fn batch_process_entry(
+    txn: &mut Txn<DbKindDht>,
+    ops: Vec<DhtOpHashed>,
+) -> WorkflowResult<Vec<DhtOpHashed>> {
     // add incoming ops to the validation limbo
     let mut to_pending = Vec::with_capacity(ops.len());
     for op in ops {
@@ -80,7 +83,7 @@ fn batch_process_entry(txn: &mut Txn<DbKindDht>, ops: Vec<DhtOpHashed>) -> Workf
     tracing::debug!("Inserting {} ops", to_pending.len());
     add_to_pending(txn, &to_pending)?;
 
-    Ok(())
+    Ok(to_pending)
 }
 
 #[derive(Default, Clone)]
@@ -99,6 +102,7 @@ pub async fn incoming_dht_ops_workflow(
         incoming_op_hashes,
         incoming_ops_batch,
         dht_db,
+        dht_store,
         ..
     } = space;
 
@@ -157,6 +161,10 @@ pub async fn incoming_dht_ops_workflow(
                 while let Some(entries) = maybe_batch {
                     let senders = Arc::new(parking_lot::Mutex::new(Vec::new()));
                     let senders2 = senders.clone();
+                    // Collect ops actually inserted (post-dedupe) so we can mirror them
+                    // into DhtStore after the legacy txn commits.
+                    let pending_ops = Arc::new(parking_lot::Mutex::new(Vec::new()));
+                    let pending_ops2 = pending_ops.clone();
                     if let Err(err) = dht_db
                         .write_async(move |txn| {
                             for entry in entries {
@@ -165,7 +173,13 @@ pub async fn incoming_dht_ops_workflow(
 
                                 // we can't send the results here...
                                 // we haven't committed
-                                senders2.lock().push((snd, res));
+                                match res {
+                                    Ok(ref inserted) => {
+                                        pending_ops2.lock().extend(inserted.iter().cloned());
+                                    }
+                                    Err(_) => {}
+                                }
+                                senders2.lock().push((snd, res.map(|_| ())));
                             }
 
                             WorkflowResult::Ok(())
@@ -173,6 +187,21 @@ pub async fn incoming_dht_ops_workflow(
                         .await
                     {
                         tracing::error!(?err, "incoming_dht_ops_workflow error");
+                    } else {
+                        // Mirror the committed ops into the new DHT DB.
+                        // Errors are logged rather than propagated because this code runs inside
+                        // a spawned task that has no caller to return a WorkflowResult to.
+                        let ops_to_mirror = pending_ops.lock().drain(..).collect::<Vec<_>>();
+                        if !ops_to_mirror.is_empty() {
+                            if let Err(err) =
+                                dht_store.record_incoming_ops(ops_to_mirror).await
+                            {
+                                tracing::error!(
+                                    ?err,
+                                    "incoming_dht_ops_workflow new-DB mirror error"
+                                );
+                            }
+                        }
                     }
 
                     for (snd, res) in senders.lock().drain(..) {
