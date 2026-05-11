@@ -676,6 +676,25 @@ impl DhtStore<DbWrite<Dht>> {
         Ok(())
     }
 
+    /// Apply a successful countersigning completion: clear `withhold_publish`
+    /// on the matching `ChainOpPublish` rows so the publish workflow can pick
+    /// them up. The author / action_hash that the legacy site uses to filter
+    /// authored-DB rows are not needed here because the new DB's
+    /// `ChainOpPublish` is keyed directly by `op_hash`.
+    pub async fn apply_countersigning_success(
+        &self,
+        op_hashes: Vec<DhtOpHash>,
+    ) -> StateMutationResult<()> {
+        let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
+        for hash in op_hashes {
+            tx.clear_chain_op_withhold_publish(&hash)
+                .await
+                .map_err(StateMutationError::from)?;
+        }
+        tx.commit().await.map_err(StateMutationError::from)?;
+        Ok(())
+    }
+
     /// Downgrade this writable store to a read-only store.
     pub fn as_read(&self) -> DhtStoreRead {
         DhtStore::new(self.db.as_ref().clone())
@@ -1294,6 +1313,71 @@ mod tests {
 
         // No-op; should not error.
         store.clear_require_receipt(vec![op.as_hash().clone()]).await.unwrap();
+    }
+
+    // ---------------------------------------------------------------------------
+    // apply_countersigning_success tests
+    // ---------------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn apply_countersigning_success_clears_withhold() {
+        let store = DhtStore::new_test(dht_id()).await.unwrap();
+
+        // Seed an op through the full pipeline into ChainOp (satisfies FK for ChainOpPublish).
+        let op = build_test_store_record_op_hashed(80);
+        store.record_incoming_ops(vec![op.clone()]).await.unwrap();
+        store
+            .record_sys_validation_outcome(vec![(op.as_hash().clone(), SysOutcome::Accepted)])
+            .await
+            .unwrap();
+        store
+            .record_app_validation_outcome(vec![(op.as_hash().clone(), AppOutcome::Accepted)])
+            .await
+            .unwrap();
+        store
+            .integrate_ready_ops(Timestamp::from_micros(1))
+            .await
+            .unwrap();
+
+        // Seed ChainOpPublish with withhold_publish = Some(true).
+        store
+            .db()
+            .insert_chain_op_publish(op.as_hash(), None, None, Some(true))
+            .await
+            .unwrap();
+        let row = store
+            .db()
+            .as_ref()
+            .get_chain_op_publish(op.as_hash().clone())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.withhold_publish, Some(1));
+
+        store
+            .apply_countersigning_success(vec![op.as_hash().clone()])
+            .await
+            .unwrap();
+
+        let row = store
+            .db()
+            .as_ref()
+            .get_chain_op_publish(op.as_hash().clone())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.withhold_publish, None);
+    }
+
+    #[tokio::test]
+    async fn apply_countersigning_success_no_op_when_row_absent() {
+        // No ChainOpPublish row exists — method should not error.
+        let store = DhtStore::new_test(dht_id()).await.unwrap();
+        let dummy_hash = DhtOpHash::from_raw_36(vec![0xAA; 36]);
+        store
+            .apply_countersigning_success(vec![dummy_hash])
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
