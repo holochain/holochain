@@ -2695,7 +2695,7 @@ dependencies = [
 
 [[package]]
 name = "hcterm"
-version = "0.7.0-dev.23"
+version = "0.7.0-dev.24"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2739,7 +2739,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.7.0-dev.15"
+version = "0.7.0-dev.16"
 dependencies = [
  "getrandom 0.3.4",
  "hdi",
@@ -2938,7 +2938,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.7.0-dev.23"
+version = "0.7.0-dev.24"
 dependencies = [
  "anyhow",
  "assert2",
@@ -3037,7 +3037,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.7.0-dev.23"
+version = "0.7.0-dev.24"
 dependencies = [
  "async-trait",
  "fixt",
@@ -3066,7 +3066,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.7.0-dev.23"
+version = "0.7.0-dev.24"
 dependencies = [
  "anyhow",
  "clap",
@@ -3080,7 +3080,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.7.0-dev.22"
+version = "0.7.0-dev.23"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -3102,7 +3102,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_client"
-version = "0.7.0-dev.23"
+version = "0.7.0-dev.24"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -3129,7 +3129,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.7.0-dev.23"
+version = "0.7.0-dev.24"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -3156,7 +3156,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_client"
-version = "0.9.0-dev.23"
+version = "0.9.0-dev.24"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3186,7 +3186,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.7.0-dev.22"
+version = "0.7.0-dev.23"
 dependencies = [
  "derive_more",
  "holo_hash",
@@ -3221,7 +3221,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_config"
-version = "0.7.0-dev.22"
+version = "0.7.0-dev.23"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -3239,7 +3239,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_data"
-version = "0.7.0-dev.12"
+version = "0.7.0-dev.13"
 dependencies = [
  "base64",
  "holo_hash",
@@ -3286,7 +3286,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_keystore"
-version = "0.7.0-dev.14"
+version = "0.7.0-dev.15"
 dependencies = [
  "assert_cmd",
  "base64",
@@ -3350,7 +3350,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.7.0-dev.23"
+version = "0.7.0-dev.24"
 dependencies = [
  "async-trait",
  "base64",
@@ -3432,7 +3432,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_sqlite"
-version = "0.7.0-dev.18"
+version = "0.7.0-dev.19"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3476,7 +3476,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.7.0-dev.23"
+version = "0.7.0-dev.24"
 dependencies = [
  "async-recursion",
  "base64",
@@ -3525,7 +3525,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.7.0-dev.15"
+version = "0.7.0-dev.16"
 dependencies = [
  "hdk",
  "holochain_serialized_bytes",
@@ -3561,7 +3561,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.7.0-dev.22"
+version = "0.7.0-dev.23"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3593,7 +3593,7 @@ dependencies = [
  "parking_lot",
  "pretty_assertions",
  "proptest",
- "proptest-derive 0.8.0",
+ "proptest-derive 0.5.1",
  "rand 0.9.4",
  "regex",
  "rusqlite",
@@ -3633,7 +3633,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.7.0-dev.23"
+version = "0.7.0-dev.24"
 dependencies = [
  "holochain_types",
  "strum 0.27.2",
@@ -3688,7 +3688,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_websocket"
-version = "0.7.0-dev.22"
+version = "0.7.0-dev.23"
 dependencies = [
  "async-trait",
  "bytes",
@@ -3707,7 +3707,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.7.0-dev.14"
+version = "0.7.0-dev.15"
 dependencies = [
  "derive_builder",
  "derive_more",
@@ -3722,7 +3722,7 @@ dependencies = [
  "num_enum",
  "once_cell",
  "proptest",
- "proptest-derive 0.8.0",
+ "proptest-derive 0.5.1",
  "rand 0.9.4",
  "rusqlite",
  "schemars 0.9.0",
@@ -5273,7 +5273,7 @@ checksum = "1fafa6961cabd9c63bcd77a45d7e3b7f3b552b70417831fb0f56db717e72407e"
 
 [[package]]
 name = "mr_bundle"
-version = "0.7.0-dev.1"
+version = "0.7.0-dev.2"
 dependencies = [
  "bytes",
  "dunce",

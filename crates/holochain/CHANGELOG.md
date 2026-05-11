@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.7.0-dev.24
+
 - **BREAKING CHANGE** switch peer metadata store from using the database from `holochain_sqlite` to using the new one defined in `holochain_state`. There is no migration path for existing installs of Holochain, and startup errors would be expected if the data state is not cleared. \#5748
 - Add peer metadata store in `holochain_state` that wraps the database added in `holochain_data`. \#5748
 - Remove the custom `ConductorStoreError` and `ConductorStoreResult` from `holochain_state`, use the `StateQueryError` and `StateQueryResult` instead.
