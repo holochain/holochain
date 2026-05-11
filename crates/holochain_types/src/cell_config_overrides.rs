@@ -70,7 +70,6 @@ mod tests {
 
         let overrides = CellConfigOverrides {
             bootstrap_url: None,
-            signal_url: None,
             base64_auth_material: Some("dGVzdA==".to_string()),
             relay_url: None,
         };
@@ -78,7 +77,6 @@ mod tests {
 
         let overrides = CellConfigOverrides {
             bootstrap_url: None,
-            signal_url: None,
             base64_auth_material: None,
             relay_url: Some("http://relay.example.com/relay".to_string()),
         };
