@@ -500,6 +500,47 @@ impl DhtStore<DbWrite<Dht>> {
         Ok(())
     }
 
+    /// Insert self-authored warrants directly into the `Warrant` table, bypassing
+    /// `LimboWarrant`.  Self-authored warrants are locally trusted and do not need
+    /// to go through the limbo/validation cycle.
+    ///
+    /// Any op that is not a `WarrantOp` is skipped with a warning log.  All
+    /// inserts happen in a single transaction.
+    pub async fn record_locally_validated_warrants(
+        &self,
+        warrants: Vec<DhtOpHashed>,
+    ) -> StateMutationResult<()> {
+        use holochain_data::dht::InsertWarrant;
+
+        let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
+        for op in warrants {
+            let warrant_op = match op.as_content() {
+                DhtOp::WarrantOp(w) => w,
+                DhtOp::ChainOp(_) => {
+                    tracing::warn!(
+                        "record_locally_validated_warrants got a non-warrant DhtOp; skipping"
+                    );
+                    continue;
+                }
+            };
+            let hash = op.as_hash();
+            let proof_bytes = holochain_serialized_bytes::encode(&warrant_op.proof)
+                .map_err(StateMutationError::from)?;
+            tx.insert_warrant(InsertWarrant {
+                hash,
+                author: &warrant_op.author,
+                timestamp: warrant_op.timestamp,
+                warrantee: &warrant_op.warrantee,
+                proof: &proof_bytes,
+                storage_center_loc: warrant_op.warrantee.get_loc(),
+            })
+            .await
+            .map_err(StateMutationError::from)?;
+        }
+        tx.commit().await.map_err(StateMutationError::from)?;
+        Ok(())
+    }
+
     /// Downgrade this writable store to a read-only store.
     pub fn as_read(&self) -> DhtStoreRead {
         DhtStore::new(self.db.as_ref().clone())
@@ -945,5 +986,29 @@ mod tests {
         // Exactly one row still exists.
         let row = store.db.as_ref().get_limbo_chain_op(op_hash).await.unwrap();
         assert!(row.is_some(), "LimboChainOp row should still be present");
+    }
+
+    // ---------------------------------------------------------------------------
+    // record_locally_validated_warrants tests
+    // ---------------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn record_locally_validated_warrants_inserts_warrant() {
+        let store = DhtStore::new_test(dht_id()).await.unwrap();
+        let warrant_op = build_test_warrant_op_hashed(30);
+        store
+            .record_locally_validated_warrants(vec![warrant_op.clone()])
+            .await
+            .unwrap();
+        let row = store
+            .db()
+            .as_ref()
+            .get_warrant(warrant_op.as_hash().clone())
+            .await
+            .unwrap()
+            .expect("warrant row missing");
+        // warrantee is seed.wrapping_add(50) = 80 for seed=30.
+        let expected_warrantee = AgentPubKey::from_raw_36(vec![80u8; 36]);
+        assert_eq!(row.warrantee, expected_warrantee.get_raw_36().to_vec());
     }
 }
