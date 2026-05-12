@@ -410,45 +410,47 @@ impl Cell {
                         Result::<(), DatabaseError>::Ok(())
                     })
                     .await;
-                if let Err(err) = legacy_write {
+                if let Err(ref err) = legacy_write {
                     error!("error applying legacy scheduled-fn updates: {:?}", err);
-                    return;
                 }
 
-                // Mirror the legacy unschedule/reschedule decisions in the new DHT DB.
-                for (scheduled_fn, action) in new_db_decisions {
-                    match action {
-                        // Ephemeral fn: no persistent state to update.
-                        None => {}
-                        // Persisted fn with no next schedule or a failed zome call: remove it.
-                        Some(None) => {
-                            if let Err(e) = self
-                                .space
-                                .dht_store
-                                .unschedule_function(&author_for_new_db, &scheduled_fn)
-                                .await
-                            {
-                                error!("error unscheduling function {:?}: {:?}", scheduled_fn, e);
+                // Mirror the legacy unschedule/reschedule decisions in the new DHT DB,
+                // but only when the legacy write succeeded.
+                if legacy_write.is_ok() {
+                    for (scheduled_fn, action) in new_db_decisions {
+                        match action {
+                            // Ephemeral fn: no persistent state to update.
+                            None => {}
+                            // Persisted fn with no next schedule or a failed zome call: remove it.
+                            Some(None) => {
+                                if let Err(e) = self
+                                    .space
+                                    .dht_store
+                                    .unschedule_function(&author_for_new_db, &scheduled_fn)
+                                    .await
+                                {
+                                    error!("error unscheduling function {:?}: {:?}", scheduled_fn, e);
+                                }
                             }
-                        }
-                        // Persisted fn with a new schedule: upsert.
-                        Some(Some(next_schedule)) => {
-                            let maybe_schedule = Some(next_schedule);
-                            if let Err(e) = self
-                                .space
-                                .dht_store
-                                .upsert_scheduled_function(
-                                    &author_for_new_db,
-                                    &scheduled_fn,
-                                    &maybe_schedule,
-                                    now,
-                                )
-                                .await
-                            {
-                                error!(
-                                    "error upserting scheduled function {:?}: {:?}",
-                                    scheduled_fn, e
-                                );
+                            // Persisted fn with a new schedule: upsert.
+                            Some(Some(next_schedule)) => {
+                                let maybe_schedule = Some(next_schedule);
+                                if let Err(e) = self
+                                    .space
+                                    .dht_store
+                                    .upsert_scheduled_function(
+                                        &author_for_new_db,
+                                        &scheduled_fn,
+                                        &maybe_schedule,
+                                        now,
+                                    )
+                                    .await
+                                {
+                                    error!(
+                                        "error upserting scheduled function {:?}: {:?}",
+                                        scheduled_fn, e
+                                    );
+                                }
                             }
                         }
                     }
@@ -715,11 +717,13 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
                     .await?;
 
                 // Mirror: record the validation receipt in the new DHT DB.
-                self.space
+                // Capture any mirror error here — we must not let it skip the
+                // legacy completion path below.
+                let receipt_mirror_result = self.space
                     .dht_store
                     .record_validation_receipt(&receipt_for_new_db)
                     .await
-                    .map_err(|e| CellError::from(HolochainP2pError::other(e)))?;
+                    .map_err(|e| CellError::from(HolochainP2pError::other(e)));
 
                 // If we have enough receipts then set receipts to complete.
                 if receipt_count >= required_validation_count as usize {
@@ -738,6 +742,9 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
                         .await
                         .map_err(|e| CellError::from(HolochainP2pError::other(e)))?;
                 }
+
+                // Propagate any earlier mirror error after the legacy path completes.
+                receipt_mirror_result?;
             }
 
             CellResult::Ok(())
