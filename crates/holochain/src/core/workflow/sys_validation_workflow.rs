@@ -304,80 +304,95 @@ async fn sys_validation_workflow_inner(
         }
     }
 
-    let (mut summary, invalid_ops, _forked_pairs, chain_op_sys_outcomes, warrant_sys_outcomes) = workspace
-        .dht_db
-        .write_async(move |txn| {
-            let mut summary = OutcomeSummary {
-                warrant_deps_copied,
-                ..Default::default()
-            };
-            let mut invalid_ops = vec![];
-            let mut forked_pairs: Vec<(AgentPubKey, ForkedPair)> = Vec::with_capacity(0);
-            let mut chain_op_sys_outcomes: Vec<(DhtOpHash, SysOutcome)> = Vec::new();
-            let mut warrant_sys_outcomes: Vec<(DhtOpHash, SysOutcome)> = Vec::new();
+    let (mut summary, invalid_ops, _forked_pairs, chain_op_sys_outcomes, warrant_sys_outcomes) =
+        workspace
+            .dht_db
+            .write_async(move |txn| {
+                let mut summary = OutcomeSummary {
+                    warrant_deps_copied,
+                    ..Default::default()
+                };
+                let mut invalid_ops = vec![];
+                let mut forked_pairs: Vec<(AgentPubKey, ForkedPair)> = Vec::with_capacity(0);
+                let mut chain_op_sys_outcomes: Vec<(DhtOpHash, SysOutcome)> = Vec::new();
+                let mut warrant_sys_outcomes: Vec<(DhtOpHash, SysOutcome)> = Vec::new();
 
-            for (hashed_op, outcome) in validation_outcomes {
-                let (op, op_hash) = hashed_op.into_inner();
-                let op_type = op.get_type();
+                for (hashed_op, outcome) in validation_outcomes {
+                    let (op, op_hash) = hashed_op.into_inner();
+                    let op_type = op.get_type();
 
-                if let DhtOp::ChainOp(chain_op) = &op {
-                    // Author a ChainFork warrant if fork is detected
-                    let action = chain_op.action();
-                    if let Some(forked_action) = detect_fork(txn, &action)? {
-                        let signature = chain_op.signature().clone();
-                        let action_hash = action.to_hash();
-                        forked_pairs.push((
-                            action.author().clone(),
-                            ForkedPair {
-                                action_pair: ((action_hash, signature), forked_action),
-                                seq: action.action_seq(),
-                            },
-                        ));
-                    }
-                }
-
-                match outcome {
-                    Outcome::Accepted => {
-                        summary.accepted += 1;
-                        match op_type {
-                            DhtOpType::Chain(_) => {
-                                chain_op_sys_outcomes.push((op_hash.clone(), SysOutcome::Accepted));
-                                put_validation_limbo(txn, &op_hash, ValidationStage::SysValidated)?
-                            }
-                            DhtOpType::Warrant(_) => {
-                                warrant_sys_outcomes.push((op_hash.clone(), SysOutcome::Accepted));
-                                put_integration_limbo(txn, &op_hash, ValidationStatus::Valid)?
-                            }
-                        };
-                    }
-                    Outcome::MissingDhtDep => {
-                        summary.missing += 1;
-                        // Awaiting dependencies — status stays NULL in the new DB;
-                        // no outcome to record.
-                        let status = ValidationStage::AwaitingSysDeps;
-                        put_validation_limbo(txn, &op_hash, status)?;
-                    }
-                    Outcome::Rejected(_) => {
-                        invalid_ops.push((op_hash.clone(), op.clone()));
-
-                        match op {
-                            DhtOp::ChainOp(_) => {
-                                summary.rejected += 1;
-                                chain_op_sys_outcomes.push((op_hash.clone(), SysOutcome::Rejected));
-                            }
-                            DhtOp::WarrantOp(_) => {
-                                summary.warrants_rejected += 1;
-                                warrant_sys_outcomes.push((op_hash.clone(), SysOutcome::Rejected));
-                            }
+                    if let DhtOp::ChainOp(chain_op) = &op {
+                        // Author a ChainFork warrant if fork is detected
+                        let action = chain_op.action();
+                        if let Some(forked_action) = detect_fork(txn, &action)? {
+                            let signature = chain_op.signature().clone();
+                            let action_hash = action.to_hash();
+                            forked_pairs.push((
+                                action.author().clone(),
+                                ForkedPair {
+                                    action_pair: ((action_hash, signature), forked_action),
+                                    seq: action.action_seq(),
+                                },
+                            ));
                         }
+                    }
 
-                        put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;
+                    match outcome {
+                        Outcome::Accepted => {
+                            summary.accepted += 1;
+                            match op_type {
+                                DhtOpType::Chain(_) => {
+                                    chain_op_sys_outcomes
+                                        .push((op_hash.clone(), SysOutcome::Accepted));
+                                    put_validation_limbo(
+                                        txn,
+                                        &op_hash,
+                                        ValidationStage::SysValidated,
+                                    )?
+                                }
+                                DhtOpType::Warrant(_) => {
+                                    warrant_sys_outcomes
+                                        .push((op_hash.clone(), SysOutcome::Accepted));
+                                    put_integration_limbo(txn, &op_hash, ValidationStatus::Valid)?
+                                }
+                            };
+                        }
+                        Outcome::MissingDhtDep => {
+                            summary.missing += 1;
+                            // Awaiting dependencies — status stays NULL in the new DB;
+                            // no outcome to record.
+                            let status = ValidationStage::AwaitingSysDeps;
+                            put_validation_limbo(txn, &op_hash, status)?;
+                        }
+                        Outcome::Rejected(_) => {
+                            invalid_ops.push((op_hash.clone(), op.clone()));
+
+                            match op {
+                                DhtOp::ChainOp(_) => {
+                                    summary.rejected += 1;
+                                    chain_op_sys_outcomes
+                                        .push((op_hash.clone(), SysOutcome::Rejected));
+                                }
+                                DhtOp::WarrantOp(_) => {
+                                    summary.warrants_rejected += 1;
+                                    warrant_sys_outcomes
+                                        .push((op_hash.clone(), SysOutcome::Rejected));
+                                }
+                            }
+
+                            put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;
+                        }
                     }
                 }
-            }
-            WorkflowResult::Ok((summary, invalid_ops, forked_pairs, chain_op_sys_outcomes, warrant_sys_outcomes))
-        })
-        .await?;
+                WorkflowResult::Ok((
+                    summary,
+                    invalid_ops,
+                    forked_pairs,
+                    chain_op_sys_outcomes,
+                    warrant_sys_outcomes,
+                ))
+            })
+            .await?;
 
     workspace
         .dht_store
