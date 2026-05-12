@@ -1,8 +1,9 @@
-use super::error::WorkflowResult;
+use super::error::{WorkflowError, WorkflowResult};
 use crate::core::queue_consumer::WorkComplete;
 use futures::{stream, StreamExt};
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::DynHolochainP2pDna;
+use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::*;
 use itertools::Itertools;
 use std::collections::HashSet;
@@ -17,12 +18,13 @@ mod unit_tests;
 
 #[cfg_attr(
     feature = "instrument",
-    tracing::instrument(skip(vault, network, keystore, apply_block))
+    tracing::instrument(skip(vault, dht_store, network, keystore, apply_block))
 )]
 /// Send validation receipts to their authors in serial, skipping authors not recently online.
 pub async fn validation_receipt_workflow(
     dna_hash: Arc<DnaHash>,
     vault: DbWrite<DbKindDht>,
+    dht_store: DhtStore,
     network: DynHolochainP2pDna,
     keystore: MetaLairClient,
     running_cell_ids: HashSet<CellId>,
@@ -79,11 +81,16 @@ pub async fn validation_receipt_workflow(
 
             if !recently_online {
                 for receipt in receipts {
+                    let op_hash = receipt.dht_op_hash.clone();
                     vault
                         .write_async(move |txn| {
                             set_require_receipt(txn, &receipt.dht_op_hash, false)
                         })
                         .await?;
+                    dht_store
+                        .clear_require_receipt(vec![op_hash])
+                        .await
+                        .map_err(WorkflowError::from)?;
                 }
                 continue;
             }
@@ -102,11 +109,16 @@ pub async fn validation_receipt_workflow(
             Ok(()) => {
                 // Mark them sent so we don't keep trying
                 for receipt in receipts {
+                    let op_hash = receipt.dht_op_hash.clone();
                     vault
                         .write_async(move |txn| {
                             set_require_receipt(txn, &receipt.dht_op_hash, false)
                         })
                         .await?;
+                    dht_store
+                        .clear_require_receipt(vec![op_hash])
+                        .await
+                        .map_err(WorkflowError::from)?;
                 }
             }
             Err(e) => {
