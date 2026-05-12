@@ -270,6 +270,18 @@ impl DhtStore<DbWrite<Dht>> {
     /// schema's `ValidationReceipt` table has `hash` as PRIMARY KEY ON CONFLICT
     /// IGNORE, so duplicate inserts are silently dropped — same de-dupe
     /// semantics as the legacy table.
+    ///
+    /// The receipt count is queried after the transaction commits, so a
+    /// concurrent writer could insert or remove receipts between commit and
+    /// count; this is acceptable because the count only drives
+    /// `mark_chain_op_receipts_complete`, which is informational and
+    /// eventual-consistency is sufficient.
+    ///
+    /// Note: the legacy `ValidationReceipt.hash` stores a raw 32-byte blake2b
+    /// digest, while the new DB wraps the same digest in a `DhtOpHash` (36
+    /// bytes with the HoloHash type prefix).  Any code that compares receipt
+    /// hashes across the two DBs during read cutover must account for this
+    /// difference.
     pub async fn record_validation_receipt(
         &self,
         receipt: &holochain_types::prelude::SignedValidationReceipt,
@@ -1332,7 +1344,7 @@ mod tests {
     }
 
     // ---------------------------------------------------------------------------
-    // record_locally_validated_warrants tests
+    // record_validation_receipt tests
     // ---------------------------------------------------------------------------
 
     #[tokio::test]
@@ -1634,6 +1646,10 @@ mod tests {
         assert_eq!(row.sys_validation_status, Some(2));
         assert_eq!(row.app_validation_status, Some(2));
     }
+
+    // ---------------------------------------------------------------------------
+    // record_locally_validated_warrants tests
+    // ---------------------------------------------------------------------------
 
     #[tokio::test]
     async fn record_locally_validated_warrants_inserts_warrant() {
