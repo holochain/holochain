@@ -211,6 +211,9 @@ async fn app_validation_workflow_inner(
     let failed_ops = Arc::new(Mutex::new(HashSet::new()));
     let mut agent_activity_ops = vec![];
     let mut warrant_op_hashes: Vec<(DhtOpHash, OpBasis)> = vec![];
+    // Collected for mirroring into DhtStore (new schema).
+    let mut warrant_ops_vec: Vec<DhtOpHashed> = vec![];
+    let mut app_validation_outcomes: Vec<(DhtOpHash, AppOutcome)> = vec![];
     // Track action hashes already warranted in this batch to avoid creating duplicate
     // warrants for the same action. Multiple op types (StoreRecord, StoreEntry,
     // RegisterAgentActivity) can share the same action, and without this deduplication
@@ -334,6 +337,8 @@ async fn app_validation_workflow_inner(
 
                         warrant_op_hashes
                             .push((warrant_op.to_hash(), warrant_op.dht_basis().clone()));
+                        // Clone for mirroring into DhtStore (new schema).
+                        warrant_ops_vec.push(warrant_op.clone());
 
                         if let Err(err) = workspace
                             .authored_db
@@ -347,6 +352,14 @@ async fn app_validation_workflow_inner(
                         }
                     }
                 }
+
+                // Capture the outcome for mirroring into DhtStore before moving into the closure.
+                let app_outcome = match &outcome {
+                    Outcome::Accepted => AppOutcome::Accepted,
+                    Outcome::AwaitingDeps(_) => AppOutcome::AwaitingDeps,
+                    Outcome::Rejected(_) => AppOutcome::Rejected,
+                };
+                app_validation_outcomes.push((dht_op_hash.clone(), app_outcome));
 
                 let write_result = workspace
                     .dht_db
@@ -404,6 +417,22 @@ async fn app_validation_workflow_inner(
             workspace.dht_db.clone(),
         )
         .await?;
+    }
+
+    // D3a: mirror app validation outcomes into the new DhtStore schema.
+    if !app_validation_outcomes.is_empty() {
+        workspace
+            .dht_store
+            .record_app_validation_outcome(app_validation_outcomes)
+            .await?;
+    }
+
+    // D3b: mirror locally-validated warrant ops into the new DhtStore schema.
+    if !warrant_ops_vec.is_empty() {
+        workspace
+            .dht_store
+            .record_locally_validated_warrants(warrant_ops_vec)
+            .await?;
     }
 
     let outcome_summary = OutcomeSummary {
