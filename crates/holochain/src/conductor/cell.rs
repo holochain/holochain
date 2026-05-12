@@ -363,7 +363,7 @@ impl Cell {
 
                 let author = self.id.agent_pubkey().clone();
                 // In case of an error, a persisted fn needs to be unscheduled.
-                let _ = authored_db
+                let legacy_write = authored_db
                     .write_async(move |txn| {
                         for ((scheduled_fn, ephemeral), result) in dispatched.into_iter().zip(results.iter()) {
                             match result {
@@ -410,6 +410,10 @@ impl Cell {
                         Result::<(), DatabaseError>::Ok(())
                     })
                     .await;
+                if let Err(err) = legacy_write {
+                    error!("error applying legacy scheduled-fn updates: {:?}", err);
+                    return;
+                }
 
                 // Mirror the legacy unschedule/reschedule decisions in the new DHT DB.
                 for (scheduled_fn, action) in new_db_decisions {
