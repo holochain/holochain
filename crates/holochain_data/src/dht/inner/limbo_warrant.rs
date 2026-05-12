@@ -78,7 +78,7 @@ where
 {
     sqlx::query_as(
         "SELECT * FROM LimboWarrant
-         WHERE sys_validation_status IS NULL AND abandoned_at IS NULL
+         WHERE sys_validation_status IS NULL
          ORDER BY sys_validation_attempts, when_received
          LIMIT ?",
     )
@@ -96,7 +96,7 @@ where
 {
     sqlx::query_as(
         "SELECT * FROM LimboWarrant
-         WHERE abandoned_at IS NOT NULL OR sys_validation_status IN (1, 2)
+         WHERE sys_validation_status IN (1, 2)
          ORDER BY when_received
          LIMIT ?",
     )
@@ -113,27 +113,14 @@ pub(crate) async fn set_sys_validation_status<'e, E>(
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    let result = sqlx::query("UPDATE LimboWarrant SET sys_validation_status = ? WHERE hash = ?")
-        .bind(status)
-        .bind(hash.get_raw_36())
-        .execute(executor)
-        .await?;
-    Ok(result.rows_affected())
-}
-
-pub(crate) async fn set_abandoned_at<'e, E>(
-    executor: E,
-    hash: &DhtOpHash,
-    when: Timestamp,
-) -> sqlx::Result<u64>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    let result = sqlx::query("UPDATE LimboWarrant SET abandoned_at = ? WHERE hash = ?")
-        .bind(when.as_micros())
-        .bind(hash.get_raw_36())
-        .execute(executor)
-        .await?;
+    let result = sqlx::query(
+        "UPDATE LimboWarrant SET sys_validation_status = ?
+         WHERE hash = ? AND sys_validation_status IS NULL",
+    )
+    .bind(status)
+    .bind(hash.get_raw_36())
+    .execute(executor)
+    .await?;
     Ok(result.rows_affected())
 }
 

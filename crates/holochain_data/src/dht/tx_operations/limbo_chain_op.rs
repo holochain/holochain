@@ -5,7 +5,7 @@ use crate::handles::{TxRead, TxWrite};
 use crate::kind::Dht;
 use crate::models::dht::LimboChainOpRow;
 use holo_hash::DhtOpHash;
-use holochain_integrity_types::dht_v2::RecordValidity;
+use holochain_integrity_types::dht_v2::OpValidity;
 use holochain_timestamp::Timestamp;
 
 impl TxWrite<Dht> {
@@ -35,22 +35,21 @@ impl TxWrite<Dht> {
         limbo_chain_op::set_app_validation_status(self.conn_mut(), op_hash, status).await
     }
 
-    /// Record when validation was abandoned for the given op. Returns the number of rows updated.
-    pub async fn set_limbo_chain_op_abandoned_at(
+    /// Force both sys and app validation status to `Rejected`, bypassing the
+    /// normal ordering constraints.  Returns the number of rows updated.
+    pub async fn force_reject_limbo_chain_op(
         &mut self,
         op_hash: &DhtOpHash,
-        when: Timestamp,
     ) -> sqlx::Result<u64> {
-        limbo_chain_op::set_abandoned_at(self.conn_mut(), op_hash, when).await
+        limbo_chain_op::force_reject(self.conn_mut(), op_hash).await
     }
 
-    /// Set the `require_receipt` flag for the given op. Returns the number of rows updated.
-    pub async fn set_limbo_chain_op_require_receipt(
+    /// Clear the `require_receipt` flag for the given op. Returns the number of rows updated.
+    pub async fn clear_limbo_chain_op_require_receipt(
         &mut self,
         op_hash: &DhtOpHash,
-        require_receipt: bool,
     ) -> sqlx::Result<u64> {
-        limbo_chain_op::set_require_receipt(self.conn_mut(), op_hash, require_receipt).await
+        limbo_chain_op::clear_require_receipt(self.conn_mut(), op_hash).await
     }
 
     /// Atomically promote a `LimboChainOp` row to the `ChainOp` table using
@@ -62,7 +61,7 @@ impl TxWrite<Dht> {
     pub async fn promote_limbo_chain_op(
         &mut self,
         op_hash: &DhtOpHash,
-        validation_status: RecordValidity,
+        validation_status: OpValidity,
         when_integrated: Timestamp,
     ) -> sqlx::Result<bool> {
         limbo_chain_op::promote_to_chain_op(
