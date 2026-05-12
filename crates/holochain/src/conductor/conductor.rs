@@ -3135,15 +3135,16 @@ impl Conductor {
             // Remove (or purge) the per-DNA mirrored store so a reinstall
             // doesn't inherit stale rows from the previous installation.
             let dht_store = self.spaces.dht_store(dna_hash)?;
-            // Purge first so stale rows are cleared even if the file unlink succeeds
-            // while pooled connections remain open.
-            dht_store.purge_all().await.map_err(ConductorError::other)?;
             let dht_store_id = holochain_data::kind::Dht::new(Arc::new(dna_hash.clone()));
             let dht_store_path = self.spaces.db_dir.as_ref().as_ref().join(
                 holochain_data::DatabaseIdentifier::database_id(&dht_store_id),
             );
             if let Err(err) = ffs::remove_file(&dht_store_path).await {
-                tracing::warn!(?err, "Could not remove DhtStore DB file");
+                tracing::warn!(
+                    ?err,
+                    "Could not remove DhtStore DB file, probably because it is still in use. Purging all data instead."
+                );
+                dht_store.purge_all().await.map_err(ConductorError::other)?;
             } else {
                 tracing::info!("Deleted DhtStore DB file {}", dht_store_path.display());
             }
