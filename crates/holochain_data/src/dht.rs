@@ -1168,6 +1168,11 @@ mod tests {
         .await
         .unwrap();
 
+        // sys_validation_status must be set first (set-once ordering constraint).
+        db.set_limbo_chain_op_sys_validation_status(&op_hash, Some(1))
+            .await
+            .unwrap();
+
         let updated = db
             .set_limbo_chain_op_app_validation_status(&op_hash, Some(1))
             .await
@@ -1293,7 +1298,7 @@ mod tests {
         assert_eq!(row.when_integrated, 500);
         assert_eq!(row.serialized_size, 256);
         assert_eq!(row.validation_status, i64::from(RecordValidity::Accepted));
-        assert_eq!(row.locally_validated, 0);
+        assert_eq!(row.locally_validated, 1); // promoted from limbo = locally validated
         assert_eq!(row.when_received, 100);
         assert_eq!(row.storage_center_loc, 42);
     }
