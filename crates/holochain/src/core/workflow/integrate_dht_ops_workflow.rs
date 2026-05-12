@@ -139,10 +139,7 @@ pub async fn integrate_dht_ops_workflow(
                 ))
             })
             .await?;
-    let _new_promoted = dht_store
-        .integrate_ready_ops(when_integrated)
-        .await
-        .map_err(WorkflowError::from)?;
+    let new_promoted_result = dht_store.integrate_ready_ops(when_integrated).await;
     let changed = stored_ops.len();
     let ops_ps = changed as f64 / start.elapsed().as_micros() as f64 * 1_000_000.0;
     tracing::debug!(?changed, %ops_ps, "ops integrated");
@@ -229,8 +226,10 @@ pub async fn integrate_dht_ops_workflow(
         }
 
         trigger_receipt.trigger(&"integrate_dht_ops_workflow");
+        new_promoted_result.map_err(WorkflowError::from)?;
         Ok(WorkComplete::Incomplete(None))
     } else {
+        new_promoted_result.map_err(WorkflowError::from)?;
         Ok(WorkComplete::Complete)
     }
 }
