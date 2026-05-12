@@ -9,3 +9,13 @@ pub fn url2_schema(_: &mut SchemaGenerator) -> Schema {
         "format": "uri",
     })
 }
+
+/// Custom schemars representation for `Option<Url2>`
+pub fn optional_url2_schema(_: &mut SchemaGenerator) -> Schema {
+    schemars::json_schema!({
+        "anyOf": [
+            { "type": "string", "format": "uri" },
+            { "type": "null" }
+        ]
+    })
+}

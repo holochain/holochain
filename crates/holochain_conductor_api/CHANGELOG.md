@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Added `SpaceNetworkOverride` struct and optional `space_overrides` field to `NetworkConfig`, allowing per-DNA-space bootstrap and signal server configuration in the conductor config. Existing configs without this field continue to work unchanged.
+
 ## 0.7.0-dev.23
 
 ## 0.7.0-dev.22

@@ -78,7 +78,7 @@ use futures::future;
 use futures::future::FutureExt;
 use futures::future::TryFutureExt;
 use futures::stream::StreamExt;
-use holo_hash::DnaHash;
+use holo_hash::{DnaHash, DnaHashB64};
 use holochain_conductor_api::conductor::KeystoreConfig;
 use holochain_conductor_api::AppInfo;
 use holochain_conductor_api::AppStatusFilter;
@@ -1854,15 +1854,53 @@ mod app_status_impls {
     use holochain_types::cell_config_overrides::CellConfigOverrides;
 
     impl Conductor {
+        /// Resolve the effective [`CellConfigOverrides`] for a cell by merging:
+        /// 1. App manifest overrides (highest priority)
+        /// 2. Conductor `space_overrides` for this DNA hash (fallback)
+        ///
+        /// If neither source provides any overrides, returns the app_overrides as-is.
+        fn resolve_cell_overrides(
+            &self,
+            dna_hash: &DnaHash,
+            app_overrides: Option<CellConfigOverrides>,
+        ) -> Option<CellConfigOverrides> {
+            let space_key = DnaHashB64::from(dna_hash.clone()).to_string();
+            let conductor_override = self.config.network.space_overrides.get(&space_key);
+
+            match (app_overrides, conductor_override) {
+                (Some(app), None) => Some(app),
+                (app, Some(conductor)) => {
+                    let mut merged = app.unwrap_or_default();
+                    if merged.bootstrap_url.is_none() {
+                        merged.bootstrap_url =
+                            conductor.bootstrap_url.as_ref().map(|u| u.to_string());
+                    }
+                    if merged.base64_auth_material.is_none() {
+                        merged.base64_auth_material = conductor.base64_auth_material.clone();
+                    }
+                    if merged.relay_url.is_none() {
+                        merged.relay_url = conductor.relay_url.as_ref().map(|u| u.to_string());
+                    }
+                    if merged.is_overriding() {
+                        Some(merged)
+                    } else {
+                        None
+                    }
+                }
+                (None, None) => None,
+            }
+        }
+
         /// Instantiate cells, add them to the conductor's state, then initialize them.
         pub(crate) async fn create_cells_and_startup(
             self: Arc<Self>,
             cell_ids: impl Iterator<Item = CellId>,
-            config_override: Option<CellConfigOverrides>,
+            app_config_override: Option<CellConfigOverrides>,
         ) -> ConductorResult<()> {
             let cells_to_create = cell_ids.map(|cell_id| {
                 let handle = self.clone();
-                let overrides = config_override.clone();
+                let overrides =
+                    handle.resolve_cell_overrides(cell_id.dna_hash(), app_config_override.clone());
                 async move { handle.clone().create_cell(&cell_id, overrides).await }
             });
             // Create cells with bounded parallelism (max 5 concurrent)
@@ -1885,7 +1923,8 @@ mod app_status_impls {
                 .values()
                 .enumerate()
                 .map(|(i, cell)| {
-                    let config_override = config_override.clone();
+                    let config_override = self
+                        .resolve_cell_overrides(cell.id().dna_hash(), app_config_override.clone());
                     let cell_id = cell.id().clone();
                     let agent_pubkey = cell_id.agent_pubkey().clone();
                     let holochain_p2p_dna = cell.holochain_p2p_dna().clone();

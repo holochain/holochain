@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Per-space bootstrap server overrides from conductor config are now merged into cell config overrides, with app manifest overrides taking precedence.
 ## 0.7.0-dev.24
 
 - **BREAKING CHANGE** switch peer metadata store from using the database from `holochain_sqlite` to using the new one defined in `holochain_state`. There is no migration path for existing installs of Holochain, and startup errors would be expected if the data state is not cleared. \#5748
