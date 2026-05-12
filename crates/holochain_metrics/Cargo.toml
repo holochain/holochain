@@ -1,6 +1,6 @@
 [package]
 name = "holochain_metrics"
-version = "0.6.1-rc.2"
+version = "0.6.1"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 description = "High-level Rust integration of opentelemetry metrics and InfluxDB"
