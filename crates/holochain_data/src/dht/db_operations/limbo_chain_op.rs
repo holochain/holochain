@@ -5,7 +5,7 @@ use crate::handles::{DbRead, DbWrite};
 use crate::kind::Dht;
 use crate::models::dht::LimboChainOpRow;
 use holo_hash::DhtOpHash;
-use holochain_integrity_types::dht_v2::RecordValidity;
+use holochain_integrity_types::dht_v2::OpValidity;
 use holochain_timestamp::Timestamp;
 
 impl DbWrite<Dht> {
@@ -35,22 +35,12 @@ impl DbWrite<Dht> {
         limbo_chain_op::set_app_validation_status(self.pool(), op_hash, status).await
     }
 
-    /// Record when validation was abandoned for the given op. Returns the number of rows updated.
-    pub async fn set_limbo_chain_op_abandoned_at(
+    /// Clear the `require_receipt` flag for the given op. Returns the number of rows updated.
+    pub async fn clear_limbo_chain_op_require_receipt(
         &self,
         op_hash: &DhtOpHash,
-        when: Timestamp,
     ) -> sqlx::Result<u64> {
-        limbo_chain_op::set_abandoned_at(self.pool(), op_hash, when).await
-    }
-
-    /// Set the `require_receipt` flag for the given op. Returns the number of rows updated.
-    pub async fn set_limbo_chain_op_require_receipt(
-        &self,
-        op_hash: &DhtOpHash,
-        require_receipt: bool,
-    ) -> sqlx::Result<u64> {
-        limbo_chain_op::set_require_receipt(self.pool(), op_hash, require_receipt).await
+        limbo_chain_op::clear_require_receipt(self.pool(), op_hash).await
     }
 
     /// Atomically promote a `LimboChainOp` row to the `ChainOp` table.
@@ -61,7 +51,7 @@ impl DbWrite<Dht> {
     pub async fn promote_limbo_chain_op(
         &self,
         op_hash: &DhtOpHash,
-        validation_status: RecordValidity,
+        validation_status: OpValidity,
         when_integrated: Timestamp,
     ) -> sqlx::Result<bool> {
         let mut tx = self.begin().await?;

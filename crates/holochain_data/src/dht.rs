@@ -1183,38 +1183,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn set_limbo_chain_op_abandoned_at_updates() {
-        let db = test_open_db(dht_db_id()).await.unwrap();
-        let action_hash = seed_action_for_op(&db, 0).await;
-        let op_hash = DhtOpHash::from_raw_36(vec![0xAC; 36]);
-        db.insert_limbo_chain_op(InsertLimboChainOp {
-            op_hash: &op_hash,
-            action_hash: &action_hash,
-            op_type: 1,
-            basis_hash: &sample_basis(1),
-            storage_center_loc: 0,
-            require_receipt: true,
-            when_received: Timestamp::from_micros(1),
-            serialized_size: 100,
-        })
-        .await
-        .unwrap();
-
-        let updated = db
-            .set_limbo_chain_op_abandoned_at(&op_hash, Timestamp::from_micros(500))
-            .await
-            .unwrap();
-        assert_eq!(updated, 1);
-        let row = db
-            .as_ref()
-            .get_limbo_chain_op(op_hash)
-            .await
-            .unwrap()
-            .unwrap();
-        assert_eq!(row.abandoned_at, Some(500));
-    }
-
-    #[tokio::test]
     async fn set_limbo_chain_op_require_receipt_updates() {
         let db = test_open_db(dht_db_id()).await.unwrap();
         let action_hash = seed_action_for_op(&db, 0).await;
@@ -1233,7 +1201,7 @@ mod tests {
         .unwrap();
 
         let updated = db
-            .set_limbo_chain_op_require_receipt(&op_hash, false)
+            .clear_limbo_chain_op_require_receipt(&op_hash)
             .await
             .unwrap();
         assert_eq!(updated, 1);
@@ -1274,34 +1242,6 @@ mod tests {
 
         let row = db.as_ref().get_limbo_warrant(hash).await.unwrap().unwrap();
         assert_eq!(row.sys_validation_status, Some(1));
-    }
-
-    #[tokio::test]
-    async fn set_limbo_warrant_abandoned_at_updates() {
-        let db = test_open_db(dht_db_id()).await.unwrap();
-        let hash = DhtOpHash::from_raw_36(vec![0xBC; 36]);
-        let author = AgentPubKey::from_raw_36(vec![1u8; 36]);
-        let warrantee = AgentPubKey::from_raw_36(vec![2u8; 36]);
-        db.insert_limbo_warrant(InsertLimboWarrant {
-            hash: &hash,
-            author: &author,
-            timestamp: Timestamp::from_micros(10),
-            warrantee: &warrantee,
-            proof: &[0u8; 64],
-            storage_center_loc: 77,
-            when_received: Timestamp::from_micros(100),
-            serialized_size: 128,
-        })
-        .await
-        .unwrap();
-
-        let updated = db
-            .set_limbo_warrant_abandoned_at(&hash, Timestamp::from_micros(500))
-            .await
-            .unwrap();
-        assert_eq!(updated, 1);
-        let row = db.as_ref().get_limbo_warrant(hash).await.unwrap().unwrap();
-        assert_eq!(row.abandoned_at, Some(500));
     }
 
     #[tokio::test]

@@ -2,7 +2,7 @@
 
 use crate::models::dht::LimboChainOpRow;
 use holo_hash::{ActionHash, AnyDhtHash, DhtOpHash};
-use holochain_integrity_types::dht_v2::RecordValidity;
+use holochain_integrity_types::dht_v2::OpValidity;
 use holochain_timestamp::Timestamp;
 use sqlx::{Executor, Sqlite, SqliteConnection};
 
@@ -81,7 +81,7 @@ where
 {
     sqlx::query_as(
         "SELECT * FROM LimboChainOp
-         WHERE sys_validation_status IS NULL AND abandoned_at IS NULL
+         WHERE sys_validation_status IS NULL
          ORDER BY sys_validation_attempts, when_received
          LIMIT ?",
     )
@@ -100,7 +100,6 @@ where
     sqlx::query_as(
         "SELECT * FROM LimboChainOp
          WHERE sys_validation_status = 1 AND app_validation_status IS NULL
-           AND abandoned_at IS NULL
          ORDER BY app_validation_attempts, when_received
          LIMIT ?",
     )
@@ -118,8 +117,7 @@ where
 {
     sqlx::query_as(
         "SELECT * FROM LimboChainOp
-         WHERE abandoned_at IS NOT NULL
-            OR sys_validation_status = 2
+         WHERE sys_validation_status = 2
             OR (sys_validation_status = 1 AND app_validation_status IN (1, 2))
          ORDER BY when_received
          LIMIT ?",
@@ -137,11 +135,14 @@ pub(crate) async fn set_sys_validation_status<'e, E>(
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    let result = sqlx::query("UPDATE LimboChainOp SET sys_validation_status = ? WHERE hash = ?")
-        .bind(status)
-        .bind(op_hash.get_raw_36())
-        .execute(executor)
-        .await?;
+    let result = sqlx::query(
+        "UPDATE LimboChainOp SET sys_validation_status = ?
+         WHERE hash = ? AND sys_validation_status IS NULL",
+    )
+    .bind(status)
+    .bind(op_hash.get_raw_36())
+    .execute(executor)
+    .await?;
     Ok(result.rows_affected())
 }
 
@@ -153,40 +154,45 @@ pub(crate) async fn set_app_validation_status<'e, E>(
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    let result = sqlx::query("UPDATE LimboChainOp SET app_validation_status = ? WHERE hash = ?")
-        .bind(status)
-        .bind(op_hash.get_raw_36())
-        .execute(executor)
-        .await?;
+    let result = sqlx::query(
+        "UPDATE LimboChainOp SET app_validation_status = ?
+         WHERE hash = ? AND sys_validation_status IS NOT NULL AND app_validation_status IS NULL",
+    )
+    .bind(status)
+    .bind(op_hash.get_raw_36())
+    .execute(executor)
+    .await?;
     Ok(result.rows_affected())
 }
 
-pub(crate) async fn set_abandoned_at<'e, E>(
+/// Force both `sys_validation_status` and `app_validation_status` to `Rejected`
+/// (`2`), bypassing the normal ordering constraints.  Used by `reject_chain_op`
+/// which must be able to reject an op regardless of its current state.
+pub(crate) async fn force_reject<'e, E>(
     executor: E,
     op_hash: &DhtOpHash,
-    when: Timestamp,
 ) -> sqlx::Result<u64>
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    let result = sqlx::query("UPDATE LimboChainOp SET abandoned_at = ? WHERE hash = ?")
-        .bind(when.as_micros())
-        .bind(op_hash.get_raw_36())
-        .execute(executor)
-        .await?;
+    let result = sqlx::query(
+        "UPDATE LimboChainOp SET sys_validation_status = 2, app_validation_status = 2
+         WHERE hash = ?",
+    )
+    .bind(op_hash.get_raw_36())
+    .execute(executor)
+    .await?;
     Ok(result.rows_affected())
 }
 
-pub(crate) async fn set_require_receipt<'e, E>(
+pub(crate) async fn clear_require_receipt<'e, E>(
     executor: E,
     op_hash: &DhtOpHash,
-    require_receipt: bool,
 ) -> sqlx::Result<u64>
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    let result = sqlx::query("UPDATE LimboChainOp SET require_receipt = ? WHERE hash = ?")
-        .bind(require_receipt as i64)
+    let result = sqlx::query("UPDATE LimboChainOp SET require_receipt = 0 WHERE hash = ?")
         .bind(op_hash.get_raw_36())
         .execute(executor)
         .await?;
@@ -216,7 +222,7 @@ where
 pub(crate) async fn promote_to_chain_op(
     conn: &mut SqliteConnection,
     op_hash: &DhtOpHash,
-    validation_status: RecordValidity,
+    validation_status: OpValidity,
     when_integrated: Timestamp,
 ) -> sqlx::Result<bool> {
     // SELECT the limbo row's payload.
@@ -250,7 +256,7 @@ pub(crate) async fn promote_to_chain_op(
     .bind(&limbo.basis_hash)
     .bind(limbo.storage_center_loc)
     .bind(i64::from(validation_status))
-    .bind(0_i64) // locally_validated = false for network-received ops
+    .bind(1_i64) // locally_validated = true: op has been through limbo and validated locally
     .bind(limbo.when_received)
     .bind(when_integrated.as_micros())
     .bind(limbo.serialized_size)
