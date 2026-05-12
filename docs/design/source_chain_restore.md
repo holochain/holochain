@@ -47,7 +47,7 @@ Restore therefore cannot reuse the existing install path unmodified. The seq 0�
 
 Per [`state_model.md`](./state_model.md), each DNA cell uses a single database holding authored chain rows, integrated DHT ops, validation limbo, and cached data. Self-authored ops are inserted with `record_validity = 1` (pre-validated) and bypass the validation limbo. Network-received ops land in `LimboChainOp` first and are promoted to `ChainOp` only after sys and app validation succeed.
 
-There is no existing reverse path that takes integrated DHT ops authored by us-on-another-node and reinstates them as authored rows on this node. Restore needs to introduce that path while reusing the validation pipeline so that we do not blindly trust whatever the DHT hands back.
+There is no existing reverse path that takes DHT-side ops authored by us-on-another-node and reinstates them as authored rows on this node. Restore introduces that path. Because validation rules are immutable for a given DNA — a record signed by `A` that was previously valid remains valid forever under the same rules — restore does not re-run sys or app validation on incoming records; the signature on each `Record` is the trust anchor. The detailed verification model is set out in Step 1 below.
 
 ### `get_agent_activity` as the primary retrieval mechanism
 
@@ -147,7 +147,7 @@ GetActivityOptions {
 
 Aggregation rules across the per-peer responses:
 
-- If any peer reports `ChainStatus::Forked`, `ChainStatus::Invalid`, or returns any `SignedWarrant` for `A`, abort permanently. The chain is unrecoverable for this agent.
+- If any peer reports `ChainStatus::Forked`, `ChainStatus::Invalid`, or returns a `SignedWarrant` whose inner warrant is a `ChainIntegrityWarrant` for `A`, abort permanently. The chain is unrecoverable for this agent. Other warrant variants (none exist today, but the surface is reserved) are not treated as unconditionally fatal here.
 - The workflow targets unanimous agreement on `ChainHead` across all queried peers. If fewer than the configured quorum (see [Configuration](#configuration)) responses arrive, or if the responses that do arrive do not all report the same `(seq, hash)` chain head, the workflow does not abort. It waits and retries Step 1 from scratch (see [Retry behaviour](#retry-behaviour)).
 - When all queried peers agree on the same `(H, head_hash)`, that pair is the **target head**.
 
