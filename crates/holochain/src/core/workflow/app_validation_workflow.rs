@@ -355,11 +355,11 @@ async fn app_validation_workflow_inner(
                     }
                 }
 
-                // Capture the outcome for mirroring into DhtStore; push only on legacy success.
-                let app_outcome = match &outcome {
-                    Outcome::Accepted => AppOutcome::Accepted,
-                    Outcome::AwaitingDeps(_) => AppOutcome::AwaitingDeps,
-                    Outcome::Rejected(_) => AppOutcome::Rejected,
+                // Capture the outcome for mirroring into DhtStore (only Accepted/Rejected).
+                let app_outcome_opt = match &outcome {
+                    Outcome::Accepted => Some(AppOutcome::Accepted),
+                    Outcome::AwaitingDeps(_) => None, // status stays NULL; nothing to record
+                    Outcome::Rejected(_) => Some(AppOutcome::Rejected),
                 };
                 let outcome_dht_op_hash = dht_op_hash.clone();
 
@@ -387,8 +387,8 @@ async fn app_validation_workflow_inner(
                     .await;
                 if let Err(err) = write_result {
                     tracing::error!(?chain_op, ?err, "Error updating dht op in database.");
-                } else {
-                    // Mirror into DhtStore only when the legacy write succeeded.
+                } else if let Some(app_outcome) = app_outcome_opt {
+                    // Capture for mirroring after the legacy write commits.
                     app_validation_outcomes.push((outcome_dht_op_hash, app_outcome));
                 }
             }
@@ -424,7 +424,7 @@ async fn app_validation_workflow_inner(
         .await?;
     }
 
-    // D3a: mirror app validation outcomes into the new DhtStore schema.
+    // mirror app validation outcomes into the new DhtStore schema.
     if !app_validation_outcomes.is_empty() {
         workspace
             .dht_store
@@ -432,7 +432,7 @@ async fn app_validation_workflow_inner(
             .await?;
     }
 
-    // D3b: mirror locally-validated warrant ops into the new DhtStore schema.
+    // mirror locally-validated warrant ops into the new DhtStore schema.
     if !warrant_ops_vec.is_empty() {
         workspace
             .dht_store

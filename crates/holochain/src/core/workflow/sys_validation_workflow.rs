@@ -304,7 +304,7 @@ async fn sys_validation_workflow_inner(
         }
     }
 
-    let (mut summary, invalid_ops, _forked_pairs, sys_outcomes) = workspace
+    let (mut summary, invalid_ops, _forked_pairs, chain_op_sys_outcomes, warrant_sys_outcomes) = workspace
         .dht_db
         .write_async(move |txn| {
             let mut summary = OutcomeSummary {
@@ -313,7 +313,8 @@ async fn sys_validation_workflow_inner(
             };
             let mut invalid_ops = vec![];
             let mut forked_pairs: Vec<(AgentPubKey, ForkedPair)> = Vec::with_capacity(0);
-            let mut sys_outcomes: Vec<(DhtOpHash, SysOutcome)> = Vec::new();
+            let mut chain_op_sys_outcomes: Vec<(DhtOpHash, SysOutcome)> = Vec::new();
+            let mut warrant_sys_outcomes: Vec<(DhtOpHash, SysOutcome)> = Vec::new();
 
             for (hashed_op, outcome) in validation_outcomes {
                 let (op, op_hash) = hashed_op.into_inner();
@@ -338,32 +339,35 @@ async fn sys_validation_workflow_inner(
                 match outcome {
                     Outcome::Accepted => {
                         summary.accepted += 1;
-                        sys_outcomes.push((op_hash.clone(), SysOutcome::Accepted));
                         match op_type {
                             DhtOpType::Chain(_) => {
+                                chain_op_sys_outcomes.push((op_hash.clone(), SysOutcome::Accepted));
                                 put_validation_limbo(txn, &op_hash, ValidationStage::SysValidated)?
                             }
                             DhtOpType::Warrant(_) => {
+                                warrant_sys_outcomes.push((op_hash.clone(), SysOutcome::Accepted));
                                 put_integration_limbo(txn, &op_hash, ValidationStatus::Valid)?
                             }
                         };
                     }
                     Outcome::MissingDhtDep => {
                         summary.missing += 1;
-                        sys_outcomes.push((op_hash.clone(), SysOutcome::AwaitingDeps));
+                        // Awaiting dependencies — status stays NULL in the new DB;
+                        // no outcome to record.
                         let status = ValidationStage::AwaitingSysDeps;
                         put_validation_limbo(txn, &op_hash, status)?;
                     }
                     Outcome::Rejected(_) => {
                         invalid_ops.push((op_hash.clone(), op.clone()));
-                        sys_outcomes.push((op_hash.clone(), SysOutcome::Rejected));
 
                         match op {
                             DhtOp::ChainOp(_) => {
                                 summary.rejected += 1;
+                                chain_op_sys_outcomes.push((op_hash.clone(), SysOutcome::Rejected));
                             }
                             DhtOp::WarrantOp(_) => {
                                 summary.warrants_rejected += 1;
+                                warrant_sys_outcomes.push((op_hash.clone(), SysOutcome::Rejected));
                             }
                         }
 
@@ -371,13 +375,17 @@ async fn sys_validation_workflow_inner(
                     }
                 }
             }
-            WorkflowResult::Ok((summary, invalid_ops, forked_pairs, sys_outcomes))
+            WorkflowResult::Ok((summary, invalid_ops, forked_pairs, chain_op_sys_outcomes, warrant_sys_outcomes))
         })
         .await?;
 
     workspace
         .dht_store
-        .record_sys_validation_outcome(sys_outcomes)
+        .record_chain_op_sys_validation_outcome(chain_op_sys_outcomes)
+        .await?;
+    workspace
+        .dht_store
+        .record_warrant_sys_validation_outcome(warrant_sys_outcomes)
         .await?;
 
     {
