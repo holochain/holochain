@@ -118,7 +118,7 @@ impl DhtStore<DbWrite<Dht>> {
     /// cron string has no future occurrences). Errors for individual rows are
     /// logged and the loop continues, so a single bad row does not abort
     /// processing of the remaining rows.
-    pub async fn reschedule_expired_persisted(&self, author: &AgentPubKey, now: Timestamp) -> () {
+    pub async fn reschedule_expired_persisted(&self, author: &AgentPubKey, now: Timestamp) {
         let expired = match self
             .db
             .as_ref()
