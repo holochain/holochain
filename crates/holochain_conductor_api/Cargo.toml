@@ -13,9 +13,7 @@ edition = "2021"
 kitsune2_transport_tx5 = { version = "0.4.1", optional = true, default-features = false }
 kitsune2_transport_iroh = { version = "0.4.1", optional = true, default-features = false }
 derive_more = { version = "2.0", features = ["from"] }
-holo_hash = { version = "^0.6.1", path = "../holo_hash", features = [
-  "full",
-] }
+holo_hash = { version = "^0.6.1", path = "../holo_hash", features = ["full"] }
 holochain_state_types = { version = "^0.6.1", path = "../holochain_state_types" }
 holochain_serialized_bytes = "=0.0.57"
 holochain_types = { version = "^0.6.1", path = "../holochain_types" }
