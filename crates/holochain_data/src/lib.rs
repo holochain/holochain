@@ -241,7 +241,7 @@ async fn create_pool(opts: SqliteConnectOptions, max_readers: u16) -> sqlx::Resu
     Ok(pool)
 }
 
-#[cfg(all(test, feature = "test-utils"))]
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -363,6 +363,7 @@ mod tests {
             "LimboChainOp",
             "LimboWarrant",
             "PrivateEntry",
+            "ScheduledFunction",
             "UpdatedRecord",
             "ValidationReceipt",
             "Warrant",

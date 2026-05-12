@@ -1,8 +1,9 @@
 -- DHT database schema (per-DNA). See docs/design/state_model.md.
 --
 -- Integer convention summary:
---   ActionType         : 1..=8 (Dna, AgentValidationPkg, InitZomesComplete,
---                               Create, Update, Delete, CreateLink, DeleteLink)
+--   ActionType         : 1..=10 (Dna, AgentValidationPkg, InitZomesComplete,
+--                                Create, Update, Delete, CreateLink, DeleteLink,
+--                                CloseChain, OpenChain)
 --   ChainOpType        : 1..=9 (see state_model.md)
 --   CapAccess          : 0=Unrestricted, 1=Transferable, 2=Assigned
 --   record_validity /
@@ -20,7 +21,7 @@
 
 -- Actions: both self-authored and network-received.
 CREATE TABLE Action (
-    hash            BLOB    PRIMARY KEY,
+    hash            BLOB    PRIMARY KEY ON CONFLICT IGNORE,
     author          BLOB    NOT NULL,
     seq             INTEGER NOT NULL,
     prev_hash       BLOB,                     -- NULL only for the genesis Dna action
@@ -39,20 +40,20 @@ CREATE TABLE Action (
 
 -- Public entries.
 CREATE TABLE Entry (
-    hash BLOB PRIMARY KEY,
+    hash BLOB PRIMARY KEY ON CONFLICT IGNORE,
     blob BLOB NOT NULL
 ) STRICT, WITHOUT ROWID;
 
 -- Private entries (local author only).
 CREATE TABLE PrivateEntry (
-    hash   BLOB PRIMARY KEY,
+    hash   BLOB PRIMARY KEY ON CONFLICT IGNORE,
     author BLOB NOT NULL,
     blob   BLOB NOT NULL
 ) STRICT, WITHOUT ROWID;
 
 -- Capability grants index.
 CREATE TABLE CapGrant (
-    action_hash BLOB    PRIMARY KEY,
+    action_hash BLOB    PRIMARY KEY ON CONFLICT IGNORE,
     cap_access  INTEGER NOT NULL,             -- 0=Unrestricted, 1=Transferable, 2=Assigned
     tag         TEXT,
     FOREIGN KEY(action_hash) REFERENCES Action(hash)
@@ -76,7 +77,7 @@ CREATE TABLE ChainLock (
 
 -- Limbo for network-received chain ops awaiting validation.
 CREATE TABLE LimboChainOp (
-    hash                    BLOB    PRIMARY KEY,
+    hash                    BLOB    PRIMARY KEY ON CONFLICT IGNORE,
     op_type                 INTEGER NOT NULL,
     action_hash             BLOB    NOT NULL,
 
@@ -100,7 +101,7 @@ CREATE TABLE LimboChainOp (
 
 -- Limbo for network-received warrants awaiting validation.
 CREATE TABLE LimboWarrant (
-    hash                    BLOB    PRIMARY KEY,
+    hash                    BLOB    PRIMARY KEY ON CONFLICT IGNORE,
     author                  BLOB    NOT NULL,
     timestamp               INTEGER NOT NULL,
     warrantee               BLOB    NOT NULL,
@@ -120,7 +121,7 @@ CREATE TABLE LimboWarrant (
 
 -- Integrated chain ops.
 CREATE TABLE ChainOp (
-    hash               BLOB    PRIMARY KEY,
+    hash               BLOB    PRIMARY KEY ON CONFLICT IGNORE,
     op_type            INTEGER NOT NULL,
     action_hash        BLOB    NOT NULL,
 
@@ -140,7 +141,7 @@ CREATE TABLE ChainOp (
 
 -- Publish state for self-authored chain ops.
 CREATE TABLE ChainOpPublish (
-    op_hash           BLOB    PRIMARY KEY,
+    op_hash           BLOB    PRIMARY KEY ON CONFLICT IGNORE,
     last_publish_time INTEGER,
     receipts_complete INTEGER,
     FOREIGN KEY(op_hash) REFERENCES ChainOp(hash)
@@ -148,7 +149,7 @@ CREATE TABLE ChainOpPublish (
 
 -- Validation receipts for authored ops.
 CREATE TABLE ValidationReceipt (
-    hash          BLOB    PRIMARY KEY,
+    hash          BLOB    PRIMARY KEY ON CONFLICT IGNORE,
     op_hash       BLOB    NOT NULL,
     validators    BLOB    NOT NULL,
     signature     BLOB    NOT NULL,
@@ -158,7 +159,7 @@ CREATE TABLE ValidationReceipt (
 
 -- Integrated warrants.
 CREATE TABLE Warrant (
-    hash               BLOB    PRIMARY KEY,
+    hash               BLOB    PRIMARY KEY ON CONFLICT IGNORE,
     author             BLOB    NOT NULL,
     timestamp          INTEGER NOT NULL,
     warrantee          BLOB    NOT NULL,
@@ -168,14 +169,14 @@ CREATE TABLE Warrant (
 
 -- Publish state for self-authored warrants.
 CREATE TABLE WarrantPublish (
-    warrant_hash      BLOB    PRIMARY KEY,
+    warrant_hash      BLOB    PRIMARY KEY ON CONFLICT IGNORE,
     last_publish_time INTEGER,
     FOREIGN KEY(warrant_hash) REFERENCES Warrant(hash)
 ) STRICT, WITHOUT ROWID;
 
 -- Link index.
 CREATE TABLE Link (
-    action_hash BLOB    PRIMARY KEY,
+    action_hash BLOB    PRIMARY KEY ON CONFLICT IGNORE,
     base_hash   BLOB    NOT NULL,
     zome_index  INTEGER NOT NULL,
     link_type   INTEGER NOT NULL,
@@ -185,14 +186,14 @@ CREATE TABLE Link (
 
 -- Deleted-link index.
 CREATE TABLE DeletedLink (
-    action_hash      BLOB PRIMARY KEY,
+    action_hash      BLOB PRIMARY KEY ON CONFLICT IGNORE,
     create_link_hash BLOB NOT NULL,
     FOREIGN KEY(action_hash) REFERENCES Action(hash) ON DELETE CASCADE
 ) STRICT, WITHOUT ROWID;
 
 -- Updated-record index.
 CREATE TABLE UpdatedRecord (
-    action_hash          BLOB PRIMARY KEY,
+    action_hash          BLOB PRIMARY KEY ON CONFLICT IGNORE,
     original_action_hash BLOB NOT NULL,
     original_entry_hash  BLOB NOT NULL,
     FOREIGN KEY(action_hash) REFERENCES Action(hash) ON DELETE CASCADE
@@ -200,8 +201,20 @@ CREATE TABLE UpdatedRecord (
 
 -- Deleted-record index.
 CREATE TABLE DeletedRecord (
-    action_hash         BLOB PRIMARY KEY,
+    action_hash         BLOB PRIMARY KEY ON CONFLICT IGNORE,
     deletes_action_hash BLOB NOT NULL,
     deletes_entry_hash  BLOB NOT NULL,
     FOREIGN KEY(action_hash) REFERENCES Action(hash) ON DELETE CASCADE
+) STRICT, WITHOUT ROWID;
+
+-- Scheduled function records (per-author within this DNA's DB).
+CREATE TABLE ScheduledFunction (
+    author         BLOB    NOT NULL,
+    zome_name      TEXT    NOT NULL,
+    scheduled_fn   TEXT    NOT NULL,
+    maybe_schedule BLOB    NOT NULL,
+    start_at       INTEGER NOT NULL,
+    end_at         INTEGER NOT NULL,
+    ephemeral      INTEGER NOT NULL,             -- 0/1
+    PRIMARY KEY (author, zome_name, scheduled_fn) ON CONFLICT ROLLBACK
 ) STRICT, WITHOUT ROWID;

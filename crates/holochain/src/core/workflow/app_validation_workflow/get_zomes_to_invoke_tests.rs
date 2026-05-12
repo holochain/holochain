@@ -51,6 +51,7 @@ async fn register_agent_activity() {
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
+        test_space.space.dht_store.clone(),
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
@@ -109,6 +110,7 @@ async fn store_entry_create_app_entry() {
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
+        test_space.space.dht_store.clone(),
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
@@ -163,6 +165,7 @@ async fn store_entry_create_non_app_entry() {
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
+        test_space.space.dht_store.clone(),
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
@@ -223,6 +226,7 @@ async fn store_entry_update_app_entry() {
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
+        test_space.space.dht_store.clone(),
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
@@ -279,6 +283,7 @@ async fn store_entry_update_non_app_entry() {
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
+        test_space.space.dht_store.clone(),
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
@@ -334,6 +339,7 @@ async fn store_record_create_app_entry() {
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
+        test_space.space.dht_store.clone(),
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
@@ -375,6 +381,7 @@ async fn store_record_create_non_app_entry() {
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
+        test_space.space.dht_store.clone(),
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
@@ -429,6 +436,7 @@ async fn store_record_create_wrong_entry() {
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
+        test_space.space.dht_store.clone(),
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
@@ -474,6 +482,7 @@ async fn store_record_create_link() {
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
+        test_space.space.dht_store.clone(),
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
@@ -536,6 +545,7 @@ async fn store_record_update_app_entry() {
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
+        test_space.space.dht_store.clone(),
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
@@ -581,6 +591,7 @@ async fn store_record_update_non_app_entry() {
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
+        test_space.space.dht_store.clone(),
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
@@ -658,6 +669,7 @@ async fn store_record_update_of_update_app_entry() {
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
+        test_space.space.dht_store.clone(),
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
@@ -715,6 +727,7 @@ async fn store_record_delete_without_entry() {
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
+        test_space.space.dht_store.clone(),
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
@@ -770,6 +783,7 @@ async fn store_record_delete_non_app_entry() {
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
+        test_space.space.dht_store.clone(),
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
@@ -828,6 +842,7 @@ async fn store_record_delete_link() {
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
+        test_space.space.dht_store.clone(),
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
@@ -898,6 +913,7 @@ async fn register_update_app_entry() {
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
+        test_space.space.dht_store.clone(),
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
@@ -944,6 +960,7 @@ async fn register_update_non_app_entry() {
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
+        test_space.space.dht_store.clone(),
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
@@ -1002,6 +1019,7 @@ async fn register_delete_create_app_entry() {
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
+        test_space.space.dht_store.clone(),
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
@@ -1067,6 +1085,7 @@ async fn register_delete_create_non_app_entry() {
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
+        test_space.space.dht_store.clone(),
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
@@ -1136,6 +1155,7 @@ async fn register_delete_update_app_entry() {
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
+        test_space.space.dht_store.clone(),
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
@@ -1201,6 +1221,7 @@ async fn register_delete_update_non_app_entry() {
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
+        test_space.space.dht_store.clone(),
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
@@ -1256,6 +1277,7 @@ async fn register_create_link() {
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
+        test_space.space.dht_store.clone(),
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
@@ -1301,6 +1323,7 @@ async fn register_delete_link() {
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
+        test_space.space.dht_store.clone(),
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,

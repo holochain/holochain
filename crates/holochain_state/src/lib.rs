@@ -24,9 +24,12 @@
 //! The Query trait allows combining arbitrary database SQL queries with
 //! the scratch space so reads can union across the database and in-memory data.
 
+pub use dht_store::DhtStore;
+
 pub mod block;
 pub mod chain_lock;
 pub mod conductor;
+pub mod dht_store;
 #[allow(missing_docs)]
 pub mod dna_def;
 pub mod entry_def;

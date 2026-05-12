@@ -876,6 +876,7 @@ pub struct AppValidationWorkspace {
     // Writeable because of warrants
     authored_db: DbWrite<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
+    dht_store: DhtStore,
     cache: DbWrite<DbKindCache>,
     keystore: MetaLairClient,
 }
@@ -885,12 +886,14 @@ impl AppValidationWorkspace {
         // Writeable because of warrants
         authored_db: DbWrite<DbKindAuthored>,
         dht_db: DbWrite<DbKindDht>,
+        dht_store: DhtStore,
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
     ) -> Self {
         Self {
             authored_db,
             dht_db,
+            dht_store,
             cache,
             keystore,
         }
@@ -900,6 +903,7 @@ impl AppValidationWorkspace {
         Ok(HostFnWorkspace::new(
             self.authored_db.clone().into(),
             self.dht_db.clone().into(),
+            self.dht_store.clone(),
             self.cache.clone(),
             self.keystore.clone(),
             None,

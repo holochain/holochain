@@ -16,6 +16,7 @@ mod entry;
 mod limbo_chain_op;
 mod limbo_warrant;
 mod link;
+mod scheduled_function;
 mod updated_record;
 mod validation_receipt;
 mod warrant;

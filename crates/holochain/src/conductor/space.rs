@@ -49,6 +49,7 @@ pub struct Spaces {
     pub(crate) wasm_store: holochain_state::wasm::WasmStore,
     pub(crate) dna_def_store: holochain_state::dna_def::DnaDefStore,
     pub(crate) entry_def_store: holochain_state::entry_def::EntryDefStore,
+    pub(crate) space_data_config: holochain_data::HolochainDataConfig,
     db_key: DbKey,
     data_db_key: holochain_data::DbKey,
 }
@@ -73,6 +74,9 @@ pub struct Space {
     /// The dht databases. These are shared across cells.
     /// There is one per unique Dna.
     pub dht_db: DbWrite<DbKindDht>,
+
+    /// DHT store wrapping the new holochain_data database.
+    pub dht_store: DhtStore,
 
     /// The peer meta store. One per unique Dna.
     pub peer_meta_store: holochain_state::peer_metadata_store::PeerMetaStore,
@@ -205,6 +209,12 @@ impl Spaces {
         let dna_def_store = holochain_state::dna_def::DnaDefStore::new(wasm_db.clone());
         let entry_def_store = holochain_state::entry_def::EntryDefStore::new(wasm_db);
 
+        let space_data_config = holochain_data::HolochainDataConfig {
+            key: Some(data_db_key.clone()),
+            sync_level: db_sync,
+            max_readers: config.db_max_readers,
+        };
+
         Ok(Spaces {
             map: RwShare::new(HashMap::new()),
             db_dir: Arc::new(root_db_dir),
@@ -214,6 +224,7 @@ impl Spaces {
             wasm_store,
             dna_def_store,
             entry_def_store,
+            space_data_config,
             db_key,
             data_db_key,
         })
@@ -359,6 +370,7 @@ impl Spaces {
                             self.config.db_sync_strategy,
                             self.db_key.clone(),
                             self.config.db_max_readers,
+                            self.space_data_config.clone(),
                             Some(self.data_db_key.clone()),
                         )?;
 
@@ -409,6 +421,11 @@ impl Spaces {
     /// Get the dht database (this will create the space if it doesn't already exist).
     pub fn dht_db(&self, dna_hash: &DnaHash) -> DatabaseResult<DbWrite<DbKindDht>> {
         self.get_or_create_space_ref(dna_hash, |space| space.dht_db.clone())
+    }
+
+    /// Get the new-schema DHT store (this will create the space if it doesn't already exist).
+    pub fn dht_store(&self, dna_hash: &DnaHash) -> DatabaseResult<DhtStore> {
+        self.get_or_create_space_ref(dna_hash, |space| space.dht_store.clone())
     }
 
     /// Get the peer meta store for a DNA space.
@@ -480,6 +497,7 @@ impl Space {
         db_sync_strategy: DbSyncStrategy,
         db_key: DbKey,
         db_max_readers: u16,
+        space_data_config: holochain_data::HolochainDataConfig,
         data_db_key: Option<holochain_data::DbKey>,
     ) -> DatabaseResult<Self> {
         let (db_sync_level, data_db_sync_level) = match db_sync_strategy {
@@ -487,7 +505,7 @@ impl Space {
             DbSyncStrategy::Resilient => (DbSyncLevel::Normal, holochain_data::DbSyncLevel::Normal),
         };
 
-        let (cache, dht_db, peer_meta_store) = tokio::task::block_in_place(|| {
+        let (cache, dht_db, peer_meta_store, dht_store) = tokio::task::block_in_place(|| {
             let cache = DbWrite::open_with_pool_config(
                 root_db_dir.as_ref(),
                 DbKindCache(dna_hash.clone()),
@@ -519,7 +537,15 @@ impl Space {
                 .map_err(|e| holochain_sqlite::error::DatabaseError::Other(e.into()))?;
             let peer_meta_store =
                 holochain_state::peer_metadata_store::PeerMetaStore::new(peer_meta_store_db);
-            DatabaseResult::Ok((cache, dht_db, peer_meta_store))
+            let new_dht_db = tokio::runtime::Handle::current()
+                .block_on(holochain_data::open_db(
+                    &root_db_dir,
+                    holochain_data::kind::Dht::new(dna_hash.clone()),
+                    space_data_config.clone(),
+                ))
+                .map_err(|e| DatabaseError::Other(e.into()))?;
+            let dht_store = DhtStore::new(new_dht_db);
+            DatabaseResult::Ok((cache, dht_db, peer_meta_store, dht_store))
         })?;
 
         let witnessing_workspace = WitnessingWorkspace::default();
@@ -530,6 +556,7 @@ impl Space {
             cache_db: cache,
             authored_dbs: Arc::new(parking_lot::Mutex::new(HashMap::new())),
             dht_db,
+            dht_store,
             peer_meta_store,
             countersigning_workspaces: Default::default(),
             witnessing_workspace,
@@ -551,6 +578,7 @@ impl Space {
         SourceChain::raw_empty(
             self.get_or_create_authored_db(author.clone())?,
             self.dht_db.clone(),
+            self.dht_store.clone(),
             keystore,
             author,
         )
@@ -566,6 +594,7 @@ impl Space {
         Ok(SourceChainWorkspace::new(
             self.get_or_create_authored_db(author.clone())?.clone(),
             self.dht_db.clone(),
+            self.dht_store.clone(),
             self.cache_db.clone(),
             keystore,
             author,
@@ -689,6 +718,7 @@ impl TestSpace {
             .tempdir()
             .unwrap();
 
+        let test_space_data_config = holochain_data::HolochainDataConfig::default();
         Self {
             space: Space::new(
                 Arc::new(dna_hash),
@@ -696,6 +726,7 @@ impl TestSpace {
                 Default::default(),
                 Default::default(),
                 ConductorConfig::default().db_max_readers,
+                test_space_data_config,
                 None,
             )
             .unwrap(),

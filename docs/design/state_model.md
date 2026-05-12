@@ -74,6 +74,23 @@ CREATE TABLE PrivateEntry (
    blob   BLOB NOT NULL
 ) WITHOUT ROWID;
 
+-- Scheduled function records (per-author within this DNA's DB).
+--
+-- Records scheduled zome-function invocations originated by an author within
+-- this DNA. Per-author state, but lives in the per-DNA DB; the row's `author`
+-- column distinguishes rows for different agents on the same DNA.
+CREATE TABLE ScheduledFunction (
+   author         BLOB    NOT NULL,
+   zome_name      TEXT    NOT NULL,
+   scheduled_fn   TEXT    NOT NULL,
+   maybe_schedule BLOB    NOT NULL,      -- Serialized Option<Schedule>
+   start_at       INTEGER NOT NULL,      -- Microsecond timestamp the function becomes live
+   end_at         INTEGER NOT NULL,      -- Microsecond timestamp the function expires
+   ephemeral      INTEGER NOT NULL,      -- 0/1 — 1 means the row is removed once it fires
+
+   PRIMARY KEY (author, zome_name, scheduled_fn)
+) WITHOUT ROWID;
+
 -- Capability grants lookup table.
 --
 -- For simpler querying of cap grants from the agent chain.
@@ -318,7 +335,11 @@ pub struct ActionHeader {
     pub prev_action: Option<ActionHash>,
 }
 
-/// Action-specific data stored separately from header
+/// Action-specific data stored separately from header.
+///
+/// The `action_type` INTEGER column stores the discriminant:
+///   1=Dna, 2=AgentValidationPkg, 3=InitZomesComplete, 4=Create,
+///   5=Update, 6=Delete, 7=CreateLink, 8=DeleteLink, 9=CloseChain, 10=OpenChain
 pub enum ActionData {
     Dna(DnaData),
     AgentValidationPkg(AgentValidationPkgData),
@@ -328,6 +349,8 @@ pub enum ActionData {
     Delete(DeleteData),
     CreateLink(CreateLinkData),
     DeleteLink(DeleteLinkData),
+    CloseChain(CloseChainData),
+    OpenChain(OpenChainData),
 }
 
 /// Full action
@@ -378,6 +401,16 @@ pub struct AgentValidationPkgData {
 }
 
 pub struct InitZomesCompleteData {}
+
+pub struct CloseChainData {
+    pub new_target: Option<MigrationTarget>,
+}
+
+pub struct OpenChainData {
+    pub prev_target: MigrationTarget,
+    /// Hash of the matching `CloseChain` action on the old chain.
+    pub close_hash: ActionHash,
+}
 ```
 
 DHT Operations:
@@ -1019,7 +1052,7 @@ ORDER BY LimboChainOp.when_received
    FROM Action
    WHERE Action.hash = :action_hash
        AND Action.record_validity = 1
-       AND Action.action_type = 8 -- ActionType::CreateLink
+       AND Action.action_type = 7 -- ActionType::CreateLink
    ```
    - If the action is a `CreateLink` and the op is rejected, ensure no row exists in `Link` table for this action:
    ```sql
@@ -1039,7 +1072,7 @@ ORDER BY LimboChainOp.when_received
    FROM Action
    WHERE Action.hash = :action_hash
        AND Action.record_validity = 1
-       AND Action.action_type = 9 -- ActionType::DeleteLink
+       AND Action.action_type = 8 -- ActionType::DeleteLink
    ```
    - If the action is a `DeleteLink` and the op is rejected, ensure no row exists in `DeletedLink` table for this action:
    ```sql
@@ -1060,7 +1093,7 @@ ORDER BY LimboChainOp.when_received
    FROM Action
    WHERE Action.hash = :action_hash
        AND Action.record_validity = 1
-       AND Action.action_type = 6 -- ActionType::Update
+       AND Action.action_type = 5 -- ActionType::Update
    ```
    - If the action is an `Update` and the op is rejected, ensure no row exists in `UpdatedRecord` table:
    ```sql
@@ -1081,7 +1114,7 @@ ORDER BY LimboChainOp.when_received
    FROM Action
    WHERE Action.hash = :action_hash
        AND Action.record_validity = 1
-       AND Action.action_type = 7 -- ActionType::Delete
+       AND Action.action_type = 6 -- ActionType::Delete
    ```
    - If the action is a `Delete` and the op is rejected, ensure no row exists in `DeletedRecord` table:
    ```sql
@@ -1239,7 +1272,7 @@ LEFT JOIN PrivateEntry ON Action.entry_hash = PrivateEntry.hash
     AND PrivateEntry.author = :author
 WHERE Action.author = :author
   AND Action.seq BETWEEN :start_seq AND :end_seq
-  AND Action.action_type IN (5, 6, ...) -- ActionType::Create, ActionType::Update, etc.
+  AND Action.action_type IN (4, 5, ...) -- ActionType::Create, ActionType::Update, etc.
   AND Action.entry_hash IN (...)
 ORDER BY Action.seq ASC
 ```
@@ -1495,7 +1528,7 @@ Uses the `DeletedRecord` index table.
 SELECT Action.*, Entry.*
 FROM Action
 LEFT JOIN Entry ON Action.entry_hash = Entry.hash
-WHERE Action.action_type = 5 -- ActionType::Create
+WHERE Action.action_type = 4 -- ActionType::Create
   AND Action.record_validity = 1
   -- Exclude creates that have been deleted
   AND NOT EXISTS (

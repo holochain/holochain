@@ -4,25 +4,34 @@ use crate::models::dht::UpdatedRecordRow;
 use holo_hash::{ActionHash, EntryHash};
 use sqlx::{Executor, Sqlite};
 
-pub(crate) async fn insert_updated_record_index<'e, E>(
+/// Parameters for inserting a row into the `UpdatedRecord` index table.
+pub struct InsertUpdatedRecord<'a> {
+    /// Hash of the Update action (primary key).
+    pub action_hash: &'a ActionHash,
+    /// Hash of the original action being updated.
+    pub original_action_hash: &'a ActionHash,
+    /// Hash of the original entry being updated.
+    pub original_entry_hash: &'a EntryHash,
+}
+
+/// Insert a row into the `UpdatedRecord` index table. Returns the number of rows inserted.
+pub(crate) async fn insert_updated_record_index<'a, 'e, E>(
     executor: E,
-    action_hash: &ActionHash,
-    original_action_hash: &ActionHash,
-    original_entry_hash: &EntryHash,
-) -> sqlx::Result<()>
+    record: InsertUpdatedRecord<'a>,
+) -> sqlx::Result<u64>
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    sqlx::query(
+    let result = sqlx::query(
         "INSERT INTO UpdatedRecord (action_hash, original_action_hash, original_entry_hash)
          VALUES (?, ?, ?)",
     )
-    .bind(action_hash.get_raw_36())
-    .bind(original_action_hash.get_raw_36())
-    .bind(original_entry_hash.get_raw_36())
+    .bind(record.action_hash.get_raw_36())
+    .bind(record.original_action_hash.get_raw_36())
+    .bind(record.original_entry_hash.get_raw_36())
     .execute(executor)
     .await?;
-    Ok(())
+    Ok(result.rows_affected())
 }
 
 pub(crate) async fn get_updated_records<'e, E>(

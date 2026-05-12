@@ -199,6 +199,7 @@ mod tests {
         let workspace = HostFnWorkspaceRead::new(
             alice_host_fn_caller.authored_db.clone().into(),
             alice_host_fn_caller.dht_db.clone().into(),
+            alice_host_fn_caller.dht_store.clone(),
             alice_host_fn_caller.cache.clone(),
             alice_host_fn_caller.keystore.clone(),
             Some(cell_id.agent_pubkey().clone()),

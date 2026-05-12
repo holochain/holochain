@@ -22,6 +22,14 @@ impl TxWrite<Dht> {
         )
         .await
     }
+
+    /// Mark receipts as complete for the given op. Returns the number of rows updated.
+    pub async fn set_chain_op_receipts_complete(
+        &mut self,
+        op_hash: &DhtOpHash,
+    ) -> sqlx::Result<u64> {
+        chain_op_publish::set_receipts_complete(self.conn_mut(), op_hash).await
+    }
 }
 
 impl TxRead<Dht> {

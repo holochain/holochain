@@ -17,6 +17,7 @@ pub(crate) mod entry;
 pub(crate) mod limbo_chain_op;
 pub(crate) mod limbo_warrant;
 pub(crate) mod link;
+pub(crate) mod scheduled_function;
 pub(crate) mod updated_record;
 pub(crate) mod validation_receipt;
 pub(crate) mod warrant;

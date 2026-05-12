@@ -59,11 +59,13 @@ async fn test_cell_handle_publish() {
         .await
         .unwrap();
 
+    let dht_store = spaces.test_spaces[&dna].space.dht_store.clone();
     super::Cell::genesis(
         cell_id.clone(),
         handle.clone(),
         db.clone(),
         dht_db.clone(),
+        dht_store,
         ribosome,
         None,
     )

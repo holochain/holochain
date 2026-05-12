@@ -1709,6 +1709,7 @@ mod clone_cell_impls {
                 let source_chain = SourceChain::new(
                     self.get_or_create_authored_db(app_role.dna_hash(), app.agent_key().clone())?,
                     self.get_or_create_dht_db(app_role.dna_hash())?,
+                    self.get_or_create_dht_store(app_role.dna_hash())?,
                     self.keystore.clone(),
                     app.agent_key().clone(),
                 )
@@ -2234,6 +2235,7 @@ mod misc_impls {
                     cell.id().agent_pubkey().clone(),
                 )?,
                 self.get_or_create_dht_db(cell_id.dna_hash())?,
+                self.get_or_create_dht_store(cell_id.dna_hash())?,
                 self.keystore.clone(),
                 cell_id.agent_pubkey().clone(),
             )
@@ -2286,6 +2288,7 @@ mod misc_impls {
                     cell.id().agent_pubkey().clone(),
                 )?,
                 self.get_or_create_dht_db(cell_id.dna_hash())?,
+                self.get_or_create_dht_store(cell_id.dna_hash())?,
                 self.keystore.clone(),
                 cell_id.agent_pubkey().clone(),
             )
@@ -2360,6 +2363,7 @@ mod misc_impls {
                     )?
                     .into(),
                     self.get_or_create_dht_db(cell_id.dna_hash())?.into(),
+                    self.get_or_create_dht_store(cell_id.dna_hash())?,
                     self.keystore().clone(),
                     cell_id.agent_pubkey().clone(),
                 )
@@ -2835,6 +2839,13 @@ mod accessor_impls {
             self.spaces.dht_db(dna_hash)
         }
 
+        pub(crate) fn get_or_create_dht_store(
+            &self,
+            dna_hash: &DnaHash,
+        ) -> DatabaseResult<DhtStore> {
+            self.spaces.dht_store(dna_hash)
+        }
+
         /// Get the post commit sender.
         pub async fn post_commit_permit(
             &self,
@@ -3120,6 +3131,33 @@ impl Conductor {
 
             self.delete_or_purge_database(dht_db).await?;
             self.delete_or_purge_database(cache_db).await?;
+
+            // Remove (or purge) the per-DNA mirrored store so a reinstall
+            // doesn't inherit stale rows from the previous installation.
+            let dht_store = self.spaces.dht_store(dna_hash)?;
+            let dht_store_id = holochain_data::kind::Dht::new(Arc::new(dna_hash.clone()));
+            let dht_store_path = self.spaces.db_dir.as_ref().as_ref().join(
+                holochain_data::DatabaseIdentifier::database_id(&dht_store_id),
+            );
+            if let Err(err) = ffs::remove_file(&dht_store_path).await {
+                tracing::warn!(
+                    ?err,
+                    "Could not remove DhtStore DB file, probably because it is still in use. Purging all data instead."
+                );
+                dht_store.purge_all().await.map_err(ConductorError::other)?;
+            } else {
+                tracing::info!("Deleted DhtStore DB file {}", dht_store_path.display());
+            }
+            let stem = dht_store_path.to_string_lossy();
+            for ext in ["shm", "wal"] {
+                let support_path = PathBuf::from(format!("{stem}-{ext}"));
+                if let Err(err) = ffs::remove_file(&support_path).await {
+                    let err = err.remove_backtrace();
+                    tracing::warn!(?err, "Failed to remove DhtStore DB support file");
+                } else {
+                    tracing::info!("Deleted file {}", support_path.display());
+                }
+            }
         }
 
         Ok(())
@@ -3264,6 +3302,10 @@ mod test_utils_impls {
             Ok(self.get_or_create_dht_db(dna_hash)?)
         }
 
+        pub fn get_dht_store(&self, dna_hash: &DnaHash) -> ConductorApiResult<DhtStore> {
+            Ok(self.get_or_create_dht_store(dna_hash)?)
+        }
+
         pub async fn get_cache_db(
             &self,
             cell_id: &CellId,
@@ -3317,6 +3359,7 @@ pub(crate) async fn genesis_cells(
             let authored_db =
                 space.get_or_create_authored_db(cell_id_inner.agent_pubkey().clone())?;
             let dht_db = space.dht_db;
+            let dht_store = space.dht_store;
             let ribosome = conductor.get_ribosome(&cell_id_inner).map_err(Box::new)?;
 
             Cell::genesis(
@@ -3324,6 +3367,7 @@ pub(crate) async fn genesis_cells(
                 conductor,
                 authored_db,
                 dht_db,
+                dht_store,
                 ribosome,
                 proof,
             )

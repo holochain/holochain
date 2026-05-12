@@ -1797,6 +1797,7 @@ impl TestHarness {
                 .get_or_create_authored_db(author.clone())
                 .unwrap(),
             test_space.space.dht_db.clone(),
+            test_space.space.dht_store.clone(),
             keystore.clone(),
             dna_hash.clone(),
             author.clone(),

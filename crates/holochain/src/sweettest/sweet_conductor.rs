@@ -875,6 +875,7 @@ impl SweetConductor {
             self.get_or_create_authored_db(dna_hash, agent_key.clone())
                 .unwrap(),
             self.get_dht_db(dna_hash).unwrap(),
+            self.get_dht_store(dna_hash).unwrap(),
             self.keystore().clone(),
             agent_key.clone(),
         )

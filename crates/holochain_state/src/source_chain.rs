@@ -10,6 +10,7 @@ use async_recursion::async_recursion;
 pub use error::*;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
+use holo_hash::AnyDhtHash;
 use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
 use holo_hash::EntryHash;
@@ -35,6 +36,7 @@ pub struct SourceChain<AuthorDb = DbWrite<DbKindAuthored>, DhtDb = DbWrite<DbKin
     scratch: SyncScratch,
     vault: AuthorDb,
     dht_db: DhtDb,
+    pub(crate) dht_store: DhtStore,
     keystore: MetaLairClient,
     author: Arc<AgentPubKey>,
     head_info: Option<HeadInfo>,
@@ -312,6 +314,14 @@ impl SourceChain {
 
         let now = Timestamp::now();
 
+        // Snapshots for the new-DB mirror block. Both the legacy closure and
+        // the new-DB block consume the same drained values; these clones are
+        // cheap (Vec<HoloHashed<_>> / Vec<ScheduledFn>).
+        let entries_for_new_db = entries.clone();
+        let actions_for_new_db = actions.clone();
+        let ops_for_new_db = ops.clone();
+        let scheduled_fns_for_new_db = scheduled_fns.clone();
+
         // Take out a write lock as late as possible, after doing everything we can in memory and
         // before starting any database read/write operations.
         let write_permit = self.vault.acquire_write_permit().await?;
@@ -411,6 +421,7 @@ impl SourceChain {
                     let child_chain = Self::new(
                         self.vault.clone(),
                         self.dht_db.clone(),
+                        self.dht_store.clone(),
                         keystore.clone(),
                         (*self.author).clone(),
                     )
@@ -437,6 +448,219 @@ impl SourceChain {
             }
             Ok((actions, permit)) => {
                 drop(permit);
+
+                // Mirror the authored-side writes to the new holochain_data DHT DB.
+                // Strict on failure: if anything here fails, the whole flush fails.
+                {
+                    // `author` was moved into the legacy closure above; re-clone from `self`.
+                    let author = self.author.clone();
+                    let mut tx = self
+                        .dht_store
+                        .db()
+                        .begin()
+                        .await
+                        .map_err(SourceChainError::other)?;
+
+                    // Collect the set of entry hashes whose authoring action declares
+                    // them as private. Entries whose hash matches one of these go to
+                    // `PrivateEntry`; every other entry — including any whose hash is
+                    // not referenced by an in-batch action — goes to the public `Entry`
+                    // table, matching the legacy authored-DB write below.
+                    let private_entry_hashes = actions_for_new_db
+                        .iter()
+                        .filter_map(|sah| {
+                            let action = sah.action();
+                            let visibility = action.entry_visibility()?;
+                            if *visibility == EntryVisibility::Private {
+                                action.entry_hash().cloned()
+                            } else {
+                                None
+                            }
+                        })
+                        .collect::<std::collections::HashSet<_>>();
+
+                    for entry_hashed in &entries_for_new_db {
+                        let entry_hash = entry_hashed.as_hash();
+                        let entry = entry_hashed.as_content();
+                        if private_entry_hashes.contains(entry_hash) {
+                            tx.insert_private_entry(entry_hash, author.as_ref(), entry)
+                                .await
+                                .map_err(SourceChainError::other)?;
+                        } else {
+                            tx.insert_entry(entry_hash, entry)
+                                .await
+                                .map_err(SourceChainError::other)?;
+                        }
+                    }
+
+                    // Track which action hashes were successfully inserted into the new DB.
+                    // Ops whose action insert failed must also be skipped to avoid FK
+                    // violations on ChainOp.action_hash.
+                    let mut inserted_action_hashes = std::collections::HashSet::<ActionHash>::new();
+
+                    for sah in &actions_for_new_db {
+                        let new_sah = legacy_to_dht_v2_signed_action(sah);
+
+                        tx.insert_action(
+                            &new_sah,
+                            Some(holochain_zome_types::dht_v2::RecordValidity::Accepted),
+                        )
+                        .await
+                        .map_err(SourceChainError::other)?;
+
+                        // Record that this action hash is present in the new DB.
+                        inserted_action_hashes.insert(sah.as_hash().clone());
+
+                        // Dispatch index table inserts based on action variant.
+                        // `ActionData` is the dht_v2 discriminant; import locally to
+                        // avoid shadowing the legacy `Action` variants in scope.
+                        {
+                            use holochain_zome_types::dht_v2::ActionData;
+                            match &new_sah.hashed.content.data {
+                                ActionData::CreateLink(a) => {
+                                    let _ = tx
+                                        .insert_link_index(holochain_data::dht::InsertLink {
+                                            action_hash: new_sah.as_hash(),
+                                            base_hash: &a.base_address,
+                                            zome_index: a.zome_index.0,
+                                            link_type: a.link_type.0,
+                                            tag: Some(a.tag.0.as_slice()),
+                                        })
+                                        .await
+                                        .map_err(SourceChainError::other)?;
+                                }
+                                ActionData::DeleteLink(a) => {
+                                    let _ = tx
+                                        .insert_deleted_link_index(
+                                            holochain_data::dht::InsertDeletedLink {
+                                                action_hash: new_sah.as_hash(),
+                                                create_link_hash: &a.link_add_address,
+                                            },
+                                        )
+                                        .await
+                                        .map_err(SourceChainError::other)?;
+                                }
+                                ActionData::Update(a) => {
+                                    let _ = tx
+                                        .insert_updated_record_index(
+                                            holochain_data::dht::InsertUpdatedRecord {
+                                                action_hash: new_sah.as_hash(),
+                                                original_action_hash: &a.original_action_address,
+                                                original_entry_hash: &a.original_entry_address,
+                                            },
+                                        )
+                                        .await
+                                        .map_err(SourceChainError::other)?;
+                                }
+                                ActionData::Delete(a) => {
+                                    let _ = tx
+                                        .insert_deleted_record_index(
+                                            holochain_data::dht::InsertDeletedRecord {
+                                                action_hash: new_sah.as_hash(),
+                                                deletes_action_hash: &a.deletes_address,
+                                                deletes_entry_hash: &a.deletes_entry_address,
+                                            },
+                                        )
+                                        .await
+                                        .map_err(SourceChainError::other)?;
+                                }
+                                _ => {}
+                            }
+                        }
+
+                        // For Create/Update of a CapGrant entry type, insert a CapGrant index row.
+                        if let Some((cap_access, tag)) =
+                            cap_grant_index_params(sah, &entries_for_new_db)
+                        {
+                            tx.insert_cap_grant(new_sah.as_hash(), cap_access, tag.as_deref())
+                                .await
+                                .map_err(SourceChainError::other)?;
+                        }
+                    }
+
+                    for (op, op_hash, _op_order, timestamp, _dep) in &ops_for_new_db {
+                        let op_as_chain = match op.as_chain_op() {
+                            Some(c) => c,
+                            None => continue, // warrant ops: skip for this slice
+                        };
+                        // Skip ops whose action hash was not recorded as successfully inserted.
+                        if !inserted_action_hashes.contains(op_as_chain.action_hash()) {
+                            continue;
+                        }
+                        let linkable_basis = op_as_chain.dht_basis().clone();
+                        let storage_center_loc = linkable_basis.get_loc();
+                        // ChainOp.basis_hash in the new schema is AnyDhtHash (all
+                        // authored ops' bases are DHT-addressable entries or actions).
+                        // TODO: ChainOp.basis_hash uses AnyDhtHash, which lacks External.
+                        // Authored CreateLink with External basis cannot mirror to ChainOp
+                        // until the new schema widens basis_hash to AnyLinkableHash.
+                        // Action and Link rows are still inserted; the legacy DB still has
+                        // the ChainOp row.
+                        let basis_hash: AnyDhtHash = match AnyDhtHash::try_from(linkable_basis) {
+                            Ok(h) => h,
+                            Err(e) => {
+                                tracing::debug!(
+                                    op_hash = ?op_hash,
+                                    "new DB skip: op with external-hash basis is not yet \
+                                     representable in ChainOp; legacy DB has it. op_hash={op_hash:?} err={e:?}"
+                                );
+                                continue;
+                            }
+                        };
+
+                        let serialized_size = encoded_chain_op_size(
+                            op_as_chain,
+                            &actions_for_new_db,
+                            &entries_for_new_db,
+                        );
+                        tx.insert_chain_op(holochain_data::dht::InsertChainOp {
+                            op_hash,
+                            action_hash: op_as_chain.action_hash(),
+                            op_type: i64::from(op_as_chain.get_type()),
+                            basis_hash: &basis_hash,
+                            storage_center_loc,
+                            validation_status:
+                                holochain_zome_types::dht_v2::RecordValidity::Accepted,
+                            locally_validated: true,
+                            when_received: *timestamp,
+                            when_integrated: *timestamp,
+                            serialized_size,
+                        })
+                        .await
+                        .map_err(SourceChainError::other)?;
+
+                        // Always insert a ChainOpPublish row for self-authored ops so the
+                        // publish workflow can track them without a separate lookup.
+                        tx.insert_chain_op_publish(op_hash, None, None)
+                            .await
+                            .map_err(SourceChainError::other)?;
+                    }
+
+                    // Scheduled functions flushed from the scratch are always written
+                    // with `maybe_schedule = None` (see schedule_fn in mutations.rs).
+                    // None => start=now, end=Timestamp::max(), ephemeral=true.
+                    for scheduled_fn in &scheduled_fns_for_new_db {
+                        let maybe_schedule_blob =
+                            serialize_maybe_schedule_none().map_err(SourceChainError::other)?;
+                        let _ = tx
+                            .insert_scheduled_function(
+                                holochain_data::dht::InsertScheduledFunction {
+                                    author: author.as_ref(),
+                                    zome_name: scheduled_fn.zome_name().0.as_ref(),
+                                    scheduled_fn: scheduled_fn.fn_name().0.as_ref(),
+                                    maybe_schedule: &maybe_schedule_blob,
+                                    start_at: now,
+                                    end_at: Timestamp::max(),
+                                    ephemeral: true,
+                                },
+                            )
+                            .await
+                            .map_err(SourceChainError::other)?;
+                    }
+
+                    tx.commit().await.map_err(SourceChainError::other)?;
+                }
+                // End of new-DB mirror block.
 
                 authored_ops_to_dht_db(
                     storage_arcs,
@@ -582,6 +806,7 @@ where
     pub async fn new(
         vault: AuthorDb,
         dht_db: DhtDb,
+        dht_store: DhtStore,
         keystore: MetaLairClient,
         author: AgentPubKey,
     ) -> SourceChainResult<Self> {
@@ -592,6 +817,7 @@ where
             scratch,
             vault,
             dht_db,
+            dht_store,
             keystore,
             author,
             head_info,
@@ -607,6 +833,7 @@ where
     pub async fn raw_empty(
         vault: AuthorDb,
         dht_db: DhtDb,
+        dht_store: DhtStore,
         keystore: MetaLairClient,
         author: AgentPubKey,
     ) -> SourceChainResult<Self> {
@@ -617,6 +844,7 @@ where
             scratch,
             vault,
             dht_db,
+            dht_store,
             keystore,
             author,
             head_info,
@@ -1175,6 +1403,7 @@ async fn rebase_actions_on(
 pub async fn genesis(
     authored: DbWrite<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
+    dht_store: DhtStore,
     keystore: MetaLairClient,
     dna_hash: DnaHash,
     agent_pubkey: AgentPubKey,
@@ -1226,6 +1455,48 @@ pub async fn genesis(
     let (agent_action, agent_entry) = agent_record.clone().into_inner();
     let agent_entry = agent_entry.into_option();
 
+    // Pre-compute (op, op_hash, timestamp) tuples for the new-DB mirror block.
+    // This mirrors what put_raw does internally via ChainOpUniqueForm::op_hash,
+    // but done upfront so we can keep the actions and ops available for the
+    // new-DB write without moving them into the legacy closure.
+    //
+    // Each triple is (ChainOpLite, DhtOpHash, Timestamp) for one op.
+    let mut ops_with_hashes_for_new_db: Vec<(ChainOpLite, DhtOpHash, Timestamp)> = Vec::new();
+    {
+        // Process each (signed_action, ops) pair to compute op hashes.
+        // We clone the action here (cheap because Action uses Arc<[u8]> for large fields)
+        // and let ChainOpUniqueForm::op_hash consume the clone.
+        let pairs: &[(&SignedActionHashed, &[ChainOpLite])] = &[
+            (&dna_action, &dna_ops),
+            (&agent_validation_action, &avh_ops),
+            (&agent_action, &agent_ops),
+        ];
+        for (shh, ops) in pairs {
+            let mut action_opt: Option<Action> = Some(shh.action().clone());
+            for op in *ops {
+                let op_type = op.get_type();
+                let (action_back, op_hash) = ChainOpUniqueForm::op_hash(
+                    op_type,
+                    action_opt.take().expect("action must be present"),
+                )
+                .map_err(SourceChainError::other)?;
+                let timestamp = action_back.timestamp();
+                action_opt = Some(action_back);
+                ops_with_hashes_for_new_db.push(((*op).clone(), op_hash, timestamp));
+            }
+        }
+    }
+
+    // Clone the actions and agent entry for the new-DB mirror block.
+    // The originals are moved into the legacy authored write closure below.
+    let dna_action_for_new_db = dna_action.clone();
+    let agent_validation_action_for_new_db = agent_validation_action.clone();
+    let agent_action_for_new_db = agent_action.clone();
+    // `agent_entry` is `Option<Entry>` — clone before move.
+    let agent_entry_for_new_db = agent_entry.clone();
+    // Entry hash for the agent entry (AgentPubKey → EntryHash via Into).
+    let agent_entry_hash: EntryHash = agent_pubkey.into();
+
     let mut ops_to_integrate = Vec::new();
 
     let ops_to_integrate = authored
@@ -1251,6 +1522,93 @@ pub async fn genesis(
     // to discover that the network is sharded and that we should not be an authority for
     // these items, so we assume we are an authority.
     authored_ops_to_dht_db_without_check(ops_to_integrate, authored.clone().into(), dht_db).await?;
+
+    // Mirror genesis writes to the new holochain_data DHT DB.
+    {
+        let mut tx = dht_store
+            .db()
+            .begin()
+            .await
+            .map_err(SourceChainError::other)?;
+
+        // Insert the public agent entry (Entry::Agent is always public).
+        if let Some(entry) = &agent_entry_for_new_db {
+            tx.insert_entry(&agent_entry_hash, entry)
+                .await
+                .map_err(SourceChainError::other)?;
+        }
+
+        // Insert all three genesis actions.
+        let genesis_actions: &[&SignedActionHashed] = &[
+            &dna_action_for_new_db,
+            &agent_validation_action_for_new_db,
+            &agent_action_for_new_db,
+        ];
+        for sah in genesis_actions {
+            let new_sah = legacy_to_dht_v2_signed_action(sah);
+            tx.insert_action(
+                &new_sah,
+                Some(holochain_zome_types::dht_v2::RecordValidity::Accepted),
+            )
+            .await
+            .map_err(SourceChainError::other)?;
+        }
+
+        // Insert chain ops for all three genesis actions.
+        for (op, op_hash, timestamp) in &ops_with_hashes_for_new_db {
+            let linkable_basis = op.dht_basis().clone();
+            let storage_center_loc = linkable_basis.get_loc();
+            let basis_hash: AnyDhtHash = match AnyDhtHash::try_from(linkable_basis) {
+                Ok(h) => h,
+                Err(e) => {
+                    tracing::debug!(
+                        op_hash = ?op_hash,
+                        "genesis new DB skip: op with external-hash basis; err={e:?}"
+                    );
+                    continue;
+                }
+            };
+
+            let genesis_actions_slice: Vec<SignedActionHashed> = vec![
+                dna_action_for_new_db.clone(),
+                agent_validation_action_for_new_db.clone(),
+                agent_action_for_new_db.clone(),
+            ];
+            let genesis_entries_slice: Vec<holochain_types::EntryHashed> = agent_entry_for_new_db
+                .as_ref()
+                .map(|e| {
+                    vec![holochain_types::EntryHashed::with_pre_hashed(
+                        e.clone(),
+                        agent_entry_hash.clone(),
+                    )]
+                })
+                .unwrap_or_default();
+            let serialized_size =
+                encoded_chain_op_size(op, &genesis_actions_slice, &genesis_entries_slice);
+            tx.insert_chain_op(holochain_data::dht::InsertChainOp {
+                op_hash,
+                action_hash: op.action_hash(),
+                op_type: i64::from(op.get_type()),
+                basis_hash: &basis_hash,
+                storage_center_loc,
+                validation_status: holochain_zome_types::dht_v2::RecordValidity::Accepted,
+                locally_validated: true,
+                when_received: *timestamp,
+                when_integrated: *timestamp,
+                serialized_size,
+            })
+            .await
+            .map_err(SourceChainError::other)?;
+
+            tx.insert_chain_op_publish(op_hash, None, None)
+                .await
+                .map_err(SourceChainError::other)?;
+        }
+
+        tx.commit().await.map_err(SourceChainError::other)?;
+    }
+    // End of new-DB mirror block.
+
     Ok(())
 }
 
@@ -1398,11 +1756,183 @@ pub async fn dump_state(
         .await?)
 }
 
+// ---------------------------------------------------------------------------
+// Private helpers for the new-DB mirror block in `flush`
+// ---------------------------------------------------------------------------
+
+/// Convert a legacy [`SignedActionHashed`] (using the variant-per-type `Action`
+/// enum) to the new [`holochain_zome_types::dht_v2::SignedActionHashed`] (which
+/// uses a flat `ActionHeader` + `ActionData` envelope).
+///
+/// All legacy action variants are covered. The hash is carried over from the
+/// original (the v2 hash is content-derived, so re-hashing would change it;
+/// the pre-hashed constructor preserves the existing hash as the canonical
+/// identity during the dual-write transition).
+fn legacy_to_dht_v2_signed_action(
+    shh: &SignedActionHashed,
+) -> holochain_zome_types::dht_v2::SignedActionHashed {
+    use holochain_zome_types::dht_v2::{
+        Action as V2Action, ActionData, ActionHeader, AgentValidationPkgData, CloseChainData,
+        CreateData, CreateLinkData, DeleteData, DeleteLinkData, DnaData, InitZomesCompleteData,
+        OpenChainData, UpdateData,
+    };
+
+    // `Action` (legacy) and `SignedHashed` are in scope via the prelude.
+    let legacy_action = shh.action();
+    let header = ActionHeader {
+        author: legacy_action.author().clone(),
+        timestamp: legacy_action.timestamp(),
+        action_seq: legacy_action.action_seq(),
+        prev_action: legacy_action.prev_action().cloned(),
+    };
+
+    let data = match legacy_action {
+        Action::Dna(d) => ActionData::Dna(DnaData {
+            dna_hash: d.hash.clone(),
+        }),
+        Action::AgentValidationPkg(d) => ActionData::AgentValidationPkg(AgentValidationPkgData {
+            membrane_proof: d.membrane_proof.clone(),
+        }),
+        Action::InitZomesComplete(_) => ActionData::InitZomesComplete(InitZomesCompleteData {}),
+        Action::Create(d) => ActionData::Create(CreateData {
+            entry_type: d.entry_type.clone(),
+            entry_hash: d.entry_hash.clone(),
+        }),
+        Action::Update(d) => ActionData::Update(UpdateData {
+            original_action_address: d.original_action_address.clone(),
+            original_entry_address: d.original_entry_address.clone(),
+            entry_type: d.entry_type.clone(),
+            entry_hash: d.entry_hash.clone(),
+        }),
+        Action::Delete(d) => ActionData::Delete(DeleteData {
+            deletes_address: d.deletes_address.clone(),
+            deletes_entry_address: d.deletes_entry_address.clone(),
+        }),
+        Action::CreateLink(d) => ActionData::CreateLink(CreateLinkData {
+            base_address: d.base_address.clone(),
+            target_address: d.target_address.clone(),
+            zome_index: d.zome_index,
+            link_type: d.link_type,
+            tag: d.tag.clone(),
+        }),
+        Action::DeleteLink(d) => ActionData::DeleteLink(DeleteLinkData {
+            base_address: d.base_address.clone(),
+            link_add_address: d.link_add_address.clone(),
+        }),
+        Action::CloseChain(d) => ActionData::CloseChain(CloseChainData {
+            new_target: d.new_target.clone(),
+        }),
+        Action::OpenChain(d) => ActionData::OpenChain(OpenChainData {
+            prev_target: d.prev_target.clone(),
+            close_hash: d.close_hash.clone(),
+        }),
+    };
+
+    let v2_action = V2Action { header, data };
+    let hashed = holo_hash::HoloHashed::with_pre_hashed(v2_action, shh.as_hash().clone());
+    SignedHashed::with_presigned(hashed, shh.signature().clone())
+}
+
+/// Return the `(cap_access_i64, Option<tag>)` parameters needed for
+/// `TxWrite::insert_cap_grant`, if the given action creates/updates a
+/// `CapGrant` entry. Returns `None` for all other action types.
+///
+/// The entry content is needed to extract the tag; entries are looked up by
+/// the entry hash carried by the action.
+///
+/// `Action`, `EntryType`, `CapAccess`, and `Entry` are all in scope via the
+/// prelude.
+fn cap_grant_index_params(
+    shh: &SignedActionHashed,
+    entries: &[EntryHashed],
+) -> Option<(i64, Option<String>)> {
+    let (entry_type, entry_hash) = match shh.action() {
+        Action::Create(d) => (&d.entry_type, &d.entry_hash),
+        Action::Update(d) => (&d.entry_type, &d.entry_hash),
+        _ => return None,
+    };
+
+    if !matches!(entry_type, EntryType::CapGrant) {
+        return None;
+    }
+
+    // Find the matching entry in the scratch batch.
+    let entry = entries
+        .iter()
+        .find(|e| e.as_hash() == entry_hash)?
+        .as_content();
+
+    let cap_grant = match entry {
+        Entry::CapGrant(g) => g,
+        _ => return None,
+    };
+
+    let cap_access_i64 = match &cap_grant.access {
+        CapAccess::Unrestricted => 0_i64,
+        CapAccess::Transferable { .. } => 1_i64,
+        CapAccess::Assigned { .. } => 2_i64,
+    };
+    // Deliberate empty→NULL normalisation: the new schema stores an absent tag
+    // as NULL rather than an empty string (the legacy DB stores ""). This is a
+    // behavioural difference that becomes visible at read-cutover and must be
+    // accounted for when reads switch to the new DB.
+    let tag = if cap_grant.tag.is_empty() {
+        None
+    } else {
+        Some(cap_grant.tag.clone())
+    };
+
+    Some((cap_access_i64, tag))
+}
+
+/// Serialize `None` as an `Option<Schedule>` blob — the same encoding that
+/// the legacy `schedule_fn` mutation uses when `maybe_schedule` is `None`.
+///
+/// In the legacy code (`mutations.rs::schedule_fn`), `None` is serialized via
+/// `to_blob::<Option<Schedule>>(&None)`, which calls
+/// `holochain_serialized_bytes::encode(&None::<Schedule>)`.
+fn serialize_maybe_schedule_none(
+) -> Result<Vec<u8>, holochain_serialized_bytes::SerializedBytesError> {
+    holochain_serialized_bytes::encode(&None::<holochain_zome_types::schedule::Schedule>)
+}
+
+/// Encode the wire-form `DhtOp` for a `ChainOpLite` and return its serialized
+/// length in bytes. The action is looked up by hash in `actions`; the entry
+/// (if any) is looked up by `Action::entry_hash` in `entries`. Returns `0`
+/// only if the op cannot be reconstructed because the action is missing —
+/// which would indicate a programming error in the caller.
+fn encoded_chain_op_size(
+    op: &holochain_types::dht_op::ChainOpLite,
+    actions: &[SignedActionHashed],
+    entries: &[holochain_types::EntryHashed],
+) -> u32 {
+    use holochain_types::dht_op::{ChainOp, DhtOp};
+
+    let action_hash = op.action_hash();
+    let Some(sah) = actions.iter().find(|sah| sah.as_hash() == action_hash) else {
+        return 0;
+    };
+    let signed_action: SignedAction = (sah.action().clone(), sah.signature().clone()).into();
+    let maybe_entry: Option<Entry> = signed_action
+        .action()
+        .entry_hash()
+        .and_then(|eh| entries.iter().find(|e| e.as_hash() == eh))
+        .map(|e| e.as_content().clone());
+
+    match ChainOp::from_type(op.get_type(), signed_action, maybe_entry) {
+        Ok(chain_op) => holochain_serialized_bytes::encode(&DhtOp::from(chain_op))
+            .map(|b| b.len() as u32)
+            .unwrap_or(0),
+        Err(_) => 0,
+    }
+}
+
 impl From<SourceChain> for SourceChainRead {
     fn from(chain: SourceChain) -> Self {
         SourceChainRead {
             vault: chain.vault.into(),
             dht_db: chain.dht_db.into(),
+            dht_store: chain.dht_store,
             scratch: chain.scratch,
             keystore: chain.keystore,
             author: chain.author,
@@ -1434,13 +1964,26 @@ mod tests {
             agent_key: alice,
             authored: db,
             dht: dht_db,
+            dht_store,
             keystore,
         } = TestCase::new().await;
 
-        let chain_2 =
-            SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone()).await?;
-        let chain_3 =
-            SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone()).await?;
+        let chain_2 = SourceChain::new(
+            db.clone(),
+            dht_db.to_db(),
+            dht_store.clone(),
+            keystore.clone(),
+            alice.clone(),
+        )
+        .await?;
+        let chain_3 = SourceChain::new(
+            db.clone(),
+            dht_db.to_db(),
+            dht_store.clone(),
+            keystore.clone(),
+            alice.clone(),
+        )
+        .await?;
 
         let action_builder = builder::CloseChain { new_target: None };
         chain_1
@@ -1488,13 +2031,26 @@ mod tests {
             agent_key: alice,
             authored: db,
             dht: dht_db,
+            dht_store,
             keystore,
         } = TestCase::new().await;
 
-        let chain_2 =
-            SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone()).await?;
-        let chain_3 =
-            SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone()).await?;
+        let chain_2 = SourceChain::new(
+            db.clone(),
+            dht_db.to_db(),
+            dht_store.clone(),
+            keystore.clone(),
+            alice.clone(),
+        )
+        .await?;
+        let chain_3 = SourceChain::new(
+            db.clone(),
+            dht_db.to_db(),
+            dht_store.clone(),
+            keystore.clone(),
+            alice.clone(),
+        )
+        .await?;
 
         let entry_1 = Entry::App(fixt!(AppEntryBytes));
         let eh1 = EntryHash::with_data_sync(&entry_1);
@@ -1602,6 +2158,7 @@ mod tests {
             agent_key: alice,
             authored: db,
             dht: dht_db,
+            dht_store,
             keystore,
         } = TestCase::new().await;
 
@@ -1697,9 +2254,14 @@ mod tests {
 
         // commit grant update to alice's source chain
         let (updated_action_hash, updated_entry_hash) = {
-            let chain =
-                SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone())
-                    .await?;
+            let chain = SourceChain::new(
+                db.clone(),
+                dht_db.to_db(),
+                dht_store.clone(),
+                keystore.clone(),
+                alice.clone(),
+            )
+            .await?;
             let (entry, entry_hash) =
                 EntryHashed::from_content_sync(Entry::CapGrant(updated_grant.clone())).into_inner();
             let action_builder = builder::Update {
@@ -1768,9 +2330,11 @@ mod tests {
         // returned for any agent on the conductor,in this case for alice trying
         // to access carol's chain
         {
+            let extra_dht_store = crate::test_utils::test_dht_store(fake_dna_hash(1)).await;
             source_chain::genesis(
                 db.clone(),
                 dht_db.to_db(),
+                extra_dht_store,
                 keystore.clone(),
                 fake_dna_hash(1),
                 carol.clone(),
@@ -1778,10 +2342,15 @@ mod tests {
             )
             .await
             .unwrap();
-            let carol_chain =
-                SourceChain::new(db.clone(), dht_db.clone(), keystore.clone(), carol.clone())
-                    .await
-                    .unwrap();
+            let carol_chain = SourceChain::new(
+                db.clone(),
+                dht_db.clone(),
+                dht_store.clone(),
+                keystore.clone(),
+                carol.clone(),
+            )
+            .await
+            .unwrap();
             let maybe_cap_grant = carol_chain
                 .valid_cap_grant(("".into(), "".into()), alice.clone(), secret)
                 .await
@@ -1791,9 +2360,14 @@ mod tests {
 
         // delete updated cap grant
         {
-            let chain =
-                SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone())
-                    .await?;
+            let chain = SourceChain::new(
+                db.clone(),
+                dht_db.to_db(),
+                dht_store.clone(),
+                keystore.clone(),
+                alice.clone(),
+            )
+            .await?;
             let action_builder = builder::Delete {
                 deletes_address: updated_action_hash,
                 deletes_entry_address: updated_entry_hash,
@@ -1840,9 +2414,14 @@ mod tests {
             GrantedFunctions::All,
         );
         let (original_action_address, original_entry_address) = {
-            let chain =
-                SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone())
-                    .await?;
+            let chain = SourceChain::new(
+                db.clone(),
+                dht_db.to_db(),
+                dht_store.clone(),
+                keystore.clone(),
+                alice.clone(),
+            )
+            .await?;
             let (entry, entry_hash) =
                 EntryHashed::from_content_sync(Entry::CapGrant(unrestricted_grant.clone()))
                     .into_inner();
@@ -1881,9 +2460,11 @@ mod tests {
         // bob's chain.
         {
             {
+                let extra_dht_store = crate::test_utils::test_dht_store(fake_dna_hash(1)).await;
                 source_chain::genesis(
                     db.clone(),
                     dht_db.to_db(),
+                    extra_dht_store,
                     keystore.clone(),
                     fake_dna_hash(1),
                     bob.clone(),
@@ -1891,10 +2472,15 @@ mod tests {
                 )
                 .await
                 .unwrap();
-                let bob_chain =
-                    SourceChain::new(db.clone(), dht_db.clone(), keystore.clone(), bob.clone())
-                        .await
-                        .unwrap();
+                let bob_chain = SourceChain::new(
+                    db.clone(),
+                    dht_db.clone(),
+                    dht_store.clone(),
+                    keystore.clone(),
+                    bob.clone(),
+                )
+                .await
+                .unwrap();
                 let maybe_cap_grant = bob_chain
                     .valid_cap_grant(("".into(), "".into()), carol.clone(), None)
                     .await
@@ -1905,9 +2491,14 @@ mod tests {
 
         // delete unrestricted cap grant
         {
-            let chain =
-                SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone())
-                    .await?;
+            let chain = SourceChain::new(
+                db.clone(),
+                dht_db.to_db(),
+                dht_store.clone(),
+                keystore.clone(),
+                alice.clone(),
+            )
+            .await?;
             let action_builder = builder::Delete {
                 deletes_address: original_action_address,
                 deletes_entry_address: original_entry_address,
@@ -1953,9 +2544,14 @@ mod tests {
         );
 
         {
-            let chain =
-                SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone())
-                    .await?;
+            let chain = SourceChain::new(
+                db.clone(),
+                dht_db.to_db(),
+                dht_store.clone(),
+                keystore.clone(),
+                alice.clone(),
+            )
+            .await?;
 
             // commit first grant to alice's chain
             let (entry, entry_hash) =
@@ -2000,6 +2596,8 @@ mod tests {
         let dht_db = test_dht_db();
         let keystore = test_keystore();
         let vault = test_db.to_db();
+        let dna_hash = fixt!(DnaHash);
+        let dht_store = crate::test_utils::test_dht_store(dna_hash.clone()).await;
 
         let author = Arc::new(keystore.new_sign_keypair_random().await.unwrap());
 
@@ -2016,8 +2614,9 @@ mod tests {
         genesis(
             vault.clone(),
             dht_db.to_db(),
+            dht_store.clone(),
             keystore.clone(),
-            fixt!(DnaHash),
+            dna_hash,
             (*author).clone(),
             None,
         )
@@ -2027,6 +2626,7 @@ mod tests {
         let source_chain = SourceChain::new(
             vault.clone(),
             dht_db.to_db(),
+            dht_store.clone(),
             keystore.clone(),
             (*author).clone(),
         )
@@ -2082,6 +2682,7 @@ mod tests {
         let source_chain = SourceChain::new(
             vault.clone(),
             dht_db.to_db(),
+            dht_store.clone(),
             keystore.clone(),
             (*author).clone(),
         )
@@ -2484,6 +3085,7 @@ mod tests {
         agent_key: AgentPubKey,
         authored: TestDb<DbKindAuthored>,
         dht: TestDb<DbKindDht>,
+        dht_store: DhtStore,
         keystore: MetaLairClient,
     }
 
@@ -2493,10 +3095,12 @@ mod tests {
             let dht = test_dht_db();
             let keystore = test_keystore();
             let dna_hash = fixt!(DnaHash);
+            let dht_store = crate::test_utils::test_dht_store(dna_hash.clone()).await;
             let agent_key = keystore.new_sign_keypair_random().await.unwrap();
             genesis(
                 authored.to_db(),
                 dht.to_db(),
+                dht_store.clone(),
                 keystore.clone(),
                 dna_hash,
                 agent_key.clone(),
@@ -2507,6 +3111,7 @@ mod tests {
             let chain = SourceChain::new(
                 authored.to_db(),
                 dht.to_db(),
+                dht_store.clone(),
                 keystore.clone(),
                 agent_key.clone(),
             )
@@ -2517,6 +3122,7 @@ mod tests {
                 agent_key,
                 authored,
                 dht,
+                dht_store,
                 keystore,
             }
         }

@@ -1,29 +1,15 @@
 //! `TxRead<Dht>` / `TxWrite<Dht>` API for the `Link` table.
 
-use super::super::inner::link;
+use super::super::inner::link::{self, InsertLink};
 use crate::handles::{TxRead, TxWrite};
 use crate::kind::Dht;
 use crate::models::dht::LinkRow;
-use holo_hash::{ActionHash, AnyLinkableHash};
+use holo_hash::AnyLinkableHash;
 
 impl TxWrite<Dht> {
-    pub async fn insert_link_index(
-        &mut self,
-        action_hash: &ActionHash,
-        base_hash: &AnyLinkableHash,
-        zome_index: u8,
-        link_type: u8,
-        tag: Option<&[u8]>,
-    ) -> sqlx::Result<()> {
-        link::insert_link_index(
-            self.conn_mut(),
-            action_hash,
-            base_hash,
-            zome_index,
-            link_type,
-            tag,
-        )
-        .await
+    /// Insert a row into the `Link` index table. Returns the number of rows inserted.
+    pub async fn insert_link_index(&mut self, link: InsertLink<'_>) -> sqlx::Result<u64> {
+        link::insert_link_index(self.conn_mut(), link).await
     }
 }
 

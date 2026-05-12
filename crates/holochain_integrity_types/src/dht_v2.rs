@@ -75,10 +75,14 @@ pub enum ActionType {
     CreateLink = 7,
     /// Deletes an existing `CreateLink` action.
     DeleteLink = 8,
+    /// Closes the source chain, optionally pointing at a migration target.
+    CloseChain = 9,
+    /// Opens a new source chain following a migration from a previous chain.
+    OpenChain = 10,
 }
 
 /// Maps [`ActionType`] onto the schema `Action.action_type` INTEGER column
-/// (`1..=8`). `0` is reserved and never written.
+/// (`1..=10`). `0` is reserved and never written.
 impl From<ActionType> for i64 {
     fn from(t: ActionType) -> Self {
         t as i64
@@ -86,7 +90,7 @@ impl From<ActionType> for i64 {
 }
 
 /// Inverse of [`From<ActionType> for i64`]. Returns `Err(v)` for any value
-/// outside `1..=8` (including `0`).
+/// outside `1..=10` (including `0`).
 impl TryFrom<i64> for ActionType {
     type Error = i64;
     fn try_from(v: i64) -> Result<Self, Self::Error> {
@@ -100,6 +104,8 @@ impl TryFrom<i64> for ActionType {
             6 => Ok(Delete),
             7 => Ok(CreateLink),
             8 => Ok(DeleteLink),
+            9 => Ok(CloseChain),
+            10 => Ok(OpenChain),
             other => Err(other),
         }
     }
@@ -229,6 +235,28 @@ pub struct DeleteLinkData {
     pub link_add_address: ActionHash,
 }
 
+/// Per-variant data for [`ActionType::CloseChain`].
+///
+/// The `author`, `timestamp`, `action_seq`, and `prev_action` fields live on
+/// [`ActionHeader`]; only the chain-close-specific fields go here.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
+pub struct CloseChainData {
+    /// Optional migration target the chain closes towards.
+    pub new_target: Option<crate::action::MigrationTarget>,
+}
+
+/// Per-variant data for [`ActionType::OpenChain`].
+///
+/// The `author`, `timestamp`, `action_seq`, and `prev_action` fields live on
+/// [`ActionHeader`]; only the chain-open-specific fields go here.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
+pub struct OpenChainData {
+    /// The previous DNA hash or agent key this chain migrated from.
+    pub prev_target: crate::action::MigrationTarget,
+    /// Hash of the matching `CloseChain` action on the old chain.
+    pub close_hash: ActionHash,
+}
+
 /// Per-variant action data, stored serialized in the `Action.action_data`
 /// BLOB column.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
@@ -250,6 +278,10 @@ pub enum ActionData {
     CreateLink(CreateLinkData),
     /// Deletes a previously created link.
     DeleteLink(DeleteLinkData),
+    /// Closes the source chain.
+    CloseChain(CloseChainData),
+    /// Opens a new chain following a migration.
+    OpenChain(OpenChainData),
 }
 
 impl ActionData {
@@ -264,6 +296,8 @@ impl ActionData {
             ActionData::Delete(_) => ActionType::Delete,
             ActionData::CreateLink(_) => ActionType::CreateLink,
             ActionData::DeleteLink(_) => ActionType::DeleteLink,
+            ActionData::CloseChain(_) => ActionType::CloseChain,
+            ActionData::OpenChain(_) => ActionType::OpenChain,
         }
     }
 
@@ -331,12 +365,14 @@ mod tests {
             Delete,
             CreateLink,
             DeleteLink,
+            CloseChain,
+            OpenChain,
         ] {
             let n: i64 = v.into();
             assert_eq!(ActionType::try_from(n).unwrap(), v);
         }
         assert!(ActionType::try_from(0).is_err());
-        assert!(ActionType::try_from(9).is_err());
+        assert!(ActionType::try_from(11).is_err());
     }
 
     #[test]

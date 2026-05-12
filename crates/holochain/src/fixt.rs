@@ -219,10 +219,12 @@ fixturator!(
         let cache = holochain_state::test_utils::test_cache_db();
         let keystore = holochain_keystore::test_keystore();
         tokio_helper::block_forever_on(async {
-            fake_genesis(authored_db.to_db(), dht_db.to_db(), keystore.clone()).await.unwrap();
+            fake_genesis(authored_db.to_db(), dht_db.to_db(), fake_dna_hash(get_fixt_index!() as u8), keystore.clone()).await.unwrap();
+            let dht_store = holochain_state::test_utils::test_dht_store(fake_dna_hash(get_fixt_index!() as u8)).await;
             HostFnWorkspace::new(
                 authored_db.to_db(),
                 dht_db.to_db(),
+                dht_store,
                 cache.to_db(),
                 keystore,
                 Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
@@ -235,10 +237,12 @@ fixturator!(
         let cache = holochain_state::test_utils::test_cache_db();
         let keystore = holochain_keystore::test_keystore();
         tokio_helper::block_forever_on(async {
-            fake_genesis(authored_db.to_db(), dht_db.to_db(), keystore.clone()).await.unwrap();
+            fake_genesis(authored_db.to_db(), dht_db.to_db(), fake_dna_hash(get_fixt_index!() as u8), keystore.clone()).await.unwrap();
+            let dht_store = holochain_state::test_utils::test_dht_store(fake_dna_hash(get_fixt_index!() as u8)).await;
             HostFnWorkspace::new(
                 authored_db.to_db(),
                 dht_db.to_db(),
+                dht_store,
                 cache.to_db(),
                 keystore,
                 Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
@@ -252,10 +256,12 @@ fixturator!(
         let agent = fixt!(AgentPubKey, Predictable, get_fixt_index!());
         let keystore = holochain_keystore::test_keystore();
         tokio_helper::block_forever_on(async {
-            crate::test_utils::fake_genesis_for_agent(authored_db.to_db(), dht_db.to_db(), agent.clone(), keystore.clone()).await.unwrap();
+            crate::test_utils::fake_genesis_for_agent(authored_db.to_db(), dht_db.to_db(), fake_dna_hash(get_fixt_index!() as u8), agent.clone(), keystore.clone()).await.unwrap();
+            let dht_store = holochain_state::test_utils::test_dht_store(fake_dna_hash(get_fixt_index!() as u8)).await;
             HostFnWorkspace::new(
                 authored_db.to_db(),
                 dht_db.to_db(),
+                dht_store,
                 cache.to_db(),
                 keystore,
                 Some(agent),
@@ -272,10 +278,12 @@ fixturator!(
         let cache = holochain_state::test_utils::test_cache_db();
         let keystore = holochain_keystore::test_keystore();
         tokio_helper::block_forever_on(async {
-            fake_genesis(authored_db.to_db(), dht_db.to_db(), keystore.clone()).await.unwrap();
+            fake_genesis(authored_db.to_db(), dht_db.to_db(), fake_dna_hash(get_fixt_index!() as u8), keystore.clone()).await.unwrap();
+            let dht_store = holochain_state::test_utils::test_dht_store(fake_dna_hash(get_fixt_index!() as u8)).await;
             HostFnWorkspaceRead::new(
                 authored_db.to_db().into(),
                 dht_db.to_db().into(),
+                dht_store,
                 cache.to_db(),
                 keystore,
                 Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
@@ -288,10 +296,12 @@ fixturator!(
         let cache = holochain_state::test_utils::test_cache_db();
         let keystore = holochain_keystore::test_keystore();
         tokio_helper::block_forever_on(async {
-            fake_genesis(authored_db.to_db(), dht_db.to_db(), keystore.clone()).await.unwrap();
+            fake_genesis(authored_db.to_db(), dht_db.to_db(), fake_dna_hash(get_fixt_index!() as u8), keystore.clone()).await.unwrap();
+            let dht_store = holochain_state::test_utils::test_dht_store(fake_dna_hash(get_fixt_index!() as u8)).await;
             HostFnWorkspaceRead::new(
                 authored_db.to_db().into(),
                 dht_db.to_db().into(),
+                dht_store,
                 cache.to_db(),
                 keystore,
                 Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
@@ -305,10 +315,12 @@ fixturator!(
         let agent = fixt!(AgentPubKey, Predictable, get_fixt_index!());
         let keystore = holochain_keystore::test_keystore();
         tokio_helper::block_forever_on(async {
-            crate::test_utils::fake_genesis_for_agent(authored_db.to_db(), dht_db.to_db(), agent.clone(), keystore.clone()).await.unwrap();
+            crate::test_utils::fake_genesis_for_agent(authored_db.to_db(), dht_db.to_db(), fake_dna_hash(get_fixt_index!() as u8), agent.clone(), keystore.clone()).await.unwrap();
+            let dht_store = holochain_state::test_utils::test_dht_store(fake_dna_hash(get_fixt_index!() as u8)).await;
             HostFnWorkspaceRead::new(
                 authored_db.to_db().into(),
                 dht_db.to_db().into(),
+                dht_store,
                 cache.to_db(),
                 keystore,
                 Some(agent),

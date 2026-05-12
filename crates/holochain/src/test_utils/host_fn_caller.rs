@@ -20,6 +20,7 @@ use holo_hash::AnyDhtHash;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::GetLinksRequestOptions;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
+use holochain_state::dht_store::DhtStore;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasmPair;
@@ -85,6 +86,7 @@ pub enum MaybeLinkable {
 pub struct HostFnCaller {
     pub authored_db: DbWrite<DbKindAuthored>,
     pub dht_db: DbWrite<DbKindDht>,
+    pub dht_store: DhtStore,
     pub cache: DbWrite<DbKindCache>,
     pub ribosome: RealRibosome,
     pub zome_path: ZomePath,
@@ -116,6 +118,7 @@ impl HostFnCaller {
             .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())
             .unwrap();
         let dht_db = handle.get_dht_db(cell_id.dna_hash()).unwrap();
+        let dht_store = handle.get_dht_store(cell_id.dna_hash()).unwrap();
         let cache = handle.get_cache_db(cell_id).await.unwrap();
         let keystore = handle.keystore().clone();
         let network = holochain_p2p::HolochainP2pDna::new(
@@ -141,6 +144,7 @@ impl HostFnCaller {
         HostFnCaller {
             authored_db,
             dht_db,
+            dht_store,
             cache,
             ribosome,
             zome_path,
@@ -164,6 +168,7 @@ impl HostFnCaller {
         let HostFnCaller {
             authored_db,
             dht_db,
+            dht_store,
             cache,
             network,
             keystore,
@@ -178,6 +183,7 @@ impl HostFnCaller {
         let workspace = SourceChainWorkspace::new(
             authored_db,
             dht_db,
+            dht_store,
             cache,
             keystore.clone(),
             cell_id.agent_pubkey().clone(),

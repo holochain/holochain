@@ -18,8 +18,13 @@ mod inner;
 mod tx_operations;
 
 pub use inner::chain_op::InsertChainOp;
+pub use inner::deleted_link::InsertDeletedLink;
+pub use inner::deleted_record::InsertDeletedRecord;
 pub use inner::limbo_chain_op::InsertLimboChainOp;
 pub use inner::limbo_warrant::InsertLimboWarrant;
+pub use inner::link::InsertLink;
+pub use inner::scheduled_function::InsertScheduledFunction;
+pub use inner::updated_record::InsertUpdatedRecord;
 pub use inner::warrant::InsertWarrant;
 
 #[cfg(test)]
@@ -898,7 +903,14 @@ mod tests {
         let base = sample_base(5);
 
         let mut tx = db.begin().await.unwrap();
-        tx.insert_link_index(&action_hash, &base, 3, 7, Some(b"tag-bytes"))
+        let _ = tx
+            .insert_link_index(InsertLink {
+                action_hash: &action_hash,
+                base_hash: &base,
+                zome_index: 3,
+                link_type: 7,
+                tag: Some(b"tag-bytes"),
+            })
             .await
             .unwrap();
         tx.commit().await.unwrap();
@@ -926,7 +938,11 @@ mod tests {
         let create_link = ActionHash::from_raw_36(vec![0x55; 36]);
 
         let mut tx = db.begin().await.unwrap();
-        tx.insert_deleted_link_index(&delete_action, &create_link)
+        let _ = tx
+            .insert_deleted_link_index(InsertDeletedLink {
+                action_hash: &delete_action,
+                create_link_hash: &create_link,
+            })
             .await
             .unwrap();
         tx.commit().await.unwrap();
@@ -943,7 +959,12 @@ mod tests {
         let original_entry = EntryHash::from_raw_36(vec![0x77; 36]);
 
         let mut tx = db.begin().await.unwrap();
-        tx.insert_updated_record_index(&update_action, &original, &original_entry)
+        let _ = tx
+            .insert_updated_record_index(InsertUpdatedRecord {
+                action_hash: &update_action,
+                original_action_hash: &original,
+                original_entry_hash: &original_entry,
+            })
             .await
             .unwrap();
         tx.commit().await.unwrap();
@@ -968,7 +989,12 @@ mod tests {
         let deletes_entry = EntryHash::from_raw_36(vec![0x99; 36]);
 
         let mut tx = db.begin().await.unwrap();
-        tx.insert_deleted_record_index(&delete_action, &deletes_action, &deletes_entry)
+        let _ = tx
+            .insert_deleted_record_index(InsertDeletedRecord {
+                action_hash: &delete_action,
+                deletes_action_hash: &deletes_action,
+                deletes_entry_hash: &deletes_entry,
+            })
             .await
             .unwrap();
         tx.commit().await.unwrap();
@@ -1080,5 +1106,47 @@ mod tests {
             );
             assert_eq!(fetched.signature().0, [seed; 64]);
         }
+    }
+
+    #[tokio::test]
+    async fn set_chain_op_receipts_complete_round_trip() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+
+        let action = sample_action(7);
+        db.insert_action(&action, Some(RecordValidity::Accepted))
+            .await
+            .unwrap();
+
+        let op_hash = DhtOpHash::from_raw_36(vec![9u8; 36]);
+        let basis_hash =
+            AnyDhtHash::from_raw_36_and_type(vec![9u8; 36], holo_hash::hash_type::AnyDht::Action);
+
+        db.insert_chain_op(InsertChainOp {
+            op_hash: &op_hash,
+            action_hash: action.as_hash(),
+            op_type: 1,
+            basis_hash: &basis_hash,
+            storage_center_loc: 0,
+            validation_status: RecordValidity::Accepted,
+            locally_validated: true,
+            when_received: Timestamp::from_micros(1),
+            when_integrated: Timestamp::from_micros(1),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+
+        db.insert_chain_op_publish(&op_hash, None, None)
+            .await
+            .unwrap();
+        let _ = db.set_chain_op_receipts_complete(&op_hash).await.unwrap();
+
+        let row = db
+            .as_ref()
+            .get_chain_op_publish(op_hash)
+            .await
+            .unwrap()
+            .expect("row");
+        assert_eq!(row.receipts_complete, Some(1));
     }
 }
