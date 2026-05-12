@@ -21,7 +21,7 @@ impl TxRead<Dht> {
 
 impl TxWrite<Dht> {
     /// Upsert a scheduled-function row. Returns the number of rows written.
-    pub async fn insert_scheduled_function(
+    pub async fn upsert_scheduled_function(
         &mut self,
         f: InsertScheduledFunction<'_>,
     ) -> sqlx::Result<u64> {

@@ -650,7 +650,7 @@ impl SourceChain {
                         let maybe_schedule_blob =
                             serialize_maybe_schedule_none().map_err(SourceChainError::other)?;
                         let _ = tx
-                            .insert_scheduled_function(
+                            .upsert_scheduled_function(
                                 holochain_data::dht::InsertScheduledFunction {
                                     author: author.as_ref(),
                                     zome_name: scheduled_fn.zome_name().0.as_ref(),
