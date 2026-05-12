@@ -337,29 +337,31 @@ async fn app_validation_workflow_inner(
 
                         warrant_op_hashes
                             .push((warrant_op.to_hash(), warrant_op.dht_basis().clone()));
-                        // Clone for mirroring into DhtStore (new schema).
-                        warrant_ops_vec.push(warrant_op.clone());
 
+                        let warrant_op_for_authored = warrant_op.clone();
                         if let Err(err) = workspace
                             .authored_db
                             .write_async(move |txn| {
                                 warn!("Inserting warrant op");
-                                insert_op_authored(txn, &warrant_op)
+                                insert_op_authored(txn, &warrant_op_for_authored)
                             })
                             .await
                         {
                             tracing::warn!("Error writing warrant op: {err}");
+                        } else {
+                            // Mirror into DhtStore only when the legacy write succeeded.
+                            warrant_ops_vec.push(warrant_op);
                         }
                     }
                 }
 
-                // Capture the outcome for mirroring into DhtStore before moving into the closure.
+                // Capture the outcome for mirroring into DhtStore; push only on legacy success.
                 let app_outcome = match &outcome {
                     Outcome::Accepted => AppOutcome::Accepted,
                     Outcome::AwaitingDeps(_) => AppOutcome::AwaitingDeps,
                     Outcome::Rejected(_) => AppOutcome::Rejected,
                 };
-                app_validation_outcomes.push((dht_op_hash.clone(), app_outcome));
+                let outcome_dht_op_hash = dht_op_hash.clone();
 
                 let write_result = workspace
                     .dht_db
@@ -385,6 +387,9 @@ async fn app_validation_workflow_inner(
                     .await;
                 if let Err(err) = write_result {
                     tracing::error!(?chain_op, ?err, "Error updating dht op in database.");
+                } else {
+                    // Mirror into DhtStore only when the legacy write succeeded.
+                    app_validation_outcomes.push((outcome_dht_op_hash, app_outcome));
                 }
             }
             Err(err) => {
