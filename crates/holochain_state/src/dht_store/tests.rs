@@ -347,6 +347,11 @@ async fn record_app_validation_outcome_accepted() {
     let store = DhtStore::new_test(dht_id()).await.unwrap();
     let op = build_test_store_record_op_hashed(11);
     store.record_incoming_ops(vec![op.clone()]).await.unwrap();
+    // sys_validation_status must be set before app (ordering constraint).
+    store
+        .record_chain_op_sys_validation_outcome(vec![(op.as_hash().clone(), SysOutcome::Accepted)])
+        .await
+        .unwrap();
     // Pre-state: app_validation_status should be NULL.
     let row = store
         .db()
@@ -377,6 +382,11 @@ async fn record_app_validation_outcome_rejected() {
     let store = DhtStore::new_test(dht_id()).await.unwrap();
     let op = build_test_store_record_op_hashed(12);
     store.record_incoming_ops(vec![op.clone()]).await.unwrap();
+    // sys_validation_status must be set before app (ordering constraint).
+    store
+        .record_chain_op_sys_validation_outcome(vec![(op.as_hash().clone(), SysOutcome::Accepted)])
+        .await
+        .unwrap();
 
     store
         .record_app_validation_outcome(vec![(op.as_hash().clone(), AppOutcome::Rejected)])
