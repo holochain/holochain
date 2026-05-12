@@ -671,6 +671,7 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
 
                 let receipt_op_hash = receipt.receipt.dht_op_hash.clone();
                 let receipt_op_hash_for_new_db = receipt_op_hash.clone();
+                let receipt_for_new_db = receipt.clone();
 
                 let receipt_count = self
                     .space
@@ -708,6 +709,13 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
                         }
                     })
                     .await?;
+
+                // Mirror: record the validation receipt in the new DHT DB.
+                self.space
+                    .dht_store
+                    .record_validation_receipt(&receipt_for_new_db)
+                    .await
+                    .map_err(|e| CellError::from(HolochainP2pError::other(e)))?;
 
                 // If we have enough receipts then set receipts to complete.
                 if receipt_count >= required_validation_count as usize {
