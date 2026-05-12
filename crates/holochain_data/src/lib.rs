@@ -7,7 +7,7 @@ use sqlx::{
     Pool, Sqlite,
 };
 use std::path::Path;
-#[cfg(any(test, feature = "test-utils"))]
+#[cfg(feature = "test-utils")]
 use std::str::FromStr;
 
 mod key;
@@ -170,7 +170,7 @@ pub async fn open_db<I: DatabaseIdentifier>(
     Ok(DbWrite::new(pool, database_id))
 }
 
-#[cfg(any(test, feature = "test-utils"))]
+#[cfg(feature = "test-utils")]
 pub async fn test_open_db<I: DatabaseIdentifier>(database_id: I) -> sqlx::Result<DbWrite<I>> {
     let pool = connect_database_memory(HolochainDataConfig::default()).await?;
 
@@ -196,7 +196,7 @@ async fn connect_database(
 }
 
 /// Connect to an in-memory SQLite database for testing.
-#[cfg(any(test, feature = "test-utils"))]
+#[cfg(feature = "test-utils")]
 async fn connect_database_memory(config: HolochainDataConfig) -> sqlx::Result<Pool<Sqlite>> {
     let opts = SqliteConnectOptions::from_str(":memory:")?;
     let max_readers = config.max_readers;
