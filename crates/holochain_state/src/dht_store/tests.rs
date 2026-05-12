@@ -490,7 +490,10 @@ async fn integrate_ready_ops_promotes_warrant() {
         .unwrap();
     // Mark sys=1 (warrants have no app validation).
     store
-        .record_warrant_sys_validation_outcome(vec![(warrant.as_hash().clone(), SysOutcome::Accepted)])
+        .record_warrant_sys_validation_outcome(vec![(
+            warrant.as_hash().clone(),
+            SysOutcome::Accepted,
+        )])
         .await
         .unwrap();
 
@@ -519,9 +522,7 @@ async fn integrate_ready_ops_promotes_warrant() {
 #[tokio::test]
 async fn record_validation_receipt_inserts_and_counts() {
     use holochain_types::prelude::Signature;
-    use holochain_types::prelude::{
-        SignedValidationReceipt, ValidationReceipt, ValidationStatus,
-    };
+    use holochain_types::prelude::{SignedValidationReceipt, ValidationReceipt, ValidationStatus};
 
     let store = DhtStore::new_test(dht_id()).await.unwrap();
 
@@ -818,5 +819,4 @@ async fn record_locally_validated_warrants_inserts_warrant() {
     // warrantee is seed.wrapping_add(50) = 80 for seed=30.
     let expected_warrantee = AgentPubKey::from_raw_36(vec![80u8; 36]);
     assert_eq!(row.warrantee, expected_warrantee.get_raw_36().to_vec());
-}
 }

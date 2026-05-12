@@ -168,10 +168,7 @@ where
 /// Force both `sys_validation_status` and `app_validation_status` to `Rejected`
 /// (`2`), bypassing the normal ordering constraints.  Used by `reject_chain_op`
 /// which must be able to reject an op regardless of its current state.
-pub(crate) async fn force_reject<'e, E>(
-    executor: E,
-    op_hash: &DhtOpHash,
-) -> sqlx::Result<u64>
+pub(crate) async fn force_reject<'e, E>(executor: E, op_hash: &DhtOpHash) -> sqlx::Result<u64>
 where
     E: Executor<'e, Database = Sqlite>,
 {

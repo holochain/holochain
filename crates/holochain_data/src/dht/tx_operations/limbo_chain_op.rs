@@ -37,10 +37,7 @@ impl TxWrite<Dht> {
 
     /// Force both sys and app validation status to `Rejected`, bypassing the
     /// normal ordering constraints.  Returns the number of rows updated.
-    pub async fn force_reject_limbo_chain_op(
-        &mut self,
-        op_hash: &DhtOpHash,
-    ) -> sqlx::Result<u64> {
+    pub async fn force_reject_limbo_chain_op(&mut self, op_hash: &DhtOpHash) -> sqlx::Result<u64> {
         limbo_chain_op::force_reject(self.conn_mut(), op_hash).await
     }
 

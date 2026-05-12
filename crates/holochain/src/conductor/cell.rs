@@ -429,7 +429,10 @@ impl Cell {
                                     .unschedule_function(&author_for_new_db, &scheduled_fn)
                                     .await
                                 {
-                                    error!("error unscheduling function {:?}: {:?}", scheduled_fn, e);
+                                    error!(
+                                        "error unscheduling function {:?}: {:?}",
+                                        scheduled_fn, e
+                                    );
                                 }
                             }
                             // Persisted fn with a new schedule: upsert.
@@ -719,7 +722,8 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
                 // Mirror: record the validation receipt in the new DHT DB.
                 // Capture any mirror error here — we must not let it skip the
                 // legacy completion path below.
-                let receipt_mirror_result = self.space
+                let receipt_mirror_result = self
+                    .space
                     .dht_store
                     .record_validation_receipt(&receipt_for_new_db)
                     .await
