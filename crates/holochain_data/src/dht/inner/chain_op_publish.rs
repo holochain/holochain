@@ -69,12 +69,11 @@ pub(crate) async fn set_last_publish_time<'e, E>(
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    let result =
-        sqlx::query("UPDATE ChainOpPublish SET last_publish_time = ? WHERE op_hash = ?")
-            .bind(when.as_micros())
-            .bind(op_hash.get_raw_36())
-            .execute(executor)
-            .await?;
+    let result = sqlx::query("UPDATE ChainOpPublish SET last_publish_time = ? WHERE op_hash = ?")
+        .bind(when.as_micros())
+        .bind(op_hash.get_raw_36())
+        .execute(executor)
+        .await?;
     Ok(result.rows_affected())
 }
 
@@ -86,10 +85,9 @@ pub(crate) async fn clear_withhold_publish<'e, E>(
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    let result =
-        sqlx::query("UPDATE ChainOpPublish SET withhold_publish = NULL WHERE op_hash = ?")
-            .bind(op_hash.get_raw_36())
-            .execute(executor)
-            .await?;
+    let result = sqlx::query("UPDATE ChainOpPublish SET withhold_publish = NULL WHERE op_hash = ?")
+        .bind(op_hash.get_raw_36())
+        .execute(executor)
+        .await?;
     Ok(result.rows_affected())
 }

@@ -137,13 +137,11 @@ pub(crate) async fn set_sys_validation_status<'e, E>(
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    let result = sqlx::query(
-        "UPDATE LimboChainOp SET sys_validation_status = ? WHERE hash = ?",
-    )
-    .bind(status)
-    .bind(op_hash.get_raw_36())
-    .execute(executor)
-    .await?;
+    let result = sqlx::query("UPDATE LimboChainOp SET sys_validation_status = ? WHERE hash = ?")
+        .bind(status)
+        .bind(op_hash.get_raw_36())
+        .execute(executor)
+        .await?;
     Ok(result.rows_affected())
 }
 
@@ -155,13 +153,11 @@ pub(crate) async fn set_app_validation_status<'e, E>(
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    let result = sqlx::query(
-        "UPDATE LimboChainOp SET app_validation_status = ? WHERE hash = ?",
-    )
-    .bind(status)
-    .bind(op_hash.get_raw_36())
-    .execute(executor)
-    .await?;
+    let result = sqlx::query("UPDATE LimboChainOp SET app_validation_status = ? WHERE hash = ?")
+        .bind(status)
+        .bind(op_hash.get_raw_36())
+        .execute(executor)
+        .await?;
     Ok(result.rows_affected())
 }
 
@@ -173,13 +169,11 @@ pub(crate) async fn set_abandoned_at<'e, E>(
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    let result = sqlx::query(
-        "UPDATE LimboChainOp SET abandoned_at = ? WHERE hash = ?",
-    )
-    .bind(when.as_micros())
-    .bind(op_hash.get_raw_36())
-    .execute(executor)
-    .await?;
+    let result = sqlx::query("UPDATE LimboChainOp SET abandoned_at = ? WHERE hash = ?")
+        .bind(when.as_micros())
+        .bind(op_hash.get_raw_36())
+        .execute(executor)
+        .await?;
     Ok(result.rows_affected())
 }
 
@@ -191,13 +185,11 @@ pub(crate) async fn set_require_receipt<'e, E>(
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    let result = sqlx::query(
-        "UPDATE LimboChainOp SET require_receipt = ? WHERE hash = ?",
-    )
-    .bind(require_receipt as i64)
-    .bind(op_hash.get_raw_36())
-    .execute(executor)
-    .await?;
+    let result = sqlx::query("UPDATE LimboChainOp SET require_receipt = ? WHERE hash = ?")
+        .bind(require_receipt as i64)
+        .bind(op_hash.get_raw_36())
+        .execute(executor)
+        .await?;
     Ok(result.rows_affected())
 }
 

@@ -1272,12 +1272,7 @@ mod tests {
             .unwrap();
         assert_eq!(updated, 1);
 
-        let row = db
-            .as_ref()
-            .get_limbo_warrant(hash)
-            .await
-            .unwrap()
-            .unwrap();
+        let row = db.as_ref().get_limbo_warrant(hash).await.unwrap().unwrap();
         assert_eq!(row.sys_validation_status, Some(1));
     }
 
@@ -1305,12 +1300,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(updated, 1);
-        let row = db
-            .as_ref()
-            .get_limbo_warrant(hash)
-            .await
-            .unwrap()
-            .unwrap();
+        let row = db.as_ref().get_limbo_warrant(hash).await.unwrap().unwrap();
         assert_eq!(row.abandoned_at, Some(500));
     }
 
@@ -1483,12 +1473,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(updated, 1);
-        let row = db
-            .as_ref()
-            .get_chain_op(op_hash)
-            .await
-            .unwrap()
-            .unwrap();
+        let row = db.as_ref().get_chain_op(op_hash).await.unwrap().unwrap();
         assert_eq!(row.validation_status, i64::from(RecordValidity::Rejected));
     }
 

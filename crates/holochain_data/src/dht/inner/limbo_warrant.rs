@@ -113,13 +113,11 @@ pub(crate) async fn set_sys_validation_status<'e, E>(
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    let result = sqlx::query(
-        "UPDATE LimboWarrant SET sys_validation_status = ? WHERE hash = ?",
-    )
-    .bind(status)
-    .bind(hash.get_raw_36())
-    .execute(executor)
-    .await?;
+    let result = sqlx::query("UPDATE LimboWarrant SET sys_validation_status = ? WHERE hash = ?")
+        .bind(status)
+        .bind(hash.get_raw_36())
+        .execute(executor)
+        .await?;
     Ok(result.rows_affected())
 }
 
@@ -131,13 +129,11 @@ pub(crate) async fn set_abandoned_at<'e, E>(
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    let result = sqlx::query(
-        "UPDATE LimboWarrant SET abandoned_at = ? WHERE hash = ?",
-    )
-    .bind(when.as_micros())
-    .bind(hash.get_raw_36())
-    .execute(executor)
-    .await?;
+    let result = sqlx::query("UPDATE LimboWarrant SET abandoned_at = ? WHERE hash = ?")
+        .bind(when.as_micros())
+        .bind(hash.get_raw_36())
+        .execute(executor)
+        .await?;
     Ok(result.rows_affected())
 }
 
