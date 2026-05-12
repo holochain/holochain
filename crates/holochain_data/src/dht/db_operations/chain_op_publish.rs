@@ -40,10 +40,7 @@ impl DbWrite<Dht> {
     }
 
     /// Clear `withhold_publish` (set to NULL) for the given op. Returns the number of rows updated.
-    pub async fn clear_chain_op_withhold_publish(
-        &self,
-        op_hash: &DhtOpHash,
-    ) -> sqlx::Result<u64> {
+    pub async fn clear_chain_op_withhold_publish(&self, op_hash: &DhtOpHash) -> sqlx::Result<u64> {
         chain_op_publish::clear_withhold_publish(self.pool(), op_hash).await
     }
 }

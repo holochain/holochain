@@ -193,9 +193,7 @@ pub async fn incoming_dht_ops_workflow(
                         // a spawned task that has no caller to return a WorkflowResult to.
                         let ops_to_mirror = pending_ops.lock().drain(..).collect::<Vec<_>>();
                         if !ops_to_mirror.is_empty() {
-                            if let Err(err) =
-                                dht_store.record_incoming_ops(ops_to_mirror).await
-                            {
+                            if let Err(err) = dht_store.record_incoming_ops(ops_to_mirror).await {
                                 tracing::error!(
                                     ?err,
                                     "incoming_dht_ops_workflow new-DB mirror error"
