@@ -969,8 +969,7 @@ mod tests {
         let author = AgentPubKey::from_raw_36(vec![seed; 36]);
         let entry_hash = EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]);
         let entry = Entry::App(AppEntryBytes(
-            holochain_serialized_bytes::SerializedBytes::try_from(UnsafeBytes::from(vec![seed; 8]))
-                .unwrap(),
+            holochain_serialized_bytes::SerializedBytes::from(UnsafeBytes::from(vec![seed; 8])),
         ));
         let sig = Signature::from([seed; 64]);
         let action = Action::Create(Create {
