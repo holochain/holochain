@@ -3,10 +3,12 @@ use crate::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
 use ::fixt::*;
 use holo_hash::fixt::ActionHashFixturator;
 use holo_hash::fixt::AgentPubKeyFixturator;
+use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::fixt::EntryHashFixturator;
 use holochain_conductor_api::conductor::ConductorTuningParams;
 use holochain_state::mutations;
 use holochain_state::prelude::StateMutationResult;
+use holochain_state::test_utils::test_dht_store;
 
 #[tokio::test]
 async fn test_trigger_receiver_waits_for_sender() {
@@ -230,6 +232,12 @@ async fn publish_loop() {
         .tempdir()
         .unwrap();
     let db = DbWrite::test(tmpdir.path(), kind).expect("Couldn't create test database");
+    // The sqlx pool used by DhtStore has an acquire_timeout driven by tokio time.
+    // Resume real time while creating the pool so that the `spawn_blocking`
+    // connection setup can complete before the acquire_timeout fires.
+    tokio::time::resume();
+    let dht_store = test_dht_store(fixt!(DnaHash)).await;
+    tokio::time::pause();
     let action = Action::Create(Create {
         author: fixt!(AgentPubKey),
         timestamp: Timestamp::now(),
@@ -270,6 +278,28 @@ async fn publish_loop() {
     let (ts, mut trigger_recv) =
         TriggerSender::new_with_loop(Duration::from_secs(60)..Duration::from_secs(60 * 5), true);
 
+    // Helper: the DhtStore's sqlx pool uses tokio-time for acquire_timeout.
+    // With start_paused = true the auto-advance fires that timer before the
+    // spawn_blocking connection setup finishes.  Resume real time for the
+    // duration of each workflow call so pool operations complete normally.
+    macro_rules! run_workflow {
+        () => {{
+            tokio::time::resume();
+            let result = publish_dht_ops_workflow(
+                db.clone(),
+                dht_store.clone(),
+                dna_network.clone(),
+                ts.clone(),
+                author.clone(),
+                ConductorTuningParams::default().min_publish_interval(),
+            )
+            .await
+            .unwrap();
+            tokio::time::pause();
+            result
+        }};
+    }
+
     let timer = tokio::time::Instant::now();
     trigger_recv.listen().await.unwrap();
     // - Publish runs after a 1m.
@@ -277,15 +307,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60) && timer.elapsed() < Duration::from_secs(61)
     );
 
-    publish_dht_ops_workflow(
-        db.clone(),
-        dna_network.clone(),
-        ts.clone(),
-        author.clone(),
-        ConductorTuningParams::default().min_publish_interval(),
-    )
-    .await
-    .unwrap();
+    run_workflow!();
 
     // - Op was published.
     op_published.recv().await.unwrap();
@@ -297,15 +319,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60 * 2)
             && timer.elapsed() < Duration::from_secs(60 * 2 + 1)
     );
-    publish_dht_ops_workflow(
-        db.clone(),
-        dna_network.clone(),
-        ts.clone(),
-        author.clone(),
-        ConductorTuningParams::default().min_publish_interval(),
-    )
-    .await
-    .unwrap();
+    run_workflow!();
 
     // - But the op isn't published because it was published in the last five minutes.
     assert_eq!(
@@ -319,15 +333,7 @@ async fn publish_loop() {
     let timer = tokio::time::Instant::now();
     trigger_recv.listen().await.unwrap();
     assert!(timer.elapsed() < Duration::from_secs(1));
-    publish_dht_ops_workflow(
-        db.clone(),
-        dna_network.clone(),
-        ts.clone(),
-        author.clone(),
-        ConductorTuningParams::default().min_publish_interval(),
-    )
-    .await
-    .unwrap();
+    run_workflow!();
 
     // - But still no op is published.
     assert_eq!(
@@ -360,15 +366,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60) && timer.elapsed() < Duration::from_secs(61)
     );
 
-    publish_dht_ops_workflow(
-        db.clone(),
-        dna_network.clone(),
-        ts.clone(),
-        author.clone(),
-        ConductorTuningParams::default().min_publish_interval(),
-    )
-    .await
-    .unwrap();
+    run_workflow!();
 
     // - The data is published because of the last publish time being greater then the interval.
     op_published.recv().await.unwrap();
@@ -390,15 +388,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60 * 2)
             && timer.elapsed() < Duration::from_secs(60 * 2 + 1)
     );
-    publish_dht_ops_workflow(
-        db.clone(),
-        dna_network.clone(),
-        ts.clone(),
-        author.clone(),
-        ConductorTuningParams::default().min_publish_interval(),
-    )
-    .await
-    .unwrap();
+    run_workflow!();
 
     // - But no op is published because receipts are complete.
     assert_eq!(
@@ -433,15 +423,7 @@ async fn publish_loop() {
     let timer = tokio::time::Instant::now();
     trigger_recv.listen().await.unwrap();
     assert!(timer.elapsed() < Duration::from_secs(1));
-    publish_dht_ops_workflow(
-        db.clone(),
-        dna_network.clone(),
-        ts.clone(),
-        author.clone(),
-        ConductorTuningParams::default().min_publish_interval(),
-    )
-    .await
-    .unwrap();
+    run_workflow!();
 
     // - Op was published.
     op_published.recv().await.unwrap();
@@ -453,15 +435,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60) && timer.elapsed() < Duration::from_secs(61)
     );
 
-    publish_dht_ops_workflow(
-        db.clone(),
-        dna_network.clone(),
-        ts.clone(),
-        author.clone(),
-        ConductorTuningParams::default().min_publish_interval(),
-    )
-    .await
-    .unwrap();
+    run_workflow!();
     // - The op is not published because of the time interval.
     assert_eq!(
         op_published.try_recv(),
