@@ -2,7 +2,7 @@
 
 use crate::models::dht::ChainOpRow;
 use holo_hash::{ActionHash, AnyDhtHash, DhtOpHash};
-use holochain_integrity_types::dht_v2::RecordValidity;
+use holochain_integrity_types::dht_v2::OpValidity;
 use holochain_timestamp::Timestamp;
 use sqlx::{Executor, Sqlite};
 
@@ -20,7 +20,7 @@ pub struct InsertChainOp<'a> {
     /// Numeric storage center derived from `basis_hash`.
     pub storage_center_loc: u32,
     /// Final validation outcome.
-    pub validation_status: RecordValidity,
+    pub validation_status: OpValidity,
     /// `true` when this authority locally validated the op; `false` when
     /// accepted via receipts only.
     pub locally_validated: bool,
@@ -92,20 +92,28 @@ where
         .await
 }
 
-/// Update `validation_status` for the given op. Returns the number of rows updated.
+/// Update `validation_status` to `Rejected` for the given op only when the
+/// current status is `Accepted`.  Returns the number of rows updated.
+///
+/// This enforces a one-way `Accepted → Rejected` transition; once an op is
+/// rejected it cannot be changed again via this path.
 pub(crate) async fn set_validation_status<'e, E>(
     executor: E,
     op_hash: &DhtOpHash,
-    validation_status: RecordValidity,
+    validation_status: OpValidity,
 ) -> sqlx::Result<u64>
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    let result = sqlx::query("UPDATE ChainOp SET validation_status = ? WHERE hash = ?")
-        .bind(i64::from(validation_status))
-        .bind(op_hash.get_raw_36())
-        .execute(executor)
-        .await?;
+    let accepted = i64::from(OpValidity::Accepted);
+    let result = sqlx::query(
+        "UPDATE ChainOp SET validation_status = ? WHERE hash = ? AND validation_status = ?",
+    )
+    .bind(i64::from(validation_status))
+    .bind(op_hash.get_raw_36())
+    .bind(accepted)
+    .execute(executor)
+    .await?;
     Ok(result.rows_affected())
 }
 
