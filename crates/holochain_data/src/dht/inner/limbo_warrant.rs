@@ -148,11 +148,11 @@ where
     Ok(())
 }
 
-/// Promote a `LimboWarrant` row to the `Warrant` table in a single atomic step.
+/// Promote a `LimboWarrant` row to the `Warrant` table.
 ///
 /// Reads the limbo row, inserts into `Warrant` with the carried fields, then
-/// deletes the limbo row.  All three statements run on the given connection;
-/// the caller is responsible for wrapping them inside a transaction.
+/// deletes the limbo row. All three statements run on the given connection.
+/// **The caller must wrap this call in a transaction** to ensure atomicity.
 ///
 /// Returns `true` if the limbo row existed and was promoted, `false` if it
 /// did not exist.
