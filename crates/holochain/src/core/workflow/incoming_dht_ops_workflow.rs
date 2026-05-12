@@ -173,11 +173,8 @@ pub async fn incoming_dht_ops_workflow(
 
                                 // we can't send the results here...
                                 // we haven't committed
-                                match res {
-                                    Ok(ref inserted) => {
-                                        pending_ops2.lock().extend(inserted.iter().cloned());
-                                    }
-                                    Err(_) => {}
+                                if let Ok(ref inserted) = res {
+                                    pending_ops2.lock().extend(inserted.iter().cloned());
                                 }
                                 senders2.lock().push((snd, res.map(|_| ())));
                             }
