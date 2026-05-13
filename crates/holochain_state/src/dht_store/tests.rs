@@ -45,11 +45,11 @@ async fn delete_live_ephemeral_scheduled_functions_roundtrip() {
 }
 
 #[tokio::test]
-async fn upsert_scheduled_function_none_schedule_deletes() {
+async fn upsert_scheduled_function_none_schedule_writes_ephemeral_row() {
     let store = DhtStore::new_test(dht_id()).await.unwrap();
     let author = agent(2);
 
-    // Seed a persisted row.
+    // Seed a persisted row (ephemeral=false, start=0, end=100).
     store
         .db
         .upsert_scheduled_function(InsertScheduledFunction {
@@ -64,7 +64,8 @@ async fn upsert_scheduled_function_none_schedule_deletes() {
         .await
         .unwrap();
 
-    // None schedule => delete.
+    // Upsert with None maps to (now, max, ephemeral=true). With now=50,
+    // the row should be rewritten to (start=50, end=max, ephemeral=true).
     let rows = store
         .upsert_scheduled_function(
             &author,
@@ -74,16 +75,19 @@ async fn upsert_scheduled_function_none_schedule_deletes() {
         )
         .await
         .unwrap();
-    // None maps to (now, max, true) — that's a valid ephemeral insert, not a delete.
-    // Re-insert to prove the row is present (upsert was used).
-    let _ = rows;
+    assert_eq!(rows, 1, "None upsert should write exactly one row");
 
-    // Explicit unschedule removes it.
+    // Confirm the row is now ephemeral and live at now=60:
+    // delete_live_ephemeral removes ephemeral rows with start_at <= now.
     let deleted = store
-        .unschedule_function(&author, &ScheduledFn::new("z".into(), "f".into()))
+        .db
+        .delete_live_ephemeral_scheduled_functions(&author, Timestamp::from_micros(60))
         .await
         .unwrap();
-    assert_eq!(deleted, 1);
+    assert_eq!(
+        deleted, 1,
+        "row should be ephemeral with start_at <= 60 after None upsert"
+    );
 }
 
 #[tokio::test]

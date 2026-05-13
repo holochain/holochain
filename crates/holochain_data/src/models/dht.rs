@@ -1,6 +1,6 @@
 //! `sqlx::FromRow` row structs for the DHT database.
 //!
-//! Each struct mirrors one table. BLOBs are `Vec<u8>`; NULL-able columns are
+//! Each struct represents a single table. BLOBs are `Vec<u8>`; NULL-able columns are
 //! `Option<T>`; booleans are stored as `i64` (0/1). For integer-encoded
 //! enum columns, the mapping lives on the corresponding enum's
 //! `From<T> for i64` / `TryFrom<i64> for T` impl (see
