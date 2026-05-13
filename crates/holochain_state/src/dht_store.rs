@@ -488,7 +488,7 @@ impl DhtStore<DbWrite<Dht>> {
     ///
     /// For each (op_hash, outcome) pair, updates `sys_validation_status` on the
     /// matching `LimboChainOp` row.
-    pub async fn record_chain_op_sys_validation_outcome(
+    pub async fn record_chain_op_sys_validation_outcomes(
         &self,
         outcomes: Vec<(DhtOpHash, SysOutcome)>,
     ) -> StateMutationResult<()> {
@@ -510,7 +510,7 @@ impl DhtStore<DbWrite<Dht>> {
     ///
     /// For each (op_hash, outcome) pair, updates `sys_validation_status` on the
     /// matching `LimboWarrant` row.
-    pub async fn record_warrant_sys_validation_outcome(
+    pub async fn record_warrant_sys_validation_outcomes(
         &self,
         outcomes: Vec<(DhtOpHash, SysOutcome)>,
     ) -> StateMutationResult<()> {
@@ -532,7 +532,7 @@ impl DhtStore<DbWrite<Dht>> {
     /// (op_hash, outcome) pair, update `app_validation_status` on the matching
     /// `LimboChainOp` row.  Warrants have no `app_validation_status` column, so
     /// only chain ops are updated here.
-    pub async fn record_app_validation_outcome(
+    pub async fn record_app_validation_outcomes(
         &self,
         outcomes: Vec<(DhtOpHash, AppOutcome)>,
     ) -> StateMutationResult<()> {
@@ -646,28 +646,6 @@ impl DhtStore<DbWrite<Dht>> {
         Ok(promoted)
     }
 
-    /// Set `require_receipt = false` for each of the given op hashes on
-    /// `LimboChainOp`.
-    ///
-    /// If a hash no longer has a `LimboChainOp` row (e.g. the op has already
-    /// been promoted to `ChainOp`), the update matches 0 rows and is silently
-    /// ignored — that is correct, not a bug, because `require_receipt` only
-    /// exists on the limbo table.
-    pub async fn clear_require_receipt(
-        &self,
-        op_hashes: Vec<DhtOpHash>,
-    ) -> StateMutationResult<()> {
-        let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
-        for hash in op_hashes {
-            // Returns rows_affected; ignored — see doc note above.
-            tx.clear_limbo_chain_op_require_receipt(&hash)
-                .await
-                .map_err(StateMutationError::from)?;
-        }
-        tx.commit().await.map_err(StateMutationError::from)?;
-        Ok(())
-    }
-
     /// Update `ChainOpPublish.last_publish_time = now` for each given op hash.
     pub async fn record_published_op_hashes(
         &self,
@@ -686,7 +664,7 @@ impl DhtStore<DbWrite<Dht>> {
 
     /// Clear `withhold_publish` on the `ChainOpPublish` rows for the given
     /// op hashes so the publish workflow can pick them up.
-    pub async fn clear_op_withhold_publish(
+    pub async fn clear_op_withhold_publishes(
         &self,
         op_hashes: Vec<DhtOpHash>,
     ) -> StateMutationResult<()> {
@@ -704,7 +682,7 @@ impl DhtStore<DbWrite<Dht>> {
     /// failure outside the validation workflows. Tries `ChainOp` first; if no
     /// row matches (the op is still in limbo), marks both sys and app validation
     /// status as Rejected on `LimboChainOp`.
-    pub async fn reject_chain_op(&self, op_hashes: Vec<DhtOpHash>) -> StateMutationResult<()> {
+    pub async fn reject_chain_ops(&self, op_hashes: Vec<DhtOpHash>) -> StateMutationResult<()> {
         use holochain_zome_types::dht_v2::OpValidity;
 
         let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
@@ -771,7 +749,7 @@ impl From<DhtStore<DbWrite<Dht>>> for DhtStoreRead {
     }
 }
 
-#[cfg(any(test, feature = "test_utils"))]
+#[cfg(feature = "test_utils")]
 impl DhtStore<DbWrite<Dht>> {
     /// Create an in-memory DHT store for testing.
     pub async fn new_test(dht: Dht) -> DhtStoreResult<Self> {

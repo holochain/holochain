@@ -165,34 +165,40 @@ where
     Ok(result.rows_affected())
 }
 
-/// Force both `sys_validation_status` and `app_validation_status` to `Rejected`
-/// (`2`), bypassing the normal ordering constraints.  Used by `reject_chain_op`
-/// which must be able to reject an op regardless of its current state.
+/// Force a limbo op into a rejected terminal state, bypassing the normal
+/// validation ordering.  Used by `reject_chain_ops` for ops that fail outside
+/// the normal sys/app validation workflows.
+///
+/// The rejection is recorded at whichever stage has not yet completed:
+///
+/// - `sys_validation_status IS NULL` → set `sys_validation_status = Rejected`,
+///   leave `app_validation_status` as NULL.
+/// - `sys_validation_status = Accepted, app_validation_status IS NULL` →
+///   set `app_validation_status = Rejected`.
+///
+/// Returns the number of rows updated (0 or 1).  Rows already at a terminal
+/// state (`sys = Rejected`, or `app IN (Accepted, Rejected)`) are not modified.
 pub(crate) async fn force_reject<'e, E>(executor: E, op_hash: &DhtOpHash) -> sqlx::Result<u64>
 where
     E: Executor<'e, Database = Sqlite>,
 {
     let result = sqlx::query(
-        "UPDATE LimboChainOp SET sys_validation_status = 2, app_validation_status = 2
-         WHERE hash = ?",
+        "UPDATE LimboChainOp SET
+             sys_validation_status = CASE
+                 WHEN sys_validation_status IS NULL THEN 2
+                 ELSE sys_validation_status
+             END,
+             app_validation_status = CASE
+                 WHEN sys_validation_status = 1 AND app_validation_status IS NULL THEN 2
+                 ELSE app_validation_status
+             END
+         WHERE hash = ?
+           AND (sys_validation_status IS NULL
+                OR (sys_validation_status = 1 AND app_validation_status IS NULL))",
     )
     .bind(op_hash.get_raw_36())
     .execute(executor)
     .await?;
-    Ok(result.rows_affected())
-}
-
-pub(crate) async fn clear_require_receipt<'e, E>(
-    executor: E,
-    op_hash: &DhtOpHash,
-) -> sqlx::Result<u64>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    let result = sqlx::query("UPDATE LimboChainOp SET require_receipt = 0 WHERE hash = ?")
-        .bind(op_hash.get_raw_36())
-        .execute(executor)
-        .await?;
     Ok(result.rows_affected())
 }
 

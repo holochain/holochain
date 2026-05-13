@@ -93,10 +93,13 @@ where
 }
 
 /// Update `validation_status` to `Rejected` for the given op only when the
-/// current status is `Accepted`.  Returns the number of rows updated.
+/// current status is `Accepted` and the op is not locally validated.  Returns
+/// the number of rows updated.
 ///
-/// This enforces a one-way `Accepted → Rejected` transition; once an op is
-/// rejected it cannot be changed again via this path.
+/// This enforces a one-way `Accepted → Rejected` transition on network-cached
+/// ops only.  Locally-authored or locally-validated ops never change status
+/// through this path — a status change for such ops would require a warrant
+/// and reprocessing.
 pub(crate) async fn set_validation_status<'e, E>(
     executor: E,
     op_hash: &DhtOpHash,
@@ -107,7 +110,8 @@ where
 {
     let accepted = i64::from(OpValidity::Accepted);
     let result = sqlx::query(
-        "UPDATE ChainOp SET validation_status = ? WHERE hash = ? AND validation_status = ?",
+        "UPDATE ChainOp SET validation_status = ?
+         WHERE hash = ? AND validation_status = ? AND locally_validated = 0",
     )
     .bind(i64::from(validation_status))
     .bind(op_hash.get_raw_36())

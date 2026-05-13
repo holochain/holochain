@@ -428,7 +428,7 @@ async fn app_validation_workflow_inner(
     if !app_validation_outcomes.is_empty() {
         workspace
             .dht_store
-            .record_app_validation_outcome(app_validation_outcomes)
+            .record_app_validation_outcomes(app_validation_outcomes)
             .await?;
     }
 

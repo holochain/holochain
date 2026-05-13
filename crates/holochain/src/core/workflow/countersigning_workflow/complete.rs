@@ -243,7 +243,7 @@ async fn apply_success_state_changes(
 
     space
         .dht_store
-        .clear_op_withhold_publish(hashes_for_new_db)
+        .clear_op_withhold_publishes(hashes_for_new_db)
         .await
         .map_err(WorkflowError::from)?;
 

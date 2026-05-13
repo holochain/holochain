@@ -35,14 +35,6 @@ impl DbWrite<Dht> {
         limbo_chain_op::set_app_validation_status(self.pool(), op_hash, status).await
     }
 
-    /// Clear the `require_receipt` flag for the given op. Returns the number of rows updated.
-    pub async fn clear_limbo_chain_op_require_receipt(
-        &self,
-        op_hash: &DhtOpHash,
-    ) -> sqlx::Result<u64> {
-        limbo_chain_op::clear_require_receipt(self.pool(), op_hash).await
-    }
-
     /// Atomically promote a `LimboChainOp` row to the `ChainOp` table.
     ///
     /// Begins a transaction, delegates to the inner promotion helper, and

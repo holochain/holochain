@@ -396,11 +396,11 @@ async fn sys_validation_workflow_inner(
 
     workspace
         .dht_store
-        .record_chain_op_sys_validation_outcome(chain_op_sys_outcomes)
+        .record_chain_op_sys_validation_outcomes(chain_op_sys_outcomes)
         .await?;
     workspace
         .dht_store
-        .record_warrant_sys_validation_outcome(warrant_sys_outcomes)
+        .record_warrant_sys_validation_outcomes(warrant_sys_outcomes)
         .await?;
 
     {
@@ -479,7 +479,7 @@ async fn sys_validation_workflow_inner(
             })
             .await?;
         // Clone warrants before the legacy write so we can mirror them into the new DB after.
-        let warrants_for_new_db: Vec<DhtOpHashed> = warrants.clone();
+        let locally_validated_warrants: Vec<DhtOpHashed> = warrants.clone();
         // "self-publish" warrants, i.e. insert them into the DHT DB.
         // This works around the problem that the commonly used function [`holochain_state::integrate::authored_ops_to_dht_db`]
         // joins on the Action table to filter out private entries.
@@ -494,7 +494,7 @@ async fn sys_validation_workflow_inner(
             .await?;
         workspace
             .dht_store
-            .record_locally_validated_warrants(warrants_for_new_db)
+            .record_locally_validated_warrants(locally_validated_warrants)
             .await?;
 
         summary.warranted = warranted;
