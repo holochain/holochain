@@ -487,8 +487,7 @@ impl DhtStore<DbWrite<Dht>> {
     /// Record the system validation outcome for each chain op.
     ///
     /// For each (op_hash, outcome) pair, updates `sys_validation_status` on the
-    /// matching `LimboChainOp` row. Returns
-    /// [`StateMutationError::MissingLimboRow`] if any op has no matching row.
+    /// matching `LimboChainOp` row.
     pub async fn record_chain_op_sys_validation_outcome(
         &self,
         outcomes: Vec<(DhtOpHash, SysOutcome)>,
@@ -499,13 +498,9 @@ impl DhtStore<DbWrite<Dht>> {
                 SysOutcome::Accepted => 1,
                 SysOutcome::Rejected => 2,
             };
-            let rows = tx
-                .set_limbo_chain_op_sys_validation_status(&hash, Some(status))
+            tx.set_limbo_chain_op_sys_validation_status(&hash, Some(status))
                 .await
                 .map_err(StateMutationError::from)?;
-            if rows == 0 {
-                return Err(StateMutationError::MissingLimboRow(hash));
-            }
         }
         tx.commit().await.map_err(StateMutationError::from)?;
         Ok(())
@@ -514,8 +509,7 @@ impl DhtStore<DbWrite<Dht>> {
     /// Record the system validation outcome for each warrant op.
     ///
     /// For each (op_hash, outcome) pair, updates `sys_validation_status` on the
-    /// matching `LimboWarrant` row. Returns
-    /// [`StateMutationError::MissingLimboRow`] if any op has no matching row.
+    /// matching `LimboWarrant` row.
     pub async fn record_warrant_sys_validation_outcome(
         &self,
         outcomes: Vec<(DhtOpHash, SysOutcome)>,
@@ -526,13 +520,9 @@ impl DhtStore<DbWrite<Dht>> {
                 SysOutcome::Accepted => 1,
                 SysOutcome::Rejected => 2,
             };
-            let rows = tx
-                .set_limbo_warrant_sys_validation_status(&hash, Some(status))
+            tx.set_limbo_warrant_sys_validation_status(&hash, Some(status))
                 .await
                 .map_err(StateMutationError::from)?;
-            if rows == 0 {
-                return Err(StateMutationError::MissingLimboRow(hash));
-            }
         }
         tx.commit().await.map_err(StateMutationError::from)?;
         Ok(())
@@ -541,8 +531,7 @@ impl DhtStore<DbWrite<Dht>> {
     /// Record the app validation outcome for each op.  For each
     /// (op_hash, outcome) pair, update `app_validation_status` on the matching
     /// `LimboChainOp` row.  Warrants have no `app_validation_status` column, so
-    /// only chain ops are updated here. Returns
-    /// [`StateMutationError::MissingLimboRow`] if any op has no matching row.
+    /// only chain ops are updated here.
     pub async fn record_app_validation_outcome(
         &self,
         outcomes: Vec<(DhtOpHash, AppOutcome)>,
@@ -553,13 +542,9 @@ impl DhtStore<DbWrite<Dht>> {
                 AppOutcome::Accepted => 1,
                 AppOutcome::Rejected => 2,
             };
-            let rows = tx
-                .set_limbo_chain_op_app_validation_status(&hash, Some(status))
+            tx.set_limbo_chain_op_app_validation_status(&hash, Some(status))
                 .await
                 .map_err(StateMutationError::from)?;
-            if rows == 0 {
-                return Err(StateMutationError::MissingLimboRow(hash));
-            }
         }
         tx.commit().await.map_err(StateMutationError::from)?;
         Ok(())
