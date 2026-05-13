@@ -1188,39 +1188,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn set_limbo_chain_op_require_receipt_updates() {
-        let db = test_open_db(dht_db_id()).await.unwrap();
-        let action_hash = seed_action_for_op(&db, 0).await;
-        let op_hash = DhtOpHash::from_raw_36(vec![0xAA; 36]);
-        db.insert_limbo_chain_op(InsertLimboChainOp {
-            op_hash: &op_hash,
-            action_hash: &action_hash,
-            op_type: 1,
-            basis_hash: &sample_basis(1),
-            storage_center_loc: 42,
-            require_receipt: true,
-            when_received: Timestamp::from_micros(100),
-            serialized_size: 256,
-        })
-        .await
-        .unwrap();
-
-        let updated = db
-            .clear_limbo_chain_op_require_receipt(&op_hash)
-            .await
-            .unwrap();
-        assert_eq!(updated, 1);
-
-        let row = db
-            .as_ref()
-            .get_limbo_chain_op(op_hash)
-            .await
-            .unwrap()
-            .unwrap();
-        assert_eq!(row.require_receipt, 0);
-    }
-
-    #[tokio::test]
     async fn set_limbo_warrant_sys_validation_status_updates() {
         let db = test_open_db(dht_db_id()).await.unwrap();
         let hash = DhtOpHash::from_raw_36(vec![0xBB; 36]);
@@ -1410,9 +1377,26 @@ mod tests {
 
     #[tokio::test]
     async fn set_chain_op_validation_status_updates() {
+        // The transition only applies to network-cached ops; seed one with
+        // locally_validated = false.
         let db = test_open_db(dht_db_id()).await.unwrap();
-        let (op_hash, _) = seed_chain_op(&db, 0).await;
-        // seed_chain_op already inserts with Accepted; flip to Rejected.
+        let action_hash = seed_action_for_op(&db, 0).await;
+        let op_hash = DhtOpHash::from_raw_36(vec![0xF0; 36]);
+        db.insert_chain_op(InsertChainOp {
+            op_hash: &op_hash,
+            action_hash: &action_hash,
+            op_type: 1,
+            basis_hash: &sample_basis(0),
+            storage_center_loc: 0,
+            validation_status: RecordValidity::Accepted,
+            locally_validated: false,
+            when_received: Timestamp::from_micros(1),
+            when_integrated: Timestamp::from_micros(2),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+
         let updated = db
             .set_chain_op_validation_status(&op_hash, RecordValidity::Rejected)
             .await
@@ -1420,6 +1404,20 @@ mod tests {
         assert_eq!(updated, 1);
         let row = db.as_ref().get_chain_op(op_hash).await.unwrap().unwrap();
         assert_eq!(row.validation_status, i64::from(RecordValidity::Rejected));
+    }
+
+    #[tokio::test]
+    async fn set_chain_op_validation_status_skips_locally_validated() {
+        // Locally validated ops never change status through this path.
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let (op_hash, _) = seed_chain_op(&db, 0).await; // locally_validated = true
+        let updated = db
+            .set_chain_op_validation_status(&op_hash, RecordValidity::Rejected)
+            .await
+            .unwrap();
+        assert_eq!(updated, 0);
+        let row = db.as_ref().get_chain_op(op_hash).await.unwrap().unwrap();
+        assert_eq!(row.validation_status, i64::from(RecordValidity::Accepted));
     }
 
     #[tokio::test]

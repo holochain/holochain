@@ -41,14 +41,6 @@ impl TxWrite<Dht> {
         limbo_chain_op::force_reject(self.conn_mut(), op_hash).await
     }
 
-    /// Clear the `require_receipt` flag for the given op. Returns the number of rows updated.
-    pub async fn clear_limbo_chain_op_require_receipt(
-        &mut self,
-        op_hash: &DhtOpHash,
-    ) -> sqlx::Result<u64> {
-        limbo_chain_op::clear_require_receipt(self.conn_mut(), op_hash).await
-    }
-
     /// Atomically promote a `LimboChainOp` row to the `ChainOp` table using
     /// the current transaction.
     ///

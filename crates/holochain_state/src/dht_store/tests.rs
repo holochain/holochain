@@ -298,7 +298,7 @@ async fn record_sys_validation_outcome_chain_op() {
     assert_eq!(row_before.sys_validation_status, None);
 
     store
-        .record_chain_op_sys_validation_outcome(vec![(op_hash.clone(), SysOutcome::Accepted)])
+        .record_chain_op_sys_validation_outcomes(vec![(op_hash.clone(), SysOutcome::Accepted)])
         .await
         .unwrap();
 
@@ -332,7 +332,7 @@ async fn record_sys_validation_outcome_warrant() {
     assert_eq!(row_before.sys_validation_status, None);
 
     store
-        .record_warrant_sys_validation_outcome(vec![(op_hash.clone(), SysOutcome::Rejected)])
+        .record_warrant_sys_validation_outcomes(vec![(op_hash.clone(), SysOutcome::Rejected)])
         .await
         .unwrap();
 
@@ -353,7 +353,7 @@ async fn record_app_validation_outcome_accepted() {
     store.record_incoming_ops(vec![op.clone()]).await.unwrap();
     // sys_validation_status must be set before app (ordering constraint).
     store
-        .record_chain_op_sys_validation_outcome(vec![(op.as_hash().clone(), SysOutcome::Accepted)])
+        .record_chain_op_sys_validation_outcomes(vec![(op.as_hash().clone(), SysOutcome::Accepted)])
         .await
         .unwrap();
     // Pre-state: app_validation_status should be NULL.
@@ -367,7 +367,7 @@ async fn record_app_validation_outcome_accepted() {
     assert_eq!(row.app_validation_status, None);
 
     store
-        .record_app_validation_outcome(vec![(op.as_hash().clone(), AppOutcome::Accepted)])
+        .record_app_validation_outcomes(vec![(op.as_hash().clone(), AppOutcome::Accepted)])
         .await
         .unwrap();
 
@@ -388,12 +388,12 @@ async fn record_app_validation_outcome_rejected() {
     store.record_incoming_ops(vec![op.clone()]).await.unwrap();
     // sys_validation_status must be set before app (ordering constraint).
     store
-        .record_chain_op_sys_validation_outcome(vec![(op.as_hash().clone(), SysOutcome::Accepted)])
+        .record_chain_op_sys_validation_outcomes(vec![(op.as_hash().clone(), SysOutcome::Accepted)])
         .await
         .unwrap();
 
     store
-        .record_app_validation_outcome(vec![(op.as_hash().clone(), AppOutcome::Rejected)])
+        .record_app_validation_outcomes(vec![(op.as_hash().clone(), AppOutcome::Rejected)])
         .await
         .unwrap();
 
@@ -430,11 +430,11 @@ async fn integrate_ready_ops_promotes_ready_chain_op() {
     store.record_incoming_ops(vec![op.clone()]).await.unwrap();
     // Mark ready: sys=1, app=1.
     store
-        .record_chain_op_sys_validation_outcome(vec![(op.as_hash().clone(), SysOutcome::Accepted)])
+        .record_chain_op_sys_validation_outcomes(vec![(op.as_hash().clone(), SysOutcome::Accepted)])
         .await
         .unwrap();
     store
-        .record_app_validation_outcome(vec![(op.as_hash().clone(), AppOutcome::Accepted)])
+        .record_app_validation_outcomes(vec![(op.as_hash().clone(), AppOutcome::Accepted)])
         .await
         .unwrap();
 
@@ -504,7 +504,7 @@ async fn integrate_ready_ops_promotes_warrant() {
         .unwrap();
     // Mark sys=1 (warrants have no app validation).
     store
-        .record_warrant_sys_validation_outcome(vec![(
+        .record_warrant_sys_validation_outcomes(vec![(
             warrant.as_hash().clone(),
             SysOutcome::Accepted,
         )])
@@ -544,11 +544,11 @@ async fn record_validation_receipt_inserts_and_counts() {
     let op = build_test_store_record_op_hashed(60);
     store.record_incoming_ops(vec![op.clone()]).await.unwrap();
     store
-        .record_chain_op_sys_validation_outcome(vec![(op.as_hash().clone(), SysOutcome::Accepted)])
+        .record_chain_op_sys_validation_outcomes(vec![(op.as_hash().clone(), SysOutcome::Accepted)])
         .await
         .unwrap();
     store
-        .record_app_validation_outcome(vec![(op.as_hash().clone(), AppOutcome::Accepted)])
+        .record_app_validation_outcomes(vec![(op.as_hash().clone(), AppOutcome::Accepted)])
         .await
         .unwrap();
     store
@@ -576,78 +576,6 @@ async fn record_validation_receipt_inserts_and_counts() {
 }
 
 #[tokio::test]
-async fn clear_require_receipt_clears_limbo_row() {
-    let store = DhtStore::new_test(dht_id()).await.unwrap();
-    let op = build_test_store_record_op_hashed(70);
-    store.record_incoming_ops(vec![op.clone()]).await.unwrap();
-    // Pre: require_receipt = 1 (set by record_incoming_ops).
-    let row = store
-        .db()
-        .as_ref()
-        .get_limbo_chain_op(op.as_hash().clone())
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(row.require_receipt, 1);
-
-    store
-        .clear_require_receipt(vec![op.as_hash().clone()])
-        .await
-        .unwrap();
-
-    let row = store
-        .db()
-        .as_ref()
-        .get_limbo_chain_op(op.as_hash().clone())
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(row.require_receipt, 0);
-}
-
-#[tokio::test]
-async fn clear_require_receipt_no_op_for_integrated() {
-    // Once promoted, the op is in ChainOp which has no require_receipt column.
-    // The method should succeed (no error) with no observable effect.
-    let store = DhtStore::new_test(dht_id()).await.unwrap();
-    let op = build_test_store_record_op_hashed(71);
-    store.record_incoming_ops(vec![op.clone()]).await.unwrap();
-    store
-        .record_chain_op_sys_validation_outcome(vec![(op.as_hash().clone(), SysOutcome::Accepted)])
-        .await
-        .unwrap();
-    store
-        .record_app_validation_outcome(vec![(op.as_hash().clone(), AppOutcome::Accepted)])
-        .await
-        .unwrap();
-    store
-        .integrate_ready_ops(Timestamp::from_micros(1))
-        .await
-        .unwrap();
-    // Op is now in ChainOp.
-    assert!(store
-        .db()
-        .as_ref()
-        .get_limbo_chain_op(op.as_hash().clone())
-        .await
-        .unwrap()
-        .is_none());
-    assert!(store
-        .db()
-        .as_ref()
-        .get_chain_op(op.as_hash().clone())
-        .await
-        .unwrap()
-        .is_some());
-
-    // No-op; should not error.
-    store
-        .clear_require_receipt(vec![op.as_hash().clone()])
-        .await
-        .unwrap();
-}
-
-#[tokio::test]
 async fn apply_countersigning_success_clears_withhold() {
     let store = DhtStore::new_test(dht_id()).await.unwrap();
 
@@ -655,11 +583,11 @@ async fn apply_countersigning_success_clears_withhold() {
     let op = build_test_store_record_op_hashed(80);
     store.record_incoming_ops(vec![op.clone()]).await.unwrap();
     store
-        .record_chain_op_sys_validation_outcome(vec![(op.as_hash().clone(), SysOutcome::Accepted)])
+        .record_chain_op_sys_validation_outcomes(vec![(op.as_hash().clone(), SysOutcome::Accepted)])
         .await
         .unwrap();
     store
-        .record_app_validation_outcome(vec![(op.as_hash().clone(), AppOutcome::Accepted)])
+        .record_app_validation_outcomes(vec![(op.as_hash().clone(), AppOutcome::Accepted)])
         .await
         .unwrap();
     store
@@ -683,7 +611,7 @@ async fn apply_countersigning_success_clears_withhold() {
     assert_eq!(row.withhold_publish, Some(1));
 
     store
-        .clear_op_withhold_publish(vec![op.as_hash().clone()])
+        .clear_op_withhold_publishes(vec![op.as_hash().clone()])
         .await
         .unwrap();
 
@@ -703,7 +631,7 @@ async fn apply_countersigning_success_no_op_when_row_absent() {
     let store = DhtStore::new_test(dht_id()).await.unwrap();
     let dummy_hash = DhtOpHash::from_raw_36(vec![0xAA; 36]);
     store
-        .clear_op_withhold_publish(vec![dummy_hash])
+        .clear_op_withhold_publishes(vec![dummy_hash])
         .await
         .unwrap();
 }
@@ -715,11 +643,11 @@ async fn record_published_op_hashes_updates_publish_time() {
     let op = build_test_store_record_op_hashed(90);
     store.record_incoming_ops(vec![op.clone()]).await.unwrap();
     store
-        .record_chain_op_sys_validation_outcome(vec![(op.as_hash().clone(), SysOutcome::Accepted)])
+        .record_chain_op_sys_validation_outcomes(vec![(op.as_hash().clone(), SysOutcome::Accepted)])
         .await
         .unwrap();
     store
-        .record_app_validation_outcome(vec![(op.as_hash().clone(), AppOutcome::Accepted)])
+        .record_app_validation_outcomes(vec![(op.as_hash().clone(), AppOutcome::Accepted)])
         .await
         .unwrap();
     store
@@ -756,29 +684,28 @@ async fn reject_chain_op_rejects_integrated_op() {
     let op = build_test_store_record_op_hashed(100);
     store.record_incoming_ops(vec![op.clone()]).await.unwrap();
     store
-        .record_chain_op_sys_validation_outcome(vec![(op.as_hash().clone(), SysOutcome::Accepted)])
+        .record_chain_op_sys_validation_outcomes(vec![(op.as_hash().clone(), SysOutcome::Accepted)])
         .await
         .unwrap();
     store
-        .record_app_validation_outcome(vec![(op.as_hash().clone(), AppOutcome::Accepted)])
+        .record_app_validation_outcomes(vec![(op.as_hash().clone(), AppOutcome::Accepted)])
         .await
         .unwrap();
     store
         .integrate_ready_ops(Timestamp::from_micros(1))
         .await
         .unwrap();
-    // Pre: validation_status is Accepted.
-    let row = store
-        .db()
-        .as_ref()
-        .get_chain_op(op.as_hash().clone())
+    // Simulate a network-cached op: clear the locally_validated flag set by
+    // promotion. The reject_chain_ops path only changes status on network-
+    // cached ops.
+    sqlx::query("UPDATE ChainOp SET locally_validated = 0 WHERE hash = ?")
+        .bind(op.as_hash().get_raw_36())
+        .execute(store.db().pool())
         .await
-        .unwrap()
         .unwrap();
-    assert_eq!(row.validation_status, i64::from(RecordValidity::Accepted));
 
     store
-        .reject_chain_op(vec![op.as_hash().clone()])
+        .reject_chain_ops(vec![op.as_hash().clone()])
         .await
         .unwrap();
 
@@ -793,6 +720,42 @@ async fn reject_chain_op_rejects_integrated_op() {
 }
 
 #[tokio::test]
+async fn reject_chain_op_no_op_for_locally_validated_integrated_op() {
+    use holochain_zome_types::dht_v2::RecordValidity;
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+    let op = build_test_store_record_op_hashed(102);
+    store.record_incoming_ops(vec![op.clone()]).await.unwrap();
+    store
+        .record_chain_op_sys_validation_outcomes(vec![(op.as_hash().clone(), SysOutcome::Accepted)])
+        .await
+        .unwrap();
+    store
+        .record_app_validation_outcomes(vec![(op.as_hash().clone(), AppOutcome::Accepted)])
+        .await
+        .unwrap();
+    store
+        .integrate_ready_ops(Timestamp::from_micros(1))
+        .await
+        .unwrap();
+
+    // Promotion sets locally_validated = 1; reject_chain_ops should be a
+    // silent no-op for locally-validated integrated ops.
+    store
+        .reject_chain_ops(vec![op.as_hash().clone()])
+        .await
+        .unwrap();
+
+    let row = store
+        .db()
+        .as_ref()
+        .get_chain_op(op.as_hash().clone())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(row.validation_status, i64::from(RecordValidity::Accepted));
+}
+
+#[tokio::test]
 async fn reject_chain_op_rejects_limbo_op() {
     let store = DhtStore::new_test(dht_id()).await.unwrap();
     let op = build_test_store_record_op_hashed(101);
@@ -800,10 +763,11 @@ async fn reject_chain_op_rejects_limbo_op() {
     // Op is in limbo with sys=NULL, app=NULL.
 
     store
-        .reject_chain_op(vec![op.as_hash().clone()])
+        .reject_chain_ops(vec![op.as_hash().clone()])
         .await
         .unwrap();
 
+    // sys=NULL prior to reject → sys=Rejected, app=NULL.
     let row = store
         .db()
         .as_ref()
@@ -812,7 +776,7 @@ async fn reject_chain_op_rejects_limbo_op() {
         .unwrap()
         .unwrap();
     assert_eq!(row.sys_validation_status, Some(2));
-    assert_eq!(row.app_validation_status, Some(2));
+    assert_eq!(row.app_validation_status, None);
 }
 
 #[tokio::test]

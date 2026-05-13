@@ -180,10 +180,10 @@ pub mod test {
             })
             .await
             .unwrap();
-        // Mirror the rejection into the new DhtStore schema.
+        // Mirror the rejection into the new DhtStore.
         alice_host_fn_caller
             .dht_store
-            .reject_chain_op(vec![record_op_hash, entry_op_hash])
+            .reject_chain_ops(vec![record_op_hash, entry_op_hash])
             .await
             .unwrap();
 

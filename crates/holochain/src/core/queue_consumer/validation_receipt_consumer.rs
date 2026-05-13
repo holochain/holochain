@@ -2,17 +2,15 @@
 
 use super::*;
 use crate::core::workflow::validation_receipt_workflow::validation_receipt_workflow;
-use holochain_state::dht_store::DhtStore;
 
 /// Spawn the QueueConsumer for validation receipt workflow
 #[cfg_attr(
     feature = "instrument",
-    tracing::instrument(skip(env, dht_store, conductor, network))
+    tracing::instrument(skip(env, conductor, network))
 )]
 pub fn spawn_validation_receipt_consumer(
     dna_hash: Arc<DnaHash>,
     env: DbWrite<DbKindDht>,
-    dht_store: DhtStore,
     conductor: ConductorHandle,
     network: DynHolochainP2pDna,
 ) -> TriggerSender {
@@ -28,7 +26,6 @@ pub fn spawn_validation_receipt_consumer(
             validation_receipt_workflow(
                 dna_hash.clone(),
                 env.clone(),
-                dht_store.clone(),
                 network.clone(),
                 keystore.clone(),
                 conductor.running_cell_ids(),
