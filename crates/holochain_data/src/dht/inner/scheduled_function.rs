@@ -12,8 +12,7 @@ pub struct InsertScheduledFunction<'a> {
     pub zome_name: &'a str,
     /// Name of the scheduled function within the zome.
     pub scheduled_fn: &'a str,
-    /// Serialized `Option<Schedule>` blob — the same encoding the legacy
-    /// table uses for `maybe_schedule`.
+    /// Serialized `Option<Schedule>` blob for `maybe_schedule`.
     pub maybe_schedule: &'a [u8],
     /// Microsecond timestamp at which the function becomes live.
     pub start_at: Timestamp,

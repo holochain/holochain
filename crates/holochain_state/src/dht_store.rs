@@ -15,8 +15,7 @@ use holochain_zome_types::schedule::ScheduleError;
 
 use crate::mutations::{StateMutationError, StateMutationResult};
 
-/// Result of system validation for a single DHT op, expressed in terms the
-/// new schema understands.
+/// Result of system validation for a single DHT op.
 #[derive(Debug, Clone, Copy)]
 pub enum SysOutcome {
     /// Accepted — `sys_validation_status = 1`.
@@ -50,8 +49,9 @@ pub enum DhtStoreError {
     #[error(transparent)]
     ScheduleParams(#[from] ScheduleError),
     /// `mark_chain_op_receipts_complete` was called for an `op_hash` that has
-    /// no matching `ChainOpPublish` row. The flush mirror should always insert
-    /// one for self-authored ops, so this indicates a wiring bug.
+    /// no matching `ChainOpPublish` row. Self-authored ops always have a
+    /// `ChainOpPublish` row inserted during source-chain flush, so this
+    /// indicates a wiring bug.
     #[error("no ChainOpPublish row for the given op_hash")]
     ChainOpPublishMissing,
 }
@@ -256,7 +256,7 @@ impl DhtStore<DbWrite<Dht>> {
             .await?)
     }
 
-    /// Insert a [`SignedValidationReceipt`] into the `ValidationReceipt` table
+    /// Insert a `SignedValidationReceipt` into the `ValidationReceipt` table
     /// and return the current receipt count for the underlying op.
     ///
     /// The receipt hash is derived by serializing the full
@@ -276,8 +276,8 @@ impl DhtStore<DbWrite<Dht>> {
     ) -> StateMutationResult<u64> {
         use holo_hash::encode::blake2b_256;
 
-        // Derive the receipt hash the same way the legacy `add_if_unique` does:
-        // serialize the whole SignedValidationReceipt, then take blake2b_256.
+        // Derive the receipt hash: serialize the whole SignedValidationReceipt,
+        // then take blake2b_256.
         let bytes =
             holochain_serialized_bytes::encode(receipt).map_err(StateMutationError::from)?;
         let hash_bytes = blake2b_256(&bytes);
@@ -318,8 +318,8 @@ impl DhtStore<DbWrite<Dht>> {
 
     /// Mark the receipts for `op_hash` as complete. Returns
     /// [`DhtStoreError::ChainOpPublishMissing`] if no matching row exists,
-    /// which indicates the flush mirror failed to insert a `ChainOpPublish`
-    /// row for this self-authored op.
+    /// which indicates that no `ChainOpPublish` row was inserted for this
+    /// self-authored op.
     pub async fn mark_chain_op_receipts_complete(&self, op_hash: &DhtOpHash) -> DhtStoreResult<()> {
         let rows = self.db.set_chain_op_receipts_complete(op_hash).await?;
         if rows == 0 {
@@ -487,7 +487,8 @@ impl DhtStore<DbWrite<Dht>> {
     /// Record the system validation outcome for each chain op.
     ///
     /// For each (op_hash, outcome) pair, updates `sys_validation_status` on the
-    /// matching `LimboChainOp` row.
+    /// matching `LimboChainOp` row. Returns
+    /// [`StateMutationError::MissingLimboRow`] if any op has no matching row.
     pub async fn record_chain_op_sys_validation_outcome(
         &self,
         outcomes: Vec<(DhtOpHash, SysOutcome)>,
@@ -498,9 +499,13 @@ impl DhtStore<DbWrite<Dht>> {
                 SysOutcome::Accepted => 1,
                 SysOutcome::Rejected => 2,
             };
-            tx.set_limbo_chain_op_sys_validation_status(&hash, Some(status))
+            let rows = tx
+                .set_limbo_chain_op_sys_validation_status(&hash, Some(status))
                 .await
                 .map_err(StateMutationError::from)?;
+            if rows == 0 {
+                return Err(StateMutationError::MissingLimboRow(hash));
+            }
         }
         tx.commit().await.map_err(StateMutationError::from)?;
         Ok(())
@@ -509,7 +514,8 @@ impl DhtStore<DbWrite<Dht>> {
     /// Record the system validation outcome for each warrant op.
     ///
     /// For each (op_hash, outcome) pair, updates `sys_validation_status` on the
-    /// matching `LimboWarrant` row.
+    /// matching `LimboWarrant` row. Returns
+    /// [`StateMutationError::MissingLimboRow`] if any op has no matching row.
     pub async fn record_warrant_sys_validation_outcome(
         &self,
         outcomes: Vec<(DhtOpHash, SysOutcome)>,
@@ -520,9 +526,13 @@ impl DhtStore<DbWrite<Dht>> {
                 SysOutcome::Accepted => 1,
                 SysOutcome::Rejected => 2,
             };
-            tx.set_limbo_warrant_sys_validation_status(&hash, Some(status))
+            let rows = tx
+                .set_limbo_warrant_sys_validation_status(&hash, Some(status))
                 .await
                 .map_err(StateMutationError::from)?;
+            if rows == 0 {
+                return Err(StateMutationError::MissingLimboRow(hash));
+            }
         }
         tx.commit().await.map_err(StateMutationError::from)?;
         Ok(())
@@ -531,7 +541,8 @@ impl DhtStore<DbWrite<Dht>> {
     /// Record the app validation outcome for each op.  For each
     /// (op_hash, outcome) pair, update `app_validation_status` on the matching
     /// `LimboChainOp` row.  Warrants have no `app_validation_status` column, so
-    /// only chain ops are updated here.
+    /// only chain ops are updated here. Returns
+    /// [`StateMutationError::MissingLimboRow`] if any op has no matching row.
     pub async fn record_app_validation_outcome(
         &self,
         outcomes: Vec<(DhtOpHash, AppOutcome)>,
@@ -542,9 +553,13 @@ impl DhtStore<DbWrite<Dht>> {
                 AppOutcome::Accepted => 1,
                 AppOutcome::Rejected => 2,
             };
-            tx.set_limbo_chain_op_app_validation_status(&hash, Some(status))
+            let rows = tx
+                .set_limbo_chain_op_app_validation_status(&hash, Some(status))
                 .await
                 .map_err(StateMutationError::from)?;
+            if rows == 0 {
+                return Err(StateMutationError::MissingLimboRow(hash));
+            }
         }
         tx.commit().await.map_err(StateMutationError::from)?;
         Ok(())
@@ -669,11 +684,6 @@ impl DhtStore<DbWrite<Dht>> {
     }
 
     /// Update `ChainOpPublish.last_publish_time = now` for each given op hash.
-    ///
-    /// Matches the legacy `set_last_publish_time` on the authored DB; the new
-    /// schema's `ChainOpPublish` row owns this field instead of the authored
-    /// DB's `DhtOp` row. Called from `publish_dht_ops_workflow` after the ops
-    /// have been forwarded to the network.
     pub async fn record_published_op_hashes(
         &self,
         op_hashes: Vec<DhtOpHash>,

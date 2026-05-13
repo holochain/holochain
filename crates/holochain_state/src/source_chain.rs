@@ -314,9 +314,9 @@ impl SourceChain {
 
         let now = Timestamp::now();
 
-        // Snapshots for the new-DB mirror block. Both the legacy closure and
-        // the new-DB block consume the same drained values; these clones are
-        // cheap (Vec<HoloHashed<_>> / Vec<ScheduledFn>).
+        // Snapshots reused by the new-DB write block after the legacy closure
+        // consumes the originals; these clones are cheap
+        // (Vec<HoloHashed<_>> / Vec<ScheduledFn>).
         let entries_for_new_db = entries.clone();
         let actions_for_new_db = actions.clone();
         let ops_for_new_db = ops.clone();
@@ -449,7 +449,7 @@ impl SourceChain {
             Ok((actions, permit)) => {
                 drop(permit);
 
-                // Mirror the authored-side writes to the new holochain_data DHT DB.
+                // Write the authored-side data to the new holochain_data DHT DB.
                 // Strict on failure: if anything here fails, the whole flush fails.
                 {
                     // `author` was moved into the legacy closure above; re-clone from `self`.
@@ -592,8 +592,8 @@ impl SourceChain {
                         // ChainOp.basis_hash in the new schema is AnyDhtHash (all
                         // authored ops' bases are DHT-addressable entries or actions).
                         // TODO: ChainOp.basis_hash uses AnyDhtHash, which lacks External.
-                        // Authored CreateLink with External basis cannot mirror to ChainOp
-                        // until the new schema widens basis_hash to AnyLinkableHash.
+                        // Authored CreateLink with External basis cannot be inserted into
+                        // ChainOp until the new schema widens basis_hash to AnyLinkableHash.
                         // Action and Link rows are still inserted; the legacy DB still has
                         // the ChainOp row.
                         let basis_hash: AnyDhtHash = match AnyDhtHash::try_from(linkable_basis) {
@@ -631,8 +631,8 @@ impl SourceChain {
 
                         // Always insert a ChainOpPublish row for self-authored ops so the
                         // publish workflow can track them without a separate lookup.
-                        // Mirror the legacy authored-DB behaviour: countersigning ops are
-                        // withheld from publishing until the session succeeds.
+                        // Countersigning ops are withheld from publishing until the
+                        // session succeeds.
                         let withhold = if is_countersigning_session {
                             Some(true)
                         } else {
@@ -667,7 +667,6 @@ impl SourceChain {
 
                     tx.commit().await.map_err(SourceChainError::other)?;
                 }
-                // End of new-DB mirror block.
 
                 authored_ops_to_dht_db(
                     storage_arcs,
@@ -1462,8 +1461,8 @@ pub async fn genesis(
     let (agent_action, agent_entry) = agent_record.clone().into_inner();
     let agent_entry = agent_entry.into_option();
 
-    // Pre-compute (op, op_hash, timestamp) tuples for the new-DB mirror block.
-    // This mirrors what put_raw does internally via ChainOpUniqueForm::op_hash,
+    // Pre-compute (op, op_hash, timestamp) tuples for the new-DB write block.
+    // This matches what put_raw does internally via ChainOpUniqueForm::op_hash,
     // but done upfront so we can keep the actions and ops available for the
     // new-DB write without moving them into the legacy closure.
     //
@@ -1494,7 +1493,7 @@ pub async fn genesis(
         }
     }
 
-    // Clone the actions and agent entry for the new-DB mirror block.
+    // Clone the actions and agent entry for the new-DB write block.
     // The originals are moved into the legacy authored write closure below.
     let dna_action_for_new_db = dna_action.clone();
     let agent_validation_action_for_new_db = agent_validation_action.clone();
@@ -1530,7 +1529,7 @@ pub async fn genesis(
     // these items, so we assume we are an authority.
     authored_ops_to_dht_db_without_check(ops_to_integrate, authored.clone().into(), dht_db).await?;
 
-    // Mirror genesis writes to the new holochain_data DHT DB.
+    // Write the genesis actions, entries and ops to the new holochain_data DHT DB.
     {
         let mut tx = dht_store
             .db()
@@ -1614,7 +1613,6 @@ pub async fn genesis(
 
         tx.commit().await.map_err(SourceChainError::other)?;
     }
-    // End of new-DB mirror block.
 
     Ok(())
 }
@@ -1764,7 +1762,7 @@ pub async fn dump_state(
 }
 
 // ---------------------------------------------------------------------------
-// Private helpers for the new-DB mirror block in `flush`
+// Private helpers for the new-DB writes in `flush` and `genesis`
 // ---------------------------------------------------------------------------
 
 /// Convert a legacy [`SignedActionHashed`] (using the variant-per-type `Action`
@@ -3088,7 +3086,7 @@ mod tests {
     }
 
     /// Flush of a countersigning op writes `withhold_publish = 1` to `ChainOpPublish`
-    /// in the new DHT schema, mirroring the legacy authored-DB behaviour.
+    /// in the new DHT schema.
     #[tokio::test(flavor = "multi_thread")]
     async fn flush_countersigning_op_sets_withhold_publish() {
         use holochain_zome_types::countersigning::{
