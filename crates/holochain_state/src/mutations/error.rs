@@ -33,9 +33,6 @@ pub enum StateMutationError {
     #[error("The operation was not found in the cache")]
     OpNotFoundInCache,
 
-    #[error("Expected limbo row for op {0} but none exists in the DHT database")]
-    MissingLimboRow(holo_hash::DhtOpHash),
-
     #[error("{0}")]
     Other(String),
 }
