@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Remove the `isotest` dependency from `holochain_types` and `holochain_cascade`. In `holochain_types::test_utils::chain`, the conversions between `TestChainHash` and `ActionHash` are now plain `From` impls; out-of-tree test code should use `TestChainHash::from(&action_hash)` instead of `TestChainHash::test(&action_hash)`.
+
 ## 0.7.0-dev.24
 
 - **BREAKING CHANGE** switch peer metadata store from using the database from `holochain_sqlite` to using the new one defined in `holochain_state`. There is no migration path for existing installs of Holochain, and startup errors would be expected if the data state is not cleared. \#5748
