@@ -50,9 +50,7 @@ impl From<TestChainHash> for ActionHash {
 
 impl From<&ActionHash> for TestChainHash {
     fn from(h: &ActionHash) -> Self {
-        Self(u32::from_le_bytes(
-            h.get_raw_32()[0..4].try_into().unwrap(),
-        ))
+        Self(u32::from_le_bytes(h.get_raw_32()[0..4].try_into().unwrap()))
     }
 }
 
