@@ -1,8 +1,9 @@
-use super::error::WorkflowResult;
+use super::error::{WorkflowError, WorkflowResult};
 use crate::core::queue_consumer::WorkComplete;
 use futures::{stream, StreamExt};
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::DynHolochainP2pDna;
+use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::*;
 use itertools::Itertools;
 use std::collections::HashSet;
@@ -17,12 +18,13 @@ mod unit_tests;
 
 #[cfg_attr(
     feature = "instrument",
-    tracing::instrument(skip(vault, network, keystore, apply_block))
+    tracing::instrument(skip(vault, dht_store, network, keystore, apply_block))
 )]
 /// Send validation receipts to their authors in serial, skipping authors not recently online.
 pub async fn validation_receipt_workflow(
     dna_hash: Arc<DnaHash>,
     vault: DbWrite<DbKindDht>,
+    dht_store: DhtStore,
     network: DynHolochainP2pDna,
     keystore: MetaLairClient,
     running_cell_ids: HashSet<CellId>,
@@ -78,6 +80,8 @@ pub async fn validation_receipt_workflow(
             };
 
             if !recently_online {
+                let op_hashes: Vec<DhtOpHash> =
+                    receipts.iter().map(|r| r.dht_op_hash.clone()).collect();
                 for receipt in receipts {
                     vault
                         .write_async(move |txn| {
@@ -85,6 +89,11 @@ pub async fn validation_receipt_workflow(
                         })
                         .await?;
                 }
+                // Mirror: clear `require_receipt` on the new-DB `ChainOp` rows.
+                dht_store
+                    .clear_require_receipts(op_hashes)
+                    .await
+                    .map_err(WorkflowError::from)?;
                 continue;
             }
         }
@@ -101,6 +110,8 @@ pub async fn validation_receipt_workflow(
         {
             Ok(()) => {
                 // Mark them sent so we don't keep trying
+                let op_hashes: Vec<DhtOpHash> =
+                    receipts.iter().map(|r| r.dht_op_hash.clone()).collect();
                 for receipt in receipts {
                     vault
                         .write_async(move |txn| {
@@ -108,6 +119,11 @@ pub async fn validation_receipt_workflow(
                         })
                         .await?;
                 }
+                // Mirror: clear `require_receipt` on the new-DB `ChainOp` rows.
+                dht_store
+                    .clear_require_receipts(op_hashes)
+                    .await
+                    .map_err(WorkflowError::from)?;
             }
             Err(e) => {
                 info!(failed_to_sign_and_send_receipt = ?e);

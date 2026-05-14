@@ -646,6 +646,22 @@ impl DhtStore<DbWrite<Dht>> {
         Ok(promoted)
     }
 
+    /// Clear `require_receipt = 0` on the `ChainOp` row for each given op hash.
+    /// Called by the validation receipt workflow after a receipt has been sent.
+    pub async fn clear_require_receipts(
+        &self,
+        op_hashes: Vec<DhtOpHash>,
+    ) -> StateMutationResult<()> {
+        let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
+        for hash in op_hashes {
+            tx.clear_chain_op_require_receipt(&hash)
+                .await
+                .map_err(StateMutationError::from)?;
+        }
+        tx.commit().await.map_err(StateMutationError::from)?;
+        Ok(())
+    }
+
     /// Update `ChainOpPublish.last_publish_time = now` for each given op hash.
     pub async fn record_published_op_hashes(
         &self,

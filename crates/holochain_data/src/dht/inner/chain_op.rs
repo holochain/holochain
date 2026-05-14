@@ -24,6 +24,8 @@ pub struct InsertChainOp<'a> {
     /// `true` when this authority locally validated the op; `false` when
     /// accepted via receipts only.
     pub locally_validated: bool,
+    /// `true` while a validation receipt is still owed to the op's author.
+    pub require_receipt: bool,
     /// Microsecond timestamp at which the op was received.
     pub when_received: Timestamp,
     /// Microsecond timestamp at which the op was integrated.
@@ -42,9 +44,9 @@ where
     sqlx::query(
         "INSERT INTO ChainOp
             (hash, op_type, action_hash, basis_hash, storage_center_loc,
-             validation_status, locally_validated, when_received, when_integrated,
-             serialized_size)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+             validation_status, locally_validated, require_receipt,
+             when_received, when_integrated, serialized_size)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(op.op_hash.get_raw_36())
     .bind(op.op_type)
@@ -53,12 +55,29 @@ where
     .bind(op.storage_center_loc as i64)
     .bind(i64::from(op.validation_status))
     .bind(op.locally_validated as i64)
+    .bind(op.require_receipt as i64)
     .bind(op.when_received.as_micros())
     .bind(op.when_integrated.as_micros())
     .bind(op.serialized_size as i64)
     .execute(executor)
     .await?;
     Ok(())
+}
+
+/// Clear the `require_receipt` flag for the given op on the `ChainOp` table.
+/// Returns the number of rows updated.
+pub(crate) async fn clear_require_receipt<'e, E>(
+    executor: E,
+    op_hash: &DhtOpHash,
+) -> sqlx::Result<u64>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let result = sqlx::query("UPDATE ChainOp SET require_receipt = 0 WHERE hash = ?")
+        .bind(op_hash.get_raw_36())
+        .execute(executor)
+        .await?;
+    Ok(result.rows_affected())
 }
 
 pub(crate) async fn get_chain_op<'e, E>(
@@ -70,8 +89,8 @@ where
 {
     sqlx::query_as(
         "SELECT hash, op_type, action_hash, basis_hash, storage_center_loc,
-                validation_status, locally_validated, when_received, when_integrated,
-                serialized_size
+                validation_status, locally_validated, require_receipt,
+                when_received, when_integrated, serialized_size
          FROM ChainOp WHERE hash = ?",
     )
     .bind(hash.get_raw_36())
