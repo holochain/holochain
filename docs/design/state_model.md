@@ -198,6 +198,9 @@ CREATE TABLE ChainOp (
     validation_status INTEGER NOT NULL, -- 1=accepted, 2=rejected
     locally_validated BOOLEAN NOT NULL, -- whether this op was validated by us, or fetched from an authority
 
+    -- Validation receipt requirement
+    require_receipt BOOLEAN NOT NULL,    -- copied from LimboChainOp at promotion; cleared after the receipt is sent
+
     -- Timing
     when_received   INTEGER NOT NULL, -- set at authoring time for self-authored ops, or copied from LimboChainOp
     when_integrated INTEGER NOT NULL, -- set at authoring time for self-authored ops, or when moved out of LimboChainOp
@@ -517,9 +520,18 @@ The high-level flow for authoring actions and distributing ops is as follows:
    └─> Update `last_publish_time` in `ChainOpPublish` (or `WarrantPublish`)
 
 5. Validation Receipt Workflow
-   ├─> Receive validation receipts from validators
-   ├─> Insert into `ValidationReceipt` table
-   └─> Update `receipts_complete` in `ChainOpPublish` when sufficient receipts received
+   ├─> Send side (validator): scan `ChainOp` for rows with `require_receipt = 1`
+   │     ├─> Sign and send a validation receipt to the op's author
+   │     └─> Clear `require_receipt` on the `ChainOp` row once the receipt is sent
+   └─> Receive side (author):
+         ├─> Receive validation receipts from validators
+         ├─> Insert into `ValidationReceipt` table
+         └─> Update `receipts_complete` in `ChainOpPublish` when sufficient receipts received
+
+   The `require_receipt` flag is set on `LimboChainOp` at ingress (step 7 of the
+   incoming workflow) and carried into `ChainOp` at integration time. It is
+   never modified while the op is in limbo — it is only cleared after the
+   receipt has been sent.
 
 6. Countersigning Workflow (if applicable)
    ├─> Lock the chain: Insert into `ChainLock` with session subject and expiration
@@ -986,6 +998,7 @@ ORDER BY LimboChainOp.when_received
 
 2. **Move Op to ChainOp Table**
    - Start a write transaction for each op.
+   - `require_receipt` is carried across so the validation receipt workflow can act on the integrated row.
    - Execute the following insert:
    ```sql
    INSERT INTO ChainOp (
@@ -996,6 +1009,7 @@ ORDER BY LimboChainOp.when_received
        storage_center_loc,
        validation_status,
        locally_validated,
+       require_receipt,
        when_received,
        when_integrated,
        serialized_size
@@ -1010,10 +1024,11 @@ ORDER BY LimboChainOp.when_received
            WHEN sys_validation_status = 1 AND app_validation_status = 1 THEN 1
            ELSE 2
        END,
-       TRUE,  -- locally_validated
+       TRUE,             -- locally_validated
+       require_receipt,  -- copied from LimboChainOp
        when_received,
        unixepoch(),
-       serialized_size  -- calculated when op arrived
+       serialized_size   -- calculated when op arrived
    FROM LimboChainOp
    WHERE hash = :op_hash
    ```
@@ -1134,9 +1149,14 @@ ORDER BY LimboChainOp.when_received
 6. **Commit Transaction**
     - Commit the write transaction to finalize changes for this op.
 
-7. **Send Validation Receipt** (if required)
-   - If op came from network and `require_receipt = true`
-   - Send a signed validation receipt back to the author
+7. **Trigger Validation Receipt Workflow**
+   - Send a trigger to the `validation_receipt_workflow` queue consumer.
+   - That workflow runs independently of integration. It scans `ChainOp` for
+     rows with `require_receipt = 1`, signs a validation receipt for each,
+     sends it to the op's author, and then clears the flag via
+     `UPDATE ChainOp SET require_receipt = 0 WHERE hash = ?`. The flag is the
+     *only* signal a receipt is owed; once cleared, the op is not re-processed
+     by this workflow.
 
 ### Record Validity Aggregation
 

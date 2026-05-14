@@ -363,7 +363,7 @@ impl Cell {
 
                 let author = self.id.agent_pubkey().clone();
                 // In case of an error, a persisted fn needs to be unscheduled.
-                let _ = authored_db
+                let legacy_write = authored_db
                     .write_async(move |txn| {
                         for ((scheduled_fn, ephemeral), result) in dispatched.into_iter().zip(results.iter()) {
                             match result {
@@ -410,8 +410,11 @@ impl Cell {
                         Result::<(), DatabaseError>::Ok(())
                     })
                     .await;
+                if let Err(ref err) = legacy_write {
+                    error!("error applying legacy scheduled-fn updates: {:?}", err);
+                }
 
-                // Mirror the legacy unschedule/reschedule decisions in the new DHT DB.
+                // Mirror the unschedule/reschedule decisions in the new DHT DB.
                 for (scheduled_fn, action) in new_db_decisions {
                     match action {
                         // Ephemeral fn: no persistent state to update.
@@ -671,6 +674,7 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
 
                 let receipt_op_hash = receipt.receipt.dht_op_hash.clone();
                 let receipt_op_hash_for_new_db = receipt_op_hash.clone();
+                let receipt_for_new_db = receipt.clone();
 
                 let receipt_count = self
                     .space
@@ -709,6 +713,16 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
                     })
                     .await?;
 
+                // Mirror: record the validation receipt in the new DHT DB.
+                // Capture any mirror error here — we must not let it skip the
+                // legacy completion path below.
+                let receipt_mirror_result = self
+                    .space
+                    .dht_store
+                    .record_validation_receipt(&receipt_for_new_db)
+                    .await
+                    .map_err(|e| CellError::from(HolochainP2pError::other(e)));
+
                 // If we have enough receipts then set receipts to complete.
                 if receipt_count >= required_validation_count as usize {
                     // Note that the flag is set in the authored db because that's what the publish workflow checks to decide
@@ -726,6 +740,9 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
                         .await
                         .map_err(|e| CellError::from(HolochainP2pError::other(e)))?;
                 }
+
+                // Propagate any earlier mirror error after the legacy path completes.
+                receipt_mirror_result?;
             }
 
             CellResult::Ok(())

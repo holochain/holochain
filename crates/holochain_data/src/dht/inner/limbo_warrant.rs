@@ -3,7 +3,7 @@
 use crate::models::dht::LimboWarrantRow;
 use holo_hash::{AgentPubKey, DhtOpHash};
 use holochain_timestamp::Timestamp;
-use sqlx::{Executor, Sqlite};
+use sqlx::{Executor, Sqlite, SqliteConnection};
 
 /// Parameters for inserting a row into `LimboWarrant`.
 pub struct InsertLimboWarrant<'a> {
@@ -78,7 +78,7 @@ where
 {
     sqlx::query_as(
         "SELECT * FROM LimboWarrant
-         WHERE sys_validation_status IS NULL AND abandoned_at IS NULL
+         WHERE sys_validation_status IS NULL
          ORDER BY sys_validation_attempts, when_received
          LIMIT ?",
     )
@@ -96,13 +96,32 @@ where
 {
     sqlx::query_as(
         "SELECT * FROM LimboWarrant
-         WHERE abandoned_at IS NOT NULL OR sys_validation_status IN (1, 2)
+         WHERE sys_validation_status IN (1, 2)
          ORDER BY when_received
          LIMIT ?",
     )
     .bind(limit as i64)
     .fetch_all(executor)
     .await
+}
+
+pub(crate) async fn set_sys_validation_status<'e, E>(
+    executor: E,
+    hash: &DhtOpHash,
+    status: Option<i64>,
+) -> sqlx::Result<u64>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let result = sqlx::query(
+        "UPDATE LimboWarrant SET sys_validation_status = ?
+         WHERE hash = ? AND sys_validation_status IS NULL",
+    )
+    .bind(status)
+    .bind(hash.get_raw_36())
+    .execute(executor)
+    .await?;
+    Ok(result.rows_affected())
 }
 
 pub(crate) async fn delete_limbo_warrant<'e, E>(executor: E, hash: DhtOpHash) -> sqlx::Result<()>
@@ -114,4 +133,58 @@ where
         .execute(executor)
         .await?;
     Ok(())
+}
+
+/// Promote a `LimboWarrant` row to the `Warrant` table.
+///
+/// Reads the limbo row, inserts into `Warrant` with the carried fields, then
+/// deletes the limbo row. All three statements run on the given connection.
+/// **The caller must wrap this call in a transaction** to ensure atomicity.
+///
+/// Returns `true` if the limbo row existed and was promoted, `false` if it
+/// did not exist.
+///
+/// Note: the `Warrant` table has no `when_integrated` column, so no
+/// integration timestamp is stored.
+pub(crate) async fn promote_to_warrant(
+    conn: &mut SqliteConnection,
+    hash: &DhtOpHash,
+) -> sqlx::Result<bool> {
+    // SELECT the limbo row's payload.
+    let row: Option<LimboWarrantRow> = sqlx::query_as(
+        "SELECT hash, author, timestamp, warrantee, proof, storage_center_loc,
+                sys_validation_status, abandoned_at, when_received,
+                sys_validation_attempts, last_validation_attempt, serialized_size
+         FROM LimboWarrant WHERE hash = ?",
+    )
+    .bind(hash.get_raw_36())
+    .fetch_optional(&mut *conn)
+    .await?;
+
+    let limbo = match row {
+        Some(r) => r,
+        None => return Ok(false),
+    };
+
+    // INSERT into Warrant.
+    sqlx::query(
+        "INSERT INTO Warrant (hash, author, timestamp, warrantee, proof, storage_center_loc)
+         VALUES (?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&limbo.hash)
+    .bind(&limbo.author)
+    .bind(limbo.timestamp)
+    .bind(&limbo.warrantee)
+    .bind(&limbo.proof)
+    .bind(limbo.storage_center_loc)
+    .execute(&mut *conn)
+    .await?;
+
+    // DELETE the limbo row.
+    sqlx::query("DELETE FROM LimboWarrant WHERE hash = ?")
+        .bind(hash.get_raw_36())
+        .execute(&mut *conn)
+        .await?;
+
+    Ok(true)
 }

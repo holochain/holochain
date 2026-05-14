@@ -10,17 +10,19 @@ pub(crate) async fn insert_chain_op_publish<'e, E>(
     op_hash: &DhtOpHash,
     last_publish_time: Option<Timestamp>,
     receipts_complete: Option<bool>,
+    withhold_publish: Option<bool>,
 ) -> sqlx::Result<()>
 where
     E: Executor<'e, Database = Sqlite>,
 {
     sqlx::query(
-        "INSERT INTO ChainOpPublish (op_hash, last_publish_time, receipts_complete)
-         VALUES (?, ?, ?)",
+        "INSERT INTO ChainOpPublish (op_hash, last_publish_time, receipts_complete, withhold_publish)
+         VALUES (?, ?, ?, ?)",
     )
     .bind(op_hash.get_raw_36())
     .bind(last_publish_time.map(|t| t.as_micros()))
     .bind(receipts_complete.map(|b| b as i64))
+    .bind(withhold_publish.map(|b| b as i64))
     .execute(executor)
     .await?;
     Ok(())
@@ -34,7 +36,7 @@ where
     E: Executor<'e, Database = Sqlite>,
 {
     sqlx::query_as(
-        "SELECT op_hash, last_publish_time, receipts_complete
+        "SELECT op_hash, last_publish_time, receipts_complete, withhold_publish
          FROM ChainOpPublish WHERE op_hash = ?",
     )
     .bind(op_hash.get_raw_36())
@@ -52,6 +54,38 @@ where
     E: Executor<'e, Database = Sqlite>,
 {
     let result = sqlx::query("UPDATE ChainOpPublish SET receipts_complete = 1 WHERE op_hash = ?")
+        .bind(op_hash.get_raw_36())
+        .execute(executor)
+        .await?;
+    Ok(result.rows_affected())
+}
+
+/// Update `last_publish_time` for the given op. Returns the number of rows updated.
+pub(crate) async fn set_last_publish_time<'e, E>(
+    executor: E,
+    op_hash: &DhtOpHash,
+    when: Timestamp,
+) -> sqlx::Result<u64>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let result = sqlx::query("UPDATE ChainOpPublish SET last_publish_time = ? WHERE op_hash = ?")
+        .bind(when.as_micros())
+        .bind(op_hash.get_raw_36())
+        .execute(executor)
+        .await?;
+    Ok(result.rows_affected())
+}
+
+/// Clear `withhold_publish` (set to NULL) for the given op. Returns the number of rows updated.
+pub(crate) async fn clear_withhold_publish<'e, E>(
+    executor: E,
+    op_hash: &DhtOpHash,
+) -> sqlx::Result<u64>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let result = sqlx::query("UPDATE ChainOpPublish SET withhold_publish = NULL WHERE op_hash = ?")
         .bind(op_hash.get_raw_36())
         .execute(executor)
         .await?;

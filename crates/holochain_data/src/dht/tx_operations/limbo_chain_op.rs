@@ -5,6 +5,8 @@ use crate::handles::{TxRead, TxWrite};
 use crate::kind::Dht;
 use crate::models::dht::LimboChainOpRow;
 use holo_hash::DhtOpHash;
+use holochain_integrity_types::dht_v2::OpValidity;
+use holochain_timestamp::Timestamp;
 
 impl TxWrite<Dht> {
     pub async fn insert_limbo_chain_op(&mut self, op: InsertLimboChainOp<'_>) -> sqlx::Result<()> {
@@ -13,6 +15,51 @@ impl TxWrite<Dht> {
 
     pub async fn delete_limbo_chain_op(&mut self, hash: DhtOpHash) -> sqlx::Result<()> {
         limbo_chain_op::delete_limbo_chain_op(self.conn_mut(), hash).await
+    }
+
+    /// Set the system-validation status for the given op. Returns the number of rows updated.
+    pub async fn set_limbo_chain_op_sys_validation_status(
+        &mut self,
+        op_hash: &DhtOpHash,
+        status: Option<i64>,
+    ) -> sqlx::Result<u64> {
+        limbo_chain_op::set_sys_validation_status(self.conn_mut(), op_hash, status).await
+    }
+
+    /// Set the app-validation status for the given op. Returns the number of rows updated.
+    pub async fn set_limbo_chain_op_app_validation_status(
+        &mut self,
+        op_hash: &DhtOpHash,
+        status: Option<i64>,
+    ) -> sqlx::Result<u64> {
+        limbo_chain_op::set_app_validation_status(self.conn_mut(), op_hash, status).await
+    }
+
+    /// Force both sys and app validation status to `Rejected`, bypassing the
+    /// normal ordering constraints.  Returns the number of rows updated.
+    pub async fn force_reject_limbo_chain_op(&mut self, op_hash: &DhtOpHash) -> sqlx::Result<u64> {
+        limbo_chain_op::force_reject(self.conn_mut(), op_hash).await
+    }
+
+    /// Atomically promote a `LimboChainOp` row to the `ChainOp` table using
+    /// the current transaction.
+    ///
+    /// Returns `true` if the limbo row existed and was promoted, `false` if it
+    /// did not exist.  The caller's transaction is used — commit or rollback is
+    /// the caller's responsibility.
+    pub async fn promote_limbo_chain_op(
+        &mut self,
+        op_hash: &DhtOpHash,
+        validation_status: OpValidity,
+        when_integrated: Timestamp,
+    ) -> sqlx::Result<bool> {
+        limbo_chain_op::promote_to_chain_op(
+            self.conn_mut(),
+            op_hash,
+            validation_status,
+            when_integrated,
+        )
+        .await
     }
 }
 

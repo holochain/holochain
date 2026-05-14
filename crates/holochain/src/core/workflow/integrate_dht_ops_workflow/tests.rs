@@ -11,7 +11,7 @@ use holochain_sqlite::error::{DatabaseError, DatabaseResult};
 use holochain_state::mutations;
 use holochain_state::query::link::{GetLinksFilter, GetLinksQuery};
 use holochain_state::test_utils::{
-    test_authored_db_with_id, test_dht_db, test_dht_db_with_dna_hash, TestDb,
+    test_authored_db_with_id, test_dht_db, test_dht_db_with_dna_hash, test_dht_store, TestDb,
 };
 use holochain_state::validation_db::ValidationStage;
 use holochain_types::prelude::{ChainOp, DhtOp, DhtOpHashed, Signature};
@@ -373,6 +373,7 @@ impl Db {
 
 async fn call_workflow(env: DbWrite<DbKindDht>, dna_hash: DnaHash) {
     let (qt, _rx) = TriggerSender::new();
+    let dht_store = test_dht_store(dna_hash.clone()).await;
 
     let mut mock_hc_p2p = MockHolochainP2pDnaT::new();
     mock_hc_p2p.expect_dna_hash().return_const(dna_hash);
@@ -383,6 +384,7 @@ async fn call_workflow(env: DbWrite<DbKindDht>, dna_hash: DnaHash) {
     let mock_network = Arc::new(mock_hc_p2p);
     integrate_dht_ops_workflow(
         env,
+        dht_store,
         qt,
         mock_network,
         mock_authored_db_provider_none(),
@@ -934,6 +936,7 @@ async fn publish_trigger_provider_is_called() {
 
     // Set up network mock
     let (qt, _rx) = TriggerSender::new();
+    let dht_store = test_dht_store(dna_hash.clone()).await;
     let mut hc_p2p = MockHolochainP2pDnaT::new();
     hc_p2p.expect_dna_hash().return_const(dna_hash.clone());
     hc_p2p
@@ -944,6 +947,7 @@ async fn publish_trigger_provider_is_called() {
     // Run the workflow
     integrate_dht_ops_workflow(
         dht_env.clone(),
+        dht_store,
         qt,
         mock_network,
         authored_mock,
@@ -1006,6 +1010,7 @@ async fn inform_kitsune_about_integrated_ops() {
 
         let (tx, _rx) = TriggerSender::new();
         let dna_hash = fixt!(DnaHash);
+        let dht_store = test_dht_store(dna_hash.clone()).await;
         let mut hc_p2p = MockHolochainP2pDnaT::new();
         hc_p2p.expect_dna_hash().return_const(dna_hash.clone());
         hc_p2p
@@ -1022,6 +1027,7 @@ async fn inform_kitsune_about_integrated_ops() {
         let hc_p2p = Arc::new(hc_p2p);
         integrate_dht_ops_workflow(
             env,
+            dht_store,
             tx,
             hc_p2p,
             mock_authored_db_provider_none(),
@@ -1043,12 +1049,14 @@ async fn kitsune_not_informed_when_no_ops_integrated() {
     Db::set(pre_state, env.clone()).await;
 
     let (tx, _rx) = TriggerSender::new();
+    let dht_store = test_dht_store(dna_hash.clone()).await;
     let mut hc_p2p = MockHolochainP2pDnaT::new();
     hc_p2p.expect_dna_hash().return_const(dna_hash.clone());
     hc_p2p.expect_new_integrated_data().never();
     let hc_p2p = Arc::new(hc_p2p);
     integrate_dht_ops_workflow(
         env,
+        dht_store,
         tx,
         hc_p2p,
         mock_authored_db_provider_none(),
@@ -1089,6 +1097,7 @@ async fn single_local_author_marks_both_databases() {
     );
 
     let (tx, _rx) = TriggerSender::new();
+    let dht_store = test_dht_store(dna_hash.clone()).await;
     let mut hc_p2p = MockHolochainP2pDnaT::new();
     hc_p2p.expect_dna_hash().return_const(dna_hash.clone());
     hc_p2p.expect_new_integrated_data().return_once(move |ops| {
@@ -1100,6 +1109,7 @@ async fn single_local_author_marks_both_databases() {
 
     integrate_dht_ops_workflow(
         dht_env.clone(),
+        dht_store,
         tx,
         mock_network,
         mock,
@@ -1166,6 +1176,7 @@ async fn multiple_local_authors_marked_integrated() {
     );
 
     let (tx, _rx) = TriggerSender::new();
+    let dht_store = test_dht_store(dna_hash.clone()).await;
     let mut hc_p2p = MockHolochainP2pDnaT::new();
     hc_p2p.expect_dna_hash().return_const(dna_hash.clone());
     hc_p2p
@@ -1180,6 +1191,7 @@ async fn multiple_local_authors_marked_integrated() {
 
     integrate_dht_ops_workflow(
         dht_env.clone(),
+        dht_store,
         tx,
         mock_network,
         mock,
@@ -1299,10 +1311,12 @@ async fn publish_triggered_for_integrated_local_authored_ops() {
 
     // Create trigger
     let (tx, _rx) = TriggerSender::new();
+    let dht_store = test_dht_store(dna_hash.clone()).await;
 
     // Run workflow
     integrate_dht_ops_workflow(
         dht_env.clone(),
+        dht_store,
         tx,
         mock_network,
         Arc::new(authored_mock),

@@ -7,8 +7,8 @@ use holo_hash::{ActionHash, DnaHash};
 use holochain::{
     prelude::{DisabledAppReason, InlineZomeSet},
     sweettest::{
-        await_consistency, SweetCell, SweetConductor, SweetConductorBatch, SweetConductorConfig,
-        SweetDnaFile, SweetInlineZomes,
+        await_consistency, await_consistency_s, SweetCell, SweetConductor, SweetConductorBatch,
+        SweetConductorConfig, SweetDnaFile, SweetInlineZomes,
     },
     test_utils::retry_fn_until_timeout,
 };
@@ -441,7 +441,9 @@ mod zero_arc {
         let (bob_conductor, bob_cell) = conductors_and_cells.remove(0);
         let (carol_conductor, carol_cell) = conductors_and_cells.remove(0);
 
-        await_consistency([&alice_cell, &bob_cell]).await.unwrap();
+        await_consistency_s(120, [&alice_cell, &bob_cell])
+            .await
+            .unwrap();
 
         // Ensure that Carol knows about Bob's full arc.
         bob_conductor
@@ -460,7 +462,9 @@ mod zero_arc {
             )
             .await;
 
-        await_consistency([&alice_cell, &bob_cell]).await.unwrap();
+        await_consistency_s(120, [&alice_cell, &bob_cell])
+            .await
+            .unwrap();
 
         // Bob should have issued a warrant against Alice.
 

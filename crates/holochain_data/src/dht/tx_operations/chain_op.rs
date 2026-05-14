@@ -5,10 +5,29 @@ use crate::handles::{TxRead, TxWrite};
 use crate::kind::Dht;
 use crate::models::dht::ChainOpRow;
 use holo_hash::{ActionHash, AnyDhtHash, DhtOpHash};
+use holochain_integrity_types::dht_v2::OpValidity;
 
 impl TxWrite<Dht> {
     pub async fn insert_chain_op(&mut self, op: InsertChainOp<'_>) -> sqlx::Result<()> {
         chain_op::insert_chain_op(self.conn_mut(), op).await
+    }
+
+    /// Update `validation_status` for the given op. Returns the number of rows updated.
+    pub async fn set_chain_op_validation_status(
+        &mut self,
+        op_hash: &DhtOpHash,
+        validation_status: OpValidity,
+    ) -> sqlx::Result<u64> {
+        chain_op::set_validation_status(self.conn_mut(), op_hash, validation_status).await
+    }
+
+    /// Clear the `require_receipt` flag on the `ChainOp` row for the given op.
+    /// Returns the number of rows updated.
+    pub async fn clear_chain_op_require_receipt(
+        &mut self,
+        op_hash: &DhtOpHash,
+    ) -> sqlx::Result<u64> {
+        chain_op::clear_require_receipt(self.conn_mut(), op_hash).await
     }
 }
 

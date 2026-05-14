@@ -98,6 +98,7 @@ pub async fn spawn_queue_consumer_tasks(
     let tx_publish = spawn_publish_dht_ops_consumer(
         cell_id.clone(),
         authored_db.clone(),
+        space.dht_store.clone(),
         conductor.clone(),
         network.clone(),
     );
@@ -109,6 +110,7 @@ pub async fn spawn_queue_consumer_tasks(
         spawn_validation_receipt_consumer(
             dna_hash.clone(),
             dht_db.clone(),
+            space.dht_store.clone(),
             conductor.clone(),
             network.clone(),
         )
@@ -120,6 +122,7 @@ pub async fn spawn_queue_consumer_tasks(
         spawn_integrate_dht_ops_consumer(
             dna_hash.clone(),
             dht_db.clone(),
+            space.dht_store.clone(),
             conductor.task_manager(),
             tx_receipt.clone(),
             network.clone(),
@@ -153,6 +156,7 @@ pub async fn spawn_queue_consumer_tasks(
             SysValidationWorkspace::new(
                 authored_db.clone(),
                 dht_db.clone(),
+                space.dht_store.clone(),
                 cache.clone(),
                 cell_id.dna_hash().clone(),
                 conductor

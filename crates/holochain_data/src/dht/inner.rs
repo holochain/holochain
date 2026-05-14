@@ -1,6 +1,6 @@
 //! Free-standing `async fn`s over `sqlx::Executor` for each DHT domain.
 //!
-//! Each submodule mirrors a single SQL table (or — for `entry` — the
+//! Each submodule covers a single SQL table (or — for `entry` — the
 //! `Entry` and `PrivateEntry` pair). The handle layers (`db_operations` /
 //! `tx_operations`) are thin wrappers that acquire the appropriate executor
 //! and delegate here.

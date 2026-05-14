@@ -314,9 +314,9 @@ impl SourceChain {
 
         let now = Timestamp::now();
 
-        // Snapshots for the new-DB mirror block. Both the legacy closure and
-        // the new-DB block consume the same drained values; these clones are
-        // cheap (Vec<HoloHashed<_>> / Vec<ScheduledFn>).
+        // Snapshots reused by the new-DB write block after the legacy closure
+        // consumes the originals; these clones are cheap
+        // (Vec<HoloHashed<_>> / Vec<ScheduledFn>).
         let entries_for_new_db = entries.clone();
         let actions_for_new_db = actions.clone();
         let ops_for_new_db = ops.clone();
@@ -449,7 +449,7 @@ impl SourceChain {
             Ok((actions, permit)) => {
                 drop(permit);
 
-                // Mirror the authored-side writes to the new holochain_data DHT DB.
+                // Write the authored-side data to the new holochain_data DHT DB.
                 // Strict on failure: if anything here fails, the whole flush fails.
                 {
                     // `author` was moved into the legacy closure above; re-clone from `self`.
@@ -592,8 +592,8 @@ impl SourceChain {
                         // ChainOp.basis_hash in the new schema is AnyDhtHash (all
                         // authored ops' bases are DHT-addressable entries or actions).
                         // TODO: ChainOp.basis_hash uses AnyDhtHash, which lacks External.
-                        // Authored CreateLink with External basis cannot mirror to ChainOp
-                        // until the new schema widens basis_hash to AnyLinkableHash.
+                        // Authored CreateLink with External basis cannot be inserted into
+                        // ChainOp until the new schema widens basis_hash to AnyLinkableHash.
                         // Action and Link rows are still inserted; the legacy DB still has
                         // the ChainOp row.
                         let basis_hash: AnyDhtHash = match AnyDhtHash::try_from(linkable_basis) {
@@ -622,6 +622,7 @@ impl SourceChain {
                             validation_status:
                                 holochain_zome_types::dht_v2::RecordValidity::Accepted,
                             locally_validated: true,
+                            require_receipt: false,
                             when_received: *timestamp,
                             when_integrated: *timestamp,
                             serialized_size,
@@ -631,7 +632,14 @@ impl SourceChain {
 
                         // Always insert a ChainOpPublish row for self-authored ops so the
                         // publish workflow can track them without a separate lookup.
-                        tx.insert_chain_op_publish(op_hash, None, None)
+                        // Countersigning ops are withheld from publishing until the
+                        // session succeeds.
+                        let withhold = if is_countersigning_session {
+                            Some(true)
+                        } else {
+                            None
+                        };
+                        tx.insert_chain_op_publish(op_hash, None, None, withhold)
                             .await
                             .map_err(SourceChainError::other)?;
                     }
@@ -643,7 +651,7 @@ impl SourceChain {
                         let maybe_schedule_blob =
                             serialize_maybe_schedule_none().map_err(SourceChainError::other)?;
                         let _ = tx
-                            .insert_scheduled_function(
+                            .upsert_scheduled_function(
                                 holochain_data::dht::InsertScheduledFunction {
                                     author: author.as_ref(),
                                     zome_name: scheduled_fn.zome_name().0.as_ref(),
@@ -660,7 +668,6 @@ impl SourceChain {
 
                     tx.commit().await.map_err(SourceChainError::other)?;
                 }
-                // End of new-DB mirror block.
 
                 authored_ops_to_dht_db(
                     storage_arcs,
@@ -1455,8 +1462,8 @@ pub async fn genesis(
     let (agent_action, agent_entry) = agent_record.clone().into_inner();
     let agent_entry = agent_entry.into_option();
 
-    // Pre-compute (op, op_hash, timestamp) tuples for the new-DB mirror block.
-    // This mirrors what put_raw does internally via ChainOpUniqueForm::op_hash,
+    // Pre-compute (op, op_hash, timestamp) tuples for the new-DB write block.
+    // This matches what put_raw does internally via ChainOpUniqueForm::op_hash,
     // but done upfront so we can keep the actions and ops available for the
     // new-DB write without moving them into the legacy closure.
     //
@@ -1487,7 +1494,7 @@ pub async fn genesis(
         }
     }
 
-    // Clone the actions and agent entry for the new-DB mirror block.
+    // Clone the actions and agent entry for the new-DB write block.
     // The originals are moved into the legacy authored write closure below.
     let dna_action_for_new_db = dna_action.clone();
     let agent_validation_action_for_new_db = agent_validation_action.clone();
@@ -1523,7 +1530,7 @@ pub async fn genesis(
     // these items, so we assume we are an authority.
     authored_ops_to_dht_db_without_check(ops_to_integrate, authored.clone().into(), dht_db).await?;
 
-    // Mirror genesis writes to the new holochain_data DHT DB.
+    // Write the genesis actions, entries and ops to the new holochain_data DHT DB.
     {
         let mut tx = dht_store
             .db()
@@ -1593,6 +1600,7 @@ pub async fn genesis(
                 storage_center_loc,
                 validation_status: holochain_zome_types::dht_v2::RecordValidity::Accepted,
                 locally_validated: true,
+                require_receipt: false,
                 when_received: *timestamp,
                 when_integrated: *timestamp,
                 serialized_size,
@@ -1600,14 +1608,13 @@ pub async fn genesis(
             .await
             .map_err(SourceChainError::other)?;
 
-            tx.insert_chain_op_publish(op_hash, None, None)
+            tx.insert_chain_op_publish(op_hash, None, None, None)
                 .await
                 .map_err(SourceChainError::other)?;
         }
 
         tx.commit().await.map_err(SourceChainError::other)?;
     }
-    // End of new-DB mirror block.
 
     Ok(())
 }
@@ -1757,7 +1764,7 @@ pub async fn dump_state(
 }
 
 // ---------------------------------------------------------------------------
-// Private helpers for the new-DB mirror block in `flush`
+// Private helpers for the new-DB writes in `flush` and `genesis`
 // ---------------------------------------------------------------------------
 
 /// Convert a legacy [`SignedActionHashed`] (using the variant-per-type `Action`
@@ -1768,7 +1775,7 @@ pub async fn dump_state(
 /// original (the v2 hash is content-derived, so re-hashing would change it;
 /// the pre-hashed constructor preserves the existing hash as the canonical
 /// identity during the dual-write transition).
-fn legacy_to_dht_v2_signed_action(
+pub(crate) fn legacy_to_dht_v2_signed_action(
     shh: &SignedActionHashed,
 ) -> holochain_zome_types::dht_v2::SignedActionHashed {
     use holochain_zome_types::dht_v2::{
@@ -1901,7 +1908,7 @@ fn serialize_maybe_schedule_none(
 /// (if any) is looked up by `Action::entry_hash` in `entries`. Returns `0`
 /// only if the op cannot be reconstructed because the action is missing —
 /// which would indicate a programming error in the caller.
-fn encoded_chain_op_size(
+pub(crate) fn encoded_chain_op_size(
     op: &holochain_types::dht_op::ChainOpLite,
     actions: &[SignedActionHashed],
     entries: &[holochain_types::EntryHashed],
@@ -1951,7 +1958,7 @@ mod tests {
     use ::fixt::fixt;
     use ::fixt::prelude::*;
     use holo_hash::fixt::DnaHashFixturator;
-    use holo_hash::fixt::{ActionHashFixturator, AgentPubKeyFixturator};
+    use holo_hash::fixt::{ActionHashFixturator, AgentPubKeyFixturator, EntryHashFixturator};
     use holochain_keystore::test_keystore;
     use holochain_zome_types::Entry;
     use matches::assert_matches;
@@ -3078,6 +3085,91 @@ mod tests {
                 .unwrap()
         });
         assert!(actual_warrants.is_empty());
+    }
+
+    /// Flush of a countersigning op writes `withhold_publish = 1` to `ChainOpPublish`
+    /// in the new DHT schema.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn flush_countersigning_op_sets_withhold_publish() {
+        use holochain_zome_types::countersigning::{
+            CounterSigningAgentState, CounterSigningSessionData, CounterSigningSessionTimes,
+            PreflightRequest,
+        };
+        use std::time::Duration;
+
+        let TestCase {
+            chain,
+            agent_key: alice,
+            dht_store,
+            keystore,
+            ..
+        } = TestCase::new().await;
+
+        // Second signing agent — exists only as a key; no local chain needed.
+        let bob = keystore.new_sign_keypair_random().await.unwrap();
+
+        // Build a preflight request for alice (index 0) and bob (index 1).
+        let app_entry_hash = fixt!(EntryHash);
+        let app_entry_type = EntryType::App(AppEntryDef::new(
+            EntryDefIndex(0),
+            0.into(),
+            EntryVisibility::Public,
+        ));
+        let start = Timestamp::now();
+        let end = (start + Duration::from_secs(60)).unwrap();
+        let session_times = CounterSigningSessionTimes::try_new(start, end).unwrap();
+        let preflight_request = PreflightRequest::try_new(
+            app_entry_hash,
+            vec![(alice.clone(), vec![]), (bob.clone(), vec![])],
+            vec![],
+            0,
+            false,
+            session_times,
+            ActionBase::Create(CreateBase::new(app_entry_type.clone())),
+            PreflightBytes(vec![]),
+        )
+        .unwrap();
+
+        // Alice accepts — this locks her chain and returns her agent state.
+        let alice_agent_state = chain
+            .accept_countersigning_preflight_request(preflight_request.clone(), 0)
+            .await
+            .unwrap();
+
+        // Build a fake Bob agent state (index 1). The test only cares that
+        // the flush path sets `withhold_publish`; full signature verification
+        // is not exercised here.
+        let bob_agent_state = CounterSigningAgentState::new(1, fixt!(ActionHash), 2);
+
+        let session_data = CounterSigningSessionData::try_new(
+            preflight_request,
+            vec![
+                (alice_agent_state, fixt!(Signature)),
+                (bob_agent_state, fixt!(Signature)),
+            ],
+            vec![],
+        )
+        .unwrap();
+
+        let entry = Entry::CounterSign(Box::new(session_data), fixt!(AppEntryBytes));
+        chain
+            .put_countersigned(entry, ChainTopOrdering::Strict, EntryRateWeight::default())
+            .await
+            .unwrap();
+
+        chain.flush(vec![DhtArc::Empty]).await.unwrap();
+
+        // Assert that at least one ChainOpPublish row carries withhold_publish = 1.
+        let withheld_count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM ChainOpPublish WHERE withhold_publish = 1")
+                .fetch_one(dht_store.db().pool())
+                .await
+                .unwrap();
+        assert!(
+            withheld_count > 0,
+            "expected at least one ChainOpPublish row with withhold_publish=1 \
+             after countersigning flush, got 0"
+        );
     }
 
     struct TestCase {

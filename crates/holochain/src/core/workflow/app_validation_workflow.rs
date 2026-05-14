@@ -211,6 +211,9 @@ async fn app_validation_workflow_inner(
     let failed_ops = Arc::new(Mutex::new(HashSet::new()));
     let mut agent_activity_ops = vec![];
     let mut warrant_op_hashes: Vec<(DhtOpHash, OpBasis)> = vec![];
+    // Collected for mirroring into DhtStore (new schema).
+    let mut warrant_ops_vec: Vec<DhtOpHashed> = vec![];
+    let mut app_validation_outcomes: Vec<(DhtOpHash, AppOutcome)> = vec![];
     // Track action hashes already warranted in this batch to avoid creating duplicate
     // warrants for the same action. Multiple op types (StoreRecord, StoreEntry,
     // RegisterAgentActivity) can share the same action, and without this deduplication
@@ -335,18 +338,30 @@ async fn app_validation_workflow_inner(
                         warrant_op_hashes
                             .push((warrant_op.to_hash(), warrant_op.dht_basis().clone()));
 
+                        let warrant_op_for_authored = warrant_op.clone();
                         if let Err(err) = workspace
                             .authored_db
                             .write_async(move |txn| {
                                 warn!("Inserting warrant op");
-                                insert_op_authored(txn, &warrant_op)
+                                insert_op_authored(txn, &warrant_op_for_authored)
                             })
                             .await
                         {
                             tracing::warn!("Error writing warrant op: {err}");
+                        } else {
+                            // Mirror into DhtStore only when the legacy write succeeded.
+                            warrant_ops_vec.push(warrant_op);
                         }
                     }
                 }
+
+                // Capture the outcome for mirroring into DhtStore (only Accepted/Rejected).
+                let app_outcome_opt = match &outcome {
+                    Outcome::Accepted => Some(AppOutcome::Accepted),
+                    Outcome::AwaitingDeps(_) => None, // status stays NULL; nothing to record
+                    Outcome::Rejected(_) => Some(AppOutcome::Rejected),
+                };
+                let outcome_dht_op_hash = dht_op_hash.clone();
 
                 let write_result = workspace
                     .dht_db
@@ -372,6 +387,9 @@ async fn app_validation_workflow_inner(
                     .await;
                 if let Err(err) = write_result {
                     tracing::error!(?chain_op, ?err, "Error updating dht op in database.");
+                } else if let Some(app_outcome) = app_outcome_opt {
+                    // Capture for mirroring after the legacy write commits.
+                    app_validation_outcomes.push((outcome_dht_op_hash, app_outcome));
                 }
             }
             Err(err) => {
@@ -404,6 +422,22 @@ async fn app_validation_workflow_inner(
             workspace.dht_db.clone(),
         )
         .await?;
+    }
+
+    // mirror app validation outcomes into the new DhtStore schema.
+    if !app_validation_outcomes.is_empty() {
+        workspace
+            .dht_store
+            .record_app_validation_outcomes(app_validation_outcomes)
+            .await?;
+    }
+
+    // mirror locally-validated warrant ops into the new DhtStore schema.
+    if !warrant_ops_vec.is_empty() {
+        workspace
+            .dht_store
+            .record_locally_validated_warrants(warrant_ops_vec)
+            .await?;
     }
 
     let outcome_summary = OutcomeSummary {

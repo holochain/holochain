@@ -131,6 +131,8 @@ CREATE TABLE ChainOp (
     validation_status  INTEGER NOT NULL,
     locally_validated  INTEGER NOT NULL,
 
+    require_receipt    INTEGER NOT NULL,
+
     when_received      INTEGER NOT NULL,
     when_integrated    INTEGER NOT NULL,
 
@@ -144,6 +146,7 @@ CREATE TABLE ChainOpPublish (
     op_hash           BLOB    PRIMARY KEY ON CONFLICT IGNORE,
     last_publish_time INTEGER,
     receipts_complete INTEGER,
+    withhold_publish  INTEGER,
     FOREIGN KEY(op_hash) REFERENCES ChainOp(hash)
 ) STRICT, WITHOUT ROWID;
 

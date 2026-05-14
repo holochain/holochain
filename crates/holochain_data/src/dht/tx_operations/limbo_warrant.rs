@@ -14,6 +14,25 @@ impl TxWrite<Dht> {
     pub async fn delete_limbo_warrant(&mut self, hash: DhtOpHash) -> sqlx::Result<()> {
         limbo_warrant::delete_limbo_warrant(self.conn_mut(), hash).await
     }
+
+    /// Set the system-validation status for the given warrant. Returns the number of rows updated.
+    pub async fn set_limbo_warrant_sys_validation_status(
+        &mut self,
+        hash: &DhtOpHash,
+        status: Option<i64>,
+    ) -> sqlx::Result<u64> {
+        limbo_warrant::set_sys_validation_status(self.conn_mut(), hash, status).await
+    }
+
+    /// Atomically promote a `LimboWarrant` row to the `Warrant` table using
+    /// the current transaction.
+    ///
+    /// Returns `true` if the limbo row existed and was promoted, `false` if it
+    /// did not exist.  The caller's transaction is used — commit or rollback is
+    /// the caller's responsibility.
+    pub async fn promote_limbo_warrant(&mut self, hash: &DhtOpHash) -> sqlx::Result<bool> {
+        limbo_warrant::promote_to_warrant(self.conn_mut(), hash).await
+    }
 }
 
 impl TxRead<Dht> {
