@@ -131,6 +131,8 @@ CREATE TABLE ChainOp (
     validation_status  INTEGER NOT NULL,
     locally_validated  INTEGER NOT NULL,
 
+    require_receipt    INTEGER NOT NULL,
+
     when_received      INTEGER NOT NULL,
     when_integrated    INTEGER NOT NULL,
 

@@ -13,6 +13,7 @@ use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::prelude::{DbKindDht, DbWrite};
 use holochain_state::prelude::*;
+use holochain_state::test_utils::test_dht_store;
 use rusqlite::named_params;
 use std::sync::Arc;
 
@@ -30,9 +31,11 @@ async fn no_running_cells() {
 
     let dna_hash = fixt!(DnaHash);
 
+    let dht_store = test_dht_store(dna_hash.clone()).await;
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
         vault,
+        dht_store,
         dna,
         keystore,
         vec![].into_iter().collect(), // No running cells
@@ -75,9 +78,11 @@ async fn do_not_block_or_send_to_self() {
 
     let validator = CellId::new(dna_hash.clone(), author);
 
+    let dht_store = test_dht_store(dna_hash.clone()).await;
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
         vault.clone(),
+        dht_store,
         dna,
         keystore,
         vec![validator].into_iter().collect(), // No running cells
@@ -118,9 +123,11 @@ async fn block_invalid_op_author() {
         keystore.new_sign_keypair_random().await.unwrap(),
     );
 
+    let dht_store = test_dht_store(dna_hash.clone()).await;
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
         vault.clone(),
+        dht_store,
         dna,
         keystore,
         vec![validator].into_iter().collect(),
@@ -161,9 +168,11 @@ async fn continues_if_receipt_cannot_be_signed() {
         fixt!(AgentPubKey), // Not valid because it won't be found in Lair
     );
 
+    let dht_store = test_dht_store(dna_hash.clone()).await;
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
         vault.clone(),
+        dht_store,
         dna,
         keystore,
         vec![invalid_validator].into_iter().collect(),
@@ -202,9 +211,11 @@ async fn send_validation_receipt() {
         keystore.new_sign_keypair_random().await.unwrap(),
     );
 
+    let dht_store = test_dht_store(dna_hash.clone()).await;
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
         vault.clone(),
+        dht_store,
         dna,
         keystore,
         vec![validator].into_iter().collect(), // No running cells
@@ -258,9 +269,11 @@ async fn errors_for_some_ops_does_not_prevent_the_workflow_proceeding() {
         keystore.new_sign_keypair_random().await.unwrap(),
     );
 
+    let dht_store = test_dht_store(dna_hash.clone()).await;
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
         vault.clone(),
+        dht_store,
         dna,
         keystore,
         vec![validator].into_iter().collect(), // No running cells
@@ -326,9 +339,11 @@ async fn skips_authors_not_recently_online_and_clears_require_receipt() {
         keystore.new_sign_keypair_random().await.unwrap(),
     );
 
+    let dht_store = test_dht_store(dna_hash.clone()).await;
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
         vault.clone(),
+        dht_store,
         dna,
         keystore,
         vec![validator].into_iter().collect(),

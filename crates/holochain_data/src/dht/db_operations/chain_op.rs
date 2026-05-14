@@ -20,6 +20,12 @@ impl DbWrite<Dht> {
     ) -> sqlx::Result<u64> {
         chain_op::set_validation_status(self.pool(), op_hash, validation_status).await
     }
+
+    /// Clear the `require_receipt` flag on the `ChainOp` row for the given op.
+    /// Returns the number of rows updated.
+    pub async fn clear_chain_op_require_receipt(&self, op_hash: &DhtOpHash) -> sqlx::Result<u64> {
+        chain_op::clear_require_receipt(self.pool(), op_hash).await
+    }
 }
 
 impl DbRead<Dht> {

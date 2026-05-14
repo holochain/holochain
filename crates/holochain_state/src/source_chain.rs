@@ -622,6 +622,7 @@ impl SourceChain {
                             validation_status:
                                 holochain_zome_types::dht_v2::RecordValidity::Accepted,
                             locally_validated: true,
+                            require_receipt: false,
                             when_received: *timestamp,
                             when_integrated: *timestamp,
                             serialized_size,
@@ -1599,6 +1600,7 @@ pub async fn genesis(
                 storage_center_loc,
                 validation_status: holochain_zome_types::dht_v2::RecordValidity::Accepted,
                 locally_validated: true,
+                require_receipt: false,
                 when_received: *timestamp,
                 when_integrated: *timestamp,
                 serialized_size,

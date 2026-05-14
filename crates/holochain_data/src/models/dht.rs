@@ -174,6 +174,9 @@ pub struct ChainOpRow {
     pub validation_status: i64,
     /// `1` when this authority locally validated the op, `0` when accepted via receipts.
     pub locally_validated: i64,
+    /// `1` while a validation receipt is still owed to the op's author; `0` once it has
+    /// been sent (or was never required).
+    pub require_receipt: i64,
     /// Microsecond timestamp at which the op was received.
     pub when_received: i64,
     /// Microsecond timestamp at which the op was integrated.

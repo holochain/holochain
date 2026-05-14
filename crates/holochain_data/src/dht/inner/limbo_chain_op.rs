@@ -245,13 +245,15 @@ pub(crate) async fn promote_to_chain_op(
         None => return Ok(false),
     };
 
-    // INSERT into ChainOp.
+    // INSERT into ChainOp. Carry `require_receipt` over so the receipt
+    // workflow can find the op on `ChainOp` and clear the flag once the
+    // receipt has been sent.
     sqlx::query(
         "INSERT INTO ChainOp
             (hash, op_type, action_hash, basis_hash, storage_center_loc,
-             validation_status, locally_validated, when_received, when_integrated,
-             serialized_size)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+             validation_status, locally_validated, require_receipt,
+             when_received, when_integrated, serialized_size)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&limbo.hash)
     .bind(limbo.op_type)
@@ -260,6 +262,7 @@ pub(crate) async fn promote_to_chain_op(
     .bind(limbo.storage_center_loc)
     .bind(i64::from(validation_status))
     .bind(1_i64) // locally_validated = true: op has been through limbo and validated locally
+    .bind(limbo.require_receipt)
     .bind(limbo.when_received)
     .bind(when_integrated.as_micros())
     .bind(limbo.serialized_size)
