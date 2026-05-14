@@ -8,7 +8,6 @@ use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_sqlite::prelude::DbKindDht;
 use holochain_types::test_utils::chain::*;
-use isotest::Iso;
 use std::sync::Arc;
 use test_case::test_case;
 
@@ -103,8 +102,8 @@ async fn returns_expected_filtered_sequence_from_filter(
                  }| TestChainItem {
                     seq: a.hashed.action_seq(),
                     timestamp: a.action().timestamp(),
-                    hash: TestChainHash::test(a.as_hash()),
-                    prev: a.hashed.prev_action().map(TestChainHash::test),
+                    hash: TestChainHash::from(a.as_hash()),
+                    prev: a.hashed.prev_action().map(TestChainHash::from),
                 },
             )
             .collect(),

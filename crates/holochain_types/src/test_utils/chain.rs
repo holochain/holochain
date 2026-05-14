@@ -1,4 +1,5 @@
-//! Implements TestChainItem, a type used with isotest
+//! Implements TestChainItem, a minimal `ChainItem` used to drive chain-shape tests
+//! without constructing real signed actions.
 
 use crate::prelude::ChainItem;
 use ::fixt::prelude::*;
@@ -41,18 +42,18 @@ impl TestChainHash {
     }
 }
 
-isotest::iso! {
-    TestChainHash => |h| hash_from_u32(*h),
-    ActionHash => |h| Self(u32::from_le_bytes(h.get_raw_32()[0..4].try_into().unwrap())),
-    test_cases: [
-        TestChainHash(0),
-        TestChainHash(256),
-        TestChainHash(u32::MAX)
-    ],
-    real_cases: [
-        ActionHash::from_raw_32(vec![0; 32]),
-        ActionHash::from_raw_32(vec![255; 32])
-    ],
+impl From<TestChainHash> for ActionHash {
+    fn from(h: TestChainHash) -> Self {
+        hash_from_u32(*h)
+    }
+}
+
+impl From<&ActionHash> for TestChainHash {
+    fn from(h: &ActionHash) -> Self {
+        Self(u32::from_le_bytes(
+            h.get_raw_32()[0..4].try_into().unwrap(),
+        ))
+    }
 }
 
 /// A test implementation of a minimal ChainItem which uses simple numbers for hashes

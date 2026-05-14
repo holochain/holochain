@@ -39,7 +39,6 @@ holochain_cascade = { path = ".", default-features = false, features = [
   "test_utils",
 ] }
 
-isotest = "0"
 pretty_assertions = "1.4"
 test-case = "3.3"
 
