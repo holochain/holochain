@@ -3044,6 +3044,7 @@ dependencies = [
  "futures",
  "holo_hash",
  "holochain_cascade",
+ "holochain_data",
  "holochain_p2p",
  "holochain_serialized_bytes",
  "holochain_sqlite",
