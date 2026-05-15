@@ -774,5 +774,8 @@ impl DhtStore<DbWrite<Dht>> {
     }
 }
 
+pub(crate) mod action_indexes;
+mod cache;
+
 #[cfg(test)]
 mod tests;

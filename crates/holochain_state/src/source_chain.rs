@@ -511,62 +511,13 @@ impl SourceChain {
                         // Record that this action hash is present in the new DB.
                         inserted_action_hashes.insert(sah.as_hash().clone());
 
-                        // Dispatch index table inserts based on action variant.
-                        // `ActionData` is the dht_v2 discriminant; import locally to
-                        // avoid shadowing the legacy `Action` variants in scope.
-                        {
-                            use holochain_zome_types::dht_v2::ActionData;
-                            match &new_sah.hashed.content.data {
-                                ActionData::CreateLink(a) => {
-                                    let _ = tx
-                                        .insert_link_index(holochain_data::dht::InsertLink {
-                                            action_hash: new_sah.as_hash(),
-                                            base_hash: &a.base_address,
-                                            zome_index: a.zome_index.0,
-                                            link_type: a.link_type.0,
-                                            tag: Some(a.tag.0.as_slice()),
-                                        })
-                                        .await
-                                        .map_err(SourceChainError::other)?;
-                                }
-                                ActionData::DeleteLink(a) => {
-                                    let _ = tx
-                                        .insert_deleted_link_index(
-                                            holochain_data::dht::InsertDeletedLink {
-                                                action_hash: new_sah.as_hash(),
-                                                create_link_hash: &a.link_add_address,
-                                            },
-                                        )
-                                        .await
-                                        .map_err(SourceChainError::other)?;
-                                }
-                                ActionData::Update(a) => {
-                                    let _ = tx
-                                        .insert_updated_record_index(
-                                            holochain_data::dht::InsertUpdatedRecord {
-                                                action_hash: new_sah.as_hash(),
-                                                original_action_hash: &a.original_action_address,
-                                                original_entry_hash: &a.original_entry_address,
-                                            },
-                                        )
-                                        .await
-                                        .map_err(SourceChainError::other)?;
-                                }
-                                ActionData::Delete(a) => {
-                                    let _ = tx
-                                        .insert_deleted_record_index(
-                                            holochain_data::dht::InsertDeletedRecord {
-                                                action_hash: new_sah.as_hash(),
-                                                deletes_action_hash: &a.deletes_address,
-                                                deletes_entry_hash: &a.deletes_entry_address,
-                                            },
-                                        )
-                                        .await
-                                        .map_err(SourceChainError::other)?;
-                                }
-                                _ => {}
-                            }
-                        }
+                        crate::dht_store::action_indexes::insert_action_indexes(
+                            &mut tx,
+                            new_sah.as_hash(),
+                            &new_sah.hashed.content.data,
+                        )
+                        .await
+                        .map_err(SourceChainError::other)?;
 
                         // For Create/Update of a CapGrant entry type, insert a CapGrant index row.
                         if let Some((cap_access, tag)) =
