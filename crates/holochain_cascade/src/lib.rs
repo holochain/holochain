@@ -37,9 +37,12 @@ use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
+use holochain_data::kind::Dht;
+use holochain_data::DbWrite as DataDbWrite;
 use holochain_p2p::actor::GetLinksRequestOptions;
 use holochain_p2p::actor::{GetActivityOptions, NetworkRequestOptions};
 use holochain_p2p::{DynHolochainP2pDna, HolochainP2pError};
+use holochain_state::dht_store::DhtStore;
 use holochain_state::host_fn_workspace::HostFnStores;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::mutations::insert_action;
@@ -123,6 +126,7 @@ pub struct CascadeImpl {
     scratch: Option<SyncScratch>,
     network: Option<DynHolochainP2pDna>,
     private_data: Option<Arc<AgentPubKey>>,
+    dht_store: Option<DhtStore<DataDbWrite<Dht>>>,
     duration_metric: &'static CascadeDurationMetric,
     /// Optional zome call origin for metrics attribution.
     zome_call_origin: Option<(ZomeName, FunctionName)>,
@@ -169,6 +173,14 @@ impl CascadeImpl {
         }
     }
 
+    /// Add the DhtStore mirror target for cache writes.
+    pub fn with_dht_store(self, dht_store: DhtStore<DataDbWrite<Dht>>) -> Self {
+        Self {
+            dht_store: Some(dht_store),
+            ..self
+        }
+    }
+
     /// Add the cache to the cascade.
     pub fn with_scratch(self, scratch: SyncScratch) -> Self {
         Self {
@@ -190,6 +202,7 @@ impl CascadeImpl {
             private_data: self.private_data,
             cache: Some(cache_db),
             network: Some(network),
+            dht_store: self.dht_store,
             duration_metric: create_cascade_duration_metric(),
             zome_call_origin: self.zome_call_origin,
         }
@@ -204,6 +217,7 @@ impl CascadeImpl {
             cache: None,
             scratch: None,
             private_data: None,
+            dht_store: None,
             duration_metric: create_cascade_duration_metric(),
             zome_call_origin: None,
         }
@@ -223,6 +237,7 @@ impl CascadeImpl {
             dht,
             cache,
             scratch,
+            dht_store,
         } = workspace.stores();
         let private_data = workspace.author();
         CascadeImpl {
@@ -232,6 +247,7 @@ impl CascadeImpl {
             private_data,
             scratch,
             network: Some(network),
+            dht_store,
             duration_metric: create_cascade_duration_metric(),
             zome_call_origin: None,
         }
@@ -244,6 +260,7 @@ impl CascadeImpl {
             dht,
             cache,
             scratch,
+            dht_store,
         } = stores;
         Self {
             authored: Some(authored),
@@ -252,6 +269,7 @@ impl CascadeImpl {
             scratch,
             network: None,
             private_data: author,
+            dht_store,
             duration_metric: create_cascade_duration_metric(),
             zome_call_origin: None,
         }
