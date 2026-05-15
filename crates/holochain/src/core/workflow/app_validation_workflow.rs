@@ -950,6 +950,7 @@ impl AppValidationWorkspace {
             .with_authored(self.authored_db.clone().into())
             .with_dht(self.dht_db.clone().into())
             .with_network(network, self.cache.clone())
+            .with_dht_store(self.dht_store.clone())
     }
 }
 
