@@ -472,6 +472,44 @@ impl CascadeImpl {
                     }
                 })
                 .await?;
+
+            // Mirror the activity and warrants to the new DhtStore, if
+            // configured. The legacy cache write above is authoritative;
+            // mirror failures are logged and swallowed so a misbehaving
+            // mirror cannot break the cascade.
+            if let Some(dht_store) = self.dht_store.as_ref() {
+                let activity_ops: Vec<DhtOpHashed> = activity
+                    .iter()
+                    .map(|ra| {
+                        DhtOpHashed::from_content_sync(holochain_types::dht_op::DhtOp::ChainOp(
+                            Box::new(holochain_types::dht_op::ChainOp::RegisterAgentActivity(
+                                ra.action.signature().clone(),
+                                ra.action.action().clone(),
+                            )),
+                        ))
+                    })
+                    .collect();
+
+                if !activity_ops.is_empty() {
+                    if let Err(err) = dht_store.record_cached_activity_ops(activity_ops).await {
+                        tracing::warn!(?err, "cache mirror: record_cached_activity_ops failed");
+                    }
+                }
+
+                let warrant_ops: Vec<DhtOpHashed> = warrants
+                    .iter()
+                    .map(|w| DhtOpHashed::from_content_sync(w.clone()))
+                    .collect();
+
+                if !warrant_ops.is_empty() {
+                    if let Err(err) = dht_store.record_incoming_cached_warrants(warrant_ops).await {
+                        tracing::warn!(
+                            ?err,
+                            "cache mirror: record_incoming_cached_warrants failed"
+                        );
+                    }
+                }
+            }
         }
 
         Ok(())
