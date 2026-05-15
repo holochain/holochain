@@ -33,7 +33,7 @@ impl DhtStore<DbWrite<Dht>> {
     /// Any `ops.warrant` is ignored: cascade routes cached warrants through
     /// [`Self::record_incoming_cached_warrants`] instead.
     pub async fn record_cached_chain_ops(&self, ops: &RenderedOps) -> StateMutationResult<()> {
-        if ops.ops.is_empty() {
+        if ops.ops.is_empty() && ops.entry.is_none() {
             return Ok(());
         }
 
