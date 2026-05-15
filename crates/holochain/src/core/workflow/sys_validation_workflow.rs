@@ -1539,7 +1539,9 @@ impl SysValidationWorkspace {
     }
 
     pub fn network_and_cache_cascade(&self, network: DynHolochainP2pDna) -> CascadeImpl {
-        CascadeImpl::empty().with_network(network, self.cache.clone())
+        CascadeImpl::empty()
+            .with_network(network, self.cache.clone())
+            .with_dht_store(self.dht_store.clone())
     }
 }
 

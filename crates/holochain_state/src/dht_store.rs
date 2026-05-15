@@ -776,3 +776,5 @@ impl DhtStore<DbWrite<Dht>> {
 
 #[cfg(test)]
 mod tests;
+
+mod cache;

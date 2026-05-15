@@ -37,9 +37,12 @@ use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
+use holochain_data::kind::Dht;
+use holochain_data::DbWrite as DataDbWrite;
 use holochain_p2p::actor::GetLinksRequestOptions;
 use holochain_p2p::actor::{GetActivityOptions, NetworkRequestOptions};
 use holochain_p2p::{DynHolochainP2pDna, HolochainP2pError};
+use holochain_state::dht_store::DhtStore;
 use holochain_state::host_fn_workspace::HostFnStores;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::mutations::insert_action;
@@ -123,6 +126,7 @@ pub struct CascadeImpl {
     scratch: Option<SyncScratch>,
     network: Option<DynHolochainP2pDna>,
     private_data: Option<Arc<AgentPubKey>>,
+    dht_store: Option<DhtStore<DataDbWrite<Dht>>>,
     duration_metric: &'static CascadeDurationMetric,
     /// Optional zome call origin for metrics attribution.
     zome_call_origin: Option<(ZomeName, FunctionName)>,
@@ -169,6 +173,14 @@ impl CascadeImpl {
         }
     }
 
+    /// Add the DhtStore mirror target for cache writes.
+    pub fn with_dht_store(self, dht_store: DhtStore<DataDbWrite<Dht>>) -> Self {
+        Self {
+            dht_store: Some(dht_store),
+            ..self
+        }
+    }
+
     /// Add the cache to the cascade.
     pub fn with_scratch(self, scratch: SyncScratch) -> Self {
         Self {
@@ -190,6 +202,7 @@ impl CascadeImpl {
             private_data: self.private_data,
             cache: Some(cache_db),
             network: Some(network),
+            dht_store: self.dht_store,
             duration_metric: create_cascade_duration_metric(),
             zome_call_origin: self.zome_call_origin,
         }
@@ -204,6 +217,7 @@ impl CascadeImpl {
             cache: None,
             scratch: None,
             private_data: None,
+            dht_store: None,
             duration_metric: create_cascade_duration_metric(),
             zome_call_origin: None,
         }
@@ -223,6 +237,7 @@ impl CascadeImpl {
             dht,
             cache,
             scratch,
+            dht_store,
         } = workspace.stores();
         let private_data = workspace.author();
         CascadeImpl {
@@ -232,6 +247,7 @@ impl CascadeImpl {
             private_data,
             scratch,
             network: Some(network),
+            dht_store,
             duration_metric: create_cascade_duration_metric(),
             zome_call_origin: None,
         }
@@ -244,6 +260,7 @@ impl CascadeImpl {
             dht,
             cache,
             scratch,
+            dht_store,
         } = stores;
         Self {
             authored: Some(authored),
@@ -252,6 +269,7 @@ impl CascadeImpl {
             scratch,
             network: None,
             private_data: author,
+            dht_store,
             duration_metric: create_cascade_duration_metric(),
             zome_call_origin: None,
         }
@@ -342,15 +360,28 @@ impl CascadeImpl {
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn merge_ops_into_cache(&self, responses: Vec<WireOps>) -> CascadeResult<()> {
         let cache = some_or_return!(self.cache.as_ref());
+
+        // Pre-render outside the legacy transaction so the rendered data is
+        // available both for the legacy cache write and for the DhtStore
+        // mirror below. A render failure short-circuits here rather than
+        // rolling back the legacy transaction.
+        let rendered_all: Vec<RenderedOps> = responses
+            .into_iter()
+            .map(|r| r.render())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let rendered_for_legacy = rendered_all.clone();
         cache
-            .write_async(|txn| {
-                for response in responses {
-                    let ops = response.render()?;
-                    Self::insert_rendered_ops(txn, &ops)?;
+            .write_async(move |txn| {
+                for ops in &rendered_for_legacy {
+                    Self::insert_rendered_ops(txn, ops)?;
                 }
                 CascadeResult::Ok(())
             })
             .await?;
+
+        self.mirror_rendered_to_dht_store(&rendered_all).await;
+
         Ok(())
     }
 
@@ -361,16 +392,53 @@ impl CascadeImpl {
         key: WireLinkKey,
     ) -> CascadeResult<()> {
         let cache = some_or_return!(self.cache.as_ref());
+
+        // Pre-render outside the legacy transaction so the rendered data is
+        // available both for the legacy cache write and for the DhtStore
+        // mirror below.
+        let rendered_all: Vec<RenderedOps> = responses
+            .into_iter()
+            .map(|r| r.render(&key))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let rendered_for_legacy = rendered_all.clone();
         cache
             .write_async(move |txn| {
-                for response in responses {
-                    let ops = response.render(&key)?;
-                    Self::insert_rendered_ops(txn, &ops)?;
+                for ops in &rendered_for_legacy {
+                    Self::insert_rendered_ops(txn, ops)?;
                 }
                 CascadeResult::Ok(())
             })
             .await?;
+
+        self.mirror_rendered_to_dht_store(&rendered_all).await;
+
         Ok(())
+    }
+
+    /// Mirror cached rendered ops to the new `DhtStore`, if configured.
+    ///
+    /// The legacy cache write is authoritative: any failure here is logged
+    /// and swallowed so a misbehaving mirror cannot break the cascade.
+    async fn mirror_rendered_to_dht_store(&self, rendered_all: &[RenderedOps]) {
+        let Some(dht_store) = self.dht_store.as_ref() else {
+            return;
+        };
+
+        for rendered_ops in rendered_all {
+            if !rendered_ops.ops.is_empty() || rendered_ops.entry.is_some() {
+                if let Err(err) = dht_store.record_cached_chain_ops(rendered_ops).await {
+                    tracing::warn!(?err, "cache mirror: record_cached_chain_ops failed");
+                }
+            }
+
+            if let Some(warrant) = rendered_ops.warrant.as_ref() {
+                let op = DhtOpHashed::from_content_sync(warrant.clone());
+                if let Err(err) = dht_store.record_incoming_cached_warrants(vec![op]).await {
+                    tracing::warn!(?err, "cache mirror: record_incoming_cached_warrants failed");
+                }
+            }
+        }
     }
 
     /// Add new activity to the Cache.
@@ -401,6 +469,44 @@ impl CascadeImpl {
                     }
                 })
                 .await?;
+
+            // Mirror the activity and warrants to the new DhtStore, if
+            // configured. The legacy cache write above is authoritative;
+            // mirror failures are logged and swallowed so a misbehaving
+            // mirror cannot break the cascade.
+            if let Some(dht_store) = self.dht_store.as_ref() {
+                let activity_ops: Vec<DhtOpHashed> = activity
+                    .iter()
+                    .map(|ra| {
+                        DhtOpHashed::from_content_sync(holochain_types::dht_op::DhtOp::ChainOp(
+                            Box::new(holochain_types::dht_op::ChainOp::RegisterAgentActivity(
+                                ra.action.signature().clone(),
+                                ra.action.action().clone(),
+                            )),
+                        ))
+                    })
+                    .collect();
+
+                if !activity_ops.is_empty() {
+                    if let Err(err) = dht_store.record_cached_activity_ops(activity_ops).await {
+                        tracing::warn!(?err, "cache mirror: record_cached_activity_ops failed");
+                    }
+                }
+
+                let warrant_ops: Vec<DhtOpHashed> = warrants
+                    .iter()
+                    .map(|w| DhtOpHashed::from_content_sync(w.clone()))
+                    .collect();
+
+                if !warrant_ops.is_empty() {
+                    if let Err(err) = dht_store.record_incoming_cached_warrants(warrant_ops).await {
+                        tracing::warn!(
+                            ?err,
+                            "cache mirror: record_incoming_cached_warrants failed"
+                        );
+                    }
+                }
+            }
         }
 
         Ok(())
