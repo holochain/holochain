@@ -59,45 +59,41 @@ impl DhtStore<DbWrite<Dht>> {
             // carries the legacy form.
             match op.action.action() {
                 Action::CreateLink(a) => {
-                    let _ = tx
-                        .insert_link_index(InsertLink {
-                            action_hash: new_sah.as_hash(),
-                            base_hash: &a.base_address,
-                            zome_index: a.zome_index.0,
-                            link_type: a.link_type.0,
-                            tag: Some(a.tag.0.as_slice()),
-                        })
-                        .await
-                        .map_err(StateMutationError::from)?;
+                    tx.insert_link_index(InsertLink {
+                        action_hash: new_sah.as_hash(),
+                        base_hash: &a.base_address,
+                        zome_index: a.zome_index.0,
+                        link_type: a.link_type.0,
+                        tag: Some(a.tag.0.as_slice()),
+                    })
+                    .await
+                    .map_err(StateMutationError::from)?;
                 }
                 Action::DeleteLink(a) => {
-                    let _ = tx
-                        .insert_deleted_link_index(InsertDeletedLink {
-                            action_hash: new_sah.as_hash(),
-                            create_link_hash: &a.link_add_address,
-                        })
-                        .await
-                        .map_err(StateMutationError::from)?;
+                    tx.insert_deleted_link_index(InsertDeletedLink {
+                        action_hash: new_sah.as_hash(),
+                        create_link_hash: &a.link_add_address,
+                    })
+                    .await
+                    .map_err(StateMutationError::from)?;
                 }
                 Action::Update(a) => {
-                    let _ = tx
-                        .insert_updated_record_index(InsertUpdatedRecord {
-                            action_hash: new_sah.as_hash(),
-                            original_action_hash: &a.original_action_address,
-                            original_entry_hash: &a.original_entry_address,
-                        })
-                        .await
-                        .map_err(StateMutationError::from)?;
+                    tx.insert_updated_record_index(InsertUpdatedRecord {
+                        action_hash: new_sah.as_hash(),
+                        original_action_hash: &a.original_action_address,
+                        original_entry_hash: &a.original_entry_address,
+                    })
+                    .await
+                    .map_err(StateMutationError::from)?;
                 }
                 Action::Delete(a) => {
-                    let _ = tx
-                        .insert_deleted_record_index(InsertDeletedRecord {
-                            action_hash: new_sah.as_hash(),
-                            deletes_action_hash: &a.deletes_address,
-                            deletes_entry_hash: &a.deletes_entry_address,
-                        })
-                        .await
-                        .map_err(StateMutationError::from)?;
+                    tx.insert_deleted_record_index(InsertDeletedRecord {
+                        action_hash: new_sah.as_hash(),
+                        deletes_action_hash: &a.deletes_address,
+                        deletes_entry_hash: &a.deletes_entry_address,
+                    })
+                    .await
+                    .map_err(StateMutationError::from)?;
                 }
                 _ => {}
             }

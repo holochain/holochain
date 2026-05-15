@@ -435,10 +435,7 @@ impl CascadeImpl {
             if let Some(warrant) = rendered_ops.warrant.as_ref() {
                 let op = DhtOpHashed::from_content_sync(warrant.clone());
                 if let Err(err) = dht_store.record_incoming_cached_warrants(vec![op]).await {
-                    tracing::warn!(
-                        ?err,
-                        "cache mirror: record_incoming_cached_warrants failed"
-                    );
+                    tracing::warn!(?err, "cache mirror: record_incoming_cached_warrants failed");
                 }
             }
         }
