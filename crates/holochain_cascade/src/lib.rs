@@ -361,10 +361,9 @@ impl CascadeImpl {
     async fn merge_ops_into_cache(&self, responses: Vec<WireOps>) -> CascadeResult<()> {
         let cache = some_or_return!(self.cache.as_ref());
 
-        // Pre-render outside the legacy transaction so the rendered data is
-        // available both for the legacy cache write and for the DhtStore
-        // mirror below. A render failure short-circuits here rather than
-        // rolling back the legacy transaction.
+        // Render outside the cache transaction so the transform is not
+        // counted as transaction time, and so the rendered data can be
+        // reused by the `DhtStore` cache call below.
         let rendered_all: Vec<RenderedOps> = responses
             .into_iter()
             .map(|r| r.render())
@@ -380,7 +379,7 @@ impl CascadeImpl {
             })
             .await?;
 
-        self.mirror_rendered_to_dht_store(&rendered_all).await;
+        self.cache_rendered_ops(&rendered_all).await;
 
         Ok(())
     }
@@ -393,9 +392,9 @@ impl CascadeImpl {
     ) -> CascadeResult<()> {
         let cache = some_or_return!(self.cache.as_ref());
 
-        // Pre-render outside the legacy transaction so the rendered data is
-        // available both for the legacy cache write and for the DhtStore
-        // mirror below.
+        // Render outside the cache transaction so the transform is not
+        // counted as transaction time, and so the rendered data can be
+        // reused by the `DhtStore` cache call below.
         let rendered_all: Vec<RenderedOps> = responses
             .into_iter()
             .map(|r| r.render(&key))
@@ -411,34 +410,29 @@ impl CascadeImpl {
             })
             .await?;
 
-        self.mirror_rendered_to_dht_store(&rendered_all).await;
+        self.cache_rendered_ops(&rendered_all).await;
 
         Ok(())
     }
 
-    /// Mirror cached rendered ops to the new `DhtStore`, if configured.
+    /// Write a batch of rendered ops to the `DhtStore`, if one is configured.
     ///
-    /// The legacy cache write is authoritative: any failure here is logged
-    /// and swallowed so a misbehaving mirror cannot break the cascade.
-    async fn mirror_rendered_to_dht_store(&self, rendered_all: &[RenderedOps]) {
+    /// Failures are logged at warn and swallowed: the cache write above is
+    /// the source of truth for now, so a `DhtStore` failure must not break
+    /// the cascade.
+    async fn cache_rendered_ops(&self, rendered_all: &[RenderedOps]) {
         let Some(dht_store) = self.dht_store.as_ref() else {
             return;
         };
 
         for rendered_ops in rendered_all {
-            if !rendered_ops.ops.is_empty() || rendered_ops.entry.is_some() {
-                if let Err(err) = dht_store.record_cached_chain_ops(rendered_ops).await {
-                    tracing::warn!(?err, "cache mirror: record_cached_chain_ops failed");
-                }
+            if let Err(err) = dht_store.cache_chain_ops(rendered_ops).await {
+                tracing::warn!(?err, "DhtStore: cache_chain_ops failed");
             }
 
             if let Some(warrant) = rendered_ops.warrant.as_ref() {
-                let op = DhtOpHashed::from_content_sync(warrant.clone());
-                if let Err(err) = dht_store.record_incoming_cached_warrants(vec![op]).await {
-                    tracing::warn!(
-                        ?err,
-                        "cache mirror: record_incoming_cached_warrants failed"
-                    );
+                if let Err(err) = dht_store.cache_warrants(vec![warrant.clone()]).await {
+                    tracing::warn!(?err, "DhtStore: cache_warrants failed");
                 }
             }
         }
@@ -472,6 +466,34 @@ impl CascadeImpl {
                     }
                 })
                 .await?;
+
+            if let Some(dht_store) = self.dht_store.as_ref() {
+                let activity_rendered = RenderedOps {
+                    entry: None,
+                    ops: activity
+                        .iter()
+                        .map(|ra| {
+                            RenderedOp::new(
+                                ra.action.action().clone(),
+                                ra.action.signature().clone(),
+                                None,
+                                ChainOpType::RegisterAgentActivity,
+                            )
+                        })
+                        .collect::<Result<Vec<_>, _>>()?,
+                    warrant: None,
+                };
+
+                if let Err(err) = dht_store.cache_chain_ops(&activity_rendered).await {
+                    tracing::warn!(?err, "DhtStore: cache_chain_ops failed for activity");
+                }
+
+                if !warrants.is_empty() {
+                    if let Err(err) = dht_store.cache_warrants(warrants).await {
+                        tracing::warn!(?err, "DhtStore: cache_warrants failed");
+                    }
+                }
+            }
         }
 
         Ok(())
