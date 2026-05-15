@@ -360,15 +360,28 @@ impl CascadeImpl {
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn merge_ops_into_cache(&self, responses: Vec<WireOps>) -> CascadeResult<()> {
         let cache = some_or_return!(self.cache.as_ref());
+
+        // Pre-render outside the legacy transaction so the rendered data is
+        // available both for the legacy cache write and for the DhtStore
+        // mirror below. A render failure short-circuits here rather than
+        // rolling back the legacy transaction.
+        let rendered_all: Vec<RenderedOps> = responses
+            .into_iter()
+            .map(|r| r.render())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let rendered_for_legacy = rendered_all.clone();
         cache
-            .write_async(|txn| {
-                for response in responses {
-                    let ops = response.render()?;
-                    Self::insert_rendered_ops(txn, &ops)?;
+            .write_async(move |txn| {
+                for ops in &rendered_for_legacy {
+                    Self::insert_rendered_ops(txn, ops)?;
                 }
                 CascadeResult::Ok(())
             })
             .await?;
+
+        self.mirror_rendered_to_dht_store(&rendered_all).await;
+
         Ok(())
     }
 
@@ -379,16 +392,56 @@ impl CascadeImpl {
         key: WireLinkKey,
     ) -> CascadeResult<()> {
         let cache = some_or_return!(self.cache.as_ref());
+
+        // Pre-render outside the legacy transaction so the rendered data is
+        // available both for the legacy cache write and for the DhtStore
+        // mirror below.
+        let rendered_all: Vec<RenderedOps> = responses
+            .into_iter()
+            .map(|r| r.render(&key))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let rendered_for_legacy = rendered_all.clone();
         cache
             .write_async(move |txn| {
-                for response in responses {
-                    let ops = response.render(&key)?;
-                    Self::insert_rendered_ops(txn, &ops)?;
+                for ops in &rendered_for_legacy {
+                    Self::insert_rendered_ops(txn, ops)?;
                 }
                 CascadeResult::Ok(())
             })
             .await?;
+
+        self.mirror_rendered_to_dht_store(&rendered_all).await;
+
         Ok(())
+    }
+
+    /// Mirror cached rendered ops to the new `DhtStore`, if configured.
+    ///
+    /// The legacy cache write is authoritative: any failure here is logged
+    /// and swallowed so a misbehaving mirror cannot break the cascade.
+    async fn mirror_rendered_to_dht_store(&self, rendered_all: &[RenderedOps]) {
+        let Some(dht_store) = self.dht_store.as_ref() else {
+            return;
+        };
+
+        for rendered_ops in rendered_all {
+            if !rendered_ops.ops.is_empty() || rendered_ops.entry.is_some() {
+                if let Err(err) = dht_store.record_cached_chain_ops(rendered_ops).await {
+                    tracing::warn!(?err, "cache mirror: record_cached_chain_ops failed");
+                }
+            }
+
+            if let Some(warrant) = rendered_ops.warrant.as_ref() {
+                let op = DhtOpHashed::from_content_sync(warrant.clone());
+                if let Err(err) = dht_store.record_incoming_cached_warrants(vec![op]).await {
+                    tracing::warn!(
+                        ?err,
+                        "cache mirror: record_incoming_cached_warrants failed"
+                    );
+                }
+            }
+        }
     }
 
     /// Add new activity to the Cache.
