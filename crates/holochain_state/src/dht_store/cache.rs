@@ -45,12 +45,16 @@ impl DhtStore<DbWrite<Dht>> {
         }
 
         for op in &ops.ops {
-            let new_sah = crate::source_chain::legacy_to_dht_v2_signed_action(&op.action);
-            tx.insert_action(&new_sah, None)
+            tx.insert_action(&op.signed_action_v2, None)
                 .await
                 .map_err(StateMutationError::from)?;
 
-            insert_action_indexes(&mut tx, new_sah.as_hash(), &new_sah.hashed.content.data).await?;
+            insert_action_indexes(
+                &mut tx,
+                op.signed_action_v2.as_hash(),
+                &op.signed_action_v2.hashed.content.data,
+            )
+            .await?;
 
             let linkable_basis = op.op_light.dht_basis();
             let storage_center_loc = linkable_basis.get_loc();
@@ -71,7 +75,7 @@ impl DhtStore<DbWrite<Dht>> {
 
             tx.insert_chain_op(InsertChainOp {
                 op_hash: &op.op_hash,
-                action_hash: new_sah.as_hash(),
+                action_hash: op.signed_action_v2.as_hash(),
                 op_type,
                 basis_hash: &basis_hash,
                 storage_center_loc,

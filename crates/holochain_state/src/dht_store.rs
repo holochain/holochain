@@ -418,7 +418,7 @@ impl DhtStore<DbWrite<Dht>> {
                         ),
                         signed_action.signature().clone(),
                     );
-                    let new_sah = crate::source_chain::legacy_to_dht_v2_signed_action(&sah);
+                    let new_sah = holochain_zome_types::dht_v2::from_legacy_signed_action(&sah);
                     tx.insert_action(&new_sah, None)
                         .await
                         .map_err(StateMutationError::from)?;

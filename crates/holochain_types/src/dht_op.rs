@@ -1185,8 +1185,13 @@ impl WireOps {
 /// The data rendered from a wire op to place in the database.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RenderedOp {
-    /// The action to insert into the database.
+    /// The action in its legacy form, used by the legacy SQLite cache schema.
     pub action: SignedActionHashed,
+    /// The same action in its dht_v2 form (flat `ActionHeader` + `ActionData`),
+    /// used by the new [`holochain_data`] DHT store. Computed at construction
+    /// time so callers receive a transformed input rather than converting
+    /// per-op themselves.
+    pub signed_action_v2: holochain_zome_types::dht_v2::SignedActionHashed,
     /// The action to insert into the database.
     pub op_light: DhtOpLite,
     /// The hash of the [`DhtOp`]
@@ -1207,12 +1212,13 @@ impl RenderedOp {
     ) -> DhtOpResult<Self> {
         let (action, op_hash) = ChainOpUniqueForm::op_hash(op_type, action)?;
         let action_hashed = ActionHashed::from_content_sync(action);
-        // TODO: Verify signature?
         let action = SignedActionHashed::with_presigned(action_hashed, signature);
+        let signed_action_v2 = holochain_zome_types::dht_v2::from_legacy_signed_action(&action);
         let op_light =
             ChainOpLite::from_type(op_type, action.as_hash().clone(), action.action())?.into();
         Ok(Self {
             action,
+            signed_action_v2,
             op_light,
             op_hash,
             validation_status,

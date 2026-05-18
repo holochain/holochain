@@ -11,6 +11,74 @@ use crate::op::ChainOpType;
 use crate::signature::Signed;
 use holochain_integrity_types::record::SignedHashed;
 
+/// Convert a legacy [`crate::record::SignedActionHashed`] (using the
+/// variant-per-type `Action` enum) into the v2 [`SignedActionHashed`] (which
+/// uses a flat [`ActionHeader`] + [`ActionData`] envelope).
+///
+/// The hash is carried over from the original — the v2 hash is content-derived,
+/// so re-hashing would change it; the pre-hashed constructor preserves the
+/// existing hash as the canonical identity during the dual-write transition.
+pub fn from_legacy_signed_action(shh: &crate::record::SignedActionHashed) -> SignedActionHashed {
+    use crate::action::Action as LegacyAction;
+    let legacy_action = shh.action();
+    let header = ActionHeader {
+        author: legacy_action.author().clone(),
+        timestamp: legacy_action.timestamp(),
+        action_seq: legacy_action.action_seq(),
+        prev_action: legacy_action.prev_action().cloned(),
+    };
+
+    let data = match legacy_action {
+        LegacyAction::Dna(d) => ActionData::Dna(DnaData {
+            dna_hash: d.hash.clone(),
+        }),
+        LegacyAction::AgentValidationPkg(d) => {
+            ActionData::AgentValidationPkg(AgentValidationPkgData {
+                membrane_proof: d.membrane_proof.clone(),
+            })
+        }
+        LegacyAction::InitZomesComplete(_) => {
+            ActionData::InitZomesComplete(InitZomesCompleteData {})
+        }
+        LegacyAction::Create(d) => ActionData::Create(CreateData {
+            entry_type: d.entry_type.clone(),
+            entry_hash: d.entry_hash.clone(),
+        }),
+        LegacyAction::Update(d) => ActionData::Update(UpdateData {
+            original_action_address: d.original_action_address.clone(),
+            original_entry_address: d.original_entry_address.clone(),
+            entry_type: d.entry_type.clone(),
+            entry_hash: d.entry_hash.clone(),
+        }),
+        LegacyAction::Delete(d) => ActionData::Delete(DeleteData {
+            deletes_address: d.deletes_address.clone(),
+            deletes_entry_address: d.deletes_entry_address.clone(),
+        }),
+        LegacyAction::CreateLink(d) => ActionData::CreateLink(CreateLinkData {
+            base_address: d.base_address.clone(),
+            target_address: d.target_address.clone(),
+            zome_index: d.zome_index,
+            link_type: d.link_type,
+            tag: d.tag.clone(),
+        }),
+        LegacyAction::DeleteLink(d) => ActionData::DeleteLink(DeleteLinkData {
+            base_address: d.base_address.clone(),
+            link_add_address: d.link_add_address.clone(),
+        }),
+        LegacyAction::CloseChain(d) => ActionData::CloseChain(CloseChainData {
+            new_target: d.new_target.clone(),
+        }),
+        LegacyAction::OpenChain(d) => ActionData::OpenChain(OpenChainData {
+            prev_target: d.prev_target.clone(),
+            close_hash: d.close_hash.clone(),
+        }),
+    };
+
+    let v2_action = Action { header, data };
+    let hashed = holo_hash::HoloHashed::with_pre_hashed(v2_action, shh.as_hash().clone());
+    SignedHashed::with_presigned(hashed, shh.signature().clone())
+}
+
 /// A v2 [`Action`] with its [`crate::signature::Signature`] (no hash).
 pub type SignedAction = Signed<Action>;
 
