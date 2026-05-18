@@ -282,23 +282,20 @@ async fn publish_loop() {
     // With start_paused = true the auto-advance fires that timer before the
     // spawn_blocking connection setup finishes.  Resume real time for the
     // duration of each workflow call so pool operations complete normally.
-    macro_rules! run_workflow {
-        () => {{
-            tokio::time::resume();
-            let result = publish_dht_ops_workflow(
-                db.clone(),
-                dht_store.clone(),
-                dna_network.clone(),
-                ts.clone(),
-                author.clone(),
-                ConductorTuningParams::default().min_publish_interval(),
-            )
-            .await
-            .unwrap();
-            tokio::time::pause();
-            result
-        }};
-    }
+    let run_workflow = || async {
+        tokio::time::resume();
+        publish_dht_ops_workflow(
+            db.clone(),
+            dht_store.clone(),
+            dna_network.clone(),
+            ts.clone(),
+            author.clone(),
+            ConductorTuningParams::default().min_publish_interval(),
+        )
+        .await
+        .unwrap();
+        tokio::time::pause();
+    };
 
     let timer = tokio::time::Instant::now();
     trigger_recv.listen().await.unwrap();
@@ -307,7 +304,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60) && timer.elapsed() < Duration::from_secs(61)
     );
 
-    run_workflow!();
+    run_workflow().await;
 
     // - Op was published.
     op_published.recv().await.unwrap();
@@ -319,7 +316,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60 * 2)
             && timer.elapsed() < Duration::from_secs(60 * 2 + 1)
     );
-    run_workflow!();
+    run_workflow().await;
 
     // - But the op isn't published because it was published in the last five minutes.
     assert_eq!(
@@ -333,7 +330,7 @@ async fn publish_loop() {
     let timer = tokio::time::Instant::now();
     trigger_recv.listen().await.unwrap();
     assert!(timer.elapsed() < Duration::from_secs(1));
-    run_workflow!();
+    run_workflow().await;
 
     // - But still no op is published.
     assert_eq!(
@@ -366,7 +363,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60) && timer.elapsed() < Duration::from_secs(61)
     );
 
-    run_workflow!();
+    run_workflow().await;
 
     // - The data is published because of the last publish time being greater then the interval.
     op_published.recv().await.unwrap();
@@ -388,7 +385,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60 * 2)
             && timer.elapsed() < Duration::from_secs(60 * 2 + 1)
     );
-    run_workflow!();
+    run_workflow().await;
 
     // - But no op is published because receipts are complete.
     assert_eq!(
@@ -423,7 +420,7 @@ async fn publish_loop() {
     let timer = tokio::time::Instant::now();
     trigger_recv.listen().await.unwrap();
     assert!(timer.elapsed() < Duration::from_secs(1));
-    run_workflow!();
+    run_workflow().await;
 
     // - Op was published.
     op_published.recv().await.unwrap();
@@ -435,7 +432,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60) && timer.elapsed() < Duration::from_secs(61)
     );
 
-    run_workflow!();
+    run_workflow().await;
     // - The op is not published because of the time interval.
     assert_eq!(
         op_published.try_recv(),
