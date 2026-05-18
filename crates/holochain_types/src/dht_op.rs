@@ -1188,7 +1188,7 @@ pub struct RenderedOp {
     /// The action in its legacy form, used by the legacy SQLite cache schema.
     pub action: SignedActionHashed,
     /// The same action in its dht_v2 form (flat `ActionHeader` + `ActionData`),
-    /// used by the new [`holochain_data`] DHT store. Computed at construction
+    /// used by the new `holochain_data` DHT store. Computed at construction
     /// time so callers receive a transformed input rather than converting
     /// per-op themselves.
     pub signed_action_v2: holochain_zome_types::dht_v2::SignedActionHashed,

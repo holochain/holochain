@@ -145,6 +145,106 @@ impl TryFrom<i64> for ChainOpType {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::action::{Create, CreateLink, EntryType};
+    use crate::entry_def::EntryVisibility;
+    use crate::link::LinkTag;
+    use crate::prelude::AppEntryDef;
+    use crate::signature::Signature;
+    use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, EntryHash};
+    use holochain_integrity_types::action::Action as LegacyAction;
+    use holochain_integrity_types::record::SignedHashed;
+    use holochain_timestamp::Timestamp;
+
+    fn legacy_signed_create() -> crate::record::SignedActionHashed {
+        let action = LegacyAction::Create(Create {
+            author: AgentPubKey::from_raw_36(vec![1u8; 36]),
+            timestamp: Timestamp::from_micros(1_000),
+            action_seq: 4,
+            prev_action: ActionHash::from_raw_36(vec![2u8; 36]),
+            entry_type: EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
+            entry_hash: EntryHash::from_raw_36(vec![3u8; 36]),
+            weight: Default::default(),
+        });
+        let hashed =
+            holo_hash::HoloHashed::with_pre_hashed(action, ActionHash::from_raw_36(vec![9u8; 36]));
+        SignedHashed::with_presigned(hashed, Signature::from([7u8; 64]))
+    }
+
+    fn legacy_signed_create_link() -> crate::record::SignedActionHashed {
+        let action = LegacyAction::CreateLink(CreateLink {
+            author: AgentPubKey::from_raw_36(vec![1u8; 36]),
+            timestamp: Timestamp::from_micros(2_000),
+            action_seq: 5,
+            prev_action: ActionHash::from_raw_36(vec![2u8; 36]),
+            base_address: AnyLinkableHash::from_raw_36_and_type(
+                vec![4u8; 36],
+                holo_hash::hash_type::AnyLinkable::Entry,
+            ),
+            target_address: AnyLinkableHash::from_raw_36_and_type(
+                vec![5u8; 36],
+                holo_hash::hash_type::AnyLinkable::Entry,
+            ),
+            zome_index: 1.into(),
+            link_type: 2.into(),
+            tag: LinkTag(vec![0xAA, 0xBB]),
+            weight: Default::default(),
+        });
+        let hashed =
+            holo_hash::HoloHashed::with_pre_hashed(action, ActionHash::from_raw_36(vec![11u8; 36]));
+        SignedHashed::with_presigned(hashed, Signature::from([8u8; 64]))
+    }
+
+    #[test]
+    fn from_legacy_signed_action_preserves_hash_and_signature() {
+        let legacy = legacy_signed_create();
+        let v2 = from_legacy_signed_action(&legacy);
+
+        assert_eq!(v2.as_hash(), legacy.as_hash());
+        assert_eq!(v2.signature(), legacy.signature());
+    }
+
+    #[test]
+    fn from_legacy_signed_action_maps_create_fields() {
+        let legacy = legacy_signed_create();
+        let v2 = from_legacy_signed_action(&legacy);
+        let action = &v2.hashed.content;
+
+        assert_eq!(&action.header.author, legacy.action().author());
+        assert_eq!(action.header.timestamp, legacy.action().timestamp());
+        assert_eq!(action.header.action_seq, legacy.action().action_seq());
+        assert_eq!(
+            action.header.prev_action.as_ref(),
+            legacy.action().prev_action()
+        );
+        match (&action.data, legacy.action()) {
+            (ActionData::Create(v2_data), LegacyAction::Create(legacy_data)) => {
+                assert_eq!(v2_data.entry_hash, legacy_data.entry_hash);
+                assert_eq!(v2_data.entry_type, legacy_data.entry_type);
+            }
+            _ => panic!("unexpected variant pair"),
+        }
+    }
+
+    #[test]
+    fn from_legacy_signed_action_maps_create_link_fields() {
+        let legacy = legacy_signed_create_link();
+        let v2 = from_legacy_signed_action(&legacy);
+
+        match (&v2.hashed.content.data, legacy.action()) {
+            (ActionData::CreateLink(v2_data), LegacyAction::CreateLink(legacy_data)) => {
+                assert_eq!(v2_data.base_address, legacy_data.base_address);
+                assert_eq!(v2_data.target_address, legacy_data.target_address);
+                assert_eq!(v2_data.zome_index, legacy_data.zome_index);
+                assert_eq!(v2_data.link_type, legacy_data.link_type);
+                assert_eq!(v2_data.tag, legacy_data.tag);
+            }
+            _ => panic!("unexpected variant pair"),
+        }
+    }
 
     #[test]
     fn chain_op_type_i64_roundtrip() {
