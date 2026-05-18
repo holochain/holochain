@@ -31,6 +31,12 @@ pub enum RecordValidity {
     Rejected = 2,
 }
 
+/// Alias for the validation status of a DHT op (chain op or warrant).
+///
+/// Semantically identical to [`RecordValidity`] — `Accepted` or `Rejected` —
+/// but named for ops rather than records to make call-site intent clearer.
+pub type OpValidity = RecordValidity;
+
 /// Maps [`RecordValidity`] onto the `record_validity` /
 /// `sys_validation_status` / `app_validation_status` INTEGER columns
 /// (`1 = Accepted`, `2 = Rejected`). `0` is reserved and never written.

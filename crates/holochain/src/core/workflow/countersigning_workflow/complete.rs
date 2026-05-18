@@ -233,12 +233,19 @@ async fn apply_success_state_changes(
     // validated it previously so i now agree that i authored it.
     // TODO: perhaps this should be `authored_ops_to_dht_db`, i.e. the arc check should
     //       be performed, because we may not be an authority for these ops
+    let hashes_for_new_db = this_cell_actions_op_basis_hashes.clone();
     authored_ops_to_dht_db_without_check(
         this_cell_actions_op_basis_hashes,
         authored_db.into(),
         dht_db,
     )
     .await?;
+
+    space
+        .dht_store
+        .clear_op_withhold_publishes(hashes_for_new_db)
+        .await
+        .map_err(WorkflowError::from)?;
 
     integration_trigger.trigger(&"integrate countersigning_success");
 

@@ -33,10 +33,11 @@ pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u8 = 5;
 
 #[cfg_attr(
     feature = "instrument",
-    tracing::instrument(skip(db, network, trigger_self, min_publish_interval))
+    tracing::instrument(skip(db, dht_store, network, trigger_self, min_publish_interval))
 )]
 pub async fn publish_dht_ops_workflow(
     db: DbWrite<DbKindAuthored>,
+    dht_store: DhtStore,
     network: DynHolochainP2pDna,
     trigger_self: TriggerSender,
     agent: AgentPubKey,
@@ -83,6 +84,7 @@ pub async fn publish_dht_ops_workflow(
     }
 
     let now = time::SystemTime::now().duration_since(time::UNIX_EPOCH)?;
+    let success_for_new_db = success.clone();
     let continue_publish = db
         .write_async({
             let agent = agent.clone();
@@ -94,6 +96,14 @@ pub async fn publish_dht_ops_workflow(
             }
         })
         .await?;
+
+    // Mirror the publish-time update into the new DHT DB.
+    if !success_for_new_db.is_empty() {
+        let when = Timestamp::from_micros(now.as_micros() as i64);
+        dht_store
+            .record_published_op_hashes(success_for_new_db, when)
+            .await?;
+    }
 
     // If we have more ops that could be published then continue looping.
     if continue_publish {

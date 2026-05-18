@@ -9,6 +9,7 @@ use crate::core::queue_consumer::WorkComplete;
 use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_sqlite::sql::sql_cell::*;
+use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::*;
 use kitsune2_api::StoredOp;
 use std::collections::HashMap;
@@ -21,6 +22,7 @@ mod tests;
     feature = "instrument",
     tracing::instrument(skip(
         vault,
+        dht_store,
         trigger_receipt,
         network,
         authored_db_provider,
@@ -29,6 +31,7 @@ mod tests;
 )]
 pub async fn integrate_dht_ops_workflow(
     vault: DbWrite<DbKindDht>,
+    dht_store: DhtStore,
     trigger_receipt: TriggerSender,
     network: DynHolochainP2pDna,
     authored_db_provider: Arc<dyn super::provider::authored_db_provider::AuthoredDbProvider>,
@@ -136,6 +139,7 @@ pub async fn integrate_dht_ops_workflow(
                 ))
             })
             .await?;
+    let new_promoted_result = dht_store.integrate_ready_ops(when_integrated).await;
     let changed = stored_ops.len();
     let ops_ps = changed as f64 / start.elapsed().as_micros() as f64 * 1_000_000.0;
     tracing::debug!(?changed, %ops_ps, "ops integrated");
@@ -222,8 +226,10 @@ pub async fn integrate_dht_ops_workflow(
         }
 
         trigger_receipt.trigger(&"integrate_dht_ops_workflow");
+        new_promoted_result.map_err(WorkflowError::from)?;
         Ok(WorkComplete::Incomplete(None))
     } else {
+        new_promoted_result.map_err(WorkflowError::from)?;
         Ok(WorkComplete::Complete)
     }
 }

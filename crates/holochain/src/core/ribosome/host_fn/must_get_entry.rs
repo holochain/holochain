@@ -168,6 +168,9 @@ pub mod test {
             action.clone(),
             record_entry,
         ));
+        // Clone hashes before the move closure consumes record_state and entry_state.
+        let record_op_hash = record_state.as_hash().clone();
+        let entry_op_hash = entry_state.as_hash().clone();
         dht_db
             .write_async(move |txn| -> StateMutationResult<()> {
                 set_validation_status(txn, record_state.as_hash(), ValidationStatus::Rejected)?;
@@ -175,6 +178,12 @@ pub mod test {
 
                 Ok(())
             })
+            .await
+            .unwrap();
+        // Mirror the rejection into the new DhtStore.
+        alice_host_fn_caller
+            .dht_store
+            .reject_chain_ops(vec![record_op_hash, entry_op_hash])
             .await
             .unwrap();
 

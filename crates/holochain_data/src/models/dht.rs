@@ -1,6 +1,6 @@
 //! `sqlx::FromRow` row structs for the DHT database.
 //!
-//! Each struct mirrors one table. BLOBs are `Vec<u8>`; NULL-able columns are
+//! Each struct represents a single table. BLOBs are `Vec<u8>`; NULL-able columns are
 //! `Option<T>`; booleans are stored as `i64` (0/1). For integer-encoded
 //! enum columns, the mapping lives on the corresponding enum's
 //! `From<T> for i64` / `TryFrom<i64> for T` impl (see
@@ -174,6 +174,9 @@ pub struct ChainOpRow {
     pub validation_status: i64,
     /// `1` when this authority locally validated the op, `0` when accepted via receipts.
     pub locally_validated: i64,
+    /// `1` while a validation receipt is still owed to the op's author; `0` once it has
+    /// been sent (or was never required).
+    pub require_receipt: i64,
     /// Microsecond timestamp at which the op was received.
     pub when_received: i64,
     /// Microsecond timestamp at which the op was integrated.
@@ -191,6 +194,8 @@ pub struct ChainOpPublishRow {
     pub last_publish_time: Option<i64>,
     /// `1` when enough validation receipts have been collected, `0`/`NULL` otherwise.
     pub receipts_complete: Option<i64>,
+    /// `1` to suppress publishing (e.g. pending countersigning), `NULL` otherwise.
+    pub withhold_publish: Option<i64>,
 }
 
 /// Row from the `ValidationReceipt` table.

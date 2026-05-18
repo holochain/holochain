@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Mirror DHT-database writes from workflows and cell into the new
+  `holochain_data` DHT store (parallel-write DHT slice).
+
 ## 0.7.0-dev.25
 
 ## 0.7.0-dev.24
