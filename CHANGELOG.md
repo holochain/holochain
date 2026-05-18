@@ -14,6 +14,58 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20260518.003858
+
+## [hcterm-0.7.0-dev.25](crates/hcterm/CHANGELOG.md#0.7.0-dev.25)
+
+## [holochain\_cli-0.7.0-dev.25](crates/holochain_cli/CHANGELOG.md#0.7.0-dev.25)
+
+## [holochain\_cli\_bundle-0.7.0-dev.24](crates/holochain_cli_bundle/CHANGELOG.md#0.7.0-dev.24)
+
+## [holochain\_cli\_client-0.7.0-dev.25](crates/holochain_cli_client/CHANGELOG.md#0.7.0-dev.25)
+
+## [holochain\_cli\_sandbox-0.7.0-dev.25](crates/holochain_cli_sandbox/CHANGELOG.md#0.7.0-dev.25)
+
+## [holochain\_client-0.9.0-dev.25](crates/holochain_client/CHANGELOG.md#0.9.0-dev.25)
+
+## [holochain-0.7.0-dev.25](crates/holochain/CHANGELOG.md#0.7.0-dev.25)
+
+## [holochain\_cascade-0.7.0-dev.25](crates/holochain_cascade/CHANGELOG.md#0.7.0-dev.25)
+
+## [holochain\_conductor\_config-0.7.0-dev.24](crates/holochain_conductor_config/CHANGELOG.md#0.7.0-dev.24)
+
+## [holochain\_test\_wasm\_common-0.7.0-dev.17](crates/holochain_test_wasm_common/CHANGELOG.md#0.7.0-dev.17)
+
+## [holochain\_wasm\_test\_utils-0.7.0-dev.25](crates/holochain_wasm_test_utils/CHANGELOG.md#0.7.0-dev.25)
+
+## [holochain\_websocket-0.7.0-dev.24](crates/holochain_websocket/CHANGELOG.md#0.7.0-dev.24)
+
+## [hdk-0.7.0-dev.17](crates/hdk/CHANGELOG.md#0.7.0-dev.17)
+
+## [holochain\_p2p-0.7.0-dev.25](crates/holochain_p2p/CHANGELOG.md#0.7.0-dev.25)
+
+## [hdi-0.8.0-dev.12](crates/hdi/CHANGELOG.md#0.8.0-dev.12)
+
+## [holochain\_state-0.7.0-dev.25](crates/holochain_state/CHANGELOG.md#0.7.0-dev.25)
+
+## [hdk\_derive-0.7.0-dev.12](crates/hdk_derive/CHANGELOG.md#0.7.0-dev.12)
+
+## [holochain\_data-0.7.0-dev.14](crates/holochain_data/CHANGELOG.md#0.7.0-dev.14)
+
+## [holochain\_conductor\_api-0.7.0-dev.24](crates/holochain_conductor_api/CHANGELOG.md#0.7.0-dev.24)
+
+## [holochain\_state\_types-0.7.0-dev.12](crates/holochain_state_types/CHANGELOG.md#0.7.0-dev.12)
+
+## [holochain\_types-0.7.0-dev.24](crates/holochain_types/CHANGELOG.md#0.7.0-dev.24)
+
+## [holochain\_keystore-0.7.0-dev.16](crates/holochain_keystore/CHANGELOG.md#0.7.0-dev.16)
+
+## [holochain\_sqlite-0.7.0-dev.20](crates/holochain_sqlite/CHANGELOG.md#0.7.0-dev.20)
+
+## [holochain\_zome\_types-0.7.0-dev.16](crates/holochain_zome_types/CHANGELOG.md#0.7.0-dev.16)
+
+## [holochain\_integrity\_types-0.7.0-dev.12](crates/holochain_integrity_types/CHANGELOG.md#0.7.0-dev.12)
+
 # 20260511.004219
 
 ## [hcterm-0.7.0-dev.24](crates/hcterm/CHANGELOG.md#0.7.0-dev.24)
