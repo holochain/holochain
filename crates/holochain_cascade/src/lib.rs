@@ -39,6 +39,7 @@ use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holochain_data::kind::Dht;
 use holochain_data::DbWrite as DataDbWrite;
+use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::actor::GetLinksRequestOptions;
 use holochain_p2p::actor::{GetActivityOptions, NetworkRequestOptions};
 use holochain_p2p::{DynHolochainP2pDna, HolochainP2pError};
@@ -287,6 +288,7 @@ impl CascadeImpl {
             op_hash,
             action,
             validation_status,
+            ..
         } = op;
         let op_order = OpOrder::new(op_light.get_type(), action.action().timestamp());
         let timestamp = action.action().timestamp();
@@ -379,7 +381,12 @@ impl CascadeImpl {
             })
             .await?;
 
-        self.cache_rendered_ops(&rendered_all).await;
+        // Signature verification gates writes into the new `DhtStore`.
+        // The legacy cache write above keeps its existing behaviour so the
+        // long tail of tests using synthetic signatures continues to work
+        // while the legacy path is in place.
+        let verified = verify_rendered_ops_batch(rendered_all).await;
+        self.cache_rendered_ops(&verified).await;
 
         Ok(())
     }
@@ -410,7 +417,8 @@ impl CascadeImpl {
             })
             .await?;
 
-        self.cache_rendered_ops(&rendered_all).await;
+        let verified = verify_rendered_ops_batch(rendered_all).await;
+        self.cache_rendered_ops(&verified).await;
 
         Ok(())
     }
@@ -468,6 +476,9 @@ impl CascadeImpl {
                 .await?;
 
             if let Some(dht_store) = self.dht_store.as_ref() {
+                // Signature verification gates writes into the new `DhtStore`.
+                let (activity, warrants) = verify_activity_signatures(activity, warrants).await;
+
                 let activity_rendered = RenderedOps {
                     entry: None,
                     ops: activity
@@ -1515,6 +1526,123 @@ impl CascadeImpl {
             None => Q::without_private_data_access(hash),
         }
     }
+}
+
+/// Verify the action signatures (and warrant signature, if present) on every
+/// `RenderedOps` in the batch. Batches where any signature fails verification
+/// are logged at warn and dropped.
+async fn verify_rendered_ops_batch(rendered_all: Vec<RenderedOps>) -> Vec<RenderedOps> {
+    let mut verified = Vec::with_capacity(rendered_all.len());
+    for rendered in rendered_all {
+        if verify_rendered_ops_signatures(&rendered).await {
+            verified.push(rendered);
+        }
+    }
+    verified
+}
+
+async fn verify_rendered_ops_signatures(rendered: &RenderedOps) -> bool {
+    for op in &rendered.ops {
+        let action = op.action.action();
+        match action
+            .signer()
+            .verify_signature(op.action.signature(), action)
+            .await
+        {
+            Ok(true) => {}
+            Ok(false) => {
+                tracing::warn!(
+                    signer = ?action.signer(),
+                    "Rendered op signature failed verification; dropping batch"
+                );
+                return false;
+            }
+            Err(err) => {
+                tracing::warn!(
+                    ?err,
+                    "Error verifying rendered op signature; dropping batch"
+                );
+                return false;
+            }
+        }
+    }
+
+    if let Some(warrant_op) = &rendered.warrant {
+        match warrant_op
+            .author
+            .verify_signature(warrant_op.signature(), warrant_op.warrant().clone())
+            .await
+        {
+            Ok(true) => {}
+            Ok(false) => {
+                tracing::warn!(
+                    author = ?warrant_op.author,
+                    "Rendered warrant signature failed verification; dropping batch"
+                );
+                return false;
+            }
+            Err(err) => {
+                tracing::warn!(
+                    ?err,
+                    "Error verifying rendered warrant signature; dropping batch"
+                );
+                return false;
+            }
+        }
+    }
+
+    true
+}
+
+/// Verify each agent-activity record and warrant in a
+/// `MustGetAgentActivityResponse::Activity`. Records or warrants with bad
+/// signatures are logged at warn and dropped.
+async fn verify_activity_signatures(
+    activity: Vec<RegisterAgentActivity>,
+    warrants: Vec<WarrantOp>,
+) -> (Vec<RegisterAgentActivity>, Vec<WarrantOp>) {
+    let mut verified_activity = Vec::with_capacity(activity.len());
+    for ra in activity {
+        let action = ra.action.action();
+        match action
+            .signer()
+            .verify_signature(ra.action.signature(), action)
+            .await
+        {
+            Ok(true) => verified_activity.push(ra),
+            Ok(false) => {
+                tracing::warn!(
+                    signer = ?action.signer(),
+                    "Activity record signature failed verification; dropping"
+                );
+            }
+            Err(err) => {
+                tracing::warn!(?err, "Error verifying activity record signature; dropping");
+            }
+        }
+    }
+
+    let mut verified_warrants = Vec::with_capacity(warrants.len());
+    for warrant_op in warrants {
+        match warrant_op
+            .author
+            .verify_signature(warrant_op.signature(), warrant_op.warrant().clone())
+            .await
+        {
+            Ok(true) => verified_warrants.push(warrant_op),
+            Ok(false) => {
+                tracing::warn!(
+                    author = ?warrant_op.author,
+                    "Activity warrant signature failed verification; dropping"
+                );
+            }
+            Err(err) => {
+                tracing::warn!(?err, "Error verifying activity warrant signature; dropping");
+            }
+        }
+    }
+
+    (verified_activity, verified_warrants)
 }
 
 /// TODO
