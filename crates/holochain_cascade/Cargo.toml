@@ -16,7 +16,6 @@ holo_hash = { version = "^0.7.0-dev.9", path = "../holo_hash", features = [
   "full",
 ] }
 holochain_sqlite = { version = "^0.7.0-dev.20", path = "../holochain_sqlite" }
-holochain_data = { version = "^0.7.0-dev.14", path = "../holochain_data" }
 holochain_keystore = { version = "^0.7.0-dev.16", path = "../holochain_keystore" }
 holochain_p2p = { version = "^0.7.0-dev.25", default-features = false, path = "../holochain_p2p" }
 holochain_serialized_bytes = "=0.0.57"

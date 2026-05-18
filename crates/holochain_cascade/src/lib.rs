@@ -37,8 +37,6 @@ use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
-use holochain_data::kind::Dht;
-use holochain_data::DbWrite as DataDbWrite;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::actor::GetLinksRequestOptions;
 use holochain_p2p::actor::{GetActivityOptions, NetworkRequestOptions};
@@ -127,7 +125,7 @@ pub struct CascadeImpl {
     scratch: Option<SyncScratch>,
     network: Option<DynHolochainP2pDna>,
     private_data: Option<Arc<AgentPubKey>>,
-    dht_store: Option<DhtStore<DataDbWrite<Dht>>>,
+    dht_store: Option<DhtStore>,
     duration_metric: &'static CascadeDurationMetric,
     /// Optional zome call origin for metrics attribution.
     zome_call_origin: Option<(ZomeName, FunctionName)>,
@@ -175,7 +173,7 @@ impl CascadeImpl {
     }
 
     /// Add the DhtStore mirror target for cache writes.
-    pub fn with_dht_store(self, dht_store: DhtStore<DataDbWrite<Dht>>) -> Self {
+    pub fn with_dht_store(self, dht_store: DhtStore) -> Self {
         Self {
             dht_store: Some(dht_store),
             ..self
