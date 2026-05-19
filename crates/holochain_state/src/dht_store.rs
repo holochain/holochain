@@ -939,6 +939,18 @@ impl DhtStore<DbWrite<Dht>> {
         let db = holochain_data::test_open_db(dht).await?;
         Ok(Self::new(db))
     }
+
+    /// Return the `when_integrated` timestamp for the given op hash if the op
+    /// is present in the `ChainOp` table (i.e. it has been promoted from limbo
+    /// and fully integrated). Returns `None` when the op is not yet integrated.
+    pub async fn when_integrated(
+        &self,
+        op_hash: &holo_hash::DhtOpHash,
+    ) -> DhtStoreResult<Option<Timestamp>> {
+        let mut tx = self.db.begin().await?;
+        let row = tx.as_mut().get_chain_op(op_hash.clone()).await?;
+        Ok(row.map(|r| Timestamp::from_micros(r.when_integrated)))
+    }
 }
 
 pub(crate) mod action_indexes;

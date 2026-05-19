@@ -9,11 +9,10 @@ use std::sync::Arc;
 /// Spawn the QueueConsumer for DhtOpIntegration workflow
 #[cfg_attr(
     feature = "instrument",
-    tracing::instrument(skip(env, dht_store, trigger_receipt, tm, network, conductor))
+    tracing::instrument(skip(dht_store, trigger_receipt, tm, network, conductor))
 )]
 pub fn spawn_integrate_dht_ops_consumer(
     dna_hash: Arc<DnaHash>,
-    env: DbWrite<DbKindDht>,
     dht_store: DhtStore,
     tm: TaskManagerClient,
     trigger_receipt: TriggerSender,
@@ -29,7 +28,6 @@ pub fn spawn_integrate_dht_ops_consumer(
         (tx.clone(), rx),
         move || {
             integrate_dht_ops_workflow(
-                env.clone(),
                 dht_store.clone(),
                 trigger_receipt.clone(),
                 network.clone(),
