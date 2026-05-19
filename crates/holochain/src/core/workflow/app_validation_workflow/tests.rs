@@ -22,6 +22,7 @@ use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_p2p::actor::MockHcP2p;
 use holochain_p2p::HolochainP2pDna;
 use holochain_sqlite::error::DatabaseResult;
+use holochain_state::dht_store::SysOutcome;
 use holochain_state::mutations::insert_op_dht;
 use holochain_state::prelude::{from_blob, insert_op_cache, StateQueryResult};
 use holochain_state::test_utils::test_db_dir;
@@ -119,10 +120,26 @@ async fn main_workflow() {
     let dht_delete_op_hashed = DhtOpHashed::from_content_sync(dht_delete_op);
 
     // insert op to validate in dht db and mark ready for app validation
+    let dht_delete_op_hashed_for_store = dht_delete_op_hashed.clone();
+    let dht_delete_op_hash_for_store = dht_delete_op_hash.clone();
     app_validation_workspace.dht_db.test_write(move |txn| {
         insert_op_dht(txn, &dht_delete_op_hashed, 0, None).unwrap();
         put_validation_limbo(txn, &dht_delete_op_hash, ValidationStage::SysValidated).unwrap();
     });
+    // Mirror into the new DhtStore so the workflow can read from it.
+    app_validation_workspace
+        .dht_store
+        .record_incoming_ops(vec![dht_delete_op_hashed_for_store])
+        .await
+        .unwrap();
+    app_validation_workspace
+        .dht_store
+        .record_chain_op_sys_validation_outcomes(vec![(
+            dht_delete_op_hash_for_store,
+            SysOutcome::Accepted,
+        )])
+        .await
+        .unwrap();
 
     // check delete op is now counted as op to validate
     let ops_to_validate =
@@ -316,6 +333,10 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
     assert_eq!(ops_to_validate, 0);
 
     // insert create and delete op in dht db and mark ready for app validation
+    let dht_delete_op_hashed_for_store = dht_delete_op_hashed.clone();
+    let dht_delete_op_hash_for_store = dht_delete_op_hash.clone();
+    let dht_create_op_hashed_for_store = dht_create_op_hashed.clone();
+    let dht_create_op_hash_for_store = dht_create_op_hashed.as_hash().clone();
     app_validation_workspace.dht_db.test_write(move |txn| {
         insert_op_dht(txn, &dht_delete_op_hashed, 0, None).unwrap();
         put_validation_limbo(txn, &dht_delete_op_hash, ValidationStage::SysValidated).unwrap();
@@ -327,6 +348,23 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
         )
         .unwrap();
     });
+    // Mirror into the new DhtStore so the workflow can read from it.
+    app_validation_workspace
+        .dht_store
+        .record_incoming_ops(vec![
+            dht_delete_op_hashed_for_store,
+            dht_create_op_hashed_for_store,
+        ])
+        .await
+        .unwrap();
+    app_validation_workspace
+        .dht_store
+        .record_chain_op_sys_validation_outcomes(vec![
+            (dht_delete_op_hash_for_store, SysOutcome::Accepted),
+            (dht_create_op_hash_for_store, SysOutcome::Accepted),
+        ])
+        .await
+        .unwrap();
 
     // check create and delete op are now counted as ops to validate
     let ops_to_validate =
@@ -457,6 +495,10 @@ async fn validate_ops_in_sequence_must_get_action() {
     let dht_delete_op_hashed = DhtOpHashed::from_content_sync(dht_delete_op);
 
     // insert create and delete op in dht db and mark ready for app validation
+    let dht_delete_op_hashed_for_store = dht_delete_op_hashed.clone();
+    let dht_delete_op_hash_for_store = dht_delete_op_hash.clone();
+    let dht_create_op_hashed_for_store = dht_create_op_hashed.clone();
+    let dht_create_op_hash_for_store = dht_create_op_hashed.as_hash().clone();
     app_validation_workspace.dht_db.test_write(move |txn| {
         insert_op_dht(txn, &dht_delete_op_hashed, 0, None).unwrap();
         put_validation_limbo(txn, &dht_delete_op_hash, ValidationStage::SysValidated).unwrap();
@@ -468,6 +510,23 @@ async fn validate_ops_in_sequence_must_get_action() {
         )
         .unwrap();
     });
+    // Mirror into the new DhtStore so the workflow can read from it.
+    app_validation_workspace
+        .dht_store
+        .record_incoming_ops(vec![
+            dht_delete_op_hashed_for_store,
+            dht_create_op_hashed_for_store,
+        ])
+        .await
+        .unwrap();
+    app_validation_workspace
+        .dht_store
+        .record_chain_op_sys_validation_outcomes(vec![
+            (dht_delete_op_hash_for_store, SysOutcome::Accepted),
+            (dht_create_op_hash_for_store, SysOutcome::Accepted),
+        ])
+        .await
+        .unwrap();
 
     // check create and delete op are now counted as ops to validate
     let ops_to_validate =
@@ -627,12 +686,33 @@ async fn handle_error_in_op_validation() {
 
     // insert both ops in dht db and mark ready for app validation
     let expected_failed_dht_op_hash = dht_create_op_hash.clone();
+    let dht_create_op_hashed_for_store = dht_create_op_hashed.clone();
+    let dht_create_op_hash_for_store = dht_create_op_hash.clone();
+    let dht_store_entry_op_hashed_for_store = dht_store_entry_op_hashed.clone();
+    let dht_store_entry_op_hash_for_store = dht_store_entry_op_hash.clone();
     app_validation_workspace.dht_db.test_write(move |txn| {
         insert_op_dht(txn, &dht_create_op_hashed, 0, None).unwrap();
         put_validation_limbo(txn, &dht_create_op_hash, ValidationStage::SysValidated).unwrap();
         insert_op_dht(txn, &dht_store_entry_op_hashed, 0, None).unwrap();
         put_validation_limbo(txn, &dht_store_entry_op_hash, ValidationStage::SysValidated).unwrap();
     });
+    // Mirror into the new DhtStore so the workflow can read from it.
+    app_validation_workspace
+        .dht_store
+        .record_incoming_ops(vec![
+            dht_create_op_hashed_for_store,
+            dht_store_entry_op_hashed_for_store,
+        ])
+        .await
+        .unwrap();
+    app_validation_workspace
+        .dht_store
+        .record_chain_op_sys_validation_outcomes(vec![
+            (dht_create_op_hash_for_store, SysOutcome::Accepted),
+            (dht_store_entry_op_hash_for_store, SysOutcome::Accepted),
+        ])
+        .await
+        .unwrap();
 
     // check ops are now counted as ops to validate
     let ops_to_validate =
@@ -1013,10 +1093,26 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
     let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
 
     // Insert op to validate in DHT DB and mark ready for app validation
+    let dht_create_op_hashed_for_store = dht_create_op_hashed.clone();
+    let dht_create_op_hash_for_store = dht_create_op_hash.clone();
     app_validation_workspace.dht_db.test_write(move |txn| {
         insert_op_dht(txn, &dht_create_op_hashed, 0, None).unwrap();
         put_validation_limbo(txn, &dht_create_op_hash, ValidationStage::SysValidated).unwrap();
     });
+    // Mirror into the new DhtStore so the workflow can read from it.
+    app_validation_workspace
+        .dht_store
+        .record_incoming_ops(vec![dht_create_op_hashed_for_store])
+        .await
+        .unwrap();
+    app_validation_workspace
+        .dht_store
+        .record_chain_op_sys_validation_outcomes(vec![(
+            dht_create_op_hash_for_store,
+            SysOutcome::Accepted,
+        )])
+        .await
+        .unwrap();
 
     // Check op is now counted as op to validate
     let ops_to_validate =

@@ -204,22 +204,32 @@ async fn chain_op_from_limbo_row(
     let signature: Signature = legacy.signature().clone();
     let action: Action = legacy.action().clone();
 
-    // Look up the entry referenced by the given action, returning
-    // `RecordEntry::Present` when found or `RecordEntry::NA` when the action
-    // carries no entry hash.
+    // Look up the entry referenced by the given action.
+    //
+    // Returns:
+    //   - `RecordEntry::NA`       — action carries no entry hash
+    //   - `RecordEntry::Present`  — entry found in the database
+    //   - `RecordEntry::Hidden`   — action references a private entry (not stored on this node)
+    //   - `RecordEntry::NotStored`— action references a public entry we don't have locally
     async fn fetch_entry_for_action(
         db: &DbRead<Dht>,
         action: &Action,
     ) -> StateQueryResult<RecordEntry> {
-        match action.entry_hash() {
-            None => Ok(RecordEntry::NA),
-            Some(h) => {
-                let entry = db.get_entry(h.clone(), None).await?.ok_or_else(|| {
-                    crate::query::StateQueryError::Other(format!(
-                        "Entry {h:?} referenced by Action not found"
-                    ))
-                })?;
-                Ok(RecordEntry::Present(entry))
+        let Some(entry_hash) = action.entry_hash() else {
+            return Ok(RecordEntry::NA);
+        };
+        match db.get_entry(entry_hash.clone(), None).await? {
+            Some(entry) => Ok(RecordEntry::Present(entry)),
+            None => {
+                // Entry not in the database. Use the entry type visibility to
+                // distinguish private entries (Hidden) from public ones we
+                // simply don't have yet (NotStored).
+                use holochain_zome_types::entry_def::EntryVisibility;
+                if action.entry_visibility() == Some(&EntryVisibility::Private) {
+                    Ok(RecordEntry::Hidden)
+                } else {
+                    Ok(RecordEntry::NotStored)
+                }
             }
         }
     }

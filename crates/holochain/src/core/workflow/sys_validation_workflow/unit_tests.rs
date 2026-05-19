@@ -1,6 +1,5 @@
 use super::sys_validation_workflow;
 use super::validation_deps::SysValDeps;
-use super::validation_query::get_ops_to_app_validate;
 use super::SysValidationWorkspace;
 use crate::conductor::space::TestSpace;
 use crate::core::queue_consumer::TriggerReceiver;
@@ -992,7 +991,10 @@ impl TestCase {
 
     /// This provides a quick and reliable way to check that ops have been sys validated
     async fn get_ops_pending_app_validation(&self) -> HashSet<DhtOpHash> {
-        get_ops_to_app_validate(&self.dht_db_handle().into())
+        self.test_space
+            .space
+            .dht_store
+            .ops_pending_app_validation(10_000)
             .await
             .unwrap()
             .into_iter()
