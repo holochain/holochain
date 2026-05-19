@@ -5,6 +5,7 @@ use crate::handles::{TxRead, TxWrite};
 use crate::kind::Dht;
 use crate::models::dht::LimboWarrantRow;
 use holo_hash::DhtOpHash;
+use holochain_timestamp::Timestamp;
 
 impl TxWrite<Dht> {
     pub async fn insert_limbo_warrant(&mut self, w: InsertLimboWarrant<'_>) -> sqlx::Result<()> {
@@ -25,13 +26,18 @@ impl TxWrite<Dht> {
     }
 
     /// Atomically promote a `LimboWarrant` row to the `Warrant` table using
-    /// the current transaction.
+    /// the current transaction. `when_integrated` is stamped on the new
+    /// `Warrant` row.
     ///
     /// Returns `true` if the limbo row existed and was promoted, `false` if it
     /// did not exist.  The caller's transaction is used — commit or rollback is
     /// the caller's responsibility.
-    pub async fn promote_limbo_warrant(&mut self, hash: &DhtOpHash) -> sqlx::Result<bool> {
-        limbo_warrant::promote_to_warrant(self.conn_mut(), hash).await
+    pub async fn promote_limbo_warrant(
+        &mut self,
+        hash: &DhtOpHash,
+        when_integrated: Timestamp,
+    ) -> sqlx::Result<bool> {
+        limbo_warrant::promote_to_warrant(self.conn_mut(), hash, when_integrated).await
     }
 }
 

@@ -5,6 +5,7 @@ use crate::handles::{DbRead, DbWrite};
 use crate::kind::Dht;
 use crate::models::dht::LimboWarrantRow;
 use holo_hash::DhtOpHash;
+use holochain_timestamp::Timestamp;
 
 impl DbWrite<Dht> {
     pub async fn insert_limbo_warrant(&self, w: InsertLimboWarrant<'_>) -> sqlx::Result<()> {
@@ -27,11 +28,17 @@ impl DbWrite<Dht> {
     /// Atomically promote a `LimboWarrant` row to the `Warrant` table.
     ///
     /// Begins a transaction, delegates to the inner promotion helper, and
-    /// commits on success.  Returns `true` if the limbo row existed and was
-    /// promoted, `false` if it did not exist.
-    pub async fn promote_limbo_warrant(&self, hash: &DhtOpHash) -> sqlx::Result<bool> {
+    /// commits on success.  `when_integrated` is stamped on the new `Warrant`
+    /// row.  Returns `true` if the limbo row existed and was promoted, `false`
+    /// if it did not exist.
+    pub async fn promote_limbo_warrant(
+        &self,
+        hash: &DhtOpHash,
+        when_integrated: Timestamp,
+    ) -> sqlx::Result<bool> {
         let mut tx = self.begin().await?;
-        let result = limbo_warrant::promote_to_warrant(tx.conn_mut(), hash).await?;
+        let result =
+            limbo_warrant::promote_to_warrant(tx.conn_mut(), hash, when_integrated).await?;
         tx.commit().await?;
         Ok(result)
     }

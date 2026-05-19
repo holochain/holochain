@@ -106,6 +106,7 @@ CREATE TABLE LimboWarrant (
     timestamp               INTEGER NOT NULL,
     warrantee               BLOB    NOT NULL,
     proof                   BLOB    NOT NULL,
+    signature               BLOB    NOT NULL,
 
     storage_center_loc      INTEGER NOT NULL,
 
@@ -167,7 +168,10 @@ CREATE TABLE Warrant (
     timestamp          INTEGER NOT NULL,
     warrantee          BLOB    NOT NULL,
     proof              BLOB    NOT NULL,
-    storage_center_loc INTEGER NOT NULL
+    signature          BLOB    NOT NULL,
+    storage_center_loc INTEGER NOT NULL,
+    when_integrated    INTEGER NOT NULL,
+    serialized_size    INTEGER NOT NULL
 ) STRICT, WITHOUT ROWID;
 
 -- Publish state for self-authored warrants.
@@ -220,4 +224,15 @@ CREATE TABLE ScheduledFunction (
     end_at         INTEGER NOT NULL,
     ephemeral      INTEGER NOT NULL,             -- 0/1
     PRIMARY KEY (author, zome_name, scheduled_fn) ON CONFLICT ROLLBACK
+) STRICT, WITHOUT ROWID;
+
+-- K2 slice-hash cache: one row per (arc, slice_index). Storing a
+-- slice hash replaces any prior value at the same key (gossip may
+-- re-compute and re-store after detecting divergence).
+CREATE TABLE SliceHash (
+    arc_start   INTEGER NOT NULL,
+    arc_end     INTEGER NOT NULL,
+    slice_index INTEGER NOT NULL,
+    hash        BLOB    NOT NULL,
+    PRIMARY KEY (arc_start, arc_end, slice_index) ON CONFLICT REPLACE
 ) STRICT, WITHOUT ROWID;

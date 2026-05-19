@@ -62,6 +62,14 @@ pub type DhtStoreResult<T> = Result<T, DhtStoreError>;
 /// A read-only view of the DHT store.
 pub type DhtStoreRead = DhtStore<holochain_data::DbRead<Dht>>;
 
+// Re-exports of the row types returned by the K2 op-store reads, so
+// downstream crates (`holochain_p2p`) can consume them without depending
+// on `holochain_data` directly.
+pub use holochain_data::models::dht::{
+    K2ChainOpForWireRow, K2OpHashRow, K2OpIdSinceRow, K2OpPresentRow, K2WarrantForWireRow,
+    SliceHashIndexedRow,
+};
+
 /// Per-DNA store for the DHT database.
 ///
 /// Owns a [`DbWrite<Dht>`] handle (or a [`holochain_data::DbRead<Dht>`] in the
@@ -464,6 +472,7 @@ impl DhtStore<DbWrite<Dht>> {
                     let storage_center_loc = warrantee.get_loc();
                     let proof_bytes = holochain_serialized_bytes::encode(&warrant_op.proof)
                         .map_err(StateMutationError::from)?;
+                    let signature_bytes = warrant_op.signature().0;
 
                     tx.insert_limbo_warrant(InsertLimboWarrant {
                         hash: &op_hash,
@@ -471,6 +480,7 @@ impl DhtStore<DbWrite<Dht>> {
                         timestamp,
                         warrantee,
                         proof: &proof_bytes,
+                        signature: &signature_bytes,
                         storage_center_loc,
                         when_received: now,
                         serialized_size,
@@ -563,7 +573,11 @@ impl DhtStore<DbWrite<Dht>> {
         use holochain_data::dht::InsertWarrant;
 
         let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
+        let now = Timestamp::now();
         for op in warrants {
+            let serialized_size = holochain_serialized_bytes::encode(op.as_content())
+                .map_err(StateMutationError::from)?
+                .len() as u32;
             let warrant_op = match op.as_content() {
                 DhtOp::WarrantOp(w) => w,
                 DhtOp::ChainOp(_) => {
@@ -576,13 +590,17 @@ impl DhtStore<DbWrite<Dht>> {
             let hash = op.as_hash();
             let proof_bytes = holochain_serialized_bytes::encode(&warrant_op.proof)
                 .map_err(StateMutationError::from)?;
+            let signature_bytes = warrant_op.signature().0;
             tx.insert_warrant(InsertWarrant {
                 hash,
                 author: &warrant_op.author,
                 timestamp: warrant_op.timestamp,
                 warrantee: &warrant_op.warrantee,
                 proof: &proof_bytes,
+                signature: &signature_bytes,
                 storage_center_loc: warrant_op.warrantee.get_loc(),
+                when_integrated: now,
+                serialized_size,
             })
             .await
             .map_err(StateMutationError::from)?;
@@ -634,7 +652,7 @@ impl DhtStore<DbWrite<Dht>> {
         for row in warrant_ready {
             let hash = DhtOpHash::from_raw_36(row.hash.clone());
             let promoted_ok = tx
-                .promote_limbo_warrant(&hash)
+                .promote_limbo_warrant(&hash, when_integrated)
                 .await
                 .map_err(StateMutationError::from)?;
             if promoted_ok {
@@ -762,6 +780,175 @@ fn compute_chain_op_validation_status(
 impl From<DhtStore<DbWrite<Dht>>> for DhtStoreRead {
     fn from(store: DhtStore<DbWrite<Dht>>) -> Self {
         store.as_read()
+    }
+}
+
+// ───────────────────────── K2 op-store reads ─────────────────────────
+//
+// Generic over any handle that borrows a read pool, so both
+// `DhtStoreRead` and the writable `DhtStore<DbWrite<Dht>>` expose these.
+// Returns map `sqlx::Error` into `StateQueryError`.
+impl<Db> DhtStore<Db>
+where
+    Db: AsRef<holochain_data::DbRead<Dht>>,
+{
+    /// `(op_hash, basis, size)` triples for every integrated, locally-
+    /// validated op whose authored timestamp falls in `[start, end)`.
+    /// Used by K2 `retrieve_op_hashes_in_time_slice`.
+    pub async fn k2_op_hashes_in_time_slice(
+        &self,
+        arc_start: u32,
+        arc_end: u32,
+        start: Timestamp,
+        end: Timestamp,
+    ) -> crate::query::StateQueryResult<Vec<holochain_data::models::dht::K2OpHashRow>> {
+        self.db
+            .as_ref()
+            .k2_op_hashes_in_time_slice(arc_start, arc_end, start.as_micros(), end.as_micros())
+            .await
+            .map_err(crate::query::StateQueryError::Sqlx)
+    }
+
+    /// Up to `limit` `(hash, basis, when_integrated, size)` tuples with
+    /// `when_integrated >= t_min`. Used by K2 `retrieve_op_ids_bounded`'s
+    /// inner paging loop.
+    pub async fn k2_op_ids_since_time_batch(
+        &self,
+        arc_start: u32,
+        arc_end: u32,
+        t_min: Timestamp,
+        limit: u32,
+    ) -> crate::query::StateQueryResult<Vec<holochain_data::models::dht::K2OpIdSinceRow>> {
+        self.db
+            .as_ref()
+            .k2_op_ids_since_time_batch(arc_start, arc_end, t_min.as_micros(), limit)
+            .await
+            .map_err(crate::query::StateQueryError::Sqlx)
+    }
+
+    /// Subset of `op_hashes` that exist locally, with their basis hashes.
+    /// Used by K2 `filter_out_existing_ops`.
+    pub async fn k2_check_op_hashes_present(
+        &self,
+        op_hashes: &[Vec<u8>],
+    ) -> crate::query::StateQueryResult<Vec<holochain_data::models::dht::K2OpPresentRow>> {
+        self.db
+            .as_ref()
+            .k2_check_op_hashes_present(op_hashes)
+            .await
+            .map_err(crate::query::StateQueryError::Sqlx)
+    }
+
+    /// Joined chain-op rows (ChainOp ⋈ Action LEFT JOIN Entry) for wire
+    /// reconstruction. Filtered to `locally_validated = 1`.
+    pub async fn k2_get_chain_ops_for_wire(
+        &self,
+        op_hashes: &[Vec<u8>],
+    ) -> crate::query::StateQueryResult<Vec<holochain_data::models::dht::K2ChainOpForWireRow>> {
+        self.db
+            .as_ref()
+            .k2_get_chain_ops_for_wire(op_hashes)
+            .await
+            .map_err(crate::query::StateQueryError::Sqlx)
+    }
+
+    /// Warrant rows for wire reconstruction.
+    pub async fn k2_get_warrants_for_wire(
+        &self,
+        op_hashes: &[Vec<u8>],
+    ) -> crate::query::StateQueryResult<Vec<holochain_data::models::dht::K2WarrantForWireRow>> {
+        self.db
+            .as_ref()
+            .k2_get_warrants_for_wire(op_hashes)
+            .await
+            .map_err(crate::query::StateQueryError::Sqlx)
+    }
+
+    /// Earliest authored timestamp in the arc, across both `ChainOp`
+    /// (joined with `Action`) and `Warrant`. `None` if no rows match.
+    pub async fn k2_earliest_authored_timestamp_in_arc(
+        &self,
+        arc_start: u32,
+        arc_end: u32,
+    ) -> crate::query::StateQueryResult<Option<Timestamp>> {
+        let micros = self
+            .db
+            .as_ref()
+            .k2_earliest_authored_timestamp_in_arc(arc_start, arc_end)
+            .await
+            .map_err(crate::query::StateQueryError::Sqlx)?;
+        Ok(micros.map(Timestamp::from_micros))
+    }
+
+    /// Total integrated op + warrant count (no `locally_validated` filter
+    /// — preserves the old DHT+cache combined count).
+    pub async fn k2_total_integrated_op_count(&self) -> crate::query::StateQueryResult<u64> {
+        let n = self
+            .db
+            .as_ref()
+            .k2_count_integrated_ops()
+            .await
+            .map_err(crate::query::StateQueryError::Sqlx)?;
+        Ok(n.max(0) as u64)
+    }
+
+    /// `SliceHash[max(slice_index)]` for the arc, or 0 if none.
+    pub async fn slice_hash_count(
+        &self,
+        arc_start: u32,
+        arc_end: u32,
+    ) -> crate::query::StateQueryResult<u64> {
+        self.db
+            .as_ref()
+            .max_slice_index(arc_start, arc_end)
+            .await
+            .map_err(crate::query::StateQueryError::Sqlx)
+    }
+
+    /// Single stored slice hash, if any.
+    pub async fn get_slice_hash(
+        &self,
+        arc_start: u32,
+        arc_end: u32,
+        slice_index: u64,
+    ) -> crate::query::StateQueryResult<Option<Vec<u8>>> {
+        self.db
+            .as_ref()
+            .get_slice_hash(arc_start, arc_end, slice_index)
+            .await
+            .map_err(crate::query::StateQueryError::Sqlx)
+    }
+
+    /// Every `(slice_index, hash)` pair stored for the arc.
+    pub async fn get_slice_hashes(
+        &self,
+        arc_start: u32,
+        arc_end: u32,
+    ) -> crate::query::StateQueryResult<Vec<holochain_data::models::dht::SliceHashIndexedRow>> {
+        self.db
+            .as_ref()
+            .get_slice_hashes(arc_start, arc_end)
+            .await
+            .map_err(crate::query::StateQueryError::Sqlx)
+    }
+}
+
+// ─────────────────── SliceHash write (DbWrite only) ──────────────────
+impl DhtStore<DbWrite<Dht>> {
+    /// Insert or replace the slice hash for `(arc, slice_index)`. K2
+    /// `store_slice_hash`.
+    pub async fn store_slice_hash(
+        &self,
+        arc_start: u32,
+        arc_end: u32,
+        slice_index: u64,
+        hash: &[u8],
+    ) -> StateMutationResult<()> {
+        self.db
+            .insert_slice_hash(arc_start, arc_end, slice_index, hash)
+            .await
+            .map_err(StateMutationError::from)?;
+        Ok(())
     }
 }
 

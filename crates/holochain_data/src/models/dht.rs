@@ -140,6 +140,8 @@ pub struct LimboWarrantRow {
     pub warrantee: Vec<u8>,
     /// Serialized `WarrantProof` blob.
     pub proof: Vec<u8>,
+    /// 64-byte signature over the warrant content.
+    pub signature: Vec<u8>,
     /// Numeric storage center derived from the warrantee.
     pub storage_center_loc: i64,
     /// Encoded [`RecordValidity`](holochain_integrity_types::dht_v2::RecordValidity);
@@ -226,8 +228,14 @@ pub struct WarrantRow {
     pub warrantee: Vec<u8>,
     /// Serialized `WarrantProof` blob.
     pub proof: Vec<u8>,
+    /// 64-byte signature over the warrant content.
+    pub signature: Vec<u8>,
     /// Numeric storage center derived from the warrantee.
     pub storage_center_loc: i64,
+    /// Microsecond timestamp at which the warrant was integrated.
+    pub when_integrated: i64,
+    /// Wire-size of the warrant in bytes.
+    pub serialized_size: i64,
 }
 
 /// Row from the `WarrantPublish` table (publishing state for self-authored warrants).
@@ -283,4 +291,95 @@ pub struct DeletedRecordRow {
     pub deletes_action_hash: Vec<u8>,
     /// Hash of the entry referenced by the deleted action.
     pub deletes_entry_hash: Vec<u8>,
+}
+
+/// `(op_hash, basis_hash, serialized_size)` triple returned by K2 time-slice
+/// and presence-style reads.
+#[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
+pub struct K2OpHashRow {
+    /// DHT op hash.
+    pub hash: Vec<u8>,
+    /// DHT basis hash for the op.
+    pub basis_hash: Vec<u8>,
+    /// Wire-size of the op in bytes.
+    pub serialized_size: i64,
+}
+
+/// `(op_hash, basis_hash, when_integrated, serialized_size)` returned by
+/// K2 "ops since timestamp" reads.
+#[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
+pub struct K2OpIdSinceRow {
+    /// DHT op hash.
+    pub hash: Vec<u8>,
+    /// DHT basis hash for the op.
+    pub basis_hash: Vec<u8>,
+    /// Microsecond timestamp at which this op was integrated.
+    pub when_integrated: i64,
+    /// Wire-size of the op in bytes.
+    pub serialized_size: i64,
+}
+
+/// `(op_hash, basis_hash)` pair returned by K2 presence-check reads.
+#[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
+pub struct K2OpPresentRow {
+    /// DHT op hash.
+    pub hash: Vec<u8>,
+    /// DHT basis hash for the op.
+    pub basis_hash: Vec<u8>,
+}
+
+/// Joined `ChainOp ⋈ Action LEFT JOIN Entry` row for full op rendering.
+///
+/// `entry_blob` is `Some` only when the action carries a public entry that
+/// has arrived locally.
+#[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
+pub struct K2ChainOpForWireRow {
+    /// DHT op hash.
+    pub op_hash: Vec<u8>,
+    /// DHT basis hash for the op.
+    pub basis_hash: Vec<u8>,
+    /// Encoded `ChainOpType` discriminant (1..=9).
+    pub op_type: i64,
+    /// Action's content-addressed hash.
+    pub action_hash: Vec<u8>,
+    /// Author of the action.
+    pub author: Vec<u8>,
+    /// Microsecond authoring timestamp.
+    pub timestamp: i64,
+    /// Source-chain position.
+    pub seq: i64,
+    /// Previous action hash; `None` only for the genesis `Dna` action.
+    pub prev_hash: Option<Vec<u8>>,
+    /// Serialized `ActionData` blob (v2 form).
+    pub action_data: Vec<u8>,
+    /// 64-byte action signature.
+    pub signature: Vec<u8>,
+    /// Serialized `Entry` blob; `None` when no entry is attached or not yet present.
+    pub entry_blob: Option<Vec<u8>>,
+}
+
+/// Joined `Warrant` row for full op rendering on the K2 wire.
+#[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
+pub struct K2WarrantForWireRow {
+    /// DHT op hash (= warrant hash).
+    pub hash: Vec<u8>,
+    /// Agent pub key of the warrant author.
+    pub author: Vec<u8>,
+    /// Microsecond authoring timestamp.
+    pub timestamp: i64,
+    /// Agent pub key of the warrantee (also serves as the DHT basis).
+    pub warrantee: Vec<u8>,
+    /// Serialized `WarrantProof` blob.
+    pub proof: Vec<u8>,
+    /// 64-byte warrant signature.
+    pub signature: Vec<u8>,
+}
+
+/// `(slice_index, hash)` pair returned when enumerating slice hashes.
+#[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
+pub struct SliceHashIndexedRow {
+    /// Slice index within the arc.
+    pub slice_index: i64,
+    /// Stored slice hash.
+    pub hash: Vec<u8>,
 }

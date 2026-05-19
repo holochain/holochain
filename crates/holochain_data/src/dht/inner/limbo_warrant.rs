@@ -17,6 +17,8 @@ pub struct InsertLimboWarrant<'a> {
     pub warrantee: &'a AgentPubKey,
     /// Serialized `WarrantProof` blob.
     pub proof: &'a [u8],
+    /// 64-byte signature over the warrant content.
+    pub signature: &'a [u8],
     /// Numeric storage center derived from the warrantee.
     pub storage_center_loc: u32,
     /// Microsecond timestamp at which the warrant was received.
@@ -34,15 +36,16 @@ where
 {
     sqlx::query(
         "INSERT INTO LimboWarrant
-            (hash, author, timestamp, warrantee, proof, storage_center_loc,
+            (hash, author, timestamp, warrantee, proof, signature, storage_center_loc,
              when_received, serialized_size)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(w.hash.get_raw_36())
     .bind(w.author.get_raw_36())
     .bind(w.timestamp.as_micros())
     .bind(w.warrantee.get_raw_36())
     .bind(w.proof)
+    .bind(w.signature)
     .bind(w.storage_center_loc as i64)
     .bind(w.when_received.as_micros())
     .bind(w.serialized_size as i64)
@@ -59,7 +62,7 @@ where
     E: Executor<'e, Database = Sqlite>,
 {
     sqlx::query_as(
-        "SELECT hash, author, timestamp, warrantee, proof, storage_center_loc,
+        "SELECT hash, author, timestamp, warrantee, proof, signature, storage_center_loc,
                 sys_validation_status, abandoned_at, when_received,
                 sys_validation_attempts, last_validation_attempt, serialized_size
          FROM LimboWarrant WHERE hash = ?",
@@ -137,22 +140,24 @@ where
 
 /// Promote a `LimboWarrant` row to the `Warrant` table.
 ///
-/// Reads the limbo row, inserts into `Warrant` with the carried fields, then
-/// deletes the limbo row. All three statements run on the given connection.
-/// **The caller must wrap this call in a transaction** to ensure atomicity.
+/// Reads the limbo row, inserts into `Warrant` with the carried fields plus
+/// the supplied `when_integrated` timestamp, then deletes the limbo row. All
+/// three statements run on the given connection. **The caller must wrap this
+/// call in a transaction** to ensure atomicity.
+///
+/// `serialized_size` is carried over from the limbo row so K2 can budget bytes
+/// for warrant ops the same way it does for chain ops.
 ///
 /// Returns `true` if the limbo row existed and was promoted, `false` if it
 /// did not exist.
-///
-/// Note: the `Warrant` table has no `when_integrated` column, so no
-/// integration timestamp is stored.
 pub(crate) async fn promote_to_warrant(
     conn: &mut SqliteConnection,
     hash: &DhtOpHash,
+    when_integrated: holochain_timestamp::Timestamp,
 ) -> sqlx::Result<bool> {
     // SELECT the limbo row's payload.
     let row: Option<LimboWarrantRow> = sqlx::query_as(
-        "SELECT hash, author, timestamp, warrantee, proof, storage_center_loc,
+        "SELECT hash, author, timestamp, warrantee, proof, signature, storage_center_loc,
                 sys_validation_status, abandoned_at, when_received,
                 sys_validation_attempts, last_validation_attempt, serialized_size
          FROM LimboWarrant WHERE hash = ?",
@@ -168,15 +173,19 @@ pub(crate) async fn promote_to_warrant(
 
     // INSERT into Warrant.
     sqlx::query(
-        "INSERT INTO Warrant (hash, author, timestamp, warrantee, proof, storage_center_loc)
-         VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO Warrant (hash, author, timestamp, warrantee, proof, signature,
+                              storage_center_loc, when_integrated, serialized_size)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&limbo.hash)
     .bind(&limbo.author)
     .bind(limbo.timestamp)
     .bind(&limbo.warrantee)
     .bind(&limbo.proof)
+    .bind(&limbo.signature)
     .bind(limbo.storage_center_loc)
+    .bind(when_integrated.as_micros())
+    .bind(limbo.serialized_size)
     .execute(&mut *conn)
     .await?;
 

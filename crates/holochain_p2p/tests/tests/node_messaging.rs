@@ -1186,8 +1186,11 @@ async fn spawn_test(
             .await
             .unwrap(),
     );
-    let db_op = DbWrite::test_in_mem(DbKindDht(Arc::new(dna_hash.clone()))).unwrap();
-    let db_cache = DbWrite::test_in_mem(DbKindCache(Arc::new(dna_hash.clone()))).unwrap();
+    let dht_store = holochain_state::DhtStore::new_test(holochain_data::kind::Dht::new(Arc::new(
+        dna_hash.clone(),
+    )))
+    .await
+    .unwrap();
     let conductor_store = holochain_state::conductor::ConductorStore::new_test()
         .await
         .unwrap();
@@ -1201,13 +1204,9 @@ async fn spawn_test(
                 let db_peer_meta = db_peer_meta.clone();
                 Box::pin(async move { Ok(db_peer_meta.clone()) })
             }),
-            get_db_op_store: Arc::new(move |_| {
-                let db_op = db_op.clone();
-                Box::pin(async move { Ok(db_op.clone()) })
-            }),
-            get_db_cache: Arc::new(move |_| {
-                let db_cache = db_cache.clone();
-                Box::pin(async move { Ok(db_cache) })
+            get_dht_store: Arc::new(move |_| {
+                let dht_store = dht_store.clone();
+                Box::pin(async move { Ok(dht_store) })
             }),
             get_conductor_store: Arc::new(move || {
                 let conductor_store = conductor_store.clone();

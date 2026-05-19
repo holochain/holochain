@@ -6,7 +6,6 @@ use holochain_p2p::{
     HolochainP2pLocalAgent,
 };
 use holochain_state::prelude::test_db_dir;
-use holochain_types::db::{DbKindCache, DbKindDht, DbWrite};
 use kitsune2_api::{
     AgentInfo, AgentInfoSigned, DhtArc, DynPeerMetaStore, SpaceId, Timestamp, Url, KEY_PREFIX_ROOT,
     META_KEY_UNRESPONSIVE,
@@ -334,8 +333,11 @@ impl TestCase {
             .await
             .unwrap(),
         );
-        let db_op = DbWrite::test_in_mem(DbKindDht(Arc::new(dna_hash.clone()))).unwrap();
-        let db_cache = DbWrite::test_in_mem(DbKindCache(Arc::new(dna_hash.clone()))).unwrap();
+        let dht_store = holochain_state::DhtStore::new_test(holochain_data::kind::Dht::new(
+            Arc::new(dna_hash.clone()),
+        ))
+        .await
+        .unwrap();
         let conductor_store = holochain_state::conductor::ConductorStore::new_test()
             .await
             .unwrap();
@@ -348,13 +350,9 @@ impl TestCase {
                     Box::pin(async move { Ok(db_peer_meta2.clone()) })
                 }),
                 peer_meta_pruning_interval_ms: 1,
-                get_db_op_store: Arc::new(move |_| {
-                    let db_op = db_op.clone();
-                    Box::pin(async move { Ok(db_op) })
-                }),
-                get_db_cache: Arc::new(move |_| {
-                    let db_cache = db_cache.clone();
-                    Box::pin(async move { Ok(db_cache) })
+                get_dht_store: Arc::new(move |_| {
+                    let dht_store = dht_store.clone();
+                    Box::pin(async move { Ok(dht_store) })
                 }),
                 get_conductor_store: Arc::new(move || {
                     let conductor_store = conductor_store.clone();

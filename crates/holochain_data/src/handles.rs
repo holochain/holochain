@@ -200,6 +200,14 @@ impl<I: DatabaseIdentifier> AsRef<DbRead<I>> for DbWrite<I> {
     }
 }
 
+/// Identity borrow on [`DbRead`]. Lets generic call sites accept either
+/// `DbRead<I>` or `DbWrite<I>` through `AsRef<DbRead<I>>`.
+impl<I: DatabaseIdentifier> AsRef<DbRead<I>> for DbRead<I> {
+    fn as_ref(&self) -> &DbRead<I> {
+        self
+    }
+}
+
 /// Conversion from [`TxWrite`] to [`TxRead`].
 impl<I: DatabaseIdentifier> From<TxWrite<I>> for TxRead<I> {
     fn from(write: TxWrite<I>) -> Self {

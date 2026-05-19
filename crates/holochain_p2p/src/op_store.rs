@@ -1,28 +1,37 @@
-use bytes::Bytes;
+//! Kitsune2 [`OpStore`] backed by the `holochain_data` per-DNA DHT
+//! database via `holochain_state::DhtStore`.
+//!
+//! All reads go through `DhtStore` methods; this module is responsible only
+//! for marshalling K2 types (`OpId`, `MetaOp`, `DhtArc`, `Timestamp`) into
+//! and out of the row shapes returned by the store. Wire bytes for chain
+//! ops are built by converting the stored v2 `SignedAction` back to the
+//! legacy form via `holochain_zome_types::dht_v2::to_legacy_signed_action`
+//! and encoding the resulting `DhtOp`.
+
+use bytes::{Bytes, BytesMut};
 use futures::future::BoxFuture;
-use holo_hash::{DhtOpHash, DnaHash, OpBasis};
-use holochain_serialized_bytes::prelude::decode;
-use holochain_sqlite::db::{DbKindCache, DbKindDht, DbWrite, ReadAccess};
-use holochain_sqlite::rusqlite::types::Value;
-use holochain_sqlite::sql::sql_dht::{
-    CHECK_OP_IDS_PRESENT, EARLIEST_TIMESTAMP, OPS_BY_ID, OP_HASHES_IN_TIME_SLICE,
-    OP_HASHES_SINCE_TIME_BATCH, TOTAL_OP_COUNT,
+use holo_hash::{DhtOpHash, DnaHash, HoloHashed, HOLO_HASH_CORE_LEN, HOLO_HASH_UNTYPED_LEN};
+use holochain_serialized_bytes::prelude::{decode, encode};
+use holochain_state::dht_store::{K2ChainOpForWireRow, K2WarrantForWireRow};
+use holochain_state::DhtStore;
+use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
+use holochain_types::warrant::WarrantOp;
+use holochain_zome_types::dht_v2::{
+    to_legacy_signed_action, Action as ActionV2, ActionData, ActionHeader, SignedActionHashed,
 };
-use holochain_state::prelude::{named_params, StateMutationResult};
-use holochain_types::dht_op::DhtOpHashed;
-use holochain_types::prelude::DhtOp;
+use holochain_zome_types::op::ChainOpType;
+use holochain_zome_types::warrant::{SignedWarrant, Warrant, WarrantProof};
 use kitsune2_api::*;
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
-use std::rc::Rc;
 use std::sync::Arc;
 
 /// Holochain implementation of the Kitsune2 [OpStoreFactory].
 pub struct HolochainOpStoreFactory {
-    /// The database connection getter.
-    pub getter: crate::GetDbOpStore,
-    /// The cache database connection getter.
-    pub cache_getter: crate::GetDbCache,
+    /// Returns the `DhtStore` for a DNA. The store is write-capable so it
+    /// can also handle `store_slice_hash`; reads are exposed through the
+    /// same handle.
+    pub getter: crate::GetDhtStore,
     /// The event handler.
     pub handler: Arc<std::sync::OnceLock<crate::spawn::WrapEvtSender>>,
 }
@@ -48,19 +57,14 @@ impl kitsune2_api::OpStoreFactory for HolochainOpStoreFactory {
         space: kitsune2_api::SpaceId,
     ) -> BoxFut<'static, kitsune2_api::K2Result<kitsune2_api::DynOpStore>> {
         let getter = self.getter.clone();
-        let cache_getter = self.cache_getter.clone();
         let handler = self.handler.clone();
         Box::pin(async move {
             let dna_hash = DnaHash::from_k2_space(&space);
-            let db = getter(dna_hash.clone()).await.map_err(|err| {
-                kitsune2_api::K2Error::other_src("failed to get op_store db", err)
-            })?;
-            let cache_db = cache_getter(dna_hash.clone())
+            let store = getter(dna_hash.clone())
                 .await
-                .map_err(|err| kitsune2_api::K2Error::other_src("failed to get cache db", err))?;
+                .map_err(|err| kitsune2_api::K2Error::other_src("failed to get dht store", err))?;
             let op_store: kitsune2_api::DynOpStore =
-                Arc::new(HolochainOpStore::new(db, cache_db, dna_hash, handler));
-
+                Arc::new(HolochainOpStore::new(store, dna_hash, handler));
             Ok(op_store)
         })
     }
@@ -68,8 +72,7 @@ impl kitsune2_api::OpStoreFactory for HolochainOpStoreFactory {
 
 /// Holochain implementation of the Kitsune2 [OpStore].
 pub struct HolochainOpStore {
-    db: DbWrite<DbKindDht>,
-    cache_db: DbWrite<DbKindCache>,
+    store: DhtStore,
     dna_hash: DnaHash,
     sender: Arc<std::sync::OnceLock<crate::spawn::WrapEvtSender>>,
 }
@@ -77,8 +80,7 @@ pub struct HolochainOpStore {
 impl Debug for HolochainOpStore {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("HolochainOpStore")
-            .field("db", &self.db)
-            .field("cache_db", &self.cache_db)
+            .field("dna_hash", &self.dna_hash)
             .finish()
     }
 }
@@ -86,18 +88,33 @@ impl Debug for HolochainOpStore {
 impl HolochainOpStore {
     /// Create a new [HolochainOpStore].
     pub fn new(
-        db: DbWrite<DbKindDht>,
-        cache_db: DbWrite<DbKindCache>,
+        store: DhtStore,
         dna_hash: DnaHash,
         sender: Arc<std::sync::OnceLock<crate::spawn::WrapEvtSender>>,
     ) -> HolochainOpStore {
         Self {
-            db,
-            cache_db,
+            store,
             dna_hash,
             sender,
         }
     }
+}
+
+/// Build a K2 located [`OpId`] from the raw 36-byte op-hash and basis-hash
+/// blobs stored in the DHT database (no type prefix in either).
+///
+/// `to_located_k2_op_id` on `HoloHash` would do this too, but it requires
+/// typed `DhtOpHash` / `OpBasis` values, and `OpBasis = AnyLinkableHash`
+/// can't be reconstructed from a 36-byte blob alone (the type prefix has
+/// been stripped). K2 only needs the op-hash core + the basis location
+/// bytes, both of which are present in the stored 36-byte forms.
+fn k2_op_id_from_raw(op_hash_36: &[u8], basis_36: &[u8]) -> OpId {
+    debug_assert_eq!(op_hash_36.len(), HOLO_HASH_UNTYPED_LEN);
+    debug_assert_eq!(basis_36.len(), HOLO_HASH_UNTYPED_LEN);
+    let mut inner = BytesMut::with_capacity(HOLO_HASH_UNTYPED_LEN);
+    inner.extend_from_slice(&op_hash_36[..HOLO_HASH_CORE_LEN]);
+    inner.extend_from_slice(&basis_36[HOLO_HASH_CORE_LEN..]);
+    OpId::from(inner.freeze())
 }
 
 impl OpStore for HolochainOpStore {
@@ -131,129 +148,127 @@ impl OpStore for HolochainOpStore {
         start: Timestamp,
         end: Timestamp,
     ) -> BoxFuture<'_, K2Result<(Vec<OpId>, u32)>> {
-        let db = self.db.clone();
-
         let (arc_start, arc_end) = match arc {
-            DhtArc::Empty => {
-                return Box::pin(async move { Ok((vec![], 0)) });
-            }
+            DhtArc::Empty => return Box::pin(async move { Ok((vec![], 0)) }),
             DhtArc::Arc(start, end) => (start, end),
         };
-
+        let start_t = holochain_timestamp::Timestamp::from_micros(start.as_micros());
+        let end_t = holochain_timestamp::Timestamp::from_micros(end.as_micros());
         Box::pin(async move {
-            let out = db
-                .read_async(move |txn| -> StateMutationResult<(Vec<OpId>, u32)> {
-                    let mut stmt = txn.prepare(OP_HASHES_IN_TIME_SLICE)?;
-
-                    let mut rows = stmt.query(named_params! {
-                        ":storage_start_loc": arc_start,
-                        ":storage_end_loc": arc_end,
-                        ":timestamp_min": start.as_micros(),
-                        ":timestamp_max": end.as_micros(),
-                    })?;
-
-                    let mut out = Vec::new();
-                    let mut out_size = 0;
-                    while let Some(row) = rows.next()? {
-                        let hash: DhtOpHash = row.get(0)?;
-                        let op_basis: OpBasis = row.get(1)?;
-                        let serialized_size: u32 = row.get(2)?;
-
-                        let op_id = hash.to_located_k2_op_id(&op_basis);
-                        out.push(op_id);
-                        out_size += serialized_size;
-                    }
-
-                    Ok((out, out_size))
-                })
+            let rows = self
+                .store
+                .k2_op_hashes_in_time_slice(arc_start, arc_end, start_t, end_t)
                 .await
                 .map_err(|e| K2Error::other_src("Failed to retrieve op hashes in time slice", e))?;
-
-            Ok(out)
+            let mut out = Vec::with_capacity(rows.len());
+            let mut total: u32 = 0;
+            for row in rows {
+                out.push(k2_op_id_from_raw(&row.hash, &row.basis_hash));
+                total = total.saturating_add(row.serialized_size.max(0) as u32);
+            }
+            Ok((out, total))
         })
     }
 
-    /// Retrieve a list of ops by their op ids.
-    ///
-    /// This should be used to get op data for ops.
     fn retrieve_ops(&self, op_ids: Vec<OpId>) -> BoxFuture<'_, K2Result<Vec<MetaOp>>> {
-        let db = self.db.clone();
+        // Convert K2 op-ids back to raw hash bytes; skip and log invalid ones
+        // rather than aborting the whole batch.
+        let raw_hashes: Vec<Vec<u8>> = op_ids
+            .iter()
+            .filter_map(|id| match DhtOpHash::try_from_k2_op(id) {
+                Ok(h) => Some(h.get_raw_36().to_vec()),
+                Err(e) => {
+                    tracing::warn!("Cannot retrieve op for invalid op id: {e}");
+                    None
+                }
+            })
+            .collect();
 
         Box::pin(async move {
-            let out = db
-                .read_async(move |txn| -> StateMutationResult<Vec<MetaOp>> {
-                    let mut stmt = txn.prepare(OPS_BY_ID)?;
-
-                    let mut rows = stmt.query([Rc::new(
-                        op_ids
-                            .iter()
-                            .filter_map(|id| match DhtOpHash::try_from_k2_op(id) {
-                                Ok(hash) => Some(Value::from(hash.into_inner())),
-                                Err(e) => {
-                                    tracing::warn!("Cannot retrieve op for invalid op id: {e}");
-                                    None
-                                }
-                            })
-                            .collect::<Vec<_>>(),
-                    )])?;
-
-                    let mut out = Vec::new();
-                    while let Some(row) = rows.next()? {
-                        let hash: DhtOpHash = row.get(0)?;
-                        let op_basis: OpBasis = row.get(1)?;
-                        let dht_op = holochain_state::query::map_sql_dht_op(false, "type", row)?;
-
-                        out.push(MetaOp {
-                            op_id: hash.to_located_k2_op_id(&op_basis),
-                            op_data: holochain_serialized_bytes::prelude::encode(&dht_op)?.into(),
-                        });
-                    }
-
-                    Ok(out)
-                })
+            if raw_hashes.is_empty() {
+                return Ok(Vec::new());
+            }
+            let chain_rows = self
+                .store
+                .k2_get_chain_ops_for_wire(&raw_hashes)
                 .await
-                .map_err(|e| K2Error::other_src("Failed to retrieve ops", e))?;
+                .map_err(|e| K2Error::other_src("Failed to retrieve chain ops", e))?;
+            let warrant_rows = self
+                .store
+                .k2_get_warrants_for_wire(&raw_hashes)
+                .await
+                .map_err(|e| K2Error::other_src("Failed to retrieve warrants", e))?;
+
+            let mut out = Vec::with_capacity(chain_rows.len() + warrant_rows.len());
+
+            for row in chain_rows {
+                let op = match build_chain_dht_op(row) {
+                    Ok(op) => op,
+                    Err(e) => {
+                        tracing::warn!("Failed to reconstruct chain op for wire: {e}");
+                        continue;
+                    }
+                };
+                let dht_op_hash = DhtOpHashed::from_content_sync(op.clone()).hash;
+                let op_id = dht_op_hash.to_located_k2_op_id(&op.dht_basis());
+                let op_data =
+                    encode(&op).map_err(|e| K2Error::other_src("Failed to encode chain op", e))?;
+                out.push(MetaOp {
+                    op_id,
+                    op_data: op_data.into(),
+                });
+            }
+
+            for row in warrant_rows {
+                let op = match build_warrant_dht_op(row) {
+                    Ok(op) => op,
+                    Err(e) => {
+                        tracing::warn!("Failed to reconstruct warrant op for wire: {e}");
+                        continue;
+                    }
+                };
+                let dht_op_hash = DhtOpHashed::from_content_sync(op.clone()).hash;
+                let op_id = dht_op_hash.to_located_k2_op_id(&op.dht_basis());
+                let op_data = encode(&op)
+                    .map_err(|e| K2Error::other_src("Failed to encode warrant op", e))?;
+                out.push(MetaOp {
+                    op_id,
+                    op_data: op_data.into(),
+                });
+            }
 
             Ok(out)
         })
     }
 
     fn filter_out_existing_ops(&self, op_ids: Vec<OpId>) -> BoxFuture<'_, K2Result<Vec<OpId>>> {
-        let db = self.db.clone();
-
+        // Build the candidate set + hash-byte lookup; skip invalid op-ids.
+        let mut candidate_set: HashSet<OpId> = HashSet::with_capacity(op_ids.len());
+        let mut raw_hashes: Vec<Vec<u8>> = Vec::with_capacity(op_ids.len());
+        for id in &op_ids {
+            match DhtOpHash::try_from_k2_op(id) {
+                Ok(h) => {
+                    raw_hashes.push(h.get_raw_36().to_vec());
+                    candidate_set.insert(id.clone());
+                }
+                Err(e) => {
+                    tracing::warn!("Got invalid op id: {e}");
+                }
+            }
+        }
         Box::pin(async move {
-            let out = db
-                .read_async(move |txn| -> StateMutationResult<Vec<OpId>> {
-                    let mut out = op_ids.clone().into_iter().collect::<HashSet<_>>();
-
-                    let mut stmt = txn.prepare(CHECK_OP_IDS_PRESENT)?;
-
-                    let mut rows = stmt.query([Rc::new(
-                        op_ids
-                            .iter()
-                            .filter_map(|id| match DhtOpHash::try_from_k2_op(id) {
-                                Ok(hash) => Some(Value::from(hash.into_inner())),
-                                Err(e) => {
-                                    tracing::warn!("Got invalid op id: {e}");
-                                    out.remove(id);
-                                    None
-                                }
-                            })
-                            .collect::<Vec<_>>(),
-                    )])?;
-
-                    while let Some(row) = rows.next()? {
-                        let op_hash: DhtOpHash = row.get(0)?;
-                        let op_basis: OpBasis = row.get(1)?;
-                        out.remove(&op_hash.to_located_k2_op_id(&op_basis));
-                    }
-
-                    Ok(out.into_iter().collect())
-                })
+            if raw_hashes.is_empty() {
+                return Ok(Vec::new());
+            }
+            let rows = self
+                .store
+                .k2_check_op_hashes_present(&raw_hashes)
                 .await
                 .map_err(|e| K2Error::other_src("Failed to filter out existing ops", e))?;
-
-            Ok(out)
+            for row in rows {
+                candidate_set.remove(&k2_op_id_from_raw(&row.hash, &row.basis_hash));
+            }
+            Ok(candidate_set.into_iter().collect())
         })
     }
 
@@ -263,124 +278,72 @@ impl OpStore for HolochainOpStore {
         start: Timestamp,
         limit_bytes: u32,
     ) -> BoxFuture<'_, K2Result<(Vec<OpId>, u32, Timestamp)>> {
-        let db = self.db.clone();
-
         let (arc_start, arc_end) = match arc {
-            DhtArc::Empty => {
-                return Box::pin(async move { Ok((vec![], 0, start)) });
-            }
+            DhtArc::Empty => return Box::pin(async move { Ok((vec![], 0, start)) }),
             DhtArc::Arc(start, end) => (start, end),
         };
 
         Box::pin(async move {
-            let out = db
-                .read_async(
-                    move |txn| -> StateMutationResult<(Vec<OpId>, u32, Timestamp)> {
-                        let mut used_bytes = 0;
-                        let mut latest_timestamp = start;
-                        let mut out = HashSet::new();
+            let mut used_bytes: u32 = 0;
+            let mut latest_timestamp = start;
+            let mut out: HashSet<OpId> = HashSet::new();
 
-                        'outer: loop {
-                            let mut stmt = txn.prepare(OP_HASHES_SINCE_TIME_BATCH)?;
-                            let mut rows = match stmt.query(named_params! {
-                                ":storage_start_loc": arc_start,
-                                ":storage_end_loc": arc_end,
-                                ":timestamp_min": latest_timestamp.as_micros(),
-                                // Fetch ops in batches of 500. This lets us observe the `limit_bytes`
-                                // without going to the database too many times.
-                                // Because the timestamp being queried is the integration timestamp,
-                                // it shouldn't be possible for >500 ops authored at the same time
-                                // to prevent this loop from proceeding.
-                                ":limit": 500,
-                            }) {
-                                Ok(rows) => rows,
-                                Err(e) => return Err(e.into()),
-                            };
+            // Page in batches of 500 to bound memory while still observing
+            // `limit_bytes`. The integration timestamp is monotonic per
+            // local clock; >500 ops at the exact same micro is implausible
+            // so the cursor always advances.
+            'outer: loop {
+                let cursor_t =
+                    holochain_timestamp::Timestamp::from_micros(latest_timestamp.as_micros());
+                let rows = self
+                    .store
+                    .k2_op_ids_since_time_batch(arc_start, arc_end, cursor_t, 500)
+                    .await
+                    .map_err(|e| K2Error::other_src("Failed to retrieve op ids bounded", e))?;
+                let ops_size_before = out.len();
+                for row in rows {
+                    let row_size = row.serialized_size.max(0) as u32;
+                    if used_bytes.saturating_add(row_size) > limit_bytes {
+                        break 'outer;
+                    }
+                    let op_id = k2_op_id_from_raw(&row.hash, &row.basis_hash);
+                    if out.insert(op_id) {
+                        latest_timestamp = Timestamp::from_micros(row.when_integrated);
+                        used_bytes = used_bytes.saturating_add(row_size);
+                    }
+                }
+                if out.len() == ops_size_before {
+                    break;
+                }
+            }
 
-                            let ops_size = out.len();
-
-                            while let Some(row) = rows.next()? {
-                                let hash: DhtOpHash = row.get(0)?;
-                                let op_basis: OpBasis = row.get(1)?;
-                                let timestamp = Timestamp::from_micros(row.get::<_, i64>(2)?);
-                                let serialized_size: u32 = row.get(3)?;
-
-                                if used_bytes + serialized_size > limit_bytes {
-                                    break 'outer;
-                                }
-
-                                let op_id = hash.to_located_k2_op_id(&op_basis);
-                                if out.insert(op_id) {
-                                    latest_timestamp = timestamp;
-                                    used_bytes += serialized_size;
-                                }
-                            }
-
-                            // If we didn't discover any new ops, break
-                            if out.len() == ops_size {
-                                break;
-                            }
-                        }
-
-                        Ok((out.into_iter().collect(), used_bytes, latest_timestamp))
-                    },
-                )
-                .await
-                .map_err(|e| K2Error::other_src("Failed to retrieve op ids bounded", e))?;
-
-            Ok(out)
+            Ok((out.into_iter().collect(), used_bytes, latest_timestamp))
         })
     }
 
     fn earliest_timestamp_in_arc(&self, arc: DhtArc) -> BoxFuture<'_, K2Result<Option<Timestamp>>> {
-        let db = self.db.clone();
-
         let (arc_start, arc_end) = match arc {
-            DhtArc::Empty => {
-                return Box::pin(async move { Ok(None) });
-            }
+            DhtArc::Empty => return Box::pin(async move { Ok(None) }),
             DhtArc::Arc(start, end) => (start, end),
         };
-
         Box::pin(async move {
-            db.read_async(move |txn| -> StateMutationResult<Option<Timestamp>> {
-                let mut stmt = txn.prepare(EARLIEST_TIMESTAMP)?;
-
-                Ok(stmt
-                    .query_row(
-                        named_params! {
-                            ":storage_start_loc": arc_start,
-                            ":storage_end_loc": arc_end,
-                        },
-                        |row| row.get::<_, Option<i64>>(0),
-                    )?
-                    .map(Timestamp::from_micros))
-            })
-            .await
-            .map_err(|e| K2Error::other_src("Failed to retrieve earliest timestamp in arc", e))
+            let opt = self
+                .store
+                .k2_earliest_authored_timestamp_in_arc(arc_start, arc_end)
+                .await
+                .map_err(|e| {
+                    K2Error::other_src("Failed to retrieve earliest timestamp in arc", e)
+                })?;
+            Ok(opt.map(|t| Timestamp::from_micros(t.as_micros())))
         })
     }
 
     fn query_total_op_count(&self) -> BoxFuture<'_, K2Result<u64>> {
-        let db = self.db.clone();
-        let cache_db = self.cache_db.clone();
-
         Box::pin(async move {
-            let dht_count = db
-                .read_async(move |txn| -> StateMutationResult<u64> {
-                    Ok(txn.query_row(TOTAL_OP_COUNT, [], |row| row.get(0))?)
-                })
+            self.store
+                .k2_total_integrated_op_count()
                 .await
-                .map_err(|e| K2Error::other_src("Failed to query total op count from dht", e))?;
-
-            let cache_count = cache_db
-                .read_async(move |txn| -> StateMutationResult<u64> {
-                    Ok(txn.query_row(TOTAL_OP_COUNT, [], |row| row.get(0))?)
-                })
-                .await
-                .map_err(|e| K2Error::other_src("Failed to query total op count from cache", e))?;
-
-            Ok(dht_count + cache_count)
+                .map_err(|e| K2Error::other_src("Failed to query total op count", e))
         })
     }
 
@@ -390,75 +353,29 @@ impl OpStore for HolochainOpStore {
         slice_index: u64,
         slice_hash: Bytes,
     ) -> BoxFuture<'_, K2Result<()>> {
-        let db = self.db.clone();
-
         let (arc_start, arc_end) = match arc {
-            DhtArc::Empty => {
-                return Box::pin(async move { Ok(()) });
-            }
+            DhtArc::Empty => return Box::pin(async move { Ok(()) }),
             DhtArc::Arc(start, end) => (start, end),
         };
-
+        let bytes = slice_hash.to_vec();
         Box::pin(async move {
-            db.write_async(move |txn| -> StateMutationResult<()> {
-                let mut stmt = txn.prepare(
-                    r#"INSERT INTO SliceHash
-                (arc_start, arc_end, slice_index, hash)
-                VALUES (:arc_start, :arc_end, :slice_index, :hash)"#,
-                )?;
-
-                stmt.execute(named_params! {
-                    ":arc_start": arc_start,
-                    ":arc_end": arc_end,
-                    ":slice_index": slice_index,
-                    ":hash": slice_hash.to_vec(),
-                })?;
-
-                Ok(())
-            })
-            .await
-            .map_err(|e| K2Error::other_src("Failed to store slice hash", e))?;
-
-            Ok(())
+            self.store
+                .store_slice_hash(arc_start, arc_end, slice_index, &bytes)
+                .await
+                .map_err(|e| K2Error::other_src("Failed to store slice hash", e))
         })
     }
 
     fn slice_hash_count(&self, arc: DhtArc) -> BoxFuture<'_, K2Result<u64>> {
-        let db = self.db.clone();
-
         let (arc_start, arc_end) = match arc {
-            DhtArc::Empty => {
-                return Box::pin(async move { Ok(0) });
-            }
+            DhtArc::Empty => return Box::pin(async move { Ok(0) }),
             DhtArc::Arc(start, end) => (start, end),
         };
-
         Box::pin(async move {
-            let out = db
-                .read_async(move |txn| -> StateMutationResult<u64> {
-                    let mut stmt = txn.prepare(
-                        r#"SELECT COALESCE(MAX(slice_index),0) FROM SliceHash
-                    WHERE arc_start = :arc_start AND arc_end = :arc_end"#,
-                    )?;
-
-                    let count = match stmt.query_row(
-                        named_params! {
-                            ":arc_start": arc_start,
-                            ":arc_end": arc_end,
-                        },
-                        |r| r.get(0),
-                    ) {
-                        Ok(count) => count,
-                        Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) => 0,
-                        Err(e) => return Err(e.into()),
-                    };
-
-                    Ok(count)
-                })
+            self.store
+                .slice_hash_count(arc_start, arc_end)
                 .await
-                .map_err(|e| K2Error::other_src("Failed to count slice hashes", e))?;
-
-            Ok(out)
+                .map_err(|e| K2Error::other_src("Failed to count slice hashes", e))
         })
     }
 
@@ -467,74 +384,106 @@ impl OpStore for HolochainOpStore {
         arc: DhtArc,
         slice_index: u64,
     ) -> BoxFuture<'_, K2Result<Option<Bytes>>> {
-        let db = self.db.clone();
-
         let (arc_start, arc_end) = match arc {
-            DhtArc::Empty => {
-                return Box::pin(async move { Ok(None) });
-            }
+            DhtArc::Empty => return Box::pin(async move { Ok(None) }),
             DhtArc::Arc(start, end) => (start, end),
         };
-
         Box::pin(async move {
-            let out = db
-                .read_async(move |txn| -> StateMutationResult<Option<Bytes>> {
-                    let mut stmt = txn.prepare(r#"SELECT hash FROM SliceHash
-                    WHERE arc_start = :arc_start AND arc_end = :arc_end AND slice_index = :slice_index"#)?;
-
-                    let hash = match stmt.query_row(named_params! {
-                        ":arc_start": arc_start,
-                        ":arc_end": arc_end,
-                        ":slice_index": slice_index,
-                    }, |r| r.get::<_, Vec<u8>>(0)) {
-                        Ok(hash) => Some(Bytes::from(hash)),
-                        Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) => None,
-                        Err(e) => return Err(e.into()),
-                    };
-
-                    Ok(hash)
-                })
+            self.store
+                .get_slice_hash(arc_start, arc_end, slice_index)
                 .await
-                .map_err(|e| K2Error::other_src("Failed to retrieve slice hash", e))?;
-
-            Ok(out)
+                .map(|opt| opt.map(Bytes::from))
+                .map_err(|e| K2Error::other_src("Failed to retrieve slice hash", e))
         })
     }
 
     fn retrieve_slice_hashes(&self, arc: DhtArc) -> BoxFuture<'_, K2Result<Vec<(u64, Bytes)>>> {
-        let db = self.db.clone();
-
         let (arc_start, arc_end) = match arc {
-            DhtArc::Empty => {
-                return Box::pin(async move { Ok(vec![]) });
-            }
+            DhtArc::Empty => return Box::pin(async move { Ok(vec![]) }),
             DhtArc::Arc(start, end) => (start, end),
         };
-
         Box::pin(async move {
-            let out = db
-                .read_async(move |txn| -> StateMutationResult<Vec<(u64, Bytes)>> {
-                    let mut stmt = txn.prepare(
-                        r#"SELECT slice_index, hash FROM SliceHash
-                    WHERE arc_start = :arc_start AND arc_end = :arc_end"#,
-                    )?;
-
-                    let hash = stmt
-                        .query_map(
-                            named_params! {
-                                ":arc_start": arc_start,
-                                ":arc_end": arc_end,
-                            },
-                            |r| Ok((r.get::<_, u64>(0)?, Bytes::from(r.get::<_, Vec<u8>>(1)?))),
-                        )?
-                        .collect::<holochain_sqlite::rusqlite::Result<Vec<_>>>()?;
-
-                    Ok(hash)
-                })
+            self.store
+                .get_slice_hashes(arc_start, arc_end)
                 .await
-                .map_err(|e| K2Error::other_src("Failed to retrieve slice hashes", e))?;
-
-            Ok(out)
+                .map(|rows| {
+                    rows.into_iter()
+                        .map(|r| (r.slice_index.max(0) as u64, Bytes::from(r.hash)))
+                        .collect()
+                })
+                .map_err(|e| K2Error::other_src("Failed to retrieve slice hashes", e))
         })
     }
+}
+
+/// Reconstruct a legacy [`DhtOp::ChainOp`] from the joined row.
+fn build_chain_dht_op(row: K2ChainOpForWireRow) -> Result<DhtOp, String> {
+    use holo_hash::{ActionHash, AgentPubKey};
+
+    let op_type_i: i64 = row.op_type;
+    let op_type: ChainOpType = ChainOpType::try_from(op_type_i)
+        .map_err(|v| format!("invalid op_type {v} in ChainOp row"))?;
+
+    let action_data: ActionData = holochain_serialized_bytes::decode(&row.action_data)
+        .map_err(|e| format!("failed to decode ActionData: {e:?}"))?;
+    let action_hash = ActionHash::from_raw_36(row.action_hash);
+    let prev_action = row.prev_hash.map(ActionHash::from_raw_36);
+
+    let header = ActionHeader {
+        author: AgentPubKey::from_raw_36(row.author),
+        timestamp: holochain_timestamp::Timestamp::from_micros(row.timestamp),
+        action_seq: row.seq.max(0) as u32,
+        prev_action,
+    };
+    let v2_action = ActionV2 {
+        header,
+        data: action_data,
+    };
+    let signature = decode_signature(&row.signature)?;
+
+    let sah: SignedActionHashed = holochain_zome_types::record::SignedHashed::with_presigned(
+        HoloHashed::with_pre_hashed(v2_action, action_hash),
+        signature,
+    );
+    let legacy_sah = to_legacy_signed_action(&sah);
+
+    let entry = match row.entry_blob {
+        Some(blob) => Some(
+            holochain_serialized_bytes::decode::<_, holochain_types::prelude::Entry>(&blob)
+                .map_err(|e| format!("failed to decode Entry blob: {e:?}"))?,
+        ),
+        None => None,
+    };
+
+    let chain_op = ChainOp::from_type(op_type, legacy_sah.into(), entry)
+        .map_err(|e| format!("failed to build legacy ChainOp: {e:?}"))?;
+    Ok(DhtOp::ChainOp(Box::new(chain_op)))
+}
+
+/// Reconstruct a legacy [`DhtOp::WarrantOp`] from the warrant row.
+fn build_warrant_dht_op(row: K2WarrantForWireRow) -> Result<DhtOp, String> {
+    use holo_hash::AgentPubKey;
+
+    let author = AgentPubKey::from_raw_36(row.author);
+    let warrantee = AgentPubKey::from_raw_36(row.warrantee);
+    let timestamp = holochain_timestamp::Timestamp::from_micros(row.timestamp);
+    let proof: WarrantProof = holochain_serialized_bytes::decode(&row.proof)
+        .map_err(|e| format!("failed to decode WarrantProof: {e:?}"))?;
+    let signature = decode_signature(&row.signature)?;
+
+    let warrant = Warrant {
+        proof,
+        warrantee,
+        author,
+        timestamp,
+    };
+    let signed = SignedWarrant::new(warrant, signature);
+    Ok(DhtOp::WarrantOp(Box::new(WarrantOp::from(signed))))
+}
+
+fn decode_signature(bytes: &[u8]) -> Result<holochain_zome_types::signature::Signature, String> {
+    let arr: [u8; 64] = bytes
+        .try_into()
+        .map_err(|_| format!("signature length {} is not 64 bytes", bytes.len()))?;
+    Ok(holochain_zome_types::signature::Signature::from(arr))
 }

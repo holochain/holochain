@@ -655,6 +655,7 @@ mod tests {
             timestamp: Timestamp::from_micros(10),
             warrantee: &warrantee,
             proof: &proof,
+            signature: &[7u8; 64],
             storage_center_loc: 77,
             when_received: Timestamp::from_micros(100),
             serialized_size: 128,
@@ -669,6 +670,7 @@ mod tests {
             .unwrap()
             .expect("missing");
         assert_eq!(row.warrantee, warrantee.get_raw_36().to_vec());
+        assert_eq!(row.signature, vec![7u8; 64]);
         assert!(
             db.as_ref()
                 .limbo_warrants_pending_sys_validation(10)
@@ -715,7 +717,10 @@ mod tests {
             timestamp: Timestamp::from_micros(1),
             warrantee: &warrantee,
             proof: &[9u8; 32],
+            signature: &[8u8; 64],
             storage_center_loc: 88,
+            when_integrated: Timestamp::from_micros(50),
+            serialized_size: 128,
         })
         .await
         .unwrap();
@@ -727,6 +732,8 @@ mod tests {
             .unwrap()
             .expect("missing");
         assert_eq!(row.warrantee, warrantee.get_raw_36().to_vec());
+        assert_eq!(row.when_integrated, 50);
+        assert_eq!(row.serialized_size, 128);
 
         let by_warrantee = db
             .as_ref()
@@ -856,7 +863,10 @@ mod tests {
             timestamp: Timestamp::from_micros(1),
             warrantee: &warrantee,
             proof: &[0u8; 32],
+            signature: &[1u8; 64],
             storage_center_loc: 0,
+            when_integrated: Timestamp::from_micros(5),
+            serialized_size: 64,
         })
         .await
         .unwrap();
@@ -1202,6 +1212,7 @@ mod tests {
             timestamp: Timestamp::from_micros(10),
             warrantee: &warrantee,
             proof: &[0u8; 64],
+            signature: &[0u8; 64],
             storage_center_loc: 77,
             when_received: Timestamp::from_micros(100),
             serialized_size: 128,
@@ -1300,6 +1311,7 @@ mod tests {
             timestamp: Timestamp::from_micros(10),
             warrantee: &warrantee,
             proof: &[5u8; 64],
+            signature: &[6u8; 64],
             storage_center_loc: 77,
             when_received: Timestamp::from_micros(100),
             serialized_size: 128,
@@ -1307,7 +1319,10 @@ mod tests {
         .await
         .unwrap();
 
-        let promoted = db.promote_limbo_warrant(&hash).await.unwrap();
+        let promoted = db
+            .promote_limbo_warrant(&hash, Timestamp::from_micros(200))
+            .await
+            .unwrap();
         assert!(promoted);
 
         assert!(db

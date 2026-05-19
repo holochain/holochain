@@ -110,7 +110,11 @@ impl DhtStore<DbWrite<Dht>> {
             let op_hash = holo_hash::DhtOpHash::with_data_sync(&warrant_op);
             let proof_bytes = holochain_serialized_bytes::encode(&warrant_op.proof)
                 .map_err(StateMutationError::from)?;
+            let signature_bytes = warrant_op.signature().0;
             let storage_center_loc = warrant_op.warrantee.get_loc();
+            let serialized_size = holochain_serialized_bytes::encode(&warrant_op)
+                .map_err(StateMutationError::from)?
+                .len() as u32;
 
             tx.insert_limbo_warrant(InsertLimboWarrant {
                 hash: &op_hash,
@@ -118,9 +122,10 @@ impl DhtStore<DbWrite<Dht>> {
                 timestamp: warrant_op.timestamp,
                 warrantee: &warrant_op.warrantee,
                 proof: &proof_bytes,
+                signature: &signature_bytes,
                 storage_center_loc,
                 when_received: now,
-                serialized_size: 0,
+                serialized_size,
             })
             .await
             .map_err(StateMutationError::from)?;
