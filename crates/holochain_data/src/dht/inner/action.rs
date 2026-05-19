@@ -127,3 +127,25 @@ where
     .await?;
     rows.into_iter().map(row_to_signed_action_hashed).collect()
 }
+
+/// Return actions whose `prev_hash = :prev_hash` and `hash != :exclude_hash`.
+/// Used by the sys-validation workflow to detect chain forks.
+pub(crate) async fn get_actions_by_prev_hash<'e, E>(
+    executor: E,
+    prev_hash: &ActionHash,
+    exclude_hash: &ActionHash,
+) -> sqlx::Result<Vec<SignedActionHashed>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let rows: Vec<ActionRow> = sqlx::query_as(
+        "SELECT hash, author, seq, prev_hash, timestamp, action_type,
+                action_data, signature, entry_hash, private_entry, record_validity
+         FROM Action WHERE prev_hash = ? AND hash != ?",
+    )
+    .bind(prev_hash.get_raw_36())
+    .bind(exclude_hash.get_raw_36())
+    .fetch_all(executor)
+    .await?;
+    rows.into_iter().map(row_to_signed_action_hashed).collect()
+}
