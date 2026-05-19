@@ -67,6 +67,9 @@ impl Drop for OpsClaim {
     }
 }
 
+// TODO(read-migration): once legacy DhtOp writes are removed, switch
+// this intra-transaction dedup to rely on the new DhtStore. For now
+// it remains on the legacy txn to preserve same-transaction semantics.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(txn, ops)))]
 fn batch_process_entry(
     txn: &mut Txn<DbKindDht>,
@@ -139,8 +142,12 @@ pub async fn incoming_dht_ops_workflow(
         }
     }
 
-    // Filter the list of ops to only include those that are not already in the database.
-    filter_ops = filter_existing_ops(&dht_db, filter_ops).await?;
+    // Filter the list of ops to only include those that are not already in the new DHT store.
+    filter_ops = dht_store
+        .as_read()
+        .filter_existing_ops(filter_ops)
+        .await
+        .map_err(super::error::WorkflowError::from)?;
 
     // Check again whether everything has been filtered out and avoid launching a Tokio task if so
     if filter_ops.is_empty() {
@@ -271,17 +278,5 @@ fn op_exists_inner(txn: &rusqlite::Transaction<'_>, hash: &DhtOpHash) -> Databas
 pub async fn op_exists(vault: &DbWrite<DbKindDht>, hash: DhtOpHash) -> DatabaseResult<bool> {
     vault
         .read_async(move |txn| op_exists_inner(txn, &hash))
-        .await
-}
-
-pub async fn filter_existing_ops(
-    vault: &DbWrite<DbKindDht>,
-    mut ops: Vec<DhtOpHashed>,
-) -> DatabaseResult<Vec<DhtOpHashed>> {
-    vault
-        .read_async(move |txn| {
-            ops.retain(|op| !op_exists_inner(txn, &op.hash).unwrap_or(true));
-            Ok(ops)
-        })
         .await
 }
