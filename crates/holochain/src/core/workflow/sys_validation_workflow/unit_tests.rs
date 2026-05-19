@@ -328,10 +328,9 @@ async fn validate_valid_warrant_with_cached_dependency() {
         fixt!(Signature),
         Action::Create(create),
         crate::prelude::RecordEntry::Present(entry),
-    )
-    .into();
+    );
     test_case
-        .save_op_to_db(test_case.cache_db_handle(), warranted_op)
+        .save_chain_op_to_cache(warranted_op)
         .await
         .unwrap();
 
@@ -840,6 +839,47 @@ impl TestCase {
         .unwrap();
 
         Ok(test_op_hash)
+    }
+
+    /// Write a chain op to both the legacy cache database and the new DHT store so
+    /// that the op is visible to both the legacy `copy_cached_op_to_dht` path and
+    /// to `move_warranted_op_to_limbo`. In production, cascade's `cache_chain_ops`
+    /// performs this dual write; this helper replicates that for test fixtures that
+    /// bypass cascade.
+    async fn save_chain_op_to_cache(&self, chain_op: ChainOp) -> StateMutationResult<DhtOpHash> {
+        // Build the RenderedOps first so we can pass it to cache_chain_ops.
+        let action = chain_op.action();
+        let signature = chain_op.signature().clone();
+        let op_type = chain_op.get_type();
+        let entry = match chain_op.entry() {
+            holochain_zome_types::record::RecordEntry::Present(e) => Some(
+                holochain_zome_types::entry::EntryHashed::from_content_sync(e.clone()),
+            ),
+            _ => None,
+        };
+
+        let rendered_op =
+            holochain_types::dht_op::RenderedOp::new(action, signature, None, op_type)
+                .expect("render op for test fixture");
+        let rendered_ops = holochain_types::dht_op::RenderedOps {
+            entry,
+            ops: vec![rendered_op],
+            warrant: None,
+        };
+
+        // Legacy cache write (required by copy_cached_op_to_dht).
+        let op_hash = self
+            .save_op_to_db(self.cache_db_handle(), DhtOp::ChainOp(Box::new(chain_op)))
+            .await?;
+
+        // New DhtStore write so move_warranted_op_to_limbo can find the row.
+        self.test_space
+            .space
+            .dht_store
+            .cache_chain_ops(&rendered_ops)
+            .await?;
+
+        Ok(op_hash)
     }
 
     /// Write an op to both the legacy DHT database and the new DHT store so that
