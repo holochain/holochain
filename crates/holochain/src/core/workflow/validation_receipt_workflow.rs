@@ -48,7 +48,10 @@ pub async fn validation_receipt_workflow(
         .collect::<Vec<_>>();
 
     // Get out all ops that are marked for sending receipt.
-    let receipts = pending_receipts(&vault, validators.clone()).await?;
+    let receipts = dht_store
+        .pending_validation_receipts(validators.clone())
+        .await
+        .map_err(WorkflowError::from)?;
 
     let validators: HashSet<_> = validators.into_iter().collect();
 
@@ -187,14 +190,4 @@ async fn sign_and_send_receipts_to_author(
     .await?;
 
     Ok(())
-}
-
-#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-async fn pending_receipts(
-    vault: &DbRead<DbKindDht>,
-    validators: Vec<AgentPubKey>,
-) -> StateQueryResult<Vec<(ValidationReceipt, AgentPubKey)>> {
-    vault
-        .read_async(move |txn| get_pending_validation_receipts(txn, validators))
-        .await
 }
