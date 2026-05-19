@@ -64,12 +64,20 @@ async fn sys_validation_produces_invalid_chain_op_warrant() {
     .unwrap();
     matches::assert_matches!(outcome, Outcome::Rejected(_));
 
-    //- Inject the invalid op directly into bob's DHT db
+    //- Inject the invalid op directly into bob's DHT db (legacy) and new DHT store
     let op = DhtOpHashed::from_content_sync(op);
     let db = conductor.spaces.dht_db(dna.dna_hash()).unwrap();
+    let op_for_legacy = op.clone();
     db.test_write(move |txn| {
-        insert_op_dht(txn, &op, 0, None).unwrap();
+        insert_op_dht(txn, &op_for_legacy, 0, None).unwrap();
     });
+    conductor
+        .spaces
+        .dht_store(dna.dna_hash())
+        .unwrap()
+        .record_incoming_ops(vec![op])
+        .await
+        .unwrap();
 
     //- Trigger sys validation
     conductor
@@ -196,16 +204,26 @@ async fn sys_validation_produces_forked_chain_warrant() {
     matches::assert_matches!(outcome, Outcome::Accepted);
 
     // Inject genesis + original action (as already-integrated data) and the
-    // forked op (as pending validation) into Bob's DHT db
+    // forked op (as pending validation) into Bob's DHT db (legacy) and new DHT store
     let prev_op_hashed = DhtOpHashed::from_content_sync(prev_op);
     let original_op_hashed = DhtOpHashed::from_content_sync(original_op);
     let forked_op_hashed = DhtOpHashed::from_content_sync(forked_op);
     let db = conductor.spaces.dht_db(dna.dna_hash()).unwrap();
+    let prev_for_legacy = prev_op_hashed.clone();
+    let orig_for_legacy = original_op_hashed.clone();
+    let fork_for_legacy = forked_op_hashed.clone();
     db.test_write(move |txn| {
-        insert_op_dht(txn, &prev_op_hashed, 0, None).unwrap();
-        insert_op_dht(txn, &original_op_hashed, 0, None).unwrap();
-        insert_op_dht(txn, &forked_op_hashed, 0, None).unwrap();
+        insert_op_dht(txn, &prev_for_legacy, 0, None).unwrap();
+        insert_op_dht(txn, &orig_for_legacy, 0, None).unwrap();
+        insert_op_dht(txn, &fork_for_legacy, 0, None).unwrap();
     });
+    conductor
+        .spaces
+        .dht_store(dna.dna_hash())
+        .unwrap()
+        .record_incoming_ops(vec![prev_op_hashed, original_op_hashed, forked_op_hashed])
+        .await
+        .unwrap();
 
     // Check that Bob authored a chain fork warrant with the correct action hashes
     retry_until_timeout!(60_000, 500, {
@@ -355,16 +373,26 @@ async fn sys_validation_produces_two_warrants_when_receiving_both_forked_ops() {
     .unwrap();
     matches::assert_matches!(outcome2, Outcome::Accepted);
 
-    // Inject the previous action and both forked ops into Bob's DHT db
+    // Inject the previous action and both forked ops into Bob's DHT db (legacy) and new DHT store
     let prev_op_hashed = DhtOpHashed::from_content_sync(prev_op);
     let op1_hashed = DhtOpHashed::from_content_sync(op1);
     let op2_hashed = DhtOpHashed::from_content_sync(op2);
     let db = conductor.spaces.dht_db(dna.dna_hash()).unwrap();
+    let prev_for_legacy = prev_op_hashed.clone();
+    let op1_for_legacy = op1_hashed.clone();
+    let op2_for_legacy = op2_hashed.clone();
     db.test_write(move |txn| {
-        insert_op_dht(txn, &prev_op_hashed, 0, None).unwrap();
-        insert_op_dht(txn, &op1_hashed, 0, None).unwrap();
-        insert_op_dht(txn, &op2_hashed, 0, None).unwrap();
+        insert_op_dht(txn, &prev_for_legacy, 0, None).unwrap();
+        insert_op_dht(txn, &op1_for_legacy, 0, None).unwrap();
+        insert_op_dht(txn, &op2_for_legacy, 0, None).unwrap();
     });
+    conductor
+        .spaces
+        .dht_store(dna.dna_hash())
+        .unwrap()
+        .record_incoming_ops(vec![prev_op_hashed, op1_hashed, op2_hashed])
+        .await
+        .unwrap();
 
     // Check that Bob authored 2 chain fork warrants
     retry_until_timeout!(60_000, 500, {

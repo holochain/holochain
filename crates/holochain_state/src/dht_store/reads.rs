@@ -49,7 +49,8 @@ impl DhtStore<DbRead<Dht>> {
     pub async fn find_fork_for_action(
         &self,
         action: &holochain_zome_types::action::Action,
-    ) -> StateQueryResult<Option<(holo_hash::ActionHash, holochain_types::prelude::Signature)>> {
+    ) -> StateQueryResult<Option<(holo_hash::ActionHash, holochain_types::prelude::Signature)>>
+    {
         let Some(prev) = action.prev_action() else {
             return Ok(None);
         };
@@ -139,7 +140,8 @@ impl DhtStore<DbWrite<Dht>> {
     pub async fn find_fork_for_action(
         &self,
         action: &holochain_zome_types::action::Action,
-    ) -> StateQueryResult<Option<(holo_hash::ActionHash, holochain_types::prelude::Signature)>> {
+    ) -> StateQueryResult<Option<(holo_hash::ActionHash, holochain_types::prelude::Signature)>>
+    {
         self.as_read().find_fork_for_action(action).await
     }
 }

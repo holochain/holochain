@@ -113,11 +113,9 @@ use holochain_cascade::CascadeImpl;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_sqlite::prelude::*;
-use holochain_sqlite::sql::sql_cell::ACTION_HASH_BY_PREV;
 use holochain_state::dht_store::DhtStore;
 use holochain_state::integrate::insert_locally_validated_op;
 use holochain_state::prelude::*;
-use holochain_state::query::StateQueryError;
 use rusqlite::Transaction;
 use std::convert::TryInto;
 use std::sync::Arc;
@@ -237,8 +235,12 @@ async fn sys_validation_workflow_inner(
     _keystore: MetaLairClient,
     _representative_agent: AgentPubKey,
 ) -> WorkflowResult<OutcomeSummary> {
-    let db = workspace.dht_db.clone();
-    let sorted_ops = validation_query::get_ops_to_sys_validate(&db).await?;
+    let sorted_ops = workspace
+        .dht_store
+        .as_read()
+        .ops_pending_sys_validation(10_000)
+        .await
+        .map_err(WorkflowError::from)?;
 
     // Forget what dependencies are currently in use
     current_validation_dependencies
@@ -305,95 +307,113 @@ async fn sys_validation_workflow_inner(
         }
     }
 
-    let (mut summary, invalid_ops, _forked_pairs, chain_op_sys_outcomes, warrant_sys_outcomes) =
-        workspace
-            .dht_db
-            .write_async(move |txn| {
-                let mut summary = OutcomeSummary {
-                    warrant_deps_copied,
-                    ..Default::default()
-                };
-                let mut invalid_ops = vec![];
-                let mut forked_pairs: Vec<(AgentPubKey, ForkedPair)> = Vec::with_capacity(0);
-                let mut chain_op_sys_outcomes: Vec<(DhtOpHash, SysOutcome)> = Vec::new();
-                let mut warrant_sys_outcomes: Vec<(DhtOpHash, SysOutcome)> = Vec::new();
+    let (
+        mut summary,
+        invalid_ops,
+        pending_fork_checks,
+        chain_op_sys_outcomes,
+        warrant_sys_outcomes,
+    ) = workspace
+        .dht_db
+        .write_async(move |txn| {
+            let mut summary = OutcomeSummary {
+                warrant_deps_copied,
+                ..Default::default()
+            };
+            let mut invalid_ops = vec![];
+            // Collect (action, incoming_signature, incoming_hash) for each chain op so
+            // that fork detection can run asynchronously after this transaction closes.
+            let mut pending_fork_checks: Vec<(Action, Signature, ActionHash)> =
+                Vec::with_capacity(0);
+            let mut chain_op_sys_outcomes: Vec<(DhtOpHash, SysOutcome)> = Vec::new();
+            let mut warrant_sys_outcomes: Vec<(DhtOpHash, SysOutcome)> = Vec::new();
 
-                for (hashed_op, outcome) in validation_outcomes {
-                    let (op, op_hash) = hashed_op.into_inner();
-                    let op_type = op.get_type();
+            for (hashed_op, outcome) in validation_outcomes {
+                let (op, op_hash) = hashed_op.into_inner();
+                let op_type = op.get_type();
 
-                    if let DhtOp::ChainOp(chain_op) = &op {
-                        // Author a ChainFork warrant if fork is detected
-                        let action = chain_op.action();
-                        if let Some(forked_action) = detect_fork(txn, &action)? {
-                            let signature = chain_op.signature().clone();
-                            let action_hash = action.to_hash();
-                            forked_pairs.push((
-                                action.author().clone(),
-                                ForkedPair {
-                                    action_pair: ((action_hash, signature), forked_action),
-                                    seq: action.action_seq(),
-                                },
-                            ));
-                        }
-                    }
+                if let DhtOp::ChainOp(chain_op) = &op {
+                    // Collect the data needed for async fork detection after this txn.
+                    let action = chain_op.action();
+                    let signature = chain_op.signature().clone();
+                    let action_hash = action.to_hash();
+                    pending_fork_checks.push((action, signature, action_hash));
+                }
 
-                    match outcome {
-                        Outcome::Accepted => {
-                            summary.accepted += 1;
-                            match op_type {
-                                DhtOpType::Chain(_) => {
-                                    chain_op_sys_outcomes
-                                        .push((op_hash.clone(), SysOutcome::Accepted));
-                                    put_validation_limbo(
-                                        txn,
-                                        &op_hash,
-                                        ValidationStage::SysValidated,
-                                    )?
-                                }
-                                DhtOpType::Warrant(_) => {
-                                    warrant_sys_outcomes
-                                        .push((op_hash.clone(), SysOutcome::Accepted));
-                                    put_integration_limbo(txn, &op_hash, ValidationStatus::Valid)?
-                                }
-                            };
-                        }
-                        Outcome::MissingDhtDep => {
-                            summary.missing += 1;
-                            // Awaiting dependencies — status stays NULL in the new DB;
-                            // no outcome to record.
-                            let status = ValidationStage::AwaitingSysDeps;
-                            put_validation_limbo(txn, &op_hash, status)?;
-                        }
-                        Outcome::Rejected(reason) => {
-                            invalid_ops.push((op_hash.clone(), op.clone(), reason));
-
-                            match op {
-                                DhtOp::ChainOp(_) => {
-                                    summary.rejected += 1;
-                                    chain_op_sys_outcomes
-                                        .push((op_hash.clone(), SysOutcome::Rejected));
-                                }
-                                DhtOp::WarrantOp(_) => {
-                                    summary.warrants_rejected += 1;
-                                    warrant_sys_outcomes
-                                        .push((op_hash.clone(), SysOutcome::Rejected));
-                                }
+                match outcome {
+                    Outcome::Accepted => {
+                        summary.accepted += 1;
+                        match op_type {
+                            DhtOpType::Chain(_) => {
+                                chain_op_sys_outcomes.push((op_hash.clone(), SysOutcome::Accepted));
+                                put_validation_limbo(txn, &op_hash, ValidationStage::SysValidated)?
                             }
+                            DhtOpType::Warrant(_) => {
+                                warrant_sys_outcomes.push((op_hash.clone(), SysOutcome::Accepted));
+                                put_integration_limbo(txn, &op_hash, ValidationStatus::Valid)?
+                            }
+                        };
+                    }
+                    Outcome::MissingDhtDep => {
+                        summary.missing += 1;
+                        // Awaiting dependencies — status stays NULL in the new DB;
+                        // no outcome to record.
+                        let status = ValidationStage::AwaitingSysDeps;
+                        put_validation_limbo(txn, &op_hash, status)?;
+                    }
+                    Outcome::Rejected(reason) => {
+                        invalid_ops.push((op_hash.clone(), op.clone(), reason));
 
-                            put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;
+                        match op {
+                            DhtOp::ChainOp(_) => {
+                                summary.rejected += 1;
+                                chain_op_sys_outcomes.push((op_hash.clone(), SysOutcome::Rejected));
+                            }
+                            DhtOp::WarrantOp(_) => {
+                                summary.warrants_rejected += 1;
+                                warrant_sys_outcomes.push((op_hash.clone(), SysOutcome::Rejected));
+                            }
                         }
+
+                        put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;
                     }
                 }
-                WorkflowResult::Ok((
-                    summary,
-                    invalid_ops,
-                    forked_pairs,
-                    chain_op_sys_outcomes,
-                    warrant_sys_outcomes,
-                ))
-            })
-            .await?;
+            }
+            WorkflowResult::Ok((
+                summary,
+                invalid_ops,
+                pending_fork_checks,
+                chain_op_sys_outcomes,
+                warrant_sys_outcomes,
+            ))
+        })
+        .await?;
+
+    // Fork detection is read-only; run it async outside the legacy write
+    // transaction now that find_fork_for_action is async.
+    let mut forked_pairs: Vec<(AgentPubKey, ForkedPair)> = Vec::with_capacity(0);
+    for (action, incoming_sig, incoming_hash) in pending_fork_checks {
+        match workspace
+            .dht_store
+            .as_read()
+            .find_fork_for_action(&action)
+            .await
+        {
+            Ok(Some((sibling_hash, sibling_sig))) => {
+                forked_pairs.push((
+                    action.author().clone(),
+                    ForkedPair {
+                        action_pair: ((incoming_hash, incoming_sig), (sibling_hash, sibling_sig)),
+                        seq: action.action_seq(),
+                    },
+                ));
+            }
+            Ok(None) => {}
+            Err(e) => {
+                tracing::error!(error = ?e, "Error detecting chain fork");
+            }
+        }
+    }
 
     workspace
         .dht_store
@@ -459,7 +479,7 @@ async fn sys_validation_workflow_inner(
             warrants.push(warrant_op);
         }
 
-        for (author, fork) in _forked_pairs {
+        for (author, fork) in forked_pairs {
             let warrant_op = make_fork_warrant_op_inner(
                 &_keystore,
                 _representative_agent.clone(),
@@ -599,6 +619,84 @@ async fn fetch_missing_dependencies(
     .sum()
 }
 
+/// Read an op from the cache by action hash + op type and write it into the new DHT
+/// store via `record_incoming_ops`, so that `ops_pending_sys_validation` can pick it
+/// up on the next pass.  This is the companion write to `copy_cached_op_to_dht`
+/// which only writes to the legacy DB.
+async fn mirror_cache_op_to_dht_store(
+    cache: DbRead<DbKindCache>,
+    dht_store: &DhtStore,
+    action_hash: ActionHash,
+    op_type: ChainOpType,
+) {
+    let op_opt = cache
+        .read_async(move |txn| {
+            let maybe_row = txn
+                .query_row(
+                    r#"
+                    SELECT
+                        Action.blob AS action_blob,
+                        Entry.blob AS entry_blob
+                    FROM Action
+                        LEFT JOIN Entry ON Action.entry_hash = Entry.hash
+                    WHERE
+                        Action.hash = :action_hash
+                    "#,
+                    rusqlite::named_params! { ":action_hash": action_hash },
+                    |row| {
+                        let action_blob = row.get::<_, Vec<u8>>(0)?;
+                        let entry_blob = row.get::<_, Option<Vec<u8>>>(1)?;
+                        Ok((action_blob, entry_blob))
+                    },
+                )
+                .optional()?;
+
+            WorkflowResult::Ok(maybe_row)
+        })
+        .await;
+
+    let (action_blob, entry_blob) = match op_opt {
+        Ok(Some(row)) => row,
+        Ok(None) => return,
+        Err(e) => {
+            tracing::error!(error = ?e, "Error reading op from cache for DHT-store mirror");
+            return;
+        }
+    };
+
+    let signed_action: SignedAction = match from_blob(action_blob) {
+        Ok(sa) => sa,
+        Err(e) => {
+            tracing::error!(error = ?e, "Error decoding signed action for DHT-store mirror");
+            return;
+        }
+    };
+
+    let maybe_entry: Option<Entry> = match entry_blob {
+        Some(blob) => match from_blob(blob) {
+            Ok(e) => Some(e),
+            Err(err) => {
+                tracing::error!(error = ?err, "Error decoding entry for DHT-store mirror");
+                return;
+            }
+        },
+        None => None,
+    };
+
+    let chain_op = match ChainOp::from_type(op_type, signed_action, maybe_entry) {
+        Ok(op) => op,
+        Err(e) => {
+            tracing::error!(error = ?e, "Error building ChainOp for DHT-store mirror");
+            return;
+        }
+    };
+
+    let op_hashed = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(chain_op)));
+    if let Err(e) = dht_store.record_incoming_ops(vec![op_hashed]).await {
+        tracing::error!(error = ?e, "Error mirroring warranted op to new DHT store");
+    }
+}
+
 // - Move any cached warranted ops because they need to be validated now.
 // - Check the validation status of any warranted ops that are in the DHT database.
 // - Any ops that have a validation status can be used to mark warrants as ready to validate.
@@ -622,6 +720,16 @@ async fn move_and_check_warrant_deps(
         {
             Ok(copied) if copied => {
                 *warrant_deps_copied += 1;
+
+                // Also mirror the op into the new DHT store so that
+                // `ops_pending_sys_validation` can pick it up on the next pass.
+                mirror_cache_op_to_dht_store(
+                    workspace.cache.clone().into(),
+                    &workspace.dht_store,
+                    action_hash.clone(),
+                    op_type,
+                )
+                .await;
             }
             Ok(_) => {
                 // It's in the DHT already.
@@ -1651,10 +1759,16 @@ pub async fn make_fork_warrant_op_inner(
 /// different hash. The author check is performed in memory: if the authors
 /// match, a fork is confirmed. If they differ, a cross-author `prev_action`
 /// collision error is returned.
+///
+/// This function is retained for unit tests; production code uses the async
+/// [`DhtStoreRead::find_fork_for_action`] instead.
+#[cfg(test)]
 fn detect_fork(
     txn: &mut Transaction<'_>,
     action: &Action,
 ) -> StateQueryResult<Option<(ActionHash, Signature)>> {
+    use holochain_sqlite::sql::sql_cell::ACTION_HASH_BY_PREV;
+    use holochain_state::query::StateQueryError;
     let mut statement = txn.prepare(ACTION_HASH_BY_PREV)?;
     let items = statement
         .query_map(
