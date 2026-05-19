@@ -15,6 +15,35 @@ use holochain_zome_types::schedule::ScheduleError;
 
 use crate::mutations::{StateMutationError, StateMutationResult};
 
+/// Summary of a single op promoted by [`DhtStore::integrate_ready_ops`].
+///
+/// Captures the fields the integration workflow needs for metrics,
+/// authored-op tracking, agent blocking, and `new_integrated_data`
+/// notifications. The `basis_hash` field uses [`holo_hash::AnyLinkableHash`]
+/// (the `OpBasis` alias) so that it covers Action, Entry, Agent, and link
+/// base addresses — matching what `DhtOpHash::to_located_k2_op_id` expects.
+#[derive(Debug, Clone)]
+pub struct IntegratedOpSummary {
+    /// Op hash (chain-op hash or warrant hash).
+    pub op_hash: holo_hash::DhtOpHash,
+    /// DHT basis hash (where the op is stored).
+    pub basis_hash: holo_hash::AnyLinkableHash,
+    /// Authored timestamp of the underlying action or warrant.
+    pub authored_timestamp: Timestamp,
+    /// Terminal validation status for this op.
+    pub validation_status: holochain_zome_types::dht_v2::OpValidity,
+    /// When the op was received (used for the integration-delay metric).
+    pub when_received: Timestamp,
+    /// Combined validation attempts captured before promotion.
+    pub validation_attempts: u32,
+    /// Authoring agent for chain ops; `None` for warrants.
+    pub action_author: Option<holo_hash::AgentPubKey>,
+    /// Authoring agent for warrant ops; `None` for chain ops.
+    pub warrant_author: Option<holo_hash::AgentPubKey>,
+    /// Warrantee for warrant ops; `None` for chain ops.
+    pub warrantee: Option<holo_hash::AgentPubKey>,
+}
+
 /// Result of system validation for a single DHT op.
 #[derive(Debug, Clone, Copy)]
 pub enum SysOutcome {
@@ -628,15 +657,20 @@ impl DhtStore<DbWrite<Dht>> {
     /// Warrants are promoted by moving their op metadata from `LimboWarrantOp`
     /// → `WarrantOp`; the shared `Warrant` content row stays put.
     ///
-    /// Returns the set of promoted op hashes (chain ops and warrant hashes
-    /// together).  A generous batch limit is used; if more than that are ready
-    /// in a single tick, the next tick handles the remainder.
+    /// Returns per-op summary data for each promoted op (chain ops and warrants
+    /// together). The summary includes the basis hash, authored timestamp,
+    /// validation status, reception time, validation attempt counts, and
+    /// author/warrantee fields needed by the integration workflow for metrics,
+    /// agent blocking, and `new_integrated_data` notifications.
+    ///
+    /// A generous batch limit is used; if more than that are ready in a single
+    /// tick, the next tick handles the remainder.
     pub async fn integrate_ready_ops(
         &self,
         when_integrated: Timestamp,
-    ) -> StateMutationResult<Vec<DhtOpHash>> {
+    ) -> StateMutationResult<Vec<IntegratedOpSummary>> {
         let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
-        let mut promoted = Vec::new();
+        let mut out: Vec<IntegratedOpSummary> = Vec::new();
 
         let chain_ready = tx
             .as_mut()
@@ -646,12 +680,44 @@ impl DhtStore<DbWrite<Dht>> {
         for row in chain_ready {
             let op_hash = DhtOpHash::from_raw_36(row.hash.clone());
             let validation_status = compute_chain_op_validation_status(&row);
+
+            // Reconstruct the basis hash from op_type + raw bytes.
+            // The new-schema DB stores only 36 raw bytes (no type prefix), so
+            // we recover the type from the op_type discriminant.
+            let basis_hash = chain_op_basis_hash_from_row(row.op_type, row.basis_hash.clone());
+
+            // Look up the action to recover author + authored timestamp.
+            let action_hash = holo_hash::ActionHash::from_raw_36(row.action_hash.clone());
+            let v2_action = tx
+                .as_mut()
+                .get_action(action_hash)
+                .await
+                .map_err(StateMutationError::from)?;
+            let (action_author, authored_timestamp) = match v2_action {
+                Some(sah) => (
+                    Some(sah.hashed.content.header.author.clone()),
+                    sah.hashed.content.header.timestamp,
+                ),
+                None => (None, Timestamp::from_micros(0)),
+            };
+
             let promoted_ok = tx
                 .promote_limbo_chain_op(&op_hash, validation_status, when_integrated)
                 .await
                 .map_err(StateMutationError::from)?;
             if promoted_ok {
-                promoted.push(op_hash);
+                out.push(IntegratedOpSummary {
+                    op_hash,
+                    basis_hash,
+                    authored_timestamp,
+                    validation_status,
+                    when_received: Timestamp::from_micros(row.when_received),
+                    validation_attempts: (row.sys_validation_attempts + row.app_validation_attempts)
+                        as u32,
+                    action_author,
+                    warrant_author: None,
+                    warrantee: None,
+                });
             }
         }
 
@@ -661,18 +727,35 @@ impl DhtStore<DbWrite<Dht>> {
             .await
             .map_err(StateMutationError::from)?;
         for row in warrant_ready {
-            let hash = DhtOpHash::from_raw_36(row.hash.clone());
+            let op_hash = DhtOpHash::from_raw_36(row.hash.clone());
             let promoted_ok = tx
-                .promote_limbo_warrant(&hash, when_integrated)
+                .promote_limbo_warrant(&op_hash, when_integrated)
                 .await
                 .map_err(StateMutationError::from)?;
             if promoted_ok {
-                promoted.push(hash);
+                let validation_status = match row.sys_validation_status {
+                    Some(2) => holochain_zome_types::dht_v2::OpValidity::Rejected,
+                    _ => holochain_zome_types::dht_v2::OpValidity::Accepted,
+                };
+                // Warrant basis = warrantee (AgentPubKey hash).
+                let warrantee = holo_hash::AgentPubKey::from_raw_36(row.warrantee.clone());
+                let basis_hash: holo_hash::AnyLinkableHash = warrantee.clone().into();
+                out.push(IntegratedOpSummary {
+                    op_hash,
+                    basis_hash,
+                    authored_timestamp: Timestamp::from_micros(row.timestamp),
+                    validation_status,
+                    when_received: Timestamp::from_micros(row.when_received),
+                    validation_attempts: row.sys_validation_attempts as u32,
+                    action_author: None,
+                    warrant_author: Some(holo_hash::AgentPubKey::from_raw_36(row.author.clone())),
+                    warrantee: Some(warrantee),
+                });
             }
         }
 
         tx.commit().await.map_err(StateMutationError::from)?;
-        Ok(promoted)
+        Ok(out)
     }
 
     /// Clear `require_receipt = 0` on the `ChainOp` row for each given op hash.
@@ -786,6 +869,40 @@ fn entry_hash_from_chain_op_action(
     chain_op.action().entry_hash().cloned().ok_or_else(|| {
         StateMutationError::Other("op carries entry but action has no entry_hash".into())
     })
+}
+
+/// Reconstruct a DHT basis hash from a `LimboChainOp` row.
+///
+/// The new schema stores `basis_hash` as raw 36 bytes (no type prefix), so
+/// the type must be inferred from `op_type`. The mapping follows
+/// `docs/design/state_model.md` and `holochain_zome_types::dht_v2::ChainOpType`:
+///
+/// | `op_type` | Basis hash type |
+/// |-----------|-----------------|
+/// | 1 (StoreRecord)                 | `ActionHash`  |
+/// | 2 (StoreEntry)                  | `EntryHash`   |
+/// | 3 (RegisterAgentActivity)       | `AgentPubKey` |
+/// | 4 (RegisterUpdatedContent)      | `EntryHash`   |
+/// | 5 (RegisterUpdatedRecord)       | `ActionHash`  |
+/// | 6 (RegisterDeletedEntryAction)  | `EntryHash`   |
+/// | 7 (RegisterDeletedBy)           | `ActionHash`  |
+/// | 8 (RegisterAddLink)             | `EntryHash`   |
+/// | 9 (RegisterRemoveLink)          | `EntryHash`   |
+///
+/// Link bases (8, 9) can technically be any `AnyLinkableHash` variant, but
+/// the new schema stores them in the same 36-byte slot. Non-Holochain external
+/// hashes are not representable in this schema and would not reach integration;
+/// `EntryHash` is used as the fallback for those rows.
+fn chain_op_basis_hash_from_row(op_type: i64, raw: Vec<u8>) -> holo_hash::AnyLinkableHash {
+    match op_type {
+        // StoreRecord, RegisterUpdatedRecord, RegisterDeletedBy → ActionHash basis
+        1 | 5 | 7 => holo_hash::ActionHash::from_raw_36(raw).into(),
+        // RegisterAgentActivity → AgentPubKey basis
+        3 => holo_hash::AgentPubKey::from_raw_36(raw).into(),
+        // StoreEntry, RegisterUpdatedContent, RegisterDeletedEntryAction,
+        // RegisterAddLink, RegisterRemoveLink → EntryHash basis (or Agent as Entry)
+        _ => holo_hash::EntryHash::from_raw_36(raw).into(),
+    }
 }
 
 /// Compute the terminal [`OpValidity`](holochain_zome_types::dht_v2::OpValidity)

@@ -451,11 +451,12 @@ async fn integrate_ready_ops_promotes_ready_chain_op() {
         .await
         .unwrap();
 
-    let promoted = store
+    let summaries = store
         .integrate_ready_ops(Timestamp::from_micros(999))
         .await
         .unwrap();
-    assert_eq!(promoted, vec![op.as_hash().clone()]);
+    let promoted_hashes: Vec<_> = summaries.iter().map(|s| s.op_hash.clone()).collect();
+    assert_eq!(promoted_hashes, vec![op.as_hash().clone()]);
 
     assert!(store
         .db()
@@ -484,11 +485,11 @@ async fn integrate_ready_ops_skips_unready() {
     let op = build_test_store_record_op_hashed(51);
     store.record_incoming_ops(vec![op.clone()]).await.unwrap();
     // No validation outcomes recorded — sys/app are NULL, not ready.
-    let promoted = store
+    let summaries = store
         .integrate_ready_ops(Timestamp::from_micros(999))
         .await
         .unwrap();
-    assert!(promoted.is_empty());
+    assert!(summaries.is_empty());
 
     // Op still in limbo, not in ChainOp.
     assert!(store
@@ -524,11 +525,12 @@ async fn integrate_ready_ops_promotes_warrant() {
         .await
         .unwrap();
 
-    let promoted = store
+    let summaries = store
         .integrate_ready_ops(Timestamp::from_micros(999))
         .await
         .unwrap();
-    assert_eq!(promoted, vec![warrant.as_hash().clone()]);
+    let promoted_hashes: Vec<_> = summaries.iter().map(|s| s.op_hash.clone()).collect();
+    assert_eq!(promoted_hashes, vec![warrant.as_hash().clone()]);
 
     assert!(store
         .db()
