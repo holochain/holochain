@@ -176,10 +176,13 @@ Assigned to @
   - Add tag `vY` for new version Y.
   - Manually create a github release at tag with changelog.
 
-- [ ] Documentation
+- [ ] Documentation (`docs-pages` repo)
   - Write App Upgrade Guide for new holochain version.
   - Update Compatibility Table to add new tool versions compatible with new holochain version.
+    - For major releases, add a new compatibility table file and link from `pages/resources/compatibility/index.md`.
   - Update Developer Portal to use code examples and explanations for new holochain version.
+    - Tip: search the repo for `TODO(upgrade)` -- this will help you discover places that need to be routinely updated for point releases or major releases.
+  - Test all exercises in Getting Started guide (excluding initial Holonix installation).
 
 ### Stage 7
 
