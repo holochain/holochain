@@ -33,6 +33,38 @@ impl DhtStore<DbRead<Dht>> {
             .filter_map(|(op, exists)| if exists { None } else { Some(op) })
             .collect())
     }
+
+    /// Return ops awaiting system validation, sorted across chain ops and
+    /// warrants by `(sys_validation_attempts, when_received)`, up to `limit`
+    /// rows total.
+    pub async fn ops_pending_sys_validation(
+        &self,
+        limit: u32,
+    ) -> StateQueryResult<Vec<DhtOpHashed>> {
+        let db = self.db();
+        let chain_rows = db.limbo_chain_ops_pending_sys_validation(limit).await?;
+        let warrant_rows = db.limbo_warrants_pending_sys_validation(limit).await?;
+
+        let mut out: Vec<(i64, i64, DhtOpHashed)> =
+            Vec::with_capacity(chain_rows.len() + warrant_rows.len());
+
+        for row in chain_rows {
+            let attempts = row.sys_validation_attempts;
+            let when_received = row.when_received;
+            let op = chain_op_from_limbo_row(db, &row).await?;
+            out.push((attempts, when_received, op));
+        }
+        for row in warrant_rows {
+            let attempts = row.sys_validation_attempts;
+            let when_received = row.when_received;
+            let op = warrant_from_limbo_row(&row)?;
+            out.push((attempts, when_received, op));
+        }
+
+        out.sort_by_key(|(attempts, when_received, _)| (*attempts, *when_received));
+        out.truncate(limit as usize);
+        Ok(out.into_iter().map(|(_, _, op)| op).collect())
+    }
 }
 
 impl DhtStore<DbWrite<Dht>> {
@@ -52,11 +84,214 @@ impl DhtStore<DbWrite<Dht>> {
     ) -> StateQueryResult<Vec<DhtOpHashed>> {
         self.as_read().filter_existing_ops(ops).await
     }
+
+    /// See [`DhtStore::ops_pending_sys_validation`].
+    pub async fn ops_pending_sys_validation(
+        &self,
+        limit: u32,
+    ) -> StateQueryResult<Vec<DhtOpHashed>> {
+        self.as_read().ops_pending_sys_validation(limit).await
+    }
 }
 
 // Compile-only sanity check that the read-only alias resolves correctly.
 #[allow(dead_code)]
 fn _read_only_alias_compiles(_: DhtStoreRead) {}
+
+/// Reconstruct a [`DhtOpHashed`] (`ChainOp` variant) from a `LimboChainOp`
+/// row by fetching the action (and entry when required) from the database.
+async fn chain_op_from_limbo_row(
+    db: &DbRead<Dht>,
+    row: &holochain_data::models::dht::LimboChainOpRow,
+) -> StateQueryResult<DhtOpHashed> {
+    use holochain_types::action::NewEntryAction;
+    use holochain_types::dht_op::{ChainOp, DhtOp};
+    use holochain_types::prelude::{RecordEntry, Signature};
+    use holochain_zome_types::action::Action;
+    use holochain_zome_types::dht_v2::to_legacy_signed_action;
+    use holochain_zome_types::op::ChainOpType;
+
+    let op_type = ChainOpType::try_from(row.op_type).map_err(|n| {
+        crate::query::StateQueryError::Other(format!("invalid op_type {n} in LimboChainOp row"))
+    })?;
+
+    let action_hash = holo_hash::ActionHash::from_raw_36(row.action_hash.clone());
+    let v2_action = db.get_action(action_hash.clone()).await?.ok_or_else(|| {
+        crate::query::StateQueryError::Other(format!(
+            "Action {action_hash:?} referenced by LimboChainOp not found"
+        ))
+    })?;
+
+    let legacy = to_legacy_signed_action(&v2_action).map_err(|e| {
+        crate::query::StateQueryError::Other(format!("to_legacy_signed_action: {e}"))
+    })?;
+    let signature: Signature = legacy.signature().clone();
+    let action: Action = legacy.action().clone();
+
+    // Look up the entry referenced by the given action, returning
+    // `RecordEntry::Present` when found or `RecordEntry::NA` when the action
+    // carries no entry hash.
+    async fn fetch_entry_for_action(
+        db: &DbRead<Dht>,
+        action: &Action,
+    ) -> StateQueryResult<RecordEntry> {
+        match action.entry_hash() {
+            None => Ok(RecordEntry::NA),
+            Some(h) => {
+                let entry = db.get_entry(h.clone(), None).await?.ok_or_else(|| {
+                    crate::query::StateQueryError::Other(format!(
+                        "Entry {h:?} referenced by Action not found"
+                    ))
+                })?;
+                Ok(RecordEntry::Present(entry))
+            }
+        }
+    }
+
+    // Look up the entry referenced by an Update action, always returning
+    // `RecordEntry::Present`.
+    async fn fetch_entry_for_update(
+        db: &DbRead<Dht>,
+        update: &holochain_zome_types::action::Update,
+    ) -> StateQueryResult<RecordEntry> {
+        let entry_hash = update.entry_hash.clone();
+        let entry = db
+            .get_entry(entry_hash.clone(), None)
+            .await?
+            .ok_or_else(|| {
+                crate::query::StateQueryError::Other(format!(
+                    "Entry {entry_hash:?} for Update not found"
+                ))
+            })?;
+        Ok(RecordEntry::Present(entry))
+    }
+
+    let chain_op = match op_type {
+        ChainOpType::StoreRecord => {
+            let entry = fetch_entry_for_action(db, &action).await?;
+            ChainOp::StoreRecord(signature, action, entry)
+        }
+        ChainOpType::StoreEntry => {
+            let entry_hash = action.entry_hash().cloned().ok_or_else(|| {
+                crate::query::StateQueryError::Other("StoreEntry action has no entry_hash".into())
+            })?;
+            let entry = db
+                .get_entry(entry_hash.clone(), None)
+                .await?
+                .ok_or_else(|| {
+                    crate::query::StateQueryError::Other(format!(
+                        "Entry {entry_hash:?} for StoreEntry not found"
+                    ))
+                })?;
+            let new_entry_action = NewEntryAction::try_from(action).map_err(|_| {
+                crate::query::StateQueryError::Other(
+                    "StoreEntry action is not a Create/Update".into(),
+                )
+            })?;
+            ChainOp::StoreEntry(signature, new_entry_action, entry)
+        }
+        ChainOpType::RegisterAgentActivity => ChainOp::RegisterAgentActivity(signature, action),
+        ChainOpType::RegisterUpdatedContent => {
+            let update = match action {
+                Action::Update(u) => u,
+                _ => {
+                    return Err(crate::query::StateQueryError::Other(
+                        "RegisterUpdatedContent action is not Update".into(),
+                    ))
+                }
+            };
+            let entry = fetch_entry_for_update(db, &update).await?;
+            ChainOp::RegisterUpdatedContent(signature, update, entry)
+        }
+        ChainOpType::RegisterUpdatedRecord => {
+            let update = match action {
+                Action::Update(u) => u,
+                _ => {
+                    return Err(crate::query::StateQueryError::Other(
+                        "RegisterUpdatedRecord action is not Update".into(),
+                    ))
+                }
+            };
+            let entry = fetch_entry_for_update(db, &update).await?;
+            ChainOp::RegisterUpdatedRecord(signature, update, entry)
+        }
+        ChainOpType::RegisterDeletedEntryAction => {
+            let delete = match action {
+                Action::Delete(d) => d,
+                _ => {
+                    return Err(crate::query::StateQueryError::Other(
+                        "RegisterDeletedEntryAction action is not Delete".into(),
+                    ))
+                }
+            };
+            ChainOp::RegisterDeletedEntryAction(signature, delete)
+        }
+        ChainOpType::RegisterDeletedBy => {
+            let delete = match action {
+                Action::Delete(d) => d,
+                _ => {
+                    return Err(crate::query::StateQueryError::Other(
+                        "RegisterDeletedBy action is not Delete".into(),
+                    ))
+                }
+            };
+            ChainOp::RegisterDeletedBy(signature, delete)
+        }
+        ChainOpType::RegisterAddLink => {
+            let create_link = match action {
+                Action::CreateLink(c) => c,
+                _ => {
+                    return Err(crate::query::StateQueryError::Other(
+                        "RegisterAddLink action is not CreateLink".into(),
+                    ))
+                }
+            };
+            ChainOp::RegisterAddLink(signature, create_link)
+        }
+        ChainOpType::RegisterRemoveLink => {
+            let delete_link = match action {
+                Action::DeleteLink(d) => d,
+                _ => {
+                    return Err(crate::query::StateQueryError::Other(
+                        "RegisterRemoveLink action is not DeleteLink".into(),
+                    ))
+                }
+            };
+            ChainOp::RegisterRemoveLink(signature, delete_link)
+        }
+    };
+
+    let op = DhtOp::ChainOp(Box::new(chain_op));
+    let op_hash = holo_hash::DhtOpHash::from_raw_36(row.hash.clone());
+    Ok(DhtOpHashed::with_pre_hashed(op, op_hash))
+}
+
+/// Reconstruct a [`DhtOpHashed`] (`WarrantOp` variant) from a `LimboWarrant` row.
+fn warrant_from_limbo_row(
+    row: &holochain_data::models::dht::LimboWarrantRow,
+) -> StateQueryResult<DhtOpHashed> {
+    use holochain_types::dht_op::DhtOp;
+    use holochain_types::prelude::Signature;
+    use holochain_types::warrant::WarrantOp;
+    use holochain_zome_types::warrant::{SignedWarrant, Warrant, WarrantProof};
+
+    let proof: WarrantProof = holochain_serialized_bytes::decode(&row.proof)?;
+    let author = holo_hash::AgentPubKey::from_raw_36(row.author.clone());
+    let warrantee = holo_hash::AgentPubKey::from_raw_36(row.warrantee.clone());
+    let timestamp = holochain_types::prelude::Timestamp::from_micros(row.timestamp);
+
+    let warrant = Warrant::new(proof, author, timestamp, warrantee);
+    // The signature is not stored in the limbo row — warrants are self-proving
+    // via their proof content.  Use a zeroed signature as a placeholder, the
+    // same approach used elsewhere in the codebase when reconstructing
+    // WarrantOps from storage without a separate signature column.
+    let signature = Signature::from([0u8; 64]);
+    let signed_warrant = SignedWarrant::new(warrant, signature);
+    let warrant_op = WarrantOp::from(signed_warrant);
+    let op = DhtOp::WarrantOp(Box::new(warrant_op));
+    let op_hash = holo_hash::DhtOpHash::from_raw_36(row.hash.clone());
+    Ok(DhtOpHashed::with_pre_hashed(op, op_hash))
+}
 
 #[cfg(test)]
 mod tests {
@@ -140,5 +375,53 @@ mod tests {
         let filtered = store.as_read().filter_existing_ops(input).await.unwrap();
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].as_hash(), &unknown_hash);
+    }
+
+    #[tokio::test]
+    async fn ops_pending_sys_validation_returns_recorded_chain_op() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let op = make_chain_op(10);
+        let hash = op.as_hash().clone();
+
+        store.record_incoming_ops(vec![op]).await.unwrap();
+
+        let pending = store.ops_pending_sys_validation(1_000).await.unwrap();
+        let hashes: Vec<_> = pending.iter().map(|o| o.as_hash().clone()).collect();
+        assert!(hashes.contains(&hash));
+    }
+
+    #[tokio::test]
+    async fn ops_pending_sys_validation_excludes_completed() {
+        use crate::dht_store::SysOutcome;
+
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let op = make_chain_op(11);
+        let hash = op.as_hash().clone();
+
+        store.record_incoming_ops(vec![op]).await.unwrap();
+        store
+            .record_chain_op_sys_validation_outcomes(vec![(hash.clone(), SysOutcome::Accepted)])
+            .await
+            .unwrap();
+
+        let pending = store.ops_pending_sys_validation(1_000).await.unwrap();
+        let hashes: Vec<_> = pending.iter().map(|o| o.as_hash().clone()).collect();
+        assert!(!hashes.contains(&hash));
+    }
+
+    #[tokio::test]
+    async fn ops_pending_sys_validation_respects_limit_across_union() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let ops: Vec<_> = (12..16).map(make_chain_op).collect();
+        store.record_incoming_ops(ops).await.unwrap();
+
+        let pending = store.ops_pending_sys_validation(2).await.unwrap();
+        assert_eq!(pending.len(), 2);
     }
 }
