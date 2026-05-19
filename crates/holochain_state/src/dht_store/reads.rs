@@ -11,6 +11,7 @@ use holo_hash::{DhtOpHash, HasHash};
 use holochain_data::kind::Dht;
 use holochain_data::{DbRead, DbWrite};
 use holochain_types::dht_op::DhtOpHashed;
+use holochain_zome_types::dht_v2::RecordValidity;
 
 impl DhtStore<DbRead<Dht>> {
     /// Returns `true` if `hash` appears in any op-bearing DHT table
@@ -93,6 +94,58 @@ impl DhtStore<DbRead<Dht>> {
         Ok(out)
     }
 
+    /// Return pending validation receipts: one entry per integrated, validated
+    /// op that still has `require_receipt = 1`. Each tuple is
+    /// `(ValidationReceipt, action_author)` so the caller can group by author.
+    ///
+    /// The `validators` field on each [`ValidationReceipt`] is populated from
+    /// the supplied `validators` argument (the locally-running agents for this
+    /// DNA).
+    pub async fn pending_validation_receipts(
+        &self,
+        validators: Vec<holo_hash::AgentPubKey>,
+    ) -> StateQueryResult<
+        Vec<(
+            holochain_types::prelude::ValidationReceipt,
+            holo_hash::AgentPubKey,
+        )>,
+    > {
+        let rows = self.db().pending_validation_receipts().await?;
+        rows.into_iter()
+            .map(|r| {
+                let dht_op_hash = holo_hash::DhtOpHash::from_raw_36(r.op_hash);
+                let author = holo_hash::AgentPubKey::from_raw_36(r.action_author);
+                // Map from RecordValidity (Accepted=1, Rejected=2) to
+                // ValidationStatus (Valid=0, Rejected=1).
+                let record_validity =
+                    RecordValidity::try_from(r.validation_status).map_err(|v| {
+                        crate::query::StateQueryError::Other(format!(
+                            "invalid validation_status {v} in ChainOp row"
+                        ))
+                    })?;
+                let validation_status = match record_validity {
+                    RecordValidity::Accepted => {
+                        holochain_zome_types::validate::ValidationStatus::Valid
+                    }
+                    RecordValidity::Rejected => {
+                        holochain_zome_types::validate::ValidationStatus::Rejected
+                    }
+                };
+                let when_integrated =
+                    holochain_types::prelude::Timestamp::from_micros(r.when_integrated);
+                Ok((
+                    holochain_types::prelude::ValidationReceipt {
+                        dht_op_hash,
+                        validation_status,
+                        validators: validators.clone(),
+                        when_integrated,
+                    },
+                    author,
+                ))
+            })
+            .collect()
+    }
+
     /// Return ops awaiting system validation, sorted across chain ops and
     /// warrants by `(sys_validation_attempts, when_received)`, up to `limit`
     /// rows total.
@@ -132,6 +185,19 @@ impl DhtStore<DbWrite<Dht>> {
     /// Delegates to the read-only view of this store.
     pub async fn op_exists(&self, hash: &DhtOpHash) -> StateQueryResult<bool> {
         self.as_read().op_exists(hash).await
+    }
+
+    /// See [`DhtStore::pending_validation_receipts`].
+    pub async fn pending_validation_receipts(
+        &self,
+        validators: Vec<holo_hash::AgentPubKey>,
+    ) -> StateQueryResult<
+        Vec<(
+            holochain_types::prelude::ValidationReceipt,
+            holo_hash::AgentPubKey,
+        )>,
+    > {
+        self.as_read().pending_validation_receipts(validators).await
     }
 
     /// Drop any op whose hash is already recorded in the DHT store.
@@ -647,5 +713,79 @@ mod tests {
         let (got_hash, got_sig) = result.expect("fork should be detected");
         assert_eq!(got_hash, expected_hash, "sibling hash should match op_a");
         assert_eq!(got_sig, expected_sig, "sibling signature should match op_a");
+    }
+
+    #[tokio::test]
+    async fn pending_validation_receipts_returns_integrated_require_receipt_ops() {
+        use crate::dht_store::{AppOutcome, SysOutcome};
+
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let op = make_chain_op(60);
+        let hash = op.as_hash().clone();
+        let author = match op.as_content() {
+            DhtOp::ChainOp(c) => c.action().author().clone(),
+            _ => unreachable!(),
+        };
+
+        store.record_incoming_ops(vec![op]).await.unwrap();
+        store
+            .record_chain_op_sys_validation_outcomes(vec![(hash.clone(), SysOutcome::Accepted)])
+            .await
+            .unwrap();
+        store
+            .record_app_validation_outcomes(vec![(hash.clone(), AppOutcome::Accepted)])
+            .await
+            .unwrap();
+        store
+            .integrate_ready_ops(holochain_types::prelude::Timestamp::now())
+            .await
+            .unwrap();
+
+        let validators = vec![AgentPubKey::from_raw_36(vec![0xFF; 36])];
+        let receipts = store
+            .pending_validation_receipts(validators.clone())
+            .await
+            .unwrap();
+
+        assert_eq!(receipts.len(), 1);
+        assert_eq!(receipts[0].0.dht_op_hash, hash);
+        assert_eq!(receipts[0].1, author);
+        assert_eq!(receipts[0].0.validators, validators);
+    }
+
+    #[tokio::test]
+    async fn pending_validation_receipts_excludes_ops_without_require_receipt() {
+        use crate::dht_store::{AppOutcome, SysOutcome};
+
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let op = make_chain_op(61);
+        let hash = op.as_hash().clone();
+        store.record_incoming_ops(vec![op]).await.unwrap();
+        store
+            .record_chain_op_sys_validation_outcomes(vec![(hash.clone(), SysOutcome::Accepted)])
+            .await
+            .unwrap();
+        store
+            .record_app_validation_outcomes(vec![(hash.clone(), AppOutcome::Accepted)])
+            .await
+            .unwrap();
+        store
+            .integrate_ready_ops(holochain_types::prelude::Timestamp::now())
+            .await
+            .unwrap();
+        store
+            .clear_require_receipts(vec![hash.clone()])
+            .await
+            .unwrap();
+
+        let receipts = store.pending_validation_receipts(vec![]).await.unwrap();
+        assert!(
+            receipts.iter().all(|(r, _)| r.dht_op_hash != hash),
+            "op with cleared require_receipt should not appear"
+        );
     }
 }
