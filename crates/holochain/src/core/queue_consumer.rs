@@ -121,7 +121,6 @@ pub async fn spawn_queue_consumer_tasks(
     let tx_integration = queue_consumer_map.spawn_once_integration(dna_hash.clone(), || {
         spawn_integrate_dht_ops_consumer(
             dna_hash.clone(),
-            dht_db.clone(),
             space.dht_store.clone(),
             conductor.task_manager(),
             tx_receipt.clone(),
