@@ -34,6 +34,55 @@ impl DhtStore<DbRead<Dht>> {
             .collect())
     }
 
+    /// Find an existing action that shares `prev_action` with the given
+    /// `action` but has a different hash. Used by sys-validation to detect
+    /// chain forks.
+    ///
+    /// Returns `Ok(None)` if `action` has no `prev_action`, or if no
+    /// sibling exists. Returns `Err` with a descriptive message if a
+    /// sibling action by a different author is found (cross-author
+    /// `prev_action` collision).
+    pub async fn find_fork_for_action(
+        &self,
+        action: &holochain_zome_types::action::Action,
+    ) -> StateQueryResult<Option<holochain_types::prelude::SignedAction>> {
+        use holochain_zome_types::dht_v2::to_legacy_signed_action;
+
+        let Some(prev) = action.prev_action() else {
+            return Ok(None);
+        };
+        let incoming_hash = holo_hash::ActionHash::with_data_sync(action);
+
+        let siblings = self
+            .db()
+            .get_actions_by_prev_hash(prev, &incoming_hash)
+            .await?;
+
+        let incoming_author = action.author();
+        if let Some(v2_sibling) = siblings.into_iter().next() {
+            let legacy_sibling = to_legacy_signed_action(&v2_sibling).map_err(|e| {
+                crate::query::StateQueryError::Other(format!(
+                    "to_legacy_signed_action on sibling: {e}"
+                ))
+            })?;
+            let existing_author = legacy_sibling.action().author();
+            if existing_author != incoming_author {
+                return Err(crate::query::StateQueryError::Other(format!(
+                    "Cross-author prev_action collision: incoming author {incoming_author} \
+                     differs from existing author {existing_author} for prev_action {prev:?}"
+                )));
+            }
+            // Return the SignedAction (action + signature, no hash).
+            let signature = legacy_sibling.signature().clone();
+            let action = legacy_sibling.action().clone();
+            Ok(Some(holochain_types::prelude::SignedAction::new(
+                action, signature,
+            )))
+        } else {
+            Ok(None)
+        }
+    }
+
     /// Return ops awaiting system validation, sorted across chain ops and
     /// warrants by `(sys_validation_attempts, when_received)`, up to `limit`
     /// rows total.
@@ -91,6 +140,14 @@ impl DhtStore<DbWrite<Dht>> {
         limit: u32,
     ) -> StateQueryResult<Vec<DhtOpHashed>> {
         self.as_read().ops_pending_sys_validation(limit).await
+    }
+
+    /// See [`DhtStore::find_fork_for_action`].
+    pub async fn find_fork_for_action(
+        &self,
+        action: &holochain_zome_types::action::Action,
+    ) -> StateQueryResult<Option<holochain_types::prelude::SignedAction>> {
+        self.as_read().find_fork_for_action(action).await
     }
 }
 
@@ -306,6 +363,24 @@ mod tests {
     use holochain_zome_types::prelude::AppEntryDef;
     use std::sync::Arc;
 
+    fn make_fork_op(author: &AgentPubKey, prev: &ActionHash, seq: u32, seed: u8) -> DhtOpHashed {
+        let action = Action::Create(Create {
+            author: author.clone(),
+            timestamp: Timestamp::from_micros(seed as i64 * 1000),
+            action_seq: seq,
+            prev_action: prev.clone(),
+            entry_type: EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
+            entry_hash: EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]),
+            weight: Default::default(),
+        });
+        let chain_op = ChainOp::RegisterAgentActivity(Signature::from([seed; 64]), action);
+        DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(chain_op)))
+    }
+
     fn dht_id() -> Dht {
         Dht::new(Arc::new(holo_hash::DnaHash::from_raw_36(vec![0u8; 36])))
     }
@@ -423,5 +498,45 @@ mod tests {
 
         let pending = store.ops_pending_sys_validation(2).await.unwrap();
         assert_eq!(pending.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn find_fork_for_action_returns_none_when_no_sibling() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let op = make_chain_op(30);
+        let action = match op.as_content() {
+            DhtOp::ChainOp(c) => c.action().clone(),
+            _ => unreachable!(),
+        };
+
+        let result = store.find_fork_for_action(&action).await.unwrap();
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn find_fork_for_action_returns_sibling() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+
+        let author = AgentPubKey::from_raw_36(vec![31u8; 36]);
+        let prev_action_hash = ActionHash::from_raw_36(vec![231u8; 36]);
+
+        // Two ops sharing the same prev_action and author but with different
+        // timestamps/entry_hashes (seeds differ) — different hashes overall.
+        let op_a = make_fork_op(&author, &prev_action_hash, 2, 32);
+        let op_b = make_fork_op(&author, &prev_action_hash, 2, 33);
+
+        let action_b = match op_b.as_content() {
+            DhtOp::ChainOp(c) => c.action().clone(),
+            _ => unreachable!(),
+        };
+
+        store.record_incoming_ops(vec![op_a]).await.unwrap();
+
+        let result = store.find_fork_for_action(&action_b).await.unwrap();
+        assert!(result.is_some(), "fork should be detected");
     }
 }
