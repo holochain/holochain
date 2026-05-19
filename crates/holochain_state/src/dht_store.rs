@@ -748,6 +748,27 @@ impl DhtStore<DbWrite<Dht>> {
         Ok(())
     }
 
+    /// Re-queue a cache-derived op for validation.
+    ///
+    /// If a `ChainOp` row matching `(action_hash, op_type)` with
+    /// `locally_validated = false` exists, move it back into `LimboChainOp`
+    /// with cleared validation status so the next sys-validation pass picks it
+    /// up via `ops_pending_sys_validation`.
+    ///
+    /// Returns `Ok(true)` if a row was moved, `Ok(false)` if no matching
+    /// cached row exists (e.g. the op was never cached, or was already locally
+    /// validated).
+    pub async fn move_warranted_op_to_limbo(
+        &self,
+        action_hash: &holo_hash::ActionHash,
+        op_type: holochain_zome_types::op::ChainOpType,
+    ) -> StateMutationResult<bool> {
+        Ok(self
+            .db
+            .move_chain_op_to_limbo(action_hash, i64::from(op_type))
+            .await?)
+    }
+
     /// Downgrade this writable store to a read-only store.
     pub fn as_read(&self) -> DhtStoreRead {
         DhtStore::new(self.db.as_ref().clone())

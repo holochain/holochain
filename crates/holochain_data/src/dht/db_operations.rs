@@ -16,6 +16,7 @@ mod entry;
 mod limbo_chain_op;
 mod limbo_warrant;
 mod link;
+mod move_to_limbo;
 mod op_exists;
 mod scheduled_function;
 mod slice_hash;

@@ -1,5 +1,12 @@
 use super::*;
 use holo_hash::DnaHash;
+use holochain_types::dht_op::RenderedOp;
+use holochain_types::dht_op::RenderedOps;
+use holochain_types::prelude::Signature;
+use holochain_zome_types::action::{Action, Create, EntryType};
+use holochain_zome_types::entry_def::EntryVisibility;
+use holochain_zome_types::op::ChainOpType;
+use holochain_zome_types::prelude::AppEntryDef;
 use std::sync::Arc;
 
 fn dht_id() -> Dht {
@@ -783,6 +790,153 @@ async fn reject_chain_op_rejects_limbo_op() {
         .unwrap();
     assert_eq!(row.sys_validation_status, Some(2));
     assert_eq!(row.app_validation_status, None);
+}
+
+/// Build a single-op `RenderedOps` for a `StoreRecord(Create)` using the
+/// same style as `cache.rs` tests.  Returns `(RenderedOps, action_hash)`.
+fn build_rendered_store_record_for_move(seed: u8) -> (RenderedOps, holo_hash::ActionHash) {
+    use holo_hash::{ActionHash, EntryHash};
+    use holochain_serialized_bytes::UnsafeBytes;
+    use holochain_types::prelude::{AppEntryBytes, Entry, EntryHashed};
+
+    let author = AgentPubKey::from_raw_36(vec![seed; 36]);
+    let entry_hash = EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]);
+    let entry = Entry::App(AppEntryBytes(
+        holochain_serialized_bytes::SerializedBytes::from(UnsafeBytes::from(vec![seed; 8])),
+    ));
+    let sig = Signature::from([seed; 64]);
+    let action = Action::Create(Create {
+        author,
+        timestamp: Timestamp::from_micros(seed as i64 * 1000),
+        action_seq: 1,
+        prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36]),
+        entry_type: EntryType::App(AppEntryDef::new(
+            0.into(),
+            0.into(),
+            EntryVisibility::Public,
+        )),
+        entry_hash: entry_hash.clone(),
+        weight: Default::default(),
+    });
+    let entry_hashed = EntryHashed::with_pre_hashed(entry, entry_hash);
+    let rendered =
+        RenderedOp::new(action, sig, None, ChainOpType::StoreRecord).expect("rendered op build");
+    let action_hash = rendered.action.as_hash().clone();
+    let ops = RenderedOps {
+        entry: Some(entry_hashed),
+        ops: vec![rendered],
+        warrant: None,
+    };
+    (ops, action_hash)
+}
+
+#[tokio::test]
+async fn move_warranted_op_to_limbo_moves_locally_validated_false() {
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+    let (rendered, action_hash) = build_rendered_store_record_for_move(42);
+    let op_hash = rendered.ops[0].op_hash.clone();
+
+    // Cache the op: inserts into ChainOp with locally_validated = 0.
+    store.cache_chain_ops(&rendered).await.unwrap();
+
+    // Confirm the op is in ChainOp with locally_validated = 0.
+    let chain_row = store
+        .db()
+        .as_ref()
+        .get_chain_op(op_hash.clone())
+        .await
+        .unwrap()
+        .expect("ChainOp row missing after cache_chain_ops");
+    assert_eq!(chain_row.locally_validated, 0);
+
+    // Move to limbo.
+    let moved = store
+        .move_warranted_op_to_limbo(&action_hash, ChainOpType::StoreRecord)
+        .await
+        .unwrap();
+    assert!(moved, "expected row to be moved");
+
+    // ChainOp row should be gone.
+    let chain_row_after = store
+        .db()
+        .as_ref()
+        .get_chain_op(op_hash.clone())
+        .await
+        .unwrap();
+    assert!(
+        chain_row_after.is_none(),
+        "ChainOp row should be removed after move_warranted_op_to_limbo"
+    );
+
+    // LimboChainOp row should exist with cleared validation status.
+    let limbo_row = store
+        .db()
+        .as_ref()
+        .get_limbo_chain_op(op_hash)
+        .await
+        .unwrap()
+        .expect("LimboChainOp row missing after move_warranted_op_to_limbo");
+    assert_eq!(
+        limbo_row.sys_validation_status, None,
+        "sys_validation_status should be NULL"
+    );
+    assert_eq!(
+        limbo_row.app_validation_status, None,
+        "app_validation_status should be NULL"
+    );
+    assert_eq!(limbo_row.require_receipt, 0);
+}
+
+#[tokio::test]
+async fn move_warranted_op_to_limbo_returns_false_when_not_cached() {
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+    let action_hash = holo_hash::ActionHash::from_raw_36(vec![0xBB; 36]);
+
+    let moved = store
+        .move_warranted_op_to_limbo(&action_hash, ChainOpType::StoreRecord)
+        .await
+        .unwrap();
+    assert!(!moved, "expected false when no matching cached row exists");
+}
+
+#[tokio::test]
+async fn move_warranted_op_to_limbo_no_match_for_locally_validated_true() {
+    // An op that is locally validated (locally_validated = 1 via incoming ops path)
+    // should NOT be moved, because the predicate requires locally_validated = 0.
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+    let op = build_test_store_record_op_hashed(43);
+    let op_hash = op.as_hash().clone();
+    let action_hash = {
+        let action = op.as_content().as_chain_op().unwrap().action();
+        holo_hash::ActionHash::with_data_sync(&action)
+    };
+
+    // record_incoming_ops → LimboChainOp (not ChainOp), then promote to ChainOp
+    // with locally_validated = 1.
+    store.record_incoming_ops(vec![op]).await.unwrap();
+    store
+        .record_chain_op_sys_validation_outcomes(vec![(op_hash.clone(), SysOutcome::Accepted)])
+        .await
+        .unwrap();
+    store
+        .record_app_validation_outcomes(vec![(op_hash.clone(), AppOutcome::Accepted)])
+        .await
+        .unwrap();
+    store
+        .integrate_ready_ops(Timestamp::from_micros(1))
+        .await
+        .unwrap();
+
+    // ChainOp now has locally_validated = 1. The move should not match it.
+    let moved = store
+        .move_warranted_op_to_limbo(&action_hash, ChainOpType::StoreRecord)
+        .await
+        .unwrap();
+    assert!(!moved, "should not move a locally_validated = 1 row");
+
+    // Verify the row is still in ChainOp.
+    let row = store.db().as_ref().get_chain_op(op_hash).await.unwrap();
+    assert!(row.is_some(), "ChainOp row should still be present");
 }
 
 #[tokio::test]
