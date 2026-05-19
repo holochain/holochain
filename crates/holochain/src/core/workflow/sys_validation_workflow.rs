@@ -619,84 +619,6 @@ async fn fetch_missing_dependencies(
     .sum()
 }
 
-/// Read an op from the cache by action hash + op type and write it into the new DHT
-/// store via `record_incoming_ops`, so that `ops_pending_sys_validation` can pick it
-/// up on the next pass.  This is the companion write to `copy_cached_op_to_dht`
-/// which only writes to the legacy DB.
-async fn mirror_cache_op_to_dht_store(
-    cache: DbRead<DbKindCache>,
-    dht_store: &DhtStore,
-    action_hash: ActionHash,
-    op_type: ChainOpType,
-) {
-    let op_opt = cache
-        .read_async(move |txn| {
-            let maybe_row = txn
-                .query_row(
-                    r#"
-                    SELECT
-                        Action.blob AS action_blob,
-                        Entry.blob AS entry_blob
-                    FROM Action
-                        LEFT JOIN Entry ON Action.entry_hash = Entry.hash
-                    WHERE
-                        Action.hash = :action_hash
-                    "#,
-                    rusqlite::named_params! { ":action_hash": action_hash },
-                    |row| {
-                        let action_blob = row.get::<_, Vec<u8>>(0)?;
-                        let entry_blob = row.get::<_, Option<Vec<u8>>>(1)?;
-                        Ok((action_blob, entry_blob))
-                    },
-                )
-                .optional()?;
-
-            WorkflowResult::Ok(maybe_row)
-        })
-        .await;
-
-    let (action_blob, entry_blob) = match op_opt {
-        Ok(Some(row)) => row,
-        Ok(None) => return,
-        Err(e) => {
-            tracing::error!(error = ?e, "Error reading op from cache for DHT-store mirror");
-            return;
-        }
-    };
-
-    let signed_action: SignedAction = match from_blob(action_blob) {
-        Ok(sa) => sa,
-        Err(e) => {
-            tracing::error!(error = ?e, "Error decoding signed action for DHT-store mirror");
-            return;
-        }
-    };
-
-    let maybe_entry: Option<Entry> = match entry_blob {
-        Some(blob) => match from_blob(blob) {
-            Ok(e) => Some(e),
-            Err(err) => {
-                tracing::error!(error = ?err, "Error decoding entry for DHT-store mirror");
-                return;
-            }
-        },
-        None => None,
-    };
-
-    let chain_op = match ChainOp::from_type(op_type, signed_action, maybe_entry) {
-        Ok(op) => op,
-        Err(e) => {
-            tracing::error!(error = ?e, "Error building ChainOp for DHT-store mirror");
-            return;
-        }
-    };
-
-    let op_hashed = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(chain_op)));
-    if let Err(e) = dht_store.record_incoming_ops(vec![op_hashed]).await {
-        tracing::error!(error = ?e, "Error mirroring warranted op to new DHT store");
-    }
-}
-
 // - Move any cached warranted ops because they need to be validated now.
 // - Check the validation status of any warranted ops that are in the DHT database.
 // - Any ops that have a validation status can be used to mark warrants as ready to validate.
@@ -721,15 +643,18 @@ async fn move_and_check_warrant_deps(
             Ok(copied) if copied => {
                 *warrant_deps_copied += 1;
 
-                // Also mirror the op into the new DHT store so that
-                // `ops_pending_sys_validation` can pick it up on the next pass.
-                mirror_cache_op_to_dht_store(
-                    workspace.cache.clone().into(),
-                    &workspace.dht_store,
-                    action_hash.clone(),
-                    op_type,
-                )
-                .await;
+                // Re-queue the cache-derived op for validation in the new
+                // DHT database. In the new schema cached ops live in
+                // `ChainOp` with `locally_validated = 0`; this moves the
+                // row into `LimboChainOp` so the next pass through
+                // `ops_pending_sys_validation` picks it up.
+                if let Err(e) = workspace
+                    .dht_store
+                    .move_warranted_op_to_limbo(&action_hash, op_type)
+                    .await
+                {
+                    tracing::error!(error = ?e, "Error moving cached warranted op to limbo");
+                }
             }
             Ok(_) => {
                 // It's in the DHT already.
