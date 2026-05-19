@@ -8,6 +8,8 @@ use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
 use holochain_p2p::DynHolochainP2pDna;
+use holochain_sqlite::db::DbKindDht;
+use holochain_sqlite::prelude::DbWrite;
 use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::*;
 use holochain_zome_types::dht_v2::OpValidity;
@@ -21,6 +23,7 @@ mod tests;
 #[cfg_attr(
     feature = "instrument",
     tracing::instrument(skip(
+        vault,
         dht_store,
         trigger_receipt,
         network,
@@ -29,6 +32,7 @@ mod tests;
     ))
 )]
 pub async fn integrate_dht_ops_workflow(
+    vault: DbWrite<DbKindDht>,
     dht_store: DhtStore,
     trigger_receipt: TriggerSender,
     network: DynHolochainP2pDna,
@@ -44,6 +48,23 @@ pub async fn integrate_dht_ops_workflow(
         .integrate_ready_ops(when_integrated)
         .await
         .map_err(WorkflowError::from)?;
+
+    // Dual-write: mark all awaiting-integration ops in the legacy DhtOp table
+    // so legacy readers (tests, integration dumps) see consistent state during
+    // the read-migration window. This mirrors the former
+    // SET_VALIDATED_OPS_TO_INTEGRATED SQL and covers both network-received ops
+    // (which flow through the new DhtStore's limbo pathway) and locally-authored
+    // ops (genesis, call_zome) which are inserted into the legacy DB as
+    // validation_stage=3 but directly into the new DB as already-integrated.
+    // This will be removed once the legacy DhtOp table is retired.
+    let legacy_marked = vault
+        .write_async(move |txn| -> StateMutationResult<usize> {
+            holochain_state::mutations::set_all_awaiting_integration_to_integrated(
+                txn,
+                when_integrated,
+            )
+        })
+        .await?;
 
     let changed = summaries.len();
     let ops_ps = changed as f64 / start.elapsed().as_micros() as f64 * 1_000_000.0;
@@ -156,6 +177,10 @@ pub async fn integrate_dht_ops_workflow(
         }
 
         trigger_receipt.trigger(&"integrate_dht_ops_workflow");
+        Ok(WorkComplete::Incomplete(None))
+    } else if legacy_marked > 0 {
+        // New-DB had nothing to integrate, but legacy ops were marked.
+        // Loop so any further legacy stragglers are caught before yielding.
         Ok(WorkComplete::Incomplete(None))
     } else {
         Ok(WorkComplete::Complete)

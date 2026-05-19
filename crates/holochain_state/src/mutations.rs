@@ -648,6 +648,32 @@ pub fn set_when_integrated(
     Ok(())
 }
 
+/// Mark every [DhtOp] that is awaiting integration (validation_stage = 3,
+/// validation_status IS NOT NULL) as integrated in the legacy `DhtOp` table.
+///
+/// Sets `when_integrated = time` and clears `validation_stage` on all matching
+/// rows. Returns the number of rows updated.
+///
+/// Used as a dual-write shim during the read-migration window so that legacy
+/// readers see consistent integration state. Will be removed once the legacy
+/// `DhtOp` table is retired.
+pub fn set_all_awaiting_integration_to_integrated(
+    txn: &mut Txn<DbKindDht>,
+    time: Timestamp,
+) -> StateMutationResult<usize> {
+    let n = txn.execute(
+        "UPDATE DhtOp
+         SET when_integrated = :when_integrated,
+             validation_stage = NULL
+         WHERE validation_stage = 3
+           AND validation_status IS NOT NULL",
+        holochain_sqlite::rusqlite::named_params! {
+            ":when_integrated": time,
+        },
+    )?;
+    Ok(n)
+}
+
 /// Set when a [DhtOp] was last publish time
 pub fn set_last_publish_time(
     txn: &mut Txn<DbKindAuthored>,
