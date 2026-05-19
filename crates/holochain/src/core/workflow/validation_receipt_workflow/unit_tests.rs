@@ -264,17 +264,16 @@ async fn errors_for_some_ops_does_not_prevent_the_workflow_proceeding() {
     let mut dna = MockHolochainP2pDnaT::new();
     dna.expect_was_agent_recently_online()
         .returning(|_| Ok(true));
-    let mut seq = mockall::Sequence::new();
+    // Both authors are processed; the order is not guaranteed by the DB query.
+    // Author1's send returns an error; author2's send succeeds.
     dna.expect_send_validation_receipts()
         .times(1)
         .withf(move |author: &AgentPubKey, _| *author == author1)
-        .in_sequence(&mut seq)
         .returning(|_, _| Err("I'm a test error".into()));
 
     dna.expect_send_validation_receipts()
         .times(1)
         .withf(move |author: &AgentPubKey, _| *author == author2)
-        .in_sequence(&mut seq)
         .returning(|_, _| Ok(()));
     let dna = Arc::new(dna);
 
