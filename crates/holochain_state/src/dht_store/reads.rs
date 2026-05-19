@@ -42,12 +42,14 @@ impl DhtStore<DbRead<Dht>> {
     /// sibling exists. Returns `Err` with a descriptive message if a
     /// sibling action by a different author is found (cross-author
     /// `prev_action` collision).
+    ///
+    /// The returned tuple is `(hash, signature)` for the sibling action —
+    /// the exact shape the sys-validation workflow needs to author a
+    /// `ChainFork` warrant.
     pub async fn find_fork_for_action(
         &self,
         action: &holochain_zome_types::action::Action,
-    ) -> StateQueryResult<Option<holochain_types::prelude::SignedAction>> {
-        use holochain_zome_types::dht_v2::to_legacy_signed_action;
-
+    ) -> StateQueryResult<Option<(holo_hash::ActionHash, holochain_types::prelude::Signature)>> {
         let Some(prev) = action.prev_action() else {
             return Ok(None);
         };
@@ -59,28 +61,19 @@ impl DhtStore<DbRead<Dht>> {
             .await?;
 
         let incoming_author = action.author();
-        if let Some(v2_sibling) = siblings.into_iter().next() {
-            let legacy_sibling = to_legacy_signed_action(&v2_sibling).map_err(|e| {
-                crate::query::StateQueryError::Other(format!(
-                    "to_legacy_signed_action on sibling: {e}"
-                ))
-            })?;
-            let existing_author = legacy_sibling.action().author();
+        if let Some(sibling) = siblings.into_iter().next() {
+            let existing_author = &sibling.hashed.content.header.author;
             if existing_author != incoming_author {
                 return Err(crate::query::StateQueryError::Other(format!(
                     "Cross-author prev_action collision: incoming author {incoming_author} \
                      differs from existing author {existing_author} for prev_action {prev:?}"
                 )));
             }
-            // Return the SignedAction (action + signature, no hash).
-            let signature = legacy_sibling.signature().clone();
-            let action = legacy_sibling.action().clone();
-            Ok(Some(holochain_types::prelude::SignedAction::new(
-                action, signature,
-            )))
-        } else {
-            Ok(None)
+            let hash = sibling.as_hash().clone();
+            let signature = sibling.signature().clone();
+            return Ok(Some((hash, signature)));
         }
+        Ok(None)
     }
 
     /// Return ops awaiting system validation, sorted across chain ops and
@@ -146,7 +139,7 @@ impl DhtStore<DbWrite<Dht>> {
     pub async fn find_fork_for_action(
         &self,
         action: &holochain_zome_types::action::Action,
-    ) -> StateQueryResult<Option<holochain_types::prelude::SignedAction>> {
+    ) -> StateQueryResult<Option<(holo_hash::ActionHash, holochain_types::prelude::Signature)>> {
         self.as_read().find_fork_for_action(action).await
     }
 }
@@ -529,6 +522,16 @@ mod tests {
         let op_a = make_fork_op(&author, &prev_action_hash, 2, 32);
         let op_b = make_fork_op(&author, &prev_action_hash, 2, 33);
 
+        // Capture op_a's action hash and signature before moving op_a into the store.
+        let expected_hash = match op_a.as_content() {
+            DhtOp::ChainOp(c) => ActionHash::with_data_sync(&c.action()),
+            _ => unreachable!(),
+        };
+        let expected_sig = match op_a.as_content() {
+            DhtOp::ChainOp(c) => c.signature().clone(),
+            _ => unreachable!(),
+        };
+
         let action_b = match op_b.as_content() {
             DhtOp::ChainOp(c) => c.action().clone(),
             _ => unreachable!(),
@@ -537,6 +540,8 @@ mod tests {
         store.record_incoming_ops(vec![op_a]).await.unwrap();
 
         let result = store.find_fork_for_action(&action_b).await.unwrap();
-        assert!(result.is_some(), "fork should be detected");
+        let (got_hash, got_sig) = result.expect("fork should be detected");
+        assert_eq!(got_hash, expected_hash, "sibling hash should match op_a");
+        assert_eq!(got_sig, expected_sig, "sibling signature should match op_a");
     }
 }
