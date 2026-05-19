@@ -180,6 +180,7 @@ Assigned to @
   - Write App Upgrade Guide for new holochain version.
   - Update Compatibility Table to add new tool versions compatible with new holochain version.
   - Update Developer Portal to use code examples and explanations for new holochain version.
+    - Tip: search the repo for `TODO(upgrade)` -- this will help you discover places that need to be routinely updated for point releases or major releases.
 
 ### Stage 7
 
