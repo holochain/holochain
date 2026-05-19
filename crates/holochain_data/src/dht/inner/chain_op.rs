@@ -152,3 +152,41 @@ where
         .fetch_all(executor)
         .await
 }
+
+/// Row returned by [`pending_validation_receipts`]: op metadata plus the
+/// underlying action's author so receipts can be addressed.
+#[derive(Debug, sqlx::FromRow)]
+pub struct PendingReceiptRow {
+    /// Raw 36-byte op hash from `ChainOp.hash`.
+    pub op_hash: Vec<u8>,
+    /// Validation status integer (`1` = Accepted, `2` = Rejected).
+    pub validation_status: i64,
+    /// Microsecond timestamp at which the op was integrated.
+    pub when_integrated: i64,
+    /// Raw 36-byte author public key from `Action.author`.
+    pub action_author: Vec<u8>,
+}
+
+/// Return integrated, validated [`ChainOp`] rows that still require a
+/// validation receipt to be sent to the action author.
+pub(crate) async fn pending_validation_receipts<'e, E>(
+    executor: E,
+) -> sqlx::Result<Vec<PendingReceiptRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT
+            ChainOp.hash AS op_hash,
+            ChainOp.validation_status AS validation_status,
+            ChainOp.when_integrated AS when_integrated,
+            Action.author AS action_author
+         FROM ChainOp
+         JOIN Action ON ChainOp.action_hash = Action.hash
+         WHERE ChainOp.require_receipt = 1
+           AND ChainOp.when_integrated IS NOT NULL
+           AND ChainOp.validation_status IS NOT NULL",
+    )
+    .fetch_all(executor)
+    .await
+}
