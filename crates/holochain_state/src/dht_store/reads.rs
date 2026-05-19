@@ -77,6 +77,22 @@ impl DhtStore<DbRead<Dht>> {
         Ok(None)
     }
 
+    /// Return chain ops that have passed system validation and are awaiting
+    /// app validation. Warrants have no app-validation stage, so they are not
+    /// included.
+    pub async fn ops_pending_app_validation(
+        &self,
+        limit: u32,
+    ) -> StateQueryResult<Vec<DhtOpHashed>> {
+        let db = self.db();
+        let rows = db.limbo_chain_ops_pending_app_validation(limit).await?;
+        let mut out = Vec::with_capacity(rows.len());
+        for row in rows {
+            out.push(chain_op_from_limbo_row(db, &row).await?);
+        }
+        Ok(out)
+    }
+
     /// Return ops awaiting system validation, sorted across chain ops and
     /// warrants by `(sys_validation_attempts, when_received)`, up to `limit`
     /// rows total.
@@ -126,6 +142,14 @@ impl DhtStore<DbWrite<Dht>> {
         ops: Vec<DhtOpHashed>,
     ) -> StateQueryResult<Vec<DhtOpHashed>> {
         self.as_read().filter_existing_ops(ops).await
+    }
+
+    /// See [`DhtStore::ops_pending_app_validation`].
+    pub async fn ops_pending_app_validation(
+        &self,
+        limit: u32,
+    ) -> StateQueryResult<Vec<DhtOpHashed>> {
+        self.as_read().ops_pending_app_validation(limit).await
     }
 
     /// See [`DhtStore::ops_pending_sys_validation`].
@@ -493,6 +517,74 @@ mod tests {
 
         let pending = store.ops_pending_sys_validation(2).await.unwrap();
         assert_eq!(pending.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn ops_pending_app_validation_returns_sys_validated_chain_op() {
+        use crate::dht_store::SysOutcome;
+
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let op = make_chain_op(50);
+        let hash = op.as_hash().clone();
+
+        store.record_incoming_ops(vec![op]).await.unwrap();
+        store
+            .record_chain_op_sys_validation_outcomes(vec![(hash.clone(), SysOutcome::Accepted)])
+            .await
+            .unwrap();
+
+        let pending = store.ops_pending_app_validation(1_000).await.unwrap();
+        let hashes: Vec<_> = pending.iter().map(|o| o.as_hash().clone()).collect();
+        assert!(hashes.contains(&hash));
+    }
+
+    #[tokio::test]
+    async fn ops_pending_app_validation_excludes_pending_sys() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let op = make_chain_op(51);
+        let hash = op.as_hash().clone();
+
+        // Insert but don't record sys-validation outcome.
+        store.record_incoming_ops(vec![op]).await.unwrap();
+
+        let pending = store.ops_pending_app_validation(1_000).await.unwrap();
+        let hashes: Vec<_> = pending.iter().map(|o| o.as_hash().clone()).collect();
+        assert!(
+            !hashes.contains(&hash),
+            "op not yet sys-validated should not appear"
+        );
+    }
+
+    #[tokio::test]
+    async fn ops_pending_app_validation_excludes_app_validated() {
+        use crate::dht_store::{AppOutcome, SysOutcome};
+
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let op = make_chain_op(52);
+        let hash = op.as_hash().clone();
+
+        store.record_incoming_ops(vec![op]).await.unwrap();
+        store
+            .record_chain_op_sys_validation_outcomes(vec![(hash.clone(), SysOutcome::Accepted)])
+            .await
+            .unwrap();
+        store
+            .record_app_validation_outcomes(vec![(hash.clone(), AppOutcome::Accepted)])
+            .await
+            .unwrap();
+
+        let pending = store.ops_pending_app_validation(1_000).await.unwrap();
+        let hashes: Vec<_> = pending.iter().map(|o| o.as_hash().clone()).collect();
+        assert!(
+            !hashes.contains(&hash),
+            "fully-validated op should not appear"
+        );
     }
 
     #[tokio::test]
