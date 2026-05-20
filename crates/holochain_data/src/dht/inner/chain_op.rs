@@ -1,7 +1,7 @@
 //! Free-standing operations against the `ChainOp` table.
 
 use crate::models::dht::ChainOpRow;
-use holo_hash::{ActionHash, AnyDhtHash, DhtOpHash};
+use holo_hash::{ActionHash, AnyDhtHash, AnyLinkableHash, DhtOpHash};
 use holochain_integrity_types::dht_v2::OpValidity;
 use holochain_timestamp::Timestamp;
 use sqlx::{Executor, Sqlite};
@@ -16,7 +16,7 @@ pub struct InsertChainOp<'a> {
     /// [`From<ChainOpType> for i64`](holochain_zome_types::dht_v2).
     pub op_type: i64,
     /// DHT basis hash (where the op is stored).
-    pub basis_hash: &'a AnyDhtHash,
+    pub basis_hash: &'a AnyLinkableHash,
     /// Numeric storage center derived from `basis_hash`.
     pub storage_center_loc: u32,
     /// Final validation outcome.

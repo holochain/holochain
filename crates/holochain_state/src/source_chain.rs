@@ -10,7 +10,6 @@ use async_recursion::async_recursion;
 pub use error::*;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
-use holo_hash::AnyDhtHash;
 use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
 use holo_hash::EntryHash;
@@ -538,26 +537,8 @@ impl SourceChain {
                         if !inserted_action_hashes.contains(op_as_chain.action_hash()) {
                             continue;
                         }
-                        let linkable_basis = op_as_chain.dht_basis().clone();
-                        let storage_center_loc = linkable_basis.get_loc();
-                        // ChainOp.basis_hash in the new schema is AnyDhtHash (all
-                        // authored ops' bases are DHT-addressable entries or actions).
-                        // TODO: ChainOp.basis_hash uses AnyDhtHash, which lacks External.
-                        // Authored CreateLink with External basis cannot be inserted into
-                        // ChainOp until the new schema widens basis_hash to AnyLinkableHash.
-                        // Action and Link rows are still inserted; the legacy DB still has
-                        // the ChainOp row.
-                        let basis_hash: AnyDhtHash = match AnyDhtHash::try_from(linkable_basis) {
-                            Ok(h) => h,
-                            Err(e) => {
-                                tracing::debug!(
-                                    op_hash = ?op_hash,
-                                    "new DB skip: op with external-hash basis is not yet \
-                                     representable in ChainOp; legacy DB has it. op_hash={op_hash:?} err={e:?}"
-                                );
-                                continue;
-                            }
-                        };
+                        let basis_hash = op_as_chain.dht_basis().clone();
+                        let storage_center_loc = basis_hash.get_loc();
 
                         let serialized_size = encoded_chain_op_size(
                             op_as_chain,
@@ -1514,18 +1495,8 @@ pub async fn genesis(
 
         // Insert chain ops for all three genesis actions.
         for (op, op_hash, timestamp) in &ops_with_hashes_for_new_db {
-            let linkable_basis = op.dht_basis().clone();
-            let storage_center_loc = linkable_basis.get_loc();
-            let basis_hash: AnyDhtHash = match AnyDhtHash::try_from(linkable_basis) {
-                Ok(h) => h,
-                Err(e) => {
-                    tracing::debug!(
-                        op_hash = ?op_hash,
-                        "genesis new DB skip: op with external-hash basis; err={e:?}"
-                    );
-                    continue;
-                }
-            };
+            let basis_hash = op.dht_basis().clone();
+            let storage_center_loc = basis_hash.get_loc();
 
             let genesis_actions_slice: Vec<SignedActionHashed> = vec![
                 dna_action_for_new_db.clone(),

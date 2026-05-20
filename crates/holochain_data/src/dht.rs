@@ -555,8 +555,11 @@ mod tests {
         action.as_hash().clone()
     }
 
-    fn sample_basis(seed: u8) -> AnyDhtHash {
-        AnyDhtHash::from_raw_36_and_type(vec![seed; 36], holo_hash::hash_type::AnyDht::Entry)
+    fn sample_basis(seed: u8) -> AnyLinkableHash {
+        AnyLinkableHash::from_raw_36_and_type(
+            vec![seed; 36],
+            holo_hash::hash_type::AnyLinkable::Entry,
+        )
     }
 
     #[tokio::test]
@@ -781,7 +784,11 @@ mod tests {
         assert_eq!(row.validation_status, 1);
         assert_eq!(row.locally_validated, 1);
 
-        let by_basis = db.as_ref().get_chain_ops_by_basis(basis).await.unwrap();
+        let by_basis = db
+            .as_ref()
+            .get_chain_ops_by_basis(AnyDhtHash::try_from(basis).unwrap())
+            .await
+            .unwrap();
         assert_eq!(by_basis.len(), 1);
 
         let for_action = db
@@ -1469,8 +1476,10 @@ mod tests {
             .unwrap();
 
         let op_hash = DhtOpHash::from_raw_36(vec![9u8; 36]);
-        let basis_hash =
-            AnyDhtHash::from_raw_36_and_type(vec![9u8; 36], holo_hash::hash_type::AnyDht::Action);
+        let basis_hash = AnyLinkableHash::from_raw_36_and_type(
+            vec![9u8; 36],
+            holo_hash::hash_type::AnyLinkable::Action,
+        );
 
         db.insert_chain_op(InsertChainOp {
             op_hash: &op_hash,
