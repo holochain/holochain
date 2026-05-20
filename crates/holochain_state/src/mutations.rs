@@ -652,7 +652,9 @@ pub fn set_when_integrated(
 /// validation_status IS NOT NULL) as integrated in the legacy `DhtOp` table.
 ///
 /// Sets `when_integrated = time` and clears `validation_stage` on all matching
-/// rows. Returns the number of rows updated.
+/// rows. Returns the `(DhtOpHash, Option<AgentPubKey>)` pairs of the ops it
+/// marked, so callers can drive publish-trigger updates for locally-authored
+/// ops that bypass the new-DB limbo path.
 ///
 /// Used as a dual-write shim during the read-migration window so that legacy
 /// readers see consistent integration state. Will be removed once the legacy
@@ -660,18 +662,32 @@ pub fn set_when_integrated(
 pub fn set_all_awaiting_integration_to_integrated(
     txn: &mut Txn<DbKindDht>,
     time: Timestamp,
-) -> StateMutationResult<usize> {
-    let n = txn.execute(
+) -> StateMutationResult<Vec<(DhtOpHash, Option<AgentPubKey>)>> {
+    let mut stmt = txn.prepare(
         "UPDATE DhtOp
          SET when_integrated = :when_integrated,
              validation_stage = NULL
          WHERE validation_stage = 3
-           AND validation_status IS NOT NULL",
-        holochain_sqlite::rusqlite::named_params! {
+           AND validation_status IS NOT NULL
+         RETURNING
+           hash,
+           COALESCE(
+             (SELECT author FROM Action  WHERE Action.hash  = DhtOp.action_hash LIMIT 1),
+             (SELECT author FROM Warrant WHERE Warrant.hash = DhtOp.action_hash LIMIT 1)
+           )",
+    )?;
+    let rows = stmt.query_map(
+        named_params! {
             ":when_integrated": time,
         },
+        |row| {
+            let hash: DhtOpHash = row.get(0)?;
+            let author: Option<AgentPubKey> = row.get(1)?;
+            Ok((hash, author))
+        },
     )?;
-    Ok(n)
+    let out: Vec<(DhtOpHash, Option<AgentPubKey>)> = rows.collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(out)
 }
 
 /// Set when a [DhtOp] was last publish time
@@ -1153,13 +1169,14 @@ pub fn remove_countersigning_session(
 /// This function will fail on database errors or serialization errors but succeed if there was
 /// nothing to be done.
 ///
-/// Returns `true` if the op was copied, `false` if it already existed in the DHT database.
+/// Returns `Some(op)` with the copied op if the op was copied, `None` if it already existed
+/// in the DHT database.
 pub async fn copy_cached_op_to_dht(
     dht: DbWrite<DbKindDht>,
     cache: DbRead<DbKindCache>,
     action_hash: ActionHash,
     chain_op_type: ChainOpType,
-) -> StateMutationResult<bool> {
+) -> StateMutationResult<Option<DhtOpHashed>> {
     let dht_permit = dht.acquire_write_permit().await?;
 
     let (exists_in_dht, dht_permit) = dht
@@ -1179,7 +1196,7 @@ pub async fn copy_cached_op_to_dht(
 
     // Nothing further to do, a DhtOp with the same action_hash and type already exists
     if exists_in_dht {
-        return Ok(false);
+        return Ok(None);
     }
 
     let maybe_action_entry = cache
@@ -1237,6 +1254,7 @@ pub async fn copy_cached_op_to_dht(
 
     let serialized_size = encode(&dht_op)?.len() as u32;
     let dht_op_hashed = DhtOpHashed::from_content_sync(dht_op);
+    let op_to_return = dht_op_hashed.clone();
 
     let _ = dht
         .write_async_with_permit(dht_permit, move |txn| {
@@ -1244,7 +1262,7 @@ pub async fn copy_cached_op_to_dht(
         })
         .await?;
 
-    Ok(true)
+    Ok(Some(op_to_return))
 }
 
 #[cfg(test)]
@@ -1279,7 +1297,10 @@ mod tests {
         )
         .await
         .unwrap();
-        assert!(copied, "Op should have been copied to DHT database");
+        assert!(
+            copied.is_some(),
+            "Op should have been copied to DHT database"
+        );
 
         let found: bool = dht_db
             .read_async(move |txn| -> StateMutationResult<bool> {
@@ -1324,7 +1345,10 @@ mod tests {
         )
         .await
         .unwrap();
-        assert!(!copied, "Op should not have been copied to DHT database");
+        assert!(
+            copied.is_none(),
+            "Op should not have been copied to DHT database"
+        );
 
         let validation_status = dht_db
             .read_async(
