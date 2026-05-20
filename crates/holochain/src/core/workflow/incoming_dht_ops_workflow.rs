@@ -172,6 +172,7 @@ pub async fn incoming_dht_ops_workflow(
                     // into DhtStore after the legacy txn commits.
                     let pending_ops = Arc::new(parking_lot::Mutex::new(Vec::new()));
                     let pending_ops2 = pending_ops.clone();
+                    let mut mirror_ok = false;
                     if let Err(err) = dht_db
                         .write_async(move |txn| {
                             for entry in entries {
@@ -193,16 +194,21 @@ pub async fn incoming_dht_ops_workflow(
                         tracing::error!(?err, "incoming_dht_ops_workflow error");
                     } else {
                         // Mirror the committed ops into the new DHT DB.
-                        // Errors are logged rather than propagated because this code runs inside
-                        // a spawned task that has no caller to return a WorkflowResult to.
+                        // sys-validation now reads from the new DB, so the
+                        // trigger below is only meaningful once the mirror
+                        // succeeds.
                         let ops_to_mirror = pending_ops.lock().drain(..).collect::<Vec<_>>();
-                        if !ops_to_mirror.is_empty() {
-                            if let Err(err) = dht_store.record_incoming_ops(ops_to_mirror).await {
-                                tracing::error!(
-                                    ?err,
-                                    "incoming_dht_ops_workflow new-DB mirror error"
-                                );
-                            }
+                        if ops_to_mirror.is_empty() {
+                            mirror_ok = true;
+                        } else if let Err(err) =
+                            dht_store.record_incoming_ops(ops_to_mirror).await
+                        {
+                            tracing::error!(
+                                ?err,
+                                "incoming_dht_ops_workflow new-DB mirror error"
+                            );
+                        } else {
+                            mirror_ok = true;
                         }
                     }
 
@@ -210,11 +216,15 @@ pub async fn incoming_dht_ops_workflow(
                         let _ = snd.send(res);
                     }
 
-                    // trigger validation of queued ops
-                    tracing::debug!(
-                        "Incoming dht ops workflow is now triggering the sys_validation_trigger"
-                    );
-                    sys_validation_trigger.trigger(&"incoming_dht_ops_workflow");
+                    // trigger validation of queued ops only when the new-DB
+                    // mirror succeeded — sys-validation reads from the new
+                    // DB and would find no ops to process otherwise.
+                    if mirror_ok {
+                        tracing::debug!(
+                            "Incoming dht ops workflow is now triggering the sys_validation_trigger"
+                        );
+                        sys_validation_trigger.trigger(&"incoming_dht_ops_workflow");
+                    }
 
                     maybe_batch = incoming_ops_batch.check_end();
                 }
