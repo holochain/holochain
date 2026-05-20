@@ -274,14 +274,27 @@ async fn author_of_invalid_warrant_is_blocked() {
     // Insert the warrant into Bob's DHT database.
     let warrant_op_hashed = DhtOpHashed::from_content_sync(warrant_op);
 
+    {
+        let warrant_op_hashed = warrant_op_hashed.clone();
+        conductors[1]
+            .get_dht_db(dna_file.dna_hash())
+            .unwrap()
+            .test_write(move |txn| {
+                insert_op_dht(txn, &warrant_op_hashed, 0, None).unwrap();
+                set_validation_status(txn, &warrant_op_hashed.hash, ValidationStatus::Valid)
+                    .unwrap();
+                set_when_integrated(txn, &warrant_op_hashed.hash, Timestamp::now()).unwrap();
+            });
+    }
+
+    // Also insert into Bob's new DhtStore so K2 gossip can find and serve it.
     conductors[1]
-        .get_dht_db(dna_file.dna_hash())
+        .get_spaces()
+        .dht_store(dna_file.dna_hash())
         .unwrap()
-        .test_write(move |txn| {
-            insert_op_dht(txn, &warrant_op_hashed, 0, None).unwrap();
-            set_validation_status(txn, &warrant_op_hashed.hash, ValidationStatus::Valid).unwrap();
-            set_when_integrated(txn, &warrant_op_hashed.hash, Timestamp::now()).unwrap();
-        });
+        .record_locally_validated_warrants(vec![warrant_op_hashed])
+        .await
+        .unwrap();
 
     // Wait for Alice and Bob to sync so that Alice receives the warrant.
     await_consistency([&alice, &bob]).await.unwrap();
