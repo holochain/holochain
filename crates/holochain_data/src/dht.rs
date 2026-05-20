@@ -21,6 +21,7 @@ pub use inner::chain_op::InsertChainOp;
 pub use inner::deleted_link::InsertDeletedLink;
 pub use inner::deleted_record::InsertDeletedRecord;
 pub use inner::limbo_chain_op::InsertLimboChainOp;
+pub use inner::limbo_chain_op::LimboChainOpJoinedRow;
 pub use inner::limbo_warrant::InsertLimboWarrant;
 pub use inner::link::InsertLink;
 pub use inner::scheduled_function::InsertScheduledFunction;
