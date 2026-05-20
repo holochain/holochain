@@ -114,6 +114,7 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_sqlite::prelude::*;
 use holochain_sqlite::sql::sql_cell::ACTION_HASH_BY_PREV;
+use holochain_state::dht_store::DhtStore;
 use holochain_state::integrate::insert_locally_validated_op;
 use holochain_state::prelude::*;
 use holochain_state::query::StateQueryError;
@@ -1539,7 +1540,9 @@ impl SysValidationWorkspace {
     }
 
     pub fn network_and_cache_cascade(&self, network: DynHolochainP2pDna) -> CascadeImpl {
-        CascadeImpl::empty().with_network(network, self.cache.clone())
+        CascadeImpl::empty()
+            .with_network(network, self.cache.clone())
+            .with_dht_store(self.dht_store.clone())
     }
 }
 

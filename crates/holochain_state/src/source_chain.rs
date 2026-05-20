@@ -499,7 +499,7 @@ impl SourceChain {
                     let mut inserted_action_hashes = std::collections::HashSet::<ActionHash>::new();
 
                     for sah in &actions_for_new_db {
-                        let new_sah = legacy_to_dht_v2_signed_action(sah);
+                        let new_sah = holochain_zome_types::dht_v2::from_legacy_signed_action(sah);
 
                         tx.insert_action(
                             &new_sah,
@@ -511,62 +511,13 @@ impl SourceChain {
                         // Record that this action hash is present in the new DB.
                         inserted_action_hashes.insert(sah.as_hash().clone());
 
-                        // Dispatch index table inserts based on action variant.
-                        // `ActionData` is the dht_v2 discriminant; import locally to
-                        // avoid shadowing the legacy `Action` variants in scope.
-                        {
-                            use holochain_zome_types::dht_v2::ActionData;
-                            match &new_sah.hashed.content.data {
-                                ActionData::CreateLink(a) => {
-                                    let _ = tx
-                                        .insert_link_index(holochain_data::dht::InsertLink {
-                                            action_hash: new_sah.as_hash(),
-                                            base_hash: &a.base_address,
-                                            zome_index: a.zome_index.0,
-                                            link_type: a.link_type.0,
-                                            tag: Some(a.tag.0.as_slice()),
-                                        })
-                                        .await
-                                        .map_err(SourceChainError::other)?;
-                                }
-                                ActionData::DeleteLink(a) => {
-                                    let _ = tx
-                                        .insert_deleted_link_index(
-                                            holochain_data::dht::InsertDeletedLink {
-                                                action_hash: new_sah.as_hash(),
-                                                create_link_hash: &a.link_add_address,
-                                            },
-                                        )
-                                        .await
-                                        .map_err(SourceChainError::other)?;
-                                }
-                                ActionData::Update(a) => {
-                                    let _ = tx
-                                        .insert_updated_record_index(
-                                            holochain_data::dht::InsertUpdatedRecord {
-                                                action_hash: new_sah.as_hash(),
-                                                original_action_hash: &a.original_action_address,
-                                                original_entry_hash: &a.original_entry_address,
-                                            },
-                                        )
-                                        .await
-                                        .map_err(SourceChainError::other)?;
-                                }
-                                ActionData::Delete(a) => {
-                                    let _ = tx
-                                        .insert_deleted_record_index(
-                                            holochain_data::dht::InsertDeletedRecord {
-                                                action_hash: new_sah.as_hash(),
-                                                deletes_action_hash: &a.deletes_address,
-                                                deletes_entry_hash: &a.deletes_entry_address,
-                                            },
-                                        )
-                                        .await
-                                        .map_err(SourceChainError::other)?;
-                                }
-                                _ => {}
-                            }
-                        }
+                        crate::dht_store::action_indexes::insert_action_indexes(
+                            &mut tx,
+                            new_sah.as_hash(),
+                            &new_sah.hashed.content.data,
+                        )
+                        .await
+                        .map_err(SourceChainError::other)?;
 
                         // For Create/Update of a CapGrant entry type, insert a CapGrant index row.
                         if let Some((cap_access, tag)) =
@@ -1552,7 +1503,7 @@ pub async fn genesis(
             &agent_action_for_new_db,
         ];
         for sah in genesis_actions {
-            let new_sah = legacy_to_dht_v2_signed_action(sah);
+            let new_sah = holochain_zome_types::dht_v2::from_legacy_signed_action(sah);
             tx.insert_action(
                 &new_sah,
                 Some(holochain_zome_types::dht_v2::RecordValidity::Accepted),
@@ -1766,79 +1717,6 @@ pub async fn dump_state(
 // ---------------------------------------------------------------------------
 // Private helpers for the new-DB writes in `flush` and `genesis`
 // ---------------------------------------------------------------------------
-
-/// Convert a legacy [`SignedActionHashed`] (using the variant-per-type `Action`
-/// enum) to the new [`holochain_zome_types::dht_v2::SignedActionHashed`] (which
-/// uses a flat `ActionHeader` + `ActionData` envelope).
-///
-/// All legacy action variants are covered. The hash is carried over from the
-/// original (the v2 hash is content-derived, so re-hashing would change it;
-/// the pre-hashed constructor preserves the existing hash as the canonical
-/// identity during the dual-write transition).
-pub(crate) fn legacy_to_dht_v2_signed_action(
-    shh: &SignedActionHashed,
-) -> holochain_zome_types::dht_v2::SignedActionHashed {
-    use holochain_zome_types::dht_v2::{
-        Action as V2Action, ActionData, ActionHeader, AgentValidationPkgData, CloseChainData,
-        CreateData, CreateLinkData, DeleteData, DeleteLinkData, DnaData, InitZomesCompleteData,
-        OpenChainData, UpdateData,
-    };
-
-    // `Action` (legacy) and `SignedHashed` are in scope via the prelude.
-    let legacy_action = shh.action();
-    let header = ActionHeader {
-        author: legacy_action.author().clone(),
-        timestamp: legacy_action.timestamp(),
-        action_seq: legacy_action.action_seq(),
-        prev_action: legacy_action.prev_action().cloned(),
-    };
-
-    let data = match legacy_action {
-        Action::Dna(d) => ActionData::Dna(DnaData {
-            dna_hash: d.hash.clone(),
-        }),
-        Action::AgentValidationPkg(d) => ActionData::AgentValidationPkg(AgentValidationPkgData {
-            membrane_proof: d.membrane_proof.clone(),
-        }),
-        Action::InitZomesComplete(_) => ActionData::InitZomesComplete(InitZomesCompleteData {}),
-        Action::Create(d) => ActionData::Create(CreateData {
-            entry_type: d.entry_type.clone(),
-            entry_hash: d.entry_hash.clone(),
-        }),
-        Action::Update(d) => ActionData::Update(UpdateData {
-            original_action_address: d.original_action_address.clone(),
-            original_entry_address: d.original_entry_address.clone(),
-            entry_type: d.entry_type.clone(),
-            entry_hash: d.entry_hash.clone(),
-        }),
-        Action::Delete(d) => ActionData::Delete(DeleteData {
-            deletes_address: d.deletes_address.clone(),
-            deletes_entry_address: d.deletes_entry_address.clone(),
-        }),
-        Action::CreateLink(d) => ActionData::CreateLink(CreateLinkData {
-            base_address: d.base_address.clone(),
-            target_address: d.target_address.clone(),
-            zome_index: d.zome_index,
-            link_type: d.link_type,
-            tag: d.tag.clone(),
-        }),
-        Action::DeleteLink(d) => ActionData::DeleteLink(DeleteLinkData {
-            base_address: d.base_address.clone(),
-            link_add_address: d.link_add_address.clone(),
-        }),
-        Action::CloseChain(d) => ActionData::CloseChain(CloseChainData {
-            new_target: d.new_target.clone(),
-        }),
-        Action::OpenChain(d) => ActionData::OpenChain(OpenChainData {
-            prev_target: d.prev_target.clone(),
-            close_hash: d.close_hash.clone(),
-        }),
-    };
-
-    let v2_action = V2Action { header, data };
-    let hashed = holo_hash::HoloHashed::with_pre_hashed(v2_action, shh.as_hash().clone());
-    SignedHashed::with_presigned(hashed, shh.signature().clone())
-}
 
 /// Return the `(cap_access_i64, Option<tag>)` parameters needed for
 /// `TxWrite::insert_cap_grant`, if the given action creates/updates a

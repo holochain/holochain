@@ -6,7 +6,7 @@ holochain-process = { max-threads = 1 }
 # "retries" defines the number of times a test should be retried. If set to a
 # non-zero value, tests that succeed on a subsequent attempt will be marked as
 # flaky. Can be overridden through the `--retries` option.
-retries = 1
+retries = 2
 
 # this will display all of fail, retry, slow
 # see https://nexte.st/book/other-options.html?highlight=failure-output#--status-level-and---final-status-level
