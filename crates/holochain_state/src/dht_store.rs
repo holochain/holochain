@@ -5,7 +5,7 @@
 //! obtain a reference from [`Space`](crate) and invoke named methods; they do
 //! not need to interact with the underlying handle directly.
 
-use holo_hash::{AgentPubKey, AnyDhtHash, DhtOpHash, HasHash};
+use holo_hash::{AgentPubKey, DhtOpHash, HasHash};
 use holochain_data::dht::{InsertLimboChainOp, InsertLimboWarrant, InsertScheduledFunction};
 use holochain_data::kind::Dht;
 use holochain_data::DbWrite;
@@ -480,14 +480,8 @@ impl DhtStore<DbWrite<Dht>> {
                     }
 
                     // Compute basis hash and storage_center_loc.
-                    let linkable_basis = chain_op.dht_basis();
-                    let storage_center_loc = linkable_basis.get_loc();
-                    let basis_hash: AnyDhtHash =
-                        AnyDhtHash::try_from(linkable_basis).map_err(|e| {
-                            StateMutationError::Other(format!(
-                                "cannot convert op basis to AnyDhtHash: {e:?}"
-                            ))
-                        })?;
+                    let basis_hash = chain_op.dht_basis();
+                    let storage_center_loc = basis_hash.get_loc();
 
                     tx.insert_limbo_chain_op(InsertLimboChainOp {
                         op_hash: &op_hash,
