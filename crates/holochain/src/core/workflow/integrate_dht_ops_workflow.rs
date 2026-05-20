@@ -57,16 +57,19 @@ pub async fn integrate_dht_ops_workflow(
     // ops (genesis, call_zome) which are inserted into the legacy DB as
     // validation_stage=3 but directly into the new DB as already-integrated.
     // This will be removed once the legacy DhtOp table is retired.
-    let legacy_marked = vault
-        .write_async(move |txn| -> StateMutationResult<usize> {
-            holochain_state::mutations::set_all_awaiting_integration_to_integrated(
-                txn,
-                when_integrated,
-            )
-        })
+    let legacy_marked_pairs: Vec<(DhtOpHash, Option<AgentPubKey>)> = vault
+        .write_async(
+            move |txn| -> StateMutationResult<Vec<(DhtOpHash, Option<AgentPubKey>)>> {
+                holochain_state::mutations::set_all_awaiting_integration_to_integrated(
+                    txn,
+                    when_integrated,
+                )
+            },
+        )
         .await?;
 
     let changed = summaries.len();
+    let legacy_marked = legacy_marked_pairs.len();
     let ops_ps = changed as f64 / start.elapsed().as_micros() as f64 * 1_000_000.0;
     tracing::debug!(?changed, %ops_ps, "ops integrated");
     let dna_hash = network.dna_hash().clone();
@@ -74,7 +77,8 @@ pub async fn integrate_dht_ops_workflow(
 
     let mut stored_ops: Vec<StoredOp> = Vec::with_capacity(summaries.len());
     let mut block_agents: Vec<(AgentPubKey, DhtOpHash)> = Vec::new();
-    let mut integrated_pairs: Vec<(DhtOpHash, Option<AgentPubKey>)> =
+    // Pairs from the new-DB summaries (network-received ops that went through limbo).
+    let mut new_db_pairs: Vec<(DhtOpHash, Option<AgentPubKey>)> =
         Vec::with_capacity(summaries.len());
 
     for s in &summaries {
@@ -82,7 +86,7 @@ pub async fn integrate_dht_ops_workflow(
             created_at: kitsune2_api::Timestamp::from_micros(s.authored_timestamp.as_micros()),
             op_id: s.op_hash.to_located_k2_op_id(&s.basis_hash),
         });
-        integrated_pairs.push((s.op_hash.clone(), s.action_author.clone()));
+        new_db_pairs.push((s.op_hash.clone(), s.action_author.clone()));
 
         if let (Some(warrantee), Some(warrant_author)) = (&s.warrantee, &s.warrant_author) {
             match s.validation_status {
@@ -141,46 +145,54 @@ pub async fn integrate_dht_ops_workflow(
         );
     }
 
-    if changed > 0 {
-        network.new_integrated_data(stored_ops).await?;
+    if changed > 0 || legacy_marked > 0 {
+        // Combine new-DB pairs with legacy-only pairs (e.g. locally-authored ops
+        // that bypassed LimboChainOp). Deduplicate in case an op appears in both.
+        let mut seen = std::collections::HashSet::new();
+        let all_integrated_pairs: Vec<(DhtOpHash, Option<AgentPubKey>)> = new_db_pairs
+            .into_iter()
+            .chain(legacy_marked_pairs)
+            .filter(|(h, _)| seen.insert(h.clone()))
+            .collect();
 
         update_local_authored_status(
             authored_db_provider.clone(),
             publish_trigger_provider,
             &dna_hash,
             when_integrated,
-            integrated_pairs,
+            all_integrated_pairs,
         )
         .await?;
 
-        // Block agents warranted for invalid ops.
-        match InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::max()) {
-            Ok(interval) => {
-                for (block_agent, invalid_op_hash) in block_agents {
-                    if let Err(err) = network
-                        .block(Block::new(
-                            BlockTarget::Cell(
-                                CellId::new(network.dna_hash(), block_agent),
-                                CellBlockReason::InvalidOp(invalid_op_hash),
-                            ),
-                            interval.clone(),
-                        ))
-                        .await
-                    {
-                        tracing::warn!(?err, "Error blocking agent");
+        if changed > 0 {
+            network.new_integrated_data(stored_ops).await?;
+
+            // Block agents warranted for invalid ops.
+            match InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::max()) {
+                Ok(interval) => {
+                    for (block_agent, invalid_op_hash) in block_agents {
+                        if let Err(err) = network
+                            .block(Block::new(
+                                BlockTarget::Cell(
+                                    CellId::new(network.dna_hash(), block_agent),
+                                    CellBlockReason::InvalidOp(invalid_op_hash),
+                                ),
+                                interval.clone(),
+                            ))
+                            .await
+                        {
+                            tracing::warn!(?err, "Error blocking agent");
+                        }
                     }
                 }
+                Err(err) => {
+                    tracing::error!(?err, "Invalid interval when blocking agents")
+                }
             }
-            Err(err) => {
-                tracing::error!(?err, "Invalid interval when blocking agents")
-            }
+
+            trigger_receipt.trigger(&"integrate_dht_ops_workflow");
         }
 
-        trigger_receipt.trigger(&"integrate_dht_ops_workflow");
-        Ok(WorkComplete::Incomplete(None))
-    } else if legacy_marked > 0 {
-        // New-DB had nothing to integrate, but legacy ops were marked.
-        // Loop so any further legacy stragglers are caught before yielding.
         Ok(WorkComplete::Incomplete(None))
     } else {
         Ok(WorkComplete::Complete)

@@ -640,24 +640,30 @@ async fn move_and_check_warrant_deps(
         )
         .await
         {
-            Ok(copied) if copied => {
+            Ok(Some(op)) => {
                 *warrant_deps_copied += 1;
 
-                // Re-queue the cache-derived op for validation in the new
-                // DHT database. In the new schema cached ops live in
-                // `ChainOp` with `locally_validated = 0`; this moves the
-                // row into `LimboChainOp` so the next pass through
-                // `ops_pending_sys_validation` picks it up.
+                // Mirror the warrant dep into the new DhtStore as a limbo op so
+                // `ops_pending_sys_validation` picks it up for validation.
+                // `move_warranted_op_to_limbo` relies on the op already being in
+                // the new DhtStore's `ChainOp` table (cache path), but warrant
+                // deps arrive via the network cascade and only land in the legacy
+                // DHT DB via `copy_cached_op_to_dht`. We therefore insert the op
+                // directly into `LimboChainOp` via `record_incoming_ops`.
+                if let Err(e) = workspace.dht_store.record_incoming_ops(vec![op]).await {
+                    tracing::error!(error = ?e, "Error mirroring warrant dep op into new DhtStore limbo");
+                }
+            }
+            Ok(None) => {
+                // It's in the legacy DHT DB already; the new DhtStore may still
+                // need it — attempt the limbo move in case it was missed earlier.
                 if let Err(e) = workspace
                     .dht_store
                     .move_warranted_op_to_limbo(&action_hash, op_type)
                     .await
                 {
-                    tracing::error!(error = ?e, "Error moving cached warranted op to limbo");
+                    tracing::debug!(error = ?e, "Could not move warranted op to limbo (may already be integrated)");
                 }
-            }
-            Ok(_) => {
-                // It's in the DHT already.
             }
             Err(StateMutationError::OpNotFoundInCache) => {
                 tracing::debug!("Warranted op {} not found in cache", action_hash);
