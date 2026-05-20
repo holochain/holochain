@@ -86,10 +86,12 @@ impl DhtStore<DbRead<Dht>> {
         limit: u32,
     ) -> StateQueryResult<Vec<DhtOpHashed>> {
         let db = self.db();
-        let rows = db.limbo_chain_ops_pending_app_validation(limit).await?;
+        let rows = db
+            .limbo_chain_ops_pending_app_validation_with_action(limit)
+            .await?;
         let mut out = Vec::with_capacity(rows.len());
         for row in rows {
-            out.push(chain_op_from_limbo_row(db, &row).await?);
+            out.push(chain_op_from_joined_row(&row)?);
         }
         Ok(out)
     }
@@ -154,7 +156,9 @@ impl DhtStore<DbRead<Dht>> {
         limit: u32,
     ) -> StateQueryResult<Vec<DhtOpHashed>> {
         let db = self.db();
-        let chain_rows = db.limbo_chain_ops_pending_sys_validation(limit).await?;
+        let chain_rows = db
+            .limbo_chain_ops_pending_sys_validation_with_action(limit)
+            .await?;
         let warrant_rows = db.limbo_warrants_pending_sys_validation(limit).await?;
 
         let mut out: Vec<(i64, i64, DhtOpHashed)> =
@@ -163,7 +167,7 @@ impl DhtStore<DbRead<Dht>> {
         for row in chain_rows {
             let attempts = row.sys_validation_attempts;
             let when_received = row.when_received;
-            let op = chain_op_from_limbo_row(db, &row).await?;
+            let op = chain_op_from_joined_row(&row)?;
             out.push((attempts, when_received, op));
         }
         for row in warrant_rows {
@@ -240,57 +244,78 @@ impl DhtStore<DbWrite<Dht>> {
 #[allow(dead_code)]
 fn _read_only_alias_compiles(_: DhtStoreRead) {}
 
-/// Reconstruct a [`DhtOpHashed`] (`ChainOp` variant) from a `LimboChainOp`
-/// row by fetching the action (and entry when required) from the database.
-async fn chain_op_from_limbo_row(
-    db: &DbRead<Dht>,
-    row: &holochain_data::models::dht::LimboChainOpRow,
+/// Reconstruct a [`DhtOpHashed`] (`ChainOp` variant) from a
+/// [`LimboChainOpJoinedRow`] without any additional database round-trips.
+/// The action and entry blobs are decoded in-process from the joined columns.
+fn chain_op_from_joined_row(
+    row: &holochain_data::dht::LimboChainOpJoinedRow,
 ) -> StateQueryResult<DhtOpHashed> {
+    use holo_hash::{ActionHash, AgentPubKey};
     use holochain_types::action::NewEntryAction;
     use holochain_types::dht_op::{ChainOp, DhtOp};
     use holochain_types::prelude::{RecordEntry, Signature};
-    use holochain_zome_types::action::Action;
-    use holochain_zome_types::dht_v2::to_legacy_signed_action;
+    use holochain_zome_types::action::Action as LegacyAction;
+    use holochain_zome_types::dht_v2::{
+        to_legacy_signed_action, Action, ActionData, ActionHeader, SignedActionHashed,
+    };
     use holochain_zome_types::op::ChainOpType;
+    use holochain_zome_types::prelude::Signature as V2Signature;
 
     let op_type = ChainOpType::try_from(row.op_type).map_err(|n| {
         crate::query::StateQueryError::Other(format!("invalid op_type {n} in LimboChainOp row"))
     })?;
 
-    let action_hash = holo_hash::ActionHash::from_raw_36(row.action_hash.clone());
-    let v2_action = db.get_action(action_hash.clone()).await?.ok_or_else(|| {
+    // Decode the v2 Action from the joined columns.
+    let action_data: ActionData = holochain_serialized_bytes::decode(&row.action_data)
+        .map_err(|e| crate::query::StateQueryError::Other(format!("decode ActionData: {e}")))?;
+    let action_v2 = Action {
+        header: ActionHeader {
+            author: AgentPubKey::from_raw_36(row.action_author.clone()),
+            timestamp: holochain_types::prelude::Timestamp::from_micros(row.action_timestamp),
+            action_seq: row.action_seq as u32,
+            prev_action: row
+                .action_prev_hash
+                .as_ref()
+                .map(|h| ActionHash::from_raw_36(h.clone())),
+        },
+        data: action_data,
+    };
+    let sig_bytes: [u8; 64] = row.action_signature.as_slice().try_into().map_err(|_| {
         crate::query::StateQueryError::Other(format!(
-            "Action {action_hash:?} referenced by LimboChainOp not found"
+            "signature column has {} bytes, expected 64",
+            row.action_signature.len()
         ))
     })?;
+    let action_hash = ActionHash::from_raw_36(row.action_hash.clone());
+    let hashed = holo_hash::HoloHashed::with_pre_hashed(action_v2, action_hash);
+    let v2_signed: SignedActionHashed =
+        SignedActionHashed::with_presigned(hashed, V2Signature(sig_bytes));
 
-    let legacy = to_legacy_signed_action(&v2_action).map_err(|e| {
+    let legacy = to_legacy_signed_action(&v2_signed).map_err(|e| {
         crate::query::StateQueryError::Other(format!("to_legacy_signed_action: {e}"))
     })?;
     let signature: Signature = legacy.signature().clone();
-    let action: Action = legacy.action().clone();
+    let action: LegacyAction = legacy.action().clone();
 
-    // Look up the entry referenced by the given action.
-    //
-    // Returns:
-    //   - `RecordEntry::NA`       — action carries no entry hash
-    //   - `RecordEntry::Present`  — entry found in the database
-    //   - `RecordEntry::Hidden`   — action references a private entry (not stored on this node)
-    //   - `RecordEntry::NotStored`— action references a public entry we don't have locally
-    async fn fetch_entry_for_action(
-        db: &DbRead<Dht>,
-        action: &Action,
-    ) -> StateQueryResult<RecordEntry> {
-        let Some(entry_hash) = action.entry_hash() else {
+    // Decode the optional entry blob from the LEFT JOIN.
+    let decoded_entry: Option<holochain_types::prelude::Entry> = row
+        .entry_blob
+        .as_ref()
+        .map(|blob| {
+            holochain_serialized_bytes::decode(blob)
+                .map_err(|e| crate::query::StateQueryError::Other(format!("decode Entry: {e}")))
+        })
+        .transpose()?;
+
+    // Helper: build RecordEntry from legacy action + decoded entry.
+    let entry_for_action = |action: &LegacyAction| -> StateQueryResult<RecordEntry> {
+        use holochain_zome_types::entry_def::EntryVisibility;
+        if action.entry_hash().is_none() {
             return Ok(RecordEntry::NA);
-        };
-        match db.get_entry(entry_hash.clone(), None).await? {
+        }
+        match decoded_entry.clone() {
             Some(entry) => Ok(RecordEntry::Present(entry)),
             None => {
-                // Entry not in the database. Use the entry type visibility to
-                // distinguish private entries (Hidden) from public ones we
-                // simply don't have yet (NotStored).
-                use holochain_zome_types::entry_def::EntryVisibility;
                 if action.entry_visibility() == Some(&EntryVisibility::Private) {
                     Ok(RecordEntry::Hidden)
                 } else {
@@ -298,43 +323,34 @@ async fn chain_op_from_limbo_row(
                 }
             }
         }
-    }
+    };
 
-    // Look up the entry referenced by an Update action, always returning
-    // `RecordEntry::Present`.
-    async fn fetch_entry_for_update(
-        db: &DbRead<Dht>,
-        update: &holochain_zome_types::action::Update,
-    ) -> StateQueryResult<RecordEntry> {
-        let entry_hash = update.entry_hash.clone();
-        let entry = db
-            .get_entry(entry_hash.clone(), None)
-            .await?
-            .ok_or_else(|| {
-                crate::query::StateQueryError::Other(format!(
-                    "Entry {entry_hash:?} for Update not found"
-                ))
-            })?;
-        Ok(RecordEntry::Present(entry))
-    }
+    // Helper: entry required to be present (Update ops).
+    let entry_for_update =
+        |update: &holochain_zome_types::action::Update| -> StateQueryResult<RecordEntry> {
+            match decoded_entry.clone() {
+                Some(entry) => Ok(RecordEntry::Present(entry)),
+                None => Err(crate::query::StateQueryError::Other(format!(
+                    "Entry {:?} for Update not found",
+                    update.entry_hash
+                ))),
+            }
+        };
 
     let chain_op = match op_type {
         ChainOpType::StoreRecord => {
-            let entry = fetch_entry_for_action(db, &action).await?;
+            let entry = entry_for_action(&action)?;
             ChainOp::StoreRecord(signature, action, entry)
         }
         ChainOpType::StoreEntry => {
             let entry_hash = action.entry_hash().cloned().ok_or_else(|| {
                 crate::query::StateQueryError::Other("StoreEntry action has no entry_hash".into())
             })?;
-            let entry = db
-                .get_entry(entry_hash.clone(), None)
-                .await?
-                .ok_or_else(|| {
-                    crate::query::StateQueryError::Other(format!(
-                        "Entry {entry_hash:?} for StoreEntry not found"
-                    ))
-                })?;
+            let entry = decoded_entry.clone().ok_or_else(|| {
+                crate::query::StateQueryError::Other(format!(
+                    "Entry {entry_hash:?} for StoreEntry not found"
+                ))
+            })?;
             let new_entry_action = NewEntryAction::try_from(action).map_err(|_| {
                 crate::query::StateQueryError::Other(
                     "StoreEntry action is not a Create/Update".into(),
@@ -345,31 +361,31 @@ async fn chain_op_from_limbo_row(
         ChainOpType::RegisterAgentActivity => ChainOp::RegisterAgentActivity(signature, action),
         ChainOpType::RegisterUpdatedContent => {
             let update = match action {
-                Action::Update(u) => u,
+                LegacyAction::Update(u) => u,
                 _ => {
                     return Err(crate::query::StateQueryError::Other(
                         "RegisterUpdatedContent action is not Update".into(),
                     ))
                 }
             };
-            let entry = fetch_entry_for_update(db, &update).await?;
+            let entry = entry_for_update(&update)?;
             ChainOp::RegisterUpdatedContent(signature, update, entry)
         }
         ChainOpType::RegisterUpdatedRecord => {
             let update = match action {
-                Action::Update(u) => u,
+                LegacyAction::Update(u) => u,
                 _ => {
                     return Err(crate::query::StateQueryError::Other(
                         "RegisterUpdatedRecord action is not Update".into(),
                     ))
                 }
             };
-            let entry = fetch_entry_for_update(db, &update).await?;
+            let entry = entry_for_update(&update)?;
             ChainOp::RegisterUpdatedRecord(signature, update, entry)
         }
         ChainOpType::RegisterDeletedEntryAction => {
             let delete = match action {
-                Action::Delete(d) => d,
+                LegacyAction::Delete(d) => d,
                 _ => {
                     return Err(crate::query::StateQueryError::Other(
                         "RegisterDeletedEntryAction action is not Delete".into(),
@@ -380,7 +396,7 @@ async fn chain_op_from_limbo_row(
         }
         ChainOpType::RegisterDeletedBy => {
             let delete = match action {
-                Action::Delete(d) => d,
+                LegacyAction::Delete(d) => d,
                 _ => {
                     return Err(crate::query::StateQueryError::Other(
                         "RegisterDeletedBy action is not Delete".into(),
@@ -391,7 +407,7 @@ async fn chain_op_from_limbo_row(
         }
         ChainOpType::RegisterAddLink => {
             let create_link = match action {
-                Action::CreateLink(c) => c,
+                LegacyAction::CreateLink(c) => c,
                 _ => {
                     return Err(crate::query::StateQueryError::Other(
                         "RegisterAddLink action is not CreateLink".into(),
@@ -402,7 +418,7 @@ async fn chain_op_from_limbo_row(
         }
         ChainOpType::RegisterRemoveLink => {
             let delete_link = match action {
-                Action::DeleteLink(d) => d,
+                LegacyAction::DeleteLink(d) => d,
                 _ => {
                     return Err(crate::query::StateQueryError::Other(
                         "RegisterRemoveLink action is not DeleteLink".into(),
