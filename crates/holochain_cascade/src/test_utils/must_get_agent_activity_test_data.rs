@@ -22,6 +22,7 @@ pub fn create_warrant_op() -> WarrantOp {
                 action_author: author.clone(),
                 action: (fixt!(ActionHash), fixt!(Signature)),
                 chain_op_type: ChainOpType::RegisterAddLink,
+                reason: "invalid chain op".into(),
             }),
             fake_agent_pub_key(1),
             author,

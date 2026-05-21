@@ -898,6 +898,7 @@ impl TestCase {
                             warranted_action.signature.clone(),
                         ),
                         chain_op_type,
+                        reason: "test warrant".into(),
                     },
                 ),
                 issuing_agent.clone(),

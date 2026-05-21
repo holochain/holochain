@@ -528,6 +528,7 @@ mod tests {
                     action_author: fixt!(AgentPubKey),
                     action: (fixt!(ActionHash), fixt!(Signature)),
                     chain_op_type: ChainOpType::RegisterAddLink,
+                    reason: "test warrant".into(),
                 }),
                 agent.clone(),
                 Timestamp::now(),
