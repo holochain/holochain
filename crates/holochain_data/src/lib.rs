@@ -361,12 +361,14 @@ mod tests {
             "Entry",
             "Link",
             "LimboChainOp",
-            "LimboWarrant",
+            "LimboWarrantOp",
             "PrivateEntry",
             "ScheduledFunction",
+            "SliceHash",
             "UpdatedRecord",
             "ValidationReceipt",
             "Warrant",
+            "WarrantOp",
             "WarrantPublish",
         ] {
             assert!(

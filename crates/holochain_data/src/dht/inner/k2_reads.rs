@@ -1,4 +1,5 @@
-//! K2 op-store reads that span the `ChainOp`/`Warrant`/`Action`/`Entry` tables.
+//! K2 op-store reads that span the
+//! `ChainOp`/`Warrant`/`WarrantOp`/`Action`/`Entry` tables.
 //!
 //! These are the cross-table queries Kitsune2's `OpStore` trait expects.
 //! Each `async fn` is generic over `sqlx::Executor` so it can run against a
@@ -7,13 +8,14 @@
 //! All "gossip-shaped" reads (time-slice, ids-since, ops-by-id, presence,
 //! earliest-timestamp) filter `ChainOp.locally_validated = 1` so network-
 //! cached ops are never gossiped or served to peers. Warrants are not
-//! filtered: they always route through `LimboWarrant` validation before
-//! being promoted to `Warrant`, so every row in `Warrant` is locally
-//! validated by construction.
+//! filtered: they always route through `LimboWarrantOp` validation before
+//! being promoted to `WarrantOp`, so every warrant joined against
+//! `WarrantOp` is locally validated by construction.
 //!
-//! `count_integrated_ops` is the exception: it counts every row in both
-//! tables (cache included) to preserve the K2 `query_total_op_count`
-//! semantics of "everything we hold locally".
+//! `count_integrated_ops` counts every integrated op (`ChainOp` +
+//! `WarrantOp`) to preserve the K2 `query_total_op_count` semantics of
+//! "everything we hold locally" (cache included, since the cache mirror
+//! writes into `ChainOp`).
 
 use crate::models::dht::{
     K2ChainOpForWireRow, K2OpHashRow, K2OpIdSinceRow, K2OpPresentRow, K2WarrantForWireRow,
@@ -80,16 +82,17 @@ where
             SELECT
                 Warrant.hash AS op_hash,
                 Warrant.warrantee AS basis_hash,
-                Warrant.serialized_size AS serialized_size,
+                WarrantOp.serialized_size AS serialized_size,
                 Warrant.timestamp AS sort_ts
             FROM Warrant
+            JOIN WarrantOp ON WarrantOp.hash = Warrant.hash
             WHERE
                 (
-                    (? <= ? AND Warrant.storage_center_loc >= ?
-                            AND Warrant.storage_center_loc <= ?)
+                    (? <= ? AND WarrantOp.storage_center_loc >= ?
+                            AND WarrantOp.storage_center_loc <= ?)
                     OR
-                    (? >  ? AND (Warrant.storage_center_loc <= ?
-                              OR Warrant.storage_center_loc >= ?))
+                    (? >  ? AND (WarrantOp.storage_center_loc <= ?
+                              OR WarrantOp.storage_center_loc >= ?))
                 )
                 AND Warrant.timestamp >= ?
                 AND Warrant.timestamp <  ?
@@ -159,18 +162,19 @@ where
             SELECT
                 Warrant.hash AS op_hash,
                 Warrant.warrantee AS basis_hash,
-                Warrant.when_integrated AS when_integrated,
-                Warrant.serialized_size AS serialized_size
+                WarrantOp.when_integrated AS when_integrated,
+                WarrantOp.serialized_size AS serialized_size
             FROM Warrant
+            JOIN WarrantOp ON WarrantOp.hash = Warrant.hash
             WHERE
                 (
-                    (? <= ? AND Warrant.storage_center_loc >= ?
-                            AND Warrant.storage_center_loc <= ?)
+                    (? <= ? AND WarrantOp.storage_center_loc >= ?
+                            AND WarrantOp.storage_center_loc <= ?)
                     OR
-                    (? >  ? AND (Warrant.storage_center_loc <= ?
-                              OR Warrant.storage_center_loc >= ?))
+                    (? >  ? AND (WarrantOp.storage_center_loc <= ?
+                              OR WarrantOp.storage_center_loc >= ?))
                 )
-                AND Warrant.when_integrated >= ?
+                AND WarrantOp.when_integrated >= ?
         )
         ORDER BY when_integrated ASC
         LIMIT ?
@@ -205,7 +209,8 @@ where
 }
 
 /// Return the subset of `hashes` that exist in `ChainOp` (with
-/// `locally_validated = 1`) or in `Warrant`, with their basis hashes.
+/// `locally_validated = 1`) or in `WarrantOp` (integrated warrants), with
+/// their basis hashes.
 pub(crate) async fn check_op_hashes_present<'e, E>(
     executor: E,
     hashes: &[Vec<u8>],
@@ -219,7 +224,8 @@ where
 
     // sqlx doesn't expand `IN (...)` for blob slices directly. Build a
     // UNION ALL across ChainOp (filtered to `locally_validated = 1`) and
-    // Warrant in a single query, parameterising each hash list.
+    // Warrant ⋈ WarrantOp (so we only see integrated warrants), parameterising
+    // each hash list.
     let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new(
         "SELECT hash, basis_hash FROM ChainOp
          WHERE locally_validated = 1 AND hash IN (",
@@ -230,7 +236,13 @@ where
             sep.push_bind(h);
         }
     }
-    qb.push(") UNION ALL SELECT hash, warrantee AS basis_hash FROM Warrant WHERE hash IN (");
+    qb.push(
+        ") UNION ALL
+         SELECT Warrant.hash, Warrant.warrantee AS basis_hash
+         FROM Warrant
+         JOIN WarrantOp ON WarrantOp.hash = Warrant.hash
+         WHERE Warrant.hash IN (",
+    );
     {
         let mut sep = qb.separated(", ");
         for h in hashes {
@@ -289,7 +301,8 @@ where
         .await
 }
 
-/// Fetch full warrant rows for the given op hashes.
+/// Fetch full warrant rows for the given op hashes (integrated warrants
+/// only — joined with `WarrantOp`).
 pub(crate) async fn get_warrants_for_wire<'e, E>(
     executor: E,
     op_hashes: &[Vec<u8>],
@@ -302,8 +315,11 @@ where
     }
 
     let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new(
-        "SELECT hash, author, timestamp, warrantee, proof, signature
-         FROM Warrant WHERE hash IN (",
+        "SELECT Warrant.hash, Warrant.author, Warrant.timestamp,
+                Warrant.warrantee, Warrant.proof, Warrant.signature
+         FROM Warrant
+         JOIN WarrantOp ON WarrantOp.hash = Warrant.hash
+         WHERE Warrant.hash IN (",
     );
     {
         let mut sep = qb.separated(", ");
@@ -319,8 +335,9 @@ where
 }
 
 /// Minimum authored timestamp across both `ChainOp` (joined with `Action`)
-/// and `Warrant`, filtered to `arc` and (for chain ops)
-/// `locally_validated = 1`. `None` when no rows match.
+/// and integrated warrants (`Warrant` joined with `WarrantOp`), filtered
+/// to `arc` and (for chain ops) `locally_validated = 1`. `None` when no
+/// rows match.
 pub(crate) async fn earliest_authored_timestamp_in_arc<'e, E>(
     executor: E,
     arc: ArcBounds,
@@ -346,13 +363,14 @@ where
             UNION ALL
             SELECT Warrant.timestamp AS ts
             FROM Warrant
+            JOIN WarrantOp ON WarrantOp.hash = Warrant.hash
             WHERE
                 (
-                    (? <= ? AND Warrant.storage_center_loc >= ?
-                            AND Warrant.storage_center_loc <= ?)
+                    (? <= ? AND WarrantOp.storage_center_loc >= ?
+                            AND WarrantOp.storage_center_loc <= ?)
                     OR
-                    (? >  ? AND (Warrant.storage_center_loc <= ?
-                              OR Warrant.storage_center_loc >= ?))
+                    (? >  ? AND (WarrantOp.storage_center_loc <= ?
+                              OR WarrantOp.storage_center_loc >= ?))
                 )
         )
     ";
@@ -394,7 +412,7 @@ where
         "SELECT
             (SELECT COUNT(*) FROM ChainOp WHERE when_integrated IS NOT NULL)
             +
-            (SELECT COUNT(*) FROM Warrant)",
+            (SELECT COUNT(*) FROM WarrantOp)",
     )
     .fetch_one(executor)
     .await?;

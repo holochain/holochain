@@ -1,11 +1,16 @@
-//! Free-standing operations against the `LimboWarrant` table.
+//! Free-standing operations against the `Warrant` and `LimboWarrantOp` tables.
+//!
+//! `Warrant` content is inserted alongside `LimboWarrantOp` when a warrant
+//! enters limbo, and stays in place when the op is promoted to `WarrantOp`
+//! at integration time — only the metadata table changes.
 
 use crate::models::dht::LimboWarrantRow;
 use holo_hash::{AgentPubKey, DhtOpHash};
 use holochain_timestamp::Timestamp;
 use sqlx::{Executor, Sqlite, SqliteConnection};
 
-/// Parameters for inserting a row into `LimboWarrant`.
+/// Parameters for inserting a warrant into limbo — content goes into
+/// `Warrant`, op metadata into `LimboWarrantOp`.
 pub struct InsertLimboWarrant<'a> {
     /// DHT op hash (primary key).
     pub hash: &'a DhtOpHash,
@@ -27,18 +32,17 @@ pub struct InsertLimboWarrant<'a> {
     pub serialized_size: u32,
 }
 
-pub(crate) async fn insert_limbo_warrant<'a, 'e, E>(
-    executor: E,
+/// Insert into `Warrant` (content) and `LimboWarrantOp` (op metadata).
+///
+/// The two `INSERT`s must execute atomically; the caller is responsible
+/// for wrapping this call in a transaction.
+pub(crate) async fn insert_limbo_warrant<'a>(
+    conn: &mut SqliteConnection,
     w: InsertLimboWarrant<'a>,
-) -> sqlx::Result<()>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
+) -> sqlx::Result<()> {
     sqlx::query(
-        "INSERT INTO LimboWarrant
-            (hash, author, timestamp, warrantee, proof, signature, storage_center_loc,
-             when_received, serialized_size)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO Warrant (hash, author, timestamp, warrantee, proof, signature)
+         VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind(w.hash.get_raw_36())
     .bind(w.author.get_raw_36())
@@ -46,11 +50,21 @@ where
     .bind(w.warrantee.get_raw_36())
     .bind(w.proof)
     .bind(w.signature)
+    .execute(&mut *conn)
+    .await?;
+
+    sqlx::query(
+        "INSERT INTO LimboWarrantOp
+            (hash, storage_center_loc, when_received, serialized_size)
+         VALUES (?, ?, ?, ?)",
+    )
+    .bind(w.hash.get_raw_36())
     .bind(w.storage_center_loc as i64)
     .bind(w.when_received.as_micros())
     .bind(w.serialized_size as i64)
-    .execute(executor)
+    .execute(&mut *conn)
     .await?;
+
     Ok(())
 }
 
@@ -62,10 +76,13 @@ where
     E: Executor<'e, Database = Sqlite>,
 {
     sqlx::query_as(
-        "SELECT hash, author, timestamp, warrantee, proof, signature, storage_center_loc,
-                sys_validation_status, abandoned_at, when_received,
-                sys_validation_attempts, last_validation_attempt, serialized_size
-         FROM LimboWarrant WHERE hash = ?",
+        "SELECT w.hash, w.author, w.timestamp, w.warrantee, w.proof, w.signature,
+                op.storage_center_loc, op.sys_validation_status, op.abandoned_at,
+                op.when_received, op.sys_validation_attempts, op.last_validation_attempt,
+                op.serialized_size
+         FROM Warrant w
+         JOIN LimboWarrantOp op ON op.hash = w.hash
+         WHERE w.hash = ?",
     )
     .bind(hash.get_raw_36())
     .fetch_optional(executor)
@@ -80,9 +97,14 @@ where
     E: Executor<'e, Database = Sqlite>,
 {
     sqlx::query_as(
-        "SELECT * FROM LimboWarrant
-         WHERE sys_validation_status IS NULL
-         ORDER BY sys_validation_attempts, when_received
+        "SELECT w.hash, w.author, w.timestamp, w.warrantee, w.proof, w.signature,
+                op.storage_center_loc, op.sys_validation_status, op.abandoned_at,
+                op.when_received, op.sys_validation_attempts, op.last_validation_attempt,
+                op.serialized_size
+         FROM Warrant w
+         JOIN LimboWarrantOp op ON op.hash = w.hash
+         WHERE op.sys_validation_status IS NULL
+         ORDER BY op.sys_validation_attempts, op.when_received
          LIMIT ?",
     )
     .bind(limit as i64)
@@ -98,9 +120,14 @@ where
     E: Executor<'e, Database = Sqlite>,
 {
     sqlx::query_as(
-        "SELECT * FROM LimboWarrant
-         WHERE sys_validation_status IN (1, 2)
-         ORDER BY when_received
+        "SELECT w.hash, w.author, w.timestamp, w.warrantee, w.proof, w.signature,
+                op.storage_center_loc, op.sys_validation_status, op.abandoned_at,
+                op.when_received, op.sys_validation_attempts, op.last_validation_attempt,
+                op.serialized_size
+         FROM Warrant w
+         JOIN LimboWarrantOp op ON op.hash = w.hash
+         WHERE op.sys_validation_status IN (1, 2)
+         ORDER BY op.when_received
          LIMIT ?",
     )
     .bind(limit as i64)
@@ -117,7 +144,7 @@ where
     E: Executor<'e, Database = Sqlite>,
 {
     let result = sqlx::query(
-        "UPDATE LimboWarrant SET sys_validation_status = ?
+        "UPDATE LimboWarrantOp SET sys_validation_status = ?
          WHERE hash = ? AND sys_validation_status IS NULL",
     )
     .bind(status)
@@ -127,70 +154,56 @@ where
     Ok(result.rows_affected())
 }
 
-pub(crate) async fn delete_limbo_warrant<'e, E>(executor: E, hash: DhtOpHash) -> sqlx::Result<()>
-where
-    E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query("DELETE FROM LimboWarrant WHERE hash = ?")
+/// Delete a warrant in limbo: removes both the `LimboWarrantOp` row and the
+/// underlying `Warrant` content (the content was inserted alongside the
+/// limbo row and isn't useful without it).
+///
+/// **The caller must wrap this call in a transaction** to keep the two
+/// deletes atomic.
+pub(crate) async fn delete_limbo_warrant(
+    conn: &mut SqliteConnection,
+    hash: DhtOpHash,
+) -> sqlx::Result<()> {
+    sqlx::query("DELETE FROM LimboWarrantOp WHERE hash = ?")
         .bind(hash.get_raw_36())
-        .execute(executor)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query("DELETE FROM Warrant WHERE hash = ?")
+        .bind(hash.get_raw_36())
+        .execute(&mut *conn)
         .await?;
     Ok(())
 }
 
-/// Promote a `LimboWarrant` row to the `Warrant` table.
+/// Promote a warrant from limbo to integrated: copies the `LimboWarrantOp`
+/// row into `WarrantOp` (stamping `when_integrated`) and deletes the limbo
+/// row. The shared `Warrant` content row is left in place.
 ///
-/// Reads the limbo row, inserts into `Warrant` with the carried fields plus
-/// the supplied `when_integrated` timestamp, then deletes the limbo row. All
-/// three statements run on the given connection. **The caller must wrap this
-/// call in a transaction** to ensure atomicity.
-///
-/// `serialized_size` is carried over from the limbo row so K2 can budget bytes
-/// for warrant ops the same way it does for chain ops.
+/// **The caller must wrap this call in a transaction** to ensure atomicity.
 ///
 /// Returns `true` if the limbo row existed and was promoted, `false` if it
 /// did not exist.
 pub(crate) async fn promote_to_warrant(
     conn: &mut SqliteConnection,
     hash: &DhtOpHash,
-    when_integrated: holochain_timestamp::Timestamp,
+    when_integrated: Timestamp,
 ) -> sqlx::Result<bool> {
-    // SELECT the limbo row's payload.
-    let row: Option<LimboWarrantRow> = sqlx::query_as(
-        "SELECT hash, author, timestamp, warrantee, proof, signature, storage_center_loc,
-                sys_validation_status, abandoned_at, when_received,
-                sys_validation_attempts, last_validation_attempt, serialized_size
-         FROM LimboWarrant WHERE hash = ?",
+    let result = sqlx::query(
+        "INSERT INTO WarrantOp (hash, storage_center_loc, when_received,
+                                when_integrated, serialized_size)
+         SELECT hash, storage_center_loc, when_received, ?, serialized_size
+         FROM LimboWarrantOp WHERE hash = ?",
     )
-    .bind(hash.get_raw_36())
-    .fetch_optional(&mut *conn)
-    .await?;
-
-    let limbo = match row {
-        Some(r) => r,
-        None => return Ok(false),
-    };
-
-    // INSERT into Warrant.
-    sqlx::query(
-        "INSERT INTO Warrant (hash, author, timestamp, warrantee, proof, signature,
-                              storage_center_loc, when_integrated, serialized_size)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    )
-    .bind(&limbo.hash)
-    .bind(&limbo.author)
-    .bind(limbo.timestamp)
-    .bind(&limbo.warrantee)
-    .bind(&limbo.proof)
-    .bind(&limbo.signature)
-    .bind(limbo.storage_center_loc)
     .bind(when_integrated.as_micros())
-    .bind(limbo.serialized_size)
+    .bind(hash.get_raw_36())
     .execute(&mut *conn)
     .await?;
 
-    // DELETE the limbo row.
-    sqlx::query("DELETE FROM LimboWarrant WHERE hash = ?")
+    if result.rows_affected() == 0 {
+        return Ok(false);
+    }
+
+    sqlx::query("DELETE FROM LimboWarrantOp WHERE hash = ?")
         .bind(hash.get_raw_36())
         .execute(&mut *conn)
         .await?;

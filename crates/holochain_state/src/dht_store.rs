@@ -372,12 +372,16 @@ impl DhtStore<DbWrite<Dht>> {
         sqlx::query("DELETE FROM DeletedRecord")
             .execute(&mut *tx)
             .await?;
-        // Action and Warrant parents.
+        // Action and Warrant parents (warrant op metadata first, since both
+        // LimboWarrantOp and WarrantOp reference Warrant via FK).
         sqlx::query("DELETE FROM Action").execute(&mut *tx).await?;
-        sqlx::query("DELETE FROM Warrant").execute(&mut *tx).await?;
-        sqlx::query("DELETE FROM LimboWarrant")
+        sqlx::query("DELETE FROM LimboWarrantOp")
             .execute(&mut *tx)
             .await?;
+        sqlx::query("DELETE FROM WarrantOp")
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("DELETE FROM Warrant").execute(&mut *tx).await?;
         // Independent tables.
         sqlx::query("DELETE FROM Entry").execute(&mut *tx).await?;
         sqlx::query("DELETE FROM PrivateEntry")
@@ -599,6 +603,7 @@ impl DhtStore<DbWrite<Dht>> {
                 proof: &proof_bytes,
                 signature: &signature_bytes,
                 storage_center_loc: warrant_op.warrantee.get_loc(),
+                when_received: now,
                 when_integrated: now,
                 serialized_size,
             })

@@ -127,7 +127,9 @@ pub struct LimboChainOpRow {
     pub serialized_size: i64,
 }
 
-/// Row from the `LimboWarrant` table (warrants awaiting validation).
+/// Joined `Warrant` + `LimboWarrantOp` row (a warrant awaiting validation,
+/// with op metadata). The split lives on disk; callers see content and op
+/// fields bundled together for ergonomics.
 #[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
 pub struct LimboWarrantRow {
     /// DHT op hash (primary key).
@@ -215,7 +217,9 @@ pub struct ValidationReceiptRow {
     pub when_received: i64,
 }
 
-/// Row from the `Warrant` table (integrated warrants).
+/// Joined `Warrant` + `WarrantOp` row (an integrated warrant with op
+/// metadata). The split lives on disk; callers see content and op fields
+/// bundled together for ergonomics.
 #[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
 pub struct WarrantRow {
     /// DHT op hash (primary key).
@@ -232,6 +236,8 @@ pub struct WarrantRow {
     pub signature: Vec<u8>,
     /// Numeric storage center derived from the warrantee.
     pub storage_center_loc: i64,
+    /// Microsecond timestamp at which the warrant was received.
+    pub when_received: i64,
     /// Microsecond timestamp at which the warrant was integrated.
     pub when_integrated: i64,
     /// Wire-size of the warrant in bytes.

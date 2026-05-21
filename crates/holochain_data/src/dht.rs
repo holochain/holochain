@@ -686,7 +686,7 @@ mod tests {
             .unwrap()
             .is_empty());
 
-        sqlx::query("UPDATE LimboWarrant SET sys_validation_status = 1 WHERE hash = ?")
+        sqlx::query("UPDATE LimboWarrantOp SET sys_validation_status = 1 WHERE hash = ?")
             .bind(hash.get_raw_36())
             .execute(db.pool())
             .await
@@ -719,6 +719,7 @@ mod tests {
             proof: &[9u8; 32],
             signature: &[8u8; 64],
             storage_center_loc: 88,
+            when_received: Timestamp::from_micros(40),
             when_integrated: Timestamp::from_micros(50),
             serialized_size: 128,
         })
@@ -732,6 +733,7 @@ mod tests {
             .unwrap()
             .expect("missing");
         assert_eq!(row.warrantee, warrantee.get_raw_36().to_vec());
+        assert_eq!(row.when_received, 40);
         assert_eq!(row.when_integrated, 50);
         assert_eq!(row.serialized_size, 128);
 
@@ -865,6 +867,7 @@ mod tests {
             proof: &[0u8; 32],
             signature: &[1u8; 64],
             storage_center_loc: 0,
+            when_received: Timestamp::from_micros(3),
             when_integrated: Timestamp::from_micros(5),
             serialized_size: 64,
         })

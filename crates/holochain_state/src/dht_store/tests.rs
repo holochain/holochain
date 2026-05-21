@@ -136,7 +136,7 @@ async fn purge_all_empties_every_table() {
         ("CapClaim", "SELECT COUNT(*) FROM CapClaim"),
         ("ChainLock", "SELECT COUNT(*) FROM ChainLock"),
         ("LimboChainOp", "SELECT COUNT(*) FROM LimboChainOp"),
-        ("LimboWarrant", "SELECT COUNT(*) FROM LimboWarrant"),
+        ("LimboWarrantOp", "SELECT COUNT(*) FROM LimboWarrantOp"),
         ("ChainOp", "SELECT COUNT(*) FROM ChainOp"),
         ("ChainOpPublish", "SELECT COUNT(*) FROM ChainOpPublish"),
         (
@@ -144,6 +144,7 @@ async fn purge_all_empties_every_table() {
             "SELECT COUNT(*) FROM ValidationReceipt",
         ),
         ("Warrant", "SELECT COUNT(*) FROM Warrant"),
+        ("WarrantOp", "SELECT COUNT(*) FROM WarrantOp"),
         ("WarrantPublish", "SELECT COUNT(*) FROM WarrantPublish"),
         ("Link", "SELECT COUNT(*) FROM Link"),
         ("DeletedLink", "SELECT COUNT(*) FROM DeletedLink"),

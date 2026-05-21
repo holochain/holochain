@@ -6,7 +6,7 @@ The Holochain data storage and validation architecture provides:
 
 1. A single per-DNA database storing both agents' authored [action and entry](./data_model.md) chains and DHT data.
 2. Ops as the unit of validation, with an aggregated validity status for [records](./data_model.md). 
-3. Validation limbo tables (`LimboChainOp`, `LimboWarrant`) to track pending ops from the network, with shared `Action`/`Entry` tables.
+3. Validation limbo tables (`LimboChainOp`, `LimboWarrantOp`) to track pending ops from the network, with shared `Action` and `Warrant` content tables.
 4. Unified data querying across authored, obligated, and cached data in a single database.
 
 ## Architecture
@@ -15,7 +15,7 @@ The Holochain data storage and validation architecture provides:
 
 1. **Ops are the unit of validation**: All validation happens at the op level.
 2. **Records aggregate op validity**: A record's validity is derived from the ops produced from it.
-3. **Validation limbo isolates pending ops**: Unvalidated ops from the network stay in `LimboChainOp` (warrants in `LimboWarrant`) until validated, with actions and entries in shared `Action`/`Entry` tables marked by NULL `record_validity`. Self-authored ops bypass limbo (pre-validated at authoring time) but still go through integration to register in the DHT model.
+3. **Validation limbo isolates pending ops**: Unvalidated ops from the network stay in `LimboChainOp` (warrants in `LimboWarrantOp`) until validated, with actions and entries in shared `Action`/`Entry` tables marked by NULL `record_validity`. Warrant content lives in a shared `Warrant` table across limbo and integrated states. Self-authored ops bypass limbo (pre-validated at authoring time) but still go through integration to register in the DHT model.
 4. **Single database per DNA**: Each DNA cell uses one database for all chain, DHT, and validation data. Private entries are isolated in a dedicated table for access control auditing.
 5. **Unified data storage**: The database serves authored chain data, obligated DHT data, and cached data. Cached data can be distinguished by arc coverage as required.
 6. **Clear state transitions**: Data moves through well-defined states with no ambiguity.
@@ -156,15 +156,24 @@ CREATE TABLE LimboChainOp (
     FOREIGN KEY(action_hash) REFERENCES Action(hash)
 );
 
--- Limbo for DHT warrant ops which are in the process of being validated.
--- Warrants have sys validation only; there is no app validation step.
-CREATE TABLE LimboWarrant (
+-- Warrant content (matches `SignedWarrant` on the wire).
+--
+-- Shared between limbo and integrated states; op-level metadata lives in
+-- `LimboWarrantOp` / `WarrantOp`, parallel to how `Action` is shared
+-- between `LimboChainOp` and `ChainOp`.
+CREATE TABLE Warrant (
     hash      BLOB PRIMARY KEY,
     author    BLOB NOT NULL,
     timestamp INTEGER NOT NULL,
     warrantee BLOB NOT NULL,
     proof     BLOB NOT NULL,  -- Serialized WarrantProof (InvalidChainOp or ChainFork)
-    signature BLOB NOT NULL,  -- Author's signature over the warrant
+    signature BLOB NOT NULL   -- Author's signature over the warrant
+);
+
+-- Op metadata for warrants awaiting validation.
+-- Warrants have sys validation only; there is no app validation step.
+CREATE TABLE LimboWarrantOp (
+    hash BLOB PRIMARY KEY,
 
     -- DHT location (stored at warrantee's agent authority)
     storage_center_loc INTEGER NOT NULL,
@@ -179,7 +188,9 @@ CREATE TABLE LimboWarrant (
     last_validation_attempt INTEGER,
 
     -- Storage tracking
-    serialized_size INTEGER NOT NULL
+    serialized_size INTEGER NOT NULL,
+
+    FOREIGN KEY(hash) REFERENCES Warrant(hash)
 );
 
 -- Integrated DHT chain ops.
@@ -238,27 +249,24 @@ CREATE TABLE ValidationReceipt (
     FOREIGN KEY(op_hash) REFERENCES ChainOp(hash)
 );
 
--- Integrated DHT warrants.
+-- Op metadata for integrated warrants. Content lives in `Warrant`.
 --
 -- Contains both self-authored warrants (inserted directly at authoring time) and
--- network-received warrants (moved from LimboWarrant after validation).
-CREATE TABLE Warrant (
-    hash      BLOB PRIMARY KEY,
-    author    BLOB NOT NULL,
-    timestamp INTEGER NOT NULL,
-    warrantee BLOB NOT NULL,
-    proof     BLOB NOT NULL,  -- Serialized WarrantProof (InvalidChainOp or ChainFork)
-    signature BLOB NOT NULL,  -- Author's signature over the warrant
+-- network-received warrants (moved from LimboWarrantOp after validation).
+CREATE TABLE WarrantOp (
+    hash BLOB PRIMARY KEY,
 
     -- DHT location (stored at warrantee's agent authority)
     storage_center_loc INTEGER NOT NULL,
 
-    -- Timing (set at authoring time for self-authored warrants,
-    -- or when moved out of LimboWarrant for network-received warrants)
+    -- Timing
+    when_received   INTEGER NOT NULL,
     when_integrated INTEGER NOT NULL,
 
-    -- Storage tracking (carried from LimboWarrant or computed at authoring time)
-    serialized_size INTEGER NOT NULL
+    -- Storage tracking
+    serialized_size INTEGER NOT NULL,
+
+    FOREIGN KEY(hash) REFERENCES Warrant(hash)
 );
 
 -- Publishing state for locally authored warrants.
@@ -350,7 +358,7 @@ CREATE TABLE SliceHash (
 
 7. **Removed tables**: `AuthoredChainOp`, `AuthoredWarrantOp`, and the separate authored `Action`/`Entry` tables are removed. Their data is consolidated into the DHT tables.
 
-8. **`Warrant` gains `signature`, `when_integrated`, and `serialized_size`; `LimboWarrant` gains `signature`**: The current implementation stores warrant signatures alongside the serialized warrant. With chain-ops and warrants now sharing the same gossip path through Kitsune2's `OpStore`, warrants need the same first-class columns that `ChainOp` has — a `signature` available without deserializing the proof, plus `when_integrated` for "since" queries and `serialized_size` for storage accounting. `LimboWarrant` carries the signature alongside the warrant content so it survives the move to `Warrant` at integration time.
+8. **Warrant content/op-metadata split**: The current implementation stores warrant content and per-storage metadata together. With chain-ops and warrants both flowing through Kitsune2's `OpStore`, warrants need the same first-class metadata `ChainOp` has — `when_integrated` for "since" queries, `serialized_size` for storage accounting, plus a top-level `signature` so gossip code doesn't deserialize the proof to find it. To keep content (what the wire carries / what's signed) separate from local op state, warrants split into `Warrant` (content) + `LimboWarrantOp` / `WarrantOp` (metadata), parallel to `Action` ⟷ `LimboChainOp` / `ChainOp`. `Warrant` is shared between limbo and integrated states; promotion only moves metadata.
 
 9. **`SliceHash` table for gossip slice cache**: A new table caches the combined hash of integrated op hashes per `(arc_start, arc_end, slice_index)` bucket. Kitsune2 gossip uses these cached hashes to detect divergence between peers without re-scanning the underlying ops on each comparison. `ON CONFLICT REPLACE` lets gossip overwrite a stale entry once it recomputes; nothing else writes to this table.
 
@@ -833,8 +841,9 @@ The incoming DHT ops workflow is the entry point for all DHT ops received from t
        - Set initial state: `sys_validation_status = NULL`, `app_validation_status = NULL`, `when_received = current_timestamp`, `serialized_size = encoded size`, `require_receipt = true`
      - **If warrant op (`DhtOp::WarrantOp`)**:
        - No action or entry insertion (warrants don't have actions)
-       - Insert into `LimboWarrant` with the full warrant content (`hash`, `author`, `timestamp`, `warrantee`, `proof`, `signature`, `storage_center_loc`)
-       - Set initial state: `sys_validation_status = NULL`, `when_received = current_timestamp`, `serialized_size = encoded size`
+       - Insert into `Warrant` with the warrant content (`hash`, `author`, `timestamp`, `warrantee`, `proof`, `signature`)
+       - Insert into `LimboWarrantOp` with the op metadata (`hash`, `storage_center_loc`)
+       - Set initial state on the limbo row: `sys_validation_status = NULL`, `when_received = current_timestamp`, `serialized_size = encoded size`
 
 8. **Trigger Sys Validation**
    - Send trigger to `sys_validation_workflow` queue consumer
@@ -1768,52 +1777,50 @@ TODO: Design how to track and prune cached ops when storage pressure occurs.
 
 ## Warrant Handling
 
-Warrants use parallel limbo and integrated tables to chain ops (`LimboWarrant` → `Warrant`), but with a simpler validation flow: warrants have sys validation only — there is no app validation step.
+Warrants use parallel limbo and integrated op-metadata tables (`LimboWarrantOp` → `WarrantOp`) over a shared `Warrant` content table, with a simpler validation flow than chain ops: warrants have sys validation only — there is no app validation step.
 
 ### Warrant Processing Flow
 
 1. **Incoming DHT Ops Workflow**
    - Warrant op arrives as `DhtOp::WarrantOp(warrant)`
    - Hash verification and counterfeit checks performed
-   - Inserted into `LimboWarrant` (no action or entry insertion)
+   - Warrant content inserted into `Warrant`; op metadata inserted into `LimboWarrantOp` (no action or entry insertion)
 
 2. **Warrant Sys Validation Workflow**
    - Warrant validation depends on warrant type:
 
    **ChainIntegrityWarrant**: Proves an author broke chain rules
-   - Stays in `LimboWarrant` until the warranted action is fetched and validated
+   - Stays in `LimboWarrantOp` until the warranted action is fetched and validated
    - If warranted action is rejected: warrant is accepted (proves the claim)
    - If warranted action is accepted: warrant is rejected (false claim)
 
    **ChainForkWarrant**: Proves an author has forked their chain
-   - Stays in `LimboWarrant` until both forked actions are fetched and checked
+   - Stays in `LimboWarrantOp` until both forked actions are fetched and checked
    - If both forked actions are at the same sequence number: warrant is accepted (proves fork)
    - If the forked actions do not match the fork condition: warrant is rejected (false claim)
 
-   After validation, update `LimboWarrant.sys_validation_status` to `0` (accepted) or `1` (rejected).
+   After validation, update `LimboWarrantOp.sys_validation_status` to `1` (accepted) or `2` (rejected).
 
 3. **Warrant Integration Workflow**
-   - Query `LimboWarrant` for ops with a terminal state:
+   - Query `LimboWarrantOp` (joined to `Warrant` if content fields are needed) for ops with a terminal state:
    ```sql
-   SELECT * FROM LimboWarrant
+   SELECT * FROM LimboWarrantOp
    WHERE abandoned_at IS NOT NULL
       OR sys_validation_status IN (1, 2)
    ORDER BY when_received
    ```
-   - For accepted warrants, insert into `Warrant`:
+   - For accepted warrants, insert into `WarrantOp` (content already in `Warrant`):
    ```sql
-   INSERT INTO Warrant (
-       hash, author, timestamp, warrantee, proof, signature,
-       storage_center_loc, when_integrated, serialized_size
+   INSERT INTO WarrantOp (
+       hash, storage_center_loc, when_received, when_integrated, serialized_size
    )
    SELECT
-       hash, author, timestamp, warrantee, proof, signature,
-       storage_center_loc, unixepoch(), serialized_size
-   FROM LimboWarrant
+       hash, storage_center_loc, when_received, unixepoch(), serialized_size
+   FROM LimboWarrantOp
    WHERE hash = :warrant_hash
      AND sys_validation_status = 1
    ```
-   - Delete from `LimboWarrant` and commit.
+   - Delete from `LimboWarrantOp` and commit. `Warrant` content stays put.
 
 ### Warrant Query Patterns
 
@@ -1839,8 +1846,8 @@ SELECT EXISTS(
 
 The system maintains these invariants:
 
-1. **No chain op exists in both `LimboChainOp` and `ChainOp` simultaneously; no warrant exists in both `LimboWarrant` and `Warrant` simultaneously**
-2. **Self-authored ops are never in limbo**: They are inserted directly into `ChainOp`/`Warrant` at authoring time, but still go through integration to populate index tables
+1. **No chain op exists in both `LimboChainOp` and `ChainOp` simultaneously; no warrant op exists in both `LimboWarrantOp` and `WarrantOp` simultaneously** (the shared `Warrant` content row is always referenced by exactly one of them while the warrant is pending or integrated)
+2. **Self-authored ops are never in limbo**: They are inserted directly into `ChainOp`/`WarrantOp` at authoring time, but still go through integration to populate index tables
 3. **Every `ChainOp` has a definite `validation_status` (never `NULL`)**
 4. **`Action.record_validity` is `1` for self-authored records, `NULL` for pending network-received records, `1` (accepted) or `2` (rejected) after integration**
 5. **Network-received ops are moved from limbo to integrated tables atomically with `record_validity` updates**

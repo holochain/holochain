@@ -1,4 +1,4 @@
-//! `DbRead<Dht>` / `DbWrite<Dht>` API for the `Warrant` table.
+//! `DbRead<Dht>` / `DbWrite<Dht>` API for the `Warrant` + `WarrantOp` tables.
 
 use super::super::inner::warrant::{self, InsertWarrant};
 use crate::handles::{DbRead, DbWrite};
@@ -7,8 +7,12 @@ use crate::models::dht::WarrantRow;
 use holo_hash::{AgentPubKey, DhtOpHash};
 
 impl DbWrite<Dht> {
+    /// Insert an integrated warrant atomically into `Warrant` + `WarrantOp`.
     pub async fn insert_warrant(&self, w: InsertWarrant<'_>) -> sqlx::Result<()> {
-        warrant::insert_warrant(self.pool(), w).await
+        let mut tx = self.begin().await?;
+        warrant::insert_warrant(tx.conn_mut(), w).await?;
+        tx.commit().await?;
+        Ok(())
     }
 }
 

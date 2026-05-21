@@ -15,9 +15,9 @@
 --   Index tables (Link, DeletedLink, UpdatedRecord, DeletedRecord) cascade on
 --   delete of the referenced Action — the index is derivative and must follow
 --   the parent. All other FKs (CapGrant, LimboChainOp, ChainOp, ChainOpPublish,
---   ValidationReceipt, WarrantPublish) intentionally do NOT cascade: deletes
---   must be done explicitly by workflow code, so accidental loss of first-class
---   state can't happen via parent removal.
+--   ValidationReceipt, LimboWarrantOp, WarrantOp, WarrantPublish) intentionally
+--   do NOT cascade: deletes must be done explicitly by workflow code, so
+--   accidental loss of first-class state can't happen via parent removal.
 
 -- Actions: both self-authored and network-received.
 CREATE TABLE Action (
@@ -99,14 +99,23 @@ CREATE TABLE LimboChainOp (
     FOREIGN KEY(action_hash) REFERENCES Action(hash)
 ) STRICT, WITHOUT ROWID;
 
--- Limbo for network-received warrants awaiting validation.
-CREATE TABLE LimboWarrant (
+-- Warrant content (matches `SignedWarrant` on the wire).
+--
+-- Shared between limbo and integrated states; op-level metadata lives in
+-- `LimboWarrantOp` / `WarrantOp`. This mirrors the way `Action` is shared
+-- between `LimboChainOp` and `ChainOp`.
+CREATE TABLE Warrant (
+    hash      BLOB    PRIMARY KEY ON CONFLICT IGNORE,
+    author    BLOB    NOT NULL,
+    timestamp INTEGER NOT NULL,
+    warrantee BLOB    NOT NULL,
+    proof     BLOB    NOT NULL,
+    signature BLOB    NOT NULL
+) STRICT, WITHOUT ROWID;
+
+-- Op metadata for network-received warrants awaiting validation.
+CREATE TABLE LimboWarrantOp (
     hash                    BLOB    PRIMARY KEY ON CONFLICT IGNORE,
-    author                  BLOB    NOT NULL,
-    timestamp               INTEGER NOT NULL,
-    warrantee               BLOB    NOT NULL,
-    proof                   BLOB    NOT NULL,
-    signature               BLOB    NOT NULL,
 
     storage_center_loc      INTEGER NOT NULL,
 
@@ -117,7 +126,9 @@ CREATE TABLE LimboWarrant (
     sys_validation_attempts INTEGER NOT NULL DEFAULT 0,
     last_validation_attempt INTEGER,
 
-    serialized_size         INTEGER NOT NULL
+    serialized_size         INTEGER NOT NULL,
+
+    FOREIGN KEY(hash) REFERENCES Warrant(hash)
 ) STRICT, WITHOUT ROWID;
 
 -- Integrated chain ops.
@@ -161,17 +172,14 @@ CREATE TABLE ValidationReceipt (
     FOREIGN KEY(op_hash) REFERENCES ChainOp(hash)
 ) STRICT, WITHOUT ROWID;
 
--- Integrated warrants.
-CREATE TABLE Warrant (
+-- Op metadata for integrated warrants. Content lives in `Warrant`.
+CREATE TABLE WarrantOp (
     hash               BLOB    PRIMARY KEY ON CONFLICT IGNORE,
-    author             BLOB    NOT NULL,
-    timestamp          INTEGER NOT NULL,
-    warrantee          BLOB    NOT NULL,
-    proof              BLOB    NOT NULL,
-    signature          BLOB    NOT NULL,
     storage_center_loc INTEGER NOT NULL,
+    when_received      INTEGER NOT NULL,
     when_integrated    INTEGER NOT NULL,
-    serialized_size    INTEGER NOT NULL
+    serialized_size    INTEGER NOT NULL,
+    FOREIGN KEY(hash) REFERENCES Warrant(hash)
 ) STRICT, WITHOUT ROWID;
 
 -- Publish state for self-authored warrants.
