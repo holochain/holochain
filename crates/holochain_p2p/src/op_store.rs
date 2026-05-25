@@ -6,7 +6,15 @@
 //! and out of the row shapes returned by the store. Wire bytes for chain
 //! ops are built by converting the stored v2 `SignedAction` back to the
 //! legacy form via `holochain_zome_types::dht_v2::to_legacy_signed_action`
-//! and encoding the resulting `DhtOp`.
+//! and encoding the resulting `DhtOp`. The wire stays the legacy `DhtOp`
+//! encoding so gossip interoperates with peers that have not moved to the
+//! v2 model; the v2 database is bridged to it here rather than changing the
+//! network format.
+//!
+//! Op ids are always built from the hash and basis bytes already stored in
+//! the database, never by re-hashing a reconstructed op: the v2→legacy
+//! conversion is lossy, so a rehash could disagree with the stored id (and
+//! hashing every op on every read is needless work).
 
 use bytes::{Bytes, BytesMut};
 use futures::future::BoxFuture;
@@ -157,7 +165,7 @@ impl OpStore for HolochainOpStore {
         Box::pin(async move {
             let rows = self
                 .store
-                .k2_op_hashes_in_time_slice(arc_start, arc_end, start_t, end_t)
+                .op_hashes_in_time_slice(arc_start, arc_end, start_t, end_t)
                 .await
                 .map_err(|e| K2Error::other_src("Failed to retrieve op hashes in time slice", e))?;
             let mut out = Vec::with_capacity(rows.len());
@@ -188,20 +196,21 @@ impl OpStore for HolochainOpStore {
             if raw_hashes.is_empty() {
                 return Ok(Vec::new());
             }
-            let chain_rows = self
-                .store
-                .k2_get_chain_ops_for_wire(&raw_hashes)
-                .await
-                .map_err(|e| K2Error::other_src("Failed to retrieve chain ops", e))?;
-            let warrant_rows = self
-                .store
-                .k2_get_warrants_for_wire(&raw_hashes)
-                .await
-                .map_err(|e| K2Error::other_src("Failed to retrieve warrants", e))?;
+            // Chain ops and warrants live in disjoint tables, so fetch both
+            // sets concurrently.
+            let (chain_rows, warrant_rows) = futures::future::try_join(
+                self.store.get_chain_ops_for_wire(&raw_hashes),
+                self.store.get_warrants_for_wire(&raw_hashes),
+            )
+            .await
+            .map_err(|e| K2Error::other_src("Failed to retrieve ops", e))?;
 
             let mut out = Vec::with_capacity(chain_rows.len() + warrant_rows.len());
 
             for row in chain_rows {
+                // The op id comes from the stored hash + basis, not a rehash
+                // of the reconstructed (lossy) legacy op.
+                let op_id = k2_op_id_from_raw(&row.op_hash, &row.basis_hash);
                 let op = match build_chain_dht_op(row) {
                     Ok(op) => op,
                     Err(e) => {
@@ -209,8 +218,6 @@ impl OpStore for HolochainOpStore {
                         continue;
                     }
                 };
-                let dht_op_hash = DhtOpHashed::from_content_sync(op.clone()).hash;
-                let op_id = dht_op_hash.to_located_k2_op_id(&op.dht_basis());
                 let op_data =
                     encode(&op).map_err(|e| K2Error::other_src("Failed to encode chain op", e))?;
                 out.push(MetaOp {
@@ -220,6 +227,8 @@ impl OpStore for HolochainOpStore {
             }
 
             for row in warrant_rows {
+                // Warrant op id = (warrant hash, warrantee basis), both stored.
+                let op_id = k2_op_id_from_raw(&row.hash, &row.warrantee);
                 let op = match build_warrant_dht_op(row) {
                     Ok(op) => op,
                     Err(e) => {
@@ -227,8 +236,6 @@ impl OpStore for HolochainOpStore {
                         continue;
                     }
                 };
-                let dht_op_hash = DhtOpHashed::from_content_sync(op.clone()).hash;
-                let op_id = dht_op_hash.to_located_k2_op_id(&op.dht_basis());
                 let op_data = encode(&op)
                     .map_err(|e| K2Error::other_src("Failed to encode warrant op", e))?;
                 out.push(MetaOp {
@@ -262,7 +269,7 @@ impl OpStore for HolochainOpStore {
             }
             let rows = self
                 .store
-                .k2_check_op_hashes_present(&raw_hashes)
+                .check_op_hashes_present(&raw_hashes)
                 .await
                 .map_err(|e| K2Error::other_src("Failed to filter out existing ops", e))?;
             for row in rows {
@@ -297,7 +304,7 @@ impl OpStore for HolochainOpStore {
                     holochain_timestamp::Timestamp::from_micros(latest_timestamp.as_micros());
                 let rows = self
                     .store
-                    .k2_op_ids_since_time_batch(arc_start, arc_end, cursor_t, 500)
+                    .op_ids_since_time_batch(arc_start, arc_end, cursor_t, 500)
                     .await
                     .map_err(|e| K2Error::other_src("Failed to retrieve op ids bounded", e))?;
                 let ops_size_before = out.len();
@@ -329,7 +336,7 @@ impl OpStore for HolochainOpStore {
         Box::pin(async move {
             let opt = self
                 .store
-                .k2_earliest_authored_timestamp_in_arc(arc_start, arc_end)
+                .earliest_authored_timestamp_in_arc(arc_start, arc_end)
                 .await
                 .map_err(|e| {
                     K2Error::other_src("Failed to retrieve earliest timestamp in arc", e)
@@ -341,7 +348,7 @@ impl OpStore for HolochainOpStore {
     fn query_total_op_count(&self) -> BoxFuture<'_, K2Result<u64>> {
         Box::pin(async move {
             self.store
-                .k2_total_integrated_op_count()
+                .total_integrated_op_count()
                 .await
                 .map_err(|e| K2Error::other_src("Failed to query total op count", e))
         })

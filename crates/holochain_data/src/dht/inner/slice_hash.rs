@@ -31,11 +31,15 @@ where
     Ok(())
 }
 
-/// Highest stored slice index for the arc, or 0 if no rows exist.
+/// Number of stored slices for the arc, or 0 if none.
 ///
-/// Note: this preserves the K2 contract semantic ("recent count" = max
-/// index + 1, treated as a high-water mark) rather than `COUNT(*)`.
-pub(crate) async fn max_slice_index<'e, E>(
+/// K2 assigns slice indices consecutively from 0, so the count is the
+/// highest stored index + 1. This matches the kitsune2 reference op-store,
+/// which returns `highest_stored_id + 1`. A plain `MAX(slice_index)` would
+/// undercount by one and could not tell "no slices" apart from "one slice
+/// at index 0", so read the nullable `MAX` and add one only when a row
+/// exists.
+pub(crate) async fn slice_hash_count<'e, E>(
     executor: E,
     arc_start: u32,
     arc_end: u32,
@@ -43,15 +47,15 @@ pub(crate) async fn max_slice_index<'e, E>(
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    let (n,): (i64,) = sqlx::query_as(
-        "SELECT COALESCE(MAX(slice_index), 0) FROM SliceHash
+    let (max_index,): (Option<i64>,) = sqlx::query_as(
+        "SELECT MAX(slice_index) FROM SliceHash
          WHERE arc_start = ? AND arc_end = ?",
     )
     .bind(arc_start as i64)
     .bind(arc_end as i64)
     .fetch_one(executor)
     .await?;
-    Ok(n.max(0) as u64)
+    Ok(max_index.map_or(0, |m| m.max(0) as u64 + 1))
 }
 
 /// Fetch a single stored slice hash, if any.

@@ -19,9 +19,9 @@ impl DbWrite<Dht> {
 }
 
 impl DbRead<Dht> {
-    /// Highest stored slice index for the arc, or 0 if none.
-    pub async fn max_slice_index(&self, arc_start: u32, arc_end: u32) -> sqlx::Result<u64> {
-        slice_hash::max_slice_index(self.pool(), arc_start, arc_end).await
+    /// Number of stored slices for the arc, or 0 if none.
+    pub async fn slice_hash_count(&self, arc_start: u32, arc_end: u32) -> sqlx::Result<u64> {
+        slice_hash::slice_hash_count(self.pool(), arc_start, arc_end).await
     }
 
     /// Single slice hash, if any.

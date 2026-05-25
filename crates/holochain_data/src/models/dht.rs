@@ -334,7 +334,8 @@ pub struct K2OpPresentRow {
     pub basis_hash: Vec<u8>,
 }
 
-/// Joined `ChainOp ⋈ Action LEFT JOIN Entry` row for full op rendering.
+/// `ChainOp` joined with `Action`, left-joined with `Entry`, for full op
+/// rendering.
 ///
 /// `entry_blob` is `Some` only when the action carries a public entry that
 /// has arrived locally.

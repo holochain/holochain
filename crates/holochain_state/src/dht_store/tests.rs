@@ -154,6 +154,7 @@ async fn purge_all_empties_every_table() {
             "ScheduledFunction",
             "SELECT COUNT(*) FROM ScheduledFunction",
         ),
+        ("SliceHash", "SELECT COUNT(*) FROM SliceHash"),
     ] {
         let count: i64 = sqlx::query_scalar(sql).fetch_one(pool).await.unwrap();
         assert_eq!(count, 0, "{table} not empty after purge_all");

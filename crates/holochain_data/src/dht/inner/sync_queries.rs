@@ -1,21 +1,24 @@
 //! K2 op-store reads that span the
-//! `ChainOp`/`Warrant`/`WarrantOp`/`Action`/`Entry` tables.
+//! `Action`/`Entry`/`ChainOp`/`Warrant`/`WarrantOp` tables.
 //!
 //! These are the cross-table queries Kitsune2's `OpStore` trait expects.
 //! Each `async fn` is generic over `sqlx::Executor` so it can run against a
 //! pool (`DbRead`/`DbWrite`) or a transaction (`TxRead`/`TxWrite`).
 //!
-//! All "gossip-shaped" reads (time-slice, ids-since, ops-by-id, presence,
+//! Reads that *serve* ops to peers (time-slice, ids-since, ops-for-wire,
 //! earliest-timestamp) filter `ChainOp.locally_validated = 1` so network-
-//! cached ops are never gossiped or served to peers. Warrants are not
-//! filtered: they always route through `LimboWarrantOp` validation before
-//! being promoted to `WarrantOp`, so every warrant joined against
-//! `WarrantOp` is locally validated by construction.
+//! cached ops are never gossiped. Warrants need no such filter: they always
+//! route through `LimboWarrantOp` validation before being promoted to
+//! `WarrantOp`, so every warrant joined against `WarrantOp` is locally
+//! validated by construction.
+//!
+//! `check_op_hashes_present` is the exception: it answers "do we already
+//! hold this op, at any stage?" so the fetch logic never re-requests ops
+//! that are sitting in limbo or the cache. It matches the limbo and
+//! integrated tables alike, with no `locally_validated` filter.
 //!
 //! `count_integrated_ops` counts every integrated op (`ChainOp` +
-//! `WarrantOp`) to preserve the K2 `query_total_op_count` semantics of
-//! "everything we hold locally" (cache included, since the cache mirror
-//! writes into `ChainOp`).
+//! `WarrantOp`) to report the total observed DHT size.
 
 use crate::models::dht::{
     K2ChainOpForWireRow, K2OpHashRow, K2OpIdSinceRow, K2OpPresentRow, K2WarrantForWireRow,
@@ -208,9 +211,15 @@ where
         .await
 }
 
-/// Return the subset of `hashes` that exist in `ChainOp` (with
-/// `locally_validated = 1`) or in `WarrantOp` (integrated warrants), with
-/// their basis hashes.
+/// Return the subset of `hashes` we already hold locally, with their basis
+/// hashes — used to decide which ops still need fetching from peers.
+///
+/// "Hold locally" means present at *any* stage: a chain op in `LimboChainOp`
+/// (awaiting validation) or `ChainOp` (integrated or cache-mirrored), or a
+/// warrant whose content row exists in `Warrant` (which by invariant implies
+/// a `LimboWarrantOp` or `WarrantOp` row). There is deliberately no
+/// `locally_validated` filter: an op we are still validating is one we
+/// should not re-request.
 pub(crate) async fn check_op_hashes_present<'e, E>(
     executor: E,
     hashes: &[Vec<u8>],
@@ -222,13 +231,20 @@ where
         return Ok(Vec::new());
     }
 
-    // sqlx doesn't expand `IN (...)` for blob slices directly. Build a
-    // UNION ALL across ChainOp (filtered to `locally_validated = 1`) and
-    // Warrant ⋈ WarrantOp (so we only see integrated warrants), parameterising
-    // each hash list.
-    let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new(
-        "SELECT hash, basis_hash FROM ChainOp
-         WHERE locally_validated = 1 AND hash IN (",
+    // sqlx doesn't expand `IN (...)` for blob slices directly, so build the
+    // UNION across the limbo + integrated chain-op tables and the shared
+    // warrant content table, binding each hash list in turn.
+    let mut qb: QueryBuilder<Sqlite> =
+        QueryBuilder::new("SELECT hash, basis_hash FROM LimboChainOp WHERE hash IN (");
+    {
+        let mut sep = qb.separated(", ");
+        for h in hashes {
+            sep.push_bind(h);
+        }
+    }
+    qb.push(
+        ") UNION
+         SELECT hash, basis_hash FROM ChainOp WHERE hash IN (",
     );
     {
         let mut sep = qb.separated(", ");
@@ -237,11 +253,8 @@ where
         }
     }
     qb.push(
-        ") UNION ALL
-         SELECT Warrant.hash, Warrant.warrantee AS basis_hash
-         FROM Warrant
-         JOIN WarrantOp ON WarrantOp.hash = Warrant.hash
-         WHERE Warrant.hash IN (",
+        ") UNION
+         SELECT hash, warrantee AS basis_hash FROM Warrant WHERE hash IN (",
     );
     {
         let mut sep = qb.separated(", ");
@@ -358,7 +371,6 @@ where
                     (? >  ? AND (ChainOp.storage_center_loc <= ?
                               OR ChainOp.storage_center_loc >= ?))
                 )
-                AND ChainOp.when_integrated IS NOT NULL
                 AND ChainOp.locally_validated = 1
             UNION ALL
             SELECT Warrant.timestamp AS ts
@@ -401,16 +413,14 @@ where
 }
 
 /// Total count of every integrated op + warrant in this DHT store, with no
-/// `locally_validated` filter. Preserves the K2 `query_total_op_count`
-/// semantics of "everything we hold locally" (cache included, since the
-/// cache mirror writes into `ChainOp`).
+/// `locally_validated` filter — the total observed DHT size.
 pub(crate) async fn count_integrated_ops<'e, E>(executor: E) -> sqlx::Result<i64>
 where
     E: Executor<'e, Database = Sqlite>,
 {
     let (n,): (i64,) = sqlx::query_as(
         "SELECT
-            (SELECT COUNT(*) FROM ChainOp WHERE when_integrated IS NOT NULL)
+            (SELECT COUNT(*) FROM ChainOp)
             +
             (SELECT COUNT(*) FROM WarrantOp)",
     )

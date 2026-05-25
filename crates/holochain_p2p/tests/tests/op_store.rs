@@ -150,14 +150,9 @@ fn test_dht_op(authored_timestamp: Timestamp) -> DhtOpHashed {
 
 /// Move the supplied chain ops from limbo into the integrated table.
 ///
-/// `record_incoming_ops` parks each op in `LimboChainOp` with NULL
-/// validation statuses; `integrate_ready_ops` only promotes rows that have
-/// gone through the validation workflows. For tests that need integrated
-/// rows without exercising validation, this helper flips sys+app to
-/// `Accepted` then triggers integration. To preserve the
-/// distinct-per-op `when_integrated` cursor the K2 "since" paging loop
-/// expects, each op is integrated in its own call with a monotonically
-/// increasing timestamp.
+/// Flips sys+app validation to `Accepted` and integrates each op in its own
+/// call with a monotonically increasing `when_integrated` (`(i + 1) * 100`),
+/// so the K2 "since" paging cursor sees a distinct timestamp per op.
 async fn set_all_integrated(store: &DhtStore, op_hashes: &[DhtOpHash]) {
     for (i, hash) in op_hashes.iter().enumerate() {
         store
@@ -231,7 +226,7 @@ async fn retrieve_ops_does_not_panic_with_too_short_op_ids() {
 
 #[tokio::test]
 async fn filter_out_existing_ops() {
-    let (store, op_store) = setup_test().await;
+    let (_store, op_store) = setup_test().await;
 
     let dht_op_1 = test_dht_op(Timestamp::now());
     let dht_op_2 = test_dht_op(Timestamp::now());
@@ -244,14 +239,9 @@ async fn filter_out_existing_ops() {
         .await
         .unwrap();
 
-    // `filter_out_existing_ops` consults `ChainOp` (integrated), so we
-    // need to drive the ops through validation+integration first.
-    set_all_integrated(
-        &store,
-        &[dht_op_1.as_hash().clone(), dht_op_2.as_hash().clone()],
-    )
-    .await;
-
+    // `filter_out_existing_ops` reports ops we hold at *any* stage, so ops
+    // sitting in limbo (still awaiting validation) already count as present
+    // and must not be re-fetched — no integration step needed here.
     let to_check = vec![
         dht_op_1
             .as_hash()
@@ -407,13 +397,10 @@ async fn retrieve_op_ids_bounded() {
     let op_hashes: Vec<_> = dht_ops.iter().map(|o| o.as_hash().clone()).collect();
     set_all_integrated(&store, &op_hashes).await;
 
-    // Get everything. NOTE: with the new schema, `retrieve_op_ids_bounded`
-    // orders by `when_integrated` (set by `set_all_integrated` to "now"
-    // for every op in a single call), so the per-op timestamp distinction
-    // the old test relied on is collapsed. We still expect every op to
-    // come back; size still matches; the returned cursor advances to the
-    // shared `when_integrated`.
-    let (hashes, size, _timestamp) = op_store
+    // Get everything. Ops are returned ordered by `when_integrated`, which
+    // `set_all_integrated` assigned as `(i + 1) * 100`, so the cursor
+    // advances to the last op's integration time (1500 * 100).
+    let (hashes, size, timestamp) = op_store
         .retrieve_op_ids_bounded(
             DhtArc::FULL,
             kitsune2_api::Timestamp::from_micros(0),
@@ -426,12 +413,13 @@ async fn retrieve_op_ids_bounded() {
         encoded_ops.iter().map(|b| b.len()).sum::<usize>() as u32,
         size
     );
+    assert_eq!(kitsune2_api::Timestamp::from_micros(150000), timestamp);
 
-    // Retrieve, bounded by the size of the first 750 ops. Since every op
-    // shares the same `when_integrated`, the loop returns up to the bound
-    // and stops; we should see roughly the first 750 by byte budget.
+    // Bound the byte budget to the first 750 ops. The loop stops once the
+    // budget is hit, so the cursor lands on the 750th op's integration time
+    // (750 * 100).
     let bounded_size = encoded_ops.iter().take(750).map(|b| b.len()).sum::<usize>() as u32;
-    let (hashes, size, _timestamp) = op_store
+    let (hashes, size, timestamp) = op_store
         .retrieve_op_ids_bounded(
             DhtArc::FULL,
             kitsune2_api::Timestamp::from_micros(0),
@@ -441,6 +429,7 @@ async fn retrieve_op_ids_bounded() {
         .unwrap();
     assert_eq!(750, hashes.len());
     assert_eq!(bounded_size, size);
+    assert_eq!(kitsune2_api::Timestamp::from_micros(75000), timestamp);
 }
 
 #[tokio::test]
@@ -473,18 +462,18 @@ async fn create_and_read_slice_hashes() {
 async fn count_slice_hashes() {
     let (_, op_store) = setup_test().await;
 
-    op_store
-        .store_slice_hash(DhtArc::Arc(0, 100), 5, Bytes::from_static(b"hash-a"))
-        .await
-        .unwrap();
+    // K2 assigns slice indices consecutively from 0, so the count is the
+    // highest stored index + 1. Three slices (0, 1, 2) in one arc; one
+    // slice (0) in another.
+    for index in 0..3 {
+        op_store
+            .store_slice_hash(DhtArc::Arc(0, 100), index, Bytes::from_static(b"hash"))
+            .await
+            .unwrap();
+    }
 
     op_store
-        .store_slice_hash(DhtArc::Arc(0, 100), 6, Bytes::from_static(b"hash-b"))
-        .await
-        .unwrap();
-
-    op_store
-        .store_slice_hash(DhtArc::Arc(0, 101), 5, Bytes::from_static(b"hash-c"))
+        .store_slice_hash(DhtArc::Arc(0, 101), 0, Bytes::from_static(b"hash-other"))
         .await
         .unwrap();
 
@@ -492,14 +481,20 @@ async fn count_slice_hashes() {
         .slice_hash_count(DhtArc::Arc(0, 100))
         .await
         .unwrap();
-    // The "count" is the highest stored slice index, not the literal count
-    assert_eq!(6, count);
+    assert_eq!(3, count);
 
     let count = op_store
         .slice_hash_count(DhtArc::Arc(0, 101))
         .await
         .unwrap();
-    assert_eq!(5, count);
+    assert_eq!(1, count);
+
+    // An arc with no stored slices counts as zero.
+    let count = op_store
+        .slice_hash_count(DhtArc::Arc(0, 102))
+        .await
+        .unwrap();
+    assert_eq!(0, count);
 }
 
 #[tokio::test]
@@ -547,23 +542,25 @@ async fn overwrite_slice_hashes() {
     let (_, op_store) = setup_test().await;
 
     op_store
-        .store_slice_hash(DhtArc::Arc(0, 100), 5, Bytes::from_static(b"hash-a"))
+        .store_slice_hash(DhtArc::Arc(0, 100), 0, Bytes::from_static(b"hash-a"))
         .await
         .unwrap();
 
     op_store
-        .store_slice_hash(DhtArc::Arc(0, 100), 5, Bytes::from_static(b"hash-b"))
+        .store_slice_hash(DhtArc::Arc(0, 100), 0, Bytes::from_static(b"hash-b"))
         .await
         .unwrap();
 
+    // Re-storing the same index overwrites rather than adding a row, so the
+    // count stays at one.
     let count = op_store
         .slice_hash_count(DhtArc::Arc(0, 100))
         .await
         .unwrap();
-    assert_eq!(5, count);
+    assert_eq!(1, count);
 
     let hash = op_store
-        .retrieve_slice_hash(DhtArc::Arc(0, 100), 5)
+        .retrieve_slice_hash(DhtArc::Arc(0, 100), 0)
         .await
         .unwrap();
     assert_eq!(Some(Bytes::from_static(b"hash-b")), hash);

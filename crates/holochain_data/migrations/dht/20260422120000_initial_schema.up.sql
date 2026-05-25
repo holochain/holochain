@@ -234,7 +234,7 @@ CREATE TABLE ScheduledFunction (
     PRIMARY KEY (author, zome_name, scheduled_fn) ON CONFLICT ROLLBACK
 ) STRICT, WITHOUT ROWID;
 
--- K2 slice-hash cache: one row per (arc, slice_index). Storing a
+-- K2 slice-hashes: one row per (arc, slice_index). Storing a
 -- slice hash replaces any prior value at the same key (gossip may
 -- re-compute and re-store after detecting divergence).
 CREATE TABLE SliceHash (
