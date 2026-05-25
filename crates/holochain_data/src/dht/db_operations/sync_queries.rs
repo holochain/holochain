@@ -50,8 +50,8 @@ impl DbRead<Dht> {
         .await
     }
 
-    /// Subset of `op_hashes` we already hold locally, at any stage, with
-    /// their basis hashes.
+    /// Subset of `op_hashes` we hold in limbo or as locally-validated
+    /// integrated ops (cache-only copies excluded), with their basis hashes.
     pub async fn check_op_hashes_present(
         &self,
         op_hashes: &[Vec<u8>],

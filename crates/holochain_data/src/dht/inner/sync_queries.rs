@@ -13,9 +13,12 @@
 //! validated by construction.
 //!
 //! `check_op_hashes_present` is the exception: it answers "do we already
-//! hold this op, at any stage?" so the fetch logic never re-requests ops
-//! that are sitting in limbo or the cache. It matches the limbo and
-//! integrated tables alike, with no `locally_validated` filter.
+//! hold this op in a form that doesn't need re-delivery?" so the fetch logic
+//! never re-requests ops that are already in the validation pipeline. It
+//! matches `LimboChainOp` (awaiting validation) and `ChainOp` with
+//! `locally_validated = 1` (integrated), but *not* cache-mirrored ops
+//! (`locally_validated = 0`), which still rely on gossip to re-deliver them
+//! into validation.
 //!
 //! `count_integrated_ops` counts every integrated op (`ChainOp` +
 //! `WarrantOp`) to report the total observed DHT size.
@@ -211,15 +214,21 @@ where
         .await
 }
 
-/// Return the subset of `hashes` we already hold locally, with their basis
-/// hashes — used to decide which ops still need fetching from peers.
+/// Return the subset of `hashes` we already hold in a way that does not need
+/// re-delivery, with their basis hashes — used to decide which ops still
+/// need fetching from peers.
 ///
-/// "Hold locally" means present at *any* stage: a chain op in `LimboChainOp`
-/// (awaiting validation) or `ChainOp` (integrated or cache-mirrored), or a
-/// warrant whose content row exists in `Warrant` (which by invariant implies
-/// a `LimboWarrantOp` or `WarrantOp` row). There is deliberately no
-/// `locally_validated` filter: an op we are still validating is one we
-/// should not re-request.
+/// "Hold" means a chain op that is either awaiting validation in
+/// `LimboChainOp` or already integrated by us (`ChainOp` with
+/// `locally_validated = 1`), or a warrant whose content row exists in
+/// `Warrant` (which by invariant implies a `LimboWarrantOp` or `WarrantOp`
+/// row, both of which route through validation).
+///
+/// Cache-mirrored ops (`ChainOp` with `locally_validated = 0`) are
+/// deliberately *excluded*: their content is held only to serve reads, they
+/// never entered the validation pipeline, and the only way they reach it is
+/// to be re-delivered by gossip. Reporting them as present would suppress
+/// that re-delivery and they would never integrate.
 pub(crate) async fn check_op_hashes_present<'e, E>(
     executor: E,
     hashes: &[Vec<u8>],
@@ -232,8 +241,8 @@ where
     }
 
     // sqlx doesn't expand `IN (...)` for blob slices directly, so build the
-    // UNION across the limbo + integrated chain-op tables and the shared
-    // warrant content table, binding each hash list in turn.
+    // UNION across the limbo + locally-validated chain-op tables and the
+    // shared warrant content table, binding each hash list in turn.
     let mut qb: QueryBuilder<Sqlite> =
         QueryBuilder::new("SELECT hash, basis_hash FROM LimboChainOp WHERE hash IN (");
     {
@@ -244,7 +253,7 @@ where
     }
     qb.push(
         ") UNION
-         SELECT hash, basis_hash FROM ChainOp WHERE hash IN (",
+         SELECT hash, basis_hash FROM ChainOp WHERE locally_validated = 1 AND hash IN (",
     );
     {
         let mut sep = qb.separated(", ");
