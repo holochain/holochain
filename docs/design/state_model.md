@@ -324,7 +324,7 @@ CREATE TABLE DeletedRecord (
     FOREIGN KEY(action_hash) REFERENCES Action(hash) ON DELETE CASCADE
 );
 
--- K2 gossip slice-hash cache.
+-- Kitsune2 gossip slice-hash cache.
 --
 -- Caches a combined hash of all integrated op hashes that fall within a
 -- given (arc, slice_index) bucket. Used by Kitsune2 gossip to detect
@@ -360,7 +360,7 @@ CREATE TABLE SliceHash (
 
 8. **Warrant content/op-metadata split**: The current implementation stores warrant content and per-storage metadata together. With chain-ops and warrants both flowing through Kitsune2's `OpStore`, warrants need the same first-class metadata `ChainOp` has — `when_integrated` for "since" queries, `serialized_size` for storage accounting, plus a top-level `signature` so gossip code doesn't deserialize the proof to find it. To keep content (what the wire carries / what's signed) separate from local op state, warrants split into `Warrant` (content) + `LimboWarrantOp` / `WarrantOp` (metadata), parallel to `Action` ⟷ `LimboChainOp` / `ChainOp`. `Warrant` is shared between limbo and integrated states; promotion only moves metadata.
 
-9. **`SliceHash` table for gossip slice cache**: A new table caches the combined hash of integrated op hashes per `(arc_start, arc_end, slice_index)` bucket. Kitsune2 gossip uses these cached hashes to detect divergence between peers without re-scanning the underlying ops on each comparison. `ON CONFLICT REPLACE` lets gossip overwrite a stale entry once it recomputes; nothing else writes to this table.
+9. **`SliceHash` gossip cache moves into the DHT database**: Kitsune2 gossip caches a combined hash of integrated op hashes per `(arc_start, arc_end, slice_index)` bucket to detect divergence between peers without re-scanning the underlying ops. This is not new behaviour — the previous implementation kept an equivalent cache; the only difference here is that it lives in the unified per-DNA DHT database alongside the ops it summarises, so K2's whole `OpStore` state has a single home. `ON CONFLICT REPLACE` lets gossip overwrite a stale entry once it recomputes; nothing else writes to this table.
 
 ### Rust Structure
 
@@ -1824,21 +1824,24 @@ Warrants use parallel limbo and integrated op-metadata tables (`LimboWarrantOp` 
 
 ### Warrant Query Patterns
 
-Accepted warrants can be queried from the `Warrant` table:
+`Warrant` holds content for both pending and integrated warrants, so queries
+that want only accepted warrants join through `WarrantOp` (a row exists there
+only once the warrant has been integrated).
 
-Find all warrants against a specific agent:
+Find all integrated warrants against a specific agent:
 
 ```sql
-SELECT * FROM Warrant
-WHERE warrantee = ?
-ORDER BY timestamp DESC;
+SELECT w.* FROM Warrant w
+JOIN WarrantOp op ON op.hash = w.hash
+WHERE w.warrantee = ?
+ORDER BY w.timestamp DESC;
 ```
 
-Check if a specific warrant exists:
+Check if a specific warrant has been integrated:
 
 ```sql
 SELECT EXISTS(
-    SELECT 1 FROM Warrant WHERE hash = ?
+    SELECT 1 FROM WarrantOp WHERE hash = ?
 );
 ```
 
