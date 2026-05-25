@@ -1340,9 +1340,16 @@ mod tests {
             .await
             .unwrap()
             .expect("warrant");
+        assert_eq!(row.author, author.get_raw_36().to_vec());
+        assert_eq!(row.timestamp, 10);
         assert_eq!(row.warrantee, warrantee.get_raw_36().to_vec());
         assert_eq!(row.proof, vec![5u8; 64]);
+        assert_eq!(row.signature, vec![6u8; 64]);
         assert_eq!(row.storage_center_loc, 77);
+        assert_eq!(row.when_received, 100);
+        // `when_integrated` is the promotion timestamp, not the limbo one.
+        assert_eq!(row.when_integrated, 200);
+        assert_eq!(row.serialized_size, 128);
     }
 
     #[tokio::test]

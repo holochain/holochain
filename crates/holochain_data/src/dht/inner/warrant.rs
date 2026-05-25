@@ -37,10 +37,11 @@ pub struct InsertWarrant<'a> {
 
 /// Insert into both `Warrant` (content) and `WarrantOp` (op metadata).
 ///
-/// The two `INSERT`s must execute atomically; the caller is responsible
-/// for wrapping this call in a transaction. `INSERT INTO Warrant ... ON
-/// CONFLICT IGNORE` lets the content row already exist (e.g. when promoting
-/// from limbo where it was inserted alongside `LimboWarrantOp`).
+/// The two `INSERT`s must execute atomically; the caller wraps this in a
+/// transaction. Both tables declare their primary key `ON CONFLICT IGNORE`,
+/// so a warrant delivered more than once (e.g. a gossip retry of an already
+/// integrated warrant) is silently skipped rather than aborting the
+/// transaction — no explicit `OR IGNORE` is needed.
 pub(crate) async fn insert_warrant<'a>(
     conn: &mut SqliteConnection,
     w: InsertWarrant<'a>,

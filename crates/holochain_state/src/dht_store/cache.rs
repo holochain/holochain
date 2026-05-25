@@ -2,7 +2,7 @@
 //!
 //! Chain ops fetched from peer authorities are inserted with
 //! `locally_validated = false`, bypassing limbo. Warrants are always routed
-//! through `LimboWarrant` so the local conductor can validate them
+//! through limbo (`LimboWarrantOp`) so the local conductor can validate them
 //! regardless of arc coverage.
 
 use holo_hash::{AnyDhtHash, HasHash};
@@ -94,7 +94,7 @@ impl DhtStore<DbWrite<Dht>> {
         Ok(())
     }
 
-    /// Insert cached warrants into `LimboWarrant`.
+    /// Insert cached warrants into `Warrant` + `LimboWarrantOp`.
     ///
     /// Warrants must be locally validated regardless of arc coverage, so they
     /// are routed through limbo rather than inserted directly.
