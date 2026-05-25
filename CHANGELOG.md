@@ -14,6 +14,61 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20260525.004052
+
+## [hcterm-0.7.0-dev.26](crates/hcterm/CHANGELOG.md#0.7.0-dev.26)
+
+## [holochain\_cli-0.7.0-dev.26](crates/holochain_cli/CHANGELOG.md#0.7.0-dev.26)
+
+## [holochain\_cli\_bundle-0.7.0-dev.25](crates/holochain_cli_bundle/CHANGELOG.md#0.7.0-dev.25)
+
+## [holochain\_cli\_client-0.7.0-dev.26](crates/holochain_cli_client/CHANGELOG.md#0.7.0-dev.26)
+
+## [holochain\_cli\_sandbox-0.7.0-dev.26](crates/holochain_cli_sandbox/CHANGELOG.md#0.7.0-dev.26)
+
+## [holochain\_client-0.9.0-dev.26](crates/holochain_client/CHANGELOG.md#0.9.0-dev.26)
+
+## [holochain-0.7.0-dev.26](crates/holochain/CHANGELOG.md#0.7.0-dev.26)
+
+- Mirror DHT-database writes from workflows and cell into the new `holochain_data` DHT store (parallel-write DHT slice).
+- Remove the `isotest` dependency from `holochain_types` and `holochain_cascade`. In `holochain_types::test_utils::chain`, the conversions between `TestChainHash` and `ActionHash` are now plain `From` impls; out-of-tree test code should use `TestChainHash::from(&action_hash)` instead of `TestChainHash::test(&action_hash)`.
+
+## [holochain\_cascade-0.7.0-dev.26](crates/holochain_cascade/CHANGELOG.md#0.7.0-dev.26)
+
+## [holochain\_conductor\_config-0.7.0-dev.25](crates/holochain_conductor_config/CHANGELOG.md#0.7.0-dev.25)
+
+## [holochain\_test\_wasm\_common-0.7.0-dev.18](crates/holochain_test_wasm_common/CHANGELOG.md#0.7.0-dev.18)
+
+## [holochain\_wasm\_test\_utils-0.7.0-dev.26](crates/holochain_wasm_test_utils/CHANGELOG.md#0.7.0-dev.26)
+
+## [holochain\_websocket-0.7.0-dev.25](crates/holochain_websocket/CHANGELOG.md#0.7.0-dev.25)
+
+## [hdk-0.7.0-dev.18](crates/hdk/CHANGELOG.md#0.7.0-dev.18)
+
+## [holochain\_p2p-0.7.0-dev.26](crates/holochain_p2p/CHANGELOG.md#0.7.0-dev.26)
+
+## [hdi-0.8.0-dev.13](crates/hdi/CHANGELOG.md#0.8.0-dev.13)
+
+## [holochain\_state-0.7.0-dev.26](crates/holochain_state/CHANGELOG.md#0.7.0-dev.26)
+
+## [hdk\_derive-0.7.0-dev.13](crates/hdk_derive/CHANGELOG.md#0.7.0-dev.13)
+
+## [holochain\_data-0.7.0-dev.15](crates/holochain_data/CHANGELOG.md#0.7.0-dev.15)
+
+## [holochain\_conductor\_api-0.7.0-dev.25](crates/holochain_conductor_api/CHANGELOG.md#0.7.0-dev.25)
+
+## [holochain\_state\_types-0.7.0-dev.13](crates/holochain_state_types/CHANGELOG.md#0.7.0-dev.13)
+
+## [holochain\_types-0.7.0-dev.25](crates/holochain_types/CHANGELOG.md#0.7.0-dev.25)
+
+## [holochain\_keystore-0.7.0-dev.17](crates/holochain_keystore/CHANGELOG.md#0.7.0-dev.17)
+
+## [holochain\_sqlite-0.7.0-dev.21](crates/holochain_sqlite/CHANGELOG.md#0.7.0-dev.21)
+
+## [holochain\_zome\_types-0.7.0-dev.17](crates/holochain_zome_types/CHANGELOG.md#0.7.0-dev.17)
+
+## [holochain\_integrity\_types-0.7.0-dev.13](crates/holochain_integrity_types/CHANGELOG.md#0.7.0-dev.13)
+
 # 20260518.003858
 
 ## [hcterm-0.7.0-dev.25](crates/hcterm/CHANGELOG.md#0.7.0-dev.25)
