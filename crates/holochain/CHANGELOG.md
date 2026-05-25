@@ -7,8 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Mirror DHT-database writes from workflows and cell into the new
-  `holochain_data` DHT store (parallel-write DHT slice).
+## 0.7.0-dev.26
+
+- Mirror DHT-database writes from workflows and cell into the new `holochain_data` DHT store (parallel-write DHT slice).
 - Remove the `isotest` dependency from `holochain_types` and `holochain_cascade`. In `holochain_types::test_utils::chain`, the conversions between `TestChainHash` and `ActionHash` are now plain `From` impls; out-of-tree test code should use `TestChainHash::from(&action_hash)` instead of `TestChainHash::test(&action_hash)`.
 
 ## 0.7.0-dev.25
