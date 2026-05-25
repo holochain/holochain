@@ -6,7 +6,7 @@ This document describes a design for restoring an agent's source chain on a fres
 
 Restore covers _public_ chain state only. It does not, and cannot, recover private entries, capability claims, validation receipts, or other purely local state. Agent key recovery itself is out of scope; it is assumed that an external layer has already made the agent's signing key available to the local Lair keystore instance before install.
 
-It is a largely independent feature design built on top of the existing system; [`data_model.md`](./data_model.md) and [`state_model.md`](./state_model.md) are referenced where their definitions apply. Concretely, the feature introduces **a new cell instantiation workflow** that replaces the genesis workflow on installs flagged as restoring, plus the supporting API and configuration described below.
+It is a largely independent feature design built on top of the existing system; [`data_model.md`](./data_model.md) and [`state_model.md`](./state_model.md) are referenced where their definitions apply. Concretely, the feature introduces **a new cell instantiation workflow** that replaces the genesis workflow on installs flagged as restoring, **a per-app orchestrator** that drives that workflow across all of an app's cells, plus the supporting API and configuration described below.
 
 ## Scope and assumptions
 
@@ -16,6 +16,7 @@ In scope:
 2. The same `AgentPubKey` was previously used on some other node to author a chain in the same DNA, and that chain's public ops are reachable somewhere on the DHT.
 3. The agent's signing key is present in the local Lair keystore at install time (otherwise no future action could be signed even after restore, so the install is not useful).
 4. Both full-arc and zero-arc installations.
+5. Apps with more than one cell. A per-app orchestrator restores each cell's chain in turn; the app reaches a callable state only once every cell has restored. See [Per-app orchestration](#per-app-orchestration).
 
 Out of scope:
 
@@ -23,7 +24,6 @@ Out of scope:
 2. Recovery of private entries (kept in `PrivateEntry`; never distributed).
 3. Recovery of `CapClaim` rows (never on the DHT).
 4. Recovery of any local-only state such as `ChainLock` or received validation receipts.
-5. Multi-cell coordination (each cell restores its own chain independently).
 
 ## Background
 
@@ -95,6 +95,21 @@ Restore is a new cell instantiation workflow that replaces `genesis_workflow` fo
 
 The app stays in `AppStatus::AwaitingRestore` for the duration of the workflow (new variant, see [App status](#app-status) below). Zome calls — including any that would author new chain actions — are rejected while in this state. Network activity that supports the restore itself proceeds normally: incoming gossip, op validation, and integration must run so that records fetched as part of restore can land in the DHT side of the database, so writes performed by those workflows are not blocked by the app status. What is blocked is application-driven chain authoring.
 
+### Per-app orchestration
+
+An app may comprise more than one cell (one per provisioned role). The unit of restore is the cell — each cell has its own per-DNA database and its own chain to reconstruct — but the unit of status is the app, because Holochain has no per-cell persisted status. A per-app orchestrator bridges the two.
+
+On a restore install the orchestrator:
+
+1. Sets the app to `AppStatus::AwaitingRestore`.
+2. Iterates the app's `provisioned_cells()`. Clone cells are not provisioned at install time, so only provisioned cells participate; clones created later go through the normal (non-restore) creation path.
+3. Runs the restore workflow for each cell **in sequence, not in parallel**. Restore is signature-check and hash-calculation heavy; serialising cells caps that work at one chain's worth at a time rather than multiplying it across every cell of the app at once. Cells are processed in the deterministic order of the `provisioned_cells()` index map.
+4. Emits `SystemSignal::RestoreComplete { cell_id }` as each cell finishes.
+5. **Stops at the first cell that fails permanently.** That cell's failure moves the whole app to `AppStatus::Unrecoverable(cell_id, reason)` and emits `SystemSignal::RestoreFailed { cell_id, reason }`; cells later in the order are never attempted. An app missing even one cell cannot run usefully, and the `Unrecoverable` state would block `enable_app` regardless, so there is no value in pressing on. Cells restored before the failure keep their reconstructed chains on disk — that work is not rolled back — but the app will not become callable until the operator resolves the broken cell (in practice, by uninstalling).
+6. When every provisioned cell has restored, moves the app to `AppStatus::Disabled(DisabledAppReason::NeverStarted)` and emits `SystemSignal::AppRestoreComplete { installed_app_id }`. As with any install, the app is not enabled automatically; the caller invokes `enable_app` separately.
+
+The remainder of this document describes the per-cell restore workflow that the orchestrator runs. Except where it refers to app-level status transitions, every step is scoped to a single cell.
+
 ### App status
 
 Restore introduces two new `AppStatus` variants:
@@ -104,22 +119,23 @@ pub enum AppStatus {
     Enabled,
     Disabled(DisabledAppReason),
     AwaitingMemproofs,
-    /// Restore workflow is in progress. Zome calls rejected. Transitions to
-    /// Disabled(NeverStarted) on success or Unrecoverable on permanent failure.
+    /// Restore is in progress for one or more of the app's cells. Zome calls
+    /// rejected. Transitions to Disabled(NeverStarted) once every cell has
+    /// restored, or to Unrecoverable as soon as any one cell fails permanently.
     AwaitingRestore,
-    /// Restore hit a permanent failure (locally-validated chain-integrity
-    /// warrant against `A`). Terminal: the app cannot be enabled and must
-    /// be uninstalled.
-    Unrecoverable(UnrecoverableAppReason),
+    /// Restore hit a permanent failure on one of the app's cells (a
+    /// locally-validated chain-integrity warrant against `A`). Terminal: the
+    /// app cannot be enabled and must be uninstalled. Names the failing cell.
+    Unrecoverable(CellId, UnrecoverableCellReason),
 }
 ```
 
-`AwaitingRestore` is analogous to the existing `AwaitingMemproofs` — installed but not yet callable, with a workflow running to clear the precondition. `Unrecoverable` is new; it expresses an outcome that existing variants cannot capture cleanly (`Disabled` can be re-enabled, but a forked chain cannot become un-forked).
+`AwaitingRestore` is analogous to the existing `AwaitingMemproofs` — installed but not yet callable, with a workflow running to clear the precondition. `Unrecoverable` is new; it expresses an outcome that existing variants cannot capture cleanly (`Disabled` can be re-enabled, but a forked chain cannot become un-forked). The status is app-level: an app with several cells does not get a per-cell persisted status. The failing `CellId` is carried in the `Unrecoverable` variant so the operator knows which cell broke.
 
-`UnrecoverableAppReason` captures the cause for operator visibility, at minimum:
+`UnrecoverableCellReason` captures the cause for operator visibility, at minimum:
 
 ```rust
-pub enum UnrecoverableAppReason {
+pub enum UnrecoverableCellReason {
     /// Two or more conflicting actions at the same sequence position on the
     /// agent's chain — proven by a `ChainIntegrityWarrant::ChainFork` that
     /// local validation has accepted.
@@ -132,20 +148,21 @@ pub enum UnrecoverableAppReason {
 
 `ChainStatus::Invalid` and `ChainIntegrityWarrant` are not separate failure categories — `ChainStatus::Invalid` is the authority's classification _when it has accepted_ a `ChainIntegrityWarrant`. Restore therefore keys off the warrant (after validating it locally; see [Treatment of warrants](#step-1--pin-the-target-via-get_agent_activity_multi)), not the status flag in isolation. An incomplete or empty response is **not** a failure: it returns the workflow to retry, not to `Unrecoverable`.
 
-State transitions during restore:
+State transitions during restore (driven by the per-app orchestrator; see [Per-app orchestration](#per-app-orchestration)):
 
 ```
 install_app(restore_from_dht: true)
     └─> AppStatus::AwaitingRestore
-            ├─(chain integrity check passes)─> AppStatus::Disabled(NeverStarted)
-            │                                       └─(enable_app)─> AppStatus::Enabled
-            └─(permanent failure)──────────> AppStatus::Unrecoverable(reason)
+            ├─(every cell's chain integrity check passes)─> AppStatus::Disabled(NeverStarted)
+            │                                                     └─(enable_app)─> AppStatus::Enabled
+            └─(any cell fails permanently)───────────────> AppStatus::Unrecoverable(cell_id, reason)
 ```
 
-Two new system signals accompany the terminal transitions. Restore runs per cell, so the signals carry `cell_id` (an app with multiple cells will emit one signal per cell):
+Three new system signals accompany the transitions. The per-cell signals carry `cell_id`; the app-level completion signal carries `installed_app_id`:
 
-- `SystemSignal::RestoreComplete { cell_id }`
-- `SystemSignal::RestoreFailed { cell_id, reason: UnrecoverableAppReason }`
+- `SystemSignal::RestoreComplete { cell_id }` — emitted as each individual cell finishes restoring.
+- `SystemSignal::AppRestoreComplete { installed_app_id }` — emitted once when every cell of the app has restored and the app reaches `Disabled(NeverStarted)`.
+- `SystemSignal::RestoreFailed { cell_id, reason: UnrecoverableCellReason }` — emitted when a cell fails permanently; the app moves to `Unrecoverable` at the same moment, so this doubles as the app-level failure notice.
 
 ### Install API extension
 
@@ -238,13 +255,13 @@ Records claimed to be in the target chain that fail their signature check, or th
 
 This check loads the chain from the local store. Any failure means restore is not yet complete and the workflow returns to waiting/requesting. The check is the implementation of the guarantee in [Problem statement](#problem-statement) that a complete, gap-free, fork-free chain is in place before the cell may be used.
 
-#### Step 3 — Hand off to the normal install path
+#### Step 3 — Hand the cell back to the orchestrator
 
-When the chain-integrity check succeeds, the app transitions out of `AppStatus::AwaitingRestore` into `AppStatus::Disabled(DisabledAppReason::NeverStarted)` — the same state a non-restoring install lands in after genesis completes. The cell is **not** enabled automatically; the caller must invoke `enable_app` to make it callable. This matches existing install semantics, where installation and activation are separate admin operations.
+When the chain-integrity check succeeds for this cell, the workflow reports completion to the per-app orchestrator and a `SystemSignal::RestoreComplete { cell_id }` is emitted so subscribers learn this cell is done without polling. The cell's reconstructed chain is now on disk; nothing further happens to it until the app is enabled.
 
-A `SystemSignal::RestoreComplete { cell_id }` is emitted on the transition so that subscribers learn restore is done without polling. After `enable_app`, new actions authored on this node publish through the normal publish workflow on top of the restored tip.
+App-level status does **not** change on a single cell completing. The orchestrator advances to the next provisioned cell (see [Per-app orchestration](#per-app-orchestration)). Only once **every** cell of the app has reached this point does the app transition out of `AppStatus::AwaitingRestore` into `AppStatus::Disabled(DisabledAppReason::NeverStarted)` — the same state a non-restoring install lands in after genesis — and emit `SystemSignal::AppRestoreComplete { installed_app_id }`. The app is **not** enabled automatically; the caller must invoke `enable_app`, matching existing install semantics where installation and activation are separate admin operations. After `enable_app`, new actions authored on this node publish through the normal publish workflow on top of each cell's restored tip.
 
-If restore reaches a permanent failure (see [Failure modes](#failure-modes-and-operator-behaviour)), the app transitions to `AppStatus::Unrecoverable` and a `SystemSignal::RestoreFailed { cell_id, reason }` is emitted. `Unrecoverable` is a terminal state: the app cannot be enabled and must be uninstalled. The signal carries enough detail (fork, warrant variant, etc.) for an operator UI to explain the outcome.
+If this cell reaches a permanent failure (see [Failure modes](#failure-modes-and-operator-behaviour)), the orchestrator moves the whole app to `AppStatus::Unrecoverable(cell_id, reason)` and emits `SystemSignal::RestoreFailed { cell_id, reason }`, then stops without attempting any remaining cells. `Unrecoverable` is a terminal state: the app cannot be enabled and must be uninstalled. The signal carries enough detail (fork, warrant variant, failing cell) for an operator UI to explain the outcome.
 
 #### Retry behaviour
 
@@ -262,6 +279,8 @@ Permanent failures (any locally-validated `ChainIntegrityWarrant` against `A`) b
 ### Crash recovery
 
 Holochain workflows already retain enough state to recover across conductor restarts. A crash during restore leaves the app in `AppStatus::AwaitingRestore` with any rows written so far in a consistent state. On restart, the workflow re-enters Step 1 unconditionally (re-running `get_agent_activity_multi` from scratch), so no special checkpoint or "restore-in-progress" marker is introduced specifically for this workflow.
+
+The per-app orchestrator resumes the same way without any persisted per-cell progress flag. On restart it finds the app in `AppStatus::AwaitingRestore` and walks `provisioned_cells()` from the start of the deterministic order, re-running the restore workflow for each cell. There is no separate "is this cell already done?" lookup: a cell restored before the crash simply re-runs its workflow, which re-pins the head in Step 1 and then satisfies the Step 2 chain-integrity check immediately because the chain is already present. Step 2 writes are idempotent (signature and hash checks make redundant writes no-ops), so re-running an already-restored or partially-restored cell is safe and converges without duplicating data.
 
 Re-running Step 1 on resume is intentional. The network's view of the agent's chain may have changed between the original Step 1 call and the resume — peers come and go, gossip propagates — and the safe default is to re-query from scratch rather than rely on a possibly out-of-date pinned head. This is _not_ primarily about the author writing more chain content elsewhere in the meantime: an agent that uses restore should not also be authoring on another node, and if they do they are creating a fork themselves. The retry-from-scratch design treats that scenario as an extra safety margin, but the substantive reason is network view drift.
 
@@ -340,8 +359,8 @@ Applications that rely on the lost categories must accept degraded post-restore 
 | Restored record fails signature check against `A` | Record discarded. Restore continues with responses from other peers. |
 | Restored record's hash does not match the Step 1 candidate for its sequence | Record discarded. Restore continues with responses from other peers. |
 | Warrant returned by a peer for `A` | Submitted to local validation. App stays in `AwaitingRestore` until validation completes; outcome below. |
-| Validated `ChainIntegrityWarrant::ChainFork` for `A` | Permanent failure. App transitions to `AppStatus::Unrecoverable(ChainFork(...))`; `SystemSignal::RestoreFailed` emitted. |
-| Validated `ChainIntegrityWarrant` of another variant (e.g. `InvalidChainOp`) for `A` | Permanent failure. App transitions to `AppStatus::Unrecoverable(ChainIntegrityWarrant(...))`; `SystemSignal::RestoreFailed` emitted. |
+| Validated `ChainIntegrityWarrant::ChainFork` for `A` | Permanent failure. App transitions to `AppStatus::Unrecoverable(cell_id, ChainFork(...))`; `SystemSignal::RestoreFailed` emitted; remaining cells not attempted. |
+| Validated `ChainIntegrityWarrant` of another variant (e.g. `InvalidChainOp`) for `A` | Permanent failure. App transitions to `AppStatus::Unrecoverable(cell_id, ChainIntegrityWarrant(...))`; `SystemSignal::RestoreFailed` emitted; remaining cells not attempted. |
 | Warrants all rejected by local validation | Treated as if no warrants were reported. Workflow proceeds to Step 2. |
 | Crash mid-restore | Workflow re-enters Step 1 on next conductor start (see [Crash recovery](#crash-recovery)); previously written authored-state rows are reused. |
 
