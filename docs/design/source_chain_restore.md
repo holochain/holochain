@@ -150,7 +150,7 @@ pub enum UnrecoverableCellReason {
 
 State transitions during restore (driven by the per-app orchestrator; see [Per-app orchestration](#per-app-orchestration)):
 
-```
+```text
 install_app(restore_from_dht: true)
     └─> AppStatus::AwaitingRestore
             ├─(every cell's chain integrity check passes)─> AppStatus::Disabled(NeverStarted)
