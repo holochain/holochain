@@ -201,6 +201,7 @@ mod tests {
                     action_author: warranted_action_author.clone(),
                     action: (warranted_action_hash.clone(), fixt!(Signature)),
                     chain_op_type: ChainOpType::RegisterAddLink,
+                    reason: "Test reason".to_string(),
                 }),
                 fixt!(AgentPubKey),
                 Timestamp::now(),

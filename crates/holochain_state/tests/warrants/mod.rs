@@ -23,6 +23,7 @@ async fn write_invalid_op_warrant_to_database() {
             action_author: fixt!(AgentPubKey),
             action: (fixt!(ActionHash), fixt!(Signature)),
             chain_op_type: ChainOpType::StoreRecord,
+            reason: "test warrant".into(),
         }),
         fixt!(AgentPubKey),
         Timestamp::now(),
