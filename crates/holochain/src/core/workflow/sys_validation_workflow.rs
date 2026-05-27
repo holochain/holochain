@@ -365,8 +365,8 @@ async fn sys_validation_workflow_inner(
                             let status = ValidationStage::AwaitingSysDeps;
                             put_validation_limbo(txn, &op_hash, status)?;
                         }
-                        Outcome::Rejected(_) => {
-                            invalid_ops.push((op_hash.clone(), op.clone()));
+                        Outcome::Rejected(reason) => {
+                            invalid_ops.push((op_hash.clone(), op.clone(), reason));
 
                             match op {
                                 DhtOp::ChainOp(_) => {
@@ -411,9 +411,9 @@ async fn sys_validation_workflow_inner(
         // RegisterAgentActivity) can share the same action, and without this deduplication
         // all of them would trigger a separate warrant when processed in the same run.
         let mut warranted_in_batch = std::collections::HashSet::new();
-        for (op_hash, chain_op) in invalid_ops
+        for (op_hash, chain_op, reason) in invalid_ops
             .into_iter()
-            .filter_map(|(h, op)| op.as_chain_op().map(|op| (h, op.clone())))
+            .filter_map(|(h, op, reason)| op.as_chain_op().map(|op| (h, op.clone(), reason)))
         {
             let action_hash = chain_op.action().to_hash();
 
@@ -449,9 +449,13 @@ async fn sys_validation_workflow_inner(
             }
 
             warranted_in_batch.insert(action_hash);
-            let warrant_op =
-                make_invalid_chain_warrant_op(&_keystore, _representative_agent.clone(), &chain_op)
-                    .await?;
+            let warrant_op = make_invalid_chain_warrant_op(
+                &_keystore,
+                _representative_agent.clone(),
+                &chain_op,
+                &reason,
+            )
+            .await?;
             warrants.push(warrant_op);
         }
 
@@ -1073,8 +1077,16 @@ async fn validate_warrant_op(
             ChainIntegrityWarrant::InvalidChainOp {
                 action: (action_hash, action_sig),
                 action_author,
+                reason,
                 ..
             } => {
+                if reason.len() > holochain_zome_types::warrant::MAX_WARRANT_REASON_BYTES {
+                    return Err(ValidationOutcome::InvalidWarrant(
+                        Box::new(op.warrant().clone()),
+                        "reason exceeds maximum length".into(),
+                    )
+                    .into());
+                }
                 let (action, validation_status) = {
                     let deps = validation_dependencies.lock().expect("poisoned");
                     let (action, validation_status) = deps
@@ -1580,6 +1592,7 @@ pub async fn make_invalid_chain_warrant_op(
     keystore: &MetaLairClient,
     warrant_author: AgentPubKey,
     op: &ChainOp,
+    reason: &str,
 ) -> WorkflowResult<DhtOpHashed> {
     let action = op.action();
     let action_author = action.author().clone();
@@ -1589,6 +1602,7 @@ pub async fn make_invalid_chain_warrant_op(
         action_author: action_author.clone(),
         action: (action.to_hash().clone(), op.signature().clone()),
         chain_op_type: op.get_type(),
+        reason: holochain_zome_types::warrant::truncate_warrant_reason(reason),
     });
     let warrant = Warrant::new(proof, warrant_author, Timestamp::now(), action_author);
     let warrant_op = WarrantOp::sign(keystore, warrant)

@@ -352,6 +352,7 @@ mod tests {
                     action_author,
                     action: (action_hash, Signature::from([seed; 64])),
                     chain_op_type: ChainOpType::StoreRecord,
+                    reason: "test warrant".into(),
                 }),
                 AgentPubKey::from_raw_36(vec![seed.wrapping_add(10); 36]),
                 Timestamp::from_micros(seed as i64 * 1000),

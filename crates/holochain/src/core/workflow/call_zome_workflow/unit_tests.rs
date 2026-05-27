@@ -267,6 +267,7 @@ async fn create_signed_warrant(author: &AgentPubKey, keystore: &MetaLairClient) 
             action_author: fixt!(AgentPubKey),
             action: (fixt!(ActionHash), fixt!(Signature)),
             chain_op_type: ChainOpType::StoreEntry,
+            reason: "test warrant".into(),
         }),
         (*author).clone(),
         Timestamp::now(),

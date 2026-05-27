@@ -262,6 +262,7 @@ async fn author_of_invalid_warrant_is_blocked() {
                 action.signature().clone(),
             ),
             chain_op_type: ChainOpType::StoreRecord,
+            reason: "test warrant".into(),
         }),
         bob.agent_pubkey().clone(),
         Timestamp::now(),

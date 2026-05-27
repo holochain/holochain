@@ -262,6 +262,130 @@ async fn validate_chain_fork_warrant_missing_dependency() {
     );
 }
 
+/// Test that a valid InvalidChainOp warrant is accepted when the warranted action
+/// is present locally and was itself rejected by validation.
+#[tokio::test(flavor = "multi_thread")]
+async fn validate_invalid_chain_op_warrant_accepted() {
+    holochain_trace::test_run();
+
+    let mut test_case = ChainForkWarrantTestCase::new().await;
+
+    let action = test_case.create_signed_action().await;
+    test_case.insert_warranted_validated_action(
+        &action,
+        ChainOpType::RegisterAgentActivity,
+        ValidationStatus::Rejected,
+    );
+
+    // Build the warrant through the production code path with a short reason.
+    let warrant_op = test_case
+        .make_invalid_chain_op_warrant(&action, "nope")
+        .await;
+
+    let outcome = test_case.validate_warrant_dht_op(warrant_op).await.unwrap();
+
+    assert!(
+        matches!(outcome, Outcome::Accepted),
+        "Expected Accepted but actual outcome was {outcome:?}"
+    );
+}
+
+/// Test that an InvalidChainOp warrant whose reason exceeds the maximum length is
+/// rejected by sys validation. This guards against a malicious peer publishing an
+/// oversized warrant payload as a griefing vector.
+#[tokio::test(flavor = "multi_thread")]
+async fn validate_invalid_chain_op_warrant_rejected_oversized_reason() {
+    use holochain_zome_types::warrant::MAX_WARRANT_REASON_BYTES;
+
+    holochain_trace::test_run();
+
+    let mut test_case = ChainForkWarrantTestCase::new().await;
+
+    let action = test_case.create_signed_action().await;
+    test_case.insert_warranted_validated_action(
+        &action,
+        ChainOpType::RegisterAgentActivity,
+        ValidationStatus::Rejected,
+    );
+
+    // Construct the warrant directly, bypassing `truncate_warrant_reason`, so the
+    // reason exceeds the limit as it would if it arrived from a misbehaving peer.
+    let oversized_reason = "a".repeat(MAX_WARRANT_REASON_BYTES + 1);
+    let warrant_op = test_case
+        .create_invalid_chain_op_warrant_raw(&action, oversized_reason)
+        .await;
+
+    let outcome = test_case.validate_warrant(warrant_op).await.unwrap();
+
+    match outcome {
+        Outcome::Rejected(reason) => {
+            assert!(
+                reason.contains("reason exceeds maximum length"),
+                "Expected 'reason exceeds maximum length' in rejection reason, got: {reason}"
+            );
+        }
+        _ => panic!("Expected Rejected outcome but got: {outcome:?}"),
+    }
+}
+
+/// Prove the fundamental invariant guarding the network: a warrant produced through
+/// the production code path can never be rejected by another peer for an oversized
+/// reason, no matter how long the validation reason was. Both sys and app validation
+/// funnel warrant creation through `make_invalid_chain_warrant_op`, which truncates
+/// the reason before signing, so this single proof covers both validation paths.
+#[tokio::test(flavor = "multi_thread")]
+async fn make_invalid_chain_op_warrant_truncates_so_it_validates() {
+    use holochain_zome_types::warrant::MAX_WARRANT_REASON_BYTES;
+
+    holochain_trace::test_run();
+
+    let mut test_case = ChainForkWarrantTestCase::new().await;
+
+    let action = test_case.create_signed_action().await;
+    test_case.insert_warranted_validated_action(
+        &action,
+        ChainOpType::RegisterAgentActivity,
+        ValidationStatus::Rejected,
+    );
+
+    // An absurdly long reason, far beyond the limit, as an app validation callback
+    // could trivially return. All-ASCII so the truncation lands exactly on the byte
+    // limit (no char-boundary backoff).
+    let huge_reason = "a".repeat(MAX_WARRANT_REASON_BYTES * 20);
+    let warrant_op = test_case
+        .make_invalid_chain_op_warrant(&action, &huge_reason)
+        .await;
+
+    // The production code path must have truncated the reason: the 10240-byte input
+    // is clipped to exactly the limit, and is a prefix of the original.
+    let reason = match &warrant_op.content {
+        DhtOp::WarrantOp(w) => match &w.proof {
+            WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+                reason, ..
+            }) => reason.clone(),
+            other => panic!("unexpected warrant proof: {other:?}"),
+        },
+        other => panic!("expected a warrant op, got: {other:?}"),
+    };
+    assert_eq!(
+        reason.len(),
+        MAX_WARRANT_REASON_BYTES,
+        "make_invalid_chain_warrant_op must truncate the {} byte reason down to the {MAX_WARRANT_REASON_BYTES} byte limit",
+        huge_reason.len()
+    );
+    assert!(
+        huge_reason.starts_with(&reason),
+        "truncated reason must be a prefix of the original"
+    );
+
+    // And, crucially, the warrant we produced must validate on another node.
+    let outcome = test_case.validate_warrant_dht_op(warrant_op).await.unwrap();
+    assert!(
+        matches!(outcome, Outcome::Accepted),
+        "A locally-produced warrant must be accepted by other peers, but got: {outcome:?}"
+    );
+}
+
 /// Test helper for ChainFork warrant validation tests
 struct ChainForkWarrantTestCase {
     keystore: holochain_keystore::MetaLairClient,
@@ -397,6 +521,90 @@ impl ChainForkWarrantTestCase {
             .unwrap()
     }
 
+    /// Create a single signed Create action authored by `chain_author`.
+    async fn create_signed_action(&self) -> SignedActionHashed {
+        let mut create = fixt!(Create);
+        create.author = self.chain_author.clone();
+        create.action_seq = 5;
+        create.timestamp = Timestamp::now();
+        create.entry_type = EntryType::App(AppEntryDef {
+            entry_index: 0.into(),
+            zome_index: 0.into(),
+            visibility: EntryVisibility::Public,
+        });
+        create.entry_hash = fixt!(EntryHash);
+        self.sign_action(Action::Create(create)).await
+    }
+
+    /// Insert an action as a warranted dependency that has been validated with the
+    /// given status, which is the state the InvalidChainOp warrant path expects.
+    fn insert_warranted_validated_action(
+        &mut self,
+        action: &SignedActionHashed,
+        op_type: ChainOpType,
+        status: ValidationStatus,
+    ) {
+        use super::validation_deps::{
+            ValidationDependencyState, ValidationDependencyValue, WarrantedDep,
+        };
+
+        let mut deps = self.validation_dependencies.lock().expect("poisoned");
+        let state = ValidationDependencyState::new_present(
+            ValidationDependencyValue::Warranted(WarrantedDep::Pending(action.clone(), op_type)),
+            CascadeSource::Local,
+        );
+        let mut new_deps =
+            ValidationDependencies::new_from_iter(vec![(action.as_hash().clone(), state)]);
+        new_deps.update_warrant_dep_validated(action.as_hash(), status);
+        deps.merge(new_deps);
+    }
+
+    /// Build an InvalidChainOp warrant through the production code path, which
+    /// truncates the reason before signing.
+    async fn make_invalid_chain_op_warrant(
+        &self,
+        action: &SignedActionHashed,
+        reason: &str,
+    ) -> DhtOpHashed {
+        let chain_op =
+            ChainOp::RegisterAgentActivity(action.signature.clone(), action.hashed.content.clone());
+        crate::core::workflow::sys_validation_workflow::make_invalid_chain_warrant_op(
+            &self.keystore,
+            self.warrant_author.clone(),
+            &chain_op,
+            reason,
+        )
+        .await
+        .unwrap()
+    }
+
+    /// Build an InvalidChainOp warrant directly with an arbitrary reason, bypassing
+    /// truncation. Used to simulate a warrant arriving from a misbehaving peer.
+    async fn create_invalid_chain_op_warrant_raw(
+        &self,
+        action: &SignedActionHashed,
+        reason: String,
+    ) -> holochain_types::warrant::WarrantOp {
+        use holochain_zome_types::warrant::{ChainIntegrityWarrant, Warrant, WarrantProof};
+
+        let action_author = action.action().author().clone();
+        let warrant = Warrant::new(
+            WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+                action_author: action_author.clone(),
+                action: (action.as_hash().clone(), action.signature.clone()),
+                chain_op_type: ChainOpType::RegisterAgentActivity,
+                reason,
+            }),
+            self.warrant_author.clone(),
+            Timestamp::now(),
+            action_author,
+        );
+
+        holochain_types::warrant::WarrantOp::sign(&self.keystore, warrant)
+            .await
+            .unwrap()
+    }
+
     /// Create a valid ChainFork warrant
     async fn create_chain_fork_warrant(
         &self,
@@ -471,5 +679,11 @@ impl ChainForkWarrantTestCase {
         let op = DhtOp::WarrantOp(Box::new(warrant_op));
 
         validate_op(&op, &dna_hash, self.validation_dependencies.clone()).await
+    }
+
+    /// Validate an already-hashed DhtOp, as produced by `make_invalid_chain_warrant_op`.
+    async fn validate_warrant_dht_op(&self, op: DhtOpHashed) -> WorkflowResult<Outcome> {
+        let dna_hash = DnaDefHashed::from_content_sync(self.dna_def.clone()).hash;
+        validate_op(&op.content, &dna_hash, self.validation_dependencies.clone()).await
     }
 }

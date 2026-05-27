@@ -285,7 +285,7 @@ async fn app_validation_workflow_inner(
                 let awaiting_ops = awaiting_ops.clone();
                 let rejected_ops = rejected_ops.clone();
 
-                if let Outcome::Rejected(_) = &outcome {
+                if let Outcome::Rejected(reason) = &outcome {
                     let action_hash = chain_op.action().to_hash();
 
                     let issue_warrant = if warranted_in_batch.contains(&action_hash) {
@@ -332,6 +332,7 @@ async fn app_validation_workflow_inner(
                                 keystore,
                                 _representative_agent.clone(),
                                 &chain_op,
+                                reason,
                             )
                             .await?;
 

@@ -154,6 +154,7 @@ fn create_test_warrant(agent_key: &AgentPubKey) -> SignedWarrant {
             action_author: agent_key.clone(),
             action: (fixt!(ActionHash), fixt!(Signature)),
             chain_op_type: ChainOpType::StoreEntry,
+            reason: "invalid chain op".into(),
         }),
         fixt!(AgentPubKey),
         Timestamp::now(),

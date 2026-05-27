@@ -20,6 +20,7 @@ fn warrant(i: u8) -> SignedWarrant {
         action_author: agent_hash(&[i]),
         action: (::fixt::fixt!(ActionHash), ::fixt::fixt!(Signature)),
         chain_op_type: ChainOpType::StoreRecord,
+        reason: "invalid chain op".into(),
     });
     let warrant = Warrant::new(
         p,
