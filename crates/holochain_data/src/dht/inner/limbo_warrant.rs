@@ -24,6 +24,9 @@ pub struct InsertLimboWarrant<'a> {
     pub proof: &'a [u8],
     /// 64-byte signature over the warrant content.
     pub signature: &'a [u8],
+    /// Human-readable rejection reason, denormalized out of `proof` for
+    /// queryability; `None` for warrants that carry no reason.
+    pub reason: Option<&'a str>,
     /// Numeric storage center derived from the warrantee.
     pub storage_center_loc: u32,
     /// Microsecond timestamp at which the warrant was received.
@@ -41,8 +44,8 @@ pub(crate) async fn insert_limbo_warrant<'a>(
     w: InsertLimboWarrant<'a>,
 ) -> sqlx::Result<()> {
     sqlx::query(
-        "INSERT INTO Warrant (hash, author, timestamp, warrantee, proof, signature)
-         VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO Warrant (hash, author, timestamp, warrantee, proof, signature, reason)
+         VALUES (?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(w.hash.get_raw_36())
     .bind(w.author.get_raw_36())
@@ -50,6 +53,7 @@ pub(crate) async fn insert_limbo_warrant<'a>(
     .bind(w.warrantee.get_raw_36())
     .bind(w.proof)
     .bind(w.signature)
+    .bind(w.reason)
     .execute(&mut *conn)
     .await?;
 
@@ -76,7 +80,7 @@ where
     E: Executor<'e, Database = Sqlite>,
 {
     sqlx::query_as(
-        "SELECT w.hash, w.author, w.timestamp, w.warrantee, w.proof, w.signature,
+        "SELECT w.hash, w.author, w.timestamp, w.warrantee, w.proof, w.signature, w.reason,
                 op.storage_center_loc, op.sys_validation_status, op.abandoned_at,
                 op.when_received, op.sys_validation_attempts, op.last_validation_attempt,
                 op.serialized_size
@@ -97,7 +101,7 @@ where
     E: Executor<'e, Database = Sqlite>,
 {
     sqlx::query_as(
-        "SELECT w.hash, w.author, w.timestamp, w.warrantee, w.proof, w.signature,
+        "SELECT w.hash, w.author, w.timestamp, w.warrantee, w.proof, w.signature, w.reason,
                 op.storage_center_loc, op.sys_validation_status, op.abandoned_at,
                 op.when_received, op.sys_validation_attempts, op.last_validation_attempt,
                 op.serialized_size
@@ -120,7 +124,7 @@ where
     E: Executor<'e, Database = Sqlite>,
 {
     sqlx::query_as(
-        "SELECT w.hash, w.author, w.timestamp, w.warrantee, w.proof, w.signature,
+        "SELECT w.hash, w.author, w.timestamp, w.warrantee, w.proof, w.signature, w.reason,
                 op.storage_center_loc, op.sys_validation_status, op.abandoned_at,
                 op.when_received, op.sys_validation_attempts, op.last_validation_attempt,
                 op.serialized_size

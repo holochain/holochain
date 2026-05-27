@@ -110,7 +110,10 @@ CREATE TABLE Warrant (
     timestamp INTEGER NOT NULL,
     warrantee BLOB    NOT NULL,
     proof     BLOB    NOT NULL,
-    signature BLOB    NOT NULL
+    signature BLOB    NOT NULL,
+    -- Human-readable rejection reason, denormalized out of `proof` for
+    -- queryability. NULL for warrants that carry no reason (e.g. chain forks).
+    reason    TEXT
 ) STRICT, WITHOUT ROWID;
 
 -- Op metadata for network-received warrants awaiting validation.

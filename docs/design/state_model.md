@@ -167,7 +167,8 @@ CREATE TABLE Warrant (
     timestamp INTEGER NOT NULL,
     warrantee BLOB NOT NULL,
     proof     BLOB NOT NULL,  -- Serialized WarrantProof (InvalidChainOp or ChainFork)
-    signature BLOB NOT NULL   -- Author's signature over the warrant
+    signature BLOB NOT NULL,  -- Author's signature over the warrant
+    reason    TEXT            -- InvalidChainOp rejection reason, denormalized from proof; NULL for chain forks
 );
 
 -- Op metadata for warrants awaiting validation.

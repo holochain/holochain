@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Serve Kitsune2 gossip op-store reads — op hashes, op data, presence checks, and the slice-hash cache — from the new `holochain_data` DHT store instead of the legacy databases. Warrant storage is split into shared `Warrant` content plus `LimboWarrantOp`/`WarrantOp` metadata tables, mirroring the action/chain-op split. \#5731
+- Serve Kitsune2 gossip op-store reads — op hashes, op data, presence checks, and the slice-hash cache — from the new `holochain_data` DHT store instead of the legacy databases. Warrant storage is split into shared `Warrant` content plus `LimboWarrantOp`/`WarrantOp` metadata tables, mirroring the action/chain-op split. The `Warrant` table also persists the `InvalidChainOp` rejection reason in a queryable `reason` column (denormalized from the proof), completing the persistence the reason feature intended. \#5731
 
 ## 0.7.0-dev.26
 

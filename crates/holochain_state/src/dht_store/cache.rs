@@ -123,6 +123,7 @@ impl DhtStore<DbWrite<Dht>> {
                 warrantee: &warrant_op.warrantee,
                 proof: &proof_bytes,
                 signature: &signature_bytes,
+                reason: warrant_op.proof.reason(),
                 storage_center_loc,
                 when_received: now,
                 serialized_size,

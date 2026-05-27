@@ -267,6 +267,20 @@ impl WarrantProof {
             Self::ChainIntegrity(_) => WarrantType::ChainIntegrityWarrant,
         }
     }
+
+    /// The human-readable rejection reason carried by this warrant, if any.
+    ///
+    /// Only [`ChainIntegrityWarrant::InvalidChainOp`] carries a reason;
+    /// chain-fork warrants return `None`. The reason is already bounded to
+    /// [`MAX_WARRANT_REASON_BYTES`] at warrant creation.
+    pub fn reason(&self) -> Option<&str> {
+        match self {
+            Self::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp { reason, .. }) => {
+                Some(reason.as_str())
+            }
+            Self::ChainIntegrity(ChainIntegrityWarrant::ChainFork { .. }) => None,
+        }
+    }
 }
 
 /// A signed warrant with a timestamp
@@ -303,6 +317,31 @@ mod tests {
             *chain_op_type = ChainOpType::StoreEntry;
         }
         assert_ne!(a, b);
+    }
+
+    #[test]
+    fn reason_returns_invalid_chain_op_reason() {
+        let proof = WarrantProof::ChainIntegrity(invalid_chain_op("because it was invalid"));
+        assert_eq!(proof.reason(), Some("because it was invalid"));
+    }
+
+    #[test]
+    fn reason_is_none_for_chain_fork() {
+        let proof = WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork {
+            chain_author: AgentPubKey::from_raw_36(vec![1u8; 36]),
+            action_pair: (
+                (
+                    ActionHash::from_raw_36(vec![2u8; 36]),
+                    Signature::from([3u8; 64]),
+                ),
+                (
+                    ActionHash::from_raw_36(vec![4u8; 36]),
+                    Signature::from([5u8; 64]),
+                ),
+            ),
+            seq: 5,
+        });
+        assert_eq!(proof.reason(), None);
     }
 
     #[test]

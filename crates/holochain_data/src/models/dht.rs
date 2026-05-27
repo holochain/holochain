@@ -144,6 +144,9 @@ pub struct LimboWarrantRow {
     pub proof: Vec<u8>,
     /// 64-byte signature over the warrant content.
     pub signature: Vec<u8>,
+    /// Human-readable rejection reason, denormalized out of `proof`;
+    /// `None` for warrants that carry no reason.
+    pub reason: Option<String>,
     /// Numeric storage center derived from the warrantee.
     pub storage_center_loc: i64,
     /// Encoded [`RecordValidity`](holochain_integrity_types::dht_v2::RecordValidity);
@@ -234,6 +237,9 @@ pub struct WarrantRow {
     pub proof: Vec<u8>,
     /// 64-byte signature over the warrant content.
     pub signature: Vec<u8>,
+    /// Human-readable rejection reason, denormalized out of `proof`;
+    /// `None` for warrants that carry no reason.
+    pub reason: Option<String>,
     /// Numeric storage center derived from the warrantee.
     pub storage_center_loc: i64,
     /// Microsecond timestamp at which the warrant was received.

@@ -279,6 +279,9 @@ async fn record_incoming_ops_inserts_limbo_warrant() {
     );
     let row = row.unwrap();
     assert!(row.serialized_size > 0, "serialized_size should be > 0");
+    // The rejection reason is extracted from the warrant proof and stored in
+    // its own column.
+    assert_eq!(row.reason.as_deref(), Some("test warrant"));
 }
 
 #[tokio::test]
@@ -800,4 +803,7 @@ async fn record_locally_validated_warrants_inserts_warrant() {
     // warrantee is seed.wrapping_add(50) = 80 for seed=30.
     let expected_warrantee = AgentPubKey::from_raw_36(vec![80u8; 36]);
     assert_eq!(row.warrantee, expected_warrantee.get_raw_36().to_vec());
+    // The rejection reason is extracted from the warrant proof and stored in
+    // its own column.
+    assert_eq!(row.reason.as_deref(), Some("test warrant"));
 }
