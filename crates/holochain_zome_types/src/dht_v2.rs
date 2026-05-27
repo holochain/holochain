@@ -79,6 +79,129 @@ pub fn from_legacy_signed_action(shh: &crate::record::SignedActionHashed) -> Sig
     SignedHashed::with_presigned(hashed, shh.signature().clone())
 }
 
+/// Reverse of [`from_legacy_signed_action`]: build a legacy
+/// [`crate::record::SignedActionHashed`] from a v2 [`SignedActionHashed`].
+///
+/// **Lossy.** Legacy actions carry a `weight` field (rate-limit metadata)
+/// that the v2 model deliberately discards; the reconstructed legacy
+/// actions get the [`Default`] weight value. Because the legacy hash
+/// includes the weight, the legacy hash of the reconstructed action will
+/// generally differ from the original legacy hash. This helper preserves
+/// the v2 hash on the returned legacy form so callers that need to use
+/// the stored identity (e.g. local indexing) still can, but **the wire
+/// hash will not match the stored hash** for ops that originally carried
+/// non-default weights. Cross-version conductor compatibility is broken
+/// by this; that is intentional during the storage migration.
+pub fn to_legacy_signed_action(sah: &SignedActionHashed) -> crate::record::SignedActionHashed {
+    use crate::action::{
+        Action as LegacyAction, AgentValidationPkg, CloseChain, Create, CreateLink, Delete,
+        DeleteLink, Dna, InitZomesComplete, OpenChain, Update,
+    };
+    use holo_hash::ActionHash;
+
+    let v2_action = &sah.hashed.content;
+    let header = &v2_action.header;
+    let author = header.author.clone();
+    let timestamp = header.timestamp;
+    let action_seq = header.action_seq;
+    // Legacy non-DNA actions require a `prev_action`. The DNA variant doesn't
+    // have one; for every other variant the column is non-NULL in storage, so
+    // unwrapping is safe in well-formed data. We fall back to a zero-hash to
+    // keep this helper total.
+    let prev_action = header
+        .prev_action
+        .clone()
+        .unwrap_or_else(|| ActionHash::from_raw_36(vec![0u8; 36]));
+
+    let legacy: LegacyAction = match &v2_action.data {
+        ActionData::Dna(d) => LegacyAction::Dna(Dna {
+            author,
+            timestamp,
+            hash: d.dna_hash.clone(),
+        }),
+        ActionData::AgentValidationPkg(d) => LegacyAction::AgentValidationPkg(AgentValidationPkg {
+            author,
+            timestamp,
+            action_seq,
+            prev_action,
+            membrane_proof: d.membrane_proof.clone(),
+        }),
+        ActionData::InitZomesComplete(_) => LegacyAction::InitZomesComplete(InitZomesComplete {
+            author,
+            timestamp,
+            action_seq,
+            prev_action,
+        }),
+        ActionData::Create(d) => LegacyAction::Create(Create {
+            author,
+            timestamp,
+            action_seq,
+            prev_action,
+            entry_type: d.entry_type.clone(),
+            entry_hash: d.entry_hash.clone(),
+            weight: Default::default(),
+        }),
+        ActionData::Update(d) => LegacyAction::Update(Update {
+            author,
+            timestamp,
+            action_seq,
+            prev_action,
+            original_action_address: d.original_action_address.clone(),
+            original_entry_address: d.original_entry_address.clone(),
+            entry_type: d.entry_type.clone(),
+            entry_hash: d.entry_hash.clone(),
+            weight: Default::default(),
+        }),
+        ActionData::Delete(d) => LegacyAction::Delete(Delete {
+            author,
+            timestamp,
+            action_seq,
+            prev_action,
+            deletes_address: d.deletes_address.clone(),
+            deletes_entry_address: d.deletes_entry_address.clone(),
+            weight: Default::default(),
+        }),
+        ActionData::CreateLink(d) => LegacyAction::CreateLink(CreateLink {
+            author,
+            timestamp,
+            action_seq,
+            prev_action,
+            base_address: d.base_address.clone(),
+            target_address: d.target_address.clone(),
+            zome_index: d.zome_index,
+            link_type: d.link_type,
+            tag: d.tag.clone(),
+            weight: Default::default(),
+        }),
+        ActionData::DeleteLink(d) => LegacyAction::DeleteLink(DeleteLink {
+            author,
+            timestamp,
+            action_seq,
+            prev_action,
+            base_address: d.base_address.clone(),
+            link_add_address: d.link_add_address.clone(),
+        }),
+        ActionData::CloseChain(d) => LegacyAction::CloseChain(CloseChain {
+            author,
+            timestamp,
+            action_seq,
+            prev_action,
+            new_target: d.new_target.clone(),
+        }),
+        ActionData::OpenChain(d) => LegacyAction::OpenChain(OpenChain {
+            author,
+            timestamp,
+            action_seq,
+            prev_action,
+            prev_target: d.prev_target.clone(),
+            close_hash: d.close_hash.clone(),
+        }),
+    };
+
+    let hashed = holo_hash::HoloHashed::with_pre_hashed(legacy, sah.as_hash().clone());
+    SignedHashed::with_presigned(hashed, sah.signature().clone())
+}
+
 /// A v2 [`Action`] with its [`crate::signature::Signature`] (no hash).
 pub type SignedAction = Signed<Action>;
 

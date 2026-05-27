@@ -62,6 +62,14 @@ pub type DhtStoreResult<T> = Result<T, DhtStoreError>;
 /// A read-only view of the DHT store.
 pub type DhtStoreRead = DhtStore<holochain_data::DbRead<Dht>>;
 
+// Re-exports of the row types returned by the K2 op-store reads, so
+// downstream crates (`holochain_p2p`) can consume them without depending
+// on `holochain_data` directly.
+pub use holochain_data::models::dht::{
+    K2ChainOpForWireRow, K2OpHashRow, K2OpIdSinceRow, K2OpPresentRow, K2WarrantForWireRow,
+    SliceHashIndexedRow,
+};
+
 /// Per-DNA store for the DHT database.
 ///
 /// Owns a [`DbWrite<Dht>`] handle (or a [`holochain_data::DbRead<Dht>`] in the
@@ -364,12 +372,16 @@ impl DhtStore<DbWrite<Dht>> {
         sqlx::query("DELETE FROM DeletedRecord")
             .execute(&mut *tx)
             .await?;
-        // Action and Warrant parents.
+        // Action and Warrant parents (warrant op metadata first, since both
+        // LimboWarrantOp and WarrantOp reference Warrant via FK).
         sqlx::query("DELETE FROM Action").execute(&mut *tx).await?;
-        sqlx::query("DELETE FROM Warrant").execute(&mut *tx).await?;
-        sqlx::query("DELETE FROM LimboWarrant")
+        sqlx::query("DELETE FROM LimboWarrantOp")
             .execute(&mut *tx)
             .await?;
+        sqlx::query("DELETE FROM WarrantOp")
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("DELETE FROM Warrant").execute(&mut *tx).await?;
         // Independent tables.
         sqlx::query("DELETE FROM Entry").execute(&mut *tx).await?;
         sqlx::query("DELETE FROM PrivateEntry")
@@ -384,6 +396,9 @@ impl DhtStore<DbWrite<Dht>> {
         sqlx::query("DELETE FROM ScheduledFunction")
             .execute(&mut *tx)
             .await?;
+        sqlx::query("DELETE FROM SliceHash")
+            .execute(&mut *tx)
+            .await?;
         tx.commit().await?;
         Ok(())
     }
@@ -392,8 +407,9 @@ impl DhtStore<DbWrite<Dht>> {
     ///
     /// For each [`DhtOpHashed`], the parent `Action` (and any associated
     /// `Entry`) is inserted into the DHT database first, then the op itself
-    /// is inserted into `LimboChainOp` (chain ops) or `LimboWarrant` (warrant
-    /// ops).  `require_receipt = true`; `serialized_size` is provided by the
+    /// is inserted into `LimboChainOp` (chain ops) or `Warrant` +
+    /// `LimboWarrantOp` (warrant ops).  `require_receipt = true`;
+    /// `serialized_size` is provided by the
     /// caller and should reflect the size of the op as received from the network.
     ///
     /// All writes happen in a single transaction.  The `Action` and both limbo
@@ -464,6 +480,7 @@ impl DhtStore<DbWrite<Dht>> {
                     let storage_center_loc = warrantee.get_loc();
                     let proof_bytes = holochain_serialized_bytes::encode(&warrant_op.proof)
                         .map_err(StateMutationError::from)?;
+                    let signature_bytes = warrant_op.signature().0;
 
                     tx.insert_limbo_warrant(InsertLimboWarrant {
                         hash: &op_hash,
@@ -471,6 +488,8 @@ impl DhtStore<DbWrite<Dht>> {
                         timestamp,
                         warrantee,
                         proof: &proof_bytes,
+                        signature: &signature_bytes,
+                        reason: warrant_op.proof.reason(),
                         storage_center_loc,
                         when_received: now,
                         serialized_size,
@@ -509,7 +528,7 @@ impl DhtStore<DbWrite<Dht>> {
     /// Record the system validation outcome for each warrant op.
     ///
     /// For each (op_hash, outcome) pair, updates `sys_validation_status` on the
-    /// matching `LimboWarrant` row.
+    /// matching `LimboWarrantOp` row.
     pub async fn record_warrant_sys_validation_outcomes(
         &self,
         outcomes: Vec<(DhtOpHash, SysOutcome)>,
@@ -550,9 +569,9 @@ impl DhtStore<DbWrite<Dht>> {
         Ok(())
     }
 
-    /// Insert self-authored warrants directly into the `Warrant` table, bypassing
-    /// `LimboWarrant`.  Self-authored warrants are locally trusted and do not need
-    /// to go through the limbo/validation cycle.
+    /// Insert self-authored warrants directly into the `Warrant` + `WarrantOp`
+    /// tables, bypassing limbo (`LimboWarrantOp`).  Self-authored warrants are
+    /// locally trusted and do not need to go through the limbo/validation cycle.
     ///
     /// Any op that is not a `WarrantOp` is skipped with a warning log.  All
     /// inserts happen in a single transaction.
@@ -563,7 +582,11 @@ impl DhtStore<DbWrite<Dht>> {
         use holochain_data::dht::InsertWarrant;
 
         let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
+        let now = Timestamp::now();
         for op in warrants {
+            let serialized_size = holochain_serialized_bytes::encode(op.as_content())
+                .map_err(StateMutationError::from)?
+                .len() as u32;
             let warrant_op = match op.as_content() {
                 DhtOp::WarrantOp(w) => w,
                 DhtOp::ChainOp(_) => {
@@ -576,13 +599,19 @@ impl DhtStore<DbWrite<Dht>> {
             let hash = op.as_hash();
             let proof_bytes = holochain_serialized_bytes::encode(&warrant_op.proof)
                 .map_err(StateMutationError::from)?;
+            let signature_bytes = warrant_op.signature().0;
             tx.insert_warrant(InsertWarrant {
                 hash,
                 author: &warrant_op.author,
                 timestamp: warrant_op.timestamp,
                 warrantee: &warrant_op.warrantee,
                 proof: &proof_bytes,
+                signature: &signature_bytes,
+                reason: warrant_op.proof.reason(),
                 storage_center_loc: warrant_op.warrantee.get_loc(),
+                when_received: now,
+                when_integrated: now,
+                serialized_size,
             })
             .await
             .map_err(StateMutationError::from)?;
@@ -596,8 +625,8 @@ impl DhtStore<DbWrite<Dht>> {
     ///
     /// Chain ops are moved from `LimboChainOp` → `ChainOp` with the terminal
     /// `validation_status` computed from the captured sys/app outcomes.
-    /// Warrants are moved from `LimboWarrant` → `Warrant` (no timestamp
-    /// column on `Warrant`).
+    /// Warrants are promoted by moving their op metadata from `LimboWarrantOp`
+    /// → `WarrantOp`; the shared `Warrant` content row stays put.
     ///
     /// Returns the set of promoted op hashes (chain ops and warrant hashes
     /// together).  A generous batch limit is used; if more than that are ready
@@ -634,7 +663,7 @@ impl DhtStore<DbWrite<Dht>> {
         for row in warrant_ready {
             let hash = DhtOpHash::from_raw_36(row.hash.clone());
             let promoted_ok = tx
-                .promote_limbo_warrant(&hash)
+                .promote_limbo_warrant(&hash, when_integrated)
                 .await
                 .map_err(StateMutationError::from)?;
             if promoted_ok {
@@ -776,6 +805,7 @@ impl DhtStore<DbWrite<Dht>> {
 
 pub(crate) mod action_indexes;
 mod cache;
+mod sync_reads;
 
 #[cfg(test)]
 mod tests;

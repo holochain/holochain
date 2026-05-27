@@ -136,7 +136,7 @@ async fn purge_all_empties_every_table() {
         ("CapClaim", "SELECT COUNT(*) FROM CapClaim"),
         ("ChainLock", "SELECT COUNT(*) FROM ChainLock"),
         ("LimboChainOp", "SELECT COUNT(*) FROM LimboChainOp"),
-        ("LimboWarrant", "SELECT COUNT(*) FROM LimboWarrant"),
+        ("LimboWarrantOp", "SELECT COUNT(*) FROM LimboWarrantOp"),
         ("ChainOp", "SELECT COUNT(*) FROM ChainOp"),
         ("ChainOpPublish", "SELECT COUNT(*) FROM ChainOpPublish"),
         (
@@ -144,6 +144,7 @@ async fn purge_all_empties_every_table() {
             "SELECT COUNT(*) FROM ValidationReceipt",
         ),
         ("Warrant", "SELECT COUNT(*) FROM Warrant"),
+        ("WarrantOp", "SELECT COUNT(*) FROM WarrantOp"),
         ("WarrantPublish", "SELECT COUNT(*) FROM WarrantPublish"),
         ("Link", "SELECT COUNT(*) FROM Link"),
         ("DeletedLink", "SELECT COUNT(*) FROM DeletedLink"),
@@ -153,6 +154,7 @@ async fn purge_all_empties_every_table() {
             "ScheduledFunction",
             "SELECT COUNT(*) FROM ScheduledFunction",
         ),
+        ("SliceHash", "SELECT COUNT(*) FROM SliceHash"),
     ] {
         let count: i64 = sqlx::query_scalar(sql).fetch_one(pool).await.unwrap();
         assert_eq!(count, 0, "{table} not empty after purge_all");
@@ -277,6 +279,9 @@ async fn record_incoming_ops_inserts_limbo_warrant() {
     );
     let row = row.unwrap();
     assert!(row.serialized_size > 0, "serialized_size should be > 0");
+    // The rejection reason is extracted from the warrant proof and stored in
+    // its own column.
+    assert_eq!(row.reason.as_deref(), Some("test warrant"));
 }
 
 #[tokio::test]
@@ -798,4 +803,7 @@ async fn record_locally_validated_warrants_inserts_warrant() {
     // warrantee is seed.wrapping_add(50) = 80 for seed=30.
     let expected_warrantee = AgentPubKey::from_raw_36(vec![80u8; 36]);
     assert_eq!(row.warrantee, expected_warrantee.get_raw_36().to_vec());
+    // The rejection reason is extracted from the warrant proof and stored in
+    // its own column.
+    assert_eq!(row.reason.as_deref(), Some("test warrant"));
 }

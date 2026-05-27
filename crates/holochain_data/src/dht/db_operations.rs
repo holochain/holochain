@@ -17,6 +17,8 @@ mod limbo_chain_op;
 mod limbo_warrant;
 mod link;
 mod scheduled_function;
+mod slice_hash;
+mod sync_queries;
 mod updated_record;
 mod validation_receipt;
 mod warrant;

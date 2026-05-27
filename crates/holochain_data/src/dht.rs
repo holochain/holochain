@@ -655,6 +655,8 @@ mod tests {
             timestamp: Timestamp::from_micros(10),
             warrantee: &warrantee,
             proof: &proof,
+            signature: &[7u8; 64],
+            reason: Some("invalid chain op"),
             storage_center_loc: 77,
             when_received: Timestamp::from_micros(100),
             serialized_size: 128,
@@ -669,6 +671,8 @@ mod tests {
             .unwrap()
             .expect("missing");
         assert_eq!(row.warrantee, warrantee.get_raw_36().to_vec());
+        assert_eq!(row.signature, vec![7u8; 64]);
+        assert_eq!(row.reason.as_deref(), Some("invalid chain op"));
         assert!(
             db.as_ref()
                 .limbo_warrants_pending_sys_validation(10)
@@ -684,7 +688,7 @@ mod tests {
             .unwrap()
             .is_empty());
 
-        sqlx::query("UPDATE LimboWarrant SET sys_validation_status = 1 WHERE hash = ?")
+        sqlx::query("UPDATE LimboWarrantOp SET sys_validation_status = 1 WHERE hash = ?")
             .bind(hash.get_raw_36())
             .execute(db.pool())
             .await
@@ -715,7 +719,12 @@ mod tests {
             timestamp: Timestamp::from_micros(1),
             warrantee: &warrantee,
             proof: &[9u8; 32],
+            signature: &[8u8; 64],
+            reason: Some("rejected by app validation"),
             storage_center_loc: 88,
+            when_received: Timestamp::from_micros(40),
+            when_integrated: Timestamp::from_micros(50),
+            serialized_size: 128,
         })
         .await
         .unwrap();
@@ -727,6 +736,10 @@ mod tests {
             .unwrap()
             .expect("missing");
         assert_eq!(row.warrantee, warrantee.get_raw_36().to_vec());
+        assert_eq!(row.when_received, 40);
+        assert_eq!(row.when_integrated, 50);
+        assert_eq!(row.serialized_size, 128);
+        assert_eq!(row.reason.as_deref(), Some("rejected by app validation"));
 
         let by_warrantee = db
             .as_ref()
@@ -856,7 +869,12 @@ mod tests {
             timestamp: Timestamp::from_micros(1),
             warrantee: &warrantee,
             proof: &[0u8; 32],
+            signature: &[1u8; 64],
+            reason: None,
             storage_center_loc: 0,
+            when_received: Timestamp::from_micros(3),
+            when_integrated: Timestamp::from_micros(5),
+            serialized_size: 64,
         })
         .await
         .unwrap();
@@ -1202,6 +1220,8 @@ mod tests {
             timestamp: Timestamp::from_micros(10),
             warrantee: &warrantee,
             proof: &[0u8; 64],
+            signature: &[0u8; 64],
+            reason: None,
             storage_center_loc: 77,
             when_received: Timestamp::from_micros(100),
             serialized_size: 128,
@@ -1300,6 +1320,8 @@ mod tests {
             timestamp: Timestamp::from_micros(10),
             warrantee: &warrantee,
             proof: &[5u8; 64],
+            signature: &[6u8; 64],
+            reason: Some("invalid chain op"),
             storage_center_loc: 77,
             when_received: Timestamp::from_micros(100),
             serialized_size: 128,
@@ -1307,7 +1329,10 @@ mod tests {
         .await
         .unwrap();
 
-        let promoted = db.promote_limbo_warrant(&hash).await.unwrap();
+        let promoted = db
+            .promote_limbo_warrant(&hash, Timestamp::from_micros(200))
+            .await
+            .unwrap();
         assert!(promoted);
 
         assert!(db
@@ -1322,9 +1347,19 @@ mod tests {
             .await
             .unwrap()
             .expect("warrant");
+        assert_eq!(row.author, author.get_raw_36().to_vec());
+        assert_eq!(row.timestamp, 10);
         assert_eq!(row.warrantee, warrantee.get_raw_36().to_vec());
         assert_eq!(row.proof, vec![5u8; 64]);
+        assert_eq!(row.signature, vec![6u8; 64]);
         assert_eq!(row.storage_center_loc, 77);
+        assert_eq!(row.when_received, 100);
+        // `when_integrated` is the promotion timestamp, not the limbo one.
+        assert_eq!(row.when_integrated, 200);
+        assert_eq!(row.serialized_size, 128);
+        // The reason rides on the shared `Warrant` content row, so it
+        // survives promotion unchanged.
+        assert_eq!(row.reason.as_deref(), Some("invalid chain op"));
     }
 
     #[tokio::test]

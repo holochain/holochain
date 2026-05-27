@@ -13,7 +13,6 @@ use holochain_p2p::{
 };
 use holochain_timestamp::{InclusiveTimestampInterval, Timestamp};
 use holochain_types::{
-    db::{DbKindCache, DbKindDht, DbWrite},
     prelude::{Block, BlockTargetId, CellBlockReason, CellId},
     record::WireRecordOps,
 };
@@ -519,8 +518,11 @@ impl TestActor {
         keystore: MetaLairClient,
         bootstrap_addr: &SocketAddr,
     ) -> Self {
-        let op_db = DbWrite::test_in_mem(DbKindDht(Arc::new(dna_hash.clone()))).unwrap();
-        let cache_db = DbWrite::test_in_mem(DbKindCache(Arc::new(dna_hash.clone()))).unwrap();
+        let dht_store = holochain_state::DhtStore::new_test(holochain_data::kind::Dht::new(
+            Arc::new(dna_hash.clone()),
+        ))
+        .await
+        .unwrap();
         let peer_meta_db = holochain_state::peer_metadata_store::PeerMetaStore::new(
             holochain_data::test_open_db(PeerMetaStore::new(Arc::new(dna_hash.clone())))
                 .await
@@ -531,13 +533,9 @@ impl TestActor {
                 let conductor_store = conductor_store.clone();
                 Box::pin(async move { conductor_store })
             }),
-            get_db_op_store: Arc::new(move |_| {
-                let op_db = op_db.clone();
-                Box::pin(async move { Ok(op_db) })
-            }),
-            get_db_cache: Arc::new(move |_| {
-                let cache_db = cache_db.clone();
-                Box::pin(async move { Ok(cache_db) })
+            get_dht_store: Arc::new(move |_| {
+                let dht_store = dht_store.clone();
+                Box::pin(async move { Ok(dht_store) })
             }),
             get_db_peer_meta: Arc::new(move |_| {
                 let peer_meta_db = peer_meta_db.clone();

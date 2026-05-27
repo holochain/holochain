@@ -28,17 +28,15 @@ pub type GetDbPeerMeta = Arc<
         + Sync,
 >;
 
-/// Callback function to retrieve an op store database handle for a dna hash.
-pub type GetDbOpStore = Arc<
-    dyn Fn(DnaHash) -> BoxFut<'static, HolochainP2pResult<DbWrite<DbKindDht>>>
-        + 'static
-        + Send
-        + Sync,
->;
-
-/// Callback function to retrieve a cache database handle for a dna hash.
-pub type GetDbCache = Arc<
-    dyn Fn(DnaHash) -> BoxFut<'static, HolochainP2pResult<DbWrite<DbKindCache>>>
+/// Callback function to retrieve the per-DNA [`DhtStore`] used by the K2
+/// op-store backend.
+///
+/// The returned store is write-capable: it serves K2's reads (time-slice,
+/// `retrieve_ops`, etc.) **and** K2's writes (`store_slice_hash`).
+///
+/// [`DhtStore`]: holochain_state::DhtStore
+pub type GetDhtStore = Arc<
+    dyn Fn(DnaHash) -> BoxFut<'static, HolochainP2pResult<holochain_state::DhtStore>>
         + 'static
         + Send
         + Sync,
@@ -79,36 +77,25 @@ pub struct HolochainP2pConfig {
     /// Default: 10 s
     pub peer_meta_pruning_interval_ms: u64,
 
-    /// Callback function to retrieve an op store database handle for a dna hash.
+    /// Callback function to retrieve the per-DNA [`DhtStore`] used by the
+    /// K2 op-store backend.
     ///
-    /// Called when a new space is created to open the DHT [`DbWrite`] for that DNA. Gossip uses
-    /// the returned handle to read and write ops for that space.
-    ///
-    /// **Must be set explicitly** — the [`Default`] value panics when called. Example:
-    ///
-    /// ```ignore
-    /// get_db_op_store: Arc::new(move |dna_hash| {
-    ///     let res = spaces.dht(&dna_hash);
-    ///     Box::pin(async move { res.map_err(HolochainP2pError::other) })
-    /// }),
-    /// ```
-    pub get_db_op_store: GetDbOpStore,
-
-    /// Callback function to retrieve a cache database handle for a dna hash.
-    ///
-    /// Called when a new space is created to open the cache [`DbWrite`] for that DNA.
-    /// The returned handle is used alongside [`get_db_op_store`](Self::get_db_op_store)
-    /// to report the total local op count to gossip.
+    /// Called when a new space is created. The returned store handles all
+    /// K2 reads (time-slice, `retrieve_ops`, etc.) and writes
+    /// (`store_slice_hash`) against the `holochain_data` DHT database for
+    /// that DNA.
     ///
     /// **Must be set explicitly** — the [`Default`] value panics when called. Example:
     ///
     /// ```ignore
-    /// get_db_cache: Arc::new(move |dna_hash| {
-    ///     let res = spaces.cache(&dna_hash);
+    /// get_dht_store: Arc::new(move |dna_hash| {
+    ///     let res = spaces.dht_store(&dna_hash);
     ///     Box::pin(async move { res.map_err(HolochainP2pError::other) })
     /// }),
     /// ```
-    pub get_db_cache: GetDbCache,
+    ///
+    /// [`DhtStore`]: holochain_state::DhtStore
+    pub get_dht_store: GetDhtStore,
 
     /// Callback function to retrieve the conductor store.
     ///
@@ -206,7 +193,7 @@ impl std::fmt::Debug for HolochainP2pConfig {
 impl Default for HolochainP2pConfig {
     /// Returns a config with placeholder values.
     ///
-    /// The database callbacks (`get_db_peer_meta`, `get_db_op_store`, `get_db_cache`,
+    /// The database callbacks (`get_db_peer_meta`, `get_dht_store`,
     /// `get_conductor_store`) all panic with `unimplemented!()` when invoked — they will
     /// be called the first time a space is created, so **always supply concrete
     /// implementations** before passing this config to [`spawn_holochain_p2p`].
@@ -214,8 +201,7 @@ impl Default for HolochainP2pConfig {
     ///
     /// ```ignore
     /// let config = HolochainP2pConfig {
-    ///     get_db_op_store: Arc::new(move |dna_hash| { ... }),
-    ///     get_db_cache: Arc::new(move |dna_hash| { ... }),
+    ///     get_dht_store: Arc::new(move |dna_hash| { ... }),
     ///     ..HolochainP2pConfig::default()
     /// };
     /// ```
@@ -223,8 +209,7 @@ impl Default for HolochainP2pConfig {
         Self {
             get_db_peer_meta: Arc::new(|_| unimplemented!()),
             peer_meta_pruning_interval_ms: 10_000,
-            get_db_op_store: Arc::new(|_| unimplemented!()),
-            get_db_cache: Arc::new(|_| unimplemented!()),
+            get_dht_store: Arc::new(|_| unimplemented!()),
             get_conductor_store: Arc::new(|| unimplemented!()),
             target_arc_factor: 1,
             auth_material_bootstrap: None,

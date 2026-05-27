@@ -1,18 +1,27 @@
-//! `DbRead<Dht>` / `DbWrite<Dht>` API for the `LimboWarrant` table.
+//! `DbRead<Dht>` / `DbWrite<Dht>` API for the `Warrant` + `LimboWarrantOp` tables.
 
 use super::super::inner::limbo_warrant::{self, InsertLimboWarrant};
 use crate::handles::{DbRead, DbWrite};
 use crate::kind::Dht;
 use crate::models::dht::LimboWarrantRow;
 use holo_hash::DhtOpHash;
+use holochain_timestamp::Timestamp;
 
 impl DbWrite<Dht> {
+    /// Insert a limbo warrant atomically into `Warrant` + `LimboWarrantOp`.
     pub async fn insert_limbo_warrant(&self, w: InsertLimboWarrant<'_>) -> sqlx::Result<()> {
-        limbo_warrant::insert_limbo_warrant(self.pool(), w).await
+        let mut tx = self.begin().await?;
+        limbo_warrant::insert_limbo_warrant(tx.conn_mut(), w).await?;
+        tx.commit().await?;
+        Ok(())
     }
 
+    /// Delete a limbo warrant atomically from `LimboWarrantOp` + `Warrant`.
     pub async fn delete_limbo_warrant(&self, hash: DhtOpHash) -> sqlx::Result<()> {
-        limbo_warrant::delete_limbo_warrant(self.pool(), hash).await
+        let mut tx = self.begin().await?;
+        limbo_warrant::delete_limbo_warrant(tx.conn_mut(), hash).await?;
+        tx.commit().await?;
+        Ok(())
     }
 
     /// Set the system-validation status for the given warrant. Returns the number of rows updated.
@@ -24,14 +33,19 @@ impl DbWrite<Dht> {
         limbo_warrant::set_sys_validation_status(self.pool(), hash, status).await
     }
 
-    /// Atomically promote a `LimboWarrant` row to the `Warrant` table.
+    /// Atomically promote a limbo warrant: move metadata from `LimboWarrantOp`
+    /// to `WarrantOp`, stamping `when_integrated`. `Warrant` content stays put.
     ///
-    /// Begins a transaction, delegates to the inner promotion helper, and
-    /// commits on success.  Returns `true` if the limbo row existed and was
-    /// promoted, `false` if it did not exist.
-    pub async fn promote_limbo_warrant(&self, hash: &DhtOpHash) -> sqlx::Result<bool> {
+    /// Returns `true` if the limbo row existed and was promoted, `false`
+    /// if it did not exist.
+    pub async fn promote_limbo_warrant(
+        &self,
+        hash: &DhtOpHash,
+        when_integrated: Timestamp,
+    ) -> sqlx::Result<bool> {
         let mut tx = self.begin().await?;
-        let result = limbo_warrant::promote_to_warrant(tx.conn_mut(), hash).await?;
+        let result =
+            limbo_warrant::promote_to_warrant(tx.conn_mut(), hash, when_integrated).await?;
         tx.commit().await?;
         Ok(result)
     }

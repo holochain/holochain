@@ -565,8 +565,7 @@ impl HolochainP2pActor {
             getter: config.get_db_peer_meta.clone(),
         });
         builder.op_store = Arc::new(HolochainOpStoreFactory {
-            getter: config.get_db_op_store.clone(),
-            cache_getter: config.get_db_cache.clone(),
+            getter: config.get_dht_store.clone(),
             handler: evt_sender.clone(),
         });
         let preflight = Arc::new(Mutex::new(

@@ -2,7 +2,7 @@
 //!
 //! Chain ops fetched from peer authorities are inserted with
 //! `locally_validated = false`, bypassing limbo. Warrants are always routed
-//! through `LimboWarrant` so the local conductor can validate them
+//! through limbo (`LimboWarrantOp`) so the local conductor can validate them
 //! regardless of arc coverage.
 
 use holo_hash::{AnyDhtHash, HasHash};
@@ -94,7 +94,7 @@ impl DhtStore<DbWrite<Dht>> {
         Ok(())
     }
 
-    /// Insert cached warrants into `LimboWarrant`.
+    /// Insert cached warrants into `Warrant` + `LimboWarrantOp`.
     ///
     /// Warrants must be locally validated regardless of arc coverage, so they
     /// are routed through limbo rather than inserted directly.
@@ -110,7 +110,11 @@ impl DhtStore<DbWrite<Dht>> {
             let op_hash = holo_hash::DhtOpHash::with_data_sync(&warrant_op);
             let proof_bytes = holochain_serialized_bytes::encode(&warrant_op.proof)
                 .map_err(StateMutationError::from)?;
+            let signature_bytes = warrant_op.signature().0;
             let storage_center_loc = warrant_op.warrantee.get_loc();
+            let serialized_size = holochain_serialized_bytes::encode(&warrant_op)
+                .map_err(StateMutationError::from)?
+                .len() as u32;
 
             tx.insert_limbo_warrant(InsertLimboWarrant {
                 hash: &op_hash,
@@ -118,9 +122,11 @@ impl DhtStore<DbWrite<Dht>> {
                 timestamp: warrant_op.timestamp,
                 warrantee: &warrant_op.warrantee,
                 proof: &proof_bytes,
+                signature: &signature_bytes,
+                reason: warrant_op.proof.reason(),
                 storage_center_loc,
                 when_received: now,
-                serialized_size: 0,
+                serialized_size,
             })
             .await
             .map_err(StateMutationError::from)?;
