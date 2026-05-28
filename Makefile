@@ -50,8 +50,10 @@ static-clippy-unstable:
 	CHK_SQL_FMT=1 cargo clippy --all-targets --features $(UNSTABLE_FEATURES)
 
 # ensure we can build the docs
+# --no-deps skips generating HTML for third-party dependencies, which is the
+# bulk of the work; we only care that our own crates' docs build cleanly.
 static-doc:
-	RUSTDOCFLAGS=-Dwarnings cargo doc
+	RUSTDOCFLAGS=-Dwarnings cargo doc --workspace --no-deps
 
 # build all targets
 # this not only builds the test binaries for usage by `test-workspace`,
