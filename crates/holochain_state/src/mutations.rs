@@ -1265,6 +1265,54 @@ pub async fn copy_cached_op_to_dht(
     Ok(Some(op_to_return))
 }
 
+/// Read a single chain op of `chain_op_type` for `action_hash` from a DHT
+/// database, reconstructing it from the stored action and (optional) entry.
+///
+/// Returns `None` if the action is not present. Used to backfill an op from
+/// the legacy DHT database into the new `DhtStore` when it is missing there.
+pub async fn read_chain_op_from_dht(
+    dht: DbRead<DbKindDht>,
+    action_hash: ActionHash,
+    chain_op_type: ChainOpType,
+) -> StateMutationResult<Option<DhtOpHashed>> {
+    let maybe_action_entry = dht
+        .read_async(
+            move |txn| -> StateMutationResult<Option<(SignedAction, Option<Entry>)>> {
+                let mut stmt = txn.prepare(
+                    "SELECT Action.blob, Entry.blob \
+                     FROM Action LEFT JOIN Entry ON Action.entry_hash = Entry.hash \
+                     WHERE Action.hash = :action_hash",
+                )?;
+                let maybe = stmt
+                    .query_row(named_params! { ":action_hash": action_hash }, |row| {
+                        Ok((
+                            row.get::<_, Vec<u8>>(0)?,
+                            row.get::<_, Option<Vec<u8>>>(1)?,
+                        ))
+                    })
+                    .optional()?
+                    .map(
+                        |(action_blob, entry_blob): (Vec<u8>, Option<Vec<u8>>)| -> StateMutationResult<(SignedAction, Option<Entry>)> {
+                            Ok((
+                                from_blob::<SignedAction>(action_blob)?,
+                                entry_blob.map(from_blob).transpose()?,
+                            ))
+                        },
+                    )
+                    .transpose()?;
+                Ok(maybe)
+            },
+        )
+        .await?;
+
+    let Some((action, maybe_entry)) = maybe_action_entry else {
+        return Ok(None);
+    };
+
+    let dht_op = DhtOp::from(ChainOp::from_type(chain_op_type, action, maybe_entry)?);
+    Ok(Some(DhtOpHashed::from_content_sync(dht_op)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
