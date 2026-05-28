@@ -15,9 +15,14 @@ use holochain_zome_types::dht_v2::RecordValidity;
 
 impl DhtStore<DbRead<Dht>> {
     /// Returns `true` if `hash` appears in any op-bearing DHT table
-    /// (`ChainOp`, `LimboChainOp`, `Warrant`, `LimboWarrant`).
+    /// (`ChainOp`, `LimboChainOp`, `WarrantOp`, `LimboWarrantOp`).
     pub async fn op_exists(&self, hash: &DhtOpHash) -> StateQueryResult<bool> {
         Ok(self.db().op_exists(hash).await?)
+    }
+
+    /// Count integrated ops (chain ops plus warrants) held in the DHT store.
+    pub async fn count_integrated_ops(&self) -> StateQueryResult<i64> {
+        Ok(self.db().count_integrated_ops().await?)
     }
 
     /// Drop any op whose hash is already recorded in the DHT store.
@@ -291,9 +296,7 @@ fn chain_op_from_joined_row(
     let v2_signed: SignedActionHashed =
         SignedActionHashed::with_presigned(hashed, V2Signature(sig_bytes));
 
-    let legacy = to_legacy_signed_action(&v2_signed).map_err(|e| {
-        crate::query::StateQueryError::Other(format!("to_legacy_signed_action: {e}"))
-    })?;
+    let legacy = to_legacy_signed_action(&v2_signed);
     let signature: Signature = legacy.signature().clone();
     let action: LegacyAction = legacy.action().clone();
 

@@ -4,7 +4,7 @@ use holo_hash::DhtOpHash;
 use sqlx::{Executor, Sqlite};
 
 /// Returns `true` if the given op hash appears in any of the op-bearing
-/// tables (`ChainOp`, `LimboChainOp`, `Warrant`, `LimboWarrant`).
+/// tables (`ChainOp`, `LimboChainOp`, `WarrantOp`, `LimboWarrantOp`).
 ///
 /// Used by the incoming-ops workflow to filter ops that have already
 /// been recorded locally so we don't re-process duplicates from the
@@ -20,9 +20,9 @@ where
             UNION ALL
             SELECT 1 FROM LimboChainOp WHERE hash = ?1
             UNION ALL
-            SELECT 1 FROM Warrant WHERE hash = ?1
+            SELECT 1 FROM WarrantOp WHERE hash = ?1
             UNION ALL
-            SELECT 1 FROM LimboWarrant WHERE hash = ?1
+            SELECT 1 FROM LimboWarrantOp WHERE hash = ?1
             LIMIT 1
          )",
     )
