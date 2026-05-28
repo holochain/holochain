@@ -328,19 +328,16 @@ impl DhtStore<DbWrite<Dht>> {
         let signature_bytes = holochain_serialized_bytes::encode(&receipt.validators_signatures)
             .map_err(StateMutationError::from)?;
 
-        let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
-
-        tx.insert_validation_receipt(
-            &receipt_hash,
-            &op_hash,
-            &validators_bytes,
-            &signature_bytes,
-            holochain_types::prelude::Timestamp::now(),
-        )
-        .await
-        .map_err(StateMutationError::from)?;
-
-        tx.commit().await.map_err(StateMutationError::from)?;
+        self.db
+            .insert_validation_receipt(
+                &receipt_hash,
+                &op_hash,
+                &validators_bytes,
+                &signature_bytes,
+                holochain_types::prelude::Timestamp::now(),
+            )
+            .await
+            .map_err(StateMutationError::from)?;
 
         let op_hash_bytes = op_hash.get_raw_36().to_vec();
         let count: i64 =
@@ -941,8 +938,7 @@ impl DhtStore<DbWrite<Dht>> {
         &self,
         op_hash: &holo_hash::DhtOpHash,
     ) -> DhtStoreResult<Option<Timestamp>> {
-        let mut tx = self.db.begin().await?;
-        let row = tx.as_mut().get_chain_op(op_hash.clone()).await?;
+        let row = self.db.as_ref().get_chain_op(op_hash.clone()).await?;
         Ok(row.map(|r| Timestamp::from_micros(r.when_integrated)))
     }
 }
