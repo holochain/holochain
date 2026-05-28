@@ -239,8 +239,7 @@ async fn sys_validation_workflow_inner(
         .dht_store
         .as_read()
         .ops_pending_sys_validation(10_000)
-        .await
-        .map_err(WorkflowError::from)?;
+        .await?;
 
     // Forget what dependencies are currently in use
     current_validation_dependencies
@@ -656,13 +655,62 @@ async fn move_and_check_warrant_deps(
             }
             Ok(None) => {
                 // It's in the legacy DHT DB already; the new DhtStore may still
-                // need it — attempt the limbo move in case it was missed earlier.
-                if let Err(e) = workspace
+                // need it. First try moving a cache-mirrored copy into limbo.
+                match workspace
                     .dht_store
                     .move_warranted_op_to_limbo(&action_hash, op_type)
                     .await
                 {
-                    tracing::debug!(error = ?e, "Could not move warranted op to limbo (may already be integrated)");
+                    Ok(true) => {}
+                    Ok(false) => {
+                        // No cache-only row was moved: the op is either already
+                        // integrated/in limbo (fine) or absent from the new
+                        // store entirely. Backfill the latter case by reading it
+                        // from the legacy DB and recording it, but only if it is
+                        // genuinely missing (filter_existing_ops drops ops that
+                        // are already validated or in limbo).
+                        match holochain_state::mutations::read_chain_op_from_dht(
+                            workspace.dht_db.clone().into(),
+                            action_hash.clone(),
+                            op_type,
+                        )
+                        .await
+                        {
+                            Ok(Some(op)) => {
+                                match workspace
+                                    .dht_store
+                                    .as_read()
+                                    .filter_existing_ops(vec![op])
+                                    .await
+                                {
+                                    Ok(missing) if !missing.is_empty() => {
+                                        if let Err(e) =
+                                            workspace.dht_store.record_incoming_ops(missing).await
+                                        {
+                                            tracing::error!(error = ?e, ?action_hash, ?op_type, "Error backfilling warranted op into new DhtStore limbo");
+                                        }
+                                    }
+                                    Ok(_) => {}
+                                    Err(e) => {
+                                        tracing::error!(error = ?e, ?action_hash, "Error checking warranted op presence in new DhtStore");
+                                    }
+                                }
+                            }
+                            Ok(None) => {
+                                tracing::warn!(
+                                    ?action_hash,
+                                    ?op_type,
+                                    "Warranted op not found in legacy DHT DB for backfill"
+                                );
+                            }
+                            Err(e) => {
+                                tracing::error!(error = ?e, ?action_hash, "Error reading warranted op from legacy DHT DB");
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        tracing::debug!(error = ?e, "Could not move warranted op to limbo (may already be integrated)");
+                    }
                 }
             }
             Err(StateMutationError::OpNotFoundInCache) => {

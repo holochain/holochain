@@ -1,4 +1,4 @@
-use super::error::{WorkflowError, WorkflowResult};
+use super::error::WorkflowResult;
 use crate::core::queue_consumer::WorkComplete;
 use futures::{stream, StreamExt};
 use holochain_keystore::MetaLairClient;
@@ -50,8 +50,7 @@ pub async fn validation_receipt_workflow(
     // Get out all ops that are marked for sending receipt.
     let receipts = dht_store
         .pending_validation_receipts(validators.clone())
-        .await
-        .map_err(WorkflowError::from)?;
+        .await?;
 
     let validators: HashSet<_> = validators.into_iter().collect();
 
@@ -93,10 +92,7 @@ pub async fn validation_receipt_workflow(
                         .await?;
                 }
                 // Mirror: clear `require_receipt` on the new-DB `ChainOp` rows.
-                dht_store
-                    .clear_require_receipts(op_hashes)
-                    .await
-                    .map_err(WorkflowError::from)?;
+                dht_store.clear_require_receipts(op_hashes).await?;
                 continue;
             }
         }
@@ -123,10 +119,7 @@ pub async fn validation_receipt_workflow(
                         .await?;
                 }
                 // Mirror: clear `require_receipt` on the new-DB `ChainOp` rows.
-                dht_store
-                    .clear_require_receipts(op_hashes)
-                    .await
-                    .map_err(WorkflowError::from)?;
+                dht_store.clear_require_receipts(op_hashes).await?;
             }
             Err(e) => {
                 info!(failed_to_sign_and_send_receipt = ?e);

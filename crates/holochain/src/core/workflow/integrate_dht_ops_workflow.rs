@@ -44,10 +44,7 @@ pub async fn integrate_dht_ops_workflow(
     let start = std::time::Instant::now();
     let when_integrated = Timestamp::now();
 
-    let summaries = dht_store
-        .integrate_ready_ops(when_integrated)
-        .await
-        .map_err(WorkflowError::from)?;
+    let summaries = dht_store.integrate_ready_ops(when_integrated).await?;
 
     // Dual-write: mark all awaiting-integration ops in the legacy DhtOp table
     // so legacy readers (tests, integration dumps) see consistent state during
@@ -221,8 +218,7 @@ async fn update_local_authored_status(
     for (author, op_hashes) in by_author {
         let Some(db) = authored_db_provider
             .get_authored_db(dna_hash, &author)
-            .await
-            .map_err(WorkflowError::from)?
+            .await?
         else {
             continue;
         };

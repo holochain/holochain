@@ -8,7 +8,9 @@ use sqlx::{Executor, Sqlite};
 ///
 /// Used by the incoming-ops workflow to filter ops that have already
 /// been recorded locally so we don't re-process duplicates from the
-/// network.
+/// network. Cache-only `ChainOp` rows (`locally_validated = 0`) are
+/// excluded, so an op mirrored into the cache but not yet validated is
+/// still re-delivered into the validation/integration path.
 pub(crate) async fn op_exists<'e, E>(executor: E, hash: &DhtOpHash) -> sqlx::Result<bool>
 where
     E: Executor<'e, Database = Sqlite>,
@@ -16,7 +18,7 @@ where
     let bytes = hash.get_raw_36();
     let row: (i64,) = sqlx::query_as(
         "SELECT EXISTS (
-            SELECT 1 FROM ChainOp WHERE hash = ?1
+            SELECT 1 FROM ChainOp WHERE locally_validated = 1 AND hash = ?1
             UNION ALL
             SELECT 1 FROM LimboChainOp WHERE hash = ?1
             UNION ALL
