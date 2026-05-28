@@ -2,13 +2,10 @@ use super::*;
 use crate::retry_until_timeout;
 use crate::sweettest::*;
 use crate::test_utils::host_fn_caller::*;
-use crate::test_utils::wait_for_integration;
 use crate::{conductor::ConductorHandle, core::MAX_TAG_SIZE};
 use holo_hash::fixt::{AgentPubKeyFixturator, EntryHashFixturator};
 use holochain_types::test_utils::ActionRefMut;
 use holochain_wasm_test_utils::TestWasm;
-use rusqlite::named_params;
-use rusqlite::Transaction;
 use std::convert::TryFrom;
 use std::time::Duration;
 use {
@@ -458,130 +455,78 @@ async fn run_test(
     conductors: SweetConductorBatch,
     dna_file: DnaFile,
 ) {
-    // Check if the correct number of ops are integrated
-    // every 100 ms for a maximum of 10 seconds but early exit
-    // if they are there.
+    // Assert against the new `holochain_data` DHT store, which is the
+    // authoritative source for integration during the migration; the legacy
+    // `DhtOp` table is now a downstream mirror. Poll every 100 ms for up to
+    // 10 seconds, exiting early once the expected ops are integrated.
     let num_attempts = 100;
     let delay_per_attempt = Duration::from_millis(100);
 
+    let dht_store = conductors[0]
+        .spaces
+        .dht_store(alice_cell_id.dna_hash())
+        .unwrap();
+
     bob_links_in_a_legit_way(&bob_cell_id, &conductors[1].raw_handle(), &dna_file).await;
 
-    // Integration should have 9 ops in it.
-    // Plus another 14 for genesis.
+    // 9 ops from the three authored records plus 14 genesis ops (both agents).
     // Init is not run because we aren't calling the zome.
-    let expected_count = 9 + 14;
+    let expected_count: i64 = 9 + 14;
 
-    let alice_dht_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(
-        &alice_dht_db,
-        expected_count,
-        num_attempts,
-        delay_per_attempt,
-    )
-    .await
-    .unwrap();
+    wait_for_new_store_integration(&dht_store, expected_count, num_attempts, delay_per_attempt)
+        .await;
+    assert_new_store_limbo_empty(&dht_store).await;
 
-    let limbo_is_empty = |txn: &Transaction| {
-        let not_empty: bool = txn
-            .query_row(
-                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE when_integrated IS NULL)",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        !not_empty
-    };
+    // Authors an op with an oversized link tag, which is rejected and produces
+    // an InvalidChainOp warrant.
+    bob_makes_a_large_link(&bob_cell_id, &conductors[1].raw_handle(), &dna_file).await;
 
-    // holochain_state::prelude::dump_tmp(&alice_dht_db);
-    // Validation should be empty
-    alice_dht_db.read_async(move |txn| -> DatabaseResult<()> {
-        let limbo = show_limbo(txn);
-        assert!(limbo_is_empty(txn), "{limbo:?}");
-
-        let num_valid_ops: usize = txn
-            .query_row("SELECT COUNT(hash) FROM DhtOp WHERE when_integrated IS NOT NULL AND validation_status = :status",
-            named_params!{
-                ":status": ValidationStatus::Valid,
-            },
-            |row| row.get(0))
-            .unwrap();
-
-        assert_eq!(num_valid_ops, expected_count);
-
-        Ok(())
-    }).await.unwrap();
-
-    let (bad_update_action, bad_update_entry_hash, link_add_hash) =
-        bob_makes_a_large_link(&bob_cell_id, &conductors[1].raw_handle(), &dna_file).await;
-
-    // Integration should have 14 chain ops in it + 1 warrant op + the running tally
+    // 14 chain ops + 1 warrant op on top of the running tally. The rejected ops
+    // are still integrated (with a rejected status), so they count here too.
     let expected_count = 14 + 1 + expected_count;
 
-    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
+    wait_for_new_store_integration(&dht_store, expected_count, num_attempts, delay_per_attempt)
+        .await;
+    assert_new_store_limbo_empty(&dht_store).await;
+}
+
+/// Poll the new DHT store until at least `expected` ops are integrated, or
+/// panic after `num_attempts`.
+async fn wait_for_new_store_integration(
+    dht_store: &holochain_state::dht_store::DhtStore,
+    expected: i64,
+    num_attempts: usize,
+    delay: Duration,
+) {
+    for _ in 0..num_attempts {
+        let integrated = dht_store.as_read().count_integrated_ops().await.unwrap();
+        if integrated >= expected {
+            return;
+        }
+        tokio::time::sleep(delay).await;
+    }
+    let integrated = dht_store.as_read().count_integrated_ops().await.unwrap();
+    panic!("new-store integration not reached: expected {expected}, integrated {integrated}");
+}
+
+/// Assert that nothing is awaiting validation in the new DHT store.
+async fn assert_new_store_limbo_empty(dht_store: &holochain_state::dht_store::DhtStore) {
+    let pending_sys = dht_store
+        .as_read()
+        .ops_pending_sys_validation(10_000)
         .await
         .unwrap();
-
-    let bad_update_entry_hash: AnyDhtHash = bad_update_entry_hash.into();
-    let num_valid_ops = move |txn: &Transaction| -> DatabaseResult<usize> {
-        let valid_ops: usize = txn
-                .query_row(
-                    "
-                    SELECT COUNT(hash) FROM DhtOp
-                    WHERE
-                    when_integrated IS NOT NULL
-                    AND
-                    (validation_status = :valid
-                        OR (validation_status = :rejected
-                            AND (
-                                (type = :store_entry AND basis_hash = :bad_update_entry_hash AND action_hash = :bad_update_action)
-                                OR
-                                (type = :store_record AND action_hash = :bad_update_action)
-                                OR
-                                (type = :add_link AND action_hash = :link_add_hash)
-                                OR
-                                (type = :update_content AND action_hash = :bad_update_action)
-                                OR
-                                (type = :update_record AND action_hash = :bad_update_action)
-                            )
-                        )
-                    )
-                    ",
-                named_params!{
-                    ":valid": ValidationStatus::Valid,
-                    ":rejected": ValidationStatus::Rejected,
-                    ":store_entry": ChainOpType::StoreEntry,
-                    ":store_record": ChainOpType::StoreRecord,
-                    ":add_link": ChainOpType::RegisterAddLink,
-                    ":update_content": ChainOpType::RegisterUpdatedContent,
-                    ":update_record": ChainOpType::RegisterUpdatedRecord,
-                    ":bad_update_entry_hash": bad_update_entry_hash,
-                    ":bad_update_action": bad_update_action,
-                    ":link_add_hash": link_add_hash,
-                },
-                |row| row.get(0))
-                .unwrap();
-
-        Ok(valid_ops)
-    };
-
-    let (limbo, empty) = alice_db
-        .read_async(move |txn| {
-            // Validation should be empty
-            let limbo = show_limbo(txn);
-            let empty = limbo_is_empty(txn);
-            DatabaseResult::Ok((limbo, empty))
-        })
+    let pending_app = dht_store
+        .as_read()
+        .ops_pending_app_validation(10_000)
         .await
         .unwrap();
-
-    assert!(empty, "{limbo:?}");
-
-    let valid_ops = alice_db
-        .read_async(move |txn| num_valid_ops(txn))
-        .await
-        .unwrap();
-    assert_eq!(valid_ops, expected_count);
+    assert!(
+        pending_sys.is_empty() && pending_app.is_empty(),
+        "new-store limbo not empty: {} pending sys validation, {} pending app validation",
+        pending_sys.len(),
+        pending_app.len()
+    );
 }
 
 async fn bob_links_in_a_legit_way(
@@ -705,37 +650,6 @@ async fn bob_makes_a_large_link(
         .integrate_dht_ops
         .trigger(&"bob_makes_a_large_link");
     (bad_update_action, bad_update_entry_hash, link_add_address)
-}
-
-fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
-    txn.prepare(
-        "
-        SELECT DhtOp.type, Action.hash, Action.blob, Action.author
-        FROM DhtOp
-        JOIN Action ON DhtOp.action_hash = Action.hash
-        WHERE
-        when_integrated IS NULL
-    ",
-    )
-    .unwrap()
-    .query_and_then([], |row| {
-        let op_type: DhtOpType = row.get("type")?;
-        match op_type {
-            DhtOpType::Chain(op_type) => {
-                let hash: ActionHash = row.get("hash")?;
-
-                let action: SignedAction = from_blob(row.get("blob")?)?;
-                Ok(ChainOpLite::from_type(op_type, hash, &action)?.into())
-            }
-            DhtOpType::Warrant(_) => {
-                let warrant: SignedWarrant = from_blob(row.get("blob")?)?;
-                Ok(warrant.into())
-            }
-        }
-    })
-    .unwrap()
-    .collect::<StateQueryResult<Vec<DhtOpLite>>>()
-    .unwrap()
 }
 
 /// Test the detect_fork function against different situations,
