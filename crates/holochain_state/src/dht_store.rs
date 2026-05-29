@@ -26,7 +26,9 @@ use crate::mutations::{StateMutationError, StateMutationResult};
 pub struct IntegratedOpSummary {
     /// Op hash (chain-op hash or warrant hash).
     pub op_hash: holo_hash::DhtOpHash,
-    /// DHT basis hash (where the op is stored).
+    /// DHT basis hash (`OpBasis`) where the op is stored.
+    /// `AnyLinkableHash`, not `AnyDhtHash`: link-op bases may be `External`
+    /// hashes, which `AnyDhtHash` cannot hold.
     pub basis_hash: holo_hash::AnyLinkableHash,
     /// Authored timestamp of the underlying action or warrant.
     pub authored_timestamp: Timestamp,
@@ -650,7 +652,7 @@ impl DhtStore<DbWrite<Dht>> {
     ///
     /// Returns per-op summary data for each promoted op (chain ops and warrants
     /// together). The summary includes the basis hash, authored timestamp,
-    /// validation status, reception time, validation attempt counts, and
+    /// validation status, received time, validation attempt counts, and
     /// author/warrantee fields needed by the integration workflow for metrics,
     /// agent blocking, and `new_integrated_data` notifications.
     ///

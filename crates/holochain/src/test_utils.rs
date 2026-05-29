@@ -295,6 +295,84 @@ pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
     ))
 }
 
+/// Poll the new DHT store until at least `expected` ops are integrated, or
+/// panic after `num_attempts`. On failure the ops still awaiting validation are
+/// listed so a failing test shows what did not progress.
+pub async fn wait_for_new_store_integration(
+    dht_store: &holochain_state::dht_store::DhtStore,
+    expected: i64,
+    num_attempts: usize,
+    delay: Duration,
+) {
+    for _ in 0..num_attempts {
+        let integrated = dht_store.as_read().count_integrated_ops().await.unwrap();
+        if integrated >= expected {
+            return;
+        }
+        tokio::time::sleep(delay).await;
+    }
+    let integrated = dht_store.as_read().count_integrated_ops().await.unwrap();
+    panic!(
+        "new-store integration not reached: expected {expected}, integrated {integrated}\n{}",
+        new_store_pending_summary(dht_store).await
+    );
+}
+
+/// Assert that nothing is awaiting validation in the new DHT store. On failure
+/// the still-pending ops are listed so the cause is visible.
+pub async fn assert_new_store_limbo_empty(dht_store: &holochain_state::dht_store::DhtStore) {
+    let pending_sys = dht_store
+        .as_read()
+        .ops_pending_sys_validation(10_000)
+        .await
+        .unwrap();
+    let pending_app = dht_store
+        .as_read()
+        .ops_pending_app_validation(10_000)
+        .await
+        .unwrap();
+    assert!(
+        pending_sys.is_empty() && pending_app.is_empty(),
+        "new-store limbo not empty: {} pending sys validation, {} pending app validation\n{}{}",
+        pending_sys.len(),
+        pending_app.len(),
+        format_pending_ops("sys", &pending_sys),
+        format_pending_ops("app", &pending_app),
+    );
+}
+
+/// Summarise the ops still awaiting validation in the new DHT store.
+async fn new_store_pending_summary(dht_store: &holochain_state::dht_store::DhtStore) -> String {
+    let pending_sys = dht_store
+        .as_read()
+        .ops_pending_sys_validation(10_000)
+        .await
+        .unwrap_or_default();
+    let pending_app = dht_store
+        .as_read()
+        .ops_pending_app_validation(10_000)
+        .await
+        .unwrap_or_default();
+    format!(
+        "{}{}",
+        format_pending_ops("sys", &pending_sys),
+        format_pending_ops("app", &pending_app)
+    )
+}
+
+/// Render a stage's pending ops, listing each op hash, so a failing test shows
+/// exactly which ops did not progress.
+fn format_pending_ops(stage: &str, ops: &[holochain_types::dht_op::DhtOpHashed]) -> String {
+    if ops.is_empty() {
+        return format!("  pending {stage}-validation: none\n");
+    }
+    let mut out = format!("  pending {stage}-validation ({}):\n", ops.len());
+    for op in ops {
+        out += &format!("    {}\n", op.as_hash());
+    }
+    out
+}
+
 /// Show authored data for each cell environment
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(envs)))]
 pub async fn show_authored<Db: ReadAccess<DbKindAuthored>>(envs: &[&Db]) {

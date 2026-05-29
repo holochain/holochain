@@ -38,13 +38,9 @@ pub(crate) async fn move_chain_op_to_limbo(
         return Ok(false);
     };
 
-    // Delete the ChainOp row.
-    sqlx::query("DELETE FROM ChainOp WHERE hash = ?")
-        .bind(&op_hash)
-        .execute(&mut *conn)
-        .await?;
-
-    // Insert a LimboChainOp row with cleared validation status.
+    // Insert a LimboChainOp row with cleared validation status, then delete
+    // the ChainOp row. Creating the new state before destroying the old keeps
+    // the intent clear; both statements run in the caller's transaction.
     sqlx::query(
         "INSERT INTO LimboChainOp
             (hash, op_type, action_hash, basis_hash, storage_center_loc,
@@ -62,6 +58,12 @@ pub(crate) async fn move_chain_op_to_limbo(
     .bind(serialized_size)
     .execute(&mut *conn)
     .await?;
+
+    // Delete the ChainOp row.
+    sqlx::query("DELETE FROM ChainOp WHERE hash = ?")
+        .bind(&op_hash)
+        .execute(&mut *conn)
+        .await?;
 
     Ok(true)
 }

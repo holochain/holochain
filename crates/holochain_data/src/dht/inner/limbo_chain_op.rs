@@ -50,7 +50,9 @@ pub struct InsertLimboChainOp<'a> {
     /// `ChainOpType` discriminant; see
     /// [`From<ChainOpType> for i64`](holochain_zome_types::dht_v2).
     pub op_type: i64,
-    /// DHT basis hash (where the op is stored).
+    /// DHT basis hash (`OpBasis`) where the op is stored.
+    /// `AnyLinkableHash`, not `AnyDhtHash`: link-op bases may be `External`
+    /// hashes, which `AnyDhtHash` cannot hold.
     pub basis_hash: &'a AnyLinkableHash,
     /// Numeric storage center derived from `basis_hash`.
     pub storage_center_loc: u32,
