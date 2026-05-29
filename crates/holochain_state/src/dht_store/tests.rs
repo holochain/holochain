@@ -949,6 +949,28 @@ async fn record_locally_validated_warrants_inserts_warrant() {
         .record_locally_validated_warrants(vec![warrant_op.clone()])
         .await
         .unwrap();
+
+    // warrantee is seed.wrapping_add(50) = 80 for seed=30.
+    let expected_warrantee = AgentPubKey::from_raw_36(vec![80u8; 36]);
+
+    // Self-issued warrants are recorded into limbo ready for integration (not
+    // straight into the integrated table), so the integration workflow runs and
+    // can block the warrantee. Integrating emits a summary carrying the
+    // warrantee, which drives that block.
+    let summaries = store
+        .integrate_ready_ops(holochain_types::prelude::Timestamp::now())
+        .await
+        .unwrap();
+    let summary = summaries
+        .iter()
+        .find(|s| s.op_hash == *warrant_op.as_hash())
+        .expect("warrant not integrated");
+    assert_eq!(summary.warrantee.as_ref(), Some(&expected_warrantee));
+    assert_eq!(
+        summary.validation_status,
+        holochain_zome_types::dht_v2::OpValidity::Accepted
+    );
+
     let row = store
         .db()
         .as_ref()
@@ -956,8 +978,6 @@ async fn record_locally_validated_warrants_inserts_warrant() {
         .await
         .unwrap()
         .expect("warrant row missing");
-    // warrantee is seed.wrapping_add(50) = 80 for seed=30.
-    let expected_warrantee = AgentPubKey::from_raw_36(vec![80u8; 36]);
     assert_eq!(row.warrantee, expected_warrantee.get_raw_36().to_vec());
     // The rejection reason is extracted from the warrant proof and stored in
     // its own column.
