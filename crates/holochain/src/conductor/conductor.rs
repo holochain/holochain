@@ -1386,16 +1386,21 @@ mod app_impls {
             if force || deps.is_empty() {
                 let app = state.get_app(installed_app_id)?;
                 let cells_to_remove = app.all_cells().collect::<Vec<_>>();
-                // Delete the cells' databases.
-                self.delete_cell_databases(app.id(), cells_to_remove.clone())
-                    .await?;
 
-                // Delete app from DB and state.
+                // Remove the app from state first so app-status reconciliation
+                // cannot restart its cells while they are being torn down.
                 self.remove_app_from_db(installed_app_id).await?;
                 tracing::debug!(msg = "Removed app from db.", app = ?app);
 
-                // Remove the cells from conductor state.
+                // Stop the cells next so their workflows and networking release
+                // the databases before we delete them. Deleting databases out
+                // from under running cells leaves background tasks querying
+                // files that no longer exist.
                 self.remove_cells(&cells_to_remove).await;
+
+                // Delete the cells' databases and drop the now-unused spaces.
+                self.delete_cell_databases(app.id(), cells_to_remove.clone())
+                    .await?;
 
                 // Remove the app's signal broadcast from conductor.
                 let installed_app_ids = self
@@ -3158,6 +3163,11 @@ impl Conductor {
                     tracing::info!("Deleted file {}", support_path.display());
                 }
             }
+
+            // Drop the cached space now its databases are gone, so a reinstall
+            // of this DNA opens fresh, migrated databases rather than reusing
+            // pools that point at the deleted files.
+            self.spaces.remove_space(dna_hash);
         }
 
         Ok(())
