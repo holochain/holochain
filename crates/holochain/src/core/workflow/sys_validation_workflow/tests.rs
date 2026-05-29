@@ -2,6 +2,7 @@ use super::*;
 use crate::retry_until_timeout;
 use crate::sweettest::*;
 use crate::test_utils::host_fn_caller::*;
+use crate::test_utils::{assert_new_store_limbo_empty, wait_for_new_store_integration};
 use crate::{conductor::ConductorHandle, core::MAX_TAG_SIZE};
 use holo_hash::fixt::{AgentPubKeyFixturator, EntryHashFixturator};
 use holochain_types::test_utils::ActionRefMut;
@@ -488,45 +489,6 @@ async fn run_test(
     wait_for_new_store_integration(&dht_store, expected_count, num_attempts, delay_per_attempt)
         .await;
     assert_new_store_limbo_empty(&dht_store).await;
-}
-
-/// Poll the new DHT store until at least `expected` ops are integrated, or
-/// panic after `num_attempts`.
-async fn wait_for_new_store_integration(
-    dht_store: &holochain_state::dht_store::DhtStore,
-    expected: i64,
-    num_attempts: usize,
-    delay: Duration,
-) {
-    for _ in 0..num_attempts {
-        let integrated = dht_store.as_read().count_integrated_ops().await.unwrap();
-        if integrated >= expected {
-            return;
-        }
-        tokio::time::sleep(delay).await;
-    }
-    let integrated = dht_store.as_read().count_integrated_ops().await.unwrap();
-    panic!("new-store integration not reached: expected {expected}, integrated {integrated}");
-}
-
-/// Assert that nothing is awaiting validation in the new DHT store.
-async fn assert_new_store_limbo_empty(dht_store: &holochain_state::dht_store::DhtStore) {
-    let pending_sys = dht_store
-        .as_read()
-        .ops_pending_sys_validation(10_000)
-        .await
-        .unwrap();
-    let pending_app = dht_store
-        .as_read()
-        .ops_pending_app_validation(10_000)
-        .await
-        .unwrap();
-    assert!(
-        pending_sys.is_empty() && pending_app.is_empty(),
-        "new-store limbo not empty: {} pending sys validation, {} pending app validation",
-        pending_sys.len(),
-        pending_app.len()
-    );
 }
 
 async fn bob_links_in_a_legit_way(

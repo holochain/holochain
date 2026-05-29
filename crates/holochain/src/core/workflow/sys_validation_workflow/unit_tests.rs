@@ -329,7 +329,7 @@ async fn validate_valid_warrant_with_cached_dependency() {
         crate::prelude::RecordEntry::Present(entry),
     );
     test_case
-        .save_chain_op_to_cache(warranted_op)
+        .save_chain_op_as_cached(warranted_op)
         .await
         .unwrap();
 
@@ -840,12 +840,10 @@ impl TestCase {
         Ok(test_op_hash)
     }
 
-    /// Write a chain op to both the legacy cache database and the new DHT store so
-    /// that the op is visible to both the legacy `copy_cached_op_to_dht` path and
-    /// to `move_warranted_op_to_limbo`. In production, cascade's `cache_chain_ops`
-    /// performs this dual write; this helper replicates that for test fixtures that
-    /// bypass cascade.
-    async fn save_chain_op_to_cache(&self, chain_op: ChainOp) -> StateMutationResult<DhtOpHash> {
+    /// Write a chain op to the legacy cache database and to the new DHT store as
+    /// a cached (not locally-validated) row, so it is visible to both the legacy
+    /// `copy_cached_op_to_dht` path and to `move_warranted_op_to_limbo`.
+    async fn save_chain_op_as_cached(&self, chain_op: ChainOp) -> StateMutationResult<DhtOpHash> {
         // Build the RenderedOps first so we can pass it to cache_chain_ops.
         let action = chain_op.action();
         let signature = chain_op.signature().clone();
@@ -994,6 +992,7 @@ impl TestCase {
         self.test_space
             .space
             .dht_store
+            .as_read()
             .ops_pending_app_validation(10_000)
             .await
             .unwrap()

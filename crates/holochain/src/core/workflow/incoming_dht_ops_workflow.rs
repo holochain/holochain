@@ -150,6 +150,13 @@ pub async fn incoming_dht_ops_workflow(
     // mirror could never catch up (and vice versa). Each write path below
     // deduplicates against its own store, so both stores self-heal.
     if filter_ops.is_empty() {
+        // TODO(read-migration): restore this trace once dedup-filtering moves
+        // onto the new DhtStore (after the legacy DhtOp table is removed). At
+        // that point an empty `filter_ops` again means "all ops were already
+        // present", which is worth tracing.
+        // tracing::trace!(
+        //     "Skipping the rest of the incoming_dht_ops_workflow because all ops were filtered out"
+        // );
         return Ok(());
     }
 

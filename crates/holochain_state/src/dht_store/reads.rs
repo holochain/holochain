@@ -1,15 +1,15 @@
 //! Read operations on the per-DNA DHT store.
 //!
-//! Methods on [`DhtStoreRead`] expose domain-meaningful reads for the
-//! holochain crate's workflows. They delegate to `holochain_data`'s
-//! `DbRead<Dht>` primitives and return values in terms of the project's
-//! existing domain types.
+//! Methods on [`DhtStoreRead`] expose domain-meaningful reads that delegate to
+//! `holochain_data`'s `DbRead<Dht>` primitives and return values in terms of
+//! the project's existing domain types. The parent module holds the
+//! corresponding write operations.
 
-use super::{DhtStore, DhtStoreRead};
+use super::DhtStore;
 use crate::query::StateQueryResult;
 use holo_hash::{DhtOpHash, HasHash};
 use holochain_data::kind::Dht;
-use holochain_data::{DbRead, DbWrite};
+use holochain_data::DbRead;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_zome_types::dht_v2::RecordValidity;
 
@@ -187,67 +187,6 @@ impl DhtStore<DbRead<Dht>> {
         Ok(out.into_iter().map(|(_, _, op)| op).collect())
     }
 }
-
-impl DhtStore<DbWrite<Dht>> {
-    /// Returns `true` if `hash` appears in any op-bearing DHT table.
-    ///
-    /// Delegates to the read-only view of this store.
-    pub async fn op_exists(&self, hash: &DhtOpHash) -> StateQueryResult<bool> {
-        self.as_read().op_exists(hash).await
-    }
-
-    /// See [`DhtStore::pending_validation_receipts`].
-    pub async fn pending_validation_receipts(
-        &self,
-        validators: Vec<holo_hash::AgentPubKey>,
-    ) -> StateQueryResult<
-        Vec<(
-            holochain_types::prelude::ValidationReceipt,
-            holo_hash::AgentPubKey,
-        )>,
-    > {
-        self.as_read().pending_validation_receipts(validators).await
-    }
-
-    /// Drop any op whose hash is already recorded in the DHT store.
-    ///
-    /// Delegates to the read-only view of this store.
-    pub async fn filter_existing_ops(
-        &self,
-        ops: Vec<DhtOpHashed>,
-    ) -> StateQueryResult<Vec<DhtOpHashed>> {
-        self.as_read().filter_existing_ops(ops).await
-    }
-
-    /// See [`DhtStore::ops_pending_app_validation`].
-    pub async fn ops_pending_app_validation(
-        &self,
-        limit: u32,
-    ) -> StateQueryResult<Vec<DhtOpHashed>> {
-        self.as_read().ops_pending_app_validation(limit).await
-    }
-
-    /// See [`DhtStore::ops_pending_sys_validation`].
-    pub async fn ops_pending_sys_validation(
-        &self,
-        limit: u32,
-    ) -> StateQueryResult<Vec<DhtOpHashed>> {
-        self.as_read().ops_pending_sys_validation(limit).await
-    }
-
-    /// See [`DhtStore::find_fork_for_action`].
-    pub async fn find_fork_for_action(
-        &self,
-        action: &holochain_zome_types::action::Action,
-    ) -> StateQueryResult<Option<(holo_hash::ActionHash, holochain_types::prelude::Signature)>>
-    {
-        self.as_read().find_fork_for_action(action).await
-    }
-}
-
-// Compile-only sanity check that the read-only alias resolves correctly.
-#[allow(dead_code)]
-fn _read_only_alias_compiles(_: DhtStoreRead) {}
 
 /// Reconstruct a [`DhtOpHashed`] (`ChainOp` variant) from a
 /// [`LimboChainOpJoinedRow`] without any additional database round-trips.
@@ -530,7 +469,7 @@ mod tests {
             .await
             .unwrap();
         let unknown = DhtOpHash::from_raw_36(vec![99u8; 36]);
-        let exists = store.op_exists(&unknown).await.unwrap();
+        let exists = store.as_read().op_exists(&unknown).await.unwrap();
         assert!(!exists);
     }
 
@@ -544,7 +483,7 @@ mod tests {
 
         store.record_incoming_ops(vec![op]).await.unwrap();
 
-        let exists = store.op_exists(&hash).await.unwrap();
+        let exists = store.as_read().op_exists(&hash).await.unwrap();
         assert!(exists, "op_exists should be true after record_incoming_ops");
     }
 
@@ -576,7 +515,11 @@ mod tests {
 
         store.record_incoming_ops(vec![op]).await.unwrap();
 
-        let pending = store.ops_pending_sys_validation(1_000).await.unwrap();
+        let pending = store
+            .as_read()
+            .ops_pending_sys_validation(1_000)
+            .await
+            .unwrap();
         let hashes: Vec<_> = pending.iter().map(|o| o.as_hash().clone()).collect();
         assert!(hashes.contains(&hash));
     }
@@ -597,7 +540,11 @@ mod tests {
             .await
             .unwrap();
 
-        let pending = store.ops_pending_sys_validation(1_000).await.unwrap();
+        let pending = store
+            .as_read()
+            .ops_pending_sys_validation(1_000)
+            .await
+            .unwrap();
         let hashes: Vec<_> = pending.iter().map(|o| o.as_hash().clone()).collect();
         assert!(!hashes.contains(&hash));
     }
@@ -610,7 +557,7 @@ mod tests {
         let ops: Vec<_> = (12..16).map(make_chain_op).collect();
         store.record_incoming_ops(ops).await.unwrap();
 
-        let pending = store.ops_pending_sys_validation(2).await.unwrap();
+        let pending = store.as_read().ops_pending_sys_validation(2).await.unwrap();
         assert_eq!(pending.len(), 2);
     }
 
@@ -630,7 +577,11 @@ mod tests {
             .await
             .unwrap();
 
-        let pending = store.ops_pending_app_validation(1_000).await.unwrap();
+        let pending = store
+            .as_read()
+            .ops_pending_app_validation(1_000)
+            .await
+            .unwrap();
         let hashes: Vec<_> = pending.iter().map(|o| o.as_hash().clone()).collect();
         assert!(hashes.contains(&hash));
     }
@@ -646,7 +597,11 @@ mod tests {
         // Insert but don't record sys-validation outcome.
         store.record_incoming_ops(vec![op]).await.unwrap();
 
-        let pending = store.ops_pending_app_validation(1_000).await.unwrap();
+        let pending = store
+            .as_read()
+            .ops_pending_app_validation(1_000)
+            .await
+            .unwrap();
         let hashes: Vec<_> = pending.iter().map(|o| o.as_hash().clone()).collect();
         assert!(
             !hashes.contains(&hash),
@@ -674,7 +629,11 @@ mod tests {
             .await
             .unwrap();
 
-        let pending = store.ops_pending_app_validation(1_000).await.unwrap();
+        let pending = store
+            .as_read()
+            .ops_pending_app_validation(1_000)
+            .await
+            .unwrap();
         let hashes: Vec<_> = pending.iter().map(|o| o.as_hash().clone()).collect();
         assert!(
             !hashes.contains(&hash),
@@ -693,7 +652,7 @@ mod tests {
             _ => unreachable!(),
         };
 
-        let result = store.find_fork_for_action(&action).await.unwrap();
+        let result = store.as_read().find_fork_for_action(&action).await.unwrap();
         assert!(result.is_none());
     }
 
@@ -728,7 +687,11 @@ mod tests {
 
         store.record_incoming_ops(vec![op_a]).await.unwrap();
 
-        let result = store.find_fork_for_action(&action_b).await.unwrap();
+        let result = store
+            .as_read()
+            .find_fork_for_action(&action_b)
+            .await
+            .unwrap();
         let (got_hash, got_sig) = result.expect("fork should be detected");
         assert_eq!(got_hash, expected_hash, "sibling hash should match op_a");
         assert_eq!(got_sig, expected_sig, "sibling signature should match op_a");
@@ -764,6 +727,7 @@ mod tests {
 
         let validators = vec![AgentPubKey::from_raw_36(vec![0xFF; 36])];
         let receipts = store
+            .as_read()
             .pending_validation_receipts(validators.clone())
             .await
             .unwrap();
@@ -801,7 +765,11 @@ mod tests {
             .await
             .unwrap();
 
-        let receipts = store.pending_validation_receipts(vec![]).await.unwrap();
+        let receipts = store
+            .as_read()
+            .pending_validation_receipts(vec![])
+            .await
+            .unwrap();
         assert!(
             receipts.iter().all(|(r, _)| r.dht_op_hash != hash),
             "op with cleared require_receipt should not appear"

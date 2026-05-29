@@ -49,6 +49,7 @@ pub async fn validation_receipt_workflow(
 
     // Get out all ops that are marked for sending receipt.
     let receipts = dht_store
+        .as_read()
         .pending_validation_receipts(validators.clone())
         .await?;
 

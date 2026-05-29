@@ -572,6 +572,9 @@ fn mock_publish_trigger_provider_with_triggers(
         if has_trigger {
             let (tx, _rx) = TriggerSender::new();
             let count = trigger_count_clone.clone();
+            // When trigger is called, increment the counter.
+            // Note: In reality we'd hook into the actual trigger, but for
+            // testing we just track that get_publish_trigger was called.
             count.fetch_add(1, Ordering::SeqCst);
             MustBoxFuture::new(async move { Some(tx) })
         } else {
