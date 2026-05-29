@@ -353,6 +353,22 @@ impl Spaces {
         self.get_or_create_space_ref(dna_hash, |s| s.clone())
     }
 
+    /// Drop the cached space for a DNA, releasing its database handles and
+    /// queue consumer triggers.
+    ///
+    /// Called once the last cell for a DNA has been removed and its database
+    /// files deleted. Without this, a reinstall of the same DNA would reuse the
+    /// cached space's connection pools, which point at the deleted files; the
+    /// pool would lazily reopen them as empty, un-migrated databases (migrations
+    /// only run when a database is opened). Dropping the space forces a
+    /// subsequent install to open fresh, migrated databases.
+    pub(crate) fn remove_space(&self, dna_hash: &DnaHash) {
+        self.map.share_mut(|spaces| {
+            spaces.remove(dna_hash);
+        });
+        self.queue_consumer_map.remove_all_for_dna(dna_hash);
+    }
+
     fn get_or_create_space_ref<F, R>(&self, dna_hash: &DnaHash, f: F) -> DatabaseResult<R>
     where
         F: Fn(&Space) -> R,
