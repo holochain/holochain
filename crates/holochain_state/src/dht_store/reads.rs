@@ -105,9 +105,10 @@ impl DhtStore<DbRead<Dht>> {
     /// op that still has `require_receipt = 1`. Each tuple is
     /// `(ValidationReceipt, action_author)` so the caller can group by author.
     ///
-    /// The `validators` field on each [`ValidationReceipt`] is populated from
-    /// the supplied `validators` argument (the locally-running agents for this
-    /// DNA).
+    /// The `validators` field on each
+    /// [`ValidationReceipt`](holochain_types::prelude::ValidationReceipt) is
+    /// populated from the supplied `validators` argument (the locally-running
+    /// agents for this DNA).
     pub async fn pending_validation_receipts(
         &self,
         validators: Vec<holo_hash::AgentPubKey>,

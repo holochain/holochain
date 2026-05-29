@@ -7,7 +7,7 @@ use holochain_timestamp::Timestamp;
 use sqlx::{Executor, Sqlite, SqliteConnection};
 
 /// A row joining `LimboChainOp` with its associated `Action` and optional
-/// `Entry` blob. Enables reconstructing a [`DhtOpHashed`] without an N+1
+/// `Entry` blob. Enables reconstructing a `DhtOpHashed` without an N+1
 /// round-trip per row.
 #[derive(Debug, sqlx::FromRow)]
 pub struct LimboChainOpJoinedRow {
