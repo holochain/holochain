@@ -591,9 +591,15 @@ impl DhtStore<DbWrite<Dht>> {
         Ok(())
     }
 
-    /// Insert self-authored warrants directly into the `Warrant` + `WarrantOp`
-    /// tables, bypassing limbo (`LimboWarrantOp`).  Self-authored warrants are
-    /// locally trusted and do not need to go through the limbo/validation cycle.
+    /// Insert self-authored warrants into limbo (`Warrant` + `LimboWarrantOp`)
+    /// already marked sys-validation accepted, so they are immediately ready
+    /// for integration.
+    ///
+    /// Self-authored warrants are locally trusted, but they must still pass
+    /// through the integration workflow: that is where the warrantee is blocked
+    /// (via [`integrate_ready_ops`](Self::integrate_ready_ops)'s
+    /// [`IntegratedOpSummary`]). Inserting them straight into `WarrantOp` would
+    /// bypass that path and the block would never fire.
     ///
     /// Any op that is not a `WarrantOp` is skipped with a warning log.  All
     /// inserts happen in a single transaction.
@@ -601,8 +607,6 @@ impl DhtStore<DbWrite<Dht>> {
         &self,
         warrants: Vec<DhtOpHashed>,
     ) -> StateMutationResult<()> {
-        use holochain_data::dht::InsertWarrant;
-
         let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
         let now = Timestamp::now();
         for op in warrants {
@@ -622,7 +626,7 @@ impl DhtStore<DbWrite<Dht>> {
             let proof_bytes = holochain_serialized_bytes::encode(&warrant_op.proof)
                 .map_err(StateMutationError::from)?;
             let signature_bytes = warrant_op.signature().0;
-            tx.insert_warrant(InsertWarrant {
+            tx.insert_limbo_warrant(InsertLimboWarrant {
                 hash,
                 author: &warrant_op.author,
                 timestamp: warrant_op.timestamp,
@@ -632,11 +636,15 @@ impl DhtStore<DbWrite<Dht>> {
                 reason: warrant_op.proof.reason(),
                 storage_center_loc: warrant_op.warrantee.get_loc(),
                 when_received: now,
-                when_integrated: now,
                 serialized_size,
             })
             .await
             .map_err(StateMutationError::from)?;
+            // Mark accepted so `integrate_ready_ops` promotes it on the next
+            // integration tick (warrants have no app-validation stage).
+            tx.set_limbo_warrant_sys_validation_status(hash, Some(1))
+                .await
+                .map_err(StateMutationError::from)?;
         }
         tx.commit().await.map_err(StateMutationError::from)?;
         Ok(())
