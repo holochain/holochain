@@ -44,7 +44,7 @@ impl DbRead<Dht> {
         chain_op::get_chain_ops_for_action(self.pool(), action_hash).await
     }
 
-    /// Return integrated, validated [`ChainOp`] rows that still require a
+    /// Return integrated, validated `ChainOp` rows that still require a
     /// validation receipt to be sent.
     pub async fn pending_validation_receipts(&self) -> sqlx::Result<Vec<PendingReceiptRow>> {
         chain_op::pending_validation_receipts(self.pool()).await
