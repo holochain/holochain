@@ -1256,8 +1256,8 @@ mod app_impls {
                 .collect();
             let maybe_duplicate_cell_id = cells_to_create
                 .iter()
-                .find(|(cell_id, _)| all_cells.contains(cell_id));
-            if let Some((duplicate_cell_id, _)) = maybe_duplicate_cell_id {
+                .find(|(cell_id, _, _)| all_cells.contains(cell_id));
+            if let Some((duplicate_cell_id, _, _)) = maybe_duplicate_cell_id {
                 return Err(ConductorError::CellAlreadyExists(
                     duplicate_cell_id.to_owned(),
                 ));
@@ -1330,6 +1330,7 @@ mod app_impls {
             let modifiers = get_modifiers_map_from_role_settings(&roles_settings);
             let membrane_proofs = get_memproof_map_from_role_settings(&roles_settings);
             let existing_cells = get_existing_cells_map_from_role_settings(&roles_settings);
+            let opening_summaries = get_opening_summary_map_from_role_settings(&roles_settings);
 
             let bundle = {
                 let original_bundle = source.resolve().await?;
@@ -1359,7 +1360,7 @@ mod app_impls {
                 installed_app_id.unwrap_or_else(|| manifest.app_name().to_owned());
 
             let ops = bundle
-                .resolve_cells(membrane_proofs, existing_cells)
+                .resolve_cells(membrane_proofs, existing_cells, opening_summaries)
                 .await?;
 
             self.clone()
@@ -1529,6 +1530,7 @@ mod app_impls {
                     (
                         CellId::new(role.dna_hash().clone(), app.agent_key.clone()),
                         memproofs.remove(role_name),
+                        role.opening_summary().cloned(),
                     )
                 })
                 .collect();
@@ -1727,8 +1729,9 @@ mod clone_cell_impls {
                 )
                 .await?;
 
-            // run genesis on cloned cell
-            let cells = vec![(clone_cell.cell_id.clone(), membrane_proof)];
+            // run genesis on cloned cell. Clone cells never carry an opening
+            // summary; that is only supplied for the role's provisioned cell.
+            let cells = vec![(clone_cell.cell_id.clone(), membrane_proof, None)];
             crate::conductor::conductor::genesis_cells(self.clone(), cells).await?;
             let state = self.get_state().await?;
             let app = state.get_app(installed_app_id)?;
@@ -3346,36 +3349,40 @@ fn purge_data(txn: &mut Transaction) -> DatabaseResult<()> {
 /// Note this function takes read locks so should not be called from within a read lock.
 pub(crate) async fn genesis_cells(
     conductor: ConductorHandle,
-    cell_ids_with_proofs: Vec<(CellId, Option<MembraneProof>)>,
+    cell_ids_with_proofs: Vec<(CellId, Option<MembraneProof>, Option<ChainSummary>)>,
 ) -> ConductorResult<()> {
-    let cells_tasks = cell_ids_with_proofs.into_iter().map(|(cell_id, proof)| {
-        let conductor = conductor.clone();
-        let cell_id_inner = cell_id.clone();
-        tokio::spawn(async move {
-            let space = conductor
-                .get_or_create_space(cell_id_inner.dna_hash())
-                .map_err(|e| CellError::FailedToCreateDnaSpace(ConductorError::from(e).into()))?;
+    let cells_tasks =
+        cell_ids_with_proofs
+            .into_iter()
+            .map(|(cell_id, proof, opening_summary)| {
+                let conductor = conductor.clone();
+                let cell_id_inner = cell_id.clone();
+                tokio::spawn(async move {
+                    let space = conductor.get_or_create_space(cell_id_inner.dna_hash()).map_err(
+                        |e| CellError::FailedToCreateDnaSpace(ConductorError::from(e).into()),
+                    )?;
 
-            let authored_db =
-                space.get_or_create_authored_db(cell_id_inner.agent_pubkey().clone())?;
-            let dht_db = space.dht_db;
-            let dht_store = space.dht_store;
-            let ribosome = conductor.get_ribosome(&cell_id_inner).map_err(Box::new)?;
+                    let authored_db =
+                        space.get_or_create_authored_db(cell_id_inner.agent_pubkey().clone())?;
+                    let dht_db = space.dht_db;
+                    let dht_store = space.dht_store;
+                    let ribosome = conductor.get_ribosome(&cell_id_inner).map_err(Box::new)?;
 
-            Cell::genesis(
-                cell_id_inner.clone(),
-                conductor,
-                authored_db,
-                dht_db,
-                dht_store,
-                ribosome,
-                proof,
-            )
-            .await
-        })
-        .map_err(CellError::from)
-        .map(|genesis_result| (cell_id, genesis_result.and_then(|r| r)))
-    });
+                    Cell::genesis(
+                        cell_id_inner.clone(),
+                        conductor,
+                        authored_db,
+                        dht_db,
+                        dht_store,
+                        ribosome,
+                        proof,
+                        opening_summary,
+                    )
+                    .await
+                })
+                .map_err(CellError::from)
+                .map(|genesis_result| (cell_id, genesis_result.and_then(|r| r)))
+            });
     let (_success, errors): (Vec<CellId>, Vec<(CellId, CellError)>) =
         futures::future::join_all(cells_tasks)
             .await
@@ -3553,6 +3560,27 @@ fn get_memproof_map_from_role_settings(role_settings: &Option<RoleSettingsMap>) 
                 RoleSettings::Provisioned { membrane_proof, .. } => membrane_proof
                     .as_ref()
                     .map(|m| (role_name.clone(), m.clone())),
+            })
+            .collect(),
+        None => HashMap::new(),
+    }
+}
+
+/// Extract the opening summaries from the RoleSettingsMap into their own HashMap
+fn get_opening_summary_map_from_role_settings(
+    role_settings: &Option<RoleSettingsMap>,
+) -> OpeningSummaryMap {
+    match role_settings {
+        Some(role_settings_map) => role_settings_map
+            .iter()
+            .filter_map(|(role_name, role_settings)| match role_settings {
+                #[allow(deprecated)]
+                RoleSettings::UseExisting { .. } => None,
+                RoleSettings::Provisioned {
+                    opening_summary, ..
+                } => opening_summary
+                    .as_ref()
+                    .map(|s| (role_name.clone(), s.clone())),
             })
             .collect(),
         None => HashMap::new(),

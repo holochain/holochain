@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Add a `ChainSummary` type (opaque `data` bytes plus a list of `(signer, signature)` pairs over that payload) describing the "opening" or "closing" state of a source chain. Core does not verify the signatures — the integrity zome does, in its `validate` and/or `genesis_self_check` callback. **Breaking:** `OpenChain.prev_target` and `OpenChain.close_hash` are now `Option` (they are `None` in the new genesis "opening summary" form), and both `OpenChain` and `CloseChain` gain an optional summary field (`opening_summary` / `closing_summary`). These change the action hash of `OpenChain`/`CloseChain` actions — acceptable as migration is gated behind `unstable-migration` with no production data. `Action::is_genesis` now also classifies a genesis-form `OpenChain` (seq 3, no migration target, carrying a summary) as a genesis record.
+
 ## 0.7.0-dev.13
 
 ## 0.7.0-dev.12

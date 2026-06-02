@@ -18,8 +18,12 @@ pub fn open_chain(
             write_workspace: Permission::Allow,
             ..
         } => {
-            // Construct the open chain action
-            let action_builder = builder::OpenChain::new(input.prev_target, input.close_hash);
+            // Construct the open chain action. A migration `OpenChain` always
+            // carries its migration target and the matching close hash; the
+            // opening summary (the genesis form) is committed by the conductor
+            // at genesis, not via this host function.
+            let action_builder =
+                builder::OpenChain::new(Some(input.prev_target), Some(input.close_hash));
 
             let action_hash = tokio_helper::block_forever_on(tokio::task::spawn(async move {
                 // push the action into the source chain

@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Re-export the `ChainSummary` type (defined in `holochain_integrity_types`) and mirror the new optional summary fields on the v2 `OpenChainData`/`CloseChainData` action models and their legacy⇄v2 conversions.
+
 ## 0.7.0-dev.18
 
 ## 0.7.0-dev.17

@@ -1361,6 +1361,7 @@ fn store_record(action: &Action, validation_dependencies: SysValDeps) -> SysVali
         check_prev_timestamp(action, prev_action)?;
         check_prev_seq(action, prev_action)?;
         check_agent_validation_pkg_predecessor(action, prev_action)?;
+        check_open_chain_well_formed(action, prev_action)?;
     }
 
     Ok(())

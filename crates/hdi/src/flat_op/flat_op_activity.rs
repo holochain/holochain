@@ -1,4 +1,5 @@
 use super::*;
+use holochain_integrity_types::ChainSummary;
 use holochain_integrity_types::MigrationTarget;
 
 /// Data specific to the
@@ -163,10 +164,16 @@ pub enum OpActivity<UnitType, LT> {
     /// [`Action::OpenChain`](holochain_integrity_types::action::Action::OpenChain) to the author's
     /// chain and contains the previous chains's [`MigrationTarget`].
     OpenChain {
-        /// Target for the previous chain that we are migrating from
-        previous_target: MigrationTarget,
-        /// Hash of the corresponding CloseChain.
-        close_hash: ActionHash,
+        /// Target for the previous chain that we are migrating from. `None` when
+        /// this is a genesis opening-summary record rather than a migration.
+        previous_target: Option<MigrationTarget>,
+        /// Hash of the corresponding CloseChain. `None` when this is a genesis
+        /// opening-summary record rather than a migration.
+        close_hash: Option<ActionHash>,
+        /// The opening summary committed as the final genesis record, if any.
+        /// Core does not verify its signatures — verify them here if your app
+        /// requires it (see [`ChainSummary`]).
+        opening_summary: Option<ChainSummary>,
         /// The [`OpenChain`] action
         action: OpenChain,
     },
@@ -176,6 +183,10 @@ pub enum OpActivity<UnitType, LT> {
     CloseChain {
         /// Target for the new chain that we are migrating to
         new_target: Option<MigrationTarget>,
+        /// The closing summary committed onto the `CloseChain` action, if any.
+        /// Core does not verify its signatures — verify them here if your app
+        /// requires it (see [`ChainSummary`]).
+        closing_summary: Option<ChainSummary>,
         /// The [`CloseChain`] action
         action: CloseChain,
     },
@@ -203,6 +214,7 @@ impl<UnitType, LT> OpActivity<UnitType, LT> {
         Self::OpenChain {
             previous_target: action.prev_target.clone(),
             close_hash: action.close_hash.clone(),
+            opening_summary: action.opening_summary.clone(),
             action,
         }
     }
@@ -211,6 +223,7 @@ impl<UnitType, LT> OpActivity<UnitType, LT> {
     pub fn close_chain(action: CloseChain) -> Self {
         Self::CloseChain {
             new_target: action.new_target.clone(),
+            closing_summary: action.closing_summary.clone(),
             action,
         }
     }

@@ -1,16 +1,121 @@
 //! Information about the current zome and dna.
 use crate::action::ZomeIndex;
+use crate::signature::Signature;
 use crate::zome::ZomeName;
 use crate::DnaModifiers;
 use crate::EntryDefIndex;
 use crate::EntryDefs;
 use crate::FunctionName;
 use crate::LinkType;
+use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_serialized_bytes::prelude::*;
 
 #[cfg(test)]
 mod test;
+
+/// An optional, app-defined summary describing the "opening" or "closing" state
+/// of a cell's source chain.
+///
+/// An *opening summary* is supplied at app installation time (the install-time
+/// analogue of the membrane proof, see `RoleSettings::Provisioned`) and is
+/// committed on-chain as the final genesis record, carried by [`Action::OpenChain`].
+/// A *closing summary* is supplied when a chain is closed during migration and is
+/// carried by [`Action::CloseChain`].
+///
+/// [`Action::OpenChain`]: crate::action::Action::OpenChain
+/// [`Action::CloseChain`]: crate::action::Action::CloseChain
+///
+/// # Validation is the application's responsibility
+///
+/// Holochain treats [`ChainSummary::data`] as opaque bytes and does **not**
+/// interpret it or verify [`ChainSummary::signatures`] in system validation. The
+/// summary record is structurally valid as far as core is concerned as soon as
+/// the action it rides on is. **If your application requires the summary to be
+/// signed by particular agents, your integrity zome must enforce that itself** —
+/// core will not do it for you.
+///
+/// Each entry in [`ChainSummary::signatures`] is a `(signer, signature)` pair,
+/// where `signature` is over the [`ChainSummary::data`] payload by `signer`'s
+/// key. The signer's public key travels with the signature, so an integrity zome
+/// can verify each one with `verify_signature(signer, signature, data)` (the host
+/// function is available in both the `validate` and `genesis_self_check`
+/// callbacks):
+///
+/// ```ignore
+/// for (signer, signature) in &summary.signatures {
+///     if !verify_signature(signer.clone(), signature.clone(), summary.data.clone())? {
+///         return Ok(ValidateCallbackResult::Invalid("bad summary signature".into()));
+///     }
+/// }
+/// // ...then check that `signer`s are the agents your app actually requires.
+/// ```
+///
+/// ## Where to validate (opening summary)
+///
+/// The opening summary is committed as the final genesis record, and genesis
+/// records are integrated *without* local app-validation for their author. That
+/// means **the authoring node only runs `genesis_self_check` over its own
+/// opening summary, not `validate`** — so an app that wants to reject a bad
+/// opening summary *before joining the network* must do so in
+/// `genesis_self_check` (which receives it via `GenesisSelfCheckDataV2`).
+/// Peers that later receive the record validate it through the integrity zome's
+/// `validate` callback (`OpRecord::OpenChain` / `OpActivity::OpenChain`). Put your
+/// summary-checking logic in a shared helper and call it from both callbacks.
+///
+/// The closing summary rides on `CloseChain` and is a normal (non-genesis)
+/// record, so it is validated through `validate` on author and peers alike.
+#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Eq, Hash)]
+pub struct ChainSummary {
+    /// Opaque, app-defined summary bytes. This is the payload that each entry in
+    /// [`ChainSummary::signatures`] signs over.
+    pub data: SerializedBytes,
+    /// `(signer, signature)` pairs over [`ChainSummary::data`], to be interpreted
+    /// and verified by the app.
+    pub signatures: Vec<(AgentPubKey, Signature)>,
+}
+
+impl ChainSummary {
+    /// Construct a new chain summary from opaque payload bytes and a list of
+    /// `(signer, signature)` pairs over that payload.
+    pub fn new(data: SerializedBytes, signatures: Vec<(AgentPubKey, Signature)>) -> Self {
+        Self { data, signatures }
+    }
+}
+
+#[cfg(test)]
+mod chain_summary_tests {
+    use super::*;
+
+    #[test]
+    fn round_trips_through_serialized_bytes_and_option() {
+        let summary = ChainSummary::new(
+            UnsafeBytes::from(vec![1u8, 2, 3, 4]).into(),
+            vec![
+                (AgentPubKey::from_raw_36(vec![1u8; 36]), Signature([7u8; 64])),
+                (AgentPubKey::from_raw_36(vec![2u8; 36]), Signature([9u8; 64])),
+            ],
+        );
+
+        // Round-trip through SerializedBytes (the canonical encoding used for
+        // persistence).
+        let sb: SerializedBytes = summary.clone().try_into().unwrap();
+        let decoded: ChainSummary = sb.try_into().unwrap();
+        assert_eq!(summary, decoded);
+
+        // `Option<ChainSummary>` is the type carried by the OpenChain/CloseChain
+        // actions.
+        let encoded = holochain_serialized_bytes::encode(&Some(summary.clone())).unwrap();
+        let decoded: Option<ChainSummary> =
+            holochain_serialized_bytes::decode(&encoded).unwrap();
+        assert_eq!(Some(summary), decoded);
+
+        let encoded_none = holochain_serialized_bytes::encode(&None::<ChainSummary>).unwrap();
+        let decoded_none: Option<ChainSummary> =
+            holochain_serialized_bytes::decode(&encoded_none).unwrap();
+        assert_eq!(None, decoded_none);
+    }
+}
 
 /// The properties of the current dna/zome being called.
 #[allow(missing_docs)]

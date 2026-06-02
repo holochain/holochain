@@ -10,6 +10,7 @@
 //! [`SignedHashed`]: crate::record::SignedHashed
 
 use crate::action::ZomeIndex;
+use crate::info::ChainSummary;
 use crate::{
     link::{LinkTag, LinkType},
     EntryType, MembraneProof,
@@ -249,6 +250,8 @@ pub struct DeleteLinkData {
 pub struct CloseChainData {
     /// Optional migration target the chain closes towards.
     pub new_target: Option<crate::action::MigrationTarget>,
+    /// Optional app-defined summary of the chain's closing state.
+    pub closing_summary: Option<ChainSummary>,
 }
 
 /// Per-variant data for [`ActionType::OpenChain`].
@@ -257,10 +260,15 @@ pub struct CloseChainData {
 /// [`ActionHeader`]; only the chain-open-specific fields go here.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 pub struct OpenChainData {
-    /// The previous DNA hash or agent key this chain migrated from.
-    pub prev_target: crate::action::MigrationTarget,
-    /// Hash of the matching `CloseChain` action on the old chain.
-    pub close_hash: ActionHash,
+    /// The previous DNA hash or agent key this chain migrated from. `None` when
+    /// this is a genesis opening-summary record rather than a migration.
+    pub prev_target: Option<crate::action::MigrationTarget>,
+    /// Hash of the matching `CloseChain` action on the old chain. `None` when
+    /// this is a genesis opening-summary record rather than a migration.
+    pub close_hash: Option<ActionHash>,
+    /// Optional app-defined summary of the chain's opening state, committed as
+    /// the final genesis record.
+    pub opening_summary: Option<ChainSummary>,
 }
 
 /// Per-variant action data, stored serialized in the `Action.action_data`

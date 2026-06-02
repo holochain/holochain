@@ -139,6 +139,9 @@ pub struct InstallAppPayload {
 
 /// Alias
 pub type MemproofMap = HashMap<RoleName, MembraneProof>;
+/// Alias: per-role opening summaries supplied at install time. See
+/// [`ChainSummary`].
+pub type OpeningSummaryMap = HashMap<RoleName, ChainSummary>;
 /// Alias
 pub type ModifiersMap = HashMap<RoleName, DnaModifiersOpt<YamlProperties>>;
 /// Alias
@@ -173,6 +176,17 @@ pub enum RoleSettings {
         /// Overwrites the dna modifiers from the dna manifest. Only
         /// modifier fields for which `Some(T)` is provided will be overwritten.
         modifiers: Option<DnaModifiersOpt<YamlProperties>>,
+        /// An optional, app-defined summary describing the "opening state" of
+        /// the provisioned cell's source chain.
+        ///
+        /// This is the install-time analogue of the membrane proof. It is
+        /// committed on-chain as the final genesis record (carried by an
+        /// `OpenChain` action) and validated like any other record — both by
+        /// system validation and by the integrity zome's `validate` callback.
+        /// See [`ChainSummary`] for details. It can only be supplied
+        /// programmatically (it is not part of the YAML manifest settings).
+        #[serde(default)]
+        opening_summary: Option<ChainSummary>,
     },
 }
 
@@ -181,6 +195,7 @@ impl Default for RoleSettings {
         Self::Provisioned {
             membrane_proof: None,
             modifiers: None,
+            opening_summary: None,
         }
     }
 }
@@ -194,6 +209,9 @@ impl From<RoleSettingsYaml> for RoleSettings {
             } => Self::Provisioned {
                 membrane_proof,
                 modifiers,
+                // The opening summary can only be supplied programmatically,
+                // never via the YAML manifest settings.
+                opening_summary: None,
             },
             #[allow(deprecated)]
             RoleSettingsYaml::UseExisting { cell_id } => Self::UseExisting { cell_id },
@@ -563,6 +581,24 @@ impl InstalledAppCommon {
             .filter_map(|(name, role)| Some((name, role.as_primary()?)))
     }
 
+    /// Find the opening summary (if any) that was supplied at install time
+    /// for the provisioned cell identified by `cell_id`. See [`ChainSummary`].
+    ///
+    /// Returns `None` for clone cells and for cells not owned by this app, since
+    /// the opening summary is only associated with the role's provisioned cell.
+    pub fn opening_summary_for_cell(&self, cell_id: &CellId) -> Option<&ChainSummary> {
+        if cell_id.agent_pubkey() != self.agent_key() {
+            return None;
+        }
+        self.primary_roles().find_map(|(_, primary)| {
+            if primary.provisioned_dna_hash() == Some(cell_id.dna_hash()) {
+                primary.opening_summary()
+            } else {
+                None
+            }
+        })
+    }
+
     /// Add a clone cell.
     pub fn add_clone(&mut self, role_name: &RoleName, dna_hash: &DnaHash) -> AppResult<CloneId> {
         let app_role_assignment = self.primary_role_mut(role_name)?;
@@ -858,6 +894,16 @@ pub struct AppRolePrimary {
     /// any longer and are not returned as part of the app info either.
     /// Disabled clone cells can be deleted through the Admin API.
     pub disabled_clones: HashMap<CloneId, DnaHash>,
+
+    /// An optional, app-defined summary supplied at install time describing the
+    /// "opening state" of this cell's source chain. The conductor commits it
+    /// on-chain as the final genesis record (carried by an `OpenChain` action).
+    /// See [`ChainSummary`].
+    ///
+    /// `#[serde(default)]` so that role assignments persisted before this field
+    /// existed deserialize cleanly to `None` with no data migration.
+    #[serde(default)]
+    pub opening_summary: Option<ChainSummary>,
 }
 
 impl AppRolePrimary {
@@ -870,7 +916,20 @@ impl AppRolePrimary {
             clones: HashMap::new(),
             next_clone_index: 0,
             disabled_clones: HashMap::new(),
+            opening_summary: None,
         }
+    }
+
+    /// Builder-style setter for the optional opening summary. See [`ChainSummary`].
+    pub fn with_opening_summary(mut self, opening_summary: Option<ChainSummary>) -> Self {
+        self.opening_summary = opening_summary;
+        self
+    }
+
+    /// Accessor for the optional opening summary supplied at install time. See
+    /// [`ChainSummary`].
+    pub fn opening_summary(&self) -> Option<&ChainSummary> {
+        self.opening_summary.as_ref()
     }
 
     /// Accessor
@@ -1116,11 +1175,81 @@ mod tests {
         let role_settings: RoleSettings = RoleSettings::Provisioned {
             membrane_proof: None,
             modifiers: None,
+            opening_summary: None,
         };
         assert_eq!(
             serde_json::to_string(&role_settings).unwrap(),
-            "{\"type\":\"provisioned\",\"value\":{\"membrane_proof\":null,\"modifiers\":null}}"
+            "{\"type\":\"provisioned\",\"value\":{\"membrane_proof\":null,\"modifiers\":null,\"opening_summary\":null}}"
         );
+    }
+
+    #[test]
+    fn app_role_primary_opening_summary_is_backward_compatible() {
+        let summary = ChainSummary::new(
+            UnsafeBytes::from(vec![9u8, 8, 7]).into(),
+            vec![(AgentPubKey::from_raw_36(vec![4u8; 36]), Signature([3u8; 64]))],
+        );
+        let primary = AppRolePrimary::new(fixt!(DnaHash), true, 10);
+
+        // A summary set on the role round-trips through serde_json, which is the
+        // exact format used to persist role assignments in the conductor database.
+        let with = primary.clone().with_opening_summary(Some(summary.clone()));
+        let json = serde_json::to_string(&with).unwrap();
+        let back: AppRolePrimary = serde_json::from_str(&json).unwrap();
+        assert_eq!(with, back);
+        assert_eq!(back.opening_summary(), Some(&summary));
+
+        // Backward compatibility: role assignments persisted before this field
+        // existed will not contain the `opening_summary` key. They must still
+        // deserialize, defaulting to `None`, so that no data migration is needed.
+        let mut value = serde_json::to_value(&primary).unwrap();
+        assert!(value
+            .as_object_mut()
+            .unwrap()
+            .remove("opening_summary")
+            .is_some());
+        let back: AppRolePrimary = serde_json::from_value(value).unwrap();
+        assert_eq!(back.opening_summary(), None);
+    }
+
+    #[test]
+    fn opening_summary_for_cell_matches_only_the_provisioned_cell() {
+        let agent = fixt!(AgentPubKey);
+        let dna_hash = fixt!(DnaHash);
+        let summary = ChainSummary::new(UnsafeBytes::from(vec![1u8]).into(), vec![]);
+
+        let app = InstalledAppCommon::new(
+            "test_app",
+            agent.clone(),
+            vec![(
+                "role".into(),
+                AppRolePrimary::new(dna_hash.clone(), true, 0)
+                    .with_opening_summary(Some(summary.clone()))
+                    .into(),
+            )],
+            AppManifest::V0(AppManifestV0 {
+                name: "test_app".to_string(),
+                description: None,
+                roles: vec![],
+                allow_deferred_memproofs: false,
+                relay_url: None,
+                bootstrap_url: None,
+            }),
+            Timestamp::now(),
+        )
+        .unwrap();
+
+        // The provisioned cell sees its summary.
+        let cell_id = CellId::new(dna_hash.clone(), agent.clone());
+        assert_eq!(app.opening_summary_for_cell(&cell_id), Some(&summary));
+
+        // A cell with a different agent (not owned by this app) sees nothing.
+        let other_agent = CellId::new(dna_hash, fixt!(AgentPubKey));
+        assert_eq!(app.opening_summary_for_cell(&other_agent), None);
+
+        // A cell with a different DNA (e.g. a clone) sees nothing.
+        let other_dna = CellId::new(fixt!(DnaHash), agent);
+        assert_eq!(app.opening_summary_for_cell(&other_dna), None);
     }
 
     #[test]

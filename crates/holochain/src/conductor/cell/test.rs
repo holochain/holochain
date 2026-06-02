@@ -68,6 +68,7 @@ async fn test_cell_handle_publish() {
         dht_store,
         ribosome,
         None,
+        None,
     )
     .await
     .unwrap();

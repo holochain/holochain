@@ -1,6 +1,7 @@
 //! # Source Chain Filtering
 //! Types for filtering the source chain.
 
+use crate::info::ChainSummary;
 use crate::MigrationTarget;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
@@ -173,6 +174,10 @@ impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
 pub struct CloseChainInput {
     /// The target identifier for the chain that will be migrated to.
     pub new_target: Option<MigrationTarget>,
+
+    /// An optional, app-defined summary of the chain's closing state, committed
+    /// onto the `CloseChain` action.
+    pub closing_summary: Option<ChainSummary>,
 }
 
 /// Input to open a chain.

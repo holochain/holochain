@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- The `OpRecord::OpenChain` / `OpActivity::OpenChain` flattened-op variants now expose `previous_target` and `close_hash` as `Option` (they are `None` for the genesis opening-summary form) plus an `opening_summary` field; `OpRecord::CloseChain` / `OpActivity::CloseChain` gain a `closing_summary` field. This lets integrity zomes read and validate the opening/closing summary in their `validate` callback.
+
 ## 0.8.0-dev.13
 
 ## 0.8.0-dev.12

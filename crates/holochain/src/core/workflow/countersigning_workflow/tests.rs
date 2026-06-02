@@ -1802,6 +1802,7 @@ impl TestHarness {
             dna_hash.clone(),
             author.clone(),
             None,
+            None,
         )
         .await
         .unwrap();

@@ -2,6 +2,7 @@ use super::EntryType;
 use super::MigrationTarget;
 use super::Timestamp;
 use crate::action;
+use crate::info::ChainSummary;
 use crate::link::LinkTag;
 use crate::link::LinkType;
 use crate::ActionUnweighed;
@@ -249,12 +250,14 @@ builder_variant!(DeleteLink {
 });
 
 builder_variant!(OpenChain {
-    prev_target: MigrationTarget,
-    close_hash: ActionHash,
+    prev_target: Option<MigrationTarget>,
+    close_hash: Option<ActionHash>,
+    | opening_summary: Option<ChainSummary>
 });
 
 builder_variant!(CloseChain {
     new_target: Option<MigrationTarget>,
+    | closing_summary: Option<ChainSummary>
 });
 
 builder_variant!(Create<EntryRateWeight> {

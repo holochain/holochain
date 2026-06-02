@@ -24,6 +24,7 @@ fn genesis_self_check(data: GenesisSelfCheckData) -> ExternResult<ValidateCallba
     let GenesisSelfCheckDataV2 {
         membrane_proof: _maybe_membrane_proof,
         agent_key: _agent_key,
+        ..
     } = data;
     Ok(ValidateCallbackResult::Valid)
 }

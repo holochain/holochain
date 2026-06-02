@@ -223,8 +223,9 @@ pub fn oc(prev_target: MigrationTarget, close_hash: ActionHash) -> OpenChain {
         timestamp: Timestamp(0),
         action_seq: 1,
         prev_action: ah(0),
-        prev_target,
-        close_hash,
+        prev_target: Some(prev_target),
+        close_hash: Some(close_hash),
+        opening_summary: None,
     }
 }
 
@@ -236,6 +237,7 @@ pub fn cc(new_target: Option<MigrationTarget>) -> CloseChain {
         action_seq: 1,
         prev_action: ah(0),
         new_target,
+        closing_summary: None,
     }
 }
 

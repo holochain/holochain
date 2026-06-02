@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Add an optional `opening_summary: Option<ChainSummary>` field to `RoleSettings::Provisioned` (install-time input) and to `AppRolePrimary` (persisted, `#[serde(default)]`). `AppBundle::resolve_cells` takes an `OpeningSummaryMap` to populate it, and `AppRoleResolution::cells_to_create` carries the per-cell summary through to genesis, where it is committed as the final genesis record. The summary type is the shared `ChainSummary`, also used for the closing summary on `CloseChain`.
+
 ## 0.7.0-dev.26
 
 ## 0.7.0-dev.25

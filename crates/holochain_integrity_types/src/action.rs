@@ -1,4 +1,5 @@
 use crate::entry_def::EntryVisibility;
+use crate::info::ChainSummary;
 use crate::link::LinkTag;
 use crate::link::LinkType;
 use crate::EntryRateWeight;
@@ -379,7 +380,15 @@ impl Action {
     }
 
     pub fn is_genesis(&self) -> bool {
+        // The mandatory genesis records (Dna, AgentValidationPkg, agent-key
+        // Create) occupy seqs 0..POST_GENESIS_SEQ_THRESHOLD. An optional opening
+        // summary is committed as a fourth genesis record, carried by an
+        // `OpenChain` in its genesis form. That genesis-form `OpenChain` is
+        // distinguished from a post-genesis migration `OpenChain` (which has a
+        // migration target) by content, so it can be classified correctly from a
+        // single action without chain-length context.
         self.action_seq() < POST_GENESIS_SEQ_THRESHOLD
+            || matches!(self, Action::OpenChain(oc) if oc.is_genesis_opening_summary())
     }
 
     pub fn rate_data(&self) -> RateWeight {
@@ -603,10 +612,20 @@ pub struct CloseChain {
     pub prev_action: ActionHash,
 
     pub new_target: Option<MigrationTarget>,
+
+    /// An optional, app-defined summary of the chain's "closing" state, supplied
+    /// when the chain is closed (e.g. during migration via `close_chain`). The
+    /// bytes and signatures are opaque to Holochain and validated by the app.
+    pub closing_summary: Option<ChainSummary>,
 }
 
-/// When migrating to a new version of a DNA, this action is committed to the
-/// new chain to declare the migration path taken.
+/// Committed to the new chain when migrating to a new version of a DNA (to
+/// declare the migration path taken), and also committed as the final genesis
+/// record when an app is installed with an opening summary.
+///
+/// `prev_target` and `close_hash` are present only in the migration form. In the
+/// genesis ("opening summary") form they are both `None`, `action_seq` is 3, and
+/// `opening_summary` is `Some`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 pub struct OpenChain {
     pub author: AgentPubKey,
@@ -614,10 +633,31 @@ pub struct OpenChain {
     pub action_seq: u32,
     pub prev_action: ActionHash,
 
-    pub prev_target: MigrationTarget,
+    /// The migration source. `None` when this is a genesis opening-summary record
+    /// rather than a migration.
+    pub prev_target: Option<MigrationTarget>,
     /// The hash of the `CloseChain` action on the old chain, to establish chain continuity
-    /// and disallow backlinks to multiple forks on the old chain.
-    pub close_hash: ActionHash,
+    /// and disallow backlinks to multiple forks on the old chain. `None` when this
+    /// is a genesis opening-summary record rather than a migration.
+    pub close_hash: Option<ActionHash>,
+
+    /// An optional, app-defined summary of the chain's "opening" state, supplied
+    /// at install time and committed as the final genesis record. The bytes and
+    /// signatures are opaque to Holochain and validated by the app.
+    pub opening_summary: Option<ChainSummary>,
+}
+
+impl OpenChain {
+    /// Whether this `OpenChain` is the genesis "opening summary" form (committed
+    /// as the final genesis record at install time) rather than a migration
+    /// `OpenChain`. The genesis form sits at [`POST_GENESIS_SEQ_THRESHOLD`],
+    /// carries no migration target, and holds an opening summary.
+    pub fn is_genesis_opening_summary(&self) -> bool {
+        self.action_seq == POST_GENESIS_SEQ_THRESHOLD
+            && self.prev_target.is_none()
+            && self.close_hash.is_none()
+            && self.opening_summary.is_some()
+    }
 }
 
 /// An action which "speaks" Entry content into being. The same content can be

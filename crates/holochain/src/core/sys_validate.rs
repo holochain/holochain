@@ -243,6 +243,71 @@ pub fn check_agent_validation_pkg_predecessor(
     }
 }
 
+/// Check that an [`Action::OpenChain`] is well formed.
+///
+/// An `OpenChain` is one of two forms:
+/// - a *migration* record, carrying both a migration target (`prev_target`) and
+///   the matching `close_hash`; or
+/// - a *genesis opening-summary* record, carrying neither, plus an
+///   `opening_summary`. The genesis form is only valid as the fourth genesis
+///   record: at [`POST_GENESIS_SEQ_THRESHOLD`], immediately following the
+///   agent-key `Create`.
+///
+/// Enforcing this keeps the genesis/migration distinction unambiguous so that
+/// [`Action::is_genesis`] can classify an `OpenChain` from its content alone.
+pub fn check_open_chain_well_formed(
+    action: &Action,
+    prev_action: &Action,
+) -> SysValidationResult<()> {
+    let Action::OpenChain(open_chain) = action else {
+        return Ok(());
+    };
+
+    let maybe_error: Option<String> = match (&open_chain.prev_target, &open_chain.close_hash) {
+        // Migration form: both the target and the close hash are present.
+        (Some(_), Some(_)) => None,
+        // Genesis opening-summary form: neither is present.
+        (None, None) => {
+            if open_chain.action_seq != POST_GENESIS_SEQ_THRESHOLD {
+                Some(
+                    "An OpenChain with no migration target is a genesis opening summary, \
+                     which is only valid as the fourth genesis record"
+                        .to_string(),
+                )
+            } else if open_chain.opening_summary.is_none() {
+                Some("A genesis-form OpenChain must carry an opening summary".to_string())
+            } else if !matches!(
+                prev_action,
+                Action::Create(Create {
+                    entry_type: EntryType::AgentPubKey,
+                    ..
+                })
+            ) {
+                Some(
+                    "A genesis-form OpenChain must immediately follow the agent key".to_string(),
+                )
+            } else {
+                None
+            }
+        }
+        // Mixed form: a migration target without a close hash, or vice versa.
+        _ => Some(
+            "An OpenChain must specify both a migration target and a close hash, or neither"
+                .to_string(),
+        ),
+    };
+
+    if let Some(error) = maybe_error {
+        Err(PrevActionErrorKind::InvalidSuccessor(
+            error,
+            Box::new((prev_action.clone(), action.clone())),
+        ))
+        .map_err(|e| ValidationOutcome::PrevActionError((e, action.clone()).into()).into())
+    } else {
+        Ok(())
+    }
+}
+
 /// Check that the author didn't change between actions
 pub fn check_prev_author(action: &Action, prev_action: &Action) -> SysValidationResult<()> {
     let a1 = prev_action.author().clone();
@@ -618,5 +683,81 @@ mod test {
         check_countersigning_preflight_response_signature(&preflight_response)
             .await
             .unwrap();
+    }
+
+    #[test]
+    fn check_open_chain_well_formed_distinguishes_genesis_and_migration() {
+        use super::check_open_chain_well_formed;
+        use holo_hash::{ActionHash, AgentPubKey, DnaHash};
+        use holochain_serialized_bytes::prelude::UnsafeBytes;
+        use holochain_zome_types::prelude::{
+            Action, ChainSummary, Create, EntryType, MigrationTarget, OpenChain,
+        };
+
+        let author = AgentPubKey::from_raw_36(vec![1u8; 36]);
+        // The agent-key Create that a genesis-form OpenChain must follow.
+        let agent_create = Action::Create(Create {
+            author: author.clone(),
+            timestamp: Timestamp::from_micros(2),
+            action_seq: 2,
+            prev_action: ActionHash::from_raw_36(vec![2u8; 36]),
+            entry_type: EntryType::AgentPubKey,
+            entry_hash: author.clone().into(),
+            weight: Default::default(),
+        });
+
+        let summary = ChainSummary::new(UnsafeBytes::from(vec![1u8]).into(), vec![]);
+
+        let make_open = |action_seq, prev_target, close_hash, opening_summary| {
+            Action::OpenChain(OpenChain {
+                author: author.clone(),
+                timestamp: Timestamp::from_micros(3),
+                action_seq,
+                prev_action: ActionHash::from_raw_36(vec![3u8; 36]),
+                prev_target,
+                close_hash,
+                opening_summary,
+            })
+        };
+
+        // Valid genesis form: seq 3, no migration target, carries a summary,
+        // directly follows the agent-key Create.
+        check_open_chain_well_formed(
+            &make_open(3, None, None, Some(summary.clone())),
+            &agent_create,
+        )
+        .unwrap();
+
+        // Genesis form at the wrong seq is rejected.
+        assert!(check_open_chain_well_formed(
+            &make_open(5, None, None, Some(summary.clone())),
+            &agent_create,
+        )
+        .is_err());
+
+        // Genesis form without a summary is rejected.
+        assert!(
+            check_open_chain_well_formed(&make_open(3, None, None, None), &agent_create,).is_err()
+        );
+
+        // Migration form (both target and close hash present) is always allowed.
+        let target = MigrationTarget::Dna(DnaHash::from_raw_36(vec![4u8; 36]));
+        check_open_chain_well_formed(
+            &make_open(
+                3,
+                Some(target.clone()),
+                Some(ActionHash::from_raw_36(vec![5u8; 36])),
+                None,
+            ),
+            &agent_create,
+        )
+        .unwrap();
+
+        // Mixed form (target without close hash) is rejected.
+        assert!(check_open_chain_well_formed(
+            &make_open(3, Some(target), None, None),
+            &agent_create,
+        )
+        .is_err());
     }
 }

@@ -94,6 +94,7 @@ pub(crate) mod slow_tests {
             payload: Arc::new(GenesisSelfCheckDataV2 {
                 membrane_proof: Some(Arc::new(().try_into().unwrap())),
                 agent_key: fixt!(AgentPubKey),
+                opening_summary: None,
             }),
         }
     }

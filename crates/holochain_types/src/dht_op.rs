@@ -464,6 +464,14 @@ impl ChainOp {
     pub fn is_genesis(&self) -> bool {
         // XXX: Not great encapsulation here, but hey, at least it's using
         // a const value for the comparison.
+        //
+        // The optional fourth genesis record (the opening summary) is an
+        // `OpenChain`, which only ever produces `StoreRecord` and
+        // `RegisterAgentActivity` ops. Both of those arms delegate to
+        // `Action::is_genesis()`, which classifies a genesis-form `OpenChain`
+        // correctly. The remaining arms are unreachable for an `OpenChain`
+        // (it is entry-less and link-less), so the plain seq comparison there
+        // is correct.
         match self {
             ChainOp::StoreRecord(_, a, _) => a.is_genesis(),
             ChainOp::StoreEntry(_, a, _) => a.action_seq() < POST_GENESIS_SEQ_THRESHOLD,

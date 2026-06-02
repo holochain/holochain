@@ -100,18 +100,25 @@ impl OpHelper for Op {
                         let OpenChain {
                             prev_target,
                             close_hash,
+                            opening_summary,
                             ..
                         } = action;
                         OpRecord::OpenChain {
                             previous_target: prev_target.clone(),
                             close_hash: close_hash.clone(),
+                            opening_summary: opening_summary.clone(),
                             action: action.clone(),
                         }
                     }
                     Action::CloseChain(action) => {
-                        let CloseChain { new_target, .. } = action;
+                        let CloseChain {
+                            new_target,
+                            closing_summary,
+                            ..
+                        } = action;
                         OpRecord::CloseChain {
                             new_target: new_target.clone(),
+                            closing_summary: closing_summary.clone(),
                             action: action.clone(),
                         }
                     }
@@ -360,18 +367,25 @@ impl OpHelper for Op {
                         let OpenChain {
                             prev_target,
                             close_hash,
+                            opening_summary,
                             ..
                         } = action;
                         OpActivity::OpenChain {
                             previous_target: prev_target.clone(),
                             close_hash: close_hash.clone(),
+                            opening_summary: opening_summary.clone(),
                             action: action.clone(),
                         }
                     }
                     Action::CloseChain(action) => {
-                        let CloseChain { new_target, .. } = action;
+                        let CloseChain {
+                            new_target,
+                            closing_summary,
+                            ..
+                        } = action;
                         OpActivity::CloseChain {
                             new_target: new_target.clone(),
+                            closing_summary: closing_summary.clone(),
                             action: action.clone(),
                         }
                     }

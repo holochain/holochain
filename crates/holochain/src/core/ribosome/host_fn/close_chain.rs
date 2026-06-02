@@ -18,8 +18,10 @@ pub fn close_chain(
             write_workspace: Permission::Allow,
             ..
         } => {
-            // Construct the close chain action
-            let action_builder = builder::CloseChain::new(input.new_target);
+            // Construct the close chain action, carrying the optional closing
+            // summary supplied by the caller.
+            let action_builder =
+                builder::CloseChain::new_full(input.new_target, input.closing_summary);
 
             let action_hash = tokio_helper::block_forever_on(tokio::task::spawn(async move {
                 // push the action into the source chain
@@ -82,6 +84,7 @@ mod tests {
         let host_access = fixt!(ZomeCallHostAccess, Predictable);
         let mut input = CloseChainInput {
             new_target: None,
+            closing_summary: None,
         };
 
         // If this is an agent migration, the agent keypair needs to exist

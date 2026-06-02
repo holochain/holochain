@@ -345,6 +345,7 @@ async fn install_app_with_roles_settings() {
         RoleSettings::Provisioned {
             membrane_proof: Default::default(),
             modifiers: Some(custom_modifiers),
+            opening_summary: None,
         },
     );
 

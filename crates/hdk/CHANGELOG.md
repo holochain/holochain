@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- `close_chain` now takes an optional `closing_summary: Option<ChainSummary>` argument, committed onto the `CloseChain` action to describe the chain's closing state. (The symmetric opening summary is supplied at install time and committed at genesis, so it needs no HDK function.)
+
 ## 0.7.0-dev.19
 
 ## 0.7.0-dev.18

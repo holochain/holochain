@@ -51,6 +51,7 @@ impl AppBundle {
         self,
         membrane_proofs: MemproofMap,
         existing_cells: ExistingCellsMap,
+        opening_summaries: OpeningSummaryMap,
     ) -> AppBundleResult<AppRoleResolution> {
         let AppManifestValidated { name: _, roles } = self.manifest().clone().validate()?;
         let bundle = Arc::new(self);
@@ -75,7 +76,10 @@ impl AppBundle {
                     match op {
                         CellProvisioningOp::CreateFromDnaFile(dna, clone_limit) => {
                             let dna_hash = dna.dna_hash().clone();
-                            let role = AppRolePrimary::new(dna_hash, true, clone_limit).into();
+                            let opening_summary = opening_summaries.get(&role_name).cloned();
+                            let role = AppRolePrimary::new(dna_hash, true, clone_limit)
+                                .with_opening_summary(opening_summary)
+                                .into();
                             // TODO: could sequentialize this to remove the clone
                             let proof = membrane_proofs.get(&role_name).cloned();
                             resolution.dnas_to_register.push((dna, proof));
@@ -178,31 +182,38 @@ pub struct AppRoleResolution {
 
 #[allow(missing_docs)]
 impl AppRoleResolution {
-    /// Return the IDs of new cells to be created as part of the resolution.
+    /// Return the IDs of new cells to be created as part of the resolution,
+    /// along with each cell's membrane proof and (optional) opening summary.
     /// Does not return existing cells to be reused.
-    pub fn cells_to_create(&self, agent_key: AgentPubKey) -> Vec<(CellId, Option<MembraneProof>)> {
-        let provisioned = self
+    pub fn cells_to_create(
+        &self,
+        agent_key: AgentPubKey,
+    ) -> Vec<(CellId, Option<MembraneProof>, Option<ChainSummary>)> {
+        // Map each provisioned cell to its (optional) opening summary, which is
+        // committed as the final genesis record.
+        let provisioned: std::collections::HashMap<CellId, Option<ChainSummary>> = self
             .role_assignments
             .iter()
             .filter_map(|(_name, role)| {
                 let role = role.as_primary()?;
                 if role.is_provisioned {
-                    Some(CellId::new(role.dna_hash().clone(), agent_key.clone()))
+                    Some((
+                        CellId::new(role.dna_hash().clone(), agent_key.clone()),
+                        role.opening_summary().cloned(),
+                    ))
                 } else {
                     None
                 }
             })
-            .collect::<std::collections::HashSet<_>>();
+            .collect();
 
         self.dnas_to_register
             .iter()
             .filter_map(|(dna, proof)| {
                 let cell_id = CellId::new(dna.dna_hash().clone(), agent_key.clone());
-                if provisioned.contains(&cell_id) {
-                    Some((cell_id, proof.clone()))
-                } else {
-                    None
-                }
+                provisioned
+                    .get(&cell_id)
+                    .map(|opening_summary| (cell_id.clone(), proof.clone(), opening_summary.clone()))
             })
             .collect()
     }

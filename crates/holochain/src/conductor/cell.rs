@@ -174,6 +174,7 @@ impl Cell {
         dht_store: holochain_state::dht_store::DhtStore,
         ribosome: Ribosome,
         membrane_proof: Option<MembraneProof>,
+        opening_summary: Option<ChainSummary>,
     ) -> CellResult<()>
     where
         Ribosome: RibosomeT + 'static,
@@ -191,7 +192,8 @@ impl Cell {
             return Ok(());
         }
 
-        let args = GenesisWorkflowArgs::new(cell_id.clone(), membrane_proof, ribosome);
+        let args =
+            GenesisWorkflowArgs::new(cell_id.clone(), membrane_proof, opening_summary, ribosome);
 
         genesis_workflow(workspace, conductor_api, args)
             .await

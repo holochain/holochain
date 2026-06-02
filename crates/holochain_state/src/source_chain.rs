@@ -1366,6 +1366,7 @@ pub async fn genesis(
     dna_hash: DnaHash,
     agent_pubkey: AgentPubKey,
     membrane_proof: Option<MembraneProof>,
+    opening_summary: Option<ChainSummary>,
 ) -> SourceChainResult<()> {
     let dna_action = Action::Dna(Dna {
         author: agent_pubkey.clone(),
@@ -1413,6 +1414,39 @@ pub async fn genesis(
     let (agent_action, agent_entry) = agent_record.clone().into_inner();
     let agent_entry = agent_entry.into_option();
 
+    // Optionally build the fourth genesis record: an `OpenChain` (in its genesis
+    // form, with no migration target) carrying the opening summary supplied at
+    // install time. It is committed atomically alongside the mandatory three.
+    let agent_action_address = agent_action.as_hash().clone();
+    let opening_summary_record: Option<(SignedActionHashed, Vec<ChainOpLite>)> =
+        match opening_summary {
+            Some(summary) => {
+                let oc_action = Action::OpenChain(OpenChain {
+                    author: agent_pubkey.clone(),
+                    timestamp: Timestamp::now(),
+                    // The opening summary is the fourth genesis record, at the
+                    // seq directly after the mandatory three.
+                    action_seq: POST_GENESIS_SEQ_THRESHOLD,
+                    prev_action: agent_action_address,
+                    // Genesis form: no migration target, only the summary.
+                    prev_target: None,
+                    close_hash: None,
+                    opening_summary: Some(summary),
+                });
+                let oc_action = ActionHashed::from_content_sync(oc_action);
+                let oc_action = SignedActionHashed::sign(&keystore, oc_action).await?;
+                let oc_record = Record::new(oc_action, None);
+                let oc_ops = produce_op_lites_from_records(vec![&oc_record])?;
+                let (oc_action, _) = oc_record.into_inner();
+                Some((oc_action, oc_ops))
+            }
+            None => None,
+        };
+    // Clone the opening-summary action for the new-DB write block; the original
+    // moves into the legacy authored write closure below.
+    let opening_summary_action_for_new_db =
+        opening_summary_record.as_ref().map(|(a, _)| a.clone());
+
     // Pre-compute (op, op_hash, timestamp) tuples for the new-DB write block.
     // This matches what put_raw does internally via ChainOpUniqueForm::op_hash,
     // but done upfront so we can keep the actions and ops available for the
@@ -1424,12 +1458,15 @@ pub async fn genesis(
         // Process each (signed_action, ops) pair to compute op hashes.
         // We clone the action here (cheap because Action uses Arc<[u8]> for large fields)
         // and let ChainOpUniqueForm::op_hash consume the clone.
-        let pairs: &[(&SignedActionHashed, &[ChainOpLite])] = &[
+        let mut pairs: Vec<(&SignedActionHashed, &[ChainOpLite])> = vec![
             (&dna_action, &dna_ops),
             (&agent_validation_action, &avh_ops),
             (&agent_action, &agent_ops),
         ];
-        for (shh, ops) in pairs {
+        if let Some((oc_action, oc_ops)) = &opening_summary_record {
+            pairs.push((oc_action, oc_ops.as_slice()));
+        }
+        for (shh, ops) in &pairs {
             let mut action_opt: Option<Action> = Some(shh.action().clone());
             for op in *ops {
                 let op_type = op.get_type();
@@ -1472,6 +1509,10 @@ pub async fn genesis(
                 agent_ops,
                 agent_entry,
             )?);
+            // The optional fourth genesis record (the opening summary), if any.
+            if let Some((oc_action, oc_ops)) = opening_summary_record {
+                ops_to_integrate.extend(source_chain::put_raw(txn, oc_action, oc_ops, None)?);
+            }
             SourceChainResult::Ok(ops_to_integrate)
         })
         .await?;
@@ -1496,13 +1537,17 @@ pub async fn genesis(
                 .map_err(SourceChainError::other)?;
         }
 
-        // Insert all three genesis actions.
-        let genesis_actions: &[&SignedActionHashed] = &[
+        // Insert the genesis actions (the mandatory three, plus the optional
+        // opening-summary record when supplied).
+        let mut genesis_actions: Vec<&SignedActionHashed> = vec![
             &dna_action_for_new_db,
             &agent_validation_action_for_new_db,
             &agent_action_for_new_db,
         ];
-        for sah in genesis_actions {
+        if let Some(oc_action) = &opening_summary_action_for_new_db {
+            genesis_actions.push(oc_action);
+        }
+        for sah in &genesis_actions {
             let new_sah = holochain_zome_types::dht_v2::from_legacy_signed_action(sah);
             tx.insert_action(
                 &new_sah,
@@ -1527,11 +1572,14 @@ pub async fn genesis(
                 }
             };
 
-            let genesis_actions_slice: Vec<SignedActionHashed> = vec![
+            let mut genesis_actions_slice: Vec<SignedActionHashed> = vec![
                 dna_action_for_new_db.clone(),
                 agent_validation_action_for_new_db.clone(),
                 agent_action_for_new_db.clone(),
             ];
+            if let Some(oc_action) = &opening_summary_action_for_new_db {
+                genesis_actions_slice.push(oc_action.clone());
+            }
             let genesis_entries_slice: Vec<holochain_types::EntryHashed> = agent_entry_for_new_db
                 .as_ref()
                 .map(|e| {
@@ -1870,7 +1918,10 @@ mod tests {
         )
         .await?;
 
-        let action_builder = builder::CloseChain { new_target: None };
+        let action_builder = builder::CloseChain {
+            new_target: None,
+            closing_summary: None,
+        };
         chain_1
             .put(action_builder.clone(), None, ChainTopOrdering::Strict)
             .await?;
@@ -2224,6 +2275,7 @@ mod tests {
                 fake_dna_hash(1),
                 carol.clone(),
                 None,
+                None,
             )
             .await
             .unwrap();
@@ -2353,6 +2405,7 @@ mod tests {
                     keystore.clone(),
                     fake_dna_hash(1),
                     bob.clone(),
+                    None,
                     None,
                 )
                 .await
@@ -2503,6 +2556,7 @@ mod tests {
             keystore.clone(),
             dna_hash,
             (*author).clone(),
+            None,
             None,
         )
         .await
@@ -3075,6 +3129,7 @@ mod tests {
                 keystore.clone(),
                 dna_hash,
                 agent_key.clone(),
+                None,
                 None,
             )
             .await

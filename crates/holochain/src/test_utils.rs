@@ -541,7 +541,7 @@ pub async fn fake_genesis_for_agent(
 ) -> SourceChainResult<()> {
     let dht_store = holochain_state::test_utils::test_dht_store(dna_hash.clone()).await;
 
-    source_chain::genesis(vault, dht_db, dht_store, keystore, dna_hash, agent, None).await
+    source_chain::genesis(vault, dht_db, dht_store, keystore, dna_hash, agent, None, None).await
 }
 
 /// Force all dht ops without enough validation receipts to be published.

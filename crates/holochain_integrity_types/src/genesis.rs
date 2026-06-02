@@ -5,6 +5,7 @@
 //! joining to ensure that they can catch any problems they can before being
 //! subject to the scrutiny of their peers and facing possible rejection.
 
+use crate::info::ChainSummary;
 use crate::DnaInfoV1;
 use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
@@ -36,6 +37,15 @@ pub struct GenesisSelfCheckDataV2 {
     pub membrane_proof: Option<MembraneProof>,
     /// Will be the 3rd record of the chain, the agent key.
     pub agent_key: AgentPubKey,
+    /// The opening summary that will be committed as the final genesis record
+    /// (carried by an `OpenChain` action), if one was supplied at install time.
+    ///
+    /// This is the authoring node's only opportunity to validate its *own*
+    /// opening summary before joining the network: genesis records are not run
+    /// through the author's `validate` callback. Core does not verify the
+    /// summary's signatures — verify them here if your app requires it (see
+    /// [`ChainSummary`](crate::info::ChainSummary)).
+    pub opening_summary: Option<ChainSummary>,
 }
 
 /// Alias to the current version of `GenesisSelfCheckData`.

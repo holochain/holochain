@@ -76,6 +76,7 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
         RoleSettings::Provisioned {
             membrane_proof: Default::default(),
             modifiers: Some(custom_modifiers),
+            opening_summary: None,
         },
     );
 
@@ -233,6 +234,7 @@ async fn install_app_with_custom_modifier_fields_none_does_not_override_existing
         RoleSettings::Provisioned {
             membrane_proof: Default::default(),
             modifiers: Some(custom_modifiers.clone()),
+            opening_summary: None,
         },
     );
 
@@ -286,6 +288,7 @@ async fn installing_with_modifiers_for_non_existing_role_fails() {
         RoleSettings::Provisioned {
             membrane_proof: Default::default(),
             modifiers: Some(DnaModifiersOpt::default()),
+            opening_summary: None,
         },
     );
 
@@ -321,6 +324,7 @@ async fn providing_membrane_proof_overrides_deferred_provisioning() {
         RoleSettings::Provisioned {
             membrane_proof: Some(MembraneProof::new(fixt!(SerializedBytes))),
             modifiers: None,
+            opening_summary: None,
         },
     );
 

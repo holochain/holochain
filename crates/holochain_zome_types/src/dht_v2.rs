@@ -67,10 +67,12 @@ pub fn from_legacy_signed_action(shh: &crate::record::SignedActionHashed) -> Sig
         }),
         LegacyAction::CloseChain(d) => ActionData::CloseChain(CloseChainData {
             new_target: d.new_target.clone(),
+            closing_summary: d.closing_summary.clone(),
         }),
         LegacyAction::OpenChain(d) => ActionData::OpenChain(OpenChainData {
             prev_target: d.prev_target.clone(),
             close_hash: d.close_hash.clone(),
+            opening_summary: d.opening_summary.clone(),
         }),
     };
 
@@ -187,6 +189,7 @@ pub fn to_legacy_signed_action(sah: &SignedActionHashed) -> crate::record::Signe
             action_seq,
             prev_action,
             new_target: d.new_target.clone(),
+            closing_summary: d.closing_summary.clone(),
         }),
         ActionData::OpenChain(d) => LegacyAction::OpenChain(OpenChain {
             author,
@@ -195,6 +198,7 @@ pub fn to_legacy_signed_action(sah: &SignedActionHashed) -> crate::record::Signe
             prev_action,
             prev_target: d.prev_target.clone(),
             close_hash: d.close_hash.clone(),
+            opening_summary: d.opening_summary.clone(),
         }),
     };
 
@@ -367,6 +371,84 @@ mod tests {
             }
             _ => panic!("unexpected variant pair"),
         }
+    }
+
+    fn summary() -> holochain_integrity_types::ChainSummary {
+        holochain_integrity_types::ChainSummary::new(
+            holochain_serialized_bytes::UnsafeBytes::from(vec![1u8, 2, 3]).into(),
+            vec![(
+                AgentPubKey::from_raw_36(vec![6u8; 36]),
+                Signature::from([5u8; 64]),
+            )],
+        )
+    }
+
+    fn legacy_signed_open_chain_genesis() -> crate::record::SignedActionHashed {
+        use crate::action::OpenChain;
+        let action = LegacyAction::OpenChain(OpenChain {
+            author: AgentPubKey::from_raw_36(vec![1u8; 36]),
+            timestamp: Timestamp::from_micros(3_000),
+            action_seq: 3,
+            prev_action: ActionHash::from_raw_36(vec![2u8; 36]),
+            prev_target: None,
+            close_hash: None,
+            opening_summary: Some(summary()),
+        });
+        let hashed =
+            holo_hash::HoloHashed::with_pre_hashed(action, ActionHash::from_raw_36(vec![12u8; 36]));
+        SignedHashed::with_presigned(hashed, Signature::from([9u8; 64]))
+    }
+
+    fn legacy_signed_close_chain_with_summary() -> crate::record::SignedActionHashed {
+        use crate::action::CloseChain;
+        let action = LegacyAction::CloseChain(CloseChain {
+            author: AgentPubKey::from_raw_36(vec![1u8; 36]),
+            timestamp: Timestamp::from_micros(4_000),
+            action_seq: 9,
+            prev_action: ActionHash::from_raw_36(vec![2u8; 36]),
+            new_target: None,
+            closing_summary: Some(summary()),
+        });
+        let hashed =
+            holo_hash::HoloHashed::with_pre_hashed(action, ActionHash::from_raw_36(vec![13u8; 36]));
+        SignedHashed::with_presigned(hashed, Signature::from([10u8; 64]))
+    }
+
+    #[test]
+    fn open_chain_opening_summary_round_trips_through_v2() {
+        let legacy = legacy_signed_open_chain_genesis();
+        let v2 = from_legacy_signed_action(&legacy);
+        // The opening summary survives the forward conversion.
+        match &v2.hashed.content.data {
+            ActionData::OpenChain(d) => {
+                assert!(d.prev_target.is_none());
+                assert!(d.close_hash.is_none());
+                assert_eq!(d.opening_summary, Some(summary()));
+            }
+            _ => panic!("unexpected variant"),
+        }
+        // Round-tripping back to the legacy form preserves the action, hash and
+        // signature exactly.
+        let back = to_legacy_signed_action(&v2);
+        assert_eq!(back.action(), legacy.action());
+        assert_eq!(back.as_hash(), legacy.as_hash());
+        assert_eq!(back.signature(), legacy.signature());
+    }
+
+    #[test]
+    fn close_chain_closing_summary_round_trips_through_v2() {
+        let legacy = legacy_signed_close_chain_with_summary();
+        let v2 = from_legacy_signed_action(&legacy);
+        match &v2.hashed.content.data {
+            ActionData::CloseChain(d) => {
+                assert_eq!(d.closing_summary, Some(summary()));
+            }
+            _ => panic!("unexpected variant"),
+        }
+        let back = to_legacy_signed_action(&v2);
+        assert_eq!(back.action(), legacy.action());
+        assert_eq!(back.as_hash(), legacy.as_hash());
+        assert_eq!(back.signature(), legacy.signature());
     }
 
     #[test]

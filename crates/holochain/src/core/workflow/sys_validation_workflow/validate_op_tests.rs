@@ -2176,6 +2176,7 @@ async fn action_after_close_chain() {
         action_seq: 23,
         prev_action: fixt!(ActionHash),
         new_target: Some(fixt!(MigrationTarget)),
+        closing_summary: None,
     };
 
     // If this is an agent migration, the agent keypair needs to exist

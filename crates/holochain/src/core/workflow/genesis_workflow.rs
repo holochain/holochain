@@ -29,6 +29,8 @@ where
 {
     cell_id: CellId,
     membrane_proof: Option<MembraneProof>,
+    /// An optional opening summary, committed as the final genesis record.
+    opening_summary: Option<ChainSummary>,
     ribosome: Ribosome,
 }
 
@@ -56,6 +58,7 @@ where
     let GenesisWorkflowArgs {
         cell_id,
         membrane_proof,
+        opening_summary,
         ribosome,
     } = args;
 
@@ -96,6 +99,7 @@ where
                     payload: Arc::new(GenesisSelfCheckDataV2 {
                         membrane_proof: membrane_proof.clone(),
                         agent_key: cell_id.agent_pubkey().clone(),
+                        opening_summary: opening_summary.clone(),
                     }),
                 },
             },
@@ -115,6 +119,7 @@ where
         cell_id.dna_hash().clone(),
         cell_id.agent_pubkey().clone(),
         membrane_proof,
+        opening_summary,
     )
     .await?;
 
@@ -177,14 +182,16 @@ mod tests {
     use holochain_state::prelude::test_dht_db;
     use holochain_state::{prelude::test_authored_db, source_chain::SourceChain};
     use holochain_trace;
+    use holochain_serialized_bytes::prelude::UnsafeBytes;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
+    use holochain_zome_types::prelude::{ChainSummary, Signature};
     use holochain_zome_types::Action;
     use matches::assert_matches;
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn genesis_initializes_source_chain() {
-        holochain_trace::test_run();
+    /// Run the genesis workflow with the given (optional) opening summary and
+    /// return the resulting source-chain actions in order.
+    async fn run_genesis(opening_summary: Option<ChainSummary>) -> Vec<Action> {
         let test_db = test_authored_db();
         let dht_db = test_dht_db();
         let keystore = test_keystore();
@@ -208,38 +215,69 @@ mod tests {
             let args = GenesisWorkflowArgs {
                 cell_id: CellId::new(dna.dna_hash().clone(), author.clone()),
                 membrane_proof: None,
+                opening_summary,
                 ribosome,
             };
             let _: () = genesis_workflow(workspace, api, args).await.unwrap();
         }
 
-        {
-            let dht_store = dht_store;
-            let source_chain = SourceChain::new(
-                vault.clone(),
-                dht_db.to_db(),
-                dht_store,
-                keystore,
-                author.clone(),
-            )
-            .await
-            .unwrap();
-            let actions = source_chain
-                .query(Default::default())
+        let source_chain =
+            SourceChain::new(vault.clone(), dht_db.to_db(), dht_store, keystore, author)
                 .await
-                .unwrap()
-                .into_iter()
-                .map(|e| e.action().clone())
-                .collect::<Vec<_>>();
+                .unwrap();
+        source_chain
+            .query(Default::default())
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|e| e.action().clone())
+            .collect::<Vec<_>>()
+    }
 
-            assert_matches!(
-                actions.as_slice(),
-                [
-                    Action::Dna(_),
-                    Action::AgentValidationPkg(_),
-                    Action::Create(_)
-                ]
-            );
-        }
+    #[tokio::test(flavor = "multi_thread")]
+    async fn genesis_initializes_source_chain() {
+        holochain_trace::test_run();
+        // With no opening summary, genesis produces exactly the three mandatory
+        // records.
+        let actions = run_genesis(None).await;
+        assert_matches!(
+            actions.as_slice(),
+            [
+                Action::Dna(_),
+                Action::AgentValidationPkg(_),
+                Action::Create(_)
+            ]
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn genesis_with_opening_summary_commits_fourth_genesis_record() {
+        holochain_trace::test_run();
+        let summary = ChainSummary::new(
+            UnsafeBytes::from(b"opening state".to_vec()).into(),
+            vec![(fake_agent_pubkey_1(), Signature([7u8; 64]))],
+        );
+        // With an opening summary, genesis commits a fourth record: a genesis-form
+        // OpenChain carrying the summary at seq 3.
+        let actions = run_genesis(Some(summary.clone())).await;
+        assert_matches!(
+            actions.as_slice(),
+            [
+                Action::Dna(_),
+                Action::AgentValidationPkg(_),
+                Action::Create(_),
+                Action::OpenChain(_)
+            ]
+        );
+        let Action::OpenChain(open_chain) = &actions[3] else {
+            unreachable!("asserted above");
+        };
+        assert_eq!(open_chain.action_seq, 3);
+        assert!(open_chain.prev_target.is_none());
+        assert!(open_chain.close_hash.is_none());
+        assert_eq!(open_chain.opening_summary.as_ref(), Some(&summary));
+        assert!(open_chain.is_genesis_opening_summary());
+        // The genesis-form OpenChain is classified as a genesis record.
+        assert!(Action::OpenChain(open_chain.clone()).is_genesis());
     }
 }
