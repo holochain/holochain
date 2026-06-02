@@ -268,15 +268,19 @@ fn chain_op_from_joined_row(
         }
     };
 
-    // Helper: entry required to be present (Update ops).
+    // Helper: build RecordEntry for Update ops, honouring private-entry
+    // visibility. Public updates without an entry are NotStored (entry data not
+    // yet local); private updates without an entry are Hidden (the entry is
+    // never shared off-author). Mirrors `entry_for_action` above.
     let entry_for_update =
         |update: &holochain_zome_types::action::Update| -> StateQueryResult<RecordEntry> {
+            use holochain_zome_types::entry_def::EntryVisibility;
             match decoded_entry.clone() {
                 Some(entry) => Ok(RecordEntry::Present(entry)),
-                None => Err(crate::query::StateQueryError::Other(format!(
-                    "Entry {:?} for Update not found",
-                    update.entry_hash
-                ))),
+                None => match update.entry_type.visibility() {
+                    EntryVisibility::Private => Ok(RecordEntry::Hidden),
+                    EntryVisibility::Public => Ok(RecordEntry::NotStored),
+                },
             }
         };
 
