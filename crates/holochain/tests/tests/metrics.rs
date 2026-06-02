@@ -69,6 +69,27 @@ async fn metrics() {
         .await;
     conductors.exchange_peer_info().await;
 
+    // Wait until each conductor's peer store contains the other agent before
+    // making cross-conductor calls. Without this the test races
+    // peer-info propagation on slow runners (wasmer-wasmi, Windows CI) and
+    // the remote signal / network get never delivers the expected metric.
+    alice_conductor
+        .wait_for_peer_visible(
+            [bob_cell.agent_pubkey().clone()],
+            Some(bob_cell.cell_id().clone()),
+            Duration::from_secs(30),
+        )
+        .await
+        .unwrap();
+    bob_conductor
+        .wait_for_peer_visible(
+            [alice_cell.agent_pubkey().clone()],
+            Some(alice_cell.cell_id().clone()),
+            Duration::from_secs(30),
+        )
+        .await
+        .unwrap();
+
     // Alice creates an entry to record zome call metrics.
     let create_entry_hash: ActionHash = alice_conductor
         .call(

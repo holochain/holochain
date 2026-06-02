@@ -116,8 +116,15 @@ pub async fn integrate_dht_ops_workflow(
         )],
     );
 
-    // Record op integration delay metric.
+    // Record op integration delay + validation attempts metrics. The
+    // summaries path covers limbo-promoted ops; locally-authored ops bypass
+    // limbo and only appear in `legacy_marked_pairs` — emit zeroed records
+    // for them so the metrics fire on every integration tick that integrated
+    // anything, matching develop's per-op emission.
+    let summary_hashes: std::collections::HashSet<DhtOpHash> =
+        summaries.iter().map(|s| s.op_hash.clone()).collect();
     let delay_metric = op_integration_delay_metric();
+    let attempts_metric = op_validation_attempts_metric();
     for s in &summaries {
         let delay_secs =
             (when_integrated.as_micros() - s.when_received.as_micros()).max(0) as f64 / 1_000_000.0;
@@ -128,13 +135,27 @@ pub async fn integrate_dht_ops_workflow(
                 dna_hash_str.clone(),
             )],
         );
-    }
-
-    // Record op validation attempts metric.
-    let attempts_metric = op_validation_attempts_metric();
-    for s in &summaries {
         attempts_metric.record(
             s.validation_attempts as u64,
+            &[opentelemetry::KeyValue::new(
+                "dna_hash",
+                dna_hash_str.clone(),
+            )],
+        );
+    }
+    for (op_hash, _) in &legacy_marked_pairs {
+        if summary_hashes.contains(op_hash) {
+            continue;
+        }
+        delay_metric.record(
+            0.0,
+            &[opentelemetry::KeyValue::new(
+                "dna_hash",
+                dna_hash_str.clone(),
+            )],
+        );
+        attempts_metric.record(
+            0,
             &[opentelemetry::KeyValue::new(
                 "dna_hash",
                 dna_hash_str.clone(),
