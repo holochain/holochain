@@ -951,6 +951,51 @@ impl DhtStore<DbWrite<Dht>> {
         let row = self.db.as_ref().get_chain_op(op_hash.clone()).await?;
         Ok(row.map(|r| Timestamp::from_micros(r.when_integrated)))
     }
+
+    /// Test-only helper that writes a warrant op straight into the integrated
+    /// `Warrant` + `WarrantOp` tables (with `when_integrated = now`), bypassing
+    /// `LimboWarrantOp` and the integration workflow's block trigger.
+    ///
+    /// Use this to seed a warrant for tests that need it visible to K2 gossip
+    /// without invoking the integration workflow's `block_agents` path — i.e.
+    /// to inject a warrant that should reach a peer for the peer to evaluate,
+    /// without the author also blocking the warrantee locally.
+    pub async fn test_insert_integrated_warrant(
+        &self,
+        warrant: DhtOpHashed,
+    ) -> StateMutationResult<()> {
+        use holochain_data::dht::InsertWarrant;
+
+        let warrant_op = match warrant.as_content() {
+            DhtOp::WarrantOp(w) => w,
+            DhtOp::ChainOp(_) => panic!("test_insert_integrated_warrant requires a WarrantOp"),
+        };
+        let serialized_size = holochain_serialized_bytes::encode(warrant.as_content())
+            .map_err(StateMutationError::from)?
+            .len() as u32;
+        let proof_bytes = holochain_serialized_bytes::encode(&warrant_op.proof)
+            .map_err(StateMutationError::from)?;
+        let signature_bytes = warrant_op.signature().0;
+        let now = Timestamp::now();
+        let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
+        tx.insert_warrant(InsertWarrant {
+            hash: warrant.as_hash(),
+            author: &warrant_op.author,
+            timestamp: warrant_op.timestamp,
+            warrantee: &warrant_op.warrantee,
+            proof: &proof_bytes,
+            signature: &signature_bytes,
+            reason: warrant_op.proof.reason(),
+            storage_center_loc: warrant_op.warrantee.get_loc(),
+            when_received: now,
+            when_integrated: now,
+            serialized_size,
+        })
+        .await
+        .map_err(StateMutationError::from)?;
+        tx.commit().await.map_err(StateMutationError::from)?;
+        Ok(())
+    }
 }
 
 pub(crate) mod action_indexes;
