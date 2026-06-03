@@ -214,7 +214,9 @@ impl<UnitType, LT> OpActivity<UnitType, LT> {
     pub fn close_chain(action: Action) -> Self {
         let new_target = match &action.data {
             holochain_integrity_types::dht_v2::ActionData::CloseChain(d) => d.new_target.clone(),
-            other => unreachable!("OpActivity::close_chain requires CloseChain data, got {other:?}"),
+            other => {
+                unreachable!("OpActivity::close_chain requires CloseChain data, got {other:?}")
+            }
         };
         Self::CloseChain { new_target, action }
     }
@@ -223,8 +225,10 @@ impl<UnitType, LT> OpActivity<UnitType, LT> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use holochain_integrity_types::dht_v2::{ActionData, ActionHeader, CloseChainData, OpenChainData};
     use holo_hash::{ActionHash, AgentPubKey, DnaHash};
+    use holochain_integrity_types::dht_v2::{
+        ActionData, ActionHeader, CloseChainData, OpenChainData,
+    };
 
     fn v2_action(data: ActionData) -> Action {
         Action {
@@ -248,7 +252,11 @@ mod tests {
         }));
         let op = OpActivity::<(), ()>::open_chain(action);
         match op {
-            OpActivity::OpenChain { previous_target, close_hash, .. } => {
+            OpActivity::OpenChain {
+                previous_target,
+                close_hash,
+                ..
+            } => {
                 assert_eq!(previous_target, target);
                 assert_eq!(close_hash, close);
             }

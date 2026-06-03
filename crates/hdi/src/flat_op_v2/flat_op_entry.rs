@@ -168,8 +168,8 @@ pub struct OpDelete {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use holochain_integrity_types::dht_v2::{ActionData, ActionHeader, DeleteData};
     use holo_hash::{ActionHash, AgentPubKey, EntryHash};
+    use holochain_integrity_types::dht_v2::{ActionData, ActionHeader, DeleteData};
 
     fn v2_action(data: ActionData) -> Action {
         Action {
