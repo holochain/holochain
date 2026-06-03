@@ -425,3 +425,177 @@ fn cap_grant_entry(entry: &Entry) -> Result<CapGrantEntry, WasmError> {
         )))),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate as hdi;
+    use crate::flat_op_v2::{FlatOp, OpActivity, OpEntry, OpRecord};
+    use crate::test_utils::set_zome_types;
+    use crate::test_utils::short_hand::{e, public_app_entry_def};
+    use holo_hash::{ActionHash, AgentPubKey, DnaHash, EntryHash};
+    use holochain_integrity_types::dht_v2::{
+        Action, ActionHeader, CreateData, CreateLinkData, DeleteData, DnaData, Record,
+    };
+    use holochain_integrity_types::record::{RecordEntry, SignedHashed};
+    use holochain_integrity_types::signature::Signature;
+    use holochain_integrity_types::{EntryType, LinkTag, LinkType, ZomeIndex};
+
+    #[hdk_entry_helper]
+    #[derive(Clone, PartialEq, Eq)]
+    pub struct A;
+
+    #[hdk_entry_types(skip_hdk_extern = true)]
+    #[unit_enum(UnitEntryTypes)]
+    #[derive(Clone, PartialEq, Eq)]
+    pub enum EntryTypes {
+        A(A),
+    }
+
+    #[hdk_link_types(skip_no_mangle = true)]
+    pub enum LinkTypes {
+        A,
+    }
+
+    fn v2_signed(data: ActionData) -> SignedHashed<Action> {
+        let action = Action {
+            header: ActionHeader {
+                author: AgentPubKey::from_raw_36(vec![1u8; 36]),
+                timestamp: holochain_integrity_types::timestamp::Timestamp::from_micros(0),
+                action_seq: 0,
+                prev_action: None,
+            },
+            data,
+        };
+        let hash = ActionHash::from_raw_36(vec![9u8; 36]);
+        SignedHashed::with_presigned(
+            holo_hash::HoloHashed::with_pre_hashed(action, hash),
+            Signature([0u8; 64]),
+        )
+    }
+
+    fn create_app_data() -> ActionData {
+        ActionData::Create(CreateData {
+            entry_type: EntryType::App(public_app_entry_def(0, 0)),
+            entry_hash: EntryHash::from_raw_36(vec![2u8; 36]),
+        })
+    }
+
+    fn types() {
+        set_zome_types(&[(0, 1)], &[(0, 1)]);
+    }
+
+    #[test]
+    fn store_record_create_app_entry_flattens_to_create_entry() {
+        types();
+        let signed = v2_signed(create_app_data());
+        let record = Record::new(signed, RecordEntry::Present(e(A {})));
+        let op = dht_v2::Op::StoreRecord(dht_v2::StoreRecord { record });
+        let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
+        assert!(matches!(
+            flat,
+            FlatOp::StoreRecord(OpRecord::CreateEntry {
+                app_entry: EntryTypes::A(A {}),
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn store_record_create_agent_flattens_to_create_agent() {
+        types();
+        let signed = v2_signed(ActionData::Create(CreateData {
+            entry_type: EntryType::AgentPubKey,
+            entry_hash: EntryHash::from_raw_36(vec![3u8; 36]),
+        }));
+        let record = Record::new(signed, RecordEntry::NA);
+        let op = dht_v2::Op::StoreRecord(dht_v2::StoreRecord { record });
+        let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
+        assert!(matches!(
+            flat,
+            FlatOp::StoreRecord(OpRecord::CreateAgent { .. })
+        ));
+    }
+
+    #[test]
+    fn store_record_dna_flattens_to_dna() {
+        types();
+        let signed = v2_signed(ActionData::Dna(DnaData {
+            dna_hash: DnaHash::from_raw_36(vec![4u8; 36]),
+        }));
+        let record = Record::new(signed, RecordEntry::NA);
+        let op = dht_v2::Op::StoreRecord(dht_v2::StoreRecord { record });
+        let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
+        assert!(matches!(flat, FlatOp::StoreRecord(OpRecord::Dna { .. })));
+    }
+
+    #[test]
+    fn store_record_create_link_resolves_link_type() {
+        types();
+        let signed = v2_signed(ActionData::CreateLink(CreateLinkData {
+            base_address: EntryHash::from_raw_36(vec![5u8; 36]).into(),
+            target_address: EntryHash::from_raw_36(vec![6u8; 36]).into(),
+            zome_index: ZomeIndex(0),
+            link_type: LinkType(0),
+            tag: LinkTag(vec![]),
+        }));
+        let record = Record::new(signed, RecordEntry::NA);
+        let op = dht_v2::Op::StoreRecord(dht_v2::StoreRecord { record });
+        let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
+        assert!(matches!(
+            flat,
+            FlatOp::StoreRecord(OpRecord::CreateLink {
+                link_type: LinkTypes::A,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn store_entry_create_app_flattens_to_create_entry() {
+        types();
+        let signed = v2_signed(create_app_data());
+        let op = dht_v2::Op::StoreEntry(dht_v2::StoreEntry {
+            action: signed,
+            entry: e(A {}),
+        });
+        let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
+        assert!(matches!(
+            flat,
+            FlatOp::StoreEntry(OpEntry::CreateEntry {
+                app_entry: EntryTypes::A(A {}),
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn register_agent_activity_create_app_flattens_with_unit_type() {
+        types();
+        let signed = v2_signed(create_app_data());
+        let op = dht_v2::Op::RegisterAgentActivity(dht_v2::RegisterAgentActivity {
+            action: signed,
+            cached_entry: None,
+        });
+        let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
+        assert!(matches!(
+            flat,
+            FlatOp::RegisterAgentActivity(OpActivity::CreateEntry {
+                app_entry_type: Some(UnitEntryTypes::A),
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn register_delete_flattens_to_register_delete() {
+        types();
+        let signed = v2_signed(ActionData::Delete(DeleteData {
+            deletes_address: ActionHash::from_raw_36(vec![7u8; 36]),
+            deletes_entry_address: EntryHash::from_raw_36(vec![8u8; 36]),
+        }));
+        let op = dht_v2::Op::RegisterDelete(dht_v2::RegisterDelete { delete: signed });
+        let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
+        assert!(matches!(flat, FlatOp::RegisterDelete(_)));
+    }
+}
