@@ -10,7 +10,6 @@ use async_recursion::async_recursion;
 pub use error::*;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
-use holo_hash::AnyDhtHash;
 use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
 use holo_hash::EntryHash;
@@ -538,26 +537,8 @@ impl SourceChain {
                         if !inserted_action_hashes.contains(op_as_chain.action_hash()) {
                             continue;
                         }
-                        let linkable_basis = op_as_chain.dht_basis().clone();
-                        let storage_center_loc = linkable_basis.get_loc();
-                        // ChainOp.basis_hash in the new schema is AnyDhtHash (all
-                        // authored ops' bases are DHT-addressable entries or actions).
-                        // TODO: ChainOp.basis_hash uses AnyDhtHash, which lacks External.
-                        // Authored CreateLink with External basis cannot be inserted into
-                        // ChainOp until the new schema widens basis_hash to AnyLinkableHash.
-                        // Action and Link rows are still inserted; the legacy DB still has
-                        // the ChainOp row.
-                        let basis_hash: AnyDhtHash = match AnyDhtHash::try_from(linkable_basis) {
-                            Ok(h) => h,
-                            Err(e) => {
-                                tracing::debug!(
-                                    op_hash = ?op_hash,
-                                    "new DB skip: op with external-hash basis is not yet \
-                                     representable in ChainOp; legacy DB has it. op_hash={op_hash:?} err={e:?}"
-                                );
-                                continue;
-                            }
-                        };
+                        let basis_hash = op_as_chain.dht_basis().clone();
+                        let storage_center_loc = basis_hash.get_loc();
 
                         let serialized_size = encoded_chain_op_size(
                             op_as_chain,
@@ -651,11 +632,13 @@ impl SourceChain {
                     }
                 }
 
-                // Write warrants to DHT database
-                let total_inserted_warrants = match self
+                // Write warrants to DHT database (legacy) and collect the
+                // successfully-inserted ops for mirroring into the new DhtStore.
+                let (total_inserted_warrants, warrant_ops_for_new_db) = match self
                     .dht_db
-                    .write_async(|txn| -> DatabaseResult<u32> {
-                        let mut inserted_warrants = 0;
+                    .write_async(|txn| -> DatabaseResult<(u32, Vec<DhtOpHashed>)> {
+                        let mut inserted_warrants = 0u32;
+                        let mut inserted_ops: Vec<DhtOpHashed> = Vec::new();
                         for warrant in warrants_to_insert {
                             let warrant_op = DhtOpHashed::from_content_sync(DhtOp::from(
                                 WarrantOp::from(warrant),
@@ -666,28 +649,42 @@ impl SourceChain {
                                 // TODO: This should only be increased if the op has actually been inserted.
                                 //       It's not possible to determine that, because mutations don't return
                                 //       the row count. Fix this once row count is returned.
-                                Ok(_) => inserted_warrants += 1,
+                                Ok(_) => {
+                                    inserted_warrants += 1;
+                                    inserted_ops.push(warrant_op);
+                                }
                                 Err(err) => {
                                     tracing::warn!(
                                         ?err,
                                         "Could not insert warrant from scratch space into DHT database"
                                     );
-
                                 }
                             }
                         }
-                        Ok(inserted_warrants)
+                        Ok((inserted_warrants, inserted_ops))
                     })
                     .await {
-                        Ok(count) => count,
+                        Ok(pair) => pair,
                         Err(err) => {
                             tracing::warn!(
                                 ?err,
                                 "Error inserting warrants from scratch space into DHT database"
                             );
-                            0
+                            (0, Vec::new())
                         }
                     };
+
+                // Mirror warrants into the new DhtStore so `ops_pending_sys_validation`
+                // picks them up via `LimboWarrant`.
+                if !warrant_ops_for_new_db.is_empty() {
+                    if let Err(err) = self
+                        .dht_store
+                        .record_incoming_ops(warrant_ops_for_new_db)
+                        .await
+                    {
+                        tracing::warn!(?err, "Error mirroring warrant ops into new DhtStore");
+                    }
+                }
 
                 SourceChainResult::Ok((actions, total_inserted_warrants))
             }
@@ -1559,18 +1556,8 @@ pub async fn genesis(
 
         // Insert chain ops for all three genesis actions.
         for (op, op_hash, timestamp) in &ops_with_hashes_for_new_db {
-            let linkable_basis = op.dht_basis().clone();
-            let storage_center_loc = linkable_basis.get_loc();
-            let basis_hash: AnyDhtHash = match AnyDhtHash::try_from(linkable_basis) {
-                Ok(h) => h,
-                Err(e) => {
-                    tracing::debug!(
-                        op_hash = ?op_hash,
-                        "genesis new DB skip: op with external-hash basis; err={e:?}"
-                    );
-                    continue;
-                }
-            };
+            let basis_hash = op.dht_basis().clone();
+            let storage_center_loc = basis_hash.get_loc();
 
             let mut genesis_actions_slice: Vec<SignedActionHashed> = vec![
                 dna_action_for_new_db.clone(),

@@ -288,12 +288,17 @@ async fn author_of_invalid_warrant_is_blocked() {
             });
     }
 
-    // Also insert into Bob's new DhtStore so K2 gossip can find and serve it.
+    // Also seed the warrant in Bob's new DhtStore so K2 gossip can find and
+    // serve it. Use the test-only helper instead of
+    // `record_locally_validated_warrants`: the latter (correctly) drives the
+    // integration workflow to block the warrantee, which would prevent Bob
+    // from gossiping the warrant to Alice. This test injects an objectively
+    // invalid warrant to verify Alice rejects it, so Bob must not act on it.
     conductors[1]
         .get_spaces()
         .dht_store(dna_file.dna_hash())
         .unwrap()
-        .record_locally_validated_warrants(vec![warrant_op_hashed])
+        .test_insert_integrated_warrant(warrant_op_hashed)
         .await
         .unwrap();
 

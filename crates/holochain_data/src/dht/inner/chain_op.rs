@@ -1,7 +1,7 @@
 //! Free-standing operations against the `ChainOp` table.
 
 use crate::models::dht::ChainOpRow;
-use holo_hash::{ActionHash, AnyDhtHash, DhtOpHash};
+use holo_hash::{ActionHash, AnyDhtHash, AnyLinkableHash, DhtOpHash};
 use holochain_integrity_types::dht_v2::OpValidity;
 use holochain_timestamp::Timestamp;
 use sqlx::{Executor, Sqlite};
@@ -15,8 +15,10 @@ pub struct InsertChainOp<'a> {
     /// `ChainOpType` discriminant; see
     /// [`From<ChainOpType> for i64`](holochain_zome_types::dht_v2).
     pub op_type: i64,
-    /// DHT basis hash (where the op is stored).
-    pub basis_hash: &'a AnyDhtHash,
+    /// DHT basis hash (`OpBasis`) where the op is stored.
+    /// `AnyLinkableHash`, not `AnyDhtHash`: link-op bases may be `External`
+    /// hashes, which `AnyDhtHash` cannot hold.
+    pub basis_hash: &'a AnyLinkableHash,
     /// Numeric storage center derived from `basis_hash`.
     pub storage_center_loc: u32,
     /// Final validation outcome.
@@ -151,4 +153,42 @@ where
         .bind(action_hash.get_raw_36())
         .fetch_all(executor)
         .await
+}
+
+/// Row returned by [`pending_validation_receipts`]: op metadata plus the
+/// underlying action's author so receipts can be addressed.
+#[derive(Debug, sqlx::FromRow)]
+pub struct PendingReceiptRow {
+    /// Raw 36-byte op hash from `ChainOp.hash`.
+    pub op_hash: Vec<u8>,
+    /// Validation status integer (`1` = Accepted, `2` = Rejected).
+    pub validation_status: i64,
+    /// Microsecond timestamp at which the op was integrated.
+    pub when_integrated: i64,
+    /// Raw 36-byte author public key from `Action.author`.
+    pub action_author: Vec<u8>,
+}
+
+/// Return integrated, validated [`ChainOp`] rows that still require a
+/// validation receipt to be sent to the action author.
+pub(crate) async fn pending_validation_receipts<'e, E>(
+    executor: E,
+) -> sqlx::Result<Vec<PendingReceiptRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT
+            ChainOp.hash AS op_hash,
+            ChainOp.validation_status AS validation_status,
+            ChainOp.when_integrated AS when_integrated,
+            Action.author AS action_author
+         FROM ChainOp
+         JOIN Action ON ChainOp.action_hash = Action.hash
+         WHERE ChainOp.require_receipt = 1
+           AND ChainOp.when_integrated IS NOT NULL
+           AND ChainOp.validation_status IS NOT NULL",
+    )
+    .fetch_all(executor)
+    .await
 }

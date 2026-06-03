@@ -12,6 +12,38 @@ use std::{sync::Arc, time::Duration};
 
 const UNRESPONSIVE_TIMEOUT: Duration = Duration::from_secs(15);
 const WAIT_BETWEEN_CALLS: Duration = Duration::from_millis(10);
+const PEER_DISCOVERY_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Wait until `hc`'s peer store for `dna_hash` knows about at least
+/// `expected_count` agents.
+///
+/// Tests that immediately call p2p methods (send_remote_signal,
+/// send_validation_receipts, get, ...) race the iroh peer-discovery handshake
+/// triggered by `spawn_test`; on slower runners (notably Windows CI) the
+/// handshake outlasts the in-test timeout, and the call fails with
+/// `"could not find url for peer"` or a peer-lookup timeout. Calling this
+/// before the racy operation makes the test wait for discovery to complete.
+async fn wait_for_peers(hc: &actor::DynHcP2p, dna_hash: DnaHash, expected_count: usize) {
+    tokio::time::timeout(PEER_DISCOVERY_TIMEOUT, async {
+        loop {
+            if hc
+                .peer_store(dna_hash.clone())
+                .await
+                .unwrap()
+                .get_all()
+                .await
+                .unwrap()
+                .len()
+                >= expected_count
+            {
+                break;
+            }
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
+        }
+    })
+    .await
+    .expect("peer discovery timed out");
+}
 
 /// An implementation of [`HcP2pHandler`] that doesn't ever respond to requests
 #[derive(Clone, Debug)]
@@ -218,6 +250,9 @@ async fn test_remote_signal() {
     let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
     let (agent1, _hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
     let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
+
+    // Wait for hc2 to discover agent1 via the bootstrap before sending.
+    wait_for_peers(&hc2, dna_hash.clone(), 2).await;
 
     hc2.send_remote_signal(
         dna_hash,
@@ -539,6 +574,9 @@ async fn test_get_empty_data_better_than_no_response() {
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
     hc3.test_set_full_arcs(space.clone()).await;
+
+    // Wait for hc1 to discover the other two agents before issuing a get.
+    wait_for_peers(&hc1, dna_hash.clone(), 3).await;
 
     // One agent will respond with empty data so we need to wait for the other one to timeout
     // before we will get the empty data.
@@ -970,6 +1008,9 @@ async fn test_validation_receipts() {
     let (_bootstrap_srv, addr) = spawn_test_bootstrap().await.unwrap();
     let (agent1, _hc1, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
     let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler.clone(), &addr).await;
+
+    // Wait for hc2 to discover agent1 via the bootstrap before sending.
+    wait_for_peers(&hc2, dna_hash.clone(), 2).await;
 
     hc2.send_validation_receipts(
         dna_hash,

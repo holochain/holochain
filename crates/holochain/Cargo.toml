@@ -297,3 +297,6 @@ unstable-countersigning = [
   "holochain_zome_types/unstable-countersigning",
   "holochain_conductor_api/unstable-countersigning",
 ]
+
+[package.metadata.docs.rs]
+features = ["test_utils"]

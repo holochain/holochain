@@ -1,4 +1,4 @@
-use super::error::{WorkflowError, WorkflowResult};
+use super::error::WorkflowResult;
 use crate::core::queue_consumer::WorkComplete;
 use futures::{stream, StreamExt};
 use holochain_keystore::MetaLairClient;
@@ -48,7 +48,10 @@ pub async fn validation_receipt_workflow(
         .collect::<Vec<_>>();
 
     // Get out all ops that are marked for sending receipt.
-    let receipts = pending_receipts(&vault, validators.clone()).await?;
+    let receipts = dht_store
+        .as_read()
+        .pending_validation_receipts(validators.clone())
+        .await?;
 
     let validators: HashSet<_> = validators.into_iter().collect();
 
@@ -90,10 +93,7 @@ pub async fn validation_receipt_workflow(
                         .await?;
                 }
                 // Mirror: clear `require_receipt` on the new-DB `ChainOp` rows.
-                dht_store
-                    .clear_require_receipts(op_hashes)
-                    .await
-                    .map_err(WorkflowError::from)?;
+                dht_store.clear_require_receipts(op_hashes).await?;
                 continue;
             }
         }
@@ -120,10 +120,7 @@ pub async fn validation_receipt_workflow(
                         .await?;
                 }
                 // Mirror: clear `require_receipt` on the new-DB `ChainOp` rows.
-                dht_store
-                    .clear_require_receipts(op_hashes)
-                    .await
-                    .map_err(WorkflowError::from)?;
+                dht_store.clear_require_receipts(op_hashes).await?;
             }
             Err(e) => {
                 info!(failed_to_sign_and_send_receipt = ?e);
@@ -187,14 +184,4 @@ async fn sign_and_send_receipts_to_author(
     .await?;
 
     Ok(())
-}
-
-#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-async fn pending_receipts(
-    vault: &DbRead<DbKindDht>,
-    validators: Vec<AgentPubKey>,
-) -> StateQueryResult<Vec<(ValidationReceipt, AgentPubKey)>> {
-    vault
-        .read_async(move |txn| get_pending_validation_receipts(txn, validators))
-        .await
 }

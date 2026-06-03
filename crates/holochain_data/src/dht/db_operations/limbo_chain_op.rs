@@ -87,4 +87,22 @@ impl DbRead<Dht> {
     ) -> sqlx::Result<Vec<LimboChainOpRow>> {
         limbo_chain_op::limbo_chain_ops_ready_for_integration(self.pool(), limit).await
     }
+
+    /// Fetch limbo chain ops pending sys-validation joined with their `Action`
+    /// and optional `Entry` in a single round-trip.
+    pub async fn limbo_chain_ops_pending_sys_validation_with_action(
+        &self,
+        limit: u32,
+    ) -> sqlx::Result<Vec<limbo_chain_op::LimboChainOpJoinedRow>> {
+        limbo_chain_op::limbo_chain_ops_pending_sys_validation_with_action(self.pool(), limit).await
+    }
+
+    /// Fetch limbo chain ops pending app-validation joined with their `Action`
+    /// and optional `Entry` in a single round-trip.
+    pub async fn limbo_chain_ops_pending_app_validation_with_action(
+        &self,
+        limit: u32,
+    ) -> sqlx::Result<Vec<limbo_chain_op::LimboChainOpJoinedRow>> {
+        limbo_chain_op::limbo_chain_ops_pending_app_validation_with_action(self.pool(), limit).await
+    }
 }

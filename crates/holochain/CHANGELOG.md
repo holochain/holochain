@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Make Sweettest documentation available on docs.rs.
 - Add an optional, install-time **opening summary** for a cell, committed *on-chain* as the final genesis record. Like the membrane proof, a `ChainSummary` (opaque `data` bytes plus a list of `(signer, signature)` pairs over that payload) can be supplied per role in `RoleSettings::Provisioned`. The conductor commits it during the genesis workflow as a fourth genesis record (an `Action::OpenChain` in its genesis form, at action seq 3 with no migration target). It is therefore validated like any other record — by system validation and by the integrity zome's `validate` callback (`OpRecord::OpenChain` / `OpActivity::OpenChain`, with the summary surfaced as `opening_summary`). It is also exposed to the author's `genesis_self_check` callback (`GenesisSelfCheckDataV2::opening_summary`). Holochain treats the summary as opaque and does not verify the signatures — the application gives them meaning. The persisted role-assignment field uses `#[serde(default)]`, so no data migration is required. System validation enforces that a genesis-form `OpenChain` only appears as the fourth genesis record.
 - Add a symmetric **closing summary**: an optional `ChainSummary` carried by `Action::CloseChain`, supplied as a new argument to the `close_chain` HDK function when a chain is closed during migration.
 

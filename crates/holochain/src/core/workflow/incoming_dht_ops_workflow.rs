@@ -67,6 +67,9 @@ impl Drop for OpsClaim {
     }
 }
 
+// TODO(read-migration): once legacy DhtOp writes are removed, switch
+// this intra-transaction dedup to rely on the new DhtStore. For now
+// it remains on the legacy txn to preserve same-transaction semantics.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(txn, ops)))]
 fn batch_process_entry(
     txn: &mut Txn<DbKindDht>,
@@ -139,14 +142,21 @@ pub async fn incoming_dht_ops_workflow(
         }
     }
 
-    // Filter the list of ops to only include those that are not already in the database.
-    filter_ops = filter_existing_ops(&dht_db, filter_ops).await?;
-
-    // Check again whether everything has been filtered out and avoid launching a Tokio task if so
+    // Do not pre-filter against the new store here. The legacy DHT table and
+    // the new store deduplicate independently, so an op present in one but
+    // missing from the other must still be written to the other; filtering up
+    // front against only the new store would let an op that is in the new store
+    // but missing from the legacy table be skipped forever, so the legacy
+    // mirror could never catch up (and vice versa). Each write path below
+    // deduplicates against its own store, so both stores self-heal.
     if filter_ops.is_empty() {
-        tracing::trace!(
-            "Skipping the rest of the incoming_dht_ops_workflow because all ops were filtered out"
-        );
+        // TODO(read-migration): restore this trace once dedup-filtering moves
+        // onto the new DhtStore (after the legacy DhtOp table is removed). At
+        // that point an empty `filter_ops` again means "all ops were already
+        // present", which is worth tracing.
+        // tracing::trace!(
+        //     "Skipping the rest of the incoming_dht_ops_workflow because all ops were filtered out"
+        // );
         return Ok(());
     }
 
@@ -161,40 +171,52 @@ pub async fn incoming_dht_ops_workflow(
                 while let Some(entries) = maybe_batch {
                     let senders = Arc::new(parking_lot::Mutex::new(Vec::new()));
                     let senders2 = senders.clone();
-                    // Collect ops actually inserted (post-dedupe) so we can mirror them
-                    // into DhtStore after the legacy txn commits.
-                    let pending_ops = Arc::new(parking_lot::Mutex::new(Vec::new()));
-                    let pending_ops2 = pending_ops.clone();
-                    if let Err(err) = dht_db
+
+                    // All ops received in this batch, written to both stores.
+                    let batch_ops: Vec<DhtOpHashed> =
+                        entries.iter().flat_map(|e| e.ops.iter().cloned()).collect();
+
+                    // Legacy DHT table — still read by the cascade for
+                    // dependency resolution. `batch_process_entry` skips ops
+                    // already in the table, so this is a safe backfill.
+                    let legacy_result = dht_db
                         .write_async(move |txn| {
                             for entry in entries {
                                 let InOpBatchEntry { snd, ops } = entry;
                                 let res = batch_process_entry(txn, ops);
-
-                                // we can't send the results here...
-                                // we haven't committed
-                                if let Ok(ref inserted) = res {
-                                    pending_ops2.lock().extend(inserted.iter().cloned());
-                                }
                                 senders2.lock().push((snd, res.map(|_| ())));
                             }
 
                             WorkflowResult::Ok(())
                         })
-                        .await
-                    {
-                        tracing::error!(?err, "incoming_dht_ops_workflow error");
+                        .await;
+
+                    // New DHT store — read by sys-validation. Skip ops already
+                    // present anywhere in the store so integrated ops are not
+                    // re-added to limbo, then record the genuinely new ops.
+                    // Gate this on the legacy write succeeding: if legacy failed
+                    // we leave the ops un-stored so they are redelivered, rather
+                    // than recording them only in the new store (which would be a
+                    // permanent mirror gap, since gossip would then consider us
+                    // to already hold them).
+                    let mut recorded_new = false;
+                    if let Err(err) = legacy_result {
+                        tracing::error!(?err, "incoming_dht_ops_workflow legacy mirror error");
                     } else {
-                        // Mirror the committed ops into the new DHT DB.
-                        // Errors are logged rather than propagated because this code runs inside
-                        // a spawned task that has no caller to return a WorkflowResult to.
-                        let ops_to_mirror = pending_ops.lock().drain(..).collect::<Vec<_>>();
-                        if !ops_to_mirror.is_empty() {
-                            if let Err(err) = dht_store.record_incoming_ops(ops_to_mirror).await {
+                        match dht_store.as_read().filter_existing_ops(batch_ops).await {
+                            Ok(new_ops) if new_ops.is_empty() => {}
+                            Ok(new_ops) => match dht_store.record_incoming_ops(new_ops).await {
+                                Ok(()) => recorded_new = true,
+                                Err(err) => tracing::error!(
+                                    ?err,
+                                    "incoming_dht_ops_workflow new-DB write error"
+                                ),
+                            },
+                            Err(err) => {
                                 tracing::error!(
                                     ?err,
-                                    "incoming_dht_ops_workflow new-DB mirror error"
-                                );
+                                    "incoming_dht_ops_workflow new-DB filter error"
+                                )
                             }
                         }
                     }
@@ -203,11 +225,14 @@ pub async fn incoming_dht_ops_workflow(
                         let _ = snd.send(res);
                     }
 
-                    // trigger validation of queued ops
-                    tracing::debug!(
-                        "Incoming dht ops workflow is now triggering the sys_validation_trigger"
-                    );
-                    sys_validation_trigger.trigger(&"incoming_dht_ops_workflow");
+                    // sys-validation reads the new store, so only trigger when
+                    // genuinely new ops were recorded there.
+                    if recorded_new {
+                        tracing::debug!(
+                            "Incoming dht ops workflow is now triggering the sys_validation_trigger"
+                        );
+                        sys_validation_trigger.trigger(&"incoming_dht_ops_workflow");
+                    }
 
                     maybe_batch = incoming_ops_batch.check_end();
                 }
@@ -271,17 +296,5 @@ fn op_exists_inner(txn: &rusqlite::Transaction<'_>, hash: &DhtOpHash) -> Databas
 pub async fn op_exists(vault: &DbWrite<DbKindDht>, hash: DhtOpHash) -> DatabaseResult<bool> {
     vault
         .read_async(move |txn| op_exists_inner(txn, &hash))
-        .await
-}
-
-pub async fn filter_existing_ops(
-    vault: &DbWrite<DbKindDht>,
-    mut ops: Vec<DhtOpHashed>,
-) -> DatabaseResult<Vec<DhtOpHashed>> {
-    vault
-        .read_async(move |txn| {
-            ops.retain(|op| !op_exists_inner(txn, &op.hash).unwrap_or(true));
-            Ok(ops)
-        })
         .await
 }
