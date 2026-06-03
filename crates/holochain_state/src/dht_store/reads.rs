@@ -83,6 +83,16 @@ impl DhtStore<DbRead<Dht>> {
         Ok(None)
     }
 
+    /// Retrieve the entry for `hash` if present. `author = Some` includes that
+    /// agent's private entry; `None` returns public entries only.
+    pub async fn retrieve_entry(
+        &self,
+        hash: &holo_hash::EntryHash,
+        author: Option<&holo_hash::AgentPubKey>,
+    ) -> StateQueryResult<Option<holochain_types::prelude::Entry>> {
+        Ok(self.db().get_entry(hash.clone(), author).await?)
+    }
+
     /// Retrieve the signed action for `hash` if present, without CRUD
     /// resolution. Returns the legacy `SignedActionHashed` (converted from the
     /// stored v2 action).

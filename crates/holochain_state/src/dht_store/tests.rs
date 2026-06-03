@@ -991,6 +991,24 @@ async fn retrieve_action_returns_stored_action() {
 }
 
 #[tokio::test]
+async fn retrieve_entry_returns_public_entry() {
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+    let (op, _action_hash, entry_hash) = store_record_op_with_hashes(2);
+    store.record_incoming_ops(vec![op]).await.unwrap();
+
+    let got = store.as_read().retrieve_entry(&entry_hash, None).await.unwrap();
+    assert!(matches!(got, Some(holochain_types::prelude::Entry::App(_))));
+
+    let missing = holo_hash::EntryHash::from_raw_36(vec![251u8; 36]);
+    assert!(store
+        .as_read()
+        .retrieve_entry(&missing, None)
+        .await
+        .unwrap()
+        .is_none());
+}
+
+#[tokio::test]
 async fn record_locally_validated_warrants_inserts_warrant() {
     let store = DhtStore::new_test(dht_id()).await.unwrap();
     let warrant_op = build_test_warrant_op_hashed(30);
