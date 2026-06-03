@@ -83,6 +83,20 @@ impl DhtStore<DbRead<Dht>> {
         Ok(None)
     }
 
+    /// Retrieve the signed action for `hash` if present, without CRUD
+    /// resolution. Returns the legacy `SignedActionHashed` (converted from the
+    /// stored v2 action).
+    pub async fn retrieve_action(
+        &self,
+        hash: &holo_hash::ActionHash,
+    ) -> StateQueryResult<Option<holochain_zome_types::record::SignedActionHashed>> {
+        Ok(self
+            .db()
+            .get_action(hash.clone())
+            .await?
+            .map(|v2| holochain_zome_types::dht_v2::to_legacy_signed_action(&v2)))
+    }
+
     /// Return chain ops that have passed system validation and are awaiting
     /// app validation. Warrants have no app-validation stage, so they are not
     /// included.

@@ -941,6 +941,55 @@ async fn move_warranted_op_to_limbo_no_match_for_locally_validated_true() {
     assert!(row.is_some(), "ChainOp row should still be present");
 }
 
+/// Like `build_test_store_record_op_hashed` but also returns the legacy
+/// action hash and entry hash, for read-back assertions.
+fn store_record_op_with_hashes(seed: u8) -> (DhtOpHashed, holo_hash::ActionHash, holo_hash::EntryHash) {
+    use holo_hash::{ActionHash, EntryHash};
+    use holochain_serialized_bytes::UnsafeBytes;
+    use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
+    use holochain_types::prelude::{AppEntryBytes, Entry, RecordEntry, Signature};
+    use holochain_zome_types::action::{Action, Create, EntryType};
+    use holochain_zome_types::entry_def::EntryVisibility;
+    use holochain_zome_types::prelude::AppEntryDef;
+
+    let author = AgentPubKey::from_raw_36(vec![seed; 36]);
+    let entry_hash = EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]);
+    let entry = Entry::App(AppEntryBytes(
+        holochain_serialized_bytes::SerializedBytes::from(UnsafeBytes::from(vec![seed; 8])),
+    ));
+    let sig = Signature::from([seed; 64]);
+    let action = Action::Create(Create {
+        author: author.clone(),
+        timestamp: Timestamp::from_micros(seed as i64 * 1000),
+        action_seq: 1,
+        prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36]),
+        entry_type: EntryType::App(AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Public)),
+        entry_hash: entry_hash.clone(),
+        weight: Default::default(),
+    });
+    let action_hash = ActionHash::with_data_sync(&action);
+    let op = DhtOp::ChainOp(Box::new(ChainOp::StoreRecord(
+        sig,
+        action,
+        RecordEntry::Present(entry),
+    )));
+    (DhtOpHashed::from_content_sync(op), action_hash, entry_hash)
+}
+
+#[tokio::test]
+async fn retrieve_action_returns_stored_action() {
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+    let (op, action_hash, _entry_hash) = store_record_op_with_hashes(1);
+    store.record_incoming_ops(vec![op]).await.unwrap();
+
+    let got = store.as_read().retrieve_action(&action_hash).await.unwrap();
+    let got = got.expect("action should be retrievable");
+    assert_eq!(got.as_hash(), &action_hash);
+
+    let missing = holo_hash::ActionHash::from_raw_36(vec![250u8; 36]);
+    assert!(store.as_read().retrieve_action(&missing).await.unwrap().is_none());
+}
+
 #[tokio::test]
 async fn record_locally_validated_warrants_inserts_warrant() {
     let store = DhtStore::new_test(dht_id()).await.unwrap();
