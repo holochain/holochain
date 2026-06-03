@@ -1,11 +1,13 @@
 //! The v2 DHT [`Op`] model, redesigned around `ActionData` (transitional
 //! `dht_v2` location; promoted to the canonical `op` module later).
 
-use super::{Action, ActionData, Record};
+use super::{Action, ActionData, ActionType, Record};
 use crate::action::conversions::WrongActionError;
 use crate::record::SignedHashed;
-use crate::Entry;
+use crate::{Entry, EntryType};
+use holo_hash::{ActionHash, AgentPubKey, EntryHash};
 use holochain_serialized_bytes::prelude::*;
+use holochain_timestamp::Timestamp;
 
 /// A DHT operation produced by a v2 action and validated by an authority.
 ///
@@ -165,6 +167,65 @@ impl RegisterDeleteLink {
     }
 }
 
+impl Op {
+    /// The signed action backing this op.
+    fn signed_action(&self) -> &SignedHashed<Action> {
+        match self {
+            Op::StoreRecord(StoreRecord { record }) => &record.signed_action,
+            Op::StoreEntry(StoreEntry { action, .. }) => action,
+            Op::RegisterUpdate(RegisterUpdate { update, .. }) => update,
+            Op::RegisterDelete(RegisterDelete { delete }) => delete,
+            Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => action,
+            Op::RegisterCreateLink(RegisterCreateLink { create_link }) => create_link,
+            Op::RegisterDeleteLink(RegisterDeleteLink { delete_link, .. }) => delete_link,
+        }
+    }
+
+    /// The author of this op's action.
+    pub fn author(&self) -> &AgentPubKey {
+        &self.signed_action().hashed.content.header.author
+    }
+
+    /// The authored timestamp of this op's action.
+    pub fn timestamp(&self) -> Timestamp {
+        self.signed_action().hashed.content.header.timestamp
+    }
+
+    /// The source-chain sequence of this op's action.
+    pub fn action_seq(&self) -> u32 {
+        self.signed_action().hashed.content.header.action_seq
+    }
+
+    /// The previous action hash, if any.
+    pub fn prev_action(&self) -> Option<&ActionHash> {
+        self.signed_action()
+            .hashed
+            .content
+            .header
+            .prev_action
+            .as_ref()
+    }
+
+    /// The action type of this op.
+    pub fn action_type(&self) -> ActionType {
+        self.signed_action().hashed.content.data.action_type()
+    }
+
+    /// The action hash of this op.
+    pub fn action_hash(&self) -> &ActionHash {
+        self.signed_action().as_hash()
+    }
+
+    /// The entry hash and type, for ops whose action creates an entry.
+    pub fn entry_data(&self) -> Option<(&EntryHash, &EntryType)> {
+        match &self.signed_action().hashed.content.data {
+            ActionData::Create(d) => Some((&d.entry_hash, &d.entry_type)),
+            ActionData::Update(d) => Some((&d.entry_hash, &d.entry_type)),
+            _ => None,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -255,5 +316,32 @@ mod tests {
             }),
         };
         assert!(RegisterDeleteLink::new(signed_action(delete_link_data()), create_link).is_ok());
+    }
+
+    #[test]
+    fn op_accessors_read_header_and_data() {
+        let sah = signed_action(create_data());
+        let expected_hash = sah.as_hash().clone();
+        let op = Op::RegisterAgentActivity(RegisterAgentActivity {
+            action: sah,
+            cached_entry: None,
+        });
+
+        assert_eq!(op.action_seq(), 1);
+        assert_eq!(op.author(), &AgentPubKey::from_raw_36(vec![1u8; 36]));
+        assert_eq!(op.timestamp(), holochain_timestamp::Timestamp::from_micros(7));
+        assert_eq!(op.prev_action(), Some(&ActionHash::from_raw_36(vec![2u8; 36])));
+        assert_eq!(op.action_type(), crate::dht_v2::ActionType::Create);
+        assert_eq!(op.action_hash(), &expected_hash);
+
+        let (entry_hash, entry_type) = op.entry_data().expect("create has entry data");
+        assert_eq!(entry_hash, &EntryHash::from_raw_36(vec![3u8; 36]));
+        assert_eq!(entry_type, &EntryType::AgentPubKey);
+    }
+
+    #[test]
+    fn op_entry_data_none_for_delete() {
+        let op = Op::RegisterDelete(RegisterDelete::new(signed_action(delete_data())).unwrap());
+        assert!(op.entry_data().is_none());
     }
 }
