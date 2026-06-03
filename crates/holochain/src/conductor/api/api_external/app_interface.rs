@@ -221,6 +221,18 @@ impl AppInterfaceApi {
                     )),
                 }
             }
+            AppRequest::SendDirectSignal {
+                dna_hash,
+                agents,
+                signal,
+            } => {
+                self.conductor_handle
+                    .clone()
+                    .send_direct_signal(installed_app_id, dna_hash, agents, signal)
+                    .await?;
+
+                Ok(AppResponse::Ok)
+            }
         }
     }
 }

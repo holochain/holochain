@@ -60,6 +60,17 @@ impl HcP2pHandler for UnresponsiveHandler {
         Box::pin(std::future::pending())
     }
 
+    fn handle_remote_signal_direct(
+        &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
+        _signal: Vec<u8>,
+        _from_agent: AgentPubKey,
+        _signature: Signature,
+    ) -> BoxFut<'_, HolochainP2pResult<()>> {
+        Box::pin(std::future::pending())
+    }
+
     fn handle_publish(
         &self,
         _dna_hash: DnaHash,

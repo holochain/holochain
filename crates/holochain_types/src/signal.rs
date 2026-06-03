@@ -21,6 +21,14 @@ pub enum Signal {
         /// The actual signal that was emitted
         signal: AppSignal,
     },
+    /// A direct signal, sent with an app call to `SendDirectSignal`.
+    AppDirect {
+        /// The receiving `CellId`.
+        cell_id: CellId,
+
+        /// The payload sent by the remote agent.
+        signal: Vec<u8>,
+    },
     /// System-defined signals
     System(SystemSignal),
 }
@@ -46,3 +54,6 @@ pub enum SystemSignal {
 impl_from! {
     SystemSignal => Signal, |s| { Self::System(s) },
 }
+
+/// The maximum size that Holochain will permit sending or receiving in a single direct signal.
+pub const DIRECT_SIGNAL_MAX_SIZE: usize = 1024 * 1024;

@@ -72,6 +72,16 @@ pub trait HcP2pHandler: 'static + Send + Sync + std::fmt::Debug {
         signature: Signature,
     ) -> BoxFut<'_, HolochainP2pResult<SerializedBytes>>;
 
+    /// A remote node is sending us a direct signal.
+    fn handle_remote_signal_direct(
+        &self,
+        dna_hash: DnaHash,
+        to_agent: AgentPubKey,
+        signal: Vec<u8>,
+        from_agent: AgentPubKey,
+        signature: Signature,
+    ) -> BoxFut<'_, HolochainP2pResult<()>>;
+
     /// A remote node is publishing data in a range we claim to be holding.
     fn handle_publish(
         &self,

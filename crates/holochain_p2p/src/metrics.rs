@@ -66,3 +66,19 @@ pub fn p2p_recv_remote_signal_metric() -> &'static P2pRecvRemoteSignalMetric {
             .build()
     })
 }
+
+/// A counter metric for counting received direct remote signals.
+pub type P2pRecvRemoteSignalDirectMetric = metrics::Counter<u64>;
+
+static P2P_RECV_REMOTE_SIGNAL_DIRECT_METRIC: OnceLock<P2pRecvRemoteSignalDirectMetric> =
+    OnceLock::new();
+
+/// Metric for counting received direct remote signals.
+pub fn p2p_recv_remote_signal_direct_metric() -> &'static P2pRecvRemoteSignalMetric {
+    P2P_RECV_REMOTE_SIGNAL_DIRECT_METRIC.get_or_init(|| {
+        meter("hc.holochain_p2p")
+            .u64_counter("hc.holochain_p2p.recv_remote_signal_direct")
+            .with_description("The number of direct remote signals received.")
+            .build()
+    })
+}

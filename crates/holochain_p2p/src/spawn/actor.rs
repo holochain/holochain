@@ -3,7 +3,8 @@
 use crate::actor::{GetLinksRequestOptions, NetworkRequestOptions};
 use crate::metrics::{
     p2p_handle_incoming_request_duration_metric, p2p_handle_incoming_request_ignored_metric,
-    p2p_outgoing_request_duration_metric, p2p_recv_remote_signal_metric,
+    p2p_outgoing_request_duration_metric, p2p_recv_remote_signal_direct_metric,
+    p2p_recv_remote_signal_metric,
 };
 use crate::peer_latency_store::{PeerLatencyService, PingFn};
 use crate::*;
@@ -67,6 +68,26 @@ impl event::HcP2pHandler for WrapEvtSender {
             },
             byte_count,
             a = "recv_call_remote",
+        )
+    }
+
+    fn handle_remote_signal_direct(
+        &self,
+        dna_hash: DnaHash,
+        to_agent: AgentPubKey,
+        signal: Vec<u8>,
+        from_agent: AgentPubKey,
+        signature: Signature,
+    ) -> BoxFut<'_, HolochainP2pResult<()>> {
+        let byte_count = signal.len();
+        timing_trace!(
+            true,
+            {
+                self.0
+                    .handle_remote_signal_direct(dna_hash, to_agent, signal, from_agent, signature)
+            },
+            byte_count,
+            a = "recv_remote_signal_direct",
         )
     }
 
@@ -1418,6 +1439,35 @@ impl HolochainP2pActor {
                         )],
                     );
                 }
+                RemoteSignalDirectEvt {
+                    to_agent,
+                    signal,
+                    from_agent,
+                    signature,
+                } => {
+                    let _response = evt_sender
+                        .get()
+                        .ok_or_else(|| HolochainP2pError::other(EVT_REG_ERR))?
+                        .handle_remote_signal_direct(
+                            dna_hash.clone(),
+                            to_agent.clone(),
+                            signal,
+                            from_agent,
+                            signature,
+                        )
+                        .await;
+                    record_incoming_request_duration(&[opentelemetry::KeyValue::new(
+                        "to_agent",
+                        format!("{to_agent:?}"),
+                    )]);
+                    p2p_recv_remote_signal_direct_metric().add(
+                        1,
+                        &[opentelemetry::KeyValue::new(
+                            "dna_hash",
+                            dna_hash.to_string(),
+                        )],
+                    );
+                }
                 PublishCountersignEvt { op } => {
                     evt_sender
                         .get()
@@ -1699,7 +1749,7 @@ impl actor::HcP2p for HolochainP2pActor {
 
             let byte_count: usize = target_payload_list.iter().map(|(_, p, _)| p.0.len()).sum();
 
-            let mut all = Vec::new();
+            let mut all = Vec::with_capacity(target_payload_list.len());
 
             for (to_agent, payload, signature) in target_payload_list {
                 let to_agent_id = to_agent.to_k2_agent();
@@ -1740,6 +1790,78 @@ impl actor::HcP2p for HolochainP2pActor {
             let out = Ok(());
 
             timing_trace_out!(out, start, byte_count, a = "send_remote_signal");
+
+            out
+        })
+    }
+
+    fn send_remote_signal_direct(
+        &self,
+        dna_hash: DnaHash,
+        agents: Vec<AgentPubKey>,
+        signal: Vec<u8>,
+        from_agent: AgentPubKey,
+        signature: Signature,
+    ) -> BoxFut<'_, HolochainP2pResult<()>> {
+        Box::pin(async move {
+            let space_id = dna_hash.to_k2_space();
+            let space = self
+                .kitsune
+                .space_if_exists(space_id.clone())
+                .await
+                .ok_or(HolochainP2pError::K2SpaceNotFound(space_id.clone()))?;
+
+            let mut all = Vec::with_capacity(agents.len());
+
+            for agent in agents {
+                let agent_id = agent.to_k2_agent();
+                let to_url = match space
+                    .peer_store()
+                    .get(agent_id)
+                    .await?
+                    .and_then(|i| i.url.clone())
+                {
+                    Some(to_url) => to_url,
+                    None => continue,
+                };
+
+                let req = WireMessage::remote_signal_direct_evt(
+                    agent.clone(),
+                    signal.clone(),
+                    from_agent.clone(),
+                    signature.clone(),
+                );
+
+                if self.should_bridge(&space, to_url.clone()) {
+                    if let Err(err) = WireMessage::encode_batch(&[&req])
+                        .map(|msg| self.recv_notify(to_url, space_id.clone(), msg))
+                    {
+                        tracing::debug!(?err, "send_remote_signal_direct failed to bridge call");
+                    }
+                } else {
+                    all.push(async {
+                        if let Err(err) = self.send_notify(&space, to_url, req).await {
+                            tracing::debug!(?err, "send_remote_signal_direct failed");
+                        }
+                    });
+                }
+            }
+
+            let start = std::time::Instant::now();
+
+            if !all.is_empty() {
+                // errors handled in individual futures
+                let _ = futures::future::join_all(all).await;
+            }
+
+            let out = Ok(());
+
+            timing_trace_out!(
+                out,
+                start,
+                byte_count = signal.len(),
+                a = "send_remote_signal_direct"
+            );
 
             out
         })
@@ -2833,6 +2955,7 @@ mod tests {
     #[derive(Clone, Debug)]
     struct BlockingEventHandler {
         pub handle_call_remote_count: Arc<Mutex<u32>>,
+        pub handle_remote_signal_direct_count: Arc<Mutex<u32>>,
         pub handle_publish_count: Arc<Mutex<u32>>,
         pub handle_get_count: Arc<Mutex<u32>>,
         pub handle_get_links_count: Arc<Mutex<u32>>,
@@ -2848,6 +2971,7 @@ mod tests {
         fn new() -> Self {
             Self {
                 handle_call_remote_count: Arc::new(Mutex::new(0)),
+                handle_remote_signal_direct_count: Arc::new(Mutex::new(0)),
                 handle_publish_count: Arc::new(Mutex::new(0)),
                 handle_get_count: Arc::new(Mutex::new(0)),
                 handle_get_links_count: Arc::new(Mutex::new(0)),
@@ -2872,6 +2996,22 @@ mod tests {
         ) -> BoxFut<'_, HolochainP2pResult<SerializedBytes>> {
             // Increment counter
             let mut count = self.handle_call_remote_count.lock().unwrap();
+            *count += 1;
+
+            // Block indefinitely
+            Box::pin(std::future::pending())
+        }
+
+        fn handle_remote_signal_direct(
+            &self,
+            _dna_hash: DnaHash,
+            _to_agent: AgentPubKey,
+            _signal: Vec<u8>,
+            _from_agent: AgentPubKey,
+            _signature: Signature,
+        ) -> BoxFut<'_, HolochainP2pResult<()>> {
+            // Increment counter
+            let mut count = self.handle_remote_signal_direct_count.lock().unwrap();
             *count += 1;
 
             // Block indefinitely

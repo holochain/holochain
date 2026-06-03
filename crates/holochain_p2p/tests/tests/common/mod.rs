@@ -53,6 +53,24 @@ impl HcP2pHandler for Handler {
         })
     }
 
+    fn handle_remote_signal_direct(
+        &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
+        signal: Vec<u8>,
+        _from_agent: AgentPubKey,
+        _signature: Signature,
+    ) -> BoxFut<'_, HolochainP2pResult<()>> {
+        Box::pin(async move {
+            let respond = format!(
+                "got_remote_signal_direct: {}",
+                String::from_utf8_lossy(&signal),
+            );
+            self.calls.lock().unwrap().push(respond.clone());
+            Ok(())
+        })
+    }
+
     fn handle_publish(
         &self,
         _dna_hash: DnaHash,

@@ -222,6 +222,17 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug + Any {
         to_agent_list: Vec<(AgentPubKey, ExternIO, Signature)>,
     ) -> BoxFut<'_, HolochainP2pResult<()>>;
 
+    /// Similar to `send_remote_signal` but bypasses the WASM when receiving the signal on the
+    /// target conductors.
+    fn send_remote_signal_direct(
+        &self,
+        dna_hash: DnaHash,
+        agents: Vec<AgentPubKey>,
+        signal: Vec<u8>,
+        from_agent: AgentPubKey,
+        signature: Signature,
+    ) -> BoxFut<'_, HolochainP2pResult<()>>;
+
     /// Publish data to the correct neighborhood.
     fn publish(
         &self,

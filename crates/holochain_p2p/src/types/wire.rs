@@ -125,6 +125,12 @@ pub enum WireMessage {
         zome_call_params_serialized: ExternIO,
         signature: Signature,
     },
+    RemoteSignalDirectEvt {
+        to_agent: AgentPubKey,
+        signal: Vec<u8>,
+        from_agent: AgentPubKey,
+        signature: Signature,
+    },
     PublishCountersignEvt {
         op: ChainOp,
     },
@@ -346,6 +352,20 @@ impl WireMessage {
         Self::RemoteSignalEvt {
             to_agent,
             zome_call_params_serialized,
+            signature,
+        }
+    }
+
+    pub fn remote_signal_direct_evt(
+        to_agent: AgentPubKey,
+        signal: Vec<u8>,
+        from_agent: AgentPubKey,
+        signature: Signature,
+    ) -> WireMessage {
+        Self::RemoteSignalDirectEvt {
+            to_agent,
+            signal,
+            from_agent,
             signature,
         }
     }

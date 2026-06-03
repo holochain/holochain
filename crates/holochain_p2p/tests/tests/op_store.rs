@@ -41,6 +41,17 @@ impl HcP2pHandler for StubHost {
         unimplemented!()
     }
 
+    fn handle_remote_signal_direct(
+        &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
+        _signal: Vec<u8>,
+        _from_agent: AgentPubKey,
+        _signature: Signature,
+    ) -> BoxFut<'_, HolochainP2pResult<()>> {
+        unimplemented!()
+    }
+
     fn handle_publish(
         &self,
         _dna_hash: DnaHash,
