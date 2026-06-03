@@ -32,4 +32,14 @@ impl DbRead<Dht> {
     ) -> sqlx::Result<Vec<SignedActionHashed>> {
         action::get_actions_by_author(self.pool(), author).await
     }
+
+    /// Fetch all actions with `prev_hash = prev_hash` and `hash != exclude_hash`.
+    /// Used to detect chain forks during sys-validation.
+    pub async fn get_actions_by_prev_hash(
+        &self,
+        prev_hash: &ActionHash,
+        exclude_hash: &ActionHash,
+    ) -> sqlx::Result<Vec<SignedActionHashed>> {
+        action::get_actions_by_prev_hash(self.pool(), prev_hash, exclude_hash).await
+    }
 }

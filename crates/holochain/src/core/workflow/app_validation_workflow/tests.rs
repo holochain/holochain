@@ -5,7 +5,6 @@ use crate::core::workflow::app_validation_workflow::{
     app_validation_workflow_inner, check_app_entry_def, put_validation_limbo,
     AppValidationWorkspace, OutcomeSummary,
 };
-use crate::core::workflow::sys_validation_workflow::validation_query;
 use crate::core::{SysValidationError, ValidationOutcome};
 use crate::sweettest::*;
 use crate::test_utils::{
@@ -22,6 +21,7 @@ use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_p2p::actor::MockHcP2p;
 use holochain_p2p::HolochainP2pDna;
 use holochain_sqlite::error::DatabaseResult;
+use holochain_state::dht_store::SysOutcome;
 use holochain_state::mutations::insert_op_dht;
 use holochain_state::prelude::{from_blob, insert_op_cache, StateQueryResult};
 use holochain_state::test_utils::test_db_dir;
@@ -92,11 +92,13 @@ async fn main_workflow() {
 
     // check there are no ops to app validate
     // genesis entries have already been validated at this stage
-    let ops_to_validate =
-        validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
-            .await
-            .unwrap()
-            .len();
+    let ops_to_validate = app_validation_workspace
+        .dht_store
+        .as_read()
+        .ops_pending_app_validation(10_000)
+        .await
+        .unwrap()
+        .len();
     assert_eq!(ops_to_validate, 0);
 
     // create op that following delete op depends on
@@ -118,18 +120,27 @@ async fn main_workflow() {
     let dht_delete_op_hash = DhtOpHash::with_data_sync(&dht_delete_op);
     let dht_delete_op_hashed = DhtOpHashed::from_content_sync(dht_delete_op);
 
-    // insert op to validate in dht db and mark ready for app validation
-    app_validation_workspace.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_delete_op_hashed, 0, None).unwrap();
-        put_validation_limbo(txn, &dht_delete_op_hash, ValidationStage::SysValidated).unwrap();
-    });
+    // Record the op into the new DhtStore as sys-validated and ready for app
+    // validation; the workflow reads ops to validate from the new store.
+    app_validation_workspace
+        .dht_store
+        .record_incoming_ops(vec![dht_delete_op_hashed])
+        .await
+        .unwrap();
+    app_validation_workspace
+        .dht_store
+        .record_chain_op_sys_validation_outcomes(vec![(dht_delete_op_hash, SysOutcome::Accepted)])
+        .await
+        .unwrap();
 
     // check delete op is now counted as op to validate
-    let ops_to_validate =
-        validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
-            .await
-            .unwrap()
-            .len();
+    let ops_to_validate = app_validation_workspace
+        .dht_store
+        .as_read()
+        .ops_pending_app_validation(10_000)
+        .await
+        .unwrap()
+        .len();
     assert_eq!(ops_to_validate, 1);
 
     let mut hc_p2p = MockHcP2p::new();
@@ -174,11 +185,13 @@ async fn main_workflow() {
     });
 
     // there is still the 1 delete op to be validated
-    let ops_to_validate =
-        validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
-            .await
-            .unwrap()
-            .len();
+    let ops_to_validate = app_validation_workspace
+        .dht_store
+        .as_read()
+        .ops_pending_app_validation(10_000)
+        .await
+        .unwrap()
+        .len();
     assert_eq!(ops_to_validate, 1);
 
     // run validation workflow
@@ -209,11 +222,13 @@ async fn main_workflow() {
     );
 
     // check ops to validate is 0 now after having been validated
-    let ops_to_validate =
-        validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
-            .await
-            .unwrap()
-            .len();
+    let ops_to_validate = app_validation_workspace
+        .dht_store
+        .as_read()
+        .ops_pending_app_validation(10_000)
+        .await
+        .unwrap()
+        .len();
     assert_eq!(ops_to_validate, 0);
 }
 
@@ -308,17 +323,21 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
 
     // check there are no ops to app validate
     // genesis entries have already been validated at this stage
-    let ops_to_validate =
-        validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
-            .await
-            .unwrap()
-            .len();
+    let ops_to_validate = app_validation_workspace
+        .dht_store
+        .as_read()
+        .ops_pending_app_validation(10_000)
+        .await
+        .unwrap()
+        .len();
     assert_eq!(ops_to_validate, 0);
 
-    // insert create and delete op in dht db and mark ready for app validation
+    // Record both ops into the new DhtStore as sys-validated. The create is
+    // also kept in the legacy DB because app validation of the delete resolves
+    // it as a dependency via the cascade, which reads the legacy DB.
+    let dht_create_op_hashed_for_store = dht_create_op_hashed.clone();
+    let dht_create_op_hash_for_store = dht_create_op_hashed.as_hash().clone();
     app_validation_workspace.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_delete_op_hashed, 0, None).unwrap();
-        put_validation_limbo(txn, &dht_delete_op_hash, ValidationStage::SysValidated).unwrap();
         insert_op_dht(txn, &dht_create_op_hashed, 0, None).unwrap();
         put_validation_limbo(
             txn,
@@ -327,13 +346,28 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
         )
         .unwrap();
     });
+    app_validation_workspace
+        .dht_store
+        .record_incoming_ops(vec![dht_delete_op_hashed, dht_create_op_hashed_for_store])
+        .await
+        .unwrap();
+    app_validation_workspace
+        .dht_store
+        .record_chain_op_sys_validation_outcomes(vec![
+            (dht_delete_op_hash, SysOutcome::Accepted),
+            (dht_create_op_hash_for_store, SysOutcome::Accepted),
+        ])
+        .await
+        .unwrap();
 
     // check create and delete op are now counted as ops to validate
-    let ops_to_validate =
-        validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
-            .await
-            .unwrap()
-            .len();
+    let ops_to_validate = app_validation_workspace
+        .dht_store
+        .as_read()
+        .ops_pending_app_validation(10_000)
+        .await
+        .unwrap()
+        .len();
     assert_eq!(ops_to_validate, 2);
 
     // run validation workflow
@@ -364,11 +398,13 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
     );
 
     // check ops to validate is also 0
-    let ops_to_validate =
-        validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
-            .await
-            .unwrap()
-            .len();
+    let ops_to_validate = app_validation_workspace
+        .dht_store
+        .as_read()
+        .ops_pending_app_validation(10_000)
+        .await
+        .unwrap()
+        .len();
     assert_eq!(ops_to_validate, 0);
 }
 
@@ -429,11 +465,13 @@ async fn validate_ops_in_sequence_must_get_action() {
 
     // check there are no ops to app validate
     // genesis entries have already been validated at this stage
-    let ops_to_validate =
-        validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
-            .await
-            .unwrap()
-            .len();
+    let ops_to_validate = app_validation_workspace
+        .dht_store
+        .as_read()
+        .ops_pending_app_validation(10_000)
+        .await
+        .unwrap()
+        .len();
     assert_eq!(ops_to_validate, 0);
 
     // create op that following delete op depends on
@@ -456,10 +494,12 @@ async fn validate_ops_in_sequence_must_get_action() {
     let dht_delete_op_hash = DhtOpHash::with_data_sync(&dht_delete_op);
     let dht_delete_op_hashed = DhtOpHashed::from_content_sync(dht_delete_op);
 
-    // insert create and delete op in dht db and mark ready for app validation
+    // Record both ops into the new DhtStore as sys-validated. The create is
+    // also kept in the legacy DB because app validation of the delete resolves
+    // it as a dependency via the cascade, which reads the legacy DB.
+    let dht_create_op_hashed_for_store = dht_create_op_hashed.clone();
+    let dht_create_op_hash_for_store = dht_create_op_hashed.as_hash().clone();
     app_validation_workspace.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_delete_op_hashed, 0, None).unwrap();
-        put_validation_limbo(txn, &dht_delete_op_hash, ValidationStage::SysValidated).unwrap();
         insert_op_dht(txn, &dht_create_op_hashed, 0, None).unwrap();
         put_validation_limbo(
             txn,
@@ -468,13 +508,28 @@ async fn validate_ops_in_sequence_must_get_action() {
         )
         .unwrap();
     });
+    app_validation_workspace
+        .dht_store
+        .record_incoming_ops(vec![dht_delete_op_hashed, dht_create_op_hashed_for_store])
+        .await
+        .unwrap();
+    app_validation_workspace
+        .dht_store
+        .record_chain_op_sys_validation_outcomes(vec![
+            (dht_delete_op_hash, SysOutcome::Accepted),
+            (dht_create_op_hash_for_store, SysOutcome::Accepted),
+        ])
+        .await
+        .unwrap();
 
     // check create and delete op are now counted as ops to validate
-    let ops_to_validate =
-        validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
-            .await
-            .unwrap()
-            .len();
+    let ops_to_validate = app_validation_workspace
+        .dht_store
+        .as_read()
+        .ops_pending_app_validation(10_000)
+        .await
+        .unwrap()
+        .len();
     assert_eq!(ops_to_validate, 2);
 
     // run validation workflow
@@ -505,11 +560,13 @@ async fn validate_ops_in_sequence_must_get_action() {
     );
 
     // check ops to validate is also 0
-    let ops_to_validate =
-        validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
-            .await
-            .unwrap()
-            .len();
+    let ops_to_validate = app_validation_workspace
+        .dht_store
+        .as_read()
+        .ops_pending_app_validation(10_000)
+        .await
+        .unwrap()
+        .len();
     assert_eq!(ops_to_validate, 0);
 }
 
@@ -625,21 +682,31 @@ async fn handle_error_in_op_validation() {
     let dht_store_entry_op_hash = DhtOpHash::with_data_sync(&dht_store_entry_op);
     let dht_store_entry_op_hashed = DhtOpHashed::from_content_sync(dht_store_entry_op);
 
-    // insert both ops in dht db and mark ready for app validation
+    // Record both ops into the new DhtStore as sys-validated and ready for app
+    // validation.
     let expected_failed_dht_op_hash = dht_create_op_hash.clone();
-    app_validation_workspace.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_create_op_hashed, 0, None).unwrap();
-        put_validation_limbo(txn, &dht_create_op_hash, ValidationStage::SysValidated).unwrap();
-        insert_op_dht(txn, &dht_store_entry_op_hashed, 0, None).unwrap();
-        put_validation_limbo(txn, &dht_store_entry_op_hash, ValidationStage::SysValidated).unwrap();
-    });
+    app_validation_workspace
+        .dht_store
+        .record_incoming_ops(vec![dht_create_op_hashed, dht_store_entry_op_hashed])
+        .await
+        .unwrap();
+    app_validation_workspace
+        .dht_store
+        .record_chain_op_sys_validation_outcomes(vec![
+            (dht_create_op_hash, SysOutcome::Accepted),
+            (dht_store_entry_op_hash, SysOutcome::Accepted),
+        ])
+        .await
+        .unwrap();
 
     // check ops are now counted as ops to validate
-    let ops_to_validate =
-        validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
-            .await
-            .unwrap()
-            .len();
+    let ops_to_validate = app_validation_workspace
+        .dht_store
+        .as_read()
+        .ops_pending_app_validation(10_000)
+        .await
+        .unwrap()
+        .len();
     assert_eq!(ops_to_validate, 2);
 
     // running validation workflow should finish without errors
@@ -672,11 +739,13 @@ async fn handle_error_in_op_validation() {
         } if actual_failed == expected_failed
     );
 
-    let ops_to_validate =
-        validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
-            .await
-            .unwrap()
-            .len();
+    let ops_to_validate = app_validation_workspace
+        .dht_store
+        .as_read()
+        .ops_pending_app_validation(10_000)
+        .await
+        .unwrap()
+        .len();
     assert_eq!(ops_to_validate, 1);
 }
 
@@ -990,11 +1059,13 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
     ));
 
     // Check there are no ops to app validate as genesis entries should have already been validated
-    let ops_to_validate =
-        validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
-            .await
-            .unwrap()
-            .len();
+    let ops_to_validate = app_validation_workspace
+        .dht_store
+        .as_read()
+        .ops_pending_app_validation(10_000)
+        .await
+        .unwrap()
+        .len();
     assert_eq!(ops_to_validate, 0);
 
     // Create op to validate
@@ -1013,17 +1084,35 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
     let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
 
     // Insert op to validate in DHT DB and mark ready for app validation
+    let dht_create_op_hashed_for_store = dht_create_op_hashed.clone();
+    let dht_create_op_hash_for_store = dht_create_op_hash.clone();
     app_validation_workspace.dht_db.test_write(move |txn| {
         insert_op_dht(txn, &dht_create_op_hashed, 0, None).unwrap();
         put_validation_limbo(txn, &dht_create_op_hash, ValidationStage::SysValidated).unwrap();
     });
+    // Mirror into the new DhtStore so the workflow can read from it.
+    app_validation_workspace
+        .dht_store
+        .record_incoming_ops(vec![dht_create_op_hashed_for_store])
+        .await
+        .unwrap();
+    app_validation_workspace
+        .dht_store
+        .record_chain_op_sys_validation_outcomes(vec![(
+            dht_create_op_hash_for_store,
+            SysOutcome::Accepted,
+        )])
+        .await
+        .unwrap();
 
     // Check op is now counted as op to validate
-    let ops_to_validate =
-        validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
-            .await
-            .unwrap()
-            .len();
+    let ops_to_validate = app_validation_workspace
+        .dht_store
+        .as_read()
+        .ops_pending_app_validation(10_000)
+        .await
+        .unwrap()
+        .len();
     assert_eq!(ops_to_validate, 1);
 
     // Check that genesis ops are currently validated and integrated
@@ -1061,11 +1150,13 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
     );
 
     // There should be no more ops to validate
-    let ops_to_validate =
-        validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
-            .await
-            .unwrap()
-            .len();
+    let ops_to_validate = app_validation_workspace
+        .dht_store
+        .as_read()
+        .ops_pending_app_validation(10_000)
+        .await
+        .unwrap()
+        .len();
     assert_eq!(ops_to_validate, 0);
 
     // The op should be marked as valid but not integrated.

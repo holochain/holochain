@@ -92,7 +92,6 @@
 //! is triggered, which completes integration of ops after successful validation.
 
 use super::error::WorkflowResult;
-use super::sys_validation_workflow::validation_query;
 use crate::conductor::entry_def_store::get_entry_def;
 use crate::conductor::Conductor;
 use crate::conductor::ConductorHandle;
@@ -200,8 +199,11 @@ async fn app_validation_workflow_inner(
     network: DynHolochainP2pDna,
     _representative_agent: AgentPubKey,
 ) -> WorkflowResult<OutcomeSummary> {
-    let db = workspace.dht_db.clone().into();
-    let sorted_dht_ops = validation_query::get_ops_to_app_validate(&db).await?;
+    let sorted_dht_ops = workspace
+        .dht_store
+        .as_read()
+        .ops_pending_app_validation(10_000)
+        .await?;
     let num_ops_to_validate = sorted_dht_ops.len();
 
     let cascade = Arc::new(workspace.full_cascade(network.clone()));

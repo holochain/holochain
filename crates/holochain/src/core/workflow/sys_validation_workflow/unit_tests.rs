@@ -1,6 +1,5 @@
 use super::sys_validation_workflow;
 use super::validation_deps::SysValDeps;
-use super::validation_query::get_ops_to_app_validate;
 use super::SysValidationWorkspace;
 use crate::conductor::space::TestSpace;
 use crate::core::queue_consumer::TriggerReceiver;
@@ -64,10 +63,7 @@ async fn validate_op_with_no_dependency() {
     };
     let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Dna(dna_action));
 
-    let op_hash = test_case
-        .save_op_to_db(test_case.dht_db_handle(), op.into())
-        .await
-        .unwrap();
+    let op_hash = test_case.save_op_to_dht(op.into()).await.unwrap();
 
     test_case.run().await;
 
@@ -115,10 +111,7 @@ async fn validate_op_with_dependency_held_in_cache() {
     });
     let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action)).into();
 
-    let op_hash = test_case
-        .save_op_to_db(test_case.dht_db_handle(), op)
-        .await
-        .unwrap();
+    let op_hash = test_case.save_op_to_dht(op).await.unwrap();
 
     let mut network = MockHolochainP2pDnaT::default();
     network
@@ -166,10 +159,7 @@ async fn validate_op_with_dependency_not_held() {
     });
     let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action)).into();
 
-    let op_hash = test_case
-        .save_op_to_db(test_case.dht_db_handle(), op)
-        .await
-        .unwrap();
+    let op_hash = test_case.save_op_to_dht(op).await.unwrap();
 
     let mut network = MockHolochainP2pDnaT::default();
     let mut ops: WireRecordOps = WireRecordOps::new();
@@ -230,10 +220,7 @@ async fn validate_op_with_dependency_not_found_on_the_dht() {
     });
     let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action)).into();
 
-    test_case
-        .save_op_to_db(test_case.dht_db_handle(), op)
-        .await
-        .unwrap();
+    test_case.save_op_to_dht(op).await.unwrap();
 
     let mut network = MockHolochainP2pDnaT::new();
     // Just return an empty response, nothing found for the request
@@ -297,10 +284,7 @@ async fn validate_op_with_wrong_sequence_number_rejected_and_not_forwarded_to_ap
         visibility: EntryVisibility::Public,
     });
     let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action)).into();
-    test_case
-        .save_op_to_db(test_case.dht_db_handle(), op)
-        .await
-        .unwrap();
+    test_case.save_op_to_dht(op).await.unwrap();
 
     test_case.run().await;
 
@@ -343,10 +327,9 @@ async fn validate_valid_warrant_with_cached_dependency() {
         fixt!(Signature),
         Action::Create(create),
         crate::prelude::RecordEntry::Present(entry),
-    )
-    .into();
+    );
     test_case
-        .save_op_to_db(test_case.cache_db_handle(), warranted_op)
+        .save_chain_op_as_cached(warranted_op)
         .await
         .unwrap();
 
@@ -362,10 +345,7 @@ async fn validate_valid_warrant_with_cached_dependency() {
     let warrant_op_hash = DhtOpHashed::from_content_sync(warrant_op.clone()).hash;
 
     test_case
-        .save_op_to_db(
-            test_case.dht_db_handle(),
-            DhtOp::WarrantOp(warrant_op.into()),
-        )
+        .save_op_to_dht(DhtOp::WarrantOp(warrant_op.into()))
         .await
         .unwrap();
 
@@ -448,10 +428,7 @@ async fn validate_valid_warrant_with_fetched_dependency() {
     let warrant_op_hash = DhtOpHashed::from_content_sync(warrant_op.clone()).hash;
 
     test_case
-        .save_op_to_db(
-            test_case.dht_db_handle(),
-            DhtOp::WarrantOp(warrant_op.into()),
-        )
+        .save_op_to_dht(DhtOp::WarrantOp(warrant_op.into()))
         .await
         .unwrap();
 
@@ -517,10 +494,7 @@ async fn reject_invalid_warrant() {
         crate::prelude::RecordEntry::Present(entry),
     );
     let valid_op_hash = DhtOpHashed::from_content_sync(valid_op.clone()).hash;
-    test_case
-        .save_op_to_db(test_case.dht_db_handle(), valid_op.into())
-        .await
-        .unwrap();
+    test_case.save_op_to_dht(valid_op.into()).await.unwrap();
 
     // Invalid warrant against a valid action
     let warrant_op = test_case
@@ -535,10 +509,7 @@ async fn reject_invalid_warrant() {
     let warrant_op_hash = DhtOpHashed::from_content_sync(warrant_op.clone()).hash;
 
     test_case
-        .save_op_to_db(
-            test_case.dht_db_handle(),
-            DhtOp::WarrantOp(warrant_op.into()),
-        )
+        .save_op_to_dht(DhtOp::WarrantOp(warrant_op.into()))
         .await
         .unwrap();
 
@@ -627,10 +598,7 @@ async fn validate_warrant_with_validated_dependency() {
         crate::prelude::RecordEntry::Present(entry),
     );
     let valid_op_hash = DhtOpHashed::from_content_sync(valid_op.clone()).hash;
-    test_case
-        .save_op_to_db(test_case.dht_db_handle(), valid_op.into())
-        .await
-        .unwrap();
+    test_case.save_op_to_dht(valid_op.into()).await.unwrap();
     test_case
         .test_space
         .space
@@ -658,10 +626,7 @@ async fn validate_warrant_with_validated_dependency() {
     let warrant_op_hash = DhtOpHashed::from_content_sync(warrant_op.clone()).hash;
 
     test_case
-        .save_op_to_db(
-            test_case.dht_db_handle(),
-            DhtOp::WarrantOp(warrant_op.into()),
-        )
+        .save_op_to_dht(DhtOp::WarrantOp(warrant_op.into()))
         .await
         .unwrap();
 
@@ -717,10 +682,7 @@ async fn avoid_duplicate_warrant() {
         Action::Create(create),
         crate::prelude::RecordEntry::Present(entry),
     );
-    test_case
-        .save_op_to_db(test_case.dht_db_handle(), invalid_op.into())
-        .await
-        .unwrap();
+    test_case.save_op_to_dht(invalid_op.into()).await.unwrap();
 
     // Valid warrant against the invalid action
     let warrant_op = test_case
@@ -733,10 +695,7 @@ async fn avoid_duplicate_warrant() {
         .unwrap();
     let warrant_op_hash = DhtOpHashed::from_content_sync(warrant_op.clone()).hash;
     test_case
-        .save_op_to_db(
-            test_case.dht_db_handle(),
-            DhtOp::WarrantOp(warrant_op.into()),
-        )
+        .save_op_to_dht(DhtOp::WarrantOp(warrant_op.into()))
         .await
         .unwrap();
 
@@ -881,6 +840,76 @@ impl TestCase {
         Ok(test_op_hash)
     }
 
+    /// Write a chain op to the legacy cache database and to the new DHT store as
+    /// a cached (not locally-validated) row, so it is visible to both the legacy
+    /// `copy_cached_op_to_dht` path and to `move_warranted_op_to_limbo`.
+    async fn save_chain_op_as_cached(&self, chain_op: ChainOp) -> StateMutationResult<DhtOpHash> {
+        // Build the RenderedOps first so we can pass it to cache_chain_ops.
+        let action = chain_op.action();
+        let signature = chain_op.signature().clone();
+        let op_type = chain_op.get_type();
+        let entry = match chain_op.entry() {
+            holochain_zome_types::record::RecordEntry::Present(e) => Some(
+                holochain_zome_types::entry::EntryHashed::from_content_sync(e.clone()),
+            ),
+            _ => None,
+        };
+
+        let rendered_op =
+            holochain_types::dht_op::RenderedOp::new(action, signature, None, op_type)
+                .expect("render op for test fixture");
+        let rendered_ops = holochain_types::dht_op::RenderedOps {
+            entry,
+            ops: vec![rendered_op],
+            warrant: None,
+        };
+
+        // Legacy cache write (required by copy_cached_op_to_dht).
+        let op_hash = self
+            .save_op_to_db(self.cache_db_handle(), DhtOp::ChainOp(Box::new(chain_op)))
+            .await?;
+
+        // New DhtStore write so move_warranted_op_to_limbo can find the row.
+        self.test_space
+            .space
+            .dht_store
+            .cache_chain_ops(&rendered_ops)
+            .await?;
+
+        Ok(op_hash)
+    }
+
+    /// Write an op to both the legacy DHT database and the new DHT store so that
+    /// both the legacy write path and the new `ops_pending_sys_validation` read
+    /// path see the op.
+    async fn save_op_to_dht(&self, op: DhtOp) -> StateMutationResult<DhtOpHash> {
+        let op_hashed = DhtOpHashed::from_content_sync(op);
+        let hash = op_hashed.as_hash().clone();
+
+        // Write to the legacy DB so that other legacy paths (app-validation query,
+        // integration, etc.) also see this op.
+        let op_for_legacy = op_hashed.clone();
+        self.test_space
+            .space
+            .dht_db
+            .write_async(move |txn| -> StateMutationResult<()> {
+                holochain_state::mutations::insert_op_untyped(txn, &op_for_legacy, 0)?;
+                Ok(())
+            })
+            .await
+            .unwrap();
+
+        // Write to the new DHT store so that `ops_pending_sys_validation` returns it.
+        self.test_space
+            .space
+            .dht_store
+            .record_incoming_ops(vec![op_hashed])
+            .await
+            .unwrap();
+
+        Ok(hash)
+    }
+
     async fn create_and_sign_warrant(
         &self,
         warranted_action: &SignedActionHashed,
@@ -960,7 +989,11 @@ impl TestCase {
 
     /// This provides a quick and reliable way to check that ops have been sys validated
     async fn get_ops_pending_app_validation(&self) -> HashSet<DhtOpHash> {
-        get_ops_to_app_validate(&self.dht_db_handle().into())
+        self.test_space
+            .space
+            .dht_store
+            .as_read()
+            .ops_pending_app_validation(10_000)
             .await
             .unwrap()
             .into_iter()

@@ -1,6 +1,6 @@
 //! `DbRead<Dht>` / `DbWrite<Dht>` API for the `ChainOp` table.
 
-use super::super::inner::chain_op::{self, InsertChainOp};
+use super::super::inner::chain_op::{self, InsertChainOp, PendingReceiptRow};
 use crate::handles::{DbRead, DbWrite};
 use crate::kind::Dht;
 use crate::models::dht::ChainOpRow;
@@ -42,5 +42,11 @@ impl DbRead<Dht> {
         action_hash: ActionHash,
     ) -> sqlx::Result<Vec<ChainOpRow>> {
         chain_op::get_chain_ops_for_action(self.pool(), action_hash).await
+    }
+
+    /// Return integrated, validated `ChainOp` rows that still require a
+    /// validation receipt to be sent.
+    pub async fn pending_validation_receipts(&self) -> sqlx::Result<Vec<PendingReceiptRow>> {
+        chain_op::pending_validation_receipts(self.pool()).await
     }
 }

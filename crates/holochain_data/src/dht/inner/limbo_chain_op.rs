@@ -1,10 +1,45 @@
 //! Free-standing operations against the `LimboChainOp` table.
 
 use crate::models::dht::LimboChainOpRow;
-use holo_hash::{ActionHash, AnyDhtHash, DhtOpHash};
+use holo_hash::{ActionHash, AnyLinkableHash, DhtOpHash};
 use holochain_integrity_types::dht_v2::OpValidity;
 use holochain_timestamp::Timestamp;
 use sqlx::{Executor, Sqlite, SqliteConnection};
+
+/// A row joining `LimboChainOp` with its associated `Action` and optional
+/// `Entry` blob. Enables reconstructing a `DhtOpHashed` without an N+1
+/// round-trip per row.
+#[derive(Debug, sqlx::FromRow)]
+pub struct LimboChainOpJoinedRow {
+    // --- LimboChainOp columns ---
+    pub hash: Vec<u8>,
+    pub op_type: i64,
+    pub action_hash: Vec<u8>,
+    pub basis_hash: Vec<u8>,
+    pub storage_center_loc: i64,
+    pub sys_validation_status: Option<i64>,
+    pub app_validation_status: Option<i64>,
+    pub abandoned_at: Option<i64>,
+    pub require_receipt: i64,
+    pub when_received: i64,
+    pub sys_validation_attempts: i64,
+    pub app_validation_attempts: i64,
+    pub last_validation_attempt: Option<i64>,
+    pub serialized_size: i64,
+    // --- Action columns (aliased to avoid collision) ---
+    pub action_author: Vec<u8>,
+    pub action_seq: i64,
+    pub action_prev_hash: Option<Vec<u8>>,
+    pub action_timestamp: i64,
+    pub action_type: i64,
+    pub action_data: Vec<u8>,
+    pub action_signature: Vec<u8>,
+    pub action_entry_hash: Option<Vec<u8>>,
+    pub action_private_entry: Option<i64>,
+    pub action_record_validity: Option<i64>,
+    // --- Entry columns (LEFT JOIN — may be NULL) ---
+    pub entry_blob: Option<Vec<u8>>,
+}
 
 /// Parameters for inserting a row into `LimboChainOp`.
 pub struct InsertLimboChainOp<'a> {
@@ -15,8 +50,10 @@ pub struct InsertLimboChainOp<'a> {
     /// `ChainOpType` discriminant; see
     /// [`From<ChainOpType> for i64`](holochain_zome_types::dht_v2).
     pub op_type: i64,
-    /// DHT basis hash (where the op is stored).
-    pub basis_hash: &'a AnyDhtHash,
+    /// DHT basis hash (`OpBasis`) where the op is stored.
+    /// `AnyLinkableHash`, not `AnyDhtHash`: link-op bases may be `External`
+    /// hashes, which `AnyDhtHash` cannot hold.
+    pub basis_hash: &'a AnyLinkableHash,
     /// Numeric storage center derived from `basis_hash`.
     pub storage_center_loc: u32,
     /// Whether the receiving authority should issue a validation receipt.
@@ -101,6 +138,102 @@ where
         "SELECT * FROM LimboChainOp
          WHERE sys_validation_status = 1 AND app_validation_status IS NULL
          ORDER BY app_validation_attempts, when_received
+         LIMIT ?",
+    )
+    .bind(limit as i64)
+    .fetch_all(executor)
+    .await
+}
+
+/// Fetch limbo chain ops pending sys-validation, joined with their `Action`
+/// and (optionally) their `Entry`, in a single query.
+pub(crate) async fn limbo_chain_ops_pending_sys_validation_with_action<'e, E>(
+    executor: E,
+    limit: u32,
+) -> sqlx::Result<Vec<LimboChainOpJoinedRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT
+            l.hash              AS hash,
+            l.op_type           AS op_type,
+            l.action_hash       AS action_hash,
+            l.basis_hash        AS basis_hash,
+            l.storage_center_loc AS storage_center_loc,
+            l.sys_validation_status AS sys_validation_status,
+            l.app_validation_status AS app_validation_status,
+            l.abandoned_at      AS abandoned_at,
+            l.require_receipt   AS require_receipt,
+            l.when_received     AS when_received,
+            l.sys_validation_attempts AS sys_validation_attempts,
+            l.app_validation_attempts AS app_validation_attempts,
+            l.last_validation_attempt AS last_validation_attempt,
+            l.serialized_size   AS serialized_size,
+            a.author            AS action_author,
+            a.seq               AS action_seq,
+            a.prev_hash         AS action_prev_hash,
+            a.timestamp         AS action_timestamp,
+            a.action_type       AS action_type,
+            a.action_data       AS action_data,
+            a.signature         AS action_signature,
+            a.entry_hash        AS action_entry_hash,
+            a.private_entry     AS action_private_entry,
+            a.record_validity   AS action_record_validity,
+            e.blob              AS entry_blob
+         FROM LimboChainOp l
+         JOIN Action a ON l.action_hash = a.hash
+         LEFT JOIN Entry e ON a.entry_hash = e.hash
+         WHERE l.sys_validation_status IS NULL
+         ORDER BY l.sys_validation_attempts, l.when_received
+         LIMIT ?",
+    )
+    .bind(limit as i64)
+    .fetch_all(executor)
+    .await
+}
+
+/// Fetch limbo chain ops pending app-validation, joined with their `Action`
+/// and (optionally) their `Entry`, in a single query.
+pub(crate) async fn limbo_chain_ops_pending_app_validation_with_action<'e, E>(
+    executor: E,
+    limit: u32,
+) -> sqlx::Result<Vec<LimboChainOpJoinedRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT
+            l.hash              AS hash,
+            l.op_type           AS op_type,
+            l.action_hash       AS action_hash,
+            l.basis_hash        AS basis_hash,
+            l.storage_center_loc AS storage_center_loc,
+            l.sys_validation_status AS sys_validation_status,
+            l.app_validation_status AS app_validation_status,
+            l.abandoned_at      AS abandoned_at,
+            l.require_receipt   AS require_receipt,
+            l.when_received     AS when_received,
+            l.sys_validation_attempts AS sys_validation_attempts,
+            l.app_validation_attempts AS app_validation_attempts,
+            l.last_validation_attempt AS last_validation_attempt,
+            l.serialized_size   AS serialized_size,
+            a.author            AS action_author,
+            a.seq               AS action_seq,
+            a.prev_hash         AS action_prev_hash,
+            a.timestamp         AS action_timestamp,
+            a.action_type       AS action_type,
+            a.action_data       AS action_data,
+            a.signature         AS action_signature,
+            a.entry_hash        AS action_entry_hash,
+            a.private_entry     AS action_private_entry,
+            a.record_validity   AS action_record_validity,
+            e.blob              AS entry_blob
+         FROM LimboChainOp l
+         JOIN Action a ON l.action_hash = a.hash
+         LEFT JOIN Entry e ON a.entry_hash = e.hash
+         WHERE l.sys_validation_status = 1 AND l.app_validation_status IS NULL
+         ORDER BY l.app_validation_attempts, l.when_received
          LIMIT ?",
     )
     .bind(limit as i64)

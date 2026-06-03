@@ -5,7 +5,7 @@
 //! through limbo (`LimboWarrantOp`) so the local conductor can validate them
 //! regardless of arc coverage.
 
-use holo_hash::{AnyDhtHash, HasHash};
+use holo_hash::HasHash;
 use holochain_data::dht::{InsertChainOp, InsertLimboWarrant};
 use holochain_data::kind::Dht;
 use holochain_data::DbWrite;
@@ -56,13 +56,8 @@ impl DhtStore<DbWrite<Dht>> {
             )
             .await?;
 
-            let linkable_basis = op.op_light.dht_basis();
-            let storage_center_loc = linkable_basis.get_loc();
-            let basis_hash: AnyDhtHash = AnyDhtHash::try_from(linkable_basis).map_err(|e| {
-                StateMutationError::Other(format!(
-                    "cannot convert cached op basis to AnyDhtHash: {e:?}"
-                ))
-            })?;
+            let basis_hash = op.op_light.dht_basis();
+            let storage_center_loc = basis_hash.get_loc();
 
             let op_type = match op.op_light.get_type() {
                 holochain_types::dht_op::DhtOpType::Chain(t) => i64::from(t),

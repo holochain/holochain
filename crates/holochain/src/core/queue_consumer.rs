@@ -330,6 +330,16 @@ impl QueueConsumerMap {
             }
         })
     }
+
+    /// Drop this map's trigger senders for every queue of the given DNA.
+    ///
+    /// Once the removed cells have also dropped their copies, the consumer
+    /// workflows terminate. Used when a DNA's space is torn down so that a
+    /// later reinstall re-spawns fresh consumers bound to the new databases.
+    pub fn remove_all_for_dna(&self, dna_hash: &DnaHash) {
+        self.map
+            .share_mut(|map| map.retain(|QueueEntry(dna, _), _| dna.as_ref() != dna_hash));
+    }
 }
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
