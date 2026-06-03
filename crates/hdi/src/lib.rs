@@ -340,6 +340,8 @@ pub mod chain;
 #[deny(missing_docs)]
 pub mod op;
 
+pub mod op_v2;
+
 #[deny(missing_docs)]
 pub mod flat_op;
 
