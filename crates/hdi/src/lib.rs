@@ -343,5 +343,7 @@ pub mod op;
 #[deny(missing_docs)]
 pub mod flat_op;
 
+pub mod flat_op_v2;
+
 #[cfg(any(feature = "test_utils", test))]
 pub mod test_utils;
