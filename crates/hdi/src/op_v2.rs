@@ -155,7 +155,9 @@ impl OpHelper for dht_v2::Op {
                             action: a.clone(),
                         },
                         EntryType::App(entry_def) => flat_op_v2::OpEntry::CreateEntry {
-                            app_entry: get_app_entry_type_for_store_entry_authority(entry_def, entry)?,
+                            app_entry: get_app_entry_type_for_store_entry_authority(
+                                entry_def, entry,
+                            )?,
                             action: a.clone(),
                         },
                         EntryType::CapClaim => flat_op_v2::OpEntry::CreateCapClaim {
@@ -177,7 +179,9 @@ impl OpHelper for dht_v2::Op {
                         EntryType::App(entry_def) => flat_op_v2::OpEntry::UpdateEntry {
                             original_action_hash: d.original_action_address.clone(),
                             original_entry_hash: d.original_entry_address.clone(),
-                            app_entry: get_app_entry_type_for_store_entry_authority(entry_def, entry)?,
+                            app_entry: get_app_entry_type_for_store_entry_authority(
+                                entry_def, entry,
+                            )?,
                             action: a.clone(),
                         },
                         EntryType::CapClaim => flat_op_v2::OpEntry::UpdateCapClaim {

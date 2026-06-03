@@ -630,7 +630,10 @@ where
 
 /// Get the app defined link type from a [`ZomeIndex`] and [`LinkType`].
 /// If the [`ZomeIndex`] is not a dependency of this zome then return a host error.
-pub(crate) fn in_scope_link_type<LT>(zome_index: ZomeIndex, link_type: LinkType) -> Result<LT, WasmError>
+pub(crate) fn in_scope_link_type<LT>(
+    zome_index: ZomeIndex,
+    link_type: LinkType,
+) -> Result<LT, WasmError>
 where
     LT: LinkTypesHelper,
     WasmError: From<<LT as LinkTypesHelper>::Error>,
