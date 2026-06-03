@@ -943,7 +943,9 @@ async fn move_warranted_op_to_limbo_no_match_for_locally_validated_true() {
 
 /// Like `build_test_store_record_op_hashed` but also returns the legacy
 /// action hash and entry hash, for read-back assertions.
-fn store_record_op_with_hashes(seed: u8) -> (DhtOpHashed, holo_hash::ActionHash, holo_hash::EntryHash) {
+fn store_record_op_with_hashes(
+    seed: u8,
+) -> (DhtOpHashed, holo_hash::ActionHash, holo_hash::EntryHash) {
     use holo_hash::{ActionHash, EntryHash};
     use holochain_serialized_bytes::UnsafeBytes;
     use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
@@ -963,7 +965,11 @@ fn store_record_op_with_hashes(seed: u8) -> (DhtOpHashed, holo_hash::ActionHash,
         timestamp: Timestamp::from_micros(seed as i64 * 1000),
         action_seq: 1,
         prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36]),
-        entry_type: EntryType::App(AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Public)),
+        entry_type: EntryType::App(AppEntryDef::new(
+            0.into(),
+            0.into(),
+            EntryVisibility::Public,
+        )),
         entry_hash: entry_hash.clone(),
         weight: Default::default(),
     });
@@ -987,7 +993,12 @@ async fn retrieve_action_returns_stored_action() {
     assert_eq!(got.as_hash(), &action_hash);
 
     let missing = holo_hash::ActionHash::from_raw_36(vec![250u8; 36]);
-    assert!(store.as_read().retrieve_action(&missing).await.unwrap().is_none());
+    assert!(store
+        .as_read()
+        .retrieve_action(&missing)
+        .await
+        .unwrap()
+        .is_none());
 }
 
 #[tokio::test]
@@ -996,7 +1007,11 @@ async fn retrieve_entry_returns_public_entry() {
     let (op, _action_hash, entry_hash) = store_record_op_with_hashes(2);
     store.record_incoming_ops(vec![op]).await.unwrap();
 
-    let got = store.as_read().retrieve_entry(&entry_hash, None).await.unwrap();
+    let got = store
+        .as_read()
+        .retrieve_entry(&entry_hash, None)
+        .await
+        .unwrap();
     assert!(matches!(got, Some(holochain_types::prelude::Entry::App(_))));
 
     let missing = holo_hash::EntryHash::from_raw_36(vec![251u8; 36]);
@@ -1049,4 +1064,32 @@ async fn record_locally_validated_warrants_inserts_warrant() {
     // The rejection reason is extracted from the warrant proof and stored in
     // its own column.
     assert_eq!(row.reason.as_deref(), Some("test warrant"));
+}
+
+#[tokio::test]
+async fn retrieve_record_returns_action_with_entry() {
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+    let (op, action_hash, _entry_hash) = store_record_op_with_hashes(3);
+    store.record_incoming_ops(vec![op]).await.unwrap();
+
+    let record = store
+        .as_read()
+        .retrieve_record(&action_hash, None)
+        .await
+        .unwrap()
+        .expect("record should be retrievable");
+    assert_eq!(record.action_address(), &action_hash);
+    // The Create action references a public App entry, so it must be present.
+    assert!(matches!(
+        record.entry(),
+        holochain_types::prelude::RecordEntry::Present(_)
+    ));
+
+    let missing = holo_hash::ActionHash::from_raw_36(vec![252u8; 36]);
+    assert!(store
+        .as_read()
+        .retrieve_record(&missing, None)
+        .await
+        .unwrap()
+        .is_none());
 }

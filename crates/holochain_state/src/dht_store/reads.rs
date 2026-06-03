@@ -93,6 +93,33 @@ impl DhtStore<DbRead<Dht>> {
         Ok(self.db().get_entry(hash.clone(), author).await?)
     }
 
+    /// Retrieve the complete record (action + entry, if any) for `hash`.
+    ///
+    /// If the action references an entry and that entry is not available
+    /// locally, returns `None` (matching the cascade's `retrieve_public_record`
+    /// contract). `author = Some` allows that agent's private entry.
+    pub async fn retrieve_record(
+        &self,
+        hash: &holo_hash::ActionHash,
+        author: Option<&holo_hash::AgentPubKey>,
+    ) -> StateQueryResult<Option<holochain_zome_types::record::Record>> {
+        let Some(v2_action) = self.db().get_action(hash.clone()).await? else {
+            return Ok(None);
+        };
+        let action = holochain_zome_types::dht_v2::to_legacy_signed_action(&v2_action);
+        let entry = match action.action().entry_hash() {
+            Some(entry_hash) => match self.db().get_entry(entry_hash.clone(), author).await? {
+                Some(entry) => Some(entry),
+                // Action references an entry but it is unavailable.
+                None => return Ok(None),
+            },
+            None => None,
+        };
+        Ok(Some(holochain_zome_types::record::Record::new(
+            action, entry,
+        )))
+    }
+
     /// Retrieve the signed action for `hash` if present, without CRUD
     /// resolution. Returns the legacy `SignedActionHashed` (converted from the
     /// stored v2 action).
