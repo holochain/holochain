@@ -12,6 +12,12 @@
 pub mod op;
 pub mod record;
 
+pub use op::{
+    Op, RegisterAgentActivity, RegisterCreateLink, RegisterDelete, RegisterDeleteLink,
+    RegisterUpdate, StoreEntry, StoreRecord,
+};
+pub use record::Record;
+
 use crate::action::ZomeIndex;
 use crate::{
     link::{LinkTag, LinkType},
