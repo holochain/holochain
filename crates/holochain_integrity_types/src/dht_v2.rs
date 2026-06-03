@@ -9,6 +9,9 @@
 //!
 //! [`SignedHashed`]: crate::record::SignedHashed
 
+pub mod op;
+pub mod record;
+
 use crate::action::ZomeIndex;
 use crate::{
     link::{LinkTag, LinkType},
