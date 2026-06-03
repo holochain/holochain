@@ -258,6 +258,120 @@ Unit tests co-located with the new types:
   macro rewrite. Phase 0 should note any macro-facing constraints discovered
   while shaping the v2 `FlatOp`.
 
+## Phase 1 — Cascade reads + wire cutover
+
+### Goal
+
+Serve all cascade reads — both the local-first requester path and the
+network-serving authority path — from the unified `holochain_data` DHT database
+via `holochain_state`, and break the network wire to carry v2 actions with v2
+hashes. Delivers issue #5730 and removes the network-side `legacy ↔ v2`
+conversions and the legacy-hash-preservation machinery.
+
+### Decomposition
+
+Phase 1 is itself multiple subsystems; it lands as four ordered sub-slices, each
+with its own implementation plan, all on the one branch:
+
+| Sub-slice | Scope | Depends on |
+|-----------|-------|------------|
+| **1a — `DhtStore` read API** | Add the cascade's compound read methods to `holochain_state::DhtStore` (and `holochain_data` primitives as needed), tested in isolation. | — |
+| **1b — Cascade authority → `DhtStore`** | Rewrite the `holochain_cascade::authority` network-serving handlers to use the 1a reads (store-only, **no scratch**). | 1a |
+| **1c — Cascade requester → `DhtStore`** | Rewrite the `holochain_cascade` local-first `get_*`/`retrieve_*` methods to use the 1a reads + scratch overlay + network fallback; delete `CascadeTxnWrapper`/`DbScratch`/cross-DB merging. | 1a |
+| **1d — Wire break to v2** | Break the K2 op-store wire and the application-`get` `WireOps` to carry v2 with v2 hashes; drop the network-side conversions (`op_store` `v2→legacy`, `record_incoming_ops` `legacy→v2`, `RenderedOp::new`) and the hash-preservation hack. | 1a–1c |
+
+### Read-stack architecture
+
+Three layers, with resolution work placed by cost:
+
+- **`holochain_data`** — SQL read operations against the unified DB, resolved in
+  SQL *where the SQL stays clean*: live entry (entry with no live delete), live
+  links (create-links minus tombstones), "deletes/updates for X",
+  agent-activity row scans. Where answering a cascade request would require an
+  overly complex multi-join, `holochain_data` returns the component pieces and
+  the next layer assembles. These queries are tested in isolation at the DB
+  level.
+- **`holochain_state`** — the compound "store" layer. `DhtStore` exposes typed
+  read methods that call `holochain_data`, **assemble multi-piece results in
+  memory** (e.g. record/entry details = action + entry + deletes + updates), and
+  — for the requester path only — **overlay the scratch in memory**. The scratch
+  type already lives in `holochain_state`, so the in-memory merge is at home
+  here.
+- **`holochain_cascade`** — thin: call the `holochain_state` read, fall back to
+  the network on a miss, cache the network result into the store
+  (`DhtStore::cache_chain_ops` / `cache_warrants`, already present). The legacy
+  `CascadeTxnWrapper` / `DbScratch` / cross-DB merge machinery is deleted.
+
+### Invariant: scratch is requester-only
+
+The scratch holds *this* conductor's in-flight, uncommitted authored data during
+a zome call or validation. It is overlaid **only** on the requester path (1c).
+The authority path (1b), which serves `get` requests arriving over the network
+from other agents, **must never** read the scratch — peers must not observe
+uncommitted local writes. Concretely: 1b uses the store-only `DhtStore` reads;
+the scratch-overlay read variant is used exclusively by 1c.
+
+### Return-type boundary (legacy until later phases)
+
+The 1a–1c read methods return the types today's consumers expect — **legacy**
+`Record` / `Details` / `Vec<Link>` / `AgentActivityResponse`, and the legacy
+`WireOps` family on the authority side — converting `v2→legacy` *inside* the
+read boundary (reusing the existing `dht_store/reads.rs` conversion). Only the
+**data source** changes in 1a–1c. 1d then breaks the *wire* specifically (the
+authority and op-store emit v2). The remaining `v2→legacy` at the zome-call
+return boundary is removed in the merged Phase 3+4.
+
+### 1a — the `DhtStore` read API (specified first)
+
+Add to `DhtStore` (with `holochain_data` primitives as needed), each tested in
+isolation:
+
+- `get_live_entry` / `get_live_record` — CRUD-resolved (not deleted).
+- `get_entry_details` / `get_record_details` — action + entry + deletes +
+  updates, assembled in `holochain_state`.
+- `get_links` (live) / `get_link_details` (with tombstones).
+- `get_agent_activity` / `must_get_agent_activity`.
+- `retrieve_action` / `retrieve_entry` / `retrieve_record` — raw, no CRUD
+  resolution.
+- a scratch-overlay read variant (or scratch parameter) used only by the
+  requester path.
+
+The exact method signatures mirror what `holochain_cascade`'s `get_*`/`retrieve_*`
+and `authority::handle_*` consume today (legacy return types) and are pinned in
+the 1a implementation plan.
+
+### Explicitly out of scope for Phase 1
+
+- The non-cascade internal DHT-read consumers (sys/app-validation queues,
+  validation receipts, publish, the incoming-ops intra-batch dedup) — **Phase
+  2**. 1d changes only the wire encode/decode and drops the network-side
+  conversions; the validation/integration consumers keep reading the v2 store as
+  they do now until Phase 2.
+- The zome-call/HDK return boundary `v2→legacy` conversion — **Phase 3+4**.
+
+### Testing
+
+- `holochain_data`: DB-level isolation tests for each resolved query (live
+  entry/record, live links, link details, deletes/updates-for, agent-activity).
+- `holochain_state`: `DhtStore` read tests covering multi-piece assembly and the
+  scratch overlay (including the invariant that the store-only variant ignores
+  any scratch).
+- `holochain_cascade`: local-hit (store), miss-then-network, and cache-write
+  behavior; authority handlers serve from the store with no scratch.
+- 1d: wire round-trip for the v2-encoded K2 ops and app-`get` `WireOps`; v2
+  hashes preserved end-to-end without the legacy-hash hack.
+
+### Risks / open questions
+
+- **Agent activity** is the most complex read (sequence scans, warrants,
+  completeness, fork handling). 1a should treat `get_agent_activity` /
+  `must_get_agent_activity` as the highest-risk method and may itself warrant a
+  dedicated plan within 1a.
+- **`holochain_data` vs `holochain_state` line.** The "clean SQL vs in-memory
+  assembly" split is a judgement call per query; the 1a plan fixes the line for
+  each method and notes any query pushed to in-memory assembly to avoid an
+  overly complex join.
+
 ## References
 
 - `docs/design/state_model.md`, `docs/design/data_model.md`
