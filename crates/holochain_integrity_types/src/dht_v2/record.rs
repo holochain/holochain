@@ -73,4 +73,12 @@ mod tests {
         assert_eq!(record.action_address(), &expected_hash);
         assert_eq!(record.entry, RecordEntry::NA);
     }
+
+    #[test]
+    fn record_serde_roundtrip() {
+        let record = Record::new(sample_signed_action(), RecordEntry::NA);
+        let bytes = holochain_serialized_bytes::encode(&record).unwrap();
+        let decoded: Record = holochain_serialized_bytes::decode(&bytes).unwrap();
+        assert_eq!(decoded, record);
+    }
 }

@@ -229,9 +229,7 @@ impl Op {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dht_v2::{
-        Action, ActionData, ActionHeader, CreateData, DeleteData, DeleteLinkData,
-    };
+    use crate::dht_v2::{Action, ActionData, ActionHeader, CreateData, DeleteData, DeleteLinkData};
     use crate::record::SignedHashed;
     use crate::signature::Signature;
     use crate::EntryType;
@@ -248,7 +246,10 @@ mod tests {
             data,
         };
         let hash = ActionHash::from_raw_36(vec![9u8; 36]);
-        SignedHashed::with_presigned(HoloHashed::with_pre_hashed(action, hash), Signature([0u8; 64]))
+        SignedHashed::with_presigned(
+            HoloHashed::with_pre_hashed(action, hash),
+            Signature([0u8; 64]),
+        )
     }
 
     fn create_data() -> ActionData {
@@ -329,8 +330,14 @@ mod tests {
 
         assert_eq!(op.action_seq(), 1);
         assert_eq!(op.author(), &AgentPubKey::from_raw_36(vec![1u8; 36]));
-        assert_eq!(op.timestamp(), holochain_timestamp::Timestamp::from_micros(7));
-        assert_eq!(op.prev_action(), Some(&ActionHash::from_raw_36(vec![2u8; 36])));
+        assert_eq!(
+            op.timestamp(),
+            holochain_timestamp::Timestamp::from_micros(7)
+        );
+        assert_eq!(
+            op.prev_action(),
+            Some(&ActionHash::from_raw_36(vec![2u8; 36]))
+        );
         assert_eq!(op.action_type(), crate::dht_v2::ActionType::Create);
         assert_eq!(op.action_hash(), &expected_hash);
 
@@ -343,5 +350,44 @@ mod tests {
     fn op_entry_data_none_for_delete() {
         let op = Op::RegisterDelete(RegisterDelete::new(signed_action(delete_data())).unwrap());
         assert!(op.entry_data().is_none());
+    }
+
+    #[test]
+    fn op_serde_roundtrip() {
+        let entry = crate::Entry::Agent(AgentPubKey::from_raw_36(vec![1u8; 36]));
+        let store_entry =
+            Op::StoreEntry(StoreEntry::new(signed_action(create_data()), entry).unwrap());
+        let store_record = Op::StoreRecord(StoreRecord {
+            record: Record::new(signed_action(create_data()), crate::record::RecordEntry::NA),
+        });
+        for op in [store_entry, store_record] {
+            let bytes = holochain_serialized_bytes::encode(&op).unwrap();
+            let decoded: Op = holochain_serialized_bytes::decode(&bytes).unwrap();
+            assert_eq!(decoded, op);
+        }
+    }
+
+    #[test]
+    fn op_accessors_work_through_store_record() {
+        let sah = signed_action(create_data());
+        let expected_hash = sah.as_hash().clone();
+        let record = Record::new(sah, crate::record::RecordEntry::NA);
+        let op = Op::StoreRecord(StoreRecord { record });
+        assert_eq!(op.action_hash(), &expected_hash);
+        assert_eq!(op.action_seq(), 1);
+    }
+
+    #[test]
+    fn op_entry_data_some_for_update() {
+        let update = ActionData::Update(crate::dht_v2::UpdateData {
+            original_action_address: ActionHash::from_raw_36(vec![10u8; 36]),
+            original_entry_address: EntryHash::from_raw_36(vec![11u8; 36]),
+            entry_type: EntryType::AgentPubKey,
+            entry_hash: EntryHash::from_raw_36(vec![12u8; 36]),
+        });
+        let op = Op::RegisterUpdate(RegisterUpdate::new(signed_action(update), None).unwrap());
+        let (entry_hash, entry_type) = op.entry_data().expect("update has entry data");
+        assert_eq!(entry_hash, &EntryHash::from_raw_36(vec![12u8; 36]));
+        assert_eq!(entry_type, &EntryType::AgentPubKey);
     }
 }
