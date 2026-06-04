@@ -141,6 +141,37 @@ impl DhtStore<DbRead<Dht>> {
         self.retrieve_record(hash, author).await
     }
 
+    /// The live `Record` for an entry: among the entry's valid, integrated,
+    /// undeleted `StoreEntry` creates (visible to `author`), prefer the one
+    /// authored by `author`, else the first by integration order. Returns
+    /// `None` if there are no live creates. `author = Some` includes that
+    /// agent's private entry.
+    pub async fn get_live_entry(
+        &self,
+        entry_hash: &holo_hash::EntryHash,
+        author: Option<&holo_hash::AgentPubKey>,
+    ) -> StateQueryResult<Option<holochain_zome_types::record::Record>> {
+        let creates = self.db().get_live_entry_creates(entry_hash, author).await?;
+        let chosen = match author {
+            Some(a) => {
+                let authored = creates
+                    .iter()
+                    .find(|sah| &sah.hashed.content.header.author == a)
+                    .cloned();
+                authored.or_else(|| creates.into_iter().next())
+            }
+            None => creates.into_iter().next(),
+        };
+        let Some(v2_sah) = chosen else {
+            return Ok(None);
+        };
+        let action = holochain_zome_types::dht_v2::to_legacy_signed_action(&v2_sah);
+        let entry = self.db().get_entry(entry_hash.clone(), author).await?;
+        Ok(Some(holochain_zome_types::record::Record::new(
+            action, entry,
+        )))
+    }
+
     /// Retrieve the signed action for `hash` if present, without CRUD
     /// resolution. Returns the legacy `SignedActionHashed` (converted from the
     /// stored v2 action).
