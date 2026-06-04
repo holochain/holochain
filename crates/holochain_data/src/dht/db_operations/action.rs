@@ -43,6 +43,32 @@ impl DbRead<Dht> {
         action::get_actions_by_prev_hash(self.pool(), prev_hash, exclude_hash).await
     }
 
+    /// The entry's `StoreEntry` create actions at `validation_status`.
+    pub async fn get_entry_creates(
+        &self,
+        entry_hash: &EntryHash,
+        author: Option<&AgentPubKey>,
+        validation_status: i64,
+    ) -> sqlx::Result<Vec<SignedActionHashed>> {
+        action::get_entry_creates(self.pool(), entry_hash, author, validation_status).await
+    }
+
+    /// The `Delete` actions on `entry_hash`.
+    pub async fn get_delete_actions_for_entry(
+        &self,
+        entry_hash: &EntryHash,
+    ) -> sqlx::Result<Vec<SignedActionHashed>> {
+        action::get_delete_actions_for_entry(self.pool(), entry_hash).await
+    }
+
+    /// The `Update` actions from `entry_hash`.
+    pub async fn get_update_actions_for_entry(
+        &self,
+        entry_hash: &EntryHash,
+    ) -> sqlx::Result<Vec<SignedActionHashed>> {
+        action::get_update_actions_for_entry(self.pool(), entry_hash).await
+    }
+
     /// Live `StoreEntry` create actions for `entry_hash` (valid, integrated,
     /// not deleted, visible to `author`), ordered by integration time.
     pub async fn get_live_entry_creates(

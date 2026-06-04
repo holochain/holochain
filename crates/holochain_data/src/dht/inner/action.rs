@@ -163,6 +163,81 @@ where
     rows.into_iter().map(row_to_signed_action_hashed).collect()
 }
 
+/// The entry's `StoreEntry` create actions at validation status
+/// `validation_status` (integrated, visible to `author`). Unlike
+/// `get_live_entry_creates`, this does NOT exclude deleted creates.
+pub(crate) async fn get_entry_creates<'e, E>(
+    executor: E,
+    entry_hash: &EntryHash,
+    author: Option<&AgentPubKey>,
+    validation_status: i64,
+) -> sqlx::Result<Vec<SignedActionHashed>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let rows: Vec<ActionRow> = sqlx::query_as(
+        "SELECT a.hash, a.author, a.seq, a.prev_hash, a.timestamp, a.action_type,
+                a.action_data, a.signature, a.entry_hash, a.private_entry, a.record_validity
+         FROM ChainOp c
+         JOIN Action a ON c.action_hash = a.hash
+         WHERE c.basis_hash = ?
+           AND c.op_type = ?
+           AND c.validation_status = ?
+           AND c.when_integrated IS NOT NULL
+           AND (a.private_entry = 0 OR a.private_entry IS NULL OR a.author = ?)
+         ORDER BY c.when_integrated",
+    )
+    .bind(entry_hash.get_raw_36())
+    .bind(i64::from(ChainOpType::StoreEntry))
+    .bind(validation_status)
+    .bind(author.map(|a| a.get_raw_36().to_vec()))
+    .fetch_all(executor)
+    .await?;
+    rows.into_iter().map(row_to_signed_action_hashed).collect()
+}
+
+/// The `Delete` actions on `entry_hash` (deletes whose `deletes_entry_hash` is the entry).
+pub(crate) async fn get_delete_actions_for_entry<'e, E>(
+    executor: E,
+    entry_hash: &EntryHash,
+) -> sqlx::Result<Vec<SignedActionHashed>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let rows: Vec<ActionRow> = sqlx::query_as(
+        "SELECT a.hash, a.author, a.seq, a.prev_hash, a.timestamp, a.action_type,
+                a.action_data, a.signature, a.entry_hash, a.private_entry, a.record_validity
+         FROM DeletedRecord d
+         JOIN Action a ON d.action_hash = a.hash
+         WHERE d.deletes_entry_hash = ?",
+    )
+    .bind(entry_hash.get_raw_36())
+    .fetch_all(executor)
+    .await?;
+    rows.into_iter().map(row_to_signed_action_hashed).collect()
+}
+
+/// The `Update` actions from `entry_hash` (updates whose `original_entry_hash` is the entry).
+pub(crate) async fn get_update_actions_for_entry<'e, E>(
+    executor: E,
+    entry_hash: &EntryHash,
+) -> sqlx::Result<Vec<SignedActionHashed>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let rows: Vec<ActionRow> = sqlx::query_as(
+        "SELECT a.hash, a.author, a.seq, a.prev_hash, a.timestamp, a.action_type,
+                a.action_data, a.signature, a.entry_hash, a.private_entry, a.record_validity
+         FROM UpdatedRecord u
+         JOIN Action a ON u.action_hash = a.hash
+         WHERE u.original_entry_hash = ?",
+    )
+    .bind(entry_hash.get_raw_36())
+    .fetch_all(executor)
+    .await?;
+    rows.into_iter().map(row_to_signed_action_hashed).collect()
+}
+
 /// The `Delete` actions that target `record_action_hash` (its CRUD deletes).
 pub(crate) async fn get_delete_actions_for_record<'e, E>(
     executor: E,
