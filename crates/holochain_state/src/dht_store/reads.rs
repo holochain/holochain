@@ -186,6 +186,60 @@ impl DhtStore<DbRead<Dht>> {
             .map(|v2| holochain_zome_types::dht_v2::to_legacy_signed_action(&v2)))
     }
 
+    /// Assemble the [`RecordDetails`] for `hash`: the record, its validation
+    /// status (from its integrated `StoreRecord` op), the deletes targeting it,
+    /// and the updates of it. Returns `None` if there is no integrated
+    /// `StoreRecord` op for `hash`. `author = Some` allows that agent's private
+    /// entry.
+    pub async fn get_record_details(
+        &self,
+        hash: &holo_hash::ActionHash,
+        author: Option<&holo_hash::AgentPubKey>,
+    ) -> StateQueryResult<Option<holochain_zome_types::metadata::RecordDetails>> {
+        use holochain_zome_types::op::ChainOpType;
+        let ops = self.db().get_chain_ops_for_action(hash.clone()).await?;
+        let Some(store_op) = ops
+            .iter()
+            .find(|r| ChainOpType::try_from(r.op_type) == Ok(ChainOpType::StoreRecord))
+        else {
+            return Ok(None);
+        };
+        let validation_status = match RecordValidity::try_from(store_op.validation_status) {
+            Ok(RecordValidity::Accepted) => holochain_zome_types::validate::ValidationStatus::Valid,
+            Ok(RecordValidity::Rejected) => {
+                holochain_zome_types::validate::ValidationStatus::Rejected
+            }
+            Err(v) => {
+                return Err(crate::query::StateQueryError::Other(format!(
+                    "invalid validation_status {v} on StoreRecord op for {hash:?}"
+                )))
+            }
+        };
+        let Some(record) = self.retrieve_record(hash, author).await? else {
+            return Ok(None);
+        };
+        let deletes = self
+            .db()
+            .get_delete_actions_for_record(hash)
+            .await?
+            .iter()
+            .map(holochain_zome_types::dht_v2::to_legacy_signed_action)
+            .collect();
+        let updates = self
+            .db()
+            .get_update_actions_for_record(hash)
+            .await?
+            .iter()
+            .map(holochain_zome_types::dht_v2::to_legacy_signed_action)
+            .collect();
+        Ok(Some(holochain_zome_types::metadata::RecordDetails {
+            record,
+            validation_status,
+            deletes,
+            updates,
+        }))
+    }
+
     /// Return chain ops that have passed system validation and are awaiting
     /// app validation. Warrants have no app-validation stage, so they are not
     /// included.
