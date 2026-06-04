@@ -172,6 +172,67 @@ impl DhtStore<DbRead<Dht>> {
         )))
     }
 
+    /// Assemble the [`EntryDetails`] for `entry_hash`: the entry, its valid
+    /// create actions, rejected create actions, the deletes on it, the updates
+    /// from it, and its Live/Dead status. Returns `None` if the entry is not
+    /// available. `author = Some` allows that agent's private entry.
+    pub async fn get_entry_details(
+        &self,
+        entry_hash: &holo_hash::EntryHash,
+        author: Option<&holo_hash::AgentPubKey>,
+    ) -> StateQueryResult<Option<holochain_zome_types::metadata::EntryDetails>> {
+        let Some(entry) = self.db().get_entry(entry_hash.clone(), author).await? else {
+            return Ok(None);
+        };
+        let to_legacy = holochain_zome_types::dht_v2::to_legacy_signed_action;
+        let actions = self
+            .db()
+            .get_entry_creates(entry_hash, author, i64::from(RecordValidity::Accepted))
+            .await?
+            .iter()
+            .map(to_legacy)
+            .collect();
+        let rejected_actions = self
+            .db()
+            .get_entry_creates(entry_hash, author, i64::from(RecordValidity::Rejected))
+            .await?
+            .iter()
+            .map(to_legacy)
+            .collect();
+        let deletes = self
+            .db()
+            .get_delete_actions_for_entry(entry_hash)
+            .await?
+            .iter()
+            .map(to_legacy)
+            .collect();
+        let updates = self
+            .db()
+            .get_update_actions_for_entry(entry_hash)
+            .await?
+            .iter()
+            .map(to_legacy)
+            .collect();
+        let entry_dht_status = if self
+            .db()
+            .get_live_entry_creates(entry_hash, author)
+            .await?
+            .is_empty()
+        {
+            holochain_zome_types::metadata::EntryDhtStatus::Dead
+        } else {
+            holochain_zome_types::metadata::EntryDhtStatus::Live
+        };
+        Ok(Some(holochain_zome_types::metadata::EntryDetails {
+            entry,
+            actions,
+            rejected_actions,
+            deletes,
+            updates,
+            entry_dht_status,
+        }))
+    }
+
     /// Retrieve the signed action for `hash` if present, without CRUD
     /// resolution. Returns the legacy `SignedActionHashed` (converted from the
     /// stored v2 action).

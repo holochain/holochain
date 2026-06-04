@@ -1308,6 +1308,108 @@ fn build_rendered_store_record_ops(
 }
 
 #[tokio::test]
+async fn get_entry_details_assembles_creates_deletes_updates_and_status() {
+    use holochain_data::dht::{InsertDeletedRecord, InsertUpdatedRecord};
+    use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
+    use holochain_types::prelude::RecordEntry;
+    use holochain_zome_types::action::{Delete, Update};
+    use holochain_zome_types::metadata::EntryDhtStatus;
+
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+    let (ops, action_hash, entry_hash) = build_rendered_store_entry(11);
+    store.cache_chain_ops(&ops).await.unwrap();
+
+    // Build a real Delete action so the Action FK is satisfied.
+    // Use RegisterDeletedEntryAction (entry-basis delete op).
+    let delete_action = Action::Delete(Delete {
+        author: AgentPubKey::from_raw_36(vec![221u8; 36]),
+        timestamp: Timestamp::from_micros(221_000),
+        action_seq: 2,
+        prev_action: holo_hash::ActionHash::from_raw_36(vec![222u8; 36]),
+        deletes_address: action_hash.clone(),
+        deletes_entry_address: entry_hash.clone(),
+        weight: Default::default(),
+    });
+    let delete_op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(
+        ChainOp::RegisterDeletedEntryAction(
+            Signature::from([221u8; 64]),
+            match delete_action.clone() {
+                Action::Delete(d) => d,
+                _ => unreachable!(),
+            },
+        ),
+    )));
+    let delete_action_hash = holo_hash::ActionHash::with_data_sync(&delete_action);
+    store.record_incoming_ops(vec![delete_op]).await.unwrap();
+
+    store
+        .db
+        .insert_deleted_record_index(InsertDeletedRecord {
+            action_hash: &delete_action_hash,
+            deletes_action_hash: &action_hash,
+            deletes_entry_hash: &entry_hash,
+        })
+        .await
+        .unwrap();
+
+    // Build a real Update action so the Action FK is satisfied.
+    // Use RegisterUpdatedContent (entry-basis update op).
+    let new_entry_hash = holo_hash::EntryHash::from_raw_36(vec![223u8; 36]);
+    let update_action = Action::Update(Update {
+        author: AgentPubKey::from_raw_36(vec![224u8; 36]),
+        timestamp: Timestamp::from_micros(224_000),
+        action_seq: 2,
+        prev_action: holo_hash::ActionHash::from_raw_36(vec![225u8; 36]),
+        original_action_address: action_hash.clone(),
+        original_entry_address: entry_hash.clone(),
+        entry_type: EntryType::App(AppEntryDef::new(
+            0.into(),
+            0.into(),
+            EntryVisibility::Public,
+        )),
+        entry_hash: new_entry_hash,
+        weight: Default::default(),
+    });
+    let update_op =
+        DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(ChainOp::RegisterUpdatedContent(
+            Signature::from([224u8; 64]),
+            match update_action.clone() {
+                Action::Update(u) => u,
+                _ => unreachable!(),
+            },
+            RecordEntry::NA,
+        ))));
+    let update_action_hash = holo_hash::ActionHash::with_data_sync(&update_action);
+    store.record_incoming_ops(vec![update_op]).await.unwrap();
+
+    store
+        .db
+        .insert_updated_record_index(InsertUpdatedRecord {
+            action_hash: &update_action_hash,
+            original_action_hash: &action_hash,
+            original_entry_hash: &entry_hash,
+        })
+        .await
+        .unwrap();
+
+    let details = store
+        .as_read()
+        .get_entry_details(&entry_hash, None)
+        .await
+        .unwrap()
+        .expect("entry details");
+    assert!(matches!(
+        details.entry,
+        holochain_types::prelude::Entry::App(_)
+    ));
+    assert_eq!(details.actions.len(), 1, "the create is still listed");
+    assert_eq!(details.rejected_actions.len(), 0);
+    assert_eq!(details.deletes.len(), 1);
+    assert_eq!(details.updates.len(), 1);
+    assert_eq!(details.entry_dht_status, EntryDhtStatus::Dead);
+}
+
+#[tokio::test]
 async fn get_record_details_assembles_record_deletes_and_updates() {
     use holochain_data::dht::{InsertDeletedRecord, InsertUpdatedRecord};
     use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
