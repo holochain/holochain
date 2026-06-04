@@ -163,6 +163,48 @@ where
     rows.into_iter().map(row_to_signed_action_hashed).collect()
 }
 
+/// The `Delete` actions that target `record_action_hash` (its CRUD deletes).
+pub(crate) async fn get_delete_actions_for_record<'e, E>(
+    executor: E,
+    record_action_hash: &ActionHash,
+) -> sqlx::Result<Vec<SignedActionHashed>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let rows: Vec<ActionRow> = sqlx::query_as(
+        "SELECT a.hash, a.author, a.seq, a.prev_hash, a.timestamp, a.action_type,
+                a.action_data, a.signature, a.entry_hash, a.private_entry, a.record_validity
+         FROM DeletedRecord d
+         JOIN Action a ON d.action_hash = a.hash
+         WHERE d.deletes_action_hash = ?",
+    )
+    .bind(record_action_hash.get_raw_36())
+    .fetch_all(executor)
+    .await?;
+    rows.into_iter().map(row_to_signed_action_hashed).collect()
+}
+
+/// The `Update` actions that update `record_action_hash` (its CRUD updates).
+pub(crate) async fn get_update_actions_for_record<'e, E>(
+    executor: E,
+    record_action_hash: &ActionHash,
+) -> sqlx::Result<Vec<SignedActionHashed>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let rows: Vec<ActionRow> = sqlx::query_as(
+        "SELECT a.hash, a.author, a.seq, a.prev_hash, a.timestamp, a.action_type,
+                a.action_data, a.signature, a.entry_hash, a.private_entry, a.record_validity
+         FROM UpdatedRecord u
+         JOIN Action a ON u.action_hash = a.hash
+         WHERE u.original_action_hash = ?",
+    )
+    .bind(record_action_hash.get_raw_36())
+    .fetch_all(executor)
+    .await?;
+    rows.into_iter().map(row_to_signed_action_hashed).collect()
+}
+
 /// Return actions whose `prev_hash = :prev_hash` and `hash != :exclude_hash`.
 /// Used by the sys-validation workflow to detect chain forks.
 pub(crate) async fn get_actions_by_prev_hash<'e, E>(

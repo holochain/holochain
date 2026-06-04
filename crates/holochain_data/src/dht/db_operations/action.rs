@@ -52,4 +52,20 @@ impl DbRead<Dht> {
     ) -> sqlx::Result<Vec<SignedActionHashed>> {
         action::get_live_entry_creates(self.pool(), entry_hash, author).await
     }
+
+    /// The `Delete` actions targeting `record_action_hash`.
+    pub async fn get_delete_actions_for_record(
+        &self,
+        record_action_hash: &ActionHash,
+    ) -> sqlx::Result<Vec<SignedActionHashed>> {
+        action::get_delete_actions_for_record(self.pool(), record_action_hash).await
+    }
+
+    /// The `Update` actions that update `record_action_hash`.
+    pub async fn get_update_actions_for_record(
+        &self,
+        record_action_hash: &ActionHash,
+    ) -> sqlx::Result<Vec<SignedActionHashed>> {
+        action::get_update_actions_for_record(self.pool(), record_action_hash).await
+    }
 }
