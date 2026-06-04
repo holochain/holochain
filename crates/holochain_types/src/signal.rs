@@ -57,3 +57,6 @@ impl_from! {
 
 /// The maximum size that Holochain will permit sending or receiving in a single direct signal.
 pub const DIRECT_SIGNAL_MAX_SIZE: usize = 1024 * 1024;
+
+#[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
+pub struct DirectSignal(pub Vec<u8>);

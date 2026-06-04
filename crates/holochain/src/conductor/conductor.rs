@@ -2799,13 +2799,15 @@ mod misc_impls {
                 return Err(ConductorError::Other(format!("Attempted to send to DNA hash {dna_hash:?} but it was not found in app {installed_app_id}").into()));
             }
 
+            let signal_bytes = holochain_serialized_bytes::encode(&DirectSignal(signal))?;
+
             let sig = self
                 .keystore()
-                .sign(app_info.agent_pub_key.clone(), signal.clone().into())
+                .sign(app_info.agent_pub_key.clone(), signal_bytes.clone().into())
                 .await?;
 
             self.holochain_p2p()
-                .send_remote_signal_direct(dna_hash, agents, signal, app_info.agent_pub_key, sig)
+                .send_remote_signal_direct(dna_hash, agents, signal_bytes, app_info.agent_pub_key, sig)
                 .await?;
 
             Ok(())

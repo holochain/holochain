@@ -505,7 +505,8 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
         signature: Signature,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
-            if signal.len() > DIRECT_SIGNAL_MAX_SIZE {
+            // Add 3 to allow for msgpack overhead for an "array 16"
+            if signal.len() > DIRECT_SIGNAL_MAX_SIZE + 3 {
                 let signal_length = signal.len();
                 warn!("Received signal payload that is {signal_length:?} > 1024**2");
                 return Err(HolochainP2pError::other(
@@ -513,11 +514,10 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
                 ));
             }
 
-            #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-            struct Signed(Vec<u8>);
+            let signal: DirectSignal = decode(&signal).map_err(HolochainP2pError::other)?;
 
             let valid_sig = from_agent
-                .verify_signature(&signature, Signed(signal.clone()))
+                .verify_signature(&signature, &signal)
                 .await
                 .map_err(HolochainP2pError::other)?;
             if !valid_sig {
@@ -529,7 +529,7 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
 
             if let Err(e) = self.signal_tx.send(Signal::AppDirect {
                 cell_id: CellId::new(dna_hash, to_agent),
-                signal,
+                signal: signal.0,
             }) {
                 info!(?e, "Failed to relay direct signal to app")
             }
