@@ -1,9 +1,9 @@
 use super::*;
-use holo_hash::DnaHash;
+use holo_hash::{ActionHash, AnyLinkableHash, DnaHash};
 use holochain_types::dht_op::RenderedOp;
 use holochain_types::dht_op::RenderedOps;
 use holochain_types::prelude::Signature;
-use holochain_zome_types::action::{Action, Create, EntryType};
+use holochain_zome_types::action::{Action, Create, CreateLink, DeleteLink, EntryType};
 use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::op::ChainOpType;
 use holochain_zome_types::prelude::AppEntryDef;
@@ -1505,4 +1505,114 @@ async fn get_record_details_assembles_record_deletes_and_updates() {
     assert_eq!(details.deletes[0].as_hash(), &delete_action_hash);
     assert_eq!(details.updates.len(), 1);
     assert_eq!(details.updates[0].as_hash(), &update_action_hash);
+}
+
+/// Build a single-op `RenderedOps` for a `RegisterAddLink(CreateLink)` chain
+/// op.  Returns `(RenderedOps, base_address, create_link_action_hash)` so
+/// callers can query by base and assert on the returned link hash.
+///
+/// The fixture mirrors `cache.rs`'s `build_rendered_create_link` but exposes
+/// the base and the create-link action hash.
+fn build_rendered_create_link_with_meta(seed: u8) -> (RenderedOps, AnyLinkableHash, ActionHash) {
+    let author = AgentPubKey::from_raw_36(vec![seed; 36]);
+    let base = AnyLinkableHash::from_raw_36_and_type(
+        vec![seed.wrapping_add(50); 36],
+        holo_hash::hash_type::AnyLinkable::Entry,
+    );
+    let target = AnyLinkableHash::from_raw_36_and_type(
+        vec![seed.wrapping_add(60); 36],
+        holo_hash::hash_type::AnyLinkable::Entry,
+    );
+    let sig = Signature::from([seed; 64]);
+    let action = Action::CreateLink(CreateLink {
+        author,
+        timestamp: Timestamp::from_micros(seed as i64 * 1000),
+        action_seq: 2,
+        prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(70); 36]),
+        base_address: base.clone(),
+        target_address: target,
+        zome_index: 0.into(),
+        link_type: 0.into(),
+        tag: holochain_zome_types::link::LinkTag(vec![1, 2, 3]),
+        weight: Default::default(),
+    });
+
+    let rendered =
+        RenderedOp::new(action, sig, None, ChainOpType::RegisterAddLink).expect("rendered op");
+    let create_link_hash = rendered.action.as_hash().clone();
+    let ops = RenderedOps {
+        entry: None,
+        ops: vec![rendered],
+        warrant: None,
+    };
+    (ops, base, create_link_hash)
+}
+
+/// Build a single-op `RenderedOps` for a `RegisterRemoveLink(DeleteLink)` chain
+/// op that tombstones the given `create_link_hash` on `base`.
+fn build_rendered_delete_link_for(
+    create_link_hash: ActionHash,
+    base: &AnyLinkableHash,
+    seed: u8,
+) -> RenderedOps {
+    let author = AgentPubKey::from_raw_36(vec![seed.wrapping_add(1); 36]);
+    let sig = Signature::from([seed.wrapping_add(1); 64]);
+    let action = Action::DeleteLink(DeleteLink {
+        author,
+        timestamp: Timestamp::from_micros(seed as i64 * 1000 + 500),
+        action_seq: 3,
+        prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(90); 36]),
+        base_address: base.clone(),
+        link_add_address: create_link_hash,
+    });
+    let rendered =
+        RenderedOp::new(action, sig, None, ChainOpType::RegisterRemoveLink).expect("rendered op");
+    RenderedOps {
+        entry: None,
+        ops: vec![rendered],
+        warrant: None,
+    }
+}
+
+#[tokio::test]
+async fn get_links_returns_live_links_and_excludes_tombstoned() {
+    use crate::query::link::GetLinksFilter;
+    use holochain_zome_types::prelude::LinkTypeFilter;
+
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+    let (create_ops, base, create_link_hash) = build_rendered_create_link_with_meta(20);
+    store.cache_chain_ops(&create_ops).await.unwrap();
+
+    let filter = GetLinksFilter {
+        after: None,
+        before: None,
+        author: None,
+    };
+    let links = store
+        .as_read()
+        .get_links(
+            &base,
+            &LinkTypeFilter::Dependencies(vec![0.into()]),
+            None,
+            &filter,
+        )
+        .await
+        .unwrap();
+    assert_eq!(links.len(), 1);
+    assert_eq!(links[0].create_link_hash, create_link_hash);
+
+    let delete_ops = build_rendered_delete_link_for(create_link_hash.clone(), &base, 20);
+    store.cache_chain_ops(&delete_ops).await.unwrap();
+
+    let links_after = store
+        .as_read()
+        .get_links(
+            &base,
+            &LinkTypeFilter::Dependencies(vec![0.into()]),
+            None,
+            &filter,
+        )
+        .await
+        .unwrap();
+    assert_eq!(links_after.len(), 0, "tombstoned link must be excluded");
 }

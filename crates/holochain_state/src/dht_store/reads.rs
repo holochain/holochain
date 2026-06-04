@@ -301,6 +301,64 @@ impl DhtStore<DbRead<Dht>> {
         }))
     }
 
+    /// The live links on `base` (CreateLink minus DeleteLink tombstones),
+    /// filtered by link type, tag prefix, author, and time. Builds each
+    /// [`holochain_zome_types::link::Link`] from its `CreateLink` action.
+    ///
+    /// Time bounds mirror the legacy `LinksQuery`: `after` is inclusive
+    /// (`timestamp >= after`) and `before` is inclusive (`timestamp <= before`).
+    pub async fn get_links(
+        &self,
+        base: &holo_hash::AnyLinkableHash,
+        type_query: &holochain_zome_types::prelude::LinkTypeFilter,
+        tag: Option<&holochain_zome_types::prelude::LinkTag>,
+        filter: &crate::query::link::GetLinksFilter,
+    ) -> StateQueryResult<Vec<holochain_zome_types::link::Link>> {
+        let actions = self.db().get_live_link_actions(base).await?;
+        let mut links = Vec::with_capacity(actions.len());
+        for sah in actions {
+            let header = &sah.hashed.content.header;
+            let holochain_zome_types::dht_v2::ActionData::CreateLink(d) = &sah.hashed.content.data
+            else {
+                continue;
+            };
+            if !type_query.contains(&d.zome_index, &d.link_type) {
+                continue;
+            }
+            if let Some(t) = tag {
+                if !d.tag.0.starts_with(&t.0) {
+                    continue;
+                }
+            }
+            if let Some(author) = &filter.author {
+                if &header.author != author {
+                    continue;
+                }
+            }
+            if let Some(before) = filter.before {
+                if header.timestamp > before {
+                    continue;
+                }
+            }
+            if let Some(after) = filter.after {
+                if header.timestamp < after {
+                    continue;
+                }
+            }
+            links.push(holochain_zome_types::link::Link {
+                author: header.author.clone(),
+                base: d.base_address.clone(),
+                target: d.target_address.clone(),
+                timestamp: header.timestamp,
+                zome_index: d.zome_index,
+                link_type: d.link_type,
+                tag: d.tag.clone(),
+                create_link_hash: sah.as_hash().clone(),
+            });
+        }
+        Ok(links)
+    }
+
     /// Return chain ops that have passed system validation and are awaiting
     /// app validation. Warrants have no app-validation stage, so they are not
     /// included.
