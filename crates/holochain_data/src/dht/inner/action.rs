@@ -1,12 +1,13 @@
 //! Free-standing operations against the `Action` table.
 
 use crate::models::dht::ActionRow;
-use holo_hash::{ActionHash, AgentPubKey, HoloHashed};
+use holo_hash::{ActionHash, AgentPubKey, EntryHash, HoloHashed};
 use holochain_integrity_types::dht_v2::{Action, ActionData, ActionHeader, RecordValidity};
 use holochain_integrity_types::entry_def::EntryVisibility;
 use holochain_integrity_types::record::SignedHashed;
 use holochain_integrity_types::signature::Signature;
 use holochain_zome_types::dht_v2::SignedActionHashed;
+use holochain_zome_types::op::ChainOpType;
 use sqlx::{Executor, Sqlite};
 
 /// Insert an `Action` row. `record_validity` is `Some(Accepted)` for
@@ -123,6 +124,40 @@ where
          FROM Action WHERE author = ? ORDER BY seq ASC",
     )
     .bind(author.get_raw_36())
+    .fetch_all(executor)
+    .await?;
+    rows.into_iter().map(row_to_signed_action_hashed).collect()
+}
+
+/// Return the live `StoreEntry` create actions for `entry_hash`: valid,
+/// integrated `StoreEntry` ops on that basis whose action has no `DeletedRecord`,
+/// and whose entry is visible to `author` (public, or private and authored by
+/// `author`). Ordered by integration time.
+pub(crate) async fn get_live_entry_creates<'e, E>(
+    executor: E,
+    entry_hash: &EntryHash,
+    author: Option<&AgentPubKey>,
+) -> sqlx::Result<Vec<SignedActionHashed>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let rows: Vec<ActionRow> = sqlx::query_as(
+        "SELECT a.hash, a.author, a.seq, a.prev_hash, a.timestamp, a.action_type,
+                a.action_data, a.signature, a.entry_hash, a.private_entry, a.record_validity
+         FROM ChainOp c
+         JOIN Action a ON c.action_hash = a.hash
+         WHERE c.basis_hash = ?
+           AND c.op_type = ?
+           AND c.validation_status = ?
+           AND c.when_integrated IS NOT NULL
+           AND NOT EXISTS (SELECT 1 FROM DeletedRecord d WHERE d.deletes_action_hash = a.hash)
+           AND (a.private_entry = 0 OR a.private_entry IS NULL OR a.author = ?)
+         ORDER BY c.when_integrated",
+    )
+    .bind(entry_hash.get_raw_36())
+    .bind(i64::from(ChainOpType::StoreEntry))
+    .bind(i64::from(RecordValidity::Accepted))
+    .bind(author.map(|a| a.get_raw_36().to_vec()))
     .fetch_all(executor)
     .await?;
     rows.into_iter().map(row_to_signed_action_hashed).collect()
