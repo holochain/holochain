@@ -120,9 +120,13 @@ async fn direct_signal_to_another_conductor() {
     holochain_trace::test_run();
 
     let mut conductors =
-        SweetConductorBatch::from_config_rendezvous(2, SweetConductorConfig::rendezvous(true)).await;
+        SweetConductorBatch::from_config_rendezvous(2, SweetConductorConfig::rendezvous(true))
+            .await;
     let dna = SweetDnaFile::unique_empty().await;
-    let app_batch = conductors.setup_app("app", &[dna.clone()]).await.unwrap();
+    let app_batch = conductors
+        .setup_app("app", std::slice::from_ref(&dna))
+        .await
+        .unwrap();
     let ((alice,), (bob,)): ((SweetCell,), (SweetCell,)) = app_batch.into_tuples();
 
     let dna_hash = dna.dna_hash().clone();
@@ -167,8 +171,14 @@ async fn direct_signal_to_agent_on_same_conductor() {
     let mut conductor = SweetConductor::standard().await;
     let dna = SweetDnaFile::unique_empty().await;
 
-    let _alice_app = conductor.setup_app("alice-app", &[dna.clone()]).await.unwrap();
-    let bob_app = conductor.setup_app("bob-app", &[dna.clone()]).await.unwrap();
+    let _alice_app = conductor
+        .setup_app("alice-app", std::slice::from_ref(&dna))
+        .await
+        .unwrap();
+    let bob_app = conductor
+        .setup_app("bob-app", std::slice::from_ref(&dna))
+        .await
+        .unwrap();
 
     let dna_hash = dna.dna_hash().clone();
     let bob_agent = bob_app.agent().clone();
@@ -203,9 +213,13 @@ async fn direct_signal_to_multiple_agents() {
     holochain_trace::test_run();
 
     let mut conductors =
-        SweetConductorBatch::from_config_rendezvous(3, SweetConductorConfig::rendezvous(true)).await;
+        SweetConductorBatch::from_config_rendezvous(3, SweetConductorConfig::rendezvous(true))
+            .await;
     let dna = SweetDnaFile::unique_empty().await;
-    let app_batch = conductors.setup_app("app", &[dna.clone()]).await.unwrap();
+    let app_batch = conductors
+        .setup_app("app", std::slice::from_ref(&dna))
+        .await
+        .unwrap();
     let ((alice,), (bob,), (carol,)): ((SweetCell,), (SweetCell,), (SweetCell,)) =
         app_batch.into_tuples();
 
@@ -256,7 +270,10 @@ async fn direct_signal_to_unknown_agent_is_dropped() {
 
     let mut conductor = SweetConductor::standard().await;
     let dna = SweetDnaFile::unique_empty().await;
-    let _app = conductor.setup_app("app", &[dna.clone()]).await.unwrap();
+    let _app = conductor
+        .setup_app("app", std::slice::from_ref(&dna))
+        .await
+        .unwrap();
     let dna_hash = dna.dna_hash().clone();
 
     // One socket to send on (its receiver is drained for responses)...
@@ -269,8 +286,13 @@ async fn direct_signal_to_unknown_agent_is_dropped() {
     // A made-up agent key that has no known URL in the peer store.
     let unknown_agent = AgentPubKey::from_raw_36(vec![0; 36]);
 
-    let response =
-        send_direct_signal(&alice_tx, dna_hash, vec![unknown_agent], b"nobody home".to_vec()).await;
+    let response = send_direct_signal(
+        &alice_tx,
+        dna_hash,
+        vec![unknown_agent],
+        b"nobody home".to_vec(),
+    )
+    .await;
     // Sending to an agent with no known URL is a best-effort no-op, not an error.
     assert!(
         matches!(response, AppResponse::Ok),
@@ -293,7 +315,10 @@ async fn direct_signal_with_no_agents_is_rejected() {
 
     let mut conductor = SweetConductor::standard().await;
     let dna = SweetDnaFile::unique_empty().await;
-    let _app = conductor.setup_app("app", &[dna.clone()]).await.unwrap();
+    let _app = conductor
+        .setup_app("app", std::slice::from_ref(&dna))
+        .await
+        .unwrap();
     let dna_hash = dna.dna_hash().clone();
 
     let (tx, rx) = connect_app_ws(&conductor, "app").await;
@@ -309,7 +334,10 @@ async fn direct_signal_over_max_size_is_rejected() {
 
     let mut conductor = SweetConductor::standard().await;
     let dna = SweetDnaFile::unique_empty().await;
-    let app = conductor.setup_app("app", &[dna.clone()]).await.unwrap();
+    let app = conductor
+        .setup_app("app", std::slice::from_ref(&dna))
+        .await
+        .unwrap();
     let agent = app.agent().clone();
     let dna_hash = dna.dna_hash().clone();
 
@@ -327,7 +355,10 @@ async fn direct_signal_to_dna_not_in_app_is_rejected() {
 
     let mut conductor = SweetConductor::standard().await;
     let dna = SweetDnaFile::unique_empty().await;
-    let app = conductor.setup_app("app", &[dna.clone()]).await.unwrap();
+    let app = conductor
+        .setup_app("app", std::slice::from_ref(&dna))
+        .await
+        .unwrap();
     let agent = app.agent().clone();
 
     // A DNA that the app does not contain.

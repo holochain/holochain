@@ -2807,7 +2807,13 @@ mod misc_impls {
                 .await?;
 
             self.holochain_p2p()
-                .send_remote_signal_direct(dna_hash, agents, signal_bytes, app_info.agent_pub_key, sig)
+                .send_remote_signal_direct(
+                    dna_hash,
+                    agents,
+                    signal_bytes,
+                    app_info.agent_pub_key,
+                    sig,
+                )
                 .await?;
 
             Ok(())
