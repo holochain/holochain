@@ -1,6 +1,8 @@
 //! Tests for local and remote signals using rendezvous config
 //!
 
+mod direct;
+
 use hdk::prelude::ExternIO;
 use holochain::sweettest::*;
 use holochain_types::prelude::*;
