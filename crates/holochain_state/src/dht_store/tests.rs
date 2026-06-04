@@ -1093,3 +1093,67 @@ async fn retrieve_record_returns_action_with_entry() {
         .unwrap()
         .is_none());
 }
+
+#[tokio::test]
+async fn get_live_record_returns_undeleted_record() {
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+    let (op, action_hash, _entry_hash) = store_record_op_with_hashes(4);
+    store.record_incoming_ops(vec![op]).await.unwrap();
+
+    let record = store
+        .as_read()
+        .get_live_record(&action_hash, None)
+        .await
+        .unwrap()
+        .expect("undeleted record should be live");
+    assert_eq!(record.action_address(), &action_hash);
+}
+
+#[tokio::test]
+async fn get_live_record_returns_none_when_deleted() {
+    use holochain_data::dht::InsertDeletedRecord;
+    use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
+    use holochain_zome_types::action::Delete;
+
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+    let (op, action_hash, entry_hash) = store_record_op_with_hashes(5);
+    store.record_incoming_ops(vec![op]).await.unwrap();
+
+    // Build and insert a Delete action so the Action FK is satisfied.
+    let delete_action = Action::Delete(Delete {
+        author: AgentPubKey::from_raw_36(vec![205u8; 36]),
+        timestamp: holochain_types::prelude::Timestamp::from_micros(205_000),
+        action_seq: 2,
+        prev_action: holo_hash::ActionHash::from_raw_36(vec![206u8; 36]),
+        deletes_address: action_hash.clone(),
+        deletes_entry_address: entry_hash.clone(),
+        weight: Default::default(),
+    });
+    let delete_op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(
+        ChainOp::RegisterDeletedBy(Signature::from([205u8; 64]), {
+            match delete_action.clone() {
+                Action::Delete(d) => d,
+                _ => unreachable!(),
+            }
+        }),
+    )));
+    let delete_action_hash = holo_hash::ActionHash::with_data_sync(&delete_action);
+    store.record_incoming_ops(vec![delete_op]).await.unwrap();
+
+    store
+        .db
+        .insert_deleted_record_index(InsertDeletedRecord {
+            action_hash: &delete_action_hash,
+            deletes_action_hash: &action_hash,
+            deletes_entry_hash: &entry_hash,
+        })
+        .await
+        .unwrap();
+
+    assert!(store
+        .as_read()
+        .get_live_record(&action_hash, None)
+        .await
+        .unwrap()
+        .is_none());
+}

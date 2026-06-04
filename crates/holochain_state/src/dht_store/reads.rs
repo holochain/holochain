@@ -120,6 +120,27 @@ impl DhtStore<DbRead<Dht>> {
         )))
     }
 
+    /// Retrieve the record for `hash` only if it is still live — i.e. its
+    /// action exists and no integrated `Delete` targets it. Returns `None` if
+    /// the action is absent, deleted, or (per `retrieve_record`) references an
+    /// entry that is unavailable. `author = Some` allows that agent's private
+    /// entry.
+    pub async fn get_live_record(
+        &self,
+        hash: &holo_hash::ActionHash,
+        author: Option<&holo_hash::AgentPubKey>,
+    ) -> StateQueryResult<Option<holochain_zome_types::record::Record>> {
+        if !self
+            .db()
+            .get_deleted_records(hash.clone())
+            .await?
+            .is_empty()
+        {
+            return Ok(None);
+        }
+        self.retrieve_record(hash, author).await
+    }
+
     /// Retrieve the signed action for `hash` if present, without CRUD
     /// resolution. Returns the legacy `SignedActionHashed` (converted from the
     /// stored v2 action).
