@@ -1,7 +1,7 @@
 //! Free-standing operations against the `Action` table.
 
 use crate::models::dht::ActionRow;
-use holo_hash::{ActionHash, AgentPubKey, EntryHash, HoloHashed};
+use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, EntryHash, HoloHashed};
 use holochain_integrity_types::dht_v2::{Action, ActionData, ActionHeader, RecordValidity};
 use holochain_integrity_types::entry_def::EntryVisibility;
 use holochain_integrity_types::record::SignedHashed;
@@ -275,6 +275,30 @@ where
          WHERE u.original_action_hash = ?",
     )
     .bind(record_action_hash.get_raw_36())
+    .fetch_all(executor)
+    .await?;
+    rows.into_iter().map(row_to_signed_action_hashed).collect()
+}
+
+/// The live `CreateLink` actions on `base` — link-index rows for the base whose
+/// create has no `DeletedLink` tombstone. Returns the full `CreateLink` actions
+/// so callers can build `Link`s and filter by type/tag/author/time.
+pub(crate) async fn get_live_link_actions<'e, E>(
+    executor: E,
+    base: &AnyLinkableHash,
+) -> sqlx::Result<Vec<SignedActionHashed>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let rows: Vec<ActionRow> = sqlx::query_as(
+        "SELECT a.hash, a.author, a.seq, a.prev_hash, a.timestamp, a.action_type,
+                a.action_data, a.signature, a.entry_hash, a.private_entry, a.record_validity
+         FROM Link l
+         JOIN Action a ON l.action_hash = a.hash
+         WHERE l.base_hash = ?
+           AND NOT EXISTS (SELECT 1 FROM DeletedLink d WHERE d.create_link_hash = l.action_hash)",
+    )
+    .bind(base.get_raw_36())
     .fetch_all(executor)
     .await?;
     rows.into_iter().map(row_to_signed_action_hashed).collect()

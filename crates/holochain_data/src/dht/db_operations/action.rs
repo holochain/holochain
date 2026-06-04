@@ -3,7 +3,7 @@
 use super::super::inner::action;
 use crate::handles::{DbRead, DbWrite};
 use crate::kind::Dht;
-use holo_hash::{ActionHash, AgentPubKey, EntryHash};
+use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, EntryHash};
 use holochain_integrity_types::dht_v2::RecordValidity;
 use holochain_zome_types::dht_v2::SignedActionHashed;
 
@@ -93,5 +93,13 @@ impl DbRead<Dht> {
         record_action_hash: &ActionHash,
     ) -> sqlx::Result<Vec<SignedActionHashed>> {
         action::get_update_actions_for_record(self.pool(), record_action_hash).await
+    }
+
+    /// The live `CreateLink` actions on `base` (excluding tombstoned links).
+    pub async fn get_live_link_actions(
+        &self,
+        base: &AnyLinkableHash,
+    ) -> sqlx::Result<Vec<SignedActionHashed>> {
+        action::get_live_link_actions(self.pool(), base).await
     }
 }
