@@ -340,6 +340,69 @@ The exact method signatures mirror what `holochain_cascade`'s `get_*`/`retrieve_
 and `authority::handle_*` consume today (legacy return types) and are pinned in
 the 1a implementation plan.
 
+### 1a agent activity — `get_agent_activity` + `must_get_agent_activity`
+
+Agent activity is the highest-risk 1a read, so its design is pinned here. It
+splits into two **store-only** DhtStore reads (no scratch — the scratch overlay,
+network fallback and cross-source merge are deferred to 1c per the requester-only
+invariant):
+
+- **1a-viii — `get_agent_activity`** (the authority "summary" read).
+- **1a-ix — `must_get_agent_activity`** (the validation "completeness" read,
+  dht-only core).
+
+Both are designed here; **1a-viii is executed first**, then 1a-ix.
+
+**What the reads compute.** Today the work is split across
+`holochain_cascade::authority::get_agent_activity_query` (`hashes.rs`,
+`records.rs`, the shared `State`/`fold`/`render`, `compute_chain_status`,
+`compute_highest_observed`) and the `must_get_agent_activity` module. The only
+DB work is a scan of the author's `RegisterAgentActivity` ops ordered by seq;
+**everything else is pure in-memory**: classify each op into
+valid (integrated + `Accepted`) / rejected (integrated + `Rejected`) / pending
+(not integrated); detect a fork (two actions at the same seq); compute the
+`ChainStatus` (`Valid`/`Invalid`/`Forked`/`Empty`) and `HighestObserved`; apply
+the `ChainQueryFilter`; emit `ChainItems::Full`/`Hashes`. Warrants are fetched
+**separately** and attached (the `Warrant` arm of the legacy row-mapper is dead
+code — `WHERE DhtOp.type = RegisterAgentActivity` excludes them). The two legacy
+`Query` structs differ only in whether they fetch the entry.
+
+**SQL-vs-Rust boundary.** `holochain_data` does only the scans (trivial SQL: one
+author, one op type, `ORDER BY seq`). The pure assembly functions
+(`fold`/`render`/`compute_chain_status`/`compute_highest_observed`/
+`ChainItemsSource`, and the `must_get` pure helpers `exclude_forked_activity`/
+`apply_timestamp_filter`/`check_agent_activity_completeness`/
+`collect_canonical_chain_hashes`) **move from `holochain_cascade` into
+`holochain_state`** — they are pure and depend only on types.
+
+**1a-viii — `get_agent_activity`:**
+- `holochain_data`: one **rich activity-scan** primitive returning, per
+  `RegisterAgentActivity` op, the v2 action + `validation_status` (NULL = pending)
+  + integration flag, with a `LEFT JOIN Entry` parameterized by an
+  `include_entries` flag (one query, no N+1, mirroring legacy `records.rs`); plus
+  a `get_warrants_for_agent(warrantee, check_validity)` primitive.
+- `holochain_state`: a single `DhtStore::get_agent_activity(author, filter,
+  options)` that branches `Full`/`Hashes` on `options.include_full_records`
+  (replacing the two legacy `Query` structs), runs the pure assembly, attaches
+  v2→legacy warrants when `options.include_warrants`, and returns legacy
+  `AgentActivityResponse` (legacy `Record`/`ActionHash`; `ActionHash` is the
+  preserved legacy hash).
+- No authority validity-guard is needed (unlike links): the scan reads
+  `DhtChainOp` + `Action` with `validation_status`/integration, not a
+  cache-populated index.
+
+**1a-ix — `must_get_agent_activity` (dht-only core):**
+- `holochain_data`: a `get_filtered_agent_activity` primitive porting the legacy
+  `MUST_GET_AGENT_ACTIVITY` query (author + `chain_top` seq bound + optional
+  `until` seq lower-bound), returning v2 actions.
+- `holochain_state`: `DhtStore::must_get_agent_activity(author, ChainFilter)`
+  resolving the `chain_top` to its seq, running the scan, then the pure
+  `exclude_forked_activity` → `apply_timestamp_filter` →
+  `check_agent_activity_completeness` pipeline, returning
+  `MustGetAgentActivityResponse` (the dht-only result; entries stay `None` as
+  today). The scratch overlay, network fallback and `merge_*` orchestration
+  remain in `holochain_cascade` for 1c.
+
 ### Explicitly out of scope for Phase 1
 
 - The non-cascade internal DHT-read consumers (sys/app-validation queues,
