@@ -304,6 +304,48 @@ where
     rows.into_iter().map(row_to_signed_action_hashed).collect()
 }
 
+/// All `CreateLink` actions on `base` (live AND tombstoned), for link details.
+pub(crate) async fn get_link_create_actions<'e, E>(
+    executor: E,
+    base: &AnyLinkableHash,
+) -> sqlx::Result<Vec<SignedActionHashed>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let rows: Vec<ActionRow> = sqlx::query_as(
+        "SELECT a.hash, a.author, a.seq, a.prev_hash, a.timestamp, a.action_type,
+                a.action_data, a.signature, a.entry_hash, a.private_entry, a.record_validity
+         FROM Link l
+         JOIN Action a ON l.action_hash = a.hash
+         WHERE l.base_hash = ?",
+    )
+    .bind(base.get_raw_36())
+    .fetch_all(executor)
+    .await?;
+    rows.into_iter().map(row_to_signed_action_hashed).collect()
+}
+
+/// The `DeleteLink` actions that tombstone `create_link_hash`.
+pub(crate) async fn get_delete_link_actions<'e, E>(
+    executor: E,
+    create_link_hash: &ActionHash,
+) -> sqlx::Result<Vec<SignedActionHashed>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let rows: Vec<ActionRow> = sqlx::query_as(
+        "SELECT a.hash, a.author, a.seq, a.prev_hash, a.timestamp, a.action_type,
+                a.action_data, a.signature, a.entry_hash, a.private_entry, a.record_validity
+         FROM DeletedLink d
+         JOIN Action a ON d.action_hash = a.hash
+         WHERE d.create_link_hash = ?",
+    )
+    .bind(create_link_hash.get_raw_36())
+    .fetch_all(executor)
+    .await?;
+    rows.into_iter().map(row_to_signed_action_hashed).collect()
+}
+
 /// Return actions whose `prev_hash = :prev_hash` and `hash != :exclude_hash`.
 /// Used by the sys-validation workflow to detect chain forks.
 pub(crate) async fn get_actions_by_prev_hash<'e, E>(

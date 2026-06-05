@@ -102,4 +102,20 @@ impl DbRead<Dht> {
     ) -> sqlx::Result<Vec<SignedActionHashed>> {
         action::get_live_link_actions(self.pool(), base).await
     }
+
+    /// All `CreateLink` actions on `base` (live and tombstoned).
+    pub async fn get_link_create_actions(
+        &self,
+        base: &AnyLinkableHash,
+    ) -> sqlx::Result<Vec<SignedActionHashed>> {
+        action::get_link_create_actions(self.pool(), base).await
+    }
+
+    /// The `DeleteLink` actions tombstoning `create_link_hash`.
+    pub async fn get_delete_link_actions(
+        &self,
+        create_link_hash: &ActionHash,
+    ) -> sqlx::Result<Vec<SignedActionHashed>> {
+        action::get_delete_link_actions(self.pool(), create_link_hash).await
+    }
 }
