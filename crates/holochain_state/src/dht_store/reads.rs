@@ -301,6 +301,51 @@ impl DhtStore<DbRead<Dht>> {
         }))
     }
 
+    /// For `base`, every `CreateLink` (live and tombstoned) matching
+    /// `type_query`/`tag`, paired with its `DeleteLink`s. Returned as legacy
+    /// `SignedActionHashed`s.
+    pub async fn get_link_details(
+        &self,
+        base: &holo_hash::AnyLinkableHash,
+        type_query: &holochain_zome_types::prelude::LinkTypeFilter,
+        tag: Option<&holochain_zome_types::prelude::LinkTag>,
+    ) -> StateQueryResult<
+        Vec<(
+            holochain_zome_types::record::SignedActionHashed,
+            Vec<holochain_zome_types::record::SignedActionHashed>,
+        )>,
+    > {
+        let creates = self.db().get_link_create_actions(base).await?;
+        let mut out = Vec::with_capacity(creates.len());
+        for create in creates {
+            let holochain_zome_types::dht_v2::ActionData::CreateLink(d) =
+                &create.hashed.content.data
+            else {
+                continue;
+            };
+            if !type_query.contains(&d.zome_index, &d.link_type) {
+                continue;
+            }
+            if let Some(t) = tag {
+                if !d.tag.0.starts_with(&t.0) {
+                    continue;
+                }
+            }
+            let deletes = self
+                .db()
+                .get_delete_link_actions(create.as_hash())
+                .await?
+                .iter()
+                .map(holochain_zome_types::dht_v2::to_legacy_signed_action)
+                .collect();
+            out.push((
+                holochain_zome_types::dht_v2::to_legacy_signed_action(&create),
+                deletes,
+            ));
+        }
+        Ok(out)
+    }
+
     /// The live links on `base` (CreateLink minus DeleteLink tombstones),
     /// filtered by link type, tag prefix, author, and time. Builds each
     /// [`holochain_zome_types::link::Link`] from its `CreateLink` action.

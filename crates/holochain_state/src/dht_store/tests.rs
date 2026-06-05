@@ -1616,3 +1616,24 @@ async fn get_links_returns_live_links_and_excludes_tombstoned() {
         .unwrap();
     assert_eq!(links_after.len(), 0, "tombstoned link must be excluded");
 }
+
+#[tokio::test]
+async fn get_link_details_pairs_creates_with_their_deletes() {
+    use holochain_zome_types::prelude::LinkTypeFilter;
+
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+    let (create_ops, base, create_link_hash) = build_rendered_create_link_with_meta(21);
+    store.cache_chain_ops(&create_ops).await.unwrap();
+    let delete_ops = build_rendered_delete_link_for(create_link_hash.clone(), &base, 21);
+    store.cache_chain_ops(&delete_ops).await.unwrap();
+
+    let details = store
+        .as_read()
+        .get_link_details(&base, &LinkTypeFilter::Dependencies(vec![0.into()]), None)
+        .await
+        .unwrap();
+    assert_eq!(details.len(), 1, "one create-link pair");
+    let (create, deletes) = &details[0];
+    assert_eq!(create.as_hash(), &create_link_hash);
+    assert_eq!(deletes.len(), 1, "the create has one DeleteLink");
+}
