@@ -7,6 +7,10 @@
 //! [`holochain_integrity_types::dht_v2`] and
 //! [`holochain_zome_types::dht_v2`]).
 
+use holochain_integrity_types::dht_v2::RecordValidity;
+use holochain_integrity_types::entry::Entry;
+use holochain_zome_types::dht_v2::SignedActionHashed;
+
 /// Row from the `Action` table.
 #[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
 pub struct ActionRow {
@@ -33,6 +37,32 @@ pub struct ActionRow {
     /// Encoded [`RecordValidity`](holochain_integrity_types::dht_v2::RecordValidity);
     /// `NULL` represents pending.
     pub record_validity: Option<i64>,
+}
+
+/// Row from an agent-activity scan: an `Action` row (flattened) plus the
+/// joined `ChainOp.validation_status` and, in Full mode, the public `Entry`
+/// blob (`NULL` in Hashes mode or when the entry is absent/private).
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub(crate) struct AgentActivityRow {
+    /// The action columns (see [`ActionRow`]).
+    #[sqlx(flatten)]
+    pub action: ActionRow,
+    /// `ChainOp.validation_status` (`1 = Accepted`, `2 = Rejected`).
+    pub validation_status: i64,
+    /// Serialized public `Entry` blob; `None` in Hashes mode or when absent.
+    pub entry_blob: Option<Vec<u8>>,
+}
+
+/// Decoded agent-activity item: an integrated `RegisterAgentActivity` action,
+/// its validation status, and (Full mode) the referenced public entry.
+#[derive(Debug, Clone)]
+pub struct AgentActivityItem {
+    /// The signed, hashed v2 action.
+    pub action: SignedActionHashed,
+    /// Validation status of the action's `RegisterAgentActivity` op.
+    pub validation_status: RecordValidity,
+    /// The referenced public entry, when fetched (Full mode) and present.
+    pub entry: Option<Entry>,
 }
 
 /// Row from the `Entry` table (public entries only).

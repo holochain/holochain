@@ -3,6 +3,7 @@
 use super::super::inner::action;
 use crate::handles::{DbRead, DbWrite};
 use crate::kind::Dht;
+use crate::models::dht::AgentActivityItem;
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, EntryHash};
 use holochain_integrity_types::dht_v2::RecordValidity;
 use holochain_zome_types::dht_v2::SignedActionHashed;
@@ -31,6 +32,16 @@ impl DbRead<Dht> {
         author: AgentPubKey,
     ) -> sqlx::Result<Vec<SignedActionHashed>> {
         action::get_actions_by_author(self.pool(), author).await
+    }
+
+    /// Integrated `RegisterAgentActivity` actions for `author`, ordered by
+    /// chain sequence. `include_entries` joins the public entry (Full mode).
+    pub async fn get_agent_activity(
+        &self,
+        author: AgentPubKey,
+        include_entries: bool,
+    ) -> sqlx::Result<Vec<AgentActivityItem>> {
+        action::get_agent_activity(self.pool(), &author, include_entries).await
     }
 
     /// Fetch all actions with `prev_hash = prev_hash` and `hash != exclude_hash`.

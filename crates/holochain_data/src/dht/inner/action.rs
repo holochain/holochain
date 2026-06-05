@@ -1,8 +1,9 @@
 //! Free-standing operations against the `Action` table.
 
-use crate::models::dht::ActionRow;
+use crate::models::dht::{ActionRow, AgentActivityItem, AgentActivityRow};
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, EntryHash, HoloHashed};
 use holochain_integrity_types::dht_v2::{Action, ActionData, ActionHeader, RecordValidity};
+use holochain_integrity_types::entry::Entry;
 use holochain_integrity_types::entry_def::EntryVisibility;
 use holochain_integrity_types::record::SignedHashed;
 use holochain_integrity_types::signature::Signature;
@@ -127,6 +128,69 @@ where
     .fetch_all(executor)
     .await?;
     rows.into_iter().map(row_to_signed_action_hashed).collect()
+}
+
+/// All integrated `RegisterAgentActivity` actions authored by `author`,
+/// ordered by chain sequence. When `include_entries` is set, the public
+/// `Entry` blob is joined in (Full mode); otherwise the entry column is `NULL`.
+pub(crate) async fn get_agent_activity<'e, E>(
+    executor: E,
+    author: &AgentPubKey,
+    include_entries: bool,
+) -> sqlx::Result<Vec<AgentActivityItem>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let sql = if include_entries {
+        "SELECT a.hash, a.author, a.seq, a.prev_hash, a.timestamp, a.action_type,
+                a.action_data, a.signature, a.entry_hash, a.private_entry, a.record_validity,
+                c.validation_status, e.blob AS entry_blob
+         FROM ChainOp c
+         JOIN Action a ON c.action_hash = a.hash
+         LEFT JOIN Entry e ON a.entry_hash = e.hash
+         WHERE a.author = ? AND c.op_type = ?
+         ORDER BY a.seq ASC"
+    } else {
+        "SELECT a.hash, a.author, a.seq, a.prev_hash, a.timestamp, a.action_type,
+                a.action_data, a.signature, a.entry_hash, a.private_entry, a.record_validity,
+                c.validation_status, NULL AS entry_blob
+         FROM ChainOp c
+         JOIN Action a ON c.action_hash = a.hash
+         WHERE a.author = ? AND c.op_type = ?
+         ORDER BY a.seq ASC"
+    };
+    let rows: Vec<AgentActivityRow> = sqlx::query_as(sql)
+        .bind(author.get_raw_36())
+        .bind(i64::from(ChainOpType::RegisterAgentActivity))
+        .fetch_all(executor)
+        .await?;
+    rows.into_iter().map(agent_activity_row_to_item).collect()
+}
+
+fn agent_activity_row_to_item(row: AgentActivityRow) -> sqlx::Result<AgentActivityItem> {
+    let action = row_to_signed_action_hashed(row.action)?;
+    let validation_status = RecordValidity::try_from(row.validation_status).map_err(|v| {
+        sqlx::Error::Decode(Box::new(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("invalid validation_status {v} on RegisterAgentActivity op"),
+        )))
+    })?;
+    let entry = match row.entry_blob {
+        Some(blob) => Some(
+            holochain_serialized_bytes::decode::<_, Entry>(&blob).map_err(|e| {
+                sqlx::Error::Decode(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("decode Entry: {e}"),
+                )))
+            })?,
+        ),
+        None => None,
+    };
+    Ok(AgentActivityItem {
+        action,
+        validation_status,
+        entry,
+    })
 }
 
 /// Return the live `StoreEntry` create actions for `entry_hash`: valid,
