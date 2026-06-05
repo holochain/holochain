@@ -36,7 +36,7 @@ The Holochain repository contains many Rust crates and some important files:
 
 Before changing any code, it's a good idea to check that your environment can build Holochain. Rather than compiling the
 whole workspace, build the binaries that the `hc sandbox` tests rely on — `holochain`, `hc`, and `hc_sandbox`. This is
-enough to confirm your toolchain is set up, and it produces the tools you'll use for manual testing later:
+enough to confirm your toolchain is set up, and it produces the tools you'll use for testing later:
 
 ```shell
 cargo build --manifest-path crates/holochain/Cargo.toml --locked
@@ -52,7 +52,7 @@ or open an issue.
 
 ### Running tests
 
-The default, full test command — and the one CI runs — is the Make target for the default Wasmer backend (cranelift) and
+The default, full test command — and the one CI runs — is the Make target for the default Wasmer backend "cranelift" and
 iroh transport:
 
 ```shell
@@ -60,7 +60,8 @@ make test-workspace-wasmer-sys-cranelift
 ```
 
 This builds the test wasms and runs the whole workspace with the exact features CI uses. It takes a long time, so you
-don't need to run it for every change; CI will run it on your pull request.
+don't need to run it on every change while iterating, but you should run it before submitting a pull request — even
+though CI will run it too.
 
 While you're iterating, run only the tests for the crate(s) you're changing. For example, if you're changing
 `holochain_p2p`:
@@ -80,8 +81,9 @@ cargo nextest run --features build_wasms
 
 ### Testing other Wasmer backends
 
-Holochain executes zome Wasm through a Wasmer backend, chosen by a set of mutually exclusive features — exactly one must
-be enabled. CI exercises each backend, and there is a Make target for each:
+Holochain executes zome Wasm through a Wasmer backend. More than one backend can be compiled in and selected at runtime
+through configuration, but the tests run against a single backend, so you must pick the one each test run will use. CI
+exercises each backend, and there is a Make target for each:
 
 - `wasmer-sys-cranelift` — the default compiler backend:
   ```shell
@@ -91,7 +93,8 @@ be enabled. CI exercises each backend, and there is a Make target for each:
   ```shell
   make test-workspace-wasmer-sys-llvm
   ```
-- `wasmer-wasmi` — the Wasm interpreter backend:
+- `wasmer-wasmi` — the Wasm interpreter backend. This is a temporary, experimental backend that will be replaced;
+  please do not use it as a default (see the note in `crates/holochain/CHANGELOG.md`):
   ```shell
   make test-workspace-wasmer-wasmi
   ```
