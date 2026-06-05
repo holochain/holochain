@@ -11,79 +11,115 @@ using the Windows Subsystem for Linux (WSL) with Ubuntu, which is expected to wo
 
 You will need:
 - Git installed, either [directly](https://git-scm.com/downloads) or via your package manager.
-- Rust installed via [rustup](https://www.rust-lang.org/tools/install).
-- [cargo-nextest](https://nexte.st/) which is recommended to run Holochain's tests. Though you can use `cargo test` if you prefer.
-
-You may find more tools useful:
-- [Make](https://www.gnu.org/software/make/), which may already be on your system, or you can install it via your package manager.
+- Rust installed via [rustup](https://www.rust-lang.org/tools/install). The toolchain version is selected automatically
+  from `rust-toolchain.toml`.
+- [cargo-nextest](https://nexte.st/), the configured test runner. The Make targets below use it, so it is required to
+  run the tests the way CI does.
+- [Make](https://www.gnu.org/software/make/), which may already be on your system or can be installed via your package
+  manager. The project's build, test, and lint steps are encoded as Make targets that bundle the exact features and
+  flags CI uses. Reproducing those by hand is fiddly, so Make is the recommended way to run them.
 
 ### Finding your way around
 
 The Holochain repository contains many Rust crates and some important files:
 - /rust-toolchain.toml: This file specifies the Rust toolchain used by the project. When you start running `cargo`
   commands, it will automatically use the Rust version specified here.
-- /Makefile: A list of make targets that can be used to lint, build and test the project. Using this is optional, but it
-  can be useful to run the same checks and tests that the CI runs.
+- /Makefile: The make targets that lint, build and test the project. They encode the exact checks and test runs that CI
+  performs, and are the recommended way to build, test, and lint locally.
 - /crates/test_utils/wasm/wasm_workspace: This is a separate Cargo workspace that contains the test WASMs that are used
   in Holochain's tests. These need to be built before running the tests, which is explained later in the guide.
 - /crates/hc: The `hc` command line tool which is used to interact with a running Holochain instance.
 - /crates/holochain: The main Holochain library/binary crate. This is what we call the "conductor" and is where you'll
   find the majority of the functional tests.
 
-### Build and test Holochain
+### Build and verify your environment
 
-Before changing any code, it's a good idea to check your environment is ready to use. You can do this by building the 
-project and running the tests.
-
-To build the project, you can run:
-```shell
-cargo build
-```
-
-This will take some time, as it will download the necessary dependencies and compile the code. It also has to build all
-those dependencies. This will be quicker the next time you run it, as Cargo will cache the compiled crates.
-
-Now, run the Holochain tests:
+Before changing any code, it's a good idea to check that your environment can build Holochain. Rather than compiling the
+whole workspace, build the binaries that the `hc sandbox` tests rely on — `holochain`, `hc`, and `hc_sandbox`. This is
+enough to confirm your toolchain is set up, and it produces the tools you'll use for manual testing later:
 
 ```shell
-cd crates/holochain
-cargo nextest run --features build_wasms
+cargo build --manifest-path crates/holochain/Cargo.toml --locked
+cargo build --manifest-path crates/hc/Cargo.toml --locked
+cargo build --manifest-path crates/hc_sandbox/Cargo.toml --locked
 ```
 
-If you have problems here you can [get in touch](https://github.com/holochain/holochain/blob/develop/CONTRIBUTING.md#coordination) 
+The first build will take some time, as it downloads and compiles all the dependencies. Subsequent builds are quicker
+because Cargo caches the compiled crates. If these succeed, your environment is ready.
+
+If you have problems here you can [get in touch](https://github.com/holochain/holochain/blob/develop/CONTRIBUTING.md#coordination)
 or open an issue.
 
-### What tests to run
+### Running tests
 
-Note that you can run all the tests in the repository by running the same command as above but from the root of the 
-repository. However, this will take a really long time and is generally not recommended.
+The default, full test command — and the one CI runs — is the Make target for the default Wasmer backend (cranelift) and
+iroh transport:
 
-Instead, please run the tests for any crates that you are changing. For example, if you are changing `holochain_p2p`
-then you should run the tests for that crate:
+```shell
+make test-workspace-wasmer-sys-cranelift
+```
+
+This builds the test wasms and runs the whole workspace with the exact features CI uses. It takes a long time, so you
+don't need to run it for every change; CI will run it on your pull request.
+
+While you're iterating, run only the tests for the crate(s) you're changing. For example, if you're changing
+`holochain_p2p`:
 
 ```shell
 cd crates/holochain_p2p
 cargo nextest run
 ```
 
-Once you are done making changes to a crate, or crates, and those tests are passing, then you should run the tests for
-Holochain as above.
-
-Of course, we welcome people running all the tests in the repository, but running fewer tests saves some time and CI
-will check that everything is passing before merging your changes. If you do run into problems with this approach,
-see the next section for how to run the tests like CI does.
-
-### Run the tests like CI does
-
-This is optional, but if you make changes and your changes are passing the tests locally but not on CI, then this 
-is a useful way to check what's going on.
-
-You would have to check which CI checks are failing, but as an example, you might run the tests with the default Wasmer
-runtime, from the root of the repository:
+Before you finish, run the `holochain` crate's tests. This crate holds the bulk of the integration tests and needs the
+test wasms built:
 
 ```shell
-make test-workspace-wasmer-sys-cranelift
+cd crates/holochain
+cargo nextest run --features build_wasms
 ```
+
+### Testing other Wasmer backends
+
+Holochain executes zome Wasm through a Wasmer backend, chosen by a set of mutually exclusive features — exactly one must
+be enabled. CI exercises each backend, and there is a Make target for each:
+
+- `wasmer-sys-cranelift` — the default compiler backend:
+  ```shell
+  make test-workspace-wasmer-sys-cranelift
+  ```
+- `wasmer-sys-llvm` — the LLVM compiler backend, which requires a compatible LLVM toolchain to be installed:
+  ```shell
+  make test-workspace-wasmer-sys-llvm
+  ```
+- `wasmer-wasmi` — the Wasm interpreter backend:
+  ```shell
+  make test-workspace-wasmer-wasmi
+  ```
+
+The `Makefile` also has variants that turn on the unstable features (`*-unstable`) and the tx5 transport
+(`*-transport_tx5`); use those targets if you need to reproduce one of those CI runs.
+
+### Static checks before submitting a PR
+
+Before opening a pull request, run the same static checks that CI enforces:
+
+```shell
+make static-all
+```
+
+This runs a formatting check (`cargo fmt --check`), a TOML formatting check, Clippy over the default and unstable feature
+sets, and a documentation build with warnings denied. Compiler and Clippy warnings are not allowed in shared code; see
+[Compiler warnings](https://github.com/holochain/holochain/blob/develop/CONTRIBUTING.md#compiler-warnings).
+
+To fix issues rather than only check for them:
+
+```shell
+cargo fmt --all              # format Rust code
+./scripts/format-toml.sh     # format TOML files (add --check to only check)
+```
+
+`scripts/format-toml.sh` runs `taplo` through `nix-shell`, so it needs Nix installed. If you don't use Nix, `make
+static-toml` (check) and `make toml-fix` (fix) do the same job with a Cargo-installed `taplo`.
 
 ### Verifying changes and reproducing issues
 
@@ -93,30 +129,21 @@ written with this harness, so take a look at what's already there as a guide for
 
 Otherwise, you can test your changes or try to reproduce an issue manually using the `hc sandbox`. This tool is used to 
 launch a `holochain` instance (conductor) that has been built locally. You can find the documentation for this tool [here](https://github.com/holochain/holochain/blob/develop/crates/hc_sandbox/README.md).
-You'll want to read the next section for instructions to build all the tools you might want to use with the sandbox.
+You'll need the CLI tools built for this (see [Build and verify your environment](#build-and-verify-your-environment) above); the next section explains how to run or install them.
 
-### Build CLI tools for manual testing
+### Using the CLI tools for manual testing
 
-Some of the tests run in the Holochain repository, run real binaries and check that they interact correctly. For example,
-the tests in `crates/hc_sandbox` do this. For these tests to work, you need to have built the CLI tools that are part
-of this repository.
+The build step above produced the `holochain`, `hc`, and `hc_sandbox` binaries. Some tests — for example those in
+`crates/hc_sandbox` — run these real binaries and check that they interact correctly, and you'll also want them to drive
+a conductor manually.
 
-Otherwise, if you just want to use the CLI tools to interact with a running conductor or start one for testing then 
-you would also want to build these CLI tools.
-
-```shell
-cargo build --manifest-path crates/holochain/Cargo.toml --locked
-cargo build --manifest-path crates/hc/Cargo.toml --locked
-cargo build --manifest-path crates/hc_sandbox/Cargo.toml --locked
-```
-
-The tools can then be run from the `target/debug` directory. For example, to run the `hc` tool, you can run:
+They can be run from the `target/debug` directory. For example, to run the `hc` tool:
 
 ```shell
 ./target/debug/hc --help
 ```
 
-If you find it easier to have these tools in your `PATH`, then you can install these tools instead of just building them:
+If you find it easier to have these tools in your `PATH`, then you can install them instead of just building them:
 
 ```shell
 cargo install --path crates/holochain --locked
