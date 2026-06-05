@@ -11,14 +11,19 @@ use crate::query::StateQueryResult;
 use holo_hash::{DhtOpHash, HasHash};
 use holochain_data::kind::Dht;
 use holochain_data::DbRead;
+use holochain_types::chain::ChainItem;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::prelude::{
     ActionHashedContainer, AgentActivityResponse, ChainItems, ChainItemsSource,
+    MustGetAgentActivityResponse, RegisterAgentActivity,
 };
+use holochain_types::warrant::WarrantOp;
+use holochain_zome_types::chain::{ChainFilter, LimitConditions};
 use holochain_zome_types::dht_v2::RecordValidity;
 use holochain_zome_types::prelude::{
     ChainFork, ChainHead, ChainQueryFilter, ChainStatus, HighestObserved, SignedWarrant,
 };
+use std::collections::{HashMap, HashSet};
 
 impl DhtStore<DbRead<Dht>> {
     /// Returns `true` if `hash` appears in any op-bearing DHT table
@@ -478,6 +483,121 @@ impl DhtStore<DbRead<Dht>> {
         }
     }
 
+    /// Store-only `must_get_agent_activity`: resolve `filter.chain_top`, scan the
+    /// bounded `RegisterAgentActivity` range, exclude forked actions, apply the
+    /// timestamp/take filters, and decide completeness. Returns legacy types.
+    /// No scratch, no network, no cross-source merge (the requester layers those
+    /// on in phase 1c).
+    pub async fn must_get_agent_activity(
+        &self,
+        author: &holo_hash::AgentPubKey,
+        filter: &ChainFilter,
+    ) -> StateQueryResult<MustGetAgentActivityResponse> {
+        use holochain_zome_types::dht_v2::to_legacy_signed_action;
+
+        // A take of zero is a degenerate filter.
+        if filter.get_take() == Some(0) {
+            return Err(crate::query::StateQueryError::InvalidInput(
+                "ChainFilter take must be greater than 0".to_string(),
+            ));
+        }
+
+        // Resolve the chain top; if absent we cannot answer.
+        let Some((chain_top_seq, chain_top_timestamp)) = self
+            .db()
+            .get_action_seq_and_timestamp(author.clone(), filter.chain_top.clone())
+            .await?
+        else {
+            return Ok(MustGetAgentActivityResponse::ChainTopNotFound(
+                filter.chain_top.clone(),
+            ));
+        };
+
+        // An until_timestamp after the chain top is unsatisfiable.
+        if let Some(until_timestamp) = filter.get_until_timestamp() {
+            if until_timestamp > chain_top_timestamp {
+                return Ok(
+                    MustGetAgentActivityResponse::UntilTimestampGreaterThanChainHead(
+                        until_timestamp,
+                    ),
+                );
+            }
+        }
+
+        // Resolve the until_hash lower bound, if any.
+        let mut resolved_until_seq = None;
+        if let Some(until_hash) = filter.get_until_hash() {
+            resolved_until_seq = self
+                .db()
+                .get_action_seq_and_timestamp(author.clone(), until_hash.clone())
+                .await?
+                .map(|(seq, _)| seq);
+            if let Some(until_seq) = resolved_until_seq {
+                if until_seq > chain_top_seq {
+                    return Ok(MustGetAgentActivityResponse::UntilHashAfterChainHead(
+                        until_hash.clone(),
+                    ));
+                }
+            }
+        }
+
+        // Scan the bounded range (already ordered seq DESC, hash DESC).
+        let mut activity: Vec<RegisterAgentActivity> = self
+            .db()
+            .get_filtered_agent_activity(author.clone(), chain_top_seq, resolved_until_seq)
+            .await?
+            .into_iter()
+            .map(|v2| RegisterAgentActivity {
+                action: to_legacy_signed_action(&v2),
+                cached_entry: None,
+            })
+            .collect();
+
+        // Keep only the canonical chain reachable from the chain top.
+        exclude_forked_activity(&mut activity, &filter.chain_top);
+
+        // Apply the until_timestamp filter; the bool records whether the kept set
+        // has a deterministic lower-bound witness.
+        let canonical_chain_precedes_until_timestamp =
+            apply_timestamp_filter(&mut activity, filter.get_until_timestamp());
+
+        // Apply the take filter.
+        if let Some(take) = filter.get_take() {
+            activity.truncate(take as usize);
+        }
+
+        let completeness = check_agent_activity_completeness(
+            &activity,
+            filter,
+            canonical_chain_precedes_until_timestamp,
+        );
+
+        Ok(match completeness {
+            MustGetAgentActivityCompleteness::Complete => {
+                let warrants = self
+                    .db()
+                    .get_warrants_by_warrantee(author.clone())
+                    .await?
+                    .into_iter()
+                    .map(warrant_row_to_signed_warrant)
+                    .collect::<StateQueryResult<Vec<_>>>()?
+                    .into_iter()
+                    .map(WarrantOp::from)
+                    .collect();
+                MustGetAgentActivityResponse::Activity { activity, warrants }
+            }
+            MustGetAgentActivityCompleteness::IncompleteChain => {
+                MustGetAgentActivityResponse::IncompleteChain
+            }
+            MustGetAgentActivityCompleteness::UntilHashMissing(hash) => {
+                MustGetAgentActivityResponse::UntilHashMissing(hash)
+            }
+            MustGetAgentActivityCompleteness::UntilTimestampIndeterminate(timestamp) => {
+                MustGetAgentActivityResponse::UntilTimestampIndeterminate(timestamp)
+            }
+        })
+    }
+
     /// Return chain ops that have passed system validation and are awaiting
     /// app validation. Warrants have no app-validation stage, so they are not
     /// included.
@@ -910,6 +1030,145 @@ fn compute_chain_status<T: ActionSequenceAndHash>(
     (status, valid_out, rejected)
 }
 
+/// An intermediary type describing the completeness of a `must_get` result.
+enum MustGetAgentActivityCompleteness {
+    Complete,
+    IncompleteChain,
+    UntilHashMissing(holo_hash::ActionHash),
+    UntilTimestampIndeterminate(holochain_types::prelude::Timestamp),
+}
+
+/// Remove forked actions by walking the chain backwards from `chain_top`.
+/// Input must already be sorted by action seq descending.
+fn exclude_forked_activity(
+    activity: &mut Vec<RegisterAgentActivity>,
+    chain_top: &holo_hash::ActionHash,
+) {
+    if activity.is_empty() {
+        return;
+    }
+    let chain_hashes = collect_canonical_chain_hashes(activity, chain_top);
+    activity.retain(|a| chain_hashes.contains(&a.action.hashed.hash));
+}
+
+/// Walk the chain from `chain_top` backwards (via `prev_action`), collecting the
+/// reachable action hashes. Input must already be sorted by action seq descending.
+fn collect_canonical_chain_hashes(
+    activity: &[RegisterAgentActivity],
+    chain_top: &holo_hash::ActionHash,
+) -> HashSet<holo_hash::ActionHash> {
+    let index_by_hash: HashMap<holo_hash::ActionHash, usize> = activity
+        .iter()
+        .enumerate()
+        .map(|(i, a)| (a.action.hashed.hash.clone(), i))
+        .collect();
+
+    let mut chain_hashes: HashSet<holo_hash::ActionHash> = HashSet::new();
+
+    let Some(&walk_index) = index_by_hash.get(chain_top) else {
+        return chain_hashes;
+    };
+
+    let mut walk_index = walk_index;
+    for _ in 0..activity.len() {
+        let current = &activity[walk_index];
+        let current_hash = current.action.hashed.hash.clone();
+        if !chain_hashes.insert(current_hash) {
+            break;
+        }
+        let Some(prev_hash) = current.action.prev_hash() else {
+            break;
+        };
+        let Some(&prev_index) = index_by_hash.get(prev_hash) else {
+            break;
+        };
+        walk_index = prev_index;
+    }
+
+    chain_hashes
+}
+
+/// Apply the `until_timestamp` filter. Returns `true` when the kept set has a
+/// deterministic lower-bound witness (an action with timestamp < `until_timestamp`).
+fn apply_timestamp_filter(
+    activity: &mut Vec<RegisterAgentActivity>,
+    until_timestamp: Option<holochain_types::prelude::Timestamp>,
+) -> bool {
+    match until_timestamp {
+        None => false,
+        Some(until_ts) => {
+            let precedes_boundary = activity
+                .last()
+                .map(|a| a.action.action().timestamp() < until_ts)
+                .unwrap_or(false);
+            activity.retain(|a| a.action.action().timestamp() >= until_ts);
+            precedes_boundary
+        }
+    }
+}
+
+/// Decide whether `activity` is a complete response for `filter`.
+fn check_agent_activity_completeness(
+    activity: &[RegisterAgentActivity],
+    filter: &ChainFilter,
+    canonical_chain_precedes_until_timestamp: bool,
+) -> MustGetAgentActivityCompleteness {
+    let has_gap = activity
+        .windows(2)
+        .any(|w| w[0].action.seq() != w[1].action.seq() + 1);
+    let reaches_genesis = activity
+        .last()
+        .map(|last| last.action.seq() == 0)
+        .unwrap_or(false);
+
+    match &filter.limit_conditions {
+        LimitConditions::ToGenesis => {
+            if has_gap || !reaches_genesis {
+                MustGetAgentActivityCompleteness::IncompleteChain
+            } else {
+                MustGetAgentActivityCompleteness::Complete
+            }
+        }
+        LimitConditions::UntilHash(until_hash) => {
+            if !activity.iter().any(|a| &a.action.hashed.hash == until_hash) {
+                MustGetAgentActivityCompleteness::UntilHashMissing(until_hash.clone())
+            } else if has_gap {
+                MustGetAgentActivityCompleteness::IncompleteChain
+            } else {
+                MustGetAgentActivityCompleteness::Complete
+            }
+        }
+        LimitConditions::UntilTimestamp(until_timestamp) => {
+            let any_satisfies_timestamp = activity
+                .iter()
+                .any(|a| a.action.action().timestamp() >= *until_timestamp);
+            if !any_satisfies_timestamp
+                || (!reaches_genesis && !canonical_chain_precedes_until_timestamp)
+            {
+                MustGetAgentActivityCompleteness::UntilTimestampIndeterminate(*until_timestamp)
+            } else if has_gap {
+                MustGetAgentActivityCompleteness::IncompleteChain
+            } else {
+                MustGetAgentActivityCompleteness::Complete
+            }
+        }
+        LimitConditions::Take(take) => {
+            let take = *take as usize;
+            if activity.len() >= take {
+                if has_gap {
+                    MustGetAgentActivityCompleteness::IncompleteChain
+                } else {
+                    MustGetAgentActivityCompleteness::Complete
+                }
+            } else if has_gap || !reaches_genesis {
+                MustGetAgentActivityCompleteness::IncompleteChain
+            } else {
+                MustGetAgentActivityCompleteness::Complete
+            }
+        }
+    }
+}
+
 /// Assemble the legacy [`AgentActivityResponse`] from the classified lists.
 fn build_agent_activity_response<T>(
     agent: holo_hash::AgentPubKey,
@@ -959,10 +1218,13 @@ mod tests {
     use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, EntryHash, HoloHashed};
     use holochain_data::kind::Dht;
     use holochain_data::DbWrite;
+    use holochain_types::chain::ChainItem;
     use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
+    use holochain_types::prelude::MustGetAgentActivityResponse;
     use holochain_types::prelude::Signature;
     use holochain_types::prelude::Timestamp;
     use holochain_zome_types::action::{Action, Create, EntryType};
+    use holochain_zome_types::chain::ChainFilter;
     use holochain_zome_types::entry_def::EntryVisibility;
     use holochain_zome_types::prelude::AppEntryDef;
     use std::sync::Arc;
@@ -1572,6 +1834,81 @@ mod tests {
             .unwrap();
         assert!(resp.warrants.is_empty());
         assert!(matches!(resp.valid_activity, ChainItems::NotRequested));
+    }
+
+    /// Build a linked chain of `len` `RegisterAgentActivity` ops for `author`
+    /// (seq 0..len, each `prev_action` = the previous action's hash). Returns the
+    /// ops and the action hashes (index = seq).
+    fn make_activity_chain(author: &AgentPubKey, len: u32) -> (Vec<DhtOpHashed>, Vec<ActionHash>) {
+        let mut ops = Vec::new();
+        let mut hashes = Vec::new();
+        let mut prev = ActionHash::from_raw_36(vec![0u8; 36]);
+        for seq in 0..len {
+            let action = Action::Create(Create {
+                author: author.clone(),
+                timestamp: Timestamp::from_micros((seq as i64 + 1) * 1000),
+                action_seq: seq,
+                prev_action: prev.clone(),
+                entry_type: EntryType::App(AppEntryDef::new(
+                    0.into(),
+                    0.into(),
+                    EntryVisibility::Public,
+                )),
+                entry_hash: EntryHash::from_raw_36(vec![(seq as u8).wrapping_add(100); 36]),
+                weight: Default::default(),
+            });
+            let action_hash = holo_hash::ActionHash::with_data_sync(&action);
+            let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(
+                ChainOp::RegisterAgentActivity(Signature::from([seq as u8; 64]), action),
+            )));
+            prev = action_hash.clone();
+            hashes.push(action_hash);
+            ops.push(op);
+        }
+        (ops, hashes)
+    }
+
+    #[tokio::test]
+    async fn must_get_agent_activity_to_genesis_complete() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let author = AgentPubKey::from_raw_36(vec![71u8; 36]);
+        let (ops, hashes) = make_activity_chain(&author, 3);
+        for (i, op) in ops.into_iter().enumerate() {
+            integrate_activity(&store, op, AppOutcome::Accepted, 10 + i as i64).await;
+        }
+
+        // A warrant for this author should be attached to a Complete response.
+        let warrant = make_warrant_for(&author, 40);
+        let wh = warrant.as_hash().clone();
+        store.record_incoming_ops(vec![warrant]).await.unwrap();
+        store
+            .record_warrant_sys_validation_outcomes(vec![(wh, SysOutcome::Accepted)])
+            .await
+            .unwrap();
+        store
+            .integrate_ready_ops(Timestamp::from_micros(99))
+            .await
+            .unwrap();
+
+        let filter = ChainFilter::new(hashes[2].clone());
+        let resp = store
+            .as_read()
+            .must_get_agent_activity(&author, &filter)
+            .await
+            .unwrap();
+
+        match resp {
+            MustGetAgentActivityResponse::Activity { activity, warrants } => {
+                assert_eq!(activity.len(), 3);
+                // Returned newest-first (seq DESC).
+                assert_eq!(activity[0].action.seq(), 2);
+                assert_eq!(activity[2].action.seq(), 0);
+                assert_eq!(warrants.len(), 1);
+            }
+            other => panic!("expected Activity, got {other:?}"),
+        }
     }
 
     #[tokio::test]
