@@ -1,5 +1,4 @@
 use opentelemetry::global::meter;
-use opentelemetry::metrics;
 use opentelemetry::metrics::{Counter, Histogram};
 use std::sync::OnceLock;
 
@@ -53,7 +52,7 @@ pub fn p2p_handle_incoming_request_ignored_metric() -> &'static P2pRequestIgnore
 }
 
 /// A counter metric for counting received remote signals.
-pub type P2pRecvRemoteSignalMetric = metrics::Counter<u64>;
+pub type P2pRecvRemoteSignalMetric = Counter<u64>;
 
 static P2P_RECV_REMOTE_SIGNAL_METRIC: OnceLock<P2pRecvRemoteSignalMetric> = OnceLock::new();
 
@@ -68,13 +67,13 @@ pub fn p2p_recv_remote_signal_metric() -> &'static P2pRecvRemoteSignalMetric {
 }
 
 /// A counter metric for counting received direct remote signals.
-pub type P2pRecvRemoteSignalDirectMetric = metrics::Counter<u64>;
+pub type P2pRecvRemoteSignalDirectMetric = Counter<u64>;
 
 static P2P_RECV_REMOTE_SIGNAL_DIRECT_METRIC: OnceLock<P2pRecvRemoteSignalDirectMetric> =
     OnceLock::new();
 
 /// Metric for counting received direct remote signals.
-pub fn p2p_recv_remote_signal_direct_metric() -> &'static P2pRecvRemoteSignalMetric {
+pub fn p2p_recv_remote_signal_direct_metric() -> &'static P2pRecvRemoteSignalDirectMetric {
     P2P_RECV_REMOTE_SIGNAL_DIRECT_METRIC.get_or_init(|| {
         meter("hc.holochain_p2p")
             .u64_counter("hc.holochain_p2p.recv_remote_signal_direct")

@@ -1765,10 +1765,12 @@ impl actor::HcP2p for HolochainP2pActor {
 
                 let req = WireMessage::remote_signal_evt(to_agent.clone(), payload, signature);
 
+                let wire_msg = WireMessage::encode_batch(&[&req]).inspect_err(|err| {
+                    tracing::error!(?err, "Failed to encode remote signal as a batch message")
+                })?;
+
                 if self.should_bridge(&space, to_url.clone()) {
-                    if let Err(err) = WireMessage::encode_batch(&[&req])
-                        .map(|msg| self.recv_notify(to_url, space_id.clone(), msg))
-                    {
+                    if let Err(err) = self.recv_notify(to_url, space_id.clone(), wire_msg) {
                         tracing::debug!(?err, "send_remote_signal failed to bridge call");
                     }
                 } else {
@@ -1833,9 +1835,14 @@ impl actor::HcP2p for HolochainP2pActor {
                 );
 
                 if self.should_bridge(&space, to_url.clone()) {
-                    if let Err(err) = WireMessage::encode_batch(&[&req])
-                        .map(|msg| self.recv_notify(to_url, space_id.clone(), msg))
-                    {
+                    let wire_msg = WireMessage::encode_batch(&[&req]).inspect_err(|err| {
+                        tracing::error!(
+                            ?err,
+                            "Failed to encode remote signal direct as a batch message"
+                        );
+                    })?;
+
+                    if let Err(err) = self.recv_notify(to_url, space_id.clone(), wire_msg) {
                         tracing::debug!(?err, "send_remote_signal_direct failed to bridge call");
                     }
                 } else {
