@@ -270,15 +270,24 @@ conversions and the legacy-hash-preservation machinery.
 
 ### Decomposition
 
-Phase 1 is itself multiple subsystems; it lands as four ordered sub-slices, each
-with its own implementation plan, all on the one branch:
+Phase 1 lands as ordered sub-slices on the one branch, each with its own
+implementation plan:
 
-| Sub-slice | Scope | Depends on |
-|-----------|-------|------------|
-| **1a — `DhtStore` read API** | Add the cascade's compound read methods to `holochain_state::DhtStore` (and `holochain_data` primitives as needed), tested in isolation. | — |
-| **1b — Cascade authority → `DhtStore`** | Rewrite the `holochain_cascade::authority` network-serving handlers to use the 1a reads (store-only, **no scratch**). | 1a |
-| **1c — Cascade requester → `DhtStore`** | Rewrite the `holochain_cascade` local-first `get_*`/`retrieve_*` methods to use the 1a reads + scratch overlay + network fallback; delete `CascadeTxnWrapper`/`DbScratch`/cross-DB merging. | 1a |
-| **1d — Wire break to v2** | Break the K2 op-store wire and the application-`get` `WireOps` to carry v2 with v2 hashes; drop the network-side conversions (`op_store` `v2→legacy`, `record_incoming_ops` `legacy→v2`, `RenderedOp::new`) and the hash-preservation hack. | 1a–1c |
+| Sub-slice | Scope | Status |
+|-----------|-------|--------|
+| **1a — `DhtStore` read API** | The cascade's compound read methods on `holochain_state::DhtStore` (+ `holochain_data` primitives), tested in isolation: `retrieve_*`, `get_live_*`, `get_*_details`, `get_links`/`get_link_details`, `get_agent_activity`, `must_get_agent_activity`. | **done** |
+| **1b — Data-serving reshape** (authority + `holochain_p2p` + requester) | Reshape the data-serving wire to **records** (actions/entries) + record-level validation status + **warrants**; serve it from the 1a reads on the authority; on the requester, consume it, **expand to ops** and run normal validation/integration (or cache) + scratch overlay + network fallback. Delete `CascadeTxnWrapper`/`DbScratch`/cross-DB merge and the legacy authority `Query` structs. | next |
+| **1c — Gossip op-wire → v2** | Break the K2 op-store **gossip** wire to carry v2 ops with v2 hashes; drop the network-side `legacy ↔ v2` conversions and the hash-preservation hack. | — |
+
+**Why 1b merges the old "authority" and "requester" slices.** The data-serving
+response type is shared by three crates: the authority *produces* it,
+`holochain_p2p` *routes/serializes* it, the requester *consumes* it. Reshaping
+that type is one atomic change — a phase boundary cannot sit between "authority
+produces the new shape" and "requester consumes it" and still compile, and the
+only way to split them would be a transitional shim (the kind of scaffolding this
+program avoids). So 1b is a single slice delivered as phased commits that compile
+at the end of the slice. The old "break the application-`get` wire in 1d" work is
+absorbed into 1b; the old gossip wire-break becomes the new final phase **1c**.
 
 ### Read-stack architecture
 
@@ -305,21 +314,26 @@ Three layers, with resolution work placed by cost:
 ### Invariant: scratch is requester-only
 
 The scratch holds *this* conductor's in-flight, uncommitted authored data during
-a zome call or validation. It is overlaid **only** on the requester path (1c).
-The authority path (1b), which serves `get` requests arriving over the network
-from other agents, **must never** read the scratch — peers must not observe
-uncommitted local writes. Concretely: 1b uses the store-only `DhtStore` reads;
-the scratch-overlay read variant is used exclusively by 1c.
+a zome call or validation. It is overlaid **only** on the requester read path.
+The authority handlers, which serve requests arriving over the network from other
+agents, **must never** read the scratch — peers must not observe uncommitted
+local writes. Concretely (within 1b): the authority handlers use the store-only
+`DhtStore` reads; the scratch-overlay read variant is used exclusively by the
+requester path.
 
 ### Return-type boundary (legacy until later phases)
 
-The 1a–1c read methods return the types today's consumers expect — **legacy**
-`Record` / `Details` / `Vec<Link>` / `AgentActivityResponse`, and the legacy
-`WireOps` family on the authority side — converting `v2→legacy` *inside* the
-read boundary (reusing the existing `dht_store/reads.rs` conversion). Only the
-**data source** changes in 1a–1c. 1d then breaks the *wire* specifically (the
-authority and op-store emit v2). The remaining `v2→legacy` at the zome-call
-return boundary is removed in the merged Phase 3+4.
+The 1a read methods return the types today's consumers expect — **legacy**
+`Record` / `Details` / `Vec<Link>` / `AgentActivityResponse` — converting
+`v2→legacy` *inside* the read boundary, with the **legacy hash preserved** (the
+hash-preservation hack keeps stored v2 actions carrying the legacy hash). 1b
+changes the data-serving wire *shape* (records + record-level validation status +
+warrants, see below) but the served actions stay legacy-typed and legacy-hashed.
+**1c** then drops hash-preservation and flips the store to native v2 hashes; the
+gossip op-wire carries v2, and — because the served actions now carry v2 hashes —
+the data-serving wire follows. The network-side `legacy ↔ v2` conversions are
+deleted at that point. The remaining `v2→legacy` at the zome-call return boundary
+is removed in the merged Phase 3+4.
 
 ### 1a — the `DhtStore` read API (specified first)
 
@@ -417,15 +431,57 @@ author, one op type, `ORDER BY seq`). The pure assembly functions
   `check_agent_activity_completeness` pipeline, returning
   `MustGetAgentActivityResponse` (the dht-only result; entries stay `None` as
   today). The scratch overlay, network fallback and `merge_*` orchestration
-  remain in `holochain_cascade` for 1c.
+  remain in `holochain_cascade` for the requester half of 1b.
+
+### 1b — data-serving model
+
+1b reshapes the network data-serving path (the `get` / `get_links` /
+`get_agent_activity` / `must_get_agent_activity` request handlers, distinct from
+gossip) around a single principle: **data serving is about records, not ops.**
+
+**What is served.** Responses carry **records** — `SignedActionHashed` plus the
+`Entry` where applicable — *not* the op-shaped wire forms (`WireDelete`,
+`WireUpdateRelationship`, `WireNewEntryAction`, `WireCreateLink`,
+`WireDeleteLink`), which are dropped. Each served record carries its
+**record-level validation status** (`Valid`/`Rejected`) — not a per-op status —
+because a caching requester benefits from learning validity immediately. The
+response also carries **warrants**.
+
+**Invalid ⇒ warrant (the pairing invariant).** A `Rejected` record is always
+served together with a warrant that proves the rejection. The authority holds
+that warrant (it warranted the author) and must include it. This is what lets the
+receiver trust a `Rejected` verdict without re-deriving it.
+
+**Receiver behaviour (the requester half of 1b).** On a response the requester:
+1. **Checks the invariant up front** — any `Rejected` record lacking a paired
+   warrant ⇒ the whole response is rejected as malformed/malicious. A lying peer
+   cannot force pointless validation work.
+2. For **`Rejected`+warranted** records → place into validation limbo paired with
+   the warrant (no re-validation).
+3. For **`Valid`** records → **expand to ops** with `produce_ops_from_record`,
+   keep the op(s) matching the request type and — when *storing* rather than
+   caching — the further ops whose `dht_basis` falls in the node's storage arc,
+   then run those ops through the normal sys/app-validation → integration
+   pipeline. This op-expansion + local re-validation *is* the trust boundary: the
+   authority's verdict is a hint, not authority.
+
+**Gossip is unaffected.** Gossip stays op-based (its v2 cutover is 1c). The two
+wires are deliberately separate: gossip moves ops between stores; data serving
+answers a specific request for immediate use.
+
+**Authority reads.** The authority handlers serve from the 1a `DhtStore` reads
+(record/entry/link-shaped, integrated-only) plus a warrant fetch for any rejected
+record; the wire types (`WireRecordOps`/`WireEntryOps`/`WireLinkOps`) are
+repurposed to the record-shaped form above. No op-shaped, per-op-status reads are
+introduced.
 
 ### Explicitly out of scope for Phase 1
 
 - The non-cascade internal DHT-read consumers (sys/app-validation queues,
   validation receipts, publish, the incoming-ops intra-batch dedup) — **Phase
-  2**. 1d changes only the wire encode/decode and drops the network-side
-  conversions; the validation/integration consumers keep reading the v2 store as
-  they do now until Phase 2.
+  2**. 1b/1c change the cascade serving + gossip wires; the
+  validation/integration consumers keep reading the v2 store as they do now until
+  Phase 2.
 - The zome-call/HDK return boundary `v2→legacy` conversion — **Phase 3+4**.
 
 ### Testing
@@ -437,8 +493,11 @@ author, one op type, `ORDER BY seq`). The pure assembly functions
   any scratch).
 - `holochain_cascade`: local-hit (store), miss-then-network, and cache-write
   behavior; authority handlers serve from the store with no scratch.
-- 1d: wire round-trip for the v2-encoded K2 ops and app-`get` `WireOps`; v2
-  hashes preserved end-to-end without the legacy-hash hack.
+- 1b: the data-serving wire round-trips records + validation status + warrants;
+  the receiver's invariant check (rejected ⇒ warrant) and op-expansion
+  (`produce_ops_from_record`) behave; rejected+warranted records land in limbo.
+- 1c: wire round-trip for the v2-encoded K2 gossip ops; v2 hashes end-to-end
+  without the legacy-hash hack.
 
 ### Risks / open questions
 
