@@ -44,6 +44,28 @@ impl DbRead<Dht> {
         action::get_agent_activity(self.pool(), &author, include_entries).await
     }
 
+    /// Bounded `RegisterAgentActivity` scan: `author`'s integrated actions with
+    /// `seq <= chain_top_seq` and (optionally) `seq >= until_seq`, ordered by
+    /// `seq DESC, hash DESC`.
+    pub async fn get_filtered_agent_activity(
+        &self,
+        author: AgentPubKey,
+        chain_top_seq: u32,
+        until_seq: Option<u32>,
+    ) -> sqlx::Result<Vec<SignedActionHashed>> {
+        action::get_filtered_agent_activity(self.pool(), &author, chain_top_seq, until_seq).await
+    }
+
+    /// The chain sequence and authored timestamp of `action_hash`, if it is an
+    /// integrated `RegisterAgentActivity` action authored by `author`.
+    pub async fn get_action_seq_and_timestamp(
+        &self,
+        author: AgentPubKey,
+        action_hash: ActionHash,
+    ) -> sqlx::Result<Option<(u32, holochain_timestamp::Timestamp)>> {
+        action::get_action_seq_and_timestamp(self.pool(), &author, &action_hash).await
+    }
+
     /// Fetch all actions with `prev_hash = prev_hash` and `hash != exclude_hash`.
     /// Used to detect chain forks during sys-validation.
     pub async fn get_actions_by_prev_hash(

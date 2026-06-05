@@ -167,6 +167,63 @@ where
     rows.into_iter().map(agent_activity_row_to_item).collect()
 }
 
+/// Bounded `RegisterAgentActivity` scan for `must_get_agent_activity`: integrated
+/// actions authored by `author` with `seq <= chain_top_seq` and (when
+/// `until_seq` is `Some`) `seq >= until_seq`, ordered by `seq DESC, hash DESC`.
+pub(crate) async fn get_filtered_agent_activity<'e, E>(
+    executor: E,
+    author: &AgentPubKey,
+    chain_top_seq: u32,
+    until_seq: Option<u32>,
+) -> sqlx::Result<Vec<SignedActionHashed>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let rows: Vec<ActionRow> = sqlx::query_as(
+        "SELECT a.hash, a.author, a.seq, a.prev_hash, a.timestamp, a.action_type,
+                a.action_data, a.signature, a.entry_hash, a.private_entry, a.record_validity
+         FROM ChainOp c
+         JOIN Action a ON c.action_hash = a.hash
+         WHERE c.op_type = ?
+           AND a.author = ?
+           AND a.seq <= ?
+           AND (? IS NULL OR a.seq >= ?)
+         ORDER BY a.seq DESC, a.hash DESC",
+    )
+    .bind(i64::from(ChainOpType::RegisterAgentActivity))
+    .bind(author.get_raw_36())
+    .bind(chain_top_seq as i64)
+    .bind(until_seq.map(|s| s as i64))
+    .bind(until_seq.map(|s| s as i64))
+    .fetch_all(executor)
+    .await?;
+    rows.into_iter().map(row_to_signed_action_hashed).collect()
+}
+
+/// The chain sequence and authored timestamp of `action_hash`, if it is an
+/// integrated `RegisterAgentActivity` action authored by `author`.
+pub(crate) async fn get_action_seq_and_timestamp<'e, E>(
+    executor: E,
+    author: &AgentPubKey,
+    action_hash: &ActionHash,
+) -> sqlx::Result<Option<(u32, holochain_timestamp::Timestamp)>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let row: Option<(i64, i64)> = sqlx::query_as(
+        "SELECT a.seq, a.timestamp
+         FROM ChainOp c
+         JOIN Action a ON c.action_hash = a.hash
+         WHERE a.hash = ? AND a.author = ? AND c.op_type = ?",
+    )
+    .bind(action_hash.get_raw_36())
+    .bind(author.get_raw_36())
+    .bind(i64::from(ChainOpType::RegisterAgentActivity))
+    .fetch_optional(executor)
+    .await?;
+    Ok(row.map(|(seq, ts)| (seq as u32, holochain_timestamp::Timestamp::from_micros(ts))))
+}
+
 fn agent_activity_row_to_item(row: AgentActivityRow) -> sqlx::Result<AgentActivityItem> {
     let action = row_to_signed_action_hashed(row.action)?;
     let validation_status = RecordValidity::try_from(row.validation_status).map_err(|v| {
