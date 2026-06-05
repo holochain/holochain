@@ -359,13 +359,24 @@ Both are designed here; **1a-viii is executed first**, then 1a-ix.
 `compute_highest_observed`) and the `must_get_agent_activity` module. The only
 DB work is a scan of the author's `RegisterAgentActivity` ops ordered by seq;
 **everything else is pure in-memory**: classify each op into
-valid (integrated + `Accepted`) / rejected (integrated + `Rejected`) / pending
-(not integrated); detect a fork (two actions at the same seq); compute the
-`ChainStatus` (`Valid`/`Invalid`/`Forked`/`Empty`) and `HighestObserved`; apply
-the `ChainQueryFilter`; emit `ChainItems::Full`/`Hashes`. Warrants are fetched
-**separately** and attached (the `Warrant` arm of the legacy row-mapper is dead
-code — `WHERE DhtOp.type = RegisterAgentActivity` excludes them). The two legacy
+valid (`Accepted`) / rejected (`Rejected`); detect a fork (two actions at the
+same seq); compute the `ChainStatus` (`Valid`/`Invalid`/`Forked`/`Empty`) and
+`HighestObserved`; apply the `ChainQueryFilter`; emit
+`ChainItems::Full`/`Hashes`. Warrants are fetched **separately** and attached
+(the `Warrant` arm of the legacy row-mapper is dead code —
+`WHERE DhtOp.type = RegisterAgentActivity` excludes them). The two legacy
 `Query` structs differ only in whether they fetch the entry.
+
+**Decision — integrated-only (drop pending).** The v2 schema splits ops into
+`ChainOp` (integrated + validated; `validation_status`/`when_integrated` both
+`NOT NULL`) and `LimboChainOp` (pending validation). The v2 reads scan **`ChainOp`
+only**, so they report only validated activity. This drops the legacy behavior
+where pending (not-yet-integrated) ops raised `highest_observed` — an authority
+now advertises only validated state. (Behavior change; acceptable mid-migration.
+Any end-state test asserting that pending raises `highest_observed` is updated in
+the final-green phase.) Consequence: there is no `pending` list; classification
+is purely `Accepted`→valid / `Rejected`→rejected, and `highest_observed` derives
+from the valid + rejected lists.
 
 **SQL-vs-Rust boundary.** `holochain_data` does only the scans (trivial SQL: one
 author, one op type, `ORDER BY seq`). The pure assembly functions
@@ -376,20 +387,25 @@ author, one op type, `ORDER BY seq`). The pure assembly functions
 `holochain_state`** — they are pure and depend only on types.
 
 **1a-viii — `get_agent_activity`:**
-- `holochain_data`: one **rich activity-scan** primitive returning, per
-  `RegisterAgentActivity` op, the v2 action + `validation_status` (NULL = pending)
-  + integration flag, with a `LEFT JOIN Entry` parameterized by an
-  `include_entries` flag (one query, no N+1, mirroring legacy `records.rs`); plus
-  a `get_warrants_for_agent(warrantee, check_validity)` primitive.
+- `holochain_data`: one **rich activity-scan** primitive returning, per integrated
+  `RegisterAgentActivity` op, the v2 action + its `ChainOp.validation_status`
+  (`Accepted`/`Rejected`), with a `LEFT JOIN Entry` parameterized by an
+  `include_entries` flag (one query, no N+1, mirroring legacy `records.rs`). It
+  reads `ChainOp ⋈ Action` filtered to `op_type = RegisterAgentActivity` and
+  `Action.author = :author`, ordered by `Action.seq`. Warrants reuse the existing
+  `get_warrants_by_warrantee` primitive (integrated warrants = legacy
+  `get_warrants_for_agent(.., check_validity = true)`).
 - `holochain_state`: a single `DhtStore::get_agent_activity(author, filter,
-  options)` that branches `Full`/`Hashes` on `options.include_full_records`
-  (replacing the two legacy `Query` structs), runs the pure assembly, attaches
-  v2→legacy warrants when `options.include_warrants`, and returns legacy
+  options)` taking a `holochain_state`-local options struct (4 bools — because
+  `GetActivityOptions` lives in `holochain_p2p`, which `holochain_state` does not
+  depend on; cascade maps it in 1b/1c). It branches `Full`/`Hashes` on
+  `include_full_records` (replacing the two legacy `Query` structs), classifies
+  rows into valid/rejected, runs the pure assembly, attaches v2→legacy warrants
+  (reconstructed from `WarrantRow`) when `include_warrants`, and returns legacy
   `AgentActivityResponse` (legacy `Record`/`ActionHash`; `ActionHash` is the
   preserved legacy hash).
-- No authority validity-guard is needed (unlike links): the scan reads
-  `DhtChainOp` + `Action` with `validation_status`/integration, not a
-  cache-populated index.
+- No authority validity-guard is needed (unlike links): the scan reads `ChainOp`
+  (integrated + validated) joined to `Action`, not a cache-populated index.
 
 **1a-ix — `must_get_agent_activity` (dht-only core):**
 - `holochain_data`: a `get_filtered_agent_activity` primitive porting the legacy
