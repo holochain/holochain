@@ -824,9 +824,10 @@ fn warrant_row_to_signed_warrant(
     Ok(SignedWarrant::new(warrant, Signature::from(sig)))
 }
 
-/// Highest observed sequence number across the valid and rejected lists
-/// (each assumed sorted ascending by sequence). Multiple actions sharing the
-/// top sequence all contribute their hashes.
+/// Highest observed sequence number across the valid and rejected lists, each
+/// assumed sorted ascending by sequence. Mirrors the legacy authority: the hash
+/// list holds the last valid and/or last rejected action, which coincide only
+/// when both share the top sequence.
 fn compute_highest_observed<T: ActionSequenceAndHash>(
     valid: &[T],
     rejected: &[T],
@@ -922,8 +923,12 @@ where
     T: ActionHashedContainer + Clone,
     Vec<T>: ChainItemsSource,
 {
-    let highest_observed = compute_highest_observed(&valid, &rejected);
+    // `compute_chain_status` returns the lists sorted ascending by sequence, so
+    // computing `highest_observed` from its output makes the "sorted input"
+    // precondition structurally guaranteed rather than relying on the caller's
+    // SQL ordering.
     let (status, valid, rejected) = compute_chain_status(valid.into_iter(), rejected.into_iter());
+    let highest_observed = compute_highest_observed(&valid, &rejected);
 
     let valid_activity = if options.include_valid_activity {
         filter.filter_actions(valid).to_chain_items()
@@ -935,8 +940,8 @@ where
     } else {
         ChainItems::NotRequested
     };
-    // `warrants` is already gated by the caller (empty when not requested),
-    // so it is passed through as-is.
+    // Warrant gating is owned entirely by the caller, which passes an empty
+    // `warrants` when `include_warrants` is false; this fn passes it through.
     AgentActivityResponse {
         agent,
         valid_activity,
@@ -1346,6 +1351,227 @@ mod tests {
         assert!(matches!(resp.status, ChainStatus::Valid(ref head) if head.action_seq == 1));
         let ho = resp.highest_observed.expect("highest observed");
         assert_eq!(ho.action_seq, 1);
+    }
+
+    #[tokio::test]
+    async fn get_agent_activity_rejected_marks_invalid() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let author = AgentPubKey::from_raw_36(vec![7u8; 36]);
+        let prev = ActionHash::from_raw_36(vec![0u8; 36]);
+
+        integrate_activity(
+            &store,
+            make_fork_op(&author, &prev, 0, 1),
+            AppOutcome::Accepted,
+            10,
+        )
+        .await;
+        integrate_activity(
+            &store,
+            make_fork_op(&author, &prev, 1, 2),
+            AppOutcome::Rejected,
+            11,
+        )
+        .await;
+
+        let opts = GetAgentActivityOptions {
+            include_valid_activity: true,
+            include_rejected_activity: true,
+            include_warrants: false,
+            include_full_records: false,
+        };
+        let resp = store
+            .as_read()
+            .get_agent_activity(&author, &ChainQueryFilter::new(), &opts)
+            .await
+            .unwrap();
+
+        assert!(matches!(resp.valid_activity, ChainItems::Hashes(ref h) if h.len() == 1));
+        match resp.rejected_activity {
+            ChainItems::Hashes(h) => {
+                assert_eq!(h.len(), 1);
+                assert_eq!(h[0].0, 1);
+            }
+            other => panic!("expected Hashes, got {other:?}"),
+        }
+        assert!(matches!(resp.status, ChainStatus::Invalid(ref head) if head.action_seq == 1));
+    }
+
+    #[tokio::test]
+    async fn get_agent_activity_detects_fork() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let author = AgentPubKey::from_raw_36(vec![9u8; 36]);
+        let prev = ActionHash::from_raw_36(vec![0u8; 36]);
+
+        integrate_activity(
+            &store,
+            make_fork_op(&author, &prev, 0, 1),
+            AppOutcome::Accepted,
+            10,
+        )
+        .await;
+        // Two valid actions both at seq 1 -> fork.
+        integrate_activity(
+            &store,
+            make_fork_op(&author, &prev, 1, 2),
+            AppOutcome::Accepted,
+            11,
+        )
+        .await;
+        integrate_activity(
+            &store,
+            make_fork_op(&author, &prev, 1, 3),
+            AppOutcome::Accepted,
+            12,
+        )
+        .await;
+
+        let opts = GetAgentActivityOptions {
+            include_valid_activity: true,
+            include_rejected_activity: false,
+            include_warrants: false,
+            include_full_records: false,
+        };
+        let resp = store
+            .as_read()
+            .get_agent_activity(&author, &ChainQueryFilter::new(), &opts)
+            .await
+            .unwrap();
+
+        // The meaningful signal is fork detection: two valid actions at the
+        // same seq yield Forked. (highest_observed mirrors the legacy authority
+        // and reports the top sequence, not necessarily every tip's hash.)
+        match resp.status {
+            ChainStatus::Forked(fork) => assert_eq!(fork.fork_seq, 1),
+            other => panic!("expected Forked, got {other:?}"),
+        }
+        let ho = resp.highest_observed.expect("highest observed");
+        assert_eq!(ho.action_seq, 1);
+    }
+
+    #[tokio::test]
+    async fn get_agent_activity_full_returns_records() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let author = AgentPubKey::from_raw_36(vec![5u8; 36]);
+        let prev = ActionHash::from_raw_36(vec![0u8; 36]);
+
+        integrate_activity(
+            &store,
+            make_fork_op(&author, &prev, 0, 1),
+            AppOutcome::Accepted,
+            10,
+        )
+        .await;
+
+        let opts = GetAgentActivityOptions {
+            include_valid_activity: true,
+            include_rejected_activity: false,
+            include_warrants: false,
+            include_full_records: true,
+        };
+        let resp = store
+            .as_read()
+            .get_agent_activity(&author, &ChainQueryFilter::new(), &opts)
+            .await
+            .unwrap();
+
+        match resp.valid_activity {
+            ChainItems::Full(records) => assert_eq!(records.len(), 1),
+            other => panic!("expected Full, got {other:?}"),
+        }
+    }
+
+    fn make_warrant_for(warrantee: &AgentPubKey, seed: u8) -> DhtOpHashed {
+        // `Signature` and `Timestamp` are already in scope from the test
+        // module's top-level `use` lines; do not re-import them here.
+        use holochain_types::warrant::WarrantOp;
+        use holochain_zome_types::op::ChainOpType;
+        use holochain_zome_types::prelude::{
+            ChainIntegrityWarrant, SignedWarrant, Warrant, WarrantProof,
+        };
+
+        let action_author = AgentPubKey::from_raw_36(vec![seed; 36]);
+        let action_hash = ActionHash::from_raw_36(vec![seed.wrapping_add(100); 36]);
+        let warrant = SignedWarrant::new(
+            Warrant::new(
+                WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+                    action_author,
+                    action: (action_hash, Signature::from([seed; 64])),
+                    chain_op_type: ChainOpType::StoreRecord,
+                    reason: "test warrant".into(),
+                }),
+                AgentPubKey::from_raw_36(vec![seed.wrapping_add(10); 36]),
+                Timestamp::from_micros(seed as i64 * 1000),
+                warrantee.clone(),
+            ),
+            Signature::from([seed.wrapping_add(1); 64]),
+        );
+        DhtOpHashed::from_content_sync(DhtOp::WarrantOp(Box::new(WarrantOp::from(warrant))))
+    }
+
+    #[tokio::test]
+    async fn get_agent_activity_attaches_warrants_when_requested() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let author = AgentPubKey::from_raw_36(vec![21u8; 36]);
+        let prev = ActionHash::from_raw_36(vec![0u8; 36]);
+
+        integrate_activity(
+            &store,
+            make_fork_op(&author, &prev, 0, 1),
+            AppOutcome::Accepted,
+            10,
+        )
+        .await;
+
+        // Integrate a warrant whose warrantee is this author.
+        let warrant = make_warrant_for(&author, 30);
+        let wh = warrant.as_hash().clone();
+        store.record_incoming_ops(vec![warrant]).await.unwrap();
+        store
+            .record_warrant_sys_validation_outcomes(vec![(wh, SysOutcome::Accepted)])
+            .await
+            .unwrap();
+        store
+            .integrate_ready_ops(Timestamp::from_micros(20))
+            .await
+            .unwrap();
+
+        // include_warrants = true -> attached.
+        let with = GetAgentActivityOptions {
+            include_valid_activity: true,
+            include_rejected_activity: false,
+            include_warrants: true,
+            include_full_records: false,
+        };
+        let resp = store
+            .as_read()
+            .get_agent_activity(&author, &ChainQueryFilter::new(), &with)
+            .await
+            .unwrap();
+        assert_eq!(resp.warrants.len(), 1);
+
+        // include_warrants = false -> empty, and valid not requested.
+        let without = GetAgentActivityOptions {
+            include_valid_activity: false,
+            include_rejected_activity: false,
+            include_warrants: false,
+            include_full_records: false,
+        };
+        let resp = store
+            .as_read()
+            .get_agent_activity(&author, &ChainQueryFilter::new(), &without)
+            .await
+            .unwrap();
+        assert!(resp.warrants.is_empty());
+        assert!(matches!(resp.valid_activity, ChainItems::NotRequested));
     }
 
     #[tokio::test]
