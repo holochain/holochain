@@ -46,6 +46,32 @@ pub struct IntegratedOpSummary {
     pub warrantee: Option<holo_hash::AgentPubKey>,
 }
 
+/// Output options for [`DhtStore::get_agent_activity`]. A `holochain_state`-local
+/// mirror of `holochain_p2p`'s `GetActivityOptions` (which is off this crate's
+/// dependency graph); the cascade maps between the two in phases 1b/1c.
+#[derive(Debug, Clone, Copy)]
+pub struct GetAgentActivityOptions {
+    /// Include the valid activity in the response.
+    pub include_valid_activity: bool,
+    /// Include the rejected activity in the response.
+    pub include_rejected_activity: bool,
+    /// Include warrants in the response.
+    pub include_warrants: bool,
+    /// Return full records instead of just hashes.
+    pub include_full_records: bool,
+}
+
+impl Default for GetAgentActivityOptions {
+    fn default() -> Self {
+        Self {
+            include_valid_activity: true,
+            include_rejected_activity: false,
+            include_warrants: true,
+            include_full_records: false,
+        }
+    }
+}
+
 /// Result of system validation for a single DHT op.
 #[derive(Debug, Clone, Copy)]
 pub enum SysOutcome {

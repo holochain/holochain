@@ -6,12 +6,19 @@
 //! corresponding write operations.
 
 use super::DhtStore;
+use crate::prelude::ActionSequenceAndHash;
 use crate::query::StateQueryResult;
 use holo_hash::{DhtOpHash, HasHash};
 use holochain_data::kind::Dht;
 use holochain_data::DbRead;
 use holochain_types::dht_op::DhtOpHashed;
+use holochain_types::prelude::{
+    ActionHashedContainer, AgentActivityResponse, ChainItems, ChainItemsSource,
+};
 use holochain_zome_types::dht_v2::RecordValidity;
+use holochain_zome_types::prelude::{
+    ChainFork, ChainHead, ChainQueryFilter, ChainStatus, HighestObserved, SignedWarrant,
+};
 
 impl DhtStore<DbRead<Dht>> {
     /// Returns `true` if `hash` appears in any op-bearing DHT table
@@ -404,6 +411,73 @@ impl DhtStore<DbRead<Dht>> {
         Ok(links)
     }
 
+    /// Agent activity for `author`: the integrated `RegisterAgentActivity`
+    /// actions classified into valid/rejected, with chain status, highest
+    /// observed, and warrants. Store-only (no scratch). Returns legacy types.
+    pub async fn get_agent_activity(
+        &self,
+        author: &holo_hash::AgentPubKey,
+        filter: &ChainQueryFilter,
+        options: &crate::dht_store::GetAgentActivityOptions,
+    ) -> StateQueryResult<AgentActivityResponse> {
+        use holochain_zome_types::dht_v2::to_legacy_signed_action;
+        use holochain_zome_types::record::Record;
+
+        let items = self
+            .db()
+            .get_agent_activity(author.clone(), options.include_full_records)
+            .await?;
+
+        let warrants = if options.include_warrants {
+            self.db()
+                .get_warrants_by_warrantee(author.clone())
+                .await?
+                .into_iter()
+                .map(warrant_row_to_signed_warrant)
+                .collect::<StateQueryResult<Vec<_>>>()?
+        } else {
+            Vec::new()
+        };
+
+        if options.include_full_records {
+            let mut valid = Vec::new();
+            let mut rejected = Vec::new();
+            for item in items {
+                let record = Record::new(to_legacy_signed_action(&item.action), item.entry);
+                match item.validation_status {
+                    RecordValidity::Accepted => valid.push(record),
+                    RecordValidity::Rejected => rejected.push(record),
+                }
+            }
+            Ok(build_agent_activity_response(
+                author.clone(),
+                valid,
+                rejected,
+                warrants,
+                filter,
+                options,
+            ))
+        } else {
+            let mut valid = Vec::new();
+            let mut rejected = Vec::new();
+            for item in items {
+                let action_hashed = to_legacy_signed_action(&item.action).hashed;
+                match item.validation_status {
+                    RecordValidity::Accepted => valid.push(action_hashed),
+                    RecordValidity::Rejected => rejected.push(action_hashed),
+                }
+            }
+            Ok(build_agent_activity_response(
+                author.clone(),
+                valid,
+                rejected,
+                warrants,
+                filter,
+                options,
+            ))
+        }
+    }
+
     /// Return chain ops that have passed system validation and are awaiting
     /// app validation. Warrants have no app-validation stage, so they are not
     /// included.
@@ -729,11 +803,157 @@ fn warrant_from_limbo_row(
     Ok(DhtOpHashed::with_pre_hashed(op, op_hash))
 }
 
+/// Reconstruct a legacy [`SignedWarrant`] from an integrated `WarrantRow`.
+fn warrant_row_to_signed_warrant(
+    row: holochain_data::models::dht::WarrantRow,
+) -> StateQueryResult<SignedWarrant> {
+    use holochain_types::prelude::{Signature, Timestamp};
+    use holochain_zome_types::warrant::{SignedWarrant, Warrant, WarrantProof};
+
+    let proof: WarrantProof = holochain_serialized_bytes::decode(&row.proof)?;
+    let author = holo_hash::AgentPubKey::from_raw_36(row.author);
+    let warrantee = holo_hash::AgentPubKey::from_raw_36(row.warrantee);
+    let timestamp = Timestamp::from_micros(row.timestamp);
+    let warrant = Warrant::new(proof, author, timestamp, warrantee);
+    let sig: [u8; 64] = row.signature.as_slice().try_into().map_err(|_| {
+        crate::query::StateQueryError::Other(format!(
+            "warrant signature column has {} bytes, expected 64",
+            row.signature.len()
+        ))
+    })?;
+    Ok(SignedWarrant::new(warrant, Signature::from(sig)))
+}
+
+/// Highest observed sequence number across the valid and rejected lists
+/// (each assumed sorted ascending by sequence). Multiple actions sharing the
+/// top sequence all contribute their hashes.
+fn compute_highest_observed<T: ActionSequenceAndHash>(
+    valid: &[T],
+    rejected: &[T],
+) -> Option<HighestObserved> {
+    let mut highest_observed: Option<u32> = None;
+    let mut hashes = Vec::new();
+    let mut check_highest = |seq: u32, hash: &holo_hash::ActionHash| {
+        if let Some(last) = highest_observed.as_mut() {
+            match seq.cmp(last) {
+                std::cmp::Ordering::Less => {}
+                std::cmp::Ordering::Equal => hashes.push(hash.clone()),
+                std::cmp::Ordering::Greater => {
+                    hashes.clear();
+                    hashes.push(hash.clone());
+                    *last = seq;
+                }
+            }
+        } else {
+            highest_observed = Some(seq);
+            hashes.push(hash.clone());
+        }
+    };
+    if let Some(v) = valid.last() {
+        check_highest(v.action_seq(), v.address());
+    }
+    if let Some(r) = rejected.last() {
+        check_highest(r.action_seq(), r.address());
+    }
+    highest_observed.map(|action_seq| HighestObserved {
+        action_seq,
+        hash: hashes,
+    })
+}
+
+/// Compute the [`ChainStatus`] from the valid and rejected lists, returning the
+/// (sorted) lists alongside. A fork is two valid actions at the same sequence.
+fn compute_chain_status<T: ActionSequenceAndHash>(
+    valid: impl Iterator<Item = T>,
+    rejected: impl Iterator<Item = T>,
+) -> (ChainStatus, Vec<T>, Vec<T>) {
+    let mut valid: Vec<_> = valid.collect();
+    let mut rejected: Vec<_> = rejected.collect();
+    valid.sort_unstable_by_key(|a| a.action_seq());
+    rejected.sort_unstable_by_key(|a| a.action_seq());
+
+    let mut valid_out: Vec<T> = Vec::with_capacity(valid.len());
+    let mut status = None;
+    for current in valid {
+        if status.is_none() {
+            let fork = valid_out.last().and_then(|v: &T| {
+                if current.action_seq() == v.action_seq() {
+                    Some(v)
+                } else {
+                    None
+                }
+            });
+            if let Some(fork) = fork {
+                status = Some(ChainStatus::Forked(ChainFork {
+                    fork_seq: current.action_seq(),
+                    first_action: current.address().clone(),
+                    second_action: fork.address().clone(),
+                }));
+            }
+        }
+        valid_out.push(current);
+    }
+
+    let status = status.unwrap_or_else(|| match (valid_out.last(), rejected.first()) {
+        (None, None) => ChainStatus::Empty,
+        (Some(v), None) => ChainStatus::Valid(ChainHead {
+            action_seq: v.action_seq(),
+            hash: v.address().clone(),
+        }),
+        (None, Some(r)) | (Some(_), Some(r)) => ChainStatus::Invalid(ChainHead {
+            action_seq: r.action_seq(),
+            hash: r.address().clone(),
+        }),
+    });
+
+    (status, valid_out, rejected)
+}
+
+/// Assemble the legacy [`AgentActivityResponse`] from the classified lists.
+fn build_agent_activity_response<T>(
+    agent: holo_hash::AgentPubKey,
+    valid: Vec<T>,
+    rejected: Vec<T>,
+    warrants: Vec<SignedWarrant>,
+    filter: &ChainQueryFilter,
+    options: &crate::dht_store::GetAgentActivityOptions,
+) -> AgentActivityResponse
+where
+    T: ActionHashedContainer + Clone,
+    Vec<T>: ChainItemsSource,
+{
+    let highest_observed = compute_highest_observed(&valid, &rejected);
+    let (status, valid, rejected) = compute_chain_status(valid.into_iter(), rejected.into_iter());
+
+    let valid_activity = if options.include_valid_activity {
+        filter.filter_actions(valid).to_chain_items()
+    } else {
+        ChainItems::NotRequested
+    };
+    let rejected_activity = if options.include_rejected_activity {
+        filter.filter_actions(rejected).to_chain_items()
+    } else {
+        ChainItems::NotRequested
+    };
+    // `warrants` is already gated by the caller (empty when not requested),
+    // so it is passed through as-is.
+    AgentActivityResponse {
+        agent,
+        valid_activity,
+        rejected_activity,
+        warrants,
+        status,
+        highest_observed,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dht_store::{AppOutcome, GetAgentActivityOptions, SysOutcome};
     use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, EntryHash, HoloHashed};
     use holochain_data::kind::Dht;
+    use holochain_data::DbWrite;
     use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
     use holochain_types::prelude::Signature;
     use holochain_types::prelude::Timestamp;
@@ -852,8 +1072,6 @@ mod tests {
 
     #[tokio::test]
     async fn ops_pending_sys_validation_excludes_completed() {
-        use crate::dht_store::SysOutcome;
-
         let store = crate::dht_store::DhtStore::new_test(dht_id())
             .await
             .unwrap();
@@ -889,8 +1107,6 @@ mod tests {
 
     #[tokio::test]
     async fn ops_pending_app_validation_returns_sys_validated_chain_op() {
-        use crate::dht_store::SysOutcome;
-
         let store = crate::dht_store::DhtStore::new_test(dht_id())
             .await
             .unwrap();
@@ -937,8 +1153,6 @@ mod tests {
 
     #[tokio::test]
     async fn ops_pending_app_validation_excludes_app_validated() {
-        use crate::dht_store::{AppOutcome, SysOutcome};
-
         let store = crate::dht_store::DhtStore::new_test(dht_id())
             .await
             .unwrap();
@@ -1025,8 +1239,6 @@ mod tests {
 
     #[tokio::test]
     async fn pending_validation_receipts_returns_integrated_require_receipt_ops() {
-        use crate::dht_store::{AppOutcome, SysOutcome};
-
         let store = crate::dht_store::DhtStore::new_test(dht_id())
             .await
             .unwrap();
@@ -1064,10 +1276,80 @@ mod tests {
         assert_eq!(receipts[0].0.validators, validators);
     }
 
+    async fn integrate_activity(
+        store: &crate::dht_store::DhtStore<DbWrite<Dht>>,
+        op: DhtOpHashed,
+        app: AppOutcome,
+        when: i64,
+    ) {
+        let hash = op.as_hash().clone();
+        store.record_incoming_ops(vec![op]).await.unwrap();
+        store
+            .record_chain_op_sys_validation_outcomes(vec![(hash.clone(), SysOutcome::Accepted)])
+            .await
+            .unwrap();
+        store
+            .record_app_validation_outcomes(vec![(hash, app)])
+            .await
+            .unwrap();
+        store
+            .integrate_ready_ops(Timestamp::from_micros(when))
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn get_agent_activity_valid_chain_hashes() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let author = AgentPubKey::from_raw_36(vec![42u8; 36]);
+        let prev = ActionHash::from_raw_36(vec![0u8; 36]);
+
+        integrate_activity(
+            &store,
+            make_fork_op(&author, &prev, 0, 1),
+            AppOutcome::Accepted,
+            10,
+        )
+        .await;
+        integrate_activity(
+            &store,
+            make_fork_op(&author, &prev, 1, 2),
+            AppOutcome::Accepted,
+            11,
+        )
+        .await;
+
+        let opts = GetAgentActivityOptions {
+            include_valid_activity: true,
+            include_rejected_activity: true,
+            include_warrants: false,
+            include_full_records: false,
+        };
+        let resp: AgentActivityResponse = store
+            .as_read()
+            .get_agent_activity(&author, &ChainQueryFilter::new(), &opts)
+            .await
+            .unwrap();
+
+        assert_eq!(resp.agent, author);
+        match resp.valid_activity {
+            ChainItems::Hashes(h) => {
+                assert_eq!(h.len(), 2);
+                assert_eq!(h[0].0, 0);
+                assert_eq!(h[1].0, 1);
+            }
+            other => panic!("expected Hashes, got {other:?}"),
+        }
+        assert!(matches!(resp.rejected_activity, ChainItems::Hashes(ref h) if h.is_empty()));
+        assert!(matches!(resp.status, ChainStatus::Valid(ref head) if head.action_seq == 1));
+        let ho = resp.highest_observed.expect("highest observed");
+        assert_eq!(ho.action_seq, 1);
+    }
+
     #[tokio::test]
     async fn pending_validation_receipts_excludes_ops_without_require_receipt() {
-        use crate::dht_store::{AppOutcome, SysOutcome};
-
         let store = crate::dht_store::DhtStore::new_test(dht_id())
             .await
             .unwrap();
