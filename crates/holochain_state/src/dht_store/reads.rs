@@ -1912,6 +1912,145 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn must_get_agent_activity_chain_top_not_found() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let author = AgentPubKey::from_raw_36(vec![72u8; 36]);
+        let (ops, _hashes) = make_activity_chain(&author, 2);
+        for (i, op) in ops.into_iter().enumerate() {
+            integrate_activity(&store, op, AppOutcome::Accepted, 10 + i as i64).await;
+        }
+        let unknown = ActionHash::from_raw_36(vec![88u8; 36]);
+        let resp = store
+            .as_read()
+            .must_get_agent_activity(&author, &ChainFilter::new(unknown.clone()))
+            .await
+            .unwrap();
+        assert!(matches!(
+            resp,
+            MustGetAgentActivityResponse::ChainTopNotFound(h) if h == unknown
+        ));
+    }
+
+    #[tokio::test]
+    async fn must_get_agent_activity_until_hash_complete() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let author = AgentPubKey::from_raw_36(vec![73u8; 36]);
+        let (ops, hashes) = make_activity_chain(&author, 3);
+        for (i, op) in ops.into_iter().enumerate() {
+            integrate_activity(&store, op, AppOutcome::Accepted, 10 + i as i64).await;
+        }
+        // until = seq 1: expect seq 2 and 1, Complete.
+        let filter = ChainFilter::until_hash(hashes[2].clone(), hashes[1].clone());
+        let resp = store
+            .as_read()
+            .must_get_agent_activity(&author, &filter)
+            .await
+            .unwrap();
+        match resp {
+            MustGetAgentActivityResponse::Activity { activity, .. } => {
+                assert_eq!(activity.len(), 2);
+                assert_eq!(activity[0].action.seq(), 2);
+                assert_eq!(activity[1].action.seq(), 1);
+            }
+            other => panic!("expected Activity, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn must_get_agent_activity_until_hash_missing() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let author = AgentPubKey::from_raw_36(vec![74u8; 36]);
+        let (ops, hashes) = make_activity_chain(&author, 2);
+        for (i, op) in ops.into_iter().enumerate() {
+            integrate_activity(&store, op, AppOutcome::Accepted, 10 + i as i64).await;
+        }
+        // until_hash references an action not in this chain.
+        let missing = ActionHash::from_raw_36(vec![77u8; 36]);
+        let filter = ChainFilter::until_hash(hashes[1].clone(), missing.clone());
+        let resp = store
+            .as_read()
+            .must_get_agent_activity(&author, &filter)
+            .await
+            .unwrap();
+        assert!(matches!(
+            resp,
+            MustGetAgentActivityResponse::UntilHashMissing(h) if h == missing
+        ));
+    }
+
+    #[tokio::test]
+    async fn must_get_agent_activity_take_complete() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let author = AgentPubKey::from_raw_36(vec![75u8; 36]);
+        let (ops, hashes) = make_activity_chain(&author, 3);
+        for (i, op) in ops.into_iter().enumerate() {
+            integrate_activity(&store, op, AppOutcome::Accepted, 10 + i as i64).await;
+        }
+        let filter = ChainFilter::take(hashes[2].clone(), 2);
+        let resp = store
+            .as_read()
+            .must_get_agent_activity(&author, &filter)
+            .await
+            .unwrap();
+        match resp {
+            MustGetAgentActivityResponse::Activity { activity, .. } => {
+                assert_eq!(activity.len(), 2);
+                assert_eq!(activity[0].action.seq(), 2);
+                assert_eq!(activity[1].action.seq(), 1);
+            }
+            other => panic!("expected Activity, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn must_get_agent_activity_take_zero_errors() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let author = AgentPubKey::from_raw_36(vec![76u8; 36]);
+        let (ops, hashes) = make_activity_chain(&author, 1);
+        for (i, op) in ops.into_iter().enumerate() {
+            integrate_activity(&store, op, AppOutcome::Accepted, 10 + i as i64).await;
+        }
+        let filter = ChainFilter::take(hashes[0].clone(), 0);
+        let result = store
+            .as_read()
+            .must_get_agent_activity(&author, &filter)
+            .await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn must_get_agent_activity_gap_is_incomplete() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let author = AgentPubKey::from_raw_36(vec![78u8; 36]);
+        let (ops, hashes) = make_activity_chain(&author, 3);
+        // Integrate seq 0 and seq 2, skip seq 1 -> the chain top cannot reach genesis.
+        integrate_activity(&store, ops[0].clone(), AppOutcome::Accepted, 10).await;
+        integrate_activity(&store, ops[2].clone(), AppOutcome::Accepted, 12).await;
+        let filter = ChainFilter::new(hashes[2].clone());
+        let resp = store
+            .as_read()
+            .must_get_agent_activity(&author, &filter)
+            .await
+            .unwrap();
+        assert!(matches!(
+            resp,
+            MustGetAgentActivityResponse::IncompleteChain
+        ));
+    }
+
+    #[tokio::test]
     async fn pending_validation_receipts_excludes_ops_without_require_receipt() {
         let store = crate::dht_store::DhtStore::new_test(dht_id())
             .await
