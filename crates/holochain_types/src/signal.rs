@@ -3,6 +3,7 @@
 //! - App-defined signals are produced via the `emit_signal` host function.
 //! - System-defined signals are produced in various places in the system
 
+use crate::app::{InstalledAppId, UnrecoverableCellReason};
 use crate::impl_from;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::prelude::*;
@@ -49,6 +50,24 @@ pub enum SystemSignal {
     SuccessfulCountersigning(EntryHash),
     /// A countersigning session has been abandoned.
     AbandonedCountersigning(EntryHash),
+    /// A single cell within an app has finished restoring its source chain from the DHT.
+    RestoreComplete {
+        /// The cell that finished restoring.
+        cell_id: CellId,
+    },
+    /// All cells of an app have finished restoring; the app is now Disabled(NeverStarted).
+    AppRestoreComplete {
+        /// The app that finished restoring.
+        installed_app_id: InstalledAppId,
+    },
+    /// A cell's restore hit a permanent failure (validated ChainIntegrityWarrant). The whole
+    /// app transitions to Unrecoverable at the same moment.
+    RestoreFailed {
+        /// The cell that failed to restore.
+        cell_id: CellId,
+        /// Why the restore is unrecoverable.
+        reason: UnrecoverableCellReason,
+    },
 }
 
 impl_from! {
@@ -61,3 +80,41 @@ pub const DIRECT_SIGNAL_MAX_SIZE: usize = 1024 * 1024;
 /// Wrapper type for transmitting a signed direct signal over the network.
 #[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
 pub struct DirectSignal(pub Vec<u8>);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::{UnrecoverableCellReason, WarrantSummary};
+    use ::fixt::prelude::*;
+    use holo_hash::fixt::*;
+
+    #[test]
+    fn restore_system_signals_serde_round_trip() {
+        let cell_id = CellId::new(fixt!(DnaHash), fixt!(AgentPubKey));
+        let summary = WarrantSummary {
+            author: fixt!(AgentPubKey),
+            warrantee: fixt!(AgentPubKey),
+            timestamp: Timestamp::from_micros(1_000_000),
+        };
+        let reason = UnrecoverableCellReason::ChainFork(summary);
+
+        let signals: Vec<SystemSignal> = vec![
+            SystemSignal::RestoreComplete {
+                cell_id: cell_id.clone(),
+            },
+            SystemSignal::AppRestoreComplete {
+                installed_app_id: "my_app".to_string(),
+            },
+            SystemSignal::RestoreFailed {
+                cell_id: cell_id.clone(),
+                reason: reason.clone(),
+            },
+        ];
+
+        for signal in &signals {
+            let json = serde_json::to_string(signal).unwrap();
+            let recovered: SystemSignal = serde_json::from_str(&json).unwrap();
+            assert_eq!(signal, &recovered);
+        }
+    }
+}
