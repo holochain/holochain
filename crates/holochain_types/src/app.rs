@@ -789,6 +789,14 @@ pub enum AppStatus {
     /// The app is installed, but genesis has not completed because Membrane Proofs
     /// have not been provided.
     AwaitingMemproofs,
+    /// Restore is in progress for one or more of the app's cells. Zome calls are rejected.
+    /// Transitions to Disabled(NeverStarted) once every cell has restored, or to
+    /// Unrecoverable if any cell fails permanently.
+    AwaitingRestore,
+    /// Restore hit a permanent failure: a locally-validated ChainIntegrityWarrant against the
+    /// agent. Terminal — the app cannot be enabled and must be uninstalled.
+    /// The CellId identifies which cell triggered the failure.
+    Unrecoverable(CellId, UnrecoverableCellReason),
 }
 
 /// The reason for an app being in a Disabled state.
@@ -1214,5 +1222,31 @@ mod tests {
         let bytes = SerializedBytes::try_from(&reason).unwrap();
         let recovered: UnrecoverableCellReason = bytes.try_into().unwrap();
         assert_eq!(reason, recovered);
+    }
+
+    #[test]
+    fn app_status_awaiting_restore_serialization() {
+        let status = AppStatus::AwaitingRestore;
+        assert_eq!(
+            serde_json::to_string(&status).unwrap(),
+            r#"{"type":"awaiting_restore"}"#
+        );
+        let recovered: AppStatus = serde_json::from_str(r#"{"type":"awaiting_restore"}"#).unwrap();
+        assert_eq!(status, recovered);
+    }
+
+    #[test]
+    fn app_status_unrecoverable_serialization() {
+        let cell_id = CellId::new(fixt!(DnaHash), fixt!(AgentPubKey));
+        let summary = WarrantSummary {
+            author: fixt!(AgentPubKey),
+            warrantee: fixt!(AgentPubKey),
+            timestamp: Timestamp::from_micros(1_000_000),
+        };
+        let reason = UnrecoverableCellReason::ChainFork(summary);
+        let status = AppStatus::Unrecoverable(cell_id, reason);
+        let json = serde_json::to_string(&status).unwrap();
+        let recovered: AppStatus = serde_json::from_str(&json).unwrap();
+        assert_eq!(status, recovered);
     }
 }
