@@ -1334,6 +1334,13 @@ mod app_impls {
                 ));
             }
 
+            if let Some(ref key) = agent_key {
+                let keys_in_lair = self.keystore.list_public_keys().await?;
+                if !keys_in_lair.contains(key) {
+                    return Err(ConductorError::AgentKeyNotInKeystore(key.clone()));
+                }
+            }
+
             let modifiers = get_modifiers_map_from_role_settings(&roles_settings);
             let membrane_proofs = get_memproof_map_from_role_settings(&roles_settings);
             let existing_cells = get_existing_cells_map_from_role_settings(&roles_settings);

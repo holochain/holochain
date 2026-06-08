@@ -126,6 +126,9 @@ pub enum ConductorError {
     #[error(transparent)]
     RibosomeError(#[from] crate::core::ribosome::error::RibosomeError),
 
+    #[error("Agent key {0} is not present in the local Lair keystore")]
+    AgentKeyNotInKeystore(holo_hash::AgentPubKey),
+
     #[error("Authentication failed with reason: {0}")]
     FailedAuthenticationError(String),
 
