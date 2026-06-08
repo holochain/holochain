@@ -31,6 +31,22 @@ impl holochain_p2p::event::HcP2pHandler for Conductor {
         })
     }
 
+    fn handle_remote_signal_direct(
+        &self,
+        dna_hash: DnaHash,
+        to_agent: AgentPubKey,
+        signal: Vec<u8>,
+        from_agent: AgentPubKey,
+        signature: Signature,
+    ) -> BoxFut<'_, HolochainP2pResult<()>> {
+        Box::pin(async {
+            self.cell_by_parts(&dna_hash, &to_agent)
+                .await?
+                .handle_remote_signal_direct(dna_hash, to_agent, signal, from_agent, signature)
+                .await
+        })
+    }
+
     fn handle_publish(
         &self,
         dna_hash: DnaHash,

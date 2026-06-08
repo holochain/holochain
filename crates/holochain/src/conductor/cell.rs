@@ -496,6 +496,51 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
         Box::pin(async move { fut.await.map_err(HolochainP2pError::other) })
     }
 
+    fn handle_remote_signal_direct(
+        &self,
+        dna_hash: DnaHash,
+        to_agent: AgentPubKey,
+        signal: Vec<u8>,
+        from_agent: AgentPubKey,
+        signature: Signature,
+    ) -> BoxFut<'_, HolochainP2pResult<()>> {
+        Box::pin(async move {
+            // Add 3 to allow for msgpack overhead for an "array 16"
+            if signal.len() > DIRECT_SIGNAL_MAX_SIZE + 3 {
+                let signal_length = signal.len();
+                warn!(
+                    "Received signal payload that is {signal_length:?} > {}",
+                    DIRECT_SIGNAL_MAX_SIZE + 3
+                );
+                return Err(HolochainP2pError::other(
+                    "Received signal payload that was too long",
+                ));
+            }
+
+            let signal: DirectSignal = decode(&signal).map_err(HolochainP2pError::other)?;
+
+            let valid_sig = from_agent
+                .verify_signature(&signature, &signal)
+                .await
+                .map_err(HolochainP2pError::other)?;
+            if !valid_sig {
+                warn!("Received signal payload with an invalid signature");
+                return Err(HolochainP2pError::other(
+                    "Received signal with an invalid signature",
+                ));
+            }
+
+            if let Err(e) = self.signal_tx.send(Signal::AppDirect {
+                cell_id: CellId::new(dna_hash, to_agent),
+                signal: signal.0,
+            }) {
+                info!(?e, "Failed to relay direct signal to app")
+            }
+
+            Ok(())
+        })
+    }
+
     fn handle_publish(
         &self,
         _dna_hash: DnaHash,

@@ -251,6 +251,32 @@ pub enum AppRequest {
     ///
     /// [`AppResponse::Ok`]
     EnableApp,
+
+    /// Send a remote signal directly to one or more peers.
+    ///
+    /// Using this app request is equivalent to calling a zome function that forwards to the HDK
+    /// function `send_remote_signal`. On the receiving end, the conductor does not call the
+    /// corresponding zome's `recv_remote_signal` function, which would then have to invoke the HDK
+    /// function `emit_signal`. The result is that signals can be exchanged between peers without
+    /// having to run a WASM function on each side.
+    ///
+    /// Note that this bypasses the usual security mechanism where zomes must create a capability
+    /// grant to permit `recv_remote_signal` to be invoked without restriction.
+    SendDirectSignal {
+        /// The app network to send messages on.
+        dna_hash: DnaHash,
+
+        /// The agents to send the signal payload to.
+        ///
+        /// An empty payload is treated as an error.
+        agents: Vec<AgentPubKey>,
+
+        /// The signal payload.
+        ///
+        /// Treated as opaque by Holochain, it is up to the application to decide how to serialize,
+        /// deserialize and process payloads.
+        signal: Vec<u8>,
+    },
 }
 
 /// Represents the possible responses to an [`AppRequest`].

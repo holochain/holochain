@@ -2217,7 +2217,7 @@ mod scheduler_impls {
 /// Miscellaneous methods
 mod misc_impls {
     use super::{state_dump_helpers::peer_store_dump, *};
-    use holochain_conductor_api::JsonDump;
+    use holochain_conductor_api::{CellInfo, JsonDump};
     use holochain_zome_types::{action::builder, Entry};
     use kitsune2_api::{SpaceId, TransportStats};
     use std::sync::atomic::Ordering;
@@ -2759,6 +2759,66 @@ mod misc_impls {
                 .share_mut(|d| d.add_ribosome(cell_id, ribosome));
 
             // TODO: Remove old wasm code? (Maybe this needs to be done on restart as it could be in use).
+
+            Ok(())
+        }
+
+        /// Send a signal directly to the specified agents, bypassing WASM execution
+        pub async fn send_direct_signal(
+            &self,
+            installed_app_id: InstalledAppId,
+            dna_hash: DnaHash,
+            agents: Vec<AgentPubKey>,
+            signal: Vec<u8>,
+        ) -> ConductorResult<()> {
+            if agents.is_empty() {
+                return Err(ConductorError::Other("No agents to signal".into()));
+            }
+
+            if signal.len() > DIRECT_SIGNAL_MAX_SIZE {
+                return Err(ConductorError::Other(
+                    format!(
+                        "Signal payload larger than {} bytes",
+                        DIRECT_SIGNAL_MAX_SIZE
+                    )
+                    .into(),
+                ));
+            }
+
+            let app_info = self.get_app_info(&installed_app_id).await?.ok_or_else(|| {
+                ConductorError::other(format!("App not installed: {installed_app_id}"))
+            })?;
+
+            let dna_belongs_to_app = app_info
+                .cell_info
+                .values()
+                .flatten()
+                .find(|c| match c {
+                    CellInfo::Provisioned(cell) => cell.cell_id.dna_hash() == &dna_hash,
+                    CellInfo::Cloned(cell) => cell.cell_id.dna_hash() == &dna_hash,
+                    CellInfo::Stem(cell) => cell.original_dna_hash == dna_hash,
+                })
+                .is_some();
+            if !dna_belongs_to_app {
+                return Err(ConductorError::Other(format!("Attempted to send to DNA hash {dna_hash:?} but it was not found in app {installed_app_id}").into()));
+            }
+
+            let signal_bytes = holochain_serialized_bytes::encode(&DirectSignal(signal))?;
+
+            let sig = self
+                .keystore()
+                .sign(app_info.agent_pub_key.clone(), signal_bytes.clone().into())
+                .await?;
+
+            self.holochain_p2p()
+                .send_remote_signal_direct(
+                    dna_hash,
+                    agents,
+                    signal_bytes,
+                    app_info.agent_pub_key,
+                    sig,
+                )
+                .await?;
 
             Ok(())
         }
