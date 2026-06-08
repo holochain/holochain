@@ -1,5 +1,5 @@
 use super::*;
-use holo_hash::{ActionHash, AnyLinkableHash, DnaHash};
+use holo_hash::{ActionHash, AnyLinkableHash, DnaHash, EntryHash};
 use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed, RenderedOp, RenderedOps};
 use holochain_types::prelude::Signature;
 use holochain_zome_types::action::{Action, Create, CreateLink, DeleteLink, EntryType};
@@ -2107,5 +2107,161 @@ async fn authority_updates_for_record_returns_integrated_updates() {
         .await
         .unwrap();
     assert_eq!(updates.len(), 1, "the integrated update should be served");
+    assert_eq!(updates[0].1, ValidationStatus::Valid);
+}
+
+/// Build a `StoreEntry(Create)` op as a `DhtOpHashed`, returning it + the entry hash.
+fn make_store_entry_op(seed: u8) -> (DhtOpHashed, EntryHash) {
+    use holochain_serialized_bytes::UnsafeBytes;
+    use holochain_types::action::NewEntryAction;
+    use holochain_types::prelude::{AppEntryBytes, Entry};
+    use holochain_zome_types::action::{Create, EntryType};
+    use holochain_zome_types::entry_def::EntryVisibility;
+    use holochain_zome_types::prelude::AppEntryDef;
+
+    let entry_hash = EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]);
+    let entry = Entry::App(AppEntryBytes(
+        holochain_serialized_bytes::SerializedBytes::from(UnsafeBytes::from(vec![seed; 8])),
+    ));
+    let create = Create {
+        author: AgentPubKey::from_raw_36(vec![seed; 36]),
+        timestamp: Timestamp::from_micros(seed as i64 * 1000),
+        action_seq: 1,
+        prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36]),
+        entry_type: EntryType::App(AppEntryDef::new(
+            0.into(),
+            0.into(),
+            EntryVisibility::Public,
+        )),
+        entry_hash: entry_hash.clone(),
+        weight: Default::default(),
+    };
+    let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(ChainOp::StoreEntry(
+        Signature::from([seed; 64]),
+        NewEntryAction::Create(create),
+        entry,
+    ))));
+    (op, entry_hash)
+}
+
+#[tokio::test]
+async fn authority_entry_creates_excludes_cached() {
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+
+    // Authoritative: incoming + integrated -> locally_validated = 1.
+    let (op, entry_hash) = make_store_entry_op(80);
+    integrate_link_op(&store, op, AppOutcome::Accepted, 1).await;
+    let creates = store
+        .as_read()
+        .get_authority_entry_creates(&entry_hash)
+        .await
+        .unwrap();
+    assert_eq!(
+        creates.len(),
+        1,
+        "locally-validated create should be served"
+    );
+    assert_eq!(creates[0].1, ValidationStatus::Valid);
+
+    // Cached: cache_chain_ops -> locally_validated = 0 -> not served.
+    let (rendered, _ah, cached_entry) = build_rendered_store_entry(81);
+    store.cache_chain_ops(&rendered).await.unwrap();
+    assert!(
+        store
+            .as_read()
+            .get_authority_entry_creates(&cached_entry)
+            .await
+            .unwrap()
+            .is_empty(),
+        "cached-only create must not be served by the authority read"
+    );
+}
+
+#[tokio::test]
+async fn authority_deletes_for_entry_returns_integrated_deletes() {
+    use holochain_zome_types::action::Delete;
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+
+    let (op, entry_hash) = make_store_entry_op(82);
+    integrate_link_op(&store, op, AppOutcome::Accepted, 1).await;
+
+    let delete_action = Action::Delete(Delete {
+        author: AgentPubKey::from_raw_36(vec![213u8; 36]),
+        timestamp: Timestamp::from_micros(213_000),
+        action_seq: 2,
+        prev_action: ActionHash::from_raw_36(vec![214u8; 36]),
+        deletes_address: ActionHash::from_raw_36(vec![215u8; 36]),
+        deletes_entry_address: entry_hash.clone(),
+        weight: Default::default(),
+    });
+    let delete_op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(
+        ChainOp::RegisterDeletedEntryAction(
+            Signature::from([213u8; 64]),
+            match delete_action {
+                Action::Delete(d) => d,
+                _ => unreachable!(),
+            },
+        ),
+    )));
+    integrate_link_op(&store, delete_op, AppOutcome::Accepted, 2).await;
+
+    let deletes = store
+        .as_read()
+        .get_authority_deletes_for_entry(&entry_hash)
+        .await
+        .unwrap();
+    assert_eq!(
+        deletes.len(),
+        1,
+        "the integrated entry-delete should be served"
+    );
+    assert_eq!(deletes[0].1, ValidationStatus::Valid);
+}
+
+#[tokio::test]
+async fn authority_updates_for_entry_returns_integrated_updates() {
+    use holochain_types::prelude::RecordEntry;
+    use holochain_zome_types::action::Update;
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+
+    let (op, entry_hash) = make_store_entry_op(83);
+    integrate_link_op(&store, op, AppOutcome::Accepted, 1).await;
+
+    let update_action = Action::Update(Update {
+        author: AgentPubKey::from_raw_36(vec![223u8; 36]),
+        timestamp: Timestamp::from_micros(223_000),
+        action_seq: 2,
+        prev_action: ActionHash::from_raw_36(vec![224u8; 36]),
+        original_action_address: ActionHash::from_raw_36(vec![225u8; 36]),
+        original_entry_address: entry_hash.clone(),
+        entry_type: EntryType::App(AppEntryDef::new(
+            0.into(),
+            0.into(),
+            EntryVisibility::Public,
+        )),
+        entry_hash: EntryHash::from_raw_36(vec![226u8; 36]),
+        weight: Default::default(),
+    });
+    let update_op =
+        DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(ChainOp::RegisterUpdatedContent(
+            Signature::from([223u8; 64]),
+            match update_action {
+                Action::Update(u) => u,
+                _ => unreachable!(),
+            },
+            RecordEntry::NA,
+        ))));
+    integrate_link_op(&store, update_op, AppOutcome::Accepted, 2).await;
+
+    let updates = store
+        .as_read()
+        .get_authority_updates_for_entry(&entry_hash)
+        .await
+        .unwrap();
+    assert_eq!(
+        updates.len(),
+        1,
+        "the integrated entry-update should be served"
+    );
     assert_eq!(updates[0].1, ValidationStatus::Valid);
 }
