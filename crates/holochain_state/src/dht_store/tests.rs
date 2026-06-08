@@ -1997,3 +1997,115 @@ async fn integrate_upgrades_cached_op_to_locally_validated() {
         "integration must upgrade the cached row to locally_validated"
     );
 }
+
+#[tokio::test]
+async fn authority_store_record_excludes_cached() {
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+
+    // Authoritative: incoming + integrated -> locally_validated = 1.
+    let (op, action_hash, _entry_hash) = store_record_op_with_hashes(70);
+    integrate_link_op(&store, op, AppOutcome::Accepted, 1).await;
+    let got = store
+        .as_read()
+        .get_authority_store_record(&action_hash)
+        .await
+        .unwrap();
+    let (_action, status) = got.expect("locally-validated record should be served");
+    assert_eq!(status, ValidationStatus::Valid);
+
+    // Cached: cache_chain_ops -> locally_validated = 0 -> not served.
+    let (rendered, cached_hash) = build_rendered_store_record_for_move(71);
+    store.cache_chain_ops(&rendered).await.unwrap();
+    assert!(
+        store
+            .as_read()
+            .get_authority_store_record(&cached_hash)
+            .await
+            .unwrap()
+            .is_none(),
+        "cached-only record must not be served by the authority read"
+    );
+}
+
+#[tokio::test]
+async fn authority_deletes_for_record_returns_integrated_deletes() {
+    use holochain_zome_types::action::Delete;
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+
+    let (op, action_hash, entry_hash) = store_record_op_with_hashes(72);
+    integrate_link_op(&store, op, AppOutcome::Accepted, 1).await;
+
+    let delete_action = Action::Delete(Delete {
+        author: AgentPubKey::from_raw_36(vec![210u8; 36]),
+        timestamp: Timestamp::from_micros(210_000),
+        action_seq: 2,
+        prev_action: ActionHash::from_raw_36(vec![211u8; 36]),
+        deletes_address: action_hash.clone(),
+        deletes_entry_address: entry_hash.clone(),
+        weight: Default::default(),
+    });
+    let delete_op =
+        DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(ChainOp::RegisterDeletedBy(
+            Signature::from([210u8; 64]),
+            match delete_action {
+                Action::Delete(d) => d,
+                _ => unreachable!(),
+            },
+        ))));
+    integrate_link_op(&store, delete_op, AppOutcome::Accepted, 2).await;
+
+    let deletes = store
+        .as_read()
+        .get_authority_deletes_for_record(&action_hash)
+        .await
+        .unwrap();
+    assert_eq!(deletes.len(), 1, "the integrated delete should be served");
+    assert_eq!(deletes[0].1, ValidationStatus::Valid);
+}
+
+#[tokio::test]
+async fn authority_updates_for_record_returns_integrated_updates() {
+    use holo_hash::EntryHash;
+    use holochain_types::prelude::RecordEntry;
+    use holochain_zome_types::action::{EntryType, Update};
+    use holochain_zome_types::entry_def::EntryVisibility;
+    use holochain_zome_types::prelude::AppEntryDef;
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+
+    let (op, action_hash, entry_hash) = store_record_op_with_hashes(73);
+    integrate_link_op(&store, op, AppOutcome::Accepted, 1).await;
+
+    let update_action = Action::Update(Update {
+        author: AgentPubKey::from_raw_36(vec![220u8; 36]),
+        timestamp: Timestamp::from_micros(220_000),
+        action_seq: 2,
+        prev_action: ActionHash::from_raw_36(vec![221u8; 36]),
+        original_action_address: action_hash.clone(),
+        original_entry_address: entry_hash.clone(),
+        entry_type: EntryType::App(AppEntryDef::new(
+            0.into(),
+            0.into(),
+            EntryVisibility::Public,
+        )),
+        entry_hash: EntryHash::from_raw_36(vec![222u8; 36]),
+        weight: Default::default(),
+    });
+    let update_op =
+        DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(ChainOp::RegisterUpdatedRecord(
+            Signature::from([220u8; 64]),
+            match update_action {
+                Action::Update(u) => u,
+                _ => unreachable!(),
+            },
+            RecordEntry::NA,
+        ))));
+    integrate_link_op(&store, update_op, AppOutcome::Accepted, 2).await;
+
+    let updates = store
+        .as_read()
+        .get_authority_updates_for_record(&action_hash)
+        .await
+        .unwrap();
+    assert_eq!(updates.len(), 1, "the integrated update should be served");
+    assert_eq!(updates[0].1, ValidationStatus::Valid);
+}

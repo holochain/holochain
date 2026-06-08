@@ -720,6 +720,79 @@ impl DhtStore<DbRead<Dht>> {
             .collect())
     }
 
+    /// Authority-serving `StoreRecord` action for `action_hash` (locally-validated
+    /// only), paired with its (legacy) validation status. Returns legacy types.
+    pub async fn get_authority_store_record(
+        &self,
+        action_hash: &holo_hash::ActionHash,
+    ) -> StateQueryResult<
+        Option<(
+            holochain_zome_types::record::SignedActionHashed,
+            ValidationStatus,
+        )>,
+    > {
+        Ok(self
+            .db()
+            .get_authority_store_record(action_hash)
+            .await?
+            .map(|(v2, validity)| {
+                (
+                    holochain_zome_types::dht_v2::to_legacy_signed_action(&v2),
+                    record_validity_to_status(validity),
+                )
+            }))
+    }
+
+    /// Authority-serving deletes targeting record `action_hash` (locally-validated
+    /// only), each paired with its (legacy) validation status.
+    pub async fn get_authority_deletes_for_record(
+        &self,
+        action_hash: &holo_hash::ActionHash,
+    ) -> StateQueryResult<
+        Vec<(
+            holochain_zome_types::record::SignedActionHashed,
+            ValidationStatus,
+        )>,
+    > {
+        Ok(self
+            .db()
+            .get_authority_deletes_for_record(action_hash)
+            .await?
+            .into_iter()
+            .map(|(v2, validity)| {
+                (
+                    holochain_zome_types::dht_v2::to_legacy_signed_action(&v2),
+                    record_validity_to_status(validity),
+                )
+            })
+            .collect())
+    }
+
+    /// Authority-serving updates targeting record `action_hash` (locally-validated
+    /// only), each paired with its (legacy) validation status.
+    pub async fn get_authority_updates_for_record(
+        &self,
+        action_hash: &holo_hash::ActionHash,
+    ) -> StateQueryResult<
+        Vec<(
+            holochain_zome_types::record::SignedActionHashed,
+            ValidationStatus,
+        )>,
+    > {
+        Ok(self
+            .db()
+            .get_authority_updates_for_record(action_hash)
+            .await?
+            .into_iter()
+            .map(|(v2, validity)| {
+                (
+                    holochain_zome_types::dht_v2::to_legacy_signed_action(&v2),
+                    record_validity_to_status(validity),
+                )
+            })
+            .collect())
+    }
+
     /// Return ops awaiting system validation, sorted across chain ops and
     /// warrants by `(sys_validation_attempts, when_received)`, up to `limit`
     /// rows total.
