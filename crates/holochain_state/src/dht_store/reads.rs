@@ -23,6 +23,7 @@ use holochain_zome_types::dht_v2::RecordValidity;
 use holochain_zome_types::prelude::{
     ChainFork, ChainHead, ChainQueryFilter, ChainStatus, HighestObserved, SignedWarrant,
 };
+use holochain_zome_types::validate::ValidationStatus;
 use std::collections::{HashMap, HashSet};
 
 impl DhtStore<DbRead<Dht>> {
@@ -669,6 +670,56 @@ impl DhtStore<DbRead<Dht>> {
             .collect()
     }
 
+    /// Authority-serving create-link actions for `base`: locally-validated only,
+    /// each paired with its (legacy) validation status. Returns legacy types.
+    pub async fn get_authority_link_creates(
+        &self,
+        base: &holo_hash::AnyLinkableHash,
+    ) -> StateQueryResult<
+        Vec<(
+            holochain_zome_types::record::SignedActionHashed,
+            ValidationStatus,
+        )>,
+    > {
+        Ok(self
+            .db()
+            .get_authority_link_creates(base)
+            .await?
+            .into_iter()
+            .map(|(v2, validity)| {
+                (
+                    holochain_zome_types::dht_v2::to_legacy_signed_action(&v2),
+                    record_validity_to_status(validity),
+                )
+            })
+            .collect())
+    }
+
+    /// Authority-serving delete-link actions targeting `base`'s links:
+    /// locally-validated only, each paired with its (legacy) validation status.
+    pub async fn get_authority_delete_links(
+        &self,
+        base: &holo_hash::AnyLinkableHash,
+    ) -> StateQueryResult<
+        Vec<(
+            holochain_zome_types::record::SignedActionHashed,
+            ValidationStatus,
+        )>,
+    > {
+        Ok(self
+            .db()
+            .get_authority_delete_links(base)
+            .await?
+            .into_iter()
+            .map(|(v2, validity)| {
+                (
+                    holochain_zome_types::dht_v2::to_legacy_signed_action(&v2),
+                    record_validity_to_status(validity),
+                )
+            })
+            .collect())
+    }
+
     /// Return ops awaiting system validation, sorted across chain ops and
     /// warrants by `(sys_validation_attempts, when_received)`, up to `limit`
     /// rows total.
@@ -701,6 +752,14 @@ impl DhtStore<DbRead<Dht>> {
         out.sort_by_key(|(attempts, when_received, _)| (*attempts, *when_received));
         out.truncate(limit as usize);
         Ok(out.into_iter().map(|(_, _, op)| op).collect())
+    }
+}
+
+/// Map the v2 record validity to the legacy validation status served on the wire.
+fn record_validity_to_status(v: RecordValidity) -> ValidationStatus {
+    match v {
+        RecordValidity::Accepted => ValidationStatus::Valid,
+        RecordValidity::Rejected => ValidationStatus::Rejected,
     }
 }
 

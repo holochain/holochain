@@ -6,6 +6,7 @@ use holochain_zome_types::action::{Action, Create, CreateLink, DeleteLink, Entry
 use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::op::ChainOpType;
 use holochain_zome_types::prelude::AppEntryDef;
+use holochain_zome_types::validate::ValidationStatus;
 use std::sync::Arc;
 
 fn dht_id() -> Dht {
@@ -1743,4 +1744,169 @@ async fn integration_indexes_delete_link() {
         .await
         .unwrap();
     assert_eq!(deletes.len(), 1, "integrated DeleteLink should be indexed");
+}
+
+async fn integrate_link_op(
+    store: &crate::dht_store::DhtStore<DbWrite<Dht>>,
+    op: DhtOpHashed,
+    app: AppOutcome,
+    when: i64,
+) {
+    let hash = op.as_hash().clone();
+    store.record_incoming_ops(vec![op]).await.unwrap();
+    store
+        .record_chain_op_sys_validation_outcomes(vec![(hash.clone(), SysOutcome::Accepted)])
+        .await
+        .unwrap();
+    store
+        .record_app_validation_outcomes(vec![(hash, app)])
+        .await
+        .unwrap();
+    store
+        .integrate_ready_ops(Timestamp::from_micros(when))
+        .await
+        .unwrap();
+}
+
+fn build_cached_create_link(base: &holo_hash::AnyLinkableHash, seed: u8) -> RenderedOps {
+    let action = Action::CreateLink(CreateLink {
+        author: AgentPubKey::from_raw_36(vec![seed; 36]),
+        timestamp: Timestamp::from_micros(seed as i64 * 1000),
+        action_seq: 2,
+        prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(60); 36]),
+        base_address: base.clone(),
+        target_address: holo_hash::AnyLinkableHash::from_raw_36_and_type(
+            vec![seed.wrapping_add(20); 36],
+            holo_hash::hash_type::AnyLinkable::Entry,
+        ),
+        zome_index: 0.into(),
+        link_type: 0.into(),
+        tag: holochain_zome_types::link::LinkTag(vec![1, 2, 3]),
+        weight: Default::default(),
+    });
+    let rendered = RenderedOp::new(
+        action,
+        Signature::from([seed; 64]),
+        None,
+        ChainOpType::RegisterAddLink,
+    )
+    .expect("rendered op build");
+    RenderedOps {
+        entry: None,
+        ops: vec![rendered],
+        warrant: None,
+    }
+}
+
+#[tokio::test]
+async fn authority_link_creates_excludes_cached() {
+    let store = crate::dht_store::DhtStore::new_test(dht_id())
+        .await
+        .unwrap();
+    let base = holo_hash::AnyLinkableHash::from_raw_36_and_type(
+        vec![7u8; 36],
+        holo_hash::hash_type::AnyLinkable::Entry,
+    );
+
+    // Authoritative (locally_validated = 1): incoming + integrated.
+    integrate_link_op(
+        &store,
+        make_create_link_op(&base, 1),
+        AppOutcome::Accepted,
+        1,
+    )
+    .await;
+    // Cached (locally_validated = 0): same base, different op.
+    store
+        .cache_chain_ops(&build_cached_create_link(&base, 2))
+        .await
+        .unwrap();
+
+    let creates = store
+        .as_read()
+        .get_authority_link_creates(&base)
+        .await
+        .unwrap();
+    assert_eq!(
+        creates.len(),
+        1,
+        "only the locally-validated create should be served"
+    );
+    assert_eq!(creates[0].1, ValidationStatus::Valid);
+}
+
+#[tokio::test]
+async fn authority_link_creates_reports_rejected() {
+    let store = crate::dht_store::DhtStore::new_test(dht_id())
+        .await
+        .unwrap();
+    let base = holo_hash::AnyLinkableHash::from_raw_36_and_type(
+        vec![8u8; 36],
+        holo_hash::hash_type::AnyLinkable::Entry,
+    );
+    // Integrated but app-rejected -> locally_validated = 1, status Rejected.
+    integrate_link_op(
+        &store,
+        make_create_link_op(&base, 3),
+        AppOutcome::Rejected,
+        1,
+    )
+    .await;
+
+    let creates = store
+        .as_read()
+        .get_authority_link_creates(&base)
+        .await
+        .unwrap();
+    assert_eq!(creates.len(), 1);
+    assert_eq!(creates[0].1, ValidationStatus::Rejected);
+}
+
+#[tokio::test]
+async fn authority_delete_links_returns_integrated_deletes() {
+    let store = crate::dht_store::DhtStore::new_test(dht_id())
+        .await
+        .unwrap();
+    let base = holo_hash::AnyLinkableHash::from_raw_36_and_type(
+        vec![9u8; 36],
+        holo_hash::hash_type::AnyLinkable::Entry,
+    );
+    // Integrate a create-link for the base, then read its action hash back
+    // (so the delete's create_link_hash matches a create in the base's index).
+    integrate_link_op(
+        &store,
+        make_create_link_op(&base, 4),
+        AppOutcome::Accepted,
+        1,
+    )
+    .await;
+    let create_hash = store
+        .as_read()
+        .get_authority_link_creates(&base)
+        .await
+        .unwrap()[0]
+        .0
+        .as_hash()
+        .clone();
+
+    // A delete-link targeting that create.
+    integrate_link_op(
+        &store,
+        make_delete_link_op(&base, &create_hash, 5),
+        AppOutcome::Accepted,
+        2,
+    )
+    .await;
+
+    let deletes = store
+        .as_read()
+        .get_authority_delete_links(&base)
+        .await
+        .unwrap();
+    assert_eq!(
+        deletes.len(),
+        1,
+        "the integrated delete-link should be served"
+    );
+    assert_eq!(deletes[0].1, ValidationStatus::Valid);
 }
