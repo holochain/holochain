@@ -141,6 +141,13 @@ pub struct ConductorConfig {
     #[serde(default = "default_incoming_request_concurrency_limit")]
     pub incoming_request_concurrency_limit: u16,
 
+    /// Number of peers that must agree on the chain head during source-chain restore.
+    ///
+    /// Increasing this value raises the cost of feeding a restoring agent a fabricated history
+    /// but also raises the chance that restore fails on small or poorly-connected DHTs.
+    #[serde(default = "default_restore_chain_quorum")]
+    pub restore_chain_quorum: u8,
+
     /// Tuning parameters to adjust the behaviour of the conductor.
     #[serde(default)]
     pub tuning_params: Option<ConductorTuningParams>,
@@ -166,6 +173,10 @@ fn default_incoming_request_concurrency_limit() -> u16 {
     std::cmp::max(default_db_max_readers() - 3, 1)
 }
 
+fn default_restore_chain_quorum() -> u8 {
+    2
+}
+
 impl Default for ConductorConfig {
     fn default() -> Self {
         Self {
@@ -178,6 +189,7 @@ impl Default for ConductorConfig {
             db_sync_strategy: DbSyncStrategy::default(),
             db_max_readers: default_db_max_readers(),
             incoming_request_concurrency_limit: default_incoming_request_concurrency_limit(),
+            restore_chain_quorum: default_restore_chain_quorum(),
             tuning_params: None,
             tracing_scope: None,
         }
@@ -849,6 +861,7 @@ mod tests {
                 tuning_params: None,
                 tracing_scope: None,
                 incoming_request_concurrency_limit: default_incoming_request_concurrency_limit(),
+                restore_chain_quorum: default_restore_chain_quorum(),
             }
         );
     }
@@ -1032,6 +1045,7 @@ admin_interfaces:
                 db_sync_strategy: DbSyncStrategy::Fast,
                 db_max_readers: 100,
                 incoming_request_concurrency_limit: 100,
+                restore_chain_quorum: default_restore_chain_quorum(),
                 tuning_params: None,
                 tracing_scope: None,
             }
@@ -1063,6 +1077,7 @@ admin_interfaces:
                 tuning_params: None,
                 tracing_scope: None,
                 incoming_request_concurrency_limit: default_incoming_request_concurrency_limit(),
+                restore_chain_quorum: default_restore_chain_quorum(),
             }
         );
     }
@@ -1250,5 +1265,28 @@ admin_interfaces:
         let default_config_json = serde_json::to_value(&default_config).unwrap();
 
         jsonschema::validate(&schema_json, &default_config_json).unwrap();
+    }
+
+    #[test]
+    fn config_restore_chain_quorum_default() {
+        let yaml = r#"---
+    data_root_path: /path/to/env
+    keystore:
+      type: danger_test_keystore
+    "#;
+        let result: ConductorConfig = config_from_yaml(yaml).unwrap();
+        assert_eq!(result.restore_chain_quorum, 2);
+    }
+
+    #[test]
+    fn config_restore_chain_quorum_explicit() {
+        let yaml = r#"---
+    data_root_path: /path/to/env
+    keystore:
+      type: danger_test_keystore
+    restore_chain_quorum: 5
+    "#;
+        let result: ConductorConfig = config_from_yaml(yaml).unwrap();
+        assert_eq!(result.restore_chain_quorum, 5);
     }
 }
