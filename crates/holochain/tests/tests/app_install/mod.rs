@@ -418,8 +418,8 @@ async fn restore_requires_agent_key() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn agent_key_not_in_lair_is_rejected() {
-    use holochain::conductor::error::ConductorError;
     use holo_hash::fixt::AgentPubKeyFixturator;
+    use holochain::conductor::error::ConductorError;
     use holochain_types::prelude::*;
 
     let conductor = SweetConductor::standard().await;
@@ -466,7 +466,10 @@ async fn agent_key_not_in_lair_is_rejected() {
         })
         .await;
     assert!(
-        matches!(result.unwrap_err(), ConductorError::AgentKeyNotInKeystore(_)),
+        matches!(
+            result.unwrap_err(),
+            ConductorError::AgentKeyNotInKeystore(_)
+        ),
         "expected AgentKeyNotInKeystore for plain install with key not in Lair"
     );
 
@@ -484,7 +487,10 @@ async fn agent_key_not_in_lair_is_rejected() {
         })
         .await;
     assert!(
-        matches!(result.unwrap_err(), ConductorError::AgentKeyNotInKeystore(_)),
+        matches!(
+            result.unwrap_err(),
+            ConductorError::AgentKeyNotInKeystore(_)
+        ),
         "expected AgentKeyNotInKeystore for restore install with key not in Lair"
     );
 }
@@ -521,7 +527,11 @@ async fn agent_key_in_lair_is_accepted() {
     let bundle_bytes = bundle.pack().unwrap();
 
     // Generate a key that IS in the keystore.
-    let key_in_lair = conductor.keystore().new_sign_keypair_random().await.unwrap();
+    let key_in_lair = conductor
+        .keystore()
+        .new_sign_keypair_random()
+        .await
+        .unwrap();
 
     let result = conductor
         .clone()
@@ -536,5 +546,8 @@ async fn agent_key_in_lair_is_accepted() {
         })
         .await;
 
-    assert!(result.is_ok(), "expected success when key is in Lair: {result:?}");
+    assert!(
+        result.is_ok(),
+        "expected success when key is in Lair: {result:?}"
+    );
 }

@@ -187,7 +187,9 @@ impl ConductorState {
     }
 
     /// Iterate over only the "awaiting_restore" apps.
-    pub fn awaiting_restore_apps(&self) -> impl Iterator<Item = (&InstalledAppId, &InstalledApp)> + '_ {
+    pub fn awaiting_restore_apps(
+        &self,
+    ) -> impl Iterator<Item = (&InstalledAppId, &InstalledApp)> + '_ {
         self.installed_apps
             .iter()
             .filter(|(_, app)| app.status == AppStatus::AwaitingRestore)
@@ -397,17 +399,14 @@ mod tests {
         )
         .unwrap();
         let installed = state.add_app(app).unwrap();
-        state.get_app_mut(&app_id.to_string()).unwrap().status =
-            AppStatus::Unrecoverable(
-                CellId::new(dna_hash, agent),
-                UnrecoverableCellReason::ChainFork(
-                    holochain_types::app::WarrantSummary {
-                        author: fixt!(AgentPubKey),
-                        warrantee: fixt!(AgentPubKey),
-                        timestamp: Timestamp::now(),
-                    },
-                ),
-            );
+        state.get_app_mut(&app_id.to_string()).unwrap().status = AppStatus::Unrecoverable(
+            CellId::new(dna_hash, agent),
+            UnrecoverableCellReason::ChainFork(Box::new(holochain_types::app::WarrantSummary {
+                author: fixt!(AgentPubKey),
+                warrantee: fixt!(AgentPubKey),
+                timestamp: Timestamp::now(),
+            })),
+        );
 
         assert_eq!(state.enabled_apps().count(), 0);
         assert_eq!(state.disabled_apps().count(), 0);
@@ -427,14 +426,8 @@ mod tests {
             .build()
             .unwrap();
         let app_id = "restore_app";
-        let app = InstalledAppCommon::new(
-            app_id,
-            agent,
-            [],
-            app_manifest.into(),
-            Timestamp::now(),
-        )
-        .unwrap();
+        let app = InstalledAppCommon::new(app_id, agent, [], app_manifest.into(), Timestamp::now())
+            .unwrap();
 
         state.add_app_awaiting_restore(app).unwrap();
 

@@ -777,9 +777,9 @@ impl From<SignedWarrant> for WarrantSummary {
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum UnrecoverableCellReason {
     /// Two or more conflicting actions at the same sequence position (proven chain fork).
-    ChainFork(WarrantSummary),
+    ChainFork(Box<WarrantSummary>),
     /// Another validated [`ChainIntegrityWarrant`] variant (e.g. `InvalidChainOp`).
-    ChainIntegrityWarrant(WarrantSummary),
+    ChainIntegrityWarrant(Box<WarrantSummary>),
 }
 
 /// The status of an installed app.
@@ -1224,7 +1224,7 @@ mod tests {
             warrantee: fixt!(AgentPubKey),
             timestamp: Timestamp::from_micros(1_000_000),
         };
-        let reason = UnrecoverableCellReason::ChainFork(summary);
+        let reason = UnrecoverableCellReason::ChainFork(Box::new(summary));
         let bytes = SerializedBytes::try_from(&reason).unwrap();
         let recovered: UnrecoverableCellReason = bytes.try_into().unwrap();
         assert_eq!(reason, recovered);
@@ -1249,7 +1249,7 @@ mod tests {
             warrantee: fixt!(AgentPubKey),
             timestamp: Timestamp::from_micros(1_000_000),
         };
-        let reason = UnrecoverableCellReason::ChainFork(summary);
+        let reason = UnrecoverableCellReason::ChainFork(Box::new(summary));
         let status = AppStatus::Unrecoverable(cell_id, reason);
         let json = serde_json::to_string(&status).unwrap();
         let recovered: AppStatus = serde_json::from_str(&json).unwrap();

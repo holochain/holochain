@@ -96,7 +96,7 @@ mod tests {
             warrantee: fixt!(AgentPubKey),
             timestamp: Timestamp::from_micros(1_000_000),
         };
-        let reason = UnrecoverableCellReason::ChainFork(summary);
+        let reason = UnrecoverableCellReason::ChainFork(Box::new(summary));
 
         let signals: Vec<SystemSignal> = vec![
             SystemSignal::RestoreComplete {
