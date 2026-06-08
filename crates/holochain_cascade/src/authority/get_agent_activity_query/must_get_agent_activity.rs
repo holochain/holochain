@@ -11,9 +11,6 @@ use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-#[cfg(test)]
-mod test;
-
 /// Get the Action sequence and timestamp for a given hash from a database.
 pub(crate) fn get_action_seq_and_timestamp(
     txn: &Transaction,

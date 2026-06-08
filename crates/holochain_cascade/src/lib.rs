@@ -75,9 +75,6 @@ mod agent_activity;
 pub mod get_options_ext;
 mod metrics;
 
-#[cfg(feature = "test_utils")]
-pub mod test_utils;
-
 /// Get an item from an option
 /// or return early from the function
 macro_rules! some_or_return {
@@ -361,13 +358,24 @@ impl CascadeImpl {
     async fn merge_ops_into_cache(&self, responses: Vec<WireOps>) -> CascadeResult<()> {
         let cache = some_or_return!(self.cache.as_ref());
 
-        // Render outside the cache transaction so the transform is not
-        // counted as transaction time, and so the rendered data can be
-        // reused by the `DhtStore` cache call below.
-        let rendered_all: Vec<RenderedOps> = responses
-            .into_iter()
-            .map(|r| r.render())
-            .collect::<Result<Vec<_>, _>>()?;
+        // Extract the warrants, then render outside the cache transaction so
+        // the transform is not counted as transaction time and the rendered
+        // data can be reused by the `DhtStore` cache call below.
+        let mut rendered_all: Vec<RenderedOps> = Vec::with_capacity(responses.len());
+        let mut response_warrants: Vec<SignedWarrant> = Vec::new();
+        for response in responses {
+            let warrants = response.warrants().to_vec();
+            let rendered = response.render()?;
+            // Anti-DoS: a peer must prove any rejected record it serves with a
+            // paired warrant. Without proof we drop the whole response rather
+            // than be forced into pointless validation work.
+            if rejected_without_warrant(&rendered, &warrants) {
+                tracing::warn!("Dropping get response with a rejected record but no warrant");
+                continue;
+            }
+            response_warrants.extend(warrants);
+            rendered_all.push(rendered);
+        }
 
         let rendered_for_legacy = rendered_all.clone();
         cache
@@ -385,25 +393,27 @@ impl CascadeImpl {
         // while the legacy path is in place.
         let verified = verify_rendered_ops_batch(rendered_all).await;
         self.cache_rendered_ops(&verified).await;
+        self.cache_response_warrants(response_warrants).await;
 
         Ok(())
     }
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-    async fn merge_link_ops_into_cache(
-        &self,
-        responses: Vec<WireLinkOps>,
-        key: WireLinkKey,
-    ) -> CascadeResult<()> {
+    async fn merge_link_ops_into_cache(&self, responses: Vec<WireLinkOps>) -> CascadeResult<()> {
         let cache = some_or_return!(self.cache.as_ref());
 
-        // Render outside the cache transaction so the transform is not
-        // counted as transaction time, and so the rendered data can be
-        // reused by the `DhtStore` cache call below.
-        let rendered_all: Vec<RenderedOps> = responses
-            .into_iter()
-            .map(|r| r.render(&key))
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut rendered_all: Vec<RenderedOps> = Vec::with_capacity(responses.len());
+        let mut response_warrants: Vec<SignedWarrant> = Vec::new();
+        for response in responses {
+            let warrants = response.warrants.clone();
+            let rendered = response.render()?;
+            if rejected_without_warrant(&rendered, &warrants) {
+                tracing::warn!("Dropping get-links response with a rejected record but no warrant");
+                continue;
+            }
+            response_warrants.extend(warrants);
+            rendered_all.push(rendered);
+        }
 
         let rendered_for_legacy = rendered_all.clone();
         cache
@@ -417,8 +427,23 @@ impl CascadeImpl {
 
         let verified = verify_rendered_ops_batch(rendered_all).await;
         self.cache_rendered_ops(&verified).await;
+        self.cache_response_warrants(response_warrants).await;
 
         Ok(())
+    }
+
+    /// Cache the warrants that accompanied a get response into the `DhtStore`.
+    async fn cache_response_warrants(&self, warrants: Vec<SignedWarrant>) {
+        if warrants.is_empty() {
+            return;
+        }
+        let Some(dht_store) = self.dht_store.as_ref() else {
+            return;
+        };
+        let warrant_ops = warrants.into_iter().map(WarrantOp::from).collect();
+        if let Err(err) = dht_store.cache_warrants(warrant_ops).await {
+            tracing::warn!(?err, "DhtStore: cache_warrants failed for get response");
+        }
     }
 
     /// Write a batch of rendered ops to the `DhtStore`, if one is configured.
@@ -587,8 +612,7 @@ impl CascadeImpl {
             }
         };
 
-        self.merge_link_ops_into_cache(results, link_key.clone())
-            .await?;
+        self.merge_link_ops_into_cache(results).await?;
         Ok(())
     }
 
@@ -1344,10 +1368,10 @@ impl CascadeImpl {
         let authority = self.am_i_an_authority(agent.clone().into()).await?;
 
         let merged_response = if authority && options.get_options.strategy() == GetStrategy::Local {
-            match self.dht.clone() {
-                Some(vault) => {
+            match self.dht_store.as_ref() {
+                Some(store) => {
                     authority::handle_get_agent_activity(
-                        vault,
+                        store.as_read(),
                         agent.clone(),
                         query.clone(),
                         (&options).into(),
@@ -1524,6 +1548,18 @@ impl CascadeImpl {
             None => Q::without_private_data_access(hash),
         }
     }
+}
+
+/// Whether a rendered get response carries a `Rejected` record without any
+/// accompanying warrant. Such a response is rejected up front so a malicious
+/// peer cannot force the receiver into pointless validation work — a rejection
+/// is only ever known through a warrant proving it.
+fn rejected_without_warrant(rendered: &RenderedOps, warrants: &[SignedWarrant]) -> bool {
+    warrants.is_empty()
+        && rendered
+            .ops
+            .iter()
+            .any(|op| op.validation_status == Some(ValidationStatus::Rejected))
 }
 
 /// Verify the action signatures (and warrant signature, if present) on every
@@ -1845,4 +1881,69 @@ async fn test_mock_cascade_with_records() {
         .unwrap()
         .unwrap();
     assert_eq!(records, vec![r0, r1, r2]);
+}
+
+#[cfg(test)]
+mod rejected_warrant_invariant_tests {
+    use super::*;
+    use ::fixt::fixt;
+    use holo_hash::fixt::{ActionHashFixturator, AgentPubKeyFixturator};
+    use holochain_zome_types::warrant::{
+        ChainIntegrityWarrant, SignedWarrant, Warrant, WarrantProof,
+    };
+
+    fn rendered_record(status: ValidationStatus) -> RenderedOps {
+        let op = RenderedOp::new(
+            fixt!(Action),
+            fixt!(Signature),
+            Some(status),
+            ChainOpType::StoreRecord,
+        )
+        .unwrap();
+        RenderedOps {
+            entry: None,
+            ops: vec![op],
+            warrant: None,
+        }
+    }
+
+    fn a_warrant() -> SignedWarrant {
+        let proof = WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+            action_author: fixt!(AgentPubKey),
+            action: (fixt!(ActionHash), fixt!(Signature)),
+            chain_op_type: ChainOpType::StoreRecord,
+            reason: "test".to_string(),
+        });
+        let warrant = Warrant::new(
+            proof,
+            fixt!(AgentPubKey),
+            Timestamp::from_micros(0),
+            fixt!(AgentPubKey),
+        );
+        SignedWarrant::new(warrant, fixt!(Signature))
+    }
+
+    #[test]
+    fn valid_record_needs_no_warrant() {
+        assert!(!rejected_without_warrant(
+            &rendered_record(ValidationStatus::Valid),
+            &[]
+        ));
+    }
+
+    #[test]
+    fn rejected_record_without_warrant_is_rejected() {
+        assert!(rejected_without_warrant(
+            &rendered_record(ValidationStatus::Rejected),
+            &[]
+        ));
+    }
+
+    #[test]
+    fn rejected_record_with_warrant_is_accepted() {
+        assert!(!rejected_without_warrant(
+            &rendered_record(ValidationStatus::Rejected),
+            &[a_warrant()]
+        ));
+    }
 }

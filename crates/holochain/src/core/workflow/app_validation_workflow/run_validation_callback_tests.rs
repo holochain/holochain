@@ -189,6 +189,7 @@ async fn validation_callback_awaiting_deps_hashes() {
             deletes: vec![],
             updates: vec![],
             entry: None,
+            warrants: vec![],
         })])
     });
 

@@ -1180,6 +1180,16 @@ impl WireOps {
             }),
         }
     }
+
+    /// The warrants accompanying this response, proving any `Rejected` records
+    /// served. Empty for the standalone-warrant variant.
+    pub fn warrants(&self) -> &[holochain_zome_types::warrant::SignedWarrant] {
+        match self {
+            WireOps::Entry(o) => &o.warrants,
+            WireOps::Record(o) => &o.warrants,
+            WireOps::Warrant(_) => &[],
+        }
+    }
 }
 
 /// The data rendered from a wire op to place in the database.

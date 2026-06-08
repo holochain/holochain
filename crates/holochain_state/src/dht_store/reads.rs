@@ -868,6 +868,23 @@ impl DhtStore<DbRead<Dht>> {
             .collect())
     }
 
+    /// Warrants held against `warrantee`'s chain, as legacy signed warrants.
+    ///
+    /// Used by the get authorities to pair a warrant with any `Rejected`
+    /// record they serve, so the receiver can verify the rejection without
+    /// being forced into pointless validation work.
+    pub async fn get_warrants_by_warrantee(
+        &self,
+        warrantee: holo_hash::AgentPubKey,
+    ) -> StateQueryResult<Vec<SignedWarrant>> {
+        self.db()
+            .get_warrants_by_warrantee(warrantee)
+            .await?
+            .into_iter()
+            .map(warrant_row_to_signed_warrant)
+            .collect()
+    }
+
     /// Return ops awaiting system validation, sorted across chain ops and
     /// warrants by `(sys_validation_attempts, when_received)`, up to `limit`
     /// rows total.

@@ -276,7 +276,7 @@ implementation plan:
 | Sub-slice | Scope | Status |
 |-----------|-------|--------|
 | **1a — `DhtStore` read API** | The cascade's compound read methods on `holochain_state::DhtStore` (+ `holochain_data` primitives), tested in isolation: `retrieve_*`, `get_live_*`, `get_*_details`, `get_links`/`get_link_details`, `get_agent_activity`, `must_get_agent_activity`. | **done** |
-| **1b — Data-serving reshape** (authority + `holochain_p2p` + requester) | Reshape the data-serving wire to **records** (actions/entries) + record-level validation status + **warrants**; serve it from the 1a reads on the authority; on the requester, consume it, **expand to ops** and run normal validation/integration (or cache) + scratch overlay + network fallback. Delete `CascadeTxnWrapper`/`DbScratch`/cross-DB merge and the legacy authority `Query` structs. | in progress: integration-path fixes (indexes, `locally_validated` upgrade) + `locally_validated`-guarded authority `DhtStore` reads for links/records/entries **done**; the wire reshape itself (below) is next |
+| **1b — Data-serving reshape** (authority + `holochain_p2p` + requester) | Reshape the data-serving wire to **records** (actions/entries) + record-level validation status + **warrants**; serve it from the 1a reads on the authority; on the requester, consume it, check the `Rejected ⇒ warrant` invariant, and cache. Delete the legacy authority `Query` structs. | **done** (the legacy authority `Query` structs + cascade integration-test layer are removed; `CascadeTxnWrapper`/`DbScratch` are retained for the requester's local read path — see the deviations note below) |
 | **1c — Gossip op-wire → v2** | Break the K2 op-store **gossip** wire to carry v2 ops with v2 hashes; drop the network-side `legacy ↔ v2` conversions and the hash-preservation hack. | — |
 
 **Why 1b merges the old "authority" and "requester" slices.** The data-serving
@@ -475,51 +475,65 @@ record; the wire types (`WireRecordOps`/`WireEntryOps`/`WireLinkOps`) are
 repurposed to the record-shaped form above. No op-shaped, per-op-status reads are
 introduced.
 
-### The reshape itself (the 1b-vi cutover)
+### The reshape itself (the 1b-vi cutover) — done
 
 The authority-serving `DhtStore` reads (`get_authority_link_creates`/
 `get_authority_delete_links`, `get_authority_store_record`/`…deletes_for_record`/
 `…updates_for_record`, `get_authority_entry_creates`/`…deletes_for_entry`/
 `…updates_for_entry`), all `locally_validated = 1`-guarded and returning `(legacy
-SignedActionHashed, ValidationStatus)`, are **done** (sub-slices preceding this).
-What remains is the wire cutover, which is **one atomic, monolithic commit** (not
-per-type slices) because the wire type couples three crates that must change
-together:
+SignedActionHashed, ValidationStatus)`, were done in the preceding sub-slices. The
+wire cutover then landed as **one atomic commit** across `holochain_types`,
+`holochain_cascade`, and `holochain_p2p`:
 
-- **Reshape the wire structs** (`holochain_types`): replace the op-shaped forms
-  (`WireDelete`/`WireUpdateRelationship`/`WireNewEntryAction`/`WireCreateLink`/
-  `WireDeleteLink`) with `Judged<SignedActionHashed>` (the `Judged` wrapper carries
-  the record-level validation status), and add a `warrants` field. The
-  reconstruction (`WireOps::render` / `WireEntryOps::render` etc.) stops
-  reassembling ops from op-shaped forms and instead becomes the **record→ops
-  expansion** (`produce_ops_from_record`) — so the wire reshape and the requester's
-  "expand to ops" are the same change, not separable slices.
-- **Authority handlers** (`holochain_cascade::authority`): `handle_get_record`/
-  `handle_get_entry`/`handle_get_links` assemble the reshaped response from the
-  `get_authority_*` reads + a warrant for any `Rejected` record;
-  `handle_get_agent_activity`/`handle_must_get_agent_activity` call the 1a
-  `get_agent_activity`/`must_get_agent_activity` reads; `handle_get_links_query`
-  calls `get_links`.
+- **Wire structs** (`holochain_types`): `WireRecordOps`/`WireEntryOps`/`WireLinkOps`
+  now carry `Judged<SignedAction>` (the `Judged` wrapper carries the record-level
+  validation status) plus a `warrants: Vec<SignedWarrant>` field; the op-shaped
+  sub-types are no longer used by them. Each `render` rebuilds the request-relevant
+  op per served action (`RenderedOp::new` with the role's `ChainOpType`) — the
+  served records are already full actions, so no op-shaped reconstruction and **no
+  `produce_ops_from_record`** are needed. (The full arc-driven
+  `produce_ops_from_record` expansion is the future "GET stores by arc" path; today
+  GET only caches the request-relevant ops and gossip fills the authoritative
+  store.)
+- **Authority handlers** (`holochain_cascade::authority`): rewritten onto
+  `DhtStoreRead` — `handle_get_record`/`handle_get_entry`/`handle_get_links`
+  assemble the reshaped response from the `get_authority_*` reads + `retrieve_entry`
+  + a warrant (via the new `DhtStoreRead::get_warrants_by_warrantee`) for any
+  `Rejected` record; `handle_get_agent_activity`/`handle_must_get_agent_activity`/
+  `handle_get_links_query` call the 1a reads. The production caller (`Cell`) passes
+  `space.dht_store.as_read()`.
 - **`holochain_p2p` routing**: the empty-response retry check (`spawn/actor.rs`)
-  destructures the wire fields — update it for the new fields (incl. `warrants`);
-  `WireOps`/`WireMessage::GetRes` recompile against the new shape.
-- **Requester** (`holochain_cascade`): consume the reshaped response — render the
-  `Record`/`Details` for the caller, check the `Rejected ⇒ warrant` invariant up
-  front, and expand `Valid` records to ops (`produce_ops_from_record`) and **cache**
-  them (`locally_validated = 0` — there is no GET-stores-by-arc path today; gossip
-  fills the authoritative store).
+  destructures the new fields (a response carrying only warrants is not "empty").
+- **Requester** (`holochain_cascade`): extracts the response warrants, checks the
+  `Rejected ⇒ warrant` invariant up front (dropping a response that serves a
+  rejected record without proof), then caches `Valid` ops + the warrants
+  (`locally_validated = 0`).
 - **Deletions**: the legacy authority `Query` structs (`GetEntryOpsQuery`/
-  `GetRecordOpsQuery`/`GetLinksOpsQuery`/`GetAgentActivity*Query`), the
-  `get_agent_activity_query` module, `CascadeTxnWrapper`/`DbScratch`/cross-DB merge,
-  and the cascade copies of the agent-activity pure fns — whatever the cutover
-  leaves unused.
+  `GetRecordOpsQuery`/`GetLinksOpsQuery`/`GetAgentActivity{Hashes,Records}Query`),
+  the dead shared agent-activity query helpers, and the entire legacy cascade
+  integration test layer (`PassThroughNetwork` + the op-shaped test-data builders +
+  the `tests/` suite) — the harness was legacy-`DbKindDht`-based and could not be
+  bridged to a `holochain_data` `DhtStore`. Focused new-path unit tests cover the
+  `Rejected ⇒ warrant` invariant.
 
-Because this is one tightly-coupled commit (no independent per-task boundary), it
-is executed inline rather than via fresh-subagent-per-task, with code review on the
-finished change. **Invariant assumption:** a `Rejected` record served on the get
-path carries a warrant; if app-validation rejections do not always produce a
-warrant, that is a validation-layer gap to address separately — the serve/receive
-mechanics here pair and check whatever warrant the authority holds.
+**Deviations from the original sketch / follow-ups:**
+
+- `CascadeTxnWrapper`/`DbScratch`/the cross-DB merge are **retained**: the
+  requester's local *read* path (`dht_get`/`dht_get_links` reading post-cache) still
+  uses them. Cutting that read path over to `DhtStore` reads is a separate, larger
+  effort (a later sub-phase), not part of the data-serving wire reshape.
+- The orphaned op-shaped sub-types (`WireDelete`/`WireUpdateRelationship`/
+  `WireNewEntryAction`/`WireCreateLink`/`WireDeleteLink` + `WireActionStatus`) are
+  left in `holochain_types::action` as dead (public) legacy, to remove in a cleanup
+  sweep — they are entangled with still-shared helpers.
+- Rebuilding cascade-level integration coverage on a `DhtStore`-backed harness is a
+  follow-up; agent-activity serving is covered by the `holochain_state` `DhtStore`
+  read tests (1a-ix).
+
+**Invariant assumption:** a `Rejected` record served on the get path carries a
+warrant; if app-validation rejections do not always produce a warrant, that is a
+validation-layer gap to address separately. Routing rejected+warranted records into
+validation limbo (rather than only caching the warrant) is also deferred.
 
 ### Explicitly out of scope for Phase 1
 
@@ -539,9 +553,11 @@ mechanics here pair and check whatever warrant the authority holds.
   any scratch).
 - `holochain_cascade`: local-hit (store), miss-then-network, and cache-write
   behavior; authority handlers serve from the store with no scratch.
-- 1b: the data-serving wire round-trips records + validation status + warrants;
-  the receiver's invariant check (rejected ⇒ warrant) and op-expansion
-  (`produce_ops_from_record`) behave; rejected+warranted records land in limbo.
+- 1b: the data-serving wire round-trips records + validation status + warrants
+  (covered by the `holochain_p2p` get round-trip tests); the receiver's invariant
+  check (rejected ⇒ warrant) behaves (covered by focused `holochain_cascade` unit
+  tests). Routing rejected+warranted records into limbo is deferred (see the
+  follow-ups note above).
 - 1c: wire round-trip for the v2-encoded K2 gossip ops; v2 hashes end-to-end
   without the legacy-hash hack.
 

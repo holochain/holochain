@@ -2033,10 +2033,12 @@ impl actor::HcP2p for HolochainP2pActor {
                         deletes,
                         updates,
                         entry,
+                        warrants,
                     }) if creates.is_empty()
                         && deletes.is_empty()
                         && updates.is_empty()
-                        && entry.is_none() =>
+                        && entry.is_none()
+                        && warrants.is_empty() =>
                     {
                         true
                     }
@@ -2045,10 +2047,12 @@ impl actor::HcP2p for HolochainP2pActor {
                         deletes,
                         updates,
                         entry,
+                        warrants,
                     }) if action.is_none()
                         && deletes.is_empty()
                         && updates.is_empty()
-                        && entry.is_none() =>
+                        && entry.is_none()
+                        && warrants.is_empty() =>
                     {
                         true
                     }
