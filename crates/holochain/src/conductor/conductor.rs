@@ -1440,6 +1440,15 @@ mod app_impls {
             let apps_ids: Vec<&String> = match status_filter {
                 Some(Enabled) => conductor_state.enabled_apps().map(|(id, _)| id).collect(),
                 Some(Disabled) => conductor_state.disabled_apps().map(|(id, _)| id).collect(),
+                Some(AwaitingRestore) => {
+                    conductor_state.awaiting_restore_apps().map(|(id, _)| id).collect()
+                }
+                Some(Unrecoverable) => conductor_state
+                    .installed_apps()
+                    .iter()
+                    .filter(|(_, app)| matches!(app.status, AppStatus::Unrecoverable(..)))
+                    .map(|(id, _)| id)
+                    .collect(),
                 None => conductor_state.installed_apps().keys().collect(),
             };
 

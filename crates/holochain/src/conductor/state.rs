@@ -376,6 +376,47 @@ mod tests {
     }
 
     #[test]
+    fn unrecoverable_app_not_in_enabled_or_disabled() {
+        use holochain_types::app::UnrecoverableCellReason;
+        let mut state = ConductorState::default();
+        let agent = fixt!(AgentPubKey);
+        let dna_hash = fixt!(DnaHash);
+        let app_manifest = AppManifestV0Builder::default()
+            .name("unrec_test".to_string())
+            .description(None)
+            .roles(vec![])
+            .build()
+            .unwrap();
+        let app_id = "unrec_app";
+        let app = InstalledAppCommon::new(
+            app_id,
+            agent.clone(),
+            [],
+            app_manifest.into(),
+            Timestamp::now(),
+        )
+        .unwrap();
+        let installed = state.add_app(app).unwrap();
+        state.get_app_mut(&app_id.to_string()).unwrap().status =
+            AppStatus::Unrecoverable(
+                CellId::new(dna_hash, agent),
+                UnrecoverableCellReason::ChainFork(
+                    holochain_types::app::WarrantSummary {
+                        author: fixt!(AgentPubKey),
+                        warrantee: fixt!(AgentPubKey),
+                        timestamp: Timestamp::now(),
+                    },
+                ),
+            );
+
+        assert_eq!(state.enabled_apps().count(), 0);
+        assert_eq!(state.disabled_apps().count(), 0);
+        assert_eq!(state.awaiting_restore_apps().count(), 0);
+        assert_eq!(state.installed_apps().len(), 1);
+        let _ = installed;
+    }
+
+    #[test]
     fn awaiting_restore_apps_iterator() {
         let mut state = ConductorState::default();
         let agent = fixt!(AgentPubKey);
