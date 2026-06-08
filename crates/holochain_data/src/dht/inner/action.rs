@@ -1,6 +1,6 @@
 //! Free-standing operations against the `Action` table.
 
-use crate::models::dht::{ActionRow, AgentActivityItem, AgentActivityRow};
+use crate::models::dht::{ActionRow, AgentActivityItem, AgentActivityRow, ValidatedActionRow};
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, EntryHash, HoloHashed};
 use holochain_integrity_types::dht_v2::{Action, ActionData, ActionHeader, RecordValidity};
 use holochain_integrity_types::entry::Entry;
@@ -465,6 +465,73 @@ where
     .fetch_all(executor)
     .await?;
     rows.into_iter().map(row_to_signed_action_hashed).collect()
+}
+
+/// Decode a `ValidatedActionRow` to a v2 action + its validation status.
+fn validated_action_row_to_item(
+    row: ValidatedActionRow,
+) -> sqlx::Result<(SignedActionHashed, RecordValidity)> {
+    let action = row_to_signed_action_hashed(row.action)?;
+    let validation_status = RecordValidity::try_from(row.validation_status).map_err(|v| {
+        sqlx::Error::Decode(Box::new(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("invalid validation_status {v} on link ChainOp"),
+        )))
+    })?;
+    Ok((action, validation_status))
+}
+
+/// Authority-serving create-link actions for `base`: locally-validated
+/// (`locally_validated = 1`) `RegisterAddLink` ops only, each with its
+/// validation status. Cached links (`locally_validated = 0`) are excluded.
+pub(crate) async fn get_authority_link_creates<'e, E>(
+    executor: E,
+    base: &AnyLinkableHash,
+) -> sqlx::Result<Vec<(SignedActionHashed, RecordValidity)>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let rows: Vec<ValidatedActionRow> = sqlx::query_as(
+        "SELECT a.hash, a.author, a.seq, a.prev_hash, a.timestamp, a.action_type,
+                a.action_data, a.signature, a.entry_hash, a.private_entry, a.record_validity,
+                c.validation_status
+         FROM Link l
+         JOIN Action a ON l.action_hash = a.hash
+         JOIN ChainOp c ON c.action_hash = a.hash AND c.op_type = ?
+         WHERE l.base_hash = ? AND c.locally_validated = 1",
+    )
+    .bind(i64::from(ChainOpType::RegisterAddLink))
+    .bind(base.get_raw_36())
+    .fetch_all(executor)
+    .await?;
+    rows.into_iter().map(validated_action_row_to_item).collect()
+}
+
+/// Authority-serving delete-link actions targeting `base`'s links:
+/// locally-validated `RegisterRemoveLink` ops only, each with its validation
+/// status.
+pub(crate) async fn get_authority_delete_links<'e, E>(
+    executor: E,
+    base: &AnyLinkableHash,
+) -> sqlx::Result<Vec<(SignedActionHashed, RecordValidity)>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let rows: Vec<ValidatedActionRow> = sqlx::query_as(
+        "SELECT a.hash, a.author, a.seq, a.prev_hash, a.timestamp, a.action_type,
+                a.action_data, a.signature, a.entry_hash, a.private_entry, a.record_validity,
+                c.validation_status
+         FROM DeletedLink d
+         JOIN Action a ON d.action_hash = a.hash
+         JOIN ChainOp c ON c.action_hash = a.hash AND c.op_type = ?
+         WHERE c.locally_validated = 1
+           AND d.create_link_hash IN (SELECT l.action_hash FROM Link l WHERE l.base_hash = ?)",
+    )
+    .bind(i64::from(ChainOpType::RegisterRemoveLink))
+    .bind(base.get_raw_36())
+    .fetch_all(executor)
+    .await?;
+    rows.into_iter().map(validated_action_row_to_item).collect()
 }
 
 /// Return actions whose `prev_hash = :prev_hash` and `hash != :exclude_hash`.

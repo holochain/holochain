@@ -151,4 +151,22 @@ impl DbRead<Dht> {
     ) -> sqlx::Result<Vec<SignedActionHashed>> {
         action::get_delete_link_actions(self.pool(), create_link_hash).await
     }
+
+    /// Authority-serving create-link actions for `base` (locally-validated only),
+    /// each with its validation status.
+    pub async fn get_authority_link_creates(
+        &self,
+        base: &AnyLinkableHash,
+    ) -> sqlx::Result<Vec<(SignedActionHashed, RecordValidity)>> {
+        action::get_authority_link_creates(self.pool(), base).await
+    }
+
+    /// Authority-serving delete-link actions targeting `base`'s links
+    /// (locally-validated only), each with its validation status.
+    pub async fn get_authority_delete_links(
+        &self,
+        base: &AnyLinkableHash,
+    ) -> sqlx::Result<Vec<(SignedActionHashed, RecordValidity)>> {
+        action::get_authority_delete_links(self.pool(), base).await
+    }
 }

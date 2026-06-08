@@ -53,6 +53,18 @@ pub(crate) struct AgentActivityRow {
     pub entry_blob: Option<Vec<u8>>,
 }
 
+/// Row pairing an `Action` (flattened) with the joined `ChainOp.validation_status`.
+/// Used by the authority-serving reads, which join `ChainOp` to enforce the
+/// `locally_validated = 1` guard and surface the record's validation status.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub(crate) struct ValidatedActionRow {
+    /// The action columns (see [`ActionRow`]).
+    #[sqlx(flatten)]
+    pub action: ActionRow,
+    /// `ChainOp.validation_status` (`1 = Accepted`, `2 = Rejected`).
+    pub validation_status: i64,
+}
+
 /// Decoded agent-activity item: an integrated `RegisterAgentActivity` action,
 /// its validation status, and (Full mode) the referenced public entry.
 #[derive(Debug, Clone)]
