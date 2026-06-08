@@ -186,6 +186,27 @@ impl ConductorState {
         Ok(app)
     }
 
+    /// Iterate over only the "awaiting_restore" apps.
+    pub fn awaiting_restore_apps(&self) -> impl Iterator<Item = (&InstalledAppId, &InstalledApp)> + '_ {
+        self.installed_apps
+            .iter()
+            .filter(|(_, app)| app.status == AppStatus::AwaitingRestore)
+    }
+
+    /// Add an app in the AwaitingRestore state. Returns an error if an app is already
+    /// present at the given ID.
+    pub fn add_app_awaiting_restore(
+        &mut self,
+        app: InstalledAppCommon,
+    ) -> ConductorResult<InstalledApp> {
+        if self.installed_apps.contains_key(app.id()) {
+            return Err(ConductorError::AppAlreadyInstalled(app.id().clone()));
+        }
+        let app = InstalledApp::new(app, AppStatus::AwaitingRestore);
+        self.installed_apps.insert(app.id().clone(), app.clone());
+        Ok(app)
+    }
+
     /// Returns the interface configuration with the given ID if present
     pub fn interface_by_id(&self, id: &AppInterfaceId) -> Option<AppInterfaceConfig> {
         self.app_interfaces.get(id).cloned()
@@ -352,5 +373,33 @@ mod tests {
             state.find_app_containing_cell(&cell_id).unwrap(),
             &installed_app
         );
+    }
+
+    #[test]
+    fn awaiting_restore_apps_iterator() {
+        let mut state = ConductorState::default();
+        let agent = fixt!(AgentPubKey);
+        let app_manifest = AppManifestV0Builder::default()
+            .name("restore_test".to_string())
+            .description(None)
+            .roles(vec![])
+            .build()
+            .unwrap();
+        let app_id = "restore_app";
+        let app = InstalledAppCommon::new(
+            app_id,
+            agent,
+            [],
+            app_manifest.into(),
+            Timestamp::now(),
+        )
+        .unwrap();
+
+        state.add_app_awaiting_restore(app).unwrap();
+
+        assert_eq!(state.awaiting_restore_apps().count(), 1);
+        assert_eq!(state.enabled_apps().count(), 0);
+        assert_eq!(state.disabled_apps().count(), 0);
+        assert!(state.awaiting_restore_apps().any(|(id, _)| id == app_id));
     }
 }
