@@ -1690,3 +1690,57 @@ async fn integration_indexes_create_link() {
         .unwrap();
     assert_eq!(creates.len(), 1, "integrated CreateLink should be indexed");
 }
+
+/// Build a `RegisterRemoveLink` (DeleteLink) op targeting `link_add`.
+fn make_delete_link_op(base: &AnyLinkableHash, link_add: &ActionHash, seed: u8) -> DhtOpHashed {
+    let action = Action::DeleteLink(DeleteLink {
+        author: AgentPubKey::from_raw_36(vec![seed; 36]),
+        timestamp: Timestamp::from_micros(seed as i64 * 1000),
+        action_seq: 3,
+        prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(90); 36]),
+        base_address: base.clone(),
+        link_add_address: link_add.clone(),
+    });
+    let delete_link = match action {
+        Action::DeleteLink(dl) => dl,
+        _ => unreachable!(),
+    };
+    DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(ChainOp::RegisterRemoveLink(
+        Signature::from([seed; 64]),
+        delete_link,
+    ))))
+}
+
+#[tokio::test]
+async fn integration_indexes_delete_link() {
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+    let base = AnyLinkableHash::from_raw_36_and_type(
+        vec![9u8; 36],
+        holo_hash::hash_type::AnyLinkable::Entry,
+    );
+    let link_add = ActionHash::from_raw_36(vec![55u8; 36]);
+    let op = make_delete_link_op(&base, &link_add, 2);
+    let hash = op.as_hash().clone();
+
+    store.record_incoming_ops(vec![op]).await.unwrap();
+    store
+        .record_chain_op_sys_validation_outcomes(vec![(hash.clone(), SysOutcome::Accepted)])
+        .await
+        .unwrap();
+    store
+        .record_app_validation_outcomes(vec![(hash, AppOutcome::Accepted)])
+        .await
+        .unwrap();
+    store
+        .integrate_ready_ops(Timestamp::from_micros(1))
+        .await
+        .unwrap();
+
+    let deletes = store
+        .as_read()
+        .db()
+        .get_delete_link_actions(&link_add)
+        .await
+        .unwrap();
+    assert_eq!(deletes.len(), 1, "integrated DeleteLink should be indexed");
+}
