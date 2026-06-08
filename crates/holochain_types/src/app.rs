@@ -741,6 +741,41 @@ impl InstalledAppCommon {
     }
 }
 
+/// Compact, operator-visible summary of a [`SignedWarrant`].
+///
+/// Carries just enough to identify the warrant for debugging;
+/// the variant of [`UnrecoverableCellReason`] tells the operator what kind it is.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+pub struct WarrantSummary {
+    /// The peer that authored and signed the warrant.
+    pub author: AgentPubKey,
+    /// The agent against whom the warrant was issued.
+    pub warrantee: AgentPubKey,
+    /// When the warrant was issued.
+    pub timestamp: Timestamp,
+}
+
+impl From<SignedWarrant> for WarrantSummary {
+    fn from(sw: SignedWarrant) -> Self {
+        let w = sw.into_data();
+        Self {
+            author: w.author,
+            warrantee: w.warrantee,
+            timestamp: w.timestamp,
+        }
+    }
+}
+
+/// Reason a cell's source chain is unrecoverable via restore.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
+pub enum UnrecoverableCellReason {
+    /// Two or more conflicting actions at the same sequence position (proven chain fork).
+    ChainFork(WarrantSummary),
+    /// Another validated [`ChainIntegrityWarrant`] variant (e.g. `InvalidChainOp`).
+    ChainIntegrityWarrant(WarrantSummary),
+}
+
 /// The status of an installed app.
 ///
 /// Either Enabled or Disabled, set by the user via the conductor admin interface.
@@ -1154,5 +1189,30 @@ mod tests {
             serde_json::to_string(&reason).unwrap(),
             "{\"type\":\"user\"}"
         );
+    }
+
+    #[test]
+    fn warrant_summary_serde_round_trip() {
+        let summary = WarrantSummary {
+            author: fixt!(AgentPubKey),
+            warrantee: fixt!(AgentPubKey),
+            timestamp: Timestamp::from_micros(1_000_000),
+        };
+        let bytes = SerializedBytes::try_from(&summary).unwrap();
+        let recovered: WarrantSummary = bytes.try_into().unwrap();
+        assert_eq!(summary, recovered);
+    }
+
+    #[test]
+    fn unrecoverable_cell_reason_serde_round_trip() {
+        let summary = WarrantSummary {
+            author: fixt!(AgentPubKey),
+            warrantee: fixt!(AgentPubKey),
+            timestamp: Timestamp::from_micros(1_000_000),
+        };
+        let reason = UnrecoverableCellReason::ChainFork(summary);
+        let bytes = SerializedBytes::try_from(&reason).unwrap();
+        let recovered: UnrecoverableCellReason = bytes.try_into().unwrap();
+        assert_eq!(reason, recovered);
     }
 }
