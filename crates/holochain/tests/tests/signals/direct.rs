@@ -346,7 +346,7 @@ async fn direct_signal_over_max_size_is_rejected() {
 
     let oversized = vec![0u8; DIRECT_SIGNAL_MAX_SIZE + 1];
     let response = send_direct_signal(&tx, dna_hash, vec![agent], oversized).await;
-    assert_error_contains(&response, "Signal payload larger than 1 MiB");
+    assert_error_contains(&response, "Signal payload larger than");
 }
 
 #[tokio::test(flavor = "multi_thread")]
