@@ -381,7 +381,7 @@ pub(crate) async fn promote_to_chain_op(
     // INSERT into ChainOp. Carry `require_receipt` over so the receipt
     // workflow can find the op on `ChainOp` and clear the flag once the
     // receipt has been sent.
-    sqlx::query(
+    let inserted = sqlx::query(
         "INSERT INTO ChainOp
             (hash, op_type, action_hash, basis_hash, storage_center_loc,
              validation_status, locally_validated, require_receipt,
@@ -400,7 +400,24 @@ pub(crate) async fn promote_to_chain_op(
     .bind(when_integrated.as_micros())
     .bind(limbo.serialized_size)
     .execute(&mut *conn)
-    .await?;
+    .await?
+    .rows_affected();
+
+    if inserted == 0 {
+        // A cache-mirrored row (`locally_validated = 0`) already existed for this
+        // op hash, so the INSERT was dropped by `PRIMARY KEY ON CONFLICT IGNORE`.
+        // The op has now been validated locally, so upgrade the existing row.
+        sqlx::query(
+            "UPDATE ChainOp
+             SET locally_validated = 1, validation_status = ?, when_integrated = ?
+             WHERE hash = ?",
+        )
+        .bind(i64::from(validation_status))
+        .bind(when_integrated.as_micros())
+        .bind(&limbo.hash)
+        .execute(&mut *conn)
+        .await?;
+    }
 
     // DELETE the limbo row.
     sqlx::query("DELETE FROM LimboChainOp WHERE hash = ?")

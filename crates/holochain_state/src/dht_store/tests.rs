@@ -1910,3 +1910,90 @@ async fn authority_delete_links_returns_integrated_deletes() {
     );
     assert_eq!(deletes[0].1, ValidationStatus::Valid);
 }
+
+#[tokio::test]
+async fn integrate_upgrades_cached_op_to_locally_validated() {
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+    let base = AnyLinkableHash::from_raw_36_and_type(
+        vec![13u8; 36],
+        holo_hash::hash_type::AnyLinkable::Entry,
+    );
+
+    // One action + signature, used to build BOTH the cached RenderedOps and
+    // the incoming DhtOpHashed, so they share the same op hash.
+    let action = Action::CreateLink(CreateLink {
+        author: AgentPubKey::from_raw_36(vec![6u8; 36]),
+        timestamp: Timestamp::from_micros(6000),
+        action_seq: 2,
+        prev_action: ActionHash::from_raw_36(vec![66u8; 36]),
+        base_address: base.clone(),
+        target_address: AnyLinkableHash::from_raw_36_and_type(
+            vec![26u8; 36],
+            holo_hash::hash_type::AnyLinkable::Entry,
+        ),
+        zome_index: 0.into(),
+        link_type: 0.into(),
+        tag: holochain_zome_types::link::LinkTag(vec![1, 2, 3]),
+        weight: Default::default(),
+    });
+    let sig = Signature::from([6u8; 64]);
+
+    // Cache the op first (locally_validated = 0). The authority read excludes it.
+    let rendered = RenderedOps {
+        entry: None,
+        ops: vec![RenderedOp::new(
+            action.clone(),
+            sig.clone(),
+            None,
+            ChainOpType::RegisterAddLink,
+        )
+        .expect("rendered op build")],
+        warrant: None,
+    };
+    store.cache_chain_ops(&rendered).await.unwrap();
+    assert!(
+        store
+            .as_read()
+            .get_authority_link_creates(&base)
+            .await
+            .unwrap()
+            .is_empty(),
+        "cached-only link must not be served by the authority read"
+    );
+
+    // Receive + validate + integrate the SAME op.
+    let create_link = match action {
+        Action::CreateLink(cl) => cl,
+        _ => unreachable!(),
+    };
+    let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(ChainOp::RegisterAddLink(
+        sig,
+        create_link,
+    ))));
+    let hash = op.as_hash().clone();
+    store.record_incoming_ops(vec![op]).await.unwrap();
+    store
+        .record_chain_op_sys_validation_outcomes(vec![(hash.clone(), SysOutcome::Accepted)])
+        .await
+        .unwrap();
+    store
+        .record_app_validation_outcomes(vec![(hash, AppOutcome::Accepted)])
+        .await
+        .unwrap();
+    store
+        .integrate_ready_ops(Timestamp::from_micros(1))
+        .await
+        .unwrap();
+
+    // Now locally validated -> the authority read serves it.
+    let creates = store
+        .as_read()
+        .get_authority_link_creates(&base)
+        .await
+        .unwrap();
+    assert_eq!(
+        creates.len(),
+        1,
+        "integration must upgrade the cached row to locally_validated"
+    );
+}
