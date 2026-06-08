@@ -717,15 +717,16 @@ impl DhtStore<DbWrite<Dht>> {
             let action_hash = holo_hash::ActionHash::from_raw_36(row.action_hash.clone());
             let v2_action = tx
                 .as_mut()
-                .get_action(action_hash)
+                .get_action(action_hash.clone())
                 .await
                 .map_err(StateMutationError::from)?;
-            let (action_author, authored_timestamp) = match v2_action {
+            let (action_author, authored_timestamp, action_data) = match v2_action {
                 Some(sah) => (
                     Some(sah.hashed.content.header.author.clone()),
                     sah.hashed.content.header.timestamp,
+                    Some(sah.hashed.content.data.clone()),
                 ),
-                None => (None, Timestamp::from_micros(0)),
+                None => (None, Timestamp::from_micros(0), None),
             };
 
             let promoted_ok = tx
@@ -733,6 +734,14 @@ impl DhtStore<DbWrite<Dht>> {
                 .await
                 .map_err(StateMutationError::from)?;
             if promoted_ok {
+                // Populate the per-action index tables for the integrated action,
+                // mirroring `cache_chain_ops`, so integrated incoming data
+                // (links, deletes, updates) is queryable via the indexes.
+                if let Some(action_data) = action_data {
+                    action_indexes::insert_action_indexes(&mut tx, &action_hash, &action_data)
+                        .await?;
+                }
+
                 out.push(IntegratedOpSummary {
                     op_hash,
                     basis_hash,

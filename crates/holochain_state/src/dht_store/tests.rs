@@ -1,7 +1,6 @@
 use super::*;
 use holo_hash::{ActionHash, AnyLinkableHash, DnaHash};
-use holochain_types::dht_op::RenderedOp;
-use holochain_types::dht_op::RenderedOps;
+use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed, RenderedOp, RenderedOps};
 use holochain_types::prelude::Signature;
 use holochain_zome_types::action::{Action, Create, CreateLink, DeleteLink, EntryType};
 use holochain_zome_types::entry_def::EntryVisibility;
@@ -174,7 +173,6 @@ async fn purge_all_empties_every_table() {
 fn build_test_store_record_op_hashed(seed: u8) -> DhtOpHashed {
     use holo_hash::{ActionHash, EntryHash};
     use holochain_serialized_bytes::UnsafeBytes;
-    use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
     use holochain_types::prelude::{AppEntryBytes, Entry, RecordEntry, Signature};
     use holochain_zome_types::action::{Action, Create, EntryType};
     use holochain_zome_types::entry_def::EntryVisibility;
@@ -210,7 +208,6 @@ fn build_test_store_record_op_hashed(seed: u8) -> DhtOpHashed {
 /// Build a `WarrantOp` (`ChainIntegrityWarrant::InvalidChainOp`) for
 /// testing.  `seed` drives distinct key bytes.
 fn build_test_warrant_op_hashed(seed: u8) -> DhtOpHashed {
-    use holochain_types::dht_op::{DhtOp, DhtOpHashed};
     use holochain_types::warrant::WarrantOp;
     use holochain_zome_types::op::ChainOpType;
     use holochain_zome_types::prelude::{
@@ -948,7 +945,6 @@ fn store_record_op_with_hashes(
 ) -> (DhtOpHashed, holo_hash::ActionHash, holo_hash::EntryHash) {
     use holo_hash::{ActionHash, EntryHash};
     use holochain_serialized_bytes::UnsafeBytes;
-    use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
     use holochain_types::prelude::{AppEntryBytes, Entry, RecordEntry, Signature};
     use holochain_zome_types::action::{Action, Create, EntryType};
     use holochain_zome_types::entry_def::EntryVisibility;
@@ -1112,7 +1108,6 @@ async fn get_live_record_returns_undeleted_record() {
 #[tokio::test]
 async fn get_live_record_returns_none_when_deleted() {
     use holochain_data::dht::InsertDeletedRecord;
-    use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
     use holochain_zome_types::action::Delete;
 
     let store = DhtStore::new_test(dht_id()).await.unwrap();
@@ -1228,7 +1223,6 @@ async fn get_live_entry_returns_none_when_create_deleted() {
 
     // Build a real Delete action so the Action FK (DeletedRecord.action_hash → Action.hash)
     // is satisfied — mirrors `get_live_record_returns_none_when_deleted`.
-    use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
     let delete_action = Action::Delete(Delete {
         author: AgentPubKey::from_raw_36(vec![207u8; 36]),
         timestamp: Timestamp::from_micros(207_000),
@@ -1310,7 +1304,6 @@ fn build_rendered_store_record_ops(
 #[tokio::test]
 async fn get_entry_details_assembles_creates_deletes_updates_and_status() {
     use holochain_data::dht::{InsertDeletedRecord, InsertUpdatedRecord};
-    use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
     use holochain_types::prelude::RecordEntry;
     use holochain_zome_types::action::{Delete, Update};
     use holochain_zome_types::metadata::EntryDhtStatus;
@@ -1412,7 +1405,6 @@ async fn get_entry_details_assembles_creates_deletes_updates_and_status() {
 #[tokio::test]
 async fn get_record_details_assembles_record_deletes_and_updates() {
     use holochain_data::dht::{InsertDeletedRecord, InsertUpdatedRecord};
-    use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
     use holochain_zome_types::action::{Delete, Update};
 
     let store = DhtStore::new_test(dht_id()).await.unwrap();
@@ -1636,4 +1628,65 @@ async fn get_link_details_pairs_creates_with_their_deletes() {
     let (create, deletes) = &details[0];
     assert_eq!(create.as_hash(), &create_link_hash);
     assert_eq!(deletes.len(), 1, "the create has one DeleteLink");
+}
+
+/// Build a `RegisterAddLink` (CreateLink) op for `base`.
+fn make_create_link_op(base: &AnyLinkableHash, seed: u8) -> DhtOpHashed {
+    let action = Action::CreateLink(CreateLink {
+        author: AgentPubKey::from_raw_36(vec![seed; 36]),
+        timestamp: Timestamp::from_micros(seed as i64 * 1000),
+        action_seq: 2,
+        prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(60); 36]),
+        base_address: base.clone(),
+        target_address: AnyLinkableHash::from_raw_36_and_type(
+            vec![seed.wrapping_add(20); 36],
+            holo_hash::hash_type::AnyLinkable::Entry,
+        ),
+        zome_index: 0.into(),
+        link_type: 0.into(),
+        tag: holochain_zome_types::link::LinkTag(vec![1, 2, 3]),
+        weight: Default::default(),
+    });
+    let create_link = match action {
+        Action::CreateLink(cl) => cl,
+        _ => unreachable!(),
+    };
+    DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(ChainOp::RegisterAddLink(
+        Signature::from([seed; 64]),
+        create_link,
+    ))))
+}
+
+#[tokio::test]
+async fn integration_indexes_create_link() {
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+    let base = AnyLinkableHash::from_raw_36_and_type(
+        vec![7u8; 36],
+        holo_hash::hash_type::AnyLinkable::Entry,
+    );
+    let op = make_create_link_op(&base, 1);
+    let hash = op.as_hash().clone();
+
+    store.record_incoming_ops(vec![op]).await.unwrap();
+    store
+        .record_chain_op_sys_validation_outcomes(vec![(hash.clone(), SysOutcome::Accepted)])
+        .await
+        .unwrap();
+    store
+        .record_app_validation_outcomes(vec![(hash, AppOutcome::Accepted)])
+        .await
+        .unwrap();
+    store
+        .integrate_ready_ops(Timestamp::from_micros(1))
+        .await
+        .unwrap();
+
+    // After integration the Link index must contain the create-link action.
+    let creates = store
+        .as_read()
+        .db()
+        .get_link_create_actions(&base)
+        .await
+        .unwrap();
+    assert_eq!(creates.len(), 1, "integrated CreateLink should be indexed");
 }
