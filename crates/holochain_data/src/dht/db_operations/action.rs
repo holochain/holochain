@@ -196,4 +196,31 @@ impl DbRead<Dht> {
     ) -> sqlx::Result<Vec<(SignedActionHashed, RecordValidity)>> {
         action::get_authority_updates_for_record(self.pool(), record_action_hash).await
     }
+
+    /// Authority-serving create actions for entry `entry_hash` (locally-validated
+    /// only), each with its validation status.
+    pub async fn get_authority_entry_creates(
+        &self,
+        entry_hash: &EntryHash,
+    ) -> sqlx::Result<Vec<(SignedActionHashed, RecordValidity)>> {
+        action::get_authority_entry_creates(self.pool(), entry_hash).await
+    }
+
+    /// Authority-serving deletes targeting entry `entry_hash` (locally-validated
+    /// only), each with its validation status.
+    pub async fn get_authority_deletes_for_entry(
+        &self,
+        entry_hash: &EntryHash,
+    ) -> sqlx::Result<Vec<(SignedActionHashed, RecordValidity)>> {
+        action::get_authority_deletes_for_entry(self.pool(), entry_hash).await
+    }
+
+    /// Authority-serving updates targeting entry `entry_hash` (locally-validated
+    /// only), each with its validation status.
+    pub async fn get_authority_updates_for_entry(
+        &self,
+        entry_hash: &EntryHash,
+    ) -> sqlx::Result<Vec<(SignedActionHashed, RecordValidity)>> {
+        action::get_authority_updates_for_entry(self.pool(), entry_hash).await
+    }
 }

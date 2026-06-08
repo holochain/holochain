@@ -611,6 +611,83 @@ where
     rows.into_iter().map(validated_action_row_to_item).collect()
 }
 
+/// Authority-serving create actions for entry `entry_hash`: locally-validated
+/// `StoreEntry` ops only, each with its validation status.
+/// Cached ops (`locally_validated = 0`) are excluded.
+pub(crate) async fn get_authority_entry_creates<'e, E>(
+    executor: E,
+    entry_hash: &EntryHash,
+) -> sqlx::Result<Vec<(SignedActionHashed, RecordValidity)>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let rows: Vec<ValidatedActionRow> = sqlx::query_as(
+        "SELECT a.hash, a.author, a.seq, a.prev_hash, a.timestamp, a.action_type,
+                a.action_data, a.signature, a.entry_hash, a.private_entry, a.record_validity,
+                c.validation_status
+         FROM ChainOp c
+         JOIN Action a ON c.action_hash = a.hash
+         WHERE c.basis_hash = ? AND c.op_type = ? AND c.locally_validated = 1",
+    )
+    .bind(entry_hash.get_raw_36())
+    .bind(i64::from(ChainOpType::StoreEntry))
+    .fetch_all(executor)
+    .await?;
+    rows.into_iter().map(validated_action_row_to_item).collect()
+}
+
+/// Authority-serving delete actions targeting entry `entry_hash`:
+/// locally-validated `RegisterDeletedEntryAction` ops only, each with its validation status.
+/// Cached ops (`locally_validated = 0`) are excluded.
+pub(crate) async fn get_authority_deletes_for_entry<'e, E>(
+    executor: E,
+    entry_hash: &EntryHash,
+) -> sqlx::Result<Vec<(SignedActionHashed, RecordValidity)>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let rows: Vec<ValidatedActionRow> = sqlx::query_as(
+        "SELECT a.hash, a.author, a.seq, a.prev_hash, a.timestamp, a.action_type,
+                a.action_data, a.signature, a.entry_hash, a.private_entry, a.record_validity,
+                c.validation_status
+         FROM DeletedRecord d
+         JOIN Action a ON d.action_hash = a.hash
+         JOIN ChainOp c ON c.action_hash = a.hash AND c.op_type = ?
+         WHERE d.deletes_entry_hash = ? AND c.locally_validated = 1",
+    )
+    .bind(i64::from(ChainOpType::RegisterDeletedEntryAction))
+    .bind(entry_hash.get_raw_36())
+    .fetch_all(executor)
+    .await?;
+    rows.into_iter().map(validated_action_row_to_item).collect()
+}
+
+/// Authority-serving update actions targeting entry `entry_hash`:
+/// locally-validated `RegisterUpdatedContent` ops only, each with its validation status.
+/// Cached ops (`locally_validated = 0`) are excluded.
+pub(crate) async fn get_authority_updates_for_entry<'e, E>(
+    executor: E,
+    entry_hash: &EntryHash,
+) -> sqlx::Result<Vec<(SignedActionHashed, RecordValidity)>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let rows: Vec<ValidatedActionRow> = sqlx::query_as(
+        "SELECT a.hash, a.author, a.seq, a.prev_hash, a.timestamp, a.action_type,
+                a.action_data, a.signature, a.entry_hash, a.private_entry, a.record_validity,
+                c.validation_status
+         FROM UpdatedRecord u
+         JOIN Action a ON u.action_hash = a.hash
+         JOIN ChainOp c ON c.action_hash = a.hash AND c.op_type = ?
+         WHERE u.original_entry_hash = ? AND c.locally_validated = 1",
+    )
+    .bind(i64::from(ChainOpType::RegisterUpdatedContent))
+    .bind(entry_hash.get_raw_36())
+    .fetch_all(executor)
+    .await?;
+    rows.into_iter().map(validated_action_row_to_item).collect()
+}
+
 /// Return actions whose `prev_hash = :prev_hash` and `hash != :exclude_hash`.
 /// Used by the sys-validation workflow to detect chain forks.
 pub(crate) async fn get_actions_by_prev_hash<'e, E>(
