@@ -91,6 +91,7 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
             network_seed: Some(network_seed_override.into()),
             roles_settings: None,
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         })
         .await
         .unwrap();
@@ -104,6 +105,7 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
             network_seed: Some(network_seed_override.into()),
             roles_settings: Some(HashMap::from([role_settings])),
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         })
         .await
         .unwrap();
@@ -246,6 +248,7 @@ async fn install_app_with_custom_modifier_fields_none_does_not_override_existing
             network_seed: None,
             roles_settings: Some(HashMap::from([role_settings])),
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         })
         .await
         .unwrap();
@@ -299,6 +302,7 @@ async fn installing_with_modifiers_for_non_existing_role_fails() {
             network_seed: Some("final seed".into()),
             roles_settings: Some(HashMap::from([role_settings])),
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         })
         .await;
 
@@ -335,6 +339,7 @@ async fn providing_membrane_proof_overrides_deferred_provisioning() {
             roles_settings: Some(HashMap::from([role_settings])),
             network_seed: None,
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         })
         .await
         .unwrap();
@@ -355,4 +360,58 @@ async fn providing_membrane_proof_overrides_deferred_provisioning() {
     let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
 
     assert_eq!(app_info.status, AppStatus::Enabled);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn restore_requires_agent_key() {
+    use holochain_types::prelude::*;
+
+    let conductor = SweetConductor::standard().await;
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+    let bundle = AppBundle::new(
+        AppManifestCurrentBuilder::default()
+            .name("test".into())
+            .description(None)
+            .roles(vec![AppRoleManifest {
+                name: "role".into(),
+                dna: AppRoleDnaManifest {
+                    path: Some(format!("{}", dna.dna_hash())),
+                    modifiers: DnaModifiersOpt::default(),
+                    installed_hash: None,
+                    clone_limit: 0,
+                },
+                provisioning: Some(CellProvisioning::Create { deferred: false }),
+            }])
+            .build()
+            .unwrap()
+            .into(),
+        vec![(
+            format!("{}", dna.dna_hash()),
+            DnaBundle::from_dna_file(dna).unwrap(),
+        )],
+    )
+    .unwrap();
+
+    let result = conductor
+        .clone()
+        .install_app_bundle(InstallAppPayload {
+            agent_key: None,
+            source: AppBundleSource::Bytes(bundle.pack().unwrap()),
+            installed_app_id: Some("restore_test".into()),
+            network_seed: None,
+            roles_settings: None,
+            ignore_genesis_failure: false,
+            restore_from_dht: true,
+        })
+        .await;
+
+    assert!(
+        result.is_err(),
+        "expected error when restore_from_dht=true and agent_key=None"
+    );
+    let err = result.unwrap_err();
+    assert!(
+        err.to_string().contains("restore") || err.to_string().contains("agent_key"),
+        "unexpected error: {err}"
+    );
 }

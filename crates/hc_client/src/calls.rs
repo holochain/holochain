@@ -645,6 +645,7 @@ pub async fn install_app_bundle(
         roles_settings,
         network_seed,
         ignore_genesis_failure: false,
+        restore_from_dht: false,
     };
 
     let installed_app = client.install_app(payload).await?;

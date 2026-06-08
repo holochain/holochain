@@ -1325,7 +1325,14 @@ mod app_impls {
                 network_seed,
                 roles_settings,
                 ignore_genesis_failure,
+                restore_from_dht,
             } = payload;
+
+            if restore_from_dht && agent_key.is_none() {
+                return Err(ConductorError::AppStatusError(
+                    "restore_from_dht requires agent_key to be specified".to_string(),
+                ));
+            }
 
             let modifiers = get_modifiers_map_from_role_settings(&roles_settings);
             let membrane_proofs = get_memproof_map_from_role_settings(&roles_settings);

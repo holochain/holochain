@@ -320,6 +320,7 @@ pub async fn register_and_install_dna_named(
         network_seed: None,
         roles_settings: Default::default(),
         ignore_genesis_failure: false,
+        restore_from_dht: false,
     };
     let request = AdminRequest::InstallApp(Box::new(payload));
     let response = client.request(request);

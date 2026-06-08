@@ -135,6 +135,12 @@ pub struct InstallAppPayload {
     /// This can be useful for diagnostics.
     #[serde(default)]
     pub ignore_genesis_failure: bool,
+
+    /// If true, suppress genesis for all cells in this app and instead reconstruct each cell's
+    /// source chain by fetching the agent's prior chain from the DHT.
+    /// Requires `agent_key` to be `Some`.
+    #[serde(default)]
+    pub restore_from_dht: bool,
 }
 
 /// Alias

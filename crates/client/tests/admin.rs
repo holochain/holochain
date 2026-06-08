@@ -54,6 +54,7 @@ async fn signed_zome_call() {
             roles_settings: None,
             source: AppBundleSource::Bytes(fixture::get_fixture_app_bundle()),
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         })
         .await
         .unwrap();
@@ -130,6 +131,7 @@ async fn storage_info() {
             roles_settings: None,
             source: AppBundleSource::Bytes(fixture::get_fixture_app_bundle()),
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         })
         .await
         .unwrap();
@@ -164,6 +166,7 @@ async fn dump_network_stats() {
             roles_settings: None,
             source: AppBundleSource::Bytes(fixture::get_fixture_app_bundle()),
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         })
         .await
         .unwrap();
@@ -194,6 +197,7 @@ async fn agent_info() {
             network_seed: None,
             source: AppBundleSource::Bytes(fixture::get_fixture_app_bundle()),
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         })
         .await
         .unwrap();
@@ -252,6 +256,7 @@ async fn peer_meta_info() {
             network_seed: None,
             source: AppBundleSource::Bytes(fixture::get_fixture_app_bundle()),
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         })
         .await
         .unwrap();
@@ -299,6 +304,7 @@ async fn install_app_then_list_apps_and_list_cell_ids() {
             network_seed: None,
             source: AppBundleSource::Bytes(fixture::get_fixture_app_bundle()),
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         })
         .await
         .unwrap();
@@ -356,6 +362,7 @@ async fn install_app_with_roles_settings() {
             network_seed: None,
             source: AppBundleSource::Bytes(fixture::get_fixture_app_bundle()),
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         })
         .await
         .unwrap();

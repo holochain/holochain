@@ -446,6 +446,7 @@ async fn test_deferred_memproof_provisioning() {
             roles_settings: Default::default(),
             network_seed: None,
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         })
         .await
         .unwrap();
@@ -562,6 +563,7 @@ async fn test_deferred_memproof_provisioning_uninstall() {
             roles_settings: Default::default(),
             network_seed: None,
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         })
         .await
         .unwrap();
