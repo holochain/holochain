@@ -475,7 +475,7 @@ fn validated_action_row_to_item(
     let validation_status = RecordValidity::try_from(row.validation_status).map_err(|v| {
         sqlx::Error::Decode(Box::new(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
-            format!("invalid validation_status {v} on link ChainOp"),
+            format!("invalid validation_status {v} on ChainOp"),
         )))
     })?;
     Ok((action, validation_status))
@@ -529,6 +529,83 @@ where
     )
     .bind(i64::from(ChainOpType::RegisterRemoveLink))
     .bind(base.get_raw_36())
+    .fetch_all(executor)
+    .await?;
+    rows.into_iter().map(validated_action_row_to_item).collect()
+}
+
+/// Authority-serving `StoreRecord` action for `action_hash`: present only if a
+/// locally-validated (`locally_validated = 1`) `StoreRecord` op exists for it,
+/// with its validation status.
+pub(crate) async fn get_authority_store_record<'e, E>(
+    executor: E,
+    action_hash: &ActionHash,
+) -> sqlx::Result<Option<(SignedActionHashed, RecordValidity)>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let row: Option<ValidatedActionRow> = sqlx::query_as(
+        "SELECT a.hash, a.author, a.seq, a.prev_hash, a.timestamp, a.action_type,
+                a.action_data, a.signature, a.entry_hash, a.private_entry, a.record_validity,
+                c.validation_status
+         FROM Action a
+         JOIN ChainOp c ON c.action_hash = a.hash AND c.op_type = ?
+         WHERE a.hash = ? AND c.locally_validated = 1",
+    )
+    .bind(i64::from(ChainOpType::StoreRecord))
+    .bind(action_hash.get_raw_36())
+    .fetch_optional(executor)
+    .await?;
+    row.map(validated_action_row_to_item).transpose()
+}
+
+/// Authority-serving delete actions targeting record `record_action_hash`:
+/// locally-validated `RegisterDeletedBy` ops only, each with its validation status.
+/// Cached ops (`locally_validated = 0`) are excluded.
+pub(crate) async fn get_authority_deletes_for_record<'e, E>(
+    executor: E,
+    record_action_hash: &ActionHash,
+) -> sqlx::Result<Vec<(SignedActionHashed, RecordValidity)>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let rows: Vec<ValidatedActionRow> = sqlx::query_as(
+        "SELECT a.hash, a.author, a.seq, a.prev_hash, a.timestamp, a.action_type,
+                a.action_data, a.signature, a.entry_hash, a.private_entry, a.record_validity,
+                c.validation_status
+         FROM DeletedRecord d
+         JOIN Action a ON d.action_hash = a.hash
+         JOIN ChainOp c ON c.action_hash = a.hash AND c.op_type = ?
+         WHERE d.deletes_action_hash = ? AND c.locally_validated = 1",
+    )
+    .bind(i64::from(ChainOpType::RegisterDeletedBy))
+    .bind(record_action_hash.get_raw_36())
+    .fetch_all(executor)
+    .await?;
+    rows.into_iter().map(validated_action_row_to_item).collect()
+}
+
+/// Authority-serving update actions targeting record `record_action_hash`:
+/// locally-validated `RegisterUpdatedRecord` ops only, each with its validation status.
+/// Cached ops (`locally_validated = 0`) are excluded.
+pub(crate) async fn get_authority_updates_for_record<'e, E>(
+    executor: E,
+    record_action_hash: &ActionHash,
+) -> sqlx::Result<Vec<(SignedActionHashed, RecordValidity)>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let rows: Vec<ValidatedActionRow> = sqlx::query_as(
+        "SELECT a.hash, a.author, a.seq, a.prev_hash, a.timestamp, a.action_type,
+                a.action_data, a.signature, a.entry_hash, a.private_entry, a.record_validity,
+                c.validation_status
+         FROM UpdatedRecord u
+         JOIN Action a ON u.action_hash = a.hash
+         JOIN ChainOp c ON c.action_hash = a.hash AND c.op_type = ?
+         WHERE u.original_action_hash = ? AND c.locally_validated = 1",
+    )
+    .bind(i64::from(ChainOpType::RegisterUpdatedRecord))
+    .bind(record_action_hash.get_raw_36())
     .fetch_all(executor)
     .await?;
     rows.into_iter().map(validated_action_row_to_item).collect()

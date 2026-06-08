@@ -169,4 +169,31 @@ impl DbRead<Dht> {
     ) -> sqlx::Result<Vec<(SignedActionHashed, RecordValidity)>> {
         action::get_authority_delete_links(self.pool(), base).await
     }
+
+    /// Authority-serving `StoreRecord` action for `action_hash` (locally-validated
+    /// only), with its validation status.
+    pub async fn get_authority_store_record(
+        &self,
+        action_hash: &ActionHash,
+    ) -> sqlx::Result<Option<(SignedActionHashed, RecordValidity)>> {
+        action::get_authority_store_record(self.pool(), action_hash).await
+    }
+
+    /// Authority-serving deletes targeting record `record_action_hash`
+    /// (locally-validated only), each with its validation status.
+    pub async fn get_authority_deletes_for_record(
+        &self,
+        record_action_hash: &ActionHash,
+    ) -> sqlx::Result<Vec<(SignedActionHashed, RecordValidity)>> {
+        action::get_authority_deletes_for_record(self.pool(), record_action_hash).await
+    }
+
+    /// Authority-serving updates targeting record `record_action_hash`
+    /// (locally-validated only), each with its validation status.
+    pub async fn get_authority_updates_for_record(
+        &self,
+        record_action_hash: &ActionHash,
+    ) -> sqlx::Result<Vec<(SignedActionHashed, RecordValidity)>> {
+        action::get_authority_updates_for_record(self.pool(), record_action_hash).await
+    }
 }
