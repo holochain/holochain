@@ -2700,7 +2700,7 @@ dependencies = [
 
 [[package]]
 name = "hcterm"
-version = "0.7.0-dev.27"
+version = "0.7.0-dev.28"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2929,7 +2929,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.7.0-dev.27"
+version = "0.7.0-dev.28"
 dependencies = [
  "anyhow",
  "assert2",
@@ -3028,7 +3028,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.7.0-dev.27"
+version = "0.7.0-dev.28"
 dependencies = [
  "async-trait",
  "fixt",
@@ -3057,7 +3057,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.7.0-dev.27"
+version = "0.7.0-dev.28"
 dependencies = [
  "anyhow",
  "clap",
@@ -3071,7 +3071,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.7.0-dev.26"
+version = "0.7.0-dev.27"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -3093,7 +3093,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_client"
-version = "0.7.0-dev.27"
+version = "0.7.0-dev.28"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -3120,7 +3120,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.7.0-dev.27"
+version = "0.7.0-dev.28"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -3147,7 +3147,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_client"
-version = "0.9.0-dev.27"
+version = "0.9.0-dev.28"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3177,7 +3177,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.7.0-dev.26"
+version = "0.7.0-dev.27"
 dependencies = [
  "derive_more",
  "holo_hash",
@@ -3212,7 +3212,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_config"
-version = "0.7.0-dev.26"
+version = "0.7.0-dev.27"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -3230,7 +3230,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_data"
-version = "0.7.0-dev.16"
+version = "0.7.0-dev.17"
 dependencies = [
  "base64",
  "holo_hash",
@@ -3341,7 +3341,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.7.0-dev.27"
+version = "0.7.0-dev.28"
 dependencies = [
  "async-trait",
  "base64",
@@ -3467,7 +3467,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.7.0-dev.27"
+version = "0.7.0-dev.28"
 dependencies = [
  "async-recursion",
  "base64",
@@ -3552,7 +3552,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.7.0-dev.26"
+version = "0.7.0-dev.27"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3623,7 +3623,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.7.0-dev.27"
+version = "0.7.0-dev.28"
 dependencies = [
  "holochain_types",
  "strum 0.27.2",
@@ -3678,7 +3678,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_websocket"
-version = "0.7.0-dev.26"
+version = "0.7.0-dev.27"
 dependencies = [
  "async-trait",
  "bytes",
