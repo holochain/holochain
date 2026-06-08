@@ -508,7 +508,10 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
             // Add 3 to allow for msgpack overhead for an "array 16"
             if signal.len() > DIRECT_SIGNAL_MAX_SIZE + 3 {
                 let signal_length = signal.len();
-                warn!("Received signal payload that is {signal_length:?} > 1024**2");
+                warn!(
+                    "Received signal payload that is {signal_length:?} > {}",
+                    DIRECT_SIGNAL_MAX_SIZE + 3
+                );
                 return Err(HolochainP2pError::other(
                     "Received signal payload that was too long",
                 ));

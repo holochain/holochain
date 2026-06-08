@@ -2777,7 +2777,11 @@ mod misc_impls {
 
             if signal.len() > DIRECT_SIGNAL_MAX_SIZE {
                 return Err(ConductorError::Other(
-                    "Signal payload larger than 1 MiB".into(),
+                    format!(
+                        "Signal payload larger than {} bytes",
+                        DIRECT_SIGNAL_MAX_SIZE
+                    )
+                    .into(),
                 ));
             }
 
