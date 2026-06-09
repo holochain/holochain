@@ -417,7 +417,7 @@ async fn restore_requires_agent_key() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn agent_key_not_in_lair_is_rejected() {
+async fn install_with_agent_key_not_in_lair_is_rejected() {
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain::conductor::error::ConductorError;
     use holochain_types::prelude::*;
@@ -496,7 +496,7 @@ async fn agent_key_not_in_lair_is_rejected() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn agent_key_in_lair_is_accepted() {
+async fn install_with_existing_agent_key_in_lair_is_accepted() {
     use holochain_types::prelude::*;
 
     let conductor = SweetConductor::standard().await;
