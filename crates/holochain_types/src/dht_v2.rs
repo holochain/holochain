@@ -3,7 +3,7 @@
 pub use holochain_zome_types::dht_v2::*;
 
 use holo_hash::{
-    hash_type, ActionHash, AnyDhtHash, DhtOpHash, EntryHash, HasHash, HashableContent,
+    hash_type, ActionHash, AnyLinkableHash, DhtOpHash, EntryHash, HasHash, HashableContent,
     HashableContentBytes, HoloHashed,
 };
 use holochain_serialized_bytes::prelude::*;
@@ -127,6 +127,87 @@ impl ChainOp {
     }
 }
 
+impl ChainOpUniqueForm<'_> {
+    /// The content-derived [`DhtOpHash`] for an op of `op_type` carrying
+    /// `action`, without needing a full [`ChainOp`] in hand.
+    ///
+    /// Agrees with [`ChainOp::to_hash`] for the corresponding op; used when
+    /// producing the several ops a single record generates.
+    pub fn op_hash(op_type: ChainOpType, action: &Action) -> DhtOpHash {
+        let form = match op_type {
+            ChainOpType::StoreRecord => ChainOpUniqueForm::CreateRecord(action),
+            ChainOpType::StoreEntry => ChainOpUniqueForm::CreateEntry(action),
+            ChainOpType::RegisterAgentActivity => ChainOpUniqueForm::AgentActivity(action),
+            ChainOpType::RegisterUpdatedContent => ChainOpUniqueForm::UpdateEntry(action),
+            ChainOpType::RegisterUpdatedRecord => ChainOpUniqueForm::UpdateRecord(action),
+            ChainOpType::RegisterDeletedBy => ChainOpUniqueForm::DeleteRecord(action),
+            ChainOpType::RegisterDeletedEntryAction => ChainOpUniqueForm::DeleteEntry(action),
+            ChainOpType::RegisterAddLink => ChainOpUniqueForm::CreateLink(action),
+            ChainOpType::RegisterRemoveLink => ChainOpUniqueForm::DeleteLink(action),
+        };
+        DhtOpHash::with_data_sync(&form)
+    }
+}
+
+/// The set of op types a record with this action produces.
+///
+/// Mirrors the legacy `action_to_op_types`, matched over the v2 [`ActionData`].
+pub fn action_to_op_types(action: &Action) -> Vec<ChainOpType> {
+    use ChainOpType::*;
+    match &action.data {
+        ActionData::Dna(_)
+        | ActionData::OpenChain(_)
+        | ActionData::CloseChain(_)
+        | ActionData::AgentValidationPkg(_)
+        | ActionData::InitZomesComplete(_) => vec![StoreRecord, RegisterAgentActivity],
+        ActionData::CreateLink(_) => vec![StoreRecord, RegisterAgentActivity, RegisterAddLink],
+        ActionData::DeleteLink(_) => vec![StoreRecord, RegisterAgentActivity, RegisterRemoveLink],
+        ActionData::Create(_) => vec![StoreRecord, RegisterAgentActivity, StoreEntry],
+        ActionData::Update(_) => vec![
+            StoreRecord,
+            RegisterAgentActivity,
+            StoreEntry,
+            RegisterUpdatedContent,
+            RegisterUpdatedRecord,
+        ],
+        ActionData::Delete(_) => vec![
+            StoreRecord,
+            RegisterAgentActivity,
+            RegisterDeletedBy,
+            RegisterDeletedEntryAction,
+        ],
+    }
+}
+
+/// The DHT basis where an op of `op_type` for `action` (hashed as
+/// `action_hash`) is stored, mirroring the legacy `ChainOpUniqueForm::basis`.
+///
+/// Returns `None` only for an `op_type` that does not match the action's data,
+/// which [`action_to_op_types`] never emits.
+#[allow(dead_code)] // will be wired in the next task (produce_ops_from_record)
+fn op_basis(
+    op_type: ChainOpType,
+    action_hash: &ActionHash,
+    action: &Action,
+) -> Option<AnyLinkableHash> {
+    use ChainOpType::*;
+    Some(match (op_type, &action.data) {
+        (StoreRecord, _) => action_hash.clone().into(),
+        (RegisterAgentActivity, _) => action.header.author.clone().into(),
+        (StoreEntry, ActionData::Create(d)) => d.entry_hash.clone().into(),
+        (StoreEntry, ActionData::Update(d)) => d.entry_hash.clone().into(),
+        (RegisterUpdatedContent, ActionData::Update(d)) => d.original_entry_address.clone().into(),
+        (RegisterUpdatedRecord, ActionData::Update(d)) => d.original_action_address.clone().into(),
+        (RegisterDeletedBy, ActionData::Delete(d)) => d.deletes_address.clone().into(),
+        (RegisterDeletedEntryAction, ActionData::Delete(d)) => {
+            d.deletes_entry_address.clone().into()
+        }
+        (RegisterAddLink, ActionData::CreateLink(d)) => d.base_address.clone(),
+        (RegisterRemoveLink, ActionData::DeleteLink(d)) => d.base_address.clone(),
+        _ => return None,
+    })
+}
+
 /// Internal representation of a `ChainOp` with all hashes pre-computed.
 /// Used during the incoming-ops workflow so hashes aren't recomputed for
 /// each database write.
@@ -141,7 +222,10 @@ pub struct HashedChainOp {
     /// The type discriminant of the op.
     pub op_type: ChainOpType,
     /// The DHT basis hash (where the op is stored).
-    pub basis_hash: AnyDhtHash,
+    ///
+    /// `AnyLinkableHash`, not `AnyDhtHash`: link-op bases may be `External`
+    /// hashes, which `AnyDhtHash` cannot hold (matches `InsertChainOp`).
+    pub basis_hash: AnyLinkableHash,
     /// The numeric storage center derived from `basis_hash`.
     pub storage_center_loc: u32,
 }
@@ -224,5 +308,83 @@ mod op_hash_tests {
         changed_action.header.action_seq = 99;
         let changed = ChainOp::CreateRecord(signed(changed_action, 7), OpEntry::ActionOnly);
         assert_ne!(base.to_hash(), changed.to_hash());
+    }
+
+    #[test]
+    fn op_hash_entry_point_matches_chain_op_to_hash() {
+        let sa = signed(create_action(), 7);
+        // Cover every variant: a v2 `ChainOp` accepts any `SignedAction`
+        // regardless of the action's content, so the same `sa` exercises the
+        // full `to_unique_form` / `op_hash` mapping.
+        let cases = [
+            (
+                ChainOp::CreateRecord(sa.clone(), OpEntry::ActionOnly),
+                ChainOpType::StoreRecord,
+            ),
+            (
+                ChainOp::CreateEntry(sa.clone(), OpEntry::ActionOnly),
+                ChainOpType::StoreEntry,
+            ),
+            (
+                ChainOp::AgentActivity(sa.clone()),
+                ChainOpType::RegisterAgentActivity,
+            ),
+            (
+                ChainOp::UpdateEntry(sa.clone(), OpEntry::ActionOnly),
+                ChainOpType::RegisterUpdatedContent,
+            ),
+            (
+                ChainOp::UpdateRecord(sa.clone(), OpEntry::ActionOnly),
+                ChainOpType::RegisterUpdatedRecord,
+            ),
+            (
+                ChainOp::DeleteRecord(sa.clone()),
+                ChainOpType::RegisterDeletedBy,
+            ),
+            (
+                ChainOp::DeleteEntry(sa.clone()),
+                ChainOpType::RegisterDeletedEntryAction,
+            ),
+            (
+                ChainOp::CreateLink(sa.clone()),
+                ChainOpType::RegisterAddLink,
+            ),
+            (
+                ChainOp::DeleteLink(sa.clone()),
+                ChainOpType::RegisterRemoveLink,
+            ),
+        ];
+        for (op, op_type) in cases {
+            assert_eq!(op.to_hash(), ChainOpUniqueForm::op_hash(op_type, sa.data()));
+        }
+    }
+
+    #[test]
+    fn action_to_op_types_create_produces_record_activity_entry() {
+        let action = create_action();
+        assert_eq!(
+            action_to_op_types(&action),
+            vec![
+                ChainOpType::StoreRecord,
+                ChainOpType::RegisterAgentActivity,
+                ChainOpType::StoreEntry,
+            ]
+        );
+    }
+
+    #[test]
+    fn op_basis_uses_action_hash_for_store_record_and_entry_hash_for_store_entry() {
+        use holo_hash::AnyLinkableHash;
+        let action = create_action();
+        let action_hash = ActionHash::from_raw_36(vec![8u8; 36]);
+
+        let record_basis = op_basis(ChainOpType::StoreRecord, &action_hash, &action).unwrap();
+        assert_eq!(record_basis, AnyLinkableHash::from(action_hash.clone()));
+
+        let entry_basis = op_basis(ChainOpType::StoreEntry, &action_hash, &action).unwrap();
+        assert_eq!(
+            entry_basis,
+            AnyLinkableHash::from(EntryHash::from_raw_36(vec![3u8; 36]))
+        );
     }
 }
