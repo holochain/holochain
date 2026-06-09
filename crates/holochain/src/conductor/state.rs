@@ -401,11 +401,13 @@ mod tests {
         let installed = state.add_app(app).unwrap();
         state.get_app_mut(&app_id.to_string()).unwrap().status = AppStatus::Unrecoverable(
             CellId::new(dna_hash, agent),
-            UnrecoverableCellReason::ChainForkWarrant(Box::new(holochain_types::app::WarrantSummary {
-                author: fixt!(AgentPubKey),
-                warrantee: fixt!(AgentPubKey),
-                timestamp: Timestamp::now(),
-            })),
+            UnrecoverableCellReason::ChainForkWarrant(Box::new(
+                holochain_types::app::WarrantSummary {
+                    author: fixt!(AgentPubKey),
+                    warrantee: fixt!(AgentPubKey),
+                    timestamp: Timestamp::now(),
+                },
+            )),
         );
 
         assert_eq!(state.enabled_apps().count(), 0);
