@@ -145,7 +145,10 @@ pub struct ConductorConfig {
     ///
     /// Increasing this value raises the cost of feeding a restoring agent a fabricated history
     /// but also raises the chance that restore fails on small or poorly-connected DHTs.
-    #[serde(default = "default_restore_chain_quorum")]
+    #[serde(
+        default = "default_restore_chain_quorum",
+        deserialize_with = "deserialize_restore_chain_quorum"
+    )]
     pub restore_chain_quorum: u8,
 
     /// Tuning parameters to adjust the behaviour of the conductor.
@@ -175,6 +178,19 @@ fn default_incoming_request_concurrency_limit() -> u16 {
 
 fn default_restore_chain_quorum() -> u8 {
     2
+}
+
+fn deserialize_restore_chain_quorum<'de, D>(deserializer: D) -> Result<u8, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = u8::deserialize(deserializer)?;
+    if value == 0 {
+        return Err(serde::de::Error::custom(
+            "restore_chain_quorum must be greater than 0",
+        ));
+    }
+    Ok(value)
 }
 
 impl Default for ConductorConfig {
@@ -1288,5 +1304,17 @@ admin_interfaces:
     "#;
         let result: ConductorConfig = config_from_yaml(yaml).unwrap();
         assert_eq!(result.restore_chain_quorum, 5);
+    }
+
+    #[test]
+    fn config_restore_chain_quorum_rejects_zero() {
+        let yaml = r#"---
+    data_root_path: /path/to/env
+    keystore:
+      type: danger_test_keystore
+    restore_chain_quorum: 0
+    "#;
+        let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
+        assert_matches!(result, Err(ConductorConfigError::SerializationError(_)));
     }
 }
