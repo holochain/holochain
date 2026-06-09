@@ -184,7 +184,6 @@ pub fn action_to_op_types(action: &Action) -> Vec<ChainOpType> {
 ///
 /// Returns `None` only for an `op_type` that does not match the action's data,
 /// which [`action_to_op_types`] never emits.
-#[allow(dead_code)] // will be wired in the next task (produce_ops_from_record)
 fn op_basis(
     op_type: ChainOpType,
     action_hash: &ActionHash,
@@ -206,6 +205,58 @@ fn op_basis(
         (RegisterRemoveLink, ActionData::DeleteLink(d)) => d.base_address.clone(),
         _ => return None,
     })
+}
+
+/// Produce the [`HashedChainOp`]s a v2 [`Record`] generates, with all hashes,
+/// bases, and storage locations pre-computed — the v2 analog of the legacy
+/// `produce_ops_from_record`.
+///
+/// The `StoreEntry` op is omitted whenever the entry is not present — whether
+/// because it is private (`Hidden`), inapplicable (`NA`), or held without its
+/// body (`NotStored`). Separately, the entry-bearing ops (`op_carries_entry`)
+/// carry the entry payload only when it is present.
+pub fn produce_ops_from_record(record: &Record) -> Vec<HashedChainOp> {
+    let action = record.action();
+    let action_hash = record.action_address();
+    let entry = record.entry.as_option();
+
+    let mut ops = Vec::new();
+    for op_type in action_to_op_types(action) {
+        // The store-entry op carries nothing without the entry.
+        if op_type == ChainOpType::StoreEntry && entry.is_none() {
+            continue;
+        }
+        let Some(basis_hash) = op_basis(op_type, action_hash, action) else {
+            continue;
+        };
+        let op_entry = if op_carries_entry(op_type) {
+            // Re-hashed from content; for a valid record this equals the
+            // action's `entry_hash`.
+            entry.map(|e| HoloHashed::from_content_sync(e.clone()))
+        } else {
+            None
+        };
+        ops.push(HashedChainOp {
+            op_hash: ChainOpUniqueForm::op_hash(op_type, action),
+            action: record.signed_action.clone(),
+            entry: op_entry,
+            op_type,
+            storage_center_loc: basis_hash.get_loc(),
+            basis_hash,
+        });
+    }
+    ops
+}
+
+/// Whether an op of this type carries the record's entry payload.
+fn op_carries_entry(op_type: ChainOpType) -> bool {
+    matches!(
+        op_type,
+        ChainOpType::StoreRecord
+            | ChainOpType::StoreEntry
+            | ChainOpType::RegisterUpdatedContent
+            | ChainOpType::RegisterUpdatedRecord
+    )
 }
 
 /// Internal representation of a `ChainOp` with all hashes pre-computed.
@@ -385,6 +436,146 @@ mod op_hash_tests {
         assert_eq!(
             entry_basis,
             AnyLinkableHash::from(EntryHash::from_raw_36(vec![3u8; 36]))
+        );
+    }
+}
+
+#[cfg(test)]
+mod produce_ops_tests {
+    use super::*;
+    use holo_hash::{ActionHash, AgentPubKey, EntryHash, HoloHashed};
+    use holochain_timestamp::Timestamp;
+    use holochain_zome_types::dht_v2::Record;
+    use holochain_zome_types::prelude::{AppEntryDef, EntryType, EntryVisibility};
+    use holochain_zome_types::record::{RecordEntry, SignedHashed};
+    use holochain_zome_types::signature::Signature;
+    use holochain_zome_types::Entry;
+
+    fn create_action() -> Action {
+        Action {
+            header: ActionHeader {
+                author: AgentPubKey::from_raw_36(vec![1u8; 36]),
+                timestamp: Timestamp::from_micros(1_000),
+                action_seq: 4,
+                prev_action: Some(ActionHash::from_raw_36(vec![2u8; 36])),
+            },
+            data: ActionData::Create(CreateData {
+                entry_type: EntryType::App(AppEntryDef::new(
+                    0.into(),
+                    0.into(),
+                    EntryVisibility::Public,
+                )),
+                entry_hash: EntryHash::from_raw_36(vec![3u8; 36]),
+            }),
+        }
+    }
+
+    fn update_action() -> Action {
+        Action {
+            header: ActionHeader {
+                author: AgentPubKey::from_raw_36(vec![1u8; 36]),
+                timestamp: Timestamp::from_micros(2_000),
+                action_seq: 5,
+                prev_action: Some(ActionHash::from_raw_36(vec![2u8; 36])),
+            },
+            data: ActionData::Update(UpdateData {
+                original_action_address: ActionHash::from_raw_36(vec![6u8; 36]),
+                original_entry_address: EntryHash::from_raw_36(vec![7u8; 36]),
+                entry_type: EntryType::App(AppEntryDef::new(
+                    0.into(),
+                    0.into(),
+                    EntryVisibility::Public,
+                )),
+                entry_hash: EntryHash::from_raw_36(vec![3u8; 36]),
+            }),
+        }
+    }
+
+    fn record(action: Action, entry: RecordEntry<Entry>) -> Record {
+        let hashed = HoloHashed::with_pre_hashed(action, ActionHash::from_raw_36(vec![9u8; 36]));
+        Record::new(
+            SignedHashed::with_presigned(hashed, Signature([7u8; 64])),
+            entry,
+        )
+    }
+
+    fn op_types(ops: &[HashedChainOp]) -> Vec<ChainOpType> {
+        ops.iter().map(|o| o.op_type).collect()
+    }
+
+    #[test]
+    fn create_with_public_entry_produces_record_activity_entry() {
+        let entry = Entry::Agent(AgentPubKey::from_raw_36(vec![5u8; 36]));
+        let ops = produce_ops_from_record(&record(create_action(), RecordEntry::Present(entry)));
+        assert_eq!(
+            op_types(&ops),
+            vec![
+                ChainOpType::StoreRecord,
+                ChainOpType::RegisterAgentActivity,
+                ChainOpType::StoreEntry,
+            ]
+        );
+        let by_type = |t| ops.iter().find(|o| o.op_type == t).unwrap();
+        assert!(by_type(ChainOpType::StoreRecord).entry.is_some());
+        assert!(by_type(ChainOpType::StoreEntry).entry.is_some());
+        assert!(by_type(ChainOpType::RegisterAgentActivity).entry.is_none());
+    }
+
+    #[test]
+    fn create_with_hidden_entry_skips_store_entry_and_omits_payload() {
+        let ops = produce_ops_from_record(&record(create_action(), RecordEntry::Hidden));
+        assert_eq!(
+            op_types(&ops),
+            vec![ChainOpType::StoreRecord, ChainOpType::RegisterAgentActivity]
+        );
+        let store_record = ops
+            .iter()
+            .find(|o| o.op_type == ChainOpType::StoreRecord)
+            .unwrap();
+        assert!(store_record.entry.is_none());
+    }
+
+    #[test]
+    fn store_record_basis_is_the_action_hash() {
+        use holo_hash::AnyLinkableHash;
+        let r = record(create_action(), RecordEntry::Hidden);
+        let action_hash = r.action_address().clone();
+        let ops = produce_ops_from_record(&r);
+        let store_record = ops
+            .iter()
+            .find(|o| o.op_type == ChainOpType::StoreRecord)
+            .unwrap();
+        assert_eq!(store_record.basis_hash, AnyLinkableHash::from(action_hash));
+    }
+
+    #[test]
+    fn update_with_public_entry_produces_full_op_set_with_update_payloads() {
+        use holo_hash::AnyLinkableHash;
+        let entry = Entry::Agent(AgentPubKey::from_raw_36(vec![5u8; 36]));
+        let ops = produce_ops_from_record(&record(update_action(), RecordEntry::Present(entry)));
+        assert_eq!(
+            op_types(&ops),
+            vec![
+                ChainOpType::StoreRecord,
+                ChainOpType::RegisterAgentActivity,
+                ChainOpType::StoreEntry,
+                ChainOpType::RegisterUpdatedContent,
+                ChainOpType::RegisterUpdatedRecord,
+            ]
+        );
+        let by_type = |t| ops.iter().find(|o| o.op_type == t).unwrap();
+        // The update ops are entry-bearing and carry the new entry.
+        assert!(by_type(ChainOpType::RegisterUpdatedContent).entry.is_some());
+        assert!(by_type(ChainOpType::RegisterUpdatedRecord).entry.is_some());
+        assert!(by_type(ChainOpType::RegisterAgentActivity).entry.is_none());
+        // Update bases: content → original entry, record → original action.
+        assert_eq!(
+            by_type(ChainOpType::RegisterUpdatedContent).basis_hash,
+            AnyLinkableHash::from(EntryHash::from_raw_36(vec![7u8; 36]))
+        );
+        assert_eq!(
+            by_type(ChainOpType::RegisterUpdatedRecord).basis_hash,
+            AnyLinkableHash::from(ActionHash::from_raw_36(vec![6u8; 36]))
         );
     }
 }
