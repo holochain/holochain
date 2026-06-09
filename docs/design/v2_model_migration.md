@@ -277,7 +277,7 @@ implementation plan:
 |-----------|-------|--------|
 | **1a — `DhtStore` read API** | The cascade's compound read methods on `holochain_state::DhtStore` (+ `holochain_data` primitives), tested in isolation: `retrieve_*`, `get_live_*`, `get_*_details`, `get_links`/`get_link_details`, `get_agent_activity`, `must_get_agent_activity`. | **done** |
 | **1b — Data-serving reshape** (authority + `holochain_p2p` + requester) | Reshape the data-serving wire to **records** (actions/entries) + record-level validation status + **warrants**; serve it from the 1a reads on the authority; on the requester, consume it, check the `Rejected ⇒ warrant` invariant, and cache. Delete the legacy authority `Query` structs. | **done** (the legacy authority `Query` structs + cascade integration-test layer are removed; `CascadeTxnWrapper`/`DbScratch` are retained for the requester's local read path — see the deviations note below) |
-| **1c — Op + action hash cutover** | Drop hash-preservation: action **and** op hashes become content-derived v2 (no `weight`); op-construction sites build the v2 `dht_v2` op types; the K2 gossip wire carries v2 ops; the network-side `legacy ↔ v2` conversions + the hash-preservation hack are deleted. Two additive foundation slices (1c-i/ii) then one coordinated identity-flip cutover (1c-iii). | designed (see "1c — op + action hash cutover"); 1c-i next |
+| **1c — Op + action hash cutover** | Drop hash-preservation: action **and** op hashes become content-derived v2 (no `weight`); op-construction sites build the v2 `dht_v2` op types; the K2 gossip wire carries v2 ops; the network-side `legacy ↔ v2` conversions + the hash-preservation hack are deleted. Two additive foundation slices (1c-i/ii) then one coordinated identity-flip cutover (1c-iii). | 1c-i ✅, 1c-ii ✅; 1c-iii boundary resolved ("data-layer v2, authoring keeps legacy types" — central hash-projection flip), planning the coordinated cutover next |
 
 **Why 1b merges the old "authority" and "requester" slices.** The data-serving
 response type is shared by three crates: the authority *produces* it,
@@ -589,11 +589,28 @@ coordinated cutover:
   - *Validation/ribosome + cleanup:* sys/app-validation, warrants, `must_get_*` host fns
     hash via v2; delete the now-dead legacy↔v2 network conversions + preservation paths.
 
-**Caveat to resolve at 1c-iii planning (not now):** exactly how the source-chain /
-authoring path mints the `ActionHash` during chain-building is the riskiest corner of
-the write-side flip and has not been traced yet; a focused investigation leads into
-planning 1c-iii. **Foundation-first:** plan + execute 1c-i, then 1c-ii, then investigate
-the source-chain seam and plan 1c-iii.
+**1c-iii boundary (resolved during planning).** The source chain mints `ActionHash`es
+by hashing the *legacy* action (`source_chain.rs` `put_with_action` →
+`ActionHashed::from_content_sync`, `weight` included) and `prev_action` chains on those
+hashes; the v2 store currently *preserves* them via `from_legacy_signed_action`'s
+`with_pre_hashed`. The chosen boundary is **"data-layer v2, authoring keeps legacy
+types"**: authoring keeps building legacy `Action` types in memory, but their
+**canonical hash becomes the content-derived v2 projection** — flip `HashableContent for
+Action` (and the op `ChainOpUniqueForm`) to hash the weightless v2 form — so every
+`ActionHash`/`DhtOpHash` is v2 on disk and wire and `prev_action` chains in v2, while the
+`ActionBuilder` / scratch / ribosome keep operating on legacy `Action` types (the full
+v2-native authoring type-flip stays **Phase 3**). Dropping `weight` from the hash is
+collision-safe (it is an inert placeholder today), and `from_legacy_signed_action`
+already covers every action variant, so the projection is total. Once the canonical hash
+is v2, `with_pre_hashed` preserves the (now-v2) hash unchanged, so the store/preservation
+path needs little beyond a consistency confirmation; the network side still needs the
+op_store + incoming v2 cutover (delete `build_chain_dht_op` + the "never rehash" hack).
+
+**Shape:** a single **coordinated identity flip** — flipping the canonical hash changes
+every hash at once, so (like 1b-vi) it cannot be staged incrementally-green; it is one
+cutover, compile-only intermediate, **green only at the end**, executed **inline**
+(monolithic) rather than fresh-subagent-per-task. The bulk of the "green at end" effort
+is **test fallout**: every test that hardcodes or round-trips a hash shifts.
 
 ### Explicitly out of scope for Phase 1
 
