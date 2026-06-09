@@ -1461,7 +1461,7 @@ mod app_impls {
                 Some(Unrecoverable) => conductor_state
                     .installed_apps()
                     .iter()
-                    .filter(|(_, app)| matches!(app.status, AppStatus::Unrecoverable(..)))
+                    .filter(|(_, app)| matches!(&app.status, AppStatus::Unrecoverable(..)))
                     .map(|(id, _)| id)
                     .collect(),
                 None => conductor_state.installed_apps().keys().collect(),
