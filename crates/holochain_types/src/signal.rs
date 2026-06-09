@@ -61,7 +61,7 @@ pub enum SystemSignal {
         installed_app_id: InstalledAppId,
     },
     /// A cell's restore hit a permanent failure (e.g. validated ChainIntegrityWarrant). The whole
-    /// app transitions to [`AppStatus::Unrecoverable`] at the same moment.
+    /// app transitions to [`crate::app::AppStatus::Unrecoverable`] at the same moment.
     RestoreFailed {
         /// The cell that failed to restore.
         cell_id: CellId,
