@@ -277,7 +277,7 @@ implementation plan:
 |-----------|-------|--------|
 | **1a — `DhtStore` read API** | The cascade's compound read methods on `holochain_state::DhtStore` (+ `holochain_data` primitives), tested in isolation: `retrieve_*`, `get_live_*`, `get_*_details`, `get_links`/`get_link_details`, `get_agent_activity`, `must_get_agent_activity`. | **done** |
 | **1b — Data-serving reshape** (authority + `holochain_p2p` + requester) | Reshape the data-serving wire to **records** (actions/entries) + record-level validation status + **warrants**; serve it from the 1a reads on the authority; on the requester, consume it, check the `Rejected ⇒ warrant` invariant, and cache. Delete the legacy authority `Query` structs. | **done** (the legacy authority `Query` structs + cascade integration-test layer are removed; `CascadeTxnWrapper`/`DbScratch` are retained for the requester's local read path — see the deviations note below) |
-| **1c — Gossip op-wire → v2** | Break the K2 op-store **gossip** wire to carry v2 ops with v2 hashes; drop the network-side `legacy ↔ v2` conversions and the hash-preservation hack. | — |
+| **1c — Op + action hash cutover** | Drop hash-preservation: action **and** op hashes become content-derived v2 (no `weight`); op-construction sites build the v2 `dht_v2` op types; the K2 gossip wire carries v2 ops; the network-side `legacy ↔ v2` conversions + the hash-preservation hack are deleted. Two additive foundation slices (1c-i/ii) then one coordinated identity-flip cutover (1c-iii). | designed (see "1c — op + action hash cutover"); 1c-i next |
 
 **Why 1b merges the old "authority" and "requester" slices.** The data-serving
 response type is shared by three crates: the authority *produces* it,
@@ -535,14 +535,76 @@ warrant; if app-validation rejections do not always produce a warrant, that is a
 validation-layer gap to address separately. Routing rejected+warranted records into
 validation limbo (rather than only caching the warrant) is also deferred.
 
+### 1c — op + action hash cutover (full v2 op + gossip wire)
+
+1c drops hash-preservation entirely: action hashes (no `weight`) **and** op hashes
+become **content-derived over the v2 form**, the op-construction call sites build the
+v2 `holochain_types::dht_v2` op types (`ChainOp`/`HashedChainOp`/`DhtOp`), the gossip
+wire encodes v2 ops, and the network-path `legacy ↔ v2` conversions + the
+"hash-preservation hack" are deleted. The scope was deliberately expanded from a
+narrow gossip-wire byte-swap to the full op cutover, because you cannot move the wire
+to v2 ops while keeping legacy hashes: the receiver must recompute the op id from the
+bytes it receives, and it cannot reproduce a weight-bearing legacy hash from
+weightless v2 data.
+
+**Why this is a coordinated identity flip, not additive reads.** Hashes are DB keys
+and references (`prev_action`, op basis). A partial flip leaves references that don't
+match, so unlike 1a/1b this cannot stay green incrementally: the v2-hash machinery is
+built additively first, then **one coordinated cutover** switches identities across
+authoring + state + incoming + publish + gossip together (compile-only intermediate,
+green at the end — the 1b-vi discipline). Existing in-dev data is wiped (hard break,
+no migration).
+
+**What already exists** (Phase 0 staging): the v2 op types
+(`holochain_types::dht_v2::{ChainOp, OpEntry, WarrantOp, DhtOp, HashedChainOp}`) are
+defined-but-unwired, and the v2 `Action` is `HashableContent` — so content-derived v2
+*action* hashes work today; the system merely *preserves* the legacy hash via
+`from_legacy_signed_action`'s `with_pre_hashed`. **Missing:** a content-derived v2
+*op* hash — `HashedChainOp.op_hash` has no producer yet.
+
+**One transitional boundary stays:** zome-call authoring still constructs *legacy*
+actions (its flip is Phase 3+4), so the produce-ops seam converts legacy→v2 and hashes
+v2. That conversion is expected cruft that later phases remove.
+
+Decomposition — two additive (independently green) foundation slices, then one
+coordinated cutover:
+
+- **1c-i — v2 op-hash foundation** (additive, green). A v2
+  `ChainOpUniqueForm`-equivalent (or op-hash fn) over the v2 `ChainOp` variants →
+  `DhtOpHash`, content-derived, no `weight`; plus a `HashedChainOp` constructor filling
+  `op_hash`/`basis_hash`/`storage_center_loc` from a v2 `SignedActionHashed` +
+  `op_type` + entry. Unit-tested, unwired.
+- **1c-ii — v2 produce-ops** (additive, green). A v2 analog of
+  `produce_ops_from_record` → `Vec<HashedChainOp>` (legacy→v2 conversion at the seam,
+  hashed v2). Additive, unwired, tested.
+- **1c-iii — the coordinated cutover** (one PR slice, several commits, green only at the
+  end). Stop preserving legacy hashes; compute + store content-derived v2 action+op
+  hashes everywhere; move the network onto v2:
+  - *Write side:* authoring (genesis / init-zomes / call-zome produce-ops) + state layer
+    (`record_incoming_ops`/`cache`/`integrate`/action-indexes/`mutations`) produce and
+    store v2 hashes; drop preservation in `from_legacy_signed_action`.
+  - *Network side:* gossip `op_store` encodes/decodes v2 `DhtOp`, op id from a native v2
+    rehash (delete `build_chain_dht_op` + the "never rehash" hack); `incoming_dht_ops`
+    decodes v2 → `HashedChainOp`; publish builds v2 ops.
+  - *Validation/ribosome + cleanup:* sys/app-validation, warrants, `must_get_*` host fns
+    hash via v2; delete the now-dead legacy↔v2 network conversions + preservation paths.
+
+**Caveat to resolve at 1c-iii planning (not now):** exactly how the source-chain /
+authoring path mints the `ActionHash` during chain-building is the riskiest corner of
+the write-side flip and has not been traced yet; a focused investigation leads into
+planning 1c-iii. **Foundation-first:** plan + execute 1c-i, then 1c-ii, then investigate
+the source-chain seam and plan 1c-iii.
+
 ### Explicitly out of scope for Phase 1
 
-- The non-cascade internal DHT-read consumers (sys/app-validation queues,
-  validation receipts, publish, the incoming-ops intra-batch dedup) — **Phase
-  2**. 1b/1c change the cascade serving + gossip wires; the
-  validation/integration consumers keep reading the v2 store as they do now until
-  Phase 2.
-- The zome-call/HDK return boundary `v2→legacy` conversion — **Phase 3+4**.
+- The non-cascade internal DHT-read consumers' **read logic** (sys/app-validation
+  queues, validation receipts, the incoming-ops intra-batch dedup) — **Phase 2**.
+  1c touches these workflows only where they **construct or hash ops** (so the new
+  hashes/wire are produced consistently); their read-consumer logic keeps reading
+  the v2 store as it does now until Phase 2.
+- The zome-call/HDK return boundary `v2→legacy` conversion, and the zome-call
+  authoring path still constructing *legacy* actions (1c converts legacy→v2 at the
+  produce-ops seam rather than changing how zome calls author) — **Phase 3+4**.
 
 ### Testing
 
