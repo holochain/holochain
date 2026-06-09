@@ -401,7 +401,7 @@ mod tests {
         let installed = state.add_app(app).unwrap();
         state.get_app_mut(&app_id.to_string()).unwrap().status = AppStatus::Unrecoverable(
             CellId::new(dna_hash, agent),
-            UnrecoverableCellReason::ChainFork(Box::new(holochain_types::app::WarrantSummary {
+            UnrecoverableCellReason::ChainForkWarrant(Box::new(holochain_types::app::WarrantSummary {
                 author: fixt!(AgentPubKey),
                 warrantee: fixt!(AgentPubKey),
                 timestamp: Timestamp::now(),

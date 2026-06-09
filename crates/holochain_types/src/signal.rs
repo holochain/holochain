@@ -60,8 +60,8 @@ pub enum SystemSignal {
         /// The app that finished restoring.
         installed_app_id: InstalledAppId,
     },
-    /// A cell's restore hit a permanent failure (validated ChainIntegrityWarrant). The whole
-    /// app transitions to Unrecoverable at the same moment.
+    /// A cell's restore hit a permanent failure (e.g. validated ChainIntegrityWarrant). The whole
+    /// app transitions to [`AppStatus::Unrecoverable`] at the same moment.
     RestoreFailed {
         /// The cell that failed to restore.
         cell_id: CellId,
@@ -96,7 +96,7 @@ mod tests {
             warrantee: fixt!(AgentPubKey),
             timestamp: Timestamp::from_micros(1_000_000),
         };
-        let reason = UnrecoverableCellReason::ChainFork(Box::new(summary));
+        let reason = UnrecoverableCellReason::ChainForkWarrant(Box::new(summary));
 
         let signals: Vec<SystemSignal> = vec![
             SystemSignal::RestoreComplete {
