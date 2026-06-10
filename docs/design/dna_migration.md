@@ -4,7 +4,8 @@
 
 **Draft / proposed.** This document describes the **chain switch** DNA migration
 path: an agent closes their source chain under one DNA and opens a new chain
-under a different DNA, carrying a signed summary of their old state forward.
+under a different DNA, optionally carrying a signed summary of their old state
+forward.
 
 Chain switch is a path that is intended to be retained indefinitely. Even
 alongside a future migration path that behaves differently, chain switch remains
@@ -76,15 +77,17 @@ pub struct OpenChain {
 }
 ```
 
-`OpenChain` is committed during `init` on the new chain. It declares
-`prev_target` — where the chain came from — and `close_hash`, the hash of the
-matching `CloseChain` action.
+`OpenChain` is expected to be committed during `init` on the new chain. It
+declares `prev_target` — where the chain came from — and `close_hash`, the hash
+of the matching `CloseChain` action.
 
 The intent of `close_hash` is to bind the new chain to a single `CloseChain` on
 the old chain, so that one old chain cannot fork into multiple migrated
-successors. Whether that intent can be fully enforced within Holochain's
-validation framework — the new network's validators cannot see the old chain —
-is an open question (see [Open questions](#open-questions)).
+successors. This binding cannot be enforced within Holochain's validation
+framework today. Verifying it requires visibility of the old network, which the
+new network's validators do not have, so enforcement would need a future
+solution that grants such visibility. In the meantime, only an outside observer
+with visibility of both networks can detect such a fault.
 
 ### `MigrationTarget`
 
@@ -201,7 +204,7 @@ pub enum RoleSettings {
 ```
 
 `InitProperties` is a newtype wrapping bytes. The bytes are opaque to the install
-process; the app alone decides how to decode them.
+process. The app alone decides how to decode them.
 
 `init_properties` is per role because `init` runs per cell and each role is a
 single DNA — the carried state is specific to the DNA being migrated into. They
@@ -239,7 +242,7 @@ A host function exposes the persisted bytes to the running zome:
 /// Look up the opaque init properties supplied to `install_app` for this cell,
 /// if any. Returns `None` if none were provided.
 ///
-/// Callable only from `init`. The bytes are app-defined; the caller is
+/// Callable only from `init`. The bytes are app-defined. The caller is
 /// responsible for decoding them.
 pub fn get_init_properties() -> ExternResult<Option<InitProperties>>;
 ```
@@ -292,11 +295,3 @@ particular convention:
   design any other migration path.
 - It does not attempt to re-validate the carried summary against the old DHT
   from the new network; trust is delegated to the listed signer keys.
-
-## Open questions
-
-- **Enforcing single-successor continuity.** `close_hash` is intended to prevent
-  an old chain forking into multiple migrated successors. Since the new
-  network's validators cannot see the old chain, it is unclear how much of this
-  can be enforced within the validation framework versus left as a property the
-  signer set vouches for.
