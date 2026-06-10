@@ -8,6 +8,7 @@
 use super::DhtStore;
 use crate::prelude::ActionSequenceAndHash;
 use crate::query::StateQueryResult;
+use crate::scratch::SyncScratch;
 use holo_hash::{DhtOpHash, HasHash};
 use holochain_data::kind::Dht;
 use holochain_data::DbRead;
@@ -258,6 +259,91 @@ impl DhtStore<DbRead<Dht>> {
             .get_action(hash.clone())
             .await?
             .map(|v2| holochain_zome_types::dht_v2::to_legacy_signed_action(&v2)))
+    }
+
+    /// Retrieve the signed action for `hash`, checking the store first and
+    /// falling back to the in-memory scratch on a miss.
+    ///
+    /// Use this on the **requester** path only. Authority handlers must never
+    /// see scratch data — use [`retrieve_action`](Self::retrieve_action) there.
+    pub async fn retrieve_action_with_scratch(
+        &self,
+        hash: &holo_hash::ActionHash,
+        scratch: &SyncScratch,
+    ) -> StateQueryResult<Option<holochain_zome_types::record::SignedActionHashed>> {
+        if let Some(sah) = self.retrieve_action(hash).await? {
+            return Ok(Some(sah));
+        }
+        scratch_action(scratch, hash)
+    }
+
+    /// Retrieve the entry for `hash`, checking the store first and falling back
+    /// to the in-memory scratch on a miss.
+    ///
+    /// `author` visibility follows the same rule as
+    /// [`retrieve_entry`](Self::retrieve_entry): `None` returns public entries
+    /// only from the store; entries in the scratch are always returned because
+    /// the scratch is by definition this agent's own authored data.
+    ///
+    /// Use this on the **requester** path only.
+    pub async fn retrieve_entry_with_scratch(
+        &self,
+        hash: &holo_hash::EntryHash,
+        author: Option<&holo_hash::AgentPubKey>,
+        scratch: &SyncScratch,
+    ) -> StateQueryResult<Option<holochain_types::prelude::Entry>> {
+        if let Some(entry) = self.retrieve_entry(hash, author).await? {
+            return Ok(Some(entry));
+        }
+        scratch_entry(scratch, hash)
+    }
+
+    /// Retrieve the complete record (action + entry, if any) for `hash`,
+    /// resolving both the action and the entry from store-or-scratch.
+    ///
+    /// Preserves the [`retrieve_record`](Self::retrieve_record) contract: if
+    /// the action references an entry that is unavailable in both the store
+    /// *and* the scratch, returns `None`.
+    ///
+    /// Use this on the **requester** path only.
+    pub async fn retrieve_record_with_scratch(
+        &self,
+        hash: &holo_hash::ActionHash,
+        author: Option<&holo_hash::AgentPubKey>,
+        scratch: &SyncScratch,
+    ) -> StateQueryResult<Option<holochain_zome_types::record::Record>> {
+        // Resolve the action from store, then scratch.
+        let action = match self.retrieve_action(hash).await? {
+            Some(sah) => sah,
+            None => match scratch_action(scratch, hash)? {
+                Some(sah) => sah,
+                None => return Ok(None),
+            },
+        };
+
+        // Resolve the entry (if the action references one).
+        let entry = match action.action().entry_hash() {
+            Some(entry_hash) => {
+                // Try the store first.
+                match self.retrieve_entry(entry_hash, author).await? {
+                    Some(e) => Some(e),
+                    // Store miss — try the scratch (scratch entries are always
+                    // visible regardless of `author`, because the scratch is
+                    // this agent's own data).
+                    None => match scratch_entry(scratch, entry_hash)? {
+                        Some(e) => Some(e),
+                        // Action references an entry that is unavailable
+                        // everywhere — honour the retrieve_record contract.
+                        None => return Ok(None),
+                    },
+                }
+            }
+            None => None,
+        };
+
+        Ok(Some(holochain_zome_types::record::Record::new(
+            action, entry,
+        )))
     }
 
     /// Assemble the [`RecordDetails`] for `hash`: the record, its validation
@@ -926,6 +1012,37 @@ fn record_validity_to_status(v: RecordValidity) -> ValidationStatus {
         RecordValidity::Accepted => ValidationStatus::Valid,
         RecordValidity::Rejected => ValidationStatus::Rejected,
     }
+}
+
+/// Look up a [`SignedActionHashed`] by `hash` in the scratch space.
+///
+/// Returns `Ok(None)` when the action is not present. Maps
+/// [`SyncScratchError`](crate::scratch::SyncScratchError) into
+/// [`StateQueryError`](crate::query::StateQueryError) via the existing `From` impl.
+fn scratch_action(
+    scratch: &SyncScratch,
+    hash: &holo_hash::ActionHash,
+) -> StateQueryResult<Option<holochain_zome_types::record::SignedActionHashed>> {
+    // Delegate to the `Store` impl on `Scratch` rather than re-scanning, so any
+    // future change to how the scratch resolves an action flows through here.
+    use crate::query::Store;
+    scratch.apply_and_then(|s| s.get_action(hash))
+}
+
+/// Look up an [`Entry`] by `hash` in the scratch space.
+///
+/// Entries in the scratch are authored by this agent and are therefore always
+/// visible, regardless of the `author` parameter. (Analogue: the legacy
+/// `Scratch::get_public_or_authored_entry` ignores `author` for the same
+/// reason.)
+fn scratch_entry(
+    scratch: &SyncScratch,
+    hash: &holo_hash::EntryHash,
+) -> StateQueryResult<Option<holochain_types::prelude::Entry>> {
+    // Delegate to the `Store` impl on `Scratch` (which likewise returns the
+    // entry regardless of author — scratch data is this agent's own).
+    use crate::query::Store;
+    scratch.apply_and_then(|s| s.get_entry(hash))
 }
 
 /// Reconstruct a [`DhtOpHashed`] (`ChainOp` variant) from a
@@ -2307,6 +2424,352 @@ mod tests {
         assert!(
             receipts.iter().all(|(r, _)| r.dht_op_hash != hash),
             "op with cleared require_receipt should not appear"
+        );
+    }
+
+    // ---- scratch overlay helpers ----
+
+    /// Build a `SignedActionHashed` (legacy) for a `Create` that references
+    /// `entry_hash`. Useful for scratch overlay tests.
+    fn make_signed_action_for_entry(
+        seed: u8,
+        entry_hash: EntryHash,
+    ) -> holochain_zome_types::record::SignedActionHashed {
+        let action = Action::Create(Create {
+            author: AgentPubKey::from_raw_36(vec![seed; 36]),
+            timestamp: Timestamp::from_micros(seed as i64 * 1000),
+            action_seq: 1,
+            prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36]),
+            entry_type: EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
+            entry_hash,
+            weight: Default::default(),
+        });
+        let action_hashed = holochain_zome_types::action::ActionHashed::from_content_sync(action);
+        holochain_zome_types::record::SignedActionHashed::with_presigned(
+            action_hashed,
+            Signature::from([seed; 64]),
+        )
+    }
+
+    /// Build a `SignedActionHashed` (legacy) for a `Create` with no entry
+    /// (simulates an action that is in the scratch but whose entry is missing).
+    fn make_signed_action_no_entry(seed: u8) -> holochain_zome_types::record::SignedActionHashed {
+        // Use a Dna action — it carries no entry hash.
+        use holochain_zome_types::action::Dna;
+        let action = Action::Dna(Dna {
+            author: AgentPubKey::from_raw_36(vec![seed; 36]),
+            timestamp: Timestamp::from_micros(seed as i64 * 1000),
+            hash: holo_hash::DnaHash::from_raw_36(vec![seed; 36]),
+        });
+        let action_hashed = holochain_zome_types::action::ActionHashed::from_content_sync(action);
+        holochain_zome_types::record::SignedActionHashed::with_presigned(
+            action_hashed,
+            Signature::from([seed; 64]),
+        )
+    }
+
+    /// Build a scratch containing a single action.
+    fn scratch_with_action(
+        sah: holochain_zome_types::record::SignedActionHashed,
+    ) -> crate::scratch::SyncScratch {
+        let mut scratch = crate::scratch::Scratch::new();
+        scratch.add_action(sah, holochain_zome_types::action::ChainTopOrdering::Relaxed);
+        scratch.into_sync()
+    }
+
+    /// Build a scratch containing an action + its entry.
+    fn scratch_with_action_and_entry(
+        sah: holochain_zome_types::record::SignedActionHashed,
+        entry: holochain_types::prelude::Entry,
+        entry_hash: EntryHash,
+    ) -> crate::scratch::SyncScratch {
+        let mut scratch = crate::scratch::Scratch::new();
+        scratch.add_action(sah, holochain_zome_types::action::ChainTopOrdering::Relaxed);
+        let entry_hashed =
+            holochain_types::prelude::EntryHashed::with_pre_hashed(entry, entry_hash);
+        scratch.add_entry(
+            entry_hashed,
+            holochain_zome_types::action::ChainTopOrdering::Relaxed,
+        );
+        scratch.into_sync()
+    }
+
+    // ---- scratch overlay tests ----
+
+    /// (a) action present only in store → `retrieve_action_with_scratch` returns it.
+    #[tokio::test]
+    async fn retrieve_action_with_scratch_finds_store_action() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let op = make_chain_op(90);
+        let action = match op.as_content() {
+            DhtOp::ChainOp(c) => c.action().clone(),
+            _ => unreachable!(),
+        };
+        let action_hash = holo_hash::ActionHash::with_data_sync(&action);
+        store.record_incoming_ops(vec![op]).await.unwrap();
+
+        // Empty scratch — action lives only in the store.
+        let empty_scratch = crate::scratch::Scratch::new().into_sync();
+        let result = store
+            .as_read()
+            .retrieve_action_with_scratch(&action_hash, &empty_scratch)
+            .await
+            .unwrap();
+        assert!(result.is_some(), "should find store-only action");
+        assert_eq!(result.unwrap().as_hash(), &action_hash);
+    }
+
+    /// (b) action present only in scratch → `retrieve_action_with_scratch` returns it.
+    #[tokio::test]
+    async fn retrieve_action_with_scratch_finds_scratch_action() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let entry_hash = EntryHash::from_raw_36(vec![91u8.wrapping_add(100); 36]);
+        let sah = make_signed_action_for_entry(91, entry_hash);
+        let action_hash = sah.as_hash().clone();
+        let scratch = scratch_with_action(sah);
+
+        // The action was never written to the store.
+        let result = store
+            .as_read()
+            .retrieve_action_with_scratch(&action_hash, &scratch)
+            .await
+            .unwrap();
+        assert!(result.is_some(), "should find scratch-only action");
+        assert_eq!(result.unwrap().as_hash(), &action_hash);
+    }
+
+    /// (d) store-only `retrieve_action` ignores a scratch-only action.
+    #[tokio::test]
+    async fn retrieve_action_ignores_scratch() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let entry_hash = EntryHash::from_raw_36(vec![92u8.wrapping_add(100); 36]);
+        let sah = make_signed_action_for_entry(92, entry_hash);
+        let action_hash = sah.as_hash().clone();
+
+        // The action exists only in the scratch — not in the store.
+        let result = store.as_read().retrieve_action(&action_hash).await.unwrap();
+        assert!(
+            result.is_none(),
+            "store-only retrieve_action must not see scratch data"
+        );
+    }
+
+    /// entry present only in store → `retrieve_entry_with_scratch` returns it.
+    #[tokio::test]
+    async fn retrieve_entry_with_scratch_finds_store_entry() {
+        use holochain_types::dht_op::{ChainOp, DhtOp};
+        use holochain_types::prelude::{AppEntryBytes, Entry};
+
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+
+        // Build a StoreEntry op that carries a public entry.
+        let seed = 93u8;
+        let author = AgentPubKey::from_raw_36(vec![seed; 36]);
+        let entry_bytes = holochain_serialized_bytes::SerializedBytes::from(
+            holochain_serialized_bytes::UnsafeBytes::from(vec![seed; 8]),
+        );
+        let entry = Entry::App(AppEntryBytes(entry_bytes));
+        let entry_hash = EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]);
+
+        let action = Action::Create(Create {
+            author,
+            timestamp: Timestamp::from_micros(seed as i64 * 1000),
+            action_seq: 1,
+            prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36]),
+            entry_type: EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
+            entry_hash: entry_hash.clone(),
+            weight: Default::default(),
+        });
+        let chain_op = ChainOp::StoreEntry(
+            Signature::from([seed; 64]),
+            action.try_into().unwrap(),
+            entry.clone(),
+        );
+        let op = holochain_types::dht_op::DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(
+            chain_op,
+        )));
+        store.record_incoming_ops(vec![op]).await.unwrap();
+
+        let empty_scratch = crate::scratch::Scratch::new().into_sync();
+        let result = store
+            .as_read()
+            .retrieve_entry_with_scratch(&entry_hash, None, &empty_scratch)
+            .await
+            .unwrap();
+        assert!(result.is_some(), "should find store-only entry");
+    }
+
+    /// entry present only in scratch → `retrieve_entry_with_scratch` returns it.
+    #[tokio::test]
+    async fn retrieve_entry_with_scratch_finds_scratch_entry() {
+        use holochain_types::prelude::{AppEntryBytes, Entry};
+
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+
+        let seed = 94u8;
+        let entry_bytes = holochain_serialized_bytes::SerializedBytes::from(
+            holochain_serialized_bytes::UnsafeBytes::from(vec![seed; 8]),
+        );
+        let entry = Entry::App(AppEntryBytes(entry_bytes));
+        let entry_hash = EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]);
+        let sah = make_signed_action_for_entry(seed, entry_hash.clone());
+        let scratch = scratch_with_action_and_entry(sah, entry.clone(), entry_hash.clone());
+
+        let result = store
+            .as_read()
+            .retrieve_entry_with_scratch(&entry_hash, None, &scratch)
+            .await
+            .unwrap();
+        assert!(result.is_some(), "should find scratch-only entry");
+    }
+
+    /// `retrieve_record_with_scratch` with action in scratch + entry in scratch.
+    #[tokio::test]
+    async fn retrieve_record_with_scratch_action_and_entry_in_scratch() {
+        use holochain_types::prelude::{AppEntryBytes, Entry};
+
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+
+        let seed = 95u8;
+        let entry_bytes = holochain_serialized_bytes::SerializedBytes::from(
+            holochain_serialized_bytes::UnsafeBytes::from(vec![seed; 8]),
+        );
+        let entry = Entry::App(AppEntryBytes(entry_bytes));
+        let entry_hash = EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]);
+        let sah = make_signed_action_for_entry(seed, entry_hash.clone());
+        let action_hash = sah.as_hash().clone();
+        let scratch = scratch_with_action_and_entry(sah, entry, entry_hash);
+
+        let result = store
+            .as_read()
+            .retrieve_record_with_scratch(&action_hash, None, &scratch)
+            .await
+            .unwrap();
+        assert!(result.is_some(), "record with action+entry both in scratch");
+    }
+
+    /// (c) `retrieve_record_with_scratch` with action in scratch but its
+    /// referenced entry nowhere → `None`.
+    #[tokio::test]
+    async fn retrieve_record_with_scratch_missing_entry_returns_none() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+
+        let seed = 96u8;
+        let entry_hash = EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]);
+        // Action references an entry, but the entry is not in scratch or store.
+        let sah = make_signed_action_for_entry(seed, entry_hash);
+        let action_hash = sah.as_hash().clone();
+        let scratch = scratch_with_action(sah);
+
+        let result = store
+            .as_read()
+            .retrieve_record_with_scratch(&action_hash, None, &scratch)
+            .await
+            .unwrap();
+        assert!(result.is_none(), "missing entry must yield None");
+    }
+
+    /// `retrieve_record_with_scratch` with an action that carries no entry
+    /// (e.g. `Dna`) → returns the record.
+    #[tokio::test]
+    async fn retrieve_record_with_scratch_no_entry_action() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+
+        let sah = make_signed_action_no_entry(97);
+        let action_hash = sah.as_hash().clone();
+        let scratch = scratch_with_action(sah);
+
+        let result = store
+            .as_read()
+            .retrieve_record_with_scratch(&action_hash, None, &scratch)
+            .await
+            .unwrap();
+        assert!(
+            result.is_some(),
+            "action with no entry should still produce a record"
+        );
+    }
+
+    /// Action resolved from the store, but its referenced entry only in the
+    /// scratch → record assembled from both sources. Exercises the cross-path
+    /// where `retrieve_record` alone returns `None`.
+    #[tokio::test]
+    async fn retrieve_record_with_scratch_store_action_scratch_entry() {
+        use holochain_types::prelude::{AppEntryBytes, Entry, EntryHashed};
+
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+
+        // `make_chain_op` records a RegisterAgentActivity op: the Create action
+        // (referencing entry `seed+100`) lands in the store, but the entry does not.
+        let seed = 94u8;
+        let op = make_chain_op(seed);
+        let action = match op.as_content() {
+            DhtOp::ChainOp(c) => c.action().clone(),
+            _ => unreachable!(),
+        };
+        let action_hash = holo_hash::ActionHash::with_data_sync(&action);
+        let entry_hash = EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]);
+        store.record_incoming_ops(vec![op]).await.unwrap();
+
+        // Store-only read returns None: the action references an entry the store
+        // does not hold.
+        let store_only = store
+            .as_read()
+            .retrieve_record(&action_hash, None)
+            .await
+            .unwrap();
+        assert!(store_only.is_none(), "entry is absent from the store");
+
+        // The entry lives only in the scratch.
+        let entry = Entry::App(AppEntryBytes(
+            holochain_serialized_bytes::SerializedBytes::from(
+                holochain_serialized_bytes::UnsafeBytes::from(vec![seed; 8]),
+            ),
+        ));
+        let mut scratch = crate::scratch::Scratch::new();
+        scratch.add_entry(
+            EntryHashed::with_pre_hashed(entry, entry_hash),
+            holochain_zome_types::action::ChainTopOrdering::Relaxed,
+        );
+        let scratch = scratch.into_sync();
+
+        // The overlay resolves the action from the store and the entry from the scratch.
+        let result = store
+            .as_read()
+            .retrieve_record_with_scratch(&action_hash, None, &scratch)
+            .await
+            .unwrap();
+        let record = result.expect("record assembled from store action + scratch entry");
+        assert_eq!(record.action_address(), &action_hash);
+        assert!(
+            record.entry().as_option().is_some(),
+            "entry should be supplied by the scratch"
         );
     }
 }
