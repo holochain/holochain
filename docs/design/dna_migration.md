@@ -4,8 +4,7 @@
 
 **Draft / proposed.** This document describes the **chain switch** DNA migration
 path: an agent closes their source chain under one DNA and opens a new chain
-under a different DNA, optionally carrying a signed summary of their old state
-forward.
+under a different DNA, optionally carrying state from the old chain forward.
 
 Chain switch is a path that is intended to be retained indefinitely. Even
 alongside a future migration path that behaves differently, chain switch remains
@@ -112,7 +111,14 @@ pub fn open_chain(prev_target: MigrationTarget, close_hash: ActionHash) -> Exter
 Both append the corresponding action to the source chain with strict chain-top
 ordering.
 
-## The chain switch flow
+## An example chain switch flow
+
+The flow below is **one possible app-level flow**, not a fixed procedure. It
+shows how an application can combine the Holochain primitives in
+[Background](#background-open-and-closed-chains) and [Design](#design) to carry
+signed state across a migration. What an app brings forward, how it establishes
+trust in it, and what (if anything) it signs are all app decisions; other flows
+are equally valid.
 
 ```mermaid
 flowchart TB
@@ -134,49 +140,62 @@ flowchart TB
     end
 ```
 
-The design adds four things on top of the open/closed-chain machinery:
+Walking the example:
 
-1. An `init_properties` install-app parameter: opaque bytes, per role.
-2. Persistence of `init_properties` in the conductor database, keyed by app and
-   role — not in the DHT.
-3. A host function to read `init_properties`, callable only from `init`.
-4. A validation convention: the new DNA lists trusted signer public keys in its
-   DNA properties, so app validation can trust signatures on carried content
-   that originated on the old network.
+1. **On the old DNA**, the app authors a summary record distilling whatever
+   state it wants to carry forward, then gathers signatures over the summary
+   bytes from a set of chosen signer agents. Signing is done **out of band** —
+   for example via remote signals or another app-defined request/response
+   mechanism. It cannot be driven through the validation framework: the set of
+   validation authorities asked to act on any piece of data is bounded, so the
+   agents whose keys the new network will trust may never be asked, and may not
+   respond.
+2. The agent commits `close_chain(Some(MigrationTarget::Dna(new_dna_hash)))`,
+   which yields the `close_hash`, and now holds the summary, the signatures, and
+   the `close_hash` locally.
+3. The agent **installs the new app**, passing the summary, signatures, and
+   `close_hash` as `init_properties`.
+4. **During `init` on the new DNA**, the app reads `init_properties`, commits
+   `open_chain` with the carried `close_hash`, and seeds the new chain by
+   authoring records derived from the summary.
+5. **Validation on the new DNA** decides whether to trust the carried records.
+   Here the new DNA lists the trusted signer public keys in its DNA properties
+   (readable via `dna_info()`); the integrity zome's `validate` callback reads
+   those keys, verifies the summary's signatures with `verify_signature`, and
+   accepts the derived records only if the signatures are valid and the signers
+   are trusted. Trust is thus baked into the DNA hash: every agent on the new
+   network agrees, by running the same DNA, on which keys are authoritative. The
+   cost is that retiring a signer key requires a further DNA migration.
 
 ## Design
 
-### 1. Producing the signed summary
+Chain switch adds three things to Holochain on top of the open/closed-chain
+machinery already described:
 
-Producing the summary is an application responsibility.
+1. An `init_properties` install-app parameter: opaque, app-defined bytes, per
+   role.
+2. Persistence of those bytes in the conductor database, keyed by app and role —
+   never in the DHT.
+3. A host function to read them, callable only from `init`.
 
-- The old coordinator authors a summary record that distils whatever state the
-  app expects agents to carry forward, or the agent's own chosen state. The
-  app's validation rules govern what a well-formed summary may contain.
-- To make the summary trustworthy on the new network, the app gathers
-  signatures over the summary bytes from a set of chosen signer agents. This
-  **must be done out of band by the app** — for example via remote signals or
-  another app-defined request/response mechanism.
-  - Signature gathering cannot be driven through the validation framework: the
-    set of validation authorities asked to act on any given piece of data is
-    bounded, so the agents whose keys the new network trusts may never be asked,
-    and may not respond. Treating signature collection as an explicit app-level
-    protocol avoids depending on validator selection.
-- The agent commits `close_chain(Some(MigrationTarget::Dna(new_dna_hash)))`,
-  which yields the `close_hash` the new chain will need.
+Everything else in a chain switch — what is carried forward, how it is signed,
+and how the new DNA decides to trust it — is application behavior. The
+[example flow](#an-example-chain-switch-flow) shows one way to assemble these
+pieces.
 
-The agent then locally holds everything required to seed the new DNA: the
-summary, the signatures, and the `close_hash`. Holding this material locally
-means seeding the new DNA does not *depend* on the old network being reachable.
+### 1. Closing the old chain
 
-Once `CloseChain` is committed the old chain cannot be extended, so the closing
-summary is the only carried record of the old chain's state. Making summary
-production robust is therefore an application responsibility. The app should
-either keep the summary reconstructible from what it commits — for example, by
-gathering signatures before committing the summary so the committed record is
-self-contained — or persist the migration data before closing the chain so it
-can retry producing the summary if something fails partway. Holochain does not
-provide a way to re-derive this material from a chain that is already closed.
+Closing the chain is the one Holochain-supported step on the old DNA: the agent
+commits `close_chain` (see [`CloseChain`](#closechain)), declaring the new DNA
+as its `new_target`. What state the agent gathers to carry forward, and how, is
+app-defined.
+
+One consequence matters for app design: once `CloseChain` is committed the old
+chain cannot be extended, so whatever the app intends to carry forward must be
+captured before or at the close. Holochain provides no way to re-derive material
+from a chain that is already closed, so the app should either keep the carried
+state reconstructible from what it commits, or persist it before closing so it
+can retry if something fails partway.
 
 ### 2. The `init_properties` install parameter
 
@@ -207,13 +226,14 @@ them later.
 
 This is a distinct channel from the two existing ones, deliberately:
 
-- **DNA properties** are part of the DNA hash. The carried summary is per-agent,
-  per-migration content; it must not change the DNA hash, so it cannot live in
-  DNA properties. (DNA properties are instead the home for the trusted signer
-  keys described in [section 5](#5-validating-carried-content-on-the-new-dna).)
+- **DNA properties** are part of the DNA hash. The carried bytes are per-agent,
+  per-migration content; they must not change the DNA hash, so they cannot live
+  in DNA properties. (DNA properties remain available for per-DNA configuration
+  — the [example flow](#an-example-chain-switch-flow) uses them to hold trusted
+  signer keys.)
 - **Membrane proof** is written into the source chain and so is shared to the
-  DHT. The summary stays private to the conductor unless and until the app
-  chooses to author derived data from it.
+  DHT. The carried bytes stay private to the conductor unless and until the app
+  chooses to author derived data from them.
 
 ### 3. Persisting `init_properties` in the conductor database
 
@@ -246,55 +266,34 @@ cleared once `init` succeeds, allowing reads elsewhere would be a footgun:
 callers would find the properties present before the first successful `init` and
 absent afterwards. Restricting to `init` makes the single point of use explicit.
 
-During `init` the app reads the properties, decodes them, commits `open_chain`
-with the carried `close_hash`, and seeds the new chain by authoring records
-derived from the summary. This path is fully local: the old cell need not be
-installed or running and the old network need not be reachable.
+What the bytes contain is up to the app. They might carry a full summary plus
+signatures, ready for `init` to seed from directly. They might instead be only a
+*hint* that a migration is intended — for example a flag telling `init` to wait
+for specific network data to become available, then seed from that rather than
+from local bytes. Holochain neither requires nor interprets a particular shape.
 
-`init` is not restricted to local data, however. It may make network calls, so
-an app can also seed the new chain from content authored by other agents,
-including content on the previous network. Because the agent key does not change
-across a chain switch, content carrying a valid signature made by the agent's
-own key on a previous network can always be trusted — even where another agent
-copied it across and re-authored it. The conductor-held `init_properties` are
-therefore one source of seed material, not the only one.
+`init` is not restricted to local data. It may make network calls, so an app can
+seed the new chain from content authored by other agents, including content on
+the previous network. Because the agent key does not change across a chain
+switch, content carrying a valid signature made by the agent's own key on a
+previous network can always be trusted — even where another agent copied it
+across and re-authored it. The conductor-held `init_properties` are therefore
+one source of seed material, not the only one.
 
 ### 5. Validating carried content on the new DNA
 
-The new DNA must be able to decide whether to trust the carried summary, since
-the summary was constructed and signed on the old network — a network the new
-DNA's validators are not part of. How an app establishes that trust is left to
-the app. What follows is one workable approach, which the implementation intends
-to exercise with integration tests; it is not the only one, and it is not
-privileged by the design.
-
-In this approach the new DNA lists the public keys whose signatures it trusts in
-its DNA properties (readable in validation via `dna_info()`). These are the keys
-of the signer agents the app asked to sign migration summaries.
-
-When an agent authors records derived from a carried summary, the integrity
-zome's `validate` callback:
-
-1. Reads the trusted signer keys from DNA properties.
-2. Verifies the summary's signatures over the summary bytes using
-   `verify_signature`.
-3. Accepts the derived records only if the signatures are valid and the signers
-   are in the trusted set.
-
-Trust is thus baked into the DNA hash: every agent on the new network agrees, by
-running the same DNA, on which keys are authoritative for migration summaries.
-
-Two constraints follow from this particular approach:
-
-- The records are trusted because the listed signers vouched for the summary,
-  not because the new network re-derived it from the old DHT (which it cannot
-  see).
-- The trusted signer keys are fixed in the DNA hash. Retiring a signer key
-  requires a further DNA migration.
+Deciding whether to trust carried content is an application design concern, not
+something Holochain dictates. The content was constructed on a network the new
+DNA's validators are not part of, so the app's integrity zome must define
+whatever rule makes that content trustworthy on the new DNA. The
+[example flow](#an-example-chain-switch-flow) gives one approach — listing
+trusted signer keys in DNA properties and verifying signatures in validation —
+which the implementation intends to exercise with integration tests.
 
 ## Non-goals
 
 - This document designs only the chain switch path. It does not attempt to
   design any other migration path.
-- It does not attempt to re-validate the carried summary against the old DHT
-  from the new network; trust is delegated to the listed signer keys.
+- It does not attempt to re-validate carried content against the old DHT from
+  the new network. How carried content is trusted on the new DNA is left to the
+  app.
