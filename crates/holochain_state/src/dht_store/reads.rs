@@ -803,6 +803,178 @@ impl DhtStore<DbRead<Dht>> {
         Ok(links)
     }
 
+    /// The live links on `base`, overlaid with the in-memory scratch.
+    ///
+    /// Extends [`get_links`](Self::get_links) with two scratch-layer adjustments:
+    ///
+    /// - **Scratch `DeleteLink` tombstones**: any store live link whose
+    ///   `create_link_hash` is targeted by a scratch `DeleteLink` is removed.
+    ///   (`get_links` only excludes *store* delete-link tombstones, so pending
+    ///   scratch deletes must be excluded here.)
+    /// - **Scratch `CreateLink` additions**: `CreateLink` actions in the scratch
+    ///   whose `base_address == base` are included if they are not tombstoned by
+    ///   a store `DeleteLink` OR a scratch `DeleteLink`, and they pass the same
+    ///   type/tag/author/time filter.
+    ///
+    /// Use this on the **requester** path only. Authority handlers must never
+    /// see scratch data — use [`get_links`](Self::get_links) there.
+    pub async fn get_links_with_scratch(
+        &self,
+        base: &holo_hash::AnyLinkableHash,
+        type_query: &holochain_zome_types::prelude::LinkTypeFilter,
+        tag: Option<&holochain_zome_types::prelude::LinkTag>,
+        filter: &crate::query::link::GetLinksFilter,
+        scratch: &SyncScratch,
+    ) -> StateQueryResult<Vec<holochain_zome_types::link::Link>> {
+        // Start with store live links, already filtered by store delete tombstones.
+        let mut store_links = self.get_links(base, type_query, tag, filter).await?;
+
+        // Collect scratch delete-link targets (link_add_address of each scratch
+        // DeleteLink) so we can exclude any store link they tombstone.
+        let scratch_dl_targets = scratch_delete_link_targets(scratch)?;
+
+        // Exclude store links tombstoned by a scratch DeleteLink.
+        store_links.retain(|l| !scratch_dl_targets.contains(&l.create_link_hash));
+
+        // Add scratch CreateLinks for this base that pass all filters.
+        let scratch_creates = scratch_create_links_for_base(scratch, base)?;
+        for sah in scratch_creates {
+            let action = sah.action();
+            let holochain_zome_types::action::Action::CreateLink(cl) = action else {
+                continue;
+            };
+            let create_hash = sah.as_hash();
+
+            // Exclude if tombstoned by a store DeleteLink.
+            if !self
+                .db()
+                .get_delete_link_actions(create_hash)
+                .await?
+                .is_empty()
+            {
+                continue;
+            }
+            // Exclude if tombstoned by a scratch DeleteLink.
+            if scratch_dl_targets.contains(create_hash) {
+                continue;
+            }
+            // Apply the same type/tag/author/time filter.
+            if !type_query.contains(&cl.zome_index, &cl.link_type) {
+                continue;
+            }
+            if let Some(t) = tag {
+                if !cl.tag.0.starts_with(&t.0) {
+                    continue;
+                }
+            }
+            if let Some(author) = &filter.author {
+                if cl.author != *author {
+                    continue;
+                }
+            }
+            if let Some(before) = filter.before {
+                if cl.timestamp > before {
+                    continue;
+                }
+            }
+            if let Some(after) = filter.after {
+                if cl.timestamp < after {
+                    continue;
+                }
+            }
+            store_links.push(holochain_zome_types::link::Link {
+                author: cl.author.clone(),
+                base: cl.base_address.clone(),
+                target: cl.target_address.clone(),
+                timestamp: cl.timestamp,
+                zome_index: cl.zome_index,
+                link_type: cl.link_type,
+                tag: cl.tag.clone(),
+                create_link_hash: create_hash.clone(),
+            });
+        }
+
+        Ok(store_links)
+    }
+
+    /// For `base`, every `CreateLink` (live and tombstoned) matching
+    /// `type_query`/`tag`, paired with its `DeleteLink`s — overlaid with the
+    /// in-memory scratch.
+    ///
+    /// Extends [`get_link_details`](Self::get_link_details) with two
+    /// scratch-layer adjustments:
+    ///
+    /// - **Scratch `DeleteLink` augmentations**: each store create's delete list
+    ///   is extended with scratch `DeleteLink`s targeting that create (i.e.,
+    ///   `link_add_address == create_hash`).
+    /// - **Scratch `CreateLink` additions**: `CreateLink` actions in the scratch
+    ///   whose `base_address == base` are included (ALL — tombstoned or not,
+    ///   mirroring `get_link_details` showing every create and its deletes), each
+    ///   paired with store deletes + scratch deletes targeting it, filtered by
+    ///   type/tag.
+    ///
+    /// Use this on the **requester** path only.
+    pub async fn get_link_details_with_scratch(
+        &self,
+        base: &holo_hash::AnyLinkableHash,
+        type_query: &holochain_zome_types::prelude::LinkTypeFilter,
+        tag: Option<&holochain_zome_types::prelude::LinkTag>,
+        scratch: &SyncScratch,
+    ) -> StateQueryResult<
+        Vec<(
+            holochain_zome_types::record::SignedActionHashed,
+            Vec<holochain_zome_types::record::SignedActionHashed>,
+        )>,
+    > {
+        // Start from store details (creates + their store deletes).
+        let mut store_details = self.get_link_details(base, type_query, tag).await?;
+
+        // Collect scratch DeleteLinks indexed by the create they tombstone.
+        let scratch_dl_by_create = scratch_delete_links_by_create(scratch)?;
+
+        // Augment each store create's delete list with scratch DeleteLinks
+        // targeting that create.
+        for (create_sah, deletes) in &mut store_details {
+            let create_hash = create_sah.as_hash();
+            if let Some(scratch_deletes) = scratch_dl_by_create.get(create_hash) {
+                deletes.extend(scratch_deletes.iter().cloned());
+            }
+        }
+
+        // Add scratch CreateLinks for this base, each paired with their deletes.
+        let scratch_creates = scratch_create_links_for_base(scratch, base)?;
+        for sah in scratch_creates {
+            let action = sah.action();
+            let holochain_zome_types::action::Action::CreateLink(cl) = action else {
+                continue;
+            };
+            let create_hash = sah.as_hash();
+            // Apply type/tag filter.
+            if !type_query.contains(&cl.zome_index, &cl.link_type) {
+                continue;
+            }
+            if let Some(t) = tag {
+                if !cl.tag.0.starts_with(&t.0) {
+                    continue;
+                }
+            }
+            // Collect deletes: store deletes + scratch deletes targeting this create.
+            let mut deletes: Vec<holochain_zome_types::record::SignedActionHashed> = self
+                .db()
+                .get_delete_link_actions(create_hash)
+                .await?
+                .iter()
+                .map(holochain_zome_types::dht_v2::to_legacy_signed_action)
+                .collect();
+            if let Some(scratch_deletes) = scratch_dl_by_create.get(create_hash) {
+                deletes.extend(scratch_deletes.iter().cloned());
+            }
+            store_details.push((sah, deletes));
+        }
+
+        Ok(store_details)
+    }
+
     /// Agent activity for `author`: the integrated `RegisterAgentActivity`
     /// actions classified into valid/rejected, with chain status, highest
     /// observed, and warrants. Store-only (no scratch). Returns legacy types.
@@ -1531,6 +1703,75 @@ fn scratch_creates_for_entry(
             .cloned()
             .collect();
         Ok::<Vec<_>, crate::query::StateQueryError>(out)
+    })
+}
+
+/// Return all scratch `CreateLink` actions whose `base_address` equals `base`.
+///
+/// Used by the requester path to collect pending authored links for a base.
+fn scratch_create_links_for_base(
+    scratch: &SyncScratch,
+    base: &holo_hash::AnyLinkableHash,
+) -> StateQueryResult<Vec<holochain_zome_types::record::SignedActionHashed>> {
+    scratch.apply_and_then(|s| {
+        let out = s
+            .actions()
+            .filter(|sah| match sah.action() {
+                holochain_zome_types::action::Action::CreateLink(cl) => &cl.base_address == base,
+                _ => false,
+            })
+            .cloned()
+            .collect();
+        Ok::<Vec<_>, crate::query::StateQueryError>(out)
+    })
+}
+
+/// Return the `link_add_address` of every `DeleteLink` in the scratch — the
+/// `ActionHash`es of the `CreateLink` actions they tombstone.
+///
+/// Used by `get_links_with_scratch` to exclude store links tombstoned by a
+/// pending scratch `DeleteLink`.
+fn scratch_delete_link_targets(
+    scratch: &SyncScratch,
+) -> StateQueryResult<std::collections::HashSet<holo_hash::ActionHash>> {
+    scratch.apply_and_then(|s| {
+        let out = s
+            .actions()
+            .filter_map(|sah| match sah.action() {
+                holochain_zome_types::action::Action::DeleteLink(dl) => {
+                    Some(dl.link_add_address.clone())
+                }
+                _ => None,
+            })
+            .collect();
+        Ok::<_, crate::query::StateQueryError>(out)
+    })
+}
+
+/// Build a map from `CreateLink` action hash → scratch `DeleteLink` actions
+/// that tombstone it. Used by `get_link_details_with_scratch` to augment each
+/// create's delete list with pending scratch deletes.
+fn scratch_delete_links_by_create(
+    scratch: &SyncScratch,
+) -> StateQueryResult<
+    std::collections::HashMap<
+        holo_hash::ActionHash,
+        Vec<holochain_zome_types::record::SignedActionHashed>,
+    >,
+> {
+    scratch.apply_and_then(|s| {
+        let mut map: std::collections::HashMap<
+            holo_hash::ActionHash,
+            Vec<holochain_zome_types::record::SignedActionHashed>,
+        > = std::collections::HashMap::new();
+        for sah in s.actions() {
+            if let holochain_zome_types::action::Action::DeleteLink(dl) = sah.action() {
+                map.entry(dl.link_add_address.clone())
+                    .or_default()
+                    .push(sah.clone());
+            }
+        }
+        Ok::<_, crate::query::StateQueryError>(map)
     })
 }
 
@@ -4072,6 +4313,445 @@ mod tests {
             details.entry_dht_status,
             holochain_zome_types::metadata::EntryDhtStatus::Live,
             "store-only get_entry_details must not see scratch deletes for status"
+        );
+    }
+
+    // ---- get_links_with_scratch / get_link_details_with_scratch helpers ----
+
+    /// Build and integrate a `RegisterAddLink` op into the store.
+    /// Returns `(action_hash, base_address)` of the created link.
+    async fn integrate_link_op_for_base(
+        store: &crate::dht_store::DhtStore<DbWrite<Dht>>,
+        base: &holo_hash::AnyLinkableHash,
+        zome_index: u8,
+        link_type: u8,
+        tag_bytes: Vec<u8>,
+        seed: u8,
+        when: i64,
+    ) -> holo_hash::ActionHash {
+        use crate::dht_store::{AppOutcome, SysOutcome};
+        use holochain_types::dht_op::{ChainOp, DhtOp};
+        use holochain_zome_types::action::CreateLink;
+        use holochain_zome_types::link::LinkTag;
+
+        let action = Action::CreateLink(CreateLink {
+            author: AgentPubKey::from_raw_36(vec![seed; 36]),
+            timestamp: Timestamp::from_micros(seed as i64 * 1000),
+            action_seq: 2,
+            prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(60); 36]),
+            base_address: base.clone(),
+            target_address: holo_hash::AnyLinkableHash::from_raw_36_and_type(
+                vec![seed.wrapping_add(20); 36],
+                holo_hash::hash_type::AnyLinkable::Entry,
+            ),
+            zome_index: zome_index.into(),
+            link_type: link_type.into(),
+            tag: LinkTag(tag_bytes),
+            weight: Default::default(),
+        });
+        let create_link = match action {
+            Action::CreateLink(cl) => cl,
+            _ => unreachable!(),
+        };
+        let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(
+            ChainOp::RegisterAddLink(Signature::from([seed; 64]), create_link),
+        )));
+        let op_hash = op.as_hash().clone();
+        let action_hash = match op.as_content() {
+            DhtOp::ChainOp(c) => holo_hash::ActionHash::with_data_sync(&c.action()),
+            _ => unreachable!(),
+        };
+        store.record_incoming_ops(vec![op]).await.unwrap();
+        store
+            .record_chain_op_sys_validation_outcomes(vec![(op_hash.clone(), SysOutcome::Accepted)])
+            .await
+            .unwrap();
+        store
+            .record_app_validation_outcomes(vec![(op_hash, AppOutcome::Accepted)])
+            .await
+            .unwrap();
+        store
+            .integrate_ready_ops(Timestamp::from_micros(when))
+            .await
+            .unwrap();
+        action_hash
+    }
+
+    /// Build a scratch `CreateLink` action for `base`.
+    fn make_scratch_create_link(
+        base: &holo_hash::AnyLinkableHash,
+        zome_index: u8,
+        link_type: u8,
+        tag_bytes: Vec<u8>,
+        seed: u8,
+    ) -> holochain_zome_types::record::SignedActionHashed {
+        use holochain_zome_types::action::CreateLink;
+        use holochain_zome_types::link::LinkTag;
+
+        let action = Action::CreateLink(CreateLink {
+            author: AgentPubKey::from_raw_36(vec![seed; 36]),
+            timestamp: Timestamp::from_micros(seed as i64 * 1000),
+            action_seq: 2,
+            prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(60); 36]),
+            base_address: base.clone(),
+            target_address: holo_hash::AnyLinkableHash::from_raw_36_and_type(
+                vec![seed.wrapping_add(20); 36],
+                holo_hash::hash_type::AnyLinkable::Entry,
+            ),
+            zome_index: zome_index.into(),
+            link_type: link_type.into(),
+            tag: LinkTag(tag_bytes),
+            weight: Default::default(),
+        });
+        let action_hashed = holochain_zome_types::action::ActionHashed::from_content_sync(action);
+        holochain_zome_types::record::SignedActionHashed::with_presigned(
+            action_hashed,
+            Signature::from([seed; 64]),
+        )
+    }
+
+    /// Build a scratch `DeleteLink` action tombstoning `create_link_hash`.
+    fn make_scratch_delete_link(
+        base: &holo_hash::AnyLinkableHash,
+        create_link_hash: holo_hash::ActionHash,
+        seed: u8,
+    ) -> holochain_zome_types::record::SignedActionHashed {
+        use holochain_zome_types::action::DeleteLink;
+
+        let action = Action::DeleteLink(DeleteLink {
+            author: AgentPubKey::from_raw_36(vec![seed; 36]),
+            timestamp: Timestamp::from_micros(seed as i64 * 1000 + 500),
+            action_seq: 3,
+            prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(90); 36]),
+            base_address: base.clone(),
+            link_add_address: create_link_hash,
+        });
+        let action_hashed = holochain_zome_types::action::ActionHashed::from_content_sync(action);
+        holochain_zome_types::record::SignedActionHashed::with_presigned(
+            action_hashed,
+            Signature::from([seed; 64]),
+        )
+    }
+
+    // ---- get_links_with_scratch tests ----
+
+    /// A scratch `CreateLink` for `base` appears in `get_links_with_scratch`
+    /// and is correctly filtered by type, tag, author, and time.
+    #[tokio::test]
+    async fn get_links_with_scratch_scratch_create_link_appears_and_is_filtered() {
+        use crate::query::link::GetLinksFilter;
+        use holochain_zome_types::prelude::LinkTypeFilter;
+
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let base = holo_hash::AnyLinkableHash::from_raw_36_and_type(
+            vec![130u8; 36],
+            holo_hash::hash_type::AnyLinkable::Entry,
+        );
+
+        // Build a scratch CreateLink: zome 0, type 0, tag [1,2,3], seed 131.
+        let scratch_sah = make_scratch_create_link(&base, 0, 0, vec![1, 2, 3], 131);
+        let scratch_create_hash = scratch_sah.as_hash().clone();
+        let mut scratch_inner = crate::scratch::Scratch::new();
+        scratch_inner.add_action(
+            scratch_sah,
+            holochain_zome_types::action::ChainTopOrdering::Relaxed,
+        );
+        let scratch = scratch_inner.into_sync();
+
+        let filter = GetLinksFilter {
+            after: None,
+            before: None,
+            author: None,
+        };
+
+        // The link appears with a matching type+tag query.
+        let links = store
+            .as_read()
+            .get_links_with_scratch(
+                &base,
+                &LinkTypeFilter::Dependencies(vec![0.into()]),
+                None,
+                &filter,
+                &scratch,
+            )
+            .await
+            .unwrap();
+        assert_eq!(links.len(), 1, "scratch CreateLink should appear");
+        assert_eq!(links[0].create_link_hash, scratch_create_hash);
+
+        // Filtered out by a different zome index.
+        let links_no_type = store
+            .as_read()
+            .get_links_with_scratch(
+                &base,
+                &LinkTypeFilter::Dependencies(vec![1.into()]),
+                None,
+                &filter,
+                &scratch,
+            )
+            .await
+            .unwrap();
+        assert!(
+            links_no_type.is_empty(),
+            "scratch CreateLink must be excluded by type filter"
+        );
+
+        // Filtered out by a non-matching tag prefix.
+        let bad_tag = holochain_zome_types::link::LinkTag(vec![9, 9, 9]);
+        let links_no_tag = store
+            .as_read()
+            .get_links_with_scratch(
+                &base,
+                &LinkTypeFilter::Dependencies(vec![0.into()]),
+                Some(&bad_tag),
+                &filter,
+                &scratch,
+            )
+            .await
+            .unwrap();
+        assert!(
+            links_no_tag.is_empty(),
+            "scratch CreateLink must be excluded by tag filter"
+        );
+
+        // Filtered out by author.
+        let other_author = AgentPubKey::from_raw_36(vec![200u8; 36]);
+        let filter_author = GetLinksFilter {
+            after: None,
+            before: None,
+            author: Some(other_author),
+        };
+        let links_no_author = store
+            .as_read()
+            .get_links_with_scratch(
+                &base,
+                &LinkTypeFilter::Dependencies(vec![0.into()]),
+                None,
+                &filter_author,
+                &scratch,
+            )
+            .await
+            .unwrap();
+        assert!(
+            links_no_author.is_empty(),
+            "scratch CreateLink must be excluded by author filter"
+        );
+
+        // Filtered out by `before` (link timestamp is 131*1000; before=130*1000 excludes it).
+        let filter_before = GetLinksFilter {
+            after: None,
+            before: Some(Timestamp::from_micros(130 * 1000)),
+            author: None,
+        };
+        let links_before = store
+            .as_read()
+            .get_links_with_scratch(
+                &base,
+                &LinkTypeFilter::Dependencies(vec![0.into()]),
+                None,
+                &filter_before,
+                &scratch,
+            )
+            .await
+            .unwrap();
+        assert!(
+            links_before.is_empty(),
+            "scratch CreateLink must be excluded by before filter"
+        );
+
+        // Filtered out by `after` (link timestamp is 131*1000; after=132*1000 excludes it).
+        let filter_after = GetLinksFilter {
+            after: Some(Timestamp::from_micros(132 * 1000)),
+            before: None,
+            author: None,
+        };
+        let links_after = store
+            .as_read()
+            .get_links_with_scratch(
+                &base,
+                &LinkTypeFilter::Dependencies(vec![0.into()]),
+                None,
+                &filter_after,
+                &scratch,
+            )
+            .await
+            .unwrap();
+        assert!(
+            links_after.is_empty(),
+            "scratch CreateLink must be excluded by after filter"
+        );
+    }
+
+    /// A scratch `DeleteLink` targeting a *store* `CreateLink` removes that
+    /// link from `get_links_with_scratch`, but both the create and the delete
+    /// appear in `get_link_details_with_scratch`.
+    #[tokio::test]
+    async fn scratch_delete_link_tombstones_store_create_in_get_links_but_not_details() {
+        use crate::query::link::GetLinksFilter;
+        use holochain_zome_types::prelude::LinkTypeFilter;
+
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let base = holo_hash::AnyLinkableHash::from_raw_36_and_type(
+            vec![140u8; 36],
+            holo_hash::hash_type::AnyLinkable::Entry,
+        );
+
+        // Integrate a store CreateLink.
+        let store_create_hash =
+            integrate_link_op_for_base(&store, &base, 0, 0, vec![1, 2, 3], 141, 100).await;
+
+        // Confirm it appears in store-only get_links.
+        let filter = GetLinksFilter {
+            after: None,
+            before: None,
+            author: None,
+        };
+        let store_links = store
+            .as_read()
+            .get_links(
+                &base,
+                &LinkTypeFilter::Dependencies(vec![0.into()]),
+                None,
+                &filter,
+            )
+            .await
+            .unwrap();
+        assert_eq!(store_links.len(), 1, "store CreateLink should be live");
+
+        // Add a scratch DeleteLink targeting the store create.
+        let dl_sah = make_scratch_delete_link(&base, store_create_hash.clone(), 142);
+        let mut scratch_inner = crate::scratch::Scratch::new();
+        scratch_inner.add_action(
+            dl_sah,
+            holochain_zome_types::action::ChainTopOrdering::Relaxed,
+        );
+        let scratch = scratch_inner.into_sync();
+
+        // get_links_with_scratch must exclude the tombstoned store link.
+        let links = store
+            .as_read()
+            .get_links_with_scratch(
+                &base,
+                &LinkTypeFilter::Dependencies(vec![0.into()]),
+                None,
+                &filter,
+                &scratch,
+            )
+            .await
+            .unwrap();
+        assert!(
+            links.is_empty(),
+            "scratch DeleteLink must tombstone the store CreateLink in get_links_with_scratch"
+        );
+
+        // get_link_details_with_scratch must show the create AND the scratch delete.
+        let details = store
+            .as_read()
+            .get_link_details_with_scratch(
+                &base,
+                &LinkTypeFilter::Dependencies(vec![0.into()]),
+                None,
+                &scratch,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            details.len(),
+            1,
+            "store CreateLink should appear in details"
+        );
+        let (create_sah, deletes) = &details[0];
+        assert_eq!(
+            create_sah.as_hash(),
+            &store_create_hash,
+            "details create should be the store CreateLink"
+        );
+        assert_eq!(
+            deletes.len(),
+            1,
+            "scratch DeleteLink must appear in the details delete list"
+        );
+    }
+
+    /// Store-only `get_links` and `get_link_details` ignore a populated scratch
+    /// (requester-only invariant).
+    #[tokio::test]
+    async fn get_links_store_only_ignores_scratch() {
+        use crate::query::link::GetLinksFilter;
+        use holochain_zome_types::prelude::LinkTypeFilter;
+
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let base = holo_hash::AnyLinkableHash::from_raw_36_and_type(
+            vec![150u8; 36],
+            holo_hash::hash_type::AnyLinkable::Entry,
+        );
+
+        // Integrate a store CreateLink.
+        let store_create_hash =
+            integrate_link_op_for_base(&store, &base, 0, 0, vec![1, 2, 3], 151, 100).await;
+
+        // Build a scratch with: one new CreateLink + one DeleteLink tombstoning the store create.
+        let scratch_cl_sah = make_scratch_create_link(&base, 0, 0, vec![4, 5, 6], 152);
+        let scratch_dl_sah = make_scratch_delete_link(&base, store_create_hash.clone(), 153);
+        let mut scratch_inner = crate::scratch::Scratch::new();
+        scratch_inner.add_action(
+            scratch_cl_sah,
+            holochain_zome_types::action::ChainTopOrdering::Relaxed,
+        );
+        scratch_inner.add_action(
+            scratch_dl_sah,
+            holochain_zome_types::action::ChainTopOrdering::Relaxed,
+        );
+        // Scratch is built but NOT passed to the store-only methods.
+        let _scratch = scratch_inner.into_sync();
+
+        // Store-only get_links: should see only the store link (no scratch create, no exclusion).
+        let filter = GetLinksFilter {
+            after: None,
+            before: None,
+            author: None,
+        };
+        let links = store
+            .as_read()
+            .get_links(
+                &base,
+                &LinkTypeFilter::Dependencies(vec![0.into()]),
+                None,
+                &filter,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            links.len(),
+            1,
+            "store-only get_links must not see scratch CreateLink"
+        );
+        assert_eq!(
+            links[0].create_link_hash, store_create_hash,
+            "store-only get_links must return the store link unaffected by scratch delete"
+        );
+
+        // Store-only get_link_details: should see only the store create, with no deletes.
+        let details = store
+            .as_read()
+            .get_link_details(&base, &LinkTypeFilter::Dependencies(vec![0.into()]), None)
+            .await
+            .unwrap();
+        assert_eq!(
+            details.len(),
+            1,
+            "store-only get_link_details must not see scratch CreateLink"
+        );
+        assert_eq!(
+            details[0].1.len(),
+            0,
+            "store-only get_link_details must not see scratch DeleteLink"
         );
     }
 }
