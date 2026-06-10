@@ -122,11 +122,19 @@ impl DhtStore<DbRead<Dht>> {
         };
         let action = holochain_zome_types::dht_v2::to_legacy_signed_action(&v2_action);
         let entry = match action.action().entry_hash() {
-            Some(entry_hash) => match self.db().get_entry(entry_hash.clone(), author).await? {
-                Some(entry) => Some(entry),
-                // Action references an entry but it is unavailable.
-                None => return Ok(None),
-            },
+            Some(entry_hash) if private_entry_visible_to(&action, author) => {
+                match self.db().get_entry(entry_hash.clone(), author).await? {
+                    Some(entry) => Some(entry),
+                    // A public entry referenced but unavailable means "no
+                    // record"; an absent private entry is simply `Hidden`.
+                    None if action_entry_is_private(&action) => None,
+                    None => return Ok(None),
+                }
+            }
+            // A private entry is `Hidden` unless the caller is the author —
+            // never attach another agent's private entry, even if the caller
+            // happens to hold a same-hash private entry of their own.
+            Some(_) => None,
             None => None,
         };
         Ok(Some(holochain_zome_types::record::Record::new(
@@ -321,23 +329,26 @@ impl DhtStore<DbRead<Dht>> {
             },
         };
 
-        // Resolve the entry (if the action references one).
+        // Resolve the entry (if the action references one). A private entry is
+        // only attached for its own author — see `private_entry_visible_to`.
         let entry = match action.action().entry_hash() {
-            Some(entry_hash) => {
-                // Try the store first.
+            Some(entry_hash) if private_entry_visible_to(&action, author) => {
+                // Try the store first, then the scratch (scratch entries are
+                // this agent's own data; the visibility guard above already
+                // ensures we only reach here for the author of a private entry).
                 match self.retrieve_entry(entry_hash, author).await? {
                     Some(e) => Some(e),
-                    // Store miss — try the scratch (scratch entries are always
-                    // visible regardless of `author`, because the scratch is
-                    // this agent's own data).
                     None => match scratch_entry(scratch, entry_hash)? {
                         Some(e) => Some(e),
-                        // Action references an entry that is unavailable
-                        // everywhere — honour the retrieve_record contract.
+                        // Unavailable everywhere: a public entry means "no
+                        // record"; an absent private entry is `Hidden`.
+                        None if action_entry_is_private(&action) => None,
                         None => return Ok(None),
                     },
                 }
             }
+            // Private entry, caller is not the author -> Hidden.
+            Some(_) => None,
             None => None,
         };
 
@@ -1771,6 +1782,27 @@ impl DhtStore<DbRead<Dht>> {
     }
 }
 
+/// Whether `action`'s entry (if any) is declared private.
+fn action_entry_is_private(action: &holochain_zome_types::record::SignedActionHashed) -> bool {
+    action.action().entry_visibility()
+        == Some(&holochain_zome_types::prelude::EntryVisibility::Private)
+}
+
+/// Whether the requesting `author` may have `action`'s entry attached to the
+/// assembled record. Always true for public entries; for a **private** entry
+/// only when the caller is the action's author. A private entry must never be
+/// served to a different author — not even when the caller holds a *same-hash*
+/// private entry of their own (the entry hash is shared by content, but the
+/// privacy is per author). This restores the legacy requester read's
+/// entry-visibility hiding that the by-hash `get_entry` lookup alone does not
+/// provide.
+fn private_entry_visible_to(
+    action: &holochain_zome_types::record::SignedActionHashed,
+    author: Option<&holo_hash::AgentPubKey>,
+) -> bool {
+    !action_entry_is_private(action) || author == Some(action.action().author())
+}
+
 /// Map the v2 record validity to the legacy validation status served on the wire.
 fn record_validity_to_status(v: RecordValidity) -> ValidationStatus {
     match v {
@@ -2735,6 +2767,78 @@ mod tests {
     fn make_chain_op_with_hash(seed: u8, hash: DhtOpHash) -> DhtOpHashed {
         let op = make_chain_op(seed);
         HoloHashed::with_pre_hashed(op.into_inner().0, hash)
+    }
+
+    /// Regression: a **private** entry must be `Hidden` from a non-author, even
+    /// when the entry is retrievable by hash (here it sits in the public `Entry`
+    /// table — the same exposure a same-hash private entry of the caller's own
+    /// produces). The action itself stays visible.
+    #[tokio::test]
+    async fn retrieve_record_hides_private_entry_from_non_author() {
+        use holochain_types::prelude::{AppEntryBytes, Entry, RecordEntry};
+
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+
+        let alice = AgentPubKey::from_raw_36(vec![1u8; 36]);
+        let bobbo = AgentPubKey::from_raw_36(vec![2u8; 36]);
+
+        let entry = Entry::App(AppEntryBytes(
+            holochain_serialized_bytes::SerializedBytes::from(
+                holochain_serialized_bytes::UnsafeBytes::from(vec![9u8; 8]),
+            ),
+        ));
+        let entry_hash = EntryHash::with_data_sync(&entry);
+        let action = Action::Create(Create {
+            author: alice.clone(),
+            timestamp: Timestamp::from_micros(1000),
+            action_seq: 1,
+            prev_action: ActionHash::from_raw_36(vec![3u8; 36]),
+            entry_type: EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Private,
+            )),
+            entry_hash: entry_hash.clone(),
+            weight: Default::default(),
+        });
+        let action_hash = ActionHash::with_data_sync(&action);
+
+        // Recording the StoreRecord op with the entry present lands the entry in
+        // the public `Entry` table — the leak surface.
+        let chain_op = ChainOp::StoreRecord(
+            Signature::from([7u8; 64]),
+            action,
+            RecordEntry::Present(entry.clone()),
+        );
+        let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(chain_op)));
+        store.record_incoming_ops(vec![op]).await.unwrap();
+
+        // A non-author gets the record, but the private entry is Hidden.
+        let record = store
+            .as_read()
+            .retrieve_record(&action_hash, Some(&bobbo))
+            .await
+            .unwrap()
+            .expect("the action is public, so a record is returned");
+        assert_eq!(
+            *record.entry(),
+            RecordEntry::Hidden,
+            "a private entry must be Hidden from a non-author"
+        );
+
+        // The author sees their own private entry.
+        let record = store
+            .as_read()
+            .retrieve_record(&action_hash, Some(&alice))
+            .await
+            .unwrap()
+            .expect("author's record");
+        assert!(
+            matches!(*record.entry(), RecordEntry::Present(_)),
+            "the author sees their own private entry"
+        );
     }
 
     #[tokio::test]
