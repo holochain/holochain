@@ -346,6 +346,126 @@ impl DhtStore<DbRead<Dht>> {
         )))
     }
 
+    /// Retrieve the record for `hash` only if it is still live, checking the
+    /// store **and** the in-memory scratch for delete tombstones.
+    ///
+    /// Returns `None` when:
+    /// - the store holds an integrated `Delete` targeting `hash`, **or**
+    /// - the scratch holds a `Delete` action whose `deletes_address == hash`.
+    ///
+    /// Otherwise delegates to [`retrieve_record_with_scratch`](Self::retrieve_record_with_scratch)
+    /// to resolve the action and entry from store-or-scratch.
+    ///
+    /// Use this on the **requester** path only. Authority handlers must never
+    /// see scratch data — use [`get_live_record`](Self::get_live_record) there.
+    pub async fn get_live_record_with_scratch(
+        &self,
+        hash: &holo_hash::ActionHash,
+        author: Option<&holo_hash::AgentPubKey>,
+        scratch: &SyncScratch,
+    ) -> StateQueryResult<Option<holochain_zome_types::record::Record>> {
+        // An integrated delete in the store is decisive — record is dead.
+        if !self
+            .db()
+            .get_deleted_records(hash.clone())
+            .await?
+            .is_empty()
+        {
+            return Ok(None);
+        }
+        // A pending delete in the scratch also kills the record.
+        if scratch_deletes_targeting(scratch, hash)? {
+            return Ok(None);
+        }
+        self.retrieve_record_with_scratch(hash, author, scratch)
+            .await
+    }
+
+    /// The live `Record` for an entry, consulting both the store and the
+    /// in-memory scratch for create candidates and delete tombstones.
+    ///
+    /// Live creates are the union of:
+    /// - the store's validated, integrated, undeleted `StoreEntry` creates
+    ///   (from [`get_live_entry_creates`](holochain_data::DbRead::get_live_entry_creates)), and
+    /// - scratch `Create`/`Update` actions whose `entry_hash() == entry_hash`
+    ///   and that are not targeted by a scratch `Delete`.
+    ///
+    /// Among these, the authored-or-first preference from
+    /// [`get_live_entry`](Self::get_live_entry) is preserved: if `author` is
+    /// `Some`, the first action by that author wins; otherwise the first store
+    /// create (by integration order) is chosen, then the first scratch create.
+    ///
+    /// The entry is resolved via store-or-scratch (same as
+    /// [`retrieve_entry_with_scratch`](Self::retrieve_entry_with_scratch)).
+    ///
+    /// Use this on the **requester** path only.
+    pub async fn get_live_entry_with_scratch(
+        &self,
+        entry_hash: &holo_hash::EntryHash,
+        author: Option<&holo_hash::AgentPubKey>,
+        scratch: &SyncScratch,
+    ) -> StateQueryResult<Option<holochain_zome_types::record::Record>> {
+        // Collect validated, integrated store creates, then drop any tombstoned
+        // by a pending scratch `Delete` (the store read only excludes integrated
+        // store deletes, so the scratch-delete exclusion is applied here).
+        let scratch_deleted = scratch_delete_targets(scratch)?;
+        let store_creates: Vec<_> = self
+            .db()
+            .get_live_entry_creates(entry_hash, author)
+            .await?
+            .into_iter()
+            .filter(|sah| !scratch_deleted.contains(sah.as_hash()))
+            .collect();
+
+        // Collect live scratch creates/updates for this entry.
+        let scratch_creates: Vec<holochain_zome_types::record::SignedActionHashed> =
+            scratch_live_entry_creates(scratch, entry_hash)?;
+
+        // Author-preference: prefer a create by `author`; failing that, first
+        // store create (integration order), then first scratch create.
+        let chosen = match author {
+            Some(a) => {
+                // Search store creates first, then scratch creates.
+                let authored = store_creates
+                    .iter()
+                    .find(|sah| &sah.hashed.content.header.author == a)
+                    .map(holochain_zome_types::dht_v2::to_legacy_signed_action);
+                let authored = authored.or_else(|| {
+                    scratch_creates
+                        .iter()
+                        .find(|sah| sah.action().author() == a)
+                        .cloned()
+                });
+                authored
+                    .or_else(|| {
+                        store_creates
+                            .into_iter()
+                            .next()
+                            .map(|sah| holochain_zome_types::dht_v2::to_legacy_signed_action(&sah))
+                    })
+                    .or_else(|| scratch_creates.into_iter().next())
+            }
+            None => store_creates
+                .into_iter()
+                .next()
+                .map(|sah| holochain_zome_types::dht_v2::to_legacy_signed_action(&sah))
+                .or_else(|| scratch_creates.into_iter().next()),
+        };
+
+        let Some(action) = chosen else {
+            return Ok(None);
+        };
+
+        // Resolve the entry from store-or-scratch.
+        let entry = self
+            .retrieve_entry_with_scratch(entry_hash, author, scratch)
+            .await?;
+
+        Ok(Some(holochain_zome_types::record::Record::new(
+            action, entry,
+        )))
+    }
+
     /// Assemble the [`RecordDetails`] for `hash`: the record, its validation
     /// status (from its integrated `StoreRecord` op), the deletes targeting it,
     /// and the updates of it. Returns `None` if there is no integrated
@@ -1043,6 +1163,89 @@ fn scratch_entry(
     // entry regardless of author — scratch data is this agent's own).
     use crate::query::Store;
     scratch.apply_and_then(|s| s.get_entry(hash))
+}
+
+/// Returns `true` if the scratch contains any `Delete` action whose
+/// `deletes_address` equals `hash`.
+///
+/// Used by the requester path to check whether a pending (not-yet-integrated)
+/// delete tombstones a record before that delete is visible in the store.
+fn scratch_deletes_targeting(
+    scratch: &SyncScratch,
+    hash: &holo_hash::ActionHash,
+) -> StateQueryResult<bool> {
+    scratch.apply_and_then(|s| {
+        let found = s.actions().any(|sah| {
+            if let holochain_zome_types::action::Action::Delete(d) = sah.action() {
+                &d.deletes_address == hash
+            } else {
+                false
+            }
+        });
+        Ok::<bool, crate::query::StateQueryError>(found)
+    })
+}
+
+/// The action hashes tombstoned by a `Delete` in this (locked) scratch — the
+/// `deletes_address` of every scratch `Delete`. Operates on a `&Scratch` so it
+/// can be reused inside an existing `apply`/`apply_and_then` closure without
+/// re-locking.
+fn delete_targets_in(
+    s: &crate::scratch::Scratch,
+) -> std::collections::HashSet<holo_hash::ActionHash> {
+    s.actions()
+        .filter_map(|sah| match sah.action() {
+            holochain_zome_types::action::Action::Delete(d) => Some(d.deletes_address.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The action hashes tombstoned by a pending scratch `Delete`.
+fn scratch_delete_targets(
+    scratch: &SyncScratch,
+) -> StateQueryResult<std::collections::HashSet<holo_hash::ActionHash>> {
+    scratch.apply_and_then(|s| Ok::<_, crate::query::StateQueryError>(delete_targets_in(s)))
+}
+
+/// Return all `Create`/`Update` actions in the scratch whose `entry_hash()`
+/// equals `entry_hash` and that are not targeted by a scratch `Delete`.
+///
+/// This is the scratch-side analogue of
+/// [`get_live_entry_creates`](holochain_data::DbRead::get_live_entry_creates):
+/// it collects candidates and filters out any that have a pending delete
+/// tombstone in the same scratch.
+fn scratch_live_entry_creates(
+    scratch: &SyncScratch,
+    entry_hash: &holo_hash::EntryHash,
+) -> StateQueryResult<Vec<holochain_zome_types::record::SignedActionHashed>> {
+    scratch.apply_and_then(|s| {
+        // Action hashes of all scratch Deletes, so tombstoned creates are excluded.
+        let deleted_addresses = delete_targets_in(s);
+
+        let creates: Vec<holochain_zome_types::record::SignedActionHashed> = s
+            .actions()
+            .filter(|sah| {
+                // Must be a Create or Update referencing this entry hash.
+                let references_entry = sah.action().entry_hash() == Some(entry_hash);
+                if !references_entry {
+                    return false;
+                }
+                matches!(
+                    sah.action(),
+                    holochain_zome_types::action::Action::Create(_)
+                        | holochain_zome_types::action::Action::Update(_)
+                )
+            })
+            .filter(|sah| {
+                // Exclude if a Delete in the scratch targets this action.
+                !deleted_addresses.contains(sah.action_address())
+            })
+            .cloned()
+            .collect();
+
+        Ok::<Vec<_>, crate::query::StateQueryError>(creates)
+    })
 }
 
 /// Reconstruct a [`DhtOpHashed`] (`ChainOp` variant) from a
@@ -2771,5 +2974,359 @@ mod tests {
             record.entry().as_option().is_some(),
             "entry should be supplied by the scratch"
         );
+    }
+
+    // ---- get_live_{record,entry}_with_scratch helpers ----
+
+    /// Build a public [`Entry::App`] with payload `vec![seed; 8]`.
+    fn make_entry(seed: u8) -> holochain_types::prelude::Entry {
+        use holochain_types::prelude::{AppEntryBytes, Entry};
+        let bytes = holochain_serialized_bytes::SerializedBytes::from(
+            holochain_serialized_bytes::UnsafeBytes::from(vec![seed; 8]),
+        );
+        Entry::App(AppEntryBytes(bytes))
+    }
+
+    /// Build and integrate a `StoreEntry` op so that `entry_hash` has a live
+    /// store create. Returns the action hash of the `Create` action.
+    async fn integrate_store_entry_op(
+        store: &crate::dht_store::DhtStore<DbWrite<Dht>>,
+        seed: u8,
+        author: &AgentPubKey,
+        entry_hash: EntryHash,
+        entry: holochain_types::prelude::Entry,
+    ) -> ActionHash {
+        use crate::dht_store::{AppOutcome, SysOutcome};
+        use holochain_types::action::NewEntryAction;
+        use holochain_types::dht_op::{ChainOp, DhtOp};
+
+        let action = Action::Create(Create {
+            author: author.clone(),
+            timestamp: Timestamp::from_micros(seed as i64 * 1000),
+            action_seq: 1,
+            prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36]),
+            entry_type: EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
+            entry_hash: entry_hash.clone(),
+            weight: Default::default(),
+        });
+        let action_hash = holo_hash::ActionHash::with_data_sync(&action);
+        let new_entry_action: NewEntryAction = action.try_into().unwrap();
+        let chain_op =
+            ChainOp::StoreEntry(Signature::from([seed; 64]), new_entry_action, entry.clone());
+        let op = holochain_types::dht_op::DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(
+            chain_op,
+        )));
+        let op_hash = op.as_hash().clone();
+        store.record_incoming_ops(vec![op]).await.unwrap();
+        store
+            .record_chain_op_sys_validation_outcomes(vec![(op_hash.clone(), SysOutcome::Accepted)])
+            .await
+            .unwrap();
+        store
+            .record_app_validation_outcomes(vec![(op_hash.clone(), AppOutcome::Accepted)])
+            .await
+            .unwrap();
+        store
+            .integrate_ready_ops(Timestamp::from_micros(1000))
+            .await
+            .unwrap();
+        action_hash
+    }
+
+    /// Build a scratch `Delete` action targeting `deletes_address` /
+    /// `deletes_entry_address`, wrapped in a `SyncScratch`.
+    fn scratch_with_delete(
+        seed: u8,
+        deletes_address: ActionHash,
+        deletes_entry_address: EntryHash,
+    ) -> crate::scratch::SyncScratch {
+        use holochain_zome_types::action::Delete;
+        let delete = Action::Delete(Delete {
+            author: AgentPubKey::from_raw_36(vec![seed; 36]),
+            timestamp: Timestamp::from_micros(seed as i64 * 2000),
+            action_seq: 2,
+            prev_action: ActionHash::from_raw_36(vec![seed.wrapping_add(150); 36]),
+            deletes_address,
+            deletes_entry_address,
+            weight: Default::default(),
+        });
+        let action_hashed = holochain_zome_types::action::ActionHashed::from_content_sync(delete);
+        let sah = holochain_zome_types::record::SignedActionHashed::with_presigned(
+            action_hashed,
+            Signature::from([seed; 64]),
+        );
+        let mut scratch = crate::scratch::Scratch::new();
+        scratch.add_action(sah, holochain_zome_types::action::ChainTopOrdering::Relaxed);
+        scratch.into_sync()
+    }
+
+    // ---- get_live_record_with_scratch tests ----
+
+    /// (a) Store create + a scratch `Delete` targeting it →
+    /// `get_live_record_with_scratch` returns `None`, but
+    /// `get_live_record` still returns the record (it ignores the scratch).
+    #[tokio::test]
+    async fn get_live_record_with_scratch_scratch_delete_tombstones_store_record() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+
+        let seed = 110u8;
+        let entry_hash = EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]);
+        let author = AgentPubKey::from_raw_36(vec![seed; 36]);
+        let entry = make_entry(seed);
+
+        // First insert a RegisterAgentActivity op so the action is in the store.
+        let act_op = make_chain_op(seed);
+        let action = match act_op.as_content() {
+            DhtOp::ChainOp(c) => c.action().clone(),
+            _ => unreachable!(),
+        };
+        let action_hash = holo_hash::ActionHash::with_data_sync(&action);
+        store.record_incoming_ops(vec![act_op]).await.unwrap();
+
+        // Integrate a StoreEntry op so the record is fully live in the store.
+        integrate_store_entry_op(&store, seed, &author, entry_hash.clone(), entry).await;
+
+        // Store-only live-record sees it.
+        let store_result = store
+            .as_read()
+            .get_live_record(&action_hash, None)
+            .await
+            .unwrap();
+        assert!(
+            store_result.is_some(),
+            "store-only get_live_record should return the record"
+        );
+
+        // A scratch Delete targeting the action hash.
+        let scratch = scratch_with_delete(seed, action_hash.clone(), entry_hash);
+
+        // With-scratch path returns None due to the scratch tombstone.
+        let result = store
+            .as_read()
+            .get_live_record_with_scratch(&action_hash, None, &scratch)
+            .await
+            .unwrap();
+        assert!(
+            result.is_none(),
+            "scratch delete should tombstone the record for get_live_record_with_scratch"
+        );
+    }
+
+    /// (b) Scratch-only create → `get_live_record_with_scratch` and
+    /// `get_live_entry_with_scratch` both return the live record.
+    #[tokio::test]
+    async fn get_live_with_scratch_scratch_only_create_is_live() {
+        use holochain_types::prelude::{AppEntryBytes, Entry};
+
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+
+        let seed = 111u8;
+        let entry_bytes = holochain_serialized_bytes::SerializedBytes::from(
+            holochain_serialized_bytes::UnsafeBytes::from(vec![seed; 8]),
+        );
+        let entry = Entry::App(AppEntryBytes(entry_bytes));
+        let entry_hash = EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]);
+        let sah = make_signed_action_for_entry(seed, entry_hash.clone());
+        let action_hash = sah.as_hash().clone();
+        let scratch = scratch_with_action_and_entry(sah, entry, entry_hash.clone());
+
+        // get_live_record_with_scratch should find the scratch-only create.
+        let record_result = store
+            .as_read()
+            .get_live_record_with_scratch(&action_hash, None, &scratch)
+            .await
+            .unwrap();
+        assert!(
+            record_result.is_some(),
+            "scratch-only create should be live for get_live_record_with_scratch"
+        );
+
+        // get_live_entry_with_scratch should also find it.
+        let entry_result = store
+            .as_read()
+            .get_live_entry_with_scratch(&entry_hash, None, &scratch)
+            .await
+            .unwrap();
+        assert!(
+            entry_result.is_some(),
+            "scratch-only create should be live for get_live_entry_with_scratch"
+        );
+    }
+
+    /// (c) Author-preference: both a store create and a scratch create exist for
+    /// the same entry. Querying with the scratch-create author picks the scratch
+    /// action; querying with a third author falls back to the store create first.
+    #[tokio::test]
+    async fn get_live_entry_with_scratch_author_preference() {
+        use holochain_types::prelude::{AppEntryBytes, Entry};
+
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+
+        // Shared entry hash for both creates.
+        let entry_hash = EntryHash::from_raw_36(vec![150u8; 36]);
+        let entry_bytes = holochain_serialized_bytes::SerializedBytes::from(
+            holochain_serialized_bytes::UnsafeBytes::from(vec![1u8; 8]),
+        );
+        let entry = Entry::App(AppEntryBytes(entry_bytes));
+
+        // Store create by store_author (seed=112).
+        let store_author = AgentPubKey::from_raw_36(vec![112u8; 36]);
+        let store_action_hash = integrate_store_entry_op(
+            &store,
+            112u8,
+            &store_author,
+            entry_hash.clone(),
+            entry.clone(),
+        )
+        .await;
+
+        // Scratch create by scratch_author (seed=113).
+        let seed = 113u8;
+        let scratch_sah = make_signed_action_for_entry(seed, entry_hash.clone());
+        let scratch_action_hash = scratch_sah.as_hash().clone();
+        let scratch = scratch_with_action_and_entry(scratch_sah, entry.clone(), entry_hash.clone());
+
+        // Querying with scratch_author → authored pick returns the scratch action.
+        let scratch_author = AgentPubKey::from_raw_36(vec![seed; 36]);
+        let result_scratch_author = store
+            .as_read()
+            .get_live_entry_with_scratch(&entry_hash, Some(&scratch_author), &scratch)
+            .await
+            .unwrap()
+            .expect("should find a live record for scratch_author");
+        assert_eq!(
+            result_scratch_author.action_address(),
+            &scratch_action_hash,
+            "scratch_author should pick the scratch create"
+        );
+
+        // Querying with store_author → authored pick returns the store action.
+        let result_store_author = store
+            .as_read()
+            .get_live_entry_with_scratch(&entry_hash, Some(&store_author), &scratch)
+            .await
+            .unwrap()
+            .expect("should find a live record for store_author");
+        assert_eq!(
+            result_store_author.action_address(),
+            &store_action_hash,
+            "store_author should pick the store create"
+        );
+
+        // Querying with an unmatched author → falls back to the first store
+        // create (store before scratch).
+        let other_author = AgentPubKey::from_raw_36(vec![200u8; 36]);
+        let result_other = store
+            .as_read()
+            .get_live_entry_with_scratch(&entry_hash, Some(&other_author), &scratch)
+            .await
+            .unwrap()
+            .expect("should find a live record for other_author");
+        assert_eq!(
+            result_other.action_address(),
+            &store_action_hash,
+            "unmatched author should fall back to first store create"
+        );
+    }
+
+    /// A scratch `Delete` targeting a *store* entry create tombstones it, so
+    /// `get_live_entry_with_scratch` returns `None` even though the store-only
+    /// `get_live_entry` still returns the record.
+    #[tokio::test]
+    async fn get_live_entry_with_scratch_scratch_delete_tombstones_store_create() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+
+        let seed = 118u8;
+        let author = AgentPubKey::from_raw_36(vec![seed; 36]);
+        let entry_hash = EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]);
+        let entry = make_entry(seed);
+
+        // Integrate a StoreEntry op so the create is live in the store.
+        let store_action_hash =
+            integrate_store_entry_op(&store, seed, &author, entry_hash.clone(), entry).await;
+
+        // Store-only read sees the live entry.
+        let store_only = store
+            .as_read()
+            .get_live_entry(&entry_hash, None)
+            .await
+            .unwrap();
+        assert!(
+            store_only.is_some(),
+            "store-only get_live_entry should return the create"
+        );
+
+        // A scratch Delete targeting the store create's action hash.
+        let scratch = scratch_with_delete(seed, store_action_hash, entry_hash.clone());
+
+        // The overlay must exclude the tombstoned store create → no live creates.
+        let result = store
+            .as_read()
+            .get_live_entry_with_scratch(&entry_hash, None, &scratch)
+            .await
+            .unwrap();
+        assert!(
+            result.is_none(),
+            "scratch delete of the store create should tombstone get_live_entry_with_scratch"
+        );
+    }
+
+    /// (d) Store-only `get_live_record` and `get_live_entry` ignore a populated
+    /// scratch (the requester-only invariant).
+    #[tokio::test]
+    async fn get_live_store_only_ignores_scratch() {
+        use holochain_types::prelude::{AppEntryBytes, Entry};
+
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+
+        let seed = 114u8;
+        let entry_bytes = holochain_serialized_bytes::SerializedBytes::from(
+            holochain_serialized_bytes::UnsafeBytes::from(vec![seed; 8]),
+        );
+        let entry = Entry::App(AppEntryBytes(entry_bytes));
+        let entry_hash = EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]);
+        let sah = make_signed_action_for_entry(seed, entry_hash.clone());
+        let action_hash = sah.as_hash().clone();
+
+        // The action + entry live only in the scratch.
+        // Store-only reads should return None.
+        let result_record = store
+            .as_read()
+            .get_live_record(&action_hash, None)
+            .await
+            .unwrap();
+        assert!(
+            result_record.is_none(),
+            "get_live_record must not see scratch-only data"
+        );
+
+        let result_entry = store
+            .as_read()
+            .get_live_entry(&entry_hash, None)
+            .await
+            .unwrap();
+        assert!(
+            result_entry.is_none(),
+            "get_live_entry must not see scratch-only data"
+        );
+
+        // Confirm the scratch data is there (sanity check) but is irrelevant
+        // to store-only queries.
+        let scratch = scratch_with_action_and_entry(sah, entry, entry_hash);
+        let _ = scratch; // scratch is intentionally not passed to the store-only methods
     }
 }
