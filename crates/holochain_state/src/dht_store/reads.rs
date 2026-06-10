@@ -374,7 +374,7 @@ impl DhtStore<DbRead<Dht>> {
             return Ok(None);
         }
         // A pending delete in the scratch also kills the record.
-        if scratch_deletes_targeting(scratch, hash)? {
+        if scratch_delete_targets(scratch)?.contains(hash) {
             return Ok(None);
         }
         self.retrieve_record_with_scratch(hash, author, scratch)
@@ -554,15 +554,9 @@ impl DhtStore<DbRead<Dht>> {
         else {
             return Ok(None);
         };
-        let validation_status = match holochain_zome_types::dht_v2::RecordValidity::try_from(
-            store_op.validation_status,
-        ) {
-            Ok(holochain_zome_types::dht_v2::RecordValidity::Accepted) => {
-                holochain_zome_types::validate::ValidationStatus::Valid
-            }
-            Ok(holochain_zome_types::dht_v2::RecordValidity::Rejected) => {
-                holochain_zome_types::validate::ValidationStatus::Rejected
-            }
+        let validation_status = match RecordValidity::try_from(store_op.validation_status) {
+            Ok(RecordValidity::Accepted) => ValidationStatus::Valid,
+            Ok(RecordValidity::Rejected) => ValidationStatus::Rejected,
             Err(v) => {
                 return Err(crate::query::StateQueryError::Other(format!(
                     "invalid validation_status {v} on StoreRecord op for {hash:?}"
@@ -643,11 +637,7 @@ impl DhtStore<DbRead<Dht>> {
         // Accepted creates: store accepted creates + all scratch creates for this entry.
         let store_accepted = self
             .db()
-            .get_entry_creates(
-                entry_hash,
-                author,
-                i64::from(holochain_zome_types::dht_v2::RecordValidity::Accepted),
-            )
+            .get_entry_creates(entry_hash, author, i64::from(RecordValidity::Accepted))
             .await?;
         let mut actions: Vec<holochain_zome_types::record::SignedActionHashed> =
             store_accepted.iter().map(to_legacy).collect();
@@ -656,11 +646,7 @@ impl DhtStore<DbRead<Dht>> {
         // Rejected creates: store only (scratch has no validation status).
         let rejected_actions = self
             .db()
-            .get_entry_creates(
-                entry_hash,
-                author,
-                i64::from(holochain_zome_types::dht_v2::RecordValidity::Rejected),
-            )
+            .get_entry_creates(entry_hash, author, i64::from(RecordValidity::Rejected))
             .await?
             .iter()
             .map(to_legacy)
@@ -1517,27 +1503,6 @@ fn scratch_entry(
     scratch.apply_and_then(|s| s.get_entry(hash))
 }
 
-/// Returns `true` if the scratch contains any `Delete` action whose
-/// `deletes_address` equals `hash`.
-///
-/// Used by the requester path to check whether a pending (not-yet-integrated)
-/// delete tombstones a record before that delete is visible in the store.
-fn scratch_deletes_targeting(
-    scratch: &SyncScratch,
-    hash: &holo_hash::ActionHash,
-) -> StateQueryResult<bool> {
-    scratch.apply_and_then(|s| {
-        let found = s.actions().any(|sah| {
-            if let holochain_zome_types::action::Action::Delete(d) = sah.action() {
-                &d.deletes_address == hash
-            } else {
-                false
-            }
-        });
-        Ok::<bool, crate::query::StateQueryError>(found)
-    })
-}
-
 /// The action hashes tombstoned by a `Delete` in this (locked) scratch — the
 /// `deletes_address` of every scratch `Delete`. Operates on a `&Scratch` so it
 /// can be reused inside an existing `apply`/`apply_and_then` closure without
@@ -1686,6 +1651,10 @@ fn scratch_updates_for_entry(
 /// (`entry_hash()`) equals `entry_hash`. This is the accepted-creates analogue
 /// for `get_entry_details` — the new entry being introduced, not the one being
 /// replaced.
+///
+/// Unlike [`scratch_live_entry_creates`], this does **not** exclude tombstoned
+/// creates: `EntryDetails.actions` lists every create regardless of deletes
+/// (liveness is reported separately via `entry_dht_status`).
 fn scratch_creates_for_entry(
     scratch: &SyncScratch,
     entry_hash: &holo_hash::EntryHash,
