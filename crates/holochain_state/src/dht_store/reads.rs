@@ -1079,7 +1079,7 @@ impl DhtStore<DbRead<Dht>> {
                 Vec<RegisterAgentActivity>,
                 Vec<holochain_types::warrant::WarrantOp>,
             )> {
-                let activity = agent_activity_from_scratch(s, author, u32::MAX, None);
+                let activity = agent_activity_from_scratch(s, author, None, None);
                 let warrants = if options.include_warrants {
                     warrants_for_agent_from_scratch(s, author)
                 } else {
@@ -1105,23 +1105,23 @@ impl DhtStore<DbRead<Dht>> {
             let mut store_valid_activity = Vec::new();
             let mut rejected = Vec::new();
             for item in items {
-                let action = to_legacy_signed_action(&item.action);
-                let ra = RegisterAgentActivity {
-                    action,
-                    cached_entry: None,
-                };
                 match item.validation_status {
-                    RecordValidity::Accepted => store_valid_activity.push(ra),
-                    RecordValidity::Rejected => {
-                        // For the rejected list we need Records, not activity.
-                        let record = Record::new(to_legacy_signed_action(&item.action), item.entry);
-                        rejected.push(record);
-                    }
+                    RecordValidity::Accepted => store_valid_activity.push(RegisterAgentActivity {
+                        action: to_legacy_signed_action(&item.action),
+                        cached_entry: None,
+                    }),
+                    // The rejected list is Records, and keeps the store row's entry.
+                    RecordValidity::Rejected => rejected.push(Record::new(
+                        to_legacy_signed_action(&item.action),
+                        item.entry,
+                    )),
                 }
             }
             // Merge store and scratch valid activity, dedup by action hash.
             let merged_activity = merge_agent_activity(vec![store_valid_activity, scratch_valid]);
-            // Convert merged activity to Records for build_agent_activity_response.
+            // Valid records carry no entry here, mirroring the cascade's
+            // `cached_entry: None` convention on the requester path (the entry is
+            // filled separately by the cascade); rejected records above keep theirs.
             let merged_valid: Vec<Record> = merged_activity
                 .into_iter()
                 .map(|a| Record::new(a.action, None))
@@ -1138,15 +1138,14 @@ impl DhtStore<DbRead<Dht>> {
             let mut store_valid_activity = Vec::new();
             let mut rejected_hashed = Vec::new();
             for item in items {
-                let action_hashed = to_legacy_signed_action(&item.action).hashed;
                 match item.validation_status {
-                    RecordValidity::Accepted => {
-                        store_valid_activity.push(RegisterAgentActivity {
-                            action: to_legacy_signed_action(&item.action),
-                            cached_entry: None,
-                        });
+                    RecordValidity::Accepted => store_valid_activity.push(RegisterAgentActivity {
+                        action: to_legacy_signed_action(&item.action),
+                        cached_entry: None,
+                    }),
+                    RecordValidity::Rejected => {
+                        rejected_hashed.push(to_legacy_signed_action(&item.action).hashed)
                     }
-                    RecordValidity::Rejected => rejected_hashed.push(action_hashed),
                 }
             }
             // Merge store and scratch valid activity, dedup by action hash.
@@ -1390,7 +1389,7 @@ impl DhtStore<DbRead<Dht>> {
             Ok::<_, crate::query::StateQueryError>(agent_activity_from_scratch(
                 s,
                 author,
-                chain_top_seq,
+                Some(chain_top_seq),
                 resolved_until_seq,
             ))
         })?;
@@ -2061,7 +2060,9 @@ fn scratch_delete_links_by_create(
 fn agent_activity_from_scratch(
     s: &crate::scratch::Scratch,
     author: &holo_hash::AgentPubKey,
-    chain_top_seq: u32,
+    // `None` = no upper bound (the whole authored chain); `Some(seq)` bounds to
+    // `action_seq <= seq` for the `must_get` chain-top window.
+    chain_top_seq: Option<u32>,
     until_seq: Option<u32>,
 ) -> Vec<RegisterAgentActivity> {
     s.actions()
@@ -2071,8 +2072,10 @@ fn agent_activity_from_scratch(
                 return false;
             }
             let seq = action.action_seq();
-            if seq > chain_top_seq {
-                return false;
+            if let Some(top) = chain_top_seq {
+                if seq > top {
+                    return false;
+                }
             }
             if let Some(until) = until_seq {
                 if seq < until {
