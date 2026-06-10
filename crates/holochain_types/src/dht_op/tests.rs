@@ -260,6 +260,22 @@ fn all_records() -> Vec<Record> {
 }
 
 #[test]
+fn legacy_op_hash_matches_v2_content_hash() {
+    // After the 1c-iii flip, the canonical legacy op hash is the content-derived
+    // v2 hash. Verify the legacy `ChainOp` hashing path agrees, op-for-op, with
+    // the v2 `ChainOpUniqueForm::op_hash` over the projected action (which 1c-i
+    // already pins to `dht_v2::ChainOp::to_hash`).
+    for record in all_records() {
+        let v2_action = crate::dht_v2::from_legacy_action(record.action());
+        for op in produce_ops_from_record(&record).unwrap() {
+            let legacy_hash = DhtOpHash::with_data_sync(&op);
+            let v2_hash = crate::dht_v2::ChainOpUniqueForm::op_hash(op.get_type(), &v2_action);
+            assert_eq!(legacy_hash, v2_hash, "op type {:?}", op.get_type());
+        }
+    }
+}
+
+#[test]
 fn get_type_op() {
     let check_all_ops = |record| {
         let ops = produce_ops_from_record(&record).unwrap();

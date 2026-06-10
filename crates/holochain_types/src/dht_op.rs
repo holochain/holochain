@@ -1129,11 +1129,9 @@ impl HashableContent for ChainOp {
     }
 
     fn hashable_content(&self) -> HashableContentBytes {
-        HashableContentBytes::Content(
-            (&self.as_unique_form())
-                .try_into()
-                .expect("Could not serialize HashableContent"),
-        )
+        // Route through the unique form so the op hash is the content-derived
+        // v2 hash (see `ChainOpUniqueForm`'s impl below).
+        self.as_unique_form().hashable_content()
     }
 }
 
@@ -1145,13 +1143,45 @@ impl HashableContent for ChainOpUniqueForm<'_> {
     }
 
     fn hashable_content(&self) -> HashableContentBytes {
-        HashableContentBytes::Content(
-            UnsafeBytes::from(
-                holochain_serialized_bytes::encode(self)
-                    .expect("Could not serialize HashableContent"),
-            )
-            .into(),
-        )
+        // The canonical op hash is content-derived v2. Project the op's legacy
+        // action to v2 and hash via the v2 `ChainOpUniqueForm`, so this agrees
+        // byte-for-byte with `crate::dht_v2::ChainOp::to_hash`. We cannot just
+        // re-serialize `self`: the legacy and v2 unique-form enums differ in
+        // variant order (e.g. delete-entry vs delete-record) and the legacy
+        // `StoreEntry` carries a `NewEntryAction`, so the bytes would diverge.
+        let (op_type, action): (ChainOpType, Action) = match self {
+            ChainOpUniqueForm::StoreRecord(a) => (ChainOpType::StoreRecord, (*a).clone()),
+            ChainOpUniqueForm::StoreEntry(nea) => (ChainOpType::StoreEntry, (*nea).clone().into()),
+            ChainOpUniqueForm::RegisterAgentActivity(a) => {
+                (ChainOpType::RegisterAgentActivity, (*a).clone())
+            }
+            ChainOpUniqueForm::RegisterUpdatedContent(u) => (
+                ChainOpType::RegisterUpdatedContent,
+                Action::Update((*u).clone()),
+            ),
+            ChainOpUniqueForm::RegisterUpdatedRecord(u) => (
+                ChainOpType::RegisterUpdatedRecord,
+                Action::Update((*u).clone()),
+            ),
+            ChainOpUniqueForm::RegisterDeletedBy(d) => {
+                (ChainOpType::RegisterDeletedBy, Action::Delete((*d).clone()))
+            }
+            ChainOpUniqueForm::RegisterDeletedEntryAction(d) => (
+                ChainOpType::RegisterDeletedEntryAction,
+                Action::Delete((*d).clone()),
+            ),
+            ChainOpUniqueForm::RegisterAddLink(cl) => (
+                ChainOpType::RegisterAddLink,
+                Action::CreateLink((*cl).clone()),
+            ),
+            ChainOpUniqueForm::RegisterRemoveLink(dl) => (
+                ChainOpType::RegisterRemoveLink,
+                Action::DeleteLink((*dl).clone()),
+            ),
+        };
+        let v2_action = crate::dht_v2::from_legacy_action(&action);
+        let hash = crate::dht_v2::ChainOpUniqueForm::op_hash(op_type, &v2_action);
+        HashableContentBytes::Prehashed39(hash.get_raw_39().to_vec())
     }
 }
 

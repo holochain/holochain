@@ -74,7 +74,7 @@ impl HcP2pHandler for UnresponsiveHandler {
     fn handle_publish(
         &self,
         _dna_hash: DnaHash,
-        _ops: Vec<holochain_types::dht_op::DhtOp>,
+        _ops: Vec<holochain_types::dht_v2::DhtOp>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(std::future::pending())
     }
@@ -285,16 +285,21 @@ async fn test_remote_signal() {
     .unwrap();
 }
 
-fn test_dht_op(authored_timestamp: holochain_types::prelude::Timestamp) -> DhtOpHashed {
+fn test_dht_op(
+    authored_timestamp: holochain_types::prelude::Timestamp,
+) -> holochain_types::dht_v2::DhtOp {
+    use holochain_types::dht_v2::{
+        from_legacy_action, ChainOp as V2ChainOp, DhtOp as V2DhtOp, OpEntry, SignedAction,
+    };
+
     let mut create = ::fixt::fixt!(Create);
     create.timestamp = authored_timestamp;
-
-    let op = DhtOp::from(ChainOp::StoreRecord(
-        ::fixt::fixt!(Signature),
-        Action::Create(create),
-        RecordEntry::Present(::fixt::fixt!(Entry)),
-    ));
-    DhtOpHashed::from_content_sync(op)
+    let action = from_legacy_action(&Action::Create(create));
+    let signed = SignedAction::new(action, ::fixt::fixt!(Signature));
+    V2DhtOp::ChainOp(Box::new(V2ChainOp::CreateRecord(
+        signed,
+        OpEntry::Present(::fixt::fixt!(Entry)),
+    )))
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -311,7 +316,7 @@ async fn test_publish() {
     hc2.test_set_full_arcs(space.clone()).await;
 
     let op = test_dht_op(holochain_types::prelude::Timestamp::now());
-    let op_hash = op.as_hash().clone();
+    let op_hash = op.to_hash();
 
     // TODO invoking process_incoming_ops is a hack,
     //      prefer calling a function on the mem store directly.
@@ -321,7 +326,7 @@ async fn test_publish() {
         .unwrap()
         .op_store()
         .process_incoming_ops(vec![bytes::Bytes::from(
-            holochain_serialized_bytes::encode(op.as_content()).unwrap(),
+            holochain_serialized_bytes::encode(&op).unwrap(),
         )])
         .await
         .unwrap();

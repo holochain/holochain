@@ -125,6 +125,116 @@ impl ChainOp {
             ChainOp::DeleteLink(sa) => ChainOpUniqueForm::DeleteLink(sa.data()),
         }
     }
+
+    /// The [`ChainOpType`] discriminant of this op.
+    pub fn op_type(&self) -> ChainOpType {
+        match self {
+            ChainOp::CreateRecord(..) => ChainOpType::StoreRecord,
+            ChainOp::CreateEntry(..) => ChainOpType::StoreEntry,
+            ChainOp::AgentActivity(..) => ChainOpType::RegisterAgentActivity,
+            ChainOp::UpdateEntry(..) => ChainOpType::RegisterUpdatedContent,
+            ChainOp::UpdateRecord(..) => ChainOpType::RegisterUpdatedRecord,
+            ChainOp::DeleteEntry(..) => ChainOpType::RegisterDeletedEntryAction,
+            ChainOp::DeleteRecord(..) => ChainOpType::RegisterDeletedBy,
+            ChainOp::CreateLink(..) => ChainOpType::RegisterAddLink,
+            ChainOp::DeleteLink(..) => ChainOpType::RegisterRemoveLink,
+        }
+    }
+
+    /// The signed action carried by this op.
+    pub fn signed_action(&self) -> &SignedAction {
+        match self {
+            ChainOp::CreateRecord(sa, _)
+            | ChainOp::CreateEntry(sa, _)
+            | ChainOp::UpdateEntry(sa, _)
+            | ChainOp::UpdateRecord(sa, _) => sa,
+            ChainOp::AgentActivity(sa)
+            | ChainOp::DeleteEntry(sa)
+            | ChainOp::DeleteRecord(sa)
+            | ChainOp::CreateLink(sa)
+            | ChainOp::DeleteLink(sa) => sa,
+        }
+    }
+
+    /// The op's entry payload, for the variants that carry one.
+    pub fn op_entry(&self) -> Option<&OpEntry> {
+        match self {
+            ChainOp::CreateRecord(_, e)
+            | ChainOp::CreateEntry(_, e)
+            | ChainOp::UpdateEntry(_, e)
+            | ChainOp::UpdateRecord(_, e) => Some(e),
+            ChainOp::AgentActivity(_)
+            | ChainOp::DeleteEntry(_)
+            | ChainOp::DeleteRecord(_)
+            | ChainOp::CreateLink(_)
+            | ChainOp::DeleteLink(_) => None,
+        }
+    }
+
+    /// The DHT basis where this op is stored.
+    pub fn dht_basis(&self) -> AnyLinkableHash {
+        let action = self.signed_action().data();
+        let action_hash = ActionHash::with_data_sync(action);
+        op_basis(self.op_type(), &action_hash, action)
+            .expect("op_basis is total over an op paired with its own action")
+    }
+}
+
+impl DhtOp {
+    /// The content-derived [`DhtOpHash`] for this op.
+    pub fn to_hash(&self) -> DhtOpHash {
+        match self {
+            DhtOp::ChainOp(op) => op.to_hash(),
+            // Warrant hashing is unchanged by the v2 flip; reuse the legacy
+            // `WarrantOp` wrapper, which carries the `DhtOp` hash type over the
+            // warrant content. The wrapped `SignedWarrant` is identical, so the
+            // hash matches the legacy form.
+            DhtOp::WarrantOp(op) => {
+                DhtOpHash::with_data_sync(&crate::warrant::WarrantOp::from(op.0.clone()))
+            }
+        }
+    }
+
+    /// The DHT basis where this op is stored.
+    pub fn dht_basis(&self) -> AnyLinkableHash {
+        match self {
+            DhtOp::ChainOp(op) => op.dht_basis(),
+            DhtOp::WarrantOp(op) => op.0.data().warrantee.clone().into(),
+        }
+    }
+}
+
+/// Reconstruct a legacy [`crate::dht_op::DhtOp`] from a v2 [`DhtOp`].
+///
+/// Used on the receive path while the legacy DHT table and
+/// `DhtStore::record_incoming_ops` still consume legacy ops: the gossip wire
+/// carries v2 ops, but ingest re-derives the legacy form here. The v2 action
+/// hash is preserved through [`to_legacy_signed_action`], so the reconstructed
+/// op re-hashes to the same content-derived v2 identity that the sender used.
+pub fn to_legacy_dht_op(op: &DhtOp) -> crate::dht_op::DhtOpResult<crate::dht_op::DhtOp> {
+    use crate::dht_op::{ChainOp as LegacyChainOp, DhtOp as LegacyDhtOp};
+    match op {
+        DhtOp::ChainOp(chain_op) => {
+            let signed = chain_op.signed_action();
+            // The from_content_sync hash is the canonical v2 hash, which
+            // to_legacy_signed_action then carries onto the legacy form.
+            let hashed = HoloHashed::from_content_sync(signed.data().clone());
+            let v2_sah = holochain_zome_types::record::SignedHashed::with_presigned(
+                hashed,
+                signed.signature().clone(),
+            );
+            let legacy_sah = to_legacy_signed_action(&v2_sah);
+            let entry = chain_op.op_entry().and_then(|e| match e {
+                OpEntry::Present(entry) => Some(entry.clone()),
+                OpEntry::Hidden | OpEntry::ActionOnly => None,
+            });
+            let legacy = LegacyChainOp::from_type(chain_op.op_type(), legacy_sah.into(), entry)?;
+            Ok(LegacyDhtOp::ChainOp(Box::new(legacy)))
+        }
+        DhtOp::WarrantOp(w) => Ok(LegacyDhtOp::WarrantOp(Box::new(
+            crate::warrant::WarrantOp::from(w.0.clone()),
+        ))),
+    }
 }
 
 impl ChainOpUniqueForm<'_> {
@@ -408,6 +518,21 @@ mod op_hash_tests {
         for (op, op_type) in cases {
             assert_eq!(op.to_hash(), ChainOpUniqueForm::op_hash(op_type, sa.data()));
         }
+    }
+
+    #[test]
+    fn dht_op_hash_and_basis_delegate_to_chain_op() {
+        let sa = signed(create_action(), 7);
+        let chain_op = ChainOp::CreateRecord(sa.clone(), OpEntry::ActionOnly);
+        let dht_op = DhtOp::ChainOp(Box::new(chain_op.clone()));
+
+        // DhtOp::to_hash agrees with ChainOp::to_hash.
+        assert_eq!(dht_op.to_hash(), chain_op.to_hash());
+
+        // StoreRecord basis is the action hash.
+        let action_hash = ActionHash::with_data_sync(sa.data());
+        assert_eq!(dht_op.dht_basis(), AnyLinkableHash::from(action_hash));
+        assert_eq!(dht_op.dht_basis(), chain_op.dht_basis());
     }
 
     #[test]

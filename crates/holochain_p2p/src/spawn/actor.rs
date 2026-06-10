@@ -94,7 +94,7 @@ impl event::HcP2pHandler for WrapEvtSender {
     fn handle_publish(
         &self,
         dna_hash: DnaHash,
-        ops: Vec<holochain_types::dht_op::DhtOp>,
+        ops: Vec<holochain_types::dht_v2::DhtOp>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         let op_count = ops.len();
         timing_trace!(
@@ -3032,7 +3032,7 @@ mod tests {
         fn handle_publish(
             &self,
             _dna_hash: DnaHash,
-            _ops: Vec<holochain_types::dht_op::DhtOp>,
+            _ops: Vec<holochain_types::dht_v2::DhtOp>,
         ) -> BoxFut<'_, HolochainP2pResult<()>> {
             // Increment counter
             let mut count = self.handle_publish_count.lock().unwrap();

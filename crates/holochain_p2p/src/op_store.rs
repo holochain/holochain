@@ -3,29 +3,28 @@
 //!
 //! All reads go through `DhtStore` methods; this module is responsible only
 //! for marshalling K2 types (`OpId`, `MetaOp`, `DhtArc`, `Timestamp`) into
-//! and out of the row shapes returned by the store. Wire bytes for chain
-//! ops are built by converting the stored v2 `SignedAction` back to the
-//! legacy form via `holochain_zome_types::dht_v2::to_legacy_signed_action`
-//! and encoding the resulting `DhtOp`. The wire stays the legacy `DhtOp`
-//! encoding so gossip interoperates with peers that have not moved to the
-//! v2 model; the v2 database is bridged to it here rather than changing the
-//! network format.
+//! and out of the row shapes returned by the store. The gossip wire carries
+//! the **v2** `holochain_types::dht_v2::DhtOp` encoding: chain-op wire bytes
+//! are built directly from the stored v2 `Action` rows, with no legacy
+//! reconstruction. Op hashes and `prev_action` chains are content-derived v2
+//! (see the 1c-iii action/op hash cutover).
 //!
-//! Op ids are always built from the hash and basis bytes already stored in
-//! the database, never by re-hashing a reconstructed op: the v2→legacy
-//! conversion is lossy, so a rehash could disagree with the stored id (and
-//! hashing every op on every read is needless work).
+//! On retrieve, op ids are built from the hash and basis bytes already stored
+//! in the database — cheaper than rehashing every op on every read, and the
+//! stored hash is the canonical v2 identity. On receive, the op id is the
+//! native v2 rehash (`DhtOp::to_hash` + `DhtOp::dht_basis`), which equals the
+//! sender's id because both sides hash the same v2 op. The incoming workflow
+//! still reconstructs the legacy op (`dht_v2::to_legacy_dht_op`) to feed the
+//! legacy DHT table and `DhtStore::record_incoming_ops` during the migration.
 
 use bytes::{Bytes, BytesMut};
 use futures::future::BoxFuture;
-use holo_hash::{DhtOpHash, DnaHash, HoloHashed, HOLO_HASH_CORE_LEN, HOLO_HASH_UNTYPED_LEN};
+use holo_hash::{DhtOpHash, DnaHash, HOLO_HASH_CORE_LEN, HOLO_HASH_UNTYPED_LEN};
 use holochain_serialized_bytes::prelude::{decode, encode};
 use holochain_state::dht_store::{K2ChainOpForWireRow, K2WarrantForWireRow};
 use holochain_state::DhtStore;
-use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
-use holochain_types::warrant::WarrantOp;
-use holochain_zome_types::dht_v2::{
-    to_legacy_signed_action, Action as ActionV2, ActionData, ActionHeader, SignedActionHashed,
+use holochain_types::dht_v2::{
+    Action as ActionV2, ActionData, ActionHeader, ChainOp, DhtOp, OpEntry, SignedAction, WarrantOp,
 };
 use holochain_zome_types::op::ChainOpType;
 use holochain_zome_types::warrant::{SignedWarrant, Warrant, WarrantProof};
@@ -133,8 +132,9 @@ impl OpStore for HolochainOpStore {
             for op_bytes in op_list {
                 let op = decode::<_, DhtOp>(&op_bytes)
                     .map_err(|e| K2Error::other_src("Could not decode op", e))?;
-                let op_hashed = DhtOpHashed::from_content_sync(op.clone());
-                ids.push(op_hashed.hash.to_located_k2_op_id(&op.dht_basis()));
+                // Native v2 rehash + basis; equals the sender's id since both
+                // sides hash the same v2 op.
+                ids.push(op.to_hash().to_located_k2_op_id(&op.dht_basis()));
                 dht_ops.push(op);
             }
 
@@ -208,13 +208,13 @@ impl OpStore for HolochainOpStore {
             let mut out = Vec::with_capacity(chain_rows.len() + warrant_rows.len());
 
             for row in chain_rows {
-                // The op id comes from the stored hash + basis, not a rehash
-                // of the reconstructed (lossy) legacy op.
+                // The op id comes from the stored hash + basis — both already
+                // the canonical v2 identity, so no rehash is needed on read.
                 let op_id = k2_op_id_from_raw(&row.op_hash, &row.basis_hash);
-                let op = match build_chain_dht_op(row) {
+                let op = match build_chain_dht_op_v2(row) {
                     Ok(op) => op,
                     Err(e) => {
-                        tracing::warn!("Failed to reconstruct chain op for wire: {e}");
+                        tracing::warn!("Failed to build v2 chain op for wire: {e}");
                         continue;
                     }
                 };
@@ -229,10 +229,10 @@ impl OpStore for HolochainOpStore {
             for row in warrant_rows {
                 // Warrant op id = (warrant hash, warrantee basis), both stored.
                 let op_id = k2_op_id_from_raw(&row.hash, &row.warrantee);
-                let op = match build_warrant_dht_op(row) {
+                let op = match build_warrant_dht_op_v2(row) {
                     Ok(op) => op,
                     Err(e) => {
-                        tracing::warn!("Failed to reconstruct warrant op for wire: {e}");
+                        tracing::warn!("Failed to build v2 warrant op for wire: {e}");
                         continue;
                     }
                 };
@@ -423,17 +423,19 @@ impl OpStore for HolochainOpStore {
     }
 }
 
-/// Reconstruct a legacy [`DhtOp::ChainOp`] from the joined row.
-fn build_chain_dht_op(row: K2ChainOpForWireRow) -> Result<DhtOp, String> {
+/// Build a v2 [`DhtOp::ChainOp`] directly from the joined row.
+///
+/// The row already stores the v2 `ActionData` + header fields, so the op is
+/// assembled natively with no legacy detour. The op id is taken from the
+/// stored hash/basis, so this builder does not re-hash.
+fn build_chain_dht_op_v2(row: K2ChainOpForWireRow) -> Result<DhtOp, String> {
     use holo_hash::{ActionHash, AgentPubKey};
 
-    let op_type_i: i64 = row.op_type;
-    let op_type: ChainOpType = ChainOpType::try_from(op_type_i)
+    let op_type: ChainOpType = ChainOpType::try_from(row.op_type)
         .map_err(|v| format!("invalid op_type {v} in ChainOp row"))?;
 
     let action_data: ActionData = holochain_serialized_bytes::decode(&row.action_data)
         .map_err(|e| format!("failed to decode ActionData: {e:?}"))?;
-    let action_hash = ActionHash::from_raw_36(row.action_hash);
     let prev_action = row.prev_hash.map(ActionHash::from_raw_36);
 
     let header = ActionHeader {
@@ -442,17 +444,12 @@ fn build_chain_dht_op(row: K2ChainOpForWireRow) -> Result<DhtOp, String> {
         action_seq: row.seq.max(0) as u32,
         prev_action,
     };
-    let v2_action = ActionV2 {
+    let action = ActionV2 {
         header,
         data: action_data,
     };
     let signature = decode_signature(&row.signature)?;
-
-    let sah: SignedActionHashed = holochain_zome_types::record::SignedHashed::with_presigned(
-        HoloHashed::with_pre_hashed(v2_action, action_hash),
-        signature,
-    );
-    let legacy_sah = to_legacy_signed_action(&sah);
+    let signed_action = SignedAction::new(action, signature);
 
     let entry = match row.entry_blob {
         Some(blob) => Some(
@@ -461,14 +458,34 @@ fn build_chain_dht_op(row: K2ChainOpForWireRow) -> Result<DhtOp, String> {
         ),
         None => None,
     };
+    // Only entry-bearing variants carry the entry payload. Map (action has an
+    // entry?, entry present?) onto OpEntry; the op hash is unaffected either way.
+    let op_entry = if signed_action.data().data.entry_hash().is_some() {
+        match entry {
+            Some(e) => OpEntry::Present(e),
+            None => OpEntry::Hidden,
+        }
+    } else {
+        OpEntry::ActionOnly
+    };
 
-    let chain_op = ChainOp::from_type(op_type, legacy_sah.into(), entry)
-        .map_err(|e| format!("failed to build legacy ChainOp: {e:?}"))?;
+    let chain_op = match op_type {
+        ChainOpType::StoreRecord => ChainOp::CreateRecord(signed_action, op_entry),
+        ChainOpType::StoreEntry => ChainOp::CreateEntry(signed_action, op_entry),
+        ChainOpType::RegisterAgentActivity => ChainOp::AgentActivity(signed_action),
+        ChainOpType::RegisterUpdatedContent => ChainOp::UpdateEntry(signed_action, op_entry),
+        ChainOpType::RegisterUpdatedRecord => ChainOp::UpdateRecord(signed_action, op_entry),
+        ChainOpType::RegisterDeletedBy => ChainOp::DeleteRecord(signed_action),
+        ChainOpType::RegisterDeletedEntryAction => ChainOp::DeleteEntry(signed_action),
+        ChainOpType::RegisterAddLink => ChainOp::CreateLink(signed_action),
+        ChainOpType::RegisterRemoveLink => ChainOp::DeleteLink(signed_action),
+    };
     Ok(DhtOp::ChainOp(Box::new(chain_op)))
 }
 
-/// Reconstruct a legacy [`DhtOp::WarrantOp`] from the warrant row.
-fn build_warrant_dht_op(row: K2WarrantForWireRow) -> Result<DhtOp, String> {
+/// Build a v2 [`DhtOp::WarrantOp`] from the warrant row. Warrant content is
+/// unchanged by the v2 flip, so this is a straight assembly.
+fn build_warrant_dht_op_v2(row: K2WarrantForWireRow) -> Result<DhtOp, String> {
     use holo_hash::AgentPubKey;
 
     let author = AgentPubKey::from_raw_36(row.author);
@@ -485,7 +502,7 @@ fn build_warrant_dht_op(row: K2WarrantForWireRow) -> Result<DhtOp, String> {
         timestamp,
     };
     let signed = SignedWarrant::new(warrant, signature);
-    Ok(DhtOp::WarrantOp(Box::new(WarrantOp::from(signed))))
+    Ok(DhtOp::WarrantOp(Box::new(WarrantOp(signed))))
 }
 
 fn decode_signature(bytes: &[u8]) -> Result<holochain_zome_types::signature::Signature, String> {
