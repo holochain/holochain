@@ -828,6 +828,17 @@ impl CascadeImpl {
             .await
     }
 
+    /// Return a `SyncScratch` for use in DhtStore overlay reads.
+    ///
+    /// When the cascade has a scratch attached, that scratch is returned.
+    /// Otherwise an empty scratch is returned so that the `*_with_scratch`
+    /// methods on `DhtStoreRead` can be called unconditionally.
+    fn local_scratch(&self) -> SyncScratch {
+        self.scratch
+            .clone()
+            .unwrap_or_else(|| Scratch::new().into_sync())
+    }
+
     /// Returns the [Record] for this [ActionHash] if it is live
     /// by getting the latest available metadata from authorities
     /// combined with this agents authored data.
@@ -838,12 +849,51 @@ impl CascadeImpl {
         action_hash: ActionHash,
         options: GetOptions,
     ) -> CascadeResult<Option<Record>> {
-        let query: GetLiveRecordQuery = self.construct_query_with_data_access(action_hash.clone());
-
         // DESIGN: we can short circuit if we have any local deletes on an action.
         // Is this bad because we will not go back to the network until our
         // cache is cleared. Could someone create an attack based on this fact?
 
+        if let Some(store) = self.dht_store.as_ref() {
+            let author = self.private_data.as_ref().map(|a| a.as_ref());
+            let scratch = self.local_scratch();
+            let read = store.as_read();
+
+            // Local read via DhtStore overlay.
+            if let Some(record) = read
+                .get_live_record_with_scratch(&action_hash, author, &scratch)
+                .await?
+            {
+                return Ok(Some(record));
+            }
+
+            if options.strategy() == GetStrategy::Network {
+                let authoring = self.am_i_authoring(&action_hash.clone().into())?;
+                let authority = self.am_i_an_authority(action_hash.clone().into()).await?;
+                if !(authoring || authority) {
+                    match self
+                        .fetch_record(action_hash.clone().into(), options.to_network_options())
+                        .await
+                    {
+                        Ok(_) => (),
+                        Err(CascadeError::NetworkError(
+                            e @ HolochainP2pError::NoPeersForLocation(_, _),
+                        )) => {
+                            tracing::debug!(?e, "No peers to fetch record from");
+                        }
+                        Err(e) => return Err(e),
+                    }
+                }
+                // Re-read after network fetch.
+                return Ok(read
+                    .get_live_record_with_scratch(&action_hash, author, &scratch)
+                    .await?);
+            }
+
+            return Ok(None);
+        }
+
+        // Legacy path (dht_store absent): keep unchanged until CR-3.
+        let query: GetLiveRecordQuery = self.construct_query_with_data_access(action_hash.clone());
         self.get_local_first_with_query(query, action_hash.into(), options)
             .await
     }
@@ -856,8 +906,47 @@ impl CascadeImpl {
         entry_hash: EntryHash,
         options: GetOptions,
     ) -> CascadeResult<Option<Record>> {
-        let query: GetLiveEntryQuery = self.construct_query_with_data_access(entry_hash.clone());
+        if let Some(store) = self.dht_store.as_ref() {
+            let author = self.private_data.as_ref().map(|a| a.as_ref());
+            let scratch = self.local_scratch();
+            let read = store.as_read();
 
+            // Local read via DhtStore overlay.
+            if let Some(record) = read
+                .get_live_entry_with_scratch(&entry_hash, author, &scratch)
+                .await?
+            {
+                return Ok(Some(record));
+            }
+
+            if options.strategy() == GetStrategy::Network {
+                let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
+                let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
+                if !(authoring || authority) {
+                    match self
+                        .fetch_record(entry_hash.clone().into(), options.to_network_options())
+                        .await
+                    {
+                        Ok(_) => (),
+                        Err(CascadeError::NetworkError(
+                            e @ HolochainP2pError::NoPeersForLocation(_, _),
+                        )) => {
+                            tracing::debug!(?e, "No peers to fetch record from");
+                        }
+                        Err(e) => return Err(e),
+                    }
+                }
+                // Re-read after network fetch.
+                return Ok(read
+                    .get_live_entry_with_scratch(&entry_hash, author, &scratch)
+                    .await?);
+            }
+
+            return Ok(None);
+        }
+
+        // Legacy path (dht_store absent): keep unchanged until CR-3.
+        let query: GetLiveEntryQuery = self.construct_query_with_data_access(entry_hash.clone());
         self.get_local_first_with_query(query, entry_hash.into(), options)
             .await
     }
@@ -1722,6 +1811,30 @@ impl Cascade for CascadeImpl {
         hash: EntryHash,
         options: NetworkRequestOptions,
     ) -> CascadeResult<Option<(EntryHashed, CascadeSource)>> {
+        if let Some(store) = self.dht_store.as_ref() {
+            let author = self.private_data.as_ref().map(|a| a.as_ref());
+            let scratch = self.local_scratch();
+            let read = store.as_read();
+
+            if let Some(entry) = read
+                .retrieve_entry_with_scratch(&hash, author, &scratch)
+                .await?
+            {
+                return Ok(Some((
+                    EntryHashed::from_content_sync(entry),
+                    CascadeSource::Local,
+                )));
+            }
+            self.fetch_record(hash.clone().into(), options).await?;
+
+            // Check if we have the data now after the network call.
+            let result = read
+                .retrieve_entry_with_scratch(&hash, author, &scratch)
+                .await?;
+            return Ok(result.map(|e| (EntryHashed::from_content_sync(e), CascadeSource::Network)));
+        }
+
+        // Legacy path (dht_store absent): keep unchanged until CR-3.
         let private_data = self.private_data.clone();
         let result = self
             .find_map({
@@ -1760,6 +1873,21 @@ impl Cascade for CascadeImpl {
         hash: ActionHash,
         options: NetworkRequestOptions,
     ) -> CascadeResult<Option<(SignedActionHashed, CascadeSource)>> {
+        if let Some(store) = self.dht_store.as_ref() {
+            let scratch = self.local_scratch();
+            let read = store.as_read();
+
+            if let Some(sah) = read.retrieve_action_with_scratch(&hash, &scratch).await? {
+                return Ok(Some((sah, CascadeSource::Local)));
+            }
+            self.fetch_record(hash.clone().into(), options).await?;
+
+            // Check if we have the data now after the network call.
+            let result = read.retrieve_action_with_scratch(&hash, &scratch).await?;
+            return Ok(result.map(|a| (a, CascadeSource::Network)));
+        }
+
+        // Legacy path (dht_store absent): keep unchanged until CR-3.
         let result = self
             .find_map({
                 let hash = hash.clone();
@@ -1787,6 +1915,35 @@ impl Cascade for CascadeImpl {
         hash: AnyDhtHash,
         options: NetworkRequestOptions,
     ) -> CascadeResult<Option<(Record, CascadeSource)>> {
+        if let Some(store) = self.dht_store.as_ref() {
+            // The DhtStore retrieve_record_with_scratch takes &ActionHash; dispatch on
+            // hash type.  In practice all callers pass an ActionHash, but the trait
+            // signature accepts AnyDhtHash so we must handle both.
+            if let holo_hash::AnyDhtHashPrimitive::Action(action_hash) =
+                hash.clone().into_primitive()
+            {
+                let author = self.private_data.as_ref().map(|a| a.as_ref());
+                let scratch = self.local_scratch();
+                let read = store.as_read();
+
+                if let Some(record) = read
+                    .retrieve_record_with_scratch(&action_hash, author, &scratch)
+                    .await?
+                {
+                    return Ok(Some((record, CascadeSource::Local)));
+                }
+                self.fetch_record(hash.clone(), options).await?;
+
+                // Check if we have the data now after the network call.
+                let result = read
+                    .retrieve_record_with_scratch(&action_hash, author, &scratch)
+                    .await?;
+                return Ok(result.map(|r| (r, CascadeSource::Network)));
+            }
+            // Fall through to legacy for EntryHash variant (see comment in legacy path).
+        }
+
+        // Legacy path (dht_store absent, or EntryHash variant): keep unchanged until CR-3.
         let result = self
             .find_map({
                 let hash = hash.clone();
@@ -1945,5 +2102,110 @@ mod rejected_warrant_invariant_tests {
             &rendered_record(ValidationStatus::Rejected),
             &[a_warrant()]
         ));
+    }
+}
+
+/// Tests that wiring `CascadeImpl` onto a `DhtStore` + scratch correctly exposes
+/// scratch-only content through the requester-read methods.
+#[cfg(all(test, feature = "test_utils"))]
+mod dht_store_scratch_overlay_tests {
+    use super::*;
+    use ::fixt::fixt;
+    use holo_hash::fixt::AgentPubKeyFixturator;
+    use holochain_zome_types::action::{Action, ActionHashed, ChainTopOrdering};
+
+    async fn empty_store() -> holochain_state::dht_store::DhtStore {
+        let dna_hash = holo_hash::DnaHash::from_raw_36(vec![42u8; 36]);
+        holochain_state::test_utils::test_dht_store(dna_hash).await
+    }
+
+    /// A `dht_get_action` call on a `CascadeImpl` built with a `DhtStore` plus a
+    /// scratch that holds an authored action must return that action without
+    /// reaching the network (the cascade has no network handle).
+    #[tokio::test]
+    async fn dht_get_action_reflects_scratch_action() {
+        let store = empty_store().await;
+
+        // Build a signed action with no associated entry (Dna action type).
+        let action = Action::Dna(fixt!(Dna));
+        let sah = SignedActionHashed::with_presigned(
+            ActionHashed::from_content_sync(action),
+            fixt!(Signature),
+        );
+        let action_hash = sah.as_hash().clone();
+
+        // Put the action into the scratch.
+        let mut scratch = Scratch::new();
+        scratch.add_action(sah.clone(), ChainTopOrdering::Relaxed);
+        let sync_scratch = scratch.into_sync();
+
+        // Construct a cascade with the DhtStore + scratch, but NO network.
+        let cascade = CascadeImpl::empty()
+            .with_dht_store(store)
+            .with_scratch(sync_scratch);
+
+        let result = cascade
+            .dht_get_action(action_hash.clone(), GetOptions::local())
+            .await
+            .expect("dht_get_action");
+
+        let record = result.expect("expected Some(Record) from scratch");
+        assert_eq!(
+            record.action_address(),
+            &action_hash,
+            "returned action hash must match the scratched action"
+        );
+    }
+
+    /// A `dht_get_entry` call on a `CascadeImpl` with a scratch holding a
+    /// `Create` action + entry returns that record without a network request.
+    #[tokio::test]
+    async fn dht_get_entry_reflects_scratch_create() {
+        use holochain_zome_types::action::{Create, EntryType};
+        use holochain_zome_types::entry::Entry;
+        use holochain_zome_types::prelude::EntryHashed;
+
+        let store = empty_store().await;
+
+        // Build an agent entry (simplest public entry type).
+        let agent = fixt!(AgentPubKey);
+        let entry = Entry::Agent(agent.clone());
+        let entry_hash = holo_hash::EntryHash::with_data_sync(&entry);
+
+        let create_action = Action::Create(Create {
+            author: agent.clone(),
+            timestamp: holochain_zome_types::prelude::Timestamp::from_micros(0),
+            action_seq: 1,
+            prev_action: holo_hash::ActionHash::from_raw_36(vec![0u8; 36]),
+            entry_type: EntryType::AgentPubKey,
+            entry_hash: entry_hash.clone(),
+            weight: Default::default(),
+        });
+        let sah = SignedActionHashed::with_presigned(
+            ActionHashed::from_content_sync(create_action),
+            fixt!(Signature),
+        );
+
+        let mut scratch = Scratch::new();
+        scratch.add_action(sah.clone(), ChainTopOrdering::Relaxed);
+        let entry_hashed = EntryHashed::from_content_sync(entry);
+        scratch.add_entry(entry_hashed, ChainTopOrdering::Relaxed);
+        let sync_scratch = scratch.into_sync();
+
+        let cascade = CascadeImpl::empty()
+            .with_dht_store(store)
+            .with_scratch(sync_scratch);
+
+        let result = cascade
+            .dht_get_entry(entry_hash.clone(), GetOptions::local())
+            .await
+            .expect("dht_get_entry");
+
+        let record = result.expect("expected Some(Record) for scratch entry");
+        assert_eq!(
+            record.action().entry_hash(),
+            Some(&entry_hash),
+            "returned record entry hash must match the scratched entry"
+        );
     }
 }
