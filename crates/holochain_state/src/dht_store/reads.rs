@@ -1282,6 +1282,175 @@ impl DhtStore<DbRead<Dht>> {
         })
     }
 
+    /// Store-and-scratch `must_get_agent_activity`: resolve `filter.chain_top`,
+    /// scan the bounded `RegisterAgentActivity` range from both the store and the
+    /// in-memory scratch, merge, exclude forked actions, apply timestamp/take
+    /// filters, and decide completeness.
+    ///
+    /// The scratch is consulted as a fallback for chain-top and until-hash
+    /// resolution (store first, then scratch), and its activity is merged into
+    /// the store-scanned range via [`merge_agent_activity`]. Warrants are
+    /// attached (from store + scratch) only when the response is `Complete`.
+    ///
+    /// Use this on the **requester** path only. Authority handlers must never
+    /// see scratch data — use [`must_get_agent_activity`](Self::must_get_agent_activity) there.
+    pub async fn must_get_agent_activity_with_scratch(
+        &self,
+        author: &holo_hash::AgentPubKey,
+        filter: &ChainFilter,
+        scratch: &SyncScratch,
+    ) -> StateQueryResult<MustGetAgentActivityResponse> {
+        use holochain_zome_types::dht_v2::to_legacy_signed_action;
+
+        // A take of zero is a degenerate filter.
+        if filter.get_take() == Some(0) {
+            return Err(crate::query::StateQueryError::InvalidInput(
+                "ChainFilter take must be greater than 0".to_string(),
+            ));
+        }
+
+        // Resolve the chain top: store first, scratch fallback.
+        let maybe_chain_top = self
+            .db()
+            .get_action_seq_and_timestamp(author.clone(), filter.chain_top.clone())
+            .await?;
+        let (chain_top_seq, chain_top_timestamp) = match maybe_chain_top {
+            Some(pair) => pair,
+            None => {
+                // Store miss — try the scratch.
+                let from_scratch =
+                    scratch.apply_and_then(|s| {
+                        Ok::<_, crate::query::StateQueryError>(
+                            action_seq_and_timestamp_from_scratch(s, author, &filter.chain_top),
+                        )
+                    })?;
+                match from_scratch {
+                    Some(pair) => pair,
+                    None => {
+                        return Ok(MustGetAgentActivityResponse::ChainTopNotFound(
+                            filter.chain_top.clone(),
+                        ));
+                    }
+                }
+            }
+        };
+
+        // An until_timestamp after the chain top is unsatisfiable.
+        if let Some(until_timestamp) = filter.get_until_timestamp() {
+            if until_timestamp > chain_top_timestamp {
+                return Ok(
+                    MustGetAgentActivityResponse::UntilTimestampGreaterThanChainHead(
+                        until_timestamp,
+                    ),
+                );
+            }
+        }
+
+        // Resolve the until_hash lower bound (store first, scratch fallback).
+        let mut resolved_until_seq = None;
+        if let Some(until_hash) = filter.get_until_hash() {
+            // Try the store.
+            resolved_until_seq = self
+                .db()
+                .get_action_seq_and_timestamp(author.clone(), until_hash.clone())
+                .await?
+                .map(|(seq, _)| seq);
+            // Fall back to scratch on a store miss.
+            if resolved_until_seq.is_none() {
+                resolved_until_seq = scratch.apply_and_then(|s| {
+                    Ok::<_, crate::query::StateQueryError>(
+                        action_seq_and_timestamp_from_scratch(s, author, until_hash)
+                            .map(|(seq, _)| seq),
+                    )
+                })?;
+            }
+            if let Some(until_seq) = resolved_until_seq {
+                if until_seq > chain_top_seq {
+                    return Ok(MustGetAgentActivityResponse::UntilHashAfterChainHead(
+                        until_hash.clone(),
+                    ));
+                }
+            }
+        }
+
+        // Scan the store bounded range.
+        let store_activity: Vec<RegisterAgentActivity> = self
+            .db()
+            .get_filtered_agent_activity(author.clone(), chain_top_seq, resolved_until_seq)
+            .await?
+            .into_iter()
+            .map(|v2| RegisterAgentActivity {
+                action: to_legacy_signed_action(&v2),
+                cached_entry: None,
+            })
+            .collect();
+
+        // Scan the scratch bounded range.
+        let scratch_activity: Vec<RegisterAgentActivity> = scratch.apply_and_then(|s| {
+            Ok::<_, crate::query::StateQueryError>(agent_activity_from_scratch(
+                s,
+                author,
+                chain_top_seq,
+                resolved_until_seq,
+            ))
+        })?;
+
+        // Merge and deduplicate store + scratch activity.
+        let mut activity = merge_agent_activity(vec![store_activity, scratch_activity]);
+
+        // Keep only the canonical chain reachable from the chain top.
+        exclude_forked_activity(&mut activity, &filter.chain_top);
+
+        // Apply the until_timestamp filter; the bool records whether the kept set
+        // has a deterministic lower-bound witness.
+        let canonical_chain_precedes_until_timestamp =
+            apply_timestamp_filter(&mut activity, filter.get_until_timestamp());
+
+        // Apply the take filter.
+        if let Some(take) = filter.get_take() {
+            activity.truncate(take as usize);
+        }
+
+        let completeness = check_agent_activity_completeness(
+            &activity,
+            filter,
+            canonical_chain_precedes_until_timestamp,
+        );
+
+        Ok(match completeness {
+            MustGetAgentActivityCompleteness::Complete => {
+                // Store warrants.
+                let store_warrant_ops: Vec<WarrantOp> = self
+                    .db()
+                    .get_warrants_by_warrantee(author.clone())
+                    .await?
+                    .into_iter()
+                    .map(warrant_row_to_signed_warrant)
+                    .collect::<StateQueryResult<Vec<_>>>()?
+                    .into_iter()
+                    .map(WarrantOp::from)
+                    .collect();
+                // Scratch warrants.
+                let scratch_warrant_ops: Vec<WarrantOp> = scratch.apply_and_then(|s| {
+                    Ok::<_, crate::query::StateQueryError>(warrants_for_agent_from_scratch(
+                        s, author,
+                    ))
+                })?;
+                let warrants = merge_warrants(vec![store_warrant_ops, scratch_warrant_ops]);
+                MustGetAgentActivityResponse::Activity { activity, warrants }
+            }
+            MustGetAgentActivityCompleteness::IncompleteChain => {
+                MustGetAgentActivityResponse::IncompleteChain
+            }
+            MustGetAgentActivityCompleteness::UntilHashMissing(hash) => {
+                MustGetAgentActivityResponse::UntilHashMissing(hash)
+            }
+            MustGetAgentActivityCompleteness::UntilTimestampIndeterminate(timestamp) => {
+                MustGetAgentActivityResponse::UntilTimestampIndeterminate(timestamp)
+            }
+        })
+    }
+
     /// Return chain ops that have passed system validation and are awaiting
     /// app validation. Warrants have no app-validation stage, so they are not
     /// included.
@@ -1922,9 +2091,6 @@ fn agent_activity_from_scratch(
 
 /// Look up the action sequence and timestamp for `action_hash` from the scratch,
 /// filtered to `author`. Returns `None` when the action is absent.
-// Not yet called in this module; will be used by the must_get_agent_activity_with_scratch
-// implementation in a follow-up task.
-#[allow(dead_code)]
 fn action_seq_and_timestamp_from_scratch(
     s: &crate::scratch::Scratch,
     author: &holo_hash::AgentPubKey,
@@ -3632,6 +3798,188 @@ mod tests {
             resp,
             MustGetAgentActivityResponse::IncompleteChain
         ));
+    }
+
+    // ---- must_get_agent_activity_with_scratch tests ----
+
+    /// Scratch-only chain top resolves correctly: the store has no such action
+    /// but the scratch does, so the response is not `ChainTopNotFound`.
+    #[tokio::test]
+    async fn must_get_agent_activity_with_scratch_chain_top_from_scratch() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let author = AgentPubKey::from_raw_36(vec![150u8; 36]);
+
+        // Build a 1-action chain and integrate seq 0 into the store.
+        let (ops, hashes) = make_activity_chain(&author, 1);
+        integrate_activity(&store, ops[0].clone(), AppOutcome::Accepted, 10).await;
+
+        // The scratch action at seq 1 is linked to hashes[0] (the store action).
+        // Its content-derived hash is what we use as chain_top.
+        let scratch_sah = make_scratch_create(&author, 1, &hashes[0], 150);
+        let scratch_chain_top = scratch_sah.as_hash().clone();
+        let mut scratch = crate::scratch::Scratch::new();
+        scratch.add_action(
+            scratch_sah,
+            holochain_zome_types::action::ChainTopOrdering::Relaxed,
+        );
+        let sync_scratch = scratch.into_sync();
+
+        // filter.chain_top == scratch_chain_top (scratch-only action hash).
+        let filter = ChainFilter::new(scratch_chain_top.clone());
+        let resp = store
+            .as_read()
+            .must_get_agent_activity_with_scratch(&author, &filter, &sync_scratch)
+            .await
+            .unwrap();
+
+        // The scratch resolved the chain top, so the result must not be
+        // ChainTopNotFound.
+        assert!(
+            !matches!(resp, MustGetAgentActivityResponse::ChainTopNotFound(_)),
+            "chain top should have been resolved from the scratch"
+        );
+    }
+
+    /// A scratch-authored action within the bounded range appears in the
+    /// merged activity of the response.
+    #[tokio::test]
+    async fn must_get_agent_activity_with_scratch_includes_scratch_activity() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let author = AgentPubKey::from_raw_36(vec![151u8; 36]);
+
+        // Build a 3-action chain (seqs 0..=2) in the store.
+        let (ops, hashes) = make_activity_chain(&author, 3);
+        for (i, op) in ops.into_iter().enumerate() {
+            integrate_activity(&store, op, AppOutcome::Accepted, 10 + i as i64).await;
+        }
+
+        // Scratch action at seq 3, linked to the store action at seq 2 (hashes[2]).
+        // The scratch action's content-derived hash becomes the chain_top for the filter.
+        let scratch_sah = make_scratch_create(&author, 3, &hashes[2], 151);
+        let scratch_hash = scratch_sah.as_hash().clone();
+        let mut scratch = crate::scratch::Scratch::new();
+        scratch.add_action(
+            scratch_sah,
+            holochain_zome_types::action::ChainTopOrdering::Relaxed,
+        );
+        let sync_scratch = scratch.into_sync();
+
+        // Use the scratch action's hash as chain_top so chain_top_seq == 3.
+        let filter = ChainFilter::new(scratch_hash.clone());
+        let resp = store
+            .as_read()
+            .must_get_agent_activity_with_scratch(&author, &filter, &sync_scratch)
+            .await
+            .unwrap();
+
+        match resp {
+            MustGetAgentActivityResponse::Activity { activity, .. } => {
+                let seqs: Vec<u32> = activity.iter().map(|a| a.action.seq()).collect();
+                assert!(
+                    seqs.contains(&3),
+                    "scratch action at seq 3 should be in merged activity; got {seqs:?}"
+                );
+                assert!(
+                    seqs.contains(&2),
+                    "store action at seq 2 should be in merged activity; got {seqs:?}"
+                );
+            }
+            other => panic!("expected Activity, got {other:?}"),
+        }
+    }
+
+    /// Store-only `must_get_agent_activity` ignores a populated scratch.
+    #[tokio::test]
+    async fn must_get_agent_activity_store_only_ignores_scratch() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let author = AgentPubKey::from_raw_36(vec![152u8; 36]);
+        let (ops, hashes) = make_activity_chain(&author, 3);
+        for (i, op) in ops.into_iter().enumerate() {
+            integrate_activity(&store, op, AppOutcome::Accepted, 10 + i as i64).await;
+        }
+
+        // Scratch action at seq 3 — must NOT appear in the store-only read.
+        let scratch_sah = make_scratch_create(&author, 3, &hashes[2], 152);
+        let mut scratch = crate::scratch::Scratch::new();
+        scratch.add_action(
+            scratch_sah,
+            holochain_zome_types::action::ChainTopOrdering::Relaxed,
+        );
+        // scratch intentionally not passed to the store-only call
+        let _ = scratch;
+
+        let filter = ChainFilter::new(hashes[2].clone());
+        let resp = store
+            .as_read()
+            .must_get_agent_activity(&author, &filter)
+            .await
+            .unwrap();
+
+        match resp {
+            MustGetAgentActivityResponse::Activity { activity, .. } => {
+                assert_eq!(
+                    activity.len(),
+                    3,
+                    "store-only read must not include scratch actions"
+                );
+                let seqs: Vec<u32> = activity.iter().map(|a| a.action.seq()).collect();
+                assert!(
+                    !seqs.contains(&3),
+                    "scratch action at seq 3 must not appear"
+                );
+            }
+            other => panic!("expected Activity, got {other:?}"),
+        }
+    }
+
+    /// take == 0 returns `InvalidInput` with a scratch present.
+    #[tokio::test]
+    async fn must_get_agent_activity_with_scratch_take_zero_errors() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let author = AgentPubKey::from_raw_36(vec![153u8; 36]);
+        let (ops, hashes) = make_activity_chain(&author, 1);
+        for (i, op) in ops.into_iter().enumerate() {
+            integrate_activity(&store, op, AppOutcome::Accepted, 10 + i as i64).await;
+        }
+        let filter = ChainFilter::take(hashes[0].clone(), 0);
+        let empty_scratch = crate::scratch::Scratch::new().into_sync();
+        let result = store
+            .as_read()
+            .must_get_agent_activity_with_scratch(&author, &filter, &empty_scratch)
+            .await;
+        assert!(result.is_err(), "take == 0 must return an error");
+    }
+
+    /// chain_top absent from both store and scratch → `ChainTopNotFound`.
+    #[tokio::test]
+    async fn must_get_agent_activity_with_scratch_chain_top_absent_in_both() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let author = AgentPubKey::from_raw_36(vec![154u8; 36]);
+        let unknown = ActionHash::from_raw_36(vec![99u8; 36]);
+        let empty_scratch = crate::scratch::Scratch::new().into_sync();
+        let resp = store
+            .as_read()
+            .must_get_agent_activity_with_scratch(
+                &author,
+                &ChainFilter::new(unknown.clone()),
+                &empty_scratch,
+            )
+            .await
+            .unwrap();
+        assert!(
+            matches!(resp, MustGetAgentActivityResponse::ChainTopNotFound(h) if h == unknown),
+            "chain top absent from both sources must yield ChainTopNotFound"
+        );
     }
 
     #[tokio::test]
