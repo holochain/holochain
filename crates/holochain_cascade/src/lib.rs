@@ -1359,6 +1359,50 @@ impl CascadeImpl {
             ));
         }
 
+        if let Some(store) = self.dht_store.as_ref() {
+            // DhtStore path: local read with scratch overlay.
+            let local_scratch = self.local_scratch();
+            let local_result = store
+                .as_read()
+                .must_get_agent_activity_with_scratch(&author, &filter, &local_scratch)
+                .await?;
+
+            // If complete, return immediately.
+            if matches!(local_result, MustGetAgentActivityResponse::Activity { .. }) {
+                return Ok(local_result);
+            }
+
+            // If no network or we are an authority, return the local (incomplete) result.
+            if self.network.is_none() || self.am_i_an_authority(author.clone().into()).await? {
+                return Ok(local_result);
+            }
+
+            // Not complete and not an authority: try the network.
+            // `fetch_must_get_agent_activity` writes the network response into the
+            // DhtStore cache via `add_activity_into_cache`; we then re-read so the
+            // freshly cached data is merged into the result.
+            match self
+                .fetch_must_get_agent_activity(author.clone(), filter.clone(), options)
+                .await
+            {
+                Ok(_) => {
+                    return Ok(store
+                        .as_read()
+                        .must_get_agent_activity_with_scratch(&author, &filter, &local_scratch)
+                        .await?);
+                }
+                Err(CascadeError::NetworkError(
+                    e @ HolochainP2pError::NoPeersForLocation(_, _),
+                )) => {
+                    tracing::debug!(?e, "No peers to fetch must_get_agent_activity from");
+                    return Ok(local_result);
+                }
+                Err(e) => return Err(e),
+            }
+        }
+
+        // Legacy path (dht_store absent): keep unchanged until CR-3.
+
         // Retrieve the `chain_top` action
         let maybe_chain_top_action_data = self
             .find_action_in_stores(&author, &filter.chain_top)
@@ -1575,7 +1619,23 @@ impl CascadeImpl {
                     )?
                 }
             }
+        } else if let (Some(store), GetStrategy::Local) =
+            (self.dht_store.as_ref(), options.get_options.strategy())
+        {
+            // Requester local read via DhtStore scratch overlay (no network needed).
+            let dht_options = holochain_state::dht_store::GetAgentActivityOptions {
+                include_valid_activity: options.include_valid_activity,
+                include_rejected_activity: options.include_rejected_activity,
+                include_warrants: options.include_warrants,
+                include_full_records: options.include_full_records,
+            };
+            let scratch = self.local_scratch();
+            store
+                .as_read()
+                .get_agent_activity_with_scratch(&agent, &query, &dht_options, &scratch)
+                .await?
         } else {
+            // Network path (or legacy without dht_store): fetch from peers and merge.
             let results = self
                 .fetch_agent_activity(agent.clone(), query.clone(), options.clone())
                 .await?;
@@ -2850,5 +2910,223 @@ mod dht_store_scratch_overlay_tests {
             count, 1,
             "store create is tombstoned by the scratch delete; only the scratch create counts"
         );
+    }
+
+    // ---- agent-activity helpers ----
+
+    /// Integrate a `RegisterAgentActivity` op for the given `action` into the
+    /// store so it is marked accepted and integrated.
+    async fn integrate_activity_op(
+        store: &holochain_state::dht_store::DhtStore,
+        action: Action,
+        seed: u8,
+        when: i64,
+    ) -> holo_hash::ActionHash {
+        use holochain_state::dht_store::{AppOutcome, SysOutcome};
+        use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
+
+        let action_hash = holo_hash::ActionHash::with_data_sync(&action);
+        let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(
+            ChainOp::RegisterAgentActivity(Signature::from([seed; 64]), action),
+        )));
+        let op_hash = op.as_hash().clone();
+        store.record_incoming_ops(vec![op]).await.unwrap();
+        store
+            .record_chain_op_sys_validation_outcomes(vec![(op_hash.clone(), SysOutcome::Accepted)])
+            .await
+            .unwrap();
+        store
+            .record_app_validation_outcomes(vec![(op_hash, AppOutcome::Accepted)])
+            .await
+            .unwrap();
+        store
+            .integrate_ready_ops(holochain_zome_types::prelude::Timestamp::from_micros(when))
+            .await
+            .unwrap();
+        action_hash
+    }
+
+    /// Build a `Create` action (no entry in store) for use as agent activity.
+    fn make_activity_create(
+        author: &AgentPubKey,
+        seq: u32,
+        prev: &holo_hash::ActionHash,
+        seed: u8,
+    ) -> Action {
+        use holochain_zome_types::action::{AppEntryDef, Create, EntryType};
+        use holochain_zome_types::entry_def::EntryVisibility;
+
+        Action::Create(Create {
+            author: author.clone(),
+            timestamp: holochain_zome_types::prelude::Timestamp::from_micros(
+                (seq as i64 + 1) * 1000,
+            ),
+            action_seq: seq,
+            prev_action: prev.clone(),
+            entry_type: EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
+            entry_hash: holo_hash::EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]),
+            weight: Default::default(),
+        })
+    }
+
+    /// Wrap an action as a `SignedActionHashed` for the scratch.
+    fn make_scratch_activity(action: Action, seed: u8) -> SignedActionHashed {
+        SignedActionHashed::with_presigned(
+            holochain_zome_types::action::ActionHashed::from_content_sync(action),
+            Signature::from([seed; 64]),
+        )
+    }
+
+    // ---- must_get_agent_activity tests ----
+
+    /// `must_get_agent_activity` via the cascade respects a scratch chain-top:
+    /// the chain top is in the scratch (not the store), so the response should
+    /// not be `ChainTopNotFound`.
+    #[tokio::test]
+    async fn must_get_agent_activity_reflects_scratch_chain_top() {
+        let store = empty_store().await;
+        let author = AgentPubKey::from_raw_36(vec![200u8; 36]);
+
+        // Seq 0 in the store.
+        let prev0 = holo_hash::ActionHash::from_raw_36(vec![0u8; 36]);
+        let action0 = make_activity_create(&author, 0, &prev0, 200);
+        let hash0 = integrate_activity_op(&store, action0, 200, 10).await;
+
+        // Seq 1 (scratch-only): linked from hash0.
+        let action1 = make_activity_create(&author, 1, &hash0, 201);
+        let scratch_top_hash = holo_hash::ActionHash::with_data_sync(&action1);
+        let sah1 = make_scratch_activity(action1, 201);
+
+        let mut scratch = Scratch::new();
+        scratch.add_action(sah1, ChainTopOrdering::Relaxed);
+        let sync_scratch = scratch.into_sync();
+
+        let cascade = CascadeImpl::empty()
+            .with_dht_store(store)
+            .with_scratch(sync_scratch);
+
+        let filter = ChainFilter::new(scratch_top_hash.clone());
+        let resp = cascade
+            .must_get_agent_activity(author, filter, NetworkRequestOptions::default())
+            .await
+            .expect("must_get_agent_activity");
+
+        assert!(
+            !matches!(resp, MustGetAgentActivityResponse::ChainTopNotFound(_)),
+            "scratch chain-top should have been resolved; got {resp:?}"
+        );
+    }
+
+    /// `must_get_agent_activity` via the cascade includes scratch activity in
+    /// the merged result when the full chain is present (store + scratch).
+    #[tokio::test]
+    async fn must_get_agent_activity_reflects_scratch_activity() {
+        let store = empty_store().await;
+        let author = AgentPubKey::from_raw_36(vec![202u8; 36]);
+
+        // Seqs 0..=1 in the store.
+        let prev0 = holo_hash::ActionHash::from_raw_36(vec![0u8; 36]);
+        let action0 = make_activity_create(&author, 0, &prev0, 202);
+        let hash0 = integrate_activity_op(&store, action0, 202, 10).await;
+        let action1 = make_activity_create(&author, 1, &hash0, 203);
+        let hash1 = integrate_activity_op(&store, action1, 203, 11).await;
+
+        // Seq 2 scratch-only, linked from hash1.
+        let action2 = make_activity_create(&author, 2, &hash1, 204);
+        let scratch_top_hash = holo_hash::ActionHash::with_data_sync(&action2);
+        let sah2 = make_scratch_activity(action2, 204);
+
+        let mut scratch = Scratch::new();
+        scratch.add_action(sah2, ChainTopOrdering::Relaxed);
+        let sync_scratch = scratch.into_sync();
+
+        let cascade = CascadeImpl::empty()
+            .with_dht_store(store)
+            .with_scratch(sync_scratch);
+
+        let filter = ChainFilter::new(scratch_top_hash.clone());
+        let resp = cascade
+            .must_get_agent_activity(author, filter, NetworkRequestOptions::default())
+            .await
+            .expect("must_get_agent_activity");
+
+        match resp {
+            MustGetAgentActivityResponse::Activity { activity, .. } => {
+                let seqs: Vec<u32> = activity.iter().map(|a| a.action.seq()).collect();
+                assert!(
+                    seqs.contains(&2),
+                    "scratch action at seq 2 should be present; got {seqs:?}"
+                );
+                assert!(
+                    seqs.contains(&0),
+                    "store action at seq 0 should be present; got {seqs:?}"
+                );
+            }
+            other => panic!("expected Activity, got {other:?}"),
+        }
+    }
+
+    // ---- get_agent_activity tests ----
+
+    /// `get_agent_activity` via the cascade (requester, Local strategy) returns
+    /// scratch activity merged with the store.
+    #[tokio::test]
+    async fn get_agent_activity_reflects_scratch_activity() {
+        let store = empty_store().await;
+        let author = AgentPubKey::from_raw_36(vec![210u8; 36]);
+
+        // Seq 0 in the store.
+        let prev0 = holo_hash::ActionHash::from_raw_36(vec![0u8; 36]);
+        let action0 = make_activity_create(&author, 0, &prev0, 210);
+        integrate_activity_op(&store, action0, 210, 10).await;
+
+        // Seq 1 scratch-only.
+        let action1 = make_activity_create(
+            &author,
+            1,
+            &holo_hash::ActionHash::from_raw_36(vec![211u8; 36]),
+            211,
+        );
+        let sah1 = make_scratch_activity(action1, 211);
+
+        let mut scratch = Scratch::new();
+        scratch.add_action(sah1, ChainTopOrdering::Relaxed);
+        let sync_scratch = scratch.into_sync();
+
+        let cascade = CascadeImpl::empty()
+            .with_dht_store(store)
+            .with_scratch(sync_scratch);
+
+        let options = GetActivityOptions {
+            include_valid_activity: true,
+            include_rejected_activity: false,
+            include_warrants: false,
+            include_full_records: false,
+            get_options: GetOptions::local(),
+            ..Default::default()
+        };
+        let resp = cascade
+            .get_agent_activity(author, ChainQueryFilter::new(), options)
+            .await
+            .expect("get_agent_activity");
+
+        match &resp.valid_activity {
+            ChainItems::Hashes(h) => {
+                let seqs: Vec<u32> = h.iter().map(|(seq, _)| *seq).collect();
+                assert!(
+                    seqs.contains(&0),
+                    "store action at seq 0 should be in valid activity; got {seqs:?}"
+                );
+                assert!(
+                    seqs.contains(&1),
+                    "scratch action at seq 1 should be in valid activity; got {seqs:?}"
+                );
+            }
+            other => panic!("expected ChainItems::Hashes, got {other:?}"),
+        }
     }
 }
