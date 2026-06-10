@@ -114,38 +114,24 @@ ordering.
 
 ## The chain switch flow
 
-```text
-OLD DNA (old DHT)                          NEW DNA (new DHT)
------------------                          -----------------
-author summary record
-   |
-   v
-gather signatures over the summary
-from chosen signer agents, out of band
-(e.g. remote signals)
-   |
-   v
-commit CloseChain(new_target = Dna(new_dna_hash))   [last action on old chain]
-   |
-   |   agent holds: summary + signatures + close_hash
-   v
-install new app with `init_properties`  ----------->  conductor persists
-(opaque bytes: summary, signatures,                   init_properties in the
- close_hash, ...)                                     conductor DB (not the DHT)
-                                                          |
-                                                          v
-                                              init() runs:
-                                                - reads init_properties
-                                                - open_chain(prev = Dna(old),
-                                                    close_hash)
-                                                - seeds new chain from the
-                                                  summary
-                                                          |
-                                                          v
-                                              app validation on the new DHT:
-                                                trusts the summary's signatures
-                                                iff signed by keys listed in the
-                                                new DNA's properties
+```mermaid
+flowchart TB
+    subgraph OLD["OLD DNA (old DHT)"]
+        A["Author summary record"]
+        B["Gather signatures over the summary<br/>from chosen signer agents, out of band<br/>(e.g. remote signals)"]
+        C["Commit CloseChain(new_target = Dna(new_dna_hash))<br/><i>last action on old chain</i>"]
+        A --> B --> C
+    end
+
+    C -->|"agent holds: summary + signatures + close_hash"| D
+
+    subgraph NEW["NEW DNA (new DHT)"]
+        D["Install new app with init_properties<br/>(opaque bytes: summary, signatures, close_hash, ...)"]
+        E["Conductor persists init_properties<br/>in the conductor DB (not the DHT)"]
+        F["init() runs:<br/>read init_properties<br/>open_chain(prev = Dna(old), close_hash)<br/>seed new chain from the summary"]
+        G["App validation on the new DHT:<br/>trust the summary's signatures iff signed<br/>by keys listed in the new DNA's properties"]
+        D --> E --> F --> G
+    end
 ```
 
 The design adds four things on top of the open/closed-chain machinery:
@@ -171,18 +157,26 @@ Producing the summary is an application responsibility.
   signatures over the summary bytes from a set of chosen signer agents. This
   **must be done out of band by the app** — for example via remote signals or
   another app-defined request/response mechanism.
-
-  Signature gathering cannot be driven through the validation framework: the set
-  of validation authorities asked to act on any given piece of data is bounded,
-  so the agents whose keys the new network trusts may never be asked, and may
-  not respond. Treating signature collection as an explicit app-level protocol
-  avoids depending on validator selection.
+  - Signature gathering cannot be driven through the validation framework: the
+    set of validation authorities asked to act on any given piece of data is
+    bounded, so the agents whose keys the new network trusts may never be asked,
+    and may not respond. Treating signature collection as an explicit app-level
+    protocol avoids depending on validator selection.
 - The agent commits `close_chain(Some(MigrationTarget::Dna(new_dna_hash)))`,
   which yields the `close_hash` the new chain will need.
 
 The agent then locally holds everything required to seed the new DNA: the
-summary, the signatures, and the `close_hash`. None of the subsequent steps
-require the old network to be reachable.
+summary, the signatures, and the `close_hash`. Holding this material locally
+means seeding the new DNA does not *depend* on the old network being reachable.
+
+Once `CloseChain` is committed the old chain cannot be extended, so the closing
+summary is the only carried record of the old chain's state. Making summary
+production robust is therefore an application responsibility. The app should
+either keep the summary reconstructible from what it commits — for example, by
+gathering signatures before committing the summary so the committed record is
+self-contained — or persist the migration data before closing the chain so it
+can retry producing the summary if something fails partway. Holochain does not
+provide a way to re-derive this material from a chain that is already closed.
 
 ### 2. The `init_properties` install parameter
 
@@ -254,18 +248,29 @@ absent afterwards. Restricting to `init` makes the single point of use explicit.
 
 During `init` the app reads the properties, decodes them, commits `open_chain`
 with the carried `close_hash`, and seeds the new chain by authoring records
-derived from the summary. All of this is local; the old cell need not be
+derived from the summary. This path is fully local: the old cell need not be
 installed or running and the old network need not be reachable.
+
+`init` is not restricted to local data, however. It may make network calls, so
+an app can also seed the new chain from content authored by other agents,
+including content on the previous network. Because the agent key does not change
+across a chain switch, content carrying a valid signature made by the agent's
+own key on a previous network can always be trusted — even where another agent
+copied it across and re-authored it. The conductor-held `init_properties` are
+therefore one source of seed material, not the only one.
 
 ### 5. Validating carried content on the new DNA
 
 The new DNA must be able to decide whether to trust the carried summary, since
 the summary was constructed and signed on the old network — a network the new
-DNA's validators are not part of.
+DNA's validators are not part of. How an app establishes that trust is left to
+the app. What follows is one workable approach, which the implementation intends
+to exercise with integration tests; it is not the only one, and it is not
+privileged by the design.
 
-The new DNA lists the public keys whose signatures it trusts in its DNA
-properties (readable in validation via `dna_info()`). These are the keys of the
-signer agents the app asked to sign migration summaries.
+In this approach the new DNA lists the public keys whose signatures it trusts in
+its DNA properties (readable in validation via `dna_info()`). These are the keys
+of the signer agents the app asked to sign migration summaries.
 
 When an agent authors records derived from a carried summary, the integrity
 zome's `validate` callback:
@@ -279,9 +284,7 @@ zome's `validate` callback:
 Trust is thus baked into the DNA hash: every agent on the new network agrees, by
 running the same DNA, on which keys are authoritative for migration summaries.
 
-This is a **convention, not the only option** — an application could establish
-trust in carried content by other means. Two constraints follow from this
-particular convention:
+Two constraints follow from this particular approach:
 
 - The records are trusted because the listed signers vouched for the summary,
   not because the new network re-derived it from the old DHT (which it cannot
