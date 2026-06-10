@@ -1028,6 +1028,145 @@ impl DhtStore<DbRead<Dht>> {
         }
     }
 
+    /// Agent activity for `author`, overlaid with the in-memory scratch.
+    ///
+    /// Extends [`get_agent_activity`](Self::get_agent_activity) with scratch-authored
+    /// actions and warrants:
+    ///
+    /// - **Scratch activity**: every action in the scratch authored by `author` is
+    ///   treated as valid (no rejection can exist for uncommitted actions) and merged
+    ///   into the valid set. Scratch activity extends `highest_observed` and shifts
+    ///   the chain status accordingly.
+    /// - **Scratch warrants**: warrants in the scratch targeting `author` are merged
+    ///   into the warrant list when `options.include_warrants` is true.
+    ///
+    /// The store-only rejected list is passed through unchanged — the scratch holds
+    /// no rejected activity.
+    ///
+    /// Use this on the **requester** path only. Authority handlers must never see
+    /// scratch data — use [`get_agent_activity`](Self::get_agent_activity) there.
+    pub async fn get_agent_activity_with_scratch(
+        &self,
+        author: &holo_hash::AgentPubKey,
+        filter: &ChainQueryFilter,
+        options: &crate::dht_store::GetAgentActivityOptions,
+        scratch: &SyncScratch,
+    ) -> StateQueryResult<AgentActivityResponse> {
+        use holochain_zome_types::dht_v2::to_legacy_signed_action;
+        use holochain_zome_types::record::Record;
+
+        let items = self
+            .db()
+            .get_agent_activity(author.clone(), options.include_full_records)
+            .await?;
+
+        // Collect store warrants (gated by option).
+        let store_warrants: Vec<holochain_zome_types::prelude::SignedWarrant> =
+            if options.include_warrants {
+                self.db()
+                    .get_warrants_by_warrantee(author.clone())
+                    .await?
+                    .into_iter()
+                    .map(warrant_row_to_signed_warrant)
+                    .collect::<StateQueryResult<Vec<_>>>()?
+            } else {
+                Vec::new()
+            };
+
+        // Collect scratch activity + warrants in one lock.
+        let (scratch_valid, scratch_warrant_ops) = scratch.apply_and_then(
+            |s| -> StateQueryResult<(
+                Vec<RegisterAgentActivity>,
+                Vec<holochain_types::warrant::WarrantOp>,
+            )> {
+                let activity = agent_activity_from_scratch(s, author, u32::MAX, None);
+                let warrants = if options.include_warrants {
+                    warrants_for_agent_from_scratch(s, author)
+                } else {
+                    Vec::new()
+                };
+                Ok((activity, warrants))
+            },
+        )?;
+
+        // Convert store warrants to WarrantOps and merge with scratch warrants.
+        let store_warrant_ops: Vec<holochain_types::warrant::WarrantOp> = store_warrants
+            .into_iter()
+            .map(holochain_types::warrant::WarrantOp::from)
+            .collect();
+        let merged_warrant_ops = merge_warrants(vec![store_warrant_ops, scratch_warrant_ops]);
+        // Convert back to SignedWarrant for AgentActivityResponse (WarrantOp derefs to it).
+        let warrants: Vec<holochain_zome_types::prelude::SignedWarrant> = merged_warrant_ops
+            .into_iter()
+            .map(|op| (*op).clone())
+            .collect();
+
+        if options.include_full_records {
+            let mut store_valid_activity = Vec::new();
+            let mut rejected = Vec::new();
+            for item in items {
+                let action = to_legacy_signed_action(&item.action);
+                let ra = RegisterAgentActivity {
+                    action,
+                    cached_entry: None,
+                };
+                match item.validation_status {
+                    RecordValidity::Accepted => store_valid_activity.push(ra),
+                    RecordValidity::Rejected => {
+                        // For the rejected list we need Records, not activity.
+                        let record = Record::new(to_legacy_signed_action(&item.action), item.entry);
+                        rejected.push(record);
+                    }
+                }
+            }
+            // Merge store and scratch valid activity, dedup by action hash.
+            let merged_activity = merge_agent_activity(vec![store_valid_activity, scratch_valid]);
+            // Convert merged activity to Records for build_agent_activity_response.
+            let merged_valid: Vec<Record> = merged_activity
+                .into_iter()
+                .map(|a| Record::new(a.action, None))
+                .collect();
+            Ok(build_agent_activity_response(
+                author.clone(),
+                merged_valid,
+                rejected,
+                warrants,
+                filter,
+                options,
+            ))
+        } else {
+            let mut store_valid_activity = Vec::new();
+            let mut rejected_hashed = Vec::new();
+            for item in items {
+                let action_hashed = to_legacy_signed_action(&item.action).hashed;
+                match item.validation_status {
+                    RecordValidity::Accepted => {
+                        store_valid_activity.push(RegisterAgentActivity {
+                            action: to_legacy_signed_action(&item.action),
+                            cached_entry: None,
+                        });
+                    }
+                    RecordValidity::Rejected => rejected_hashed.push(action_hashed),
+                }
+            }
+            // Merge store and scratch valid activity, dedup by action hash.
+            let merged_activity = merge_agent_activity(vec![store_valid_activity, scratch_valid]);
+            // Convert to ActionHashed for build_agent_activity_response.
+            let merged_valid: Vec<holochain_zome_types::action::ActionHashed> = merged_activity
+                .into_iter()
+                .map(|a| a.action.hashed)
+                .collect();
+            Ok(build_agent_activity_response(
+                author.clone(),
+                merged_valid,
+                rejected_hashed,
+                warrants,
+                filter,
+                options,
+            ))
+        }
+    }
+
     /// Store-only `must_get_agent_activity`: resolve `filter.chain_top`, scan the
     /// bounded `RegisterAgentActivity` range, exclude forked actions, apply the
     /// timestamp/take filters, and decide completeness. Returns legacy types.
@@ -1742,6 +1881,119 @@ fn scratch_delete_links_by_create(
         }
         Ok::<_, crate::query::StateQueryError>(map)
     })
+}
+
+// ---- scratch helpers for agent activity ----
+
+/// Collect all actions authored by `author` from the scratch, optionally
+/// bounded by `chain_top_seq` (inclusive upper bound) and `until_seq`
+/// (inclusive lower bound). Used inside a single `apply_and_then` closure so
+/// the `SyncScratch` mutex is held for only one lock.
+fn agent_activity_from_scratch(
+    s: &crate::scratch::Scratch,
+    author: &holo_hash::AgentPubKey,
+    chain_top_seq: u32,
+    until_seq: Option<u32>,
+) -> Vec<RegisterAgentActivity> {
+    s.actions()
+        .filter(|sah| {
+            let action = sah.action();
+            if action.author() != author {
+                return false;
+            }
+            let seq = action.action_seq();
+            if seq > chain_top_seq {
+                return false;
+            }
+            if let Some(until) = until_seq {
+                if seq < until {
+                    return false;
+                }
+            }
+            true
+        })
+        .map(|sah| RegisterAgentActivity {
+            action: sah.clone(),
+            // Entries are not cached in scratch activity (mirrors cascade TODO).
+            cached_entry: None,
+        })
+        .collect()
+}
+
+/// Look up the action sequence and timestamp for `action_hash` from the scratch,
+/// filtered to `author`. Returns `None` when the action is absent.
+// Not yet called in this module; will be used by the must_get_agent_activity_with_scratch
+// implementation in a follow-up task.
+#[allow(dead_code)]
+fn action_seq_and_timestamp_from_scratch(
+    s: &crate::scratch::Scratch,
+    author: &holo_hash::AgentPubKey,
+    action_hash: &holo_hash::ActionHash,
+) -> Option<(u32, holochain_types::prelude::Timestamp)> {
+    s.actions()
+        .find(|sah| sah.action().author() == author && &sah.hashed.hash == action_hash)
+        .map(|sah| (sah.action().action_seq(), sah.action().timestamp()))
+}
+
+/// Collect all scratch warrants whose subject (`InvalidChainOp.action_author` or
+/// `ChainFork.chain_author`) matches `agent`.
+fn warrants_for_agent_from_scratch(
+    s: &crate::scratch::Scratch,
+    agent: &holo_hash::AgentPubKey,
+) -> Vec<holochain_types::warrant::WarrantOp> {
+    use holochain_zome_types::warrant::{ChainIntegrityWarrant, WarrantProof};
+    s.warrants()
+        .filter(|sw| {
+            let WarrantProof::ChainIntegrity(ref w) = sw.proof;
+            match w {
+                ChainIntegrityWarrant::InvalidChainOp {
+                    ref action_author, ..
+                } => action_author == agent,
+                ChainIntegrityWarrant::ChainFork {
+                    ref chain_author, ..
+                } => chain_author == agent,
+            }
+        })
+        .map(|sw| holochain_types::warrant::WarrantOp::from(sw.clone()))
+        .collect()
+}
+
+/// Flatten, sort and deduplicate `RegisterAgentActivity` lists.
+///
+/// Sort key: `(Reverse(seq), Reverse(hash))` — newest action first, then by
+/// hash descending for stability.
+fn merge_agent_activity(lists: Vec<Vec<RegisterAgentActivity>>) -> Vec<RegisterAgentActivity> {
+    use std::cmp::Reverse;
+    let total: usize = lists.iter().map(|l| l.len()).sum();
+    let mut merged = Vec::with_capacity(total);
+    for list in lists {
+        merged.extend(list);
+    }
+    merged.sort_unstable_by_key(|a| {
+        (
+            Reverse(a.action.seq()),
+            Reverse(a.action.hashed.hash.clone()),
+        )
+    });
+    merged.dedup_by_key(|a| a.action.hashed.hash.clone());
+    merged
+}
+
+/// Flatten, sort and deduplicate `WarrantOp` lists.
+///
+/// Sort key: `to_hash()` — stable ordering by op hash.
+fn merge_warrants(
+    lists: Vec<Vec<holochain_types::warrant::WarrantOp>>,
+) -> Vec<holochain_types::warrant::WarrantOp> {
+    use holo_hash::HashableContentExtSync;
+    let total: usize = lists.iter().map(|l| l.len()).sum();
+    let mut merged = Vec::with_capacity(total);
+    for list in lists {
+        merged.extend(list);
+    }
+    merged.sort_unstable_by_key(|w| w.to_hash());
+    merged.dedup_by_key(|w| w.to_hash());
+    merged
 }
 
 /// Reconstruct a [`DhtOpHashed`] (`ChainOp` variant) from a
@@ -2874,6 +3126,298 @@ mod tests {
             .unwrap();
         assert!(resp.warrants.is_empty());
         assert!(matches!(resp.valid_activity, ChainItems::NotRequested));
+    }
+
+    // ---- get_agent_activity_with_scratch tests ----
+
+    /// Build a scratch `SignedActionHashed` (legacy) for a `Create` by `author`
+    /// at the given `action_seq`, linked from `prev`.
+    fn make_scratch_create(
+        author: &AgentPubKey,
+        seq: u32,
+        prev: &ActionHash,
+        seed: u8,
+    ) -> holochain_zome_types::record::SignedActionHashed {
+        let action = Action::Create(Create {
+            author: author.clone(),
+            timestamp: Timestamp::from_micros(seed as i64 * 10_000),
+            action_seq: seq,
+            prev_action: prev.clone(),
+            entry_type: EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
+            entry_hash: EntryHash::from_raw_36(vec![seed.wrapping_add(200); 36]),
+            weight: Default::default(),
+        });
+        let action_hashed = holochain_zome_types::action::ActionHashed::from_content_sync(action);
+        holochain_zome_types::record::SignedActionHashed::with_presigned(
+            action_hashed,
+            Signature::from([seed; 64]),
+        )
+    }
+
+    /// Build a scratch `SignedWarrant` whose `InvalidChainOp.action_author` == `warrantee`.
+    fn make_scratch_warrant_for(
+        warrantee: &AgentPubKey,
+        seed: u8,
+    ) -> holochain_zome_types::prelude::SignedWarrant {
+        use holochain_zome_types::op::ChainOpType;
+        use holochain_zome_types::prelude::{
+            ChainIntegrityWarrant, SignedWarrant, Warrant, WarrantProof,
+        };
+        let action_author = warrantee.clone();
+        let action_hash = ActionHash::from_raw_36(vec![seed.wrapping_add(150); 36]);
+        SignedWarrant::new(
+            Warrant::new(
+                WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+                    action_author,
+                    action: (action_hash, Signature::from([seed; 64])),
+                    chain_op_type: ChainOpType::StoreRecord,
+                    reason: "scratch warrant".into(),
+                }),
+                AgentPubKey::from_raw_36(vec![seed.wrapping_add(50); 36]),
+                Timestamp::from_micros(seed as i64 * 5_000),
+                warrantee.clone(),
+            ),
+            Signature::from([seed.wrapping_add(1); 64]),
+        )
+    }
+
+    /// A scratch action for `author` appears in the valid activity list of
+    /// `get_agent_activity_with_scratch` and shifts `highest_observed`.
+    #[tokio::test]
+    async fn get_agent_activity_with_scratch_includes_scratch_action() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let author = AgentPubKey::from_raw_36(vec![110u8; 36]);
+        let prev_hash = ActionHash::from_raw_36(vec![0u8; 36]);
+
+        // One integrated action at seq 0.
+        integrate_activity(
+            &store,
+            make_fork_op(&author, &prev_hash, 0, 1),
+            AppOutcome::Accepted,
+            10,
+        )
+        .await;
+
+        // Scratch action at seq 1 (linked from some hash — only seq matters here).
+        let scratch_prev = ActionHash::from_raw_36(vec![111u8; 36]);
+        let scratch_sah = make_scratch_create(&author, 1, &scratch_prev, 111);
+        let mut scratch = crate::scratch::Scratch::new();
+        scratch.add_action(
+            scratch_sah,
+            holochain_zome_types::action::ChainTopOrdering::Relaxed,
+        );
+        let sync_scratch = scratch.into_sync();
+
+        let opts = GetAgentActivityOptions {
+            include_valid_activity: true,
+            include_rejected_activity: false,
+            include_warrants: false,
+            include_full_records: false,
+        };
+        let resp = store
+            .as_read()
+            .get_agent_activity_with_scratch(
+                &author,
+                &ChainQueryFilter::new(),
+                &opts,
+                &sync_scratch,
+            )
+            .await
+            .unwrap();
+
+        // Both seq 0 (store) and seq 1 (scratch) should be valid.
+        match &resp.valid_activity {
+            ChainItems::Hashes(h) => {
+                assert_eq!(h.len(), 2, "expected both store and scratch action");
+                let seqs: Vec<u32> = h.iter().map(|(seq, _)| *seq).collect();
+                assert!(seqs.contains(&0), "seq 0 (store) should be present");
+                assert!(seqs.contains(&1), "seq 1 (scratch) should be present");
+            }
+            other => panic!("expected Hashes, got {other:?}"),
+        }
+        // highest_observed should reflect seq 1 from the scratch.
+        let ho = resp
+            .highest_observed
+            .expect("highest_observed should be set");
+        assert_eq!(
+            ho.action_seq, 1,
+            "highest_observed should include scratch action"
+        );
+    }
+
+    /// A scratch action for `author` appears in the full-records list.
+    #[tokio::test]
+    async fn get_agent_activity_with_scratch_full_records_includes_scratch_action() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let author = AgentPubKey::from_raw_36(vec![112u8; 36]);
+        let prev_hash = ActionHash::from_raw_36(vec![0u8; 36]);
+
+        integrate_activity(
+            &store,
+            make_fork_op(&author, &prev_hash, 0, 1),
+            AppOutcome::Accepted,
+            10,
+        )
+        .await;
+
+        let scratch_prev = ActionHash::from_raw_36(vec![113u8; 36]);
+        let scratch_sah = make_scratch_create(&author, 1, &scratch_prev, 113);
+        let mut scratch = crate::scratch::Scratch::new();
+        scratch.add_action(
+            scratch_sah,
+            holochain_zome_types::action::ChainTopOrdering::Relaxed,
+        );
+        let sync_scratch = scratch.into_sync();
+
+        let opts = GetAgentActivityOptions {
+            include_valid_activity: true,
+            include_rejected_activity: false,
+            include_warrants: false,
+            include_full_records: true,
+        };
+        let resp = store
+            .as_read()
+            .get_agent_activity_with_scratch(
+                &author,
+                &ChainQueryFilter::new(),
+                &opts,
+                &sync_scratch,
+            )
+            .await
+            .unwrap();
+
+        match &resp.valid_activity {
+            ChainItems::Full(records) => {
+                assert_eq!(records.len(), 2, "expected store record + scratch record");
+            }
+            other => panic!("expected Full, got {other:?}"),
+        }
+    }
+
+    /// A scratch warrant targeting `author` appears in the response when
+    /// `include_warrants = true`.
+    #[tokio::test]
+    async fn get_agent_activity_with_scratch_includes_scratch_warrant() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let author = AgentPubKey::from_raw_36(vec![114u8; 36]);
+        let prev_hash = ActionHash::from_raw_36(vec![0u8; 36]);
+
+        integrate_activity(
+            &store,
+            make_fork_op(&author, &prev_hash, 0, 1),
+            AppOutcome::Accepted,
+            10,
+        )
+        .await;
+
+        // Scratch contains one warrant for `author`.
+        let signed_warrant = make_scratch_warrant_for(&author, 114);
+        let mut scratch = crate::scratch::Scratch::new();
+        scratch.add_warrant(signed_warrant);
+        let sync_scratch = scratch.into_sync();
+
+        let opts_with = GetAgentActivityOptions {
+            include_valid_activity: true,
+            include_rejected_activity: false,
+            include_warrants: true,
+            include_full_records: false,
+        };
+        let resp = store
+            .as_read()
+            .get_agent_activity_with_scratch(
+                &author,
+                &ChainQueryFilter::new(),
+                &opts_with,
+                &sync_scratch,
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.warrants.len(), 1, "scratch warrant should be present");
+
+        // When include_warrants = false the scratch warrant should be absent.
+        let opts_without = GetAgentActivityOptions {
+            include_valid_activity: true,
+            include_rejected_activity: false,
+            include_warrants: false,
+            include_full_records: false,
+        };
+        let resp = store
+            .as_read()
+            .get_agent_activity_with_scratch(
+                &author,
+                &ChainQueryFilter::new(),
+                &opts_without,
+                &sync_scratch,
+            )
+            .await
+            .unwrap();
+        assert!(
+            resp.warrants.is_empty(),
+            "warrants should be empty when not requested"
+        );
+    }
+
+    /// Store-only `get_agent_activity` ignores a populated scratch.
+    #[tokio::test]
+    async fn get_agent_activity_store_only_ignores_scratch() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let author = AgentPubKey::from_raw_36(vec![115u8; 36]);
+        let prev_hash = ActionHash::from_raw_36(vec![0u8; 36]);
+
+        integrate_activity(
+            &store,
+            make_fork_op(&author, &prev_hash, 0, 1),
+            AppOutcome::Accepted,
+            10,
+        )
+        .await;
+
+        // Scratch action at seq 1 — must NOT appear in the store-only read.
+        let scratch_prev = ActionHash::from_raw_36(vec![116u8; 36]);
+        let scratch_sah = make_scratch_create(&author, 1, &scratch_prev, 116);
+        let mut scratch = crate::scratch::Scratch::new();
+        scratch.add_action(
+            scratch_sah,
+            holochain_zome_types::action::ChainTopOrdering::Relaxed,
+        );
+        // (scratch is intentionally unused in the store-only call)
+        let _ = scratch;
+
+        let opts = GetAgentActivityOptions {
+            include_valid_activity: true,
+            include_rejected_activity: false,
+            include_warrants: false,
+            include_full_records: false,
+        };
+        let resp = store
+            .as_read()
+            .get_agent_activity(&author, &ChainQueryFilter::new(), &opts)
+            .await
+            .unwrap();
+
+        match &resp.valid_activity {
+            ChainItems::Hashes(h) => {
+                assert_eq!(
+                    h.len(),
+                    1,
+                    "store-only read must not include scratch actions"
+                );
+                assert_eq!(h[0].0, 0, "only seq 0 from the store");
+            }
+            other => panic!("expected Hashes, got {other:?}"),
+        }
     }
 
     /// Build a linked chain of `len` `RegisterAgentActivity` ops for `author`
