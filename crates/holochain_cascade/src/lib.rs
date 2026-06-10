@@ -806,8 +806,37 @@ impl CascadeImpl {
         entry_hash: EntryHash,
         options: CascadeOptions,
     ) -> CascadeResult<Option<EntryDetails>> {
-        let query: GetEntryDetailsQuery = self.construct_query_with_data_access(entry_hash.clone());
+        if let Some(store) = self.dht_store.as_ref() {
+            let author = self.private_data.as_ref().map(|a| a.as_ref());
+            let scratch = self.local_scratch();
+            let read = store.as_read();
 
+            if options.get_options.strategy() == GetStrategy::Network {
+                let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
+                let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
+                if !(authoring || authority) {
+                    match self
+                        .fetch_record(entry_hash.clone().into(), options.network_request_options)
+                        .await
+                    {
+                        Ok(_) => (),
+                        Err(CascadeError::NetworkError(
+                            e @ HolochainP2pError::NoPeersForLocation(_, _),
+                        )) => {
+                            tracing::debug!(?e, "No peers to fetch record from");
+                        }
+                        Err(e) => return Err(e),
+                    }
+                }
+            }
+
+            return Ok(read
+                .get_entry_details_with_scratch(&entry_hash, author, &scratch)
+                .await?);
+        }
+
+        // Legacy path (dht_store absent): keep unchanged until CR-3.
+        let query: GetEntryDetailsQuery = self.construct_query_with_data_access(entry_hash.clone());
         self.get_latest_with_query(query, entry_hash.into(), options)
             .await
     }
@@ -821,9 +850,38 @@ impl CascadeImpl {
         action_hash: ActionHash,
         options: CascadeOptions,
     ) -> CascadeResult<Option<RecordDetails>> {
+        if let Some(store) = self.dht_store.as_ref() {
+            let author = self.private_data.as_ref().map(|a| a.as_ref());
+            let scratch = self.local_scratch();
+            let read = store.as_read();
+
+            if options.get_options.strategy() == GetStrategy::Network {
+                let authoring = self.am_i_authoring(&action_hash.clone().into())?;
+                let authority = self.am_i_an_authority(action_hash.clone().into()).await?;
+                if !(authoring || authority) {
+                    match self
+                        .fetch_record(action_hash.clone().into(), options.network_request_options)
+                        .await
+                    {
+                        Ok(_) => (),
+                        Err(CascadeError::NetworkError(
+                            e @ HolochainP2pError::NoPeersForLocation(_, _),
+                        )) => {
+                            tracing::debug!(?e, "No peers to fetch record from");
+                        }
+                        Err(e) => return Err(e),
+                    }
+                }
+            }
+
+            return Ok(read
+                .get_record_details_with_scratch(&action_hash, author, &scratch)
+                .await?);
+        }
+
+        // Legacy path (dht_store absent): keep unchanged until CR-3.
         let query: GetRecordDetailsQuery =
             self.construct_query_with_data_access(action_hash.clone());
-
         self.get_latest_with_query(query, action_hash.into(), options)
             .await
     }
@@ -2206,6 +2264,248 @@ mod dht_store_scratch_overlay_tests {
             record.action().entry_hash(),
             Some(&entry_hash),
             "returned record entry hash must match the scratched entry"
+        );
+    }
+
+    /// Helper: integrate a `StoreRecord` op for a `Create` action so that
+    /// `get_record_details_with_scratch` can locate the action via its store gate.
+    ///
+    /// The entry is included in the op so `retrieve_record` can locate it in
+    /// the database when assembling `RecordDetails`.
+    async fn integrate_store_record(
+        store: &holochain_state::dht_store::DhtStore,
+        seed: u8,
+        author: &AgentPubKey,
+        entry_hash: holo_hash::EntryHash,
+        entry: holochain_zome_types::entry::Entry,
+    ) -> ActionHash {
+        use holochain_state::dht_store::{AppOutcome, SysOutcome};
+        use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
+        use holochain_types::prelude::RecordEntry;
+        use holochain_zome_types::action::{AppEntryDef, Create, EntryType};
+        use holochain_zome_types::entry_def::EntryVisibility;
+        use holochain_zome_types::prelude::Signature;
+
+        let action = Action::Create(Create {
+            author: author.clone(),
+            timestamp: holochain_zome_types::prelude::Timestamp::from_micros(seed as i64 * 1000),
+            action_seq: 1,
+            prev_action: holo_hash::ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36]),
+            entry_type: EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
+            entry_hash: entry_hash.clone(),
+            weight: Default::default(),
+        });
+        let action_hash = holo_hash::ActionHash::with_data_sync(&action);
+        let chain_op = ChainOp::StoreRecord(
+            Signature::from([seed; 64]),
+            action,
+            RecordEntry::Present(entry),
+        );
+        let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(chain_op)));
+        let op_hash = op.as_hash().clone();
+        store.record_incoming_ops(vec![op]).await.unwrap();
+        store
+            .record_chain_op_sys_validation_outcomes(vec![(op_hash.clone(), SysOutcome::Accepted)])
+            .await
+            .unwrap();
+        store
+            .record_app_validation_outcomes(vec![(op_hash.clone(), AppOutcome::Accepted)])
+            .await
+            .unwrap();
+        store
+            .integrate_ready_ops(holochain_zome_types::prelude::Timestamp::from_micros(1000))
+            .await
+            .unwrap();
+        action_hash
+    }
+
+    /// Helper: integrate a `StoreEntry` op for a `Create` action.
+    async fn integrate_store_entry(
+        store: &holochain_state::dht_store::DhtStore,
+        seed: u8,
+        author: &AgentPubKey,
+        entry_hash: holo_hash::EntryHash,
+        entry: holochain_zome_types::entry::Entry,
+    ) -> ActionHash {
+        use holochain_state::dht_store::{AppOutcome, SysOutcome};
+        use holochain_types::action::NewEntryAction;
+        use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
+        use holochain_zome_types::action::{AppEntryDef, Create, EntryType};
+        use holochain_zome_types::entry_def::EntryVisibility;
+        use holochain_zome_types::prelude::Signature;
+
+        let action = Action::Create(Create {
+            author: author.clone(),
+            timestamp: holochain_zome_types::prelude::Timestamp::from_micros(seed as i64 * 1000),
+            action_seq: 1,
+            prev_action: holo_hash::ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36]),
+            entry_type: EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
+            entry_hash: entry_hash.clone(),
+            weight: Default::default(),
+        });
+        let action_hash = holo_hash::ActionHash::with_data_sync(&action);
+        let new_entry_action = match action {
+            Action::Create(c) => NewEntryAction::Create(c),
+            _ => unreachable!(),
+        };
+        let chain_op = ChainOp::StoreEntry(Signature::from([seed; 64]), new_entry_action, entry);
+        let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(chain_op)));
+        let op_hash = op.as_hash().clone();
+        store.record_incoming_ops(vec![op]).await.unwrap();
+        store
+            .record_chain_op_sys_validation_outcomes(vec![(op_hash.clone(), SysOutcome::Accepted)])
+            .await
+            .unwrap();
+        store
+            .record_app_validation_outcomes(vec![(op_hash.clone(), AppOutcome::Accepted)])
+            .await
+            .unwrap();
+        store
+            .integrate_ready_ops(holochain_zome_types::prelude::Timestamp::from_micros(1000))
+            .await
+            .unwrap();
+        action_hash
+    }
+
+    /// `get_record_details` on a `CascadeImpl` with a `DhtStore` plus a scratch
+    /// that holds a `Delete` targeting an integrated record must return
+    /// `RecordDetails` that includes the scratch delete.
+    #[tokio::test]
+    async fn get_record_details_reflects_scratch_delete() {
+        use holochain_zome_types::action::Delete;
+        use holochain_zome_types::entry::Entry;
+
+        let store = empty_store().await;
+
+        let seed = 42u8;
+        let author = AgentPubKey::from_raw_36(vec![seed; 36]);
+
+        // Build an Agent entry so retrieve_record can fetch it from the DB.
+        let agent_key = AgentPubKey::from_raw_36(vec![seed.wrapping_add(50); 36]);
+        let entry = Entry::Agent(agent_key.clone());
+        let entry_hash = holo_hash::EntryHash::with_data_sync(&entry);
+
+        // Integrate a StoreRecord op so get_record_details_with_scratch can find it.
+        let action_hash =
+            integrate_store_record(&store, seed, &author, entry_hash.clone(), entry).await;
+
+        // Put a scratch Delete targeting the integrated action into the scratch.
+        let delete = Action::Delete(Delete {
+            author: AgentPubKey::from_raw_36(vec![seed.wrapping_add(10); 36]),
+            timestamp: holochain_zome_types::prelude::Timestamp::from_micros(seed as i64 * 3000),
+            action_seq: 3,
+            prev_action: holo_hash::ActionHash::from_raw_36(vec![seed.wrapping_add(160); 36]),
+            deletes_address: action_hash.clone(),
+            deletes_entry_address: entry_hash.clone(),
+            weight: Default::default(),
+        });
+        let delete_sah = SignedActionHashed::with_presigned(
+            ActionHashed::from_content_sync(delete),
+            fixt!(Signature),
+        );
+
+        let mut scratch = Scratch::new();
+        scratch.add_action(delete_sah, ChainTopOrdering::Relaxed);
+        let sync_scratch = scratch.into_sync();
+
+        let cascade = CascadeImpl::empty()
+            .with_dht_store(store)
+            .with_scratch(sync_scratch);
+
+        let options = CascadeOptions {
+            get_options: GetOptions::local(),
+            network_request_options: GetOptions::local().to_network_options(),
+        };
+
+        let details = cascade
+            .get_record_details(action_hash.clone(), options)
+            .await
+            .expect("get_record_details")
+            .expect("expected Some(RecordDetails) for integrated record");
+
+        assert_eq!(
+            details.deletes.len(),
+            1,
+            "scratch Delete must appear in RecordDetails.deletes"
+        );
+        assert_eq!(details.updates.len(), 0, "no updates expected");
+    }
+
+    /// `get_entry_details` on a `CascadeImpl` with a `DhtStore` plus a scratch
+    /// holding a `Delete` targeting the entry must return `EntryDetails` where
+    /// the scratch delete appears and `entry_dht_status` is `Dead`.
+    #[tokio::test]
+    async fn get_entry_details_reflects_scratch_delete() {
+        use holochain_zome_types::action::Delete;
+        use holochain_zome_types::entry::Entry;
+        use holochain_zome_types::metadata::EntryDhtStatus;
+
+        let store = empty_store().await;
+
+        let seed = 43u8;
+        let author = AgentPubKey::from_raw_36(vec![seed; 36]);
+
+        // Use an Agent entry as the simplest public entry type.
+        let agent_key = AgentPubKey::from_raw_36(vec![seed.wrapping_add(50); 36]);
+        let entry = Entry::Agent(agent_key.clone());
+        let entry_hash = holo_hash::EntryHash::with_data_sync(&entry);
+
+        // Integrate a StoreEntry op so the entry exists in the store and is Live.
+        let store_action_hash =
+            integrate_store_entry(&store, seed, &author, entry_hash.clone(), entry).await;
+
+        // Put a scratch Delete targeting that action into the scratch so the
+        // entry becomes Dead.
+        let delete = Action::Delete(Delete {
+            author: AgentPubKey::from_raw_36(vec![seed.wrapping_add(10); 36]),
+            timestamp: holochain_zome_types::prelude::Timestamp::from_micros(seed as i64 * 3000),
+            action_seq: 3,
+            prev_action: holo_hash::ActionHash::from_raw_36(vec![seed.wrapping_add(160); 36]),
+            deletes_address: store_action_hash.clone(),
+            deletes_entry_address: entry_hash.clone(),
+            weight: Default::default(),
+        });
+        let delete_sah = SignedActionHashed::with_presigned(
+            ActionHashed::from_content_sync(delete),
+            fixt!(Signature),
+        );
+
+        let mut scratch = Scratch::new();
+        scratch.add_action(delete_sah, ChainTopOrdering::Relaxed);
+        let sync_scratch = scratch.into_sync();
+
+        let cascade = CascadeImpl::empty()
+            .with_dht_store(store)
+            .with_scratch(sync_scratch);
+
+        let options = CascadeOptions {
+            get_options: GetOptions::local(),
+            network_request_options: GetOptions::local().to_network_options(),
+        };
+
+        let details = cascade
+            .get_entry_details(entry_hash.clone(), options)
+            .await
+            .expect("get_entry_details")
+            .expect("expected Some(EntryDetails)");
+
+        assert_eq!(
+            details.deletes.len(),
+            1,
+            "scratch Delete must appear in EntryDetails.deletes"
+        );
+        assert_eq!(
+            details.entry_dht_status,
+            EntryDhtStatus::Dead,
+            "entry must be Dead after scratch Delete"
         );
     }
 }
