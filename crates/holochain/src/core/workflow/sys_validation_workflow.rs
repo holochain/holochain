@@ -125,7 +125,6 @@ use types::Outcome;
 pub mod types;
 
 pub mod validation_deps;
-pub mod validation_query;
 
 #[cfg(test)]
 mod chain_test;
