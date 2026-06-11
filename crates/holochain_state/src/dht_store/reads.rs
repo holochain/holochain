@@ -536,11 +536,15 @@ impl DhtStore<DbRead<Dht>> {
     ///
     /// # Contract
     ///
-    /// Validation status is derived exclusively from the integrated `StoreRecord`
-    /// op in the store. A scratch-only action (one that has been authored locally
-    /// but not yet committed and published) has no such op, so this method returns
-    /// `None` in that case. The record's liveness is therefore always grounded in
-    /// a peer-visible, validated store entry.
+    /// Validation status is derived from the integrated `StoreRecord` op when one
+    /// exists. A scratch-only record (authored locally but not yet committed and
+    /// published) has no such op; it is returned with `Valid` status, since the
+    /// author's own uncommitted record is valid from their perspective. This
+    /// mirrors the legacy scratch-overlay behaviour this requester read replaces,
+    /// and lets host functions resolve a just-authored record mid-call — e.g. an
+    /// `update` reading the `create` it depends on within one zome call. An action
+    /// reachable only via a non-record op (no `StoreRecord`, not in the scratch)
+    /// still returns `None`.
     ///
     /// Deletes and updates are the **union** of:
     /// - store-integrated `RegisterDeletedBy` / `RegisterUpdatedRecord` actions, and
@@ -556,32 +560,36 @@ impl DhtStore<DbRead<Dht>> {
     ) -> StateQueryResult<Option<holochain_zome_types::metadata::RecordDetails>> {
         use holochain_zome_types::op::ChainOpType;
 
-        // Validation status and the existence gate require an integrated
-        // StoreRecord op. A scratch-only record has no such op.
-        let ops = self.db().get_chain_ops_for_action(hash.clone()).await?;
-        let Some(store_op) = ops
-            .iter()
-            .find(|r| ChainOpType::try_from(r.op_type) == Ok(ChainOpType::StoreRecord))
-        else {
-            return Ok(None);
-        };
-        let validation_status = match RecordValidity::try_from(store_op.validation_status) {
-            Ok(RecordValidity::Accepted) => ValidationStatus::Valid,
-            Ok(RecordValidity::Rejected) => ValidationStatus::Rejected,
-            Err(v) => {
-                return Err(crate::query::StateQueryError::Other(format!(
-                    "invalid validation_status {v} on StoreRecord op for {hash:?}"
-                )))
-            }
-        };
-
-        // Resolve the record via store-or-scratch (so the entry can come from
-        // either source).
+        // Resolve the record via store-or-scratch first, so a locally-authored,
+        // not-yet-committed record in the scratch is visible to its author.
         let Some(record) = self
             .retrieve_record_with_scratch(hash, author, scratch)
             .await?
         else {
             return Ok(None);
+        };
+
+        // Validation status comes from the integrated StoreRecord op when one
+        // exists. A scratch-only record (authored locally, not yet committed)
+        // has no such op and is Valid from the author's perspective. A store
+        // action reachable only via a non-record op (no StoreRecord op, not in
+        // the scratch) has no record details.
+        let ops = self.db().get_chain_ops_for_action(hash.clone()).await?;
+        let store_op = ops
+            .iter()
+            .find(|r| ChainOpType::try_from(r.op_type) == Ok(ChainOpType::StoreRecord));
+        let validation_status = match store_op {
+            Some(store_op) => match RecordValidity::try_from(store_op.validation_status) {
+                Ok(RecordValidity::Accepted) => ValidationStatus::Valid,
+                Ok(RecordValidity::Rejected) => ValidationStatus::Rejected,
+                Err(v) => {
+                    return Err(crate::query::StateQueryError::Other(format!(
+                        "invalid validation_status {v} on StoreRecord op for {hash:?}"
+                    )))
+                }
+            },
+            None if scratch_action(scratch, hash)?.is_some() => ValidationStatus::Valid,
+            None => return Ok(None),
         };
 
         // Store deletes + scratch deletes targeting this action hash.
@@ -797,6 +805,9 @@ impl DhtStore<DbRead<Dht>> {
                 create_link_hash: sah.as_hash().clone(),
             });
         }
+        // Match the legacy `GetLinksQuery` contract: links are returned in
+        // creation (timestamp) order.
+        links.sort_by_key(|l| l.timestamp);
         Ok(links)
     }
 
@@ -891,6 +902,9 @@ impl DhtStore<DbRead<Dht>> {
             });
         }
 
+        // Match the legacy `GetLinksQuery` contract: links (store + scratch) are
+        // returned in creation (timestamp) order.
+        store_links.sort_by_key(|l| l.timestamp);
         Ok(store_links)
     }
 
@@ -4985,28 +4999,38 @@ mod tests {
     }
 
     /// A scratch-only action (no integrated `StoreRecord` op) returns `None`.
-    /// Documents the store-gate contract.
+    /// A scratch-only record (the author's own, not yet committed) has no
+    /// integrated StoreRecord op, but is still returned with `Valid` status so
+    /// host functions can resolve a just-authored record mid-call.
     #[tokio::test]
-    async fn get_record_details_with_scratch_returns_none_for_scratch_only_action() {
+    async fn get_record_details_with_scratch_returns_valid_for_scratch_only_record() {
+        use holochain_types::prelude::{AppEntryBytes, Entry};
+
         let store = crate::dht_store::DhtStore::new_test(dht_id())
             .await
             .unwrap();
 
         let seed = 121u8;
+        let entry_bytes = holochain_serialized_bytes::SerializedBytes::from(
+            holochain_serialized_bytes::UnsafeBytes::from(vec![seed; 8]),
+        );
+        let entry = Entry::App(AppEntryBytes(entry_bytes));
         let entry_hash = EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]);
-        // Action is only in the scratch — never written to the store.
+        // Action and its entry are only in the scratch — never written to the store.
         let sah = make_signed_action_for_entry(seed, entry_hash.clone());
         let action_hash = sah.as_hash().clone();
-        let scratch = scratch_with_action(sah);
+        let scratch = scratch_with_action_and_entry(sah, entry, entry_hash);
 
         let result = store
             .as_read()
             .get_record_details_with_scratch(&action_hash, None, &scratch)
             .await
             .unwrap();
-        assert!(
-            result.is_none(),
-            "scratch-only action must return None (no StoreRecord op)"
+        let details = result.expect("scratch-only record must return details");
+        assert_eq!(
+            details.validation_status,
+            ValidationStatus::Valid,
+            "the author's own uncommitted record is Valid"
         );
     }
 

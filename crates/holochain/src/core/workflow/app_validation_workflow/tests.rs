@@ -23,7 +23,7 @@ use holochain_p2p::HolochainP2pDna;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_state::dht_store::SysOutcome;
 use holochain_state::mutations::insert_op_dht;
-use holochain_state::prelude::{from_blob, insert_op_cache, StateQueryResult};
+use holochain_state::prelude::{from_blob, StateQueryResult};
 use holochain_state::test_utils::test_db_dir;
 use holochain_state::validation_db::ValidationStage;
 use holochain_types::dht_op::DhtOpHashed;
@@ -178,11 +178,14 @@ async fn main_workflow() {
         } if empty_set == HashSet::<DhtOpHash>::new()
     );
 
-    // insert dependent create op in dht cache db
-    // as cascade would do with fetched dependent ops
-    app_validation_workspace.cache.test_write(move |txn| {
-        insert_op_cache(txn, &dht_create_op_hashed).unwrap();
-    });
+    // Record the dependent create op into the new DhtStore, as the cascade
+    // does when it fetches a dependency from the network (the cascade's local
+    // read is now DhtStore-backed, so the dependency must live there).
+    app_validation_workspace
+        .dht_store
+        .record_incoming_ops(vec![dht_create_op_hashed])
+        .await
+        .unwrap();
 
     // there is still the 1 delete op to be validated
     let ops_to_validate = app_validation_workspace

@@ -30,6 +30,25 @@ use holochain_zome_types::Action;
 use matches::assert_matches;
 use std::sync::Arc;
 
+/// Mirror a dependency op into both the legacy DHT DB and the `DhtStore`.
+///
+/// `get_zomes_to_invoke` resolves the original action via the cascade, whose
+/// local read is now `DhtStore`-backed. Tests that seed a dependency must
+/// therefore populate the `DhtStore`; the legacy write is kept so any reader
+/// still on the old path continues to see the op.
+async fn mirror_dependency_op(test_space: &TestSpace, dht_op: DhtOpHashed) {
+    test_space
+        .space
+        .dht_store
+        .record_incoming_ops(vec![dht_op.clone()])
+        .await
+        .unwrap();
+    test_space.space.dht_db.test_write(move |txn| {
+        insert_op_dht(txn, &dht_op, 0, None).unwrap();
+        put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
+    });
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn register_agent_activity() {
     let zomes = SweetInlineZomes::new(vec![], 0);
@@ -742,10 +761,7 @@ async fn store_record_delete_without_entry() {
         original_action,
         RecordEntry::NA,
     ));
-    test_space.space.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_op, 0, None).unwrap();
-        put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
-    });
+    mirror_dependency_op(&test_space, dht_op).await;
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
         .await
@@ -798,10 +814,7 @@ async fn store_record_delete_non_app_entry() {
         original_action,
         RecordEntry::NA,
     ));
-    test_space.space.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_op, 0, None).unwrap();
-        put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
-    });
+    mirror_dependency_op(&test_space, dht_op).await;
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
         .await
@@ -857,10 +870,7 @@ async fn store_record_delete_link() {
         original_action,
         RecordEntry::NA,
     ));
-    test_space.space.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_op, 0, None).unwrap();
-        put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
-    });
+    mirror_dependency_op(&test_space, dht_op).await;
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
         .await
@@ -1034,10 +1044,7 @@ async fn register_delete_create_app_entry() {
         original_action,
         RecordEntry::NA,
     ));
-    test_space.space.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_op, 0, None).unwrap();
-        put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
-    });
+    mirror_dependency_op(&test_space, dht_op).await;
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
         .await
@@ -1100,10 +1107,7 @@ async fn register_delete_create_non_app_entry() {
         original_action,
         RecordEntry::NA,
     ));
-    test_space.space.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_op, 0, None).unwrap();
-        put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
-    });
+    mirror_dependency_op(&test_space, dht_op).await;
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
         .await
@@ -1170,10 +1174,7 @@ async fn register_delete_update_app_entry() {
         original_action,
         RecordEntry::NA,
     ));
-    test_space.space.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_op, 0, None).unwrap();
-        put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
-    });
+    mirror_dependency_op(&test_space, dht_op).await;
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
         .await
@@ -1236,10 +1237,7 @@ async fn register_delete_update_non_app_entry() {
         original_action,
         RecordEntry::NA,
     ));
-    test_space.space.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_op, 0, None).unwrap();
-        put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
-    });
+    mirror_dependency_op(&test_space, dht_op).await;
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
         .await

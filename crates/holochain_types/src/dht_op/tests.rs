@@ -459,3 +459,31 @@ fn test_all_ops_basis() {
         check_all_ops(record);
     }
 }
+
+/// The v2 op hash is derived from the v2 action projection, which drops the
+/// legacy `weight` field. The op hash must therefore be weight-independent so it
+/// is stable across the v2 round-trip: a record read back from the store or
+/// fetched over the network gets a `Default` weight, yet must hash identically.
+#[test]
+fn store_record_op_hash_is_weight_independent() {
+    let mut create = fixt!(Create);
+    create.weight = EntryRateWeight {
+        bucket_id: 1,
+        units: 5,
+        rate_bytes: 9,
+    };
+    let weighted = Action::Create(create.clone());
+    create.weight = EntryRateWeight::default();
+    let weightless = Action::Create(create);
+
+    let h_weighted = ChainOpUniqueForm::op_hash(ChainOpType::StoreRecord, weighted)
+        .unwrap()
+        .1;
+    let h_weightless = ChainOpUniqueForm::op_hash(ChainOpType::StoreRecord, weightless)
+        .unwrap()
+        .1;
+    assert_eq!(
+        h_weighted, h_weightless,
+        "StoreRecord op hash must not depend on the (v2-dropped) weight"
+    );
+}

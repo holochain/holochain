@@ -140,7 +140,6 @@ mod tests {
     use crate::fixt::DnaDefFixturator;
     use crate::fixt::MetaLairClientFixturator;
     use crate::sweettest::*;
-    use crate::test_utils::fake_genesis;
     use ::fixt::prelude::*;
     use holochain_keystore::test_keystore;
     use holochain_p2p::MockHolochainP2pDnaT;
@@ -177,17 +176,22 @@ mod tests {
         let dna_def_hashed = DnaDefHashed::from_content_sync(dna_def.clone());
         let dna_hash = dna_def_hashed.hash.clone();
 
-        // Genesis
-        fake_genesis(
+        // Genesis into the shared DhtStore so the init workflow's cascade reads
+        // resolve the agent's own chain locally (the cascade is now
+        // DhtStore-backed; `fake_genesis` would discard its own DhtStore).
+        let dht_store = holochain_state::test_utils::test_dht_store(dna_hash.clone()).await;
+        holochain_state::source_chain::genesis(
             db.clone(),
             test_dht.to_db(),
-            dna_hash.clone(),
+            dht_store.clone(),
             keystore.clone(),
+            dna_hash.clone(),
+            author.clone(),
+            None,
         )
         .await
         .unwrap();
 
-        let dht_store = holochain_state::test_utils::test_dht_store(dna_hash.clone()).await;
         let workspace = SourceChainWorkspace::new(
             db.clone(),
             test_dht.to_db(),
