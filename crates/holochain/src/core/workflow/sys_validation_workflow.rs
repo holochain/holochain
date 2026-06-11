@@ -1627,21 +1627,15 @@ impl SysValidationWorkspace {
 
     /// Create a cascade with local data only
     pub fn local_cascade(&self) -> CascadeImpl {
-        let cascade = CascadeImpl::empty()
-            .with_dht(self.dht_db.clone().into())
-            .with_cache(self.cache.clone());
+        let cascade = CascadeImpl::empty(self.dht_store.clone()).with_cache(self.cache.clone());
         match &self.scratch {
-            Some(scratch) => cascade
-                .with_authored(self.authored_db.clone().into())
-                .with_scratch(scratch.clone()),
+            Some(scratch) => cascade.with_scratch(scratch.clone()),
             None => cascade,
         }
     }
 
     pub fn network_and_cache_cascade(&self, network: DynHolochainP2pDna) -> CascadeImpl {
-        CascadeImpl::empty()
-            .with_network(network, self.cache.clone())
-            .with_dht_store(self.dht_store.clone())
+        CascadeImpl::empty(self.dht_store.clone()).with_network(network, self.cache.clone())
     }
 }
 

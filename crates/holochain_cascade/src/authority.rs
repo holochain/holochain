@@ -17,8 +17,6 @@ use holochain_types::prelude::*;
 use holochain_zome_types::warrant::SignedWarrant;
 use std::collections::HashSet;
 
-pub(crate) mod get_agent_activity_query;
-
 /// Handler for get_entry query to an Entry authority.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(store)))]
 pub async fn handle_get_entry(store: DhtStoreRead, hash: EntryHash) -> CascadeResult<WireEntryOps> {
