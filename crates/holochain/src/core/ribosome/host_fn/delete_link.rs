@@ -1,6 +1,6 @@
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::host_fn::cascade_from_call_context;
-use crate::core::ribosome::CallContext;
+use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeT;
 use holochain_cascade::error::CascadeResult;
@@ -11,7 +11,7 @@ use wasmer::RuntimeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn delete_link<'a>(
-    _ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,
     input: DeleteLinkInput,
 ) -> Result<ActionHash, RuntimeError> {

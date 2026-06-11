@@ -75,7 +75,7 @@ impl AdminInterfaceApi {
                     .conductor_handle
                     .get_dna_def(&cell_id)
                     .ok_or(ConductorApiError::CellMissing(*cell_id))?;
-                Ok(AdminResponse::DnaDefinitionReturned(dna_def))
+                Ok(AdminResponse::DnaDefinitionReturned(dna_def.content))
             }
             UpdateCoordinators(payload) => {
                 let UpdateCoordinatorsPayload { cell_id, source } = *payload;

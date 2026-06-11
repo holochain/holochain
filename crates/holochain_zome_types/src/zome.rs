@@ -141,7 +141,6 @@ impl From<CoordinatorZome> for CoordinatorZomeDef {
 
 /// A zome defined by Wasm bytecode
 // TODO: move to `holochain_types`
-
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct WasmZome {
     /// The WasmHash representing the WASM byte code for this zome.

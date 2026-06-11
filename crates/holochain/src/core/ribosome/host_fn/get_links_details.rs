@@ -1,5 +1,5 @@
 use crate::core::ribosome::host_fn::cascade_from_call_context;
-use crate::core::ribosome::CallContext;
+use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
@@ -11,7 +11,7 @@ use std::sync::Arc;
 use wasmer::RuntimeError;
 
 pub fn get_links_details(
-    _ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,
     inputs: Vec<GetLinksInput>,
 ) -> Result<Vec<LinkDetails>, RuntimeError> {

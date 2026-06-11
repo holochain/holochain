@@ -1,4 +1,4 @@
-use crate::core::ribosome::CallContext;
+use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
@@ -10,7 +10,7 @@ use std::sync::Arc;
 use wasmer::RuntimeError;
 
 pub fn dna_info_2(
-    ribosome: Arc<impl RibosomeT>,
+    ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,
     _input: (),
 ) -> Result<DnaInfoV2, RuntimeError> {
@@ -19,11 +19,11 @@ pub fn dna_info_2(
             bindings_deterministic: Permission::Allow,
             ..
         } => Ok(DnaInfoV2 {
-            name: ribosome.dna_def_hashed().name.clone(),
-            hash: ribosome.dna_def_hashed().as_hash().clone(),
-            modifiers: ribosome.dna_def_hashed().modifiers.clone(),
+            name: ribosome.dna_def().name.clone(),
+            hash: ribosome.dna_def().as_hash().clone(),
+            modifiers: ribosome.dna_def().modifiers.clone(),
             zome_names: ribosome
-                .dna_def_hashed()
+                .dna_def()
                 .integrity_zomes
                 .iter()
                 .map(|(zome_name, _zome_def)| zome_name.to_owned())

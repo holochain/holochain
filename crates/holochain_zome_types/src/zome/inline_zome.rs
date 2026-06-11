@@ -169,7 +169,7 @@ pub trait InlineZomeT: std::fmt::Debug {
 pub type InlineZomeFn =
     Arc<dyn Fn(BoxApi, ExternIO) -> InlineZomeResult<ExternIO> + 'static + Send + Sync>;
 
-impl<T: std::fmt::Debug> InlineZomeT for InlineZome<T> {
+impl<T: std::fmt::Debug + Sync> InlineZomeT for InlineZome<T> {
     fn functions(&self) -> Vec<FunctionName> {
         self.functions()
     }

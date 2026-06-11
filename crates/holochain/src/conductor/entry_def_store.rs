@@ -5,7 +5,7 @@ use crate::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::real_ribosome::RealRibosome;
-use crate::core::ribosome::RibosomeT;
+use crate::core::ribosome::{Ribosome, RibosomeT};
 use error::EntryDefStoreError;
 use error::EntryDefStoreResult;
 use holo_hash::*;
@@ -52,13 +52,13 @@ pub(crate) async fn get_entry_def(
 /// Get all the [EntryDef] for this dna
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(ribosome)))]
 pub(crate) async fn get_entry_defs(
-    ribosome: RealRibosome,
+    ribosome: Ribosome,
 ) -> EntryDefStoreResult<Vec<(EntryDefBufferKey, EntryDef)>> {
     let invocation = EntryDefsInvocation;
 
     // Get the zomes hashes
     let zomes = ribosome
-        .dna_def_hashed()
+        .dna_def()
         .integrity_zomes
         .iter()
         .cloned()

@@ -1,4 +1,4 @@
-use crate::core::ribosome::weigh_placeholder;
+use crate::core::ribosome::{weigh_placeholder, Ribosome};
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
@@ -11,7 +11,7 @@ use wasmer::RuntimeError;
 /// create record
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn create<'a>(
-    _ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,
     input: CreateInput,
 ) -> Result<ActionHash, RuntimeError> {

@@ -1,4 +1,4 @@
-use super::CallContext;
+use super::{CallContext, Ribosome};
 use super::RibosomeT;
 use holochain_cascade::CascadeImpl;
 use holochain_types::prelude::*;
@@ -20,12 +20,12 @@ impl KeyRefExt for XSalsa20Poly1305KeyRef {
     }
 }
 
-pub struct HostFnApi<Ribosome: RibosomeT> {
+pub struct HostFnApi {
     ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,
 }
 
-impl<Ribosome: RibosomeT> HostFnApi<Ribosome> {
+impl HostFnApi {
     pub fn new(ribosome: Arc<Ribosome>, call_context: Arc<CallContext>) -> Self {
         Self {
             ribosome,
@@ -41,7 +41,7 @@ macro_rules! host_fn_api_impls {
             pub(crate) mod $f;
         )*
 
-        impl<Ribosome: RibosomeT> HostFnApiT for HostFnApi<Ribosome> {
+        impl HostFnApiT for HostFnApi {
             $(
                 $(#[cfg(feature = $feat)])?
                 fn $f(&self, input: $input) -> Result<$output, HostFnApiError> {

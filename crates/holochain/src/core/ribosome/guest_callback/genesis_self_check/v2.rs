@@ -38,8 +38,8 @@ impl Invocation for GenesisSelfCheckInvocationV2 {
     fn fn_components(&self) -> FnComponents {
         vec!["genesis_self_check_2".into()].into()
     }
-    fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
-        ExternIO::encode(self.payload)
+    fn take_host_input(&self) -> Result<Option<ExternIO>, SerializedBytesError> {
+        ExternIO::encode(self.payload).map(Some)
     }
     fn auth(&self) -> InvocationAuth {
         InvocationAuth::LocalCallback

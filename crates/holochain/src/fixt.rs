@@ -21,6 +21,8 @@ use crate::test_utils::fake_genesis;
 use ::fixt::prelude::*;
 pub use holo_hash::fixt::*;
 use holo_hash::WasmHash;
+use holochain_data::kind::Wasm;
+use holochain_data::test_open_db;
 use holochain_keystore::test_keystore;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::MockHolochainP2pDnaT;
@@ -36,6 +38,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use strum::IntoEnumIterator;
 use tokio::sync::broadcast;
+use holochain_state::prelude::WasmStore;
 
 /// A collection of test WASMs.
 pub struct Zomes(pub Vec<TestWasm>);
@@ -48,8 +51,13 @@ fixturator!(
 );
 
 fixturator!(
+    WasmStore;
+    constructor fn test_new();
+);
+
+fixturator!(
     RealRibosome;
-    constructor fn empty(WasmBackend, DnaFile);
+    constructor fn empty(WasmBackend, DnaDef, WasmStore);
 );
 
 impl Iterator for RealRibosomeFixturator<Zomes> {
@@ -70,7 +78,8 @@ impl Iterator for RealRibosomeFixturator<Zomes> {
 
         let ribosome = tokio_helper::block_forever_on(RealRibosome::new(
             backend,
-            dna_file,
+            dna_file.dna_def_hashed().clone(),
+            tokio_helper::block_forever_on(async move { WasmStore::new(test_open_db(Wasm).await.unwrap()) }),
             make_module_cache(backend, None),
         ))
         .unwrap();

@@ -1,6 +1,6 @@
 //! Defines a store type for ribosomes and entry definitions.
 
-use crate::core::ribosome::{real_ribosome::RealRibosome, RibosomeT};
+use crate::core::ribosome::{real_ribosome::RealRibosome, Ribosome};
 use holochain_types::{prelude::*, share::RwShare};
 use holochain_zome_types::entry_def::EntryDef;
 use std::collections::{HashMap, HashSet};
@@ -8,7 +8,8 @@ use std::collections::{HashMap, HashSet};
 /// A store for ribosomes and entry definitions.
 #[derive(Default)]
 pub struct RibosomeStore {
-    ribosomes: HashMap<CellId, RealRibosome>,
+    ribosomes: HashMap<CellId, Ribosome>,
+    // TODO the ribosome also knows about entry information right? Why have it here?
     entry_defs: HashMap<EntryDefBufferKey, EntryDef>,
 }
 
@@ -22,12 +23,12 @@ impl RibosomeStore {
     }
 
     /// Add a single ribosome to the store.
-    pub fn add_ribosome(&mut self, cell_id: CellId, ribosome: RealRibosome) {
+    pub fn add_ribosome(&mut self, cell_id: CellId, ribosome: Ribosome) {
         self.ribosomes.insert(cell_id, ribosome);
     }
 
     /// Add ribosomes to the store.
-    pub fn add_ribosomes<T: IntoIterator<Item = (CellId, RealRibosome)> + 'static>(
+    pub fn add_ribosomes<T: IntoIterator<Item = (CellId, Ribosome)> + 'static>(
         &mut self,
         ribosomes: T,
     ) {
@@ -45,25 +46,19 @@ impl RibosomeStore {
 
     /// Get the DNA definition for a given CellId.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
-    pub fn get_dna_def(&self, cell_id: &CellId) -> Option<DnaDef> {
+    pub fn get_dna_def(&self, cell_id: &CellId) -> Option<DnaDefHashed> {
         self.ribosomes
             .get(cell_id)
-            .map(|d| d.dna_def_hashed().clone().into_content())
-    }
-
-    /// Get the DNA file for a given CellId.
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
-    pub fn get_dna_file(&self, cell_id: &CellId) -> Option<DnaFile> {
-        self.ribosomes.get(cell_id).map(|r| r.dna_file().clone())
+            .map(|d| d.dna_def().clone())
     }
 
     /// Get the ribosome for a given CellId.
-    pub fn get_ribosome(&self, cell_id: &CellId) -> Option<RealRibosome> {
+    pub fn get_ribosome(&self, cell_id: &CellId) -> Option<Ribosome> {
         self.ribosomes.get(cell_id).cloned()
     }
 
     /// Get any ribosome associated to a CellId matching the given DnaHash.
-    pub fn get_any_ribosome_for_dna_hash(&self, dna_hash: &DnaHash) -> Option<RealRibosome> {
+    pub fn get_any_ribosome_for_dna_hash(&self, dna_hash: &DnaHash) -> Option<Ribosome> {
         if let Some(cell_id) = self.ribosomes.keys().find(|c| c.dna_hash() == dna_hash) {
             return self.ribosomes.get(cell_id).cloned();
         }

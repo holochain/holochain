@@ -13,6 +13,7 @@ use holochain_zome_types::{
 };
 use sqlx::FromRow;
 use std::borrow::Cow;
+use holochain_zome_types::prelude::DnaDefHashed;
 
 /// Database model for WASM bytecode storage.
 ///
@@ -97,15 +98,15 @@ impl DnaDefModel {
         CellId::new(dna_hash, agent)
     }
 
-    /// Convert to a DnaDef given the associated zomes.
+    /// Convert to a `DnaDefHashed` given the associated zomes.
     ///
     /// This requires integrity and coordinator zome models to be provided,
     /// as they are stored in separate tables.
-    pub fn to_dna_def(
+    pub fn to_dna_def_hashed(
         &self,
         integrity_zomes: Vec<IntegrityZomeModel>,
         coordinator_zomes: Vec<CoordinatorZomeModel>,
-    ) -> Result<DnaDef, String> {
+    ) -> Result<DnaDefHashed, String> {
         let modifiers = DnaModifiers {
             network_seed: self.network_seed.clone(),
             properties: SerializedBytes::from(UnsafeBytes::from(self.properties.clone())),
@@ -132,14 +133,14 @@ impl DnaDefModel {
             .map_err(|e: serde_json::Error| e.to_string())?
             .unwrap_or_default();
 
-        Ok(DnaDef {
+        Ok(DnaDefHashed::with_pre_hashed(DnaDef {
             name: self.name.clone(),
             modifiers,
             integrity_zomes,
             coordinator_zomes,
             #[cfg(feature = "unstable-migration")]
             lineage,
-        })
+        }, DnaHash::from_raw_32(self.hash.clone())))
     }
 }
 

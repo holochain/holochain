@@ -188,7 +188,7 @@ impl DnaDef {
     }
 
     /// Return a Zome, error if not a WasmZome
-    pub fn get_wasm_zome(&self, zome_name: &ZomeName) -> Result<&WasmZome, ZomeError> {
+    pub fn get_wasm_zome(&self, zome_name: &ZomeName) -> ZomeResult<&WasmZome> {
         self.all_zomes()
             .find(|(name, _)| *name == zome_name)
             .map(|(_, def)| def)
@@ -241,6 +241,55 @@ impl DnaDef {
         let mut clone = self.clone();
         clone.modifiers = clone.modifiers.update(modifiers);
         clone
+    }
+
+    /// Replace the coordinator zomes for this DNA.
+    pub fn replace_coordinators(
+        mut self,
+        coordinator_zomes: CoordinatorZomes,
+    ) -> ZomeResult<DnaDefHashed> {
+        let dangling_dep = coordinator_zomes.iter().find_map(|(coord_name, def)| {
+            def.as_any_zome_def()
+                .dependencies()
+                .iter()
+                .find_map(|zome_name| {
+                    (!self.is_integrity_zome(zome_name))
+                        .then(|| (zome_name.to_string(), coord_name.to_string()))
+                })
+        });
+        if let Some((dangling_dep, zome_name)) = dangling_dep {
+            return Err(ZomeError::DanglingZomeDependency(dangling_dep, zome_name));
+        }
+        // Get the previous coordinators.
+        let previous_coordinators = std::mem::replace(
+            &mut self.coordinator_zomes,
+            Vec::with_capacity(0),
+        );
+
+        // Save the order they were installed.
+        let mut coordinator_order: Vec<_> = previous_coordinators
+            .iter()
+            .map(|(n, _)| n.clone())
+            .collect();
+
+        // Turn into a map.
+        let mut coordinators: std::collections::HashMap<_, _> = previous_coordinators.into_iter().collect();
+
+        // For each new coordinator insert it to the map.
+        for (name, def) in coordinator_zomes {
+            if coordinators.insert(name.clone(), def).is_none() {
+                // If this is a new coordinator then add it to the order.
+                coordinator_order.push(name);
+            }
+        }
+
+        // Insert all the coordinators in the correct order.
+        self.coordinator_zomes = coordinator_order
+            .into_iter()
+            .filter_map(|name| coordinators.remove_entry(&name))
+            .collect();
+
+        Ok(DnaDefHashed::from_content_sync(self))
     }
 }
 

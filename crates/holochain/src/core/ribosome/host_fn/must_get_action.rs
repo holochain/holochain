@@ -1,5 +1,5 @@
 use crate::core::ribosome::host_fn::cascade_from_call_context;
-use crate::core::ribosome::CallContext;
+use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
@@ -15,7 +15,7 @@ use wasmer::RuntimeError;
     tracing::instrument(skip(_ribosome, call_context))
 )]
 pub fn must_get_action(
-    _ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,
     input: MustGetActionInput,
 ) -> Result<SignedActionHashed, RuntimeError> {

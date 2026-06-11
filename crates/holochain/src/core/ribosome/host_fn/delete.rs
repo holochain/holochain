@@ -1,5 +1,5 @@
 use crate::core::ribosome::error::RibosomeError;
-use crate::core::ribosome::CallContext;
+use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::RibosomeT;
 use holochain_cascade::error::CascadeError;
 use holochain_wasmer_host::prelude::*;
@@ -12,9 +12,8 @@ use holochain_types::prelude::*;
 use std::sync::Arc;
 use wasmer::RuntimeError;
 
-#[allow(clippy::extra_unused_lifetimes)]
-pub fn delete<'a>(
-    _ribosome: Arc<impl RibosomeT>,
+pub fn delete(
+    _ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,
     input: DeleteInput,
 ) -> Result<ActionHash, RuntimeError> {

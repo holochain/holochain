@@ -1,7 +1,6 @@
 use super::hash_bytes;
 use super::CoordinatorManifest;
-use crate::prelude::DnaResult;
-use crate::prelude::DnaWasm;
+use crate::prelude::{DnaResult, DnaWasmHashed};
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::prelude::*;
 use mr_bundle::{Manifest, ResourceIdentifier};
@@ -44,7 +43,7 @@ impl Manifest for CoordinatorManifest {
 
 impl CoordinatorBundle {
     /// Convert into zomes and their wasm files.
-    pub async fn into_zomes(self) -> DnaResult<(CoordinatorZomes, Vec<DnaWasm>)> {
+    pub async fn into_zomes(self) -> DnaResult<(CoordinatorZomes, Vec<DnaWasmHashed>)> {
         let mut resources = self.get_all_resources().clone();
         let coordinator = hash_bytes(self.manifest().zomes.iter().cloned(), &mut resources).await?;
         let coordinator_zomes = coordinator
@@ -59,7 +58,7 @@ impl CoordinatorBundle {
             .collect();
         let wasms = coordinator
             .into_iter()
-            .map(|(_, _, wasm, _)| wasm)
+            .map(|(_, wasm_hash, wasm, _)| DnaWasmHashed::with_pre_hashed(wasm, wasm_hash))
             .collect();
 
         Ok((coordinator_zomes, wasms))

@@ -3,21 +3,21 @@ pub mod genesis_self_check;
 pub mod init;
 pub mod post_commit;
 pub mod validate;
-use super::HostContext;
+use super::{HostContext, Ribosome};
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::Invocation;
-use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use std::collections::VecDeque;
+use std::sync::Arc;
 use tokio::task::JoinHandle;
 
 pub type CallStreamItem = Result<(Zome, ExternIO), (Zome, RibosomeError)>;
 pub type CallStream = tokio_stream::wrappers::ReceiverStream<CallStreamItem>;
 
-pub fn call_stream<R: RibosomeT + 'static, I: Invocation + 'static>(
+pub fn call_stream(
     host_context: HostContext,
-    ribosome: R,
-    invocation: I,
+    ribosome: Ribosome,
+    invocation: Arc<dyn Invocation + 'static>,
 ) -> (
     CallStream,
     JoinHandle<Result<(), tokio::sync::mpsc::error::SendError<CallStreamItem>>>,
@@ -37,7 +37,7 @@ pub fn call_stream<R: RibosomeT + 'static, I: Invocation + 'static>(
             while let Some(to_call) = remaining_components.pop_front() {
                 let to_call = to_call.into();
                 let r = ribosome
-                    .maybe_call(host_context.clone(), &invocation, &zome, &to_call)
+                    .maybe_call(host_context.clone(), invocation.clone(), &zome, &to_call)
                     .await;
                 match r {
                     Ok(None) => {}
@@ -109,12 +109,14 @@ mod tests {
             for fn_component in fn_components.clone() {
                 // the invocation zome name and component will be called by the ribosome
                 ribosome
-                    .expect_maybe_call::<MockInvocation>()
+                    .expect_maybe_call()
                     .with(
+                        always(),
                         always(),
                         always(),
                         eq(zome.clone()),
                         eq(FunctionName::from(fn_component)),
+                        always()
                     )
                     .times(1)
                     .in_sequence(&mut sequence)

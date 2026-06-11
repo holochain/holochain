@@ -70,8 +70,8 @@ impl Invocation for PostCommitInvocation {
     fn fn_components(&self) -> FnComponents {
         vec!["post_commit".into()].into()
     }
-    fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
-        ExternIO::encode(self.actions)
+    fn take_host_input(&self) -> Result<Option<ExternIO>, SerializedBytesError> {
+        ExternIO::encode(&self.actions).map(Some)
     }
     fn auth(&self) -> InvocationAuth {
         InvocationAuth::LocalCallback

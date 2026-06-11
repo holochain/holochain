@@ -1,4 +1,4 @@
-use crate::core::ribosome::CallContext;
+use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use once_cell::unsync::Lazy;
@@ -28,7 +28,7 @@ pub fn wasm_trace(input: TraceMsg) {
 }
 
 pub fn trace(
-    _ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<Ribosome>,
     _call_context: Arc<CallContext>,
     input: TraceMsg,
 ) -> Result<(), RuntimeError> {

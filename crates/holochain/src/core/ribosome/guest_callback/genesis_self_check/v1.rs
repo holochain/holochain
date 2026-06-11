@@ -40,8 +40,8 @@ impl Invocation for GenesisSelfCheckInvocationV1 {
         // well as support for explicit v1 extern.
         vec!["genesis_self_check".into(), "1".into()].into()
     }
-    fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
-        ExternIO::encode(self.payload)
+    fn take_host_input(&self) -> Result<Option<ExternIO>, SerializedBytesError> {
+        ExternIO::encode(self.payload).map(Some)
     }
     fn auth(&self) -> InvocationAuth {
         InvocationAuth::LocalCallback

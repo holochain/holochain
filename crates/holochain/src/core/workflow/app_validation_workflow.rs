@@ -100,7 +100,7 @@ use crate::core::queue_consumer::WorkComplete;
 use crate::core::ribosome::guest_callback::validate::ValidateHostAccess;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::core::ribosome::RibosomeT;
+use crate::core::ribosome::Ribosome;
 use crate::core::ribosome::ZomesToInvoke;
 use crate::core::validation::OutcomeOrError;
 use crate::core::SysValidationError;
@@ -595,7 +595,7 @@ pub async fn validate_op(
     op: &Op,
     workspace: HostFnWorkspaceRead,
     network: DynHolochainP2pDna,
-    ribosome: &impl RibosomeT,
+    ribosome: &Ribosome,
     conductor_handle: &ConductorHandle,
     is_inline: bool,
 ) -> AppValidationOutcome<Outcome> {
@@ -603,7 +603,7 @@ pub async fn validate_op(
         .await
         .map_err(AppValidationError::SysValidationError)?;
 
-    let zomes_to_invoke = get_zomes_to_invoke(op, &workspace, network.clone(), ribosome).await;
+    let zomes_to_invoke = get_zomes_to_invoke(op, &workspace, network.clone(), &ribosome).await;
     if let Err(OutcomeOrError::Err(err)) = &zomes_to_invoke {
         tracing::error!(?op, ?err, "Error getting zomes to invoke to validate op.");
     };
@@ -684,7 +684,7 @@ async fn get_zomes_to_invoke(
     op: &Op,
     workspace: &HostFnWorkspaceRead,
     network: DynHolochainP2pDna,
-    ribosome: &impl RibosomeT,
+    ribosome: &Ribosome,
 ) -> AppValidationOutcome<ZomesToInvoke> {
     match op {
         Op::RegisterAgentActivity(RegisterAgentActivity { .. }) => Ok(ZomesToInvoke::AllIntegrity),
@@ -789,7 +789,7 @@ async fn retrieve_deleted_action(
 
 fn get_integrity_zome_from_ribosome(
     zome_index: &ZomeIndex,
-    ribosome: &impl RibosomeT,
+    ribosome: &Ribosome,
 ) -> AppValidationOutcome<ZomesToInvoke> {
     let zome = ribosome.get_integrity_zome(zome_index).ok_or_else(|| {
         Outcome::rejected(format!("No integrity zome found with index {zome_index:?}"))
@@ -800,7 +800,7 @@ fn get_integrity_zome_from_ribosome(
 #[allow(clippy::too_many_arguments)]
 async fn run_validation_callback(
     invocation: ValidateInvocation,
-    ribosome: &impl RibosomeT,
+    ribosome: &Ribosome,
     workspace: HostFnWorkspaceRead,
     network: DynHolochainP2pDna,
     is_inline: bool,

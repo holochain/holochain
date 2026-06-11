@@ -57,8 +57,8 @@ impl Invocation for InitInvocation {
     fn fn_components(&self) -> FnComponents {
         vec!["init".into()].into()
     }
-    fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
-        ExternIO::encode(())
+    fn take_host_input(&self) -> Result<Option<ExternIO>, SerializedBytesError> {
+        ExternIO::encode(()).map(Some)
     }
     fn auth(&self) -> InvocationAuth {
         InvocationAuth::LocalCallback

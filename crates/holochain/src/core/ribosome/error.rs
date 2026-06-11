@@ -108,6 +108,15 @@ pub enum RibosomeError {
 
     #[error("The callback has invalid parameters: {0}")]
     CallbackInvalidParameters(String),
+
+    #[error(transparent)]
+    ZomeError(#[from] ZomeError),
+
+    #[error("The source code for the zome {0} is missing from the WASM store")]
+    WasmModuleMissing(ZomeName),
+
+    #[error("Wanted the host input but it was already taken")]
+    HostInputMissing,
 }
 
 /// Type alias

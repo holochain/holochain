@@ -1,4 +1,4 @@
-use crate::core::ribosome::CallContext;
+use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
@@ -9,7 +9,7 @@ use wasmer::RuntimeError;
 
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(_ribosome, call_context)))]
 pub fn sign(
-    _ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,
     input: Sign,
 ) -> Result<Signature, RuntimeError> {

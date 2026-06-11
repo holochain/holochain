@@ -12,7 +12,7 @@ use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCh
 use crate::core::ribosome::guest_callback::genesis_self_check::{
     GenesisSelfCheckHostAccess, GenesisSelfCheckInvocation, GenesisSelfCheckResult,
 };
-use crate::{conductor::api::CellConductorApiT, core::ribosome::RibosomeT};
+use crate::conductor::api::CellConductorApiT;
 use derive_more::Constructor;
 use holochain_sqlite::prelude::*;
 use holochain_state::dht_store::DhtStore;
@@ -20,12 +20,11 @@ use holochain_state::source_chain;
 use holochain_types::prelude::*;
 use rusqlite::named_params;
 use std::sync::Arc;
+use crate::core::ribosome::Ribosome;
 
 /// The struct which implements the genesis Workflow
 #[derive(Constructor)]
-pub struct GenesisWorkflowArgs<Ribosome>
-where
-    Ribosome: RibosomeT + 'static,
+pub struct GenesisWorkflowArgs
 {
     cell_id: CellId,
     membrane_proof: Option<MembraneProof>,
@@ -33,25 +32,21 @@ where
 }
 
 // #[cfg_attr(feature = "instrument", tracing::instrument(skip(workspace, api, args)))]
-pub async fn genesis_workflow<Api: CellConductorApiT, Ribosome>(
+pub async fn genesis_workflow<Api: CellConductorApiT>(
     mut workspace: GenesisWorkspace,
     api: Api,
-    args: GenesisWorkflowArgs<Ribosome>,
+    args: GenesisWorkflowArgs,
 ) -> WorkflowResult<()>
-where
-    Ribosome: RibosomeT + 'static,
 {
     genesis_workflow_inner(&mut workspace, args, api).await?;
     Ok(())
 }
 
-async fn genesis_workflow_inner<Api: CellConductorApiT, Ribosome>(
+async fn genesis_workflow_inner<Api: CellConductorApiT>(
     workspace: &mut GenesisWorkspace,
-    args: GenesisWorkflowArgs<Ribosome>,
+    args: GenesisWorkflowArgs,
     api: Api,
 ) -> WorkflowResult<()>
-where
-    Ribosome: RibosomeT + 'static,
 {
     let GenesisWorkflowArgs {
         cell_id,
@@ -71,7 +66,7 @@ where
         modifiers: DnaModifiers { properties, .. },
         integrity_zomes,
         ..
-    } = &ribosome.dna_def_hashed().content;
+    } = &ribosome.dna_def().content;
     let dna_info = DnaInfoV1 {
         zome_names: integrity_zomes.iter().map(|(n, _)| n.clone()).collect(),
         name: name.clone(),
@@ -200,6 +195,7 @@ mod tests {
             let mut api = MockCellConductorApiT::new();
             api.expect_keystore().return_const(keystore.clone());
             let mut ribosome = MockRibosomeT::new();
+            let ribosome = Ribosome::new(dna.dna_def_hashed().clone(), ribosome);
             ribosome
                 .expect_run_genesis_self_check()
                 .returning(|_, _| Ok(GenesisSelfCheckResult::Valid));

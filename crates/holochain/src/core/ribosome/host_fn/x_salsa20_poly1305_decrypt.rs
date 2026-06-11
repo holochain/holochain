@@ -1,5 +1,5 @@
 use super::*;
-use crate::core::ribosome::CallContext;
+use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::RibosomeT;
 use std::sync::Arc;
 use crate::core::ribosome::HostFnAccess;
@@ -7,7 +7,7 @@ use crate::core::ribosome::RibosomeError;
 use wasmer::RuntimeError;
 
 pub fn x_salsa20_poly1305_decrypt(
-    _ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,
     input: XSalsa20Poly1305Decrypt,
 ) -> Result<Option<XSalsa20Poly1305Data>, RuntimeError> {

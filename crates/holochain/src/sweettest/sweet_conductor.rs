@@ -603,7 +603,7 @@ impl SweetConductor {
             .raw_handle()
             .create_clone_cell(installed_app_id, payload)
             .await?;
-        let dna_file = self.get_dna_file(&clone.cell_id).unwrap();
+        let dna_file = self.get_dna_def(&clone.cell_id).unwrap();
         self.dna_files.insert(clone.cell_id.clone(), dna_file);
         Ok(clone)
     }
@@ -616,15 +616,13 @@ impl SweetConductor {
         &mut self,
         cell_id: CellId,
         coordinator_zomes: CoordinatorZomes,
-        wasms: Vec<wasm::DnaWasm>,
+        wasms: Vec<wasm::DnaWasmHashed>,
     ) -> ConductorResult<()> {
         // Update the coordinators in the dna files cache
-        let mut dna_file = self.get_dna_file(&cell_id).unwrap();
-        dna_file
-            .update_coordinators(coordinator_zomes.clone(), wasms.clone())
-            .await
-            .unwrap();
-        self.dna_files.insert(cell_id.clone(), dna_file);
+        let mut dna_def = self.get_dna_def(&cell_id).unwrap();
+        let dna_def = dna_def
+            .replace_coordinators(coordinator_zomes.clone())?;
+        self.dna_files.insert(cell_id.clone(), dna_def);
         // Update the coordinators in the conductor
         self.raw_handle()
             .update_coordinators(cell_id.clone(), coordinator_zomes, wasms)

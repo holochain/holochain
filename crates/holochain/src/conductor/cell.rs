@@ -16,7 +16,7 @@ use crate::core::queue_consumer::QueueTriggers;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::real_ribosome::RealRibosome;
-use crate::core::ribosome::ZomeCallInvocation;
+use crate::core::ribosome::{Ribosome, ZomeCallInvocation};
 use crate::core::workflow::call_zome_workflow;
 use crate::core::workflow::genesis_workflow::genesis_workflow;
 use crate::core::workflow::initialize_zomes_workflow;
@@ -25,7 +25,7 @@ use crate::core::workflow::GenesisWorkflowArgs;
 use crate::core::workflow::GenesisWorkspace;
 use crate::core::workflow::InitializeZomesWorkflowArgs;
 use crate::core::workflow::ZomeCallResult;
-use crate::{conductor::api::error::ConductorApiError, core::ribosome::RibosomeT};
+use crate::conductor::api::error::ConductorApiError;
 use error::CellError;
 use futures::future::FutureExt;
 use holo_hash::*;
@@ -166,17 +166,15 @@ impl Cell {
     /// records are committed. This is a prerequisite for any other interaction
     /// with the SourceChain
     #[allow(clippy::too_many_arguments)]
-    pub async fn genesis<Ribosome>(
+    pub async fn genesis(
         cell_id: CellId,
         conductor_handle: ConductorHandle,
         authored_db: DbWrite<DbKindAuthored>,
         dht_db: DbWrite<DbKindDht>,
-        dht_store: holochain_state::dht_store::DhtStore,
+        dht_store: DhtStore,
         ribosome: Ribosome,
         membrane_proof: Option<MembraneProof>,
     ) -> CellResult<()>
-    where
-        Ribosome: RibosomeT + 'static,
     {
         let conductor_api = CellConductorApi::new(conductor_handle.clone(), cell_id.clone());
 
@@ -1021,7 +1019,7 @@ impl Cell {
     }
 
     /// Instantiate a Ribosome for use by this Cell's workflows
-    pub(crate) fn get_ribosome(&self) -> CellResult<RealRibosome> {
+    pub(crate) fn get_ribosome(&self) -> CellResult<Ribosome> {
         Ok(self
             .conductor_handle
             .get_ribosome(self.id())

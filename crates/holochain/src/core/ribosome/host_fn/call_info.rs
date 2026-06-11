@@ -1,4 +1,4 @@
-use crate::core::ribosome::CallContext;
+use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
@@ -10,7 +10,7 @@ use std::sync::Arc;
 use wasmer::RuntimeError;
 
 pub fn call_info(
-    _ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,
     _input: (),
 ) -> Result<CallInfo, RuntimeError> {

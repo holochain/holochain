@@ -46,8 +46,8 @@ impl Invocation for EntryDefsInvocation {
     fn fn_components(&self) -> FnComponents {
         vec!["entry_defs".into()].into()
     }
-    fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
-        ExternIO::encode(())
+    fn take_host_input(self) -> Result<Option<ExternIO>, SerializedBytesError> {
+        ExternIO::encode(()).map(Some)
     }
     fn auth(&self) -> InvocationAuth {
         InvocationAuth::LocalCallback

@@ -69,10 +69,11 @@ impl Invocation for ValidateInvocation {
     fn fn_components(&self) -> FnComponents {
         vec!["validate".to_string()].into()
     }
-    fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
+    fn take_host_input(&self) -> Result<Option<ExternIO>, SerializedBytesError> {
+        // TODO why is this like this?
         // No option here but to clone the actual data as it's passed
         // into the host now anyway.
-        Ok((*self.data).clone())
+        Ok(Some((*self.data).clone()))
     }
     fn auth(&self) -> InvocationAuth {
         InvocationAuth::LocalCallback

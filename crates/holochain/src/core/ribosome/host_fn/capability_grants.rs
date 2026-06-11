@@ -1,4 +1,4 @@
-use crate::core::ribosome::CallContext;
+use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::RibosomeT;
 use std::sync::Arc;
 use wasmer::RuntimeError;
@@ -6,7 +6,7 @@ use wasmer::RuntimeError;
 /// list all the grants stored locally in the chain filtered by tag
 /// this is only the current grants as per local CRUD
 pub fn capability_grants(
-    _ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<Ribosome>,
     _call_context: Arc<CallContext>,
     _input: (),
 ) -> Result<(), RuntimeError> {

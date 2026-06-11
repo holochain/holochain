@@ -9,7 +9,7 @@ use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::post_commit::send_post_commit;
-use crate::core::ribosome::RibosomeT;
+use crate::core::ribosome::{Ribosome, RibosomeT};
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::WorkflowError;
@@ -31,8 +31,8 @@ mod validation_test;
 /// Placeholder for the return value of a zome invocation
 pub type ZomeCallResult = RibosomeResult<ZomeCallResponse>;
 
-pub struct CallZomeWorkflowArgs<RibosomeT> {
-    pub ribosome: RibosomeT,
+pub struct CallZomeWorkflowArgs {
+    pub ribosome: Ribosome,
     pub invocation: ZomeCallInvocation,
     pub signal_tx: broadcast::Sender<Signal>,
     pub conductor_handle: ConductorHandle,
@@ -42,25 +42,23 @@ pub struct CallZomeWorkflowArgs<RibosomeT> {
 
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 #[allow(clippy::too_many_arguments)]
-pub async fn call_zome_workflow<Ribosome>(
+pub async fn call_zome_workflow(
     workspace: SourceChainWorkspace,
     network: DynHolochainP2pDna,
     keystore: MetaLairClient,
-    args: CallZomeWorkflowArgs<Ribosome>,
+    args: CallZomeWorkflowArgs,
     trigger_validate_dht_ops: TriggerSender,
     trigger_integrate_dht_ops: TriggerSender,
     trigger_countersigning: TriggerSender,
 ) -> WorkflowResult<ZomeCallResult>
-where
-    Ribosome: RibosomeT + 'static,
 {
     let coordinator_zome = args
         .ribosome
-        .dna_def_hashed()
+        .dna_def()
         .get_coordinator_zome(args.invocation.zome.zome_name())
         .or_else(|_| {
             args.ribosome
-                .dna_def_hashed()
+                .dna_def()
                 .get_integrity_zome(args.invocation.zome.zome_name())
                 .map(CoordinatorZome::from)
         })
@@ -140,15 +138,13 @@ where
     Ok(result)
 }
 
-async fn call_zome_workflow_inner<Ribosome>(
+async fn call_zome_workflow_inner(
     workspace: SourceChainWorkspace,
     network: DynHolochainP2pDna,
     keystore: MetaLairClient,
-    args: CallZomeWorkflowArgs<Ribosome>,
+    args: CallZomeWorkflowArgs,
     trigger_countersigning: TriggerSender,
 ) -> WorkflowResult<ZomeCallResult>
-where
-    Ribosome: RibosomeT + 'static,
 {
     let CallZomeWorkflowArgs {
         ribosome,
@@ -238,13 +234,11 @@ where
 /// the zome function.
 /// Then send to a background thread and
 /// call the zome function.
-pub async fn call_zome_function_authorized<R>(
-    ribosome: R,
+pub async fn call_zome_function_authorized(
+    ribosome: Ribosome,
     host_access: ZomeCallHostAccess,
     invocation: ZomeCallInvocation,
-) -> WorkflowResult<(R, RibosomeResult<ZomeCallResponse>)>
-where
-    R: RibosomeT + 'static,
+) -> WorkflowResult<(Ribosome, RibosomeResult<ZomeCallResponse>)>
 {
     match invocation
         .is_authorized(&host_access)
@@ -268,14 +262,12 @@ where
 }
 
 /// Run validation inline and wait for the result.
-pub async fn inline_validation<Ribosome>(
+pub async fn inline_validation(
     workspace: SourceChainWorkspace,
     network: DynHolochainP2pDna,
     conductor_handle: ConductorHandle,
     ribosome: Ribosome,
 ) -> WorkflowResult<()>
-where
-    Ribosome: RibosomeT + 'static,
 {
     let cascade = Arc::new(holochain_cascade::CascadeImpl::from_workspace_and_network(
         &workspace,

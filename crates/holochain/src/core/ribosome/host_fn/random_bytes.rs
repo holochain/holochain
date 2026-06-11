@@ -1,4 +1,4 @@
-use crate::core::ribosome::CallContext;
+use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
@@ -9,7 +9,7 @@ use wasmer::RuntimeError;
 
 /// return n crypto secure random bytes from the standard holochain crypto lib
 pub fn random_bytes(
-    _ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,
     input: u32,
 ) -> Result<holochain_types::prelude::Bytes, RuntimeError> {

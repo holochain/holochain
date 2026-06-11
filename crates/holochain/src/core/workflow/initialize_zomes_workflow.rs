@@ -7,7 +7,7 @@ use crate::core::ribosome::guest_callback::init::InitHostAccess;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::guest_callback::post_commit::send_post_commit;
-use crate::core::ribosome::RibosomeT;
+use crate::core::ribosome::{Ribosome, RibosomeT};
 use derive_more::Constructor;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::DynHolochainP2pDna;
@@ -17,9 +17,7 @@ use holochain_zome_types::action::builder;
 use tokio::sync::broadcast;
 
 #[derive(Constructor)]
-pub struct InitializeZomesWorkflowArgs<Ribosome>
-where
-    Ribosome: RibosomeT + 'static,
+pub struct InitializeZomesWorkflowArgs
 {
     pub ribosome: Ribosome,
     pub conductor_handle: ConductorHandle,
@@ -28,27 +26,23 @@ where
     pub integrate_dht_ops_trigger: TriggerSender,
 }
 
-impl<Ribosome> InitializeZomesWorkflowArgs<Ribosome>
-where
-    Ribosome: RibosomeT + 'static,
+impl InitializeZomesWorkflowArgs
 {
     pub fn dna_def(&self) -> &DnaDef {
-        self.ribosome.dna_def_hashed().as_content()
+        self.ribosome.dna_def().as_content()
     }
 }
 
 // #[cfg_attr(feature = "instrument", tracing::instrument(skip(network, keystore, workspace, args)))]
-pub async fn initialize_zomes_workflow<Ribosome>(
+pub async fn initialize_zomes_workflow(
     workspace: SourceChainWorkspace,
     network: DynHolochainP2pDna,
     keystore: MetaLairClient,
-    args: InitializeZomesWorkflowArgs<Ribosome>,
+    args: InitializeZomesWorkflowArgs,
 ) -> WorkflowResult<InitResult>
-where
-    Ribosome: RibosomeT + Clone + 'static,
 {
     let conductor_handle = args.conductor_handle.clone();
-    let coordinators = args.ribosome.dna_def_hashed().get_all_coordinators();
+    let coordinators = args.ribosome.dna_def().get_all_coordinators();
     let integrate_dht_ops_trigger = args.integrate_dht_ops_trigger.clone();
     let signal_tx = args.signal_tx.clone();
     let result =
@@ -82,14 +76,12 @@ where
     Ok(result)
 }
 
-async fn initialize_zomes_workflow_inner<Ribosome>(
+async fn initialize_zomes_workflow_inner(
     workspace: SourceChainWorkspace,
     network: DynHolochainP2pDna,
     keystore: MetaLairClient,
-    args: InitializeZomesWorkflowArgs<Ribosome>,
+    args: InitializeZomesWorkflowArgs,
 ) -> WorkflowResult<InitResult>
-where
-    Ribosome: RibosomeT + 'static,
 {
     let dna_def = args.dna_def().clone();
     let InitializeZomesWorkflowArgs {
