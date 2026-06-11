@@ -908,7 +908,6 @@ mod tests {
             &receipt_hash,
             &op_hash,
             &[1u8; 16],
-            &[2u8; 64],
             Timestamp::from_micros(42),
         )
         .await
@@ -917,6 +916,7 @@ mod tests {
         let rows = db.as_ref().get_validation_receipts(op_hash).await.unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].hash, receipt_hash.get_raw_36().to_vec());
+        assert_eq!(rows[0].blob, vec![1u8; 16]);
     }
 
     fn sample_base(seed: u8) -> AnyLinkableHash {

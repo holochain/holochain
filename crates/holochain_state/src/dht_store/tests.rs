@@ -716,6 +716,53 @@ async fn record_published_op_hashes_records_warrant_publish_time() {
 }
 
 #[tokio::test]
+async fn validation_receipts_for_action_reconstructs_receipt() {
+    use holochain_types::prelude::{SignedValidationReceipt, ValidationReceipt};
+
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+
+    // Seed an integrated, self-authored StoreRecord op.
+    let op = build_test_store_record_op_hashed(50);
+    let op_hash = op.as_hash().clone();
+    let action_hash = {
+        let action = op.as_content().as_chain_op().unwrap().action();
+        holo_hash::ActionHash::with_data_sync(&action)
+    };
+    store
+        .test_insert_authored_chain_op(op, None, None, None)
+        .await
+        .unwrap();
+
+    // Record a validation receipt (Valid, one validator) for the op.
+    let validator = agent(60);
+    let receipt = SignedValidationReceipt {
+        receipt: ValidationReceipt {
+            dht_op_hash: op_hash.clone(),
+            validation_status: ValidationStatus::Valid,
+            validators: vec![validator.clone()],
+            when_integrated: Timestamp::from_micros(5),
+        },
+        validators_signatures: vec![Signature::from([7u8; 64])],
+    };
+    store.record_validation_receipt(&receipt).await.unwrap();
+
+    // The reconstructed set carries the validator-reported status + validators.
+    let sets = store
+        .as_read()
+        .validation_receipts_for_action(action_hash)
+        .await
+        .unwrap();
+    assert_eq!(sets.len(), 1);
+    assert_eq!(sets[0].op_hash, op_hash);
+    assert_eq!(sets[0].receipts.len(), 1);
+    assert_eq!(
+        sets[0].receipts[0].validation_status,
+        ValidationStatus::Valid
+    );
+    assert_eq!(sets[0].receipts[0].validators, vec![validator]);
+}
+
+#[tokio::test]
 async fn reject_chain_op_rejects_integrated_op() {
     use holochain_zome_types::dht_v2::RecordValidity;
     let store = DhtStore::new_test(dht_id()).await.unwrap();

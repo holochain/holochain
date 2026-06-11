@@ -254,12 +254,25 @@ pub struct ValidationReceiptRow {
     pub hash: Vec<u8>,
     /// Hash of the op the receipt is for.
     pub op_hash: Vec<u8>,
-    /// Serialized list of validator agent pub keys.
-    pub validators: Vec<u8>,
-    /// 64-byte signature over the receipt.
-    pub signature: Vec<u8>,
+    /// Full serialized `SignedValidationReceipt`.
+    pub blob: Vec<u8>,
     /// Microsecond timestamp at which the receipt was received.
     pub when_received: i64,
+}
+
+/// A validation receipt joined with its op's type and publish-completion flag,
+/// for one op of a queried action. Used to build the `get_validation_receipts`
+/// host-function response.
+#[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
+pub struct ValidationReceiptForActionRow {
+    /// Full serialized `SignedValidationReceipt`.
+    pub receipt_blob: Vec<u8>,
+    /// Hash of the op the receipt is for.
+    pub op_hash: Vec<u8>,
+    /// Chain op type discriminant.
+    pub op_type: i64,
+    /// Whether the op has received enough receipts (`NULL` = not complete).
+    pub receipts_complete: Option<i64>,
 }
 
 /// Joined `Warrant` + `WarrantOp` row (an integrated warrant with op

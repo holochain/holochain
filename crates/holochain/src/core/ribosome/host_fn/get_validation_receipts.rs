@@ -1,8 +1,5 @@
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::{CallContext, RibosomeT};
-use holochain_sqlite::db::DbKindDht;
-use holochain_sqlite::prelude::DbRead;
-use holochain_state::prelude::validation_receipts_for_action;
 use holochain_types::access::{HostFnAccess, Permission};
 use holochain_util::tokio_helper;
 use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner, WasmHostError};
@@ -22,12 +19,16 @@ pub fn get_validation_receipts(
             ..
         } => {
             let results = tokio_helper::block_forever_on(async move {
-                let dht_db: DbRead<DbKindDht> = call_context.host_context.workspace().databases().1;
+                let dht_store = call_context
+                    .host_context
+                    .workspace()
+                    .stores()
+                    .dht_store
+                    .expect("HostFnWorkspace always populates dht_store");
 
-                dht_db
-                    .read_async(move |txn| {
-                        validation_receipts_for_action(txn, input.action_hash.clone())
-                    })
+                dht_store
+                    .as_read()
+                    .validation_receipts_for_action(input.action_hash.clone())
                     .await
             })
             .map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?;

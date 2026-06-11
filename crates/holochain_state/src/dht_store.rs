@@ -350,18 +350,13 @@ impl DhtStore<DbWrite<Dht>> {
 
         let op_hash = receipt.receipt.dht_op_hash.clone();
 
-        // Serialize validators and signatures as individual blobs.
-        let validators_bytes = holochain_serialized_bytes::encode(&receipt.receipt.validators)
-            .map_err(StateMutationError::from)?;
-        let signature_bytes = holochain_serialized_bytes::encode(&receipt.validators_signatures)
-            .map_err(StateMutationError::from)?;
-
+        // Store the full serialized `SignedValidationReceipt` (`bytes` above),
+        // so readers can reconstruct the validator-reported status + validators.
         self.db
             .insert_validation_receipt(
                 &receipt_hash,
                 &op_hash,
-                &validators_bytes,
-                &signature_bytes,
+                &bytes,
                 holochain_types::prelude::Timestamp::now(),
             )
             .await

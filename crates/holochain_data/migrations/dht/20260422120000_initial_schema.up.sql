@@ -169,8 +169,10 @@ CREATE TABLE ChainOpPublish (
 CREATE TABLE ValidationReceipt (
     hash          BLOB    PRIMARY KEY ON CONFLICT IGNORE,
     op_hash       BLOB    NOT NULL,
-    validators    BLOB    NOT NULL,
-    signature     BLOB    NOT NULL,
+    -- Full serialized `SignedValidationReceipt`. Stored whole (rather than as
+    -- split columns) so readers can reconstruct the validator-reported
+    -- validation status and validator set exactly as received.
+    blob          BLOB    NOT NULL,
     when_received INTEGER NOT NULL,
     FOREIGN KEY(op_hash) REFERENCES ChainOp(hash)
 ) STRICT, WITHOUT ROWID;

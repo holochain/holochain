@@ -101,6 +101,53 @@ impl DhtStore<DbRead<Dht>> {
         Ok(self.db().count_author_actions_capped(author, 3).await? >= 3)
     }
 
+    /// Validation receipts for every chain op of `action_hash`, grouped into a
+    /// [`ValidationReceiptSet`] per op.
+    ///
+    /// Each stored receipt is the full serialized `SignedValidationReceipt`, so
+    /// the validator-reported status and validator set are returned exactly as
+    /// received. `receipts_complete` reflects the op's `ChainOpPublish` row.
+    pub async fn validation_receipts_for_action(
+        &self,
+        action_hash: holo_hash::ActionHash,
+    ) -> StateQueryResult<Vec<holochain_zome_types::prelude::ValidationReceiptSet>> {
+        use holochain_zome_types::op::ChainOpType;
+        use holochain_zome_types::prelude::{ValidationReceiptInfo, ValidationReceiptSet};
+
+        let rows = self
+            .db()
+            .validation_receipts_for_action(action_hash)
+            .await?;
+        let mut sets: HashMap<DhtOpHash, ValidationReceiptSet> = HashMap::new();
+        for row in rows {
+            let op_hash = DhtOpHash::from_raw_36(row.op_hash);
+            let op_type = ChainOpType::try_from(row.op_type).map_err(|e| {
+                crate::query::StateQueryError::Other(format!(
+                    "invalid op_type {}: {e}",
+                    row.op_type
+                ))
+            })?;
+            let receipts_complete = row.receipts_complete.map(|v| v != 0).unwrap_or(false);
+            let receipt: holochain_types::prelude::SignedValidationReceipt =
+                holochain_serialized_bytes::decode(&row.receipt_blob).map_err(|e| {
+                    crate::query::StateQueryError::Other(format!("decode receipt: {e}"))
+                })?;
+            sets.entry(op_hash.clone())
+                .or_insert_with(|| ValidationReceiptSet {
+                    op_hash,
+                    op_type: op_type.to_string(),
+                    receipts_complete,
+                    receipts: Vec::new(),
+                })
+                .receipts
+                .push(ValidationReceiptInfo {
+                    validation_status: receipt.receipt.validation_status,
+                    validators: receipt.receipt.validators,
+                });
+        }
+        Ok(sets.into_values().collect())
+    }
+
     /// Find an existing action that shares `prev_action` with the given
     /// `action` but has a different hash. Used by sys-validation to detect
     /// chain forks.
