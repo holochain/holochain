@@ -34,6 +34,16 @@ impl DbRead<Dht> {
         action::get_actions_by_author(self.pool(), author).await
     }
 
+    /// Count actions authored by `author`, capped at `cap`. See
+    /// [`action::count_author_actions_capped`].
+    pub async fn count_author_actions_capped(
+        &self,
+        author: &AgentPubKey,
+        cap: i64,
+    ) -> sqlx::Result<i64> {
+        action::count_author_actions_capped(self.pool(), author, cap).await
+    }
+
     /// Integrated `RegisterAgentActivity` actions for `author`, ordered by
     /// chain sequence. `include_entries` joins the public entry (Full mode).
     pub async fn get_agent_activity(

@@ -130,6 +130,24 @@ where
     rows.into_iter().map(row_to_signed_action_hashed).collect()
 }
 
+/// Count actions authored by `author`, stopping once `cap` rows have been
+/// counted. Used by the genesis check, which only needs to know whether the
+/// first few genesis actions are present, not the full chain length.
+pub(crate) async fn count_author_actions_capped<'e, E>(
+    executor: E,
+    author: &AgentPubKey,
+    cap: i64,
+) -> sqlx::Result<i64>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_scalar("SELECT COUNT(*) FROM (SELECT 1 FROM Action WHERE author = ? LIMIT ?)")
+        .bind(author.get_raw_36())
+        .bind(cap)
+        .fetch_one(executor)
+        .await
+}
+
 /// All integrated `RegisterAgentActivity` actions authored by `author`,
 /// ordered by chain sequence. When `include_entries` is set, the public
 /// `Entry` blob is joined in (Full mode); otherwise the entry column is `NULL`.

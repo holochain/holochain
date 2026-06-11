@@ -92,6 +92,15 @@ impl DhtStore<DbRead<Dht>> {
         Ok(self.db().num_still_needing_publish(author).await? as usize)
     }
 
+    /// Whether `author`'s genesis records are present.
+    ///
+    /// Genesis writes three chain actions (`Dna`, `AgentValidationPkg`,
+    /// `AgentId`); their presence in the store marks the cell as genesised.
+    /// The count is capped at three, so a long chain does not affect the cost.
+    pub async fn has_genesis(&self, author: &AgentPubKey) -> StateQueryResult<bool> {
+        Ok(self.db().count_author_actions_capped(author, 3).await? >= 3)
+    }
+
     /// Find an existing action that shares `prev_action` with the given
     /// `action` but has a different hash. Used by sys-validation to detect
     /// chain forks.
