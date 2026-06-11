@@ -810,7 +810,15 @@ impl DhtStore<DbWrite<Dht>> {
         Ok(())
     }
 
-    /// Update `ChainOpPublish.last_publish_time = now` for each given op hash.
+    /// Record that each given op hash has just been published, updating its
+    /// publish-state timestamp.
+    ///
+    /// Chain ops have their `ChainOpPublish.last_publish_time` set to `now`.
+    /// A hash with no matching `ChainOpPublish` row is a warrant: warrants
+    /// publish at most once, so a `WarrantPublish` row recording `now` is
+    /// inserted instead (the `PRIMARY KEY ON CONFLICT IGNORE` keeps the first
+    /// publish time if the same warrant is recorded again). The publish queue
+    /// excludes any warrant that has a `WarrantPublish` row.
     pub async fn record_published_op_hashes(
         &self,
         op_hashes: Vec<DhtOpHash>,
@@ -818,9 +826,15 @@ impl DhtStore<DbWrite<Dht>> {
     ) -> StateMutationResult<()> {
         let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
         for hash in op_hashes {
-            tx.set_chain_op_last_publish_time(&hash, now)
+            let updated = tx
+                .set_chain_op_last_publish_time(&hash, now)
                 .await
                 .map_err(StateMutationError::from)?;
+            if updated == 0 {
+                tx.insert_warrant_publish(&hash, Some(now))
+                    .await
+                    .map_err(StateMutationError::from)?;
+            }
         }
         tx.commit().await.map_err(StateMutationError::from)?;
         Ok(())
@@ -1029,6 +1043,130 @@ impl DhtStore<DbWrite<Dht>> {
         .await
         .map_err(StateMutationError::from)?;
         tx.commit().await.map_err(StateMutationError::from)?;
+        Ok(())
+    }
+
+    /// Test-only: insert a self-authored chain op as fully integrated
+    /// (`locally_validated = true`, `when_integrated = now`) together with a
+    /// `ChainOpPublish` row carrying the given publish state.
+    ///
+    /// The parent `Action` is inserted first (its `private_entry` flag is
+    /// derived from the action's entry visibility). Entries are not stored,
+    /// since the publish queue does not read them.
+    pub async fn test_insert_authored_chain_op(
+        &self,
+        op: DhtOpHashed,
+        last_publish_time: Option<Timestamp>,
+        receipts_complete: Option<bool>,
+        withhold_publish: Option<bool>,
+    ) -> StateMutationResult<()> {
+        use holochain_data::dht::InsertChainOp;
+        use holochain_zome_types::dht_v2::RecordValidity;
+
+        let op_hash = op.as_hash().clone();
+        let serialized_size = holochain_serialized_bytes::encode(op.as_content())
+            .map_err(StateMutationError::from)?
+            .len() as u32;
+        let chain_op = match op.into_inner().0 {
+            DhtOp::ChainOp(c) => c,
+            DhtOp::WarrantOp(_) => panic!("test_insert_authored_chain_op requires a ChainOp"),
+        };
+
+        let signed_action = chain_op.signed_action();
+        let action_hash = holo_hash::ActionHash::with_data_sync(signed_action.action());
+        let sah = holochain_zome_types::record::SignedActionHashed::with_presigned(
+            holo_hash::HoloHashed::with_pre_hashed(
+                signed_action.action().clone(),
+                action_hash.clone(),
+            ),
+            signed_action.signature().clone(),
+        );
+        let new_sah = holochain_zome_types::dht_v2::from_legacy_signed_action(&sah);
+
+        let basis_hash = chain_op.dht_basis();
+        let storage_center_loc = basis_hash.get_loc();
+        let now = Timestamp::now();
+
+        let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
+        tx.insert_action(&new_sah, None)
+            .await
+            .map_err(StateMutationError::from)?;
+        tx.insert_chain_op(InsertChainOp {
+            op_hash: &op_hash,
+            action_hash: &action_hash,
+            op_type: i64::from(chain_op.get_type()),
+            basis_hash: &basis_hash,
+            storage_center_loc,
+            validation_status: RecordValidity::Accepted,
+            locally_validated: true,
+            require_receipt: true,
+            when_received: now,
+            when_integrated: now,
+            serialized_size,
+        })
+        .await
+        .map_err(StateMutationError::from)?;
+        tx.insert_chain_op_publish(
+            &op_hash,
+            last_publish_time,
+            receipts_complete,
+            withhold_publish,
+        )
+        .await
+        .map_err(StateMutationError::from)?;
+        tx.commit().await.map_err(StateMutationError::from)?;
+        Ok(())
+    }
+
+    /// Test-only: read the `last_publish_time` recorded for a chain op.
+    pub async fn test_chain_op_publish_time(
+        &self,
+        op_hash: &DhtOpHash,
+    ) -> DhtStoreResult<Option<Timestamp>> {
+        let row = self
+            .db
+            .as_ref()
+            .get_chain_op_publish(op_hash.clone())
+            .await?;
+        Ok(row.and_then(|r| r.last_publish_time.map(Timestamp::from_micros)))
+    }
+
+    /// Test-only: insert a `WarrantPublish` row recording `last_publish_time`
+    /// for the given warrant.
+    pub async fn test_insert_warrant_publish(
+        &self,
+        warrant_hash: &DhtOpHash,
+        last_publish_time: Option<Timestamp>,
+    ) -> StateMutationResult<()> {
+        self.db
+            .insert_warrant_publish(warrant_hash, last_publish_time)
+            .await
+            .map_err(StateMutationError::from)?;
+        Ok(())
+    }
+
+    /// Test-only: overwrite the full publish state of an existing
+    /// `ChainOpPublish` row. A `None` column is stored as SQL `NULL`; in
+    /// particular `receipts_complete = None` means "receipts not complete"
+    /// (the publish queue treats `receipts_complete IS NULL` as eligible).
+    pub async fn test_set_chain_op_publish(
+        &self,
+        op_hash: &DhtOpHash,
+        last_publish_time: Option<Timestamp>,
+        receipts_complete: Option<bool>,
+        withhold_publish: Option<bool>,
+    ) -> DhtStoreResult<()> {
+        sqlx::query(
+            "UPDATE ChainOpPublish
+             SET last_publish_time = ?, receipts_complete = ?, withhold_publish = ?
+             WHERE op_hash = ?",
+        )
+        .bind(last_publish_time.map(|t| t.as_micros()))
+        .bind(receipts_complete.map(|b| b as i64))
+        .bind(withhold_publish.map(|b| b as i64))
+        .bind(op_hash.get_raw_36())
+        .execute(self.db.pool())
+        .await?;
         Ok(())
     }
 }

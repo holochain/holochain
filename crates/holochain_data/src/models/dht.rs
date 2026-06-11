@@ -301,6 +301,21 @@ pub struct WarrantPublishRow {
     pub last_publish_time: Option<i64>,
 }
 
+/// Row returned by the publish-queue query: one self-authored op that is
+/// eligible to be published to the network, with its DHT basis.
+///
+/// `dht_hash` is the op hash (a chain op hash or a warrant hash). `basis_hash`
+/// is the type-stripped 36-byte basis: the publish path routes solely by the
+/// basis location, so the hash-type wrapper is irrelevant and is reconstructed
+/// as an external hash by the caller.
+#[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
+pub struct OpToPublishRow {
+    /// Hash of the op to publish.
+    pub dht_hash: Vec<u8>,
+    /// Type-stripped 36-byte DHT basis hash.
+    pub basis_hash: Vec<u8>,
+}
+
 /// Row from the `Link` table (link index).
 #[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
 pub struct LinkRow {

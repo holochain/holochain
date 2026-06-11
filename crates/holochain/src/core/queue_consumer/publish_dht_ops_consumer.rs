@@ -7,11 +7,10 @@ use holochain_state::dht_store::DhtStore;
 /// Spawn the QueueConsumer for Publish workflow
 #[cfg_attr(
     feature = "instrument",
-    tracing::instrument(skip(env, dht_store, conductor, network))
+    tracing::instrument(skip(dht_store, conductor, network))
 )]
 pub fn spawn_publish_dht_ops_consumer(
     cell_id: CellId,
-    env: DbWrite<DbKindAuthored>,
     dht_store: DhtStore,
     conductor: ConductorHandle,
     network: DynHolochainP2pDna,
@@ -45,7 +44,6 @@ pub fn spawn_publish_dht_ops_consumer(
         move || {
             let conductor = conductor.clone();
             let tx = tx.clone();
-            let env = env.clone();
             let dht_store = dht_store.clone();
             let agent = cell_id.agent_pubkey().clone();
             let network = network.clone();
@@ -59,8 +57,7 @@ pub fn spawn_publish_dht_ops_consumer(
                     return Ok(WorkComplete::Complete);
                 }
 
-                publish_dht_ops_workflow(env, dht_store, network, tx, agent, min_publish_interval)
-                    .await
+                publish_dht_ops_workflow(dht_store, network, tx, agent, min_publish_interval).await
             }
         },
     );

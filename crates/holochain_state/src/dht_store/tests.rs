@@ -691,6 +691,31 @@ async fn record_published_op_hashes_updates_publish_time() {
 }
 
 #[tokio::test]
+async fn record_published_op_hashes_records_warrant_publish_time() {
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+    // Seed an integrated warrant; warrants have no ChainOpPublish row.
+    let warrant = build_test_warrant_op_hashed(91);
+    let warrant_hash = warrant.as_hash().clone();
+    store.test_insert_integrated_warrant(warrant).await.unwrap();
+
+    // Recording the publish should fall through to inserting a WarrantPublish
+    // row, since there is no ChainOpPublish row to update.
+    store
+        .record_published_op_hashes(vec![warrant_hash.clone()], Timestamp::from_micros(77))
+        .await
+        .unwrap();
+
+    let row = store
+        .db()
+        .as_ref()
+        .get_warrant_publish(warrant_hash)
+        .await
+        .unwrap()
+        .expect("WarrantPublish row should exist after recording publish");
+    assert_eq!(row.last_publish_time, Some(77));
+}
+
+#[tokio::test]
 async fn reject_chain_op_rejects_integrated_op() {
     use holochain_zome_types::dht_v2::RecordValidity;
     let store = DhtStore::new_test(dht_id()).await.unwrap();

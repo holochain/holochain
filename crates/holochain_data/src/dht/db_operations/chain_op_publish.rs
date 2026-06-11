@@ -3,8 +3,8 @@
 use super::super::inner::chain_op_publish;
 use crate::handles::{DbRead, DbWrite};
 use crate::kind::Dht;
-use crate::models::dht::ChainOpPublishRow;
-use holo_hash::DhtOpHash;
+use crate::models::dht::{ChainOpPublishRow, OpToPublishRow};
+use holo_hash::{AgentPubKey, DhtOpHash};
 use holochain_timestamp::Timestamp;
 
 impl DbWrite<Dht> {
@@ -51,5 +51,21 @@ impl DbRead<Dht> {
         op_hash: DhtOpHash,
     ) -> sqlx::Result<Option<ChainOpPublishRow>> {
         chain_op_publish::get_chain_op_publish(self.pool(), op_hash).await
+    }
+
+    /// Ops eligible to be published for `author`. See
+    /// [`chain_op_publish::get_ops_to_publish`].
+    pub async fn get_ops_to_publish(
+        &self,
+        author: &AgentPubKey,
+        recency_threshold_micros: i64,
+    ) -> sqlx::Result<Vec<OpToPublishRow>> {
+        chain_op_publish::get_ops_to_publish(self.pool(), author, recency_threshold_micros).await
+    }
+
+    /// Count ops authored by `author` that may still need publishing. See
+    /// [`chain_op_publish::num_still_needing_publish`].
+    pub async fn num_still_needing_publish(&self, author: &AgentPubKey) -> sqlx::Result<i64> {
+        chain_op_publish::num_still_needing_publish(self.pool(), author).await
     }
 }

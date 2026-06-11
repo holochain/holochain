@@ -9,14 +9,14 @@ use super::DhtStore;
 use crate::prelude::ActionSequenceAndHash;
 use crate::query::StateQueryResult;
 use crate::scratch::SyncScratch;
-use holo_hash::{DhtOpHash, HasHash};
+use holo_hash::{AgentPubKey, AnyLinkableHash, DhtOpHash, ExternalHash, HasHash};
 use holochain_data::kind::Dht;
 use holochain_data::DbRead;
 use holochain_types::chain::ChainItem;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::prelude::{
     ActionHashedContainer, AgentActivityResponse, ChainItems, ChainItemsSource,
-    MustGetAgentActivityResponse, RegisterAgentActivity,
+    MustGetAgentActivityResponse, RegisterAgentActivity, Timestamp,
 };
 use holochain_types::warrant::WarrantOp;
 use holochain_zome_types::chain::{ChainFilter, LimitConditions};
@@ -26,6 +26,7 @@ use holochain_zome_types::prelude::{
 };
 use holochain_zome_types::validate::ValidationStatus;
 use std::collections::{HashMap, HashSet};
+use std::time::Duration;
 
 impl DhtStore<DbRead<Dht>> {
     /// Returns `true` if `hash` appears in any op-bearing DHT table
@@ -52,6 +53,43 @@ impl DhtStore<DbRead<Dht>> {
             .zip(present)
             .filter_map(|(op, exists)| if exists { None } else { Some(op) })
             .collect())
+    }
+
+    /// Ops authored by `author` that are ready to be published to the network,
+    /// each paired with its DHT basis.
+    ///
+    /// `min_publish_interval` bounds how recently an op may have been published
+    /// and still be skipped: the cutoff is `now - min_publish_interval`, and an
+    /// op qualifies when it has never been published or was last published at
+    /// or before the cutoff. Private `StoreEntry` ops are never returned — the
+    /// query is the guard that keeps private entries off the network.
+    ///
+    /// The basis is reconstructed as an [`ExternalHash`]: the publish path
+    /// routes purely by the basis location, so the hash-type wrapper is
+    /// irrelevant and the stored 36-byte basis is sufficient.
+    pub async fn get_ops_to_publish(
+        &self,
+        author: &AgentPubKey,
+        min_publish_interval: Duration,
+    ) -> StateQueryResult<Vec<(AnyLinkableHash, DhtOpHash)>> {
+        let recency = Timestamp::now()
+            .as_micros()
+            .saturating_sub(min_publish_interval.as_micros() as i64);
+        let rows = self.db().get_ops_to_publish(author, recency).await?;
+        Ok(rows
+            .into_iter()
+            .map(|r| {
+                let basis: AnyLinkableHash = ExternalHash::from_raw_36(r.basis_hash).into();
+                (basis, DhtOpHash::from_raw_36(r.dht_hash))
+            })
+            .collect())
+    }
+
+    /// Count ops authored by `author` that may still need publishing in the
+    /// future (ignoring the recency window). The publish workflow uses this to
+    /// decide whether to keep looping.
+    pub async fn num_still_needing_publish(&self, author: &AgentPubKey) -> StateQueryResult<usize> {
+        Ok(self.db().num_still_needing_publish(author).await? as usize)
     }
 
     /// Find an existing action that shares `prev_action` with the given

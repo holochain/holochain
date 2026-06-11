@@ -18,12 +18,8 @@ use holo_hash::*;
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::prelude::*;
 use std::collections::HashMap;
-use std::time;
 use std::time::Duration;
 use tracing::*;
-
-mod publish_query;
-pub use publish_query::{get_ops_to_publish, num_still_needing_publish};
 
 #[cfg(test)]
 mod unit_tests;
@@ -33,10 +29,9 @@ pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u8 = 5;
 
 #[cfg_attr(
     feature = "instrument",
-    tracing::instrument(skip(db, dht_store, network, trigger_self, min_publish_interval))
+    tracing::instrument(skip(dht_store, network, trigger_self, min_publish_interval))
 )]
 pub async fn publish_dht_ops_workflow(
-    db: DbWrite<DbKindAuthored>,
     dht_store: DhtStore,
     network: DynHolochainP2pDna,
     trigger_self: TriggerSender,
@@ -45,8 +40,7 @@ pub async fn publish_dht_ops_workflow(
 ) -> WorkflowResult<WorkComplete> {
     let mut complete = WorkComplete::Complete;
     let to_publish =
-        publish_dht_ops_workflow_inner(db.clone().into(), agent.clone(), min_publish_interval)
-            .await?;
+        publish_dht_ops_workflow_inner(&dht_store, agent.clone(), min_publish_interval).await?;
     let to_publish_count: usize = to_publish.values().map(Vec::len).sum();
 
     if to_publish_count > 0 {
@@ -83,27 +77,18 @@ pub async fn publish_dht_ops_workflow(
         );
     }
 
-    let now = time::SystemTime::now().duration_since(time::UNIX_EPOCH)?;
-    let success_for_new_db = success.clone();
-    let continue_publish = db
-        .write_async({
-            let agent = agent.clone();
-            move |txn| {
-                for hash in success {
-                    set_last_publish_time(txn, &hash, now)?;
-                }
-                WorkflowResult::Ok(publish_query::num_still_needing_publish(txn, agent)? > 0)
-            }
-        })
-        .await?;
-
-    // Mirror the publish-time update into the new DHT DB.
-    if !success_for_new_db.is_empty() {
-        let when = Timestamp::from_micros(now.as_micros() as i64);
+    // Record the publish time for everything that was sent successfully, then
+    // decide whether any ops may still need publishing in the future.
+    if !success.is_empty() {
         dht_store
-            .record_published_op_hashes(success_for_new_db, when)
+            .record_published_op_hashes(success, Timestamp::now())
             .await?;
     }
+    let continue_publish = dht_store
+        .as_read()
+        .num_still_needing_publish(&agent)
+        .await?
+        > 0;
 
     // If we have more ops that could be published then continue looping.
     if continue_publish {
@@ -119,16 +104,21 @@ pub async fn publish_dht_ops_workflow(
     Ok(complete)
 }
 
-/// Read the authored for ops with receipt count < R
+/// Collect the ops authored by `agent` that are ready to publish, grouped by
+/// their DHT basis, from the DHT store.
 pub async fn publish_dht_ops_workflow_inner(
-    db: DbRead<DbKindAuthored>,
+    dht_store: &DhtStore,
     agent: AgentPubKey,
     min_publish_interval: Duration,
 ) -> WorkflowResult<HashMap<OpBasis, Vec<DhtOpHash>>> {
     // Ops to publish by basis
     let mut to_publish = HashMap::new();
 
-    for (basis, op_hash) in get_ops_to_publish(agent, &db, min_publish_interval).await? {
+    for (basis, op_hash) in dht_store
+        .as_read()
+        .get_ops_to_publish(&agent, min_publish_interval)
+        .await?
+    {
         // For every op publish a request
         // Collect and sort ops by basis
         to_publish
