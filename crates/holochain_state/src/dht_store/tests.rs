@@ -854,6 +854,59 @@ async fn is_action_warranted_as_invalid_respects_validity() {
 }
 
 #[tokio::test]
+async fn op_validation_status_returns_status_only_when_locally_validated() {
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+
+    // A locally-validated, integrated op returns its terminal status.
+    let op = build_test_store_record_op_hashed(55);
+    let action_hash = {
+        let a = op.as_content().as_chain_op().unwrap().action();
+        holo_hash::ActionHash::with_data_sync(&a)
+    };
+    store
+        .test_insert_authored_chain_op(op, None, None, None)
+        .await
+        .unwrap();
+    assert_eq!(
+        store
+            .as_read()
+            .op_validation_status(&action_hash, ChainOpType::StoreRecord)
+            .await
+            .unwrap(),
+        Some(ValidationStatus::Valid)
+    );
+
+    // An op still in limbo (not yet integrated) returns None.
+    let limbo_op = build_test_store_record_op_hashed(56);
+    let limbo_action_hash = {
+        let a = limbo_op.as_content().as_chain_op().unwrap().action();
+        holo_hash::ActionHash::with_data_sync(&a)
+    };
+    store.record_incoming_ops(vec![limbo_op]).await.unwrap();
+    assert_eq!(
+        store
+            .as_read()
+            .op_validation_status(&limbo_action_hash, ChainOpType::StoreRecord)
+            .await
+            .unwrap(),
+        None
+    );
+
+    // An unknown action returns None.
+    assert_eq!(
+        store
+            .as_read()
+            .op_validation_status(
+                &ActionHash::from_raw_36(vec![0xEE; 36]),
+                ChainOpType::StoreRecord
+            )
+            .await
+            .unwrap(),
+        None
+    );
+}
+
+#[tokio::test]
 async fn reject_chain_op_rejects_integrated_op() {
     use holochain_zome_types::dht_v2::RecordValidity;
     let store = DhtStore::new_test(dht_id()).await.unwrap();

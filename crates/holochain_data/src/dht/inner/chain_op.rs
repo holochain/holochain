@@ -155,6 +155,28 @@ where
         .await
 }
 
+/// Terminal `validation_status` of the locally-validated (integrated) chain op
+/// for `(action_hash, op_type)`. Returns `None` when no `locally_validated = 1`
+/// row exists (the op is still in limbo, cache-only, or absent). Used by the
+/// warrant-dependency readiness check.
+pub(crate) async fn locally_validated_status<'e, E>(
+    executor: E,
+    action_hash: &ActionHash,
+    op_type: i64,
+) -> sqlx::Result<Option<i64>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_scalar(
+        "SELECT validation_status FROM ChainOp
+         WHERE action_hash = ? AND op_type = ? AND locally_validated = 1",
+    )
+    .bind(action_hash.get_raw_36())
+    .bind(op_type)
+    .fetch_optional(executor)
+    .await
+}
+
 /// Row returned by [`pending_validation_receipts`]: op metadata plus the
 /// underlying action's author so receipts can be addressed.
 #[derive(Debug, sqlx::FromRow)]

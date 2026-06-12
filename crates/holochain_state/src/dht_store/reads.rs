@@ -184,6 +184,33 @@ impl DhtStore<DbRead<Dht>> {
         Ok(false)
     }
 
+    /// Terminal validation status of the locally-validated (integrated) chain
+    /// op for `(action_hash, op_type)`, or `None` if it is not yet locally
+    /// validated (still in limbo, cache-only, or absent).
+    ///
+    /// Used by the sys-validation warrant-dependency readiness check: a warrant
+    /// can only be evaluated once the op it warrants has its own validation
+    /// outcome.
+    pub async fn op_validation_status(
+        &self,
+        action_hash: &holo_hash::ActionHash,
+        op_type: holochain_zome_types::op::ChainOpType,
+    ) -> StateQueryResult<Option<ValidationStatus>> {
+        let raw = self
+            .db()
+            .locally_validated_status(action_hash, i64::from(op_type))
+            .await?;
+        // `validation_status` is a `RecordValidity` discriminant: 1 = Accepted
+        // (Valid), 2 = Rejected.
+        Ok(raw.map(|v| {
+            if v == 2 {
+                ValidationStatus::Rejected
+            } else {
+                ValidationStatus::Valid
+            }
+        }))
+    }
+
     /// Find an existing action that shares `prev_action` with the given
     /// `action` but has a different hash. Used by sys-validation to detect
     /// chain forks.

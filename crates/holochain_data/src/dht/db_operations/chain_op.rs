@@ -44,6 +44,16 @@ impl DbRead<Dht> {
         chain_op::get_chain_ops_for_action(self.pool(), action_hash).await
     }
 
+    /// Terminal `validation_status` of the locally-validated chain op for
+    /// `(action_hash, op_type)`. See [`chain_op::locally_validated_status`].
+    pub async fn locally_validated_status(
+        &self,
+        action_hash: &ActionHash,
+        op_type: i64,
+    ) -> sqlx::Result<Option<i64>> {
+        chain_op::locally_validated_status(self.pool(), action_hash, op_type).await
+    }
+
     /// Return integrated, validated `ChainOp` rows that still require a
     /// validation receipt to be sent.
     pub async fn pending_validation_receipts(&self) -> sqlx::Result<Vec<PendingReceiptRow>> {
