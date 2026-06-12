@@ -356,6 +356,105 @@ where
         .await
 }
 
+/// Fetch every locally-validated (integrated) chain-op row, joined with
+/// `Action` and optional `Entry`, for full wire reconstruction. Same columns
+/// as [`get_chain_ops_for_wire`] but with no hash filter. Ordered by
+/// `ChainOp.hash` for a stable result (`ChainOp` is `WITHOUT ROWID`, so
+/// `rowid` is unavailable).
+pub(crate) async fn all_integrated_chain_ops_for_wire<'e, E>(
+    executor: E,
+) -> sqlx::Result<Vec<K2ChainOpForWireRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as::<_, K2ChainOpForWireRow>(
+        "SELECT
+            ChainOp.hash AS op_hash,
+            ChainOp.basis_hash AS basis_hash,
+            ChainOp.op_type AS op_type,
+            Action.hash AS action_hash,
+            Action.author AS author,
+            Action.timestamp AS timestamp,
+            Action.seq AS seq,
+            Action.prev_hash AS prev_hash,
+            Action.action_data AS action_data,
+            Action.signature AS signature,
+            Entry.blob AS entry_blob
+         FROM ChainOp
+         JOIN Action ON ChainOp.action_hash = Action.hash
+         LEFT JOIN Entry ON Action.entry_hash = Entry.hash
+         WHERE ChainOp.locally_validated = 1
+         ORDER BY ChainOp.hash ASC",
+    )
+    .fetch_all(executor)
+    .await
+}
+
+/// Fetch limbo chain-op rows for full wire reconstruction, joined with
+/// `Action` and optional `Entry`. Same columns as [`get_chain_ops_for_wire`]
+/// but sourced from `LimboChainOp`. When `ready` is true only rows matching
+/// [`LIMBO_CHAIN_OP_READY_PRED`] are returned (integration-limbo); when false
+/// only the complement is returned (validation-limbo). Ordered by
+/// `LimboChainOp.hash` for a stable result (`LimboChainOp` is `WITHOUT
+/// ROWID`).
+pub(crate) async fn limbo_chain_ops_for_wire<'e, E>(
+    executor: E,
+    ready: bool,
+) -> sqlx::Result<Vec<K2ChainOpForWireRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let predicate = if ready {
+        LIMBO_CHAIN_OP_READY_PRED.to_string()
+    } else {
+        limbo_chain_op_not_ready_pred()
+    };
+    let sql = format!(
+        "SELECT
+            LimboChainOp.hash AS op_hash,
+            LimboChainOp.basis_hash AS basis_hash,
+            LimboChainOp.op_type AS op_type,
+            Action.hash AS action_hash,
+            Action.author AS author,
+            Action.timestamp AS timestamp,
+            Action.seq AS seq,
+            Action.prev_hash AS prev_hash,
+            Action.action_data AS action_data,
+            Action.signature AS signature,
+            Entry.blob AS entry_blob
+         FROM LimboChainOp
+         JOIN Action ON LimboChainOp.action_hash = Action.hash
+         LEFT JOIN Entry ON Action.entry_hash = Entry.hash
+         WHERE {predicate}
+         ORDER BY LimboChainOp.hash ASC"
+    );
+    // SQL is assembled from a compile-time-constant predicate (no user
+    // input), so asserting it is safe.
+    sqlx::query_as::<_, K2ChainOpForWireRow>(sqlx::AssertSqlSafe(sql))
+        .fetch_all(executor)
+        .await
+}
+
+/// Fetch every integrated warrant row for full wire reconstruction. Same
+/// columns as [`get_warrants_for_wire`] but with no hash filter. Ordered by
+/// `WarrantOp.hash` for a stable result (`WarrantOp` is `WITHOUT ROWID`).
+pub(crate) async fn all_integrated_warrants_for_wire<'e, E>(
+    executor: E,
+) -> sqlx::Result<Vec<K2WarrantForWireRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as::<_, K2WarrantForWireRow>(
+        "SELECT Warrant.hash, Warrant.author, Warrant.timestamp,
+                Warrant.warrantee, Warrant.proof, Warrant.signature
+         FROM Warrant
+         JOIN WarrantOp ON WarrantOp.hash = Warrant.hash
+         ORDER BY WarrantOp.hash ASC",
+    )
+    .fetch_all(executor)
+    .await
+}
+
 /// Minimum authored timestamp across both `ChainOp` (joined with `Action`)
 /// and integrated warrants (`Warrant` joined with `WarrantOp`), filtered
 /// to `arc` and (for chain ops) `locally_validated = 1`. `None` when no
@@ -436,4 +535,63 @@ where
     .fetch_one(executor)
     .await?;
     Ok(n)
+}
+
+/// Predicate matching `LimboChainOp` rows ready for integration. Kept in
+/// sync with `limbo_chain_ops_ready_for_integration` (in
+/// `inner/limbo_chain_op.rs`): a row is ready once sys-validation rejected it
+/// outright, or sys-validation accepted it and app-validation reached a
+/// terminal state.
+const LIMBO_CHAIN_OP_READY_PRED: &str =
+    "sys_validation_status = 2 OR (sys_validation_status = 1 AND app_validation_status IN (1, 2))";
+
+/// Negation of [`LIMBO_CHAIN_OP_READY_PRED`]. The ready predicate evaluates
+/// to `NULL` (not `false`) for rows with `sys_validation_status IS NULL`, so
+/// a bare `NOT (...)` would silently drop pending ops under SQL's
+/// three-valued logic. Wrapping in `COALESCE(..., 0)` forces those rows to
+/// count as not-ready, which is what "still in validation" means.
+fn limbo_chain_op_not_ready_pred() -> String {
+    format!("NOT COALESCE(({LIMBO_CHAIN_OP_READY_PRED}), 0)")
+}
+
+/// `(validation_limbo, integration_limbo, integrated)` counts across the
+/// limbo + integrated tables, matching the legacy integration-state report.
+///
+/// - `integrated` = locally-validated `ChainOp` rows (GET-cached ops with
+///   `locally_validated = 0` are excluded) plus all `WarrantOp` rows.
+/// - `integration_limbo` = limbo ops ready for integration: `LimboChainOp`
+///   rows matching [`LIMBO_CHAIN_OP_READY_PRED`] plus `LimboWarrantOp` rows
+///   with a terminal `sys_validation_status` (1 or 2).
+/// - `validation_limbo` = limbo ops not yet ready: the complement of the
+///   above within each limbo table.
+pub(crate) async fn integration_state_counts<'e, E>(executor: E) -> sqlx::Result<(i64, i64, i64)>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let sql = format!(
+        "SELECT
+            (
+                (SELECT COUNT(*) FROM LimboChainOp WHERE {not_ready})
+                +
+                (SELECT COUNT(*) FROM LimboWarrantOp WHERE sys_validation_status IS NULL)
+            ) AS validation_limbo,
+            (
+                (SELECT COUNT(*) FROM LimboChainOp WHERE {ready})
+                +
+                (SELECT COUNT(*) FROM LimboWarrantOp WHERE sys_validation_status IN (1, 2))
+            ) AS integration_limbo,
+            (
+                (SELECT COUNT(*) FROM ChainOp WHERE locally_validated = 1)
+                +
+                (SELECT COUNT(*) FROM WarrantOp)
+            ) AS integrated",
+        ready = LIMBO_CHAIN_OP_READY_PRED,
+        not_ready = limbo_chain_op_not_ready_pred(),
+    );
+    // SQL is assembled from a compile-time-constant predicate (no user
+    // input), so asserting it is safe.
+    let counts: (i64, i64, i64) = sqlx::query_as(sqlx::AssertSqlSafe(sql))
+        .fetch_one(executor)
+        .await?;
+    Ok(counts)
 }

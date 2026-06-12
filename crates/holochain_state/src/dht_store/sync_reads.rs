@@ -106,6 +106,64 @@ where
         Ok(micros.map(Timestamp::from_micros))
     }
 
+    /// `(validation_limbo, integration_limbo, integrated)` counts for the
+    /// integration-state report, each as `usize`. `integrated` counts
+    /// locally-validated `ChainOp` rows (GET-cached copies excluded) plus all
+    /// `WarrantOp` rows; `integration_limbo` is the limbo subset ready for
+    /// integration and `validation_limbo` the remainder still in validation.
+    pub async fn integration_state_counts(
+        &self,
+    ) -> crate::query::StateQueryResult<(usize, usize, usize)> {
+        let (validation_limbo, integration_limbo, integrated) = self
+            .db
+            .as_ref()
+            .integration_state_counts()
+            .await
+            .map_err(crate::query::StateQueryError::Sqlx)?;
+        Ok((
+            validation_limbo.max(0) as usize,
+            integration_limbo.max(0) as usize,
+            integrated.max(0) as usize,
+        ))
+    }
+
+    /// Every locally-validated (integrated) chain-op row, joined for wire
+    /// reconstruction, with no hash filter.
+    pub async fn all_integrated_chain_ops_for_wire(
+        &self,
+    ) -> crate::query::StateQueryResult<Vec<holochain_data::models::dht::K2ChainOpForWireRow>> {
+        self.db
+            .as_ref()
+            .all_integrated_chain_ops_for_wire()
+            .await
+            .map_err(crate::query::StateQueryError::Sqlx)
+    }
+
+    /// Limbo chain-op rows joined for wire reconstruction. `ready` selects the
+    /// integration-limbo subset; `!ready` selects the validation-limbo subset.
+    pub async fn limbo_chain_ops_for_wire(
+        &self,
+        ready: bool,
+    ) -> crate::query::StateQueryResult<Vec<holochain_data::models::dht::K2ChainOpForWireRow>> {
+        self.db
+            .as_ref()
+            .limbo_chain_ops_for_wire(ready)
+            .await
+            .map_err(crate::query::StateQueryError::Sqlx)
+    }
+
+    /// Every integrated warrant row for wire reconstruction, with no hash
+    /// filter.
+    pub async fn all_integrated_warrants_for_wire(
+        &self,
+    ) -> crate::query::StateQueryResult<Vec<holochain_data::models::dht::K2WarrantForWireRow>> {
+        self.db
+            .as_ref()
+            .all_integrated_warrants_for_wire()
+            .await
+            .map_err(crate::query::StateQueryError::Sqlx)
+    }
+
     /// Total integrated op + warrant count (no `locally_validated` filter
     /// — preserves the old DHT+cache combined count).
     pub async fn total_integrated_op_count(&self) -> crate::query::StateQueryResult<u64> {

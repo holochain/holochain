@@ -98,4 +98,34 @@ impl DbRead<Dht> {
     pub async fn count_integrated_ops(&self) -> sqlx::Result<i64> {
         sync_queries::count_integrated_ops(self.pool()).await
     }
+
+    /// `(validation_limbo, integration_limbo, integrated)` counts for the
+    /// integration-state report. Integrated counts locally-validated
+    /// `ChainOp` rows (cache-only copies excluded) plus all `WarrantOp` rows.
+    pub async fn integration_state_counts(&self) -> sqlx::Result<(i64, i64, i64)> {
+        sync_queries::integration_state_counts(self.pool()).await
+    }
+
+    /// Every locally-validated (integrated) chain-op row, joined for wire
+    /// reconstruction, with no hash filter.
+    pub async fn all_integrated_chain_ops_for_wire(
+        &self,
+    ) -> sqlx::Result<Vec<K2ChainOpForWireRow>> {
+        sync_queries::all_integrated_chain_ops_for_wire(self.pool()).await
+    }
+
+    /// Limbo chain-op rows joined for wire reconstruction. `ready` selects the
+    /// integration-limbo subset; `!ready` selects the validation-limbo subset.
+    pub async fn limbo_chain_ops_for_wire(
+        &self,
+        ready: bool,
+    ) -> sqlx::Result<Vec<K2ChainOpForWireRow>> {
+        sync_queries::limbo_chain_ops_for_wire(self.pool(), ready).await
+    }
+
+    /// Every integrated warrant row for wire reconstruction, with no hash
+    /// filter.
+    pub async fn all_integrated_warrants_for_wire(&self) -> sqlx::Result<Vec<K2WarrantForWireRow>> {
+        sync_queries::all_integrated_warrants_for_wire(self.pool()).await
+    }
 }
