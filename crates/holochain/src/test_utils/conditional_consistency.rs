@@ -356,11 +356,12 @@ fn display_op(op: &DhtOp) -> String {
 /// read from the new DHT store.
 ///
 /// "Integrated" follows the new store semantics: locally-validated chain ops
-/// (GET-cached copies excluded, rejected ops included) plus integrated
-/// warrants. Ops are reconstructed into legacy `DhtOp`s so their hashes match
-/// the published set.
+/// (GET-cached copies excluded, rejected ops included). **Warrants are
+/// deliberately excluded** — the legacy check inner-joined `Action` (warrants
+/// have none) and so compared chain ops only; warrants need not reach every
+/// node. Ops are reconstructed into legacy `DhtOp`s so their hashes match the
+/// published set.
 async fn get_integrated_ops(dht_store: &DhtStoreRead) -> Vec<DhtOp> {
     let chain = dht_store.all_integrated_chain_ops_for_wire().await.unwrap();
-    let warrants = dht_store.all_integrated_warrants_for_wire().await.unwrap();
-    crate::conductor::wire_rows_to_legacy_ops(chain, warrants)
+    crate::conductor::wire_rows_to_legacy_ops(chain, Vec::new())
 }

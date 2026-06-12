@@ -70,19 +70,20 @@ struct DhtOpRow {
 
 /// Read the integrated ops a node holds, as `(hash, row)` pairs for reporting.
 ///
-/// "Integrated" follows the new store semantics: locally-validated chain ops
-/// (GET-cached copies excluded) plus integrated warrants. Ops are reconstructed
-/// into legacy `DhtOp`s so their hashes match across nodes.
+/// "Integrated" follows the new store semantics: locally-validated chain ops,
+/// GET-cached copies excluded. **Warrants are deliberately excluded** — the
+/// legacy consistency check inner-joined `Action` (warrants have no `Action`
+/// row), so it only ever compared chain ops. Warrants are not guaranteed to
+/// reach every node (zero-arc nodes, gossip timing), so requiring cross-node
+/// warrant consistency here would hang; warrant propagation is asserted
+/// separately by the warrant tests. Ops are reconstructed into legacy `DhtOp`s
+/// so their hashes match across nodes.
 async fn integrated_op_rows(dht_store: &DhtStoreRead) -> Result<Vec<DhtOpRow>, String> {
     let chain = dht_store
         .all_integrated_chain_ops_for_wire()
         .await
         .map_err(|e| e.to_string())?;
-    let warrants = dht_store
-        .all_integrated_warrants_for_wire()
-        .await
-        .map_err(|e| e.to_string())?;
-    Ok(wire_rows_to_legacy_ops(chain, warrants)
+    Ok(wire_rows_to_legacy_ops(chain, vec![])
         .into_iter()
         .map(|op| {
             let op_type = op.get_type();
