@@ -45,10 +45,11 @@ use holochain_state::prelude::*;
 use holochain_state::query::link::GetLinksFilter;
 use holochain_state::scratch::SyncScratch;
 use holochain_zome_types::prelude::{FunctionName, ZomeName};
-use metrics::cascade_fetch_error_metric;
+use metrics::{cascade_duration_metric, cascade_fetch_error_metric};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;
+use std::time::Instant;
 use tracing::*;
 
 pub mod authority;
@@ -106,6 +107,33 @@ pub struct CascadeImpl {
     dht_store: DhtStore,
     /// Optional zome call origin for metrics attribution.
     zome_call_origin: Option<(ZomeName, FunctionName)>,
+}
+
+/// Times a cascade query and records `hc.cascade.duration` on drop, so every
+/// return path of a query method (including `?` early returns) is covered.
+///
+/// Only queries with a `zome_call_origin` are recorded: the metric is
+/// attributed by `zome`/`fn`, and the origin-less cascades built by validation
+/// and the `must_get_*` host fns would otherwise emit unattributed samples.
+struct CascadeDurationGuard {
+    start: Instant,
+    /// Cloned from the cascade's `zome_call_origin`. Owned (not a `&self`
+    /// borrow) so the guard can be held across the query's `.await` points
+    /// without constraining the future's `Send`-ness.
+    zome_call_origin: Option<(ZomeName, FunctionName)>,
+}
+
+impl Drop for CascadeDurationGuard {
+    fn drop(&mut self) {
+        let Some((zome, fn_name)) = &self.zome_call_origin else {
+            return;
+        };
+        let attrs = [
+            opentelemetry::KeyValue::new("zome", zome.to_string()),
+            opentelemetry::KeyValue::new("fn", fn_name.to_string()),
+        ];
+        cascade_duration_metric().record(self.start.elapsed().as_secs_f64(), &attrs);
+    }
 }
 
 impl CascadeImpl {
@@ -505,6 +533,15 @@ impl CascadeImpl {
         cascade_fetch_error_metric().add(1, &attrs);
     }
 
+    /// Start timing a cascade query; the returned guard records
+    /// `hc.cascade.duration` when dropped. See [`CascadeDurationGuard`].
+    fn time_cascade(&self) -> CascadeDurationGuard {
+        CascadeDurationGuard {
+            start: Instant::now(),
+            zome_call_origin: self.zome_call_origin.clone(),
+        }
+    }
+
     /// Fetch a Record from the network, caching and returning the results
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     pub async fn fetch_record(
@@ -638,6 +675,7 @@ impl CascadeImpl {
         entry_hash: EntryHash,
         options: CascadeOptions,
     ) -> CascadeResult<Option<EntryDetails>> {
+        let _guard = self.time_cascade();
         let author = self.private_data.as_ref().map(|a| a.as_ref());
         let scratch = self.local_scratch();
         let read = self.dht_store.as_read();
@@ -675,6 +713,7 @@ impl CascadeImpl {
         action_hash: ActionHash,
         options: CascadeOptions,
     ) -> CascadeResult<Option<RecordDetails>> {
+        let _guard = self.time_cascade();
         let author = self.private_data.as_ref().map(|a| a.as_ref());
         let scratch = self.local_scratch();
         let read = self.dht_store.as_read();
@@ -724,6 +763,7 @@ impl CascadeImpl {
         action_hash: ActionHash,
         options: GetOptions,
     ) -> CascadeResult<Option<Record>> {
+        let _guard = self.time_cascade();
         // DESIGN: we can short circuit if we have any local deletes on an action.
         // Is this bad because we will not go back to the network until our
         // cache is cleared. Could someone create an attack based on this fact?
@@ -773,6 +813,7 @@ impl CascadeImpl {
         entry_hash: EntryHash,
         options: GetOptions,
     ) -> CascadeResult<Option<Record>> {
+        let _guard = self.time_cascade();
         let author = self.private_data.as_ref().map(|a| a.as_ref());
         let scratch = self.local_scratch();
         let read = self.dht_store.as_read();
@@ -889,6 +930,7 @@ impl CascadeImpl {
         key: WireLinkKey,
         options: GetLinksRequestOptions,
     ) -> CascadeResult<Vec<Link>> {
+        let _guard = self.time_cascade();
         // only fetch links from the network if I am not an authority and
         // GetStrategy is Network
         if let GetStrategy::Network = options.get_options.strategy() {
@@ -935,6 +977,7 @@ impl CascadeImpl {
         key: WireLinkKey,
         options: GetLinksRequestOptions,
     ) -> CascadeResult<Vec<(SignedActionHashed, Vec<SignedActionHashed>)>> {
+        let _guard = self.time_cascade();
         // only fetch link details from network if i am not an authority and
         // GetStrategy is Network
         if let GetStrategy::Network = options.get_options.strategy() {
@@ -964,6 +1007,7 @@ impl CascadeImpl {
     /// Count the number of links matching the `query`.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, query)))]
     pub async fn dht_count_links(&self, query: WireLinkQuery) -> CascadeResult<usize> {
+        let _guard = self.time_cascade();
         let mut links = HashSet::<ActionHash>::new();
         if !self.am_i_an_authority(query.base.clone()).await? {
             if let Some(network) = &self.network {
@@ -1018,6 +1062,7 @@ impl CascadeImpl {
         filter: ChainFilter,
         options: NetworkRequestOptions,
     ) -> CascadeResult<MustGetAgentActivityResponse> {
+        let _guard = self.time_cascade();
         // Validate ChainFilter take is not zero.
         if filter.get_take() == Some(0) {
             return Err(CascadeError::InvalidInput(
@@ -1090,6 +1135,7 @@ impl CascadeImpl {
         query: ChainQueryFilter,
         options: GetActivityOptions,
     ) -> CascadeResult<AgentActivityResponse> {
+        let _guard = self.time_cascade();
         let status_only = !(options.include_valid_activity || options.include_rejected_activity);
 
         // If we're an authority then we allow local queries. This means we consider ourselves an authority
