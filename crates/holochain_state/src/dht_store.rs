@@ -1033,6 +1033,7 @@ impl DhtStore<DbWrite<Dht>> {
             storage_center_loc: warrant_op.warrantee.get_loc(),
             when_received: now,
             when_integrated: now,
+            validation_status: 1,
             serialized_size,
         })
         .await

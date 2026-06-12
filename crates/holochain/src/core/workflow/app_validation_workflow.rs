@@ -297,12 +297,11 @@ async fn app_validation_workflow_inner(
                         );
                         false
                     } else {
-                        match holochain_state::warrant::is_action_warranted_as_invalid(
-                            &workspace.dht_db,
-                            action_hash.clone(),
-                            chain_op.author().clone(),
-                        )
-                        .await
+                        match workspace
+                            .dht_store
+                            .as_read()
+                            .is_action_warranted_as_invalid(&action_hash, chain_op.author())
+                            .await
                         {
                             Ok(true) => {
                                 tracing::trace!(

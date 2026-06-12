@@ -267,6 +267,12 @@ CREATE TABLE WarrantOp (
     when_received   INTEGER NOT NULL,
     when_integrated INTEGER NOT NULL,
 
+    -- Terminal sys-validation outcome carried over from limbo at promotion:
+    -- 1 = accepted (valid), 2 = rejected. Both valid and rejected warrants are
+    -- integrated (and gossiped), so readers that must ignore disproven
+    -- accusations -- e.g. `is_action_warranted_as_invalid` -- filter on this.
+    validation_status INTEGER NOT NULL,
+
     -- Storage tracking
     serialized_size INTEGER NOT NULL,
 

@@ -148,6 +148,42 @@ impl DhtStore<DbRead<Dht>> {
         Ok(sets.into_values().collect())
     }
 
+    /// Whether `action_hash` (authored by `action_author`) has any
+    /// pending-or-valid `ChainIntegrity` warrant declaring it an invalid chain
+    /// op.
+    ///
+    /// Rejected and abandoned warrants are ignored — a disproven accusation
+    /// must not mark an action invalid. Warrants still pending validation are
+    /// included, since one may be validated imminently.
+    pub async fn is_action_warranted_as_invalid(
+        &self,
+        action_hash: &holo_hash::ActionHash,
+        action_author: &AgentPubKey,
+    ) -> StateQueryResult<bool> {
+        use holochain_zome_types::warrant::{ChainIntegrityWarrant, WarrantProof};
+
+        let proofs = self
+            .db()
+            .pending_or_valid_warrant_proofs_by_warrantee(action_author)
+            .await?;
+        for proof_blob in proofs {
+            let proof: WarrantProof =
+                holochain_serialized_bytes::decode(&proof_blob).map_err(|e| {
+                    crate::query::StateQueryError::Other(format!("decode warrant proof: {e}"))
+                })?;
+            if let WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+                action,
+                ..
+            }) = &proof
+            {
+                if &action.0 == action_hash {
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
+    }
+
     /// Find an existing action that shares `prev_action` with the given
     /// `action` but has a different hash. Used by sys-validation to detect
     /// chain forks.

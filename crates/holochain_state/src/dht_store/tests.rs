@@ -762,6 +762,97 @@ async fn validation_receipts_for_action_reconstructs_receipt() {
     assert_eq!(sets[0].receipts[0].validators, vec![validator]);
 }
 
+/// Build an `InvalidChainOp` warrant against `warrantee` naming `action_hash`.
+fn build_invalid_chain_op_warrant(
+    warrantee: &AgentPubKey,
+    action_hash: &ActionHash,
+    seed: u8,
+) -> DhtOpHashed {
+    use holochain_zome_types::prelude::{
+        ChainIntegrityWarrant, SignedWarrant, Warrant, WarrantProof,
+    };
+    let warrant = SignedWarrant::new(
+        Warrant::new(
+            WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+                action_author: warrantee.clone(),
+                action: (action_hash.clone(), Signature::from([seed; 64])),
+                chain_op_type: ChainOpType::StoreRecord,
+                reason: "test warrant".into(),
+            }),
+            agent(seed.wrapping_add(1)),
+            Timestamp::from_micros(seed as i64),
+            warrantee.clone(),
+        ),
+        Signature::from([seed; 64]),
+    );
+    DhtOpHashed::from_content_sync(DhtOp::WarrantOp(Box::new(
+        holochain_types::warrant::WarrantOp::from(warrant),
+    )))
+}
+
+#[tokio::test]
+async fn is_action_warranted_as_invalid_respects_validity() {
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+
+    // Case A: a pending (limbo) warrant counts as warranting the action.
+    let warrantee_a = agent(70);
+    let action_a = ActionHash::from_raw_36(vec![0x31; 36]);
+    store
+        .record_incoming_ops(vec![build_invalid_chain_op_warrant(
+            &warrantee_a,
+            &action_a,
+            1,
+        )])
+        .await
+        .unwrap();
+    assert!(store
+        .as_read()
+        .is_action_warranted_as_invalid(&action_a, &warrantee_a)
+        .await
+        .unwrap());
+    // A different action by the same warrantee is not warranted.
+    assert!(!store
+        .as_read()
+        .is_action_warranted_as_invalid(&ActionHash::from_raw_36(vec![0x99; 36]), &warrantee_a)
+        .await
+        .unwrap());
+
+    // Case B: a valid, integrated warrant counts.
+    let warrantee_b = agent(71);
+    let action_b = ActionHash::from_raw_36(vec![0x32; 36]);
+    let valid = build_invalid_chain_op_warrant(&warrantee_b, &action_b, 2);
+    let valid_hash = valid.as_hash().clone();
+    store.record_incoming_ops(vec![valid]).await.unwrap();
+    store
+        .record_warrant_sys_validation_outcomes(vec![(valid_hash, SysOutcome::Accepted)])
+        .await
+        .unwrap();
+    store.integrate_ready_ops(Timestamp::now()).await.unwrap();
+    assert!(store
+        .as_read()
+        .is_action_warranted_as_invalid(&action_b, &warrantee_b)
+        .await
+        .unwrap());
+
+    // Case C: a rejected, integrated warrant must NOT count (a disproven
+    // accusation cannot mark the action invalid).
+    let warrantee_c = agent(72);
+    let action_c = ActionHash::from_raw_36(vec![0x33; 36]);
+    let rejected = build_invalid_chain_op_warrant(&warrantee_c, &action_c, 3);
+    let rejected_hash = rejected.as_hash().clone();
+    store.record_incoming_ops(vec![rejected]).await.unwrap();
+    store
+        .record_warrant_sys_validation_outcomes(vec![(rejected_hash, SysOutcome::Rejected)])
+        .await
+        .unwrap();
+    store.integrate_ready_ops(Timestamp::now()).await.unwrap();
+    assert!(!store
+        .as_read()
+        .is_action_warranted_as_invalid(&action_c, &warrantee_c)
+        .await
+        .unwrap());
+}
+
 #[tokio::test]
 async fn reject_chain_op_rejects_integrated_op() {
     use holochain_zome_types::dht_v2::RecordValidity;

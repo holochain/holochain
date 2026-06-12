@@ -34,6 +34,8 @@ pub struct InsertWarrant<'a> {
     pub when_received: Timestamp,
     /// Microsecond timestamp at which the warrant was integrated.
     pub when_integrated: Timestamp,
+    /// Terminal sys-validation status (1 = accepted/valid, 2 = rejected).
+    pub validation_status: i64,
     /// Wire-size of the warrant in bytes.
     pub serialized_size: u32,
 }
@@ -65,18 +67,55 @@ pub(crate) async fn insert_warrant<'a>(
 
     sqlx::query(
         "INSERT INTO WarrantOp (hash, storage_center_loc, when_received,
-                                when_integrated, serialized_size)
-         VALUES (?, ?, ?, ?, ?)",
+                                when_integrated, validation_status, serialized_size)
+         VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind(w.hash.get_raw_36())
     .bind(w.storage_center_loc as i64)
     .bind(w.when_received.as_micros())
     .bind(w.when_integrated.as_micros())
+    .bind(w.validation_status)
     .bind(w.serialized_size as i64)
     .execute(&mut *conn)
     .await?;
 
     Ok(())
+}
+
+/// Serialized `WarrantProof`s of warrants against `warrantee` that are still
+/// pending validation or have been validated as **valid** — rejected and
+/// abandoned warrants are excluded.
+///
+/// Covers both stages: limbo warrants whose sys-validation is undecided or
+/// accepted (and not abandoned), and integrated warrants that were accepted.
+/// Used by `is_action_warranted_as_invalid`, which decodes each proof to look
+/// for an `InvalidChainOp` warrant naming a specific action.
+pub(crate) async fn pending_or_valid_warrant_proofs_by_warrantee<'e, E>(
+    executor: E,
+    warrantee: &AgentPubKey,
+) -> sqlx::Result<Vec<Vec<u8>>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let rows: Vec<(Vec<u8>,)> = sqlx::query_as(
+        "SELECT w.proof
+         FROM Warrant w
+         JOIN LimboWarrantOp op ON op.hash = w.hash
+         WHERE w.warrantee = ?
+           AND op.abandoned_at IS NULL
+           AND (op.sys_validation_status IS NULL OR op.sys_validation_status = 1)
+         UNION ALL
+         SELECT w.proof
+         FROM Warrant w
+         JOIN WarrantOp op ON op.hash = w.hash
+         WHERE w.warrantee = ?
+           AND op.validation_status = 1",
+    )
+    .bind(warrantee.get_raw_36())
+    .bind(warrantee.get_raw_36())
+    .fetch_all(executor)
+    .await?;
+    Ok(rows.into_iter().map(|(proof,)| proof).collect())
 }
 
 pub(crate) async fn get_warrant<'e, E>(

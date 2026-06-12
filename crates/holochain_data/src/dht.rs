@@ -728,6 +728,7 @@ mod tests {
             storage_center_loc: 88,
             when_received: Timestamp::from_micros(40),
             when_integrated: Timestamp::from_micros(50),
+            validation_status: 1,
             serialized_size: 128,
         })
         .await
@@ -882,6 +883,7 @@ mod tests {
             storage_center_loc: 0,
             when_received: Timestamp::from_micros(3),
             when_integrated: Timestamp::from_micros(5),
+            validation_status: 1,
             serialized_size: 64,
         })
         .await
@@ -1336,6 +1338,12 @@ mod tests {
         })
         .await
         .unwrap();
+
+        // Only warrants with a terminal sys-validation status are promoted; the
+        // status is carried into `WarrantOp.validation_status`.
+        db.set_limbo_warrant_sys_validation_status(&hash, Some(1))
+            .await
+            .unwrap();
 
         let promoted = db
             .promote_limbo_warrant(&hash, Timestamp::from_micros(200))

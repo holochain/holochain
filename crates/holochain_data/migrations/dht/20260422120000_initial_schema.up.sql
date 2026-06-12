@@ -183,6 +183,10 @@ CREATE TABLE WarrantOp (
     storage_center_loc INTEGER NOT NULL,
     when_received      INTEGER NOT NULL,
     when_integrated    INTEGER NOT NULL,
+    -- Terminal sys-validation outcome carried over from limbo at promotion:
+    -- 1 = accepted (valid), 2 = rejected. Both valid and rejected warrants are
+    -- integrated, so readers that must ignore disproven warrants filter on this.
+    validation_status  INTEGER NOT NULL,
     serialized_size    INTEGER NOT NULL,
     FOREIGN KEY(hash) REFERENCES Warrant(hash)
 ) STRICT, WITHOUT ROWID;

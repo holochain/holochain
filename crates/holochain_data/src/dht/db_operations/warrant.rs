@@ -27,4 +27,14 @@ impl DbRead<Dht> {
     ) -> sqlx::Result<Vec<WarrantRow>> {
         warrant::get_warrants_by_warrantee(self.pool(), warrantee).await
     }
+
+    /// Serialized `WarrantProof`s of pending-or-valid warrants against
+    /// `warrantee`. See
+    /// [`warrant::pending_or_valid_warrant_proofs_by_warrantee`].
+    pub async fn pending_or_valid_warrant_proofs_by_warrantee(
+        &self,
+        warrantee: &AgentPubKey,
+    ) -> sqlx::Result<Vec<Vec<u8>>> {
+        warrant::pending_or_valid_warrant_proofs_by_warrantee(self.pool(), warrantee).await
+    }
 }
