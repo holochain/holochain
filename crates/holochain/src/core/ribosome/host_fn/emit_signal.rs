@@ -2,7 +2,6 @@ use crate::core::metrics::emit_signal_metric;
 use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
-use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use holochain_types::signal::Signal;
 use holochain_wasmer_host::prelude::*;

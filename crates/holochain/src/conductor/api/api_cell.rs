@@ -5,7 +5,6 @@ use super::error::ConductorApiResult;
 use crate::conductor::error::ConductorResult;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
-use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::workflow::ZomeCallResult;
 use async_trait::async_trait;
 use holochain_keystore::MetaLairClient;

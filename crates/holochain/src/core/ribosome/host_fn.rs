@@ -1,5 +1,4 @@
 use super::{CallContext, Ribosome};
-use super::RibosomeT;
 use holochain_cascade::CascadeImpl;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;

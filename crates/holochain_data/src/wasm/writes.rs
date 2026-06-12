@@ -1,7 +1,7 @@
 use holo_hash::{AgentPubKey, HashableContentExtSync};
 use holochain_types::prelude::{DnaDef, DnaWasmHashed, EntryDef, WasmZome, ZomeDef};
 use sqlx::{Acquire, Executor, Sqlite};
-
+use holochain_zome_types::zome::InlineZomeDef;
 use crate::models::wasm::{CoordinatorZomeModel, DnaDefModel, EntryDefModel, IntegrityZomeModel};
 
 use super::inner_writes;
@@ -112,7 +112,7 @@ fn extract_dependencies(zome_def: &ZomeDef) -> Vec<String> {
             .iter()
             .map(|n| n.0.as_ref().to_string())
             .collect(),
-        ZomeDef::Inline { dependencies, .. } => dependencies
+        ZomeDef::Inline(InlineZomeDef { dependencies, .. }) => dependencies
             .iter()
             .map(|n| n.0.as_ref().to_string())
             .collect(),

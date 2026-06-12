@@ -3,7 +3,6 @@ use crate::conductor::error::ConductorError;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitHostAccess;
 use crate::core::ribosome::{HostFnAccess, Ribosome};
 use crate::core::ribosome::RibosomeError;
-use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallParamsSigned;
 use crate::core::ribosome::{CallContext, HostContext, ZomeCallHostAccess};
 use futures::future::join_all;

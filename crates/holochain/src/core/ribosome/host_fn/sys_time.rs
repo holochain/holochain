@@ -1,7 +1,6 @@
 use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
-use crate::core::ribosome::RibosomeT;
 use holochain_types::access::Permission;
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::prelude::Timestamp;

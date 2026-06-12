@@ -66,6 +66,10 @@ pub struct DnaFile {
 
     /// The bytes of the WASM zomes referenced in the Dna portion.
     pub(super) code: WasmMap,
+
+    /// The inline zomes for this DNA.
+    #[serde(skip)]
+    pub(super) inline_zomes: Vec<DynInlineZome>,
 }
 
 impl From<DnaFile> for (DnaDef, Vec<wasm::DnaWasm>) {
@@ -90,6 +94,17 @@ impl DnaFile {
         Self {
             dna,
             code: code.into(),
+            inline_zomes: Vec::with_capacity(0),
+        }
+    }
+
+    /// Construct a new instance from inline zomes.
+    pub async fn new_inline(dna: DnaDef, inline_zomes: Vec<DynInlineZome>) -> Self {
+        let dna = DnaDefHashed::from_content_sync(dna);
+        Self {
+            dna,
+            code: BTreeMap::default().into(),
+            inline_zomes,
         }
     }
 
@@ -164,7 +179,7 @@ impl DnaFile {
     /// Construct a DnaFile from its constituent parts
     #[cfg(feature = "test_utils")]
     pub fn from_parts(dna: DnaDefHashed, code: WasmMap) -> Self {
-        Self { dna, code }
+        Self { dna, code, inline_zomes: Vec::with_capacity(0) }
     }
 
     /// Split a DnaFile into its constituent parts
@@ -214,6 +229,11 @@ impl DnaFile {
     /// The bytes of the WASM zomes referenced in the Dna portion.
     pub fn code(&self) -> &BTreeMap<holo_hash::WasmHash, wasm::DnaWasm> {
         &self.code.0
+    }
+
+    /// The inline zomes.
+    pub fn inline_zomes(&self) -> &Vec<DynInlineZome> {
+        &self.inline_zomes
     }
 
     /// Fetch the Webassembly byte code for a zome.

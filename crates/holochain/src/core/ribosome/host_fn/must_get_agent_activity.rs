@@ -3,7 +3,6 @@ use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
-use crate::core::ribosome::RibosomeT;
 use holochain_cascade::CascadeImpl;
 use holochain_p2p::actor::NetworkRequestOptions;
 use holochain_state::mutations::insert_op_cache;

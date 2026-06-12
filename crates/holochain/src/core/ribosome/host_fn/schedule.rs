@@ -1,6 +1,5 @@
 use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::RibosomeError;
-use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;

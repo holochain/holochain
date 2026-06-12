@@ -1,5 +1,6 @@
 use crate::conductor::space::TestSpace;
-use crate::core::ribosome::{MockRibosomeT, ZomesToInvoke};
+use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
+use crate::core::ribosome::ZomesToInvoke;
 use crate::core::validation::OutcomeOrError;
 use crate::core::workflow::app_validation_workflow::{
     get_zomes_to_invoke, put_validation_limbo, Outcome,
@@ -16,6 +17,7 @@ use holochain_state::validation_db::ValidationStage;
 use holochain_types::dht_op::{ChainOp, DhtOpHashed};
 use holochain_types::rate_limit::{EntryRateWeight, RateWeight};
 use holochain_zome_types::action::{AppEntryDef, Create, Delete, EntryType, Update, ZomeIndex};
+use holochain_zome_types::dna_def::DnaDefBuilder;
 use holochain_zome_types::fixt::{
     ActionFixturator, CreateFixturator, CreateLinkFixturator, DeleteLinkFixturator,
     EntryFixturator, SignatureFixturator, UpdateFixturator,
@@ -34,7 +36,7 @@ use std::sync::Arc;
 async fn register_agent_activity() {
     let zomes = SweetInlineZomes::new(vec![], 0);
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
-    let ribosome = MockRibosomeT::new();
+    let ribosome = MockRibosomeBuilder::new().build().await.unwrap();
 
     let action = fixt!(Action);
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
@@ -72,14 +74,10 @@ async fn store_entry_create_app_entry() {
     let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let zome = &integrity_zomes[0];
     let zome_index = ZomeIndex(0);
-    let mut ribosome = MockRibosomeT::new();
-    ribosome.expect_get_integrity_zome().return_once({
-        let zome = zome.clone();
-        move |index| {
-            assert_eq!(index, &zome_index, "expected zome index {zome_index:?}");
-            Some(zome)
-        }
-    });
+    let ribosome = MockRibosomeBuilder::new_with_dna_def(dna_file.dna_def_hashed().clone())
+        .build()
+        .await
+        .unwrap();
 
     let entry = fixt!(Entry);
     let create = Create {
@@ -131,14 +129,10 @@ async fn store_entry_create_non_app_entry() {
     let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let zome = &integrity_zomes[0];
     let zome_index = ZomeIndex(0);
-    let mut ribosome = MockRibosomeT::new();
-    ribosome.expect_get_integrity_zome().return_once({
-        let zome = zome.clone();
-        move |index| {
-            assert_eq!(index, &zome_index, "expected zome index {zome_index:?}");
-            Some(zome)
-        }
-    });
+    let ribosome = MockRibosomeBuilder::new_with_dna_def(dna_file.dna_def_hashed().clone())
+        .build()
+        .await
+        .unwrap();
 
     let entry = fixt!(Entry);
     let create = Create {
@@ -186,14 +180,10 @@ async fn store_entry_update_app_entry() {
     let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let zome = &integrity_zomes[0];
     let zome_index = ZomeIndex(0);
-    let mut ribosome = MockRibosomeT::new();
-    ribosome.expect_get_integrity_zome().return_once({
-        let zome = zome.clone();
-        move |index| {
-            assert_eq!(index, &zome_index, "expected zome index {zome_index:?}");
-            Some(zome)
-        }
-    });
+    let ribosome = MockRibosomeBuilder::new_with_dna_def(dna_file.dna_def_hashed().clone())
+        .build()
+        .await
+        .unwrap();
 
     let entry = fixt!(Entry);
     let update = Update {
@@ -247,14 +237,10 @@ async fn store_entry_update_non_app_entry() {
     let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let zome = &integrity_zomes[0];
     let zome_index = ZomeIndex(0);
-    let mut ribosome = MockRibosomeT::new();
-    ribosome.expect_get_integrity_zome().return_once({
-        let zome = zome.clone();
-        move |index| {
-            assert_eq!(index, &zome_index, "expected zome index {zome_index:?}");
-            Some(zome)
-        }
-    });
+    let ribosome = MockRibosomeBuilder::new_with_dna_def(dna_file.dna_def_hashed().clone())
+        .build()
+        .await
+        .unwrap();
 
     let entry = fixt!(Entry);
     let update = Update {
@@ -304,14 +290,10 @@ async fn store_record_create_app_entry() {
     let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let zome = &integrity_zomes[0];
     let zome_index = ZomeIndex(0);
-    let mut ribosome = MockRibosomeT::new();
-    ribosome.expect_get_integrity_zome().return_once({
-        let zome = zome.clone();
-        move |index| {
-            assert_eq!(index, &zome_index, "expected zome index {zome_index:?}");
-            Some(zome)
-        }
-    });
+    let ribosome = MockRibosomeBuilder::new_with_dna_def(dna_file.dna_def_hashed().clone())
+        .build()
+        .await
+        .unwrap();
 
     let entry = fixt!(Entry);
     let action = Action::Create(Create {
@@ -358,7 +340,7 @@ async fn store_record_create_app_entry() {
 async fn store_record_create_non_app_entry() {
     let zomes = SweetInlineZomes::new(vec![], 0);
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
-    let ribosome = MockRibosomeT::new();
+    let ribosome = MockRibosomeBuilder::new().build().await.unwrap();
 
     let action = Action::Create(Create {
         action_seq: 0,
@@ -402,13 +384,7 @@ async fn store_record_create_wrong_entry() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     // zome with index 1 does not exist
     let zome_index = ZomeIndex(1);
-    let mut ribosome = MockRibosomeT::new();
-    ribosome
-        .expect_get_integrity_zome()
-        .return_once(move |index| {
-            assert_eq!(index, &zome_index, "expected zome index {zome_index:?}");
-            None
-        });
+    let ribosome = MockRibosomeBuilder::new_with_dna_def(dna_file.dna_def_hashed().clone()).build().await.unwrap();
 
     let entry = fixt!(Entry);
     let action = Action::Create(Create {
@@ -458,14 +434,10 @@ async fn store_record_create_link() {
     let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let zome = &integrity_zomes[0];
     let zome_index = ZomeIndex(0);
-    let mut ribosome = MockRibosomeT::new();
-    ribosome.expect_get_integrity_zome().return_once({
-        let zome = zome.clone();
-        move |index| {
-            assert_eq!(index, &zome_index, "expected zome index {zome_index:?}");
-            Some(zome)
-        }
-    });
+    let ribosome = MockRibosomeBuilder::new_with_dna_def(dna_file.dna_def_hashed().clone())
+        .build()
+        .await
+        .unwrap();
 
     let mut create_link = fixt!(CreateLink);
     create_link.zome_index = zome_index;
@@ -503,14 +475,10 @@ async fn store_record_update_app_entry() {
     let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let zome = &integrity_zomes[0];
     let zome_index = ZomeIndex(0);
-    let mut ribosome = MockRibosomeT::new();
-    ribosome.expect_get_integrity_zome().return_once({
-        let zome = zome.clone();
-        move |index| {
-            assert_eq!(index, &zome_index, "expected zome index {zome_index:?}");
-            Some(zome)
-        }
-    });
+    let ribosome = MockRibosomeBuilder::new_with_dna_def(dna_file.dna_def_hashed().clone())
+        .build()
+        .await
+        .unwrap();
 
     let mut create = fixt!(Create);
     create.entry_type = EntryType::App(AppEntryDef {
@@ -564,7 +532,7 @@ async fn store_record_update_app_entry() {
 async fn store_record_update_non_app_entry() {
     let zomes = SweetInlineZomes::new(vec![], 0);
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
-    let ribosome = MockRibosomeT::new();
+    let ribosome = MockRibosomeBuilder::new().build().await.unwrap();
 
     let mut create = fixt!(Create);
     create.entry_type = EntryType::CapGrant;
@@ -612,14 +580,10 @@ async fn store_record_update_of_update_app_entry() {
     let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let zome = &integrity_zomes[0];
     let zome_index = ZomeIndex(0);
-    let mut ribosome = MockRibosomeT::new();
-    ribosome.expect_get_integrity_zome().return_once({
-        let zome = zome.clone();
-        move |index| {
-            assert_eq!(index, &zome_index, "expected zome index {zome_index:?}");
-            Some(zome)
-        }
-    });
+    let ribosome = MockRibosomeBuilder::new_with_dna_def(dna_file.dna_def_hashed().clone())
+        .build()
+        .await
+        .unwrap();
 
     let mut create = fixt!(Create);
     create.entry_type = EntryType::App(AppEntryDef {
@@ -690,14 +654,10 @@ async fn store_record_delete_without_entry() {
     let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let zome = &integrity_zomes[0];
     let zome_index = ZomeIndex(0);
-    let mut ribosome = MockRibosomeT::new();
-    ribosome.expect_get_integrity_zome().return_once({
-        let zome = zome.clone();
-        move |index| {
-            assert_eq!(index, &zome_index, "expected zome index {zome_index:?}");
-            Some(zome)
-        }
-    });
+    let ribosome = MockRibosomeBuilder::new_with_dna_def(dna_file.dna_def_hashed().clone())
+        .build()
+        .await
+        .unwrap();
 
     let mut create = fixt!(Create);
     create.entry_type = EntryType::App(AppEntryDef {
@@ -757,7 +717,7 @@ async fn store_record_delete_without_entry() {
 async fn store_record_delete_non_app_entry() {
     let zomes = SweetInlineZomes::new(vec![], 0);
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
-    let ribosome = MockRibosomeT::new();
+    let ribosome = MockRibosomeBuilder::new().build().await.unwrap();
 
     let mut create = fixt!(Create);
     create.entry_type = EntryType::CapGrant;
@@ -815,14 +775,10 @@ async fn store_record_delete_link() {
     let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let zome = &integrity_zomes[0];
     let zome_index = ZomeIndex(0);
-    let mut ribosome = MockRibosomeT::new();
-    ribosome.expect_get_integrity_zome().return_once({
-        let zome = zome.clone();
-        move |index| {
-            assert_eq!(index, &zome_index, "expected zome index {zome_index:?}");
-            Some(zome)
-        }
-    });
+    let ribosome = MockRibosomeBuilder::new_with_dna_def(dna_file.dna_def_hashed().clone())
+        .build()
+        .await
+        .unwrap();
 
     let mut create_link = fixt!(CreateLink);
     create_link.zome_index = zome_index;
@@ -874,14 +830,10 @@ async fn register_update_app_entry() {
     let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let zome = &integrity_zomes[0];
     let zome_index = ZomeIndex(0);
-    let mut ribosome = MockRibosomeT::new();
-    ribosome.expect_get_integrity_zome().return_once({
-        let zome = zome.clone();
-        move |index| {
-            assert_eq!(index, &zome_index, "expected zome index {zome_index:?}");
-            Some(zome)
-        }
-    });
+    let ribosome = MockRibosomeBuilder::new_with_dna_def(dna_file.dna_def_hashed().clone())
+        .build()
+        .await
+        .unwrap();
 
     let entry = fixt!(Entry);
     let update = Update {
@@ -932,7 +884,7 @@ async fn register_update_app_entry() {
 async fn register_update_non_app_entry() {
     let zomes = SweetInlineZomes::new(vec![], 0);
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
-    let ribosome = MockRibosomeT::new();
+    let ribosome = MockRibosomeBuilder::new().build().await.unwrap();
 
     let entry = fixt!(Entry);
     let update = Update {
@@ -981,14 +933,10 @@ async fn register_delete_create_app_entry() {
     let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let zome = &integrity_zomes[0];
     let zome_index = ZomeIndex(0);
-    let mut ribosome = MockRibosomeT::new();
-    ribosome.expect_get_integrity_zome().return_once({
-        let zome = zome.clone();
-        move |index| {
-            assert_eq!(index, &zome_index, "expected zome index {zome_index:?}");
-            Some(zome)
-        }
-    });
+    let ribosome = MockRibosomeBuilder::new_with_dna_def(dna_file.dna_def_hashed().clone())
+        .build()
+        .await
+        .unwrap();
 
     let mut create = fixt!(Create);
     create.entry_type = EntryType::App(AppEntryDef {
@@ -1050,15 +998,10 @@ async fn register_delete_create_non_app_entry() {
     let zomes = SweetInlineZomes::new(vec![], 0);
     let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let zome = &integrity_zomes[0];
-    let zome_index = ZomeIndex(0);
-    let mut ribosome = MockRibosomeT::new();
-    ribosome.expect_get_integrity_zome().return_once({
-        let zome = zome.clone();
-        move |index| {
-            assert_eq!(index, &zome_index, "expected zome index {zome_index:?}");
-            Some(zome)
-        }
-    });
+    let ribosome = MockRibosomeBuilder::new_with_dna_def(dna_file.dna_def_hashed().clone())
+        .build()
+        .await
+        .unwrap();
 
     let mut create = fixt!(Create);
     create.entry_type = EntryType::CapGrant;
@@ -1117,14 +1060,10 @@ async fn register_delete_update_app_entry() {
     let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let zome = &integrity_zomes[0];
     let zome_index = ZomeIndex(0);
-    let mut ribosome = MockRibosomeT::new();
-    ribosome.expect_get_integrity_zome().return_once({
-        let zome = zome.clone();
-        move |index| {
-            assert_eq!(index, &zome_index, "expected zome index {zome_index:?}");
-            Some(zome)
-        }
-    });
+    let ribosome = MockRibosomeBuilder::new_with_dna_def(dna_file.dna_def_hashed().clone())
+        .build()
+        .await
+        .unwrap();
 
     let mut update = fixt!(Update);
     update.entry_type = EntryType::App(AppEntryDef {
@@ -1187,14 +1126,10 @@ async fn register_delete_update_non_app_entry() {
     let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let zome = &integrity_zomes[0];
     let zome_index = ZomeIndex(0);
-    let mut ribosome = MockRibosomeT::new();
-    ribosome.expect_get_integrity_zome().return_once({
-        let zome = zome.clone();
-        move |index| {
-            assert_eq!(index, &zome_index, "expected zome index {zome_index:?}");
-            Some(zome)
-        }
-    });
+    let ribosome = MockRibosomeBuilder::new_with_dna_def(dna_file.dna_def_hashed().clone())
+        .build()
+        .await
+        .unwrap();
 
     let mut update = fixt!(Update);
     update.entry_type = EntryType::CapClaim;
@@ -1253,14 +1188,10 @@ async fn register_create_link() {
     let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let zome = &integrity_zomes[0];
     let zome_index = ZomeIndex(0);
-    let mut ribosome = MockRibosomeT::new();
-    ribosome.expect_get_integrity_zome().return_once({
-        let zome = zome.clone();
-        move |index| {
-            assert_eq!(index, &zome_index, "expected zome index {zome_index:?}");
-            Some(zome)
-        }
-    });
+    let ribosome = MockRibosomeBuilder::new_with_dna_def(dna_file.dna_def_hashed().clone())
+        .build()
+        .await
+        .unwrap();
 
     let mut create_link = fixt!(CreateLink);
     create_link.zome_index = zome_index;
@@ -1298,14 +1229,10 @@ async fn register_delete_link() {
     let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let zome = &integrity_zomes[0];
     let zome_index = ZomeIndex(0);
-    let mut ribosome = MockRibosomeT::new();
-    ribosome.expect_get_integrity_zome().return_once({
-        let zome = zome.clone();
-        move |index| {
-            assert_eq!(index, &zome_index, "expected zome index {zome_index:?}");
-            Some(zome)
-        }
-    });
+    let ribosome = MockRibosomeBuilder::new_with_dna_def(dna_file.dna_def_hashed().clone())
+        .build()
+        .await
+        .unwrap();
 
     let mut create_link = fixt!(CreateLink);
     create_link.zome_index = zome_index;

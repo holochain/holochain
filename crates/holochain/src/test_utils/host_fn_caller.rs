@@ -5,7 +5,6 @@ use crate::conductor::api::CellConductorApiT;
 use crate::conductor::api::CellConductorReadHandle;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::{host_fn, Ribosome};
-use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::InvocationAuth;

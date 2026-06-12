@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::core::ribosome::{check_clone_access::check_clone_access, error::RibosomeError, CallContext, Ribosome, RibosomeT};
+use crate::core::ribosome::{check_clone_access::check_clone_access, error::RibosomeError, CallContext, Ribosome};
 use holochain_types::{
     access::{HostFnAccess, Permission},
     app::DisableCloneCellPayload,

@@ -1,6 +1,6 @@
 //! Defines a store type for ribosomes and entry definitions.
 
-use crate::core::ribosome::{real_ribosome::RealRibosome, Ribosome};
+use crate::core::ribosome::Ribosome;
 use holochain_types::{prelude::*, share::RwShare};
 use holochain_zome_types::entry_def::EntryDef;
 use std::collections::{HashMap, HashSet};

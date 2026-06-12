@@ -1,7 +1,6 @@
 use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::RibosomeError;
-use crate::core::ribosome::RibosomeT;
 use holochain_state::source_chain::SourceChainError;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;

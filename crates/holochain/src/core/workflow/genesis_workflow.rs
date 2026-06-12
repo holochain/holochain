@@ -167,7 +167,6 @@ impl GenesisWorkspace {
 mod tests {
     use super::*;
     use crate::conductor::api::MockCellConductorApiT;
-    use crate::core::ribosome::MockRibosomeT;
     use holochain_keystore::test_keystore;
     use holochain_state::prelude::test_dht_db;
     use holochain_state::{prelude::test_authored_db, source_chain::SourceChain};
@@ -176,6 +175,7 @@ mod tests {
     use holochain_types::test_utils::fake_dna_file;
     use holochain_zome_types::Action;
     use matches::assert_matches;
+    use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn genesis_initializes_source_chain() {
@@ -194,13 +194,9 @@ mod tests {
 
             let mut api = MockCellConductorApiT::new();
             api.expect_keystore().return_const(keystore.clone());
-            let mut ribosome = MockRibosomeT::new();
-            let ribosome = Ribosome::new(dna.dna_def_hashed().clone(), ribosome);
-            ribosome
-                .expect_run_genesis_self_check()
-                .returning(|_, _| Ok(GenesisSelfCheckResult::Valid));
             let dna_def = DnaDefHashed::from_content_sync(dna.dna_def().clone());
-            ribosome.expect_dna_def_hashed().return_const(dna_def);
+            let ribosome = MockRibosomeBuilder::new_with_dna_def(dna_def).with_genesis_self_check_handler(|_, _| Ok(GenesisSelfCheckResult::Valid)).build().await.unwrap();
+
             let args = GenesisWorkflowArgs {
                 cell_id: CellId::new(dna.dna_hash().clone(), author.clone()),
                 membrane_proof: None,

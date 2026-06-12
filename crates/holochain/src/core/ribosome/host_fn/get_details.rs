@@ -2,7 +2,6 @@ use crate::core::ribosome::host_fn::cascade_from_call_context;
 use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
-use crate::core::ribosome::RibosomeT;
 use futures::future::join_all;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;

@@ -5,7 +5,6 @@
 //! opening the possibility that we might support applications written in other
 //! languages and environments.
 
-use std::cell::RefCell;
 use self::guest_callback::{
     entry_defs::EntryDefsInvocation, genesis_self_check::GenesisSelfCheckResult,
 };
@@ -43,76 +42,18 @@ use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_types::prelude::*;
 use holochain_types::zome_types::{GlobalZomeTypes, ZomeTypesError};
-use holochain_wasmer_host::prelude::{wasm_error, WasmErrorInner};
+use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner};
 use holochain_zome_types::block::BlockTargetId;
 use mockall::automock;
-use must_future::MustBoxFuture;
 use std::collections::HashMap;
 use std::iter::Iterator;
 use std::sync::Arc;
-use std::sync::atomic::AtomicU64;
-use holochain_wasmer_host::env::Env;
 use holochain_wasmer_host::error::WasmHostError;
-use once_cell::sync::Lazy;
 use opentelemetry::KeyValue;
 use tokio::sync::broadcast;
 use tokio_stream::StreamExt;
-use wasmer::{Exports, Function, FunctionEnv, FunctionEnvMut, Imports, RuntimeError, Store};
-use hdk::prelude::{GuestPtr, Len, WasmError};
-use holochain_state::prelude::WasmStore;
-use crate::core::metrics::{host_fn_call_duration_metric, ribosome_zome_call_duration_metric};
-use crate::core::ribosome::host_fn::agent_info::agent_info;
-use crate::core::ribosome::host_fn::call::call;
-use crate::core::ribosome::host_fn::call_info::call_info;
-use crate::core::ribosome::host_fn::capability_claims::capability_claims;
-use crate::core::ribosome::host_fn::capability_grants::capability_grants;
-use crate::core::ribosome::host_fn::capability_info::capability_info;
-use crate::core::ribosome::host_fn::close_chain::close_chain;
-use crate::core::ribosome::host_fn::count_links::count_links;
-use crate::core::ribosome::host_fn::create::create;
-use crate::core::ribosome::host_fn::create_clone_cell::create_clone_cell;
-use crate::core::ribosome::host_fn::create_link::create_link;
-use crate::core::ribosome::host_fn::create_x25519_keypair::create_x25519_keypair;
-use crate::core::ribosome::host_fn::delete::delete;
-use crate::core::ribosome::host_fn::delete_clone_cell::delete_clone_cell;
-use crate::core::ribosome::host_fn::delete_link::delete_link;
-use crate::core::ribosome::host_fn::disable_clone_cell::disable_clone_cell;
-use crate::core::ribosome::host_fn::dna_info_1::dna_info_1;
-use crate::core::ribosome::host_fn::dna_info_2::dna_info_2;
-use crate::core::ribosome::host_fn::ed_25519_x_salsa20_poly1305_decrypt::ed_25519_x_salsa20_poly1305_decrypt;
-use crate::core::ribosome::host_fn::ed_25519_x_salsa20_poly1305_encrypt::ed_25519_x_salsa20_poly1305_encrypt;
-use crate::core::ribosome::host_fn::emit_signal::emit_signal;
-use crate::core::ribosome::host_fn::enable_clone_cell::enable_clone_cell;
-use crate::core::ribosome::host_fn::get::get;
-use crate::core::ribosome::host_fn::get_agent_activity::get_agent_activity;
-use crate::core::ribosome::host_fn::get_details::get_details;
-use crate::core::ribosome::host_fn::get_links::get_links;
-use crate::core::ribosome::host_fn::get_links_details::get_links_details;
-use crate::core::ribosome::host_fn::get_validation_receipts::get_validation_receipts;
-use crate::core::ribosome::host_fn::must_get_action::must_get_action;
-use crate::core::ribosome::host_fn::must_get_agent_activity::must_get_agent_activity;
-use crate::core::ribosome::host_fn::must_get_entry::must_get_entry;
-use crate::core::ribosome::host_fn::must_get_valid_record::must_get_valid_record;
-use crate::core::ribosome::host_fn::open_chain::open_chain;
-use crate::core::ribosome::host_fn::query::query;
-use crate::core::ribosome::host_fn::random_bytes::random_bytes;
-use crate::core::ribosome::host_fn::schedule::schedule;
-use crate::core::ribosome::host_fn::send_remote_signal::send_remote_signal;
-use crate::core::ribosome::host_fn::sign::sign;
-use crate::core::ribosome::host_fn::sign_ephemeral::sign_ephemeral;
-use crate::core::ribosome::host_fn::sys_time::sys_time;
-use crate::core::ribosome::host_fn::trace::trace;
-use crate::core::ribosome::host_fn::update::update;
-use crate::core::ribosome::host_fn::verify_signature::verify_signature;
-use crate::core::ribosome::host_fn::x_25519_x_salsa20_poly1305_decrypt::x_25519_x_salsa20_poly1305_decrypt;
-use crate::core::ribosome::host_fn::x_25519_x_salsa20_poly1305_encrypt::x_25519_x_salsa20_poly1305_encrypt;
-use crate::core::ribosome::host_fn::x_salsa20_poly1305_decrypt::x_salsa20_poly1305_decrypt;
-use crate::core::ribosome::host_fn::x_salsa20_poly1305_encrypt::x_salsa20_poly1305_encrypt;
-use crate::core::ribosome::host_fn::x_salsa20_poly1305_shared_secret_create_random::x_salsa20_poly1305_shared_secret_create_random;
-use crate::core::ribosome::host_fn::x_salsa20_poly1305_shared_secret_export::x_salsa20_poly1305_shared_secret_export;
-use crate::core::ribosome::host_fn::x_salsa20_poly1305_shared_secret_ingest::x_salsa20_poly1305_shared_secret_ingest;
-use crate::core::ribosome::host_fn::zome_info::zome_info;
-use crate::core::ribosome::real_ribosome::{make_module_cache, RealRibosome, WasmBackend};
+use wasmer::RuntimeError;
+use crate::core::metrics::ribosome_zome_call_duration_metric;
 
 // This allow is here because #[automock] automaticaly creates a struct without
 // documentation, and there seems to be no way to add docs to it after the fact
@@ -166,6 +107,8 @@ mod check_clone_access;
 
 #[cfg(feature = "test_utils")]
 pub mod inline_ribosome;
+#[cfg(feature = "test_utils")]
+pub mod mock_ribosome;
 
 #[derive(Clone)]
 pub struct CallContext {
@@ -615,31 +558,6 @@ impl ZomeCallInvocation {
     }
 }
 
-// impl From<ZomeCallInvocation> for ZomeCallParams {
-//     fn from(inv: ZomeCallInvocation) -> Self {
-//         let ZomeCallInvocation {
-//             cell_id,
-//             zome,
-//             fn_name,
-//             cap_secret,
-//             payload,
-//             provenance,
-//             nonce,
-//             expires_at,
-//         } = inv;
-//         Self {
-//             cell_id,
-//             provenance,
-//             zome_name: zome.zome_name().clone(),
-//             fn_name,
-//             cap_secret,
-//             payload: payload.take(),
-//             nonce,
-//             expires_at,
-//         }
-//     }
-// }
-
 #[derive(Clone, Constructor)]
 pub struct ZomeCallHostAccess {
     pub workspace: HostFnWorkspace,
@@ -667,11 +585,11 @@ impl From<&ZomeCallHostAccess> for HostFnAccess {
     }
 }
 
-pub type DynRibosomeT = Arc<dyn RibosomeT>;
+pub type DynRibosomeT = Arc<dyn RibosomeImplT>;
 
 /// A ribosome for running hApp code.
 ///
-/// This structure provides the common logic for execution logic and delegates to a [RibosomeT]
+/// This structure provides the common logic for execution logic and delegates to a [RibosomeImplT]
 /// implementation for executing calls.
 #[derive(Clone)]
 pub struct Ribosome {
@@ -692,7 +610,7 @@ pub struct Ribosome {
 }
 
 impl Ribosome {
-    pub async fn new<R: RibosomeT + 'static>(dna_def: DnaDefHashed, ribosome_impl: R) -> RibosomeResult<Self> {
+    pub async fn new<R: RibosomeImplT + 'static>(dna_def: DnaDefHashed, ribosome_impl: R) -> RibosomeResult<Self> {
         let inner = Arc::new(ribosome_impl);
         let mut instance = Self {
             dna_def: dna_def.clone(),
@@ -780,6 +698,29 @@ impl Ribosome {
         instance.zome_dependencies = Arc::new(zome_dependencies);
 
         Ok(instance)
+    }
+
+    #[cfg(feature = "test_utils")]
+    pub async fn new_with_test_wasms(test_wasms: Vec<holochain_wasm_test_utils::TestWasm>) -> RibosomeResult<Self> {
+        let dna_def_builder = DnaDefBuilder::default();
+
+        let mut integrity_zomes: IntegrityZomes = vec![];
+        let mut coordinator_zomes: CoordinatorZomes = vec![];
+
+        let store = holochain_state::wasm::WasmStore::new(holochain_data::test_open_db(holochain_data::kind::Wasm).await.unwrap());
+        for test_wasm in test_wasms {
+            integrity_zomes.push((test_wasm.integrity_zome_name(), test_wasm.integrity_zome().def.into()));
+            coordinator_zomes.push((test_wasm.coordinator_zome_name(), test_wasm.coordinator_zome().def.into()));
+
+            let dna: DnaWasm = test_wasm.into();
+            store.put(DnaWasmHashed::from_content(dna).await).await.unwrap();
+        }
+
+        let dna_def = dna_def_builder.build().unwrap();
+        let dna_def_hashed = DnaDefHashed::from_content_sync(dna_def);
+
+        let real_ribosome = RealRibosome::new(WasmBackend::new(), dna_def_hashed.clone(), store, None).await?;
+        Ribosome::new(dna_def_hashed, real_ribosome).await
     }
 
     pub fn dna_def(&self) -> &DnaDefHashed {
@@ -1112,25 +1053,11 @@ fn zome_name_to_id(dna_def: &DnaDefHashed, zome_name: &ZomeName) -> RibosomeResu
     }
 }
 
-/// Interface for a Ribosome. Currently used only for mocking, as our only
-/// real concrete type is [`RealRibosome`](crate::core::ribosome::real_ribosome::RealRibosome)
+/// Interface for a Ribosome implementation.
+///
+/// Allows either WASM or inline ribosomes to be used with the [`Ribosome`] type.
 #[automock]
-pub trait RibosomeT: std::fmt::Debug + Send + Sync {
-    fn dna_def_hashed(&self) -> &DnaDefHashed;
-
-    fn dna_hash(&self) -> &DnaHash;
-
-    fn zome_name_to_id(&self, zome_name: &ZomeName) -> RibosomeResult<ZomeIndex> {
-        match self
-            .dna_def_hashed()
-            .all_zomes()
-            .position(|(name, _)| name == zome_name)
-        {
-            Some(index) => Ok(holochain_zome_types::action::ZomeIndex::from(index as u8)),
-            None => Err(RibosomeError::ZomeNotExists(zome_name.to_owned())),
-        }
-    }
-
+pub trait RibosomeImplT: std::fmt::Debug + Send + Sync {
     fn maybe_call(
         &self,
         ribosome: Arc<Ribosome>,

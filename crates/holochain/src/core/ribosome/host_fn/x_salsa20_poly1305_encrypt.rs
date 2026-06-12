@@ -2,7 +2,6 @@ use super::*;
 use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
-use crate::core::ribosome::RibosomeT;
 use std::sync::Arc;
 use wasmer::RuntimeError;
 

@@ -35,6 +35,7 @@ use std::path::Path;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use crate::core::ribosome::inline_ribosome::InlineZomeStore;
 
 /// A stream of signals.
 pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Sync + Unpin>;
@@ -60,6 +61,8 @@ pub struct SweetConductor {
     /// are not automatically loaded into the [`crate::conductor::ribosome_store::RibosomeStore`]
     /// on conductor restart otherwise.
     dna_files: HashMap<CellId, DnaFile>,
+    /// Store for inline zomes, to retain inline functions between conductor restarts.
+    inline_zome_store: Arc<InlineZomeStore>,
     rendezvous: Option<DynSweetRendezvous>,
 }
 
@@ -99,6 +102,7 @@ impl SweetConductor {
             keystore,
             config,
             dna_files: HashMap::new(),
+            inline_zome_store: Default::default(),
             rendezvous,
         }
     }
@@ -389,6 +393,12 @@ impl SweetConductor {
         dnas_with_roles: &[impl DnaWithRole],
         flags: Option<InstallAppCommonFlags>,
     ) -> ConductorApiResult<AgentPubKey> {
+        for d in dnas_with_roles {
+            for z in d.dna().inline_zomes().clone() {
+                self.inline_zome_store.insert(d.dna().dna_def().to_hash(), z)
+            }
+        }
+
         let agent = self
             .install_app(installed_app_id, agent, dnas_with_roles, flags)
             .await?;
@@ -603,8 +613,7 @@ impl SweetConductor {
             .raw_handle()
             .create_clone_cell(installed_app_id, payload)
             .await?;
-        let dna_file = self.get_dna_def(&clone.cell_id).unwrap();
-        self.dna_files.insert(clone.cell_id.clone(), dna_file);
+        // TODO update inline zome store for new dna hash
         Ok(clone)
     }
 
@@ -618,11 +627,6 @@ impl SweetConductor {
         coordinator_zomes: CoordinatorZomes,
         wasms: Vec<wasm::DnaWasmHashed>,
     ) -> ConductorResult<()> {
-        // Update the coordinators in the dna files cache
-        let mut dna_def = self.get_dna_def(&cell_id).unwrap();
-        let dna_def = dna_def
-            .replace_coordinators(coordinator_zomes.clone())?;
-        self.dna_files.insert(cell_id.clone(), dna_def);
         // Update the coordinators in the conductor
         self.raw_handle()
             .update_coordinators(cell_id.clone(), coordinator_zomes, wasms)

@@ -17,8 +17,6 @@ pub mod inline_zome;
 
 #[cfg(feature = "full-dna-def")]
 use inline_zome::InlineIntegrityZome;
-#[cfg(feature = "full-dna-def")]
-use std::sync::Arc;
 
 /// A Holochain Zome. Includes the ZomeDef as well as the name of the Zome.
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -150,6 +148,15 @@ pub struct WasmZome {
     pub dependencies: Vec<ZomeName>,
 }
 
+/// A zome defined by inline Rust code
+#[cfg(feature = "full-dna-def")]
+#[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct InlineZomeDef {
+    pub uuid: String,
+
+    pub dependencies: Vec<ZomeName>,
+}
+
 /// Just the definition of a Zome, without the name included. This exists
 /// mainly for use in HashMaps where ZomeDefs are keyed by ZomeName.
 ///
@@ -170,12 +177,8 @@ pub enum ZomeDef {
     Wasm(WasmZome),
 
     /// A zome defined by Rust closures. Cannot be deserialized.
-    #[serde(skip_deserializing)]
     #[cfg(feature = "full-dna-def")]
-    Inline {
-        inline_zome: self::inline_zome::DynInlineZome,
-        dependencies: Vec<ZomeName>,
-    },
+    Inline(InlineZomeDef),
 }
 
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -201,7 +204,7 @@ impl From<ZomeDef> for ZomeDefSerialized {
             ZomeDef::Wasm(zome) => Self::Wasm(zome),
 
             #[cfg(feature = "full-dna-def")]
-            ZomeDef::Inline { inline_zome, .. } => Self::InlineUid(inline_zome.0.uuid()),
+            ZomeDef::Inline(zome) => Self::InlineUid(zome.uuid),
         }
     }
 }
@@ -224,7 +227,7 @@ impl CoordinatorZomeDef {
             ZomeDef::Wasm(WasmZome { dependencies, .. }) => dependencies.push(zome_name.into()),
 
             #[cfg(feature = "full-dna-def")]
-            ZomeDef::Inline { dependencies, .. } => dependencies.push(zome_name.into()),
+            ZomeDef::Inline(InlineZomeDef { dependencies, .. }) => dependencies.push(zome_name.into()),
         }
     }
 }
@@ -232,40 +235,35 @@ impl CoordinatorZomeDef {
 #[cfg(feature = "full-dna-def")]
 impl From<InlineIntegrityZome> for ZomeDef {
     fn from(iz: InlineIntegrityZome) -> Self {
-        Self::Inline {
-            inline_zome: inline_zome::DynInlineZome(Arc::new(iz)),
-            dependencies: Default::default(),
-        }
+        Self::Inline(InlineZomeDef {
+            uuid: iz.uuid,
+            dependencies: Vec::with_capacity(0),
+        })
     }
 }
 
 #[cfg(feature = "full-dna-def")]
 impl From<InlineIntegrityZome> for IntegrityZomeDef {
     fn from(iz: InlineIntegrityZome) -> Self {
-        Self(ZomeDef::Inline {
-            inline_zome: inline_zome::DynInlineZome(Arc::new(iz)),
-            dependencies: Default::default(),
-        })
+        Self(iz.into())
     }
 }
 
+// TODO poorly defined conversion, cannot capture dependencies
 #[cfg(feature = "full-dna-def")]
 impl From<crate::prelude::InlineCoordinatorZome> for ZomeDef {
     fn from(iz: crate::prelude::InlineCoordinatorZome) -> Self {
-        Self::Inline {
-            inline_zome: inline_zome::DynInlineZome(Arc::new(iz)),
+        Self::Inline(InlineZomeDef {
+            uuid: iz.uuid,
             dependencies: Default::default(),
-        }
+        })
     }
 }
 
 #[cfg(feature = "full-dna-def")]
 impl From<crate::prelude::InlineCoordinatorZome> for CoordinatorZomeDef {
     fn from(iz: crate::prelude::InlineCoordinatorZome) -> Self {
-        Self(ZomeDef::Inline {
-            inline_zome: inline_zome::DynInlineZome(Arc::new(iz)),
-            dependencies: Default::default(),
-        })
+        Self(iz.into())
     }
 }
 
@@ -290,7 +288,7 @@ impl ZomeDef {
             ZomeDef::Wasm(WasmZome { dependencies, .. }) => &dependencies[..],
 
             #[cfg(feature = "full-dna-def")]
-            ZomeDef::Inline { dependencies, .. } => &dependencies[..],
+            ZomeDef::Inline(InlineZomeDef { dependencies, .. }) => &dependencies[..],
         }
     }
 }

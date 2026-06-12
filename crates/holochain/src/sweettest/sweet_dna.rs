@@ -3,6 +3,7 @@ use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasmPair;
 use mr_bundle::FileSystemBundler;
 use std::path::Path;
+use std::sync::Arc;
 
 /// Helpful constructors for DnaFiles used in tests
 #[derive(Clone, Debug, derive_more::From, derive_more::Into, shrinkwraprs::Shrinkwrap)]
@@ -160,12 +161,56 @@ impl SweetDnaFile {
         (dna, integrity_zomes, coordinator_zomes)
     }
 
+    /// Create a DnaFile from a collection of Zomes
+    async fn create_from_inline_zomes<I, C>(
+        network_seed: String,
+        integrity_zomes: Vec<I>,
+        coordinator_zomes: Vec<C>,
+        inline_zomes: Vec<DynInlineZome>,
+        properties: SerializedBytes,
+    ) -> (DnaFile, Vec<IntegrityZome>, Vec<CoordinatorZome>)
+    where
+        I: Into<IntegrityZome>,
+        C: Into<CoordinatorZome>,
+    {
+        let integrity_zomes: Vec<IntegrityZome> =
+            integrity_zomes.into_iter().map(Into::into).collect();
+        let coordinator_zomes: Vec<CoordinatorZome> =
+            coordinator_zomes.into_iter().map(Into::into).collect();
+        let iz: IntegrityZomes = integrity_zomes
+            .clone()
+            .into_iter()
+            .map(IntegrityZome::into_inner)
+            .collect();
+        let cz: CoordinatorZomes = coordinator_zomes
+            .clone()
+            .into_iter()
+            .map(CoordinatorZome::into_inner)
+            .collect();
+        let dna_def = DnaDefBuilder::default()
+            .modifiers(DnaModifiers {
+                network_seed,
+                properties: properties.clone(),
+            })
+            .integrity_zomes(iz)
+            .coordinator_zomes(cz)
+            .build()
+            .unwrap();
+
+        let dna_file = DnaFile::new_inline(dna_def, inline_zomes).await;
+        (dna_file, integrity_zomes, coordinator_zomes)
+    }
+
     /// Create a DnaFile from a collection of InlineZomes (no Wasm)
     pub async fn from_inline_zomes(
         network_seed: String,
         zomes: impl Into<InlineZomeSet>,
     ) -> (DnaFile, Vec<IntegrityZome>, Vec<CoordinatorZome>) {
         let mut zomes = zomes.into();
+
+        let mut inline_zomes: Vec<_> = zomes.coordinator_zomes.iter().map(|(_, c)| DynInlineZome(Arc::new(c.clone()) as Arc<dyn InlineZomeT + Send + Sync>)).collect();
+        inline_zomes.extend(zomes.integrity_zomes.iter().map(|(_, c)| DynInlineZome(Arc::new(c.clone()) as Arc<dyn InlineZomeT + Send + Sync>)));
+
         let coordinator_zomes: Vec<CoordinatorZome> = zomes
             .coordinator_zomes
             .into_iter()
@@ -179,7 +224,8 @@ impl SweetDnaFile {
                 z
             })
             .collect();
-        Self::from_zomes(
+
+        let (dna_file, iz, cz) = Self::create_from_inline_zomes(
             network_seed,
             zomes
                 .integrity_order
@@ -188,10 +234,12 @@ impl SweetDnaFile {
                 .map(|(n, z)| (n.into(), z.into()))
                 .collect(),
             coordinator_zomes,
-            Vec::<wasm::DnaWasm>::with_capacity(0),
+            inline_zomes,
             SerializedBytes::default(),
         )
-        .await
+            .await;
+
+        (dna_file, iz, cz)
     }
 
     /// Create a DnaFile from a collection of InlineZomes (no Wasm),
@@ -207,19 +255,5 @@ impl SweetDnaFile {
         Self::unique_from_inline_zomes(InlineZomeSet::new([], [], []))
             .await
             .0
-    }
-}
-
-/// Helpful constructors for DnaDefs used in tests
-pub struct SweetDnaDef;
-
-impl SweetDnaDef {
-    /// Create a DnaDef with a random network seed, useful for testing
-    // TODO: move fully into sweettest when possible
-    pub fn unique_from_zomes(
-        integrity_zomes: Vec<IntegrityZome>,
-        coordinator_zomes: Vec<CoordinatorZome>,
-    ) -> DnaDef {
-        DnaDef::unique_from_zomes(integrity_zomes, coordinator_zomes)
     }
 }

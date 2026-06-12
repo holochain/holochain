@@ -1,5 +1,5 @@
 use crate::core::ribosome::error::RibosomeError;
-use crate::core::ribosome::{CallContext, Ribosome, RibosomeT};
+use crate::core::ribosome::{CallContext, Ribosome};
 use holochain_sqlite::db::DbKindDht;
 use holochain_sqlite::prelude::DbRead;
 use holochain_state::prelude::validation_receipts_for_action;
@@ -57,12 +57,12 @@ mod tests {
     use holochain_wasm_test_utils::{TestWasm, TestWasmPair};
     use holochain_zome_types::prelude::*;
     use std::sync::Arc;
+    use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn call_get_validation_receipts() {
-        let ribosome = RealRibosomeFixturator::new(crate::fixt::Zomes(vec![TestWasm::Crd]))
-            .next()
-            .unwrap();
+        let ribosome = MockRibosomeBuilder::new().build().await.unwrap();
+
         let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
         call_context.zome = TestWasmPair::<IntegrityZome, CoordinatorZome>::from(TestWasm::Crd)
             .coordinator

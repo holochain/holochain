@@ -3,7 +3,6 @@ use crate::core::ribosome::{weigh_placeholder, Ribosome};
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
-use crate::core::ribosome::RibosomeT;
 use holochain_wasmer_host::prelude::*;
 use wasmer::RuntimeError;
 

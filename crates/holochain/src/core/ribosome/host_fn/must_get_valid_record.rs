@@ -2,7 +2,6 @@ use crate::core::ribosome::host_fn::cascade_from_call_context;
 use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::RibosomeError;
-use crate::core::ribosome::RibosomeT;
 use holochain_cascade::{CascadeImpl, CascadeOptions};
 use holochain_p2p::actor::NetworkRequestOptions;
 use holochain_types::prelude::*;
@@ -209,7 +208,7 @@ mod tests {
         let call_context = Arc::new(CallContext::new(
             alice_host_fn_caller
                 .ribosome
-                .dna_def_hashed()
+                .dna_def()
                 .get_zome(&zome_name)
                 .unwrap(),
             "".into(),

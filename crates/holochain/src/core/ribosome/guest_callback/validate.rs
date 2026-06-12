@@ -232,7 +232,7 @@ mod test {
         });
         let validate_invocation = ValidateInvocation::new(ZomesToInvoke::All, &op).unwrap();
 
-        let host_input = validate_invocation.clone().host_input().unwrap();
+        let host_input = validate_invocation.clone().take_host_input().unwrap().unwrap();
 
         assert_eq!(host_input, ExternIO::encode(&op).unwrap(),);
     }
@@ -246,7 +246,7 @@ mod slow_tests {
     use crate::conductor::CellError;
     use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
     use crate::core::ribosome::RibosomeError;
-    use crate::core::ribosome::RibosomeT;
+    use crate::core::ribosome::RibosomeImplT;
     use crate::core::ribosome::ZomesToInvoke;
     use crate::core::workflow::WorkflowError;
     use crate::fixt::Zomes;
@@ -261,6 +261,7 @@ mod slow_tests {
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::op::Op;
     use std::sync::Arc;
+    use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_unimplemented() {
@@ -276,9 +277,7 @@ mod slow_tests {
         )
         .unwrap();
 
-        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
-            .next()
-            .unwrap();
+        let ribosome = MockRibosomeBuilder::new().build().await.unwrap();
 
         let result = ribosome
             .run_validate(fixt!(ValidateHostAccess), validate_invocation)
@@ -301,9 +300,7 @@ mod slow_tests {
         )
         .unwrap();
 
-        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateValid]))
-            .next()
-            .unwrap();
+        let ribosome = MockRibosomeBuilder::new().build().await.unwrap();
 
         let result = ribosome
             .run_validate(fixt!(ValidateHostAccess), validate_invocation)
@@ -369,9 +366,7 @@ mod slow_tests {
         )
         .unwrap();
 
-        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalidParams]))
-            .next()
-            .unwrap();
+        let ribosome = MockRibosomeBuilder::new().build().await.unwrap();
 
         let err = ribosome
             .run_validate(fixt!(ValidateHostAccess), validate_invocation)
@@ -404,9 +399,7 @@ mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_implemented_multi() {
-        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalid]))
-            .next()
-            .unwrap();
+        let ribosome = MockRibosomeBuilder::new().build().await.unwrap();
 
         let agent = fixt!(AgentPubKey);
         let entry = Entry::Agent(agent.clone());

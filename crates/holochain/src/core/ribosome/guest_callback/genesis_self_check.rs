@@ -68,11 +68,11 @@ mod slow_tests {
     use super::v1;
     use super::v2;
     use super::GenesisSelfCheckInvocation;
-    use crate::core::ribosome::GenesisSelfCheckHostAccessV1;
+    use crate::core::ribosome::{GenesisSelfCheckHostAccessV1, Ribosome};
     use crate::core::ribosome::GenesisSelfCheckHostAccessV2;
     use crate::core::ribosome::{
         guest_callback::genesis_self_check::{GenesisSelfCheckHostAccess, GenesisSelfCheckResult},
-        RibosomeT,
+        RibosomeImplT,
     };
     use crate::fixt::RealRibosomeFixturator;
     use crate::fixt::Zomes;
@@ -87,8 +87,8 @@ mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_genesis_self_check_unimplemented() {
-        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
-            .next()
+        let ribosome = Ribosome::new_with_test_wasms(vec![TestWasm::Foo])
+            .await
             .unwrap();
         let invocation = invocation_fixture();
 
@@ -107,8 +107,8 @@ mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_genesis_self_check_implemented_invalid() {
-        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::GenesisSelfCheckInvalid]))
-            .next()
+        let ribosome = Ribosome::new_with_test_wasms(vec![TestWasm::GenesisSelfCheckInvalid])
+            .await
             .unwrap();
 
         let invocation = invocation_fixture();
@@ -131,8 +131,8 @@ mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_genesis_self_check_implemented_valid() {
-        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::GenesisSelfCheckValid]))
-            .next()
+        let ribosome = Ribosome::new_with_test_wasms(vec![TestWasm::GenesisSelfCheckValid])
+            .await
             .unwrap();
 
         let invocation = invocation_fixture();
@@ -153,8 +153,8 @@ mod slow_tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_genesis_self_check_implemented_valid_legacy() {
         let ribosome =
-            RealRibosomeFixturator::new(Zomes(vec![TestWasm::GenesisSelfCheckValidLegacy]))
-                .next()
+            Ribosome::new_with_test_wasms(vec![TestWasm::GenesisSelfCheckValidLegacy])
+                .await
                 .unwrap();
 
         let invocation = invocation_fixture();

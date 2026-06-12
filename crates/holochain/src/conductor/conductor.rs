@@ -68,7 +68,6 @@ use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
 use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CHANNEL_BOUND;
 use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CONCURRENT_LIMIT;
 use crate::core::ribosome::real_ribosome::{ModuleCacheLock, WasmBackend};
-use crate::core::ribosome::RibosomeT;
 use crate::core::workflow::ZomeCallResult;
 use crate::{
     conductor::api::error::ConductorApiResult, core::ribosome::real_ribosome::RealRibosome,
@@ -587,10 +586,10 @@ mod dna_impls {
         pub(crate) async fn register_dna_wasm(
             &self,
             cell_id: CellId,
-            ribosome: RealRibosome,
+            ribosome: Ribosome,
         ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
             let is_full_wasm_dna = ribosome
-                .dna_def_hashed()
+                .dna_def()
                 .all_zomes()
                 .all(|(_, zome_def)| matches!(zome_def, ZomeDef::Wasm(_)));
 
@@ -650,11 +649,12 @@ mod dna_impls {
                         async move {
                             let ribosome = RealRibosome::new(
                                 self.wasm_backend,
-                                dna_def_hashed,
+                                dna_def_hashed.clone(),
                                 wasm_store,
                                 self.wasmer_module_cache.clone(),
                             )
                             .await?;
+                            let ribosome = Ribosome::new(dna_def_hashed, ribosome).await?;
 
                             ConductorResult::Ok((cell_id, ribosome))
                         }
@@ -771,6 +771,7 @@ mod dna_impls {
                 self.wasmer_module_cache.clone(),
             )
             .await?;
+            let ribosome = Ribosome::new(dna_file.dna_def_hashed().clone(), ribosome).await?;
 
             let entry_defs = self
                 .register_dna_wasm(cell_id.clone(), ribosome.clone())

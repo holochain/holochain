@@ -57,7 +57,6 @@ mod tests {
     use crate::core::ribosome::guest_callback::call_stream;
     use crate::core::ribosome::FnComponents;
     use crate::core::ribosome::MockInvocation;
-    use crate::core::ribosome::MockRibosomeT;
     use crate::core::ribosome::ZomesToInvoke;
     use crate::fixt::FnComponentsFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
@@ -66,12 +65,11 @@ mod tests {
     use mockall::predicate::*;
     use mockall::Sequence;
     use tokio_stream::StreamExt;
+    use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn call_stream_streams() {
-        // stuff we need to test with
         let mut sequence = Sequence::new();
-        let mut ribosome = MockRibosomeT::new();
 
         let mut invocation = MockInvocation::new();
 
@@ -84,18 +82,26 @@ mod tests {
         let zomes: Vec<Zome> = zome_fixturator.take(3).collect();
         let fn_components: FnComponents = fn_components_fixturator.next().unwrap();
 
+        let dna_def = DnaDefBuilder::default()
+            .integrity_zomes(zomes.clone().into_iter().map(|z| (z.name, z.def.into())).collect())
+            .build()
+            .unwrap();
+        let dna_def_hashed = DnaDefHashed::from_content_sync(dna_def);
+
+        let mut ribosome_builder = MockRibosomeBuilder::new_with_dna_def(dna_def_hashed);
+
         invocation
             .expect_zomes()
             .times(1)
             .in_sequence(&mut sequence)
             .return_const(ZomesToInvoke::AllIntegrity);
 
-        ribosome
-            // this should happen inside the CallIterator constructor
-            .expect_zomes_to_invoke()
-            .times(1)
-            .in_sequence(&mut sequence)
-            .return_const(zomes.clone());
+        // ribosome_builder
+        //     // this should happen inside the CallIterator constructor
+        //     .expect_zomes_to_invoke()
+        //     .times(1)
+        //     .in_sequence(&mut sequence)
+        //     .return_const(zomes.clone());
 
         invocation
             .expect_fn_components()
@@ -108,7 +114,8 @@ mod tests {
         for zome in zomes.clone() {
             for fn_component in fn_components.clone() {
                 // the invocation zome name and component will be called by the ribosome
-                ribosome
+                ribosome_builder
+                    .raw_mock()
                     .expect_maybe_call()
                     .with(
                         always(),
@@ -120,15 +127,17 @@ mod tests {
                     )
                     .times(1)
                     .in_sequence(&mut sequence)
-                    .returning(|_, _, _, _| {
-                        must_future::MustBoxFuture::new(async {
+                    .returning(|_, _, _, _, _, _| {
+                        Box::pin(async move {
                             Ok(Some(ExternIO::encode(InitCallbackResult::Pass).unwrap()))
                         })
                     });
             }
         }
 
-        let (calls, _h) = call_stream(host_access.into(), ribosome, invocation);
+        let ribosome = ribosome_builder.build().await.unwrap();
+
+        let (calls, _h) = call_stream(host_access.into(), ribosome, std::sync::Arc::new(invocation));
 
         let output: Vec<Result<(_, ExternIO), _>> = calls.collect().await;
         assert!(output.iter().all(|r| r.is_ok()));

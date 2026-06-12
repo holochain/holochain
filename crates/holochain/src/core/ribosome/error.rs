@@ -112,11 +112,14 @@ pub enum RibosomeError {
     #[error(transparent)]
     ZomeError(#[from] ZomeError),
 
-    #[error("The source code for the zome {0} is missing from the WASM store")]
-    WasmModuleMissing(ZomeName),
+    #[error("The source code for the zome {0} is missing from the store")]
+    ZomeSourceMissing(ZomeName),
 
     #[error("Wanted the host input but it was already taken")]
     HostInputMissing,
+
+    #[error("Zome type mismatch: {0}")]
+    ZomeTypeMismatch(String),
 }
 
 /// Type alias

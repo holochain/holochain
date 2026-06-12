@@ -142,7 +142,7 @@ impl InlineCoordinatorZome {
 }
 
 /// An inline zome clonable type object.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, derive_more::Deref)]
 pub struct DynInlineZome(pub Arc<dyn InlineZomeT + Send + Sync>);
 
 pub trait InlineZomeT: std::fmt::Debug {

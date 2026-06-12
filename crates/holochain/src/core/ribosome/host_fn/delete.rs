@@ -1,6 +1,5 @@
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::{CallContext, Ribosome};
-use crate::core::ribosome::RibosomeT;
 use holochain_cascade::error::CascadeError;
 use holochain_wasmer_host::prelude::*;
 

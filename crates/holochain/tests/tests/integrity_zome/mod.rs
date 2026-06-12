@@ -54,7 +54,7 @@ async fn test_coordinator_zome_update() {
         .update_coordinators(
             cells[0].cell_id().clone(),
             vec![CoordinatorZome::from(TestCoordinatorWasm::CoordinatorZomeUpdate).into_inner()],
-            vec![TestCoordinatorWasm::CoordinatorZomeUpdate.into()],
+            vec![DnaWasmHashed::from_content(TestCoordinatorWasm::CoordinatorZomeUpdate.into()).await],
         )
         .await
         .unwrap();
@@ -167,7 +167,7 @@ async fn test_coordinator_zome_update_multi_integrity() {
         .update_coordinators(
             cells[0].cell_id().clone(),
             vec![CoordinatorZome::from(TestCoordinatorWasm::CoordinatorZomeUpdate).into_inner()],
-            vec![TestCoordinatorWasm::CoordinatorZomeUpdate.into()],
+            vec![DnaWasmHashed::from_content(TestCoordinatorWasm::CoordinatorZomeUpdate.into()).await],
         )
         .await
         .unwrap();
@@ -195,7 +195,7 @@ async fn test_coordinator_zome_update_multi_integrity() {
         .update_coordinators(
             cells[0].cell_id().clone(),
             vec![("2_coord".into(), new_coordinator)],
-            vec![TestCoordinatorWasm::CoordinatorZomeUpdate.into()],
+            vec![DnaWasmHashed::from_content(TestCoordinatorWasm::CoordinatorZomeUpdate.into()).await],
         )
         .await
         .unwrap();

@@ -15,7 +15,6 @@ use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::core::queue_consumer::QueueTriggers;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::guest_callback::init::InitResult;
-use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::{Ribosome, ZomeCallInvocation};
 use crate::core::workflow::call_zome_workflow;
 use crate::core::workflow::genesis_workflow::genesis_workflow;

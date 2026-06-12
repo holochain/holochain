@@ -1,35 +1,14 @@
-use super::guest_callback::call_stream;
 use super::guest_callback::entry_defs::EntryDefsHostAccess;
-use super::guest_callback::init::InitHostAccess;
-use super::guest_callback::post_commit::PostCommitHostAccess;
-use super::guest_callback::validate::ValidateHostAccess;
 use super::host_fn::delete_clone_cell::delete_clone_cell;
 use super::host_fn::disable_clone_cell::disable_clone_cell;
 use super::host_fn::enable_clone_cell::enable_clone_cell;
 use super::host_fn::get_agent_activity::get_agent_activity;
-use super::host_fn::HostFnApi;
 use super::{HostContext, Ribosome};
-use super::ZomeCallHostAccess;
 use crate::core::metrics::{
     host_fn_call_duration_metric, ribosome_wasm_call_duration_metric, ribosome_wasm_usage_metric,
-    ribosome_zome_call_duration_metric,
 };
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
-use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
-use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckInvocationV1;
-use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckResultV1;
-use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCheckInvocationV2;
-use crate::core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckHostAccess;
-use crate::core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckInvocation;
-use crate::core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult;
-use crate::core::ribosome::guest_callback::init::InitInvocation;
-use crate::core::ribosome::guest_callback::init::InitResult;
-use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
-use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
-use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::core::ribosome::guest_callback::CallStream;
 #[cfg(feature = "unstable-countersigning")]
 use crate::core::ribosome::host_fn::accept_countersigning_preflight_request::accept_countersigning_preflight_request;
 use crate::core::ribosome::host_fn::agent_info::agent_info;
@@ -82,17 +61,12 @@ use crate::core::ribosome::host_fn::x_salsa20_poly1305_shared_secret_export::x_s
 use crate::core::ribosome::host_fn::x_salsa20_poly1305_shared_secret_ingest::x_salsa20_poly1305_shared_secret_ingest;
 use crate::core::ribosome::host_fn::zome_info::zome_info;
 use crate::core::ribosome::CallContext;
-use crate::core::ribosome::GenesisSelfCheckHostAccessV1;
-use crate::core::ribosome::GenesisSelfCheckHostAccessV2;
 use crate::core::ribosome::Invocation;
-use crate::core::ribosome::RibosomeT;
-use crate::core::ribosome::ZomeCallInvocation;
+use crate::core::ribosome::RibosomeImplT;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use holochain_state::prelude::WasmStore;
 use holochain_types::prelude::*;
-use holochain_types::zome_types::GlobalZomeTypes;
-use holochain_types::zome_types::ZomeTypesError;
 use holochain_wasmer_host::module::CacheKey;
 use holochain_wasmer_host::module::InstanceWithStore;
 use holochain_wasmer_host::module::ModuleCache;
@@ -102,9 +76,8 @@ use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 use opentelemetry::KeyValue;
-use tracing::span::Attributes;
 use wasmer::AsStoreMut;
 use wasmer::Exports;
 use wasmer::Function;
@@ -299,14 +272,12 @@ impl RealRibosome {
         wasm_store: WasmStore,
         wasmer_module_cache: Option<Arc<ModuleCacheLock>>,
     ) -> RibosomeResult<Self> {
-        let mut ribosome = Self {
+        Ok(Self {
             backend,
             dna_def,
             wasm_store,
             wasmer_module_cache,
-        };
-
-        Ok(ribosome)
+        })
     }
 
     pub fn dna_def(&self) -> &DnaDefHashed {
@@ -332,7 +303,7 @@ impl RealRibosome {
             .as_read()
             .get(&wasm_hash)
             .await?
-            .ok_or_else(|| RibosomeError::WasmModuleMissing(zome_name.clone()))?;
+            .ok_or_else(|| RibosomeError::ZomeSourceMissing(zome_name.clone()))?;
 
         match self.backend {
             #[cfg(feature = "wasmer-sys-cranelift")]
@@ -702,11 +673,7 @@ impl RealRibosome {
     }
 }
 
-impl RibosomeT for RealRibosome {
-    fn dna_def_hashed(&self) -> &DnaDefHashed {
-        &self.dna_def
-    }
-
+impl RibosomeImplT for RealRibosome {
     /// call a function in a zome for an invocation if it exists
     /// if it does not exist, then return Ok(None)
     fn maybe_call(
@@ -827,15 +794,9 @@ impl RibosomeT for RealRibosome {
                         Ok(None)
                     }
                 }
-                ZomeDef::Inline {
-                    inline_zome: zome, ..
-                } => Ok(zome.0.get_global(&name).map(|i| i as i32)),
+                ZomeDef::Inline(_) => Err(RibosomeError::ZomeTypeMismatch("Expected WASM zome but received inline zome".to_string())),
             }
         })
-    }
-
-    fn dna_hash(&self) -> &DnaHash {
-        self.dna_def.as_hash()
     }
 
     fn list_zome_fns(&self, zome_name: &ZomeName) -> RibosomeResult<Vec<FunctionName>> {
@@ -1114,7 +1075,7 @@ mod test {
                         WasmBackend::Wasmi
                     }
                 },
-                test_open_db(Wasm)
+                WasmStore::test_new(),
             )
             .await
             .unwrap()

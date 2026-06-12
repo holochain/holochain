@@ -42,6 +42,7 @@ use holochain_zome_types::{
 };
 use matches::assert_matches;
 use std::{sync::Arc, time::Duration};
+use crate::core::ribosome::Ribosome;
 
 // test app validation with a must get action where the original action of
 // a delete is not in the cache db and then added to it
@@ -359,9 +360,15 @@ async fn validation_callback_rejects_op_depending_on_invalid_op() {
     let zomes_to_invoke = ZomesToInvoke::OneIntegrity(integrity_zomes[0].clone());
     let dna_hash = dna_file.dna_hash().clone();
     let backend = WasmBackend::new();
-    let ribosome = RealRibosome::new(backend, dna_file.clone(), make_module_cache(backend, None))
-        .await
-        .unwrap();
+    let ribosome = RealRibosome::new(
+        backend,
+        dna_file.dna_def_hashed().clone(),
+        holochain_state::wasm::WasmStore::test_new(),
+        make_module_cache(backend, None),
+    )
+    .await
+    .unwrap();
+    let ribosome = Ribosome::new(dna_file.dna_def_hashed().clone(), ribosome).await.unwrap();
     let test_space = TestSpace::new(dna_hash.clone());
     let alice = fixt!(AgentPubKey);
     let workspace = HostFnWorkspaceRead::new(
@@ -431,7 +438,7 @@ async fn validation_callback_rejects_op_depending_on_invalid_op() {
 struct TestCase {
     zomes_to_invoke: ZomesToInvoke,
     test_space: TestSpace,
-    ribosome: RealRibosome,
+    ribosome: Ribosome,
     alice: AgentPubKey,
     bob: AgentPubKey,
     workspace: HostFnWorkspaceRead,
@@ -444,9 +451,10 @@ impl TestCase {
         let dna_hash = dna_file.dna_hash().clone();
         let backend = WasmBackend::new();
         let ribosome =
-            RealRibosome::new(backend, dna_file.clone(), make_module_cache(backend, None))
+            RealRibosome::new(backend, dna_file.dna_def_hashed().clone(), holochain_state::wasm::WasmStore::test_new(), make_module_cache(backend, None))
                 .await
                 .unwrap();
+        let ribosome = Ribosome::new(dna_file.dna_def_hashed().clone(), ribosome).await.unwrap();
         let test_space = TestSpace::new(dna_hash.clone());
         let alice = fixt!(AgentPubKey);
         let bob = fixt!(AgentPubKey);

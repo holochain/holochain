@@ -1,5 +1,4 @@
 use crate::core::ribosome::{CallContext, Ribosome};
-use crate::core::ribosome::RibosomeT;
 use std::sync::Arc;
 use wasmer::RuntimeError;
 

@@ -173,7 +173,11 @@ mod test {
             .next()
             .unwrap();
 
-        let host_input = post_commit_invocation.clone().host_input().unwrap();
+        let host_input = post_commit_invocation
+            .clone()
+            .take_host_input()
+            .unwrap()
+            .unwrap();
 
         assert_eq!(
             host_input,
@@ -185,7 +189,7 @@ mod test {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
-    use crate::core::ribosome::RibosomeT;
+    use crate::core::ribosome::RibosomeImplT;
     use crate::fixt::PostCommitHostAccessFixturator;
     use crate::fixt::PostCommitInvocationFixturator;
     use crate::fixt::RealRibosomeFixturator;
@@ -198,15 +202,14 @@ mod slow_tests {
     use holochain_types::inline_zome::InlineZomeSet;
     use holochain_types::signal::Signal;
     use holochain_wasm_test_utils::TestWasm;
+    use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_post_commit_unimplemented() {
         let host_access = PostCommitHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
-            .next()
-            .unwrap();
+        let ribosome = MockRibosomeBuilder::new().build().await.unwrap();
         let mut post_commit_invocation = PostCommitInvocationFixturator::new(::fixt::Empty)
             .next()
             .unwrap();
@@ -223,9 +226,7 @@ mod slow_tests {
         let host_access = PostCommitHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::PostCommitSuccess]))
-            .next()
-            .unwrap();
+        let ribosome = MockRibosomeBuilder::new().build().await.unwrap();
         let mut post_commit_invocation = PostCommitInvocationFixturator::new(::fixt::Empty)
             .next()
             .unwrap();

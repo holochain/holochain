@@ -14,6 +14,7 @@ use holochain_types::cell_config_overrides::CellConfigOverrides;
 use holochain_zome_types::action;
 use std::sync::Arc;
 use tokio::sync::broadcast;
+use crate::core::ribosome::Ribosome;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_cell_handle_publish() {
@@ -55,9 +56,10 @@ async fn test_cell_handle_publish() {
     let backend = WasmBackend::new();
     let wasmer_module_cache = make_module_cache(backend, Some(db_dir.join("wasm-cache")));
 
-    let ribosome = RealRibosome::new(backend, dna_file, wasmer_module_cache)
+    let ribosome = RealRibosome::new(backend, dna_file.dna_def_hashed().clone(), WasmStore::test_new(), wasmer_module_cache)
         .await
         .unwrap();
+    let ribosome = Ribosome::new(dna_file.dna_def_hashed().clone(), ribosome).await.unwrap();
 
     let dht_store = spaces.test_spaces[&dna].space.dht_store.clone();
     super::Cell::genesis(

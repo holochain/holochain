@@ -7,7 +7,7 @@ use crate::core::ribosome::guest_callback::init::InitHostAccess;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::guest_callback::post_commit::send_post_commit;
-use crate::core::ribosome::{Ribosome, RibosomeT};
+use crate::core::ribosome::Ribosome;
 use derive_more::Constructor;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::DynHolochainP2pDna;
@@ -17,8 +17,7 @@ use holochain_zome_types::action::builder;
 use tokio::sync::broadcast;
 
 #[derive(Constructor)]
-pub struct InitializeZomesWorkflowArgs
-{
+pub struct InitializeZomesWorkflowArgs {
     pub ribosome: Ribosome,
     pub conductor_handle: ConductorHandle,
     pub signal_tx: broadcast::Sender<Signal>,
@@ -26,8 +25,7 @@ pub struct InitializeZomesWorkflowArgs
     pub integrate_dht_ops_trigger: TriggerSender,
 }
 
-impl InitializeZomesWorkflowArgs
-{
+impl InitializeZomesWorkflowArgs {
     pub fn dna_def(&self) -> &DnaDef {
         self.ribosome.dna_def().as_content()
     }
@@ -39,8 +37,7 @@ pub async fn initialize_zomes_workflow(
     network: DynHolochainP2pDna,
     keystore: MetaLairClient,
     args: InitializeZomesWorkflowArgs,
-) -> WorkflowResult<InitResult>
-{
+) -> WorkflowResult<InitResult> {
     let conductor_handle = args.conductor_handle.clone();
     let coordinators = args.ribosome.dna_def().get_all_coordinators();
     let integrate_dht_ops_trigger = args.integrate_dht_ops_trigger.clone();
@@ -81,8 +78,7 @@ async fn initialize_zomes_workflow_inner(
     network: DynHolochainP2pDna,
     keystore: MetaLairClient,
     args: InitializeZomesWorkflowArgs,
-) -> WorkflowResult<InitResult>
-{
+) -> WorkflowResult<InitResult> {
     let dna_def = args.dna_def().clone();
     let InitializeZomesWorkflowArgs {
         ribosome,
@@ -128,7 +124,7 @@ mod tests {
     use super::*;
     use crate::conductor::Conductor;
     use crate::core::ribosome::guest_callback::validate::ValidateResult;
-    use crate::core::ribosome::MockRibosomeT;
+    use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
     use crate::fixt::DnaDefFixturator;
     use crate::fixt::MetaLairClientFixturator;
     use crate::sweettest::*;
@@ -190,18 +186,12 @@ mod tests {
         )
         .await
         .unwrap();
-        let mut ribosome = MockRibosomeT::new();
-
-        // Setup the ribosome mock
-        ribosome
-            .expect_run_init()
-            .returning(move |_workspace, _invocation| Ok(InitResult::Pass));
-        ribosome
-            .expect_run_validate()
-            .returning(move |_, _| Ok(ValidateResult::Valid));
-        ribosome
-            .expect_dna_def_hashed()
-            .return_const(dna_def_hashed.clone());
+        let ribosome = MockRibosomeBuilder::new()
+            .with_init_handler(|_, _| Ok(InitCallbackResult::Pass))
+            .with_validate_handler(|_, _| Ok(ValidateCallbackResult::Valid))
+            .build()
+            .await
+            .unwrap();
 
         let db_dir = test_db_dir();
         let config = SweetConductorConfig::standard().tune_network_config(|nc| {

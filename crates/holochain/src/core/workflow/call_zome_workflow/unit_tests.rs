@@ -198,7 +198,7 @@ struct TestCase {
     workspace: SourceChainWorkspace,
     network: DynHolochainP2pDna,
     keystore: MetaLairClient,
-    args: CallZomeWorkflowArgs<RealRibosome>,
+    args: CallZomeWorkflowArgs,
     _conductor: SweetConductor,
 }
 
