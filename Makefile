@@ -31,14 +31,17 @@ static-fmt:
 	cargo fmt --check
 
 # lint our toml files
+# `--locked` pins taplo's published lockfile: an unlocked install resolves the
+# newest semver-compatible deps, and a recent `time` release fails to compile
+# (E0119) on our toolchain, breaking `cargo install taplo-cli@0.10.0`.
 static-toml:
-	cargo install taplo-cli@0.10.0
+	cargo install taplo-cli@0.10.0 --locked
 	taplo format --check ./*.toml
 	taplo format --check ./crates/**/*.toml
 
 # fix our toml files
 toml-fix:
-	cargo install taplo-cli@0.10.0
+	cargo install taplo-cli@0.10.0 --locked
 	taplo format ./*.toml
 	taplo format ./crates/**/*.toml
 
