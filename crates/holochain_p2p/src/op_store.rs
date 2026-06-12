@@ -423,12 +423,15 @@ impl OpStore for HolochainOpStore {
     }
 }
 
+/// Reconstruct a v2 `DhtOp` from a wire row; shared with the
+/// integration-dump + consistency reads.
+///
 /// Build a v2 [`DhtOp::ChainOp`] directly from the joined row.
 ///
 /// The row already stores the v2 `ActionData` + header fields, so the op is
 /// assembled natively with no legacy detour. The op id is taken from the
 /// stored hash/basis, so this builder does not re-hash.
-fn build_chain_dht_op_v2(row: K2ChainOpForWireRow) -> Result<DhtOp, String> {
+pub fn build_chain_dht_op_v2(row: K2ChainOpForWireRow) -> Result<DhtOp, String> {
     use holo_hash::{ActionHash, AgentPubKey};
 
     let op_type: ChainOpType = ChainOpType::try_from(row.op_type)
@@ -483,9 +486,12 @@ fn build_chain_dht_op_v2(row: K2ChainOpForWireRow) -> Result<DhtOp, String> {
     Ok(DhtOp::ChainOp(Box::new(chain_op)))
 }
 
+/// Reconstruct a v2 `DhtOp` from a wire row; shared with the
+/// integration-dump + consistency reads.
+///
 /// Build a v2 [`DhtOp::WarrantOp`] from the warrant row. Warrant content is
 /// unchanged by the v2 flip, so this is a straight assembly.
-fn build_warrant_dht_op_v2(row: K2WarrantForWireRow) -> Result<DhtOp, String> {
+pub fn build_warrant_dht_op_v2(row: K2WarrantForWireRow) -> Result<DhtOp, String> {
     use holo_hash::AgentPubKey;
 
     let author = AgentPubKey::from_raw_36(row.author);
