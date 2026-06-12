@@ -34,7 +34,7 @@ pub struct ActionRow {
     pub entry_hash: Option<Vec<u8>>,
     /// `1` when the entry is private, `0` when public; `NULL` for actions without an entry.
     pub private_entry: Option<i64>,
-    /// Encoded [`RecordValidity`](holochain_integrity_types::dht_v2::RecordValidity);
+    /// Encoded [`RecordValidity`];
     /// `NULL` represents pending.
     pub record_validity: Option<i64>,
 }
@@ -82,7 +82,7 @@ pub struct AgentActivityItem {
 pub struct EntryRow {
     /// Entry hash (primary key).
     pub hash: Vec<u8>,
-    /// Serialized [`Entry`](holochain_integrity_types::entry::Entry) blob.
+    /// Serialized [`Entry`] blob.
     pub blob: Vec<u8>,
 }
 
@@ -93,7 +93,7 @@ pub struct PrivateEntryRow {
     pub hash: Vec<u8>,
     /// Agent pub key of the local author that owns the entry.
     pub author: Vec<u8>,
-    /// Serialized [`Entry`](holochain_integrity_types::entry::Entry) blob.
+    /// Serialized [`Entry`] blob.
     pub blob: Vec<u8>,
 }
 
@@ -147,10 +147,10 @@ pub struct LimboChainOpRow {
     pub basis_hash: Vec<u8>,
     /// Numeric storage center derived from `basis_hash`.
     pub storage_center_loc: i64,
-    /// Encoded [`RecordValidity`](holochain_integrity_types::dht_v2::RecordValidity);
+    /// Encoded [`RecordValidity`];
     /// `NULL` represents pending.
     pub sys_validation_status: Option<i64>,
-    /// Encoded [`RecordValidity`](holochain_integrity_types::dht_v2::RecordValidity);
+    /// Encoded [`RecordValidity`];
     /// `NULL` represents pending.
     pub app_validation_status: Option<i64>,
     /// Microsecond timestamp at which validation was abandoned; `NULL` if not abandoned.
@@ -191,7 +191,7 @@ pub struct LimboWarrantRow {
     pub reason: Option<String>,
     /// Numeric storage center derived from the warrantee.
     pub storage_center_loc: i64,
-    /// Encoded [`RecordValidity`](holochain_integrity_types::dht_v2::RecordValidity);
+    /// Encoded [`RecordValidity`];
     /// `NULL` represents pending.
     pub sys_validation_status: Option<i64>,
     /// Microsecond timestamp at which validation was abandoned; `NULL` if not abandoned.
@@ -219,7 +219,7 @@ pub struct ChainOpRow {
     pub basis_hash: Vec<u8>,
     /// Numeric storage center derived from `basis_hash`.
     pub storage_center_loc: i64,
-    /// Encoded [`RecordValidity`](holochain_integrity_types::dht_v2::RecordValidity).
+    /// Encoded [`RecordValidity`].
     pub validation_status: i64,
     /// `1` when this authority locally validated the op, `0` when accepted via receipts.
     pub locally_validated: i64,

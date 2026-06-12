@@ -54,7 +54,7 @@ impl DbRead<Dht> {
     }
 
     /// Ops eligible to be published for `author`. See
-    /// [`chain_op_publish::get_ops_to_publish`].
+    /// `chain_op_publish::get_ops_to_publish`.
     pub async fn get_ops_to_publish(
         &self,
         author: &AgentPubKey,
@@ -64,7 +64,7 @@ impl DbRead<Dht> {
     }
 
     /// Count ops authored by `author` that may still need publishing. See
-    /// [`chain_op_publish::num_still_needing_publish`].
+    /// `chain_op_publish::num_still_needing_publish`.
     pub async fn num_still_needing_publish(&self, author: &AgentPubKey) -> sqlx::Result<i64> {
         chain_op_publish::num_still_needing_publish(self.pool(), author).await
     }

@@ -361,9 +361,9 @@ impl HashableContent for Action {
 /// This is **total** over every legacy variant. It is the action-only core
 /// shared by three callers, which therefore all agree on the v2 form (and so
 /// on the content-derived v2 hash):
-/// - [`holochain_zome_types::dht_v2::from_legacy_signed_action`], which wraps
-///   this with the carried-over hash + signature during the dual-write
-///   transition;
+/// - `holochain_zome_types::dht_v2::from_legacy_signed_action` (a higher layer,
+///   so not linkable from here), which wraps this with the carried-over hash +
+///   signature during the dual-write transition;
 /// - the `HashableContent` impls for the legacy `Action` (and its per-variant
 ///   refs) in [`crate::action`], which hash this projection so every
 ///   `ActionHash` is content-derived v2;

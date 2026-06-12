@@ -35,7 +35,7 @@ impl DbRead<Dht> {
     }
 
     /// Count actions authored by `author`, capped at `cap`. See
-    /// [`action::count_author_actions_capped`].
+    /// `action::count_author_actions_capped`.
     pub async fn count_author_actions_capped(
         &self,
         author: &AgentPubKey,

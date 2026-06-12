@@ -30,7 +30,7 @@ impl DbRead<Dht> {
 
     /// Serialized `WarrantProof`s of pending-or-valid warrants against
     /// `warrantee`. See
-    /// [`warrant::pending_or_valid_warrant_proofs_by_warrantee`].
+    /// `warrant::pending_or_valid_warrant_proofs_by_warrantee`.
     pub async fn pending_or_valid_warrant_proofs_by_warrantee(
         &self,
         warrantee: &AgentPubKey,

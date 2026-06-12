@@ -199,7 +199,8 @@ pub enum OpRecord<ET: UnitEnum, LT> {
 }
 
 impl<ET: UnitEnum, LT> OpRecord<ET, LT> {
-    /// DRY constructor. `action.data` must be [`ActionData::OpenChain`].
+    /// DRY constructor. `action.data` must be
+    /// [`ActionData::OpenChain`](holochain_integrity_types::dht_v2::ActionData::OpenChain).
     pub fn open_chain(action: Action) -> Self {
         let (previous_target, close_hash) = match &action.data {
             holochain_integrity_types::dht_v2::ActionData::OpenChain(d) => {
@@ -214,7 +215,8 @@ impl<ET: UnitEnum, LT> OpRecord<ET, LT> {
         }
     }
 
-    /// DRY constructor. `action.data` must be [`ActionData::CloseChain`].
+    /// DRY constructor. `action.data` must be
+    /// [`ActionData::CloseChain`](holochain_integrity_types::dht_v2::ActionData::CloseChain).
     pub fn close_chain(action: Action) -> Self {
         let new_target = match &action.data {
             holochain_integrity_types::dht_v2::ActionData::CloseChain(d) => d.new_target.clone(),

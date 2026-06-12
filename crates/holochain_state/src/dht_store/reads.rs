@@ -102,7 +102,7 @@ impl DhtStore<DbRead<Dht>> {
     }
 
     /// Validation receipts for every chain op of `action_hash`, grouped into a
-    /// [`ValidationReceiptSet`] per op.
+    /// [`ValidationReceiptSet`](holochain_zome_types::prelude::ValidationReceiptSet) per op.
     ///
     /// Each stored receipt is the full serialized `SignedValidationReceipt`, so
     /// the validator-reported status and validator set are returned exactly as
@@ -352,7 +352,7 @@ impl DhtStore<DbRead<Dht>> {
         )))
     }
 
-    /// Assemble the [`EntryDetails`] for `entry_hash`: the entry, its valid
+    /// Assemble the [`EntryDetails`](holochain_zome_types::metadata::EntryDetails) for `entry_hash`: the entry, its valid
     /// create actions, rejected create actions, the deletes on it, the updates
     /// from it, and its Live/Dead status. Returns `None` if the entry is not
     /// available. `author = Some` allows that agent's private entry.
@@ -635,7 +635,7 @@ impl DhtStore<DbRead<Dht>> {
         )))
     }
 
-    /// Assemble the [`RecordDetails`] for `hash`: the record, its validation
+    /// Assemble the [`RecordDetails`](holochain_zome_types::metadata::RecordDetails) for `hash`: the record, its validation
     /// status (from its integrated `StoreRecord` op), the deletes targeting it,
     /// and the updates of it. Returns `None` if there is no integrated
     /// `StoreRecord` op for `hash`. `author = Some` allows that agent's private
@@ -689,7 +689,7 @@ impl DhtStore<DbRead<Dht>> {
         }))
     }
 
-    /// Assemble the [`RecordDetails`] for `hash`, overlaying the in-memory
+    /// Assemble the [`RecordDetails`](holochain_zome_types::metadata::RecordDetails) for `hash`, overlaying the in-memory
     /// scratch for deletes and updates.
     ///
     /// # Contract
@@ -774,7 +774,7 @@ impl DhtStore<DbRead<Dht>> {
         }))
     }
 
-    /// Assemble the [`EntryDetails`] for `entry_hash`, overlaying the in-memory
+    /// Assemble the [`EntryDetails`](holochain_zome_types::metadata::EntryDetails) for `entry_hash`, overlaying the in-memory
     /// scratch for creates, deletes, updates, and Live/Dead status.
     ///
     /// Returns `None` when the entry is absent from both the store and the scratch.
@@ -1471,7 +1471,7 @@ impl DhtStore<DbRead<Dht>> {
     ///
     /// The scratch is consulted as a fallback for chain-top and until-hash
     /// resolution (store first, then scratch), and its activity is merged into
-    /// the store-scanned range via [`merge_agent_activity`]. Warrants are
+    /// the store-scanned range via `merge_agent_activity`. Warrants are
     /// attached (from store + scratch) only when the response is `Complete`.
     ///
     /// Use this on the **requester** path only. Authority handlers must never

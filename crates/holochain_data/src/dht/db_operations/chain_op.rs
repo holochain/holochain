@@ -46,7 +46,7 @@ impl DbRead<Dht> {
 
     /// Terminal validation outcome of the chain op for `(action_hash,
     /// op_type)`, from `ChainOp` or `LimboChainOp`. See
-    /// [`chain_op::op_validation_outcome`].
+    /// `chain_op::op_validation_outcome`.
     pub async fn op_validation_outcome(
         &self,
         action_hash: &ActionHash,

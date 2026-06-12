@@ -36,7 +36,7 @@ impl DbRead<Dht> {
 
     /// Validation receipts for every op of `action_hash`, joined with op type
     /// and publish-completion flag. See
-    /// [`validation_receipt::validation_receipts_for_action`].
+    /// `validation_receipt::validation_receipts_for_action`.
     pub async fn validation_receipts_for_action(
         &self,
         action_hash: ActionHash,
