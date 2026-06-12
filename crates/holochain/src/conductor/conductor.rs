@@ -90,7 +90,6 @@ use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::lair_keystore::spawn_lair_keystore_in_proc;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDnaT;
-use holochain_sqlite::sql::sql_cell::state_dump;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::*;
 use holochain_state::source_chain;
@@ -2459,7 +2458,7 @@ mod misc_impls {
         pub async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
             let cell = self.cell_by_id(cell_id).await?;
             let authored_db = cell.get_or_create_authored_db()?;
-            let dht_db = cell.dht_db();
+            let dht_store = self.get_or_create_dht_store(cell_id.dna_hash())?;
             let agent_pub_key = cell_id.agent_pubkey().clone();
             let peer_dump = peer_store_dump(self, cell_id).await?;
             let source_chain_dump =
@@ -2468,7 +2467,7 @@ mod misc_impls {
             let out = JsonDump {
                 peer_dump,
                 source_chain_dump,
-                integration_dump: integration_dump(dht_db).await?,
+                integration_dump: integration_dump(&dht_store.as_read()).await?,
             };
             // Add summary
             let summary = out.to_string();
@@ -2527,7 +2526,7 @@ mod misc_impls {
         ) -> ConductorApiResult<FullStateDump> {
             let authored_db =
                 self.get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())?;
-            let dht_db = self.get_or_create_dht_db(cell_id.dna_hash())?;
+            let dht_store = self.get_or_create_dht_store(cell_id.dna_hash())?;
             let source_chain_dump =
                 source_chain::dump_state(authored_db.into(), cell_id.agent_pubkey().clone())
                     .await?;
@@ -2536,7 +2535,8 @@ mod misc_impls {
             let out = FullStateDump {
                 peer_dump,
                 source_chain_dump,
-                integration_dump: full_integration_dump(&dht_db, dht_ops_cursor).await?,
+                integration_dump: full_integration_dump(&dht_store.as_read(), dht_ops_cursor)
+                    .await?,
             };
             Ok(out)
         }
@@ -3527,96 +3527,65 @@ pub fn app_manifest_from_dnas(
         .into()
 }
 
+/// Reconstruct legacy [`DhtOp`]s from v2 wire rows read off the [`DhtStore`].
+///
+/// Chain-op and warrant wire rows are rebuilt into v2 ops via the
+/// `holochain_p2p` reconstructors, then converted to the legacy `DhtOp`
+/// encoding the dump/consistency types expect. Rows that fail to rebuild or
+/// convert are dropped (the same lenient behaviour the wire path uses), so the
+/// result is a best-effort view of the ops the store holds.
+pub fn wire_rows_to_legacy_ops(
+    chain: Vec<holochain_state::dht_store::K2ChainOpForWireRow>,
+    warrants: Vec<holochain_state::dht_store::K2WarrantForWireRow>,
+) -> Vec<holochain_types::dht_op::DhtOp> {
+    chain
+        .into_iter()
+        .filter_map(|r| holochain_p2p::build_chain_dht_op_v2(r).ok())
+        .chain(
+            warrants
+                .into_iter()
+                .filter_map(|r| holochain_p2p::build_warrant_dht_op_v2(r).ok()),
+        )
+        .filter_map(|v2| holochain_types::dht_v2::to_legacy_dht_op(&v2).ok())
+        .collect()
+}
+
 /// Dump the integration json state.
-pub async fn integration_dump<Db: ReadAccess<DbKindDht>>(
-    vault: &Db,
+pub async fn integration_dump(
+    dht_store: &DhtStoreRead,
 ) -> ConductorApiResult<IntegrationStateDump> {
-    vault
-        .read_async(move |txn| {
-            let integrated = txn.query_row(
-                "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NOT NULL",
-                [],
-                |row| row.get(0),
-            )?;
-            let integration_limbo = txn.query_row(
-                "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NULL AND validation_stage = 3",
-                [],
-                |row| row.get(0),
-            )?;
-            let validation_limbo = txn.query_row(
-                "
-                SELECT count(hash) FROM DhtOp
-                WHERE when_integrated IS NULL
-                AND
-                (validation_stage IS NULL OR validation_stage < 3)
-                ",
-                [],
-                |row| row.get(0),
-            )?;
-            ConductorApiResult::Ok(IntegrationStateDump {
-                validation_limbo,
-                integration_limbo,
-                integrated,
-            })
-        })
-        .await
+    let (validation_limbo, integration_limbo, integrated) =
+        dht_store.integration_state_counts().await?;
+    Ok(IntegrationStateDump {
+        validation_limbo,
+        integration_limbo,
+        integrated,
+    })
 }
 
 /// Dump the full integration json state.
 /// Careful! This will return a lot of data.
 pub async fn full_integration_dump(
-    vault: &DbRead<DbKindDht>,
-    dht_ops_cursor: Option<u64>,
+    dht_store: &DhtStoreRead,
+    _dht_ops_cursor: Option<u64>,
 ) -> ConductorApiResult<FullIntegrationStateDump> {
-    vault
-        .read_async(move |txn| {
-            let integrated =
-                query_dht_ops_from_statement(txn, state_dump::DHT_OPS_INTEGRATED, dht_ops_cursor)?;
+    let integrated = wire_rows_to_legacy_ops(
+        dht_store.all_integrated_chain_ops_for_wire().await?,
+        dht_store.all_integrated_warrants_for_wire().await?,
+    );
+    let validation_limbo =
+        wire_rows_to_legacy_ops(dht_store.limbo_chain_ops_for_wire(false).await?, Vec::new());
+    let integration_limbo =
+        wire_rows_to_legacy_ops(dht_store.limbo_chain_ops_for_wire(true).await?, Vec::new());
 
-            let validation_limbo = query_dht_ops_from_statement(
-                txn,
-                state_dump::DHT_OPS_IN_VALIDATION_LIMBO,
-                dht_ops_cursor,
-            )?;
-
-            let integration_limbo = query_dht_ops_from_statement(
-                txn,
-                state_dump::DHT_OPS_IN_INTEGRATION_LIMBO,
-                dht_ops_cursor,
-            )?;
-
-            let dht_ops_cursor = txn
-                .query_row(state_dump::DHT_OPS_ROW_ID, [], |row| row.get(0))
-                .unwrap_or(0);
-
-            ConductorApiResult::Ok(FullIntegrationStateDump {
-                validation_limbo,
-                integration_limbo,
-                integrated,
-                dht_ops_cursor,
-            })
-        })
-        .await
-}
-
-fn query_dht_ops_from_statement(
-    txn: &Transaction,
-    stmt_str: &str,
-    dht_ops_cursor: Option<u64>,
-) -> ConductorApiResult<Vec<DhtOp>> {
-    let final_stmt_str = match dht_ops_cursor {
-        Some(cursor) => format!("{stmt_str} AND DhtOp.rowid > {cursor}"),
-        None => stmt_str.into(),
-    };
-
-    let mut stmt = txn.prepare(final_stmt_str.as_str())?;
-
-    let r: Vec<DhtOp> = stmt
-        .query_and_then([], |row| {
-            holochain_state::query::map_sql_dht_op(false, "dht_type", row)
-        })?
-        .collect::<StateQueryResult<Vec<_>>>()?;
-    Ok(r)
+    Ok(FullIntegrationStateDump {
+        validation_limbo,
+        integration_limbo,
+        integrated,
+        // The legacy rowid cursor has no v2 equivalent; the store reads return
+        // the full set each call, so the cursor is always reset.
+        dht_ops_cursor: 0,
+    })
 }
 
 /// Extract the modifiers from the RoleSettingsMap into their own HashMap

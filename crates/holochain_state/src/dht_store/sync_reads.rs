@@ -8,6 +8,7 @@
 
 use holochain_data::kind::Dht;
 use holochain_data::DbWrite;
+use holochain_types::prelude::AgentPubKey;
 use holochain_types::prelude::Timestamp;
 
 use super::DhtStore;
@@ -160,6 +161,21 @@ where
         self.db
             .as_ref()
             .all_integrated_warrants_for_wire()
+            .await
+            .map_err(crate::query::StateQueryError::Sqlx)
+    }
+
+    /// Chain-op rows authored and shared by `author`, joined for wire
+    /// reconstruction. Excludes private `StoreEntry` ops so private entries
+    /// never leak into the published set. Used by the consistency-check
+    /// harness to gather a cell's published ops.
+    pub async fn published_chain_ops_for_wire(
+        &self,
+        author: &AgentPubKey,
+    ) -> crate::query::StateQueryResult<Vec<holochain_data::models::dht::K2ChainOpForWireRow>> {
+        self.db
+            .as_ref()
+            .published_chain_ops_for_wire(author)
             .await
             .map_err(crate::query::StateQueryError::Sqlx)
     }

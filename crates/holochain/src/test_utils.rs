@@ -23,7 +23,6 @@ use holochain_serialized_bytes::SerializedBytesError;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::prelude::SourceChainResult;
-use holochain_state::prelude::StateQueryResult;
 use holochain_state::source_chain;
 use holochain_types::prelude::*;
 use holochain_types::test_utils::fake_dna_zomes;
@@ -410,10 +409,41 @@ pub async fn get_integration_dumps<Db: ReadAccess<DbKindDht>>(
 }
 
 /// Show the current db state.
+///
+/// Reads the legacy `DhtOp` table directly. This helper backs the legacy
+/// `wait_for_integration` path used by the app-validation workflow tests, which
+/// still assert against the dual-written legacy table; the consistency harness
+/// and admin dump read the new DHT store instead.
 pub async fn query_integration<Db: ReadAccess<DbKindDht>>(db: &Db) -> IntegrationStateDump {
-    crate::conductor::integration_dump(&db.clone().into())
-        .await
-        .unwrap()
+    db.read_async(move |txn| -> DatabaseResult<IntegrationStateDump> {
+        let integrated = txn.query_row(
+            "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NOT NULL",
+            [],
+            |row| row.get(0),
+        )?;
+        let integration_limbo = txn.query_row(
+            "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NULL AND validation_stage = 3",
+            [],
+            |row| row.get(0),
+        )?;
+        let validation_limbo = txn.query_row(
+            "
+            SELECT count(hash) FROM DhtOp
+            WHERE when_integrated IS NULL
+            AND
+            (validation_stage IS NULL OR validation_stage < 3)
+            ",
+            [],
+            |row| row.get(0),
+        )?;
+        Ok(IntegrationStateDump {
+            validation_limbo,
+            integration_limbo,
+            integrated,
+        })
+    })
+    .await
+    .unwrap()
 }
 
 async fn get_integrated_count<Db: ReadAccess<DbKindDht>>(db: &Db) -> usize {
@@ -453,37 +483,6 @@ pub async fn get_valid_and_integrated_count<Db: ReadAccess<DbKindDht>>(db: &Db) 
             },
             |row| row.get(0),
         )?)
-    })
-    .await
-    .unwrap()
-}
-
-/// Get all [`DhtOps`](holochain_types::prelude::DhtOp) integrated by this node
-pub async fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp> {
-    db.read_async(move |txn| -> StateQueryResult<Vec<DhtOp>> {
-        txn.prepare(
-            "
-            SELECT
-            DhtOp.type,
-            Action.author as author,
-            Action.blob as action_blob,
-            Entry.blob as entry_blob
-            FROM DhtOp
-            JOIN
-            Action ON DhtOp.action_hash = Action.hash
-            LEFT JOIN
-            Entry ON Action.entry_hash = Entry.hash
-            WHERE
-            DhtOp.when_integrated IS NOT NULL
-            ORDER BY DhtOp.rowid ASC
-        ",
-        )
-        .unwrap()
-        .query_and_then(named_params! {}, |row| {
-            Ok(holochain_state::query::map_sql_dht_op(true, "type", row).unwrap())
-        })
-        .unwrap()
-        .collect::<StateQueryResult<_>>()
     })
     .await
     .unwrap()

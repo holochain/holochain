@@ -26,6 +26,7 @@
 use crate::models::dht::{
     K2ChainOpForWireRow, K2OpHashRow, K2OpIdSinceRow, K2OpPresentRow, K2WarrantForWireRow,
 };
+use holo_hash::AgentPubKey;
 use sqlx::{Executor, QueryBuilder, Sqlite};
 
 /// Inclusive `[storage_start_loc, storage_end_loc]` arc bounds.
@@ -386,6 +387,45 @@ where
          WHERE ChainOp.locally_validated = 1
          ORDER BY ChainOp.hash ASC",
     )
+    .fetch_all(executor)
+    .await
+}
+
+/// Fetch the chain-op rows that `author` has authored and shares with the
+/// DHT, joined for full wire reconstruction. Same columns as
+/// [`all_integrated_chain_ops_for_wire`] but scoped to a single author and
+/// with the private-entry filter applied: `StoreEntry` ops (`op_type = 2`)
+/// carrying a private entry are excluded so private entries never leak into
+/// the published set. Ordered by `ChainOp.hash` for a stable result.
+pub(crate) async fn published_chain_ops_for_wire<'e, E>(
+    executor: E,
+    author: &AgentPubKey,
+) -> sqlx::Result<Vec<K2ChainOpForWireRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as::<_, K2ChainOpForWireRow>(
+        "SELECT
+            ChainOp.hash AS op_hash,
+            ChainOp.basis_hash AS basis_hash,
+            ChainOp.op_type AS op_type,
+            Action.hash AS action_hash,
+            Action.author AS author,
+            Action.timestamp AS timestamp,
+            Action.seq AS seq,
+            Action.prev_hash AS prev_hash,
+            Action.action_data AS action_data,
+            Action.signature AS signature,
+            Entry.blob AS entry_blob
+         FROM ChainOp
+         JOIN Action ON ChainOp.action_hash = Action.hash
+         LEFT JOIN Entry ON Action.entry_hash = Entry.hash
+         WHERE ChainOp.locally_validated = 1
+           AND Action.author = ?
+           AND (ChainOp.op_type != 2 OR Action.private_entry = 0)
+         ORDER BY ChainOp.hash ASC",
+    )
+    .bind(author.get_raw_36())
     .fetch_all(executor)
     .await
 }

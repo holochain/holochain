@@ -6,6 +6,7 @@ use crate::kind::Dht;
 use crate::models::dht::{
     K2ChainOpForWireRow, K2OpHashRow, K2OpIdSinceRow, K2OpPresentRow, K2WarrantForWireRow,
 };
+use holo_hash::AgentPubKey;
 
 impl DbRead<Dht> {
     /// `(hash, basis, size)` for every integrated, locally-validated op
@@ -121,6 +122,16 @@ impl DbRead<Dht> {
         ready: bool,
     ) -> sqlx::Result<Vec<K2ChainOpForWireRow>> {
         sync_queries::limbo_chain_ops_for_wire(self.pool(), ready).await
+    }
+
+    /// Chain-op rows authored and shared by `author`, joined for wire
+    /// reconstruction. Excludes private `StoreEntry` ops so private entries
+    /// never leak into the published set.
+    pub async fn published_chain_ops_for_wire(
+        &self,
+        author: &AgentPubKey,
+    ) -> sqlx::Result<Vec<K2ChainOpForWireRow>> {
+        sync_queries::published_chain_ops_for_wire(self.pool(), author).await
     }
 
     /// Every integrated warrant row for wire reconstruction, with no hash

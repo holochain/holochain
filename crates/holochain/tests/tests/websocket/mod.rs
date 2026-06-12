@@ -798,7 +798,7 @@ async fn network_stats() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn full_state_dump_cursor_works() {
+async fn full_state_dump_returns_all_ops() {
     holochain_trace::test_run();
 
     let mut conductor = SweetConductor::standard().await;
@@ -825,14 +825,14 @@ async fn full_state_dump_cursor_works() {
         integrated_ops_count + validation_limbo_ops_count + integration_limbo_ops_count;
     assert_eq!(7, all_dhts_ops_count);
 
-    // We are assuming we have at least one DhtOp in the Cell
-    let full_state = dump_full_state(
-        &mut client,
-        cell_id,
-        Some(full_state.integration_dump.dht_ops_cursor - 1),
-    )
-    .await
-    .unwrap();
+    // The DHT store dump reads the full op set on every call; the legacy rowid
+    // cursor has no v2 equivalent, so it is always reset to 0 and a cursor
+    // argument no longer pages the result.
+    assert_eq!(0, full_state.integration_dump.dht_ops_cursor);
+
+    let full_state = dump_full_state(&mut client, cell_id, Some(0))
+        .await
+        .unwrap();
 
     let integrated_ops_count = full_state.integration_dump.integrated.len();
     let validation_limbo_ops_count = full_state.integration_dump.validation_limbo.len();
@@ -841,7 +841,9 @@ async fn full_state_dump_cursor_works() {
     let new_all_dht_ops_count =
         integrated_ops_count + validation_limbo_ops_count + integration_limbo_ops_count;
 
-    assert_eq!(1, new_all_dht_ops_count);
+    // Passing a cursor does not page; the full set is returned again.
+    assert_eq!(7, new_all_dht_ops_count);
+    assert_eq!(0, full_state.integration_dump.dht_ops_cursor);
 }
 
 #[tokio::test(flavor = "multi_thread")]
