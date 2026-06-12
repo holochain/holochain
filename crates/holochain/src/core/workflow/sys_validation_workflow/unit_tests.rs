@@ -537,20 +537,10 @@ async fn reject_invalid_warrant() {
     ));
     assert!(state.is_none());
 
-    // Mark the sys validated dependency as valid because this test can't run the app validation workflow.
-    test_case
-        .dht_db_handle()
-        .write_async(move |txn| -> StateMutationResult<()> {
-            holochain_state::mutations::set_validation_status(
-                txn,
-                &valid_op_hash,
-                holochain_zome_types::prelude::ValidationStatus::Valid,
-            )?;
-            holochain_state::mutations::set_when_integrated(txn, &valid_op_hash, Timestamp::now())?;
-            Ok(())
-        })
-        .await
-        .unwrap();
+    // Mark the sys-validated dependency as valid in the DHT store (this test
+    // can't run the app-validation + integration workflows), so the warrant-
+    // dependency readiness check sees a terminal outcome.
+    test_case.mark_dep_valid_in_store(&valid_op_hash).await;
 
     // Validate the warrant itself
     test_case.run().await;
@@ -604,19 +594,7 @@ async fn validate_warrant_with_validated_dependency() {
     );
     let valid_op_hash = DhtOpHashed::from_content_sync(valid_op.clone()).hash;
     test_case.save_op_to_dht(valid_op.into()).await.unwrap();
-    test_case
-        .test_space
-        .space
-        .dht_db
-        .test_write(move |txn| -> StateMutationResult<()> {
-            holochain_state::mutations::set_validation_status(
-                txn,
-                &valid_op_hash,
-                holochain_zome_types::prelude::ValidationStatus::Valid,
-            )?;
-            Ok(())
-        })
-        .unwrap();
+    test_case.mark_dep_valid_in_store(&valid_op_hash).await;
 
     // Invalid warrant against a valid action
     let warrant_op = test_case
@@ -913,6 +891,27 @@ impl TestCase {
             .unwrap();
 
         Ok(hash)
+    }
+
+    /// Record a terminal Valid outcome for `op_hash` directly in the DHT store
+    /// limbo (sys + app accepted). These unit tests run only the sys-validation
+    /// workflow, so they can't drive a dependency all the way through
+    /// app-validation + integration; this seeds the decided outcome the
+    /// warrant-dependency readiness check (`op_validation_status`) reads.
+    async fn mark_dep_valid_in_store(&self, op_hash: &DhtOpHash) {
+        use holochain_state::dht_store::{AppOutcome, SysOutcome};
+        self.test_space
+            .space
+            .dht_store
+            .record_chain_op_sys_validation_outcomes(vec![(op_hash.clone(), SysOutcome::Accepted)])
+            .await
+            .unwrap();
+        self.test_space
+            .space
+            .dht_store
+            .record_app_validation_outcomes(vec![(op_hash.clone(), AppOutcome::Accepted)])
+            .await
+            .unwrap();
     }
 
     async fn create_and_sign_warrant(

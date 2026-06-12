@@ -907,6 +907,60 @@ async fn op_validation_status_returns_status_only_when_locally_validated() {
 }
 
 #[tokio::test]
+async fn op_validation_status_reads_decided_limbo_op() {
+    // A limbo op that has a validation decision but is NOT yet integrated must
+    // still surface its outcome (matching the legacy pre-integration behavior),
+    // so a warrant dependency is ready as soon as it is validated.
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+
+    // sys + app accepted (not integrated) -> Valid.
+    let valid = build_test_store_record_op_hashed(57);
+    let valid_action = {
+        let a = valid.as_content().as_chain_op().unwrap().action();
+        holo_hash::ActionHash::with_data_sync(&a)
+    };
+    let valid_hash = valid.as_hash().clone();
+    store.record_incoming_ops(vec![valid]).await.unwrap();
+    store
+        .record_chain_op_sys_validation_outcomes(vec![(valid_hash.clone(), SysOutcome::Accepted)])
+        .await
+        .unwrap();
+    store
+        .record_app_validation_outcomes(vec![(valid_hash, AppOutcome::Accepted)])
+        .await
+        .unwrap();
+    assert_eq!(
+        store
+            .as_read()
+            .op_validation_status(&valid_action, ChainOpType::StoreRecord)
+            .await
+            .unwrap(),
+        Some(ValidationStatus::Valid)
+    );
+
+    // sys rejected (not integrated) -> Rejected, even with no app decision.
+    let rejected = build_test_store_record_op_hashed(58);
+    let rejected_action = {
+        let a = rejected.as_content().as_chain_op().unwrap().action();
+        holo_hash::ActionHash::with_data_sync(&a)
+    };
+    let rejected_hash = rejected.as_hash().clone();
+    store.record_incoming_ops(vec![rejected]).await.unwrap();
+    store
+        .record_chain_op_sys_validation_outcomes(vec![(rejected_hash, SysOutcome::Rejected)])
+        .await
+        .unwrap();
+    assert_eq!(
+        store
+            .as_read()
+            .op_validation_status(&rejected_action, ChainOpType::StoreRecord)
+            .await
+            .unwrap(),
+        Some(ValidationStatus::Rejected)
+    );
+}
+
+#[tokio::test]
 async fn reject_chain_op_rejects_integrated_op() {
     use holochain_zome_types::dht_v2::RecordValidity;
     let store = DhtStore::new_test(dht_id()).await.unwrap();

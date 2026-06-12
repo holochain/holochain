@@ -184,9 +184,10 @@ impl DhtStore<DbRead<Dht>> {
         Ok(false)
     }
 
-    /// Terminal validation status of the locally-validated (integrated) chain
-    /// op for `(action_hash, op_type)`, or `None` if it is not yet locally
-    /// validated (still in limbo, cache-only, or absent).
+    /// Terminal validation status of the chain op for `(action_hash, op_type)`,
+    /// or `None` if it has no validation outcome yet (still pending, cache-only,
+    /// or absent). The outcome is read from the integrated `ChainOp` or, if the
+    /// op has been validated but not yet integrated, from `LimboChainOp`.
     ///
     /// Used by the sys-validation warrant-dependency readiness check: a warrant
     /// can only be evaluated once the op it warrants has its own validation
@@ -198,7 +199,7 @@ impl DhtStore<DbRead<Dht>> {
     ) -> StateQueryResult<Option<ValidationStatus>> {
         let raw = self
             .db()
-            .locally_validated_status(action_hash, i64::from(op_type))
+            .op_validation_outcome(action_hash, i64::from(op_type))
             .await?;
         // `validation_status` is a `RecordValidity` discriminant: 1 = Accepted
         // (Valid), 2 = Rejected.
