@@ -91,6 +91,7 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
             network_seed: Some(network_seed_override.into()),
             roles_settings: None,
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         })
         .await
         .unwrap();
@@ -104,6 +105,7 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
             network_seed: Some(network_seed_override.into()),
             roles_settings: Some(HashMap::from([role_settings])),
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         })
         .await
         .unwrap();
@@ -246,6 +248,7 @@ async fn install_app_with_custom_modifier_fields_none_does_not_override_existing
             network_seed: None,
             roles_settings: Some(HashMap::from([role_settings])),
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         })
         .await
         .unwrap();
@@ -299,6 +302,7 @@ async fn installing_with_modifiers_for_non_existing_role_fails() {
             network_seed: Some("final seed".into()),
             roles_settings: Some(HashMap::from([role_settings])),
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         })
         .await;
 
@@ -335,6 +339,7 @@ async fn providing_membrane_proof_overrides_deferred_provisioning() {
             roles_settings: Some(HashMap::from([role_settings])),
             network_seed: None,
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         })
         .await
         .unwrap();
@@ -355,4 +360,194 @@ async fn providing_membrane_proof_overrides_deferred_provisioning() {
     let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
 
     assert_eq!(app_info.status, AppStatus::Enabled);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn restore_requires_agent_key() {
+    use holochain_types::prelude::*;
+
+    let conductor = SweetConductor::standard().await;
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+    let bundle = AppBundle::new(
+        AppManifestCurrentBuilder::default()
+            .name("test".into())
+            .description(None)
+            .roles(vec![AppRoleManifest {
+                name: "role".into(),
+                dna: AppRoleDnaManifest {
+                    path: Some(format!("{}", dna.dna_hash())),
+                    modifiers: DnaModifiersOpt::default(),
+                    installed_hash: None,
+                    clone_limit: 0,
+                },
+                provisioning: Some(CellProvisioning::Create { deferred: false }),
+            }])
+            .build()
+            .unwrap()
+            .into(),
+        vec![(
+            format!("{}", dna.dna_hash()),
+            DnaBundle::from_dna_file(dna).unwrap(),
+        )],
+    )
+    .unwrap();
+
+    let result = conductor
+        .clone()
+        .install_app_bundle(InstallAppPayload {
+            agent_key: None,
+            source: AppBundleSource::Bytes(bundle.pack().unwrap()),
+            installed_app_id: Some("restore_test".into()),
+            network_seed: None,
+            roles_settings: None,
+            ignore_genesis_failure: false,
+            restore_from_dht: true,
+        })
+        .await;
+
+    assert!(
+        result.is_err(),
+        "expected error when restore_from_dht=true and agent_key=None"
+    );
+    let err = result.unwrap_err();
+    assert!(
+        err.to_string().contains("restore") || err.to_string().contains("agent_key"),
+        "unexpected error: {err}"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn install_with_agent_key_not_in_lair_is_rejected() {
+    use holo_hash::fixt::AgentPubKeyFixturator;
+    use holochain::conductor::error::ConductorError;
+    use holochain_types::prelude::*;
+
+    let conductor = SweetConductor::standard().await;
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+    let bundle = AppBundle::new(
+        AppManifestCurrentBuilder::default()
+            .name("test".into())
+            .description(None)
+            .roles(vec![AppRoleManifest {
+                name: "role".into(),
+                dna: AppRoleDnaManifest {
+                    path: Some(format!("{}", dna.dna_hash())),
+                    modifiers: DnaModifiersOpt::default(),
+                    installed_hash: None,
+                    clone_limit: 0,
+                },
+                provisioning: Some(CellProvisioning::Create { deferred: false }),
+            }])
+            .build()
+            .unwrap()
+            .into(),
+        vec![(
+            format!("{}", dna.dna_hash()),
+            DnaBundle::from_dna_file(dna).unwrap(),
+        )],
+    )
+    .unwrap();
+    let bundle_bytes = bundle.pack().unwrap();
+
+    // A random key that was never registered in the keystore.
+    let key_not_in_lair = ::fixt::fixt!(AgentPubKey, Unpredictable);
+
+    // Plain install with a key not in Lair.
+    let result = conductor
+        .clone()
+        .install_app_bundle(InstallAppPayload {
+            agent_key: Some(key_not_in_lair.clone()),
+            source: AppBundleSource::Bytes(bundle_bytes.clone()),
+            installed_app_id: Some("plain_install".into()),
+            network_seed: None,
+            roles_settings: None,
+            ignore_genesis_failure: false,
+            restore_from_dht: false,
+        })
+        .await;
+    assert!(
+        matches!(
+            result.unwrap_err(),
+            ConductorError::AgentKeyNotInKeystore(_)
+        ),
+        "expected AgentKeyNotInKeystore for plain install with key not in Lair"
+    );
+
+    // Restore install with the same key not in Lair.
+    let result = conductor
+        .clone()
+        .install_app_bundle(InstallAppPayload {
+            agent_key: Some(key_not_in_lair),
+            source: AppBundleSource::Bytes(bundle_bytes),
+            installed_app_id: Some("restore_install".into()),
+            network_seed: None,
+            roles_settings: None,
+            ignore_genesis_failure: false,
+            restore_from_dht: true,
+        })
+        .await;
+    assert!(
+        matches!(
+            result.unwrap_err(),
+            ConductorError::AgentKeyNotInKeystore(_)
+        ),
+        "expected AgentKeyNotInKeystore for restore install with key not in Lair"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn install_with_existing_agent_key_in_lair_is_accepted() {
+    use holochain_types::prelude::*;
+
+    let conductor = SweetConductor::standard().await;
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+    let bundle = AppBundle::new(
+        AppManifestCurrentBuilder::default()
+            .name("test".into())
+            .description(None)
+            .roles(vec![AppRoleManifest {
+                name: "role".into(),
+                dna: AppRoleDnaManifest {
+                    path: Some(format!("{}", dna.dna_hash())),
+                    modifiers: DnaModifiersOpt::default(),
+                    installed_hash: None,
+                    clone_limit: 0,
+                },
+                provisioning: Some(CellProvisioning::Create { deferred: false }),
+            }])
+            .build()
+            .unwrap()
+            .into(),
+        vec![(
+            format!("{}", dna.dna_hash()),
+            DnaBundle::from_dna_file(dna.clone()).unwrap(),
+        )],
+    )
+    .unwrap();
+    let bundle_bytes = bundle.pack().unwrap();
+
+    // Generate a key that IS in the keystore.
+    let key_in_lair = conductor
+        .keystore()
+        .new_sign_keypair_random()
+        .await
+        .unwrap();
+
+    let result = conductor
+        .clone()
+        .install_app_bundle(InstallAppPayload {
+            agent_key: Some(key_in_lair),
+            source: AppBundleSource::Bytes(bundle_bytes),
+            installed_app_id: Some("key_in_lair".into()),
+            network_seed: None,
+            roles_settings: None,
+            ignore_genesis_failure: false,
+            restore_from_dht: false,
+        })
+        .await;
+
+    assert!(
+        result.is_ok(),
+        "expected success when key is in Lair: {result:?}"
+    );
 }

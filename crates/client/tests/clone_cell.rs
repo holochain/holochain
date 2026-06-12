@@ -36,6 +36,7 @@ async fn clone_cell_management() {
             roles_settings: None,
             source: AppBundleSource::Bytes(fixture::get_fixture_app_bundle()),
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         })
         .await
         .unwrap();
@@ -188,6 +189,7 @@ pub async fn app_info_refresh() {
             roles_settings: None,
             source: AppBundleSource::Bytes(fixture::get_fixture_app_bundle()),
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         })
         .await
         .unwrap();

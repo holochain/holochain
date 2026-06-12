@@ -1325,7 +1325,21 @@ mod app_impls {
                 network_seed,
                 roles_settings,
                 ignore_genesis_failure,
+                restore_from_dht,
             } = payload;
+
+            if restore_from_dht && agent_key.is_none() {
+                return Err(ConductorError::AppStatusError(
+                    "restore_from_dht requires agent_key to be specified".to_string(),
+                ));
+            }
+
+            if let Some(ref key) = agent_key {
+                let keys_in_lair = self.keystore.list_public_keys().await?;
+                if !keys_in_lair.contains(key) {
+                    return Err(ConductorError::AgentKeyNotInKeystore(key.clone()));
+                }
+            }
 
             let modifiers = get_modifiers_map_from_role_settings(&roles_settings);
             let membrane_proofs = get_memproof_map_from_role_settings(&roles_settings);
@@ -1440,6 +1454,16 @@ mod app_impls {
             let apps_ids: Vec<&String> = match status_filter {
                 Some(Enabled) => conductor_state.enabled_apps().map(|(id, _)| id).collect(),
                 Some(Disabled) => conductor_state.disabled_apps().map(|(id, _)| id).collect(),
+                Some(AwaitingRestore) => conductor_state
+                    .awaiting_restore_apps()
+                    .map(|(id, _)| id)
+                    .collect(),
+                Some(Unrecoverable) => conductor_state
+                    .installed_apps()
+                    .iter()
+                    .filter(|(_, app)| matches!(&app.status, AppStatus::Unrecoverable(..)))
+                    .map(|(id, _)| id)
+                    .collect(),
                 None => conductor_state.installed_apps().keys().collect(),
             };
 

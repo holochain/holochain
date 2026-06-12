@@ -668,6 +668,7 @@ async fn app_status_and_cell_state() {
             network_seed: None,
             roles_settings: None,
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         })
         .await
         .unwrap();
@@ -786,6 +787,7 @@ async fn app_status_and_cell_state() {
             network_seed: None,
             roles_settings: None,
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         })
         .await
         .unwrap();

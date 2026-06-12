@@ -42,6 +42,12 @@ impl InstalledAppModel {
                 ("disabled".to_string(), Some(reason_json))
             }
             AppStatus::AwaitingMemproofs => ("awaiting_memproofs".to_string(), None),
+            AppStatus::AwaitingRestore => ("awaiting_restore".to_string(), None),
+            AppStatus::Unrecoverable(cell_id, reason) => {
+                let payload = serde_json::to_string(&(cell_id, reason))
+                    .map_err(|e| format!("Failed to serialize unrecoverable payload: {}", e))?;
+                ("unrecoverable".to_string(), Some(payload))
+            }
         };
 
         // Serialize the manifest using serde
@@ -96,6 +102,18 @@ impl InstalledAppModel {
                 AppStatus::Disabled(reason)
             }
             "awaiting_memproofs" => AppStatus::AwaitingMemproofs,
+            "awaiting_restore" => AppStatus::AwaitingRestore,
+            "unrecoverable" => {
+                let payload_str = self
+                    .disabled_reason
+                    .as_ref()
+                    .ok_or_else(|| "Missing unrecoverable payload".to_string())?;
+                let (cell_id, reason): (CellId, UnrecoverableCellReason) =
+                    serde_json::from_str(payload_str).map_err(|e| {
+                        format!("Failed to deserialize unrecoverable payload: {}", e)
+                    })?;
+                AppStatus::Unrecoverable(cell_id, reason)
+            }
             _ => return Err(format!("Unknown status: {}", self.status)),
         };
 

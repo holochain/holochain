@@ -51,6 +51,7 @@ async fn main() -> anyhow::Result<()> {
             roles_settings: Default::default(),
             network_seed: None,
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         };
 
         let installed_app = admin_ws.install_app(payload).await?;

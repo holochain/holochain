@@ -647,6 +647,7 @@ mod test {
             roles_settings: Default::default(),
             network_seed: None,
             ignore_genesis_failure: false,
+            restore_from_dht: false,
         }));
         let response: AdminResponse = admin_tx.request(request).await.unwrap();
         let app_info = match response {
