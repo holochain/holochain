@@ -1321,16 +1321,33 @@ impl CascadeImpl {
     }
 }
 
-/// Whether a rendered get response carries a `Rejected` record without any
-/// accompanying warrant. Such a response is rejected up front so a malicious
-/// peer cannot force the receiver into pointless validation work — a rejection
-/// is only ever known through a warrant proving it.
+/// Whether a rendered get response carries a `Rejected` record that is not
+/// justified by an accompanying warrant. Such a response is dropped up front so
+/// a malicious peer cannot serve a rejection it cannot prove: every rejected op
+/// must be paired with a warrant against *that* op — an `InvalidChainOp` naming
+/// the op's action, or a `ChainFork` against the op's author. A single unrelated
+/// warrant is not enough.
 fn rejected_without_warrant(rendered: &RenderedOps, warrants: &[SignedWarrant]) -> bool {
-    warrants.is_empty()
-        && rendered
-            .ops
-            .iter()
-            .any(|op| op.validation_status == Some(ValidationStatus::Rejected))
+    rendered
+        .ops
+        .iter()
+        .filter(|op| op.validation_status == Some(ValidationStatus::Rejected))
+        .any(|op| !rejected_op_has_warrant(op, warrants))
+}
+
+/// Whether `warrants` contains one that justifies the rejection of `op`: an
+/// `InvalidChainOp` naming the op's action, or a `ChainFork` against the op's
+/// author (a forked chain invalidates every op the author put on it).
+fn rejected_op_has_warrant(op: &RenderedOp, warrants: &[SignedWarrant]) -> bool {
+    let action_hash = op.action.as_hash();
+    let author = op.action.action().author();
+    warrants.iter().any(|sw| {
+        let WarrantProof::ChainIntegrity(w) = &sw.proof;
+        match w {
+            ChainIntegrityWarrant::InvalidChainOp { action, .. } => &action.0 == action_hash,
+            ChainIntegrityWarrant::ChainFork { chain_author, .. } => chain_author == author,
+        }
+    })
 }
 
 /// Verify the action signatures (and warrant signature, if present) on every
@@ -1668,20 +1685,42 @@ mod rejected_warrant_invariant_tests {
         }
     }
 
-    fn a_warrant() -> SignedWarrant {
-        let proof = WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
-            action_author: fixt!(AgentPubKey),
-            action: (fixt!(ActionHash), fixt!(Signature)),
-            chain_op_type: ChainOpType::StoreRecord,
-            reason: "test".to_string(),
-        });
+    fn signed(proof: WarrantProof, warrantee: AgentPubKey) -> SignedWarrant {
         let warrant = Warrant::new(
             proof,
             fixt!(AgentPubKey),
             Timestamp::from_micros(0),
-            fixt!(AgentPubKey),
+            warrantee,
         );
         SignedWarrant::new(warrant, fixt!(Signature))
+    }
+
+    /// An `InvalidChainOp` warrant naming a specific action.
+    fn invalid_chain_op_warrant(action_hash: ActionHash, author: AgentPubKey) -> SignedWarrant {
+        signed(
+            WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+                action_author: author.clone(),
+                action: (action_hash, fixt!(Signature)),
+                chain_op_type: ChainOpType::StoreRecord,
+                reason: "test".to_string(),
+            }),
+            author,
+        )
+    }
+
+    /// A `ChainFork` warrant against a chain author.
+    fn chain_fork_warrant(chain_author: AgentPubKey) -> SignedWarrant {
+        signed(
+            WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork {
+                chain_author: chain_author.clone(),
+                action_pair: (
+                    (fixt!(ActionHash), fixt!(Signature)),
+                    (fixt!(ActionHash), fixt!(Signature)),
+                ),
+                seq: 0,
+            }),
+            chain_author,
+        )
     }
 
     #[test]
@@ -1701,10 +1740,33 @@ mod rejected_warrant_invariant_tests {
     }
 
     #[test]
-    fn rejected_record_with_warrant_is_accepted() {
+    fn rejected_record_with_matching_invalid_chain_op_warrant_is_accepted() {
+        let rendered = rendered_record(ValidationStatus::Rejected);
+        let action_hash = rendered.ops[0].action.as_hash().clone();
+        let author = rendered.ops[0].action.action().author().clone();
         assert!(!rejected_without_warrant(
+            &rendered,
+            &[invalid_chain_op_warrant(action_hash, author)]
+        ));
+    }
+
+    #[test]
+    fn rejected_record_with_chain_fork_against_author_is_accepted() {
+        let rendered = rendered_record(ValidationStatus::Rejected);
+        let author = rendered.ops[0].action.action().author().clone();
+        assert!(!rejected_without_warrant(
+            &rendered,
+            &[chain_fork_warrant(author)]
+        ));
+    }
+
+    #[test]
+    fn rejected_record_with_unrelated_warrant_is_rejected() {
+        // A warrant naming some other action/author does not justify this
+        // rejected op, so the response is still dropped.
+        assert!(rejected_without_warrant(
             &rendered_record(ValidationStatus::Rejected),
-            &[a_warrant()]
+            &[invalid_chain_op_warrant(fixt!(ActionHash), fixt!(AgentPubKey))]
         ));
     }
 }

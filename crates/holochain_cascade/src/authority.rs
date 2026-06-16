@@ -25,13 +25,13 @@ use holo_hash::EntryHash;
 use holochain_state::dht_store::{DhtStoreRead, GetAgentActivityOptions};
 use holochain_state::query::link::GetLinksFilter;
 use holochain_types::prelude::*;
-use holochain_zome_types::warrant::SignedWarrant;
+use holochain_zome_types::warrant::{ChainIntegrityWarrant, SignedWarrant, WarrantProof};
 use std::collections::HashSet;
 
 /// Handler for get_entry query to an Entry authority.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(store)))]
 pub async fn handle_get_entry(store: DhtStoreRead, hash: EntryHash) -> CascadeResult<WireEntryOps> {
-    let mut rejected_authors = HashSet::new();
+    let mut rejected = RejectedRecords::default();
 
     let create_rows = store.get_authority_entry_creates(&hash).await?;
     let delete_rows = store.get_authority_deletes_for_entry(&hash).await?;
@@ -44,16 +44,16 @@ pub async fn handle_get_entry(store: DhtStoreRead, hash: EntryHash) -> CascadeRe
         .chain(update_rows.iter())
         .find_map(|(sah, _)| sah.action().entry_type().cloned());
 
-    let creates = judged_actions(create_rows, &mut rejected_authors);
-    let deletes = judged_actions(delete_rows, &mut rejected_authors);
-    let updates = judged_actions(update_rows, &mut rejected_authors);
+    let creates = judged_actions(create_rows, &mut rejected);
+    let deletes = judged_actions(delete_rows, &mut rejected);
+    let updates = judged_actions(update_rows, &mut rejected);
 
     let entry = match store.retrieve_entry(&hash, None).await? {
         Some(entry) => entry_type.map(|entry_type| EntryData { entry, entry_type }),
         None => None,
     };
 
-    let warrants = collect_warrants(&store, rejected_authors).await?;
+    let warrants = collect_warrants(&store, &rejected).await?;
 
     Ok(WireEntryOps {
         creates,
@@ -70,13 +70,13 @@ pub async fn handle_get_record(
     store: DhtStoreRead,
     hash: ActionHash,
 ) -> CascadeResult<WireRecordOps> {
-    let mut rejected_authors = HashSet::new();
+    let mut rejected = RejectedRecords::default();
 
     let mut entry = None;
     let action = match store.get_authority_store_record(&hash).await? {
         Some((sah, status)) => {
             if status == ValidationStatus::Rejected {
-                rejected_authors.insert(sah.action().author().clone());
+                rejected.insert(&sah);
             }
             if let Some(entry_hash) = sah.action().entry_hash().cloned() {
                 entry = store.retrieve_entry(&entry_hash, None).await?;
@@ -88,14 +88,14 @@ pub async fn handle_get_record(
 
     let deletes = judged_actions(
         store.get_authority_deletes_for_record(&hash).await?,
-        &mut rejected_authors,
+        &mut rejected,
     );
     let updates = judged_actions(
         store.get_authority_updates_for_record(&hash).await?,
-        &mut rejected_authors,
+        &mut rejected,
     );
 
-    let warrants = collect_warrants(&store, rejected_authors).await?;
+    let warrants = collect_warrants(&store, &rejected).await?;
 
     Ok(WireRecordOps {
         action,
@@ -140,16 +140,16 @@ pub async fn handle_get_links(
     link_key: WireLinkKey,
     _options: holochain_p2p::event::GetLinksOptions,
 ) -> CascadeResult<WireLinkOps> {
-    let mut rejected_authors = HashSet::new();
+    let mut rejected = RejectedRecords::default();
 
     let create_rows = store.get_authority_link_creates(&link_key.base).await?;
     let create_rows = filter_link_creates(create_rows, &link_key);
     let delete_rows = store.get_authority_delete_links(&link_key.base).await?;
 
-    let creates = judged_actions(create_rows, &mut rejected_authors);
-    let deletes = judged_actions(delete_rows, &mut rejected_authors);
+    let creates = judged_actions(create_rows, &mut rejected);
+    let deletes = judged_actions(delete_rows, &mut rejected);
 
-    let warrants = collect_warrants(&store, rejected_authors).await?;
+    let warrants = collect_warrants(&store, &rejected).await?;
 
     Ok(WireLinkOps {
         creates,
@@ -179,31 +179,68 @@ pub async fn handle_get_links_query(
         .await?)
 }
 
-/// Convert authority-read rows into wire-ready judged actions, recording the
-/// authors of any `Rejected` records so their warrants can be attached.
+/// The `Rejected` records in a get-lookup response, tracked so the warrants
+/// justifying them can be attached. A warrant justifies a served record when it
+/// is an `InvalidChainOp` naming one of `action_hashes`, or a `ChainFork`
+/// against one of `authors`.
+#[derive(Default)]
+struct RejectedRecords {
+    authors: HashSet<AgentPubKey>,
+    action_hashes: HashSet<ActionHash>,
+}
+
+impl RejectedRecords {
+    fn insert(&mut self, action: &SignedActionHashed) {
+        self.authors.insert(action.action().author().clone());
+        self.action_hashes.insert(action.as_hash().clone());
+    }
+
+    fn justifies(&self, warrant: &SignedWarrant) -> bool {
+        let WarrantProof::ChainIntegrity(w) = &warrant.proof;
+        match w {
+            ChainIntegrityWarrant::InvalidChainOp { action, .. } => {
+                self.action_hashes.contains(&action.0)
+            }
+            ChainIntegrityWarrant::ChainFork { chain_author, .. } => {
+                self.authors.contains(chain_author)
+            }
+        }
+    }
+}
+
+/// Convert authority-read rows into wire-ready judged actions, recording each
+/// `Rejected` record so the warrant justifying it can be attached.
 fn judged_actions(
     rows: Vec<(SignedActionHashed, ValidationStatus)>,
-    rejected_authors: &mut HashSet<AgentPubKey>,
+    rejected: &mut RejectedRecords,
 ) -> Vec<Judged<SignedAction>> {
     rows.into_iter()
         .map(|(sah, status)| {
             if status == ValidationStatus::Rejected {
-                rejected_authors.insert(sah.action().author().clone());
+                rejected.insert(&sah);
             }
             Judged::new(SignedAction::from(sah), status)
         })
         .collect()
 }
 
-/// Fetch the warrants proving the rejection of every `Rejected` record served,
-/// keyed by the rejected record's author (the warrantee).
+/// Fetch the warrants justifying the `Rejected` records served. Warrants live
+/// at the warrantee's (author's) basis, so they are read per rejected author and
+/// then filtered to those that justify a served record — an `InvalidChainOp`
+/// naming a served action, or a `ChainFork` against the author. Serving only the
+/// relevant warrants keeps a get-lookup response scoped to what it returns;
+/// agent-activity serves all of an author's warrants through its own store read.
 async fn collect_warrants(
     store: &DhtStoreRead,
-    authors: HashSet<AgentPubKey>,
+    rejected: &RejectedRecords,
 ) -> CascadeResult<Vec<SignedWarrant>> {
     let mut warrants = Vec::new();
-    for author in authors {
-        warrants.extend(store.get_warrants_by_warrantee(author).await?);
+    for author in &rejected.authors {
+        for warrant in store.get_warrants_by_warrantee(author.clone()).await? {
+            if rejected.justifies(&warrant) {
+                warrants.push(warrant);
+            }
+        }
     }
     Ok(warrants)
 }
