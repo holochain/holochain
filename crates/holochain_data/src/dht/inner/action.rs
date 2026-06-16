@@ -291,8 +291,7 @@ where
            AND c.validation_status = ?
            AND c.when_integrated IS NOT NULL
            AND NOT EXISTS (SELECT 1 FROM DeletedRecord d WHERE d.deletes_action_hash = a.hash)
-           AND (a.private_entry = 0 OR a.private_entry IS NULL OR a.author = ?)
-         ORDER BY c.when_integrated",
+           AND (a.private_entry = 0 OR a.private_entry IS NULL OR a.author = ?)",
     )
     .bind(entry_hash.get_raw_36())
     .bind(i64::from(ChainOpType::StoreEntry))
@@ -324,8 +323,7 @@ where
            AND c.op_type = ?
            AND c.validation_status = ?
            AND c.when_integrated IS NOT NULL
-           AND (a.private_entry = 0 OR a.private_entry IS NULL OR a.author = ?)
-         ORDER BY c.when_integrated",
+           AND (a.private_entry = 0 OR a.private_entry IS NULL OR a.author = ?)",
     )
     .bind(entry_hash.get_raw_36())
     .bind(i64::from(ChainOpType::StoreEntry))
