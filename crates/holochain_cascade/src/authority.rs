@@ -2,10 +2,14 @@
 //!
 //! The get authorities serve **records** — actions plus their entry — each
 //! carrying its record-level validation status. A `Rejected` record is always
-//! paired with a warrant proving the rejection, so the receiver can reject it
-//! up front without being forced into pointless validation work. All reads go
-//! through the `holochain_data`-backed [`DhtStoreRead`]; only locally-validated
-//! data is served (enforced by the store's authority reads).
+//! served with a warrant justifying the rejection. The receiver still validates
+//! that warrant (and, through it, the warranted op) before acting on it —
+//! warrants are never implicitly trusted, because acting on one blocks an agent,
+//! which is serious and currently permanent. The pairing instead guarantees a
+//! rejected op is never served without the warrant that justifies it, so the
+//! receiver is not left waiting for one or the other. All reads go through the
+//! `holochain_data`-backed [`DhtStoreRead`]; only locally-validated data is
+//! served (enforced by the store's authority reads).
 //!
 //! Each handler composes several independent [`DhtStoreRead`] queries rather
 //! than a single transaction, so a concurrent write (e.g. integration) can make

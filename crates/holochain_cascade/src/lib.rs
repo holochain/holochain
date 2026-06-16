@@ -418,8 +418,8 @@ impl CascadeImpl {
             return;
         }
         let warrant_ops = warrants.into_iter().map(WarrantOp::from).collect();
-        if let Err(err) = self.dht_store.cache_warrants(warrant_ops).await {
-            tracing::warn!(?err, "DhtStore: cache_warrants failed for get response");
+        if let Err(err) = self.dht_store.stage_warrants_for_validation(warrant_ops).await {
+            tracing::warn!(?err, "DhtStore: stage_warrants_for_validation failed for get response");
         }
     }
 
@@ -436,8 +436,8 @@ impl CascadeImpl {
             }
 
             if let Some(warrant) = rendered_ops.warrant.as_ref() {
-                if let Err(err) = self.dht_store.cache_warrants(vec![warrant.clone()]).await {
-                    tracing::warn!(?err, "DhtStore: cache_warrants failed");
+                if let Err(err) = self.dht_store.stage_warrants_for_validation(vec![warrant.clone()]).await {
+                    tracing::warn!(?err, "DhtStore: stage_warrants_for_validation failed");
                 }
             }
         }
@@ -496,8 +496,8 @@ impl CascadeImpl {
             }
 
             if !warrants.is_empty() {
-                if let Err(err) = self.dht_store.cache_warrants(warrants).await {
-                    tracing::warn!(?err, "DhtStore: cache_warrants failed");
+                if let Err(err) = self.dht_store.stage_warrants_for_validation(warrants).await {
+                    tracing::warn!(?err, "DhtStore: stage_warrants_for_validation failed");
                 }
             }
         }
