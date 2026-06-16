@@ -104,7 +104,7 @@ async fn validation_callback_must_get_action() {
     .unwrap();
     assert_matches!(outcome, Outcome::AwaitingDeps(hashes) if hashes == vec![create_action.to_hash().into()]);
 
-    // Record the action to be must-got during validation into the new DhtStore,
+    // Record the action to be must-got during validation into the DhtStore,
     // which the cascade's local read now consults.
     let dht_op = ChainOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
     let dht_op_hashed = DhtOpHashed::from_content_sync(dht_op);
@@ -448,8 +448,8 @@ async fn validation_callback_rejects_op_depending_on_invalid_op() {
     let invocation = ValidateInvocation::new(zomes_to_invoke, &create_link_op).unwrap();
     let network = Arc::new(MockHolochainP2pDnaT::new());
 
-    // Cache the invalid Create record into the new DhtStore (integrated, as a
-    // fetched op would be) and mark it rejected, so the cascade's DhtStore-backed
+    // Cache the invalid Create record into the DhtStore (integrated, as a
+    // fetched op would be) and mark it rejected, so the cascade's
     // get_record_details resolves it as a rejected record.
     let rendered = holochain_types::dht_op::RenderedOp::new(
         create_action.clone(),
