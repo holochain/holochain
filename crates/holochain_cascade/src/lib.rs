@@ -367,10 +367,10 @@ impl CascadeImpl {
             })
             .await?;
 
-        // Signature verification gates writes into the new `DhtStore`.
-        // The legacy cache write above keeps its existing behaviour so the
-        // long tail of tests using synthetic signatures continues to work
-        // while the legacy path is in place.
+        // Only signature-verified ops are written to the `DhtStore`, which is
+        // where every cascade read resolves. The cache write above is retained
+        // only so tests using synthetic signatures still find their fetched
+        // ops, and is removed once those tests use real signatures.
         let verified = verify_rendered_ops_batch(rendered_all).await;
         self.cache_rendered_ops(&verified).await;
         self.cache_response_warrants(response_warrants).await;
@@ -423,10 +423,11 @@ impl CascadeImpl {
         }
     }
 
-    /// Write a batch of rendered ops to the `DhtStore`.
+    /// Write a batch of rendered ops to the `DhtStore` (the source for every
+    /// cascade read).
     ///
-    /// Failures are logged at warn and swallowed: the cache write above is
-    /// the source of truth for now, so a `DhtStore` failure must not break
+    /// Failures are logged at warn and swallowed: the op was already served
+    /// from the network response, so a `DhtStore` write hiccup must not fail
     /// the cascade.
     async fn cache_rendered_ops(&self, rendered_all: &[RenderedOps]) {
         for rendered_ops in rendered_all {

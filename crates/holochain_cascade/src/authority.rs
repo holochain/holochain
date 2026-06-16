@@ -6,6 +6,13 @@
 //! up front without being forced into pointless validation work. All reads go
 //! through the `holochain_data`-backed [`DhtStoreRead`]; only locally-validated
 //! data is served (enforced by the store's authority reads).
+//!
+//! Each handler composes several independent [`DhtStoreRead`] queries rather
+//! than a single transaction, so a concurrent write (e.g. integration) can make
+//! a handler's result a non-atomic mix of two store states. That is acceptable:
+//! get is eventually consistent — a requester reconciles responses across
+//! authorities and over time, so a momentarily missing or extra delete/update
+//! is corrected on a later get.
 
 use super::error::CascadeResult;
 use holo_hash::ActionHash;
