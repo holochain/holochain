@@ -162,7 +162,7 @@ mod tests {
     use matches::assert_matches;
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn has_genesis_reflects_dht_store() {
+    async fn has_genesis() {
         holochain_trace::test_run();
         let test_db = test_authored_db();
         let dht_db = test_dht_db();
