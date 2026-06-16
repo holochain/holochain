@@ -390,61 +390,6 @@ async fn do_set_receipts_complete(dht_store: &DhtStore, op_hash: DhtOpHash) {
         .unwrap();
 }
 
-// --- Direct coverage of the publish-queue query via the DHT store. ---
-
-#[derive(Debug, Clone, Copy)]
-struct Facts {
-    private: bool,
-    within_min_period: bool,
-    has_required_receipts: bool,
-    store_entry: bool,
-    withhold_publish: bool,
-}
-
-/// Seed a single self-authored chain op into the DHT store with publish state
-/// derived from `facts`, and return its hash.
-async fn seed_chain_op(dht_store: &DhtStore, agent: &AgentPubKey, facts: Facts) -> DhtOpHash {
-    let entry = Entry::App(fixt!(AppEntryBytes));
-    let mut action = fixt!(Create);
-    action.author = agent.clone();
-    action.entry_hash = EntryHash::with_data_sync(&entry);
-    action.entry_type = AppEntryDefFixturator::new(if facts.private {
-        EntryVisibility::Private
-    } else {
-        EntryVisibility::Public
-    })
-    .map(EntryType::App)
-    .next()
-    .unwrap();
-
-    let op = if facts.store_entry {
-        DhtOpHashed::from_content_sync(ChainOp::StoreEntry(
-            fixt!(Signature),
-            NewEntryAction::Create(action.clone()),
-            entry.clone(),
-        ))
-    } else {
-        DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
-            fixt!(Signature),
-            Action::Create(action.clone()),
-            entry.clone().into(),
-        ))
-    };
-    let op_hash = op.as_hash().clone();
-
-    // `within_min_period` => recently published (so excluded by the recency
-    // window but still counted); otherwise never published (eligible).
-    let last_publish_time = facts.within_min_period.then(Timestamp::now);
-    let receipts_complete = facts.has_required_receipts.then_some(true);
-    let withhold_publish = facts.withhold_publish.then_some(true);
-
-    dht_store
-        .test_insert_authored_chain_op(op, last_publish_time, receipts_complete, withhold_publish)
-        .await
-        .unwrap();
-    op_hash
-}
-
 /// Build an `InvalidChainOp` warrant op authored by `agent`.
 fn build_warrant_op(agent: &AgentPubKey) -> DhtOpHashed {
     let warrant = SignedWarrant::new(
@@ -464,262 +409,52 @@ fn build_warrant_op(agent: &AgentPubKey) -> DhtOpHashed {
     DhtOpHashed::from_content_sync(DhtOp::WarrantOp(Box::new(WarrantOp::from(warrant))))
 }
 
-async fn num_to_publish(dht_store: &DhtStore, agent: &AgentPubKey) -> usize {
-    dht_store
-        .as_read()
-        .num_still_needing_publish(agent)
-        .await
-        .unwrap()
-}
-
-async fn ops_to_publish(dht_store: &DhtStore, agent: &AgentPubKey) -> Vec<DhtOpHash> {
-    dht_store
-        .as_read()
-        .get_ops_to_publish(
-            agent,
-            ConductorTuningParams::default().min_publish_interval(),
-        )
-        .await
-        .unwrap()
-        .into_iter()
-        .map(|(_, hash)| hash)
-        .collect()
-}
-
+/// The workflow publishes an integrated, self-authored warrant and records that
+/// it was published, so it is not published again. Unlike chain ops, a warrant
+/// publishes once — it needs no validation receipts.
 #[tokio::test(flavor = "multi_thread")]
-async fn query_with_same_agent() {
-    let dht_store = test_dht_store(fixt!(DnaHash)).await;
-    let agent = fixt!(AgentPubKey);
-
-    // Initially there is nothing to publish.
-    assert_eq!(num_to_publish(&dht_store, &agent).await, 0);
-    assert_eq!(ops_to_publish(&dht_store, &agent).await.len(), 0);
-
-    seed_chain_op(
-        &dht_store,
-        &agent,
-        Facts {
-            has_required_receipts: false,
-            private: false,
-            store_entry: false,
-            within_min_period: false,
-            withhold_publish: false,
-        },
-    )
-    .await;
-
-    assert_eq!(num_to_publish(&dht_store, &agent).await, 1);
-    assert_eq!(ops_to_publish(&dht_store, &agent).await.len(), 1);
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn query_with_different_agent() {
-    let dht_store = test_dht_store(fixt!(DnaHash)).await;
-    let agent = fixt!(AgentPubKey);
-
-    seed_chain_op(
-        &dht_store,
-        &fixt!(AgentPubKey),
-        Facts {
-            has_required_receipts: false,
-            private: false,
-            store_entry: false,
-            within_min_period: false,
-            withhold_publish: false,
-        },
-    )
-    .await;
-
-    assert_eq!(num_to_publish(&dht_store, &agent).await, 0);
-    assert_eq!(ops_to_publish(&dht_store, &agent).await.len(), 0);
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn query_store_entry_op_with_private_entry() {
-    let dht_store = test_dht_store(fixt!(DnaHash)).await;
-    let agent = fixt!(AgentPubKey);
-
-    seed_chain_op(
-        &dht_store,
-        &agent,
-        Facts {
-            has_required_receipts: false,
-            private: true,
-            store_entry: true,
-            within_min_period: false,
-            withhold_publish: false,
-        },
-    )
-    .await;
-
-    // A StoreEntry op for a private entry is never published.
-    assert_eq!(num_to_publish(&dht_store, &agent).await, 0);
-    assert_eq!(ops_to_publish(&dht_store, &agent).await.len(), 0);
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn query_other_store_entry_op() {
-    let dht_store = test_dht_store(fixt!(DnaHash)).await;
-    let agent = fixt!(AgentPubKey);
-
-    seed_chain_op(
-        &dht_store,
-        &agent,
-        Facts {
-            has_required_receipts: false,
-            private: false,
-            store_entry: true,
-            within_min_period: false,
-            withhold_publish: false,
-        },
-    )
-    .await;
-
-    // A StoreEntry op for a public entry is published.
-    assert_eq!(num_to_publish(&dht_store, &agent).await, 1);
-    assert_eq!(ops_to_publish(&dht_store, &agent).await.len(), 1);
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn query_private_entry_op() {
-    let dht_store = test_dht_store(fixt!(DnaHash)).await;
-    let agent = fixt!(AgentPubKey);
-
-    seed_chain_op(
-        &dht_store,
-        &agent,
-        Facts {
-            has_required_receipts: false,
-            private: true,
-            store_entry: false,
-            within_min_period: false,
-            withhold_publish: false,
-        },
-    )
-    .await;
-
-    // A StoreRecord op for a private entry is published (the entry is hidden).
-    assert_eq!(num_to_publish(&dht_store, &agent).await, 1);
-    assert_eq!(ops_to_publish(&dht_store, &agent).await.len(), 1);
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn query_op_within_min_publish_interval() {
-    let dht_store = test_dht_store(fixt!(DnaHash)).await;
-    let agent = fixt!(AgentPubKey);
-
-    seed_chain_op(
-        &dht_store,
-        &agent,
-        Facts {
-            has_required_receipts: false,
-            private: false,
-            store_entry: false,
-            within_min_period: true,
-            withhold_publish: false,
-        },
-    )
-    .await;
-
-    // The op still counts towards future publishing, but is not eligible right
-    // now because it was published within the minimum interval.
-    assert_eq!(num_to_publish(&dht_store, &agent).await, 1);
-    assert_eq!(ops_to_publish(&dht_store, &agent).await.len(), 0);
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn query_withhold_publish() {
-    let dht_store = test_dht_store(fixt!(DnaHash)).await;
-    let agent = fixt!(AgentPubKey);
-
-    seed_chain_op(
-        &dht_store,
-        &agent,
-        Facts {
-            has_required_receipts: false,
-            private: false,
-            store_entry: false,
-            within_min_period: false,
-            withhold_publish: true,
-        },
-    )
-    .await;
-
-    assert_eq!(num_to_publish(&dht_store, &agent).await, 0);
-    assert_eq!(ops_to_publish(&dht_store, &agent).await.len(), 0);
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn query_includes_warrants() {
+async fn workflow_publishes_warrant_once() {
     holochain_trace::test_run();
 
     let dht_store = test_dht_store(fixt!(DnaHash)).await;
     let agent = fixt!(AgentPubKey);
 
-    let chain_op_hash = seed_chain_op(
-        &dht_store,
-        &agent,
-        Facts {
-            private: false,
-            within_min_period: false,
-            has_required_receipts: false,
-            store_entry: false,
-            withhold_publish: false,
-        },
+    dht_store
+        .test_insert_integrated_warrant(build_warrant_op(&agent))
+        .await
+        .unwrap();
+
+    // First run: the warrant is eligible, so the workflow publishes it once.
+    let mut network = MockHolochainP2pDnaT::new();
+    network
+        .expect_publish()
+        .times(1)
+        .returning(|_, _, _, _| Ok(()));
+    let (tx, _rx) =
+        TriggerSender::new_with_loop(Duration::from_secs(5)..Duration::from_secs(30), true);
+    publish_dht_ops_workflow(
+        dht_store.clone(),
+        Arc::new(network),
+        tx,
+        agent.clone(),
+        ConductorTuningParams::default().min_publish_interval(),
     )
-    .await;
+    .await
+    .unwrap();
 
-    let warrant_op = build_warrant_op(&agent);
-    let warrant_op_hash = warrant_op.as_hash().clone();
-    dht_store
-        .test_insert_integrated_warrant(warrant_op)
-        .await
-        .unwrap();
-
-    assert_eq!(num_to_publish(&dht_store, &agent).await, 2);
-
-    // Chain ops sort before warrants.
-    let ops = ops_to_publish(&dht_store, &agent).await;
-    assert_eq!(ops, vec![chain_op_hash, warrant_op_hash]);
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn query_warrants_with_different_agent() {
-    let dht_store = test_dht_store(fixt!(DnaHash)).await;
-    let agent = fixt!(AgentPubKey);
-
-    let warrant_op = build_warrant_op(&fixt!(AgentPubKey));
-    dht_store
-        .test_insert_integrated_warrant(warrant_op)
-        .await
-        .unwrap();
-
-    assert_eq!(num_to_publish(&dht_store, &agent).await, 0);
-    assert_eq!(ops_to_publish(&dht_store, &agent).await.len(), 0);
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn query_warrant_op_already_published() {
-    let dht_store = test_dht_store(fixt!(DnaHash)).await;
-    let agent = fixt!(AgentPubKey);
-
-    let warrant_op = build_warrant_op(&agent);
-    let warrant_op_hash = warrant_op.as_hash().clone();
-    dht_store
-        .test_insert_integrated_warrant(warrant_op)
-        .await
-        .unwrap();
-
-    // Before publishing, the warrant is eligible.
-    assert_eq!(num_to_publish(&dht_store, &agent).await, 1);
-    assert_eq!(ops_to_publish(&dht_store, &agent).await.len(), 1);
-
-    // Once published (a WarrantPublish row exists), it is never published again.
-    dht_store
-        .test_insert_warrant_publish(&warrant_op_hash, Some(Timestamp::now()))
-        .await
-        .unwrap();
-
-    assert_eq!(num_to_publish(&dht_store, &agent).await, 0);
-    assert_eq!(ops_to_publish(&dht_store, &agent).await.len(), 0);
+    // Second run: the workflow recorded the publish, so the warrant is no longer
+    // eligible and must not be published again.
+    let mut network = MockHolochainP2pDnaT::new();
+    network.expect_publish().never();
+    let (tx, _rx) =
+        TriggerSender::new_with_loop(Duration::from_secs(5)..Duration::from_secs(30), true);
+    publish_dht_ops_workflow(
+        dht_store,
+        Arc::new(network),
+        tx,
+        agent,
+        ConductorTuningParams::default().min_publish_interval(),
+    )
+    .await
+    .unwrap();
 }
