@@ -171,7 +171,7 @@ mod tests {
     use holo_hash::{ActionHash, AgentPubKey, EntryHash};
     use holochain_integrity_types::dht_v2::{ActionData, ActionHeader, DeleteData};
 
-    fn v2_action(data: ActionData) -> Action {
+    fn action_from_data(data: ActionData) -> Action {
         Action {
             header: ActionHeader {
                 author: AgentPubKey::from_raw_36(vec![1u8; 36]),
@@ -185,7 +185,7 @@ mod tests {
 
     #[test]
     fn op_delete_constructs_and_clones() {
-        let action = v2_action(ActionData::Delete(DeleteData {
+        let action = action_from_data(ActionData::Delete(DeleteData {
             deletes_address: ActionHash::from_raw_36(vec![2u8; 36]),
             deletes_entry_address: EntryHash::from_raw_36(vec![3u8; 36]),
         }));
