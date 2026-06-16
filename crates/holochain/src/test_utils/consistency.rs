@@ -17,7 +17,7 @@ pub async fn request_published_ops(
     dht_store: &DhtStoreRead,
     author: &AgentPubKey,
 ) -> StateQueryResult<Vec<(u32, OpId, DhtOp)>> {
-    let chain = dht_store.published_chain_ops_for_wire(author).await?;
+    let chain = dht_store.ops_to_publish_for_wire(author).await?;
     Ok(wire_rows_to_legacy_ops(chain, Vec::new())
         .into_iter()
         .map(|op| {

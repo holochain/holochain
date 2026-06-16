@@ -169,13 +169,13 @@ where
     /// reconstruction. Excludes private `StoreEntry` ops so private entries
     /// never leak into the published set. Used by the consistency-check
     /// harness to gather a cell's published ops.
-    pub async fn published_chain_ops_for_wire(
+    pub async fn ops_to_publish_for_wire(
         &self,
         author: &AgentPubKey,
     ) -> crate::query::StateQueryResult<Vec<holochain_data::models::dht::K2ChainOpForWireRow>> {
         self.db
             .as_ref()
-            .published_chain_ops_for_wire(author)
+            .ops_to_publish_for_wire(author)
             .await
             .map_err(crate::query::StateQueryError::Sqlx)
     }

@@ -397,7 +397,7 @@ where
 /// with the private-entry filter applied: `StoreEntry` ops (`op_type = 2`)
 /// carrying a private entry are excluded so private entries never leak into
 /// the published set. Ordered by `ChainOp.hash` for a stable result.
-pub(crate) async fn published_chain_ops_for_wire<'e, E>(
+pub(crate) async fn ops_to_publish_for_wire<'e, E>(
     executor: E,
     author: &AgentPubKey,
 ) -> sqlx::Result<Vec<K2ChainOpForWireRow>>

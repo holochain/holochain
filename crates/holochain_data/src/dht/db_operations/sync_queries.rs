@@ -127,11 +127,11 @@ impl DbRead<Dht> {
     /// Chain-op rows authored and shared by `author`, joined for wire
     /// reconstruction. Excludes private `StoreEntry` ops so private entries
     /// never leak into the published set.
-    pub async fn published_chain_ops_for_wire(
+    pub async fn ops_to_publish_for_wire(
         &self,
         author: &AgentPubKey,
     ) -> sqlx::Result<Vec<K2ChainOpForWireRow>> {
-        sync_queries::published_chain_ops_for_wire(self.pool(), author).await
+        sync_queries::ops_to_publish_for_wire(self.pool(), author).await
     }
 
     /// Every integrated warrant row for wire reconstruction, with no hash
