@@ -232,7 +232,7 @@ mod tests {
         ActionData, ActionHeader, CloseChainData, OpenChainData,
     };
 
-    fn v2_action(data: ActionData) -> Action {
+    fn action_from_data(data: ActionData) -> Action {
         Action {
             header: ActionHeader {
                 author: AgentPubKey::from_raw_36(vec![1u8; 36]),
@@ -248,7 +248,7 @@ mod tests {
     fn open_chain_constructor_extracts_fields() {
         let target = MigrationTarget::Dna(DnaHash::from_raw_36(vec![5u8; 36]));
         let close = ActionHash::from_raw_36(vec![6u8; 36]);
-        let action = v2_action(ActionData::OpenChain(OpenChainData {
+        let action = action_from_data(ActionData::OpenChain(OpenChainData {
             prev_target: target.clone(),
             close_hash: close.clone(),
         }));
@@ -268,7 +268,7 @@ mod tests {
 
     #[test]
     fn close_chain_constructor_extracts_target() {
-        let action = v2_action(ActionData::CloseChain(CloseChainData { new_target: None }));
+        let action = action_from_data(ActionData::CloseChain(CloseChainData { new_target: None }));
         let op = OpActivity::<(), ()>::close_chain(action);
         match op {
             OpActivity::CloseChain { new_target, .. } => assert_eq!(new_target, None),
