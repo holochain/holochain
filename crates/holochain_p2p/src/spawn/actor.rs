@@ -1893,9 +1893,12 @@ impl actor::HcP2p for HolochainP2pActor {
 
             // -- actually publish the op hashes -- //
 
-            let op_hash_list: Vec<OpId> = op_hash_list
+            let op_hash_list: Vec<PublishOp> = op_hash_list
                 .into_iter()
-                .map(|h| h.to_located_k2_op_id(&basis_hash))
+                .map(|h| PublishOp {
+                    op_id: h.to_located_k2_op_id(&basis_hash),
+                    metadata: None,
+                })
                 .collect();
 
             let urls: std::collections::HashSet<Url> = get_responsive_remote_agents_near_location(

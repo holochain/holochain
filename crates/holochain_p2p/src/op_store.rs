@@ -125,12 +125,12 @@ fn k2_op_id_from_raw(op_hash_36: &[u8], basis_36: &[u8]) -> OpId {
 }
 
 impl OpStore for HolochainOpStore {
-    fn process_incoming_ops(&self, op_list: Vec<Bytes>) -> BoxFut<'_, K2Result<Vec<OpId>>> {
+    fn process_incoming_ops(&self, op_list: Vec<IncomingOp>) -> BoxFut<'_, K2Result<Vec<OpId>>> {
         Box::pin(async move {
             let mut dht_ops = Vec::with_capacity(op_list.len());
             let mut ids = Vec::with_capacity(op_list.len());
             for op_bytes in op_list {
-                let op = decode::<_, DhtOp>(&op_bytes)
+                let op = decode::<_, DhtOp>(&op_bytes.op_data)
                     .map_err(|e| K2Error::other_src("Could not decode op", e))?;
                 // Native v2 rehash + basis; equals the sender's id since both
                 // sides hash the same v2 op.
