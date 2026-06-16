@@ -457,7 +457,7 @@ mod tests {
         A,
     }
 
-    fn v2_signed(data: ActionData) -> SignedHashed<Action> {
+    fn signed_from_data(data: ActionData) -> SignedHashed<Action> {
         let action = Action {
             header: ActionHeader {
                 author: AgentPubKey::from_raw_36(vec![1u8; 36]),
@@ -488,7 +488,7 @@ mod tests {
     #[test]
     fn store_record_create_app_entry_flattens_to_create_entry() {
         types();
-        let signed = v2_signed(create_app_data());
+        let signed = signed_from_data(create_app_data());
         let record = Record::new(signed, RecordEntry::Present(e(A {})));
         let op = dht_v2::Op::StoreRecord(dht_v2::StoreRecord { record });
         let flat: FlatOp<EntryTypes, LinkTypes> = op.flattened().unwrap();
@@ -504,7 +504,7 @@ mod tests {
     #[test]
     fn store_record_create_agent_flattens_to_create_agent() {
         types();
-        let signed = v2_signed(ActionData::Create(CreateData {
+        let signed = signed_from_data(ActionData::Create(CreateData {
             entry_type: EntryType::AgentPubKey,
             entry_hash: EntryHash::from_raw_36(vec![3u8; 36]),
         }));
@@ -520,7 +520,7 @@ mod tests {
     #[test]
     fn store_record_dna_flattens_to_dna() {
         types();
-        let signed = v2_signed(ActionData::Dna(DnaData {
+        let signed = signed_from_data(ActionData::Dna(DnaData {
             dna_hash: DnaHash::from_raw_36(vec![4u8; 36]),
         }));
         let record = Record::new(signed, RecordEntry::NA);
@@ -532,7 +532,7 @@ mod tests {
     #[test]
     fn store_record_create_link_resolves_link_type() {
         types();
-        let signed = v2_signed(ActionData::CreateLink(CreateLinkData {
+        let signed = signed_from_data(ActionData::CreateLink(CreateLinkData {
             base_address: EntryHash::from_raw_36(vec![5u8; 36]).into(),
             target_address: EntryHash::from_raw_36(vec![6u8; 36]).into(),
             zome_index: ZomeIndex(0),
@@ -554,7 +554,7 @@ mod tests {
     #[test]
     fn store_entry_create_app_flattens_to_create_entry() {
         types();
-        let signed = v2_signed(create_app_data());
+        let signed = signed_from_data(create_app_data());
         let op = dht_v2::Op::StoreEntry(dht_v2::StoreEntry {
             action: signed,
             entry: e(A {}),
@@ -572,7 +572,7 @@ mod tests {
     #[test]
     fn register_agent_activity_create_app_flattens_with_unit_type() {
         types();
-        let signed = v2_signed(create_app_data());
+        let signed = signed_from_data(create_app_data());
         let op = dht_v2::Op::RegisterAgentActivity(dht_v2::RegisterAgentActivity {
             action: signed,
             cached_entry: None,
@@ -590,7 +590,7 @@ mod tests {
     #[test]
     fn register_delete_flattens_to_register_delete() {
         types();
-        let signed = v2_signed(ActionData::Delete(DeleteData {
+        let signed = signed_from_data(ActionData::Delete(DeleteData {
             deletes_address: ActionHash::from_raw_36(vec![7u8; 36]),
             deletes_entry_address: EntryHash::from_raw_36(vec![8u8; 36]),
         }));
