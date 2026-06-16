@@ -87,13 +87,13 @@ impl DbRead<Dht> {
     }
 
     /// The entry's `StoreEntry` create actions at `validation_status`.
-    pub async fn get_entry_creates(
+    pub async fn get_create_actions_for_entry(
         &self,
         entry_hash: &EntryHash,
         author: Option<&AgentPubKey>,
         validation_status: i64,
     ) -> sqlx::Result<Vec<SignedActionHashed>> {
-        action::get_entry_creates(self.pool(), entry_hash, author, validation_status).await
+        action::get_create_actions_for_entry(self.pool(), entry_hash, author, validation_status).await
     }
 
     /// The `Delete` actions on `entry_hash`.

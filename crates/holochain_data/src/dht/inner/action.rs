@@ -148,8 +148,9 @@ where
         .await
 }
 
-/// All integrated `RegisterAgentActivity` actions authored by `author`,
-/// ordered by chain sequence. When `include_entries` is set, the public
+/// All actions authored by `author` that have an integrated
+/// `RegisterAgentActivity` op, ordered by chain sequence. When
+/// `include_entries` is set, the public
 /// `Entry` blob is joined in (Full mode); otherwise the entry column is `NULL`.
 pub(crate) async fn get_agent_activity<'e, E>(
     executor: E,
@@ -305,7 +306,7 @@ where
 /// The entry's `StoreEntry` create actions at validation status
 /// `validation_status` (integrated, visible to `author`). Unlike
 /// `get_live_entry_creates`, this does NOT exclude deleted creates.
-pub(crate) async fn get_entry_creates<'e, E>(
+pub(crate) async fn get_create_actions_for_entry<'e, E>(
     executor: E,
     entry_hash: &EntryHash,
     author: Option<&AgentPubKey>,
