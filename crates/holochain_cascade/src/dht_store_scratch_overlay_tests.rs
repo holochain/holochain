@@ -791,15 +791,10 @@ async fn get_agent_activity_reflects_scratch_activity() {
     // Seq 0 in the store.
     let prev0 = holo_hash::ActionHash::from_raw_36(vec![0u8; 36]);
     let action0 = make_activity_create(&author, 0, &prev0, 210);
-    integrate_activity_op(&store, action0, 210, 10).await;
+    let hash0 = integrate_activity_op(&store, action0, 210, 10).await;
 
-    // Seq 1 scratch-only.
-    let action1 = make_activity_create(
-        &author,
-        1,
-        &holo_hash::ActionHash::from_raw_36(vec![211u8; 36]),
-        211,
-    );
+    // Seq 1 scratch-only, chained to the integrated seq-0 action.
+    let action1 = make_activity_create(&author, 1, &hash0, 211);
     let sah1 = make_scratch_activity(action1, 211);
 
     let mut scratch = Scratch::new();

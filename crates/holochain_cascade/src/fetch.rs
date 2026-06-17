@@ -121,7 +121,7 @@ impl CascadeImpl {
         // only so tests using synthetic signatures still find their fetched
         // ops, and is removed once those tests use real signatures.
         let verified = verify_rendered_ops_batch(rendered_all).await;
-        self.cache_rendered_ops(&verified).await;
+        self.cache_rendered_ops(&verified).await?;
         self.cache_response_warrants(response_warrants).await;
 
         Ok(())
@@ -155,7 +155,7 @@ impl CascadeImpl {
             .await?;
 
         let verified = verify_rendered_ops_batch(rendered_all).await;
-        self.cache_rendered_ops(&verified).await;
+        self.cache_rendered_ops(&verified).await?;
         self.cache_response_warrants(response_warrants).await;
 
         Ok(())
@@ -179,17 +179,17 @@ impl CascadeImpl {
         }
     }
 
-    /// Write a batch of rendered ops to the `DhtStore` (the source for every
-    /// cascade read).
+    /// Write a batch of rendered ops to the `DhtStore`, the source every cascade
+    /// read resolves against.
     ///
-    /// Failures are logged at warn and swallowed: the op was already served
-    /// from the network response, so a `DhtStore` write hiccup must not fail
-    /// the cascade.
-    async fn cache_rendered_ops(&self, rendered_all: &[RenderedOps]) {
+    /// The op write is propagated: because the cascade re-reads from the
+    /// `DhtStore` after fetching (rather than returning the network payload
+    /// directly), a swallowed write would silently turn a successful response
+    /// into a missing or incomplete read. Warrant staging is best-effort —
+    /// warrants validate independently in limbo — so it is only logged.
+    async fn cache_rendered_ops(&self, rendered_all: &[RenderedOps]) -> CascadeResult<()> {
         for rendered_ops in rendered_all {
-            if let Err(err) = self.dht_store.cache_chain_ops(rendered_ops).await {
-                tracing::warn!(?err, "DhtStore: cache_chain_ops failed");
-            }
+            self.dht_store.cache_chain_ops(rendered_ops).await?;
 
             if let Some(warrant) = rendered_ops.warrant.as_ref() {
                 if let Err(err) = self
@@ -201,6 +201,7 @@ impl CascadeImpl {
                 }
             }
         }
+        Ok(())
     }
 
     /// Add new activity to the Cache.
@@ -251,9 +252,7 @@ impl CascadeImpl {
                 warrant: None,
             };
 
-            if let Err(err) = self.dht_store.cache_chain_ops(&activity_rendered).await {
-                tracing::warn!(?err, "DhtStore: cache_chain_ops failed for activity");
-            }
+            self.dht_store.cache_chain_ops(&activity_rendered).await?;
 
             if !warrants.is_empty() {
                 if let Err(err) = self.dht_store.stage_warrants_for_validation(warrants).await {

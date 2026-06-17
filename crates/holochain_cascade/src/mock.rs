@@ -44,11 +44,11 @@ impl MockCascade {
         let map = map0;
         cascade.expect_retrieve_entry().returning(move |hash, _| {
             let m = map.lock();
-            let result = m.get(&hash.into()).map(|r| {
-                (
-                    EntryHashed::from_content_sync(r.entry().as_option().unwrap().clone()),
-                    CascadeSource::Local,
-                )
+            let result = m.get(&hash.into()).and_then(|r| {
+                r.entry()
+                    .as_option()
+                    .cloned()
+                    .map(|entry| (EntryHashed::from_content_sync(entry), CascadeSource::Local))
             });
             Box::pin(async move { Ok(result) })
         });
@@ -58,7 +58,7 @@ impl MockCascade {
 }
 
 #[tokio::test]
-async fn test_mock_cascade_with_records() {
+async fn mock_cascade_with_records() {
     use super::Cascade;
     use ::fixt::fixt;
     use holochain_p2p::actor::NetworkRequestOptions;
