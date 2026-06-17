@@ -309,7 +309,7 @@ pub(crate) async fn get_create_actions_for_entry<'e, E>(
     executor: E,
     entry_hash: &EntryHash,
     author: Option<&AgentPubKey>,
-    validation_status: i64,
+    validation_status: RecordValidity,
 ) -> sqlx::Result<Vec<SignedActionHashed>>
 where
     E: Executor<'e, Database = Sqlite>,
@@ -327,7 +327,7 @@ where
     )
     .bind(entry_hash.get_raw_36())
     .bind(i64::from(ChainOpType::StoreEntry))
-    .bind(validation_status)
+    .bind(i64::from(validation_status))
     .bind(author.map(|a| a.get_raw_36().to_vec()))
     .fetch_all(executor)
     .await?;

@@ -367,14 +367,14 @@ impl DhtStore<DbRead<Dht>> {
         let to_legacy = holochain_zome_types::dht_v2::to_legacy_signed_action;
         let actions = self
             .db()
-            .get_create_actions_for_entry(entry_hash, author, i64::from(RecordValidity::Accepted))
+            .get_create_actions_for_entry(entry_hash, author, RecordValidity::Accepted)
             .await?
             .iter()
             .map(to_legacy)
             .collect();
         let rejected_actions = self
             .db()
-            .get_create_actions_for_entry(entry_hash, author, i64::from(RecordValidity::Rejected))
+            .get_create_actions_for_entry(entry_hash, author, RecordValidity::Rejected)
             .await?
             .iter()
             .map(to_legacy)
@@ -814,7 +814,7 @@ impl DhtStore<DbRead<Dht>> {
         // Accepted creates: store accepted creates + all scratch creates for this entry.
         let store_accepted = self
             .db()
-            .get_create_actions_for_entry(entry_hash, author, i64::from(RecordValidity::Accepted))
+            .get_create_actions_for_entry(entry_hash, author, RecordValidity::Accepted)
             .await?;
         let mut actions: Vec<holochain_zome_types::record::SignedActionHashed> =
             store_accepted.iter().map(to_legacy).collect();
@@ -823,7 +823,7 @@ impl DhtStore<DbRead<Dht>> {
         // Rejected creates: store only (scratch has no validation status).
         let rejected_actions = self
             .db()
-            .get_create_actions_for_entry(entry_hash, author, i64::from(RecordValidity::Rejected))
+            .get_create_actions_for_entry(entry_hash, author, RecordValidity::Rejected)
             .await?
             .iter()
             .map(to_legacy)

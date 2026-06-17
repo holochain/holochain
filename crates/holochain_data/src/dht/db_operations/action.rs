@@ -91,7 +91,7 @@ impl DbRead<Dht> {
         &self,
         entry_hash: &EntryHash,
         author: Option<&AgentPubKey>,
-        validation_status: i64,
+        validation_status: RecordValidity,
     ) -> sqlx::Result<Vec<SignedActionHashed>> {
         action::get_create_actions_for_entry(self.pool(), entry_hash, author, validation_status)
             .await
