@@ -441,6 +441,19 @@ pub struct K2ChainOpForWireRow {
     pub entry_blob: Option<Vec<u8>>,
 }
 
+/// A [`K2ChainOpForWireRow`] plus its `when_integrated`, used to drive the
+/// integration-dump cursor: integrated ops are paginated by
+/// `(when_integrated, op_hash)`, so each row carries the `when_integrated` that
+/// (with `op_hash`) forms the cursor for the next page.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct DumpChainOpRow {
+    /// The wire columns, reconstructed with `build_chain_dht_op_v2`.
+    #[sqlx(flatten)]
+    pub wire: K2ChainOpForWireRow,
+    /// Microsecond integration timestamp; the high-order part of the cursor.
+    pub when_integrated: i64,
+}
+
 /// Joined `Warrant` row for full op rendering on the K2 wire.
 #[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
 pub struct K2WarrantForWireRow {

@@ -82,10 +82,10 @@ use holo_hash::DnaHash;
 use holochain_conductor_api::conductor::KeystoreConfig;
 use holochain_conductor_api::AppInfo;
 use holochain_conductor_api::AppStatusFilter;
-use holochain_conductor_api::FullIntegrationStateDump;
 use holochain_conductor_api::FullStateDump;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::PeerMetaInfo;
+use holochain_conductor_api::{DhtOpsCursor, FullIntegrationStateDump};
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::lair_keystore::spawn_lair_keystore_in_proc;
 use holochain_keystore::MetaLairClient;
@@ -2522,7 +2522,7 @@ mod misc_impls {
         pub async fn dump_full_cell_state(
             &self,
             cell_id: &CellId,
-            dht_ops_cursor: Option<u64>,
+            dht_ops_cursor: Option<DhtOpsCursor>,
         ) -> ConductorApiResult<FullStateDump> {
             let authored_db =
                 self.get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())?;
@@ -3550,6 +3550,24 @@ pub fn wire_rows_to_legacy_ops(
         .collect()
 }
 
+/// Reconstruct v2 [`DhtOp`](holochain_types::dht_v2::DhtOp)s from wire rows for
+/// the integration dump. Rows that fail to reconstruct are dropped (the same
+/// lenient behaviour the wire path uses), so the result is a best-effort view.
+pub fn wire_rows_to_v2_ops(
+    chain: Vec<holochain_state::dht_store::K2ChainOpForWireRow>,
+    warrants: Vec<holochain_state::dht_store::K2WarrantForWireRow>,
+) -> Vec<holochain_types::dht_v2::DhtOp> {
+    chain
+        .into_iter()
+        .filter_map(|r| holochain_p2p::build_chain_dht_op_v2(r).ok())
+        .chain(
+            warrants
+                .into_iter()
+                .filter_map(|r| holochain_p2p::build_warrant_dht_op_v2(r).ok()),
+        )
+        .collect()
+}
+
 /// Dump the integration json state.
 pub async fn integration_dump(
     dht_store: &DhtStoreRead,
@@ -3567,24 +3585,46 @@ pub async fn integration_dump(
 /// Careful! This will return a lot of data.
 pub async fn full_integration_dump(
     dht_store: &DhtStoreRead,
-    _dht_ops_cursor: Option<u64>,
+    dht_ops_cursor: Option<DhtOpsCursor>,
 ) -> ConductorApiResult<FullIntegrationStateDump> {
-    let integrated = wire_rows_to_legacy_ops(
-        dht_store.all_integrated_chain_ops_for_wire().await?,
-        dht_store.all_integrated_warrants_for_wire().await?,
+    // Page the (growing) integrated set by the `(when_integrated, hash)` cursor.
+    let after = dht_ops_cursor
+        .as_ref()
+        .map(|c| (c.when_integrated, c.hash.get_raw_36().to_vec()));
+    let integrated_rows = dht_store
+        .integrated_chain_ops_for_dump(after.as_ref().map(|(t, h)| (*t, h.as_slice())))
+        .await?;
+
+    // The next cursor is the last integrated chain op returned (ordered by
+    // `(when_integrated, hash)`); `None` when nothing new was integrated.
+    let dht_ops_cursor = integrated_rows.last().map(|row| DhtOpsCursor {
+        when_integrated: row.when_integrated,
+        hash: holo_hash::DhtOpHash::from_raw_36(row.wire.op_hash.clone()),
+    });
+
+    let mut integrated: Vec<_> = integrated_rows
+        .into_iter()
+        .filter_map(|row| holochain_p2p::build_chain_dht_op_v2(row.wire).ok())
+        .collect();
+    integrated.extend(
+        dht_store
+            .integrated_warrants_for_dump()
+            .await?
+            .into_iter()
+            .filter_map(|r| holochain_p2p::build_warrant_dht_op_v2(r).ok()),
     );
+
+    // Limbo sets are small and transient, so they are returned in full.
     let validation_limbo =
-        wire_rows_to_legacy_ops(dht_store.limbo_chain_ops_for_wire(false).await?, Vec::new());
+        wire_rows_to_v2_ops(dht_store.limbo_chain_ops_for_dump(false).await?, Vec::new());
     let integration_limbo =
-        wire_rows_to_legacy_ops(dht_store.limbo_chain_ops_for_wire(true).await?, Vec::new());
+        wire_rows_to_v2_ops(dht_store.limbo_chain_ops_for_dump(true).await?, Vec::new());
 
     Ok(FullIntegrationStateDump {
         validation_limbo,
         integration_limbo,
         integrated,
-        // The legacy rowid cursor has no v2 equivalent; the store reads return
-        // the full set each call, so the cursor is always reset.
-        dht_ops_cursor: 0,
+        dht_ops_cursor,
     })
 }
 

@@ -362,6 +362,12 @@ fn display_op(op: &DhtOp) -> String {
 /// node. Ops are reconstructed into legacy `DhtOp`s so their hashes match the
 /// published set.
 async fn get_integrated_ops(dht_store: &DhtStoreRead) -> Vec<DhtOp> {
-    let chain = dht_store.all_integrated_chain_ops_for_wire().await.unwrap();
+    let chain = dht_store
+        .integrated_chain_ops_for_dump(None)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|row| row.wire)
+        .collect();
     crate::conductor::wire_rows_to_legacy_ops(chain, Vec::new())
 }

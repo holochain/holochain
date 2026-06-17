@@ -4,7 +4,8 @@ use super::super::inner::sync_queries::{self, ArcBounds};
 use crate::handles::DbRead;
 use crate::kind::Dht;
 use crate::models::dht::{
-    K2ChainOpForWireRow, K2OpHashRow, K2OpIdSinceRow, K2OpPresentRow, K2WarrantForWireRow,
+    DumpChainOpRow, K2ChainOpForWireRow, K2OpHashRow, K2OpIdSinceRow, K2OpPresentRow,
+    K2WarrantForWireRow,
 };
 use holo_hash::AgentPubKey;
 
@@ -107,21 +108,23 @@ impl DbRead<Dht> {
         sync_queries::integration_state_counts(self.pool()).await
     }
 
-    /// Every locally-validated (integrated) chain-op row, joined for wire
-    /// reconstruction, with no hash filter.
-    pub async fn all_integrated_chain_ops_for_wire(
+    /// Integrated chain-op rows for the integration dump, paginated forward
+    /// from the `(when_integrated, op_hash)` cursor `after` (`None` from the
+    /// start, which yields the full set).
+    pub async fn integrated_chain_ops_for_dump(
         &self,
-    ) -> sqlx::Result<Vec<K2ChainOpForWireRow>> {
-        sync_queries::all_integrated_chain_ops_for_wire(self.pool()).await
+        after: Option<(i64, &[u8])>,
+    ) -> sqlx::Result<Vec<DumpChainOpRow>> {
+        sync_queries::integrated_chain_ops_for_dump(self.pool(), after).await
     }
 
-    /// Limbo chain-op rows joined for wire reconstruction. `ready` selects the
+    /// Limbo chain-op rows for the integration dump. `ready` selects the
     /// integration-limbo subset; `!ready` selects the validation-limbo subset.
-    pub async fn limbo_chain_ops_for_wire(
+    pub async fn limbo_chain_ops_for_dump(
         &self,
         ready: bool,
     ) -> sqlx::Result<Vec<K2ChainOpForWireRow>> {
-        sync_queries::limbo_chain_ops_for_wire(self.pool(), ready).await
+        sync_queries::limbo_chain_ops_for_dump(self.pool(), ready).await
     }
 
     /// Chain-op rows authored and shared by `author`, joined for wire
@@ -134,9 +137,8 @@ impl DbRead<Dht> {
         sync_queries::ops_to_publish_for_wire(self.pool(), author).await
     }
 
-    /// Every integrated warrant row for wire reconstruction, with no hash
-    /// filter.
-    pub async fn all_integrated_warrants_for_wire(&self) -> sqlx::Result<Vec<K2WarrantForWireRow>> {
-        sync_queries::all_integrated_warrants_for_wire(self.pool()).await
+    /// Every integrated warrant row for the integration dump.
+    pub async fn integrated_warrants_for_dump(&self) -> sqlx::Result<Vec<K2WarrantForWireRow>> {
+        sync_queries::integrated_warrants_for_dump(self.pool()).await
     }
 }

@@ -24,7 +24,8 @@
 //! `WarrantOp`) to report the total observed DHT size.
 
 use crate::models::dht::{
-    K2ChainOpForWireRow, K2OpHashRow, K2OpIdSinceRow, K2OpPresentRow, K2WarrantForWireRow,
+    DumpChainOpRow, K2ChainOpForWireRow, K2OpHashRow, K2OpIdSinceRow, K2OpPresentRow,
+    K2WarrantForWireRow,
 };
 use holo_hash::AgentPubKey;
 use sqlx::{Executor, QueryBuilder, Sqlite};
@@ -357,22 +358,26 @@ where
         .await
 }
 
-/// Fetch every locally-validated (integrated) chain-op row, joined with
-/// `Action` and optional `Entry`, for full wire reconstruction. Same columns
-/// as [`get_chain_ops_for_wire`] but with no hash filter. Ordered by
-/// `ChainOp.hash` for a stable result (`ChainOp` is `WITHOUT ROWID`, so
-/// `rowid` is unavailable).
-pub(crate) async fn all_integrated_chain_ops_for_wire<'e, E>(
+/// Integrated chain-op rows for the integration dump, joined with `Action` and
+/// optional `Entry` for full wire reconstruction. Ordered by
+/// `(when_integrated, hash)` and, when `after` is given, starting strictly after
+/// that cursor — so repeated dumps page forward through newly integrated ops.
+/// Passing `after = None` returns every integrated op (the dump's first page,
+/// and how the consistency harness reads the full set). Reconstruct each row
+/// with `build_chain_dht_op_v2`.
+pub(crate) async fn integrated_chain_ops_for_dump<'e, E>(
     executor: E,
-) -> sqlx::Result<Vec<K2ChainOpForWireRow>>
+    after: Option<(i64, &[u8])>,
+) -> sqlx::Result<Vec<DumpChainOpRow>>
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    sqlx::query_as::<_, K2ChainOpForWireRow>(
+    let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new(
         "SELECT
             ChainOp.hash AS op_hash,
             ChainOp.basis_hash AS basis_hash,
             ChainOp.op_type AS op_type,
+            ChainOp.when_integrated AS when_integrated,
             Action.hash AS action_hash,
             Action.author AS author,
             Action.timestamp AS timestamp,
@@ -384,11 +389,21 @@ where
          FROM ChainOp
          JOIN Action ON ChainOp.action_hash = Action.hash
          LEFT JOIN Entry ON Action.entry_hash = Entry.hash
-         WHERE ChainOp.locally_validated = 1
-         ORDER BY ChainOp.hash ASC",
-    )
-    .fetch_all(executor)
-    .await
+         WHERE ChainOp.locally_validated = 1",
+    );
+    if let Some((when_integrated, hash)) = after {
+        qb.push(" AND (ChainOp.when_integrated > ");
+        qb.push_bind(when_integrated);
+        qb.push(" OR (ChainOp.when_integrated = ");
+        qb.push_bind(when_integrated);
+        qb.push(" AND ChainOp.hash > ");
+        qb.push_bind(hash);
+        qb.push("))");
+    }
+    qb.push(" ORDER BY ChainOp.when_integrated ASC, ChainOp.hash ASC");
+    qb.build_query_as::<DumpChainOpRow>()
+        .fetch_all(executor)
+        .await
 }
 
 /// Fetch the chain-op rows that `author` has authored and shares with the
@@ -437,7 +452,7 @@ where
 /// only the complement is returned (validation-limbo). Ordered by
 /// `LimboChainOp.hash` for a stable result (`LimboChainOp` is `WITHOUT
 /// ROWID`).
-pub(crate) async fn limbo_chain_ops_for_wire<'e, E>(
+pub(crate) async fn limbo_chain_ops_for_dump<'e, E>(
     executor: E,
     ready: bool,
 ) -> sqlx::Result<Vec<K2ChainOpForWireRow>>
@@ -478,7 +493,7 @@ where
 /// Fetch every integrated warrant row for full wire reconstruction. Same
 /// columns as [`get_warrants_for_wire`] but with no hash filter. Ordered by
 /// `WarrantOp.hash` for a stable result (`WarrantOp` is `WITHOUT ROWID`).
-pub(crate) async fn all_integrated_warrants_for_wire<'e, E>(
+pub(crate) async fn integrated_warrants_for_dump<'e, E>(
     executor: E,
 ) -> sqlx::Result<Vec<K2WarrantForWireRow>>
 where

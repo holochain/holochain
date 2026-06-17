@@ -128,39 +128,41 @@ where
         ))
     }
 
-    /// Every locally-validated (integrated) chain-op row, joined for wire
-    /// reconstruction, with no hash filter.
-    pub async fn all_integrated_chain_ops_for_wire(
+    /// Integrated chain-op rows for the integration dump, paginated forward
+    /// from the `(when_integrated, op_hash)` cursor `after` (`None` from the
+    /// start, which yields the full set — also how the consistency harness
+    /// reads everything).
+    pub async fn integrated_chain_ops_for_dump(
         &self,
-    ) -> crate::query::StateQueryResult<Vec<holochain_data::models::dht::K2ChainOpForWireRow>> {
+        after: Option<(i64, &[u8])>,
+    ) -> crate::query::StateQueryResult<Vec<holochain_data::models::dht::DumpChainOpRow>> {
         self.db
             .as_ref()
-            .all_integrated_chain_ops_for_wire()
+            .integrated_chain_ops_for_dump(after)
             .await
             .map_err(crate::query::StateQueryError::Sqlx)
     }
 
-    /// Limbo chain-op rows joined for wire reconstruction. `ready` selects the
+    /// Limbo chain-op rows for the integration dump. `ready` selects the
     /// integration-limbo subset; `!ready` selects the validation-limbo subset.
-    pub async fn limbo_chain_ops_for_wire(
+    pub async fn limbo_chain_ops_for_dump(
         &self,
         ready: bool,
     ) -> crate::query::StateQueryResult<Vec<holochain_data::models::dht::K2ChainOpForWireRow>> {
         self.db
             .as_ref()
-            .limbo_chain_ops_for_wire(ready)
+            .limbo_chain_ops_for_dump(ready)
             .await
             .map_err(crate::query::StateQueryError::Sqlx)
     }
 
-    /// Every integrated warrant row for wire reconstruction, with no hash
-    /// filter.
-    pub async fn all_integrated_warrants_for_wire(
+    /// Every integrated warrant row for the integration dump.
+    pub async fn integrated_warrants_for_dump(
         &self,
     ) -> crate::query::StateQueryResult<Vec<holochain_data::models::dht::K2WarrantForWireRow>> {
         self.db
             .as_ref()
-            .all_integrated_warrants_for_wire()
+            .integrated_warrants_for_dump()
             .await
             .map_err(crate::query::StateQueryError::Sqlx)
     }

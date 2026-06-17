@@ -80,9 +80,12 @@ struct DhtOpRow {
 /// so their hashes match across nodes.
 async fn integrated_op_rows(dht_store: &DhtStoreRead) -> Result<Vec<DhtOpRow>, String> {
     let chain = dht_store
-        .all_integrated_chain_ops_for_wire()
+        .integrated_chain_ops_for_dump(None)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .map(|row| row.wire)
+        .collect();
     Ok(wire_rows_to_legacy_ops(chain, vec![])
         .into_iter()
         .map(|op| {

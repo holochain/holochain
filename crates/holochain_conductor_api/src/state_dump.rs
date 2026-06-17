@@ -1,7 +1,8 @@
 use holo_hash::AgentPubKey;
+use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
 use holochain_state_types::SourceChainDump;
-use holochain_types::dht_op::DhtOp;
+use holochain_types::dht_v2::DhtOp;
 use serde::Deserialize;
 use serde::Serialize;
 use std::sync::Arc;
@@ -57,10 +58,23 @@ pub struct FullIntegrationStateDump {
     /// This includes rejected.
     pub integrated: Vec<DhtOp>,
 
-    /// RowId for the latest DhtOp that we have seen
-    /// Useful for subsequent calls to `FullStateDump`
-    /// to return only what they haven't seen
-    pub dht_ops_cursor: u64,
+    /// Cursor marking the last integrated op returned. Pass it to a subsequent
+    /// `FullStateDump` to page forward through only the ops integrated since.
+    /// `None` when there were no integrated ops to return.
+    pub dht_ops_cursor: Option<DhtOpsCursor>,
+}
+
+/// Pagination cursor for the `integrated` ops in a [`FullIntegrationStateDump`].
+///
+/// Integrated ops are ordered by `(when_integrated, hash)`; a cursor records
+/// the last op returned so the next dump resumes strictly after it. (The legacy
+/// rowid cursor has no equivalent now that the DHT tables are `WITHOUT ROWID`.)
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct DhtOpsCursor {
+    /// Microsecond integration timestamp of the last op returned.
+    pub when_integrated: i64,
+    /// Hash of the last op returned (tie-breaks ops sharing a timestamp).
+    pub hash: DhtOpHash,
 }
 
 /// State dump of all the peer info
