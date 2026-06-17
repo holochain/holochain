@@ -73,11 +73,11 @@ use holochain_wasmer_host::module::ModuleCache;
 use holochain_wasmer_host::prelude::*;
 use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner};
 use once_cell::sync::Lazy;
+use opentelemetry::KeyValue;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
-use opentelemetry::KeyValue;
 use wasmer::AsStoreMut;
 use wasmer::Exports;
 use wasmer::Function;
@@ -150,7 +150,7 @@ pub(crate) fn make_module_cache(
     }
 }
 
-/// The only RealRibosome is a Wasm ribosome.
+/// A production ribosome to execute WASM code.
 ///
 /// Note that this is cloned on every invocation so keep clones cheap!
 #[derive(Clone, Debug)]
@@ -158,7 +158,7 @@ pub struct RealRibosome {
     backend: WasmBackend,
 
     /// The DNA definition, allowing lookups of `ZomeDef`s.
-    dna_def: DnaDefHashed,
+    dna_def: Arc<Mutex<DnaDefHashed>>,
 
     /// Handle to the WASM store, where source code is stored.
     ///
@@ -274,21 +274,17 @@ impl RealRibosome {
     ) -> RibosomeResult<Self> {
         Ok(Self {
             backend,
-            dna_def,
+            dna_def: Arc::new(Mutex::new(dna_def)),
             wasm_store,
             wasmer_module_cache,
         })
-    }
-
-    pub fn dna_def(&self) -> &DnaDefHashed {
-        &self.dna_def
     }
 
     #[cfg(any(test, feature = "test_utils"))]
     pub fn empty(backend: WasmBackend, dna_def: DnaDef, wasm_store: WasmStore) -> Self {
         Self {
             backend,
-            dna_def: DnaDefHashed::from_content_sync(dna_def),
+            dna_def: Arc::new(Mutex::new(DnaDefHashed::from_content_sync(dna_def))),
             wasm_store,
             wasmer_module_cache: make_module_cache(backend, None),
         }
@@ -296,14 +292,19 @@ impl RealRibosome {
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     pub async fn build_module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
-        let wasm_hash = self.dna_def.get_wasm_zome(zome_name)?.clone().wasm_hash;
+        let wasm_hash = self
+            .dna_def
+            .lock()
+            .get_wasm_zome(zome_name)?
+            .clone()
+            .wasm_hash;
 
         let wasm = self
             .wasm_store
             .as_read()
             .get(&wasm_hash)
             .await?
-            .ok_or_else(|| RibosomeError::ZomeSourceMissing(zome_name.clone()))?;
+            .ok_or_else(|| RibosomeError::ZomeSourceMissing(zome_name.to_string()))?;
 
         match self.backend {
             #[cfg(feature = "wasmer-sys-cranelift")]
@@ -351,7 +352,7 @@ impl RealRibosome {
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub fn get_module_cache_key(&self, zome_name: &ZomeName) -> Result<CacheKey, DnaError> {
         let mut key = [0; 32];
-        let wasm_zome_hash = self.dna_def.get_wasm_zome_hash(zome_name)?;
+        let wasm_zome_hash = self.dna_def.lock().get_wasm_zome_hash(zome_name)?;
         let bytes = wasm_zome_hash.get_raw_32();
         key.copy_from_slice(bytes);
         Ok(key)
@@ -385,7 +386,8 @@ impl RealRibosome {
             _ => Store::default(),
         }));
         let function_env = FunctionEnv::new(&mut store.lock().as_store_mut(), Env::default());
-        let (function_env, imports) = Self::imports(ribosome, context_key, store.clone(), function_env);
+        let (function_env, imports) =
+            Self::imports(ribosome, context_key, store.clone(), function_env);
         let instance;
         {
             let mut store = store.lock();
@@ -460,7 +462,7 @@ impl RealRibosome {
             wasm_store,
             make_module_cache(backend, None),
         )
-            .await?;
+        .await?;
         let empty_ribosome = Ribosome::new(empty_dna_def_hashed, empty_ribosome).await?;
         let context_key = RealRibosome::next_context_key();
         #[allow(unreachable_patterns)]
@@ -474,8 +476,12 @@ impl RealRibosome {
         // We just leave this Env uninitialized as default because we never make it
         // to an instance that needs to run on this code path.
         let function_env = FunctionEnv::new(&mut store.as_store_mut(), Env::default());
-        let (_function_env, imports) =
-            Self::imports(Arc::new(empty_ribosome), context_key, Arc::new(Mutex::new(store)), function_env);
+        let (_function_env, imports) = Self::imports(
+            Arc::new(empty_ribosome),
+            context_key,
+            Arc::new(Mutex::new(store)),
+            function_env,
+        );
         let mut imports: Vec<String> = imports.into_iter().map(|((_ns, name), _)| name).collect();
         imports.sort();
         Ok(imports)
@@ -708,16 +714,15 @@ impl RibosomeImplT for RealRibosome {
                 // Reset available metering points to the maximum allowed per zome call
                 reset_metering_points(instance_with_store.clone());
 
-                let input = invocation.take_host_input()?.ok_or_else(|| {
-                    RibosomeError::HostInputMissing
-                })?;
+                let input = invocation
+                    .take_host_input()?
+                    .ok_or_else(|| RibosomeError::HostInputMissing)?;
                 let instance_with_store_clone = instance_with_store.clone();
                 let start = std::time::Instant::now();
                 let result = tokio::task::spawn_blocking(move || {
-                    Self::call_zome_fn(input, zome, fn_name, instance_with_store_clone)
-                        .map(Some)
+                    Self::call_zome_fn(input, zome, fn_name, instance_with_store_clone).map(Some)
                 })
-                    .await?;
+                .await?;
 
                 // Record zome call duration
                 let elapsed = start.elapsed().as_secs_f64();
@@ -768,8 +773,12 @@ impl RibosomeImplT for RealRibosome {
 
                         // create a new key for the context map.
                         let context_key = Self::next_context_key();
-                        let instance_with_store =
-                            self.build_instance_with_store(ribosome, module, context_key, &zome.name.0)?;
+                        let instance_with_store = self.build_instance_with_store(
+                            ribosome,
+                            module,
+                            context_key,
+                            &zome.name.0,
+                        )?;
 
                         // add call context to map for following call
                         {
@@ -794,16 +803,16 @@ impl RibosomeImplT for RealRibosome {
                         Ok(None)
                     }
                 }
-                ZomeDef::Inline(_) => Err(RibosomeError::ZomeTypeMismatch("Expected WASM zome but received inline zome".to_string())),
+                ZomeDef::Inline(_) => Err(RibosomeError::ZomeTypeMismatch(
+                    "Expected WASM zome but received inline zome".to_string(),
+                )),
             }
         })
     }
 
     fn list_zome_fns(&self, zome_name: &ZomeName) -> RibosomeResult<Vec<FunctionName>> {
         // TODO do not cache here
-        let module = tokio_helper::block_forever_on(
-            self.build_module(zome_name),
-        )?;
+        let module = tokio_helper::block_forever_on(self.build_module(zome_name))?;
 
         let mut extern_fns: Vec<FunctionName> = module
             .info()
@@ -817,6 +826,11 @@ impl RibosomeImplT for RealRibosome {
         extern_fns.sort();
 
         Ok(extern_fns)
+    }
+
+    fn replace_cached_dna_def(&self, dna_def: DnaDefHashed) -> RibosomeResult<()> {
+        *self.dna_def.lock() = dna_def;
+        Ok(())
     }
 }
 

@@ -72,7 +72,7 @@ impl DnaBundle {
         let integrity_zomes = data[0]
             .iter()
             .map(|(zome_name, hash, _, dependencies)| {
-                let zome_def = ZomeDef::Wasm(WasmZome {
+                let zome_def = ZomeDef::Wasm(WasmZomeDef {
                     wasm_hash: hash.clone(),
                     dependencies: dependencies.clone(),
                 });
@@ -82,7 +82,7 @@ impl DnaBundle {
         let coordinator_zomes = data[1]
             .iter()
             .map(|(zome_name, hash, _, dependencies)| {
-                let zome_def = ZomeDef::Wasm(WasmZome {
+                let zome_def = ZomeDef::Wasm(WasmZomeDef {
                     wasm_hash: hash.clone(),
                     dependencies: dependencies.clone(),
                 });
@@ -193,10 +193,10 @@ impl DnaBundle {
                 // The wasm hash will be None here for inline zomes and we should
                 // not be allowed to build a manifest in the first place given that
                 // we cannot bundle inline zomes since they are not serializable.
-                match zome.wasm_hash(&name).ok() {
+                match zome.zome_hash().ok() {
                     None => panic!("Cannot construct a valid dna manifest from a DnaDef containing inline zomes!"),
                     Some(hash) => {
-                        let hash = WasmHashB64::from(hash);
+                        let hash = WasmHashB64::from(WasmHash::from_raw_39(hash.into_inner()));
                         ZomeManifest {
                             name: name.clone(),
                             hash: Some(hash),
@@ -222,10 +222,10 @@ impl DnaBundle {
                 // The wasm hash will be None here for inline zomes and we should
                 // not be allowed to build a manifest in the first place given that
                 // we cannot bundle inline zomes since they are not serializable.
-                match zome.wasm_hash(&name).ok() {
+                match zome.zome_hash().ok() {
                     None => panic!("Cannot construct a valid dna manifest from a DnaDef containing inline zomes!"),
                     Some(hash) => {
-                        let hash = WasmHashB64::from(hash);
+                        let hash = WasmHashB64::from(WasmHash::from_raw_39(hash.into_inner()));
                         ZomeManifest {
                             name: name.clone(),
                             hash: Some(hash),

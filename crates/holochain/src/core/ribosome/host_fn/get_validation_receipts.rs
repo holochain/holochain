@@ -51,7 +51,7 @@ mod tests {
     use crate::core::ribosome::host_fn::create::create;
     use crate::core::ribosome::host_fn::get_validation_receipts::get_validation_receipts;
     use crate::fixt::ZomeCallHostAccessFixturator;
-    use crate::fixt::{CallContextFixturator, RealRibosomeFixturator};
+    use crate::fixt::CallContextFixturator;
     use ::fixt::Predictable;
     use ::fixt::{fixt, Unpredictable};
     use holochain_wasm_test_utils::{TestWasm, TestWasmPair};

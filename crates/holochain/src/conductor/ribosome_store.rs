@@ -47,9 +47,7 @@ impl RibosomeStore {
     /// Get the DNA definition for a given CellId.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     pub fn get_dna_def(&self, cell_id: &CellId) -> Option<DnaDefHashed> {
-        self.ribosomes
-            .get(cell_id)
-            .map(|d| d.dna_def().clone())
+        self.ribosomes.get(cell_id).map(|d| d.dna_def().clone())
     }
 
     /// Get the ribosome for a given CellId.

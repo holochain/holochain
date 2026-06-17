@@ -564,7 +564,6 @@ mod test {
     use crate::conductor::state::ConductorState;
     use crate::conductor::Conductor;
     use crate::conductor::ConductorHandle;
-    use crate::fixt::RealRibosomeFixturator;
     use crate::sweettest::SweetDnaFile;
     use crate::sweettest::WsPollRecv;
     use crate::sweettest::{app_bundle_from_dnas, authenticate_app_ws_client};
@@ -615,7 +614,7 @@ mod test {
         let db_dir = test_db_dir();
         let conductor_handle = ConductorBuilder::new()
             .with_data_root_path(db_dir.path().to_path_buf().into())
-            .test(&[])
+            .test()
             .await
             .unwrap();
 
@@ -743,7 +742,7 @@ mod test {
         let db_dir = test_db_dir();
         let conductor_handle = Conductor::builder()
             .with_data_root_path(db_dir.path().to_path_buf().into())
-            .test(&[])
+            .test()
             .await
             .unwrap();
         (Arc::new(db_dir), conductor_handle)
@@ -763,7 +762,7 @@ mod test {
         let conductor_handle = ConductorBuilder::new()
             .config(config)
             .with_data_root_path(db_dir.path().to_path_buf().into())
-            .test(&[])
+            .test()
             .await
             .unwrap();
 
@@ -848,11 +847,6 @@ mod test {
             vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
         );
 
-        // warm the zome
-        let _ = RealRibosomeFixturator::new(crate::fixt::Zomes(vec![TestWasm::Foo]))
-            .next()
-            .unwrap();
-
         let dna_hash = dna.dna_hash().clone();
 
         let (_tmpdir, _, handle, agent_key) =
@@ -890,11 +884,6 @@ mod test {
             vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
         );
 
-        // warm the zome
-        let _ = RealRibosomeFixturator::new(crate::fixt::Zomes(vec![TestWasm::Foo]))
-            .next()
-            .unwrap();
-
         let cell_id_1 = CellId::from((dna_1.dna_hash().clone(), fake_agent_pubkey_1()));
 
         let cell_id_2 = CellId::from((dna_2.dna_hash().clone(), fake_agent_pubkey_1()));
@@ -907,7 +896,7 @@ mod test {
         let handle = ConductorBuilder::new()
             .config(ConductorConfig::default())
             .with_data_root_path(db_dir.path().to_path_buf().into())
-            .test(&[])
+            .test()
             .await
             .unwrap();
 
@@ -1219,9 +1208,6 @@ mod test {
         );
         let agent_pubkey = fake_agent_pubkey_1();
 
-        let _ = RealRibosomeFixturator::new(crate::fixt::Zomes(vec![TestWasm::Foo]))
-            .next()
-            .unwrap();
         let (_tmpdir, _, conductor_handle, _agent_key) = setup_app_in_new_conductor(
             "test app".to_string(),
             Some(agent_pubkey.clone()),

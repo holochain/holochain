@@ -14,7 +14,10 @@ pub struct WasmStore<Db = holochain_data::DbWrite<holochain_data::kind::Wasm>> {
 #[cfg(feature = "test_utils")]
 impl WasmStore {
     pub fn test_new() -> Self {
-        let db = tokio_helper::block_forever_on(holochain_data::test_open_db(holochain_data::kind::Wasm)).unwrap();
+        let db = tokio_helper::block_forever_on(holochain_data::test_open_db(
+            holochain_data::kind::Wasm,
+        ))
+        .unwrap();
         Self { db }
     }
 }

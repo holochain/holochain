@@ -1,8 +1,8 @@
+use super::inner_reads;
 use holo_hash::WasmHash;
 use holochain_types::prelude::{CellId, DnaWasmHashed, EntryDef};
-use sqlx::{Acquire, Executor, Sqlite};
 use holochain_zome_types::dna_def::DnaDefHashed;
-use super::inner_reads;
+use sqlx::{Acquire, Executor, Sqlite};
 
 fn new_decode_error(e: String) -> sqlx::Error {
     sqlx::Error::Decode(Box::new(std::io::Error::new(
@@ -16,7 +16,7 @@ pub(super) async fn wasm_exists<'e, E>(executor: E, hash: &WasmHash) -> sqlx::Re
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    inner_reads::wasm_exists(executor, hash.get_raw_32()).await
+    inner_reads::wasm_exists(executor, hash.get_raw_39()).await
 }
 
 /// Get WASM bytecode by hash.
@@ -27,7 +27,7 @@ pub(super) async fn get_wasm<'e, E>(
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    inner_reads::get_wasm(executor, hash.get_raw_32())
+    inner_reads::get_wasm(executor, hash.get_raw_39())
         .await?
         .map(|model| {
             let wasm_hash = model.wasm_hash();
@@ -50,7 +50,10 @@ where
 }
 
 /// Get a DNA definition for the passed [`CellId`].
-pub(super) async fn get_dna_def<'c, A>(conn: A, cell_id: &CellId) -> sqlx::Result<Option<DnaDefHashed>>
+pub(super) async fn get_dna_def<'c, A>(
+    conn: A,
+    cell_id: &CellId,
+) -> sqlx::Result<Option<DnaDefHashed>>
 where
     A: Acquire<'c, Database = Sqlite>,
 {

@@ -51,7 +51,7 @@ pub fn fake_dna_zomes_named(
             let (wasm, wasm_hash) = wasm.into_inner();
             dna.integrity_zomes.push((
                 zome_name,
-                ZomeDef::Wasm(WasmZome {
+                ZomeDef::Wasm(WasmZomeDef {
                     wasm_hash,
                     dependencies: Default::default(),
                 })

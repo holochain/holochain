@@ -5,6 +5,7 @@
 
 use super::error::WorkflowError;
 use super::error::WorkflowResult;
+use crate::conductor::api::CellConductorApiT;
 use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckHostAccessV1;
 use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckInvocationV1;
 use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCheckHostAccessV2;
@@ -12,7 +13,7 @@ use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCh
 use crate::core::ribosome::guest_callback::genesis_self_check::{
     GenesisSelfCheckHostAccess, GenesisSelfCheckInvocation, GenesisSelfCheckResult,
 };
-use crate::conductor::api::CellConductorApiT;
+use crate::core::ribosome::Ribosome;
 use derive_more::Constructor;
 use holochain_sqlite::prelude::*;
 use holochain_state::dht_store::DhtStore;
@@ -20,12 +21,10 @@ use holochain_state::source_chain;
 use holochain_types::prelude::*;
 use rusqlite::named_params;
 use std::sync::Arc;
-use crate::core::ribosome::Ribosome;
 
 /// The struct which implements the genesis Workflow
 #[derive(Constructor)]
-pub struct GenesisWorkflowArgs
-{
+pub struct GenesisWorkflowArgs {
     cell_id: CellId,
     membrane_proof: Option<MembraneProof>,
     ribosome: Ribosome,
@@ -36,8 +35,7 @@ pub async fn genesis_workflow<Api: CellConductorApiT>(
     mut workspace: GenesisWorkspace,
     api: Api,
     args: GenesisWorkflowArgs,
-) -> WorkflowResult<()>
-{
+) -> WorkflowResult<()> {
     genesis_workflow_inner(&mut workspace, args, api).await?;
     Ok(())
 }
@@ -46,8 +44,7 @@ async fn genesis_workflow_inner<Api: CellConductorApiT>(
     workspace: &mut GenesisWorkspace,
     args: GenesisWorkflowArgs,
     api: Api,
-) -> WorkflowResult<()>
-{
+) -> WorkflowResult<()> {
     let GenesisWorkflowArgs {
         cell_id,
         membrane_proof,
@@ -167,6 +164,7 @@ impl GenesisWorkspace {
 mod tests {
     use super::*;
     use crate::conductor::api::MockCellConductorApiT;
+    use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
     use holochain_keystore::test_keystore;
     use holochain_state::prelude::test_dht_db;
     use holochain_state::{prelude::test_authored_db, source_chain::SourceChain};
@@ -175,7 +173,6 @@ mod tests {
     use holochain_types::test_utils::fake_dna_file;
     use holochain_zome_types::Action;
     use matches::assert_matches;
-    use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn genesis_initializes_source_chain() {
@@ -195,7 +192,11 @@ mod tests {
             let mut api = MockCellConductorApiT::new();
             api.expect_keystore().return_const(keystore.clone());
             let dna_def = DnaDefHashed::from_content_sync(dna.dna_def().clone());
-            let ribosome = MockRibosomeBuilder::new_with_dna_def(dna_def).with_genesis_self_check_handler(|_, _| Ok(GenesisSelfCheckResult::Valid)).build().await.unwrap();
+            let ribosome = MockRibosomeBuilder::new_with_dna_def(dna_def)
+                .with_genesis_self_check_handler(|_, _| Ok(GenesisSelfCheckResult::Valid))
+                .build()
+                .await
+                .unwrap();
 
             let args = GenesisWorkflowArgs {
                 cell_id: CellId::new(dna.dna_hash().clone(), author.clone()),

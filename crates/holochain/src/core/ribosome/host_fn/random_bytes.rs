@@ -44,7 +44,6 @@ pub mod wasm_test {
 
     use crate::core::ribosome::HostContext;
     use crate::fixt::CallContextFixturator;
-    use crate::fixt::RealRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use crate::test_utils::RibosomeTestFixture;
     use ::fixt::prelude::*;

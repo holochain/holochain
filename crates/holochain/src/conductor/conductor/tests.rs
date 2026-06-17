@@ -59,6 +59,7 @@ async fn app_ids_are_unique() {
         spaces,
         post_commit_sender,
         outcome_tx,
+        Default::default(),
     );
 
     let app_id = "app_id".to_string();

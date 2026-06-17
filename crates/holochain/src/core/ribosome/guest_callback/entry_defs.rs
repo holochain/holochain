@@ -167,7 +167,11 @@ mod test {
             .next()
             .unwrap();
 
-        let host_input = entry_defs_invocation.clone().take_host_input().unwrap().unwrap();
+        let host_input = entry_defs_invocation
+            .clone()
+            .take_host_input()
+            .unwrap()
+            .unwrap();
 
         assert_eq!(host_input, ExternIO::encode(()).unwrap());
     }
@@ -180,8 +184,6 @@ mod slow_tests {
     use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
     use crate::core::ribosome::{Ribosome, RibosomeImplT};
     use crate::fixt::EntryDefsInvocationFixturator;
-    use crate::fixt::RealRibosomeFixturator;
-    use crate::fixt::Zomes;
     use crate::test_utils::RibosomeTestFixture;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;

@@ -1,4 +1,6 @@
+use crate::core::ribosome::inline_ribosome::{InlineRibosome, InlineZomeStore};
 use crate::core::ribosome::real_ribosome::{make_module_cache, WasmBackend};
+use crate::core::ribosome::Ribosome;
 use crate::{
     conductor::space::TestSpace,
     core::{
@@ -42,7 +44,6 @@ use holochain_zome_types::{
 };
 use matches::assert_matches;
 use std::{sync::Arc, time::Duration};
-use crate::core::ribosome::Ribosome;
 
 // test app validation with a must get action where the original action of
 // a delete is not in the cache db and then added to it
@@ -359,16 +360,9 @@ async fn validation_callback_rejects_op_depending_on_invalid_op() {
         SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Link]).await;
     let zomes_to_invoke = ZomesToInvoke::OneIntegrity(integrity_zomes[0].clone());
     let dna_hash = dna_file.dna_hash().clone();
-    let backend = WasmBackend::new();
-    let ribosome = RealRibosome::new(
-        backend,
-        dna_file.dna_def_hashed().clone(),
-        holochain_state::wasm::WasmStore::test_new(),
-        make_module_cache(backend, None),
-    )
-    .await
-    .unwrap();
-    let ribosome = Ribosome::new(dna_file.dna_def_hashed().clone(), ribosome).await.unwrap();
+    let ribosome = Ribosome::new_with_test_wasms(vec![TestWasm::Link])
+        .await
+        .unwrap();
     let test_space = TestSpace::new(dna_hash.clone());
     let alice = fixt!(AgentPubKey);
     let workspace = HostFnWorkspaceRead::new(
@@ -447,14 +441,17 @@ struct TestCase {
 impl TestCase {
     async fn new(zomes: SweetInlineZomes) -> Self {
         let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
+        let inline_zome_store = InlineZomeStore::default();
+        for z in dna_file.inline_zomes() {
+            inline_zome_store.insert(dna_file.dna_def_hashed().clone(), z.clone());
+        }
+
         let zomes_to_invoke = ZomesToInvoke::OneIntegrity(integrity_zomes[0].clone());
         let dna_hash = dna_file.dna_hash().clone();
-        let backend = WasmBackend::new();
-        let ribosome =
-            RealRibosome::new(backend, dna_file.dna_def_hashed().clone(), holochain_state::wasm::WasmStore::test_new(), make_module_cache(backend, None))
-                .await
-                .unwrap();
-        let ribosome = Ribosome::new(dna_file.dna_def_hashed().clone(), ribosome).await.unwrap();
+        let ribosome = InlineRibosome::new(dna_file.dna_def_hashed().clone(), inline_zome_store);
+        let ribosome = Ribosome::new(dna_file.dna_def_hashed().clone(), ribosome)
+            .await
+            .unwrap();
         let test_space = TestSpace::new(dna_hash.clone());
         let alice = fixt!(AgentPubKey);
         let bob = fixt!(AgentPubKey);

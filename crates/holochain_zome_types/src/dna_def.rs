@@ -188,7 +188,7 @@ impl DnaDef {
     }
 
     /// Return a Zome, error if not a WasmZome
-    pub fn get_wasm_zome(&self, zome_name: &ZomeName) -> ZomeResult<&WasmZome> {
+    pub fn get_wasm_zome(&self, zome_name: &ZomeName) -> ZomeResult<&WasmZomeDef> {
         self.all_zomes()
             .find(|(name, _)| *name == zome_name)
             .map(|(_, def)| def)
@@ -261,10 +261,8 @@ impl DnaDef {
             return Err(ZomeError::DanglingZomeDependency(dangling_dep, zome_name));
         }
         // Get the previous coordinators.
-        let previous_coordinators = std::mem::replace(
-            &mut self.coordinator_zomes,
-            Vec::with_capacity(0),
-        );
+        let previous_coordinators =
+            std::mem::replace(&mut self.coordinator_zomes, Vec::with_capacity(0));
 
         // Save the order they were installed.
         let mut coordinator_order: Vec<_> = previous_coordinators
@@ -273,7 +271,8 @@ impl DnaDef {
             .collect();
 
         // Turn into a map.
-        let mut coordinators: std::collections::HashMap<_, _> = previous_coordinators.into_iter().collect();
+        let mut coordinators: std::collections::HashMap<_, _> =
+            previous_coordinators.into_iter().collect();
 
         // For each new coordinator insert it to the map.
         for (name, def) in coordinator_zomes {

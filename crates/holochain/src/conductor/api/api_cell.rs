@@ -5,6 +5,7 @@ use super::error::ConductorApiResult;
 use crate::conductor::error::ConductorResult;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
+use crate::core::ribosome::Ribosome;
 use crate::core::workflow::ZomeCallResult;
 use async_trait::async_trait;
 use holochain_keystore::MetaLairClient;
@@ -17,7 +18,6 @@ use holochain_zome_types::block::BlockTargetId;
 use std::sync::Arc;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::OwnedPermit;
-use crate::core::ribosome::Ribosome;
 
 /// The concrete implementation of [`CellConductorApiT`], which is used to give
 /// Cells an API for calling back to their [`Conductor`](crate::conductor::Conductor).

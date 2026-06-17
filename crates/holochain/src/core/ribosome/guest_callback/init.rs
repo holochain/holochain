@@ -227,12 +227,11 @@ mod slow_tests {
     use crate::conductor::api::error::ConductorApiResult;
     use crate::conductor::CellError;
     use crate::core::ribosome::guest_callback::ValidateCallbackResult;
-    use crate::core::ribosome::{Ribosome, RibosomeError};
     use crate::core::ribosome::RibosomeImplT;
+    use crate::core::ribosome::{Ribosome, RibosomeError};
     use crate::core::workflow::WorkflowError;
     use crate::fixt::InitHostAccessFixturator;
     use crate::fixt::InitInvocationFixturator;
-    use crate::fixt::RealRibosomeFixturator;
     use crate::fixt::Zomes;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
@@ -303,10 +302,9 @@ mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_init_multi_implemented_fail() {
-        let ribosome =
-            Ribosome::new_with_test_wasms(vec![TestWasm::InitPass, TestWasm::InitFail])
-                .await
-                .unwrap();
+        let ribosome = Ribosome::new_with_test_wasms(vec![TestWasm::InitPass, TestWasm::InitFail])
+            .await
+            .unwrap();
         let mut init_invocation = InitInvocationFixturator::new(::fixt::Empty).next().unwrap();
         init_invocation.dna_def = ribosome.dna_def().as_content().clone();
 
@@ -371,7 +369,9 @@ mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_init_implemented_invalid_params() {
-        let ribosome = Ribosome::new_with_test_wasms(vec![TestWasm::InitInvalidParams]).await.unwrap();
+        let ribosome = Ribosome::new_with_test_wasms(vec![TestWasm::InitInvalidParams])
+            .await
+            .unwrap();
         let mut init_invocation = InitInvocationFixturator::new(::fixt::Empty).next().unwrap();
         init_invocation.dna_def = ribosome.dna_def().as_content().clone();
 

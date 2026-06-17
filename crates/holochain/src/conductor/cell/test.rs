@@ -1,6 +1,7 @@
 use crate::conductor::space::TestSpaces;
 use crate::conductor::Conductor;
 use crate::core::ribosome::real_ribosome::{make_module_cache, RealRibosome, WasmBackend};
+use crate::core::ribosome::Ribosome;
 use crate::core::workflow::incoming_dht_ops_workflow::op_exists;
 use crate::sweettest::SweetConductorConfig;
 use crate::test_utils::fake_valid_dna_file;
@@ -14,7 +15,6 @@ use holochain_types::cell_config_overrides::CellConfigOverrides;
 use holochain_zome_types::action;
 use std::sync::Arc;
 use tokio::sync::broadcast;
-use crate::core::ribosome::Ribosome;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_cell_handle_publish() {
@@ -46,7 +46,7 @@ async fn test_cell_handle_publish() {
         .config(config.into())
         .with_keystore(keystore.clone())
         .with_data_root_path(data_root_path.clone())
-        .test(&[])
+        .test()
         .await
         .unwrap();
     handle
@@ -56,10 +56,25 @@ async fn test_cell_handle_publish() {
     let backend = WasmBackend::new();
     let wasmer_module_cache = make_module_cache(backend, Some(db_dir.join("wasm-cache")));
 
-    let ribosome = RealRibosome::new(backend, dna_file.dna_def_hashed().clone(), WasmStore::test_new(), wasmer_module_cache)
+    let store: WasmStore = WasmStore::test_new();
+    for (hash, wasm) in dna_file.code().clone() {
+        store
+            .put(DnaWasmHashed::with_pre_hashed(wasm, hash))
+            .await
+            .unwrap();
+    }
+
+    let ribosome = RealRibosome::new(
+        backend,
+        dna_file.dna_def_hashed().clone(),
+        store,
+        wasmer_module_cache,
+    )
+    .await
+    .unwrap();
+    let ribosome = Ribosome::new(dna_file.dna_def_hashed().clone(), ribosome)
         .await
         .unwrap();
-    let ribosome = Ribosome::new(dna_file.dna_def_hashed().clone(), ribosome).await.unwrap();
 
     let dht_store = spaces.test_spaces[&dna].space.dht_store.clone();
     super::Cell::genesis(

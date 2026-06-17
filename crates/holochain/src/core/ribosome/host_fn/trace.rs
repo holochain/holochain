@@ -55,7 +55,6 @@ pub mod wasm_test {
     use super::*;
 
     use crate::fixt::CallContextFixturator;
-    use crate::fixt::RealRibosomeFixturator;
     use crate::test_utils::RibosomeTestFixture;
     use holochain_wasm_test_utils::TestWasm;
     use std::sync::Arc;

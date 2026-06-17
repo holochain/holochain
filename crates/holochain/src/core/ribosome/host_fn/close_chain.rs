@@ -58,7 +58,7 @@ pub fn close_chain(
 mod tests {
     use super::close_chain;
     use crate::fixt::ZomeCallHostAccessFixturator;
-    use crate::fixt::{CallContextFixturator, RealRibosomeFixturator};
+    use crate::fixt::CallContextFixturator;
     use ::fixt::Predictable;
     use ::fixt::{fixt, Unpredictable};
     use holochain_util::tokio_helper;

@@ -112,8 +112,8 @@ pub enum RibosomeError {
     #[error(transparent)]
     ZomeError(#[from] ZomeError),
 
-    #[error("The source code for the zome {0} is missing from the store")]
-    ZomeSourceMissing(ZomeName),
+    #[error("The source code for the zome is missing from the store: {0}")]
+    ZomeSourceMissing(String),
 
     #[error("Wanted the host input but it was already taken")]
     HostInputMissing,

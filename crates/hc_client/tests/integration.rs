@@ -623,10 +623,10 @@ async fn list_agents() -> Result<()> {
     ensure_fixture_packaged().await?;
 
     // Create DNA files for setup
-    let (dna, _, _, inline_zomes) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
+    let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 
     // Install the same app on both conductors
-    let _apps = conductors.setup_app("test-app", &[(dna, inline_zomes)]).await?;
+    let _apps = conductors.setup_app("test-app", &[dna]).await?;
 
     let admin_port_0 = conductors[0]
         .get_arbitrary_admin_websocket_port()

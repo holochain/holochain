@@ -1,19 +1,20 @@
 //! WASM-related database models.
 //!
 //! These models represent WASM bytecode, DNA definitions, zomes, and entry definitions.
-use holo_hash::{DnaHash, WasmHash};
+use holo_hash::hash_type::Zome;
+use holo_hash::{DnaHash, InlineHash, WasmHash, ZomeHash};
 use holochain_integrity_types::{
     zome::ZomeName, AppEntryName, DnaModifiers, EntryDef, EntryDefId, EntryVisibility,
 };
 use holochain_serialized_bytes::{SerializedBytes, UnsafeBytes};
 use holochain_types::prelude::CellId;
+use holochain_zome_types::prelude::{DnaDefHashed, InlineZomeDef};
 use holochain_zome_types::{
     prelude::DnaDef,
-    zome::{CoordinatorZomeDef, IntegrityZomeDef, WasmZome, ZomeDef},
+    zome::{CoordinatorZomeDef, IntegrityZomeDef, WasmZomeDef, ZomeDef},
 };
 use sqlx::FromRow;
 use std::borrow::Cow;
-use holochain_zome_types::prelude::DnaDefHashed;
 
 /// Database model for WASM bytecode storage.
 ///
@@ -30,14 +31,14 @@ impl WasmModel {
     /// Create a new WasmModel from a hash and code bytes.
     pub fn new(hash: WasmHash, code: Vec<u8>) -> Self {
         Self {
-            hash: hash.get_raw_32().to_vec(),
+            hash: hash.get_raw_39().to_vec(),
             code,
         }
     }
 
     /// Get the WasmHash from this model.
     pub fn wasm_hash(&self) -> WasmHash {
-        WasmHash::from_raw_32(self.hash.clone())
+        WasmHash::from_raw_39(self.hash.clone())
     }
 }
 
@@ -133,14 +134,17 @@ impl DnaDefModel {
             .map_err(|e: serde_json::Error| e.to_string())?
             .unwrap_or_default();
 
-        Ok(DnaDefHashed::with_pre_hashed(DnaDef {
-            name: self.name.clone(),
-            modifiers,
-            integrity_zomes,
-            coordinator_zomes,
-            #[cfg(feature = "unstable-migration")]
-            lineage,
-        }, DnaHash::from_raw_32(self.hash.clone())))
+        Ok(DnaDefHashed::with_pre_hashed(
+            DnaDef {
+                name: self.name.clone(),
+                modifiers,
+                integrity_zomes,
+                coordinator_zomes,
+                #[cfg(feature = "unstable-migration")]
+                lineage,
+            },
+            DnaHash::from_raw_32(self.hash.clone()),
+        ))
     }
 }
 
@@ -158,7 +162,7 @@ pub struct IntegrityZomeModel {
     /// The name of the zome.
     pub zome_name: String,
     /// The WASM hash for this zome (NULL for inline zomes).
-    pub wasm_hash: Option<Vec<u8>>,
+    pub zome_hash: Vec<u8>,
     /// List of zome dependency names.
     pub dependencies: sqlx::types::Json<Vec<String>>,
 }
@@ -169,7 +173,7 @@ impl IntegrityZomeModel {
         cell_id: &CellId,
         zome_index: usize,
         zome_name: String,
-        wasm_hash: Option<WasmHash>,
+        zome_hash: ZomeHash,
         dependencies: Vec<String>,
     ) -> Self {
         Self {
@@ -177,16 +181,14 @@ impl IntegrityZomeModel {
             agent: cell_id.agent_pubkey().get_raw_32().to_vec(),
             zome_index: zome_index as i64,
             zome_name,
-            wasm_hash: wasm_hash.map(|h| h.get_raw_32().to_vec()),
+            zome_hash: zome_hash.get_raw_39().to_vec(),
             dependencies: sqlx::types::Json(dependencies),
         }
     }
 
-    /// Get the WasmHash from this model, if present.
-    pub fn wasm_hash(&self) -> Option<WasmHash> {
-        self.wasm_hash
-            .as_ref()
-            .map(|bytes| WasmHash::from_raw_32(bytes.clone()))
+    /// Get the [`ZomeHash`] from this model.
+    pub fn zome_hash(&self) -> ZomeHash {
+        ZomeHash::from_raw_39(self.zome_hash.clone())
     }
 
     /// Convert to a tuple suitable for DnaDef construction.
@@ -201,15 +203,17 @@ impl IntegrityZomeModel {
             .map(|s| ZomeName(Cow::Owned(s.clone())))
             .collect();
 
-        let zome_def = if let Some(wasm_hash) = self.wasm_hash() {
-            IntegrityZomeDef::from(ZomeDef::Wasm(WasmZome {
-                wasm_hash,
+        let zome_hash = self.zome_hash();
+        let zome_def = IntegrityZomeDef::from(match zome_hash.hash_type() {
+            Zome::Wasm => ZomeDef::Wasm(WasmZomeDef {
+                wasm_hash: WasmHash::from_raw_39(zome_hash.into_inner()),
                 dependencies,
-            }))
-        } else {
-            // Inline zomes cannot be reconstructed from database
-            return Err("Cannot reconstruct inline zomes from database".to_string());
-        };
+            }),
+            Zome::Inline => ZomeDef::Inline(InlineZomeDef {
+                inline_hash: InlineHash::from_raw_39(zome_hash.into_inner()),
+                dependencies,
+            }),
+        });
 
         Ok((zome_name, zome_def))
     }
@@ -228,8 +232,8 @@ pub struct CoordinatorZomeModel {
     pub zome_index: i64,
     /// The name of the zome.
     pub zome_name: String,
-    /// The WASM hash for this zome (NULL for inline zomes).
-    pub wasm_hash: Option<Vec<u8>>,
+    /// The hash for this zome.
+    pub zome_hash: Vec<u8>,
     /// List of zome dependency names.
     pub dependencies: sqlx::types::Json<Vec<String>>,
 }
@@ -240,7 +244,7 @@ impl CoordinatorZomeModel {
         cell_id: &CellId,
         zome_index: usize,
         zome_name: String,
-        wasm_hash: Option<WasmHash>,
+        zome_hash: ZomeHash,
         dependencies: Vec<String>,
     ) -> Self {
         Self {
@@ -248,16 +252,14 @@ impl CoordinatorZomeModel {
             agent: cell_id.agent_pubkey().get_raw_32().to_vec(),
             zome_index: zome_index as i64,
             zome_name,
-            wasm_hash: wasm_hash.map(|h| h.get_raw_32().to_vec()),
+            zome_hash: zome_hash.get_raw_39().to_vec(),
             dependencies: sqlx::types::Json(dependencies),
         }
     }
 
-    /// Get the WasmHash from this model, if present.
-    pub fn wasm_hash(&self) -> Option<WasmHash> {
-        self.wasm_hash
-            .as_ref()
-            .map(|bytes| WasmHash::from_raw_32(bytes.clone()))
+    /// Get the [`ZomeHash`] from this model.
+    pub fn zome_hash(&self) -> ZomeHash {
+        ZomeHash::from_raw_39(self.zome_hash.clone())
     }
 
     /// Convert to a tuple suitable for DnaDef construction.
@@ -272,15 +274,17 @@ impl CoordinatorZomeModel {
             .map(|s| ZomeName(Cow::Owned(s.clone())))
             .collect();
 
-        let zome_def = if let Some(wasm_hash) = self.wasm_hash() {
-            CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
-                wasm_hash,
+        let zome_hash = self.zome_hash();
+        let zome_def = CoordinatorZomeDef::from(match zome_hash.hash_type() {
+            Zome::Wasm => ZomeDef::Wasm(WasmZomeDef {
+                wasm_hash: WasmHash::from_raw_39(zome_hash.into_inner()),
                 dependencies,
-            }))
-        } else {
-            // Inline zomes cannot be reconstructed from database
-            return Err("Cannot reconstruct inline zomes from database".to_string());
-        };
+            }),
+            Zome::Inline => ZomeDef::Inline(InlineZomeDef {
+                inline_hash: InlineHash::from_raw_39(zome_hash.into_inner()),
+                dependencies,
+            }),
+        });
 
         Ok((zome_name, zome_def))
     }

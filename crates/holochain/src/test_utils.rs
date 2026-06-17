@@ -142,7 +142,7 @@ pub async fn setup_app_in_new_conductor(
     let db_dir = test_db_dir();
     let conductor_handle = ConductorBuilder::new()
         .with_data_root_path(db_dir.path().to_path_buf().into())
-        .test(&[])
+        .test()
         .await
         .unwrap();
 
@@ -235,11 +235,7 @@ pub async fn setup_app_inner(
         }]),
         ..Default::default()
     };
-    let conductor_handle = ConductorBuilder::new()
-        .config(config)
-        .test(&[])
-        .await
-        .unwrap();
+    let conductor_handle = ConductorBuilder::new().config(config).test().await.unwrap();
 
     for (app_name, cell_data) in apps_data {
         install_app(
@@ -254,16 +250,6 @@ pub async fn setup_app_inner(
     let handle = conductor_handle.clone();
 
     (AppInterfaceApi::new(conductor_handle), handle)
-}
-
-/// If HC_WASM_CACHE_PATH is set warm the cache
-pub fn warm_wasm_tests() {
-    if let Some(_path) = std::env::var_os("HC_WASM_CACHE_PATH") {
-        let wasms: Vec<_> = TestWasm::iter().collect();
-        crate::fixt::RealRibosomeFixturator::new(crate::fixt::Zomes(wasms))
-            .next()
-            .unwrap();
-    }
 }
 
 /// Wait for num_attempts * delay, or until all published ops have been integrated.

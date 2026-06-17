@@ -189,10 +189,10 @@ mod test {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
+    use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
     use crate::core::ribosome::RibosomeImplT;
     use crate::fixt::PostCommitHostAccessFixturator;
     use crate::fixt::PostCommitInvocationFixturator;
-    use crate::fixt::RealRibosomeFixturator;
     use crate::fixt::Zomes;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::{SweetDnaFile, SweetInlineZomes};
@@ -202,7 +202,6 @@ mod slow_tests {
     use holochain_types::inline_zome::InlineZomeSet;
     use holochain_types::signal::Signal;
     use holochain_wasm_test_utils::TestWasm;
-    use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_post_commit_unimplemented() {
@@ -226,7 +225,11 @@ mod slow_tests {
         let host_access = PostCommitHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        let ribosome = MockRibosomeBuilder::new().build().await.unwrap();
+        let ribosome = MockRibosomeBuilder::new()
+            .with_post_commit_handler(|_, _| Ok(()))
+            .build()
+            .await
+            .unwrap();
         let mut post_commit_invocation = PostCommitInvocationFixturator::new(::fixt::Empty)
             .next()
             .unwrap();

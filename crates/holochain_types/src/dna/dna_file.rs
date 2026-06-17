@@ -149,7 +149,8 @@ impl DnaFile {
                 Some(replaced_coordinator) => {
                     // If this is replacing a previous coordinator then
                     // remove the old wasm.
-                    let wasm_hash = replaced_coordinator.wasm_hash(&name)?;
+                    let wasm_hash =
+                        WasmHash::from_raw_39(replaced_coordinator.zome_hash()?.into_inner());
                     self.code.0.remove(&wasm_hash);
                     old_wasm_hashes.push(wasm_hash);
                 }
@@ -179,7 +180,11 @@ impl DnaFile {
     /// Construct a DnaFile from its constituent parts
     #[cfg(feature = "test_utils")]
     pub fn from_parts(dna: DnaDefHashed, code: WasmMap) -> Self {
-        Self { dna, code, inline_zomes: Vec::with_capacity(0) }
+        Self {
+            dna,
+            code,
+            inline_zomes: Vec::with_capacity(0),
+        }
     }
 
     /// Split a DnaFile into its constituent parts

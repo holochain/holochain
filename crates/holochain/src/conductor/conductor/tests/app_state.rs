@@ -70,6 +70,7 @@ async fn can_update_state() {
         spaces,
         post_commit_sender,
         outcome_tx,
+        Default::default(),
     );
     let state = conductor.get_state().await.unwrap();
     let mut expected_state = ConductorState::default();

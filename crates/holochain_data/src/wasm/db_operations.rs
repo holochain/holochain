@@ -2,11 +2,11 @@
 //!
 //! Provides [`DbRead`] and [`DbWrite`] impls for querying and mutating the Wasm database table.
 
+use crate::handles::{DbRead, DbWrite};
+use crate::kind::Wasm;
 use holo_hash::{AgentPubKey, WasmHash};
 use holochain_types::prelude::{CellId, DnaDef, DnaWasmHashed, EntryDef};
 use holochain_zome_types::dna_def::DnaDefHashed;
-use crate::handles::{DbRead, DbWrite};
-use crate::kind::Wasm;
 
 use super::{reads, writes};
 
@@ -73,15 +73,18 @@ impl DbWrite<Wasm> {
 
 #[cfg(test)]
 mod tests {
-    use holo_hash::{HasHash, HashableContentExtAsync, HashableContentExtSync};
+    use crate::kind::Wasm;
+    use crate::test_open_db;
+    use holo_hash::{
+        blake2b_256, HasHash, HashableContentExtAsync, HashableContentExtSync, InlineHash,
+    };
     use holochain_integrity_types::{zome::ZomeName, EntryDefId, EntryVisibility};
     use holochain_serialized_bytes::SerializedBytes;
     use holochain_types::prelude::{
         AgentPubKey, CoordinatorZomeDef, DnaHash, DnaModifiers, DnaWasm, IntegrityZomeDef,
     };
-
-    use crate::kind::Wasm;
-    use crate::test_open_db;
+    use holochain_zome_types::prelude::InlineZomeDef;
+    use holochain_zome_types::zome::ZomeDef;
 
     use super::*;
 
@@ -633,5 +636,72 @@ mod tests {
         let cell_ids: Vec<_> = all_dnas.iter().map(|(cell_id, _)| cell_id).collect();
         assert!(cell_ids.contains(&&cell_id1));
         assert!(cell_ids.contains(&&cell_id2));
+    }
+
+    #[tokio::test]
+    async fn dna_def_with_inline_zomes_round_trip() {
+        let db = test_db().await;
+
+        let integrity_zomes: Vec<(ZomeName, IntegrityZomeDef)> = vec![(
+            ZomeName::from("inline_integrity_zome"),
+            ZomeDef::Inline(InlineZomeDef {
+                inline_hash: InlineHash::from_raw_32(blake2b_256(&[0, 1])),
+                dependencies: vec![],
+            })
+            .into(),
+        )];
+
+        let coordinator_zomes: Vec<(ZomeName, CoordinatorZomeDef)> = vec![(
+            ZomeName::from("inline_coordinator_zome"),
+            ZomeDef::Inline(InlineZomeDef {
+                inline_hash: InlineHash::from_raw_32(blake2b_256(&[0, 2])),
+                dependencies: vec![],
+            })
+            .into(),
+        )];
+
+        let dna_def = DnaDef {
+            name: "test_dna".to_string(),
+            modifiers: DnaModifiers {
+                network_seed: "test_seed".to_string(),
+                properties: SerializedBytes::default(),
+            },
+            integrity_zomes,
+            coordinator_zomes,
+            #[cfg(feature = "unstable-migration")]
+            lineage: std::collections::HashSet::new(),
+        };
+
+        let hash = dna_def.to_hash();
+        let cell_id = test_cell_id(&hash);
+
+        // Should not exist initially
+        assert!(!db.as_ref().dna_def_exists(&cell_id).await.unwrap());
+        assert!(db.as_ref().get_dna_def(&cell_id).await.unwrap().is_none());
+
+        // Store DNA definition
+        db.put_dna_def(cell_id.agent_pubkey(), &dna_def)
+            .await
+            .unwrap();
+
+        // Should exist now
+        assert!(db.as_ref().dna_def_exists(&cell_id).await.unwrap());
+
+        // Retrieve and verify
+        let retrieved = db.as_ref().get_dna_def(&cell_id).await.unwrap().unwrap();
+        assert_eq!(retrieved.name, "test_dna");
+        assert_eq!(retrieved.modifiers.network_seed, "test_seed");
+        assert_eq!(retrieved.integrity_zomes.len(), 1);
+        assert_eq!(retrieved.coordinator_zomes.len(), 1);
+
+        // Verify zome names
+        assert!(retrieved
+            .integrity_zomes
+            .iter()
+            .any(|(name, _)| name == &ZomeName::from("inline_integrity_zome")));
+        assert!(retrieved
+            .coordinator_zomes
+            .iter()
+            .any(|(name, _)| name == &ZomeName::from("inline_coordinator_zome")));
     }
 }

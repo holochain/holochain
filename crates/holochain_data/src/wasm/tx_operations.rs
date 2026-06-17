@@ -2,11 +2,11 @@
 //!
 //! Provides [`TxRead`] and [`TxWrite`] impls for querying and mutating the Wasm database table.
 
+use crate::handles::{TxRead, TxWrite};
+use crate::kind::Wasm;
 use holo_hash::{AgentPubKey, WasmHash};
 use holochain_types::prelude::{CellId, DnaDef, DnaWasmHashed, EntryDef};
 use holochain_zome_types::prelude::DnaDefHashed;
-use crate::handles::{TxRead, TxWrite};
-use crate::kind::Wasm;
 
 use super::{reads, writes};
 

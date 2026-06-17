@@ -8,6 +8,7 @@ use super::api::CellConductorHandle;
 use super::conductor::zome_call_signature_verification::is_valid_signature;
 use super::space::Space;
 use super::ConductorHandle;
+use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::cell::error::CellResult;
 use crate::core::queue_consumer::spawn_queue_consumer_tasks;
@@ -24,7 +25,6 @@ use crate::core::workflow::GenesisWorkflowArgs;
 use crate::core::workflow::GenesisWorkspace;
 use crate::core::workflow::InitializeZomesWorkflowArgs;
 use crate::core::workflow::ZomeCallResult;
-use crate::conductor::api::error::ConductorApiError;
 use error::CellError;
 use futures::future::FutureExt;
 use holo_hash::*;
@@ -173,8 +173,7 @@ impl Cell {
         dht_store: DhtStore,
         ribosome: Ribosome,
         membrane_proof: Option<MembraneProof>,
-    ) -> CellResult<()>
-    {
+    ) -> CellResult<()> {
         let conductor_api = CellConductorApi::new(conductor_handle.clone(), cell_id.clone());
 
         // run genesis

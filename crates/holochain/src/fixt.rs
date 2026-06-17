@@ -28,6 +28,7 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
+use holochain_state::prelude::WasmStore;
 pub use holochain_types::fixt::*;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
@@ -38,65 +39,11 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use strum::IntoEnumIterator;
 use tokio::sync::broadcast;
-use holochain_state::prelude::WasmStore;
 
 /// A collection of test WASMs.
 pub struct Zomes(pub Vec<TestWasm>);
 
 newtype_fixturator!(FnComponents<Vec<String>>);
-
-fixturator!(
-    WasmBackend;
-    constructor fn new();
-);
-
-fixturator!(
-    WasmStore;
-    constructor fn test_new();
-);
-
-fixturator!(
-    RealRibosome;
-    constructor fn empty(WasmBackend, DnaDef, WasmStore);
-);
-
-impl Iterator for RealRibosomeFixturator<Zomes> {
-    type Item = RealRibosome;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let input = self.0.curve.0.clone();
-        let uuid = StringFixturator::new(Unpredictable).next().unwrap();
-        let (dna_file, _, _) = tokio_helper::block_forever_on(async move {
-            SweetDnaFile::from_test_wasms(uuid, input, Default::default()).await
-        });
-
-        let backend = cfg_select! {
-            feature = "wasmer-sys-cranelift" => { WasmBackend::Cranelift }
-            feature = "wasmer-sys-llvm" => { WasmBackend::Llvm }
-            feature = "wasmer-wasmi" => { WasmBackend::Wasmi }
-        };
-
-        let ribosome = tokio_helper::block_forever_on(RealRibosome::new(
-            backend,
-            dna_file.dna_def_hashed().clone(),
-            tokio_helper::block_forever_on(async move { WasmStore::new(test_open_db(Wasm).await.unwrap()) }),
-            make_module_cache(backend, None),
-        ))
-        .unwrap();
-
-        // warm the module cache for each wasm in the ribosome
-        for zome in self.0.curve.0.clone() {
-            let mut call_context = CallContextFixturator::new(Empty).next().unwrap();
-            call_context.zome = CoordinatorZome::from(zome).erase_type();
-            tokio_helper::block_forever_on(ribosome.build_module(call_context.zome.zome_name()))
-                .unwrap();
-        }
-
-        self.0.index += 1;
-
-        Some(ribosome)
-    }
-}
 
 fixturator!(
     DnaWasm;

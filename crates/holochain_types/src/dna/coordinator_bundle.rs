@@ -49,7 +49,7 @@ impl CoordinatorBundle {
         let coordinator_zomes = coordinator
             .iter()
             .map(|(zome_name, hash, _, dependencies)| {
-                let zome_def = ZomeDef::Wasm(WasmZome {
+                let zome_def = ZomeDef::Wasm(WasmZomeDef {
                     wasm_hash: hash.clone(),
                     dependencies: dependencies.clone(),
                 });

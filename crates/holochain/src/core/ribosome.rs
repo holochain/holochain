@@ -16,15 +16,21 @@ use crate::conductor::api::CellConductorHandle;
 use crate::conductor::api::CellConductorReadHandle;
 use crate::conductor::api::ZomeCallParamsSigned;
 use crate::conductor::error::ConductorResult;
+use crate::core::metrics::ribosome_zome_call_duration_metric;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
-use crate::core::ribosome::guest_callback::genesis_self_check::v1::{GenesisSelfCheckHostAccessV1, GenesisSelfCheckInvocationV1, GenesisSelfCheckResultV1};
-use crate::core::ribosome::guest_callback::genesis_self_check::v2::{GenesisSelfCheckHostAccessV2, GenesisSelfCheckInvocationV2};
+use crate::core::ribosome::guest_callback::genesis_self_check::v1::{
+    GenesisSelfCheckHostAccessV1, GenesisSelfCheckInvocationV1, GenesisSelfCheckResultV1,
+};
+use crate::core::ribosome::guest_callback::genesis_self_check::v2::{
+    GenesisSelfCheckHostAccessV2, GenesisSelfCheckInvocationV2,
+};
 use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::guest_callback::{call_stream, CallStream};
+use crate::core::ribosome::real_ribosome::{make_module_cache, WasmBackend};
 use derive_more::Constructor;
 use error::RibosomeResult;
 use futures::future::BoxFuture;
@@ -42,18 +48,18 @@ use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_types::prelude::*;
 use holochain_types::zome_types::{GlobalZomeTypes, ZomeTypesError};
+use holochain_wasmer_host::error::WasmHostError;
 use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner};
 use holochain_zome_types::block::BlockTargetId;
 use mockall::automock;
+use opentelemetry::KeyValue;
 use std::collections::HashMap;
 use std::iter::Iterator;
 use std::sync::Arc;
-use holochain_wasmer_host::error::WasmHostError;
-use opentelemetry::KeyValue;
 use tokio::sync::broadcast;
 use tokio_stream::StreamExt;
+use uuid::Uuid;
 use wasmer::RuntimeError;
-use crate::core::metrics::ribosome_zome_call_duration_metric;
 
 // This allow is here because #[automock] automaticaly creates a struct without
 // documentation, and there seems to be no way to add docs to it after the fact
@@ -260,8 +266,8 @@ impl HostContext {
     pub fn call_zome_handle(&self) -> &CellConductorReadHandle {
         match self {
             Self::ZomeCall(ZomeCallHostAccess {
-                call_zome_handle, ..
-            })
+                               call_zome_handle, ..
+                           })
             | Self::Init(InitHostAccess { call_zome_handle, .. })
             | Self::PostCommit(PostCommitHostAccess { call_zome_handle: Some(call_zome_handle), .. })
             => call_zome_handle,
@@ -610,7 +616,10 @@ pub struct Ribosome {
 }
 
 impl Ribosome {
-    pub async fn new<R: RibosomeImplT + 'static>(dna_def: DnaDefHashed, ribosome_impl: R) -> RibosomeResult<Self> {
+    pub async fn new<R: RibosomeImplT + 'static>(
+        dna_def: DnaDefHashed,
+        ribosome_impl: R,
+    ) -> RibosomeResult<Self> {
         let inner = Arc::new(ribosome_impl);
         let mut instance = Self {
             dna_def: dna_def.clone(),
@@ -627,7 +636,11 @@ impl Ribosome {
 
                 // Call the const functions that return the number of types.
                 let num_entry_types = match inner
-                    .call_const_fn(Arc::new(instance.clone()), zome.clone(), "__num_entry_types".to_string())
+                    .call_const_fn(
+                        Arc::new(instance.clone()),
+                        zome.clone(),
+                        "__num_entry_types".to_string(),
+                    )
                     .await?
                 {
                     Some(i) => {
@@ -639,7 +652,11 @@ impl Ribosome {
                     None => 0,
                 };
                 let num_link_types = match inner
-                    .call_const_fn(Arc::new(instance.clone()), zome, "__num_link_types".to_string())
+                    .call_const_fn(
+                        Arc::new(instance.clone()),
+                        zome,
+                        "__num_link_types".to_string(),
+                    )
                     .await?
                 {
                     Some(i) => {
@@ -701,25 +718,56 @@ impl Ribosome {
     }
 
     #[cfg(feature = "test_utils")]
-    pub async fn new_with_test_wasms(test_wasms: Vec<holochain_wasm_test_utils::TestWasm>) -> RibosomeResult<Self> {
-        let dna_def_builder = DnaDefBuilder::default();
+    pub async fn new_with_test_wasms(
+        test_wasms: Vec<holochain_wasm_test_utils::TestWasm>,
+    ) -> RibosomeResult<Self> {
+        let mut dna_def_builder = DnaDefBuilder::default();
 
         let mut integrity_zomes: IntegrityZomes = vec![];
         let mut coordinator_zomes: CoordinatorZomes = vec![];
 
-        let store = holochain_state::wasm::WasmStore::new(holochain_data::test_open_db(holochain_data::kind::Wasm).await.unwrap());
+        let store = holochain_state::wasm::WasmStore::new(
+            holochain_data::test_open_db(holochain_data::kind::Wasm)
+                .await
+                .unwrap(),
+        );
         for test_wasm in test_wasms {
-            integrity_zomes.push((test_wasm.integrity_zome_name(), test_wasm.integrity_zome().def.into()));
-            coordinator_zomes.push((test_wasm.coordinator_zome_name(), test_wasm.coordinator_zome().def.into()));
+            integrity_zomes.push((
+                test_wasm.integrity_zome_name(),
+                test_wasm.integrity_zome().def.into(),
+            ));
+            coordinator_zomes.push((
+                test_wasm.coordinator_zome_name(),
+                test_wasm.coordinator_zome().def.into(),
+            ));
 
-            let dna: DnaWasm = test_wasm.into();
-            store.put(DnaWasmHashed::from_content(dna).await).await.unwrap();
+            let dnas: Vec<DnaWasm> = test_wasm.into();
+            for dna in dnas {
+                store
+                    .put(DnaWasmHashed::from_content(dna).await)
+                    .await
+                    .unwrap();
+            }
         }
 
-        let dna_def = dna_def_builder.build().unwrap();
+        let dna_def = dna_def_builder
+            .integrity_zomes(integrity_zomes)
+            .coordinator_zomes(coordinator_zomes)
+            .modifiers(DnaModifiers {
+                network_seed: Uuid::new_v4().to_string(),
+                properties: SerializedBytes::default(),
+            })
+            .build()
+            .unwrap();
         let dna_def_hashed = DnaDefHashed::from_content_sync(dna_def);
 
-        let real_ribosome = RealRibosome::new(WasmBackend::new(), dna_def_hashed.clone(), store, None).await?;
+        let real_ribosome = real_ribosome::RealRibosome::new(
+            WasmBackend::new(),
+            dna_def_hashed.clone(),
+            store,
+            make_module_cache(WasmBackend::new(), None),
+        )
+        .await?;
         Ribosome::new(dna_def_hashed, real_ribosome).await
     }
 
@@ -734,8 +782,9 @@ impl Ribosome {
     pub fn update_dna_def(
         &mut self,
         mutate: impl FnOnce(DnaDefHashed) -> ZomeResult<DnaDefHashed>,
-    ) -> ZomeResult<()> {
+    ) -> RibosomeResult<()> {
         self.dna_def = mutate(self.dna_def.clone())?;
+        self.inner.replace_cached_dna_def(self.dna_def.clone())?;
         Ok(())
     }
 
@@ -790,9 +839,7 @@ impl Ribosome {
                     })? {
                     EntryDefsResult::Err(zome, error_string) => {
                         return Err(RibosomeError::WasmRuntimeError(
-                            wasm_error!(WasmErrorInner::Host(format!(
-                                    "{zome}: {error_string}"
-                                )))
+                            wasm_error!(WasmErrorInner::Host(format!("{zome}: {error_string}")))
                                 .into(),
                         ))
                     }
@@ -800,9 +847,7 @@ impl Ribosome {
                         let vec = zome_dependencies
                             .iter()
                             .filter_map(|zome_index| {
-                                self.dna_def
-                                    .integrity_zomes
-                                    .get(zome_index.0 as usize)
+                                self.dna_def.integrity_zomes.get(zome_index.0 as usize)
                             })
                             .flat_map(|(zome_name, _)| {
                                 defs.get(zome_name).map(|e| e.0.clone()).unwrap_or_default()
@@ -817,10 +862,13 @@ impl Ribosome {
         })
     }
 
-    pub async fn maybe_call(&self, host_context: HostContext,
-                            invocation: Arc<dyn Invocation + 'static>,
-                            zome: &Zome,
-                            fn_name: &FunctionName,) -> Result<Option<ExternIO>, RibosomeError> {
+    pub async fn maybe_call(
+        &self,
+        host_context: HostContext,
+        invocation: Arc<dyn Invocation + 'static>,
+        zome: &Zome,
+        fn_name: &FunctionName,
+    ) -> Result<Option<ExternIO>, RibosomeError> {
         let this = Arc::new(self.clone());
         let inner = self.inner.clone();
         let dna_hash = self.dna_def.hash.as_hash().to_string();
@@ -850,7 +898,8 @@ impl Ribosome {
                 auth: invocation.auth(),
             };
 
-            inner.maybe_call(this, call_context, invocation, zome, fn_name, attributes)
+            inner
+                .maybe_call(this, call_context, invocation, zome, fn_name, attributes)
                 .await
         });
 
@@ -866,7 +915,11 @@ impl Ribosome {
         s
     }
 
-    async fn do_callback<A, CR, R>(&self, access: A, invocation: Arc<dyn Invocation + 'static>) -> RibosomeResult<R>
+    async fn do_callback<A, CR, R>(
+        &self,
+        access: A,
+        invocation: Arc<dyn Invocation + 'static>,
+    ) -> RibosomeResult<R>
     where
         A: Into<HostContext>,
         CR: CallbackResult + std::fmt::Debug + serde::de::DeserializeOwned,
@@ -900,11 +953,11 @@ impl Ribosome {
                     )
                 }
                 Some(Err((
-                             _zome,
-                             RibosomeError::InlineZomeError(InlineZomeError::SerializationError(
-                                                                SerializedBytesError::Deserialize(err_msg),
-                                                            )),
-                         ))) => {
+                    _zome,
+                    RibosomeError::InlineZomeError(InlineZomeError::SerializationError(
+                        SerializedBytesError::Deserialize(err_msg),
+                    )),
+                ))) => {
                     // Error returned when callback called via zome call with invalid parameters
                     return Err(RibosomeError::CallbackInvalidParameters(err_msg));
                 }
@@ -1044,10 +1097,7 @@ impl Ribosome {
 }
 
 fn zome_name_to_id(dna_def: &DnaDefHashed, zome_name: &ZomeName) -> RibosomeResult<ZomeIndex> {
-    match dna_def
-        .all_zomes()
-        .position(|(name, _)| name == zome_name)
-    {
+    match dna_def.all_zomes().position(|(name, _)| name == zome_name) {
         Some(index) => Ok(ZomeIndex::from(index as u8)),
         None => Err(RibosomeError::ZomeNotExists(zome_name.to_owned())),
     }
@@ -1085,6 +1135,13 @@ pub trait RibosomeImplT: std::fmt::Debug + Send + Sync {
 
     /// List the exported functions for the named zome
     fn list_zome_fns(&self, zome_name: &ZomeName) -> RibosomeResult<Vec<FunctionName>>;
+
+    /// Replace any cached [`DnaDef`] in the ribosome implementation.
+    ///
+    /// The [`Ribosome`] holds the authoritative copy of the [`DnaDef`] and permits mutation.
+    /// Notify the implementation that the value has changed and it should replace any copy it
+    /// holds.
+    fn replace_cached_dna_def(&self, dna_def: DnaDefHashed) -> RibosomeResult<()>;
 }
 
 /// Placeholder for weighing. Currently produces zero weight.

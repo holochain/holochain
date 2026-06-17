@@ -382,9 +382,10 @@ async fn store_record_create_non_app_entry() {
 async fn store_record_create_wrong_entry() {
     let zomes = SweetInlineZomes::new(vec![], 0);
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
-    // zome with index 1 does not exist
-    let zome_index = ZomeIndex(1);
-    let ribosome = MockRibosomeBuilder::new_with_dna_def(dna_file.dna_def_hashed().clone()).build().await.unwrap();
+    let ribosome = MockRibosomeBuilder::new_with_dna_def(dna_file.dna_def_hashed().clone())
+        .build()
+        .await
+        .unwrap();
 
     let entry = fixt!(Entry);
     let action = Action::Create(Create {
@@ -392,6 +393,7 @@ async fn store_record_create_wrong_entry() {
         author: fixt!(AgentPubKey),
         entry_hash: entry.clone().to_hash(),
         entry_type: EntryType::App(AppEntryDef {
+            // zome with index 1 does not exist
             zome_index: 1.into(),
             entry_index: 0.into(),
             visibility: Default::default(),
@@ -997,7 +999,6 @@ async fn register_delete_create_app_entry() {
 async fn register_delete_create_non_app_entry() {
     let zomes = SweetInlineZomes::new(vec![], 0);
     let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
-    let zome = &integrity_zomes[0];
     let ribosome = MockRibosomeBuilder::new_with_dna_def(dna_file.dna_def_hashed().clone())
         .build()
         .await
@@ -1124,8 +1125,6 @@ async fn register_delete_update_app_entry() {
 async fn register_delete_update_non_app_entry() {
     let zomes = SweetInlineZomes::new(vec![], 0);
     let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
-    let zome = &integrity_zomes[0];
-    let zome_index = ZomeIndex(0);
     let ribosome = MockRibosomeBuilder::new_with_dna_def(dna_file.dna_def_hashed().clone())
         .build()
         .await

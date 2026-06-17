@@ -16,7 +16,7 @@ use std::convert::TryInto;
 // hCgk 5124 <Buffer 84 28 24>
 // hCkk 5252 <Buffer 84 29 24> * ACTION
 // hCok 5380 <Buffer 84 2a 24> * WASM
-// hCsk 5508 <Buffer 84 2b 24>
+// hCsk 5508 <Buffer 84 2b 24> * INLINE
 // hCwk 5636 <Buffer 84 2c 24> * WARRANT
 // hC0k 5764 <Buffer 84 2d 24> * DNA
 // hC4k 5892 <Buffer 84 2e 24>
@@ -47,6 +47,7 @@ pub(crate) const WARRANT_PREFIX: &[u8] = &[0x84, 0x2c, 0x24]; // uhCwk [132, 44,
 pub(crate) const DNA_PREFIX: &[u8] = &[0x84, 0x2d, 0x24]; // uhC0k [132, 45, 36]
 pub(crate) const ACTION_PREFIX: &[u8] = &[0x84, 0x29, 0x24]; // uhCkk [132, 41, 36]
 pub(crate) const WASM_PREFIX: &[u8] = &[0x84, 0x2a, 0x24]; // uhCok [132, 42, 36]
+pub(crate) const INLINE_PREFIX: &[u8] = &[0x84, 0x2b, 0x24]; // hCsk [132, 43, 36]
 pub(crate) const EXTERNAL_PREFIX: &[u8] = &[0x84, 0x2f, 0x24]; // uhC8k [132, 47, 36]
 
 /// A PrimitiveHashType is one with a multihash prefix.
@@ -167,6 +168,7 @@ primitive_hash_type!(Dna, DnaHash, DnaVisitor, DNA_PREFIX);
 primitive_hash_type!(DhtOp, DhtOpHash, DhtOpVisitor, DHTOP_PREFIX);
 primitive_hash_type!(Action, ActionHash, ActionVisitor, ACTION_PREFIX);
 primitive_hash_type!(Wasm, WasmHash, WasmVisitor, WASM_PREFIX);
+primitive_hash_type!(Inline, InlineHash, InlineVisitor, INLINE_PREFIX);
 primitive_hash_type!(Warrant, WarrantHash, WarrantVisitor, WARRANT_PREFIX);
 primitive_hash_type!(External, ExternalHash, ExternalVisitor, EXTERNAL_PREFIX);
 
@@ -194,6 +196,8 @@ impl HashTypeSync for Warrant {}
 impl HashTypeAsync for External {}
 
 impl HashTypeAsync for Wasm {}
+
+impl HashTypeAsync for Inline {}
 
 impl From<AgentPubKey> for EntryHash {
     fn from(hash: AgentPubKey) -> EntryHash {

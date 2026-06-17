@@ -208,8 +208,14 @@ impl SweetDnaFile {
     ) -> (DnaFile, Vec<IntegrityZome>, Vec<CoordinatorZome>) {
         let mut zomes = zomes.into();
 
-        let mut inline_zomes: Vec<_> = zomes.coordinator_zomes.iter().map(|(_, c)| DynInlineZome(Arc::new(c.clone()) as Arc<dyn InlineZomeT + Send + Sync>)).collect();
-        inline_zomes.extend(zomes.integrity_zomes.iter().map(|(_, c)| DynInlineZome(Arc::new(c.clone()) as Arc<dyn InlineZomeT + Send + Sync>)));
+        let mut inline_zomes: Vec<_> = zomes
+            .coordinator_zomes
+            .iter()
+            .map(|(_, c)| DynInlineZome(Arc::new(c.clone()) as Arc<dyn InlineZomeT + Send + Sync>))
+            .collect();
+        inline_zomes.extend(zomes.integrity_zomes.iter().map(|(_, c)| {
+            DynInlineZome(Arc::new(c.clone()) as Arc<dyn InlineZomeT + Send + Sync>)
+        }));
 
         let coordinator_zomes: Vec<CoordinatorZome> = zomes
             .coordinator_zomes
@@ -237,7 +243,7 @@ impl SweetDnaFile {
             inline_zomes,
             SerializedBytes::default(),
         )
-            .await;
+        .await;
 
         (dna_file, iz, cz)
     }

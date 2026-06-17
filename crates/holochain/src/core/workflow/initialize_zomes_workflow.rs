@@ -201,7 +201,7 @@ mod tests {
         let conductor_handle = Conductor::builder()
             .config(config.into())
             .with_data_root_path(db_dir.path().to_path_buf().into())
-            .test(&[])
+            .test()
             .await
             .unwrap();
         let integrate_dht_ops_trigger = TriggerSender::new();

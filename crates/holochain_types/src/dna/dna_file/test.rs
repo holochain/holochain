@@ -29,14 +29,14 @@ async fn test_update_coordinators() {
     let init_coordinators = vec![
         (
             "c".into(),
-            CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
+            CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZomeDef {
                 wasm_hash: WasmHash::with_data(&dna_wasms[2]).await,
                 dependencies: vec!["b".into()],
             })),
         ),
         (
             "d".into(),
-            CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
+            CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZomeDef {
                 wasm_hash: WasmHash::with_data(&dna_wasms[3]).await,
                 dependencies: vec!["b".into(), "a".into()],
             })),
@@ -60,7 +60,7 @@ async fn test_update_coordinators() {
     }];
     let new_coordinators = vec![(
         "c".into(),
-        CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
+        CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZomeDef {
             wasm_hash: WasmHash::with_data(&new_dna_wasms[0]).await,
             dependencies: vec!["b".into()],
         })),
@@ -73,7 +73,7 @@ async fn test_update_coordinators() {
     assert_eq!(old_wasm.len(), 1);
     assert_eq!(
         old_wasm[0],
-        init_coordinators[0].1.wasm_hash(&"c".into()).unwrap()
+        WasmHash::from_raw_39(init_coordinators[0].1.zome_hash().unwrap().into_inner())
     );
     assert_eq!(dna.dna_hash(), original_dna.dna_hash());
 
@@ -91,7 +91,7 @@ async fn test_update_coordinators() {
     }];
     let new_coordinators = vec![(
         "e".into(),
-        CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
+        CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZomeDef {
             wasm_hash: WasmHash::with_data(&new_dna_wasms[0]).await,
             dependencies: vec!["a".into()],
         })),
@@ -130,28 +130,28 @@ async fn test_update_coordinators() {
     let new_coordinators = vec![
         (
             "c".into(),
-            CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
+            CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZomeDef {
                 wasm_hash: WasmHash::with_data(&new_dna_wasms[0]).await,
                 dependencies: vec!["a".into()],
             })),
         ),
         (
             "d".into(),
-            CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
+            CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZomeDef {
                 wasm_hash: WasmHash::with_data(&new_dna_wasms[1]).await,
                 dependencies: vec!["a".into()],
             })),
         ),
         (
             "e".into(),
-            CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
+            CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZomeDef {
                 wasm_hash: WasmHash::with_data(&new_dna_wasms[2]).await,
                 dependencies: vec!["a".into()],
             })),
         ),
         (
             "f".into(),
-            CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
+            CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZomeDef {
                 wasm_hash: WasmHash::with_data(&new_dna_wasms[3]).await,
                 dependencies: vec!["a".into()],
             })),
@@ -165,21 +165,27 @@ async fn test_update_coordinators() {
     assert_eq!(old_wasm.len(), 3);
     assert_eq!(
         old_wasm[0],
-        expect_def.coordinator_zomes[0]
-            .1
-            .wasm_hash(&"c".into())
-            .unwrap()
+        WasmHash::from_raw_39(
+            expect_def.coordinator_zomes[0]
+                .1
+                .zome_hash()
+                .unwrap()
+                .into_inner()
+        )
     );
     assert_eq!(
         old_wasm[1],
-        init_coordinators[1].1.wasm_hash(&"d".into()).unwrap()
+        WasmHash::from_raw_39(init_coordinators[1].1.zome_hash().unwrap().into_inner())
     );
     assert_eq!(
         old_wasm[2],
-        expect_def.coordinator_zomes[2]
-            .1
-            .wasm_hash(&"e".into())
-            .unwrap()
+        WasmHash::from_raw_39(
+            expect_def.coordinator_zomes[2]
+                .1
+                .zome_hash()
+                .unwrap()
+                .into_inner()
+        )
     );
     assert_eq!(dna.dna_hash(), original_dna.dna_hash());
 
@@ -222,14 +228,14 @@ async fn test_update_coordinators_checks_deps() {
     let init_coordinators = vec![
         (
             "c".into(),
-            CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
+            CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZomeDef {
                 wasm_hash: WasmHash::with_data(&dna_wasms[2]).await,
                 dependencies: vec!["b".into()],
             })),
         ),
         (
             "d".into(),
-            CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
+            CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZomeDef {
                 wasm_hash: WasmHash::with_data(&dna_wasms[3]).await,
                 dependencies: vec!["b".into(), "a".into()],
             })),
@@ -251,7 +257,7 @@ async fn test_update_coordinators_checks_deps() {
     }];
     let new_coordinators = vec![(
         "c".into(),
-        CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
+        CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZomeDef {
             wasm_hash: WasmHash::with_data(&new_dna_wasms[0]).await,
             dependencies: vec!["z".into()],
         })),
@@ -269,7 +275,7 @@ async fn test_update_coordinators_checks_deps() {
     }];
     let new_coordinators = vec![(
         "e".into(),
-        CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
+        CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZomeDef {
             wasm_hash: WasmHash::with_data(&new_dna_wasms[0]).await,
             dependencies: vec!["z".into()],
         })),

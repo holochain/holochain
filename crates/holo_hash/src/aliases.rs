@@ -31,6 +31,12 @@ pub type ActionHash = HoloHash<hash_type::Action>;
 /// The hash of some wasm bytecode
 pub type WasmHash = HoloHash<hash_type::Wasm>;
 
+/// A hash to identify an inline zome
+pub type InlineHash = HoloHash<hash_type::Inline>;
+
+/// Either a WASM or inline zome hash
+pub type ZomeHash = HoloHash<hash_type::Zome>;
+
 /// The hash of a Warrant
 pub type WarrantHash = HoloHash<hash_type::Warrant>;
 

@@ -55,9 +55,10 @@ pub fn call_stream(
 #[cfg(feature = "slow_tests")]
 mod tests {
     use crate::core::ribosome::guest_callback::call_stream;
-    use crate::core::ribosome::FnComponents;
+    use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
     use crate::core::ribosome::MockInvocation;
     use crate::core::ribosome::ZomesToInvoke;
+    use crate::core::ribosome::{FnComponents, InvocationAuth};
     use crate::fixt::FnComponentsFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use crate::fixt::ZomeFixturator;
@@ -65,7 +66,6 @@ mod tests {
     use mockall::predicate::*;
     use mockall::Sequence;
     use tokio_stream::StreamExt;
-    use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn call_stream_streams() {
@@ -83,7 +83,18 @@ mod tests {
         let fn_components: FnComponents = fn_components_fixturator.next().unwrap();
 
         let dna_def = DnaDefBuilder::default()
-            .integrity_zomes(zomes.clone().into_iter().map(|z| (z.name, z.def.into())).collect())
+            .integrity_zomes(
+                zomes
+                    .clone()
+                    .into_iter()
+                    .map(|z| (z.name, z.def.into()))
+                    .collect(),
+            )
+            .coordinator_zomes(vec![])
+            .modifiers(DnaModifiers {
+                network_seed: "".into(),
+                properties: SerializedBytes::default(),
+            })
             .build()
             .unwrap();
         let dna_def_hashed = DnaDefHashed::from_content_sync(dna_def);
@@ -96,18 +107,15 @@ mod tests {
             .in_sequence(&mut sequence)
             .return_const(ZomesToInvoke::AllIntegrity);
 
-        // ribosome_builder
-        //     // this should happen inside the CallIterator constructor
-        //     .expect_zomes_to_invoke()
-        //     .times(1)
-        //     .in_sequence(&mut sequence)
-        //     .return_const(zomes.clone());
-
         invocation
             .expect_fn_components()
             .times(1)
             .in_sequence(&mut sequence)
             .return_const(fn_components.clone());
+
+        invocation
+            .expect_auth()
+            .return_const(InvocationAuth::LocalCallback);
 
         // zomes are the outer loop as we process all callbacks in a single zome before moving to
         // the next one
@@ -121,9 +129,12 @@ mod tests {
                         always(),
                         always(),
                         always(),
-                        eq(zome.clone()),
+                        function({
+                            let zome = zome.clone();
+                            move |z: &Zome| z.name == zome.name
+                        }),
                         eq(FunctionName::from(fn_component)),
-                        always()
+                        always(),
                     )
                     .times(1)
                     .in_sequence(&mut sequence)
@@ -137,7 +148,11 @@ mod tests {
 
         let ribosome = ribosome_builder.build().await.unwrap();
 
-        let (calls, _h) = call_stream(host_access.into(), ribosome, std::sync::Arc::new(invocation));
+        let (calls, _h) = call_stream(
+            host_access.into(),
+            ribosome,
+            std::sync::Arc::new(invocation),
+        );
 
         let output: Vec<Result<(_, ExternIO), _>> = calls.collect().await;
         assert!(output.iter().all(|r| r.is_ok()));

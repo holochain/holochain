@@ -164,6 +164,13 @@ pub struct Conductor {
     /// Placeholder for what will be the real DNA/Wasm cache
     ribosome_store: RwShare<RibosomeStore>,
 
+    /// Store for inline zomes.
+    ///
+    // TOOD ideally this would live on the sweet conductor and the Ribosome implementation would
+    //      be injected.
+    #[cfg(feature = "test_utils")]
+    pub(crate) inline_zome_store: crate::core::ribosome::inline_ribosome::InlineZomeStore,
+
     /// Access to private keys for signing and encryption.
     keystore: MetaLairClient,
 
@@ -227,6 +234,8 @@ mod startup_shutdown_impls {
             spaces: Spaces,
             post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
             outcome_sender: OutcomeSender,
+            #[cfg(feature = "test_utils")]
+            inline_zome_store: crate::core::ribosome::inline_ribosome::InlineZomeStore,
         ) -> Self {
             let tracing_scope = config.tracing_scope().unwrap_or_default();
             let maybe_data_root_path = config.data_root_path.clone().map(|path| (*path).clone());
@@ -284,6 +293,8 @@ mod startup_shutdown_impls {
                 admin_websocket_ports: RwShare::new(Vec::new()),
                 scheduler: Arc::new(parking_lot::Mutex::new(None)),
                 ribosome_store,
+                #[cfg(feature = "test_utils")]
+                inline_zome_store,
                 keystore,
                 holochain_p2p,
                 post_commit,
@@ -548,8 +559,8 @@ mod interface_impls {
 
 /// DNA-related methods
 mod dna_impls {
-    use crate::core::ribosome::Ribosome;
     use super::*;
+    use crate::core::ribosome::Ribosome;
 
     impl Conductor {
         /// Get the list of hashes of installed Dnas in this Conductor
@@ -581,24 +592,6 @@ mod dna_impls {
                 dna_defs.insert(cell_id.to_owned(), dna_def_hashed.to_owned());
             }
             Ok(dna_defs)
-        }
-
-        pub(crate) async fn register_dna_wasm(
-            &self,
-            cell_id: CellId,
-            ribosome: Ribosome,
-        ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
-            let is_full_wasm_dna = ribosome
-                .dna_def()
-                .all_zomes()
-                .all(|(_, zome_def)| matches!(zome_def, ZomeDef::Wasm(_)));
-
-            // Only install wasm if the DNA is composed purely of WasmZomes (no InlineZomes)
-            if is_full_wasm_dna {
-                Ok(self.put_wasm_and_defs(cell_id, ribosome).await?)
-            } else {
-                Ok(Vec::with_capacity(0))
-            }
         }
 
         pub(crate) fn register_dna_entry_defs(
@@ -646,7 +639,30 @@ mod dna_impls {
                     .into_iter()
                     .map(|(cell_id, dna_def_hashed)| {
                         let wasm_store = self.spaces.wasm_store.clone();
+                        #[cfg(feature = "test_utils")]
+                        let inline_zome_store = self.inline_zome_store.clone();
                         async move {
+                            #[cfg(feature = "test_utils")]
+                            {
+                                let all_inline = dna_def_hashed
+                                    .all_zomes()
+                                    .into_iter()
+                                    .all(|z| matches!(z.1, ZomeDef::Inline(_)));
+
+                                if all_inline {
+                                    println!("Reloading from inline ribosome");
+                                    let ribosome =
+                                        crate::core::ribosome::inline_ribosome::InlineRibosome::new(
+                                            dna_def_hashed.clone(),
+                                            inline_zome_store,
+                                        );
+                                    return ConductorResult::Ok((
+                                        cell_id,
+                                        Ribosome::new(dna_def_hashed, ribosome).await?,
+                                    ));
+                                }
+                            }
+
                             let ribosome = RealRibosome::new(
                                 self.wasm_backend,
                                 dna_def_hashed.clone(),
@@ -764,17 +780,43 @@ mod dna_impls {
                 }
             }
 
-            let ribosome = RealRibosome::new(
-                self.wasm_backend,
-                dna_file.dna_def_hashed().clone(),
-                self.spaces.wasm_store.clone(),
-                self.wasmer_module_cache.clone(),
-            )
-            .await?;
-            let ribosome = Ribosome::new(dna_file.dna_def_hashed().clone(), ribosome).await?;
+            #[cfg(feature = "test_utils")]
+            for zome in dna_file.inline_zomes() {
+                self.inline_zome_store
+                    .insert(dna_file.dna_def_hashed().clone(), zome.clone());
+            }
+
+            #[allow(unused_labels)]
+            let ribosome = 'build: {
+                #[cfg(feature = "test_utils")]
+                {
+                    let all_inline = dna_file
+                        .dna_def()
+                        .all_zomes()
+                        .all(|z| matches!(z.1, ZomeDef::Inline(_)));
+
+                    if all_inline {
+                        let ribosome = crate::core::ribosome::inline_ribosome::InlineRibosome::new(
+                            dna_file.dna_def_hashed().clone(),
+                            self.inline_zome_store.clone(),
+                        );
+                        break 'build Ribosome::new(dna_file.dna_def_hashed().clone(), ribosome)
+                            .await?;
+                    }
+                }
+
+                let ribosome = RealRibosome::new(
+                    self.wasm_backend,
+                    dna_file.dna_def_hashed().clone(),
+                    self.spaces.wasm_store.clone(),
+                    self.wasmer_module_cache.clone(),
+                )
+                .await?;
+                Ribosome::new(dna_file.dna_def_hashed().clone(), ribosome).await?
+            };
 
             let entry_defs = self
-                .register_dna_wasm(cell_id.clone(), ribosome.clone())
+                .put_wasm_and_defs(cell_id.clone(), ribosome.clone())
                 .await?;
 
             self.register_dna_entry_defs(entry_defs);
@@ -2829,8 +2871,8 @@ mod misc_impls {
 /// Pure accessor methods
 mod accessor_impls {
     use super::*;
-    use tokio::sync::broadcast;
     use crate::core::ribosome::Ribosome;
+    use tokio::sync::broadcast;
 
     impl Conductor {
         pub(crate) fn ribosome_store(&self) -> &RwShare<RibosomeStore> {
@@ -3330,6 +3372,10 @@ impl Conductor {
                 Ok((state, installed_clone_cell))
             })
             .await?;
+
+        #[cfg(feature = "test_utils")]
+        self.inline_zome_store
+            .handle_clone_created(&installed_clone_cell);
 
         // register clone cell dna in ribosome store
         // Note: No WASMs provided in the DnaFile because they should already have been stored

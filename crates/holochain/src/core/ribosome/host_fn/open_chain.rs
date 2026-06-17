@@ -59,7 +59,7 @@ mod tests {
     use holo_hash::fixt::ActionHashFixturator;
 use super::open_chain;
     use crate::fixt::ZomeCallHostAccessFixturator;
-    use crate::fixt::{CallContextFixturator, RealRibosomeFixturator};
+    use crate::fixt::CallContextFixturator;
     use ::fixt::prelude::*;
     use holochain_util::tokio_helper;
     use holochain_wasm_test_utils::{TestWasm, TestWasmPair};

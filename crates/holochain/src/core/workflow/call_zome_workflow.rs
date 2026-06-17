@@ -50,8 +50,7 @@ pub async fn call_zome_workflow(
     trigger_validate_dht_ops: TriggerSender,
     trigger_integrate_dht_ops: TriggerSender,
     trigger_countersigning: TriggerSender,
-) -> WorkflowResult<ZomeCallResult>
-{
+) -> WorkflowResult<ZomeCallResult> {
     let coordinator_zome = args
         .ribosome
         .dna_def()
@@ -144,8 +143,7 @@ async fn call_zome_workflow_inner(
     keystore: MetaLairClient,
     args: CallZomeWorkflowArgs,
     trigger_countersigning: TriggerSender,
-) -> WorkflowResult<ZomeCallResult>
-{
+) -> WorkflowResult<ZomeCallResult> {
     let CallZomeWorkflowArgs {
         ribosome,
         invocation,
@@ -238,8 +236,7 @@ pub async fn call_zome_function_authorized(
     ribosome: Ribosome,
     host_access: ZomeCallHostAccess,
     invocation: ZomeCallInvocation,
-) -> WorkflowResult<(Ribosome, RibosomeResult<ZomeCallResponse>)>
-{
+) -> WorkflowResult<(Ribosome, RibosomeResult<ZomeCallResponse>)> {
     match invocation
         .is_authorized(&host_access)
         .await
@@ -267,8 +264,7 @@ pub async fn inline_validation(
     network: DynHolochainP2pDna,
     conductor_handle: ConductorHandle,
     ribosome: Ribosome,
-) -> WorkflowResult<()>
-{
+) -> WorkflowResult<()> {
     let cascade = Arc::new(holochain_cascade::CascadeImpl::from_workspace_and_network(
         &workspace,
         network.clone(),
