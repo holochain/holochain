@@ -93,7 +93,8 @@ impl DbRead<Dht> {
         author: Option<&AgentPubKey>,
         validation_status: i64,
     ) -> sqlx::Result<Vec<SignedActionHashed>> {
-        action::get_create_actions_for_entry(self.pool(), entry_hash, author, validation_status).await
+        action::get_create_actions_for_entry(self.pool(), entry_hash, author, validation_status)
+            .await
     }
 
     /// The `Delete` actions on `entry_hash`.
