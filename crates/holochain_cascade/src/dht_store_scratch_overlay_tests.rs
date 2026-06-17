@@ -1,4 +1,3 @@
-
 use super::*;
 use ::fixt::fixt;
 use holo_hash::fixt::AgentPubKeyFixturator;
