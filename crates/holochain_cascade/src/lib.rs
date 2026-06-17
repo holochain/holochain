@@ -418,8 +418,15 @@ impl CascadeImpl {
             return;
         }
         let warrant_ops = warrants.into_iter().map(WarrantOp::from).collect();
-        if let Err(err) = self.dht_store.stage_warrants_for_validation(warrant_ops).await {
-            tracing::warn!(?err, "DhtStore: stage_warrants_for_validation failed for get response");
+        if let Err(err) = self
+            .dht_store
+            .stage_warrants_for_validation(warrant_ops)
+            .await
+        {
+            tracing::warn!(
+                ?err,
+                "DhtStore: stage_warrants_for_validation failed for get response"
+            );
         }
     }
 
@@ -436,7 +443,11 @@ impl CascadeImpl {
             }
 
             if let Some(warrant) = rendered_ops.warrant.as_ref() {
-                if let Err(err) = self.dht_store.stage_warrants_for_validation(vec![warrant.clone()]).await {
+                if let Err(err) = self
+                    .dht_store
+                    .stage_warrants_for_validation(vec![warrant.clone()])
+                    .await
+                {
                     tracing::warn!(?err, "DhtStore: stage_warrants_for_validation failed");
                 }
             }
@@ -1766,7 +1777,10 @@ mod rejected_warrant_invariant_tests {
         // rejected op, so the response is still dropped.
         assert!(rejected_without_warrant(
             &rendered_record(ValidationStatus::Rejected),
-            &[invalid_chain_op_warrant(fixt!(ActionHash), fixt!(AgentPubKey))]
+            &[invalid_chain_op_warrant(
+                fixt!(ActionHash),
+                fixt!(AgentPubKey)
+            )]
         ));
     }
 }
