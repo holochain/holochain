@@ -25,8 +25,23 @@ where
     StoreEntry(OpEntry<ET>),
     /// See [`crate::flat_op::FlatOp::RegisterAgentActivity`].
     RegisterAgentActivity(OpActivity<<ET as UnitEnum>::Unit, LT>),
-    /// See [`crate::flat_op::FlatOp::RegisterCreateLink`].
-    RegisterCreateLink {
+    /// A link create or delete operation, grouped into [`OpLink`] to mirror the
+    /// [`OpRecord`]/[`OpEntry`]/[`OpActivity`] sub-types. See
+    /// [`crate::flat_op::FlatOp::RegisterCreateLink`] /
+    /// [`crate::flat_op::FlatOp::RegisterDeleteLink`].
+    RegisterLink(OpLink<LT>),
+    /// See [`crate::flat_op::FlatOp::RegisterUpdate`].
+    RegisterUpdate(OpUpdate<ET>),
+    /// See [`crate::flat_op::FlatOp::RegisterDelete`].
+    RegisterDelete(OpDelete),
+}
+
+/// The link operations of [`FlatOp`], grouped into a sub-type to mirror
+/// [`OpRecord`]/[`OpEntry`]/[`OpActivity`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OpLink<LT> {
+    /// A link was created (`ActionData::CreateLink`).
+    CreateLink {
         /// The base address where this link is stored.
         base_address: AnyLinkableHash,
         /// The target address of this link.
@@ -38,8 +53,8 @@ where
         /// The v2 action that creates the link (`ActionData::CreateLink`).
         action: Action,
     },
-    /// See [`crate::flat_op::FlatOp::RegisterDeleteLink`].
-    RegisterDeleteLink {
+    /// A link was deleted (`ActionData::DeleteLink`).
+    DeleteLink {
         /// The original create-link v2 action (`ActionData::CreateLink`).
         original_action: Action,
         /// The base address where this link is stored.
@@ -53,8 +68,4 @@ where
         /// The v2 action that deletes the link (`ActionData::DeleteLink`).
         action: Action,
     },
-    /// See [`crate::flat_op::FlatOp::RegisterUpdate`].
-    RegisterUpdate(OpUpdate<ET>),
-    /// See [`crate::flat_op::FlatOp::RegisterDelete`].
-    RegisterDelete(OpDelete),
 }

@@ -366,13 +366,15 @@ impl OpHelper for dht_v2::Op {
                     }
                 };
                 let link_type = in_scope_link_type(d.zome_index, d.link_type)?;
-                Ok(flat_op_v2::FlatOp::RegisterCreateLink {
-                    base_address: d.base_address.clone(),
-                    target_address: d.target_address.clone(),
-                    tag: d.tag.clone(),
-                    link_type,
-                    action: a.clone(),
-                })
+                Ok(flat_op_v2::FlatOp::RegisterLink(
+                    flat_op_v2::OpLink::CreateLink {
+                        base_address: d.base_address.clone(),
+                        target_address: d.target_address.clone(),
+                        tag: d.tag.clone(),
+                        link_type,
+                        action: a.clone(),
+                    },
+                ))
             }
             dht_v2::Op::RegisterDeleteLink(dht_v2::RegisterDeleteLink {
                 delete_link,
@@ -388,14 +390,16 @@ impl OpHelper for dht_v2::Op {
                     }
                 };
                 let link_type = in_scope_link_type(d.zome_index, d.link_type)?;
-                Ok(flat_op_v2::FlatOp::RegisterDeleteLink {
-                    original_action: create_link.clone(),
-                    base_address: d.base_address.clone(),
-                    target_address: d.target_address.clone(),
-                    tag: d.tag.clone(),
-                    link_type,
-                    action: delete_link.hashed.content.clone(),
-                })
+                Ok(flat_op_v2::FlatOp::RegisterLink(
+                    flat_op_v2::OpLink::DeleteLink {
+                        original_action: create_link.clone(),
+                        base_address: d.base_address.clone(),
+                        target_address: d.target_address.clone(),
+                        tag: d.tag.clone(),
+                        link_type,
+                        action: delete_link.hashed.content.clone(),
+                    },
+                ))
             }
             dht_v2::Op::RegisterDelete(dht_v2::RegisterDelete { delete }) => {
                 Ok(flat_op_v2::FlatOp::RegisterDelete(flat_op_v2::OpDelete {
