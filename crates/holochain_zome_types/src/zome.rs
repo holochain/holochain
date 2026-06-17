@@ -160,12 +160,12 @@ pub struct InlineZomeDef {
 /// Just the definition of a Zome, without the name included. This exists
 /// mainly for use in HashMaps where ZomeDefs are keyed by ZomeName.
 ///
-/// NB: Only Wasm Zomes are valid to pass through round-trip serialization,
-/// because Rust functions are not serializable. Hence, this enum serializes
-/// as if it were a bare WasmZome, and when deserializing, only Wasm zomes
-/// can be produced. InlineZomes are serialized as their network seed, so that a
-/// hash can be computed, but it is invalid to attempt to deserialize them
-/// again.
+/// NB: A `ZomeDef` only describes a zome, it does not hold the executable code.
+/// A WASM zome carries its `WasmHash` and an inline zome carries an `InlineHash`
+/// stand-in (see `InlineZomeDef`). Both variants round-trip through
+/// serialization, but deserializing an inline zome only recovers its identifying
+/// hash, not the original Rust closures, so the inline implementation must be
+/// supplied separately (the closures live on `DnaFile`).
 ///
 /// In particular, a real-world DnaFile should only ever contain Wasm zomes!
 // TODO: move to `holochain_types`
@@ -174,7 +174,7 @@ pub enum ZomeDef {
     /// A zome defined by Wasm bytecode
     Wasm(WasmZomeDef),
 
-    /// A zome defined by Rust closures. Cannot be deserialized.
+    /// A zome defined by Rust closures, identified here only by its `InlineHash`.
     #[cfg(feature = "full-dna-def")]
     Inline(InlineZomeDef),
 }
