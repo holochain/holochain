@@ -380,6 +380,16 @@ impl OpHelper for dht_v2::Op {
                 delete_link,
                 create_link,
             }) => {
+                let delete_action = &delete_link.hashed.content;
+                match &delete_action.data {
+                    ActionData::DeleteLink(_) => {}
+                    other => {
+                        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                            "RegisterDeleteLink op carried a non-DeleteLink action: {:?}",
+                            other.action_type()
+                        ))))
+                    }
+                }
                 let d = match &create_link.data {
                     ActionData::CreateLink(d) => d,
                     other => {
@@ -397,14 +407,23 @@ impl OpHelper for dht_v2::Op {
                         target_address: d.target_address.clone(),
                         tag: d.tag.clone(),
                         link_type,
-                        action: delete_link.hashed.content.clone(),
+                        action: delete_action.clone(),
                     },
                 ))
             }
             dht_v2::Op::RegisterDelete(dht_v2::RegisterDelete { delete }) => {
-                Ok(flat_op_v2::FlatOp::RegisterDelete(flat_op_v2::OpDelete {
-                    action: delete.hashed.content.clone(),
-                }))
+                let action = &delete.hashed.content;
+                match &action.data {
+                    ActionData::Delete(_) => {
+                        Ok(flat_op_v2::FlatOp::RegisterDelete(flat_op_v2::OpDelete {
+                            action: action.clone(),
+                        }))
+                    }
+                    other => Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "RegisterDelete op carried a non-Delete action: {:?}",
+                        other.action_type()
+                    )))),
+                }
             }
         }
     }
