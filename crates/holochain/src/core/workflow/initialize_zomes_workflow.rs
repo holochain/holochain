@@ -123,7 +123,6 @@ async fn initialize_zomes_workflow_inner(
 mod tests {
     use super::*;
     use crate::conductor::Conductor;
-    use crate::core::ribosome::guest_callback::validate::ValidateResult;
     use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
     use crate::fixt::DnaDefFixturator;
     use crate::fixt::MetaLairClientFixturator;

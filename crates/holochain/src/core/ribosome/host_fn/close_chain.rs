@@ -65,7 +65,6 @@ mod tests {
     use holochain_wasm_test_utils::{TestWasm, TestWasmPair};
     use holochain_zome_types::prelude::*;
     use std::sync::Arc;
-    use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
     use crate::core::ribosome::Ribosome;
 
     #[tokio::test(flavor = "multi_thread")]

@@ -603,7 +603,7 @@ pub async fn validate_op(
         .await
         .map_err(AppValidationError::SysValidationError)?;
 
-    let zomes_to_invoke = get_zomes_to_invoke(op, &workspace, network.clone(), &ribosome).await;
+    let zomes_to_invoke = get_zomes_to_invoke(op, &workspace, network.clone(), ribosome).await;
     if let Err(OutcomeOrError::Err(err)) = &zomes_to_invoke {
         tracing::error!(?op, ?err, "Error getting zomes to invoke to validate op.");
     };

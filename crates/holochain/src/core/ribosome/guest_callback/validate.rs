@@ -250,12 +250,9 @@ mod slow_tests {
     use crate::conductor::CellError;
     use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
     use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
-    use crate::core::ribosome::real_ribosome::RealRibosome;
-    use crate::core::ribosome::RibosomeImplT;
     use crate::core::ribosome::ZomesToInvoke;
     use crate::core::ribosome::{Ribosome, RibosomeError};
     use crate::core::workflow::WorkflowError;
-    use crate::fixt::Zomes;
     use crate::fixt::*;
     use crate::sweettest::{SweetConductor, SweetDnaFile};
     use crate::test_utils::RibosomeTestFixture;

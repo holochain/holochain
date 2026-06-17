@@ -10,7 +10,6 @@ use holochain::{
     core::workflow::WorkflowError,
 };
 use holochain_types::{inline_zome::InlineZomeSet, prelude::*};
-use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{op::Op, record::RecordEntry};
 use matches::assert_matches;
 

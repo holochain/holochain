@@ -651,7 +651,7 @@ impl SweetConductor {
     ///
     /// * `ignore_dna_files_cache` - Force the SweetConductor to load wasms and
     ///   dna definitions from the database instead of using cached values.
-    pub async fn startup(&mut self, ignore_dna_files_cache: bool) {
+    pub async fn startup(&mut self) {
         if self.handle.is_none() {
             // There's a db dir in the sweet conductor and the config, that are
             // supposed to be the same. Let's assert that they are.

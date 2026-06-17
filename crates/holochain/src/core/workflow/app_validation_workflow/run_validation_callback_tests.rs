@@ -1,13 +1,9 @@
 use crate::core::ribosome::inline_ribosome::{InlineRibosome, InlineZomeStore};
-use crate::core::ribosome::real_ribosome::{make_module_cache, WasmBackend};
 use crate::core::ribosome::Ribosome;
 use crate::{
     conductor::space::TestSpace,
     core::{
-        ribosome::{
-            guest_callback::validate::ValidateInvocation, real_ribosome::RealRibosome,
-            ZomesToInvoke,
-        },
+        ribosome::{guest_callback::validate::ValidateInvocation, ZomesToInvoke},
         workflow::app_validation_workflow::{run_validation_callback, Outcome},
     },
     fixt::MetaLairClientFixturator,

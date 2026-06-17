@@ -2,7 +2,7 @@ use crate::{
     conductor::api::CellConductorApi,
     core::{
         queue_consumer::TriggerSender,
-        ribosome::{real_ribosome::RealRibosome, ZomeCallInvocation},
+        ribosome::ZomeCallInvocation,
         workflow::{call_zome_workflow, CallZomeWorkflowArgs},
     },
     sweettest::{SweetConductor, SweetDnaFile},

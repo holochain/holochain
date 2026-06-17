@@ -468,7 +468,7 @@ async fn disabled_clone_cell_cannot_be_called() {
     ));
 
     conductor.shutdown().await;
-    conductor.startup(false).await;
+    conductor.startup().await;
 
     // - cell should still be disabled after restart
     let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
@@ -548,7 +548,7 @@ async fn app_status_filters() {
 
     // check that counts are still accurate after a restart
     conductor.shutdown().await;
-    conductor.startup(false).await;
+    conductor.startup().await;
 
     let inactive_apps = conductor
         .list_apps(Some(AppStatusFilter::Disabled))

@@ -17,7 +17,6 @@ use holochain_state::validation_db::ValidationStage;
 use holochain_types::dht_op::{ChainOp, DhtOpHashed};
 use holochain_types::rate_limit::{EntryRateWeight, RateWeight};
 use holochain_zome_types::action::{AppEntryDef, Create, Delete, EntryType, Update, ZomeIndex};
-use holochain_zome_types::dna_def::DnaDefBuilder;
 use holochain_zome_types::fixt::{
     ActionFixturator, CreateFixturator, CreateLinkFixturator, DeleteLinkFixturator,
     EntryFixturator, SignatureFixturator, UpdateFixturator,
@@ -126,9 +125,7 @@ async fn store_entry_create_app_entry() {
 #[tokio::test(flavor = "multi_thread")]
 async fn store_entry_create_non_app_entry() {
     let zomes = SweetInlineZomes::new(vec![], 0);
-    let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
-    let zome = &integrity_zomes[0];
-    let zome_index = ZomeIndex(0);
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let ribosome = MockRibosomeBuilder::new_with_dna_def(dna_file.dna_def_hashed().clone())
         .build()
         .await
@@ -234,9 +231,7 @@ async fn store_entry_update_app_entry() {
 #[tokio::test(flavor = "multi_thread")]
 async fn store_entry_update_non_app_entry() {
     let zomes = SweetInlineZomes::new(vec![], 0);
-    let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
-    let zome = &integrity_zomes[0];
-    let zome_index = ZomeIndex(0);
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let ribosome = MockRibosomeBuilder::new_with_dna_def(dna_file.dna_def_hashed().clone())
         .build()
         .await
@@ -998,7 +993,7 @@ async fn register_delete_create_app_entry() {
 #[tokio::test(flavor = "multi_thread")]
 async fn register_delete_create_non_app_entry() {
     let zomes = SweetInlineZomes::new(vec![], 0);
-    let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let ribosome = MockRibosomeBuilder::new_with_dna_def(dna_file.dna_def_hashed().clone())
         .build()
         .await
@@ -1124,7 +1119,7 @@ async fn register_delete_update_app_entry() {
 #[tokio::test(flavor = "multi_thread")]
 async fn register_delete_update_non_app_entry() {
     let zomes = SweetInlineZomes::new(vec![], 0);
-    let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let ribosome = MockRibosomeBuilder::new_with_dna_def(dna_file.dna_def_hashed().clone())
         .build()
         .await

@@ -20,6 +20,12 @@ pub struct MockRibosomeBuilder {
     num_link_types: i32,
 }
 
+impl Default for MockRibosomeBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MockRibosomeBuilder {
     pub fn new() -> Self {
         let dna_def = DnaDefBuilder::default()

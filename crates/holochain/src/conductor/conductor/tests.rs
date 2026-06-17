@@ -473,7 +473,7 @@ async fn test_deferred_memproof_provisioning() {
     );
 
     conductor.shutdown().await;
-    conductor.startup(false).await;
+    conductor.startup().await;
 
     //- Status is still AwaitingMemproofs after a restart
     let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();

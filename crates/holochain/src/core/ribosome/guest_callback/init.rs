@@ -227,12 +227,10 @@ mod slow_tests {
     use crate::conductor::api::error::ConductorApiResult;
     use crate::conductor::CellError;
     use crate::core::ribosome::guest_callback::ValidateCallbackResult;
-    use crate::core::ribosome::RibosomeImplT;
     use crate::core::ribosome::{Ribosome, RibosomeError};
     use crate::core::workflow::WorkflowError;
     use crate::fixt::InitHostAccessFixturator;
     use crate::fixt::InitInvocationFixturator;
-    use crate::fixt::Zomes;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
     use crate::sweettest::SweetZome;

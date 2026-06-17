@@ -1,14 +1,11 @@
-use crate::conductor::ribosome_store::RibosomeStore;
 use crate::core::ribosome::error::{RibosomeError, RibosomeResult};
 use crate::core::ribosome::host_fn::HostFnApi;
 use crate::core::ribosome::{CallContext, Invocation, Ribosome, RibosomeImplT};
 use crate::prelude::{ExternIO, FunctionName, ZomeName};
 use futures::future::BoxFuture;
 use holo_hash::{DnaHash, HasHash, InlineHash};
-use holochain_types::dna::DnaFile;
-use holochain_types::share::RwShare;
 use holochain_zome_types::clone::ClonedCell;
-use holochain_zome_types::dna_def::{DnaDef, DnaDefHashed};
+use holochain_zome_types::dna_def::DnaDefHashed;
 use holochain_zome_types::prelude::{DynInlineZome, Zome, ZomeDef};
 use opentelemetry::KeyValue;
 use std::collections::HashMap;
@@ -27,8 +24,6 @@ pub struct InlineZomeStore {
 
 #[derive(Clone)]
 struct InlineDna {
-    dna_def: DnaDefHashed,
-
     zomes: HashMap<InlineHash, DynInlineZome>,
 }
 
@@ -45,7 +40,6 @@ impl InlineZomeStore {
             .unwrap_or_else(|e| e.into_inner())
             .entry(dna_def.as_hash().clone())
             .or_insert_with(|| InlineDna {
-                dna_def,
                 zomes: Default::default(),
             })
             .zomes
@@ -96,7 +90,7 @@ impl InlineZomeStore {
 
     pub fn handle_clone_created(&self, clone: &ClonedCell) {
         let mut write_lock = self.inner.write().unwrap_or_else(|e| e.into_inner());
-        if let Some(content) = write_lock.get(&clone.original_dna_hash).map(|c| c.clone()) {
+        if let Some(content) = write_lock.get(&clone.original_dna_hash).cloned() {
             write_lock.insert(clone.cell_id.dna_hash().clone(), content);
         } else {
             tracing::error!("No source registered to clone");

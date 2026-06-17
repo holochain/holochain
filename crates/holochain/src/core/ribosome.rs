@@ -30,7 +30,6 @@ use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::guest_callback::{call_stream, CallStream};
-use crate::core::ribosome::real_ribosome::{make_module_cache, WasmBackend};
 use derive_more::Constructor;
 use error::RibosomeResult;
 use futures::future::BoxFuture;
@@ -58,7 +57,6 @@ use std::iter::Iterator;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio_stream::StreamExt;
-use uuid::Uuid;
 use wasmer::RuntimeError;
 
 // This allow is here because #[automock] automaticaly creates a struct without
@@ -754,7 +752,7 @@ impl Ribosome {
             .integrity_zomes(integrity_zomes)
             .coordinator_zomes(coordinator_zomes)
             .modifiers(DnaModifiers {
-                network_seed: Uuid::new_v4().to_string(),
+                network_seed: uuid::Uuid::new_v4().to_string(),
                 properties: SerializedBytes::default(),
             })
             .build()
@@ -762,10 +760,10 @@ impl Ribosome {
         let dna_def_hashed = DnaDefHashed::from_content_sync(dna_def);
 
         let real_ribosome = real_ribosome::RealRibosome::new(
-            WasmBackend::new(),
+            real_ribosome::WasmBackend::new(),
             dna_def_hashed.clone(),
             store,
-            make_module_cache(WasmBackend::new(), None),
+            real_ribosome::make_module_cache(real_ribosome::WasmBackend::new(), None),
         )
         .await?;
         Ribosome::new(dna_def_hashed, real_ribosome).await

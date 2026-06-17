@@ -742,7 +742,7 @@ impl RibosomeImplT for RealRibosome {
                 Ok(None)
             }
         });
-        async move { f.await.unwrap() }.boxed().into()
+        async move { f.await.unwrap() }.boxed()
     }
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
@@ -845,8 +845,6 @@ mod test {
     use crate::test_utils::RibosomeTestFixture;
     use crate::wait_for_10s;
     use hdk::prelude::*;
-    use holochain_data::kind::Wasm;
-    use holochain_data::test_open_db;
     use holochain_nonce::fresh_nonce;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::zome_io::ZomeCallParams;

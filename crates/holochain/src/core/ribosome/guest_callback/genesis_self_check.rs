@@ -68,11 +68,10 @@ mod slow_tests {
     use super::v1;
     use super::v2;
     use super::GenesisSelfCheckInvocation;
-    use crate::core::ribosome::GenesisSelfCheckHostAccessV2;
-    use crate::core::ribosome::{
-        guest_callback::genesis_self_check::{GenesisSelfCheckHostAccess, GenesisSelfCheckResult},
-        RibosomeImplT,
+    use crate::core::ribosome::guest_callback::genesis_self_check::{
+        GenesisSelfCheckHostAccess, GenesisSelfCheckResult,
     };
+    use crate::core::ribosome::GenesisSelfCheckHostAccessV2;
     use crate::core::ribosome::{GenesisSelfCheckHostAccessV1, Ribosome};
     use holochain_wasm_test_utils::TestWasm;
 
