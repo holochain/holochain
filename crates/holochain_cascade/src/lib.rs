@@ -738,16 +738,12 @@ impl CascadeImpl {
         // regardless of authority status.
         let authority = self.am_i_an_authority(agent.clone().into()).await?;
 
-        let merged_response = if authority && options.get_options.strategy() == GetStrategy::Local {
-            authority::handle_get_agent_activity(
-                self.dht_store.as_read(),
-                agent.clone(),
-                query.clone(),
-                (&options).into(),
-            )
-            .await?
-        } else if options.get_options.strategy() == GetStrategy::Local {
-            // Requester local read via DhtStore scratch overlay (no network needed).
+        let merged_response = if options.get_options.strategy() == GetStrategy::Local {
+            // Local read via the DhtStore scratch overlay (no network needed).
+            // This path is taken whether or not we're an authority for the
+            // agent, so a self-read during a zome call returns the same result
+            // either way — including authored-but-uncommitted activity held in
+            // the scratch, which the authority serving path does not overlay.
             let dht_options = holochain_state::dht_store::GetAgentActivityOptions {
                 include_valid_activity: options.include_valid_activity,
                 include_rejected_activity: options.include_rejected_activity,
