@@ -66,6 +66,7 @@ struct DhtOpRow {
     op_type: DhtOpType,
     action_seq: u32,
     author: AgentPubKey,
+    when_integrated: i64,
 }
 
 /// Read the integrated ops a node holds, as `(hash, row)` pairs for reporting.
@@ -79,16 +80,22 @@ struct DhtOpRow {
 /// separately by the warrant tests. Ops are reconstructed into legacy `DhtOp`s
 /// so their hashes match across nodes.
 async fn integrated_op_rows(dht_store: &DhtStoreRead) -> Result<Vec<DhtOpRow>, String> {
-    let chain = dht_store
+    let dump_rows = dht_store
         .integrated_chain_ops_for_dump(None)
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())?;
+    // Reconstruct each row on its own so its `when_integrated` stays paired with
+    // the op: `wire_rows_to_legacy_ops` drops rows that fail to rebuild, so
+    // zipping its output against the original list could misalign.
+    Ok(dump_rows
         .into_iter()
-        .map(|row| row.wire)
-        .collect();
-    Ok(wire_rows_to_legacy_ops(chain, vec![])
-        .into_iter()
-        .map(|op| {
+        .flat_map(|row| {
+            let when_integrated = row.when_integrated;
+            wire_rows_to_legacy_ops(vec![row.wire], vec![])
+                .into_iter()
+                .map(move |op| (op, when_integrated))
+        })
+        .map(|(op, when_integrated)| {
             let op_type = op.get_type();
             let (action_seq, author) = match &op {
                 DhtOp::ChainOp(chain_op) => (
@@ -103,6 +110,7 @@ async fn integrated_op_rows(dht_store: &DhtStoreRead) -> Result<Vec<DhtOpRow>, S
                 op_type,
                 action_seq,
                 author,
+                when_integrated,
             }
         })
         .collect())
@@ -197,16 +205,17 @@ async fn await_op_integration(
                 index, cells[index].0
             );
             println!(
-                "{:53}  {:10}  {:21}  {:53}",
-                "Author", "Action seq", "Op type", "Op hash"
+                "{:53}  {:10}  {:21}  {:53}  {:20}",
+                "Author", "Action seq", "Op type", "Op hash", "When integrated"
             );
             for row in rows {
                 println!(
-                    "{:53}  {:10}  {:21}  {:53}",
+                    "{:53}  {:10}  {:21}  {:53}  {:20}",
                     row.author,
                     row.action_seq,
                     format!("{:?}", row.op_type),
                     row.hash,
+                    row.when_integrated,
                 );
             }
             println!();
