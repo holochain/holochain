@@ -3606,6 +3606,9 @@ pub async fn full_integration_dump(
         .into_iter()
         .filter_map(|row| holochain_p2p::build_chain_dht_op_v2(row.wire).ok())
         .collect();
+    // Warrants are returned in full on every call (not cursor-paged); the cursor
+    // above tracks only the growing integrated chain-op list, so warrants can
+    // repeat across pages.
     integrated.extend(
         dht_store
             .integrated_warrants_for_dump()

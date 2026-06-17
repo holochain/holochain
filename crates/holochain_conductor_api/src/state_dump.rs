@@ -54,21 +54,28 @@ pub struct FullIntegrationStateDump {
     /// Ops waiting to be integrated.
     pub integration_limbo: Vec<DhtOp>,
 
-    /// Ops that are integrated.
-    /// This includes rejected.
+    /// Ops that are integrated (includes rejected). Integrated **chain ops** are
+    /// paged by `dht_ops_cursor`; integrated **warrants** are appended in full on
+    /// every call and are not cursor-paged.
     pub integrated: Vec<DhtOp>,
 
-    /// Cursor marking the last integrated op returned. Pass it to a subsequent
-    /// `FullStateDump` to page forward through only the ops integrated since.
-    /// `None` when there were no integrated ops to return.
+    /// Cursor marking the last integrated **chain op** returned. Pass it to a
+    /// subsequent `FullStateDump` to page forward through only the chain ops
+    /// integrated since. `None` when no integrated chain ops were returned.
+    ///
+    /// Only the (unbounded, growing) integrated chain-op list is paged. The two
+    /// limbo lists and integrated warrants are bounded/transient and returned in
+    /// full on every call, so they can repeat across pages.
     pub dht_ops_cursor: Option<DhtOpsCursor>,
 }
 
-/// Pagination cursor for the `integrated` ops in a [`FullIntegrationStateDump`].
+/// Pagination cursor for the integrated **chain ops** in a
+/// [`FullIntegrationStateDump`]. Warrants and the limbo lists are not paged by it.
 ///
-/// Integrated ops are ordered by `(when_integrated, hash)`; a cursor records
-/// the last op returned so the next dump resumes strictly after it. (The legacy
-/// rowid cursor has no equivalent now that the DHT tables are `WITHOUT ROWID`.)
+/// Integrated chain ops are ordered by `(when_integrated, hash)`; a cursor
+/// records the last op returned so the next dump resumes strictly after it. (The
+/// legacy rowid cursor has no equivalent now that the DHT tables are
+/// `WITHOUT ROWID`.)
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct DhtOpsCursor {
     /// Microsecond integration timestamp of the last op returned.
