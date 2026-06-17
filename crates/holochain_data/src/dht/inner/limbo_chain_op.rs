@@ -410,7 +410,7 @@ pub(crate) async fn promote_to_chain_op(
         sqlx::query(
             "UPDATE ChainOp
              SET locally_validated = 1, validation_status = ?, when_integrated = ?
-             WHERE hash = ?",
+             WHERE hash = ? AND locally_validated = 0",
         )
         .bind(i64::from(validation_status))
         .bind(when_integrated.as_micros())
