@@ -163,6 +163,11 @@ impl DbRead<Dht> {
         sync_queries::chain_op_exists_at_basis(self.pool(), basis).await
     }
 
+    /// Count of rows in the public `Entry` table.
+    pub async fn count_entries(&self) -> sqlx::Result<i64> {
+        sync_queries::count_entries(self.pool()).await
+    }
+
     /// Integrated chain-op rows for the integration dump, paginated forward
     /// from the `(when_integrated, op_hash)` cursor `after` (`None` from the
     /// start, which yields the full set).

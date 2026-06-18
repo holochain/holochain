@@ -1458,6 +1458,16 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn count_entries_counts_entry_rows() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        assert_eq!(db.as_ref().count_entries().await.unwrap(), 0);
+
+        let (hash, entry) = sample_entry(7);
+        db.insert_entry(&hash, &entry).await.unwrap();
+        assert_eq!(db.as_ref().count_entries().await.unwrap(), 1);
+    }
+
+    #[tokio::test]
     async fn chain_op_publish_roundtrip() {
         let db = test_open_db(dht_db_id()).await.unwrap();
         let (op_hash, _) = seed_chain_op(&db, 0).await;

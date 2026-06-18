@@ -794,3 +794,15 @@ where
         .await?;
     Ok(b)
 }
+
+/// Count of rows in the public `Entry` table (private entries live in
+/// `PrivateEntry` and are not counted here).
+pub(crate) async fn count_entries<'e, E>(executor: E) -> sqlx::Result<i64>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let (n,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM Entry")
+        .fetch_one(executor)
+        .await?;
+    Ok(n)
+}
