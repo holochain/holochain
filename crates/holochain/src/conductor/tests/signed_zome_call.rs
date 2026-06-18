@@ -383,7 +383,7 @@ async fn grant_zome_call_capability_call() {
 
     // Wait for integration workflow to complete
     retry_fn_until_timeout(
-        || async { conductor.all_ops_integrated(dna.dna_hash()).unwrap() },
+        || async { conductor.all_ops_integrated(dna.dna_hash()).await.unwrap() },
         None,
         None,
     )
@@ -431,7 +431,7 @@ async fn grant_zome_call_capability_call() {
 
     // Wait for integration workflow to complete
     retry_fn_until_timeout(
-        || async { conductor.all_ops_integrated(dna.dna_hash()).unwrap() },
+        || async { conductor.all_ops_integrated(dna.dna_hash()).await.unwrap() },
         None,
         None,
     )
@@ -479,7 +479,7 @@ async fn grant_zome_call_capability_call_ensures_zome_initialization() {
 
     // Wait for initialize zomes workflow and integration workflow to complete
     retry_fn_until_timeout(
-        || async { conductor.all_ops_integrated(dna.dna_hash()).unwrap() },
+        || async { conductor.all_ops_integrated(dna.dna_hash()).await.unwrap() },
         None,
         None,
     )
@@ -511,7 +511,7 @@ async fn grant_zome_call_capability_call_ensures_zome_initialization() {
 
     // Wait for initialize zomes workflow and integration workflow to complete
     retry_fn_until_timeout(
-        || async { conductor.all_ops_integrated(dna.dna_hash()).unwrap() },
+        || async { conductor.all_ops_integrated(dna.dna_hash()).await.unwrap() },
         None,
         None,
     )
@@ -581,7 +581,7 @@ async fn revoke_zome_call_capability_call() {
 
     // Wait for integration workflow to complete
     retry_fn_until_timeout(
-        || async { conductor.all_ops_integrated(dna.dna_hash()).unwrap() },
+        || async { conductor.all_ops_integrated(dna.dna_hash()).await.unwrap() },
         None,
         None,
     )
@@ -609,7 +609,7 @@ async fn revoke_zome_call_capability_call() {
 
     // Wait for integration workflow to complete
     retry_fn_until_timeout(
-        || async { conductor.all_ops_integrated(dna.dna_hash()).unwrap() },
+        || async { conductor.all_ops_integrated(dna.dna_hash()).await.unwrap() },
         None,
         None,
     )
@@ -680,7 +680,7 @@ async fn revoke_zome_call_capability_call_ensures_zome_initialization() {
 
     // Wait for integration workflow to complete
     retry_fn_until_timeout(
-        || async { conductor.all_ops_integrated(dna.dna_hash()).unwrap() },
+        || async { conductor.all_ops_integrated(dna.dna_hash()).await.unwrap() },
         None,
         None,
     )
@@ -702,7 +702,7 @@ async fn revoke_zome_call_capability_call_ensures_zome_initialization() {
 
     // Wait for integration workflow to complete
     retry_fn_until_timeout(
-        || async { conductor.all_ops_integrated(dna.dna_hash()).unwrap() },
+        || async { conductor.all_ops_integrated(dna.dna_hash()).await.unwrap() },
         None,
         None,
     )

@@ -370,9 +370,11 @@ mod tests {
             || async {
                 conductors[0]
                     .all_ops_integrated(dna_file.dna_hash())
+                    .await
                     .unwrap()
                     && conductors[1]
                         .all_ops_integrated(dna_file.dna_hash())
+                        .await
                         .unwrap()
             },
             Some(5000),

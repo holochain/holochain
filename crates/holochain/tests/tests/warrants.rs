@@ -158,7 +158,7 @@ async fn warrant_is_gossiped() {
         || async {
             let alice_pubkey = alice_cell.agent_pubkey().clone();
             let invalid_ops = carol_conductor
-                .get_invalid_integrated_ops(&carol_conductor.get_dht_db(&dna_hash).unwrap())
+                .get_invalid_integrated_ops(&dna_hash)
                 .await
                 .unwrap();
             invalid_ops.len() == 3 && {
