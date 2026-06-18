@@ -14,6 +14,7 @@ use holochain_timestamp::Timestamp;
 use holochain_types::activity::AgentActivityResponse;
 use holochain_types::chain::MustGetAgentActivityResponse;
 use holochain_types::dht_op::{ChainOp, DhtOpHashed, WireOps};
+use holochain_types::dht_v2::DhtOp;
 use holochain_types::link::{CountLinksResponse, WireLinkKey, WireLinkOps, WireLinkQuery};
 use holochain_types::prelude::ValidationReceiptBundle;
 use holochain_zome_types::fixt::{CreateFixturator, EntryFixturator, SignatureFixturator};
@@ -55,20 +56,21 @@ impl HcP2pHandler for StubHost {
     fn handle_publish(
         &self,
         _dna_hash: DnaHash,
-        ops: Vec<holochain_types::dht_v2::DhtOp>,
+        ops: Vec<(holochain_types::dht_v2::DhtOp, bool)>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         let store = self.store.clone();
         Box::pin(async move {
             // Mirror the conductor: reconstruct the legacy op form from the v2
             // wire op before recording into the (still-legacy) store ingest.
-            let hashed: Vec<DhtOpHashed> = ops
-                .iter()
-                .map(holochain_types::dht_v2::to_legacy_dht_op)
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(holochain_p2p::HolochainP2pError::other)?
+            let hashed: Vec<(DhtOpHashed, bool)> = ops
                 .into_iter()
-                .map(DhtOpHashed::from_content_sync)
-                .collect();
+                .map(|(op, require_receipt)| {
+                    holochain_types::dht_v2::to_legacy_dht_op(&op)
+                        .map(|op| (DhtOpHashed::from_content_sync(op), require_receipt))
+                })
+                .collect::<Result<_, _>>()
+                .map_err(holochain_p2p::HolochainP2pError::other)?;
+
             store
                 .record_incoming_ops(hashed)
                 .await
@@ -169,11 +171,6 @@ fn test_dht_op(authored_timestamp: Timestamp) -> holochain_types::dht_v2::DhtOp 
     )))
 }
 
-/// The v2 wire bytes for an op, i.e. what `process_incoming_ops` decodes.
-fn wire_bytes(op: &holochain_types::dht_v2::DhtOp) -> Bytes {
-    Bytes::from(holochain_serialized_bytes::encode(op).unwrap())
-}
-
 /// The `serialized_size` the store records for an op. During the migration the
 /// v2 wire op is reconstructed to its legacy form before recording, so the
 /// stored size is the legacy encoding's length (an approximation of the v2 wire
@@ -181,6 +178,16 @@ fn wire_bytes(op: &holochain_types::dht_v2::DhtOp) -> Bytes {
 fn stored_size(op: &holochain_types::dht_v2::DhtOp) -> usize {
     let legacy = holochain_types::dht_v2::to_legacy_dht_op(op).unwrap();
     holochain_serialized_bytes::encode(&legacy).unwrap().len()
+}
+
+/// Wrap a hashed op as a K2 [`IncomingOp`] with no metadata, mirroring how
+/// K2 gossip would pass ops to `process_incoming_ops`.
+fn incoming_op(dht_op: &DhtOp) -> IncomingOp {
+    IncomingOp {
+        op_id: dht_op.to_hash().to_located_k2_op_id(&dht_op.dht_basis()),
+        op_data: Bytes::from(holochain_serialized_bytes::encode(dht_op).unwrap()),
+        metadata: None,
+    }
 }
 
 /// Move the supplied chain ops from limbo into the integrated table.
@@ -216,7 +223,10 @@ async fn process_incoming_ops_and_retrieve() {
     let dht_op_2 = test_dht_op(Timestamp::now());
 
     op_store
-        .process_incoming_ops(vec![wire_bytes(&dht_op_1), wire_bytes(&dht_op_2)])
+        .process_incoming_ops(vec![
+            incoming_op(&dht_op_1.clone()),
+            incoming_op(&dht_op_2.clone()),
+        ])
         .await
         .unwrap();
 
@@ -260,7 +270,10 @@ async fn filter_out_existing_ops() {
     let dht_op_2 = test_dht_op(Timestamp::now());
 
     op_store
-        .process_incoming_ops(vec![wire_bytes(&dht_op_1), wire_bytes(&dht_op_2)])
+        .process_incoming_ops(vec![
+            incoming_op(&dht_op_1.clone()),
+            incoming_op(&dht_op_2.clone()),
+        ])
         .await
         .unwrap();
 
@@ -322,9 +335,8 @@ async fn retrieve_in_time_slice() {
         dht_ops.push(test_dht_op(Timestamp::from_micros((i + 1) * 100)))
     }
 
-    let encoded_ops = dht_ops.iter().map(wire_bytes).collect::<Vec<_>>();
     op_store
-        .process_incoming_ops(encoded_ops.clone())
+        .process_incoming_ops(dht_ops.iter().map(incoming_op).collect())
         .await
         .unwrap();
 
@@ -391,9 +403,8 @@ async fn retrieve_op_ids_bounded() {
         dht_ops.push(test_dht_op(Timestamp::from_micros((i + 1) * 100)))
     }
 
-    let encoded_ops = dht_ops.iter().map(wire_bytes).collect::<Vec<_>>();
     op_store
-        .process_incoming_ops(encoded_ops.clone())
+        .process_incoming_ops(dht_ops.iter().map(incoming_op).collect())
         .await
         .unwrap();
 

@@ -62,7 +62,9 @@ pub(crate) async fn witnessing_workflow(
                 sys_validation_trigger.clone(),
                 non_enzymatic_ops
                     .into_iter()
-                    .map(|(_h, o)| o.into())
+                    // Countersigning ops are published ops and require
+                    // validation receipts.
+                    .map(|(_h, o)| (o.into(), true))
                     .collect(),
             )
             .await?;

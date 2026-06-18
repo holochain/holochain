@@ -41,7 +41,8 @@ async fn mirror_dependency_op(test_space: &TestSpace, dht_op: DhtOpHashed) {
     test_space
         .space
         .dht_store
-        .record_incoming_ops(vec![dht_op.clone()])
+        // For this op, a validation receipt should not be requested
+        .record_incoming_ops(vec![(dht_op.clone(), false)])
         .await
         .unwrap();
     test_space.space.dht_db.test_write(move |txn| {

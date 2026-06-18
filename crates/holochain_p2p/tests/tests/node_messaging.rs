@@ -74,7 +74,7 @@ impl HcP2pHandler for UnresponsiveHandler {
     fn handle_publish(
         &self,
         _dna_hash: DnaHash,
-        _ops: Vec<holochain_types::dht_v2::DhtOp>,
+        _ops: Vec<(holochain_types::dht_v2::DhtOp, bool)>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(std::future::pending())
     }
@@ -325,9 +325,11 @@ async fn test_publish() {
         .await
         .unwrap()
         .op_store()
-        .process_incoming_ops(vec![bytes::Bytes::from(
-            holochain_serialized_bytes::encode(&op).unwrap(),
-        )])
+        .process_incoming_ops(vec![IncomingOp {
+            op_id: op.to_hash().to_located_k2_op_id(&op.dht_basis()),
+            op_data: bytes::Bytes::from(holochain_serialized_bytes::encode(&op).unwrap()),
+            metadata: None,
+        }])
         .await
         .unwrap();
 

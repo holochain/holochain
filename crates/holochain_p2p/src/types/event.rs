@@ -90,7 +90,7 @@ pub trait HcP2pHandler: 'static + Send + Sync + std::fmt::Debug {
     fn handle_publish(
         &self,
         dna_hash: DnaHash,
-        ops: Vec<holochain_types::dht_v2::DhtOp>,
+        ops: Vec<(holochain_types::dht_v2::DhtOp, bool)>,
     ) -> BoxFut<'_, HolochainP2pResult<()>>;
 
     /// A remote node is requesting entry data from us.
