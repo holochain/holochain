@@ -1,3 +1,4 @@
+DROP TABLE IF EXISTS InitProperties;
 DROP TABLE IF EXISTS BlockSpan;
 DROP TABLE IF EXISTS Nonce;
 DROP TABLE IF EXISTS SignalSubscription;
