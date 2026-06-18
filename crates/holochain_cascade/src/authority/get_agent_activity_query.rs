@@ -7,8 +7,8 @@ use holochain_types::prelude::{
     ActionHashedContainer, AgentActivityResponse, ChainItems, ChainItemsSource,
 };
 use holochain_zome_types::prelude::{
-    ChainFork, ChainHead, ChainQueryFilter, ChainStatus, HasValidationStatus, HighestObserved,
-    Judged, SignedWarrant, ValidationStatus,
+    Action, ChainFork, ChainHead, ChainQueryFilter, ChainStatus, HasValidationStatus,
+    HighestObserved, Judged, SignedWarrant, ValidationStatus,
 };
 
 pub mod hashes;
@@ -144,6 +144,18 @@ where
         state.rejected.clone().into_iter(),
     );
 
+    // A chain whose head is a `CloseChain` action is reported as `Closed`. This
+    // only upgrades a `Valid` status; `compute_chain_status` returns `Forked`
+    // and `Invalid` ahead of `Valid`, so higher-priority states are preserved.
+    let status = match status {
+        ChainStatus::Valid(head)
+            if matches!(valid.last().map(|v| v.action()), Some(Action::CloseChain(_))) =>
+        {
+            ChainStatus::Closed(head)
+        }
+        other => other,
+    };
+
     let valid_activity = if options.include_valid_activity {
         let valid = filter.filter_actions(valid);
         valid.to_chain_items()
@@ -172,4 +184,108 @@ where
         status,
         highest_observed,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ::fixt::prelude::*;
+    use holo_hash::fixt::*;
+    use holochain_p2p::event::GetActivityOptions;
+    use holochain_types::prelude::Record;
+    use holochain_zome_types::prelude::*;
+
+    fn signed_record(action: Action) -> Record {
+        let shh = SignedActionHashed::with_presigned(
+            ActionHashed::from_content_sync(action),
+            fixt!(Signature),
+        );
+        Record::new(shh, None)
+    }
+
+    fn dna(agent: &AgentPubKey) -> Record {
+        let mut dna = fixt!(Dna);
+        dna.author = agent.clone();
+        signed_record(Action::Dna(dna))
+    }
+
+    fn create(agent: &AgentPubKey, seq: u32) -> Record {
+        let mut create = fixt!(Create);
+        create.author = agent.clone();
+        create.action_seq = seq;
+        signed_record(Action::Create(create))
+    }
+
+    fn close(agent: &AgentPubKey, seq: u32) -> Record {
+        let mut close = fixt!(CloseChain);
+        close.author = agent.clone();
+        close.action_seq = seq;
+        signed_record(Action::CloseChain(close))
+    }
+
+    fn state_of(valid: Vec<Record>, rejected: Vec<Record>) -> State<Record> {
+        State {
+            valid,
+            rejected,
+            pending: vec![],
+            warrants: vec![],
+            status: None,
+        }
+    }
+
+    fn render_status(state: State<Record>, agent: AgentPubKey) -> ChainStatus {
+        let options = GetActivityOptions {
+            include_valid_activity: true,
+            ..Default::default()
+        };
+        render(state, agent, &ChainQueryFilter::new(), &options)
+            .unwrap()
+            .status
+    }
+
+    #[test]
+    fn closed_chain_reports_closed() {
+        let agent = fixt!(AgentPubKey);
+        let close_record = close(&agent, 2);
+        let close_head = ChainHead {
+            action_seq: 2,
+            hash: close_record.action_address().clone(),
+        };
+        let state = state_of(
+            vec![dna(&agent), create(&agent, 1), close_record],
+            vec![],
+        );
+        assert_eq!(render_status(state, agent), ChainStatus::Closed(close_head));
+    }
+
+    #[test]
+    fn forked_and_closed_reports_forked() {
+        let agent = fixt!(AgentPubKey);
+        let state = state_of(
+            vec![
+                dna(&agent),
+                create(&agent, 1),
+                create(&agent, 1), // fork at seq 1
+                close(&agent, 2),
+            ],
+            vec![],
+        );
+        assert!(matches!(
+            render_status(state, agent),
+            ChainStatus::Forked(_)
+        ));
+    }
+
+    #[test]
+    fn invalid_and_closed_reports_invalid() {
+        let agent = fixt!(AgentPubKey);
+        let state = state_of(
+            vec![dna(&agent), create(&agent, 1), close(&agent, 2)],
+            vec![create(&agent, 1)], // a rejected action
+        );
+        assert!(matches!(
+            render_status(state, agent),
+            ChainStatus::Invalid(_)
+        ));
+    }
 }
