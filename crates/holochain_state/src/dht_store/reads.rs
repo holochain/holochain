@@ -40,6 +40,18 @@ impl DhtStore<DbRead<Dht>> {
         Ok(self.db().count_integrated_ops().await?)
     }
 
+    /// Count integrated, locally-validated chain ops that passed validation
+    /// (rejected and GET-cached ops excluded).
+    pub async fn count_valid_integrated_ops(&self) -> StateQueryResult<i64> {
+        Ok(self.db().count_valid_integrated_ops().await?)
+    }
+
+    /// Count chain ops that passed both sys- and app-validation but are not yet
+    /// integrated.
+    pub async fn count_valid_not_integrated_ops(&self) -> StateQueryResult<i64> {
+        Ok(self.db().count_valid_not_integrated_ops().await?)
+    }
+
     /// Drop any op whose hash is already recorded in the DHT store.
     /// Input order is preserved for surviving ops.
     pub async fn filter_existing_ops(
