@@ -470,7 +470,10 @@ mod tests {
         // Empty is the identity element.
         assert_eq!(combine_chain_status(Empty, Empty), Empty);
         assert_eq!(combine_chain_status(Empty, Valid(head(3))), Valid(head(3)));
-        assert_eq!(combine_chain_status(Closed(head(3)), Empty), Closed(head(3)));
+        assert_eq!(
+            combine_chain_status(Closed(head(3)), Empty),
+            Closed(head(3))
+        );
 
         // Closed outranks Valid; Forked/Invalid outrank Closed.
         assert_eq!(

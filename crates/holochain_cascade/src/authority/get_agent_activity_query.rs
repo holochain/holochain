@@ -149,7 +149,10 @@ where
     // and `Invalid` ahead of `Valid`, so higher-priority states are preserved.
     let status = match status {
         ChainStatus::Valid(head)
-            if matches!(valid.last().map(|v| v.action()), Some(Action::CloseChain(_))) =>
+            if matches!(
+                valid.last().map(|v| v.action()),
+                Some(Action::CloseChain(_))
+            ) =>
         {
             ChainStatus::Closed(head)
         }
@@ -251,10 +254,7 @@ mod tests {
             action_seq: 2,
             hash: close_record.action_address().clone(),
         };
-        let state = state_of(
-            vec![dna(&agent), create(&agent, 1), close_record],
-            vec![],
-        );
+        let state = state_of(vec![dna(&agent), create(&agent, 1), close_record], vec![]);
         assert_eq!(render_status(state, agent), ChainStatus::Closed(close_head));
     }
 
