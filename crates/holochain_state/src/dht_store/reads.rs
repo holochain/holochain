@@ -66,6 +66,34 @@ impl DhtStore<DbRead<Dht>> {
         Ok(self.db().rejected_integrated_op_hashes().await?)
     }
 
+    /// Total count of every op (integrated and limbo) held in the DHT store.
+    pub async fn count_all_ops(&self) -> StateQueryResult<i64> {
+        Ok(self.db().count_all_ops().await?)
+    }
+
+    /// Whether the integrated chain op `op_hash` requires a validation receipt.
+    pub async fn op_requires_receipt(&self, op_hash: &DhtOpHash) -> StateQueryResult<bool> {
+        Ok(self.db().op_requires_receipt(op_hash).await?)
+    }
+
+    /// Whether `op_hash` is present in the limbo (not-yet-integrated) chain ops.
+    pub async fn limbo_op_exists(&self, op_hash: &DhtOpHash) -> StateQueryResult<bool> {
+        Ok(self.db().limbo_op_exists(op_hash).await?)
+    }
+
+    /// Hashes of limbo chain ops flagged as requiring a validation receipt.
+    pub async fn limbo_op_hashes_requiring_receipt(&self) -> StateQueryResult<Vec<DhtOpHash>> {
+        Ok(self.db().limbo_op_hashes_requiring_receipt().await?)
+    }
+
+    /// Whether any integrated chain op exists with the given DHT `basis`.
+    pub async fn chain_op_exists_at_basis(
+        &self,
+        basis: &AnyLinkableHash,
+    ) -> StateQueryResult<bool> {
+        Ok(self.db().chain_op_exists_at_basis(basis).await?)
+    }
+
     /// Drop any op whose hash is already recorded in the DHT store.
     /// Input order is preserved for surviving ops.
     pub async fn filter_existing_ops(
