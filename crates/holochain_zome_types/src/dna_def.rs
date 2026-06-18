@@ -244,6 +244,7 @@ impl DnaDef {
     }
 
     /// Replace the coordinator zomes for this DNA.
+    #[cfg(feature = "full")]
     pub fn replace_coordinators(
         mut self,
         coordinator_zomes: CoordinatorZomes,
