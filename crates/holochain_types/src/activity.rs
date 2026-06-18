@@ -48,7 +48,7 @@ impl AgentActivityResponse {
             agent: other.agent,
             valid_activity: ChainItems::NotRequested,
             rejected_activity: ChainItems::NotRequested,
-            status: ChainStatus::Empty,
+            status: other.status,
             highest_observed: other.highest_observed,
             warrants: other.warrants,
         }
@@ -113,6 +113,33 @@ impl From<AgentActivityResponse> for AgentActivity {
             highest_observed: a.highest_observed,
             warrants: a.warrants,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn status_only_preserves_status() {
+        let head = ChainHead {
+            action_seq: 5,
+            hash: ActionHash::from_raw_32(vec![1; 32]),
+        };
+        let response = AgentActivityResponse {
+            agent: AgentPubKey::from_raw_32(vec![2; 32]),
+            valid_activity: ChainItems::Hashes(vec![]),
+            rejected_activity: ChainItems::NotRequested,
+            status: ChainStatus::Valid(head.clone()),
+            highest_observed: None,
+            warrants: vec![],
+        };
+
+        let only = AgentActivityResponse::status_only(response);
+
+        assert_eq!(only.status, ChainStatus::Valid(head));
+        assert_eq!(only.valid_activity, ChainItems::NotRequested);
+        assert_eq!(only.rejected_activity, ChainItems::NotRequested);
     }
 }
 

@@ -446,6 +446,33 @@ async fn get_activity_with_warrants() {
     assert_eq!(r2, expected);
 }
 
+/// A status-only request (no valid/rejected activity) must still return the
+/// real chain status, not `Empty`.
+#[tokio::test(flavor = "multi_thread")]
+async fn status_only_request_returns_real_status() {
+    holochain_trace::test_run();
+
+    let test_data = ActivityTestData::valid_chain_scenario(false);
+
+    let scenario = GetActivityTestScenario::new(test_data.clone())
+        .include_agent_activity_ops_in_dht_db()
+        .await
+        .include_store_entry_ops_in_dht_db()
+        .await
+        .include_agent_activity_noise_ops_in_dht_db()
+        .await;
+
+    let options = GetActivityOptions {
+        include_valid_activity: false,
+        include_rejected_activity: false,
+        ..Default::default()
+    };
+
+    let r = scenario.query_authority(options).await.unwrap();
+
+    assert_eq!(r.status, ChainStatus::Valid(test_data.chain_head.clone()));
+}
+
 struct GetActivityTestScenario {
     dht: TestDb<DbKindDht>,
     cache: TestDb<DbKindCache>,
