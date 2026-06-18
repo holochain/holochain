@@ -368,6 +368,7 @@ async fn validate_valid_warrant_with_cached_dependency() {
 
     let status = test_case
         .get_warrant_validation_outcome(warrant_op_hash)
+        .await
         .unwrap();
 
     assert!(
@@ -453,6 +454,7 @@ async fn validate_valid_warrant_with_fetched_dependency() {
 
     let status = test_case
         .get_warrant_validation_outcome(warrant_op_hash)
+        .await
         .unwrap();
 
     assert!(
@@ -547,6 +549,7 @@ async fn reject_invalid_warrant() {
 
     let status = test_case
         .get_warrant_validation_outcome(warrant_op_hash)
+        .await
         .unwrap();
 
     assert!(
@@ -620,6 +623,7 @@ async fn validate_warrant_with_validated_dependency() {
     // Get the warrant validation outcome
     let status = test_case
         .get_warrant_validation_outcome(warrant_op_hash)
+        .await
         .unwrap();
 
     assert!(
@@ -692,6 +696,7 @@ async fn avoid_duplicate_warrant() {
     // Get the warrant validation outcome
     let status = test_case
         .get_warrant_validation_outcome(warrant_op_hash)
+        .await
         .unwrap();
 
     assert!(
@@ -721,7 +726,11 @@ async fn avoid_duplicate_warrant() {
     );
 
     let dht_warrants = test_case
-        .get_authored_warrants(&test_case.dht_db_handle(), other_warrant_agent.clone())
+        .test_space
+        .space
+        .dht_store
+        .as_read()
+        .warrants_by_author(other_warrant_agent.clone())
         .await
         .unwrap();
     assert_eq!(
@@ -732,7 +741,11 @@ async fn avoid_duplicate_warrant() {
 
     // Check that the original warrant is still present
     let dht_warrants = test_case
-        .get_authored_warrants(&test_case.dht_db_handle(), warrant_agent.clone())
+        .test_space
+        .space
+        .dht_store
+        .as_read()
+        .warrants_by_author(warrant_agent.clone())
         .await
         .unwrap();
     assert_eq!(
@@ -1025,35 +1038,18 @@ impl TestCase {
         .is_some());
     }
 
-    fn get_warrant_validation_outcome(
+    async fn get_warrant_validation_outcome(
         &self,
         warrant_op_hash: DhtOpHash,
     ) -> holochain_state::prelude::StateQueryResult<
         Option<holochain_zome_types::prelude::ValidationStatus>,
     > {
-        self.dht_db_handle().test_read(
-            move |txn| -> holochain_state::prelude::StateQueryResult<
-                Option<holochain_zome_types::prelude::ValidationStatus>,
-            > {
-                let status = txn.query_row(
-                    r#"
-            SELECT
-              DhtOp.validation_status
-            FROM
-              DhtOp
-              JOIN Warrant ON DhtOp.action_hash = Warrant.hash
-            WHERE
-              DhtOp.hash = :hash
-            "#,
-                    rusqlite::named_params! {
-                        ":hash": &warrant_op_hash,
-                    },
-                    |row| row.get::<_, Option<holochain_zome_types::prelude::ValidationStatus>>(0),
-                )?;
-
-                Ok(status)
-            },
-        )
+        self.test_space
+            .space
+            .dht_store
+            .as_read()
+            .warrant_validation_status(&warrant_op_hash)
+            .await
     }
 
     async fn get_authored_warrants<T: DbKindT>(
