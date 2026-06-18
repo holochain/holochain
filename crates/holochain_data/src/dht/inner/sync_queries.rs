@@ -681,3 +681,39 @@ where
     .await?;
     Ok(n)
 }
+
+/// Count of not-yet-integrated `LimboChainOp` rows authored by `author`.
+pub(crate) async fn count_pending_ops_for_author<'e, E>(
+    executor: E,
+    author: &AgentPubKey,
+) -> sqlx::Result<i64>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let (n,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM LimboChainOp \
+         JOIN Action ON Action.hash = LimboChainOp.action_hash \
+         WHERE Action.author = ?",
+    )
+    .bind(author.get_raw_36())
+    .fetch_one(executor)
+    .await?;
+    Ok(n)
+}
+
+/// Hashes of integrated, locally-validated chain ops that were rejected.
+/// GET-cached copies (`locally_validated = 0`) are excluded. Ordered by hash
+/// for a stable result.
+pub(crate) async fn rejected_integrated_op_hashes<'e, E>(executor: E) -> sqlx::Result<Vec<Vec<u8>>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let rows: Vec<(Vec<u8>,)> = sqlx::query_as(
+        "SELECT hash FROM ChainOp \
+         WHERE locally_validated = 1 AND validation_status = 2 \
+         ORDER BY hash",
+    )
+    .fetch_all(executor)
+    .await?;
+    Ok(rows.into_iter().map(|(h,)| h).collect())
+}

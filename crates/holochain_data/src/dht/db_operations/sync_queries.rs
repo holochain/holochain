@@ -7,7 +7,7 @@ use crate::models::dht::{
     DumpChainOpRow, K2ChainOpForWireRow, K2OpHashRow, K2OpIdSinceRow, K2OpPresentRow,
     K2WarrantForWireRow,
 };
-use holo_hash::AgentPubKey;
+use holo_hash::{AgentPubKey, DhtOpHash};
 
 impl DbRead<Dht> {
     /// `(hash, basis, size)` for every integrated, locally-validated op
@@ -118,6 +118,20 @@ impl DbRead<Dht> {
     /// but are not yet integrated.
     pub async fn count_valid_not_integrated_ops(&self) -> sqlx::Result<i64> {
         sync_queries::count_valid_not_integrated_ops(self.pool()).await
+    }
+
+    /// Count of not-yet-integrated chain ops authored by `author`.
+    pub async fn count_pending_ops_for_author(&self, author: &AgentPubKey) -> sqlx::Result<i64> {
+        sync_queries::count_pending_ops_for_author(self.pool(), author).await
+    }
+
+    /// Hashes of integrated, rejected chain ops (GET-cached copies excluded).
+    pub async fn rejected_integrated_op_hashes(&self) -> sqlx::Result<Vec<DhtOpHash>> {
+        Ok(sync_queries::rejected_integrated_op_hashes(self.pool())
+            .await?
+            .into_iter()
+            .map(DhtOpHash::from_raw_36)
+            .collect())
     }
 
     /// Integrated chain-op rows for the integration dump, paginated forward

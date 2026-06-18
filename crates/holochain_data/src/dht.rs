@@ -1098,6 +1098,162 @@ mod tests {
         assert_eq!(count, 1);
     }
 
+    async fn seed_action_for_op_with_author(
+        db: &crate::handles::DbWrite<Dht>,
+        seed: u8,
+        author: &AgentPubKey,
+    ) -> ActionHash {
+        let action = Action {
+            header: ActionHeader {
+                author: author.clone(),
+                timestamp: Timestamp::from_micros(1_000_000 + seed as i64),
+                action_seq: seed as u32,
+                prev_action: Some(ActionHash::from_raw_36(vec![seed.wrapping_sub(1); 36])),
+            },
+            data: ActionData::InitZomesComplete(InitZomesCompleteData {}),
+        };
+        let hashed = HoloHashed::with_pre_hashed(action, ActionHash::from_raw_36(vec![seed; 36]));
+        let signed = SignedHashed::with_presigned(hashed, Signature([seed; 64]));
+        db.insert_action(&signed, None).await.unwrap();
+        signed.as_hash().clone()
+    }
+
+    #[tokio::test]
+    async fn count_pending_ops_for_author_counts_only_that_authors_limbo_ops() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        // sample_action / seed_action_for_op author is all-ones.
+        let author_a = AgentPubKey::from_raw_36(vec![1u8; 36]);
+        let author_b = AgentPubKey::from_raw_36(vec![0xB2; 36]);
+
+        // Author A: two pending limbo ops.
+        for (seed, op_byte) in [(1u8, 0x11u8), (2, 0x22)] {
+            let action = seed_action_for_op(&db, seed).await;
+            db.insert_limbo_chain_op(InsertLimboChainOp {
+                op_hash: &DhtOpHash::from_raw_36(vec![op_byte; 36]),
+                action_hash: &action,
+                op_type: 1,
+                basis_hash: &sample_basis(seed),
+                storage_center_loc: 0,
+                require_receipt: false,
+                when_received: Timestamp::from_micros(1),
+                serialized_size: 0,
+            })
+            .await
+            .unwrap();
+        }
+
+        // Author A: one already-integrated chain op (excluded — not pending).
+        let a_integrated = seed_action_for_op(&db, 4).await;
+        db.insert_chain_op(InsertChainOp {
+            op_hash: &DhtOpHash::from_raw_36(vec![0x44; 36]),
+            action_hash: &a_integrated,
+            op_type: 1,
+            basis_hash: &sample_basis(4),
+            storage_center_loc: 0,
+            validation_status: RecordValidity::Accepted,
+            locally_validated: true,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(1),
+            when_integrated: Timestamp::from_micros(2),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+
+        // Author B: one pending limbo op (excluded from A's count).
+        let b_pending = seed_action_for_op_with_author(&db, 3, &author_b).await;
+        db.insert_limbo_chain_op(InsertLimboChainOp {
+            op_hash: &DhtOpHash::from_raw_36(vec![0x33; 36]),
+            action_hash: &b_pending,
+            op_type: 1,
+            basis_hash: &sample_basis(3),
+            storage_center_loc: 0,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(1),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+
+        assert_eq!(
+            db.as_ref()
+                .count_pending_ops_for_author(&author_a)
+                .await
+                .unwrap(),
+            2
+        );
+        assert_eq!(
+            db.as_ref()
+                .count_pending_ops_for_author(&author_b)
+                .await
+                .unwrap(),
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn rejected_integrated_op_hashes_returns_only_locally_validated_rejected() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+
+        // Integrated accepted — excluded.
+        let accepted = seed_action_for_op(&db, 1).await;
+        db.insert_chain_op(InsertChainOp {
+            op_hash: &DhtOpHash::from_raw_36(vec![0x11; 36]),
+            action_hash: &accepted,
+            op_type: 1,
+            basis_hash: &sample_basis(1),
+            storage_center_loc: 0,
+            validation_status: RecordValidity::Accepted,
+            locally_validated: true,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(1),
+            when_integrated: Timestamp::from_micros(2),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+
+        // Integrated rejected — included.
+        let rejected_op = DhtOpHash::from_raw_36(vec![0x22; 36]);
+        let rejected = seed_action_for_op(&db, 2).await;
+        db.insert_chain_op(InsertChainOp {
+            op_hash: &rejected_op,
+            action_hash: &rejected,
+            op_type: 1,
+            basis_hash: &sample_basis(2),
+            storage_center_loc: 0,
+            validation_status: RecordValidity::Rejected,
+            locally_validated: true,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(1),
+            when_integrated: Timestamp::from_micros(2),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+
+        // Cached rejected (locally_validated = 0) — excluded.
+        let cached = seed_action_for_op(&db, 3).await;
+        db.insert_chain_op(InsertChainOp {
+            op_hash: &DhtOpHash::from_raw_36(vec![0x33; 36]),
+            action_hash: &cached,
+            op_type: 1,
+            basis_hash: &sample_basis(3),
+            storage_center_loc: 0,
+            validation_status: RecordValidity::Rejected,
+            locally_validated: false,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(1),
+            when_integrated: Timestamp::from_micros(2),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+
+        let hashes = db.as_ref().rejected_integrated_op_hashes().await.unwrap();
+        assert_eq!(hashes, vec![rejected_op]);
+    }
+
     #[tokio::test]
     async fn chain_op_publish_roundtrip() {
         let db = test_open_db(dht_db_id()).await.unwrap();
