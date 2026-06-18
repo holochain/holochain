@@ -650,3 +650,34 @@ where
         .await?;
     Ok(counts)
 }
+
+/// Count of integrated, locally-validated `ChainOp` rows that passed validation
+/// (`validation_status = 1`). GET-cached copies (`locally_validated = 0`) and
+/// rejected ops are excluded.
+pub(crate) async fn count_valid_integrated_ops<'e, E>(executor: E) -> sqlx::Result<i64>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let (n,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM ChainOp WHERE locally_validated = 1 AND validation_status = 1",
+    )
+    .fetch_one(executor)
+    .await?;
+    Ok(n)
+}
+
+/// Count of `LimboChainOp` rows that have passed both sys- and app-validation
+/// (`sys_validation_status = 1 AND app_validation_status = 1`) but are not yet
+/// integrated.
+pub(crate) async fn count_valid_not_integrated_ops<'e, E>(executor: E) -> sqlx::Result<i64>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let (n,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM LimboChainOp \
+         WHERE sys_validation_status = 1 AND app_validation_status = 1",
+    )
+    .fetch_one(executor)
+    .await?;
+    Ok(n)
+}

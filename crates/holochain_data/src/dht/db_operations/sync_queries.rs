@@ -108,6 +108,18 @@ impl DbRead<Dht> {
         sync_queries::integration_state_counts(self.pool()).await
     }
 
+    /// Count of integrated, locally-validated `ChainOp` rows that passed
+    /// validation (rejected and GET-cached ops excluded).
+    pub async fn count_valid_integrated_ops(&self) -> sqlx::Result<i64> {
+        sync_queries::count_valid_integrated_ops(self.pool()).await
+    }
+
+    /// Count of `LimboChainOp` rows that passed both sys- and app-validation
+    /// but are not yet integrated.
+    pub async fn count_valid_not_integrated_ops(&self) -> sqlx::Result<i64> {
+        sync_queries::count_valid_not_integrated_ops(self.pool()).await
+    }
+
     /// Integrated chain-op rows for the integration dump, paginated forward
     /// from the `(when_integrated, op_hash)` cursor `after` (`None` from the
     /// start, which yields the full set).
