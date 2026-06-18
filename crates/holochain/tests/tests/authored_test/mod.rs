@@ -109,26 +109,15 @@ async fn authored_test() {
         .await
         .unwrap();
 
-    bob.dht_db()
-        .read_async({
-            let basis: AnyDhtHash = entry_hash.clone().into();
-
-            move |txn| -> DatabaseResult<()> {
-                let has_integrated_entry: bool = txn.query_row(
-                    "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE basis_hash = :hash)",
-                    named_params! {
-                        ":hash": basis,
-                    },
-                    |row| row.get(0),
-                )?;
-
-                assert!(has_integrated_entry);
-
-                Ok(())
-            }
-        })
-        .await
-        .unwrap();
+    let basis: AnyLinkableHash = entry_hash.clone().into();
+    assert!(
+        bob.dht_store()
+            .as_read()
+            .chain_op_exists_at_basis(&basis)
+            .await
+            .unwrap(),
+        "bob should have an integrated op at the entry basis"
+    );
 
     // Now bob commits the entry
     let _: ActionHash = conductor

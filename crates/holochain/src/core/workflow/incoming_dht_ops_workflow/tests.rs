@@ -4,13 +4,14 @@ use ::fixt::prelude::*;
 use holo_hash::fixt::DnaHashFixturator;
 use holochain_keystore::test_keystore;
 use holochain_keystore::AgentPubKeyExt;
+use holochain_state::dht_store::DhtStore;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn incoming_ops_to_limbo() {
     holochain_trace::test_run();
 
     let space = TestSpace::new(fixt!(DnaHash));
-    let env = space.space.dht_db.clone();
+    let dht_store = space.space.dht_store.clone();
     let keystore = test_keystore();
 
     let author = fake_agent_pubkey_1();
@@ -45,7 +46,7 @@ async fn incoming_ops_to_limbo() {
 
     futures::future::try_join_all(all).await.unwrap();
 
-    verify_ops_present(env, hash_list, true).await;
+    verify_ops_present(&dht_store, hash_list, true).await;
 }
 
 // Checks that there is no other record of the op hash being held onto outside of the database that will prevent
@@ -55,7 +56,7 @@ async fn can_retry_failed_op() {
     holochain_trace::test_run();
 
     let space = TestSpace::new(fixt!(DnaHash));
-    let env = space.space.dht_db.clone();
+    let dht_store = space.space.dht_store.clone();
     let keystore = test_keystore();
     let (sys_validation_trigger, mut sys_validation_rx) = TriggerSender::new();
 
@@ -80,7 +81,7 @@ async fn can_retry_failed_op() {
 
     // .. check that the workflow failed, with the ops NOT saved to the database
     assert!(workflow_result.is_err());
-    verify_ops_present(env.clone(), vec![hash], false).await;
+    verify_ops_present(&dht_store, vec![hash], false).await;
 
     // Now fix the signature
     let signature = author.sign(&keystore, &action).await.unwrap();
@@ -93,15 +94,15 @@ async fn can_retry_failed_op() {
         .unwrap();
 
     // ... and now it should succeed
-    verify_is_pending_validation_receipt(env, hash).await;
+    verify_is_pending_validation_receipt(&dht_store, hash).await;
     // then sys validation should run on the new op
     sys_validation_rx.listen().await.unwrap();
     // and no ops should be claimed for processing
     assert!(space.space.incoming_op_hashes.0.lock().is_empty());
 }
 
-async fn verify_is_pending_validation_receipt(env: DbWrite<DbKindDht>, hash: DhtOpHash) {
-    let pending_hashes = get_pending_op_hashes(env).await;
+async fn verify_is_pending_validation_receipt(dht_store: &DhtStore, hash: DhtOpHash) {
+    let pending_hashes = get_pending_op_hashes(dht_store).await;
 
     tracing::info!("Found {} ops", pending_hashes.len());
 
@@ -110,52 +111,17 @@ async fn verify_is_pending_validation_receipt(env: DbWrite<DbKindDht>, hash: Dht
         .any(|pending_hash| pending_hash == hash));
 }
 
-async fn verify_ops_present(env: DbWrite<DbKindDht>, hash_list: Vec<DhtOpHash>, present: bool) {
-    env.read_async(move |txn| -> DatabaseResult<()> {
-        for hash in hash_list {
-            let found: bool = txn
-                .query_row(
-                    "
-                SELECT EXISTS(
-                    SELECT 1 FROM DhtOp
-                    WHERE when_integrated IS NULL
-                    AND hash = :hash
-                )
-                ",
-                    named_params! {
-                        ":hash": hash,
-                    },
-                    |row| row.get(0),
-                )
-                .unwrap();
-            assert_eq!(present, found);
-        }
-
-        Ok(())
-    })
-    .await
-    .unwrap();
+async fn verify_ops_present(dht_store: &DhtStore, hash_list: Vec<DhtOpHash>, present: bool) {
+    for hash in hash_list {
+        let found = dht_store.as_read().limbo_op_exists(&hash).await.unwrap();
+        assert_eq!(present, found);
+    }
 }
 
-async fn get_pending_op_hashes(env: DbWrite<DbKindDht>) -> Vec<DhtOpHash> {
-    env.read_async(|txn| -> StateQueryResult<_> {
-        let mut stmt = txn.prepare(
-            "
-        SELECT hash FROM DhtOp
-        WHERE when_integrated IS NULL
-        AND require_receipt = 1
-    ",
-        )?;
-
-        let ops = stmt
-            .query_and_then([], |r| {
-                let dht_op_hash: DhtOpHash = r.get("hash")?;
-                Ok(dht_op_hash)
-            })?
-            .collect::<StateQueryResult<Vec<_>>>()?;
-
-        Ok(ops)
-    })
-    .await
-    .unwrap()
+async fn get_pending_op_hashes(dht_store: &DhtStore) -> Vec<DhtOpHash> {
+    dht_store
+        .as_read()
+        .limbo_op_hashes_requiring_receipt()
+        .await
+        .unwrap()
 }

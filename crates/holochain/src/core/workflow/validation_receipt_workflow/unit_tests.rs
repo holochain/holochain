@@ -10,12 +10,10 @@ use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::HasHash;
 use holo_hash::{AgentPubKey, DhtOpHash};
 use holochain_p2p::MockHolochainP2pDnaT;
-use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::prelude::{DbKindDht, DbWrite};
 use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::*;
 use holochain_state::test_utils::test_dht_store;
-use rusqlite::named_params;
 use std::sync::Arc;
 
 #[tokio::test(flavor = "multi_thread")]
@@ -89,7 +87,7 @@ async fn do_not_block_or_send_to_self() {
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
         vault.clone(),
-        dht_store,
+        dht_store.clone(),
         dna,
         keystore,
         vec![validator].into_iter().collect(), // No running cells
@@ -99,8 +97,8 @@ async fn do_not_block_or_send_to_self() {
 
     assert_eq!(WorkComplete::Complete, work_complete);
 
-    assert!(!get_requires_receipt(vault.clone(), valid_op_hash).await);
-    assert!(!get_requires_receipt(vault.clone(), rejected_op_hash).await);
+    assert!(!get_requires_receipt(&dht_store, valid_op_hash).await);
+    assert!(!get_requires_receipt(&dht_store, rejected_op_hash).await);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -136,7 +134,7 @@ async fn block_invalid_op_author() {
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
         vault.clone(),
-        dht_store,
+        dht_store.clone(),
         dna,
         keystore,
         vec![validator].into_iter().collect(),
@@ -148,7 +146,7 @@ async fn block_invalid_op_author() {
 
     // The op was rejected, but the `require_receipt` flag should still be cleared
     // so we don't reprocess the op.
-    assert!(!get_requires_receipt(vault, op_hash).await);
+    assert!(!get_requires_receipt(&dht_store, op_hash).await);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -182,7 +180,7 @@ async fn continues_if_receipt_cannot_be_signed() {
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
         vault.clone(),
-        dht_store,
+        dht_store.clone(),
         dna,
         keystore,
         vec![invalid_validator].into_iter().collect(),
@@ -191,7 +189,7 @@ async fn continues_if_receipt_cannot_be_signed() {
     .unwrap();
 
     assert_eq!(WorkComplete::Complete, work_complete);
-    assert!(!get_requires_receipt(vault, op_hash).await);
+    assert!(!get_requires_receipt(&dht_store, op_hash).await);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -226,7 +224,7 @@ async fn send_validation_receipt() {
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
         vault.clone(),
-        dht_store,
+        dht_store.clone(),
         dna,
         keystore,
         vec![validator].into_iter().collect(), // No running cells
@@ -237,7 +235,7 @@ async fn send_validation_receipt() {
     assert_eq!(WorkComplete::Complete, work_complete);
 
     // Should no longer require a receipt
-    assert!(!get_requires_receipt(vault.clone(), op_hash).await);
+    assert!(!get_requires_receipt(&dht_store, op_hash).await);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -285,7 +283,7 @@ async fn errors_for_some_ops_does_not_prevent_the_workflow_proceeding() {
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
         vault.clone(),
-        dht_store,
+        dht_store.clone(),
         dna,
         keystore,
         vec![validator].into_iter().collect(), // No running cells
@@ -297,12 +295,12 @@ async fn errors_for_some_ops_does_not_prevent_the_workflow_proceeding() {
 
     // Sending the receipt to this author returned an error,
     // so we did NOT clear the wants receipt flag.
-    assert!(get_requires_receipt(vault.clone(), op_hash1).await);
+    assert!(get_requires_receipt(&dht_store, op_hash1).await);
 
     // But even after we got the above error, we proceeded to
     // send the receipt for the second author which DID work,
     // so its flag is cleared.
-    assert!(!get_requires_receipt(vault.clone(), op_hash2).await);
+    assert!(!get_requires_receipt(&dht_store, op_hash2).await);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -357,7 +355,7 @@ async fn skips_authors_not_recently_online_and_clears_require_receipt() {
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
         vault.clone(),
-        dht_store,
+        dht_store.clone(),
         dna,
         keystore,
         vec![validator].into_iter().collect(),
@@ -369,10 +367,10 @@ async fn skips_authors_not_recently_online_and_clears_require_receipt() {
 
     // Author1 was not recently online, so require_receipt should be cleared
     // without attempting to send. A new publish will re-set it.
-    assert!(!get_requires_receipt(vault.clone(), op_hash1).await);
+    assert!(!get_requires_receipt(&dht_store, op_hash1).await);
 
     // Author2 was online and sending succeeded, so require_receipt is also cleared.
-    assert!(!get_requires_receipt(vault.clone(), op_hash2).await);
+    assert!(!get_requires_receipt(&dht_store, op_hash2).await);
 }
 
 async fn create_op_with_status(
@@ -443,19 +441,10 @@ async fn create_op_with_status(
     Ok((author, test_op_hash))
 }
 
-async fn get_requires_receipt(vault: DbWrite<DbKindDht>, op_hash: DhtOpHash) -> bool {
-    vault
-        .read_async(move |txn| -> DatabaseResult<bool> {
-            let requires = txn.query_row(
-                "SELECT require_receipt FROM DhtOp WHERE hash = :hash",
-                named_params! {
-                    ":hash": op_hash,
-                },
-                |row| row.get(0),
-            )?;
-
-            Ok(requires)
-        })
+async fn get_requires_receipt(dht_store: &DhtStore, op_hash: DhtOpHash) -> bool {
+    dht_store
+        .as_read()
+        .op_requires_receipt(&op_hash)
         .await
         .unwrap()
 }
