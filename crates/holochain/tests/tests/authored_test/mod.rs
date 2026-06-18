@@ -1,6 +1,6 @@
 use holo_hash::AnyDhtHash;
 use holochain::sweettest::*;
-use holochain::test_utils::wait_for_integration;
+use holochain::test_utils::wait_for_new_store_integration;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::prelude::*;
@@ -76,14 +76,13 @@ async fn authored_test() {
     // Init is not run because we aren't calling the zome.
     let expected_count = 3 + 14;
 
-    wait_for_integration(
-        bob.dht_db(),
-        expected_count,
+    wait_for_new_store_integration(
+        bob.dht_store(),
+        expected_count as i64,
         num_attempts,
         delay_per_attempt,
     )
-    .await
-    .unwrap();
+    .await;
 
     bob
         .authored_db()

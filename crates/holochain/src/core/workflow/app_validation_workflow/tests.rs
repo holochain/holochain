@@ -9,7 +9,7 @@ use crate::core::{SysValidationError, ValidationOutcome};
 use crate::sweettest::*;
 use crate::test_utils::{
     get_valid_and_integrated_count, get_valid_and_not_integrated_count, host_fn_caller::*,
-    new_invocation, new_zome_call_params, wait_for_integration,
+    new_invocation, new_zome_call_params, wait_for_new_store_integration,
 };
 use ::fixt::fixt;
 use hdk::hdi::test_utils::set_zome_types;
@@ -1120,7 +1120,7 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
 
     // Check that genesis ops are currently validated and integrated
     assert_eq!(
-        get_valid_and_integrated_count(&app_validation_workspace.dht_db).await,
+        get_valid_and_integrated_count(&app_validation_workspace.dht_store).await,
         7
     );
 
@@ -1164,13 +1164,13 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
 
     // The op should be marked as valid but not integrated.
     assert_eq!(
-        get_valid_and_not_integrated_count(&app_validation_workspace.dht_db).await,
+        get_valid_and_not_integrated_count(&app_validation_workspace.dht_store).await,
         1
     );
 
     // Check that the new op is not integrated yet
     assert_eq!(
-        get_valid_and_integrated_count(&app_validation_workspace.dht_db).await,
+        get_valid_and_integrated_count(&app_validation_workspace.dht_store).await,
         7
     );
 }
@@ -1648,11 +1648,16 @@ async fn run_test(
     // Plus 2 for Cap Grant
     let expected_count = 3 + 16 + 2;
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
-        .await
+    let alice_store = conductors[0]
+        .get_dht_store(alice_cell_id.dna_hash())
         .unwrap();
-
-    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
+    wait_for_new_store_integration(
+        &alice_store,
+        expected_count as i64,
+        num_attempts,
+        delay_per_attempt,
+    )
+    .await;
 
     alice_db
         .read_async(move |txn| -> DatabaseResult<()> {
@@ -1665,7 +1670,7 @@ async fn run_test(
         .await
         .unwrap();
     assert_eq!(
-        get_valid_and_integrated_count(&alice_db).await,
+        get_valid_and_integrated_count(&alice_store).await,
         expected_count
     );
 
@@ -1678,9 +1683,16 @@ async fn run_test(
     // RegisterAgentActivity will be valid.
     let expected_count = 3 + expected_count;
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
-        .await
+    let alice_store = conductors[0]
+        .get_dht_store(alice_cell_id.dna_hash())
         .unwrap();
+    wait_for_new_store_integration(
+        &alice_store,
+        expected_count as i64,
+        num_attempts,
+        delay_per_attempt,
+    )
+    .await;
 
     alice_db
         .read_async({
@@ -1705,7 +1717,7 @@ async fn run_test(
         .unwrap();
     // Expect having one invalid op for the store entry.
     assert_eq!(
-        get_valid_and_integrated_count(&alice_db).await,
+        get_valid_and_integrated_count(&alice_store).await,
         expected_count - 1
     );
 
@@ -1720,9 +1732,16 @@ async fn run_test(
     // Integration should have 6 ops in it
     let expected_count = 6 + expected_count;
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
-        .await
+    let alice_store = conductors[0]
+        .get_dht_store(alice_cell_id.dna_hash())
         .unwrap();
+    wait_for_new_store_integration(
+        &alice_store,
+        expected_count as i64,
+        num_attempts,
+        delay_per_attempt,
+    )
+    .await;
 
     alice_db
         .read_async({
@@ -1747,7 +1766,7 @@ async fn run_test(
         .unwrap();
     // Expect having one invalid op for the store entry.
     assert_eq!(
-        get_valid_and_integrated_count(&alice_db).await,
+        get_valid_and_integrated_count(&alice_store).await,
         expected_count - 1
     );
 
@@ -1772,9 +1791,16 @@ async fn run_test(
     // Integration should have 9 ops in it
     let expected_count = 9 + expected_count;
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
-        .await
+    let alice_store = conductors[0]
+        .get_dht_store(alice_cell_id.dna_hash())
         .unwrap();
+    wait_for_new_store_integration(
+        &alice_store,
+        expected_count as i64,
+        num_attempts,
+        delay_per_attempt,
+    )
+    .await;
 
     alice_db
         .read_async({
@@ -1801,7 +1827,7 @@ async fn run_test(
         .unwrap();
     // Expect having two invalid ops for the two store entries.
     assert_eq!(
-        get_valid_and_integrated_count(&alice_db).await,
+        get_valid_and_integrated_count(&alice_store).await,
         expected_count - 2
     );
 
@@ -1824,9 +1850,16 @@ async fn run_test(
     // Integration should have 9 ops in it
     let expected_count = 9 + expected_count;
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
-        .await
+    let alice_store = conductors[0]
+        .get_dht_store(alice_cell_id.dna_hash())
         .unwrap();
+    wait_for_new_store_integration(
+        &alice_store,
+        expected_count as i64,
+        num_attempts,
+        delay_per_attempt,
+    )
+    .await;
 
     alice_db
         .read_async({
@@ -1853,7 +1886,7 @@ async fn run_test(
         .unwrap();
     // Expect having two invalid ops for the two store entries.
     assert_eq!(
-        get_valid_and_integrated_count(&alice_db).await,
+        get_valid_and_integrated_count(&alice_store).await,
         expected_count - 2
     );
 
@@ -1878,9 +1911,16 @@ async fn run_test(
     // Integration should have 12 ops in it
     let expected_count = 12 + expected_count;
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
-        .await
+    let alice_store = conductors[0]
+        .get_dht_store(alice_cell_id.dna_hash())
         .unwrap();
+    wait_for_new_store_integration(
+        &alice_store,
+        expected_count as i64,
+        num_attempts,
+        delay_per_attempt,
+    )
+    .await;
 
     alice_db
         .read_async({
@@ -1908,7 +1948,7 @@ async fn run_test(
         .unwrap();
     // 3 invalid ops above plus 1 extra invalid ops that `remove_invalid_link` commits.
     assert_eq!(
-        get_valid_and_integrated_count(&alice_db).await,
+        get_valid_and_integrated_count(&alice_store).await,
         expected_count - (3 + 1)
     );
     expected_count
@@ -1939,9 +1979,16 @@ async fn run_test_entry_def_id(
     // StoreEntry and StoreRecord should be invalid.
     let expected_count = 3 + expected_count;
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
-        .await
+    let alice_store = conductors[0]
+        .get_dht_store(alice_cell_id.dna_hash())
         .unwrap();
+    wait_for_new_store_integration(
+        &alice_store,
+        expected_count as i64,
+        num_attempts,
+        delay_per_attempt,
+    )
+    .await;
 
     alice_db
         .read_async(move |txn| -> DatabaseResult<()> {
@@ -1961,7 +2008,7 @@ async fn run_test_entry_def_id(
         .unwrap();
     // Expect having two invalid ops for the two store entries plus the 3 from the previous test.
     assert_eq!(
-        get_valid_and_integrated_count(&alice_db).await,
+        get_valid_and_integrated_count(&alice_store).await,
         expected_count - 5
     );
 }
