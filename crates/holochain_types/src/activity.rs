@@ -116,33 +116,6 @@ impl From<AgentActivityResponse> for AgentActivity {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn status_only_preserves_status() {
-        let head = ChainHead {
-            action_seq: 5,
-            hash: ActionHash::from_raw_32(vec![1; 32]),
-        };
-        let response = AgentActivityResponse {
-            agent: AgentPubKey::from_raw_32(vec![2; 32]),
-            valid_activity: ChainItems::Hashes(vec![]),
-            rejected_activity: ChainItems::NotRequested,
-            status: ChainStatus::Valid(head.clone()),
-            highest_observed: None,
-            warrants: vec![],
-        };
-
-        let only = AgentActivityResponse::status_only(response);
-
-        assert_eq!(only.status, ChainStatus::Valid(head));
-        assert_eq!(only.valid_activity, ChainItems::NotRequested);
-        assert_eq!(only.rejected_activity, ChainItems::NotRequested);
-    }
-}
-
 /// A helper trait to allow [Record]s, [SignedActionHashed]s, and [ActionHashed]s to be converted into [ChainItems]
 /// without needing to know which source type is being operated on.
 pub trait ChainItemsSource {
@@ -169,5 +142,32 @@ impl ChainItemsSource for Vec<ActionHashed> {
 impl ChainItemsSource for Vec<(u32, ActionHash)> {
     fn to_chain_items(self) -> ChainItems {
         ChainItems::Hashes(self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn status_only_preserves_status() {
+        let head = ChainHead {
+            action_seq: 5,
+            hash: ActionHash::from_raw_32(vec![1; 32]),
+        };
+        let response = AgentActivityResponse {
+            agent: AgentPubKey::from_raw_32(vec![2; 32]),
+            valid_activity: ChainItems::Hashes(vec![]),
+            rejected_activity: ChainItems::NotRequested,
+            status: ChainStatus::Valid(head.clone()),
+            highest_observed: None,
+            warrants: vec![],
+        };
+
+        let only = AgentActivityResponse::status_only(response);
+
+        assert_eq!(only.status, ChainStatus::Valid(head));
+        assert_eq!(only.valid_activity, ChainItems::NotRequested);
+        assert_eq!(only.rejected_activity, ChainItems::NotRequested);
     }
 }
