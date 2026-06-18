@@ -755,6 +755,110 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn warrants_by_author_and_op_validation_status() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let author_a = AgentPubKey::from_raw_36(vec![3u8; 36]);
+        let author_b = AgentPubKey::from_raw_36(vec![5u8; 36]);
+        let warrantee = AgentPubKey::from_raw_36(vec![4u8; 36]);
+        let hash_a = DhtOpHash::from_raw_36(vec![0xA1; 36]);
+        let hash_b = DhtOpHash::from_raw_36(vec![0xB2; 36]);
+
+        for (hash, author, status) in [(&hash_a, &author_a, 2), (&hash_b, &author_b, 1)] {
+            db.insert_warrant(InsertWarrant {
+                hash,
+                author,
+                timestamp: Timestamp::from_micros(1),
+                warrantee: &warrantee,
+                proof: &[9u8; 32],
+                signature: &[8u8; 64],
+                reason: None,
+                storage_center_loc: 0,
+                when_received: Timestamp::from_micros(1),
+                when_integrated: Timestamp::from_micros(2),
+                validation_status: status,
+                serialized_size: 0,
+            })
+            .await
+            .unwrap();
+        }
+
+        let by_a = db
+            .as_ref()
+            .get_warrants_by_author(author_a.clone())
+            .await
+            .unwrap();
+        assert_eq!(by_a.len(), 1);
+        assert_eq!(by_a[0].author, author_a.get_raw_36().to_vec());
+
+        assert_eq!(
+            db.as_ref()
+                .warrant_op_validation_status(&hash_a)
+                .await
+                .unwrap(),
+            Some(2)
+        );
+        assert_eq!(
+            db.as_ref()
+                .warrant_op_validation_status(&hash_b)
+                .await
+                .unwrap(),
+            Some(1)
+        );
+        assert_eq!(
+            db.as_ref()
+                .warrant_op_validation_status(&DhtOpHash::from_raw_36(vec![0x99; 36]))
+                .await
+                .unwrap(),
+            None
+        );
+
+        // A limbo (not-yet-integrated) warrant whose sys-validation has been
+        // decided is read from LimboWarrantOp.
+        let limbo_hash = DhtOpHash::from_raw_36(vec![0xC3; 36]);
+        db.insert_limbo_warrant(InsertLimboWarrant {
+            hash: &limbo_hash,
+            author: &author_a,
+            timestamp: Timestamp::from_micros(1),
+            warrantee: &warrantee,
+            proof: &[9u8; 32],
+            signature: &[8u8; 64],
+            reason: None,
+            storage_center_loc: 0,
+            when_received: Timestamp::from_micros(1),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+        assert_eq!(
+            db.as_ref()
+                .warrant_op_validation_status(&limbo_hash)
+                .await
+                .unwrap(),
+            None,
+            "pending limbo warrant has no decided status"
+        );
+        db.set_limbo_warrant_sys_validation_status(&limbo_hash, Some(2))
+            .await
+            .unwrap();
+        assert_eq!(
+            db.as_ref()
+                .warrant_op_validation_status(&limbo_hash)
+                .await
+                .unwrap(),
+            Some(2)
+        );
+
+        // author_a now has both an integrated and a limbo warrant; both are
+        // listed.
+        let by_a = db
+            .as_ref()
+            .get_warrants_by_author(author_a.clone())
+            .await
+            .unwrap();
+        assert_eq!(by_a.len(), 2);
+    }
+
+    #[tokio::test]
     async fn chain_op_roundtrip() {
         let db = test_open_db(dht_db_id()).await.unwrap();
         let action_hash = seed_action_for_op(&db, 2).await;
