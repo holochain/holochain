@@ -22,6 +22,7 @@ fn merge_activity_responses(
     results: Vec<AgentActivityResponse>,
 ) -> AgentActivityResponse {
     let mut status = ChainStatus::Empty;
+    let mut merged_result_status = ChainStatus::Empty;
     let mut valid = if options.include_valid_activity {
         if options.include_full_records {
             ChainItems::Full(Vec::new())
@@ -49,12 +50,14 @@ fn merge_activity_responses(
             valid_activity,
             rejected_activity,
             warrants: these_warrants,
-            status: _,
+            status: result_status,
         } = result;
 
         if the_agent != agent {
             continue;
         }
+
+        merged_result_status = combine_chain_status(merged_result_status, result_status);
 
         warrants.extend(these_warrants);
 
@@ -204,6 +207,8 @@ fn merge_activity_responses(
         rejected = r;
         status = s;
     }
+
+    let status = combine_chain_status(status, merged_result_status);
 
     AgentActivityResponse {
         status,
@@ -401,6 +406,61 @@ mod tests {
             first_action: ActionHash::from_raw_32(vec![seq as u8; 32]),
             second_action: ActionHash::from_raw_32(vec![(seq + 1) as u8; 32]),
         }
+    }
+
+    #[test]
+    fn merge_full_carries_closed_through_hashes() {
+        use holo_hash::fixt::*;
+        use ChainStatus::*;
+
+        let agent = ::fixt::prelude::fixt!(AgentPubKey);
+        let options = GetActivityOptions {
+            include_valid_activity: true,
+            ..Default::default()
+        };
+
+        let response = AgentActivityResponse {
+            agent: agent.clone(),
+            valid_activity: ChainItems::Hashes(vec![
+                (0, ::fixt::prelude::fixt!(ActionHash)),
+                (1, ::fixt::prelude::fixt!(ActionHash)),
+                (2, head(2).hash),
+            ]),
+            rejected_activity: ChainItems::NotRequested,
+            status: Closed(head(2)),
+            highest_observed: None,
+            warrants: vec![],
+        };
+
+        let merged = merge_activity_responses(agent, &options, vec![response]);
+        assert_eq!(merged.status, Closed(head(2)));
+    }
+
+    #[test]
+    fn merge_full_forked_beats_closed() {
+        use holo_hash::fixt::*;
+        use ChainStatus::*;
+
+        let agent = ::fixt::prelude::fixt!(AgentPubKey);
+        let options = GetActivityOptions {
+            include_valid_activity: true,
+            ..Default::default()
+        };
+
+        let response = AgentActivityResponse {
+            agent: agent.clone(),
+            valid_activity: ChainItems::Hashes(vec![
+                (0, ::fixt::prelude::fixt!(ActionHash)),
+                (2, head(2).hash),
+            ]),
+            rejected_activity: ChainItems::NotRequested,
+            status: Forked(fork(1)),
+            highest_observed: None,
+            warrants: vec![],
+        };
+
+        let merged = merge_activity_responses(agent, &options, vec![response]);
+        assert!(matches!(merged.status, Forked(_)));
     }
 
     #[test]
