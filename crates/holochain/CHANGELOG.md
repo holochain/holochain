@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE**: Add an `init_properties` field to `RoleSettings::Provisioned`, carried by the new `InitProperties` type. The bytes are opaque to the conductor and never written to the DHT. They are intended to seed a freshly migrated chain during `init` as part of the chain switch DNA migration design. Downstream code that constructs or exhaustively matches `RoleSettings::Provisioned` must be updated to include this field. \#5827
 - **BREAKING CHANGE**: Bump Kitsune2 to `0.5.0-dev.4`.
 - Use Kitsune2's new op publish metadata channel to pass through a validation-receipt-required flag. Published ops request a validation receipt from holders, while gossip-fetched ops no longer do. Previously every incoming op was unconditionally marked as requiring a receipt.
 - **BREAKING CHANGE**: `get_agent_activity` can now return `ChainStatus::Closed` when an agent's source-chain head is a `CloseChain` action. `ChainStatus` is sent over the wire in agent-activity responses, so a node returning `Closed` cannot be understood by a pre-feature node. `Closed` ranks above `Valid` but below `Forked`/`Invalid`, so a chain that is also forked or invalid still reports `Forked`/`Invalid`. \#5766
