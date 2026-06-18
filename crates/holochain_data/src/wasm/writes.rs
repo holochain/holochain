@@ -36,7 +36,12 @@ where
     let agent_bytes = agent.get_raw_32();
 
     #[cfg(feature = "unstable-migration")]
-    let lineage = Some(serde_json::to_value(&dna_def.lineage).map_err(new_encode_error)?);
+    let lineage = Some(serde_json::to_value(&dna_def.lineage).map_err(|e| {
+        sqlx::Error::Encode(Box::new(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            e.to_string(),
+        )))
+    })?);
     #[cfg(not(feature = "unstable-migration"))]
     let lineage: Option<serde_json::Value> = None;
 

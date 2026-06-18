@@ -627,13 +627,6 @@ impl RealRibosome {
         (host_fn_builder.function_env, imports)
     }
 
-    // fn get_zome_dependencies(&self, zome_name: &ZomeName) -> RibosomeResult<&[ZomeIndex]> {
-    //     Ok(self
-    //         .zome_dependencies
-    //         .get(zome_name)
-    //         .ok_or_else(|| ZomeTypesError::MissingDependenciesForZome(zome_name.clone()))?)
-    // }
-
     pub fn call_zome_fn(
         input: ExternIO,
         zome: Zome,

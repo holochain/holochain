@@ -17,7 +17,7 @@ pub struct ValidateInvocation {
     /// The zomes this invocation will invoke.
     zomes_to_invoke: ZomesToInvoke,
     /// The serialized arguments to the callback function.
-    data: Arc<std::sync::Mutex<Option<ExternIO>>>,
+    data: Arc<ExternIO>,
 }
 
 impl ValidateInvocation {
@@ -25,7 +25,7 @@ impl ValidateInvocation {
         let data = ExternIO::encode(data)?;
         Ok(Self {
             zomes_to_invoke,
-            data: Arc::new(std::sync::Mutex::new(Some(data))),
+            data: Arc::new(data),
         })
     }
 }
@@ -72,7 +72,7 @@ impl Invocation for ValidateInvocation {
     }
 
     fn take_host_input(&self) -> Result<Option<ExternIO>, SerializedBytesError> {
-        Ok(self.data.lock().unwrap_or_else(|i| i.into_inner()).take())
+        Ok(Some((*self.data).clone()))
     }
 
     fn auth(&self) -> InvocationAuth {
