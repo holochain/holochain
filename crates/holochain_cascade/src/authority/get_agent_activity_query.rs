@@ -277,6 +277,24 @@ mod tests {
     }
 
     #[test]
+    fn forked_on_close_reports_forked() {
+        let agent = fixt!(AgentPubKey);
+        let state = state_of(
+            vec![
+                dna(&agent),
+                create(&agent, 1),
+                create(&agent, 2),
+                close(&agent, 2), // fork at seq 2, one branch closes the chain
+            ],
+            vec![],
+        );
+        assert!(matches!(
+            render_status(state, agent),
+            ChainStatus::Forked(_)
+        ));
+    }
+
+    #[test]
     fn invalid_and_closed_reports_invalid() {
         let agent = fixt!(AgentPubKey);
         let state = state_of(
