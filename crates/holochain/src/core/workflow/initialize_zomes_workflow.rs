@@ -23,6 +23,7 @@ pub struct InitializeZomesWorkflowArgs {
     pub signal_tx: broadcast::Sender<Signal>,
     pub cell_id: CellId,
     pub integrate_dht_ops_trigger: TriggerSender,
+    pub publish_dht_ops_trigger: TriggerSender,
 }
 
 impl InitializeZomesWorkflowArgs {
@@ -41,6 +42,7 @@ pub async fn initialize_zomes_workflow(
     let conductor_handle = args.conductor_handle.clone();
     let coordinators = args.ribosome.dna_def().get_all_coordinators();
     let integrate_dht_ops_trigger = args.integrate_dht_ops_trigger.clone();
+    let publish_dht_ops_trigger = args.publish_dht_ops_trigger.clone();
     let signal_tx = args.signal_tx.clone();
     let result =
         initialize_zomes_workflow_inner(workspace.clone(), network.clone(), keystore.clone(), args)
@@ -69,6 +71,8 @@ pub async fn initialize_zomes_workflow(
 
         // Any ops that were moved to the dht_db as part of the flush but had dependencies will need to be integrated.
         integrate_dht_ops_trigger.trigger(&"initialize_zomes_workflow");
+        // The init data is integrated at flush, so trigger publishing directly.
+        publish_dht_ops_trigger.trigger(&"initialize_zomes_workflow");
     }
     Ok(result)
 }
@@ -208,6 +212,7 @@ mod tests {
             .await
             .unwrap();
         let integrate_dht_ops_trigger = TriggerSender::new();
+        let publish_dht_ops_trigger = TriggerSender::new();
 
         let args = InitializeZomesWorkflowArgs {
             ribosome,
@@ -215,6 +220,7 @@ mod tests {
             signal_tx: broadcast::channel(1).0,
             cell_id: CellId::new(dna_hash.clone(), author.clone()),
             integrate_dht_ops_trigger: integrate_dht_ops_trigger.0.clone(),
+            publish_dht_ops_trigger: publish_dht_ops_trigger.0.clone(),
         };
         let keystore = fixt!(MetaLairClient);
         let mut network = MockHolochainP2pDnaT::new();

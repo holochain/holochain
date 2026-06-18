@@ -14,6 +14,7 @@ use crate::conductor::cell::error::CellResult;
 use crate::core::queue_consumer::spawn_queue_consumer_tasks;
 use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::core::queue_consumer::QueueTriggers;
+#[cfg(feature = "unstable-countersigning")]
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::{Ribosome, ZomeCallInvocation};
@@ -929,6 +930,7 @@ impl Cell {
             args,
             self.queue_triggers.sys_validation.clone(),
             self.queue_triggers.integrate_dht_ops.clone(),
+            self.queue_triggers.publish_dht_ops.clone(),
             self.queue_triggers.countersigning.clone(),
         )
         .await
@@ -977,6 +979,7 @@ impl Cell {
             signal_tx: self.signal_tx.clone(),
             cell_id: self.id.clone(),
             integrate_dht_ops_trigger: self.queue_triggers.integrate_dht_ops.clone(),
+            publish_dht_ops_trigger: self.queue_triggers.publish_dht_ops.clone(),
         };
         let init_result = initialize_zomes_workflow(
             workspace,
@@ -1054,10 +1057,6 @@ impl Cell {
     #[cfg(any(test, feature = "test_utils"))]
     pub(crate) fn triggers(&self) -> &QueueTriggers {
         &self.queue_triggers
-    }
-
-    pub(crate) fn publish_dht_ops_trigger(&self) -> TriggerSender {
-        self.queue_triggers.publish_dht_ops.clone()
     }
 }
 

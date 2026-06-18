@@ -22,14 +22,7 @@ mod tests;
 
 #[cfg_attr(
     feature = "instrument",
-    tracing::instrument(skip(
-        vault,
-        dht_store,
-        trigger_receipt,
-        network,
-        authored_db_provider,
-        publish_trigger_provider
-    ))
+    tracing::instrument(skip(vault, dht_store, trigger_receipt, network, authored_db_provider))
 )]
 pub async fn integrate_dht_ops_workflow(
     vault: DbWrite<DbKindDht>,
@@ -37,9 +30,6 @@ pub async fn integrate_dht_ops_workflow(
     trigger_receipt: TriggerSender,
     network: DynHolochainP2pDna,
     authored_db_provider: Arc<dyn super::provider::authored_db_provider::AuthoredDbProvider>,
-    publish_trigger_provider: Arc<
-        dyn super::provider::publish_trigger_provider::PublishTriggerProvider,
-    >,
 ) -> WorkflowResult<WorkComplete> {
     let start = std::time::Instant::now();
     let when_integrated = Timestamp::now();
@@ -175,7 +165,6 @@ pub async fn integrate_dht_ops_workflow(
 
         update_local_authored_status(
             authored_db_provider.clone(),
-            publish_trigger_provider,
             &dna_hash,
             when_integrated,
             all_integrated_pairs,
@@ -219,9 +208,6 @@ pub async fn integrate_dht_ops_workflow(
 
 async fn update_local_authored_status(
     authored_db_provider: Arc<dyn super::provider::authored_db_provider::AuthoredDbProvider>,
-    publish_trigger_provider: Arc<
-        dyn super::provider::publish_trigger_provider::PublishTriggerProvider,
-    >,
     dna_hash: &DnaHash,
     when_integrated: Timestamp,
     integrated_pairs: Vec<(DhtOpHash, Option<AgentPubKey>)>,
@@ -261,14 +247,6 @@ async fn update_local_authored_status(
             ops = ?op_hashes,
             "Marked authored ops as integrated"
         );
-
-        let cell_id = CellId::new(dna_hash.clone(), author.clone());
-        if let Some(trigger) = publish_trigger_provider.get_publish_trigger(&cell_id).await {
-            tracing::debug!(?cell_id, "Triggering publish for integrated authored ops");
-            trigger.trigger(&"integrate_dht_ops_workflow: authored ops marked as integrated");
-        } else {
-            tracing::error!(?cell_id, "No publish trigger for this cell");
-        }
     }
 
     Ok(())
