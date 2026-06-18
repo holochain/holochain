@@ -94,6 +94,11 @@ impl DhtStore<DbRead<Dht>> {
         Ok(self.db().chain_op_exists_at_basis(basis).await?)
     }
 
+    /// Count of rows in the public `Entry` table.
+    pub async fn count_entries(&self) -> StateQueryResult<i64> {
+        Ok(self.db().count_entries().await?)
+    }
+
     /// Drop any op whose hash is already recorded in the DHT store.
     /// Input order is preserved for surviving ops.
     pub async fn filter_existing_ops(
