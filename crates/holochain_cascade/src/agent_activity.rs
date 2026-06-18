@@ -272,6 +272,75 @@ pub(crate) fn compute_chain_status<T: ActionSequenceAndHash>(
     (status, valid_out, rejected)
 }
 
+/// Combine two chain statuses, keeping the higher-priority one.
+///
+/// Priority, lowest to highest: `Empty` < `Valid` < `Closed` < `Forked`/`Invalid`.
+/// Same-rank tie-breaks: `Valid`/`Valid` and `Closed`/`Closed` keep the higher
+/// `action_seq`; `Forked`/`Forked` keeps the lower `fork_seq`; `Invalid`/`Invalid`
+/// keeps the lower `action_seq`; `Forked` vs `Invalid` keeps whichever has the
+/// lower sequence number.
+fn combine_chain_status(a: ChainStatus, b: ChainStatus) -> ChainStatus {
+    use ChainStatus::*;
+    match (a, b) {
+        (Empty, other) | (other, Empty) => other,
+
+        (Valid(a), Valid(b)) => {
+            if a.action_seq > b.action_seq {
+                Valid(a)
+            } else {
+                Valid(b)
+            }
+        }
+
+        (Closed(c), Valid(_)) | (Valid(_), Closed(c)) => Closed(c),
+        (Closed(a), Closed(b)) => {
+            if a.action_seq > b.action_seq {
+                Closed(a)
+            } else {
+                Closed(b)
+            }
+        }
+
+        (Forked(c), Valid(_))
+        | (Valid(_), Forked(c))
+        | (Forked(c), Closed(_))
+        | (Closed(_), Forked(c)) => Forked(c),
+        (Invalid(c), Valid(_))
+        | (Valid(_), Invalid(c))
+        | (Invalid(c), Closed(_))
+        | (Closed(_), Invalid(c)) => Invalid(c),
+
+        (Forked(a), Forked(b)) => {
+            if a.fork_seq < b.fork_seq {
+                Forked(a)
+            } else {
+                Forked(b)
+            }
+        }
+        (Invalid(a), Invalid(b)) => {
+            if a.action_seq < b.action_seq {
+                Invalid(a)
+            } else {
+                Invalid(b)
+            }
+        }
+        (Forked(a), Invalid(b)) => {
+            if a.fork_seq < b.action_seq {
+                Forked(a)
+            } else {
+                Invalid(b)
+            }
+        }
+        (Invalid(a), Forked(b)) => {
+            if a.action_seq < b.fork_seq {
+                Invalid(a)
+            } else {
+                Forked(b)
+            }
+        }
+    }
+}
+
 fn merge_status_only(
     agent: AgentPubKey,
     results: Vec<AgentActivityResponse>,
@@ -298,66 +367,10 @@ fn merge_status_only(
                 merged_highest_observed = Some(c);
             }
         }
-        match merged_status.take() {
-            Some(last) => match (status, last) {
-                (ChainStatus::Empty, ChainStatus::Empty) => {
-                    merged_status = Some(ChainStatus::Empty);
-                }
-                (ChainStatus::Empty, ChainStatus::Valid(c))
-                | (ChainStatus::Valid(c), ChainStatus::Empty) => {
-                    merged_status = Some(ChainStatus::Valid(c));
-                }
-                (ChainStatus::Empty, ChainStatus::Forked(c))
-                | (ChainStatus::Forked(c), ChainStatus::Empty) => {
-                    merged_status = Some(ChainStatus::Forked(c));
-                }
-                (ChainStatus::Empty, ChainStatus::Invalid(c))
-                | (ChainStatus::Invalid(c), ChainStatus::Empty) => {
-                    merged_status = Some(ChainStatus::Invalid(c));
-                }
-                (ChainStatus::Valid(a), ChainStatus::Valid(b)) => {
-                    let c = if a.action_seq > b.action_seq { a } else { b };
-                    merged_status = Some(ChainStatus::Valid(c));
-                }
-                (ChainStatus::Valid(_), ChainStatus::Forked(c))
-                | (ChainStatus::Forked(c), ChainStatus::Valid(_)) => {
-                    // If the valid and forked chain heads are the same then they are in conflict here.
-                    // TODO: BACKLOG: When we handle conflicts this should count as a conflict.
-                    merged_status = Some(ChainStatus::Forked(c));
-                }
-                (ChainStatus::Invalid(c), ChainStatus::Valid(_))
-                | (ChainStatus::Valid(_), ChainStatus::Invalid(c)) => {
-                    // If the valid and invalid chain heads are the same then they are in conflict here.
-                    // TODO: BACKLOG: When we handle conflicts this should count as a conflict.
-                    merged_status = Some(ChainStatus::Invalid(c));
-                }
-                (ChainStatus::Forked(a), ChainStatus::Forked(b)) => {
-                    let c = if a.fork_seq < b.fork_seq { a } else { b };
-                    merged_status = Some(ChainStatus::Forked(c));
-                }
-                (ChainStatus::Invalid(a), ChainStatus::Invalid(b)) => {
-                    let c = if a.action_seq < b.action_seq { a } else { b };
-                    merged_status = Some(ChainStatus::Invalid(c));
-                }
-                (ChainStatus::Forked(a), ChainStatus::Invalid(b)) => {
-                    if a.fork_seq < b.action_seq {
-                        merged_status = Some(ChainStatus::Forked(a));
-                    } else {
-                        merged_status = Some(ChainStatus::Invalid(b));
-                    };
-                }
-                (ChainStatus::Invalid(a), ChainStatus::Forked(b)) => {
-                    if a.action_seq < b.fork_seq {
-                        merged_status = Some(ChainStatus::Invalid(a));
-                    } else {
-                        merged_status = Some(ChainStatus::Forked(b));
-                    };
-                }
-            },
-            None => {
-                merged_status = Some(status);
-            }
-        }
+        merged_status = Some(match merged_status.take() {
+            Some(last) => combine_chain_status(status, last),
+            None => status,
+        });
     }
     AgentActivityResponse {
         status: merged_status.unwrap_or(ChainStatus::Empty),
@@ -366,5 +379,77 @@ fn merge_status_only(
         rejected_activity: ChainItems::NotRequested,
         warrants: vec![],
         highest_observed: merged_highest_observed,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use holo_hash::ActionHash;
+    use holochain_zome_types::prelude::{ChainFork, ChainHead, ChainStatus};
+
+    fn head(seq: u32) -> ChainHead {
+        ChainHead {
+            action_seq: seq,
+            hash: ActionHash::from_raw_32(vec![seq as u8; 32]),
+        }
+    }
+
+    fn fork(seq: u32) -> ChainFork {
+        ChainFork {
+            fork_seq: seq,
+            first_action: ActionHash::from_raw_32(vec![seq as u8; 32]),
+            second_action: ActionHash::from_raw_32(vec![(seq + 1) as u8; 32]),
+        }
+    }
+
+    #[test]
+    fn combine_status_priority() {
+        use ChainStatus::*;
+
+        // Empty is the identity element.
+        assert_eq!(combine_chain_status(Empty, Empty), Empty);
+        assert_eq!(combine_chain_status(Empty, Valid(head(3))), Valid(head(3)));
+        assert_eq!(combine_chain_status(Closed(head(3)), Empty), Closed(head(3)));
+
+        // Closed outranks Valid; Forked/Invalid outrank Closed.
+        assert_eq!(
+            combine_chain_status(Valid(head(5)), Closed(head(2))),
+            Closed(head(2))
+        );
+        assert_eq!(
+            combine_chain_status(Closed(head(9)), Forked(fork(4))),
+            Forked(fork(4))
+        );
+        assert_eq!(
+            combine_chain_status(Invalid(head(4)), Closed(head(9))),
+            Invalid(head(4))
+        );
+
+        // Same-rank tie-breaks (must match prior behavior).
+        assert_eq!(
+            combine_chain_status(Valid(head(2)), Valid(head(7))),
+            Valid(head(7))
+        );
+        assert_eq!(
+            combine_chain_status(Closed(head(7)), Closed(head(2))),
+            Closed(head(7))
+        );
+        assert_eq!(
+            combine_chain_status(Forked(fork(6)), Forked(fork(2))),
+            Forked(fork(2))
+        );
+        assert_eq!(
+            combine_chain_status(Invalid(head(6)), Invalid(head(2))),
+            Invalid(head(2))
+        );
+        assert_eq!(
+            combine_chain_status(Forked(fork(2)), Invalid(head(6))),
+            Forked(fork(2))
+        );
+        assert_eq!(
+            combine_chain_status(Invalid(head(6)), Forked(fork(2))),
+            Forked(fork(2))
+        );
     }
 }
