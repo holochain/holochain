@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Add `ChainStatus::Closed` returned by `get_agent_activity` when an agent's source-chain head is a `CloseChain` action. `Closed` ranks above `Valid` but below `Forked`/`Invalid`, so a chain that is also forked or invalid still reports `Forked`/`Invalid`. **BREAKING CHANGE**: `ChainStatus` is sent over the wire in agent-activity responses, so a node returning `Closed` cannot be understood by a pre-feature node. \#5766
+- **BREAKING CHANGE**: `get_agent_activity` can now return `ChainStatus::Closed` when an agent's source-chain head is a `CloseChain` action. `ChainStatus` is sent over the wire in agent-activity responses, so a node returning `Closed` cannot be understood by a pre-feature node. `Closed` ranks above `Valid` but below `Forked`/`Invalid`, so a chain that is also forked or invalid still reports `Forked`/`Invalid`. \#5766
 - Fix `get_agent_activity` status-only requests (`ActivityRequest::Status`) which previously always returned `ChainStatus::Empty` instead of the real chain status. \#5766
 
 ## 0.7.0-dev.28
