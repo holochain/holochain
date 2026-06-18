@@ -283,7 +283,8 @@ pub(crate) fn compute_chain_status<T: ActionSequenceAndHash>(
 /// Same-rank tie-breaks: `Valid`/`Valid` and `Closed`/`Closed` keep the higher
 /// `action_seq`; `Forked`/`Forked` keeps the lower `fork_seq`; `Invalid`/`Invalid`
 /// keeps the lower `action_seq`; `Forked` vs `Invalid` keeps whichever has the
-/// lower sequence number.
+/// lower sequence number, and `Forked` on an exact tie so the result is the same
+/// regardless of operand order.
 fn combine_chain_status(a: ChainStatus, b: ChainStatus) -> ChainStatus {
     use ChainStatus::*;
     match (a, b) {
@@ -330,7 +331,9 @@ fn combine_chain_status(a: ChainStatus, b: ChainStatus) -> ChainStatus {
             }
         }
         (Forked(a), Invalid(b)) => {
-            if a.fork_seq < b.action_seq {
+            // `<=` so an exact tie resolves to `Forked` in both operand orders
+            // (the `(Invalid, Forked)` arm below also yields `Forked` on a tie).
+            if a.fork_seq <= b.action_seq {
                 Forked(a)
             } else {
                 Invalid(b)
@@ -513,6 +516,17 @@ mod tests {
         assert_eq!(
             combine_chain_status(Invalid(head(6)), Forked(fork(2))),
             Forked(fork(2))
+        );
+
+        // Forked vs Invalid at an equal sequence resolves to Forked regardless
+        // of operand order (deterministic across merge folds).
+        assert_eq!(
+            combine_chain_status(Forked(fork(4)), Invalid(head(4))),
+            Forked(fork(4))
+        );
+        assert_eq!(
+            combine_chain_status(Invalid(head(4)), Forked(fork(4))),
+            Forked(fork(4))
         );
     }
 }
