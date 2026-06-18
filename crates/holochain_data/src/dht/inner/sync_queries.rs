@@ -27,7 +27,7 @@ use crate::models::dht::{
     DumpChainOpRow, K2ChainOpForWireRow, K2OpHashRow, K2OpIdSinceRow, K2OpPresentRow,
     K2WarrantForWireRow,
 };
-use holo_hash::AgentPubKey;
+use holo_hash::{AgentPubKey, AnyLinkableHash, DhtOpHash};
 use sqlx::{Executor, QueryBuilder, Sqlite};
 
 /// Inclusive `[storage_start_loc, storage_end_loc]` arc bounds.
@@ -716,4 +716,81 @@ where
     .fetch_all(executor)
     .await?;
     Ok(rows.into_iter().map(|(h,)| h).collect())
+}
+
+/// Total count of every op held in this DHT store: integrated `ChainOp` and
+/// `WarrantOp` plus their limbo counterparts.
+pub(crate) async fn count_all_ops<'e, E>(executor: E) -> sqlx::Result<i64>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let (n,): (i64,) = sqlx::query_as(
+        "SELECT
+            (SELECT COUNT(*) FROM ChainOp)
+            + (SELECT COUNT(*) FROM LimboChainOp)
+            + (SELECT COUNT(*) FROM WarrantOp)
+            + (SELECT COUNT(*) FROM LimboWarrantOp)",
+    )
+    .fetch_one(executor)
+    .await?;
+    Ok(n)
+}
+
+/// Whether the integrated chain op `op_hash` is flagged as requiring a
+/// validation receipt. Returns `false` when the op is not an integrated
+/// chain op.
+pub(crate) async fn op_requires_receipt<'e, E>(
+    executor: E,
+    op_hash: &DhtOpHash,
+) -> sqlx::Result<bool>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let row: Option<(bool,)> = sqlx::query_as("SELECT require_receipt FROM ChainOp WHERE hash = ?")
+        .bind(op_hash.get_raw_36())
+        .fetch_optional(executor)
+        .await?;
+    Ok(row.map(|(b,)| b).unwrap_or(false))
+}
+
+/// Whether `op_hash` is present in the limbo (not-yet-integrated) chain ops.
+pub(crate) async fn limbo_op_exists<'e, E>(executor: E, op_hash: &DhtOpHash) -> sqlx::Result<bool>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let (b,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM LimboChainOp WHERE hash = ?)")
+        .bind(op_hash.get_raw_36())
+        .fetch_one(executor)
+        .await?;
+    Ok(b)
+}
+
+/// Hashes of limbo chain ops flagged as requiring a validation receipt.
+/// Ordered by hash for a stable result.
+pub(crate) async fn limbo_op_hashes_requiring_receipt<'e, E>(
+    executor: E,
+) -> sqlx::Result<Vec<Vec<u8>>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let rows: Vec<(Vec<u8>,)> =
+        sqlx::query_as("SELECT hash FROM LimboChainOp WHERE require_receipt = 1 ORDER BY hash")
+            .fetch_all(executor)
+            .await?;
+    Ok(rows.into_iter().map(|(h,)| h).collect())
+}
+
+/// Whether any integrated chain op exists with the given DHT `basis`.
+pub(crate) async fn chain_op_exists_at_basis<'e, E>(
+    executor: E,
+    basis: &AnyLinkableHash,
+) -> sqlx::Result<bool>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let (b,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM ChainOp WHERE basis_hash = ?)")
+        .bind(basis.get_raw_36())
+        .fetch_one(executor)
+        .await?;
+    Ok(b)
 }

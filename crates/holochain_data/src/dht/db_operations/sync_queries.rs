@@ -7,7 +7,7 @@ use crate::models::dht::{
     DumpChainOpRow, K2ChainOpForWireRow, K2OpHashRow, K2OpIdSinceRow, K2OpPresentRow,
     K2WarrantForWireRow,
 };
-use holo_hash::{AgentPubKey, DhtOpHash};
+use holo_hash::{AgentPubKey, AnyLinkableHash, DhtOpHash};
 
 impl DbRead<Dht> {
     /// `(hash, basis, size)` for every integrated, locally-validated op
@@ -132,6 +132,35 @@ impl DbRead<Dht> {
             .into_iter()
             .map(DhtOpHash::from_raw_36)
             .collect())
+    }
+
+    /// Total count of every op (integrated and limbo) held in this DHT store.
+    pub async fn count_all_ops(&self) -> sqlx::Result<i64> {
+        sync_queries::count_all_ops(self.pool()).await
+    }
+
+    /// Whether the integrated chain op `op_hash` requires a validation receipt.
+    pub async fn op_requires_receipt(&self, op_hash: &DhtOpHash) -> sqlx::Result<bool> {
+        sync_queries::op_requires_receipt(self.pool(), op_hash).await
+    }
+
+    /// Whether `op_hash` is present in the limbo (not-yet-integrated) chain ops.
+    pub async fn limbo_op_exists(&self, op_hash: &DhtOpHash) -> sqlx::Result<bool> {
+        sync_queries::limbo_op_exists(self.pool(), op_hash).await
+    }
+
+    /// Hashes of limbo chain ops flagged as requiring a validation receipt.
+    pub async fn limbo_op_hashes_requiring_receipt(&self) -> sqlx::Result<Vec<DhtOpHash>> {
+        Ok(sync_queries::limbo_op_hashes_requiring_receipt(self.pool())
+            .await?
+            .into_iter()
+            .map(DhtOpHash::from_raw_36)
+            .collect())
+    }
+
+    /// Whether any integrated chain op exists with the given DHT `basis`.
+    pub async fn chain_op_exists_at_basis(&self, basis: &AnyLinkableHash) -> sqlx::Result<bool> {
+        sync_queries::chain_op_exists_at_basis(self.pool(), basis).await
     }
 
     /// Integrated chain-op rows for the integration dump, paginated forward
