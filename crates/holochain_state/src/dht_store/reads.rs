@@ -99,6 +99,40 @@ impl DhtStore<DbRead<Dht>> {
         Ok(self.db().count_entries().await?)
     }
 
+    /// Integrated warrants authored by `author` (the warrant issuer),
+    /// reconstructed as `WarrantOp`s.
+    pub async fn warrants_by_author(
+        &self,
+        author: AgentPubKey,
+    ) -> StateQueryResult<Vec<holochain_types::warrant::WarrantOp>> {
+        self.db()
+            .get_warrants_by_author(author)
+            .await?
+            .into_iter()
+            .map(warrant_row_to_signed_warrant)
+            .map(|r| r.map(holochain_types::warrant::WarrantOp::from))
+            .collect()
+    }
+
+    /// Terminal validation status of an integrated warrant op, or `None` if no
+    /// such warrant op exists.
+    pub async fn warrant_validation_status(
+        &self,
+        op_hash: &DhtOpHash,
+    ) -> StateQueryResult<Option<ValidationStatus>> {
+        Ok(self
+            .db()
+            .warrant_op_validation_status(op_hash)
+            .await?
+            .map(|s| {
+                if s == 2 {
+                    ValidationStatus::Rejected
+                } else {
+                    ValidationStatus::Valid
+                }
+            }))
+    }
+
     /// Drop any op whose hash is already recorded in the DHT store.
     /// Input order is preserved for surviving ops.
     pub async fn filter_existing_ops(
