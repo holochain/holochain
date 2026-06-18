@@ -73,7 +73,7 @@ async fn test_update_coordinators() {
     assert_eq!(old_wasm.len(), 1);
     assert_eq!(
         old_wasm[0],
-        WasmHash::from_raw_39(init_coordinators[0].1.zome_hash().unwrap().into_inner())
+        WasmHash::from_raw_39(init_coordinators[0].1.zome_hash().into_inner())
     );
     assert_eq!(dna.dna_hash(), original_dna.dna_hash());
 
@@ -165,27 +165,15 @@ async fn test_update_coordinators() {
     assert_eq!(old_wasm.len(), 3);
     assert_eq!(
         old_wasm[0],
-        WasmHash::from_raw_39(
-            expect_def.coordinator_zomes[0]
-                .1
-                .zome_hash()
-                .unwrap()
-                .into_inner()
-        )
+        WasmHash::from_raw_39(expect_def.coordinator_zomes[0].1.zome_hash().into_inner())
     );
     assert_eq!(
         old_wasm[1],
-        WasmHash::from_raw_39(init_coordinators[1].1.zome_hash().unwrap().into_inner())
+        WasmHash::from_raw_39(init_coordinators[1].1.zome_hash().into_inner())
     );
     assert_eq!(
         old_wasm[2],
-        WasmHash::from_raw_39(
-            expect_def.coordinator_zomes[2]
-                .1
-                .zome_hash()
-                .unwrap()
-                .into_inner()
-        )
+        WasmHash::from_raw_39(expect_def.coordinator_zomes[2].1.zome_hash().into_inner())
     );
     assert_eq!(dna.dna_hash(), original_dna.dna_hash());
 

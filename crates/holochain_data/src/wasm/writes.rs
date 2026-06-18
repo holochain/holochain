@@ -6,13 +6,6 @@ use sqlx::{Acquire, Executor, Sqlite};
 
 use super::inner_writes;
 
-fn new_encode_error(e: impl ToString) -> sqlx::Error {
-    sqlx::Error::Encode(Box::new(std::io::Error::new(
-        std::io::ErrorKind::InvalidData,
-        e.to_string(),
-    )))
-}
-
 /// Store WASM bytecode.
 pub(super) async fn put_wasm<'e, E>(executor: E, wasm: DnaWasmHashed) -> sqlx::Result<()>
 where
@@ -61,7 +54,7 @@ where
     inner_writes::delete_coordinator_zomes(&mut *tx, hash_bytes, agent_bytes).await?;
 
     for (zome_index, (zome_name, zome_def)) in dna_def.integrity_zomes.iter().enumerate() {
-        let zome_hash = zome_def.zome_hash().map_err(new_encode_error)?;
+        let zome_hash = zome_def.zome_hash();
         let dependencies = extract_dependencies(zome_def.as_any_zome_def());
 
         let model = IntegrityZomeModel {
@@ -76,7 +69,7 @@ where
     }
 
     for (zome_index, (zome_name, zome_def)) in dna_def.coordinator_zomes.iter().enumerate() {
-        let zome_hash = zome_def.zome_hash().map_err(new_encode_error)?;
+        let zome_hash = zome_def.zome_hash();
         let dependencies = extract_dependencies(zome_def.as_any_zome_def());
 
         let model = CoordinatorZomeModel {

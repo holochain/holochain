@@ -523,7 +523,11 @@ impl Invocation for ZomeCallInvocation {
     }
 
     fn take_host_input(&self) -> Result<Option<ExternIO>, SerializedBytesError> {
-        Ok(self.payload.lock().expect("poisoned").take())
+        Ok(self
+            .payload
+            .lock()
+            .unwrap_or_else(|i| i.into_inner())
+            .take())
     }
 
     fn auth(&self) -> InvocationAuth {

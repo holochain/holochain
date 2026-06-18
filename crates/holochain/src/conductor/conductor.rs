@@ -2762,6 +2762,21 @@ mod misc_impls {
             coordinator_zomes: CoordinatorZomes,
             wasms: Vec<DnaWasmHashed>,
         ) -> ConductorResult<()> {
+            // Check if any WASMs are missing, that needs to block proceeding
+            let required_wasms: HashSet<ZomeHash> = coordinator_zomes
+                .iter()
+                .map(|(_, c)| c.zome_hash())
+                .collect();
+            let provided_wasms: HashSet<ZomeHash> =
+                wasms.iter().map(|w| w.hash.clone().into()).collect();
+            let missing_wasms = required_wasms
+                .difference(&provided_wasms)
+                .collect::<Vec<_>>();
+            if !missing_wasms.is_empty() {
+                tracing::info!("A coordinator update for {:?} cannot proceed due to missing WASM code for {:?}", cell_id, missing_wasms);
+                return Err(ConductorError::WasmMissing);
+            }
+
             // Note this isn't really concurrent safe. It would be a race condition to update the
             // same dna concurrently.
             let mut ribosome =

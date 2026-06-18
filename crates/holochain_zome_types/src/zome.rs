@@ -227,7 +227,6 @@ impl From<InlineIntegrityZome> for IntegrityZomeDef {
     }
 }
 
-// TODO poorly defined conversion, cannot capture dependencies
 #[cfg(feature = "full-dna-def")]
 impl From<crate::prelude::InlineCoordinatorZome> for ZomeDef {
     fn from(iz: crate::prelude::InlineCoordinatorZome) -> Self {
@@ -247,12 +246,12 @@ impl From<crate::prelude::InlineCoordinatorZome> for CoordinatorZomeDef {
 
 impl ZomeDef {
     /// Get the [`ZomeHash`](holo_hash::ZomeHash) for this zome def.
-    pub fn zome_hash(&self) -> ZomeResult<holo_hash::ZomeHash> {
+    pub fn zome_hash(&self) -> holo_hash::ZomeHash {
         match self {
-            ZomeDef::Wasm(WasmZomeDef { wasm_hash, .. }) => Ok(wasm_hash.clone().into()),
+            ZomeDef::Wasm(WasmZomeDef { wasm_hash, .. }) => wasm_hash.clone().into(),
 
             #[cfg(feature = "full-dna-def")]
-            ZomeDef::Inline(InlineZomeDef { inline_hash, .. }) => Ok(inline_hash.clone().into()),
+            ZomeDef::Inline(InlineZomeDef { inline_hash, .. }) => inline_hash.clone().into(),
         }
     }
 
@@ -268,13 +267,13 @@ impl ZomeDef {
 }
 
 impl IntegrityZomeDef {
-    pub fn zome_hash(&self) -> ZomeResult<holo_hash::ZomeHash> {
+    pub fn zome_hash(&self) -> holo_hash::ZomeHash {
         self.0.zome_hash()
     }
 }
 
 impl CoordinatorZomeDef {
-    pub fn zome_hash(&self) -> ZomeResult<holo_hash::ZomeHash> {
+    pub fn zome_hash(&self) -> holo_hash::ZomeHash {
         self.0.zome_hash()
     }
 }

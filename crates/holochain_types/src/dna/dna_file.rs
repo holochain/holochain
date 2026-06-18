@@ -150,7 +150,7 @@ impl DnaFile {
                     // If this is replacing a previous coordinator then
                     // remove the old wasm.
                     let wasm_hash =
-                        WasmHash::from_raw_39(replaced_coordinator.zome_hash()?.into_inner());
+                        WasmHash::from_raw_39(replaced_coordinator.zome_hash().into_inner());
                     self.code.0.remove(&wasm_hash);
                     old_wasm_hashes.push(wasm_hash);
                 }

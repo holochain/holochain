@@ -10,6 +10,7 @@ use holochain_zome_types::zome_io::ExternIO;
 use mockall::predicate::{always, eq};
 use std::sync::Arc;
 
+/// A helper type for working with a [`MockRibosomeImplT`].
 pub struct MockRibosomeBuilder {
     mock: MockRibosomeImplT,
 
@@ -27,6 +28,7 @@ impl Default for MockRibosomeBuilder {
 }
 
 impl MockRibosomeBuilder {
+    /// Create a new builder instance.
     pub fn new() -> Self {
         let dna_def = DnaDefBuilder::default()
             .modifiers(DnaModifiers {
@@ -40,6 +42,7 @@ impl MockRibosomeBuilder {
         Self::new_with_dna_def(DnaDefHashed::from_content_sync(dna_def))
     }
 
+    /// Create a new builder instance with a specified [`DnaDefHashed`] instead of an empty one.
     pub fn new_with_dna_def(dna_def: DnaDefHashed) -> Self {
         Self {
             mock: MockRibosomeImplT::default(),
@@ -49,16 +52,19 @@ impl MockRibosomeBuilder {
         }
     }
 
+    /// Specify the value that will be returned by the const function `__num_entry_types`.
     pub fn with_num_entry_types(mut self, num_entry_types: i32) -> Self {
         self.num_entry_types = num_entry_types;
         self
     }
 
+    /// Specify the value that will be returned by the const function `__num_link_types`.
     pub fn with_num_link_types(mut self, num_link_types: i32) -> Self {
         self.num_link_types = num_link_types;
         self
     }
 
+    /// Provide a callback handler for the `init` function.
     pub fn with_init_handler(
         mut self,
         handler: impl FnMut(CallContext, Arc<dyn Invocation>) -> RibosomeResult<InitCallbackResult>
@@ -86,6 +92,7 @@ impl MockRibosomeBuilder {
         self
     }
 
+    /// Provide a callback handler for the `validate` function.
     pub fn with_validate_handler(
         mut self,
         handler: impl FnMut(CallContext, Arc<dyn Invocation>) -> RibosomeResult<ValidateCallbackResult>
@@ -113,6 +120,7 @@ impl MockRibosomeBuilder {
         self
     }
 
+    /// Provide a callback handler for the `genesis_self_check_1` function.
     pub fn with_genesis_self_check_handler(
         mut self,
         handler: impl FnMut(CallContext, Arc<dyn Invocation>) -> RibosomeResult<GenesisSelfCheckResult>
@@ -140,6 +148,7 @@ impl MockRibosomeBuilder {
         self
     }
 
+    /// Provide a callback handler for the `post_commit` function.
     pub fn with_post_commit_handler(
         mut self,
         handler: impl FnMut(CallContext, Arc<dyn Invocation>) -> RibosomeResult<()>
@@ -167,10 +176,18 @@ impl MockRibosomeBuilder {
         self
     }
 
+    /// Access the raw mock in the case that one of the `with_` helpers above is not flexible enough.
     pub fn raw_mock(&mut self) -> &mut MockRibosomeImplT {
         &mut self.mock
     }
 
+    /// Prepare the mock for use and pass it to a [`Ribosome`] instance.
+    ///
+    /// The following steps are taken:
+    /// - Implement `__num_entry_types` and `__num_link_types` callbacks.
+    /// - Add a handler for zome functions that don't exist to return `Ok(None)`, matching expected
+    ///   behavior for real `maybe_call` implementations.
+    /// - Builds a new [`Ribosome`] instance using the mock.
     pub async fn build(mut self) -> RibosomeResult<Ribosome> {
         self.mock
             .expect_call_const_fn()

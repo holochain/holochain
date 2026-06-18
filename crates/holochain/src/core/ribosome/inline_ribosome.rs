@@ -28,12 +28,14 @@ struct InlineDna {
 }
 
 impl InlineZomeStore {
+    /// Create a new inline zome store.
     pub fn new() -> Self {
         Self {
             inner: Default::default(),
         }
     }
 
+    /// Insert the given inline zome, to be part of the specified [`DnaDef`].
     pub fn insert(&self, dna_def: DnaDefHashed, zome: DynInlineZome) {
         self.inner
             .write()
@@ -46,6 +48,7 @@ impl InlineZomeStore {
             .insert(zome.hash(), zome);
     }
 
+    /// Look up a zome, for the given [`DnaHash`] taken from the [`DnaDefHashed`], by name.
     pub fn lookup_zome(
         &self,
         dna_def: &DnaDefHashed,
@@ -88,6 +91,9 @@ impl InlineZomeStore {
         }
     }
 
+    /// Notify the store that a clone cell was created.
+    ///
+    /// This requires the store to know to look up zomes under another DNA hash.
     pub fn handle_clone_created(&self, clone: &ClonedCell) {
         let mut write_lock = self.inner.write().unwrap_or_else(|e| e.into_inner());
         if let Some(content) = write_lock.get(&clone.original_dna_hash).cloned() {
@@ -98,6 +104,7 @@ impl InlineZomeStore {
     }
 }
 
+/// A ribosome implementation of [`RibosomeT`] that uses inline zomes for app code execution.
 #[derive(Clone)]
 pub struct InlineRibosome {
     dna_def: DnaDefHashed,
@@ -114,6 +121,10 @@ impl std::fmt::Debug for InlineRibosome {
 }
 
 impl InlineRibosome {
+    /// Create a new [`InlineRibosome`].
+    ///
+    /// Note that the [`InlineZomeStore`] must be a pointer to a shared store where the inline
+    /// zomes for this [`DnaDef`] will be inserted.
     pub fn new(dna_def: DnaDefHashed, inline_zome_store: InlineZomeStore) -> Self {
         Self {
             dna_def,
@@ -152,7 +163,7 @@ impl RibosomeImplT for InlineRibosome {
 
     fn call_const_fn(
         &self,
-        // TODO this means the inline zomes are accessing the host functions with different inputs
+        // Note that no call is done which is why this is unused, globals are stored in memory for an inline zome
         _ribosome: Arc<Ribosome>,
         zome: Zome,
         name: String,

@@ -17,15 +17,15 @@ pub struct ValidateInvocation {
     /// The zomes this invocation will invoke.
     zomes_to_invoke: ZomesToInvoke,
     /// The serialized arguments to the callback function.
-    data: Arc<ExternIO>,
+    data: Arc<std::sync::Mutex<Option<ExternIO>>>,
 }
 
 impl ValidateInvocation {
     pub fn new(zomes_to_invoke: ZomesToInvoke, data: &Op) -> Result<Self, SerializedBytesError> {
-        let data = Arc::new(ExternIO::encode(data)?);
+        let data = ExternIO::encode(data)?;
         Ok(Self {
             zomes_to_invoke,
-            data,
+            data: Arc::new(std::sync::Mutex::new(Some(data))),
         })
     }
 }
@@ -66,15 +66,15 @@ impl Invocation for ValidateInvocation {
     fn zomes(&self) -> ZomesToInvoke {
         self.zomes_to_invoke.clone()
     }
+
     fn fn_components(&self) -> FnComponents {
         vec!["validate".to_string()].into()
     }
+
     fn take_host_input(&self) -> Result<Option<ExternIO>, SerializedBytesError> {
-        // TODO why is this like this?
-        // No option here but to clone the actual data as it's passed
-        // into the host now anyway.
-        Ok(Some((*self.data).clone()))
+        Ok(self.data.lock().unwrap_or_else(|i| i.into_inner()).take())
     }
+
     fn auth(&self) -> InvocationAuth {
         InvocationAuth::LocalCallback
     }
