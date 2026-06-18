@@ -52,6 +52,20 @@ impl DhtStore<DbRead<Dht>> {
         Ok(self.db().count_valid_not_integrated_ops().await?)
     }
 
+    /// Count chain ops authored by `author` that are not yet integrated.
+    pub async fn count_pending_ops_for_author(
+        &self,
+        author: &AgentPubKey,
+    ) -> StateQueryResult<i64> {
+        Ok(self.db().count_pending_ops_for_author(author).await?)
+    }
+
+    /// Hashes of integrated chain ops that were rejected (GET-cached copies
+    /// excluded).
+    pub async fn rejected_integrated_op_hashes(&self) -> StateQueryResult<Vec<DhtOpHash>> {
+        Ok(self.db().rejected_integrated_op_hashes().await?)
+    }
+
     /// Drop any op whose hash is already recorded in the DHT store.
     /// Input order is preserved for surviving ops.
     pub async fn filter_existing_ops(
