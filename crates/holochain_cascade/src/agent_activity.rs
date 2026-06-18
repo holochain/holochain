@@ -283,8 +283,12 @@ pub(crate) fn compute_chain_status<T: ActionSequenceAndHash>(
 /// Same-rank tie-breaks: `Valid`/`Valid` and `Closed`/`Closed` keep the higher
 /// `action_seq`; `Forked`/`Forked` keeps the lower `fork_seq`; `Invalid`/`Invalid`
 /// keeps the lower `action_seq`; `Forked` vs `Invalid` keeps whichever has the
-/// lower sequence number, and `Forked` on an exact tie so the result is the same
-/// regardless of operand order.
+/// lower sequence number, resolving an exact tie to `Forked` so the result is the
+/// same regardless of operand order.
+///
+/// The same-rank arms must come first; the cross-rank catch-all arms that follow
+/// are ordered highest-priority first, so e.g. `Closed` vs `Invalid` yields
+/// `Invalid`.
 fn combine_chain_status(a: ChainStatus, b: ChainStatus) -> ChainStatus {
     use ChainStatus::*;
     match (a, b) {
@@ -297,8 +301,6 @@ fn combine_chain_status(a: ChainStatus, b: ChainStatus) -> ChainStatus {
                 Valid(b)
             }
         }
-
-        (Closed(c), Valid(_)) | (Valid(_), Closed(c)) => Closed(c),
         (Closed(a), Closed(b)) => {
             if a.action_seq > b.action_seq {
                 Closed(a)
@@ -306,16 +308,6 @@ fn combine_chain_status(a: ChainStatus, b: ChainStatus) -> ChainStatus {
                 Closed(b)
             }
         }
-
-        (Forked(c), Valid(_))
-        | (Valid(_), Forked(c))
-        | (Forked(c), Closed(_))
-        | (Closed(_), Forked(c)) => Forked(c),
-        (Invalid(c), Valid(_))
-        | (Valid(_), Invalid(c))
-        | (Invalid(c), Closed(_))
-        | (Closed(_), Invalid(c)) => Invalid(c),
-
         (Forked(a), Forked(b)) => {
             if a.fork_seq < b.fork_seq {
                 Forked(a)
@@ -346,6 +338,12 @@ fn combine_chain_status(a: ChainStatus, b: ChainStatus) -> ChainStatus {
                 Forked(b)
             }
         }
+
+        // Cross-rank: the higher-priority status wins. Ordered highest-priority
+        // first so a lower-priority match never shadows a higher one.
+        (Invalid(c), _) | (_, Invalid(c)) => Invalid(c),
+        (Forked(c), _) | (_, Forked(c)) => Forked(c),
+        (Closed(c), _) | (_, Closed(c)) => Closed(c),
     }
 }
 
