@@ -169,6 +169,7 @@ macro_rules! holochain_externs {
             delete_clone_cell:1,
             close_chain:1,
             open_chain:1,
+            get_init_properties:1,
             get_validation_receipts:1,
             schedule:1
         );

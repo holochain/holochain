@@ -3062,6 +3062,36 @@ mod accessor_impls {
                 .find_app_containing_cell(cell_id)
                 .cloned())
         }
+
+        /// Read the init properties supplied at install time for the role that
+        /// the given cell is provisioned for.
+        ///
+        /// Returns `None` if no app contains the cell, the cell is not a
+        /// provisioned cell of any role, or no init properties were supplied
+        /// for that role.
+        pub async fn get_init_properties_for_cell(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorResult<Option<InitProperties>> {
+            let state = self.get_state().await?;
+            let Some(app) = state.find_app_containing_cell(cell_id) else {
+                return Ok(None);
+            };
+            let Some((role_name, _)) = app
+                .provisioned_cells()
+                .find(|(_, provisioned_cell_id)| provisioned_cell_id == cell_id)
+            else {
+                return Ok(None);
+            };
+            let app_id = app.id().clone();
+            let role_name = role_name.clone();
+            Ok(self
+                .spaces
+                .conductor_store
+                .as_read()
+                .get_init_properties(&app_id, &role_name)
+                .await?)
+        }
     }
 }
 
