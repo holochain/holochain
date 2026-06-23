@@ -420,11 +420,13 @@ impl SweetConductor {
             .raw_handle()
             .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())?;
         let cell_dht_db = self.raw_handle().get_dht_db(cell_id.dna_hash())?;
+        let cell_dht_store = self.raw_handle().get_dht_store(cell_id.dna_hash())?;
         let conductor_config = self.config.clone();
         Ok(SweetCell {
             cell_id,
             cell_authored_db,
             cell_dht_db,
+            cell_dht_store,
             conductor_config,
         })
     }

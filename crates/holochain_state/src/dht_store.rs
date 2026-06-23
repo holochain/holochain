@@ -46,6 +46,32 @@ pub struct IntegratedOpSummary {
     pub warrantee: Option<holo_hash::AgentPubKey>,
 }
 
+/// Output options for [`DhtStore::get_agent_activity`]. A `holochain_state`-local
+/// mirror of `holochain_p2p`'s `GetActivityOptions` (which is off this crate's
+/// dependency graph); the cascade maps between the two in phases 1b/1c.
+#[derive(Debug, Clone, Copy)]
+pub struct GetAgentActivityOptions {
+    /// Include the valid activity in the response.
+    pub include_valid_activity: bool,
+    /// Include the rejected activity in the response.
+    pub include_rejected_activity: bool,
+    /// Include warrants in the response.
+    pub include_warrants: bool,
+    /// Return full records instead of just hashes.
+    pub include_full_records: bool,
+}
+
+impl Default for GetAgentActivityOptions {
+    fn default() -> Self {
+        Self {
+            include_valid_activity: true,
+            include_rejected_activity: false,
+            include_warrants: true,
+            include_full_records: false,
+        }
+    }
+}
+
 /// Result of system validation for a single DHT op.
 #[derive(Debug, Clone, Copy)]
 pub enum SysOutcome {
@@ -324,18 +350,13 @@ impl DhtStore<DbWrite<Dht>> {
 
         let op_hash = receipt.receipt.dht_op_hash.clone();
 
-        // Serialize validators and signatures as individual blobs.
-        let validators_bytes = holochain_serialized_bytes::encode(&receipt.receipt.validators)
-            .map_err(StateMutationError::from)?;
-        let signature_bytes = holochain_serialized_bytes::encode(&receipt.validators_signatures)
-            .map_err(StateMutationError::from)?;
-
+        // Store the full serialized `SignedValidationReceipt` (`bytes` above),
+        // so readers can reconstruct the validator-reported status + validators.
         self.db
             .insert_validation_receipt(
                 &receipt_hash,
                 &op_hash,
-                &validators_bytes,
-                &signature_bytes,
+                &bytes,
                 holochain_types::prelude::Timestamp::now(),
             )
             .await
@@ -691,15 +712,16 @@ impl DhtStore<DbWrite<Dht>> {
             let action_hash = holo_hash::ActionHash::from_raw_36(row.action_hash.clone());
             let v2_action = tx
                 .as_mut()
-                .get_action(action_hash)
+                .get_action(action_hash.clone())
                 .await
                 .map_err(StateMutationError::from)?;
-            let (action_author, authored_timestamp) = match v2_action {
+            let (action_author, authored_timestamp, action_data) = match v2_action {
                 Some(sah) => (
                     Some(sah.hashed.content.header.author.clone()),
                     sah.hashed.content.header.timestamp,
+                    Some(sah.hashed.content.data.clone()),
                 ),
-                None => (None, Timestamp::from_micros(0)),
+                None => (None, Timestamp::from_micros(0), None),
             };
 
             let promoted_ok = tx
@@ -707,6 +729,14 @@ impl DhtStore<DbWrite<Dht>> {
                 .await
                 .map_err(StateMutationError::from)?;
             if promoted_ok {
+                // Populate the per-action index tables for the integrated action,
+                // mirroring `cache_chain_ops`, so integrated incoming data
+                // (links, deletes, updates) is queryable via the indexes.
+                if let Some(action_data) = action_data {
+                    action_indexes::insert_action_indexes(&mut tx, &action_hash, &action_data)
+                        .await?;
+                }
+
                 out.push(IntegratedOpSummary {
                     op_hash,
                     basis_hash,
@@ -775,7 +805,15 @@ impl DhtStore<DbWrite<Dht>> {
         Ok(())
     }
 
-    /// Update `ChainOpPublish.last_publish_time = now` for each given op hash.
+    /// Record that each given op hash has just been published, updating its
+    /// publish-state timestamp.
+    ///
+    /// Chain ops have their `ChainOpPublish.last_publish_time` set to `now`.
+    /// A hash with no matching `ChainOpPublish` row is a warrant: warrants
+    /// publish at most once, so a `WarrantPublish` row recording `now` is
+    /// inserted instead (the `PRIMARY KEY ON CONFLICT IGNORE` keeps the first
+    /// publish time if the same warrant is recorded again). The publish queue
+    /// excludes any warrant that has a `WarrantPublish` row.
     pub async fn record_published_op_hashes(
         &self,
         op_hashes: Vec<DhtOpHash>,
@@ -783,9 +821,15 @@ impl DhtStore<DbWrite<Dht>> {
     ) -> StateMutationResult<()> {
         let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
         for hash in op_hashes {
-            tx.set_chain_op_last_publish_time(&hash, now)
+            let updated = tx
+                .set_chain_op_last_publish_time(&hash, now)
                 .await
                 .map_err(StateMutationError::from)?;
+            if updated == 0 {
+                tx.insert_warrant_publish(&hash, Some(now))
+                    .await
+                    .map_err(StateMutationError::from)?;
+            }
         }
         tx.commit().await.map_err(StateMutationError::from)?;
         Ok(())
@@ -989,11 +1033,136 @@ impl DhtStore<DbWrite<Dht>> {
             storage_center_loc: warrant_op.warrantee.get_loc(),
             when_received: now,
             when_integrated: now,
+            validation_status: 1,
             serialized_size,
         })
         .await
         .map_err(StateMutationError::from)?;
         tx.commit().await.map_err(StateMutationError::from)?;
+        Ok(())
+    }
+
+    /// Test-only: insert a self-authored chain op as fully integrated
+    /// (`locally_validated = true`, `when_integrated = now`) together with a
+    /// `ChainOpPublish` row carrying the given publish state.
+    ///
+    /// The parent `Action` is inserted first (its `private_entry` flag is
+    /// derived from the action's entry visibility). Entries are not stored,
+    /// since the publish queue does not read them.
+    pub async fn test_insert_authored_chain_op(
+        &self,
+        op: DhtOpHashed,
+        last_publish_time: Option<Timestamp>,
+        receipts_complete: Option<bool>,
+        withhold_publish: Option<bool>,
+    ) -> StateMutationResult<()> {
+        use holochain_data::dht::InsertChainOp;
+        use holochain_zome_types::dht_v2::RecordValidity;
+
+        let op_hash = op.as_hash().clone();
+        let serialized_size = holochain_serialized_bytes::encode(op.as_content())
+            .map_err(StateMutationError::from)?
+            .len() as u32;
+        let chain_op = match op.into_inner().0 {
+            DhtOp::ChainOp(c) => c,
+            DhtOp::WarrantOp(_) => panic!("test_insert_authored_chain_op requires a ChainOp"),
+        };
+
+        let signed_action = chain_op.signed_action();
+        let action_hash = holo_hash::ActionHash::with_data_sync(signed_action.action());
+        let sah = holochain_zome_types::record::SignedActionHashed::with_presigned(
+            holo_hash::HoloHashed::with_pre_hashed(
+                signed_action.action().clone(),
+                action_hash.clone(),
+            ),
+            signed_action.signature().clone(),
+        );
+        let new_sah = holochain_zome_types::dht_v2::from_legacy_signed_action(&sah);
+
+        let basis_hash = chain_op.dht_basis();
+        let storage_center_loc = basis_hash.get_loc();
+        let now = Timestamp::now();
+
+        let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
+        tx.insert_action(&new_sah, None)
+            .await
+            .map_err(StateMutationError::from)?;
+        tx.insert_chain_op(InsertChainOp {
+            op_hash: &op_hash,
+            action_hash: &action_hash,
+            op_type: i64::from(chain_op.get_type()),
+            basis_hash: &basis_hash,
+            storage_center_loc,
+            validation_status: RecordValidity::Accepted,
+            locally_validated: true,
+            require_receipt: true,
+            when_received: now,
+            when_integrated: now,
+            serialized_size,
+        })
+        .await
+        .map_err(StateMutationError::from)?;
+        tx.insert_chain_op_publish(
+            &op_hash,
+            last_publish_time,
+            receipts_complete,
+            withhold_publish,
+        )
+        .await
+        .map_err(StateMutationError::from)?;
+        tx.commit().await.map_err(StateMutationError::from)?;
+        Ok(())
+    }
+
+    /// Test-only: read the `last_publish_time` recorded for a chain op.
+    pub async fn test_chain_op_publish_time(
+        &self,
+        op_hash: &DhtOpHash,
+    ) -> DhtStoreResult<Option<Timestamp>> {
+        let row = self
+            .db
+            .as_ref()
+            .get_chain_op_publish(op_hash.clone())
+            .await?;
+        Ok(row.and_then(|r| r.last_publish_time.map(Timestamp::from_micros)))
+    }
+
+    /// Test-only: insert a `WarrantPublish` row recording `last_publish_time`
+    /// for the given warrant.
+    pub async fn test_insert_warrant_publish(
+        &self,
+        warrant_hash: &DhtOpHash,
+        last_publish_time: Option<Timestamp>,
+    ) -> StateMutationResult<()> {
+        self.db
+            .insert_warrant_publish(warrant_hash, last_publish_time)
+            .await
+            .map_err(StateMutationError::from)?;
+        Ok(())
+    }
+
+    /// Test-only: overwrite the full publish state of an existing
+    /// `ChainOpPublish` row. A `None` column is stored as SQL `NULL`; in
+    /// particular `receipts_complete = None` means "receipts not complete"
+    /// (the publish queue treats `receipts_complete IS NULL` as eligible).
+    pub async fn test_set_chain_op_publish(
+        &self,
+        op_hash: &DhtOpHash,
+        last_publish_time: Option<Timestamp>,
+        receipts_complete: Option<bool>,
+        withhold_publish: Option<bool>,
+    ) -> DhtStoreResult<()> {
+        sqlx::query(
+            "UPDATE ChainOpPublish
+             SET last_publish_time = ?, receipts_complete = ?, withhold_publish = ?
+             WHERE op_hash = ?",
+        )
+        .bind(last_publish_time.map(|t| t.as_micros()))
+        .bind(receipts_complete.map(|b| b as i64))
+        .bind(withhold_publish.map(|b| b as i64))
+        .bind(op_hash.get_raw_36())
+        .execute(self.db.pool())
+        .await?;
         Ok(())
     }
 }

@@ -260,6 +260,20 @@ fn all_records() -> Vec<Record> {
 }
 
 #[test]
+fn legacy_op_hash_matches_v2_content_hash() {
+    // Check the canonical legacy op hash is the content-derived
+    // v2 hash.
+    for record in all_records() {
+        let v2_action = crate::dht_v2::from_legacy_action(record.action());
+        for op in produce_ops_from_record(&record).unwrap() {
+            let legacy_hash = DhtOpHash::with_data_sync(&op);
+            let v2_hash = crate::dht_v2::ChainOpUniqueForm::op_hash(op.get_type(), &v2_action);
+            assert_eq!(legacy_hash, v2_hash, "op type {:?}", op.get_type());
+        }
+    }
+}
+
+#[test]
 fn get_type_op() {
     let check_all_ops = |record| {
         let ops = produce_ops_from_record(&record).unwrap();
@@ -442,4 +456,32 @@ fn test_all_ops_basis() {
     for record in all_records() {
         check_all_ops(record);
     }
+}
+
+/// The v2 op hash is derived from the v2 action projection, which drops the
+/// legacy `weight` field. The op hash must therefore be weight-independent so it
+/// is stable across the v2 round-trip: a record read back from the store or
+/// fetched over the network gets a `Default` weight, yet must hash identically.
+#[test]
+fn store_record_op_hash_is_weight_independent() {
+    let mut create = fixt!(Create);
+    create.weight = EntryRateWeight {
+        bucket_id: 1,
+        units: 5,
+        rate_bytes: 9,
+    };
+    let weighted = Action::Create(create.clone());
+    create.weight = EntryRateWeight::default();
+    let weightless = Action::Create(create);
+
+    let h_weighted = ChainOpUniqueForm::op_hash(ChainOpType::StoreRecord, weighted)
+        .unwrap()
+        .1;
+    let h_weightless = ChainOpUniqueForm::op_hash(ChainOpType::StoreRecord, weightless)
+        .unwrap()
+        .1;
+    assert_eq!(
+        h_weighted, h_weightless,
+        "StoreRecord op hash must not depend on the (v2-dropped) weight"
+    );
 }

@@ -4,8 +4,10 @@ use super::super::inner::sync_queries::{self, ArcBounds};
 use crate::handles::DbRead;
 use crate::kind::Dht;
 use crate::models::dht::{
-    K2ChainOpForWireRow, K2OpHashRow, K2OpIdSinceRow, K2OpPresentRow, K2WarrantForWireRow,
+    DumpChainOpRow, K2ChainOpForWireRow, K2OpHashRow, K2OpIdSinceRow, K2OpPresentRow,
+    K2WarrantForWireRow,
 };
+use holo_hash::AgentPubKey;
 
 impl DbRead<Dht> {
     /// `(hash, basis, size)` for every integrated, locally-validated op
@@ -97,5 +99,46 @@ impl DbRead<Dht> {
     /// filter).
     pub async fn count_integrated_ops(&self) -> sqlx::Result<i64> {
         sync_queries::count_integrated_ops(self.pool()).await
+    }
+
+    /// `(validation_limbo, integration_limbo, integrated)` counts for the
+    /// integration-state report. Integrated counts locally-validated
+    /// `ChainOp` rows (cache-only copies excluded) plus all `WarrantOp` rows.
+    pub async fn integration_state_counts(&self) -> sqlx::Result<(i64, i64, i64)> {
+        sync_queries::integration_state_counts(self.pool()).await
+    }
+
+    /// Integrated chain-op rows for the integration dump, paginated forward
+    /// from the `(when_integrated, op_hash)` cursor `after` (`None` from the
+    /// start, which yields the full set).
+    pub async fn integrated_chain_ops_for_dump(
+        &self,
+        after: Option<(i64, &[u8])>,
+    ) -> sqlx::Result<Vec<DumpChainOpRow>> {
+        sync_queries::integrated_chain_ops_for_dump(self.pool(), after).await
+    }
+
+    /// Limbo chain-op rows for the integration dump. `ready` selects the
+    /// integration-limbo subset; `!ready` selects the validation-limbo subset.
+    pub async fn limbo_chain_ops_for_dump(
+        &self,
+        ready: bool,
+    ) -> sqlx::Result<Vec<K2ChainOpForWireRow>> {
+        sync_queries::limbo_chain_ops_for_dump(self.pool(), ready).await
+    }
+
+    /// Chain-op rows authored and shared by `author`, joined for wire
+    /// reconstruction. Excludes private `StoreEntry` ops so private entries
+    /// never leak into the published set.
+    pub async fn ops_to_publish_for_wire(
+        &self,
+        author: &AgentPubKey,
+    ) -> sqlx::Result<Vec<K2ChainOpForWireRow>> {
+        sync_queries::ops_to_publish_for_wire(self.pool(), author).await
+    }
+
+    /// Every integrated warrant row for the integration dump.
+    pub async fn integrated_warrants_for_dump(&self) -> sqlx::Result<Vec<K2WarrantForWireRow>> {
+        sync_queries::integrated_warrants_for_dump(self.pool()).await
     }
 }

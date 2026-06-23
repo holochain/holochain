@@ -44,7 +44,7 @@ async fn dump_full_state() {
     let authored_db = conductor
         .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())
         .unwrap();
-    let dht_db = conductor.get_or_create_dht_db(cell_id.dna_hash()).unwrap();
+    let dht_store = conductor.get_dht_store(cell_id.dna_hash()).unwrap();
     let peer_dump = peer_store_dump(&conductor, cell_id).await.unwrap();
     let source_chain_dump =
         source_chain::dump_state(authored_db.into(), cell_id.agent_pubkey().clone())
@@ -53,7 +53,9 @@ async fn dump_full_state() {
     let expected_state_dump = FullStateDump {
         peer_dump,
         source_chain_dump,
-        integration_dump: full_integration_dump(&dht_db, None).await.unwrap(),
+        integration_dump: full_integration_dump(&dht_store.as_read(), None)
+            .await
+            .unwrap(),
     };
 
     let full_state_dump = conductor.dump_full_cell_state(cell_id, None).await.unwrap();

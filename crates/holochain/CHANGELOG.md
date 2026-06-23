@@ -17,6 +17,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Add `DnaDef::replace_coordinators`, which swaps a DNA's coordinator zomes while preserving install order and rejects a coordinator whose dependency does not point at an existing integrity zome with the new `ZomeError::DanglingZomeDependency`. \#5828
 - Restructure the ribosome so that the WASM, inline, and mock backends each implement a common `RibosomeImplT` trait behind a single `Ribosome` type, replacing the previous `RealRibosome`/`RibosomeT` design. This is primarily an internal change but affects custom ribosome implementations and some sweettest internals. \#5828
 
+## 0.7.0-dev.30
+
+## 0.7.0-dev.29
+
 ## 0.7.0-dev.28
 
 - Make Sweettest documentation available on docs.rs.

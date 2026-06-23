@@ -29,7 +29,7 @@ impl DhtStore<DbWrite<Dht>> {
     ///
     /// The shared entry, if present, is inserted once for the whole
     /// `RenderedOps`. Any `ops.warrant` is ignored; warrants are inserted
-    /// via [`Self::cache_warrants`].
+    /// via [`Self::stage_warrants_for_validation`].
     pub async fn cache_chain_ops(&self, ops: &RenderedOps) -> StateMutationResult<()> {
         if ops.ops.is_empty() && ops.entry.is_none() {
             return Ok(());
@@ -93,7 +93,10 @@ impl DhtStore<DbWrite<Dht>> {
     ///
     /// Warrants must be locally validated regardless of arc coverage, so they
     /// are routed through limbo rather than inserted directly.
-    pub async fn cache_warrants(&self, warrants: Vec<WarrantOp>) -> StateMutationResult<()> {
+    pub async fn stage_warrants_for_validation(
+        &self,
+        warrants: Vec<WarrantOp>,
+    ) -> StateMutationResult<()> {
         if warrants.is_empty() {
             return Ok(());
         }
@@ -511,12 +514,15 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn cache_warrants_enters_limbo() {
+    async fn stage_warrants_for_validation_enters_limbo() {
         let store = DhtStore::new_test(dht_id()).await.unwrap();
         let warrant_op = build_warrant_op(8);
         let op_hash = holo_hash::DhtOpHash::with_data_sync(&warrant_op);
 
-        store.cache_warrants(vec![warrant_op]).await.unwrap();
+        store
+            .stage_warrants_for_validation(vec![warrant_op])
+            .await
+            .unwrap();
 
         let row = store
             .db()

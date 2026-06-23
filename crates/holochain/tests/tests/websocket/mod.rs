@@ -798,7 +798,7 @@ async fn network_stats() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn full_state_dump_cursor_works() {
+async fn full_state_dump_returns_all_ops() {
     holochain_trace::test_run();
 
     let mut conductor = SweetConductor::standard().await;
@@ -825,23 +825,26 @@ async fn full_state_dump_cursor_works() {
         integrated_ops_count + validation_limbo_ops_count + integration_limbo_ops_count;
     assert_eq!(7, all_dhts_ops_count);
 
-    // We are assuming we have at least one DhtOp in the Cell
-    let full_state = dump_full_state(
-        &mut client,
-        cell_id,
-        Some(full_state.integration_dump.dht_ops_cursor - 1),
-    )
-    .await
-    .unwrap();
+    // The first dump returns every integrated op and a cursor marking the last,
+    // so a follow-up dump pages forward through only ops integrated since.
+    let cursor = full_state.integration_dump.dht_ops_cursor;
+    assert!(cursor.is_some());
 
-    let integrated_ops_count = full_state.integration_dump.integrated.len();
-    let validation_limbo_ops_count = full_state.integration_dump.validation_limbo.len();
-    let integration_limbo_ops_count = full_state.integration_dump.integration_limbo.len();
+    let full_state = dump_full_state(&mut client, cell_id, cursor).await.unwrap();
 
-    let new_all_dht_ops_count =
-        integrated_ops_count + validation_limbo_ops_count + integration_limbo_ops_count;
-
-    assert_eq!(1, new_all_dht_ops_count);
+    // Nothing has been integrated since, so paging from the cursor returns no
+    // further integrated ops and no onward cursor. The (here empty) limbo sets
+    // are not cursor-paged, so they come back unchanged.
+    assert!(full_state.integration_dump.integrated.is_empty());
+    assert!(full_state.integration_dump.dht_ops_cursor.is_none());
+    assert_eq!(
+        full_state.integration_dump.validation_limbo.len(),
+        validation_limbo_ops_count
+    );
+    assert_eq!(
+        full_state.integration_dump.integration_limbo.len(),
+        integration_limbo_ops_count
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]

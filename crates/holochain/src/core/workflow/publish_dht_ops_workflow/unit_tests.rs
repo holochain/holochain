@@ -3,30 +3,26 @@ use crate::core::queue_consumer::WorkComplete;
 use crate::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
 use crate::prelude::*;
 use ::fixt::prelude::*;
-use chrono::Utc;
 use hdk::prelude::Action;
 use holo_hash::fixt::ActionHashFixturator;
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::fixt::EntryHashFixturator;
 use holo_hash::AgentPubKey;
+use holo_hash::DhtOpHash;
 use holo_hash::HasHash;
 use holochain_conductor_api::conductor::ConductorTuningParams;
 use holochain_p2p::MockHolochainP2pDnaT;
-use holochain_sqlite::db::DbKindAuthored;
-use holochain_sqlite::prelude::*;
+use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::*;
 use holochain_state::test_utils::test_dht_store;
-use rusqlite::named_params;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn no_ops_to_publish() {
     holochain_trace::test_run();
 
-    let test_db = holochain_state::test_utils::test_authored_db();
-    let vault = test_db.to_db();
     let dht_store = test_dht_store(fixt!(DnaHash)).await;
 
     let mut network = MockHolochainP2pDnaT::new();
@@ -36,7 +32,6 @@ async fn no_ops_to_publish() {
         TriggerSender::new_with_loop(Duration::from_secs(5)..Duration::from_secs(30), true);
 
     let work_complete = publish_dht_ops_workflow(
-        vault,
         dht_store,
         Arc::new(network),
         tx,
@@ -54,13 +49,11 @@ async fn no_ops_to_publish() {
 async fn workflow_incomplete_on_routing_error() {
     holochain_trace::test_run();
 
-    let test_db = holochain_state::test_utils::test_authored_db();
-    let vault = test_db.to_db();
     let dht_store = test_dht_store(fixt!(DnaHash)).await;
 
     let agent = fixt!(AgentPubKey);
 
-    let op_hash = create_op(vault.clone(), agent.clone()).await.unwrap();
+    let op_hash = create_op(&dht_store, agent.clone()).await.unwrap();
 
     let mut network = MockHolochainP2pDnaT::new();
     network.expect_publish().return_once(|_, _, _, _| {
@@ -73,8 +66,7 @@ async fn workflow_incomplete_on_routing_error() {
         TriggerSender::new_with_loop(Duration::from_secs(5)..Duration::from_secs(30), true);
 
     let work_complete = publish_dht_ops_workflow(
-        vault.clone(),
-        dht_store,
+        dht_store.clone(),
         Arc::new(network),
         tx,
         agent,
@@ -83,7 +75,7 @@ async fn workflow_incomplete_on_routing_error() {
     .await
     .unwrap();
 
-    let publish_timestamp = get_publish_time(vault, op_hash).await;
+    let publish_timestamp = get_publish_time(&dht_store, op_hash).await;
 
     assert_eq!(WorkComplete::Incomplete(None), work_complete);
     assert!(!rx.is_paused());
@@ -94,13 +86,11 @@ async fn workflow_incomplete_on_routing_error() {
 async fn workflow_handles_publish_errors() {
     holochain_trace::test_run();
 
-    let test_db = holochain_state::test_utils::test_authored_db();
-    let vault = test_db.to_db();
     let dht_store = test_dht_store(fixt!(DnaHash)).await;
 
     let agent = fixt!(AgentPubKey);
 
-    let op_hash = create_op(vault.clone(), agent.clone()).await.unwrap();
+    let op_hash = create_op(&dht_store, agent.clone()).await.unwrap();
 
     let mut network = MockHolochainP2pDnaT::new();
     network.expect_publish().return_once(|_, _, _, _| {
@@ -113,8 +103,7 @@ async fn workflow_handles_publish_errors() {
         TriggerSender::new_with_loop(Duration::from_secs(5)..Duration::from_secs(30), true);
 
     let work_complete = publish_dht_ops_workflow(
-        vault.clone(),
-        dht_store,
+        dht_store.clone(),
         Arc::new(network),
         tx,
         agent,
@@ -123,7 +112,7 @@ async fn workflow_handles_publish_errors() {
     .await
     .unwrap();
 
-    let publish_timestamp = get_publish_time(vault, op_hash).await;
+    let publish_timestamp = get_publish_time(&dht_store, op_hash).await;
 
     assert_eq!(WorkComplete::Complete, work_complete);
     assert!(!rx.is_paused());
@@ -134,13 +123,11 @@ async fn workflow_handles_publish_errors() {
 async fn retry_publish_until_receipts_received() {
     holochain_trace::test_run();
 
-    let test_db = holochain_state::test_utils::test_authored_db();
-    let vault = test_db.to_db();
     let dht_store = test_dht_store(fixt!(DnaHash)).await;
 
     let agent = fixt!(AgentPubKey);
 
-    let op_hash = create_op(vault.clone(), agent.clone()).await.unwrap();
+    let op_hash = create_op(&dht_store, agent.clone()).await.unwrap();
 
     let mut network = MockHolochainP2pDnaT::new();
     network.expect_publish().returning(|_, _, _, _| Ok(()));
@@ -152,7 +139,6 @@ async fn retry_publish_until_receipts_received() {
 
     for _ in 0..3 {
         let work_complete = publish_dht_ops_workflow(
-            vault.clone(),
             dht_store.clone(),
             network.clone(),
             tx.clone(),
@@ -167,13 +153,12 @@ async fn retry_publish_until_receipts_received() {
         assert_eq!(WorkComplete::Complete, work_complete);
         assert!(!rx.is_paused());
 
-        verify_published_recently(vault.clone(), op_hash.clone()).await;
+        verify_published_recently(&dht_store, op_hash.clone()).await;
     }
 
-    do_set_receipts_complete(vault.clone(), op_hash.clone()).await;
+    do_set_receipts_complete(&dht_store, op_hash.clone()).await;
 
     let work_complete = publish_dht_ops_workflow(
-        vault.clone(),
         dht_store,
         network,
         tx,
@@ -191,8 +176,6 @@ async fn retry_publish_until_receipts_received() {
 async fn loop_resumes_on_new_data() {
     holochain_trace::test_run();
 
-    let test_db = holochain_state::test_utils::test_authored_db();
-    let vault = test_db.to_db();
     let dht_store = test_dht_store(fixt!(DnaHash)).await;
 
     let agent = fixt!(AgentPubKey);
@@ -207,7 +190,6 @@ async fn loop_resumes_on_new_data() {
 
     // Do a publish with no data to get into a paused state
     let work_complete = publish_dht_ops_workflow(
-        vault.clone(),
         dht_store.clone(),
         network.clone(),
         tx.clone(),
@@ -221,10 +203,9 @@ async fn loop_resumes_on_new_data() {
     assert!(rx.is_paused()); // No work to do, so it should pause
 
     // Now create an op and try to publish again
-    create_op(vault.clone(), agent.clone()).await.unwrap();
+    create_op(&dht_store, agent.clone()).await.unwrap();
 
     let work_complete = publish_dht_ops_workflow(
-        vault,
         dht_store,
         network,
         tx,
@@ -242,12 +223,10 @@ async fn loop_resumes_on_new_data() {
 async fn ignores_data_by_other_authors() {
     holochain_trace::test_run();
 
-    let test_db = holochain_state::test_utils::test_authored_db();
-    let vault = test_db.to_db();
     let dht_store = test_dht_store(fixt!(DnaHash)).await;
 
     // Create an op for some other author
-    create_op(vault.clone(), fixt!(AgentPubKey)).await.unwrap();
+    create_op(&dht_store, fixt!(AgentPubKey)).await.unwrap();
 
     let agent = fixt!(AgentPubKey);
 
@@ -260,7 +239,6 @@ async fn ignores_data_by_other_authors() {
     let network = Arc::new(network);
 
     let work_complete = publish_dht_ops_workflow(
-        vault.clone(),
         dht_store,
         network.clone(),
         tx.clone(),
@@ -275,14 +253,12 @@ async fn ignores_data_by_other_authors() {
     assert!(rx.is_paused());
 }
 
-// Even though ops are created for actions with private entries, they should not
-// contain the private entry.
+// Even though ops are created for actions with private entries, the StoreEntry
+// op (which carries the entry) must not be published.
 #[tokio::test(flavor = "multi_thread")]
 async fn private_entries_are_not_published() {
     holochain_trace::test_run();
 
-    let test_db = holochain_state::test_utils::test_authored_db();
-    let vault = test_db.to_db();
     let dht_store = test_dht_store(fixt!(DnaHash)).await;
     let agent = fixt!(AgentPubKey);
 
@@ -324,24 +300,20 @@ async fn private_entries_are_not_published() {
         RecordEntry::Hidden
     ));
 
-    // Write all three ops to the database.
     let register_agent_activity_op_hash = register_agent_activity_op.as_hash().clone();
     let store_entry_op_hash = store_entry_op.as_hash().clone();
     let store_record_op_hash = store_record_op.as_hash().clone();
-    vault
-        .write_async({
-            move |txn| -> StateMutationResult<()> {
-                holochain_state::mutations::insert_op_authored(txn, &register_agent_activity_op)?;
-                holochain_state::mutations::insert_op_authored(txn, &store_entry_op)?;
-                holochain_state::mutations::insert_op_authored(txn, &store_record_op)?;
-                Ok(())
-            }
-        })
-        .await
-        .unwrap();
+
+    // Seed all three ops as integrated, self-authored ops in the DHT store.
+    for op in [register_agent_activity_op, store_entry_op, store_record_op] {
+        dht_store
+            .test_insert_authored_chain_op(op, None, None, None)
+            .await
+            .unwrap();
+    }
 
     // RegisterAgentActivity and StoreRecord are expected to be published.
-    // StoreRecord contains the entry and is expected to not be published.
+    // StoreEntry contains the entry and is expected to not be published.
     let mut network = MockHolochainP2pDnaT::new();
     let agent2 = agent.clone();
     network
@@ -361,7 +333,6 @@ async fn private_entries_are_not_published() {
         TriggerSender::new_with_loop(Duration::from_secs(5)..Duration::from_secs(30), true);
 
     let work_complete = publish_dht_ops_workflow(
-        vault.clone(),
         dht_store,
         network.clone(),
         tx.clone(),
@@ -375,23 +346,21 @@ async fn private_entries_are_not_published() {
     assert_eq!(WorkComplete::Complete, work_complete);
 }
 
-async fn verify_published_recently(vault: DbWrite<DbKindAuthored>, op_hash: DhtOpHash) {
-    let publish_timestamp = get_publish_time(vault.clone(), op_hash.clone())
+async fn verify_published_recently(dht_store: &DhtStore, op_hash: DhtOpHash) {
+    let publish_timestamp = get_publish_time(dht_store, op_hash)
         .await
         .expect("Expected published time to have been set");
 
+    // Published within the last second.
     assert!(
-        publish_timestamp
-            .checked_add_signed(chrono::Duration::try_seconds(1).unwrap())
-            .unwrap()
-            > chrono::DateTime::<Utc>::from(SystemTime::now())
+        publish_timestamp.as_micros() + 1_000_000 > Timestamp::now().as_micros(),
+        "publish time {publish_timestamp:?} is not recent"
     );
 }
 
-async fn create_op(
-    vault: DbWrite<DbKindAuthored>,
-    author: AgentPubKey,
-) -> StateMutationResult<DhtOpHash> {
+/// Seed an integrated, self-authored `RegisterAgentActivity` op (with an empty
+/// publish row) and return its hash.
+async fn create_op(dht_store: &DhtStore, author: AgentPubKey) -> StateMutationResult<DhtOpHash> {
     let mut create_action = fixt!(Create);
     create_action.author = author;
     let action = Action::Create(create_action);
@@ -399,56 +368,93 @@ async fn create_op(
     let op =
         DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(fixt!(Signature), action));
 
-    let test_op_hash = op.as_hash().clone();
-    vault
-        .write_async({
-            move |txn| -> StateMutationResult<()> {
-                holochain_state::mutations::insert_op_authored(txn, &op)?;
-                // Mark the op as integrated so it can be published
-                holochain_state::mutations::set_when_integrated(
-                    txn,
-                    op.as_hash(),
-                    Timestamp::now(),
-                )?;
-                Ok(())
-            }
-        })
-        .await
-        .unwrap();
+    let op_hash = op.as_hash().clone();
+    dht_store
+        .test_insert_authored_chain_op(op, None, None, None)
+        .await?;
 
-    Ok(test_op_hash)
+    Ok(op_hash)
 }
 
-async fn get_publish_time(
-    vault: DbWrite<DbKindAuthored>,
-    op_hash: DhtOpHash,
-) -> Option<chrono::DateTime<Utc>> {
-    vault
-        .read_async(
-            move |txn| -> DatabaseResult<Option<chrono::DateTime<Utc>>> {
-                let time: Option<i64> = txn.query_row(
-                    "SELECT last_publish_time FROM DhtOp WHERE hash = :hash",
-                    named_params! {
-                        ":hash": op_hash,
-                    },
-                    |row| row.get(0),
-                )?;
-
-                Ok(time.and_then(|t| chrono::DateTime::from_timestamp(t, 0)))
-            },
-        )
+async fn get_publish_time(dht_store: &DhtStore, op_hash: DhtOpHash) -> Option<Timestamp> {
+    dht_store
+        .test_chain_op_publish_time(&op_hash)
         .await
         .unwrap()
 }
 
-async fn do_set_receipts_complete(vault: DbWrite<DbKindAuthored>, op_hash: DhtOpHash) {
-    vault
-        .write_async({
-            move |txn| -> StateMutationResult<()> {
-                set_receipts_complete(txn, &op_hash, true)?;
-                Ok(())
-            }
-        })
+async fn do_set_receipts_complete(dht_store: &DhtStore, op_hash: DhtOpHash) {
+    dht_store
+        .mark_chain_op_receipts_complete(&op_hash)
         .await
         .unwrap();
+}
+
+/// Build an `InvalidChainOp` warrant op authored by `agent`.
+fn build_warrant_op(agent: &AgentPubKey) -> DhtOpHashed {
+    let warrant = SignedWarrant::new(
+        Warrant::new(
+            WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+                action_author: fixt!(AgentPubKey),
+                action: (fixt!(ActionHash), fixt!(Signature)),
+                chain_op_type: ChainOpType::RegisterAddLink,
+                reason: "test warrant".into(),
+            }),
+            agent.clone(),
+            Timestamp::now(),
+            fixt!(AgentPubKey),
+        ),
+        fixt!(Signature),
+    );
+    DhtOpHashed::from_content_sync(DhtOp::WarrantOp(Box::new(WarrantOp::from(warrant))))
+}
+
+/// The workflow publishes an integrated, self-authored warrant and records that
+/// it was published, so it is not published again. Unlike chain ops, a warrant
+/// publishes once — it needs no validation receipts.
+#[tokio::test(flavor = "multi_thread")]
+async fn workflow_publishes_warrant_once() {
+    holochain_trace::test_run();
+
+    let dht_store = test_dht_store(fixt!(DnaHash)).await;
+    let agent = fixt!(AgentPubKey);
+
+    dht_store
+        .test_insert_integrated_warrant(build_warrant_op(&agent))
+        .await
+        .unwrap();
+
+    // First run: the warrant is eligible, so the workflow publishes it once.
+    let mut network = MockHolochainP2pDnaT::new();
+    network
+        .expect_publish()
+        .times(1)
+        .returning(|_, _, _, _| Ok(()));
+    let (tx, _rx) =
+        TriggerSender::new_with_loop(Duration::from_secs(5)..Duration::from_secs(30), true);
+    publish_dht_ops_workflow(
+        dht_store.clone(),
+        Arc::new(network),
+        tx,
+        agent.clone(),
+        ConductorTuningParams::default().min_publish_interval(),
+    )
+    .await
+    .unwrap();
+
+    // Second run: the workflow recorded the publish, so the warrant is no longer
+    // eligible and must not be published again.
+    let mut network = MockHolochainP2pDnaT::new();
+    network.expect_publish().never();
+    let (tx, _rx) =
+        TriggerSender::new_with_loop(Duration::from_secs(5)..Duration::from_secs(30), true);
+    publish_dht_ops_workflow(
+        dht_store,
+        Arc::new(network),
+        tx,
+        agent,
+        ConductorTuningParams::default().min_publish_interval(),
+    )
+    .await
+    .unwrap();
 }

@@ -297,12 +297,11 @@ async fn app_validation_workflow_inner(
                         );
                         false
                     } else {
-                        match holochain_state::warrant::is_action_warranted_as_invalid(
-                            &workspace.dht_db,
-                            action_hash.clone(),
-                            chain_op.author().clone(),
-                        )
-                        .await
+                        match workspace
+                            .dht_store
+                            .as_read()
+                            .is_action_warranted_as_invalid(&action_hash, chain_op.author())
+                            .await
                         {
                             Ok(true) => {
                                 tracing::trace!(
@@ -949,11 +948,7 @@ impl AppValidationWorkspace {
     }
 
     pub fn full_cascade(&self, network: DynHolochainP2pDna) -> CascadeImpl {
-        CascadeImpl::empty()
-            .with_authored(self.authored_db.clone().into())
-            .with_dht(self.dht_db.clone().into())
-            .with_network(network, self.cache.clone())
-            .with_dht_store(self.dht_store.clone())
+        CascadeImpl::empty(self.dht_store.clone()).with_network(network, self.cache.clone())
     }
 }
 

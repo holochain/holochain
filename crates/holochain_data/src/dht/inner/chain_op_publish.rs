@@ -1,7 +1,7 @@
 //! Free-standing operations against the `ChainOpPublish` table.
 
-use crate::models::dht::ChainOpPublishRow;
-use holo_hash::DhtOpHash;
+use crate::models::dht::{ChainOpPublishRow, OpToPublishRow};
+use holo_hash::{AgentPubKey, DhtOpHash};
 use holochain_timestamp::Timestamp;
 use sqlx::{Executor, Sqlite};
 
@@ -90,4 +90,100 @@ where
         .execute(executor)
         .await?;
     Ok(result.rows_affected())
+}
+
+/// Ops eligible to be published to the network for `author`.
+///
+/// Returns integrated, self-authored chain ops together with integrated
+/// warrants authored by `author`, ordered for stable publishing. The filters
+/// mirror the historical authored-database query:
+///
+/// - **Private entries never leave the device.** `StoreEntry` ops (`op_type =
+///   2`) whose action carries a private entry (`Action.private_entry = 1`) are
+///   excluded. All other op types are published even for private entries
+///   because they do not contain the entry data.
+/// - Ops with `withhold_publish` set (e.g. in-flight countersigning) are
+///   skipped.
+/// - Ops published within the minimum publish interval are skipped via
+///   `recency_threshold_micros` (an op qualifies when it has never been
+///   published or was last published at or before the threshold).
+/// - Ops whose receipts are already complete are skipped.
+///
+/// Warrants publish at most once: a warrant qualifies only while it has no
+/// `WarrantPublish` row recording a publish time. Warrants sort last (their
+/// `sort_seq` is `i64::MAX`) and their basis is the warrantee.
+pub(crate) async fn get_ops_to_publish<'e, E>(
+    executor: E,
+    author: &AgentPubKey,
+    recency_threshold_micros: i64,
+) -> sqlx::Result<Vec<OpToPublishRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT ChainOp.hash AS dht_hash, ChainOp.basis_hash AS basis_hash, Action.seq AS sort_seq
+         FROM ChainOp
+         JOIN Action ON ChainOp.action_hash = Action.hash
+         LEFT JOIN ChainOpPublish ON ChainOpPublish.op_hash = ChainOp.hash
+         WHERE Action.author = ?
+           AND (ChainOp.op_type != 2 OR Action.private_entry = 0)
+           AND ChainOpPublish.withhold_publish IS NULL
+           AND (ChainOpPublish.last_publish_time IS NULL
+                OR ChainOpPublish.last_publish_time <= ?)
+           AND ChainOpPublish.receipts_complete IS NULL
+
+         UNION ALL
+
+         SELECT WarrantOp.hash AS dht_hash, Warrant.warrantee AS basis_hash,
+                9223372036854775807 AS sort_seq
+         FROM WarrantOp
+         JOIN Warrant ON WarrantOp.hash = Warrant.hash
+         LEFT JOIN WarrantPublish ON WarrantPublish.warrant_hash = Warrant.hash
+         WHERE Warrant.author = ?
+           AND WarrantPublish.last_publish_time IS NULL
+
+         ORDER BY sort_seq, dht_hash",
+    )
+    .bind(author.get_raw_36())
+    .bind(recency_threshold_micros)
+    .bind(author.get_raw_36())
+    .fetch_all(executor)
+    .await
+}
+
+/// Count ops authored by `author` that may still need to be published.
+///
+/// Like [`get_ops_to_publish`] but ignores the recency window: an op counts as
+/// "still needing publish" while it has not had its receipts completed
+/// (chain ops) or has never been published (warrants), regardless of how
+/// recently it was last published. The publish workflow uses this to decide
+/// whether to keep its loop running.
+pub(crate) async fn num_still_needing_publish<'e, E>(
+    executor: E,
+    author: &AgentPubKey,
+) -> sqlx::Result<i64>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_scalar(
+        "SELECT
+           (SELECT COUNT(*)
+            FROM ChainOp
+            JOIN Action ON ChainOp.action_hash = Action.hash
+            LEFT JOIN ChainOpPublish ON ChainOpPublish.op_hash = ChainOp.hash
+            WHERE Action.author = ?
+              AND ChainOpPublish.withhold_publish IS NULL
+              AND (ChainOp.op_type != 2 OR Action.private_entry = 0)
+              AND ChainOpPublish.receipts_complete IS NULL)
+         + (SELECT COUNT(*)
+            FROM WarrantOp
+            JOIN Warrant ON WarrantOp.hash = Warrant.hash
+            LEFT JOIN WarrantPublish ON WarrantPublish.warrant_hash = Warrant.hash
+            WHERE Warrant.author = ?
+              AND WarrantPublish.last_publish_time IS NULL)",
+    )
+    .bind(author.get_raw_36())
+    .bind(author.get_raw_36())
+    .fetch_one(executor)
+    .await
 }

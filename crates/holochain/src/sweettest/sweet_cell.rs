@@ -3,6 +3,7 @@ use hdk::prelude::*;
 use holo_hash::DnaHash;
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_sqlite::db::{DbKindAuthored, DbKindDht};
+use holochain_state::dht_store::DhtStore;
 use holochain_types::db::DbWrite;
 use std::sync::Arc;
 /// A reference to a Cell created by a SweetConductor installation function.
@@ -12,6 +13,7 @@ pub struct SweetCell {
     pub(super) cell_id: CellId,
     pub(super) cell_authored_db: DbWrite<DbKindAuthored>,
     pub(super) cell_dht_db: DbWrite<DbKindDht>,
+    pub(super) cell_dht_store: DhtStore,
     pub(super) conductor_config: Arc<ConductorConfig>,
 }
 
@@ -29,6 +31,11 @@ impl SweetCell {
     /// Get the dht environment for this cell
     pub fn dht_db(&self) -> &DbWrite<DbKindDht> {
         &self.cell_dht_db
+    }
+
+    /// Get the DHT store for this cell.
+    pub fn dht_store(&self) -> &DhtStore {
+        &self.cell_dht_store
     }
 
     /// Accessor for AgentPubKey

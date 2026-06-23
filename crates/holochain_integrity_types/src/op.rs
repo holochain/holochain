@@ -1,8 +1,8 @@
 //! # Dht Operations
 
 use crate::{
-    Action, ActionHashedContainer, ActionRef, ActionType, AppEntryDef, Create, CreateLink, Delete,
-    DeleteLink, Entry, EntryType, Record, SignedActionHashed, SignedHashed, Update,
+    Action, ActionHashedContainer, ActionType, AppEntryDef, Create, CreateLink, Delete, DeleteLink,
+    Entry, EntryType, Record, SignedActionHashed, SignedHashed, Update,
 };
 use holo_hash::{ActionHash, AgentPubKey, EntryHash, HasHash, HashableContent};
 use holochain_serialized_bytes::prelude::*;
@@ -420,8 +420,10 @@ impl EntryCreationAction {
     }
 }
 
-/// Allows a [`EntryCreationAction`] to hash the same bytes as
-/// the equivalent [`Action`] variant without needing to clone the action.
+/// Allows a [`EntryCreationAction`] to hash the same bytes as the equivalent
+/// [`Action`] variant. Like the legacy `Action` impls, this hashes the
+/// content-derived v2 projection, so the identity matches `Action::Create` /
+/// `Action::Update`.
 impl HashableContent for EntryCreationAction {
     type HashType = holo_hash::hash_type::Action;
 
@@ -431,14 +433,7 @@ impl HashableContent for EntryCreationAction {
     }
 
     fn hashable_content(&self) -> holo_hash::HashableContentBytes {
-        let h = match self {
-            EntryCreationAction::Create(create) => ActionRef::Create(create),
-            EntryCreationAction::Update(update) => ActionRef::Update(update),
-        };
-        let sb = SerializedBytes::from(UnsafeBytes::from(
-            holochain_serialized_bytes::encode(&h).expect("Could not serialize HashableContent"),
-        ));
-        holo_hash::HashableContentBytes::Content(sb)
+        Action::from(self.clone()).hashable_content()
     }
 }
 

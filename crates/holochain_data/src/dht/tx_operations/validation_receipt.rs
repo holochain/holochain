@@ -12,16 +12,14 @@ impl TxWrite<Dht> {
         &mut self,
         hash: &DhtOpHash,
         op_hash: &DhtOpHash,
-        validators: &[u8],
-        signature: &[u8],
+        blob: &[u8],
         when_received: Timestamp,
     ) -> sqlx::Result<()> {
         validation_receipt::insert_validation_receipt(
             self.conn_mut(),
             hash,
             op_hash,
-            validators,
-            signature,
+            blob,
             when_received,
         )
         .await

@@ -453,8 +453,18 @@ impl Spaces {
     }
 
     /// we are receiving a "publish" event from the network.
+    ///
+    /// Ops arrive in the v2 wire form. While the legacy DHT table and
+    /// `DhtStore::record_incoming_ops` still consume the legacy op form, we
+    /// reconstruct it here before handing off to the incoming workflow. Ops
+    /// that fail to reconstruct are dropped (logged), matching the workflow's
+    /// own per-op resilience.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, ops)))]
-    pub async fn handle_publish(&self, dna_hash: &DnaHash, ops: Vec<DhtOp>) -> ConductorResult<()> {
+    pub async fn handle_publish(
+        &self,
+        dna_hash: &DnaHash,
+        ops: Vec<holochain_types::dht_v2::DhtOp>,
+    ) -> ConductorResult<()> {
         let space = self.get_or_create_space(dna_hash)?;
         let trigger = match self
             .queue_consumer_map
@@ -469,7 +479,20 @@ impl Spaces {
             }
         };
 
-        incoming_dht_ops_workflow(space, trigger, ops).await?;
+        let mut legacy_ops = Vec::with_capacity(ops.len());
+        for op in &ops {
+            match holochain_types::dht_v2::to_legacy_dht_op(op) {
+                Ok(legacy) => legacy_ops.push(legacy),
+                Err(err) => {
+                    tracing::warn!(
+                        ?err,
+                        "Dropping incoming op that failed v2->legacy reconstruction"
+                    )
+                }
+            }
+        }
+
+        incoming_dht_ops_workflow(space, trigger, legacy_ops).await?;
 
         Ok(())
     }

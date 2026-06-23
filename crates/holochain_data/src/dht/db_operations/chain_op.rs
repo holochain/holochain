@@ -44,6 +44,17 @@ impl DbRead<Dht> {
         chain_op::get_chain_ops_for_action(self.pool(), action_hash).await
     }
 
+    /// Terminal validation outcome of the chain op for `(action_hash,
+    /// op_type)`, from `ChainOp` or `LimboChainOp`. See
+    /// `chain_op::op_validation_outcome`.
+    pub async fn op_validation_outcome(
+        &self,
+        action_hash: &ActionHash,
+        op_type: i64,
+    ) -> sqlx::Result<Option<i64>> {
+        chain_op::op_validation_outcome(self.pool(), action_hash, op_type).await
+    }
+
     /// Return integrated, validated `ChainOp` rows that still require a
     /// validation receipt to be sent.
     pub async fn pending_validation_receipts(&self) -> sqlx::Result<Vec<PendingReceiptRow>> {
