@@ -544,7 +544,7 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
     fn handle_publish(
         &self,
         _dna_hash: DnaHash,
-        _ops: Vec<holochain_types::dht_op::DhtOp>,
+        _ops: Vec<holochain_types::dht_v2::DhtOp>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async { unimplemented!() })
     }
@@ -591,8 +591,8 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
     ) -> BoxFut<'_, HolochainP2pResult<WireLinkOps>> {
         Box::pin(async {
             debug!(id = ?self.id());
-            let db = self.space.dht_db.clone();
-            authority::handle_get_links(db.into(), link_key, options)
+            let store = self.space.dht_store.as_read();
+            authority::handle_get_links(store, link_key, options)
                 .await
                 .map_err(HolochainP2pError::other)
         })
@@ -607,9 +607,9 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
         query: WireLinkQuery,
     ) -> BoxFut<'_, HolochainP2pResult<CountLinksResponse>> {
         Box::pin(async {
-            let db = self.space.dht_db.clone();
+            let store = self.space.dht_store.as_read();
             Ok(CountLinksResponse::new(
-                authority::handle_get_links_query(db.into(), query)
+                authority::handle_get_links_query(store, query)
                     .await
                     .map_err(HolochainP2pError::other)?
                     .into_iter()
@@ -629,8 +629,8 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
         options: holochain_p2p::event::GetActivityOptions,
     ) -> BoxFut<'_, HolochainP2pResult<AgentActivityResponse>> {
         Box::pin(async {
-            let db = self.space.dht_db.clone();
-            authority::handle_get_agent_activity(db.into(), agent, query, options)
+            let store = self.space.dht_store.as_read();
+            authority::handle_get_agent_activity(store, agent, query, options)
                 .await
                 .map_err(HolochainP2pError::other)
         })
@@ -645,8 +645,8 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
         filter: holochain_zome_types::chain::ChainFilter,
     ) -> BoxFut<'_, HolochainP2pResult<MustGetAgentActivityResponse>> {
         Box::pin(async {
-            let db = self.space.dht_db.clone();
-            authority::handle_must_get_agent_activity(db.into(), author, filter)
+            let store = self.space.dht_store.as_read();
+            authority::handle_must_get_agent_activity(store, author, filter)
                 .await
                 .map_err(HolochainP2pError::other)
         })
@@ -855,16 +855,16 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
 impl Cell {
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     async fn handle_get_entry(&self, hash: EntryHash) -> CellResult<WireEntryOps> {
-        let db = self.space.dht_db.clone();
-        authority::handle_get_entry(db.into(), hash)
+        let store = self.space.dht_store.as_read();
+        authority::handle_get_entry(store, hash)
             .await
             .map_err(Into::into)
     }
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     async fn handle_get_record(&self, hash: ActionHash) -> CellResult<WireRecordOps> {
-        let db = self.space.dht_db.clone();
-        authority::handle_get_record(db.into(), hash)
+        let store = self.space.dht_store.as_read();
+        authority::handle_get_record(store, hash)
             .await
             .map_err(Into::into)
     }

@@ -1,25 +1,30 @@
 //! Defines a Record, the basic unit of Holochain data.
 
-use crate::action::WireDelete;
-use crate::action::WireUpdateRelationship;
 use crate::prelude::*;
 use holochain_keystore::KeystoreError;
 use holochain_keystore::LairResult;
 use holochain_keystore::MetaLairClient;
 use holochain_zome_types::entry::EntryHashed;
+use holochain_zome_types::warrant::SignedWarrant;
 
-/// A condensed version of get record request.
-/// This saves bandwidth by removing duplicated and implied data.
+/// The record-serving response to a get-record request.
+///
+/// Serves the requested record as actions plus its entry (when public), each
+/// action carrying its record-level validation status. A `Rejected` action is
+/// always accompanied by a warrant in `warrants` proving the rejection; the
+/// receiver checks that invariant up front before doing any validation work.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes, Default)]
 pub struct WireRecordOps {
-    /// The action this request was for.
+    /// The action this request was for, with its validation status.
     pub action: Option<Judged<SignedAction>>,
-    /// Any deletes on the action.
-    pub deletes: Vec<Judged<WireDelete>>,
-    /// Any updates on the action.
-    pub updates: Vec<Judged<WireUpdateRelationship>>,
+    /// Any deletes on the action, each with its validation status.
+    pub deletes: Vec<Judged<SignedAction>>,
+    /// Any updates on the action, each with its validation status.
+    pub updates: Vec<Judged<SignedAction>>,
     /// The entry if there is one.
     pub entry: Option<Entry>,
+    /// Warrants proving any `Rejected` records served above.
+    pub warrants: Vec<SignedWarrant>,
 }
 
 impl WireRecordOps {
@@ -27,54 +32,50 @@ impl WireRecordOps {
     pub fn new() -> Self {
         Self::default()
     }
-    /// Render these ops to their full types.
+    /// Expand the served records into the request-relevant ops for caching.
+    ///
+    /// Each served action becomes the single op the get-record request
+    /// represents (`StoreRecord` for the record itself, `RegisterDeletedBy`
+    /// per delete, `RegisterUpdatedRecord` per update), tagged with the served
+    /// validation status. Warrants are handled separately by the requester.
     pub fn render(self) -> DhtOpResult<RenderedOps> {
         let Self {
             action,
             deletes,
             updates,
             entry,
+            warrants: _,
         } = self;
         let mut ops = Vec::with_capacity(1 + deletes.len() + updates.len());
         if let Some(action) = action {
             let status = action.validation_status();
             let (action, signature) = action.data.into();
-            // TODO: If they only need the metadata because they already have
-            // the content we could just send the entry hash instead of the
-            // SignedAction.
-            let entry_hash = action.entry_hash().cloned();
             ops.push(RenderedOp::new(
                 action,
                 signature,
                 status,
                 ChainOpType::StoreRecord,
             )?);
-            if let Some(entry_hash) = entry_hash {
-                for op in deletes {
-                    let status = op.validation_status();
-                    let op = op.data;
-                    let signature = op.signature;
-                    let action = Action::Delete(op.delete);
-
-                    ops.push(RenderedOp::new(
-                        action,
-                        signature,
-                        status,
-                        ChainOpType::RegisterDeletedBy,
-                    )?);
-                }
-                for op in updates {
-                    let status = op.validation_status();
-                    let (action, signature) = op.data.into_signed_action(entry_hash.clone()).into();
-
-                    ops.push(RenderedOp::new(
-                        action,
-                        signature,
-                        status,
-                        ChainOpType::RegisterUpdatedRecord,
-                    )?);
-                }
-            }
+        }
+        for op in deletes {
+            let status = op.validation_status();
+            let (action, signature) = op.data.into();
+            ops.push(RenderedOp::new(
+                action,
+                signature,
+                status,
+                ChainOpType::RegisterDeletedBy,
+            )?);
+        }
+        for op in updates {
+            let status = op.validation_status();
+            let (action, signature) = op.data.into();
+            ops.push(RenderedOp::new(
+                action,
+                signature,
+                status,
+                ChainOpType::RegisterUpdatedRecord,
+            )?);
         }
         Ok(RenderedOps {
             entry: entry.map(EntryHashed::from_content_sync),

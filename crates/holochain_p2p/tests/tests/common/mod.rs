@@ -74,7 +74,7 @@ impl HcP2pHandler for Handler {
     fn handle_publish(
         &self,
         _dna_hash: DnaHash,
-        _ops: Vec<holochain_types::dht_op::DhtOp>,
+        _ops: Vec<holochain_types::dht_v2::DhtOp>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
             self.calls.lock().unwrap().push("publish".into());
@@ -107,12 +107,12 @@ impl HcP2pHandler for Handler {
         Box::pin(async move {
             self.calls.lock().unwrap().push("get_links".into());
             Ok(WireLinkOps {
-                creates: vec![WireCreateLink::condense_base_only(
-                    fixt!(CreateLink),
-                    fixt!(Signature),
+                creates: vec![Judged::new(
+                    SignedAction::new(Action::CreateLink(fixt!(CreateLink)), fixt!(Signature)),
                     ValidationStatus::Valid,
                 )],
                 deletes: Vec::new(),
+                warrants: Vec::new(),
             })
         })
     }

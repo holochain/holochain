@@ -194,8 +194,8 @@ pub(crate) async fn promote_to_warrant(
 ) -> sqlx::Result<bool> {
     let result = sqlx::query(
         "INSERT INTO WarrantOp (hash, storage_center_loc, when_received,
-                                when_integrated, serialized_size)
-         SELECT hash, storage_center_loc, when_received, ?, serialized_size
+                                when_integrated, validation_status, serialized_size)
+         SELECT hash, storage_center_loc, when_received, ?, sys_validation_status, serialized_size
          FROM LimboWarrantOp WHERE hash = ?",
     )
     .bind(when_integrated.as_micros())

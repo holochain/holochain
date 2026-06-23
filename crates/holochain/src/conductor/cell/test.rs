@@ -93,9 +93,20 @@ async fn test_cell_handle_publish() {
     let op = ChainOp::StoreRecord(shh.signature().clone(), action.clone(), RecordEntry::NA);
     let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
 
+    // The publish wire carries the v2 op form.
+    let v2_op = holochain_types::dht_v2::DhtOp::ChainOp(Box::new(
+        holochain_types::dht_v2::ChainOp::CreateRecord(
+            holochain_types::dht_v2::SignedAction::new(
+                holochain_types::dht_v2::from_legacy_action(&action),
+                shh.signature().clone(),
+            ),
+            holochain_types::dht_v2::OpEntry::ActionOnly,
+        ),
+    ));
+
     spaces
         .spaces
-        .handle_publish(&dna, vec![op.clone().into()])
+        .handle_publish(&dna, vec![v2_op])
         .await
         .unwrap();
 

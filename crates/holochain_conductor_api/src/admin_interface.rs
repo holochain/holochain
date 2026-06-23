@@ -257,9 +257,9 @@ pub enum AdminRequest {
     DumpFullState {
         /// The cell ID for which to dump the state
         cell_id: Box<CellId>,
-        /// The last seen DhtOp RowId, returned in the full dump state.
-        /// Only DhtOps with RowId greater than the cursor will be returned.
-        dht_ops_cursor: Option<u64>,
+        /// Pagination cursor from a previous `DumpFullState`; only ops
+        /// integrated after it are returned. `None` starts from the beginning.
+        dht_ops_cursor: Option<crate::state_dump::DhtOpsCursor>,
     },
 
     /// Dump the network metrics tracked by kitsune.

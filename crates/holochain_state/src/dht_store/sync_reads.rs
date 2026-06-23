@@ -8,6 +8,7 @@
 
 use holochain_data::kind::Dht;
 use holochain_data::DbWrite;
+use holochain_types::prelude::AgentPubKey;
 use holochain_types::prelude::Timestamp;
 
 use super::DhtStore;
@@ -104,6 +105,81 @@ where
             .await
             .map_err(crate::query::StateQueryError::Sqlx)?;
         Ok(micros.map(Timestamp::from_micros))
+    }
+
+    /// `(validation_limbo, integration_limbo, integrated)` counts for the
+    /// integration-state report, each as `usize`. `integrated` counts
+    /// locally-validated `ChainOp` rows (GET-cached copies excluded) plus all
+    /// `WarrantOp` rows; `integration_limbo` is the limbo subset ready for
+    /// integration and `validation_limbo` the remainder still in validation.
+    pub async fn integration_state_counts(
+        &self,
+    ) -> crate::query::StateQueryResult<(usize, usize, usize)> {
+        let (validation_limbo, integration_limbo, integrated) = self
+            .db
+            .as_ref()
+            .integration_state_counts()
+            .await
+            .map_err(crate::query::StateQueryError::Sqlx)?;
+        Ok((
+            validation_limbo.max(0) as usize,
+            integration_limbo.max(0) as usize,
+            integrated.max(0) as usize,
+        ))
+    }
+
+    /// Integrated chain-op rows for the integration dump, paginated forward
+    /// from the `(when_integrated, op_hash)` cursor `after` (`None` from the
+    /// start, which yields the full set — also how the consistency harness
+    /// reads everything).
+    pub async fn integrated_chain_ops_for_dump(
+        &self,
+        after: Option<(i64, &[u8])>,
+    ) -> crate::query::StateQueryResult<Vec<holochain_data::models::dht::DumpChainOpRow>> {
+        self.db
+            .as_ref()
+            .integrated_chain_ops_for_dump(after)
+            .await
+            .map_err(crate::query::StateQueryError::Sqlx)
+    }
+
+    /// Limbo chain-op rows for the integration dump. `ready` selects the
+    /// integration-limbo subset; `!ready` selects the validation-limbo subset.
+    pub async fn limbo_chain_ops_for_dump(
+        &self,
+        ready: bool,
+    ) -> crate::query::StateQueryResult<Vec<holochain_data::models::dht::K2ChainOpForWireRow>> {
+        self.db
+            .as_ref()
+            .limbo_chain_ops_for_dump(ready)
+            .await
+            .map_err(crate::query::StateQueryError::Sqlx)
+    }
+
+    /// Every integrated warrant row for the integration dump.
+    pub async fn integrated_warrants_for_dump(
+        &self,
+    ) -> crate::query::StateQueryResult<Vec<holochain_data::models::dht::K2WarrantForWireRow>> {
+        self.db
+            .as_ref()
+            .integrated_warrants_for_dump()
+            .await
+            .map_err(crate::query::StateQueryError::Sqlx)
+    }
+
+    /// Chain-op rows authored and shared by `author`, joined for wire
+    /// reconstruction. Excludes private `StoreEntry` ops so private entries
+    /// never leak into the published set. Used by the consistency-check
+    /// harness to gather a cell's published ops.
+    pub async fn ops_to_publish_for_wire(
+        &self,
+        author: &AgentPubKey,
+    ) -> crate::query::StateQueryResult<Vec<holochain_data::models::dht::K2ChainOpForWireRow>> {
+        self.db
+            .as_ref()
+            .ops_to_publish_for_wire(author)
+            .await
+            .map_err(crate::query::StateQueryError::Sqlx)
     }
 
     /// Total integrated op + warrant count (no `locally_validated` filter
