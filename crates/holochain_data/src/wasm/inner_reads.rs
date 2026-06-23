@@ -1,8 +1,6 @@
 use sqlx::{Executor, Sqlite};
 
-use crate::models::wasm::{
-    CoordinatorZomeModel, DnaDefModel, EntryDefModel, IntegrityZomeModel, WasmModel,
-};
+use crate::models::wasm::{CoordinatorZomeModel, DnaDefModel, EntryDefModel, IntegrityZomeModel, CompiledWasmModel, WasmModel};
 
 /// Check if WASM bytecode exists in the database.
 pub(super) async fn wasm_exists<'e, E>(executor: E, hash: &[u8]) -> sqlx::Result<bool>
@@ -21,6 +19,26 @@ where
     E: Executor<'e, Database = Sqlite>,
 {
     sqlx::query_as("SELECT hash, code FROM Wasm WHERE hash = ?")
+        .bind(hash)
+        .fetch_optional(executor)
+        .await
+}
+
+/// Check if a compiled, serialized WASM module exists in the database by its original WASM hash..
+pub(super) async fn compiled_wasm_exists<'e, E>(executor: E, hash: &[u8]) -> sqlx::Result<bool> where
+    E: Executor<'e, Database = Sqlite>, {
+    sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM CompiledWasm WHERE hash = ?)")
+        .bind(hash)
+        .fetch_one(executor)
+        .await
+}
+
+/// Get a compiled, serialized WASM module by its original WASM hash.
+pub(super) async fn get_compiled_wasm<'e, E>(executor: E, hash: &[u8]) -> sqlx::Result<Option<CompiledWasmModel>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as("SELECT serialized FROM CompiledWasm WHERE hash = ?")
         .bind(hash)
         .fetch_optional(executor)
         .await

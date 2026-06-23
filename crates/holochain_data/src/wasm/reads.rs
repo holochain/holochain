@@ -27,13 +27,35 @@ pub(super) async fn get_wasm<'e, E>(
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    inner_reads::get_wasm(executor, hash.get_raw_39())
+    Ok(inner_reads::get_wasm(executor, hash.get_raw_39())
         .await?
         .map(|model| {
             let wasm_hash = model.wasm_hash();
-            Ok(DnaWasmHashed::with_pre_hashed(model.code.into(), wasm_hash))
-        })
-        .transpose()
+            DnaWasmHashed::with_pre_hashed(model.code.into(), wasm_hash)
+        }))
+}
+
+/// Check if a compiled, serialized WASM exists in the database.
+pub(super) async fn compiled_wasm_exists<'e, E>(executor: E, hash: &WasmHash) -> sqlx::Result<bool>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    inner_reads::compiled_wasm_exists(executor, hash.get_raw_39()).await
+}
+
+/// Get a compiled, serialized WASM by hash.
+pub(super) async fn get_compiled_wasm<'e, E>(
+    executor: E,
+    hash: &WasmHash,
+) -> sqlx::Result<Option<bytes::Bytes>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    Ok(inner_reads::get_compiled_wasm(executor, hash.get_raw_39())
+        .await?
+        .map(|model| {
+            bytes::Bytes::from(model.serialized)
+        }))
 }
 
 /// Check if a DNA definition exists in the database.

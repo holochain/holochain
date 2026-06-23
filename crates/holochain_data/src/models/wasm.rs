@@ -9,10 +9,7 @@ use holochain_integrity_types::{
 use holochain_serialized_bytes::{SerializedBytes, UnsafeBytes};
 use holochain_types::prelude::CellId;
 use holochain_zome_types::prelude::{DnaDefHashed, InlineZomeDef};
-use holochain_zome_types::{
-    prelude::DnaDef,
-    zome::{CoordinatorZomeDef, IntegrityZomeDef, WasmZomeDef, ZomeDef},
-};
+use holochain_zome_types::{prelude::DnaDef, zome::{CoordinatorZomeDef, IntegrityZomeDef, WasmZomeDef, ZomeDef}};
 use sqlx::FromRow;
 use std::borrow::Cow;
 
@@ -40,6 +37,15 @@ impl WasmModel {
     pub fn wasm_hash(&self) -> WasmHash {
         WasmHash::from_raw_39(self.hash.clone())
     }
+}
+
+/// Database model for compiled WASM storage.
+///
+/// Maps to the `CompiledWasm` table.
+#[derive(Debug, Clone, FromRow)]
+pub struct CompiledWasmModel {
+    /// The compiled, serialized WASM.
+    pub serialized: Vec<u8>,
 }
 
 /// Database model for DNA definition.

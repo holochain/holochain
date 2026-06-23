@@ -315,6 +315,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-lock"
+version = "3.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "290f7f2596bd5b78a9fec8088ccd89180d7f9f55b94b0576823bbbdc72ee8311"
+dependencies = [
+ "event-listener",
+ "event-listener-strategy",
+ "pin-project-lite",
+]
+
+[[package]]
 name = "async-recursion"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2984,6 +2995,7 @@ dependencies = [
  "lair_keystore_api",
  "matches",
  "mockall",
+ "moka",
  "mr_bundle",
  "must_future",
  "nanoid 0.4.0",
@@ -3233,6 +3245,7 @@ name = "holochain_data"
 version = "0.7.0-dev.19"
 dependencies = [
  "base64",
+ "bytes",
  "holo_hash",
  "holochain_conductor_api",
  "holochain_data",
@@ -3471,6 +3484,7 @@ version = "0.7.0-dev.30"
 dependencies = [
  "async-recursion",
  "base64",
+ "bytes",
  "chrono",
  "cron",
  "derive_more",
@@ -5246,10 +5260,13 @@ version = "0.12.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "957228ad12042ee839f93c8f257b62b4c0ab5eaae1d4fa60de53b27c9d7c5046"
 dependencies = [
+ "async-lock",
  "crossbeam-channel",
  "crossbeam-epoch",
  "crossbeam-utils",
  "equivalent",
+ "event-listener",
+ "futures-util",
  "parking_lot",
  "portable-atomic",
  "smallvec",

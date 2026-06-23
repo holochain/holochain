@@ -16,6 +16,24 @@ where
     Ok(())
 }
 
+/// Insert or replace a compiled, serialized WASM module.
+pub(super) async fn put_compiled_wasm<'e, E>(
+    executor: E,
+    hash: &[u8],
+    serialized: &[u8],
+) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query("INSERT OR REPLACE INTO CompiledWasm (hash, serialized) VALUES (?, ?)")
+        .bind(hash)
+        .bind(serialized)
+        .execute(executor)
+        .await?;
+
+    Ok(())
+}
+
 /// Insert or replace a single DNA definition row.
 pub(super) async fn insert_dna_def<'e, E>(executor: E, model: &DnaDefModel) -> sqlx::Result<()>
 where

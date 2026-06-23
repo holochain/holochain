@@ -1,6 +1,6 @@
 use crate::conductor::space::TestSpaces;
 use crate::conductor::Conductor;
-use crate::core::ribosome::real_ribosome::{make_module_cache, RealRibosome, WasmBackend};
+use crate::core::ribosome::real_ribosome::{RealRibosome, WasmBackend, module_cache::make_module_cache};
 use crate::core::ribosome::Ribosome;
 use crate::core::workflow::incoming_dht_ops_workflow::op_exists;
 use crate::sweettest::SweetConductorConfig;
@@ -54,9 +54,10 @@ async fn test_cell_handle_publish() {
         .await
         .unwrap();
     let backend = WasmBackend::new();
-    let wasmer_module_cache = make_module_cache(backend, Some(db_dir.join("wasm-cache")));
 
     let store: WasmStore = WasmStore::test_new();
+    let wasmer_module_cache = make_module_cache(backend, store.clone());
+
     for (hash, wasm) in dna_file.code().clone() {
         store
             .put(DnaWasmHashed::with_pre_hashed(wasm, hash))
@@ -67,8 +68,7 @@ async fn test_cell_handle_publish() {
     let ribosome = RealRibosome::new(
         backend,
         dna_file.dna_def_hashed().clone(),
-        store,
-        wasmer_module_cache,
+        Arc::new(wasmer_module_cache),
     )
     .await
     .unwrap();

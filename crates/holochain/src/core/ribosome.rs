@@ -766,8 +766,7 @@ impl Ribosome {
         let real_ribosome = real_ribosome::RealRibosome::new(
             real_ribosome::WasmBackend::new(),
             dna_def_hashed.clone(),
-            store,
-            real_ribosome::make_module_cache(real_ribosome::WasmBackend::new(), None),
+            Arc::new(real_ribosome::module_cache::make_module_cache(real_ribosome::WasmBackend::new(), store)),
         )
         .await?;
         Ribosome::new(dna_def_hashed, real_ribosome).await

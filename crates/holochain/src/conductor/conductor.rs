@@ -67,7 +67,7 @@ use crate::core::queue_consumer::QueueTriggers;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
 use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CHANNEL_BOUND;
 use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CONCURRENT_LIMIT;
-use crate::core::ribosome::real_ribosome::{ModuleCacheLock, WasmBackend};
+use crate::core::ribosome::real_ribosome::WasmBackend;
 use crate::core::workflow::ZomeCallResult;
 use crate::{
     conductor::api::error::ConductorApiResult, core::ribosome::real_ribosome::RealRibosome,
@@ -106,6 +106,7 @@ use std::time::Instant;
 use tokio::sync::mpsc::error::SendError;
 use tokio::task::JoinHandle;
 use tracing::*;
+use crate::core::ribosome::real_ribosome::module_cache::ModuleCache;
 
 mod builder;
 
@@ -183,16 +184,11 @@ pub struct Conductor {
     /// The WASM backend that is in use for this conductor.
     wasm_backend: WasmBackend,
 
-    /// Cache for wasmer modules, both on disk and in memory.
+    /// Cache for wasmer modules, both in the database and in memory.
     ///
     /// This cache serves as a central storage location for wasmer modules,
-    /// shared across all ribosomes. The cache is optional and can be disabled by
-    /// setting it to `None`.
-    ///
-    /// Note: When using the `wasmer-wasmi` feature, it's recommended to disable
-    /// this cache since modules are interpreted at runtime rather than compiled,
-    /// making caching unnecessary.
-    pub(crate) wasmer_module_cache: Option<Arc<ModuleCacheLock>>,
+    /// shared across all ribosomes
+    pub(crate) wasmer_module_cache: Arc<ModuleCache>,
 
     app_auth_token_store: RwShare<AppAuthTokenStore>,
 
@@ -218,7 +214,8 @@ mod startup_shutdown_impls {
     use super::*;
     use crate::conductor::manager::{spawn_task_outcome_handler, OutcomeReceiver, OutcomeSender};
     use crate::conductor::metrics::register_uptime_metric;
-    use crate::core::ribosome::real_ribosome::{make_module_cache, WasmBackend};
+    use crate::core::ribosome::real_ribosome::module_cache::make_module_cache;
+    use crate::core::ribosome::real_ribosome::WasmBackend;
 
     //-----------------------------------------------------------------------------
     /// Methods used by the [ConductorHandle]
@@ -281,6 +278,11 @@ mod startup_shutdown_impls {
             };
             info!("Using the {wasm_backend:?} WASM backend");
 
+            let wasmer_module_cache = Arc::new(make_module_cache(
+                wasm_backend,
+                spaces.wasm_store.clone(),
+            ));
+
             Self {
                 spaces,
                 running_cells: RwShare::new(IndexMap::new()),
@@ -298,10 +300,7 @@ mod startup_shutdown_impls {
                 holochain_p2p,
                 post_commit,
                 wasm_backend,
-                wasmer_module_cache: make_module_cache(
-                    wasm_backend,
-                    maybe_data_root_path.map(|p| p.join(WASM_CACHE)),
-                ),
+                wasmer_module_cache,
                 app_auth_token_store: RwShare::default(),
                 app_broadcast: AppBroadcast::default(),
             }
@@ -637,7 +636,6 @@ mod dna_impls {
                 dna_defs_with_cell_id
                     .into_iter()
                     .map(|(cell_id, dna_def_hashed)| {
-                        let wasm_store = self.spaces.wasm_store.clone();
                         #[cfg(feature = "test_utils")]
                         let inline_zome_store = self.inline_zome_store.clone();
                         async move {
@@ -665,7 +663,6 @@ mod dna_impls {
                             let ribosome = RealRibosome::new(
                                 self.wasm_backend,
                                 dna_def_hashed.clone(),
-                                wasm_store,
                                 self.wasmer_module_cache.clone(),
                             )
                             .await?;
@@ -807,7 +804,6 @@ mod dna_impls {
                 let ribosome = RealRibosome::new(
                     self.wasm_backend,
                     dna_file.dna_def_hashed().clone(),
-                    self.spaces.wasm_store.clone(),
                     self.wasmer_module_cache.clone(),
                 )
                 .await?;
