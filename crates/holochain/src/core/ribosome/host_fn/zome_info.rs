@@ -1,14 +1,13 @@
 use crate::core::ribosome::error::RibosomeError;
-use crate::core::ribosome::CallContext;
+use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::HostFnAccess;
-use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 use wasmer::RuntimeError;
 
 pub fn zome_info(
-    ribosome: Arc<impl RibosomeT>,
+    ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,
     _input: (),
 ) -> Result<ZomeInfo, RuntimeError> {

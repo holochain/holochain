@@ -1,7 +1,6 @@
-use crate::core::ribosome::CallContext;
+use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
-use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use holochain_wasmer_host::wasm_host_error as wasm_error;
@@ -9,7 +8,7 @@ use std::sync::Arc;
 use wasmer::RuntimeError;
 
 pub fn ed_25519_x_salsa20_poly1305_decrypt(
-    _ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,
     input: Ed25519XSalsa20Poly1305Decrypt,
 ) -> Result<XSalsa20Poly1305Data, RuntimeError> {

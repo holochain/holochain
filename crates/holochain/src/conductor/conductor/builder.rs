@@ -33,6 +33,11 @@ pub struct ConductorBuilder {
     /// With these PRAGMA commands, you'll be able to run sqlcipher
     /// directly to manipulate holochain databases.
     pub danger_print_db_secrets: bool,
+
+    /// An [`InlineZomeStore`] to use, permitting a new conductor startup to use inline zomes that
+    /// were installed on a previous run.
+    #[cfg(feature = "test_utils")]
+    pub inline_zome_store: Option<crate::core::ribosome::inline_ribosome::InlineZomeStore>,
 }
 
 impl ConductorBuilder {
@@ -274,6 +279,8 @@ impl ConductorBuilder {
             spaces,
             post_commit_sender,
             outcome_tx,
+            #[cfg(feature = "test_utils")]
+            builder.inline_zome_store.unwrap_or_default(),
         );
 
         // Create handle
@@ -378,13 +385,20 @@ impl ConductorBuilder {
         self
     }
 
+    /// Add an inline zome store
+    #[cfg(feature = "test_utils")]
+    pub fn with_inline_zome_store(
+        mut self,
+        inline_zome_store: crate::core::ribosome::inline_ribosome::InlineZomeStore,
+    ) -> Self {
+        self.inline_zome_store = Some(inline_zome_store);
+        self
+    }
+
     /// Build a Conductor with a test environment
     #[cfg(any(test, feature = "test_utils"))]
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all, fields(scope = self.config.network.tracing_scope)))]
-    pub async fn test(
-        self,
-        extra_dna_files: &[(CellId, DnaFile)],
-    ) -> ConductorResult<ConductorHandle> {
+    pub async fn test(self) -> ConductorResult<ConductorHandle> {
         if rustls::crypto::aws_lc_rs::default_provider()
             .install_default()
             .is_err()
@@ -497,24 +511,14 @@ impl ConductorBuilder {
             spaces,
             post_commit_sender,
             outcome_tx,
+            #[cfg(feature = "test_utils")]
+            builder.inline_zome_store.unwrap_or_default(),
         );
 
         // Create handle
         let handle: ConductorHandle = Arc::new(conductor);
 
         holochain_p2p.register_handler(handle.clone()).await?;
-
-        // Register extra DNAs. In particular, the ones with InlineZomes will
-        // not be registered in the Wasm DB and cannot be automatically loaded
-        // on conductor restart. Hence they need to get passed along here
-        // via the extra_dna_files argument (populated from the SweetConductor's
-        // DnaFile cache) in order to be added to the RibosomeStore manually.
-        for (cell_id, dna_file) in extra_dna_files {
-            handle
-                .register_dna_file(cell_id.clone(), dna_file.clone())
-                .await
-                .expect("Could not install DNA");
-        }
 
         Self::finish(
             handle,

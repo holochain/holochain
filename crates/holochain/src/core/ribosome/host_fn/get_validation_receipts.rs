@@ -1,5 +1,5 @@
 use crate::core::ribosome::error::RibosomeError;
-use crate::core::ribosome::{CallContext, RibosomeT};
+use crate::core::ribosome::{CallContext, Ribosome};
 use holochain_types::access::{HostFnAccess, Permission};
 use holochain_util::tokio_helper;
 use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner, WasmHostError};
@@ -9,7 +9,7 @@ use wasmer::RuntimeError;
 
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(_ribosome, call_context), fields(?call_context.zome, function = ?call_context.function_name)))]
 pub fn get_validation_receipts(
-    _ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,
     input: GetValidationReceiptsInput,
 ) -> Result<Vec<ValidationReceiptSet>, RuntimeError> {
@@ -52,18 +52,18 @@ mod tests {
     use crate::core::ribosome::host_fn::create::create;
     use crate::core::ribosome::host_fn::get_validation_receipts::get_validation_receipts;
     use crate::fixt::ZomeCallHostAccessFixturator;
-    use crate::fixt::{CallContextFixturator, RealRibosomeFixturator};
+    use crate::fixt::CallContextFixturator;
     use ::fixt::Predictable;
     use ::fixt::{fixt, Unpredictable};
     use holochain_wasm_test_utils::{TestWasm, TestWasmPair};
     use holochain_zome_types::prelude::*;
     use std::sync::Arc;
+    use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn call_get_validation_receipts() {
-        let ribosome = RealRibosomeFixturator::new(crate::fixt::Zomes(vec![TestWasm::Crd]))
-            .next()
-            .unwrap();
+        let ribosome = MockRibosomeBuilder::new().build().await.unwrap();
+
         let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
         call_context.zome = TestWasmPair::<IntegrityZome, CoordinatorZome>::from(TestWasm::Crd)
             .coordinator

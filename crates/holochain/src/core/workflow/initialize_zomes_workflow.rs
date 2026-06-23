@@ -7,7 +7,7 @@ use crate::core::ribosome::guest_callback::init::InitHostAccess;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::guest_callback::post_commit::send_post_commit;
-use crate::core::ribosome::RibosomeT;
+use crate::core::ribosome::Ribosome;
 use derive_more::Constructor;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::DynHolochainP2pDna;
@@ -17,10 +17,7 @@ use holochain_zome_types::action::builder;
 use tokio::sync::broadcast;
 
 #[derive(Constructor)]
-pub struct InitializeZomesWorkflowArgs<Ribosome>
-where
-    Ribosome: RibosomeT + 'static,
-{
+pub struct InitializeZomesWorkflowArgs {
     pub ribosome: Ribosome,
     pub conductor_handle: ConductorHandle,
     pub signal_tx: broadcast::Sender<Signal>,
@@ -28,27 +25,21 @@ where
     pub integrate_dht_ops_trigger: TriggerSender,
 }
 
-impl<Ribosome> InitializeZomesWorkflowArgs<Ribosome>
-where
-    Ribosome: RibosomeT + 'static,
-{
+impl InitializeZomesWorkflowArgs {
     pub fn dna_def(&self) -> &DnaDef {
-        self.ribosome.dna_def_hashed().as_content()
+        self.ribosome.dna_def().as_content()
     }
 }
 
 // #[cfg_attr(feature = "instrument", tracing::instrument(skip(network, keystore, workspace, args)))]
-pub async fn initialize_zomes_workflow<Ribosome>(
+pub async fn initialize_zomes_workflow(
     workspace: SourceChainWorkspace,
     network: DynHolochainP2pDna,
     keystore: MetaLairClient,
-    args: InitializeZomesWorkflowArgs<Ribosome>,
-) -> WorkflowResult<InitResult>
-where
-    Ribosome: RibosomeT + Clone + 'static,
-{
+    args: InitializeZomesWorkflowArgs,
+) -> WorkflowResult<InitResult> {
     let conductor_handle = args.conductor_handle.clone();
-    let coordinators = args.ribosome.dna_def_hashed().get_all_coordinators();
+    let coordinators = args.ribosome.dna_def().get_all_coordinators();
     let integrate_dht_ops_trigger = args.integrate_dht_ops_trigger.clone();
     let signal_tx = args.signal_tx.clone();
     let result =
@@ -82,15 +73,12 @@ where
     Ok(result)
 }
 
-async fn initialize_zomes_workflow_inner<Ribosome>(
+async fn initialize_zomes_workflow_inner(
     workspace: SourceChainWorkspace,
     network: DynHolochainP2pDna,
     keystore: MetaLairClient,
-    args: InitializeZomesWorkflowArgs<Ribosome>,
-) -> WorkflowResult<InitResult>
-where
-    Ribosome: RibosomeT + 'static,
-{
+    args: InitializeZomesWorkflowArgs,
+) -> WorkflowResult<InitResult> {
     let dna_def = args.dna_def().clone();
     let InitializeZomesWorkflowArgs {
         ribosome,
@@ -135,8 +123,7 @@ where
 mod tests {
     use super::*;
     use crate::conductor::Conductor;
-    use crate::core::ribosome::guest_callback::validate::ValidateResult;
-    use crate::core::ribosome::MockRibosomeT;
+    use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
     use crate::fixt::DnaDefFixturator;
     use crate::fixt::MetaLairClientFixturator;
     use crate::sweettest::*;
@@ -202,18 +189,12 @@ mod tests {
         )
         .await
         .unwrap();
-        let mut ribosome = MockRibosomeT::new();
-
-        // Setup the ribosome mock
-        ribosome
-            .expect_run_init()
-            .returning(move |_workspace, _invocation| Ok(InitResult::Pass));
-        ribosome
-            .expect_run_validate()
-            .returning(move |_, _| Ok(ValidateResult::Valid));
-        ribosome
-            .expect_dna_def_hashed()
-            .return_const(dna_def_hashed.clone());
+        let ribosome = MockRibosomeBuilder::new()
+            .with_init_handler(|_, _| Ok(InitCallbackResult::Pass))
+            .with_validate_handler(|_, _| Ok(ValidateCallbackResult::Valid))
+            .build()
+            .await
+            .unwrap();
 
         let db_dir = test_db_dir();
         let config = SweetConductorConfig::standard().tune_network_config(|nc| {
@@ -223,7 +204,7 @@ mod tests {
         let conductor_handle = Conductor::builder()
             .config(config.into())
             .with_data_root_path(db_dir.path().to_path_buf().into())
-            .test(&[])
+            .test()
             .await
             .unwrap();
         let integrate_dht_ops_trigger = TriggerSender::new();

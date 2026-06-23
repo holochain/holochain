@@ -1,8 +1,7 @@
 use crate::core::metrics::emit_signal_metric;
-use crate::core::ribosome::CallContext;
+use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
-use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use holochain_types::signal::Signal;
 use holochain_wasmer_host::prelude::*;
@@ -10,7 +9,7 @@ use std::sync::Arc;
 use wasmer::RuntimeError;
 
 pub fn emit_signal(
-    ribosome: Arc<impl RibosomeT>,
+    ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,
     input: AppSignal,
 ) -> Result<(), RuntimeError> {
@@ -20,7 +19,7 @@ pub fn emit_signal(
             ..
         } => {
             let cell_id = CellId::new(
-                ribosome.dna_def_hashed().as_hash().clone(),
+                ribosome.dna_def().as_hash().clone(),
                 call_context
                     .host_context
                     .workspace()

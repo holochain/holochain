@@ -204,7 +204,7 @@ async fn test_multi_integrity() {
         integrity_zomes: vec![
             (
                 "zome1".into(),
-                ZomeDef::Wasm(WasmZome {
+                ZomeDef::Wasm(WasmZomeDef {
                     wasm_hash: wasm_hash.clone(),
                     dependencies: vec![],
                 })
@@ -212,7 +212,7 @@ async fn test_multi_integrity() {
             ),
             (
                 "zome2".into(),
-                ZomeDef::Wasm(WasmZome {
+                ZomeDef::Wasm(WasmZomeDef {
                     wasm_hash: wasm_hash.clone(),
                     dependencies: vec![],
                 })
@@ -222,7 +222,7 @@ async fn test_multi_integrity() {
         coordinator_zomes: vec![
             (
                 "zome3".into(),
-                ZomeDef::Wasm(WasmZome {
+                ZomeDef::Wasm(WasmZomeDef {
                     wasm_hash: wasm_hash2.clone(),
                     dependencies: vec!["zome1".into()],
                 })
@@ -230,7 +230,7 @@ async fn test_multi_integrity() {
             ),
             (
                 "zome4".into(),
-                ZomeDef::Wasm(WasmZome {
+                ZomeDef::Wasm(WasmZomeDef {
                     wasm_hash: wasm_hash2.clone(),
                     dependencies: vec!["zome1".into(), "zome2".into()],
                 })
@@ -321,7 +321,7 @@ async fn test_multi_integrity() {
         integrity_zomes: vec![
             (
                 "zome1".into(),
-                ZomeDef::Wasm(WasmZome {
+                ZomeDef::Wasm(WasmZomeDef {
                     wasm_hash: wasm_hash.clone(),
                     dependencies: vec![],
                 })
@@ -329,7 +329,7 @@ async fn test_multi_integrity() {
             ),
             (
                 "zome2".into(),
-                ZomeDef::Wasm(WasmZome {
+                ZomeDef::Wasm(WasmZomeDef {
                     wasm_hash: wasm_hash.clone(),
                     dependencies: vec![],
                 })
@@ -339,7 +339,7 @@ async fn test_multi_integrity() {
         coordinator_zomes: vec![
             (
                 "zome3".into(),
-                ZomeDef::Wasm(WasmZome {
+                ZomeDef::Wasm(WasmZomeDef {
                     wasm_hash: wasm_hash2.clone(),
                     dependencies: vec!["zome1".into()],
                 })
@@ -347,7 +347,7 @@ async fn test_multi_integrity() {
             ),
             (
                 "zome4".into(),
-                ZomeDef::Wasm(WasmZome {
+                ZomeDef::Wasm(WasmZomeDef {
                     wasm_hash: wasm_hash2.clone(),
                     dependencies: vec!["zome1".into(), "zome2".into()],
                 })
@@ -400,7 +400,7 @@ async fn test_hash_dna_function() {
         let cmd = cmd.args(["hash", "tests/fixtures/my-app/dnas/dna1/a dna.dna"]);
         let stdout = cmd.assert().success().get_output().stdout.clone();
         let actual = String::from_utf8_lossy(&stdout).replace(['\r', '\n'], ""); // Normalize Windows/linux
-        let expected = "uhC0klF08DnZkYBN3YiE7knVHdl5eK-9f7m9Co1ICK7Xwgaxct8h5";
+        let expected = "uhC0kMpN6EzEhjaPP-MWeJi1cH2Zyw7OYEDEekSnjWE85WgCnIvEG";
         assert_eq!(expected, actual, "Expected: {expected}\nActual: {actual}");
     }
 }

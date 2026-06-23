@@ -1,7 +1,6 @@
-use crate::core::ribosome::CallContext;
+use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
-use crate::core::ribosome::RibosomeT;
 use holochain_wasmer_host::prelude::*;
 
 use holochain_types::prelude::*;
@@ -9,7 +8,7 @@ use std::sync::Arc;
 use wasmer::RuntimeError;
 
 pub fn open_chain(
-    _ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,
     input: OpenChainInput,
 ) -> Result<ActionHash, RuntimeError> {
@@ -60,20 +59,18 @@ mod tests {
     use holo_hash::fixt::ActionHashFixturator;
 use super::open_chain;
     use crate::fixt::ZomeCallHostAccessFixturator;
-    use crate::fixt::{CallContextFixturator, RealRibosomeFixturator};
+    use crate::fixt::CallContextFixturator;
     use ::fixt::prelude::*;
     use holochain_util::tokio_helper;
     use holochain_wasm_test_utils::{TestWasm, TestWasmPair};
     use holochain_zome_types::prelude::*;
     use std::sync::Arc;
+    use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn call_open_chain() {
         // Note that any zome will do here, we're not calling its functions!
-        let ribosome =
-            RealRibosomeFixturator::new(crate::fixt::Zomes(vec![TestWasm::MigrateNew]))
-                .next()
-                .unwrap();
+        let ribosome = MockRibosomeBuilder::new().build().await.unwrap();
         let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
         call_context.zome =
             TestWasmPair::<IntegrityZome, CoordinatorZome>::from(TestWasm::MigrateNew)

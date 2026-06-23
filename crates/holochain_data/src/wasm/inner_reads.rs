@@ -70,7 +70,7 @@ where
     E: Executor<'e, Database = Sqlite>,
 {
     sqlx::query_as(
-        "SELECT dna_hash, agent, zome_index, zome_name, wasm_hash, dependencies FROM IntegrityZome WHERE dna_hash = ? AND agent = ? ORDER BY zome_index",
+        "SELECT dna_hash, agent, zome_index, zome_name, zome_hash, dependencies FROM IntegrityZome WHERE dna_hash = ? AND agent = ? ORDER BY zome_index",
     )
     .bind(dna_hash)
     .bind(agent)
@@ -88,7 +88,7 @@ where
     E: Executor<'e, Database = Sqlite>,
 {
     sqlx::query_as(
-        "SELECT dna_hash, agent, zome_index, zome_name, wasm_hash, dependencies FROM CoordinatorZome WHERE dna_hash = ? AND agent = ? ORDER BY zome_index",
+        "SELECT dna_hash, agent, zome_index, zome_name, zome_hash, dependencies FROM CoordinatorZome WHERE dna_hash = ? AND agent = ? ORDER BY zome_index",
     )
     .bind(dna_hash)
     .bind(agent)

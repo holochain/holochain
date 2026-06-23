@@ -973,7 +973,7 @@ async fn check_app_entry_def_test() {
     let data_root_dir: DataRootPath = db_dir.path().to_path_buf().into();
     let conductor_handle = Conductor::builder()
         .with_data_root_path(data_root_dir)
-        .test(&[])
+        .test()
         .await
         .unwrap();
 
@@ -1288,7 +1288,7 @@ async fn app_validation_produces_warrants() {
     .unwrap();
 
     conductors[0].shutdown().await;
-    conductors[2].startup(false).await;
+    conductors[2].startup().await;
 
     //- Ensure that bob authored a warrant
     let alice_pubkey = alice.agent_pubkey().clone();

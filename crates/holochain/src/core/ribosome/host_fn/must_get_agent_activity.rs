@@ -1,9 +1,8 @@
 use crate::core::ribosome::host_fn::cascade_from_call_context;
-use crate::core::ribosome::CallContext;
+use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
-use crate::core::ribosome::RibosomeT;
 use holochain_cascade::CascadeImpl;
 use holochain_p2p::actor::NetworkRequestOptions;
 use holochain_state::mutations::insert_op_cache;
@@ -17,7 +16,7 @@ use wasmer::RuntimeError;
     tracing::instrument(skip(_ribosome, call_context))
 )]
 pub fn must_get_agent_activity(
-    _ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,
     input: MustGetAgentActivityInput,
 ) -> Result<Vec<RegisterAgentActivity>, RuntimeError> {

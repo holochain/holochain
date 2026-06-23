@@ -14,6 +14,9 @@ pub enum ZomeError {
     /// SerializedBytesError (can occur during DnaDef::update_modifiers)
     #[error(transparent)]
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
+
+    #[error("Zome dependency {0} for {1} is not pointing at an existing integrity zome that is not itself")]
+    DanglingZomeDependency(String, String),
 }
 
 pub type ZomeResult<T> = Result<T, ZomeError>;

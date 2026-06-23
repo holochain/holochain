@@ -2,11 +2,11 @@
 //!
 //! Provides [`TxRead`] and [`TxWrite`] impls for querying and mutating the Wasm database table.
 
-use holo_hash::{AgentPubKey, WasmHash};
-use holochain_types::prelude::{CellId, DnaDef, DnaWasmHashed, EntryDef};
-
 use crate::handles::{TxRead, TxWrite};
 use crate::kind::Wasm;
+use holo_hash::{AgentPubKey, WasmHash};
+use holochain_types::prelude::{CellId, DnaDef, DnaWasmHashed, EntryDef};
+use holochain_zome_types::prelude::DnaDefHashed;
 
 use super::{reads, writes};
 
@@ -27,7 +27,7 @@ impl TxRead<Wasm> {
     }
 
     /// Get a DNA definition for the passed [`CellId`].
-    pub async fn get_dna_def(&mut self, cell_id: &CellId) -> sqlx::Result<Option<DnaDef>> {
+    pub async fn get_dna_def(&mut self, cell_id: &CellId) -> sqlx::Result<Option<DnaDefHashed>> {
         reads::get_dna_def(self.tx_mut(), cell_id).await
     }
 
@@ -47,7 +47,7 @@ impl TxRead<Wasm> {
     }
 
     /// Get all DNA definitions with their associated cell IDs.
-    pub async fn get_all_dna_defs(&mut self) -> sqlx::Result<Vec<(CellId, DnaDef)>> {
+    pub async fn get_all_dna_defs(&mut self) -> sqlx::Result<Vec<(CellId, DnaDefHashed)>> {
         reads::get_all_dna_defs(self.tx_mut()).await
     }
 }

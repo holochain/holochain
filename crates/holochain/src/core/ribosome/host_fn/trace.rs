@@ -1,5 +1,4 @@
-use crate::core::ribosome::CallContext;
-use crate::core::ribosome::RibosomeT;
+use crate::core::ribosome::{CallContext, Ribosome};
 use holochain_types::prelude::*;
 use once_cell::unsync::Lazy;
 use std::sync::Arc;
@@ -28,7 +27,7 @@ pub fn wasm_trace(input: TraceMsg) {
 }
 
 pub fn trace(
-    _ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<Ribosome>,
     _call_context: Arc<CallContext>,
     input: TraceMsg,
 ) -> Result<(), RuntimeError> {
@@ -56,17 +55,15 @@ pub mod wasm_test {
     use super::*;
 
     use crate::fixt::CallContextFixturator;
-    use crate::fixt::RealRibosomeFixturator;
     use crate::test_utils::RibosomeTestFixture;
     use holochain_wasm_test_utils::TestWasm;
     use std::sync::Arc;
+    use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
 
     /// we can get an entry hash out of the fn directly
     #[tokio::test(flavor = "multi_thread")]
     async fn trace_test() {
-        let ribosome = RealRibosomeFixturator::new(crate::fixt::Zomes(vec![]))
-            .next()
-            .unwrap();
+        let ribosome = MockRibosomeBuilder::new().build().await.unwrap();
         let call_context = CallContextFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();

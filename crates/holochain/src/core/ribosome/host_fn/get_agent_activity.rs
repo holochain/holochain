@@ -1,8 +1,7 @@
 use crate::core::ribosome::host_fn::cascade_from_call_context;
-use crate::core::ribosome::CallContext;
+use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
-use crate::core::ribosome::RibosomeT;
 use holochain_cascade::get_options_ext::GetOptionsExt;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_types::prelude::*;
@@ -11,7 +10,7 @@ use std::sync::Arc;
 use wasmer::RuntimeError;
 
 pub fn get_agent_activity(
-    _ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,
     input: GetAgentActivityInput,
 ) -> Result<AgentActivity, RuntimeError> {

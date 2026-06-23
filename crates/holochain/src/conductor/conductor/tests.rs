@@ -59,6 +59,7 @@ async fn app_ids_are_unique() {
         spaces,
         post_commit_sender,
         outcome_tx,
+        Default::default(),
     );
 
     let app_id = "app_id".to_string();
@@ -472,7 +473,7 @@ async fn test_deferred_memproof_provisioning() {
     );
 
     conductor.shutdown().await;
-    conductor.startup(false).await;
+    conductor.startup().await;
 
     //- Status is still AwaitingMemproofs after a restart
     let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();

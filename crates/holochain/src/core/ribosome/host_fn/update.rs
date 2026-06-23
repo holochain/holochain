@@ -1,9 +1,8 @@
 use super::delete::get_original_entry_data;
-use crate::core::ribosome::weigh_placeholder;
+use crate::core::ribosome::{weigh_placeholder, Ribosome};
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
-use crate::core::ribosome::RibosomeT;
 use holochain_wasmer_host::prelude::*;
 use wasmer::RuntimeError;
 
@@ -11,7 +10,7 @@ use holochain_types::prelude::*;
 use std::sync::Arc;
 
 pub fn update(
-    _ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,
     input: UpdateInput,
 ) -> Result<ActionHash, RuntimeError> {

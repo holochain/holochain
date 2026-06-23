@@ -74,6 +74,7 @@ full-dna-def = [
   "dep:uuid",
   "dep:shrinkwraprs",
   "holochain_integrity_types/full-dna-def",
+  "holo_hash/hashing",
 ]
 
 full = [

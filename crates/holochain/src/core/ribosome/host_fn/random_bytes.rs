@@ -1,7 +1,6 @@
-use crate::core::ribosome::CallContext;
+use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
-use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
@@ -9,7 +8,7 @@ use wasmer::RuntimeError;
 
 /// return n crypto secure random bytes from the standard holochain crypto lib
 pub fn random_bytes(
-    _ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,
     input: u32,
 ) -> Result<holochain_types::prelude::Bytes, RuntimeError> {
@@ -45,19 +44,17 @@ pub mod wasm_test {
 
     use crate::core::ribosome::HostContext;
     use crate::fixt::CallContextFixturator;
-    use crate::fixt::RealRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use crate::test_utils::RibosomeTestFixture;
     use ::fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use std::sync::Arc;
+    use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
 
     /// we can get some random data out of the fn directly
     #[tokio::test(flavor = "multi_thread")]
     async fn random_bytes_test() {
-        let ribosome = RealRibosomeFixturator::new(crate::fixt::Zomes(vec![]))
-            .next()
-            .unwrap();
+        let ribosome = MockRibosomeBuilder::new().build().await.unwrap();
         let mut call_context = CallContextFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();

@@ -46,8 +46,8 @@ impl Invocation for EntryDefsInvocation {
     fn fn_components(&self) -> FnComponents {
         vec!["entry_defs".into()].into()
     }
-    fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
-        ExternIO::encode(())
+    fn take_host_input(&self) -> Result<Option<ExternIO>, SerializedBytesError> {
+        ExternIO::encode(()).map(Some)
     }
     fn auth(&self) -> InvocationAuth {
         InvocationAuth::LocalCallback
@@ -167,7 +167,11 @@ mod test {
             .next()
             .unwrap();
 
-        let host_input = entry_defs_invocation.clone().host_input().unwrap();
+        let host_input = entry_defs_invocation
+            .clone()
+            .take_host_input()
+            .unwrap()
+            .unwrap();
 
         assert_eq!(host_input, ExternIO::encode(()).unwrap());
     }
@@ -178,10 +182,8 @@ mod test {
 mod slow_tests {
     use crate::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
     use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
-    use crate::core::ribosome::RibosomeT;
+    use crate::core::ribosome::Ribosome;
     use crate::fixt::EntryDefsInvocationFixturator;
-    use crate::fixt::RealRibosomeFixturator;
-    use crate::fixt::Zomes;
     use crate::test_utils::RibosomeTestFixture;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
@@ -190,8 +192,8 @@ mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_entry_defs_unimplemented() {
-        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
-            .next()
+        let ribosome = Ribosome::new_with_test_wasms(vec![TestWasm::Foo])
+            .await
             .unwrap();
         let entry_defs_invocation = EntryDefsInvocationFixturator::new(::fixt::Empty)
             .next()
@@ -216,8 +218,8 @@ mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_entry_defs_implemented_defs() {
-        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::EntryDefs]))
-            .next()
+        let ribosome = Ribosome::new_with_test_wasms(vec![TestWasm::EntryDefs])
+            .await
             .unwrap();
         let entry_defs_invocation = EntryDefsInvocationFixturator::new(::fixt::Empty)
             .next()

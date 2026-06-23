@@ -313,12 +313,13 @@ async fn test_foreign_key_constraints() {
 
     // Insert an IntegrityZome referencing the DnaDef
     sqlx::query(
-        "INSERT INTO IntegrityZome (dna_hash, agent, zome_index, zome_name, dependencies) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO IntegrityZome (dna_hash, agent, zome_index, zome_name, zome_hash, dependencies) VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind(&dna_hash)
     .bind(&agent)
     .bind(0)
     .bind("test_zome")
+    .bind(vec![0u8])
     .bind("[]")
     .execute(db_conn.pool())
     .await
@@ -338,12 +339,13 @@ async fn test_foreign_key_constraints() {
     let bad_dna_hash = vec![99u8; 32];
     let bad_agent = vec![99u8; 32];
     let err = sqlx::query(
-        "INSERT INTO IntegrityZome (dna_hash, agent, zome_index, zome_name, dependencies) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO IntegrityZome (dna_hash, agent, zome_index, zome_name, zome_hash, dependencies) VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind(&bad_dna_hash)
     .bind(&bad_agent)
     .bind(0)
     .bind("bad_zome")
+    .bind(vec![0u8])
     .bind("[]")
     .execute(db_conn.pool())
     .await

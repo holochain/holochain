@@ -16,11 +16,6 @@ pub trait DnaWithRole: Clone + std::fmt::Debug + Sized {
 
     /// The DNA
     fn into_dna(self) -> DnaFile;
-
-    /// Replace the DNA without changing the role
-    fn replace_dna(self, dna: DnaFile) -> (RoleName, DnaFile) {
-        (self.role(), dna)
-    }
 }
 
 impl DnaWithRole for DnaFile {

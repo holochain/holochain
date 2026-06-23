@@ -563,7 +563,7 @@ async fn alice_can_recover_from_a_session_timeout() {
 
     // Alice comes back online, and should be able to recover her session. It will take finding
     // her session in her source chain and then trying to build a signature bundle from the network.
-    conductors[0].startup(false).await;
+    conductors[0].startup().await;
 
     tracing::warn!("Alice is back online");
 
@@ -795,7 +795,7 @@ async fn alice_can_force_abandon_session_when_automatic_resolution_has_failed_af
     conductors[0].shutdown().await;
 
     // Alice comes back online.
-    conductors[0].startup(false).await;
+    conductors[0].startup().await;
 
     // Wait until Alice's session has been attempted to be resolved.
     tokio::time::timeout(Duration::from_secs(30), async {
@@ -975,10 +975,10 @@ async fn alice_can_force_publish_session_when_automatic_resolution_has_failed_af
     conductors[1].shutdown().await;
 
     // Alice comes back online.
-    conductors[0].startup(false).await;
+    conductors[0].startup().await;
 
     // Bob comes back online too.
-    conductors[1].startup(false).await;
+    conductors[1].startup().await;
 
     // Need authority logic to work, so force setting full arcs.
     conductors[0]

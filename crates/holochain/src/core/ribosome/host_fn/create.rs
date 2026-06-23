@@ -1,8 +1,7 @@
-use crate::core::ribosome::weigh_placeholder;
+use crate::core::ribosome::{weigh_placeholder, Ribosome};
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
-use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
@@ -11,7 +10,7 @@ use wasmer::RuntimeError;
 /// create record
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn create<'a>(
-    _ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,
     input: CreateInput,
 ) -> Result<ActionHash, RuntimeError> {
@@ -119,13 +118,12 @@ pub mod wasm_test {
     use holochain_wasm_test_utils::TestWasm;
     use holochain_wasm_test_utils::TestWasmPair;
     use std::sync::Arc;
+    use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
 
     /// we can get an entry hash out of the fn directly
     #[tokio::test(flavor = "multi_thread")]
     async fn create_entry_test() {
-        let ribosome = RealRibosomeFixturator::new(crate::fixt::Zomes(vec![TestWasm::Create]))
-            .next()
-            .unwrap();
+        let ribosome = MockRibosomeBuilder::new().build().await.unwrap();
         let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
         call_context.zome = TestWasmPair::<IntegrityZome, CoordinatorZome>::from(TestWasm::Create)
             .coordinator

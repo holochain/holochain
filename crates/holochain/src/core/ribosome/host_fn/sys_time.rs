@@ -1,7 +1,6 @@
-use crate::core::ribosome::CallContext;
+use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
-use crate::core::ribosome::RibosomeT;
 use holochain_types::access::Permission;
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::prelude::Timestamp;
@@ -9,7 +8,7 @@ use std::sync::Arc;
 use wasmer::RuntimeError;
 
 pub fn sys_time(
-    _ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,
     _input: (),
 ) -> Result<Timestamp, RuntimeError> {

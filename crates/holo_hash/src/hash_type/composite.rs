@@ -1,5 +1,6 @@
 use super::*;
 use crate::error::HoloHashError;
+use crate::{InlineHash, WasmHash};
 #[cfg(feature = "serialization")]
 use holochain_serialized_bytes::prelude::*;
 use std::convert::TryInto;
@@ -156,5 +157,56 @@ impl From<AnyDht> for AnyLinkable {
             AnyDht::Entry => AnyLinkable::Entry,
             AnyDht::Action => AnyLinkable::Action,
         }
+    }
+}
+
+/// Composite type for zome hashes
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Deserialize, serde::Serialize)
+)]
+pub enum Zome {
+    /// A WASM typed hash
+    Wasm,
+    /// An Inline typed hash
+    Inline,
+}
+
+impl HashType for Zome {
+    fn get_prefix(self) -> &'static [u8] {
+        match self {
+            Self::Wasm => WASM_PREFIX,
+            Self::Inline => INLINE_PREFIX,
+        }
+    }
+
+    fn try_from_prefix(prefix: &[u8]) -> HoloHashResult<Self> {
+        match prefix {
+            primitive::WASM_PREFIX => Ok(Zome::Wasm),
+            primitive::INLINE_PREFIX => Ok(Zome::Inline),
+            _ => Err(HoloHashError::BadPrefix(
+                "ZomeHash".to_string(),
+                prefix.try_into().expect("3 byte prefix"),
+            )),
+        }
+    }
+
+    fn hash_name(self) -> &'static str {
+        "ZomeHash"
+    }
+}
+
+impl HashTypeSync for Zome {}
+
+impl From<WasmHash> for crate::ZomeHash {
+    fn from(value: WasmHash) -> Self {
+        Self::from_raw_39(value.into_inner())
+    }
+}
+
+impl From<InlineHash> for crate::ZomeHash {
+    fn from(value: InlineHash) -> Self {
+        Self::from_raw_39(value.into_inner())
     }
 }
