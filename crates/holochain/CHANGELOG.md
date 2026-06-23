@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Rework the `migrate_initial` and `migrate_new` test WASMs for the chain-switch migration path. `migrate_initial` gains a `prepare_migration_summary` function that collects and signs the data to carry forward. `migrate_new`'s `init` now reads `get_init_properties()` to obtain the real `close_hash` and the signed summary, removing the fake close hash and the live cross-cell call that were previously in the test. The integrity zome validates the signed migration record against a `trusted_signers` list in the DNA properties. \#5827
 - Clear `init_properties` from the conductor database after a successful `init` callback, so the per-role seed material does not outlive its use. \#5827
 - Add the `get_init_properties` host function and its HDK wrapper. It is callable only from the `init` callback and returns the per-role `init_properties` supplied at install time, so a freshly migrated chain can be seeded during `init`. \#5827
 - Persist per-role `init_properties` in the conductor database, keyed by `(app_id, role_name)`. Rows are written during app installation and removed automatically when the app is uninstalled. \#5827
