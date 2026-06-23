@@ -261,10 +261,8 @@ fn all_records() -> Vec<Record> {
 
 #[test]
 fn legacy_op_hash_matches_v2_content_hash() {
-    // After the 1c-iii flip, the canonical legacy op hash is the content-derived
-    // v2 hash. Verify the legacy `ChainOp` hashing path agrees, op-for-op, with
-    // the v2 `ChainOpUniqueForm::op_hash` over the projected action (which 1c-i
-    // already pins to `dht_v2::ChainOp::to_hash`).
+    // Check the canonical legacy op hash is the content-derived
+    // v2 hash.
     for record in all_records() {
         let v2_action = crate::dht_v2::from_legacy_action(record.action());
         for op in produce_ops_from_record(&record).unwrap() {

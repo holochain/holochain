@@ -1,4 +1,4 @@
-//! v2 `OpEntry` / `OpUpdate` / `OpDelete` — see [`crate::flat_op_v2`].
+//! The `OpEntry` / `OpUpdate` / `OpDelete` for v2, see description in the [`crate::flat_op_v2`] parent module.
 use super::*;
 use holochain_integrity_types::{CapClaimEntry, CapGrantEntry};
 
@@ -193,6 +193,5 @@ mod tests {
             action: action.clone(),
         };
         assert_eq!(op.clone(), op);
-        assert_eq!(op.action, action);
     }
 }

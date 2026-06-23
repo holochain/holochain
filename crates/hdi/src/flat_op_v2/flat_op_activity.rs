@@ -1,4 +1,4 @@
-//! v2 `OpActivity` — see [`crate::flat_op_v2`].
+//! The `OpActivity` for v2, see description in the [`crate::flat_op_v2`] parent module.
 use super::*;
 use holochain_integrity_types::MigrationTarget;
 
