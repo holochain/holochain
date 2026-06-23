@@ -3092,6 +3092,31 @@ mod accessor_impls {
                 .get_init_properties(&app_id, &role_name)
                 .await?)
         }
+
+        /// Remove the init properties for the role that the given cell is provisioned for.
+        /// Called after a successful `init` so the seed material does not remain past its use.
+        pub async fn delete_init_properties_for_cell(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorResult<()> {
+            let state = self.get_state().await?;
+            let Some(app) = state.find_app_containing_cell(cell_id) else {
+                return Ok(());
+            };
+            let Some((role_name, _)) = app
+                .provisioned_cells()
+                .find(|(_, provisioned_cell_id)| provisioned_cell_id == cell_id)
+            else {
+                return Ok(());
+            };
+            let app_id = app.id().clone();
+            let role_name = role_name.clone();
+            self.spaces
+                .conductor_store
+                .delete_init_properties(&app_id, &role_name)
+                .await?;
+            Ok(())
+        }
     }
 }
 

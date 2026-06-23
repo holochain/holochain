@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Clear `init_properties` from the conductor database after a successful `init` callback, so the per-role seed material does not outlive its use. \#5827
 - Add the `get_init_properties` host function and its HDK wrapper. It is callable only from the `init` callback and returns the per-role `init_properties` supplied at install time, so a freshly migrated chain can be seeded during `init`. \#5827
 - Persist per-role `init_properties` in the conductor database, keyed by `(app_id, role_name)`. Rows are written during app installation and removed automatically when the app is uninstalled. \#5827
 - **BREAKING CHANGE**: Add an `init_properties` field to `RoleSettings::Provisioned`, carried by the new `InitProperties` type. The bytes are opaque to the conductor and never written to the DHT. They are intended to seed a freshly migrated chain during `init` as part of the chain switch DNA migration design. Downstream code that constructs or exhaustively matches `RoleSettings::Provisioned` must be updated to include this field. \#5827

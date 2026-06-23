@@ -1,3 +1,4 @@
+use super::error::WorkflowError;
 use super::error::WorkflowResult;
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::api::CellConductorApiT;
@@ -39,6 +40,7 @@ pub async fn initialize_zomes_workflow(
     args: InitializeZomesWorkflowArgs,
 ) -> WorkflowResult<InitResult> {
     let conductor_handle = args.conductor_handle.clone();
+    let cell_id = args.cell_id.clone();
     let coordinators = args.ribosome.dna_def().get_all_coordinators();
     let integrate_dht_ops_trigger = args.integrate_dht_ops_trigger.clone();
     let signal_tx = args.signal_tx.clone();
@@ -55,8 +57,16 @@ pub async fn initialize_zomes_workflow(
             .flush(network.target_arcs().await?)
             .await?;
 
+        // Remove the init properties as they have served their purpose and we don't want the seed
+        // material to outlive the init callback. Do this before post-commit so cleanup is not
+        // skipped if `send_post_commit` fails.
+        conductor_handle
+            .delete_init_properties_for_cell(&cell_id)
+            .await
+            .map_err(|e| WorkflowError::Other(Box::new(e)))?;
+
         send_post_commit(
-            conductor_handle,
+            conductor_handle.clone(),
             workspace,
             network,
             keystore,
