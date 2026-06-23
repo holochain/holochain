@@ -22,7 +22,7 @@ use holochain_types::warrant::WarrantOp;
 use holochain_zome_types::chain::{ChainFilter, LimitConditions};
 use holochain_zome_types::dht_v2::RecordValidity;
 use holochain_zome_types::prelude::{
-    ChainFork, ChainHead, ChainQueryFilter, ChainStatus, HighestObserved, SignedWarrant,
+    Action, ChainFork, ChainHead, ChainQueryFilter, ChainStatus, HighestObserved, SignedWarrant,
 };
 use holochain_zome_types::validate::ValidationStatus;
 use std::collections::{HashMap, HashSet};
@@ -2852,6 +2852,22 @@ where
     // precondition structurally guaranteed rather than relying on the caller's
     // SQL ordering.
     let (status, valid, rejected) = compute_chain_status(valid.into_iter(), rejected.into_iter());
+
+    // A chain whose head is a `CloseChain` action is reported as `Closed`. This
+    // only upgrades a `Valid` status; `compute_chain_status` returns `Forked`
+    // and `Invalid` ahead of `Valid`, so higher-priority states are preserved.
+    let status = match status {
+        ChainStatus::Valid(head)
+            if matches!(
+                valid.last().map(|v| v.action()),
+                Some(Action::CloseChain(_))
+            ) =>
+        {
+            ChainStatus::Closed(head)
+        }
+        other => other,
+    };
+
     let highest_observed = compute_highest_observed(&valid, &rejected);
 
     let valid_activity = if options.include_valid_activity {
@@ -5903,5 +5919,187 @@ mod tests {
             0,
             "store-only get_link_details must not see scratch DeleteLink"
         );
+    }
+
+    // ---- ChainStatus::Closed detection ----
+    //
+    // A chain whose valid head is a `CloseChain` action is reported as `Closed`,
+    // but only when the chain is otherwise `Valid`; `Forked`/`Invalid` outrank
+    // it. These are ported from the pre-v2 cascade `get_agent_activity_query`
+    // unit tests and exercise `build_agent_activity_response` directly.
+
+    fn mk_record(action: Action) -> holochain_types::prelude::Record {
+        let shh = holochain_zome_types::record::SignedActionHashed::with_presigned(
+            holochain_zome_types::action::ActionHashed::from_content_sync(action),
+            Signature::from([0; 64]),
+        );
+        holochain_types::prelude::Record::new(shh, None)
+    }
+
+    fn mk_dna(author: &AgentPubKey) -> holochain_types::prelude::Record {
+        mk_record(Action::Dna(holochain_zome_types::action::Dna {
+            author: author.clone(),
+            timestamp: Timestamp::from_micros(0),
+            hash: holo_hash::DnaHash::from_raw_36(vec![0u8; 36]),
+        }))
+    }
+
+    fn mk_create(author: &AgentPubKey, seq: u32) -> holochain_types::prelude::Record {
+        mk_record(Action::Create(Create {
+            author: author.clone(),
+            timestamp: Timestamp::from_micros(seq as i64 * 1000),
+            action_seq: seq,
+            prev_action: ActionHash::from_raw_36(vec![seq as u8; 36]),
+            entry_type: EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
+            entry_hash: EntryHash::from_raw_36(vec![seq as u8; 36]),
+            weight: Default::default(),
+        }))
+    }
+
+    fn mk_close(author: &AgentPubKey, seq: u32) -> holochain_types::prelude::Record {
+        mk_record(Action::CloseChain(
+            holochain_zome_types::action::CloseChain {
+                author: author.clone(),
+                timestamp: Timestamp::from_micros(seq as i64 * 1000),
+                action_seq: seq,
+                prev_action: ActionHash::from_raw_36(vec![seq as u8; 36]),
+                new_target: None,
+            },
+        ))
+    }
+
+    fn status_of(
+        valid: Vec<holochain_types::prelude::Record>,
+        rejected: Vec<holochain_types::prelude::Record>,
+    ) -> ChainStatus {
+        let agent = AgentPubKey::from_raw_36(vec![0u8; 36]);
+        let options = GetAgentActivityOptions {
+            include_valid_activity: true,
+            include_rejected_activity: true,
+            include_warrants: false,
+            include_full_records: true,
+        };
+        build_agent_activity_response(
+            agent,
+            valid,
+            rejected,
+            vec![],
+            &ChainQueryFilter::new(),
+            &options,
+        )
+        .status
+    }
+
+    #[test]
+    fn closed_chain_reports_closed() {
+        let agent = AgentPubKey::from_raw_36(vec![1u8; 36]);
+        let close = mk_close(&agent, 2);
+        let close_head = ChainHead {
+            action_seq: 2,
+            hash: close.action_address().clone(),
+        };
+        let status = status_of(vec![mk_dna(&agent), mk_create(&agent, 1), close], vec![]);
+        assert_eq!(status, ChainStatus::Closed(close_head));
+    }
+
+    #[test]
+    fn forked_and_closed_reports_forked() {
+        let agent = AgentPubKey::from_raw_36(vec![1u8; 36]);
+        let status = status_of(
+            vec![
+                mk_dna(&agent),
+                mk_create(&agent, 1),
+                mk_create(&agent, 1), // fork at seq 1
+                mk_close(&agent, 2),
+            ],
+            vec![],
+        );
+        assert!(matches!(status, ChainStatus::Forked(_)));
+    }
+
+    #[test]
+    fn forked_on_close_reports_forked() {
+        let agent = AgentPubKey::from_raw_36(vec![1u8; 36]);
+        let status = status_of(
+            vec![
+                mk_dna(&agent),
+                mk_create(&agent, 1),
+                mk_create(&agent, 2),
+                mk_close(&agent, 2), // fork at seq 2, one branch closes the chain
+            ],
+            vec![],
+        );
+        assert!(matches!(status, ChainStatus::Forked(_)));
+    }
+
+    #[test]
+    fn invalid_and_closed_reports_invalid() {
+        let agent = AgentPubKey::from_raw_36(vec![1u8; 36]);
+        let status = status_of(
+            vec![mk_dna(&agent), mk_create(&agent, 1), mk_close(&agent, 2)],
+            vec![mk_create(&agent, 1)], // a rejected action
+        );
+        assert!(matches!(status, ChainStatus::Invalid(_)));
+    }
+
+    /// End-to-end: a `CloseChain` head integrated into the real DHT store is
+    /// returned as `ChainStatus::Closed` by `get_agent_activity`.
+    #[tokio::test]
+    async fn get_agent_activity_closed_chain_reports_closed() {
+        fn make_close_op(
+            author: &AgentPubKey,
+            prev: &ActionHash,
+            seq: u32,
+            seed: u8,
+        ) -> DhtOpHashed {
+            let action = Action::CloseChain(holochain_zome_types::action::CloseChain {
+                author: author.clone(),
+                timestamp: Timestamp::from_micros(seed as i64 * 1000),
+                action_seq: seq,
+                prev_action: prev.clone(),
+                new_target: None,
+            });
+            let chain_op = ChainOp::RegisterAgentActivity(Signature::from([seed; 64]), action);
+            DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(chain_op)))
+        }
+
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let author = AgentPubKey::from_raw_36(vec![7u8; 36]);
+        let prev = ActionHash::from_raw_36(vec![0u8; 36]);
+
+        integrate_activity(
+            &store,
+            make_fork_op(&author, &prev, 0, 1),
+            AppOutcome::Accepted,
+            10,
+        )
+        .await;
+        integrate_activity(
+            &store,
+            make_close_op(&author, &prev, 1, 2),
+            AppOutcome::Accepted,
+            11,
+        )
+        .await;
+
+        let opts = GetAgentActivityOptions {
+            include_valid_activity: true,
+            include_rejected_activity: false,
+            include_warrants: false,
+            include_full_records: false,
+        };
+        let resp = store
+            .as_read()
+            .get_agent_activity(&author, &ChainQueryFilter::new(), &opts)
+            .await
+            .unwrap();
+
+        assert!(matches!(resp.status, ChainStatus::Closed(ref head) if head.action_seq == 1));
     }
 }

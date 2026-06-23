@@ -831,3 +831,46 @@ async fn get_agent_activity_reflects_scratch_activity() {
         other => panic!("expected ChainItems::Hashes, got {other:?}"),
     }
 }
+
+/// A status-only request (`include_valid_activity` and `include_rejected_activity`
+/// both false) must still return the real chain status, not `Empty`. Ported from
+/// the pre-v2 cascade `get_agent_activity` integration tests.
+#[tokio::test]
+async fn get_agent_activity_status_only_returns_real_status() {
+    let store = empty_store().await;
+    let author = AgentPubKey::from_raw_36(vec![213u8; 36]);
+
+    // Two integrated actions; seq 1 is the chain head.
+    let prev0 = holo_hash::ActionHash::from_raw_36(vec![0u8; 36]);
+    let action0 = make_activity_create(&author, 0, &prev0, 213);
+    let hash0 = integrate_activity_op(&store, action0, 213, 10).await;
+
+    let action1 = make_activity_create(&author, 1, &hash0, 214);
+    let hash1 = integrate_activity_op(&store, action1, 214, 11).await;
+
+    let cascade = CascadeImpl::empty(store);
+
+    let options = GetActivityOptions {
+        include_valid_activity: false,
+        include_rejected_activity: false,
+        include_warrants: false,
+        include_full_records: false,
+        get_options: GetOptions::local(),
+        ..Default::default()
+    };
+    let resp = cascade
+        .get_agent_activity(author, ChainQueryFilter::new(), options)
+        .await
+        .expect("get_agent_activity");
+
+    assert_eq!(
+        resp.status,
+        ChainStatus::Valid(ChainHead {
+            action_seq: 1,
+            hash: hash1,
+        }),
+        "status-only request must return the real chain status"
+    );
+    assert_eq!(resp.valid_activity, ChainItems::NotRequested);
+    assert_eq!(resp.rejected_activity, ChainItems::NotRequested);
+}

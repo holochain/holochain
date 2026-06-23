@@ -208,6 +208,15 @@ pub enum ChainStatus {
     /// information is not reflected here but is instead found in the
     /// [`AgentActivity::warrants`] field.
     Invalid(ChainHead),
+    /// The chain is valid (as for [`ChainStatus::Valid`]) and additionally its
+    /// head is a `CloseChain` action, meaning the author has closed their
+    /// source chain and will append no further actions. The `ChainHead` points
+    /// to the `CloseChain` action.
+    ///
+    /// `Closed` takes precedence over [`ChainStatus::Valid`]. A chain that is
+    /// also forked or invalid is reported as [`ChainStatus::Forked`] or
+    /// [`ChainStatus::Invalid`] instead, since those are higher priority.
+    Closed(ChainHead),
 }
 
 /// A pairing of an action sequence and its corresponding action hash in a chain.
