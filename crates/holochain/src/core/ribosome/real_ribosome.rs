@@ -77,7 +77,7 @@ use opentelemetry::KeyValue;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use wasmer::AsStoreMut;
 use wasmer::Exports;
 use wasmer::Function;
@@ -101,7 +101,7 @@ mod wasmer_wasmi;
 #[cfg(feature = "wasmer-wasmi")]
 use wasmer_wasmi::*;
 
-pub(crate) type ModuleCacheLock = parking_lot::RwLock<ModuleCache>;
+pub(crate) type ModuleCacheLock = RwLock<ModuleCache>;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 #[non_exhaustive]
@@ -337,7 +337,7 @@ impl RealRibosome {
             tokio::task::spawn_blocking(move || {
                 use holochain_util::timed;
 
-                let cache = timed!([1, 10, 1000], cache_lock.write());
+                let cache = timed!([1, 10, 1000], cache_lock.write().unwrap_or_else(|e| e.into_inner()));
                 Ok(timed!([1, 1000, 10_000], cache.get(cache_key, &wasm))?)
             })
             .await?
@@ -841,7 +841,6 @@ mod test {
     use holochain_nonce::fresh_nonce;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::zome_io::ZomeCallParams;
-    use parking_lot::Mutex;
     use std::collections::HashMap;
     use std::sync::Arc;
     use std::time::Duration;
