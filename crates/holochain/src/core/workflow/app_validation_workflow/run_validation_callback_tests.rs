@@ -1,31 +1,25 @@
-use crate::core::ribosome::real_ribosome::{make_module_cache, WasmBackend};
+use crate::core::ribosome::inline_ribosome::{InlineRibosome, InlineZomeStore};
+use crate::core::ribosome::Ribosome;
 use crate::{
     conductor::space::TestSpace,
     core::{
-        ribosome::{
-            guest_callback::validate::ValidateInvocation, real_ribosome::RealRibosome,
-            ZomesToInvoke,
-        },
+        ribosome::{guest_callback::validate::ValidateInvocation, ZomesToInvoke},
         workflow::app_validation_workflow::{run_validation_callback, Outcome},
     },
     fixt::MetaLairClientFixturator,
     sweettest::{SweetDnaFile, SweetInlineZomes},
 };
 use fixt::fixt;
-use hdk::prelude::{CreateLinkFixturator, EntryFixturator, RecordEntry, RegisterCreateLink};
+use hdk::prelude::{CreateLinkFixturator, EntryFixturator, RegisterCreateLink};
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::{ActionHash, AgentPubKey, HashableContentExtSync};
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_sqlite::exports::FallibleIterator;
-use holochain_state::{
-    host_fn_workspace::HostFnWorkspaceRead,
-    prelude::{insert_op_cache, set_validation_status, set_when_integrated},
-};
-use holochain_timestamp::Timestamp;
+use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_types::{
     chain::MustGetAgentActivityResponse,
     db::{DbKindCache, DbWrite},
-    dht_op::{ChainOp, DhtOp, DhtOpHashed, WireOps},
+    dht_op::{ChainOp, DhtOpHashed, WireOps},
     record::WireRecordOps,
 };
 use holochain_wasm_test_utils::TestWasm;
@@ -108,12 +102,16 @@ async fn validation_callback_must_get_action() {
     .unwrap();
     assert_matches!(outcome, Outcome::AwaitingDeps(hashes) if hashes == vec![create_action.to_hash().into()]);
 
-    // write action to be must got during validation to dht cache db
+    // Record the action to be must-got during validation into the DhtStore,
+    // which the cascade's local read now consults.
     let dht_op = ChainOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
     let dht_op_hashed = DhtOpHashed::from_content_sync(dht_op);
-    test_space.space.cache_db.test_write(move |txn| {
-        insert_op_cache(txn, &dht_op_hashed).unwrap();
-    });
+    test_space
+        .space
+        .dht_store
+        .record_incoming_ops(vec![dht_op_hashed])
+        .await
+        .unwrap();
 
     // the same validation should now successfully validate the op
     let outcome = run_validation_callback(invocation, &ribosome, workspace, network, false)
@@ -189,6 +187,7 @@ async fn validation_callback_awaiting_deps_hashes() {
             deletes: vec![],
             updates: vec![],
             entry: None,
+            warrants: vec![],
         })])
     });
 
@@ -212,6 +211,22 @@ async fn validation_callback_awaiting_deps_hashes() {
         vec![create_action_signed_hashed.as_hash().clone()],
     )
     .await;
+
+    // The fetched op carries a synthetic signature, so the signature gate keeps
+    // it out of the DhtStore (it reaches only the legacy cache, confirmed
+    // above). Mirror it into the DhtStore — which the cascade's local read now
+    // consults — standing in for the verified fetch a real signature would allow.
+    test_space
+        .space
+        .dht_store
+        .record_incoming_ops(vec![DhtOpHashed::from_content_sync(
+            ChainOp::RegisterAgentActivity(
+                create_action_signed_hashed.signature().clone(),
+                create_action.clone(),
+            ),
+        )])
+        .await
+        .unwrap();
 
     // app validation outcome should be accepted, now that the missing record
     // has been fetched
@@ -338,6 +353,35 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     )
     .await;
 
+    // The fetched activity carries synthetic signatures, so the signature gate
+    // keeps it out of the DhtStore (it reaches only the legacy cache, confirmed
+    // above). Cache bob's chain into the DhtStore as integrated agent activity —
+    // which the cascade's local agent-activity read consults — standing in for
+    // the verified fetch a real signature would allow.
+    let rendered_activity = |sah: &SignedActionHashed| holochain_types::dht_op::RenderedOps {
+        entry: None,
+        ops: vec![holochain_types::dht_op::RenderedOp::new(
+            sah.hashed.content.clone(),
+            sah.signature().clone(),
+            None,
+            holochain_zome_types::op::ChainOpType::RegisterAgentActivity,
+        )
+        .unwrap()],
+        warrant: None,
+    };
+    test_space
+        .space
+        .dht_store
+        .cache_chain_ops(&rendered_activity(&create_action_signed_hashed))
+        .await
+        .unwrap();
+    test_space
+        .space
+        .dht_store
+        .cache_chain_ops(&rendered_activity(&delete_action_signed_hashed))
+        .await
+        .unwrap();
+
     // app validation outcome should be accepted, now that bob's missing agent
     // activity is available in alice's cache
     let outcome = run_validation_callback(invocation, &ribosome, workspace, network, false)
@@ -358,8 +402,7 @@ async fn validation_callback_rejects_op_depending_on_invalid_op() {
         SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Link]).await;
     let zomes_to_invoke = ZomesToInvoke::OneIntegrity(integrity_zomes[0].clone());
     let dna_hash = dna_file.dna_hash().clone();
-    let backend = WasmBackend::new();
-    let ribosome = RealRibosome::new(backend, dna_file.clone(), make_module_cache(backend, None))
+    let ribosome = Ribosome::new_with_test_wasms(vec![TestWasm::Link])
         .await
         .unwrap();
     let test_space = TestSpace::new(dna_hash.clone());
@@ -384,12 +427,8 @@ async fn validation_callback_rejects_op_depending_on_invalid_op() {
     create.author = alice.clone();
     create.action_seq = 0;
     let create_action = Action::Create(create.clone());
-    let create_action_op =
-        DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(ChainOp::StoreRecord(
-            fixt!(Signature),
-            create_action.clone(),
-            RecordEntry::Present(fixt!(Entry)),
-        ))));
+    let create_entry = fixt!(Entry);
+    let create_entry_hash = create_action.entry_hash().unwrap().clone();
     // A CreateLink to be validated that does a must_get_valid_record to the invalid Create
     // in the validate callback.
     let mut create_link = fixt!(CreateLink);
@@ -406,12 +445,37 @@ async fn validation_callback_rejects_op_depending_on_invalid_op() {
     let invocation = ValidateInvocation::new(zomes_to_invoke, &create_link_op).unwrap();
     let network = Arc::new(MockHolochainP2pDnaT::new());
 
-    // Insert invalid Create op into the cache db.
-    test_space.space.cache_db.test_write(move |txn| {
-        insert_op_cache(txn, &create_action_op).unwrap();
-        set_validation_status(txn, &create_action_op.hash, ValidationStatus::Rejected).unwrap();
-        set_when_integrated(txn, &create_action_op.hash, Timestamp::now()).unwrap();
-    });
+    // Cache the invalid Create record into the DhtStore (integrated, as a
+    // fetched op would be) and mark it rejected, so the cascade's
+    // get_record_details resolves it as a rejected record.
+    let rendered = holochain_types::dht_op::RenderedOp::new(
+        create_action.clone(),
+        fixt!(Signature),
+        None,
+        holochain_zome_types::op::ChainOpType::StoreRecord,
+    )
+    .unwrap();
+    let create_op_hash = rendered.op_hash.clone();
+    let rendered_ops = holochain_types::dht_op::RenderedOps {
+        entry: Some(holochain_types::prelude::EntryHashed::with_pre_hashed(
+            create_entry,
+            create_entry_hash,
+        )),
+        ops: vec![rendered],
+        warrant: None,
+    };
+    test_space
+        .space
+        .dht_store
+        .cache_chain_ops(&rendered_ops)
+        .await
+        .unwrap();
+    test_space
+        .space
+        .dht_store
+        .reject_chain_ops(vec![create_op_hash])
+        .await
+        .unwrap();
 
     // App validation should reject the CreateLink op because the record at the base address of the link is invalid.
     let outcome = run_validation_callback(
@@ -431,7 +495,7 @@ async fn validation_callback_rejects_op_depending_on_invalid_op() {
 struct TestCase {
     zomes_to_invoke: ZomesToInvoke,
     test_space: TestSpace,
-    ribosome: RealRibosome,
+    ribosome: Ribosome,
     alice: AgentPubKey,
     bob: AgentPubKey,
     workspace: HostFnWorkspaceRead,
@@ -440,13 +504,17 @@ struct TestCase {
 impl TestCase {
     async fn new(zomes: SweetInlineZomes) -> Self {
         let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
+        let inline_zome_store = InlineZomeStore::default();
+        for z in dna_file.inline_zomes() {
+            inline_zome_store.insert(dna_file.dna_def_hashed().clone(), z.clone());
+        }
+
         let zomes_to_invoke = ZomesToInvoke::OneIntegrity(integrity_zomes[0].clone());
         let dna_hash = dna_file.dna_hash().clone();
-        let backend = WasmBackend::new();
-        let ribosome =
-            RealRibosome::new(backend, dna_file.clone(), make_module_cache(backend, None))
-                .await
-                .unwrap();
+        let ribosome = InlineRibosome::new(dna_file.dna_def_hashed().clone(), inline_zome_store);
+        let ribosome = Ribosome::new(dna_file.dna_def_hashed().clone(), ribosome)
+            .await
+            .unwrap();
         let test_space = TestSpace::new(dna_hash.clone());
         let alice = fixt!(AgentPubKey);
         let bob = fixt!(AgentPubKey);

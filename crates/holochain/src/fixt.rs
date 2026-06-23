@@ -9,14 +9,12 @@ use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitHostAccess;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateHostAccess;
-use crate::core::ribosome::real_ribosome::{make_module_cache, RealRibosome, WasmBackend};
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::sweettest::SweetDnaFile;
 use crate::test_utils::fake_genesis;
 use ::fixt::prelude::*;
 pub use holo_hash::fixt::*;
@@ -41,53 +39,6 @@ use tokio::sync::broadcast;
 pub struct Zomes(pub Vec<TestWasm>);
 
 newtype_fixturator!(FnComponents<Vec<String>>);
-
-fixturator!(
-    WasmBackend;
-    constructor fn new();
-);
-
-fixturator!(
-    RealRibosome;
-    constructor fn empty(WasmBackend, DnaFile);
-);
-
-impl Iterator for RealRibosomeFixturator<Zomes> {
-    type Item = RealRibosome;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let input = self.0.curve.0.clone();
-        let uuid = StringFixturator::new(Unpredictable).next().unwrap();
-        let (dna_file, _, _) = tokio_helper::block_forever_on(async move {
-            SweetDnaFile::from_test_wasms(uuid, input, Default::default()).await
-        });
-
-        let backend = cfg_select! {
-            feature = "wasmer-sys-cranelift" => { WasmBackend::Cranelift }
-            feature = "wasmer-sys-llvm" => { WasmBackend::Llvm }
-            feature = "wasmer-wasmi" => { WasmBackend::Wasmi }
-        };
-
-        let ribosome = tokio_helper::block_forever_on(RealRibosome::new(
-            backend,
-            dna_file,
-            make_module_cache(backend, None),
-        ))
-        .unwrap();
-
-        // warm the module cache for each wasm in the ribosome
-        for zome in self.0.curve.0.clone() {
-            let mut call_context = CallContextFixturator::new(Empty).next().unwrap();
-            call_context.zome = CoordinatorZome::from(zome).erase_type();
-            tokio_helper::block_forever_on(ribosome.build_module(call_context.zome.zome_name()))
-                .unwrap();
-        }
-
-        self.0.index += 1;
-
-        Some(ribosome)
-    }
-}
 
 fixturator!(
     DnaWasm;

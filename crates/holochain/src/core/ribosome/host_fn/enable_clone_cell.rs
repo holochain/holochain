@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
-use crate::core::ribosome::{
-    check_clone_access::check_clone_access, error::RibosomeError, CallContext, RibosomeT,
-};
+use crate::core::ribosome::{check_clone_access::check_clone_access, error::RibosomeError, CallContext, Ribosome};
 use holochain_types::{
     access::{HostFnAccess, Permission},
     app::EnableCloneCellPayload,
@@ -14,7 +12,7 @@ use wasmer::RuntimeError;
 
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(_ribosome, call_context), fields(? call_context.zome, function = ? call_context.function_name)))]
 pub fn enable_clone_cell(
-    _ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,
     input: EnableCloneCellInput,
 ) -> Result<ClonedCell, RuntimeError> {

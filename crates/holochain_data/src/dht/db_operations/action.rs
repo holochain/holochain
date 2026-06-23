@@ -3,7 +3,8 @@
 use super::super::inner::action;
 use crate::handles::{DbRead, DbWrite};
 use crate::kind::Dht;
-use holo_hash::{ActionHash, AgentPubKey};
+use crate::models::dht::AgentActivityItem;
+use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, EntryHash};
 use holochain_integrity_types::dht_v2::RecordValidity;
 use holochain_zome_types::dht_v2::SignedActionHashed;
 
@@ -33,6 +34,48 @@ impl DbRead<Dht> {
         action::get_actions_by_author(self.pool(), author).await
     }
 
+    /// Count actions authored by `author`, capped at `cap`. See
+    /// `action::count_author_actions_capped`.
+    pub async fn count_author_actions_capped(
+        &self,
+        author: &AgentPubKey,
+        cap: i64,
+    ) -> sqlx::Result<i64> {
+        action::count_author_actions_capped(self.pool(), author, cap).await
+    }
+
+    /// Integrated `RegisterAgentActivity` actions for `author`, ordered by
+    /// chain sequence. `include_entries` joins the public entry (Full mode).
+    pub async fn get_agent_activity(
+        &self,
+        author: AgentPubKey,
+        include_entries: bool,
+    ) -> sqlx::Result<Vec<AgentActivityItem>> {
+        action::get_agent_activity(self.pool(), &author, include_entries).await
+    }
+
+    /// Bounded `RegisterAgentActivity` scan: `author`'s integrated actions with
+    /// `seq <= chain_top_seq` and (optionally) `seq >= until_seq`, ordered by
+    /// `seq DESC, hash DESC`.
+    pub async fn get_filtered_agent_activity(
+        &self,
+        author: AgentPubKey,
+        chain_top_seq: u32,
+        until_seq: Option<u32>,
+    ) -> sqlx::Result<Vec<SignedActionHashed>> {
+        action::get_filtered_agent_activity(self.pool(), &author, chain_top_seq, until_seq).await
+    }
+
+    /// The chain sequence and authored timestamp of `action_hash`, if it is an
+    /// integrated `RegisterAgentActivity` action authored by `author`.
+    pub async fn get_action_seq_and_timestamp(
+        &self,
+        author: AgentPubKey,
+        action_hash: ActionHash,
+    ) -> sqlx::Result<Option<(u32, holochain_timestamp::Timestamp)>> {
+        action::get_action_seq_and_timestamp(self.pool(), &author, &action_hash).await
+    }
+
     /// Fetch all actions with `prev_hash = prev_hash` and `hash != exclude_hash`.
     /// Used to detect chain forks during sys-validation.
     pub async fn get_actions_by_prev_hash(
@@ -41,5 +84,154 @@ impl DbRead<Dht> {
         exclude_hash: &ActionHash,
     ) -> sqlx::Result<Vec<SignedActionHashed>> {
         action::get_actions_by_prev_hash(self.pool(), prev_hash, exclude_hash).await
+    }
+
+    /// The entry's `StoreEntry` create actions at `validation_status`.
+    pub async fn get_create_actions_for_entry(
+        &self,
+        entry_hash: &EntryHash,
+        author: Option<&AgentPubKey>,
+        validation_status: RecordValidity,
+    ) -> sqlx::Result<Vec<SignedActionHashed>> {
+        action::get_create_actions_for_entry(self.pool(), entry_hash, author, validation_status)
+            .await
+    }
+
+    /// The `Delete` actions on `entry_hash`.
+    pub async fn get_delete_actions_for_entry(
+        &self,
+        entry_hash: &EntryHash,
+    ) -> sqlx::Result<Vec<SignedActionHashed>> {
+        action::get_delete_actions_for_entry(self.pool(), entry_hash).await
+    }
+
+    /// The `Update` actions from `entry_hash`.
+    pub async fn get_update_actions_for_entry(
+        &self,
+        entry_hash: &EntryHash,
+    ) -> sqlx::Result<Vec<SignedActionHashed>> {
+        action::get_update_actions_for_entry(self.pool(), entry_hash).await
+    }
+
+    /// Live `StoreEntry` create actions for `entry_hash` (valid, integrated,
+    /// not deleted, visible to `author`), ordered by integration time.
+    pub async fn get_live_entry_creates(
+        &self,
+        entry_hash: &EntryHash,
+        author: Option<&AgentPubKey>,
+    ) -> sqlx::Result<Vec<SignedActionHashed>> {
+        action::get_live_entry_creates(self.pool(), entry_hash, author).await
+    }
+
+    /// The `Delete` actions targeting `record_action_hash`.
+    pub async fn get_delete_actions_for_record(
+        &self,
+        record_action_hash: &ActionHash,
+    ) -> sqlx::Result<Vec<SignedActionHashed>> {
+        action::get_delete_actions_for_record(self.pool(), record_action_hash).await
+    }
+
+    /// The `Update` actions that update `record_action_hash`.
+    pub async fn get_update_actions_for_record(
+        &self,
+        record_action_hash: &ActionHash,
+    ) -> sqlx::Result<Vec<SignedActionHashed>> {
+        action::get_update_actions_for_record(self.pool(), record_action_hash).await
+    }
+
+    /// The live `CreateLink` actions on `base` (excluding tombstoned links).
+    pub async fn get_live_link_actions(
+        &self,
+        base: &AnyLinkableHash,
+    ) -> sqlx::Result<Vec<SignedActionHashed>> {
+        action::get_live_link_actions(self.pool(), base).await
+    }
+
+    /// All `CreateLink` actions on `base` (live and tombstoned).
+    pub async fn get_link_create_actions(
+        &self,
+        base: &AnyLinkableHash,
+    ) -> sqlx::Result<Vec<SignedActionHashed>> {
+        action::get_link_create_actions(self.pool(), base).await
+    }
+
+    /// The `DeleteLink` actions tombstoning `create_link_hash`.
+    pub async fn get_delete_link_actions(
+        &self,
+        create_link_hash: &ActionHash,
+    ) -> sqlx::Result<Vec<SignedActionHashed>> {
+        action::get_delete_link_actions(self.pool(), create_link_hash).await
+    }
+
+    /// Authority-serving create-link actions for `base` (locally-validated only),
+    /// each with its validation status.
+    pub async fn get_authority_link_creates(
+        &self,
+        base: &AnyLinkableHash,
+    ) -> sqlx::Result<Vec<(SignedActionHashed, RecordValidity)>> {
+        action::get_authority_link_creates(self.pool(), base).await
+    }
+
+    /// Authority-serving delete-link actions targeting `base`'s links
+    /// (locally-validated only), each with its validation status.
+    pub async fn get_authority_delete_links(
+        &self,
+        base: &AnyLinkableHash,
+    ) -> sqlx::Result<Vec<(SignedActionHashed, RecordValidity)>> {
+        action::get_authority_delete_links(self.pool(), base).await
+    }
+
+    /// Authority-serving `StoreRecord` action for `action_hash` (locally-validated
+    /// only), with its validation status.
+    pub async fn get_authority_store_record(
+        &self,
+        action_hash: &ActionHash,
+    ) -> sqlx::Result<Option<(SignedActionHashed, RecordValidity)>> {
+        action::get_authority_store_record(self.pool(), action_hash).await
+    }
+
+    /// Authority-serving deletes targeting record `record_action_hash`
+    /// (locally-validated only), each with its validation status.
+    pub async fn get_authority_deletes_for_record(
+        &self,
+        record_action_hash: &ActionHash,
+    ) -> sqlx::Result<Vec<(SignedActionHashed, RecordValidity)>> {
+        action::get_authority_deletes_for_record(self.pool(), record_action_hash).await
+    }
+
+    /// Authority-serving updates targeting record `record_action_hash`
+    /// (locally-validated only), each with its validation status.
+    pub async fn get_authority_updates_for_record(
+        &self,
+        record_action_hash: &ActionHash,
+    ) -> sqlx::Result<Vec<(SignedActionHashed, RecordValidity)>> {
+        action::get_authority_updates_for_record(self.pool(), record_action_hash).await
+    }
+
+    /// Authority-serving create actions for entry `entry_hash` (locally-validated
+    /// only), each with its validation status.
+    pub async fn get_authority_entry_creates(
+        &self,
+        entry_hash: &EntryHash,
+    ) -> sqlx::Result<Vec<(SignedActionHashed, RecordValidity)>> {
+        action::get_authority_entry_creates(self.pool(), entry_hash).await
+    }
+
+    /// Authority-serving deletes targeting entry `entry_hash` (locally-validated
+    /// only), each with its validation status.
+    pub async fn get_authority_deletes_for_entry(
+        &self,
+        entry_hash: &EntryHash,
+    ) -> sqlx::Result<Vec<(SignedActionHashed, RecordValidity)>> {
+        action::get_authority_deletes_for_entry(self.pool(), entry_hash).await
+    }
+
+    /// Authority-serving updates targeting entry `entry_hash` (locally-validated
+    /// only), each with its validation status.
+    pub async fn get_authority_updates_for_entry(
+        &self,
+        entry_hash: &EntryHash,
+    ) -> sqlx::Result<Vec<(SignedActionHashed, RecordValidity)>> {
+        action::get_authority_updates_for_entry(self.pool(), entry_hash).await
     }
 }

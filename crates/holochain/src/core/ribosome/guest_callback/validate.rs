@@ -22,10 +22,10 @@ pub struct ValidateInvocation {
 
 impl ValidateInvocation {
     pub fn new(zomes_to_invoke: ZomesToInvoke, data: &Op) -> Result<Self, SerializedBytesError> {
-        let data = Arc::new(ExternIO::encode(data)?);
+        let data = ExternIO::encode(data)?;
         Ok(Self {
             zomes_to_invoke,
-            data,
+            data: Arc::new(data),
         })
     }
 }
@@ -66,14 +66,15 @@ impl Invocation for ValidateInvocation {
     fn zomes(&self) -> ZomesToInvoke {
         self.zomes_to_invoke.clone()
     }
+
     fn fn_components(&self) -> FnComponents {
         vec!["validate".to_string()].into()
     }
-    fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
-        // No option here but to clone the actual data as it's passed
-        // into the host now anyway.
-        Ok((*self.data).clone())
+
+    fn take_host_input(&self) -> Result<Option<ExternIO>, SerializedBytesError> {
+        Ok(Some((*self.data).clone()))
     }
+
     fn auth(&self) -> InvocationAuth {
         InvocationAuth::LocalCallback
     }
@@ -231,7 +232,11 @@ mod test {
         });
         let validate_invocation = ValidateInvocation::new(ZomesToInvoke::All, &op).unwrap();
 
-        let host_input = validate_invocation.clone().host_input().unwrap();
+        let host_input = validate_invocation
+            .clone()
+            .take_host_input()
+            .unwrap()
+            .unwrap();
 
         assert_eq!(host_input, ExternIO::encode(&op).unwrap(),);
     }
@@ -244,11 +249,10 @@ mod slow_tests {
     use crate::conductor::api::error::ConductorApiError;
     use crate::conductor::CellError;
     use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
-    use crate::core::ribosome::RibosomeError;
-    use crate::core::ribosome::RibosomeT;
+    use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
     use crate::core::ribosome::ZomesToInvoke;
+    use crate::core::ribosome::{Ribosome, RibosomeError};
     use crate::core::workflow::WorkflowError;
-    use crate::fixt::Zomes;
     use crate::fixt::*;
     use crate::sweettest::{SweetConductor, SweetDnaFile};
     use crate::test_utils::RibosomeTestFixture;
@@ -275,9 +279,7 @@ mod slow_tests {
         )
         .unwrap();
 
-        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
-            .next()
-            .unwrap();
+        let ribosome = MockRibosomeBuilder::new().build().await.unwrap();
 
         let result = ribosome
             .run_validate(fixt!(ValidateHostAccess), validate_invocation)
@@ -300,9 +302,7 @@ mod slow_tests {
         )
         .unwrap();
 
-        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateValid]))
-            .next()
-            .unwrap();
+        let ribosome = MockRibosomeBuilder::new().build().await.unwrap();
 
         let result = ribosome
             .run_validate(fixt!(ValidateHostAccess), validate_invocation)
@@ -368,8 +368,8 @@ mod slow_tests {
         )
         .unwrap();
 
-        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalidParams]))
-            .next()
+        let ribosome = Ribosome::new_with_test_wasms(vec![TestWasm::ValidateInvalidParams])
+            .await
             .unwrap();
 
         let err = ribosome
@@ -403,8 +403,8 @@ mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_implemented_multi() {
-        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalid]))
-            .next()
+        let ribosome = Ribosome::new_with_test_wasms(vec![TestWasm::ValidateInvalid])
+            .await
             .unwrap();
 
         let agent = fixt!(AgentPubKey);

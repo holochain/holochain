@@ -9,6 +9,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - **BREAKING CHANGE**: `get_agent_activity` can now return `ChainStatus::Closed` when an agent's source-chain head is a `CloseChain` action. `ChainStatus` is sent over the wire in agent-activity responses, so a node returning `Closed` cannot be understood by a pre-feature node. `Closed` ranks above `Valid` but below `Forked`/`Invalid`, so a chain that is also forked or invalid still reports `Forked`/`Invalid`. \#5766
 - Fix `get_agent_activity` status-only requests (`ActivityRequest::Status`) which previously always returned `ChainStatus::Empty` instead of the real chain status. \#5766
+- **BREAKING CHANGE** Inline zome definitions are no longer embedded in `DnaDef`. The `ZomeDef::Inline` variant now carries an `InlineZomeDef` (an `InlineHash` identifier plus its dependencies) instead of the executable closures. The closures are held on `DnaFile` in a new, non-serialized `inline_zomes` field (constructed via `DnaFile::new_inline`) and executed by a dedicated inline ribosome. WASM zomes are unaffected at the API level; this only changes code that builds inline-zome DNAs directly, such as tests using sweettest. \#5828
+- **BREAKING CHANGE** `ZomeDef` no longer uses the custom `untagged` serialization that encoded a Wasm zome as a bare `WasmZome`. Because the `DnaHash` is derived from the serialized integrity zomes, the hash of an otherwise-identical DNA changes with this release. There is no migration path for existing installs of Holochain, and startup errors would be expected if the data state is not cleared. \#5828
+- **BREAKING CHANGE** `WasmZome` is renamed to `WasmZomeDef`. \#5828
+- **BREAKING CHANGE** `ZomeDef::wasm_hash` (and the `IntegrityZomeDef`/`CoordinatorZomeDef` wrappers) is replaced by `zome_hash`, which returns a `ZomeHash` for both WASM and inline zomes. `DnaDef::get_wasm_zome` now returns `ZomeResult<&WasmZomeDef>`. \#5828
+- **BREAKING CHANGE** `InlineZome::uuid` is replaced by `InlineZome::hash`, which returns an `InlineHash` derived from the previous UUID via blake2b. \#5828
+- **BREAKING CHANGE** Removed `DnaWithRole::replace_dna`. \#5828
+- Add two hash types to `holo_hash`: `InlineHash` (`hash_type::Inline`, prefix `uhCsk`), which identifies an inline zome, and `ZomeHash` (`hash_type::Zome`), which is either a WASM or inline zome hash. \#5828
+- Add `DnaDef::replace_coordinators`, which swaps a DNA's coordinator zomes while preserving install order and rejects a coordinator whose dependency does not point at an existing integrity zome with the new `ZomeError::DanglingZomeDependency`. \#5828
+- Restructure the ribosome so that the WASM, inline, and mock backends each implement a common `RibosomeImplT` trait behind a single `Ribosome` type, replacing the previous `RealRibosome`/`RibosomeT` design. This is primarily an internal change but affects custom ribosome implementations and some sweettest internals. \#5828
+
+## 0.7.0-dev.30
+
+## 0.7.0-dev.29
 
 ## 0.7.0-dev.28
 

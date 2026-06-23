@@ -6,9 +6,20 @@ use holo_hash::WasmHash;
 use holochain_types::prelude::*;
 
 /// A wrapper around the WASM database for managing WASM bytecode storage and retrieval.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct WasmStore<Db = holochain_data::DbWrite<holochain_data::kind::Wasm>> {
     db: Db,
+}
+
+#[cfg(feature = "test_utils")]
+impl WasmStore {
+    pub fn test_new() -> Self {
+        let db = tokio_helper::block_forever_on(holochain_data::test_open_db(
+            holochain_data::kind::Wasm,
+        ))
+        .unwrap();
+        Self { db }
+    }
 }
 
 /// A read-only view of the WASM store.

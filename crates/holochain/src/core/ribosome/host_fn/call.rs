@@ -1,9 +1,8 @@
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::error::ConductorError;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitHostAccess;
-use crate::core::ribosome::HostFnAccess;
+use crate::core::ribosome::{HostFnAccess, Ribosome};
 use crate::core::ribosome::RibosomeError;
-use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallParamsSigned;
 use crate::core::ribosome::{CallContext, HostContext, ZomeCallHostAccess};
 use futures::future::join_all;
@@ -14,7 +13,7 @@ use std::sync::Arc;
 use wasmer::RuntimeError;
 
 pub fn call(
-    ribosome: Arc<impl RibosomeT>,
+    ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,
     inputs: Vec<Call>,
 ) -> Result<Vec<ZomeCallResponse>, RuntimeError> {
@@ -95,7 +94,7 @@ pub fn call(
 }
 
 async fn execute_call(
-    ribosome: Arc<impl RibosomeT>,
+    ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,
     input: Call,
     fork: bool,
@@ -124,7 +123,7 @@ async fn execute_call(
             let zome_call_params = ZomeCallParams {
                 provenance: provenance.clone(),
                 cell_id: CellId::new(
-                    ribosome.dna_def_hashed().as_hash().clone(),
+                    ribosome.dna_def().as_hash().clone(),
                     target_agent.clone(),
                 ),
                 zome_name,

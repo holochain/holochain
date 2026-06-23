@@ -32,7 +32,7 @@ pub trait OpHelper {
 /// All possible variants that an [`RegisterAgentActivity`]
 /// with an [`Action`] that has an [`EntryType`] can produce.
 #[derive(Debug)]
-enum ActivityEntry<Unit> {
+pub(crate) enum ActivityEntry<Unit> {
     App { entry_type: Option<Unit> },
     PrivateApp { entry_type: Option<Unit> },
     Agent(AgentPubKey),
@@ -539,7 +539,7 @@ impl OpHelper for Op {
 
 /// Produces the user-defined entry type enum. Even if the entry is private, this will succeed.
 /// To be used only in the context of a StoreEntry authority.
-fn get_app_entry_type_for_store_entry_authority<ET>(
+pub(crate) fn get_app_entry_type_for_store_entry_authority<ET>(
     entry_def: &AppEntryDef,
     entry: &Entry,
 ) -> Result<ET, WasmError>
@@ -562,7 +562,7 @@ where
 /// Produces the user-defined entry type enum or the unit enum if entry is not present.
 /// To be used only in the context of a StoreRecord or AgentActivity authority.
 /// If the entry's availability does not match the defined visibility, an error will result.
-fn get_app_entry_type_for_record_authority<ET>(
+pub(crate) fn get_app_entry_type_for_record_authority<ET>(
     entry_def: &AppEntryDef,
     entry: Option<&Entry>,
 ) -> Result<UnitEnumEither<ET>, WasmError>
@@ -602,7 +602,7 @@ where
 /// Maps [`RegisterAgentActivity`] ops to their
 /// entries. The entry type will be [`None`] if
 /// the zome id is not a dependency of this zome.
-fn activity_entry<ET>(
+pub(crate) fn activity_entry<ET>(
     entry_type: &EntryType,
     entry_hash: &EntryHash,
 ) -> Result<ActivityEntry<<ET as UnitEnum>::Unit>, WasmError>
@@ -630,7 +630,10 @@ where
 
 /// Get the app defined link type from a [`ZomeIndex`] and [`LinkType`].
 /// If the [`ZomeIndex`] is not a dependency of this zome then return a host error.
-fn in_scope_link_type<LT>(zome_index: ZomeIndex, link_type: LinkType) -> Result<LT, WasmError>
+pub(crate) fn in_scope_link_type<LT>(
+    zome_index: ZomeIndex,
+    link_type: LinkType,
+) -> Result<LT, WasmError>
 where
     LT: LinkTypesHelper,
     WasmError: From<<LT as LinkTypesHelper>::Error>,
@@ -643,7 +646,7 @@ where
 
 /// Get the app defined link type from a [`ZomeIndex`] and [`LinkType`].
 /// If the [`ZomeIndex`] is not a dependency of this zome then return a host error.
-fn activity_link_type<LT>(
+pub(crate) fn activity_link_type<LT>(
     zome_index: ZomeIndex,
     link_type: LinkType,
 ) -> Result<Option<LT>, WasmError>

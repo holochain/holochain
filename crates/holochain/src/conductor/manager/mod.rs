@@ -379,7 +379,7 @@ mod test {
         let db_dir = test_db_dir();
         let handle = Conductor::builder()
             .with_data_root_path(db_dir.path().to_path_buf().into())
-            .test(&[])
+            .test()
             .await
             .unwrap();
         let tm = handle.task_manager();
@@ -411,7 +411,7 @@ mod test {
         let db_dir = test_db_dir();
         let handle = Conductor::builder()
             .with_data_root_path(db_dir.as_ref().to_path_buf().into())
-            .test(&[])
+            .test()
             .await
             .unwrap();
         let tm = handle.task_manager();

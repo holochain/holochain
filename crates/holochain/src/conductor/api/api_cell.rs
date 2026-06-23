@@ -5,7 +5,7 @@ use super::error::ConductorApiResult;
 use crate::conductor::error::ConductorResult;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
-use crate::core::ribosome::real_ribosome::RealRibosome;
+use crate::core::ribosome::Ribosome;
 use crate::core::workflow::ZomeCallResult;
 use async_trait::async_trait;
 use holochain_keystore::MetaLairClient;
@@ -55,20 +55,22 @@ impl CellConductorApiT for CellConductorApi {
         self.conductor_handle.keystore()
     }
 
-    fn get_dna_file(&self, cell_id: &CellId) -> Option<DnaFile> {
-        self.conductor_handle.get_dna_file(cell_id)
+    fn get_dna_def(&self, cell_id: &CellId) -> Option<DnaDef> {
+        self.conductor_handle
+            .get_dna_def(cell_id)
+            .map(|d| d.content)
     }
 
-    fn get_this_ribosome(&self) -> ConductorApiResult<RealRibosome> {
+    fn get_this_ribosome(&self) -> ConductorApiResult<Ribosome> {
         Ok(self.conductor_handle.get_ribosome(&self.cell_id)?)
     }
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     fn get_zome(&self, cell_id: &CellId, zome_name: &ZomeName) -> ConductorApiResult<Zome> {
         let dna = self
-            .get_dna_file(cell_id)
+            .get_dna_def(cell_id)
             .ok_or_else(|| ConductorApiError::CellMissing(cell_id.clone()))?;
-        Ok(dna.dna_def().get_zome(zome_name)?)
+        Ok(dna.get_zome(zome_name)?)
     }
 
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
@@ -94,11 +96,11 @@ pub trait CellConductorApiT: Send + Sync {
     /// Request access to this conductor's keystore
     fn keystore(&self) -> &MetaLairClient;
 
-    /// Get a [`Dna`](holochain_types::prelude::Dna) from the [`RibosomeStore`](crate::conductor::ribosome_store::RibosomeStore)
-    fn get_dna_file(&self, cell_id: &CellId) -> Option<DnaFile>;
+    /// Get a [`DnaDef`] from the [`RibosomeStore`](crate::conductor::ribosome_store::RibosomeStore)
+    fn get_dna_def(&self, cell_id: &CellId) -> Option<DnaDef>;
 
-    /// Get the [`RealRibosome`] of this cell from the [`RibosomeStore`](crate::conductor::ribosome_store::RibosomeStore)
-    fn get_this_ribosome(&self) -> ConductorApiResult<RealRibosome>;
+    /// Get the [`Ribosome`] of this cell from the [`RibosomeStore`](crate::conductor::ribosome_store::RibosomeStore)
+    fn get_this_ribosome(&self) -> ConductorApiResult<Ribosome>;
 
     /// Get a [`Zome`](holochain_types::prelude::Zome) from this cell's Dna
     fn get_zome(&self, cell_id: &CellId, zome_name: &ZomeName) -> ConductorApiResult<Zome>;

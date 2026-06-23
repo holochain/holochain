@@ -421,7 +421,7 @@ async fn check_timeout_named<T>(
 pub async fn dump_full_state(
     client: &mut WebsocketSender,
     cell_id: CellId,
-    dht_ops_cursor: Option<u64>,
+    dht_ops_cursor: Option<holochain_conductor_api::DhtOpsCursor>,
 ) -> WebsocketResult<FullStateDump> {
     let request = AdminRequest::DumpFullState {
         cell_id: Box::new(cell_id),

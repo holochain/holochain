@@ -1,8 +1,8 @@
-use holo_hash::WasmHash;
-use holochain_types::prelude::{CellId, DnaDef, DnaWasmHashed, EntryDef};
-use sqlx::{Acquire, Executor, Sqlite};
-
 use super::inner_reads;
+use holo_hash::WasmHash;
+use holochain_types::prelude::{CellId, DnaWasmHashed, EntryDef};
+use holochain_zome_types::dna_def::DnaDefHashed;
+use sqlx::{Acquire, Executor, Sqlite};
 
 fn new_decode_error(e: String) -> sqlx::Error {
     sqlx::Error::Decode(Box::new(std::io::Error::new(
@@ -16,7 +16,7 @@ pub(super) async fn wasm_exists<'e, E>(executor: E, hash: &WasmHash) -> sqlx::Re
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    inner_reads::wasm_exists(executor, hash.get_raw_32()).await
+    inner_reads::wasm_exists(executor, hash.get_raw_39()).await
 }
 
 /// Get WASM bytecode by hash.
@@ -27,7 +27,7 @@ pub(super) async fn get_wasm<'e, E>(
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    inner_reads::get_wasm(executor, hash.get_raw_32())
+    inner_reads::get_wasm(executor, hash.get_raw_39())
         .await?
         .map(|model| {
             let wasm_hash = model.wasm_hash();
@@ -50,7 +50,10 @@ where
 }
 
 /// Get a DNA definition for the passed [`CellId`].
-pub(super) async fn get_dna_def<'c, A>(conn: A, cell_id: &CellId) -> sqlx::Result<Option<DnaDef>>
+pub(super) async fn get_dna_def<'c, A>(
+    conn: A,
+    cell_id: &CellId,
+) -> sqlx::Result<Option<DnaDefHashed>>
 where
     A: Acquire<'c, Database = Sqlite>,
 {
@@ -66,7 +69,7 @@ where
             inner_reads::get_coordinator_zomes(&mut *conn, dna_hash, agent).await?;
 
         dna_model
-            .to_dna_def(integrity_zomes, coordinator_zomes)
+            .to_dna_def_hashed(integrity_zomes, coordinator_zomes)
             .map(Some)
             .map_err(new_decode_error)
     } else {
@@ -112,7 +115,7 @@ where
 }
 
 /// Get all DNA definitions with their associated [`CellId`]s.
-pub(super) async fn get_all_dna_defs<'c, A>(conn: A) -> sqlx::Result<Vec<(CellId, DnaDef)>>
+pub(super) async fn get_all_dna_defs<'c, A>(conn: A) -> sqlx::Result<Vec<(CellId, DnaDefHashed)>>
 where
     A: Acquire<'c, Database = Sqlite>,
 {
@@ -131,7 +134,7 @@ where
 
         let cell_id = dna_model.to_cell_id();
         let dna_def = dna_model
-            .to_dna_def(integrity_zomes, coordinator_zomes)
+            .to_dna_def_hashed(integrity_zomes, coordinator_zomes)
             .map_err(new_decode_error)?;
 
         results.push((cell_id, dna_def));

@@ -3,8 +3,8 @@
 use super::super::inner::validation_receipt;
 use crate::handles::{DbRead, DbWrite};
 use crate::kind::Dht;
-use crate::models::dht::ValidationReceiptRow;
-use holo_hash::DhtOpHash;
+use crate::models::dht::{ValidationReceiptForActionRow, ValidationReceiptRow};
+use holo_hash::{ActionHash, DhtOpHash};
 use holochain_timestamp::Timestamp;
 
 impl DbWrite<Dht> {
@@ -12,16 +12,14 @@ impl DbWrite<Dht> {
         &self,
         hash: &DhtOpHash,
         op_hash: &DhtOpHash,
-        validators: &[u8],
-        signature: &[u8],
+        blob: &[u8],
         when_received: Timestamp,
     ) -> sqlx::Result<()> {
         validation_receipt::insert_validation_receipt(
             self.pool(),
             hash,
             op_hash,
-            validators,
-            signature,
+            blob,
             when_received,
         )
         .await
@@ -34,5 +32,15 @@ impl DbRead<Dht> {
         op_hash: DhtOpHash,
     ) -> sqlx::Result<Vec<ValidationReceiptRow>> {
         validation_receipt::get_validation_receipts(self.pool(), op_hash).await
+    }
+
+    /// Validation receipts for every op of `action_hash`, joined with op type
+    /// and publish-completion flag. See
+    /// `validation_receipt::validation_receipts_for_action`.
+    pub async fn validation_receipts_for_action(
+        &self,
+        action_hash: ActionHash,
+    ) -> sqlx::Result<Vec<ValidationReceiptForActionRow>> {
+        validation_receipt::validation_receipts_for_action(self.pool(), action_hash).await
     }
 }

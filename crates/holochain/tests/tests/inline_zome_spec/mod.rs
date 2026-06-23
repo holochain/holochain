@@ -10,7 +10,6 @@ use holochain::{
     core::workflow::WorkflowError,
 };
 use holochain_types::{inline_zome::InlineZomeSet, prelude::*};
-use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{op::Op, record::RecordEntry};
 use matches::assert_matches;
 
@@ -312,35 +311,6 @@ async fn simple_validation() -> anyhow::Result<()> {
     assert!(correct, "Error was: {err:?}");
 
     Ok(())
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn can_call_real_zomes_too() {
-    holochain_trace::test_run();
-
-    let mut conductor = SweetConductor::standard().await;
-    let (mut integrity, mut coordinator) = simple_crud_zome().into_zomes();
-    integrity.push(TestWasm::Create.into());
-    coordinator.push(TestWasm::Create.into());
-
-    let (dna, _, _) =
-        SweetDnaFile::unique_from_zomes(integrity, coordinator, TestWasm::Create.into()).await;
-
-    let app = conductor
-        .setup_app("app1", std::slice::from_ref(&dna))
-        .await
-        .unwrap();
-
-    let (cell,) = app.into_tuple();
-
-    let hash: ActionHash = conductor
-        .call(&cell.zome(SweetInlineZomes::COORDINATOR), "create_unit", ())
-        .await;
-
-    let el: Option<Record> = conductor
-        .call(&cell.zome("create_entry"), "get_post", hash.clone())
-        .await;
-    assert_eq!(el.unwrap().action_address(), &hash)
 }
 
 /// Simple scenario involving two agents using the same DNA

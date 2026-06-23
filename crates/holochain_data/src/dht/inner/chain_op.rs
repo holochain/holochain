@@ -155,6 +155,51 @@ where
         .await
 }
 
+/// Terminal validation outcome (`1` = Valid/Accepted, `2` = Rejected) of the
+/// chain op for `(action_hash, op_type)`, taken from whichever of the
+/// integrated `ChainOp` (preferred) or the in-validation `LimboChainOp` holds a
+/// decided result. Returns `None` when the op is still pending validation,
+/// cache-only, or absent. Used by the warrant-dependency readiness check.
+///
+/// The `LimboChainOp` branch matches the legacy `get_dht_op_validation_state`,
+/// which surfaced a validation decision *before* the op was integrated: a
+/// dependency that has been validated (sys-rejected, or sys-accepted with an
+/// app decision) is ready even though the integration workflow has not yet
+/// promoted it.
+pub(crate) async fn op_validation_outcome<'e, E>(
+    executor: E,
+    action_hash: &ActionHash,
+    op_type: i64,
+) -> sqlx::Result<Option<i64>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_scalar(
+        "SELECT outcome FROM (
+            SELECT validation_status AS outcome, 0 AS pri
+            FROM ChainOp
+            WHERE action_hash = ? AND op_type = ? AND locally_validated = 1
+            UNION ALL
+            SELECT
+                (CASE WHEN sys_validation_status = 2 OR app_validation_status = 2
+                      THEN 2 ELSE 1 END) AS outcome,
+                1 AS pri
+            FROM LimboChainOp
+            WHERE action_hash = ? AND op_type = ?
+              AND (sys_validation_status = 2
+                   OR (sys_validation_status = 1 AND app_validation_status IN (1, 2)))
+         )
+         ORDER BY pri
+         LIMIT 1",
+    )
+    .bind(action_hash.get_raw_36())
+    .bind(op_type)
+    .bind(action_hash.get_raw_36())
+    .bind(op_type)
+    .fetch_optional(executor)
+    .await
+}
+
 /// Row returned by [`pending_validation_receipts`]: op metadata plus the
 /// underlying action's author so receipts can be addressed.
 #[derive(Debug, sqlx::FromRow)]

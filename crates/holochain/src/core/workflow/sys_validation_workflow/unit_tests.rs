@@ -74,12 +74,17 @@ async fn validate_op_with_no_dependency() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn validate_op_with_dependency_held_in_cache() {
+async fn validate_op_with_dependency_held_in_dht_store() {
     holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
-    // Previous op, to go in the cache
+    // Previous op — a *held dependency*, not an op under validation. "Held
+    // locally" means cached in the DhtStore (`save_chain_op_as_cached` →
+    // `cache_chain_ops`), so `retrieve_action` finds it but it is NOT queued for
+    // sys validation. (Seeding it via `save_op_to_dht`/`record_incoming_ops`
+    // would put it in limbo, so sys validation would try to validate the
+    // dependency itself and fetch *its* prev_action from the network.)
     let mut prev_create_action = fixt!(Create);
     prev_create_action.author = test_case.agent.clone();
     prev_create_action.action_seq = 10;
@@ -92,9 +97,9 @@ async fn validate_op_with_dependency_held_in_cache() {
         .sign_action(Action::Create(prev_create_action.clone()))
         .await;
     let previous_op =
-        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(prev_create_action)).into();
+        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(prev_create_action));
     test_case
-        .save_op_to_db(test_case.cache_db_handle(), previous_op)
+        .save_chain_op_as_cached(previous_op)
         .await
         .unwrap();
 
@@ -253,7 +258,8 @@ async fn validate_op_with_wrong_sequence_number_rejected_and_not_forwarded_to_ap
     let mut test_case = TestCase::new().await;
     test_case.with_network_behaviour(network);
 
-    // Previous op, to be found in the cache
+    // Previous op — a *held dependency*, cached in the DhtStore (not queued for
+    // sys validation). See the note in `validate_op_with_dependency_held_in_dht_store`.
     let mut validation_package_action = fixt!(AgentValidationPkg);
     validation_package_action.author = test_case.agent.clone();
     validation_package_action.action_seq = 10;
@@ -265,10 +271,9 @@ async fn validate_op_with_wrong_sequence_number_rejected_and_not_forwarded_to_ap
     let previous_op = ChainOp::RegisterAgentActivity(
         fixt!(Signature),
         Action::AgentValidationPkg(validation_package_action),
-    )
-    .into();
+    );
     test_case
-        .save_op_to_db(test_case.cache_db_handle(), previous_op)
+        .save_chain_op_as_cached(previous_op)
         .await
         .unwrap();
 
@@ -532,20 +537,10 @@ async fn reject_invalid_warrant() {
     ));
     assert!(state.is_none());
 
-    // Mark the sys validated dependency as valid because this test can't run the app validation workflow.
-    test_case
-        .dht_db_handle()
-        .write_async(move |txn| -> StateMutationResult<()> {
-            holochain_state::mutations::set_validation_status(
-                txn,
-                &valid_op_hash,
-                holochain_zome_types::prelude::ValidationStatus::Valid,
-            )?;
-            holochain_state::mutations::set_when_integrated(txn, &valid_op_hash, Timestamp::now())?;
-            Ok(())
-        })
-        .await
-        .unwrap();
+    // Mark the sys-validated dependency as valid in the DHT store (this test
+    // can't run the app-validation + integration workflows), so the warrant-
+    // dependency readiness check sees a terminal outcome.
+    test_case.mark_dep_valid_in_store(&valid_op_hash).await;
 
     // Validate the warrant itself
     test_case.run().await;
@@ -599,19 +594,7 @@ async fn validate_warrant_with_validated_dependency() {
     );
     let valid_op_hash = DhtOpHashed::from_content_sync(valid_op.clone()).hash;
     test_case.save_op_to_dht(valid_op.into()).await.unwrap();
-    test_case
-        .test_space
-        .space
-        .dht_db
-        .test_write(move |txn| -> StateMutationResult<()> {
-            holochain_state::mutations::set_validation_status(
-                txn,
-                &valid_op_hash,
-                holochain_zome_types::prelude::ValidationStatus::Valid,
-            )?;
-            Ok(())
-        })
-        .unwrap();
+    test_case.mark_dep_valid_in_store(&valid_op_hash).await;
 
     // Invalid warrant against a valid action
     let warrant_op = test_case
@@ -908,6 +891,27 @@ impl TestCase {
             .unwrap();
 
         Ok(hash)
+    }
+
+    /// Record a terminal Valid outcome for `op_hash` directly in the DHT store
+    /// limbo (sys + app accepted). These unit tests run only the sys-validation
+    /// workflow, so they can't drive a dependency all the way through
+    /// app-validation + integration; this seeds the decided outcome the
+    /// warrant-dependency readiness check (`op_validation_status`) reads.
+    async fn mark_dep_valid_in_store(&self, op_hash: &DhtOpHash) {
+        use holochain_state::dht_store::{AppOutcome, SysOutcome};
+        self.test_space
+            .space
+            .dht_store
+            .record_chain_op_sys_validation_outcomes(vec![(op_hash.clone(), SysOutcome::Accepted)])
+            .await
+            .unwrap();
+        self.test_space
+            .space
+            .dht_store
+            .record_app_validation_outcomes(vec![(op_hash.clone(), AppOutcome::Accepted)])
+            .await
+            .unwrap();
     }
 
     async fn create_and_sign_warrant(

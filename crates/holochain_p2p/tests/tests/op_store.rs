@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use fixt::fixt;
-use holo_hash::{AgentPubKey, AnyDhtHash, DhtOpHash, DnaHash, HasHash};
+use holo_hash::{AgentPubKey, AnyDhtHash, DhtOpHash, DnaHash};
 use holochain_p2p::event::{
     CountersigningSessionNegotiationMessage, DynHcP2pHandler, GetActivityOptions, GetLinksOptions,
     HcP2pHandler,
@@ -8,14 +8,14 @@ use holochain_p2p::event::{
 use holochain_p2p::{HolochainOpStore, HolochainP2pResult};
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::dht_store::SysOutcome;
-use holochain_state::prelude::{ChainFilter, ExternIO, RecordEntry, Signature};
+use holochain_state::prelude::{ChainFilter, ExternIO, Signature};
 use holochain_state::DhtStore;
 use holochain_timestamp::Timestamp;
 use holochain_types::activity::AgentActivityResponse;
 use holochain_types::chain::MustGetAgentActivityResponse;
 use holochain_types::dht_op::{ChainOp, DhtOpHashed, WireOps};
 use holochain_types::link::{CountLinksResponse, WireLinkKey, WireLinkOps, WireLinkQuery};
-use holochain_types::prelude::{DhtOp, ValidationReceiptBundle};
+use holochain_types::prelude::ValidationReceiptBundle;
 use holochain_zome_types::fixt::{CreateFixturator, EntryFixturator, SignatureFixturator};
 use holochain_zome_types::prelude::ChainQueryFilter;
 use holochain_zome_types::Action;
@@ -55,11 +55,17 @@ impl HcP2pHandler for StubHost {
     fn handle_publish(
         &self,
         _dna_hash: DnaHash,
-        ops: Vec<DhtOp>,
+        ops: Vec<holochain_types::dht_v2::DhtOp>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         let store = self.store.clone();
         Box::pin(async move {
+            // Mirror the conductor: reconstruct the legacy op form from the v2
+            // wire op before recording into the (still-legacy) store ingest.
             let hashed: Vec<DhtOpHashed> = ops
+                .iter()
+                .map(holochain_types::dht_v2::to_legacy_dht_op)
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(holochain_p2p::HolochainP2pError::other)?
                 .into_iter()
                 .map(DhtOpHashed::from_content_sync)
                 .collect();
@@ -147,16 +153,34 @@ impl HcP2pHandler for StubHost {
     }
 }
 
-fn test_dht_op(authored_timestamp: Timestamp) -> DhtOpHashed {
+/// Build a v2 `StoreRecord` op, as it travels on the gossip wire.
+fn test_dht_op(authored_timestamp: Timestamp) -> holochain_types::dht_v2::DhtOp {
+    use holochain_types::dht_v2::{
+        from_legacy_action, ChainOp as V2ChainOp, DhtOp as V2DhtOp, OpEntry, SignedAction,
+    };
+
     let mut create = fixt!(Create);
     create.timestamp = authored_timestamp;
+    let action = from_legacy_action(&Action::Create(create));
+    let signed = SignedAction::new(action, fixt!(Signature));
+    V2DhtOp::ChainOp(Box::new(V2ChainOp::CreateRecord(
+        signed,
+        OpEntry::Present(fixt!(Entry)),
+    )))
+}
 
-    let op = DhtOp::from(ChainOp::StoreRecord(
-        fixt!(Signature),
-        Action::Create(create),
-        RecordEntry::Present(fixt!(Entry)),
-    ));
-    DhtOpHashed::from_content_sync(op)
+/// The v2 wire bytes for an op, i.e. what `process_incoming_ops` decodes.
+fn wire_bytes(op: &holochain_types::dht_v2::DhtOp) -> Bytes {
+    Bytes::from(holochain_serialized_bytes::encode(op).unwrap())
+}
+
+/// The `serialized_size` the store records for an op. During the migration the
+/// v2 wire op is reconstructed to its legacy form before recording, so the
+/// stored size is the legacy encoding's length (an approximation of the v2 wire
+/// size, used only for gossip budgeting).
+fn stored_size(op: &holochain_types::dht_v2::DhtOp) -> usize {
+    let legacy = holochain_types::dht_v2::to_legacy_dht_op(op).unwrap();
+    holochain_serialized_bytes::encode(&legacy).unwrap().len()
 }
 
 /// Move the supplied chain ops from limbo into the integrated table.
@@ -192,19 +216,16 @@ async fn process_incoming_ops_and_retrieve() {
     let dht_op_2 = test_dht_op(Timestamp::now());
 
     op_store
-        .process_incoming_ops(vec![
-            Bytes::from(holochain_serialized_bytes::encode(dht_op_1.as_content()).unwrap()),
-            Bytes::from(holochain_serialized_bytes::encode(dht_op_2.as_content()).unwrap()),
-        ])
+        .process_incoming_ops(vec![wire_bytes(&dht_op_1), wire_bytes(&dht_op_2)])
         .await
         .unwrap();
 
     let to_retrieve = vec![
         dht_op_1
-            .as_hash()
+            .to_hash()
             .to_located_k2_op_id(&dht_op_1.dht_basis()),
         dht_op_2
-            .as_hash()
+            .to_hash()
             .to_located_k2_op_id(&dht_op_2.dht_basis()),
     ];
 
@@ -212,11 +233,7 @@ async fn process_incoming_ops_and_retrieve() {
     let retrieved = op_store.retrieve_ops(to_retrieve.clone()).await.unwrap();
     assert!(retrieved.is_empty());
 
-    set_all_integrated(
-        &store,
-        &[dht_op_1.as_hash().clone(), dht_op_2.as_hash().clone()],
-    )
-    .await;
+    set_all_integrated(&store, &[dht_op_1.to_hash(), dht_op_2.to_hash()]).await;
 
     // Now integrated — should be retrievable.
     let retrieved = op_store.retrieve_ops(to_retrieve).await.unwrap();
@@ -243,10 +260,7 @@ async fn filter_out_existing_ops() {
     let dht_op_2 = test_dht_op(Timestamp::now());
 
     op_store
-        .process_incoming_ops(vec![
-            Bytes::from(holochain_serialized_bytes::encode(dht_op_1.as_content()).unwrap()),
-            Bytes::from(holochain_serialized_bytes::encode(dht_op_2.as_content()).unwrap()),
-        ])
+        .process_incoming_ops(vec![wire_bytes(&dht_op_1), wire_bytes(&dht_op_2)])
         .await
         .unwrap();
 
@@ -255,10 +269,10 @@ async fn filter_out_existing_ops() {
     // and must not be re-fetched — no integration step needed here.
     let to_check = vec![
         dht_op_1
-            .as_hash()
+            .to_hash()
             .to_located_k2_op_id(&dht_op_1.dht_basis()),
         dht_op_2
-            .as_hash()
+            .to_hash()
             .to_located_k2_op_id(&dht_op_2.dht_basis()),
     ];
     let all_exist_filtered = op_store.filter_out_existing_ops(to_check).await.unwrap();
@@ -268,7 +282,7 @@ async fn filter_out_existing_ops() {
     let non_existent_op_id = OpId::from(Bytes::from_static(&[5; 36]));
     let to_check = vec![
         dht_op_1
-            .as_hash()
+            .to_hash()
             .to_located_k2_op_id(&dht_op_1.dht_basis()),
         non_existent_op_id.clone(),
     ];
@@ -284,7 +298,7 @@ async fn filter_out_existing_ops_filters_invalid_op_ids_as_well() {
 
     let valid_op = test_dht_op(Timestamp::now());
     let valid_op_id = valid_op
-        .as_hash()
+        .to_hash()
         .to_located_k2_op_id(&valid_op.dht_basis());
 
     let op_id_too_short = kitsune2_api::OpId::from(bytes::Bytes::from(vec![0u8; 31]));
@@ -308,10 +322,7 @@ async fn retrieve_in_time_slice() {
         dht_ops.push(test_dht_op(Timestamp::from_micros((i + 1) * 100)))
     }
 
-    let encoded_ops = dht_ops
-        .iter()
-        .map(|dht_op| Bytes::from(holochain_serialized_bytes::encode(dht_op.as_content()).unwrap()))
-        .collect::<Vec<_>>();
+    let encoded_ops = dht_ops.iter().map(wire_bytes).collect::<Vec<_>>();
     op_store
         .process_incoming_ops(encoded_ops.clone())
         .await
@@ -328,7 +339,7 @@ async fn retrieve_in_time_slice() {
     assert!(hashes.is_empty());
     assert_eq!(0, size);
 
-    let op_hashes: Vec<_> = dht_ops.iter().map(|o| o.as_hash().clone()).collect();
+    let op_hashes: Vec<_> = dht_ops.iter().map(|o| o.to_hash()).collect();
     set_all_integrated(&store, &op_hashes).await;
 
     // Get everything
@@ -341,10 +352,7 @@ async fn retrieve_in_time_slice() {
         .await
         .unwrap();
     assert_eq!(5, hashes.len());
-    assert_eq!(
-        encoded_ops.iter().map(|b| b.len()).sum::<usize>() as u32,
-        size
-    );
+    assert_eq!(dht_ops.iter().map(stored_size).sum::<usize>() as u32, size);
 
     // Get just some ops by restricting the time slice
     let (hashes, size) = op_store
@@ -357,7 +365,7 @@ async fn retrieve_in_time_slice() {
         .unwrap();
     assert_eq!(2, hashes.len());
     assert_eq!(
-        encoded_ops.iter().take(2).map(|b| b.len()).sum::<usize>() as u32,
+        dht_ops.iter().take(2).map(stored_size).sum::<usize>() as u32,
         size
     );
 
@@ -383,10 +391,7 @@ async fn retrieve_op_ids_bounded() {
         dht_ops.push(test_dht_op(Timestamp::from_micros((i + 1) * 100)))
     }
 
-    let encoded_ops = dht_ops
-        .iter()
-        .map(|dht_op| Bytes::from(holochain_serialized_bytes::encode(dht_op.as_content()).unwrap()))
-        .collect::<Vec<_>>();
+    let encoded_ops = dht_ops.iter().map(wire_bytes).collect::<Vec<_>>();
     op_store
         .process_incoming_ops(encoded_ops.clone())
         .await
@@ -405,7 +410,7 @@ async fn retrieve_op_ids_bounded() {
     assert_eq!(0, size);
     assert_eq!(timestamp, kitsune2_api::Timestamp::from_micros(0));
 
-    let op_hashes: Vec<_> = dht_ops.iter().map(|o| o.as_hash().clone()).collect();
+    let op_hashes: Vec<_> = dht_ops.iter().map(|o| o.to_hash()).collect();
     set_all_integrated(&store, &op_hashes).await;
 
     // Get everything. Ops are returned ordered by `when_integrated`, which
@@ -420,16 +425,13 @@ async fn retrieve_op_ids_bounded() {
         .await
         .unwrap();
     assert_eq!(1500, hashes.len());
-    assert_eq!(
-        encoded_ops.iter().map(|b| b.len()).sum::<usize>() as u32,
-        size
-    );
+    assert_eq!(dht_ops.iter().map(stored_size).sum::<usize>() as u32, size);
     assert_eq!(kitsune2_api::Timestamp::from_micros(150000), timestamp);
 
     // Bound the byte budget to the first 750 ops. The loop stops once the
     // budget is hit, so the cursor lands on the 750th op's integration time
     // (750 * 100).
-    let bounded_size = encoded_ops.iter().take(750).map(|b| b.len()).sum::<usize>() as u32;
+    let bounded_size = dht_ops.iter().take(750).map(stored_size).sum::<usize>() as u32;
     let (hashes, size, timestamp) = op_store
         .retrieve_op_ids_bounded(
             DhtArc::FULL,

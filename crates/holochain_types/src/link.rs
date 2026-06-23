@@ -1,6 +1,5 @@
 //! Links interrelate entries in a source chain.
 
-use crate::dht_op::DhtOpError;
 use crate::dht_op::DhtOpResult;
 use crate::dht_op::RenderedOp;
 use crate::dht_op::RenderedOps;
@@ -10,6 +9,7 @@ use holo_hash::AnyLinkableHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::op::ChainOpType;
 use holochain_zome_types::prelude::*;
+use holochain_zome_types::warrant::SignedWarrant;
 use regex::Regex;
 
 /// Link key for sending across the wire for get links requests.
@@ -29,13 +29,20 @@ pub struct WireLinkKey {
     pub author: Option<AgentPubKey>,
 }
 
-/// Condensed link ops for sending across the wire in response to get links.
+/// The record-serving response to a get-links request.
+///
+/// Serves the create-link and delete-link actions matching the query, each
+/// carrying its record-level validation status. A `Rejected` action is always
+/// accompanied by a warrant in `warrants` proving the rejection; the receiver
+/// checks that invariant up front.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes, Default)]
 pub struct WireLinkOps {
-    /// create links that match this query.
-    pub creates: Vec<WireCreateLink>,
-    /// delete links that match this query.
-    pub deletes: Vec<WireDeleteLink>,
+    /// Create-link actions that match this query, each with its status.
+    pub creates: Vec<Judged<SignedAction>>,
+    /// Delete-link actions that match this query, each with its status.
+    pub deletes: Vec<Judged<SignedAction>>,
+    /// Warrants proving any `Rejected` records served above.
+    pub warrants: Vec<SignedWarrant>,
 }
 
 impl WireLinkOps {
@@ -43,153 +50,43 @@ impl WireLinkOps {
     pub fn new() -> Self {
         Default::default()
     }
-    /// Render these ops to their full types.
-    pub fn render(self, key: &WireLinkKey) -> DhtOpResult<RenderedOps> {
-        let Self { creates, deletes } = self;
+    /// Expand the served records into the request-relevant ops for caching.
+    ///
+    /// Each served action becomes the single op the get-links request
+    /// represents (`RegisterAddLink` per create, `RegisterRemoveLink` per
+    /// delete), tagged with the served validation status. Warrants are handled
+    /// separately by the requester.
+    pub fn render(self) -> DhtOpResult<RenderedOps> {
+        let Self {
+            creates,
+            deletes,
+            warrants: _,
+        } = self;
         let mut ops = Vec::with_capacity(creates.len() + deletes.len());
-        // We silently ignore ops that fail to render as they come from the network.
-        ops.extend(creates.into_iter().filter_map(|op| op.render(key).ok()));
-        ops.extend(deletes.into_iter().filter_map(|op| op.render(key).ok()));
+        for op in creates {
+            let status = op.validation_status();
+            let (action, signature) = op.data.into();
+            ops.push(RenderedOp::new(
+                action,
+                signature,
+                status,
+                ChainOpType::RegisterAddLink,
+            )?);
+        }
+        for op in deletes {
+            let status = op.validation_status();
+            let (action, signature) = op.data.into();
+            ops.push(RenderedOp::new(
+                action,
+                signature,
+                status,
+                ChainOpType::RegisterRemoveLink,
+            )?);
+        }
         Ok(RenderedOps {
             ops,
             ..Default::default()
         })
-    }
-}
-
-/// Condensed version of a [`CreateLink`]
-#[allow(missing_docs)]
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
-pub struct WireCreateLink {
-    pub author: AgentPubKey,
-    pub timestamp: Timestamp,
-    pub action_seq: u32,
-    pub prev_action: ActionHash,
-
-    pub target_address: AnyLinkableHash,
-    pub zome_index: ZomeIndex,
-    pub link_type: LinkType,
-    pub tag: Option<LinkTag>,
-    pub signature: Signature,
-    pub validation_status: ValidationStatus,
-    pub weight: RateWeight,
-}
-
-/// Condensed version of a [`DeleteLink`]
-#[allow(missing_docs)]
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
-pub struct WireDeleteLink {
-    pub author: AgentPubKey,
-    pub timestamp: Timestamp,
-    pub action_seq: u32,
-    pub prev_action: ActionHash,
-
-    pub link_add_address: ActionHash,
-    pub signature: Signature,
-    pub validation_status: ValidationStatus,
-}
-
-impl WireCreateLink {
-    fn new(
-        h: CreateLink,
-        signature: Signature,
-        validation_status: ValidationStatus,
-        tag: bool,
-    ) -> Self {
-        Self {
-            author: h.author,
-            timestamp: h.timestamp,
-            action_seq: h.action_seq,
-            prev_action: h.prev_action,
-            target_address: h.target_address,
-            zome_index: h.zome_index,
-            link_type: h.link_type,
-            tag: if tag { Some(h.tag) } else { None },
-            signature,
-            validation_status,
-            weight: h.weight,
-        }
-    }
-    /// Condense down a create link op for the wire without a tag.
-    pub fn condense_base_only(
-        h: CreateLink,
-        signature: Signature,
-        validation_status: ValidationStatus,
-    ) -> Self {
-        Self::new(h, signature, validation_status, false)
-    }
-    /// Condense down a create link op for the wire with a tag.
-    pub fn condense(
-        h: CreateLink,
-        signature: Signature,
-        validation_status: ValidationStatus,
-    ) -> Self {
-        Self::new(h, signature, validation_status, true)
-    }
-    /// Render these ops to their full types.
-    pub fn render(self, key: &WireLinkKey) -> DhtOpResult<RenderedOp> {
-        let tag = self
-            .tag
-            .or_else(|| key.tag.clone())
-            .ok_or(DhtOpError::LinkKeyTagMissing)?;
-        let action = Action::CreateLink(CreateLink {
-            author: self.author,
-            timestamp: self.timestamp,
-            action_seq: self.action_seq,
-            prev_action: self.prev_action,
-            base_address: key.base.clone(),
-            target_address: self.target_address,
-            zome_index: self.zome_index,
-            link_type: self.link_type,
-            weight: self.weight,
-            tag,
-        });
-        let signature = self.signature;
-        let validation_status = Some(self.validation_status);
-        RenderedOp::new(
-            action,
-            signature,
-            validation_status,
-            ChainOpType::RegisterAddLink,
-        )
-    }
-}
-
-impl WireDeleteLink {
-    /// Condense down a delete link op for the wire.
-    pub fn condense(
-        h: DeleteLink,
-        signature: Signature,
-        validation_status: ValidationStatus,
-    ) -> Self {
-        Self {
-            author: h.author,
-            timestamp: h.timestamp,
-            action_seq: h.action_seq,
-            prev_action: h.prev_action,
-            signature,
-            validation_status,
-            link_add_address: h.link_add_address,
-        }
-    }
-    /// Render these ops to their full types.
-    pub fn render(self, key: &WireLinkKey) -> DhtOpResult<RenderedOp> {
-        let action = Action::DeleteLink(DeleteLink {
-            author: self.author,
-            timestamp: self.timestamp,
-            action_seq: self.action_seq,
-            prev_action: self.prev_action,
-            base_address: key.base.clone(),
-            link_add_address: self.link_add_address,
-        });
-        let signature = self.signature;
-        let validation_status = Some(self.validation_status);
-        RenderedOp::new(
-            action,
-            signature,
-            validation_status,
-            ChainOpType::RegisterRemoveLink,
-        )
     }
 }
 

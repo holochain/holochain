@@ -7,6 +7,10 @@
 //! [`holochain_integrity_types::dht_v2`] and
 //! [`holochain_zome_types::dht_v2`]).
 
+use holochain_integrity_types::dht_v2::RecordValidity;
+use holochain_integrity_types::entry::Entry;
+use holochain_zome_types::dht_v2::SignedActionHashed;
+
 /// Row from the `Action` table.
 #[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
 pub struct ActionRow {
@@ -30,9 +34,47 @@ pub struct ActionRow {
     pub entry_hash: Option<Vec<u8>>,
     /// `1` when the entry is private, `0` when public; `NULL` for actions without an entry.
     pub private_entry: Option<i64>,
-    /// Encoded [`RecordValidity`](holochain_integrity_types::dht_v2::RecordValidity);
+    /// Encoded [`RecordValidity`];
     /// `NULL` represents pending.
     pub record_validity: Option<i64>,
+}
+
+/// Row from an agent-activity scan: an `Action` row (flattened) plus the
+/// joined `ChainOp.validation_status` and, in Full mode, the public `Entry`
+/// blob (`NULL` in Hashes mode or when the entry is absent/private).
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub(crate) struct AgentActivityRow {
+    /// The action columns (see [`ActionRow`]).
+    #[sqlx(flatten)]
+    pub action: ActionRow,
+    /// `ChainOp.validation_status` (`1 = Accepted`, `2 = Rejected`).
+    pub validation_status: i64,
+    /// Serialized public `Entry` blob; `None` in Hashes mode or when absent.
+    pub entry_blob: Option<Vec<u8>>,
+}
+
+/// Row pairing an `Action` (flattened) with the joined `ChainOp.validation_status`.
+/// Used by the authority-serving reads, which join `ChainOp` to enforce the
+/// `locally_validated = 1` guard and surface the record's validation status.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub(crate) struct ValidatedActionRow {
+    /// The action columns (see [`ActionRow`]).
+    #[sqlx(flatten)]
+    pub action: ActionRow,
+    /// `ChainOp.validation_status` (`1 = Accepted`, `2 = Rejected`).
+    pub validation_status: i64,
+}
+
+/// Decoded agent-activity item: an integrated `RegisterAgentActivity` action,
+/// its validation status, and (Full mode) the referenced public entry.
+#[derive(Debug, Clone)]
+pub struct AgentActivityItem {
+    /// The signed, hashed v2 action.
+    pub action: SignedActionHashed,
+    /// Validation status of the action's `RegisterAgentActivity` op.
+    pub validation_status: RecordValidity,
+    /// The referenced public entry, when fetched (Full mode) and present.
+    pub entry: Option<Entry>,
 }
 
 /// Row from the `Entry` table (public entries only).
@@ -40,7 +82,7 @@ pub struct ActionRow {
 pub struct EntryRow {
     /// Entry hash (primary key).
     pub hash: Vec<u8>,
-    /// Serialized [`Entry`](holochain_integrity_types::entry::Entry) blob.
+    /// Serialized [`Entry`] blob.
     pub blob: Vec<u8>,
 }
 
@@ -51,7 +93,7 @@ pub struct PrivateEntryRow {
     pub hash: Vec<u8>,
     /// Agent pub key of the local author that owns the entry.
     pub author: Vec<u8>,
-    /// Serialized [`Entry`](holochain_integrity_types::entry::Entry) blob.
+    /// Serialized [`Entry`] blob.
     pub blob: Vec<u8>,
 }
 
@@ -105,10 +147,10 @@ pub struct LimboChainOpRow {
     pub basis_hash: Vec<u8>,
     /// Numeric storage center derived from `basis_hash`.
     pub storage_center_loc: i64,
-    /// Encoded [`RecordValidity`](holochain_integrity_types::dht_v2::RecordValidity);
+    /// Encoded [`RecordValidity`];
     /// `NULL` represents pending.
     pub sys_validation_status: Option<i64>,
-    /// Encoded [`RecordValidity`](holochain_integrity_types::dht_v2::RecordValidity);
+    /// Encoded [`RecordValidity`];
     /// `NULL` represents pending.
     pub app_validation_status: Option<i64>,
     /// Microsecond timestamp at which validation was abandoned; `NULL` if not abandoned.
@@ -149,7 +191,7 @@ pub struct LimboWarrantRow {
     pub reason: Option<String>,
     /// Numeric storage center derived from the warrantee.
     pub storage_center_loc: i64,
-    /// Encoded [`RecordValidity`](holochain_integrity_types::dht_v2::RecordValidity);
+    /// Encoded [`RecordValidity`];
     /// `NULL` represents pending.
     pub sys_validation_status: Option<i64>,
     /// Microsecond timestamp at which validation was abandoned; `NULL` if not abandoned.
@@ -177,7 +219,7 @@ pub struct ChainOpRow {
     pub basis_hash: Vec<u8>,
     /// Numeric storage center derived from `basis_hash`.
     pub storage_center_loc: i64,
-    /// Encoded [`RecordValidity`](holochain_integrity_types::dht_v2::RecordValidity).
+    /// Encoded [`RecordValidity`].
     pub validation_status: i64,
     /// `1` when this authority locally validated the op, `0` when accepted via receipts.
     pub locally_validated: i64,
@@ -212,12 +254,25 @@ pub struct ValidationReceiptRow {
     pub hash: Vec<u8>,
     /// Hash of the op the receipt is for.
     pub op_hash: Vec<u8>,
-    /// Serialized list of validator agent pub keys.
-    pub validators: Vec<u8>,
-    /// 64-byte signature over the receipt.
-    pub signature: Vec<u8>,
+    /// Full serialized `SignedValidationReceipt`.
+    pub blob: Vec<u8>,
     /// Microsecond timestamp at which the receipt was received.
     pub when_received: i64,
+}
+
+/// A validation receipt joined with its op's type and publish-completion flag,
+/// for one op of a queried action. Used to build the `get_validation_receipts`
+/// host-function response.
+#[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
+pub struct ValidationReceiptForActionRow {
+    /// Full serialized `SignedValidationReceipt`.
+    pub receipt_blob: Vec<u8>,
+    /// Hash of the op the receipt is for.
+    pub op_hash: Vec<u8>,
+    /// Chain op type discriminant.
+    pub op_type: i64,
+    /// Whether the op has received enough receipts (`NULL` = not complete).
+    pub receipts_complete: Option<i64>,
 }
 
 /// Joined `Warrant` + `WarrantOp` row (an integrated warrant with op
@@ -257,6 +312,21 @@ pub struct WarrantPublishRow {
     pub warrant_hash: Vec<u8>,
     /// Microsecond timestamp of the most recent publish attempt.
     pub last_publish_time: Option<i64>,
+}
+
+/// Row returned by the publish-queue query: one self-authored op that is
+/// eligible to be published to the network, with its DHT basis.
+///
+/// `dht_hash` is the op hash (a chain op hash or a warrant hash). `basis_hash`
+/// is the type-stripped 36-byte basis: the publish path routes solely by the
+/// basis location, so the hash-type wrapper is irrelevant and is reconstructed
+/// as an external hash by the caller.
+#[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
+pub struct OpToPublishRow {
+    /// Hash of the op to publish.
+    pub dht_hash: Vec<u8>,
+    /// Type-stripped 36-byte DHT basis hash.
+    pub basis_hash: Vec<u8>,
 }
 
 /// Row from the `Link` table (link index).
@@ -369,6 +439,19 @@ pub struct K2ChainOpForWireRow {
     pub signature: Vec<u8>,
     /// Serialized `Entry` blob; `None` when no entry is attached or not yet present.
     pub entry_blob: Option<Vec<u8>>,
+}
+
+/// A [`K2ChainOpForWireRow`] plus its `when_integrated`, used to drive the
+/// integration-dump cursor: integrated ops are paginated by
+/// `(when_integrated, op_hash)`, so each row carries the `when_integrated` that
+/// (with `op_hash`) forms the cursor for the next page.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct DumpChainOpRow {
+    /// The wire columns, reconstructed with `build_chain_dht_op_v2`.
+    #[sqlx(flatten)]
+    pub wire: K2ChainOpForWireRow,
+    /// Microsecond integration timestamp; the high-order part of the cursor.
+    pub when_integrated: i64,
 }
 
 /// Joined `Warrant` row for full op rendering on the K2 wire.

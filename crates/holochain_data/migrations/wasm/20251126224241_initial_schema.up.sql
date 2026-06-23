@@ -23,11 +23,10 @@ CREATE TABLE IF NOT EXISTS IntegrityZome (
     agent           BLOB           NOT NULL,
     zome_index      INTEGER        NOT NULL,
     zome_name       TEXT           NOT NULL,
-    wasm_hash       BLOB,                     -- NULL for inline zomes
+    zome_hash       BLOB           NOT NULL,
     dependencies    JSON           NOT NULL,  -- JSON array of zome names
     PRIMARY KEY (dna_hash, agent, zome_index),
-    FOREIGN KEY (dna_hash, agent) REFERENCES DnaDef(hash, agent) ON DELETE CASCADE,
-    FOREIGN KEY (wasm_hash) REFERENCES Wasm(hash)
+    FOREIGN KEY (dna_hash, agent) REFERENCES DnaDef(hash, agent) ON DELETE CASCADE
 );
 
 -- CoordinatorZome storage (one row per zome in a DNA)
@@ -36,11 +35,10 @@ CREATE TABLE IF NOT EXISTS CoordinatorZome (
     agent           BLOB           NOT NULL,
     zome_index      INTEGER        NOT NULL,
     zome_name       TEXT           NOT NULL,
-    wasm_hash       BLOB,                     -- NULL for inline zomes
+    zome_hash       BLOB           NOT NULL,
     dependencies    JSON           NOT NULL,  -- JSON array of zome names
     PRIMARY KEY (dna_hash, agent, zome_index),
-    FOREIGN KEY (dna_hash, agent) REFERENCES DnaDef(hash, agent) ON DELETE CASCADE,
-    FOREIGN KEY (wasm_hash) REFERENCES Wasm(hash)
+    FOREIGN KEY (dna_hash, agent) REFERENCES DnaDef(hash, agent) ON DELETE CASCADE
 );
 
 -- EntryDef storage (flattened from EntryDef struct)

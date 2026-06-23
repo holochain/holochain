@@ -4,7 +4,6 @@ use crate::link::LinkType;
 use crate::EntryRateWeight;
 use crate::MembraneProof;
 use crate::RateWeight;
-use holo_hash::impl_hashable_content;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyLinkableHash;
@@ -86,24 +85,6 @@ impl Display for Action {
             Action::Delete(delete) => write!(f, "create=[author={}, timestamp={:?}, deletes_address={}, deletes_entry_address={}]", delete.author, delete.timestamp, delete.deletes_address, delete.deletes_entry_address),
         }
     }
-}
-
-/// This allows action types to be serialized to bytes without requiring
-/// an owned value. This produces the same bytes as if they were
-/// serialized with the [`Action`] type.
-#[derive(Clone, Debug, Serialize, PartialEq, Eq, Hash)]
-#[serde(tag = "type")]
-pub(crate) enum ActionRef<'a> {
-    Dna(&'a Dna),
-    AgentValidationPkg(&'a AgentValidationPkg),
-    InitZomesComplete(&'a InitZomesComplete),
-    CreateLink(&'a CreateLink),
-    DeleteLink(&'a DeleteLink),
-    OpenChain(&'a OpenChain),
-    CloseChain(&'a CloseChain),
-    Create(&'a Create),
-    Update(&'a Update),
-    Delete(&'a Delete),
 }
 
 pub type ActionHashed = HoloHashed<Action>;
@@ -420,10 +401,27 @@ impl Action {
     }
 }
 
-impl_hashable_content!(Action, Action);
+impl HashableContent for Action {
+    type HashType = holo_hash::hash_type::Action;
 
-/// Allows the internal action types to produce
-/// a [`ActionHash`] from a reference to themselves.
+    fn hash_type(&self) -> Self::HashType {
+        use holo_hash::PrimitiveHashType;
+        holo_hash::hash_type::Action::new()
+    }
+
+    fn hashable_content(&self) -> holo_hash::HashableContentBytes {
+        // The canonical `ActionHash` is content-derived v2: hash the v2
+        // projection (header + `ActionData`, weightless), not the legacy action
+        // bytes. Authoring still builds legacy `Action`s; only the identity they
+        // hash to is flipped to v2.
+        crate::dht_v2::from_legacy_action(self).hashable_content()
+    }
+}
+
+/// Allows the internal action types to produce a [`ActionHash`] from a
+/// reference to themselves. Like [`Action`] above, each hashes the v2
+/// projection, so a bare action and its `Action::$n(..)` enum form share an
+/// identity.
 macro_rules! impl_hashable_content_for_ref {
     ($n: ident) => {
         impl HashableContent for $n {
@@ -435,12 +433,7 @@ macro_rules! impl_hashable_content_for_ref {
             }
 
             fn hashable_content(&self) -> holo_hash::HashableContentBytes {
-                let h = ActionRef::$n(self);
-                let sb = SerializedBytes::from(UnsafeBytes::from(
-                    holochain_serialized_bytes::encode(&h)
-                        .expect("Could not serialize HashableContent"),
-                ));
-                holo_hash::HashableContentBytes::Content(sb)
+                Action::$n(self.clone()).hashable_content()
             }
         }
     };

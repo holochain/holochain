@@ -1,8 +1,7 @@
 use crate::core::ribosome::host_fn::cascade_from_call_context;
-use crate::core::ribosome::CallContext;
+use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
-use crate::core::ribosome::RibosomeT;
 use futures::StreamExt;
 use holochain_p2p::actor::GetLinksRequestOptions;
 use holochain_types::prelude::*;
@@ -12,7 +11,7 @@ use wasmer::RuntimeError;
 
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(_ribosome, call_context), fields(?call_context.zome, function = ?call_context.function_name)))]
 pub fn get_links(
-    _ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,
     inputs: Vec<GetLinksInput>,
 ) -> Result<Vec<Vec<Link>>, RuntimeError> {

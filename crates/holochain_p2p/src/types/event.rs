@@ -83,10 +83,14 @@ pub trait HcP2pHandler: 'static + Send + Sync + std::fmt::Debug {
     ) -> BoxFut<'_, HolochainP2pResult<()>>;
 
     /// A remote node is publishing data in a range we claim to be holding.
+    ///
+    /// Ops arrive in the v2 wire form ([`holochain_types::dht_v2::DhtOp`]); the
+    /// receiving conductor reconstructs the legacy form for the migration-era
+    /// ingest pipeline.
     fn handle_publish(
         &self,
         dna_hash: DnaHash,
-        ops: Vec<holochain_types::dht_op::DhtOp>,
+        ops: Vec<holochain_types::dht_v2::DhtOp>,
     ) -> BoxFut<'_, HolochainP2pResult<()>>;
 
     /// A remote node is requesting entry data from us.

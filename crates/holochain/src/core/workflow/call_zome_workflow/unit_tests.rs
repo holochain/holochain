@@ -2,7 +2,7 @@ use crate::{
     conductor::api::CellConductorApi,
     core::{
         queue_consumer::TriggerSender,
-        ribosome::{real_ribosome::RealRibosome, ZomeCallInvocation},
+        ribosome::ZomeCallInvocation,
         workflow::{call_zome_workflow, CallZomeWorkflowArgs},
     },
     sweettest::{SweetConductor, SweetDnaFile},
@@ -198,7 +198,7 @@ struct TestCase {
     workspace: SourceChainWorkspace,
     network: DynHolochainP2pDna,
     keystore: MetaLairClient,
-    args: CallZomeWorkflowArgs<RealRibosome>,
+    args: CallZomeWorkflowArgs,
     _conductor: SweetConductor,
 }
 

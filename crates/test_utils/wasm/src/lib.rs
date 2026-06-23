@@ -514,7 +514,7 @@ impl From<TestCoordinatorWasm> for CoordinatorZome {
 async fn path_to_def(path: PathBuf, dependencies: Vec<ZomeName>) -> ZomeDef {
     let wasm = DnaWasm::from(get_code(path));
     let wasm_hash = WasmHash::with_data(&wasm).await;
-    ZomeDef::Wasm(WasmZome {
+    ZomeDef::Wasm(WasmZomeDef {
         wasm_hash,
         dependencies,
     })

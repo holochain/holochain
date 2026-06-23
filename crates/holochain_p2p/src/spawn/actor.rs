@@ -94,7 +94,7 @@ impl event::HcP2pHandler for WrapEvtSender {
     fn handle_publish(
         &self,
         dna_hash: DnaHash,
-        ops: Vec<holochain_types::dht_op::DhtOp>,
+        ops: Vec<holochain_types::dht_v2::DhtOp>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         let op_count = ops.len();
         timing_trace!(
@@ -2033,10 +2033,12 @@ impl actor::HcP2p for HolochainP2pActor {
                         deletes,
                         updates,
                         entry,
+                        warrants,
                     }) if creates.is_empty()
                         && deletes.is_empty()
                         && updates.is_empty()
-                        && entry.is_none() =>
+                        && entry.is_none()
+                        && warrants.is_empty() =>
                     {
                         true
                     }
@@ -2045,10 +2047,12 @@ impl actor::HcP2p for HolochainP2pActor {
                         deletes,
                         updates,
                         entry,
+                        warrants,
                     }) if action.is_none()
                         && deletes.is_empty()
                         && updates.is_empty()
-                        && entry.is_none() =>
+                        && entry.is_none()
+                        && warrants.is_empty() =>
                     {
                         true
                     }
@@ -3028,7 +3032,7 @@ mod tests {
         fn handle_publish(
             &self,
             _dna_hash: DnaHash,
-            _ops: Vec<holochain_types::dht_op::DhtOp>,
+            _ops: Vec<holochain_types::dht_v2::DhtOp>,
         ) -> BoxFut<'_, HolochainP2pResult<()>> {
             // Increment counter
             let mut count = self.handle_publish_count.lock().unwrap();

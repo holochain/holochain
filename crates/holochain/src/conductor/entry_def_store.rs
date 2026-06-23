@@ -4,8 +4,7 @@ use super::Conductor;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
-use crate::core::ribosome::real_ribosome::RealRibosome;
-use crate::core::ribosome::RibosomeT;
+use crate::core::ribosome::Ribosome;
 use error::EntryDefStoreError;
 use error::EntryDefStoreResult;
 use holo_hash::*;
@@ -52,13 +51,13 @@ pub(crate) async fn get_entry_def(
 /// Get all the [EntryDef] for this dna
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(ribosome)))]
 pub(crate) async fn get_entry_defs(
-    ribosome: RealRibosome,
+    ribosome: Ribosome,
 ) -> EntryDefStoreResult<Vec<(EntryDefBufferKey, EntryDef)>> {
     let invocation = EntryDefsInvocation;
 
     // Get the zomes hashes
     let zomes = ribosome
-        .dna_def_hashed()
+        .dna_def()
         .integrity_zomes
         .iter()
         .cloned()
@@ -122,7 +121,7 @@ mod tests {
         let db_dir = test_db_dir();
         let handle = Conductor::builder()
             .with_data_root_path(db_dir.path().to_path_buf().into())
-            .test(&[])
+            .test()
             .await
             .unwrap();
 
@@ -178,7 +177,7 @@ mod tests {
         // Restart conductor and check defs are still here
         let handle = Conductor::builder()
             .with_data_root_path(db_dir.path().to_path_buf().into())
-            .test(&[])
+            .test()
             .await
             .unwrap();
 

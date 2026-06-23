@@ -1,7 +1,6 @@
-use crate::core::ribosome::CallContext;
+use crate::core::ribosome::{CallContext, Ribosome};
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
-use crate::core::ribosome::RibosomeT;
 use holochain_wasmer_host::prelude::*;
 
 use holochain_types::prelude::*;
@@ -10,7 +9,7 @@ use wasmer::RuntimeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn create_link<'a>(
-    _ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<Ribosome>,
     call_context: Arc<CallContext>,
     input: CreateLinkInput,
 ) -> Result<ActionHash, RuntimeError> {

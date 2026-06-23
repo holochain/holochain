@@ -1,17 +1,10 @@
+use crate::models::wasm::{CoordinatorZomeModel, DnaDefModel, EntryDefModel, IntegrityZomeModel};
 use holo_hash::{AgentPubKey, HashableContentExtSync};
-use holochain_types::prelude::{DnaDef, DnaWasmHashed, EntryDef, WasmZome, ZomeDef};
+use holochain_types::prelude::{DnaDef, DnaWasmHashed, EntryDef, WasmZomeDef, ZomeDef};
+use holochain_zome_types::zome::InlineZomeDef;
 use sqlx::{Acquire, Executor, Sqlite};
 
-use crate::models::wasm::{CoordinatorZomeModel, DnaDefModel, EntryDefModel, IntegrityZomeModel};
-
 use super::inner_writes;
-
-fn new_encode_error(e: impl ToString) -> sqlx::Error {
-    sqlx::Error::Encode(Box::new(std::io::Error::new(
-        std::io::ErrorKind::InvalidData,
-        e.to_string(),
-    )))
-}
 
 /// Store WASM bytecode.
 pub(super) async fn put_wasm<'e, E>(executor: E, wasm: DnaWasmHashed) -> sqlx::Result<()>
@@ -19,7 +12,7 @@ where
     E: Executor<'e, Database = Sqlite>,
 {
     let (wasm, hash) = wasm.into_inner();
-    inner_writes::put_wasm(executor, hash.get_raw_32(), &wasm.code).await
+    inner_writes::put_wasm(executor, hash.get_raw_39(), &wasm.code).await
 }
 
 /// Store a DNA definition and its associated zomes.
@@ -43,7 +36,12 @@ where
     let agent_bytes = agent.get_raw_32();
 
     #[cfg(feature = "unstable-migration")]
-    let lineage = Some(serde_json::to_value(&dna_def.lineage).map_err(new_encode_error)?);
+    let lineage = Some(serde_json::to_value(&dna_def.lineage).map_err(|e| {
+        sqlx::Error::Encode(Box::new(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            e.to_string(),
+        )))
+    })?);
     #[cfg(not(feature = "unstable-migration"))]
     let lineage: Option<serde_json::Value> = None;
 
@@ -61,7 +59,7 @@ where
     inner_writes::delete_coordinator_zomes(&mut *tx, hash_bytes, agent_bytes).await?;
 
     for (zome_index, (zome_name, zome_def)) in dna_def.integrity_zomes.iter().enumerate() {
-        let wasm_hash = zome_def.wasm_hash(zome_name).map_err(new_encode_error)?;
+        let zome_hash = zome_def.zome_hash();
         let dependencies = extract_dependencies(zome_def.as_any_zome_def());
 
         let model = IntegrityZomeModel {
@@ -69,14 +67,14 @@ where
             agent: agent_bytes.to_vec(),
             zome_index: zome_index as i64,
             zome_name: zome_name.0.as_ref().to_string(),
-            wasm_hash: Some(wasm_hash.get_raw_32().to_vec()),
+            zome_hash: zome_hash.get_raw_39().to_vec(),
             dependencies: sqlx::types::Json(dependencies),
         };
         inner_writes::insert_integrity_zome(&mut *tx, &model).await?;
     }
 
     for (zome_index, (zome_name, zome_def)) in dna_def.coordinator_zomes.iter().enumerate() {
-        let wasm_hash = zome_def.wasm_hash(zome_name).map_err(new_encode_error)?;
+        let zome_hash = zome_def.zome_hash();
         let dependencies = extract_dependencies(zome_def.as_any_zome_def());
 
         let model = CoordinatorZomeModel {
@@ -84,7 +82,7 @@ where
             agent: agent_bytes.to_vec(),
             zome_index: zome_index as i64,
             zome_name: zome_name.0.as_ref().to_string(),
-            wasm_hash: Some(wasm_hash.get_raw_32().to_vec()),
+            zome_hash: zome_hash.get_raw_39().to_vec(),
             dependencies: sqlx::types::Json(dependencies),
         };
         inner_writes::insert_coordinator_zome(&mut *tx, &model).await?;
@@ -108,11 +106,11 @@ where
 
 fn extract_dependencies(zome_def: &ZomeDef) -> Vec<String> {
     match zome_def {
-        ZomeDef::Wasm(WasmZome { dependencies, .. }) => dependencies
+        ZomeDef::Wasm(WasmZomeDef { dependencies, .. }) => dependencies
             .iter()
             .map(|n| n.0.as_ref().to_string())
             .collect(),
-        ZomeDef::Inline { dependencies, .. } => dependencies
+        ZomeDef::Inline(InlineZomeDef { dependencies, .. }) => dependencies
             .iter()
             .map(|n| n.0.as_ref().to_string())
             .collect(),

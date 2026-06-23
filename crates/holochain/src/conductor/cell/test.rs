@@ -1,6 +1,7 @@
 use crate::conductor::space::TestSpaces;
 use crate::conductor::Conductor;
 use crate::core::ribosome::real_ribosome::{make_module_cache, RealRibosome, WasmBackend};
+use crate::core::ribosome::Ribosome;
 use crate::core::workflow::incoming_dht_ops_workflow::op_exists;
 use crate::sweettest::SweetConductorConfig;
 use crate::test_utils::fake_valid_dna_file;
@@ -45,7 +46,7 @@ async fn test_cell_handle_publish() {
         .config(config.into())
         .with_keystore(keystore.clone())
         .with_data_root_path(data_root_path.clone())
-        .test(&[])
+        .test()
         .await
         .unwrap();
     handle
@@ -55,7 +56,23 @@ async fn test_cell_handle_publish() {
     let backend = WasmBackend::new();
     let wasmer_module_cache = make_module_cache(backend, Some(db_dir.join("wasm-cache")));
 
-    let ribosome = RealRibosome::new(backend, dna_file, wasmer_module_cache)
+    let store: WasmStore = WasmStore::test_new();
+    for (hash, wasm) in dna_file.code().clone() {
+        store
+            .put(DnaWasmHashed::with_pre_hashed(wasm, hash))
+            .await
+            .unwrap();
+    }
+
+    let ribosome = RealRibosome::new(
+        backend,
+        dna_file.dna_def_hashed().clone(),
+        store,
+        wasmer_module_cache,
+    )
+    .await
+    .unwrap();
+    let ribosome = Ribosome::new(dna_file.dna_def_hashed().clone(), ribosome)
         .await
         .unwrap();
 
@@ -93,9 +110,20 @@ async fn test_cell_handle_publish() {
     let op = ChainOp::StoreRecord(shh.signature().clone(), action.clone(), RecordEntry::NA);
     let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
 
+    // The publish wire carries the v2 op form.
+    let v2_op = holochain_types::dht_v2::DhtOp::ChainOp(Box::new(
+        holochain_types::dht_v2::ChainOp::CreateRecord(
+            holochain_types::dht_v2::SignedAction::new(
+                holochain_types::dht_v2::from_legacy_action(&action),
+                shh.signature().clone(),
+            ),
+            holochain_types::dht_v2::OpEntry::ActionOnly,
+        ),
+    ));
+
     spaces
         .spaces
-        .handle_publish(&dna, vec![op.clone().into()])
+        .handle_publish(&dna, vec![v2_op])
         .await
         .unwrap();
 

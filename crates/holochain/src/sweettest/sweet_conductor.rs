@@ -8,6 +8,7 @@ use crate::conductor::ConductorHandle;
 use crate::conductor::{
     api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult, Conductor,
 };
+use crate::core::ribosome::inline_ribosome::InlineZomeStore;
 use crate::retry_until_timeout;
 #[cfg(feature = "transport-iroh")]
 use crate::test_utils::retry_fn_until_timeout;
@@ -53,13 +54,7 @@ pub struct SweetConductor {
     db_dir: TestDir,
     keystore: MetaLairClient,
     config: Arc<ConductorConfig>,
-    /// A cache for DnaFiles such that they can be reloaded into the
-    /// RibosomeStore from here after a conductor restart.
-    /// This is relevant in particular for DnaFiles containing inline zomes
-    /// since they are not persisted to the wasm database and therefore
-    /// are not automatically loaded into the [`crate::conductor::ribosome_store::RibosomeStore`]
-    /// on conductor restart otherwise.
-    dna_files: HashMap<CellId, DnaFile>,
+    inline_zome_store_ref: InlineZomeStore,
     rendezvous: Option<DynSweetRendezvous>,
 }
 
@@ -94,11 +89,11 @@ impl SweetConductor {
         let keystore = handle.keystore().clone();
 
         Self {
+            inline_zome_store_ref: handle.inline_zome_store.clone(),
             handle: Some(SweetConductorHandle(handle)),
             db_dir: env_dir,
             keystore,
             config,
-            dna_files: HashMap::new(),
             rendezvous,
         }
     }
@@ -208,7 +203,7 @@ impl SweetConductor {
 
         let keystore = keystore.unwrap_or_else(holochain_keystore::test_keystore);
 
-        let handle = Self::handle_from_existing(keystore, &config, &[]).await;
+        let handle = Self::handle_from_existing(keystore, &config, Default::default()).await;
 
         info!("Starting with config: {:?}", config);
 
@@ -219,15 +214,16 @@ impl SweetConductor {
     pub async fn handle_from_existing(
         keystore: MetaLairClient,
         config: &ConductorConfig,
-        extra_dna_files: &[(CellId, DnaFile)],
+        inline_zome_store_ref: InlineZomeStore,
     ) -> ConductorHandle {
         NUM_CREATED.fetch_add(1, Ordering::SeqCst);
 
         Conductor::builder()
             .config(config.clone())
             .with_keystore(keystore)
+            .with_inline_zome_store(inline_zome_store_ref)
             .no_print_setup()
-            .test(extra_dna_files)
+            .test()
             .await
             .unwrap()
     }
@@ -267,26 +263,6 @@ impl SweetConductor {
         self.raw_handle().disable_app(id, reason).await
     }
 
-    /// Adds the DnaFiles to the SweetConductor cache so that they can be re-added
-    /// to the RibosomeStore after a conductor restart.
-    /// The latter is required for the case of inline zomes since they are not
-    /// persisted to the wasm database and consequently don't automatically get
-    /// reloaded into the [`crate::conductor::ribosome_store::RibosomeStore`] after a conductor restart.
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-    async fn add_dna_files_to_sweet_conductor_cache(
-        &mut self,
-        agent_key: AgentPubKey,
-        dna_files: impl IntoIterator<Item = &DnaFile>,
-    ) -> ConductorApiResult<()> {
-        for dna_file in dna_files.into_iter() {
-            self.dna_files.insert(
-                CellId::new(dna_file.dna_hash().clone(), agent_key.clone()),
-                dna_file.to_owned(),
-            );
-        }
-        Ok(())
-    }
-
     /// Install an app
     // TODO: make this take a more flexible config for specifying things like
     // membrane proofs
@@ -314,17 +290,6 @@ impl SweetConductor {
                 None,
                 flags,
             )
-            .await?;
-
-        // Add the dna files to the SweetConductor's dna files cache to be able to re-inject them
-        // when restarting the conductor since inline zomes can't otherwise be persisted across
-        // conductor restarts.
-        let dna_files = dnas_with_roles
-            .iter()
-            .map(|dr| dr.dna())
-            .collect::<Vec<_>>();
-
-        self.add_dna_files_to_sweet_conductor_cache(agent.clone(), dna_files.clone())
             .await?;
 
         Ok(agent)
@@ -364,23 +329,12 @@ impl SweetConductor {
             )
             .await?;
 
-        // Add the dna files to the SweetConductor's dna files cache to be able to re-inject them
-        // when restarting the conductor since inline zomes can't otherwise be persisted across
-        // conductor restarts.
-        let dna_files = dnas_with_roles
-            .iter()
-            .map(|dr| dr.dna())
-            .collect::<Vec<_>>();
-
-        self.add_dna_files_to_sweet_conductor_cache(agent.clone(), dna_files.clone())
-            .await?;
-
         Ok(agent)
     }
 
     /// Install an app and enable it
     // TODO: make this take a more flexible config for specifying things like
-    // membrane proofs
+    //       membrane proofs
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn install_and_enable_app(
         &mut self,
@@ -466,11 +420,13 @@ impl SweetConductor {
             .raw_handle()
             .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())?;
         let cell_dht_db = self.raw_handle().get_dht_db(cell_id.dna_hash())?;
+        let cell_dht_store = self.raw_handle().get_dht_store(cell_id.dna_hash())?;
         let conductor_config = self.config.clone();
         Ok(SweetCell {
             cell_id,
             cell_authored_db,
             cell_dht_db,
+            cell_dht_store,
             conductor_config,
         })
     }
@@ -603,8 +559,6 @@ impl SweetConductor {
             .raw_handle()
             .create_clone_cell(installed_app_id, payload)
             .await?;
-        let dna_file = self.get_dna_file(&clone.cell_id).unwrap();
-        self.dna_files.insert(clone.cell_id.clone(), dna_file);
         Ok(clone)
     }
 
@@ -616,15 +570,8 @@ impl SweetConductor {
         &mut self,
         cell_id: CellId,
         coordinator_zomes: CoordinatorZomes,
-        wasms: Vec<wasm::DnaWasm>,
+        wasms: Vec<wasm::DnaWasmHashed>,
     ) -> ConductorResult<()> {
-        // Update the coordinators in the dna files cache
-        let mut dna_file = self.get_dna_file(&cell_id).unwrap();
-        dna_file
-            .update_coordinators(coordinator_zomes.clone(), wasms.clone())
-            .await
-            .unwrap();
-        self.dna_files.insert(cell_id.clone(), dna_file);
         // Update the coordinators in the conductor
         self.raw_handle()
             .update_coordinators(cell_id.clone(), coordinator_zomes, wasms)
@@ -706,10 +653,7 @@ impl SweetConductor {
     ///
     /// * `ignore_dna_files_cache` - Force the SweetConductor to load wasms and
     ///   dna definitions from the database instead of using cached values.
-    ///   When using inline zomes, this means that the inline zomes are no
-    ///   longer available after startup since they cannot be persisted
-    ///   to and read from the database.
-    pub async fn startup(&mut self, ignore_dna_files_cache: bool) {
+    pub async fn startup(&mut self) {
         if self.handle.is_none() {
             // There's a db dir in the sweet conductor and the config, that are
             // supposed to be the same. Let's assert that they are.
@@ -719,22 +663,13 @@ impl SweetConductor {
                 "SweetConductor db_dir and config.data_root_path are not the same",
             );
 
-            // Inline zomes are not persisted in the database. In order for them to be
-            // reloaded into the ribosome store after a conductor restart, we load all
-            // DnaFiles associated to apps that we have installed (including non-inline
-            // zomes) from the cache here and pass them to Self::handle_from_existing
-            // as extra_dna_files to be loaded into the ribosome store explicitly
-            // (and thereby overwrite ribosomes with DnaFiles loaded from the database).
-            // But there are cases when testing with actual wasms (not inline-zomes)
-            // where we want to ensure that the wasms can get correctly loaded from
-            // the database so we offer the option to explicitly ignore the cache here.
-            let extra_dna_files = match ignore_dna_files_cache {
-                true => vec![],
-                false => self.dna_files.clone().into_iter().collect::<Vec<_>>(),
-            };
             self.handle = Some(SweetConductorHandle(
-                Self::handle_from_existing(self.keystore.clone(), &self.config, &extra_dna_files)
-                    .await,
+                Self::handle_from_existing(
+                    self.keystore.clone(),
+                    &self.config,
+                    self.inline_zome_store_ref.clone(),
+                )
+                .await,
             ));
         } else {
             panic!("Attempted to start conductor which was already started");
@@ -1198,7 +1133,6 @@ impl std::fmt::Debug for SweetConductor {
         f.debug_struct("SweetConductor")
             .field("db_dir", &self.db_dir)
             .field("config", &self.config)
-            .field("dna_files", &self.dna_files)
             .finish()
     }
 }

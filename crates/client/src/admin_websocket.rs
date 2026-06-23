@@ -3,8 +3,8 @@ use crate::util::AbortOnDropHandle;
 use holo_hash::{ActionHash, DnaHash};
 use holochain_conductor_api::{
     AdminInterfaceConfig, AdminRequest, AdminResponse, AppAuthenticationToken,
-    AppAuthenticationTokenIssued, AppInfo, AppInterfaceInfo, AppStatusFilter, FullStateDump,
-    IssueAppAuthenticationTokenPayload, PeerMetaInfo, StorageInfo,
+    AppAuthenticationTokenIssued, AppInfo, AppInterfaceInfo, AppStatusFilter, DhtOpsCursor,
+    FullStateDump, IssueAppAuthenticationTokenPayload, PeerMetaInfo, StorageInfo,
 };
 use holochain_types::network::HolochainTransportStats;
 use holochain_types::websocket::AllowedOrigins;
@@ -472,7 +472,7 @@ impl AdminWebsocket {
     pub async fn dump_full_state(
         &self,
         cell_id: CellId,
-        dht_ops_cursor: Option<u64>,
+        dht_ops_cursor: Option<DhtOpsCursor>,
     ) -> ConductorApiResult<FullStateDump> {
         let msg = AdminRequest::DumpFullState {
             cell_id: Box::new(cell_id),

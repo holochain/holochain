@@ -8,6 +8,7 @@ use super::api::CellConductorHandle;
 use super::conductor::zome_call_signature_verification::is_valid_signature;
 use super::space::Space;
 use super::ConductorHandle;
+use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::cell::error::CellResult;
 use crate::core::queue_consumer::spawn_queue_consumer_tasks;
@@ -15,8 +16,7 @@ use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::core::queue_consumer::QueueTriggers;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::guest_callback::init::InitResult;
-use crate::core::ribosome::real_ribosome::RealRibosome;
-use crate::core::ribosome::ZomeCallInvocation;
+use crate::core::ribosome::{Ribosome, ZomeCallInvocation};
 use crate::core::workflow::call_zome_workflow;
 use crate::core::workflow::genesis_workflow::genesis_workflow;
 use crate::core::workflow::initialize_zomes_workflow;
@@ -25,7 +25,6 @@ use crate::core::workflow::GenesisWorkflowArgs;
 use crate::core::workflow::GenesisWorkspace;
 use crate::core::workflow::InitializeZomesWorkflowArgs;
 use crate::core::workflow::ZomeCallResult;
-use crate::{conductor::api::error::ConductorApiError, core::ribosome::RibosomeT};
 use error::CellError;
 use futures::future::FutureExt;
 use holo_hash::*;
@@ -166,18 +165,15 @@ impl Cell {
     /// records are committed. This is a prerequisite for any other interaction
     /// with the SourceChain
     #[allow(clippy::too_many_arguments)]
-    pub async fn genesis<Ribosome>(
+    pub async fn genesis(
         cell_id: CellId,
         conductor_handle: ConductorHandle,
         authored_db: DbWrite<DbKindAuthored>,
         dht_db: DbWrite<DbKindDht>,
-        dht_store: holochain_state::dht_store::DhtStore,
+        dht_store: DhtStore,
         ribosome: Ribosome,
         membrane_proof: Option<MembraneProof>,
-    ) -> CellResult<()>
-    where
-        Ribosome: RibosomeT + 'static,
-    {
+    ) -> CellResult<()> {
         let conductor_api = CellConductorApi::new(conductor_handle.clone(), cell_id.clone());
 
         // run genesis
@@ -544,7 +540,7 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
     fn handle_publish(
         &self,
         _dna_hash: DnaHash,
-        _ops: Vec<holochain_types::dht_op::DhtOp>,
+        _ops: Vec<holochain_types::dht_v2::DhtOp>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async { unimplemented!() })
     }
@@ -591,8 +587,8 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
     ) -> BoxFut<'_, HolochainP2pResult<WireLinkOps>> {
         Box::pin(async {
             debug!(id = ?self.id());
-            let db = self.space.dht_db.clone();
-            authority::handle_get_links(db.into(), link_key, options)
+            let store = self.space.dht_store.as_read();
+            authority::handle_get_links(store, link_key, options)
                 .await
                 .map_err(HolochainP2pError::other)
         })
@@ -607,9 +603,9 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
         query: WireLinkQuery,
     ) -> BoxFut<'_, HolochainP2pResult<CountLinksResponse>> {
         Box::pin(async {
-            let db = self.space.dht_db.clone();
+            let store = self.space.dht_store.as_read();
             Ok(CountLinksResponse::new(
-                authority::handle_get_links_query(db.into(), query)
+                authority::handle_get_links_query(store, query)
                     .await
                     .map_err(HolochainP2pError::other)?
                     .into_iter()
@@ -629,8 +625,8 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
         options: holochain_p2p::event::GetActivityOptions,
     ) -> BoxFut<'_, HolochainP2pResult<AgentActivityResponse>> {
         Box::pin(async {
-            let db = self.space.dht_db.clone();
-            authority::handle_get_agent_activity(db.into(), agent, query, options)
+            let store = self.space.dht_store.as_read();
+            authority::handle_get_agent_activity(store, agent, query, options)
                 .await
                 .map_err(HolochainP2pError::other)
         })
@@ -645,8 +641,8 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
         filter: holochain_zome_types::chain::ChainFilter,
     ) -> BoxFut<'_, HolochainP2pResult<MustGetAgentActivityResponse>> {
         Box::pin(async {
-            let db = self.space.dht_db.clone();
-            authority::handle_must_get_agent_activity(db.into(), author, filter)
+            let store = self.space.dht_store.as_read();
+            authority::handle_must_get_agent_activity(store, author, filter)
                 .await
                 .map_err(HolochainP2pError::other)
         })
@@ -855,16 +851,16 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
 impl Cell {
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     async fn handle_get_entry(&self, hash: EntryHash) -> CellResult<WireEntryOps> {
-        let db = self.space.dht_db.clone();
-        authority::handle_get_entry(db.into(), hash)
+        let store = self.space.dht_store.as_read();
+        authority::handle_get_entry(store, hash)
             .await
             .map_err(Into::into)
     }
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     async fn handle_get_record(&self, hash: ActionHash) -> CellResult<WireRecordOps> {
-        let db = self.space.dht_db.clone();
-        authority::handle_get_record(db.into(), hash)
+        let store = self.space.dht_store.as_read();
+        authority::handle_get_record(store, hash)
             .await
             .map_err(Into::into)
     }
@@ -1021,7 +1017,7 @@ impl Cell {
     }
 
     /// Instantiate a Ribosome for use by this Cell's workflows
-    pub(crate) fn get_ribosome(&self) -> CellResult<RealRibosome> {
+    pub(crate) fn get_ribosome(&self) -> CellResult<Ribosome> {
         Ok(self
             .conductor_handle
             .get_ribosome(self.id())

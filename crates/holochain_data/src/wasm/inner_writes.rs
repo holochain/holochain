@@ -81,13 +81,13 @@ where
     E: Executor<'e, Database = Sqlite>,
 {
     sqlx::query(
-        "INSERT OR REPLACE INTO IntegrityZome (dna_hash, agent, zome_index, zome_name, wasm_hash, dependencies) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT OR REPLACE INTO IntegrityZome (dna_hash, agent, zome_index, zome_name, zome_hash, dependencies) VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind(&model.dna_hash)
     .bind(&model.agent)
     .bind(model.zome_index)
     .bind(&model.zome_name)
-    .bind(model.wasm_hash.as_deref())
+    .bind(model.zome_hash.as_slice())
     .bind(&model.dependencies)
     .execute(executor)
     .await?;
@@ -104,13 +104,13 @@ where
     E: Executor<'e, Database = Sqlite>,
 {
     sqlx::query(
-        "INSERT OR REPLACE INTO CoordinatorZome (dna_hash, agent, zome_index, zome_name, wasm_hash, dependencies) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT OR REPLACE INTO CoordinatorZome (dna_hash, agent, zome_index, zome_name, zome_hash, dependencies) VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind(&model.dna_hash)
     .bind(&model.agent)
     .bind(model.zome_index)
     .bind(&model.zome_name)
-    .bind(model.wasm_hash.as_deref())
+    .bind(model.zome_hash.as_slice())
     .bind(&model.dependencies)
     .execute(executor)
     .await?;

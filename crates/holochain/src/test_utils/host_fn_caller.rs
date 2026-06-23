@@ -4,14 +4,12 @@ use crate::conductor::api::CellConductorApi;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::api::CellConductorReadHandle;
 use crate::conductor::ConductorHandle;
-use crate::core::ribosome::host_fn;
-use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::InvocationAuth;
-use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
+use crate::core::ribosome::{host_fn, Ribosome};
 use crate::core::workflow::call_zome_function_authorized;
 use hdk::prelude::*;
 use holo_hash::ActionHash;
@@ -88,7 +86,7 @@ pub struct HostFnCaller {
     pub dht_db: DbWrite<DbKindDht>,
     pub dht_store: DhtStore,
     pub cache: DbWrite<DbKindCache>,
-    pub ribosome: RealRibosome,
+    pub ribosome: Ribosome,
     pub zome_path: ZomePath,
     pub network: HolochainP2pDna,
     pub keystore: MetaLairClient,
@@ -164,7 +162,7 @@ impl HostFnCaller {
     }
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self), fields(cell_id = %self.zome_path.cell_id())))]
-    pub async fn unpack(&self) -> (Arc<RealRibosome>, Arc<CallContext>, SourceChainWorkspace) {
+    pub async fn unpack(&self) -> (Arc<Ribosome>, Arc<CallContext>, SourceChainWorkspace) {
         let HostFnCaller {
             authored_db,
             dht_db,
@@ -198,7 +196,7 @@ impl HostFnCaller {
             call_zome_handle,
         );
         let ribosome = Arc::new(ribosome);
-        let zome = ribosome.dna_def_hashed().get_zome(&zome_name).unwrap();
+        let zome = ribosome.dna_def().get_zome(&zome_name).unwrap();
         let call_context = Arc::new(CallContext::new(
             zome,
             FunctionName::new("not_sure_what_should_be_here"),
@@ -219,7 +217,7 @@ impl HostFnCaller {
         let TestWasmPair { integrity, .. } = zome.into();
         let zome_index = self
             .ribosome
-            .dna_def_hashed()
+            .dna_def()
             .integrity_zomes
             .iter()
             .position(|(z, _)| *z == integrity)
@@ -244,7 +242,7 @@ impl HostFnCaller {
         let TestWasmPair { integrity, .. } = zome.into();
         let zome_index = self
             .ribosome
-            .dna_def_hashed()
+            .dna_def()
             .integrity_zomes
             .iter()
             .position(|(z, _)| *z == integrity)

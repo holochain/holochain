@@ -54,7 +54,10 @@ async fn test_coordinator_zome_update() {
         .update_coordinators(
             cells[0].cell_id().clone(),
             vec![CoordinatorZome::from(TestCoordinatorWasm::CoordinatorZomeUpdate).into_inner()],
-            vec![TestCoordinatorWasm::CoordinatorZomeUpdate.into()],
+            vec![
+                DnaWasmHashed::from_content(TestCoordinatorWasm::CoordinatorZomeUpdate.into())
+                    .await,
+            ],
         )
         .await
         .unwrap();
@@ -75,7 +78,7 @@ async fn test_coordinator_zome_update() {
     // zome update is persisted correctly in the database and not only in the
     // in-memory ribosome store
     conductor.shutdown().await;
-    conductor.startup(true).await;
+    conductor.startup().await;
 
     let record: Option<Record> = conductor
         .call(
@@ -97,7 +100,7 @@ async fn test_coordinator_zome_update_multi_integrity() {
         CoordinatorZome::from(TestCoordinatorWasm::CoordinatorZome).into_inner();
 
     let second_coordinator = match second_coordinator.erase_type() {
-        ZomeDef::Wasm(WasmZome {
+        ZomeDef::Wasm(WasmZomeDef {
             wasm_hash,
             mut dependencies,
         }) => {
@@ -106,7 +109,7 @@ async fn test_coordinator_zome_update_multi_integrity() {
 
             Zome::<CoordinatorZomeDef>::new(
                 "2_coord".into(),
-                ZomeDef::Wasm(WasmZome {
+                ZomeDef::Wasm(WasmZomeDef {
                     wasm_hash,
                     dependencies,
                 })
@@ -167,7 +170,10 @@ async fn test_coordinator_zome_update_multi_integrity() {
         .update_coordinators(
             cells[0].cell_id().clone(),
             vec![CoordinatorZome::from(TestCoordinatorWasm::CoordinatorZomeUpdate).into_inner()],
-            vec![TestCoordinatorWasm::CoordinatorZomeUpdate.into()],
+            vec![
+                DnaWasmHashed::from_content(TestCoordinatorWasm::CoordinatorZomeUpdate.into())
+                    .await,
+            ],
         )
         .await
         .unwrap();
@@ -185,7 +191,7 @@ async fn test_coordinator_zome_update_multi_integrity() {
     // Replace "2_coord" with different zome but same dependecies.
     let wasm_hash =
         WasmHash::with_data(&DnaWasm::from(TestCoordinatorWasm::CoordinatorZomeUpdate)).await;
-    let new_coordinator: CoordinatorZomeDef = ZomeDef::Wasm(WasmZome {
+    let new_coordinator: CoordinatorZomeDef = ZomeDef::Wasm(WasmZomeDef {
         wasm_hash,
         dependencies: vec!["2".into()],
     })
@@ -195,7 +201,10 @@ async fn test_coordinator_zome_update_multi_integrity() {
         .update_coordinators(
             cells[0].cell_id().clone(),
             vec![("2_coord".into(), new_coordinator)],
-            vec![TestCoordinatorWasm::CoordinatorZomeUpdate.into()],
+            vec![
+                DnaWasmHashed::from_content(TestCoordinatorWasm::CoordinatorZomeUpdate.into())
+                    .await,
+            ],
         )
         .await
         .unwrap();
@@ -211,7 +220,7 @@ async fn test_coordinator_zome_update_multi_integrity() {
     // zome update is persisted correctly in the database and not only in the
     // in-memory ribosome store
     conductor.shutdown().await;
-    conductor.startup(true).await;
+    conductor.startup().await;
 
     let record: Option<Record> = conductor
         .call(&cells[0].zome("2_coord"), "get_entry", hash2)

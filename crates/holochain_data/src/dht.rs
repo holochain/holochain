@@ -728,6 +728,7 @@ mod tests {
             storage_center_loc: 88,
             when_received: Timestamp::from_micros(40),
             when_integrated: Timestamp::from_micros(50),
+            validation_status: 1,
             serialized_size: 128,
         })
         .await
@@ -847,6 +848,93 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn integration_state_counts_split_and_exclude_cached() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+
+        // One cached ChainOp (locally_validated = 0) — must NOT count as
+        // integrated.
+        let cached_action = seed_action_for_op(&db, 1).await;
+        db.insert_chain_op(InsertChainOp {
+            op_hash: &DhtOpHash::from_raw_36(vec![0x10; 36]),
+            action_hash: &cached_action,
+            op_type: 1,
+            basis_hash: &sample_basis(1),
+            storage_center_loc: 0,
+            validation_status: RecordValidity::Accepted,
+            locally_validated: false,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(1),
+            when_integrated: Timestamp::from_micros(2),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+
+        // One integrated ChainOp (locally_validated = 1).
+        let integrated_action = seed_action_for_op(&db, 2).await;
+        db.insert_chain_op(InsertChainOp {
+            op_hash: &DhtOpHash::from_raw_36(vec![0x20; 36]),
+            action_hash: &integrated_action,
+            op_type: 1,
+            basis_hash: &sample_basis(2),
+            storage_center_loc: 0,
+            validation_status: RecordValidity::Accepted,
+            locally_validated: true,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(1),
+            when_integrated: Timestamp::from_micros(2),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+
+        // One pending LimboChainOp (sys_validation_status NULL) →
+        // validation_limbo.
+        let pending_action = seed_action_for_op(&db, 3).await;
+        db.insert_limbo_chain_op(InsertLimboChainOp {
+            op_hash: &DhtOpHash::from_raw_36(vec![0x30; 36]),
+            action_hash: &pending_action,
+            op_type: 1,
+            basis_hash: &sample_basis(3),
+            storage_center_loc: 0,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(1),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+
+        // One ready LimboChainOp (sys = 1, app = 1) → integration_limbo.
+        let ready_action = seed_action_for_op(&db, 4).await;
+        let ready_op = DhtOpHash::from_raw_36(vec![0x40; 36]);
+        db.insert_limbo_chain_op(InsertLimboChainOp {
+            op_hash: &ready_op,
+            action_hash: &ready_action,
+            op_type: 1,
+            basis_hash: &sample_basis(4),
+            storage_center_loc: 0,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(1),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+        db.set_limbo_chain_op_sys_validation_status(&ready_op, Some(1))
+            .await
+            .unwrap();
+        db.set_limbo_chain_op_app_validation_status(&ready_op, Some(1))
+            .await
+            .unwrap();
+
+        let (validation_limbo, integration_limbo, integrated) =
+            db.as_ref().integration_state_counts().await.unwrap();
+        assert_eq!(validation_limbo, 1);
+        assert_eq!(integration_limbo, 1);
+        // Only the locally-validated ChainOp counts; the cached op is excluded.
+        assert_eq!(integrated, 1);
+    }
+
+    #[tokio::test]
     async fn chain_op_publish_roundtrip() {
         let db = test_open_db(dht_db_id()).await.unwrap();
         let (op_hash, _) = seed_chain_op(&db, 0).await;
@@ -882,6 +970,7 @@ mod tests {
             storage_center_loc: 0,
             when_received: Timestamp::from_micros(3),
             when_integrated: Timestamp::from_micros(5),
+            validation_status: 1,
             serialized_size: 64,
         })
         .await
@@ -908,7 +997,6 @@ mod tests {
             &receipt_hash,
             &op_hash,
             &[1u8; 16],
-            &[2u8; 64],
             Timestamp::from_micros(42),
         )
         .await
@@ -917,6 +1005,7 @@ mod tests {
         let rows = db.as_ref().get_validation_receipts(op_hash).await.unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].hash, receipt_hash.get_raw_36().to_vec());
+        assert_eq!(rows[0].blob, vec![1u8; 16]);
     }
 
     fn sample_base(seed: u8) -> AnyLinkableHash {
@@ -1336,6 +1425,12 @@ mod tests {
         })
         .await
         .unwrap();
+
+        // Only warrants with a terminal sys-validation status are promoted; the
+        // status is carried into `WarrantOp.validation_status`.
+        db.set_limbo_warrant_sys_validation_status(&hash, Some(1))
+            .await
+            .unwrap();
 
         let promoted = db
             .promote_limbo_warrant(&hash, Timestamp::from_micros(200))
