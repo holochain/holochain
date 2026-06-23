@@ -225,3 +225,59 @@ impl<ET: UnitEnum, LT> OpRecord<ET, LT> {
         Self::CloseChain { new_target, action }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use holo_hash::{ActionHash, AgentPubKey, DnaHash};
+    use holochain_integrity_types::dht_v2::{
+        ActionData, ActionHeader, CloseChainData, OpenChainData,
+    };
+
+    fn action_from_data(data: ActionData) -> Action {
+        Action {
+            header: ActionHeader {
+                author: AgentPubKey::from_raw_36(vec![1u8; 36]),
+                timestamp: holochain_integrity_types::timestamp::Timestamp::from_micros(0),
+                action_seq: 0,
+                prev_action: None,
+            },
+            data,
+        }
+    }
+
+    #[test]
+    fn open_chain_constructor_extracts_fields() {
+        let target = MigrationTarget::Dna(DnaHash::from_raw_36(vec![5u8; 36]));
+        let close = ActionHash::from_raw_36(vec![6u8; 36]);
+        let action = action_from_data(ActionData::OpenChain(OpenChainData {
+            prev_target: target.clone(),
+            close_hash: close.clone(),
+        }));
+        let op = OpRecord::<(), ()>::open_chain(action);
+        match op {
+            OpRecord::OpenChain {
+                previous_target,
+                close_hash,
+                ..
+            } => {
+                assert_eq!(previous_target, target);
+                assert_eq!(close_hash, close);
+            }
+            _ => panic!("expected OpenChain"),
+        }
+    }
+
+    #[test]
+    fn close_chain_constructor_extracts_target() {
+        let target = MigrationTarget::Dna(DnaHash::from_raw_36(vec![7u8; 36]));
+        let action = action_from_data(ActionData::CloseChain(CloseChainData {
+            new_target: Some(target.clone()),
+        }));
+        let op = OpRecord::<(), ()>::close_chain(action);
+        match op {
+            OpRecord::CloseChain { new_target, .. } => assert_eq!(new_target, Some(target)),
+            _ => panic!("expected CloseChain"),
+        }
+    }
+}
