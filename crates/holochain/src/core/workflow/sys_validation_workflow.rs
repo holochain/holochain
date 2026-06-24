@@ -313,7 +313,9 @@ async fn sys_validation_workflow_inner(
         warrant_sys_outcomes,
     ) = workspace
         .dht_db
-        .write_async(move |txn| {
+        // #5370: legacy DhtOp validation-status dual-write removed; this write
+        // no longer touches the DB (the `txn` and put_*_limbo calls are dead).
+        .write_async(move |_txn| {
             let mut summary = OutcomeSummary {
                 warrant_deps_copied,
                 ..Default::default()
@@ -344,20 +346,16 @@ async fn sys_validation_workflow_inner(
                         match op_type {
                             DhtOpType::Chain(_) => {
                                 chain_op_sys_outcomes.push((op_hash.clone(), SysOutcome::Accepted));
-                                put_validation_limbo(txn, &op_hash, ValidationStage::SysValidated)?
                             }
                             DhtOpType::Warrant(_) => {
                                 warrant_sys_outcomes.push((op_hash.clone(), SysOutcome::Accepted));
-                                put_integration_limbo(txn, &op_hash, ValidationStatus::Valid)?
                             }
                         };
                     }
                     Outcome::MissingDhtDep => {
                         summary.missing += 1;
                         // Awaiting dependencies — status stays NULL in the new DB;
-                        // no outcome to record.
-                        let status = ValidationStage::AwaitingSysDeps;
-                        put_validation_limbo(txn, &op_hash, status)?;
+                        // no outcome to record. #5370: no legacy status write.
                     }
                     Outcome::Rejected(reason) => {
                         invalid_ops.push((op_hash.clone(), op.clone(), reason));
@@ -373,7 +371,7 @@ async fn sys_validation_workflow_inner(
                             }
                         }
 
-                        put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;
+                        // #5370: legacy DhtOp validation-status dual-write removed.
                     }
                 }
             }
@@ -676,8 +674,11 @@ async fn move_and_check_warrant_deps(
                 }
             }
             Err(StateMutationError::OpNotFoundInCache) => {
+                // The op isn't in the cache, but it may already be present and
+                // validated in the main DhtStore (received via publish/gossip and
+                // integrated). Don't skip — fall through to check its validation
+                // status below so the warrant dependency can resolve.
                 tracing::debug!("Warranted op {} not found in cache", action_hash);
-                continue;
             }
             Err(e) => {
                 tracing::error!(error = ?e, "Error copying warranted op to DHT");
@@ -1596,6 +1597,8 @@ impl SysValidationWorkspace {
     }
 }
 
+// #5370: dead pending full DbKindDht retirement.
+#[allow(dead_code)]
 fn put_validation_limbo(
     txn: &mut Transaction<'_>,
     hash: &DhtOpHash,
@@ -1605,6 +1608,8 @@ fn put_validation_limbo(
     Ok(())
 }
 
+// #5370: dead pending full DbKindDht retirement.
+#[allow(dead_code)]
 fn put_integration_limbo(
     txn: &mut Transaction<'_>,
     hash: &DhtOpHash,

@@ -1,4 +1,6 @@
 use crate::chain_lock::{get_chain_lock, ChainLock};
+// #5370: import kept (function still used by callers) pending DbKindDht retirement.
+#[allow(unused_imports)]
 use crate::integrate::authored_ops_to_dht_db;
 use crate::integrate::authored_ops_to_dht_db_without_check;
 use crate::prelude::*;
@@ -264,6 +266,10 @@ impl SourceChain {
     ///   entry is written without an active chain lock.
     #[async_recursion]
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
+    // #5370: `storage_arcs` is now only used in the recursive call after the
+    // legacy DhtOp authored-ops dual-write was removed; restored when that
+    // write path is fully retired.
+    #[allow(clippy::only_used_in_recursion)]
     pub async fn flush(
         &self,
         storage_arcs: Vec<DhtArc>,
@@ -601,13 +607,12 @@ impl SourceChain {
                     tx.commit().await.map_err(SourceChainError::other)?;
                 }
 
-                authored_ops_to_dht_db(
-                    storage_arcs,
-                    ops_to_integrate,
-                    self.vault.clone().into(),
-                    self.dht_db.clone(),
-                )
-                .await?;
+                // #5370: legacy DhtOp authored-ops dual-write removed; authored
+                // ops are written to the DhtStore above (insert_chain_op +
+                // ChainOpPublish). `authored_ops_to_dht_db`, `ops_to_integrate`
+                // and the `dht_db` input remain as dead code pending DbKindDht
+                // retirement.
+                let _ = &ops_to_integrate;
 
                 // Insert warrants into DHT database.
                 // Check signatures first
@@ -636,43 +641,32 @@ impl SourceChain {
                 // successfully-inserted ops for mirroring into the new DhtStore.
                 let (total_inserted_warrants, warrant_ops_for_new_db) = match self
                     .dht_db
-                    .write_async(|txn| -> DatabaseResult<(u32, Vec<DhtOpHashed>)> {
+                    // #5370: legacy DhtOp warrant dual-write removed; the
+                    // `_txn` input and `insert_op_dht` are dead. Warrants are
+                    // mirrored into the DhtStore below.
+                    .write_async(|_txn| -> DatabaseResult<(u32, Vec<DhtOpHashed>)> {
                         let mut inserted_warrants = 0u32;
                         let mut inserted_ops: Vec<DhtOpHashed> = Vec::new();
                         for warrant in warrants_to_insert {
                             let warrant_op = DhtOpHashed::from_content_sync(DhtOp::from(
                                 WarrantOp::from(warrant),
                             ));
-                            let serialized_size =
-                                encode(&warrant_op).unwrap_or_else(|_| vec![]).len() as u32;
-                            match insert_op_dht(txn, &warrant_op, serialized_size, None) {
-                                // TODO: This should only be increased if the op has actually been inserted.
-                                //       It's not possible to determine that, because mutations don't return
-                                //       the row count. Fix this once row count is returned.
-                                Ok(_) => {
-                                    inserted_warrants += 1;
-                                    inserted_ops.push(warrant_op);
-                                }
-                                Err(err) => {
-                                    tracing::warn!(
-                                        ?err,
-                                        "Could not insert warrant from scratch space into DHT database"
-                                    );
-                                }
-                            }
+                            inserted_warrants += 1;
+                            inserted_ops.push(warrant_op);
                         }
                         Ok((inserted_warrants, inserted_ops))
                     })
-                    .await {
-                        Ok(pair) => pair,
-                        Err(err) => {
-                            tracing::warn!(
-                                ?err,
-                                "Error inserting warrants from scratch space into DHT database"
-                            );
-                            (0, Vec::new())
-                        }
-                    };
+                    .await
+                {
+                    Ok(pair) => pair,
+                    Err(err) => {
+                        tracing::warn!(
+                            ?err,
+                            "Error inserting warrants from scratch space into DHT database"
+                        );
+                        (0, Vec::new())
+                    }
+                };
 
                 // Mirror warrants into the new DhtStore so `ops_pending_sys_validation`
                 // picks them up via `LimboWarrant`.
@@ -2804,22 +2798,23 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn flush_writes_warrants_to_dht_db() {
+    async fn flush_writes_warrants_to_dht_store() {
         let TestCase {
             chain,
             agent_key,
-            dht,
+            dht_store,
             keystore,
             ..
         } = TestCase::new().await;
         let warrantee = fixt!(AgentPubKey);
 
-        let warrantee_clone = warrantee.clone();
-        let actual_warrants = dht.test_read(move |txn| {
-            CascadeTxnWrapper::from(txn)
-                .get_warrants_for_agent(&warrantee_clone, true)
-                .unwrap()
-        });
+        // The warrant is authored by `agent_key` (the warrant issuer). Read it
+        // back via the DhtStore (limbo + integrated) rather than the legacy DB.
+        let actual_warrants = dht_store
+            .as_read()
+            .warrants_by_author(agent_key.clone())
+            .await
+            .unwrap();
         assert_eq!(actual_warrants.len(), 0);
 
         // Create a warrant
@@ -2832,17 +2827,17 @@ mod tests {
             })
             .unwrap();
 
-        // Flush should write warrants to DHT database
+        // Flush should write warrants to the DHT store
         let (actions, warrant_count) = chain.flush(vec![]).await.unwrap();
         assert!(actions.is_empty());
         assert_eq!(warrant_count, 1);
 
-        // Check DHT database
-        let actual_warrants = dht.test_read(move |txn| {
-            CascadeTxnWrapper::from(txn)
-                .get_warrants_for_agent(&warrantee, false)
-                .unwrap()
-        });
+        // Check the DHT store
+        let actual_warrants = dht_store
+            .as_read()
+            .warrants_by_author(agent_key.clone())
+            .await
+            .unwrap();
         assert_eq!(actual_warrants, vec![WarrantOp::from(signed_warrant)]);
     }
 
@@ -2852,7 +2847,7 @@ mod tests {
         let TestCase {
             chain,
             agent_key,
-            dht,
+            dht_store,
             keystore,
             ..
         } = TestCase::new().await;
@@ -2868,18 +2863,17 @@ mod tests {
             })
             .unwrap();
 
-        // Flush should write warrant to DHT database
+        // Flush should write warrant to the DHT store
         let (actions, warrant_count) = chain.flush(vec![]).await.unwrap();
         assert!(actions.is_empty());
         assert_eq!(warrant_count, 1);
 
-        // Check DHT database
-        let warrantee_clone = warrantee.clone();
-        let actual_warrants = dht.test_read(move |txn| {
-            CascadeTxnWrapper::from(txn)
-                .get_warrants_for_agent(&warrantee_clone, false)
-                .unwrap()
-        });
+        // Check the DHT store
+        let actual_warrants = dht_store
+            .as_read()
+            .warrants_by_author(agent_key.clone())
+            .await
+            .unwrap();
         assert_eq!(
             actual_warrants,
             vec![WarrantOp::from(signed_warrant.clone())]
@@ -2893,17 +2887,17 @@ mod tests {
             })
             .unwrap();
 
-        // Flush should not write duplicate warrant to DHT database
+        // Flush should not write duplicate warrant to the DHT store
         let (actions, warrant_count) = chain.flush(vec![]).await.unwrap();
         assert!(actions.is_empty());
         assert_eq!(warrant_count, 1); // rejected inserts are not reported by the insertion method, so this will indicate 1
 
-        // Check DHT database again
-        let actual_warrants = dht.test_read(move |txn| {
-            CascadeTxnWrapper::from(txn)
-                .get_warrants_for_agent(&warrantee, false)
-                .unwrap()
-        });
+        // Check the DHT store again
+        let actual_warrants = dht_store
+            .as_read()
+            .warrants_by_author(agent_key.clone())
+            .await
+            .unwrap();
         assert_eq!(actual_warrants, vec![WarrantOp::from(signed_warrant)]);
     }
 

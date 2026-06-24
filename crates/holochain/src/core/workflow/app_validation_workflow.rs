@@ -365,26 +365,25 @@ async fn app_validation_workflow_inner(
                 };
                 let outcome_dht_op_hash = dht_op_hash.clone();
 
+                // #5370: legacy DhtOp validation-status dual-write removed; the
+                // write no longer touches the DB (the `_txn`, `dht_op_hash` and
+                // put_*_limbo calls are dead). Counters/outcome mirroring stay.
                 let write_result = workspace
                     .dht_db
-                    .write_async(move|txn| match outcome {
-                        Outcome::Accepted => {
-                            accepted_ops.fetch_add(1, Ordering::SeqCst);
-                            put_integration_limbo(txn, &dht_op_hash, ValidationStatus::Valid)
+                    .write_async(move |_txn| -> WorkflowResult<()> {
+                        match outcome {
+                            Outcome::Accepted => {
+                                accepted_ops.fetch_add(1, Ordering::SeqCst);
+                            }
+                            Outcome::AwaitingDeps(_) => {
+                                awaiting_ops.fetch_add(1, Ordering::SeqCst);
+                            }
+                            Outcome::Rejected(_) => {
+                                rejected_ops.fetch_add(1, Ordering::SeqCst);
+                                tracing::info!("Received invalid op. The op author will be blocked. Op: {dht_op_lite:?}");
+                            }
                         }
-                        Outcome::AwaitingDeps(_) => {
-                            awaiting_ops.fetch_add(1, Ordering::SeqCst);
-                            put_validation_limbo(
-                                txn,
-                                &dht_op_hash,
-                                ValidationStage::AwaitingAppDeps,
-                            )
-                        }
-                        Outcome::Rejected(_) => {
-                            rejected_ops.fetch_add(1, Ordering::SeqCst);
-                            tracing::info!("Received invalid op. The op author will be blocked. Op: {dht_op_lite:?}");
-                            put_integration_limbo(txn, &dht_op_hash, ValidationStatus::Rejected)
-                        }
+                        Ok(())
                     })
                     .await;
                 if let Err(err) = write_result {

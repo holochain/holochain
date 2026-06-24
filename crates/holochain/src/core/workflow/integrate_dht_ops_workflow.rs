@@ -31,29 +31,17 @@ pub async fn integrate_dht_ops_workflow(
     network: DynHolochainP2pDna,
     authored_db_provider: Arc<dyn super::provider::authored_db_provider::AuthoredDbProvider>,
 ) -> WorkflowResult<WorkComplete> {
+    // #5370: `vault` (DbKindDht) input kept as dead code pending retirement.
+    let _ = &vault;
     let start = std::time::Instant::now();
     let when_integrated = Timestamp::now();
 
     let summaries = dht_store.integrate_ready_ops(when_integrated).await?;
 
-    // Dual-write: mark all awaiting-integration ops in the legacy DhtOp table
-    // so legacy readers (tests, integration dumps) see consistent state during
-    // the read-migration window. This mirrors the former
-    // SET_VALIDATED_OPS_TO_INTEGRATED SQL and covers both network-received ops
-    // (which flow through the new DhtStore's limbo pathway) and locally-authored
-    // ops (genesis, call_zome) which are inserted into the legacy DB as
-    // validation_stage=3 but directly into the new DB as already-integrated.
-    // This will be removed once the legacy DhtOp table is retired.
-    let legacy_marked_pairs: Vec<(DhtOpHash, Option<AgentPubKey>)> = vault
-        .write_async(
-            move |txn| -> StateMutationResult<Vec<(DhtOpHash, Option<AgentPubKey>)>> {
-                holochain_state::mutations::set_all_awaiting_integration_to_integrated(
-                    txn,
-                    when_integrated,
-                )
-            },
-        )
-        .await?;
+    // #5370: legacy DhtOp dual-write removed; nothing reads DbKindDht. The
+    // `vault` input and `set_all_awaiting_integration_to_integrated` remain as
+    // dead code pending full DbKindDht retirement.
+    let legacy_marked_pairs: Vec<(DhtOpHash, Option<AgentPubKey>)> = Vec::new();
 
     let changed = summaries.len();
     let legacy_marked = legacy_marked_pairs.len();
