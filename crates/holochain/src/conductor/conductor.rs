@@ -1300,6 +1300,12 @@ mod app_impls {
                         Timestamp::now(),
                     )?;
 
+                    for cell in app.all_cells() {
+                        if let Ok(ribosome) = self.get_ribosome(&cell) {
+                            ribosome.genesis_complete().await;
+                        }
+                    }
+
                     // Update the db
                     let disabled_app = self.add_disabled_app_to_db(app).await?;
 
@@ -3417,6 +3423,7 @@ impl Conductor {
 mod test_utils_impls {
     use super::*;
     use tokio::sync::broadcast;
+    use crate::core::ribosome::Ribosome;
 
     impl Conductor {
         pub async fn get_state_from_handle(&self) -> ConductorResult<ConductorState> {
@@ -3456,6 +3463,10 @@ mod test_utils_impls {
         ) -> ConductorApiResult<QueueTriggers> {
             let cell = self.cell_by_id(cell_id).await?;
             Ok(cell.triggers().clone())
+        }
+
+        pub fn test_get_ribosome(&self, cell_id: &CellId) -> ConductorResult<Ribosome> {
+            self.get_ribosome(cell_id)
         }
     }
 }

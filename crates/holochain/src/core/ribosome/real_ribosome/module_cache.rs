@@ -109,6 +109,10 @@ impl ModuleCache {
         }
     }
 
+    pub(super) async fn evict_from_memory_cache(&self, wasm_hash: &WasmHash) {
+        self.cache.invalidate(wasm_hash).await;
+    }
+
     #[cfg(feature = "wasmer-wasmi")]
     async fn get_interpreted(&self, wasm_hash: &WasmHash) -> Result<Option<Arc<wasmer::Module>>, wasmer::RuntimeError> {
         if let Some(module) = self.cache.get(wasm_hash).await {

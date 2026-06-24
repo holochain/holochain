@@ -789,6 +789,14 @@ impl Ribosome {
         Ok(())
     }
 
+    /// Inform this ribosome that genesis is complete.
+    ///
+    /// This signals that all the zome function calls required to set up this ribosome on first
+    /// use have completed and cached data can be released until the ribosome is actually used.
+    pub(crate) async fn genesis_complete(&self) {
+        self.inner.genesis_complete().await;
+    }
+
     fn zomes_to_invoke(&self, zomes_to_invoke: ZomesToInvoke) -> Vec<Zome> {
         match zomes_to_invoke {
             ZomesToInvoke::AllIntegrity => self
@@ -1095,6 +1103,16 @@ impl Ribosome {
     ) -> RibosomeResult<EntryDefsResult> {
         self.do_callback(host_access, Arc::new(invocation)).await
     }
+
+    #[cfg(feature = "test_utils")]
+    pub fn is_memory_cached(&self, zome_name: &ZomeName) -> RibosomeResult<bool> {
+        self.inner.is_memory_cached(zome_name)
+    }
+
+    #[cfg(feature = "test_utils")]
+    pub fn is_compiled_wasm_stored(&self, zome_name: ZomeName) -> BoxFuture<'static, RibosomeResult<bool>> {
+        self.inner.is_compiled_wasm_stored(zome_name)
+    }
 }
 
 fn zome_name_to_id(dna_def: &DnaDefHashed, zome_name: &ZomeName) -> RibosomeResult<ZomeIndex> {
@@ -1143,6 +1161,26 @@ pub trait RibosomeImplT: std::fmt::Debug + Send + Sync {
     /// Notify the implementation that the value has changed and it should replace any copy it
     /// holds.
     fn replace_cached_dna_def(&self, dna_def: DnaDefHashed) -> RibosomeResult<()>;
+
+    /// Inform this ribosome that genesis is complete.
+    fn genesis_complete(&self) -> BoxFuture<'static, ()> {
+        Box::pin(async move { () })
+    }
+
+    #[cfg(feature = "test_utils")]
+    fn is_memory_cached(&self, zome_name: &ZomeName) -> RibosomeResult<bool> {
+        let _zome_name = zome_name;
+        Ok(false)
+    }
+
+    #[cfg(feature = "test_utils")]
+    fn is_compiled_wasm_stored(&self, zome_name: ZomeName) -> BoxFuture<'static, RibosomeResult<bool>> {
+        let _zome_name = zome_name;
+
+        Box::pin(async move {
+            Ok(false)
+        })
+    }
 }
 
 /// Placeholder for weighing. Currently produces zero weight.

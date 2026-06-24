@@ -36,3 +36,4 @@ mod warrants;
 mod websocket;
 mod websocket_stress;
 mod zero_arc;
+pub mod wasm_caching;
