@@ -1313,13 +1313,12 @@ async fn app_validation_produces_warrants() {
         {
             let alice_pubkey = alice_pubkey.clone();
             conductors[2]
-                .spaces
-                .dht_db(dna_hash)
+                .get_dht_store(dna_hash)
                 .unwrap()
-                .test_read(move |txn| {
-                    let store = CascadeTxnWrapper::from(txn);
-                    store.get_warrants_for_agent(&alice_pubkey, true).unwrap()
-                })
+                .as_read()
+                .get_warrants_by_warrantee(alice_pubkey)
+                .await
+                .unwrap()
                 .len()
         },
         1
@@ -1468,16 +1467,15 @@ async fn skip_issuing_warrant_if_one_found() {
         || async {
             let alice_pubkey = alice.agent_pubkey().clone();
             let warrants = conductors[2]
-                .get_spaces()
-                .dht_db(dna_file.dna_hash())
+                .get_dht_store(dna_file.dna_hash())
                 .unwrap()
-                .test_read(move |txn| {
-                    let store = CascadeTxnWrapper::from(txn);
-                    store.get_warrants_for_agent(&alice_pubkey, true).unwrap()
-                });
+                .as_read()
+                .get_warrants_by_warrantee(alice_pubkey)
+                .await
+                .unwrap();
 
             // Check for any warrant against Alice
-            if !warrants.is_empty() && warrants[0].warrant().warrantee == *alice.agent_pubkey() {
+            if !warrants.is_empty() && warrants[0].data().warrantee == *alice.agent_pubkey() {
                 return true;
             }
 
@@ -1492,13 +1490,12 @@ async fn skip_issuing_warrant_if_one_found() {
     // Now there's at least one valid warrant, check that there's just one warrant.
     let alice_pubkey = alice.agent_pubkey().clone();
     let warrants = conductors[2]
-        .get_spaces()
-        .dht_db(dna_file.dna_hash())
+        .get_dht_store(dna_file.dna_hash())
         .unwrap()
-        .test_read(move |txn| {
-            let store = CascadeTxnWrapper::from(txn);
-            store.get_warrants_for_agent(&alice_pubkey, false).unwrap()
-        });
+        .as_read()
+        .get_warrants_by_warrantee(alice_pubkey)
+        .await
+        .unwrap();
 
     assert_eq!(
         1,

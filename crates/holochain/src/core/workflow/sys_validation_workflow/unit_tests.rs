@@ -524,20 +524,28 @@ async fn reject_invalid_warrant() {
     let work_complete = test_case.run().await;
     assert!(matches!(work_complete, WorkComplete::Incomplete(_)));
 
-    // Check that the dependency got sys validated
-    let (stage, state) = holochain_state::validation_db::get_dht_op_validation_state(
-        &test_case.dht_db_handle().into(),
-        valid_action.as_hash().clone(),
-        holochain_zome_types::op::ChainOpType::StoreRecord,
-    )
-    .await
-    .unwrap()
-    .unwrap();
-    assert!(matches!(
-        stage,
-        Some(holochain_state::validation_db::ValidationStage::SysValidated)
-    ));
-    assert!(state.is_none());
+    // Check that the dependency got sys validated: it should no longer be
+    // pending sys-validation in the DHT store, and must not yet carry a
+    // terminal (app/integration) outcome.
+    let dht_store = &test_case.test_space.space.dht_store;
+    let pending = dht_store
+        .as_read()
+        .ops_pending_sys_validation(100)
+        .await
+        .unwrap();
+    assert!(
+        !pending.iter().any(|op| op.as_hash() == &valid_op_hash),
+        "dependency op should no longer be pending sys-validation"
+    );
+    assert!(dht_store
+        .as_read()
+        .op_validation_status(
+            valid_action.as_hash(),
+            holochain_zome_types::op::ChainOpType::StoreRecord,
+        )
+        .await
+        .unwrap()
+        .is_none());
 
     // Mark the sys-validated dependency as valid in the DHT store (this test
     // can't run the app-validation + integration workflows), so the warrant-
@@ -796,6 +804,8 @@ impl TestCase {
         self.dna_hash.hash.clone()
     }
 
+    // #5370: legacy DhtOp test accessor now unused; retire with DbKindDht.
+    #[allow(dead_code)]
     fn dht_db_handle(&self) -> DbWrite<DbKindDht> {
         self.test_space.space.dht_db.clone()
     }
