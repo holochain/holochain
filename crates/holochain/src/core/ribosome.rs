@@ -599,7 +599,7 @@ pub type DynRibosomeT = Arc<dyn RibosomeImplT>;
 ///
 /// This structure provides the common logic for execution logic and delegates to a [RibosomeImplT]
 /// implementation for executing calls.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Ribosome {
     inner: DynRibosomeT,
 
@@ -766,7 +766,10 @@ impl Ribosome {
         let real_ribosome = real_ribosome::RealRibosome::new(
             real_ribosome::WasmBackend::new(),
             dna_def_hashed.clone(),
-            Arc::new(real_ribosome::module_cache::make_module_cache(real_ribosome::WasmBackend::new(), store)),
+            Arc::new(real_ribosome::module_cache::make_module_cache(
+                real_ribosome::WasmBackend::new(),
+                store,
+            )),
         )
         .await?;
         Ribosome::new(dna_def_hashed, real_ribosome).await
@@ -1110,7 +1113,10 @@ impl Ribosome {
     }
 
     #[cfg(feature = "test_utils")]
-    pub fn is_compiled_wasm_stored(&self, zome_name: ZomeName) -> BoxFuture<'static, RibosomeResult<bool>> {
+    pub fn is_compiled_wasm_stored(
+        &self,
+        zome_name: ZomeName,
+    ) -> BoxFuture<'static, RibosomeResult<bool>> {
         self.inner.is_compiled_wasm_stored(zome_name)
     }
 }
@@ -1174,12 +1180,13 @@ pub trait RibosomeImplT: std::fmt::Debug + Send + Sync {
     }
 
     #[cfg(feature = "test_utils")]
-    fn is_compiled_wasm_stored(&self, zome_name: ZomeName) -> BoxFuture<'static, RibosomeResult<bool>> {
+    fn is_compiled_wasm_stored(
+        &self,
+        zome_name: ZomeName,
+    ) -> BoxFuture<'static, RibosomeResult<bool>> {
         let _zome_name = zome_name;
 
-        Box::pin(async move {
-            Ok(false)
-        })
+        Box::pin(async move { Ok(false) })
     }
 }
 

@@ -67,6 +67,7 @@ use crate::core::queue_consumer::QueueTriggers;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
 use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CHANNEL_BOUND;
 use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CONCURRENT_LIMIT;
+use crate::core::ribosome::real_ribosome::module_cache::ModuleCache;
 use crate::core::ribosome::real_ribosome::WasmBackend;
 use crate::core::workflow::ZomeCallResult;
 use crate::{
@@ -106,7 +107,6 @@ use std::time::Instant;
 use tokio::sync::mpsc::error::SendError;
 use tokio::task::JoinHandle;
 use tracing::*;
-use crate::core::ribosome::real_ribosome::module_cache::ModuleCache;
 
 mod builder;
 
@@ -278,10 +278,8 @@ mod startup_shutdown_impls {
             };
             info!("Using the {wasm_backend:?} WASM backend");
 
-            let wasmer_module_cache = Arc::new(make_module_cache(
-                wasm_backend,
-                spaces.wasm_store.clone(),
-            ));
+            let wasmer_module_cache =
+                Arc::new(make_module_cache(wasm_backend, spaces.wasm_store.clone()));
 
             Self {
                 spaces,
@@ -613,11 +611,26 @@ mod dna_impls {
         )> {
             // Get all installed cells from conductor state
             let state = self.get_state().await?;
-            let all_cells: Vec<CellId> = state
-                .installed_apps()
-                .values()
-                .flat_map(|app| app.all_cells())
-                .collect();
+
+            let mut out_ribosomes = Vec::new();
+            let mut out_defs = Vec::new();
+
+            let enabled_apps: Vec<_> = state.enabled_apps().map(|(_, app)| app.clone()).collect();
+            for enabled_app in enabled_apps {
+                let (z, d) = self.load_wasms_info_ribosome_for_app(&enabled_app).await?;
+                out_ribosomes.extend(z);
+                out_defs.extend(d);
+            }
+
+            Ok((out_ribosomes, out_defs))
+        }
+
+        pub(crate) async fn load_wasms_info_ribosome_for_app(
+            &self,
+            installed_app: &InstalledApp,
+        ) -> ConductorResult<(Vec<(CellId, Ribosome)>, Vec<(EntryDefBufferKey, EntryDef)>)>
+        {
+            let all_cells: Vec<CellId> = installed_app.all_cells().collect();
 
             // Retrieve DNA definitions from wasm database
             let mut dna_defs_with_cell_id = Vec::new();
@@ -2029,6 +2042,12 @@ mod app_status_impls {
                 return Ok(app.clone());
             }
 
+            let (z, d) = self.load_wasms_info_ribosome_for_app(app).await?;
+            self.ribosome_store().share_mut(|ds| {
+                ds.add_ribosomes(z);
+                ds.add_entry_defs(d);
+            });
+
             // Prepare module config overrides from app manifest
             let config_override = Self::p2p_config_overrides(&app.manifest);
 
@@ -3422,8 +3441,8 @@ impl Conductor {
 #[allow(missing_docs)]
 mod test_utils_impls {
     use super::*;
-    use tokio::sync::broadcast;
     use crate::core::ribosome::Ribosome;
+    use tokio::sync::broadcast;
 
     impl Conductor {
         pub async fn get_state_from_handle(&self) -> ConductorResult<ConductorState> {

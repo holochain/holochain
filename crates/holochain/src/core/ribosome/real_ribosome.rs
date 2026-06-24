@@ -67,6 +67,7 @@ use futures::future::BoxFuture;
 use futures::FutureExt;
 use holochain_state::prelude::WasmStore;
 use holochain_types::prelude::*;
+use holochain_util::timed;
 use holochain_wasmer_host::module::InstanceWithStore;
 use holochain_wasmer_host::prelude::*;
 use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner};
@@ -86,7 +87,6 @@ use wasmer::Module;
 use wasmer::RuntimeError;
 use wasmer::Store;
 use wasmer::Type;
-use holochain_util::timed;
 
 pub mod module_cache;
 
@@ -98,9 +98,9 @@ use wasmer_sys::*;
 #[cfg(feature = "wasmer-wasmi")]
 mod wasmer_wasmi;
 
+use crate::core::ribosome::real_ribosome::module_cache::{make_module_cache, ModuleCache};
 #[cfg(feature = "wasmer-wasmi")]
 use wasmer_wasmi::*;
-use crate::core::ribosome::real_ribosome::module_cache::{make_module_cache, ModuleCache};
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 #[non_exhaustive]
@@ -247,15 +247,12 @@ impl RealRibosome {
     }
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
-    async fn get_from_cache_or_build(
-        &self,
-        zome_name: &ZomeName,
-    ) -> RibosomeResult<Arc<Module>> {
+    async fn get_from_cache_or_build(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
         let cache_key = self.get_module_cache_key(zome_name)?;
 
-        timed!([1, 1000, 10_000], self.wasmer_module_cache.get(&cache_key)).await?.ok_or_else(|| {
-            RibosomeError::ZomeSourceMissing(zome_name.to_string())
-        })
+        timed!([1, 1000, 10_000], self.wasmer_module_cache.get(&cache_key))
+            .await?
+            .ok_or_else(|| RibosomeError::ZomeSourceMissing(zome_name.to_string()))
     }
 
     /// Create a key for module cache.
@@ -709,7 +706,6 @@ impl RibosomeImplT for RealRibosome {
     }
 
     fn list_zome_fns(&self, zome_name: &ZomeName) -> RibosomeResult<Vec<FunctionName>> {
-        // TODO do not cache here
         let module = tokio_helper::block_forever_on(self.get_from_cache_or_build(zome_name))?;
 
         let mut extern_fns: Vec<FunctionName> = module
@@ -733,9 +729,18 @@ impl RibosomeImplT for RealRibosome {
 
     fn genesis_complete(&self) -> BoxFuture<'static, ()> {
         let zome_names: Vec<_> = {
-            self.dna_def.lock().all_zomes().into_iter().map(|(zome_name, _)| zome_name).cloned().collect()
+            self.dna_def
+                .lock()
+                .all_zomes()
+                .into_iter()
+                .map(|(zome_name, _)| zome_name)
+                .cloned()
+                .collect()
         };
-        let keys: Vec<_> = zome_names.into_iter().filter_map(|name| self.get_module_cache_key(&name).ok()).collect();
+        let keys: Vec<_> = zome_names
+            .into_iter()
+            .filter_map(|name| self.get_module_cache_key(&name).ok())
+            .collect();
         let cache = self.wasmer_module_cache.clone();
 
         Box::pin(async move {
@@ -756,18 +761,24 @@ impl RibosomeImplT for RealRibosome {
     }
 
     #[cfg(feature = "test_utils")]
-    fn is_compiled_wasm_stored(&self, zome_name: ZomeName) -> BoxFuture<'static, RibosomeResult<bool>> {
+    fn is_compiled_wasm_stored(
+        &self,
+        zome_name: ZomeName,
+    ) -> BoxFuture<'static, RibosomeResult<bool>> {
         let key_result = self.get_module_cache_key(&zome_name);
         let cache = self.wasmer_module_cache.clone();
 
         Box::pin(async move {
             let key = key_result?;
             cache.is_compiled_wasm_stored(&key).await.map_err(|err| {
-                tracing::error!(?err, ?zome_name, "Failed to check if a compiled WASM has been stored");
+                tracing::error!(
+                    ?err,
+                    ?zome_name,
+                    "Failed to check if a compiled WASM has been stored"
+                );
                 RibosomeError::ZomeSourceMissing(zome_name.to_string())
             })
         })
-
     }
 }
 
