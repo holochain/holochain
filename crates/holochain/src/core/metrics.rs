@@ -76,6 +76,22 @@ pub(crate) fn op_validation_attempts_metric() -> &'static OpValidationAttemptsMe
     })
 }
 
+/// Record integration metrics for locally-authored ops.
+///
+/// In the v2 model, locally-authored ops are integrated immediately at source
+/// chain flush, bypassing the integration workflow's `summaries` path that
+/// records [`op_integration_delay_metric`] / [`op_validation_attempts_metric`]
+/// for network-received ops. Authored ops have no integration delay and need no
+/// validation retries, so emit a single zeroed sample for each whenever
+/// authoring integrates ops at flush — keeping authored data treated like
+/// network data and matching develop's per-op emission for telemetry
+/// continuity.
+pub(crate) fn record_authored_op_integration(dna_hash: &DnaHash) {
+    let attributes = [KeyValue::new("dna_hash", dna_hash.to_string())];
+    op_integration_delay_metric().record(0.0, &attributes);
+    op_validation_attempts_metric().record(0, &attributes);
+}
+
 pub(crate) type WasmUsageMetric = metrics::Counter<u64>;
 
 static WASM_USAGE_METRIC: OnceLock<WasmUsageMetric> = OnceLock::new();

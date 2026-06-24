@@ -111,6 +111,12 @@ pub async fn call_zome_workflow(
                             // integration to trigger publish.
                             trigger_integrate_dht_ops.trigger(&"call_zome_workflow");
                             trigger_publish_dht_ops.trigger(&"call_zome_workflow");
+                            // Authored ops integrate at flush, bypassing the
+                            // integration workflow, so record their integration
+                            // metrics here.
+                            crate::core::metrics::record_authored_op_integration(
+                                &network.dna_hash(),
+                            );
                         }
                     }
 

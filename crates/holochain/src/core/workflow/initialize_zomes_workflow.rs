@@ -57,6 +57,12 @@ pub async fn initialize_zomes_workflow(
             .flush(network.target_arcs().await?)
             .await?;
 
+        if !flushed_actions.is_empty() {
+            // Authored ops integrate at flush, bypassing the integration
+            // workflow, so record their integration metrics here.
+            crate::core::metrics::record_authored_op_integration(&network.dna_hash());
+        }
+
         send_post_commit(
             conductor_handle,
             workspace,
