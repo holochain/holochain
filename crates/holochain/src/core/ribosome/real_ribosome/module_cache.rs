@@ -42,7 +42,7 @@ pub struct ModuleCache {
 }
 
 impl ModuleCache {
-    #[cfg(not(feature = "wasmer-wasmi"))]
+    #[cfg_attr(feature = "wasmer-wasmi", allow(unused))]
     fn new(
         wasm_store: WasmStore,
         make_engine: fn() -> Engine,
@@ -126,7 +126,7 @@ impl ModuleCache {
     async fn get_interpreted(
         &self,
         wasm_hash: &WasmHash,
-    ) -> Result<Option<Arc<wasmer::Module>>, wasmer::RuntimeError> {
+    ) -> Result<Arc<wasmer::Module>, wasmer::RuntimeError> {
         // Read the original source code for this WASM from the database.
         let maybe_code = self
             .wasm_store
@@ -143,7 +143,7 @@ impl ModuleCache {
                 ?wasm_hash,
                 "No source code found in the database, cannot populate the cache"
             );
-            return Ok(None);
+            return Err(wasmer::RuntimeError::new("Missing WASM source"));
         };
 
         let module = holochain_wasmer_host::module::wasmi::build_module(&source.content.code)?;
@@ -151,7 +151,7 @@ impl ModuleCache {
         // Cache the module for the next use.
         self.cache.insert(wasm_hash.clone(), module.clone()).await;
 
-        Ok(Some(module))
+        Ok(module)
     }
 
     /// Check whether the specified WASM module is current cached in-memory.
@@ -373,7 +373,7 @@ mod tests {
         let module = cache.get(&wasm_hash).await.unwrap();
 
         // Should be cached in memory
-        let in_memory_cached = cache.is_in_memory_cache(&wasm_hash).await.unwrap();
+        let in_memory_cached = cache.is_in_memory_cache(&wasm_hash);
         assert!(in_memory_cached);
 
         // Should not be cached in the compiled table
