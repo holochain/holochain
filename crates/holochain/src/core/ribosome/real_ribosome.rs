@@ -250,9 +250,7 @@ impl RealRibosome {
     async fn get_from_cache_or_build(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
         let cache_key = self.get_module_cache_key(zome_name)?;
 
-        timed!([1, 1000, 10_000], self.wasmer_module_cache.get(&cache_key))
-            .await?
-            .ok_or_else(|| RibosomeError::ZomeSourceMissing(zome_name.to_string()))
+        Ok(timed!([1, 1000, 10_000], self.wasmer_module_cache.get(&cache_key)).await?)
     }
 
     /// Create a key for module cache.

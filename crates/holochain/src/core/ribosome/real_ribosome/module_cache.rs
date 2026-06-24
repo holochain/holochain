@@ -42,6 +42,7 @@ pub struct ModuleCache {
 }
 
 impl ModuleCache {
+    #[cfg(not(feature = "wasmer-wasmi"))]
     fn new(
         wasm_store: WasmStore,
         make_engine: fn() -> Engine,
@@ -77,46 +78,44 @@ impl ModuleCache {
     pub(super) async fn get(
         &self,
         wasm_hash: &WasmHash,
-    ) -> Result<Option<Arc<wasmer::Module>>, wasmer::RuntimeError> {
-        if let Some(module) = self.cache.get(wasm_hash).await {
-            return Ok(Some(module));
-        }
+    ) -> Result<Arc<wasmer::Module>, wasmer::RuntimeError> {
+        self.cache.try_get_with(wasm_hash.clone(), async {
+            if let Some(builder) = self.builder.clone() {
+                // Wasm is not cached in memory, so try to load an already built module from the database
+                let maybe_serialized = self
+                    .wasm_store
+                    .as_read()
+                    .get_compiled(wasm_hash)
+                    .await
+                    .map_err(|err| {
+                        tracing::error!(?err, "Failed to read compiled module from the database");
+                        wasmer::RuntimeError::new(format!("Failed to read compiled module from the database: {}", err))
+                    })?;
+                if let Some(serialized) = maybe_serialized {
+                    match builder.from_serialized_module(serialized) {
+                        Ok(module) => {
+                            // The serialized module was found, but is not currently cached, so add it to the
+                            // in memory cache.
+                            self.cache.insert(wasm_hash.clone(), module.clone()).await;
 
-        if let Some(builder) = self.builder.clone() {
-            // Wasm is not cached in memory, so try to load an already built module from the database
-            let maybe_serialized = self
-                .wasm_store
-                .as_read()
-                .get_compiled(wasm_hash)
-                .await
-                .unwrap_or_else(|err| {
-                    tracing::error!(?err, "Failed to read compiled module from the database");
-                    None
-                });
-            if let Some(serialized) = maybe_serialized {
-                match builder.from_serialized_module(serialized) {
-                    Ok(module) => {
-                        // The serialized module was found, but is not currently cached, so add it to the
-                        // in memory cache.
-                        self.cache.insert(wasm_hash.clone(), module.clone()).await;
-
-                        return Ok(Some(module));
-                    }
-                    Err(err) => {
-                        tracing::info!(?err, ?wasm_hash, "Invalid compiled, serialized module found in the database. Attempting recovery");
+                            return Ok(module);
+                        }
+                        Err(err) => {
+                            tracing::info!(?err, ?wasm_hash, "Invalid compiled, serialized module found in the database. Attempting recovery");
+                        }
                     }
                 }
+
+                // Attempt to load the WASM source code and populate the cache that way
+                self.get_from_source(wasm_hash).await
+            } else {
+                #[cfg(not(feature = "wasmer-wasmi"))]
+                panic!("Missing builder");
+
+                #[cfg(feature = "wasmer-wasmi")]
+                self.get_interpreted(wasm_hash).await
             }
-
-            // Attempt to load the WASM source code and populate the cache that way
-            self.get_from_source(wasm_hash).await
-        } else {
-            #[cfg(not(feature = "wasmer-wasmi"))]
-            panic!("Missing builder");
-
-            #[cfg(feature = "wasmer-wasmi")]
-            self.get_interpreted(wasm_hash).await
-        }
+        }).await.map_err(|e| (*e).clone())
     }
 
     pub(super) async fn evict_from_memory_cache(&self, wasm_hash: &WasmHash) {
@@ -128,10 +127,6 @@ impl ModuleCache {
         &self,
         wasm_hash: &WasmHash,
     ) -> Result<Option<Arc<wasmer::Module>>, wasmer::RuntimeError> {
-        if let Some(module) = self.cache.get(wasm_hash).await {
-            return Ok(Some(module));
-        }
-
         // Read the original source code for this WASM from the database.
         let maybe_code = self
             .wasm_store
@@ -182,7 +177,7 @@ impl ModuleCache {
     async fn get_from_source(
         &self,
         wasm_hash: &WasmHash,
-    ) -> Result<Option<Arc<wasmer::Module>>, wasmer::RuntimeError> {
+    ) -> Result<Arc<wasmer::Module>, wasmer::RuntimeError> {
         // Read the original source code for this WASM from the database.
         let maybe_code = self
             .wasm_store
@@ -199,7 +194,7 @@ impl ModuleCache {
                 ?wasm_hash,
                 "No source code found in the database, cannot populate the cache"
             );
-            return Ok(None);
+            return Err(wasmer::RuntimeError::new("Missing WASM source"));
         };
 
         // Run the compile step, on a thread where blocking is acceptable.
@@ -219,7 +214,9 @@ impl ModuleCache {
                     ?err,
                     "Blocking call for the module compile operation failed"
                 );
-                return Ok(None);
+                return Err(wasmer::RuntimeError::new(
+                    "Blocking call for the module compile operation failed",
+                ));
             }
         };
 
@@ -242,7 +239,9 @@ impl ModuleCache {
             }
             Err(err) => {
                 tracing::error!(?err, "Failed to serialize WASM module after building, the module will be rebuilt again next time it is requested");
-                return Ok(None);
+                return Err(wasmer::RuntimeError::new(
+                    "Failed to build WASM source code",
+                ));
             }
         };
 
@@ -266,7 +265,7 @@ impl ModuleCache {
 
         self.cache.insert(wasm_hash.clone(), module.clone()).await;
 
-        Ok(Some(module))
+        Ok(module)
     }
 }
 
@@ -298,7 +297,6 @@ mod tests {
         assert!(!compiled_stored);
 
         let module = cache.get(&wasm_hash).await.unwrap();
-        assert!(module.is_some());
 
         // Check that the cache is now populated
         let in_memory_cache = cache.is_in_memory_cache(&wasm_hash);
@@ -345,7 +343,6 @@ mod tests {
 
         // Should fail to use the invalid, cached value and replace it.
         let result = cache.get(&wasm_hash).await.unwrap();
-        assert!(result.is_some());
 
         // Check that the compiled module we're storing isn't empty. I.e. has been replaced.
         let compiled = cache
@@ -374,14 +371,13 @@ mod tests {
         let cache = make_module_cache(WasmBackend::new(), store);
 
         let module = cache.get(&wasm_hash).await.unwrap();
-        assert!(module.is_some());
 
         // Should be cached in memory
-        let in_memory_cached = cache.is_compiled_wasm_stored(&wasm_hash).await.unwrap();
+        let in_memory_cached = cache.is_in_memory_cache(&wasm_hash).await.unwrap();
         assert!(in_memory_cached);
 
         // Should not be cached in the compiled table
         let compiled_stored = cache.is_compiled_wasm_stored(&wasm_hash).await.unwrap();
-        assert!(compiled_stored);
+        assert!(!compiled_stored);
     }
 }
