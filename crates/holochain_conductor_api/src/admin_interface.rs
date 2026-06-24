@@ -603,6 +603,8 @@ pub enum AppStatusFilter {
     Enabled,
     /// Filter on apps which are Disabled.
     Disabled,
+    /// Filter on apps which are awaiting memproofs.
+    AwaitingMemproofs,
     /// Filter on apps whose source-chain restore is in progress.
     AwaitingRestore,
     /// Filter on apps whose source-chain restore has permanently failed.

@@ -27,7 +27,10 @@ impl TxRead<Wasm> {
     }
 
     /// Get a compiled, serialized WASM module by hash.
-    pub async fn get_compiled_wasm(&mut self, hash: &WasmHash) -> sqlx::Result<Option<bytes::Bytes>> {
+    pub async fn get_compiled_wasm(
+        &mut self,
+        hash: &WasmHash,
+    ) -> sqlx::Result<Option<bytes::Bytes>> {
         reads::get_compiled_wasm(self.conn_mut(), hash).await
     }
 
@@ -69,7 +72,11 @@ impl TxWrite<Wasm> {
     }
 
     /// Store a compiled, serialized WASM module under its original WASM hash.
-    pub async fn put_compiled_wasm(&mut self, hash: WasmHash, serialized: bytes::Bytes) -> sqlx::Result<()> {
+    pub async fn put_compiled_wasm(
+        &mut self,
+        hash: WasmHash,
+        serialized: bytes::Bytes,
+    ) -> sqlx::Result<()> {
         writes::put_compiled_wasm(self.conn_mut(), hash, &serialized).await
     }
 

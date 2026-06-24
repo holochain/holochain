@@ -53,9 +53,7 @@ where
 {
     Ok(inner_reads::get_compiled_wasm(executor, hash.get_raw_39())
         .await?
-        .map(|model| {
-            bytes::Bytes::from(model.serialized)
-        }))
+        .map(|model| bytes::Bytes::from(model.serialized)))
 }
 
 /// Check if a DNA definition exists in the database.

@@ -23,9 +23,9 @@ impl<Db> DnaDefStore<Db> {
 
 impl DnaDefStore<holochain_data::DbRead<holochain_data::kind::Wasm>> {
     /// Retrieve a DNA definition from the database by its cell ID.
-    pub async fn get(&self, cell_id: &CellId) -> StateQueryResult<Option<(CellId, DnaDefHashed)>> {
+    pub async fn get(&self, cell_id: &CellId) -> StateQueryResult<Option<DnaDefHashed>> {
         match self.db.get_dna_def(cell_id).await? {
-            Some(dna_def) => Ok(Some((cell_id.clone(), dna_def))),
+            Some(dna_def) => Ok(Some(dna_def)),
             None => Ok(None),
         }
     }

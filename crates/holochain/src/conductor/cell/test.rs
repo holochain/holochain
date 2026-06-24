@@ -1,6 +1,8 @@
 use crate::conductor::space::TestSpaces;
 use crate::conductor::Conductor;
-use crate::core::ribosome::real_ribosome::{RealRibosome, WasmBackend, module_cache::make_module_cache};
+use crate::core::ribosome::real_ribosome::{
+    module_cache::make_module_cache, RealRibosome, WasmBackend,
+};
 use crate::core::ribosome::Ribosome;
 use crate::core::workflow::incoming_dht_ops_workflow::op_exists;
 use crate::sweettest::SweetConductorConfig;

@@ -140,6 +140,15 @@ impl ConductorState {
             .filter(|(_, app)| matches!(app.status, AppStatus::Disabled(_)))
     }
 
+    /// Iterate over only the "awaiting memproof" apps.
+    pub fn awaiting_memproofs_apps(
+        &self,
+    ) -> impl Iterator<Item = (&InstalledAppId, &InstalledApp)> + '_ {
+        self.installed_apps
+            .iter()
+            .filter(|(_, app)| matches!(app.status, AppStatus::AwaitingMemproofs))
+    }
+
     /// Getter for a single app. Returns error if app missing.
     pub fn get_app(&self, id: &InstalledAppId) -> ConductorResult<&InstalledApp> {
         self.installed_apps

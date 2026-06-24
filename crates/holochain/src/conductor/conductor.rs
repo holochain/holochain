@@ -32,9 +32,6 @@
 //! }
 //! ```
 
-/// Name of the wasm cache folder within the data root directory.
-pub const WASM_CACHE: &str = "wasm-cache";
-
 pub use self::share::RwShare;
 use super::api::error::ConductorApiError;
 use super::api::AppInterfaceApi;
@@ -234,15 +231,6 @@ mod startup_shutdown_impls {
             inline_zome_store: crate::core::ribosome::inline_ribosome::InlineZomeStore,
         ) -> Self {
             let tracing_scope = config.tracing_scope().unwrap_or_default();
-            let maybe_data_root_path = config.data_root_path.clone().map(|path| (*path).clone());
-
-            if let Some(path) = &maybe_data_root_path {
-                let mut path = path.clone();
-                path.push(WASM_CACHE);
-
-                // best effort to ensure the cache dir exists if configured
-                let _ = std::fs::create_dir_all(&path);
-            }
 
             let wasm_backend = match &config.wasm_backend {
                 Some(wasm_backend) => match wasm_backend {
@@ -354,7 +342,7 @@ mod startup_shutdown_impls {
             admin_configs: Vec<AdminInterfaceConfig>,
         ) -> ConductorResult<()> {
             // Load the wasms and dna defs from the database and populate the RibosomeStore
-            self.load_ribosomes().await?;
+            self.load_wasms_into_ribosomes().await?;
 
             info!("Conductor startup: Ribosomes loaded.");
 
@@ -577,15 +565,17 @@ mod dna_impls {
 
         /// Create a hash map of all existing DNA definitions, mapped to cell
         /// ids.
-        pub fn get_dna_definitions(
+        pub async fn get_dna_definitions(
             &self,
             app: &InstalledApp,
         ) -> ConductorResult<IndexMap<CellId, DnaDefHashed>> {
             let mut dna_defs = IndexMap::new();
             for cell_id in app.all_cells() {
-                let ribosome = self.get_ribosome(&cell_id)?;
-                let dna_def_hashed = ribosome.dna_def();
-                dna_defs.insert(cell_id.to_owned(), dna_def_hashed.to_owned());
+                let def = match self.spaces.dna_def_store.as_read().get(&cell_id).await? {
+                    Some(def) => def,
+                    None => return Err(ConductorError::DnaDefMissing(cell_id)),
+                };
+                dna_defs.insert(cell_id.to_owned(), def.to_owned());
             }
             Ok(dna_defs)
         }
@@ -603,42 +593,29 @@ mod dna_impls {
                 .share_mut(|d| d.add_ribosome(cell_id, ribosome));
         }
 
-        pub(crate) async fn load_wasms_into_ribosomes(
-            &self,
-        ) -> ConductorResult<(
-            impl IntoIterator<Item = (CellId, Ribosome)>,
-            impl IntoIterator<Item = (EntryDefBufferKey, EntryDef)>,
-        )> {
+        pub(crate) async fn load_wasms_into_ribosomes(&self) -> ConductorResult<()> {
             // Get all installed cells from conductor state
             let state = self.get_state().await?;
 
-            let mut out_ribosomes = Vec::new();
-            let mut out_defs = Vec::new();
-
             let enabled_apps: Vec<_> = state.enabled_apps().map(|(_, app)| app.clone()).collect();
             for enabled_app in enabled_apps {
-                let (z, d) = self.load_wasms_info_ribosome_for_app(&enabled_app).await?;
-                out_ribosomes.extend(z);
-                out_defs.extend(d);
+                self.load_wasms_into_ribosome_for_app(&enabled_app).await?;
             }
 
-            Ok((out_ribosomes, out_defs))
+            Ok(())
         }
 
-        pub(crate) async fn load_wasms_info_ribosome_for_app(
+        pub(crate) async fn load_wasms_into_ribosome_for_app(
             &self,
             installed_app: &InstalledApp,
-        ) -> ConductorResult<(Vec<(CellId, Ribosome)>, Vec<(EntryDefBufferKey, EntryDef)>)>
-        {
+        ) -> ConductorResult<()> {
             let all_cells: Vec<CellId> = installed_app.all_cells().collect();
 
             // Retrieve DNA definitions from wasm database
             let mut dna_defs_with_cell_id = Vec::new();
             for cell_id in all_cells {
-                if let Some(cell_dna_tuple) =
-                    self.spaces.dna_def_store.as_read().get(&cell_id).await?
-                {
-                    dna_defs_with_cell_id.push(cell_dna_tuple);
+                if let Some(def) = self.spaces.dna_def_store.as_read().get(&cell_id).await? {
+                    dna_defs_with_cell_id.push((cell_id, def));
                 }
             }
 
@@ -660,7 +637,6 @@ mod dna_impls {
                                     .all(|z| matches!(z.1, ZomeDef::Inline(_)));
 
                                 if all_inline {
-                                    println!("Reloading from inline ribosome");
                                     let ribosome =
                                         crate::core::ribosome::inline_ribosome::InlineRibosome::new(
                                             dna_def_hashed.clone(),
@@ -688,7 +664,12 @@ mod dna_impls {
             let ribosomes_with_cell_id =
                 futures::future::try_join_all(ribosomes_with_cell_id_future).await?;
 
-            Ok((ribosomes_with_cell_id, entry_defs))
+            self.ribosome_store().share_mut(|ds| {
+                ds.add_ribosomes(ribosomes_with_cell_id);
+                ds.add_entry_defs(entry_defs);
+            });
+
+            Ok(())
         }
 
         /// Get the root environment directory.
@@ -754,16 +735,6 @@ mod dna_impls {
                 .await?;
 
             Ok(zome_defs)
-        }
-
-        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-        pub(crate) async fn load_ribosomes(&self) -> ConductorResult<()> {
-            let (ribosomes, entry_defs) = self.load_wasms_into_ribosomes().await?;
-            self.ribosome_store().share_mut(|ds| {
-                ds.add_ribosomes(ribosomes);
-                ds.add_entry_defs(entry_defs);
-            });
-            Ok(())
         }
 
         /// Install a [`DnaFile`] in this Conductor
@@ -1474,6 +1445,10 @@ mod app_impls {
             let apps_ids: Vec<&String> = match status_filter {
                 Some(Enabled) => conductor_state.enabled_apps().map(|(id, _)| id).collect(),
                 Some(Disabled) => conductor_state.disabled_apps().map(|(id, _)| id).collect(),
+                Some(AwaitingMemproofs) => conductor_state
+                    .awaiting_memproofs_apps()
+                    .map(|(id, _)| id)
+                    .collect(),
                 Some(AwaitingRestore) => conductor_state
                     .awaiting_restore_apps()
                     .map(|(id, _)| id)
@@ -1487,13 +1462,17 @@ mod app_impls {
                 None => conductor_state.installed_apps().keys().collect(),
             };
 
-            let mut app_infos: Vec<AppInfo> = apps_ids
-                .into_iter()
-                .map(|app_id| self.get_app_info_inner(app_id, &conductor_state))
-                .collect::<Result<Vec<_>, _>>()?
-                .into_iter()
-                .flatten()
-                .collect();
+            let mut app_infos: Vec<AppInfo> = futures::future::join_all(
+                apps_ids
+                    .into_iter()
+                    .map(|app_id| self.get_app_info_inner(app_id, &conductor_state)),
+            )
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .flatten()
+            .collect();
             app_infos.sort_by_key(|app_info| std::cmp::Reverse(app_info.installed_at));
 
             Ok(app_infos)
@@ -1559,7 +1538,7 @@ mod app_impls {
             installed_app_id: &InstalledAppId,
         ) -> ConductorResult<Option<AppInfo>> {
             let state = self.get_state().await?;
-            let maybe_app_info = self.get_app_info_inner(installed_app_id, &state)?;
+            let maybe_app_info = self.get_app_info_inner(installed_app_id, &state).await?;
             Ok(maybe_app_info)
         }
 
@@ -1582,6 +1561,8 @@ mod app_impls {
                 })
                 .collect();
 
+            self.load_wasms_into_ribosome_for_app(app).await?;
+
             crate::conductor::conductor::genesis_cells(self.clone(), cells_to_genesis).await?;
 
             self.update_state({
@@ -1598,7 +1579,7 @@ mod app_impls {
             Ok(())
         }
 
-        fn get_app_info_inner(
+        async fn get_app_info_inner(
             &self,
             app_id: &InstalledAppId,
             state: &ConductorState,
@@ -1606,7 +1587,7 @@ mod app_impls {
             match state.get_app(app_id) {
                 Err(_) => Ok(None),
                 Ok(app) => {
-                    let dna_definitions = self.get_dna_definitions(app)?;
+                    let dna_definitions = self.get_dna_definitions(app).await?;
                     Ok(Some(AppInfo::from_installed_app(app, &dna_definitions)))
                 }
             }
@@ -2042,11 +2023,7 @@ mod app_status_impls {
                 return Ok(app.clone());
             }
 
-            let (z, d) = self.load_wasms_info_ribosome_for_app(app).await?;
-            self.ribosome_store().share_mut(|ds| {
-                ds.add_ribosomes(z);
-                ds.add_entry_defs(d);
-            });
+            self.load_wasms_into_ribosome_for_app(app).await?;
 
             // Prepare module config overrides from app manifest
             let config_override = Self::p2p_config_overrides(&app.manifest);
@@ -3486,6 +3463,15 @@ mod test_utils_impls {
 
         pub fn test_get_ribosome(&self, cell_id: &CellId) -> ConductorResult<Ribosome> {
             self.get_ribosome(cell_id)
+        }
+
+        pub async fn load_wasms_into_ribosome_for_installed_app(
+            &self,
+            installed_app_id: &InstalledAppId,
+        ) -> ConductorResult<()> {
+            let state = self.get_state().await?;
+            let app = state.get_app(installed_app_id)?;
+            self.load_wasms_into_ribosome_for_app(app).await
         }
     }
 }

@@ -69,7 +69,11 @@ impl DbWrite<Wasm> {
     }
 
     /// Store a compiled, serialized WASM module under its original WASM hash..
-    pub async fn put_compiled_wasm(&self, hash: WasmHash, serialized: bytes::Bytes) -> sqlx::Result<()> {
+    pub async fn put_compiled_wasm(
+        &self,
+        hash: WasmHash,
+        serialized: bytes::Bytes,
+    ) -> sqlx::Result<()> {
         writes::put_compiled_wasm(self.pool(), hash, &serialized).await
     }
 

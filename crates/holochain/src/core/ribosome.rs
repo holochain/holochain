@@ -1170,7 +1170,7 @@ pub trait RibosomeImplT: std::fmt::Debug + Send + Sync {
 
     /// Inform this ribosome that genesis is complete.
     fn genesis_complete(&self) -> BoxFuture<'static, ()> {
-        Box::pin(async move { () })
+        Box::pin(async move {})
     }
 
     #[cfg(feature = "test_utils")]

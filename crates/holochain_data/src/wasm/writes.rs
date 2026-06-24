@@ -16,8 +16,13 @@ where
 }
 
 /// Store a compiled, serialized WASM module.
-pub(super) async fn put_compiled_wasm<'e, E>(executor: E, wasm_hash: WasmHash, wasm_serialized: &[u8]) -> sqlx::Result<()>
-where E: Executor<'e, Database = Sqlite>
+pub(super) async fn put_compiled_wasm<'e, E>(
+    executor: E,
+    wasm_hash: WasmHash,
+    wasm_serialized: &[u8],
+) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
 {
     inner_writes::put_compiled_wasm(executor, wasm_hash.get_raw_39(), wasm_serialized).await
 }

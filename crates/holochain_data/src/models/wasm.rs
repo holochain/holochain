@@ -9,7 +9,10 @@ use holochain_integrity_types::{
 use holochain_serialized_bytes::{SerializedBytes, UnsafeBytes};
 use holochain_types::prelude::CellId;
 use holochain_zome_types::prelude::{DnaDefHashed, InlineZomeDef};
-use holochain_zome_types::{prelude::DnaDef, zome::{CoordinatorZomeDef, IntegrityZomeDef, WasmZomeDef, ZomeDef}};
+use holochain_zome_types::{
+    prelude::DnaDef,
+    zome::{CoordinatorZomeDef, IntegrityZomeDef, WasmZomeDef, ZomeDef},
+};
 use sqlx::FromRow;
 use std::borrow::Cow;
 

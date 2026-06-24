@@ -732,7 +732,6 @@ impl RibosomeImplT for RealRibosome {
             self.dna_def
                 .lock()
                 .all_zomes()
-                .into_iter()
                 .map(|(zome_name, _)| zome_name)
                 .cloned()
                 .collect()

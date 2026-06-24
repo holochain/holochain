@@ -101,7 +101,7 @@ impl AdminInterfaceApi {
                     .clone()
                     .install_app_bundle(*payload)
                     .await?;
-                let dna_definitions = self.conductor_handle.get_dna_definitions(&app)?;
+                let dna_definitions = self.conductor_handle.get_dna_definitions(&app).await?;
                 Ok(AdminResponse::AppInstalled(AppInfo::from_installed_app(
                     &app,
                     &dna_definitions,
