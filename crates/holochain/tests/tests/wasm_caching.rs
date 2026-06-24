@@ -21,12 +21,15 @@ async fn wasm_is_memory_cached_once_enabled() {
     let zome_name = TestWasm::Foo.integrity_zome_name();
     let ribosome = conductor.test_get_ribosome(&cell_id).unwrap();
 
-    // On install, the app should be compiled into the store.
-    let is_compiled_wasm_stored = ribosome
-        .is_compiled_wasm_stored(zome_name.clone())
-        .await
-        .unwrap();
-    assert!(is_compiled_wasm_stored);
+    #[cfg(not(feature = "wasmer-wasmi"))]
+    {
+        // On install, the app should be compiled into the store.
+        let is_compiled_wasm_stored = ribosome
+            .is_compiled_wasm_stored(zome_name.clone())
+            .await
+            .unwrap();
+        assert!(is_compiled_wasm_stored);
+    }
     // But not cached in memory, because the app is in a disabled state.
     let is_memory_cached = ribosome.is_memory_cached(&zome_name).unwrap();
     assert!(!is_memory_cached);
@@ -55,14 +58,18 @@ async fn wasm_is_not_memory_cached_on_startup_for_disabled_apps() {
     let cell_id = CellId::new(dna_hash, agent_key);
 
     let zome_name = TestWasm::Foo.integrity_zome_name();
-    let ribosome = conductor.test_get_ribosome(&cell_id).unwrap();
 
-    // On install, the app should be compiled into the store.
-    let is_compiled_wasm_stored = ribosome
-        .is_compiled_wasm_stored(zome_name.clone())
-        .await
-        .unwrap();
-    assert!(is_compiled_wasm_stored);
+    #[cfg(not(feature = "wasmer-wasmi"))]
+    {
+        let ribosome = conductor.test_get_ribosome(&cell_id).unwrap();
+
+        // On install, the app should be compiled into the store.
+        let is_compiled_wasm_stored = ribosome
+            .is_compiled_wasm_stored(zome_name.clone())
+            .await
+            .unwrap();
+        assert!(is_compiled_wasm_stored);
+    }
 
     // Restart the conductor while the app is in the disabled state
     conductor.shutdown().await;
