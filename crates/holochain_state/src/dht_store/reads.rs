@@ -66,6 +66,27 @@ impl DhtStore<DbRead<Dht>> {
         Ok(self.db().rejected_integrated_op_hashes().await?)
     }
 
+    /// `(op_hash, basis, storage_center_loc)` for every integrated chain op.
+    /// Used to verify DHT-location consistency across conductors.
+    pub async fn integrated_op_locations(
+        &self,
+    ) -> StateQueryResult<Vec<(DhtOpHash, holo_hash::AnyLinkableHash, u32)>> {
+        Ok(self
+            .db()
+            .integrated_op_locations()
+            .await?
+            .into_iter()
+            .map(|r| {
+                let basis: AnyLinkableHash = ExternalHash::from_raw_36(r.basis_hash).into();
+                (
+                    DhtOpHash::from_raw_36(r.hash),
+                    basis,
+                    r.storage_center_loc as u32,
+                )
+            })
+            .collect())
+    }
+
     /// Total count of every op (integrated and limbo) held in the DHT store.
     pub async fn count_all_ops(&self) -> StateQueryResult<i64> {
         Ok(self.db().count_all_ops().await?)
@@ -518,6 +539,20 @@ impl DhtStore<DbRead<Dht>> {
             .get_action(hash.clone())
             .await?
             .map(|v2| holochain_zome_types::dht_v2::to_legacy_signed_action(&v2)))
+    }
+
+    /// The signed action carried by the integrated chain op `op_hash`, if the
+    /// op is held in the store. Used by the receipt-receive path to inspect the
+    /// action's entry type.
+    pub async fn action_for_op(
+        &self,
+        op_hash: &DhtOpHash,
+    ) -> StateQueryResult<Option<holochain_zome_types::record::SignedActionHashed>> {
+        let Some(row) = self.db().get_chain_op(op_hash.clone()).await? else {
+            return Ok(None);
+        };
+        let action_hash = holo_hash::ActionHash::from_raw_36(row.action_hash);
+        self.retrieve_action(&action_hash).await
     }
 
     /// Retrieve the signed action for `hash`, checking the store first and

@@ -113,6 +113,31 @@ where
         .await
 }
 
+/// Location-relevant columns of an integrated chain op.
+#[derive(Debug, sqlx::FromRow)]
+pub struct OpLocationRow {
+    /// Raw 36-byte op hash.
+    pub hash: Vec<u8>,
+    /// Raw 36-byte DHT basis hash.
+    pub basis_hash: Vec<u8>,
+    /// Storage center location (`u32` stored as `i64` in SQLite).
+    pub storage_center_loc: i64,
+}
+
+/// Return `(hash, basis_hash, storage_center_loc)` for every integrated
+/// (`locally_validated = 1`) chain op. Used to verify DHT-location consistency
+/// across conductors.
+pub(crate) async fn integrated_op_locations<'e, E>(executor: E) -> sqlx::Result<Vec<OpLocationRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT hash, basis_hash, storage_center_loc FROM ChainOp WHERE locally_validated = 1",
+    )
+    .fetch_all(executor)
+    .await
+}
+
 /// Update `validation_status` to `Rejected` for the given op only when the
 /// current status is `Accepted` and the op is not locally validated.  Returns
 /// the number of rows updated.

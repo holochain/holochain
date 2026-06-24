@@ -40,7 +40,6 @@ use holochain_state::prelude::*;
 use holochain_state::schedule::live_scheduled_fns;
 use holochain_types::cell_config_overrides::CellConfigOverrides;
 use kitsune2_api::BoxFut;
-use rusqlite::OptionalExtension;
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::sync::Arc;
@@ -663,51 +662,39 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
 
                 // Get the action for this op so we can check the entry type.
                 let hash = receipt.receipt.dht_op_hash.clone();
-                let action: Option<SignedAction> = self
-                    .get_or_create_authored_db()?
-                    .read_async(move |txn| {
-                        let h: Option<Vec<u8>> = txn
-                            .query_row(
-                                "SELECT Action.blob as action_blob
-                    FROM DhtOp
-                    JOIN Action ON Action.hash = DhtOp.action_hash
-                    WHERE DhtOp.hash = :hash",
-                                named_params! {
-                                    ":hash": hash,
-                                },
-                                |row| row.get("action_blob"),
-                            )
-                            .optional()?;
-                        match h {
-                            Some(h) => from_blob(h),
-                            None => Ok(None),
-                        }
-                    })
-                    .await?;
+                let action = self
+                    .space
+                    .dht_store
+                    .as_read()
+                    .action_for_op(&hash)
+                    .await
+                    .map_err(|e| CellError::from(HolochainP2pError::other(e)))?;
 
                 // If the action has an app entry type get the entry def
                 // from the conductor.
-                let required_receipt_count = match action.as_ref().and_then(|h| h.entry_type()) {
-                    Some(EntryType::App(AppEntryDef {
-                        zome_index,
-                        entry_index,
-                        ..
-                    })) => {
-                        let ribosome = self.conductor_api.get_this_ribosome().map_err(Box::new)?;
-                        let zome = ribosome.get_integrity_zome(zome_index);
-                        match zome {
-                            Some(zome) => self
-                                .conductor_api
-                                .get_entry_def(&EntryDefBufferKey::new(
-                                    zome.into_inner().1,
-                                    *entry_index,
-                                ))
-                                .map(|e| u8::from(e.required_validations)),
-                            None => None,
+                let required_receipt_count =
+                    match action.as_ref().and_then(|h| h.action().entry_type()) {
+                        Some(EntryType::App(AppEntryDef {
+                            zome_index,
+                            entry_index,
+                            ..
+                        })) => {
+                            let ribosome =
+                                self.conductor_api.get_this_ribosome().map_err(Box::new)?;
+                            let zome = ribosome.get_integrity_zome(zome_index);
+                            match zome {
+                                Some(zome) => self
+                                    .conductor_api
+                                    .get_entry_def(&EntryDefBufferKey::new(
+                                        zome.into_inner().1,
+                                        *entry_index,
+                                    ))
+                                    .map(|e| u8::from(e.required_validations)),
+                                None => None,
+                            }
                         }
-                    }
-                    _ => None,
-                };
+                        _ => None,
+                    };
 
                 // If no required receipt count was found then fallback to the default.
                 let required_validation_count = required_receipt_count.unwrap_or(
