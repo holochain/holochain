@@ -296,7 +296,7 @@ mod tests {
         let compiled_stored = cache.is_compiled_wasm_stored(&wasm_hash).await.unwrap();
         assert!(!compiled_stored);
 
-        let module = cache.get(&wasm_hash).await.unwrap();
+        cache.get(&wasm_hash).await.unwrap();
 
         // Check that the cache is now populated
         let in_memory_cache = cache.is_in_memory_cache(&wasm_hash);
@@ -342,7 +342,7 @@ mod tests {
         let cache = make_module_cache(WasmBackend::new(), store);
 
         // Should fail to use the invalid, cached value and replace it.
-        let result = cache.get(&wasm_hash).await.unwrap();
+        cache.get(&wasm_hash).await.unwrap();
 
         // Check that the compiled module we're storing isn't empty. I.e. has been replaced.
         let compiled = cache
@@ -370,7 +370,7 @@ mod tests {
 
         let cache = make_module_cache(WasmBackend::new(), store);
 
-        let module = cache.get(&wasm_hash).await.unwrap();
+        cache.get(&wasm_hash).await.unwrap();
 
         // Should be cached in memory
         let in_memory_cached = cache.is_in_memory_cache(&wasm_hash);
