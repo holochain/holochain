@@ -701,77 +701,31 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
                     crate::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE,
                 );
 
-                let receipt_op_hash = receipt.receipt.dht_op_hash.clone();
-                let receipt_op_hash_for_new_db = receipt_op_hash.clone();
-                let receipt_for_new_db = receipt.clone();
-
+                // #5370: receipt-receive cut over to the DhtStore. The legacy
+                // `ValidationReceipt` write (`add_if_unique`) is gated by a
+                // foreign key to the legacy `DhtOp` table, which is no longer
+                // dual-written, so it failed to record receipts for
+                // self-authored ops (and erred out the whole handler before the
+                // mirror ran). Record the receipt in the DhtStore — whose FK is
+                // the live `ChainOp` — and use the returned count to decide
+                // completion.
                 let receipt_count = self
                     .space
-                    .dht_db
-                    .write_async({
-                        let receipt_op_hash = receipt_op_hash.clone();
-                        move |txn| -> StateMutationResult<usize> {
-                            // Add the new receipts to the db
-                            add_if_unique(txn, receipt)?;
-
-                            // Get the current count for this DhtOp.
-                            let receipt_count: usize = txn.query_row(
-                            "SELECT COUNT(rowid) FROM ValidationReceipt WHERE op_hash = :op_hash",
-                            named_params! {
-                                ":op_hash": receipt_op_hash,
-                            },
-                            |row| row.get(0),
-                        )?;
-
-                            if receipt_count >= required_validation_count as usize {
-                                // If we have enough receipts then set receipts to complete.
-                                //
-                                // Don't fail here if this doesn't work, it's only informational. Getting
-                                // the same flag set in the authored db is what will stop the publish
-                                // workflow from republishing this op.
-                                set_receipts_complete_redundantly_in_dht_db(
-                                    txn,
-                                    &receipt_op_hash,
-                                    true,
-                                )
-                                .ok();
-                            }
-
-                            Ok(receipt_count)
-                        }
-                    })
-                    .await?;
-
-                // Mirror: record the validation receipt in the new DHT DB.
-                // Capture any mirror error here — we must not let it skip the
-                // legacy completion path below.
-                let receipt_mirror_result = self
-                    .space
                     .dht_store
-                    .record_validation_receipt(&receipt_for_new_db)
+                    .record_validation_receipt(&receipt)
                     .await
-                    .map_err(|e| CellError::from(HolochainP2pError::other(e)));
+                    .map_err(|e| CellError::from(HolochainP2pError::other(e)))?
+                    as usize;
 
-                // If we have enough receipts then set receipts to complete.
+                // If we have enough receipts then mark the op's receipts
+                // complete so the publish workflow stops republishing it.
                 if receipt_count >= required_validation_count as usize {
-                    // Note that the flag is set in the authored db because that's what the publish workflow checks to decide
-                    // whether to republish the op for more validation receipts.
-                    self.get_or_create_authored_db()?
-                        .write_async(move |txn| -> StateMutationResult<()> {
-                            set_receipts_complete(txn, &receipt_op_hash, true)
-                        })
-                        .await?;
-
-                    // Mirror: set receipts_complete in the new DHT DB.
                     self.space
                         .dht_store
-                        .mark_chain_op_receipts_complete(&receipt_op_hash_for_new_db)
+                        .mark_chain_op_receipts_complete(&hash)
                         .await
                         .map_err(|e| CellError::from(HolochainP2pError::other(e)))?;
                 }
-
-                // Propagate any earlier mirror error after the legacy path completes.
-                receipt_mirror_result?;
             }
 
             CellResult::Ok(())
