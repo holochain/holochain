@@ -73,7 +73,8 @@ impl AdminInterfaceApi {
             GetDnaDefinition(cell_id) => {
                 let dna_def = self
                     .conductor_handle
-                    .get_dna_def(&cell_id)
+                    .get_dna_definition(&cell_id)
+                    .await?
                     .ok_or(ConductorApiError::CellMissing(*cell_id))?;
                 Ok(AdminResponse::DnaDefinitionReturned(dna_def.content))
             }

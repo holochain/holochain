@@ -569,6 +569,21 @@ mod dna_impls {
                 .share_ref(|ds| ds.get_dna_def(cell_id))
         }
 
+        /// Get a [`DnaDefHashed`] from the DNA definition store.
+        ///
+        /// Unlike [`Conductor::get_dna_def`], which reads the in-memory ribosome
+        /// store, this reads from the database — the authoritative record of
+        /// every registered and installed DNA — so it also resolves DNAs whose
+        /// ribosomes are not currently loaded (for example, disabled or
+        /// awaiting-memproof apps). This keeps `GetDnaDefinition` consistent with
+        /// `ListDnas`.
+        pub async fn get_dna_definition(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorResult<Option<DnaDefHashed>> {
+            Ok(self.spaces.dna_def_store.as_read().get(cell_id).await?)
+        }
+
         /// Get an [`EntryDef`] from the [`EntryDefBufferKey`]
         pub fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
             self.ribosome_store().share_ref(|ds| ds.get_entry_def(key))
