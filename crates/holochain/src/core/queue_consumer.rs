@@ -714,6 +714,10 @@ pub(super) fn trigger_stream(rx: TriggerReceiver, stop: StopReceiver) -> impl St
     })))
 }
 
+/// How long to wait before re-running a workflow that failed with a non-fatal
+/// error.
+const WORKFLOW_ERROR_RETRY_DELAY: Duration = Duration::from_secs(1);
+
 async fn queue_consumer_main_task_impl<
     Fut: 'static + Send + Future<Output = WorkflowResult<WorkComplete>>,
 >(
@@ -742,7 +746,16 @@ async fn queue_consumer_main_task_impl<
                     }
                     tx.trigger(&"retrigger")
                 }
-                Err(err) => handle_workflow_error(&name, err)?,
+                Err(err) if err.workflow_should_bail() => handle_workflow_error(&name, err)?,
+                Err(err) => {
+                    // A non-fatal error like a database write error due to
+                    // multiple threads trying to write means this run consumed
+                    // its trigger but did no useful work.
+                    // Retrigger the workflow after a delay.
+                    handle_workflow_error(&name, err)?;
+                    tokio::time::sleep(WORKFLOW_ERROR_RETRY_DELAY).await;
+                    tx.trigger(&"retry after error");
+                }
                 _ => (),
             }
 
