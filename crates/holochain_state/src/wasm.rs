@@ -72,6 +72,7 @@ impl WasmStore<holochain_data::DbWrite<holochain_data::kind::Wasm>> {
             .map_err(StateMutationError::from)
     }
 
+    /// Store a compiled, serialized WASM module under its original WASM hash.
     pub async fn put_compiled(
         &self,
         wasm_hash: WasmHash,

@@ -133,10 +133,12 @@ impl ModuleCache {
             .as_read()
             .get(wasm_hash)
             .await
-            .unwrap_or_else(|err| {
+            .map_err(|err| {
                 tracing::error!(?err, "Failed to read WASM source code from the database");
-                None
-            });
+                wasmer::RuntimeError::new(format!(
+                    "Failed to read WASM source code from the database: {err}"
+                ))
+            })?;
 
         let Some(source) = maybe_code else {
             tracing::warn!(
@@ -184,10 +186,12 @@ impl ModuleCache {
             .as_read()
             .get(wasm_hash)
             .await
-            .unwrap_or_else(|err| {
+            .map_err(|err| {
                 tracing::error!(?err, "Failed to read WASM source code from the database");
-                None
-            });
+                wasmer::RuntimeError::new(format!(
+                    "Failed to read WASM source code from the database: {err}"
+                ))
+            })?;
 
         let Some(source) = maybe_code else {
             tracing::warn!(

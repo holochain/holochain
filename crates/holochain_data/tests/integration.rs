@@ -262,7 +262,7 @@ async fn migrations_applied() {
     );
     assert!(
         table_names.contains(&"CompiledWasm".to_string()),
-        "Wasm table missing"
+        "CompiledWasm table missing"
     );
     assert!(
         table_names.contains(&"DnaDef".to_string()),
