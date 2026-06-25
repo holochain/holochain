@@ -1,4 +1,4 @@
-use crate::chain_lock::{get_chain_lock, ChainLock};
+use crate::chain_lock::ChainLock;
 // #5370: import kept (function still used by callers) pending DbKindDht retirement.
 #[allow(unused_imports)]
 use crate::integrate::authored_ops_to_dht_db;
@@ -67,12 +67,10 @@ pub type SourceChainRead = SourceChain<DbRead<DbKindAuthored>, DbRead<DbKindDht>
 impl SourceChain {
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn unlock_chain(&self) -> SourceChainResult<()> {
-        self.vault
-            .write_async({
-                let author = self.author.clone();
-
-                move |txn| unlock_chain(txn, &author)
-            })
+        // #5370: the chain lock now lives in the merged store, not the legacy
+        // authored DB.
+        self.dht_store
+            .release_chain_lock(self.author.as_ref())
             .await?;
         Ok(())
     }
@@ -93,31 +91,51 @@ impl SourceChain {
             preflight_request.signing_agents[agent_index as usize].0
         );
 
-        let countersigning_agent_state = self
-            .vault
-            .write_async(move |txn| {
-                // Check for a chain lock.
-                // Note that the lock may not be valid anymore, but we must respect it here anyway.
-                let chain_lock = get_chain_lock(txn, author.as_ref())?;
-                if chain_lock.is_some() {
-                    return Err(SourceChainError::ChainLocked);
-                }
-                let HeadInfo {
-                    action: persisted_head,
-                    seq: persisted_seq,
-                    ..
-                } = chain_head_db_nonempty(txn)?;
-                let countersigning_agent_state =
-                    CounterSigningAgentState::new(agent_index, persisted_head, persisted_seq);
-                lock_chain(
-                    txn,
-                    author.as_ref(),
-                    &hashed_preflight_request,
-                    preflight_request.session_times.end(),
-                )?;
-                SourceChainResult::Ok(countersigning_agent_state)
-            })
+        // Check for a chain lock.
+        // Note that the lock may not be valid anymore, but we must respect it here anyway.
+        // `get_chain_lock` returns any lock row, including an expired one, so an
+        // expired lock still rejects acceptance exactly as the legacy authored-DB
+        // path did.
+        if self
+            .dht_store
+            .as_read()
+            .get_chain_lock(author.as_ref().clone())
+            .await?
+            .is_some()
+        {
+            return Err(SourceChainError::ChainLocked);
+        }
+
+        let HeadInfo {
+            action: persisted_head,
+            seq: persisted_seq,
+            ..
+        } = self
+            .dht_store
+            .as_read()
+            .chain_head_for_author(author.as_ref())
+            .await?
+            .ok_or(SourceChainError::ChainEmpty)?;
+        let countersigning_agent_state =
+            CounterSigningAgentState::new(agent_index, persisted_head, persisted_seq);
+
+        // Take out the lock. We verified above that no lock exists, so this must
+        // succeed; the bool guards against a concurrent writer slipping a lock in
+        // between the check and here, in which case we reject as `ChainLocked`
+        // rather than extending or stealing the lock.
+        let acquired = self
+            .dht_store
+            .acquire_chain_lock(
+                author.as_ref(),
+                &hashed_preflight_request,
+                *preflight_request.session_times.end(),
+                Timestamp::now(),
+            )
             .await?;
+        if !acquired {
+            return Err(SourceChainError::ChainLocked);
+        }
+
         Ok(countersigning_agent_state)
     }
 
@@ -331,42 +349,38 @@ impl SourceChain {
         // before starting any database read/write operations.
         let write_permit = self.vault.acquire_write_permit().await?;
 
-        // If there are records to write, then we need to respect the chain lock
+        // If there are records to write, then we need to respect the chain lock.
+        // #5370: the lock now lives in the merged store. Reading it here (outside
+        // the authored write txn) opens a tiny TOCTOU window, but this is a coarse
+        // countersigning-session guard and the window is acceptable.
         if !records.is_empty() {
-            self.vault
-                .read_async({
-                    let author = author.clone();
-                    move |txn| {
-                        let chain_lock = get_chain_lock(txn, author.as_ref())?;
-                        match chain_lock {
-                            Some(chain_lock) => {
-                                // If the chain is locked, the lock must be for this entry.
-                                if chain_lock.subject() != lock_subject {
-                                    return Err(SourceChainError::ChainLocked);
-                                }
-                                // If the lock is expired then we can't write this countersigning session.
-                                else if chain_lock.is_expired_at(now) {
-                                    return Err(SourceChainError::LockExpired);
-                                }
-
-                                // Otherwise, the lock matches this entry and has not expired. We can proceed!
-                            }
-                            None => {
-                                // If this is a countersigning entry but there is no chain lock then maybe
-                                // the session expired before the entry could be written or maybe the app
-                                // has just made a mistake. Either way, it's not valid to write this entry!
-                                if is_countersigning_session {
-                                    return Err(
-                                        SourceChainError::CountersigningWriteWithoutSession,
-                                    );
-                                }
-                            }
-                        }
-
-                        Ok(())
-                    }
-                })
+            let chain_lock = self
+                .dht_store
+                .as_read()
+                .get_chain_lock(author.as_ref().clone())
                 .await?;
+            match chain_lock {
+                Some(chain_lock) => {
+                    // If the chain is locked, the lock must be for this entry.
+                    if chain_lock.subject() != lock_subject {
+                        return Err(SourceChainError::ChainLocked);
+                    }
+                    // If the lock is expired then we can't write this countersigning session.
+                    else if chain_lock.is_expired_at(now) {
+                        return Err(SourceChainError::LockExpired);
+                    }
+
+                    // Otherwise, the lock matches this entry and has not expired. We can proceed!
+                }
+                None => {
+                    // If this is a countersigning entry but there is no chain lock then maybe
+                    // the session expired before the entry could be written or maybe the app
+                    // has just made a mistake. Either way, it's not valid to write this entry!
+                    if is_countersigning_session {
+                        return Err(SourceChainError::CountersigningWriteWithoutSession);
+                    }
+                }
+            }
         }
 
         let chain_flush_result = self
@@ -1227,10 +1241,11 @@ where
     }
 
     pub async fn get_chain_lock(&self) -> SourceChainResult<Option<ChainLock>> {
-        let author = self.author.clone();
+        // #5370: the chain lock now lives in the merged store.
         Ok(self
-            .vault
-            .read_async(move |txn| get_chain_lock(txn, author.as_ref()))
+            .dht_store
+            .as_read()
+            .get_chain_lock(self.author.as_ref().clone())
             .await?)
     }
 

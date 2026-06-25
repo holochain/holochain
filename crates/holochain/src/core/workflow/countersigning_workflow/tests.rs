@@ -23,14 +23,11 @@ use holo_hash::ActionHash;
 use holo_hash::{AgentPubKey, DnaHash, EntryHash};
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::{HolochainP2pError, MockHolochainP2pDnaT};
-use holochain_state::chain_lock::get_chain_lock;
 use holochain_state::prelude::{
     chain_head_db, current_countersigning_session, insert_op_authored,
     remove_countersigning_session, set_withhold_publish, AppEntryBytesFixturator, HeadInfo,
 };
-use holochain_state::prelude::{
-    insert_action, insert_entry, unlock_chain, CounterSigningSessionData,
-};
+use holochain_state::prelude::{insert_action, insert_entry, CounterSigningSessionData};
 use holochain_state::prelude::{StateMutationError, StateMutationResult};
 use holochain_state::query::from_blob;
 use holochain_state::source_chain;
@@ -1894,16 +1891,11 @@ impl TestHarness {
     }
 
     async fn unlock_chain(&self) {
-        let authored = self
-            .test_space
+        // #5370: the chain lock lives in the merged store.
+        self.test_space
             .space
-            .get_or_create_authored_db(self.author.clone())
-            .unwrap();
-        authored
-            .write_async({
-                let author = self.author.clone();
-                move |txn| unlock_chain(txn, &author)
-            })
+            .dht_store
+            .release_chain_lock(&self.author)
             .await
             .unwrap();
     }
@@ -2097,16 +2089,13 @@ impl TestHarness {
     }
 
     async fn expect_chain_locked(&self) {
-        let authored = self
+        // #5370: the chain lock lives in the merged store.
+        let lock = self
             .test_space
             .space
-            .get_or_create_authored_db(self.author.clone())
-            .unwrap();
-        let lock = authored
-            .read_async({
-                let author = self.author.clone();
-                move |txn| get_chain_lock(txn, &author)
-            })
+            .dht_store
+            .as_read()
+            .get_chain_lock(self.author.clone())
             .await
             .unwrap();
 
@@ -2114,16 +2103,13 @@ impl TestHarness {
     }
 
     pub async fn expect_chain_unlocked(&self) {
-        let authored = self
+        // #5370: the chain lock lives in the merged store.
+        let lock = self
             .test_space
             .space
-            .get_or_create_authored_db(self.author.clone())
-            .unwrap();
-        let lock = authored
-            .read_async({
-                let author = self.author.clone();
-                move |txn| get_chain_lock(txn, &author)
-            })
+            .dht_store
+            .as_read()
+            .get_chain_lock(self.author.clone())
             .await
             .unwrap();
 

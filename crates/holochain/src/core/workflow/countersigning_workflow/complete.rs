@@ -8,7 +8,6 @@ use holochain_p2p::DynHolochainP2pDna;
 use holochain_sqlite::db::ReadAccess;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_state::integrate::authored_ops_to_dht_db_without_check;
-use holochain_state::mutations;
 use holochain_state::prelude::*;
 use holochain_timestamp::Timestamp;
 use holochain_types::dht_op::ChainOp;
@@ -39,20 +38,25 @@ pub(crate) async fn inner_countersigning_session_complete(
         None => return Ok(None),
     };
 
+    // Read the chain lock from the merged store (#5370). It isn't necessarily for
+    // the current session; we can't check that until we have the session data.
+    let chain_lock = space
+        .dht_store
+        .as_read()
+        .get_chain_lock(author.clone())
+        .await?;
+
     // Do a quick check to see if this entry hash matches the current locked session, so we don't
     // check signatures unless there is an active session.
     let reader_closure = {
         let entry_hash = entry_hash.clone();
-        let author = author.clone();
         move |txn: &Txn<DbKindAuthored>| {
-            // This chain lock isn't necessarily for the current session, we can't check that until later.
             if let Some((session_record, cs_entry_hash, session_data)) =
                 current_countersigning_session(txn)?
             {
                 let lock_subject = session_data.preflight_request.fingerprint()?;
 
-                let chain_lock = holochain_state::chain_lock::get_chain_lock(txn, &author)?;
-                if let Some(chain_lock) = chain_lock {
+                if let Some(chain_lock) = &chain_lock {
                     // This is the case where we have already locked the chain for another session and are
                     // receiving another signature bundle from a different session. We don't need this, so
                     // it's safe to short circuit.
@@ -207,27 +211,24 @@ async fn apply_success_state_changes(
     let authored_db = space.get_or_create_authored_db(author.clone())?;
     let dht_db = space.dht_db.clone();
 
-    // Unlock the chain and remove the withhold publish flag from all ops in this session.
+    // Load the op hashes for this session so that we can publish them.
     let this_cell_actions_op_basis_hashes = authored_db
-        .write_async({
-            let author = author.clone();
+        .read_async({
+            let this_cells_action_hash = this_cells_action_hash.clone();
             move |txn| -> SourceChainResult<Vec<DhtOpHash>> {
-                // All checks have passed so unlock the chain.
-                mutations::unlock_chain(txn, &author)?;
-                // Update ops to publish.
-                txn.execute(
-                    "UPDATE DhtOp SET withhold_publish = NULL WHERE action_hash = :action_hash",
-                    named_params! {
-                        ":action_hash": this_cells_action_hash,
-                    },
-                )
-                .map_err(holochain_state::prelude::StateMutationError::from)?;
-
-                // Load the op hashes for this session so that we can publish them.
                 Ok(get_countersigning_op_hashes(txn, this_cells_action_hash)?)
             }
         })
         .await?;
+
+    // All checks have passed so unlock the chain. #5370: the lock lives in the
+    // merged store. The withhold-publish flag is cleared on the merged store
+    // below via `clear_op_withhold_publishes`.
+    space
+        .dht_store
+        .release_chain_lock(author)
+        .await
+        .map_err(WorkflowError::from)?;
 
     // If all signatures are valid (above) and i signed then i must have
     // validated it previously so i now agree that i authored it.
@@ -253,7 +254,7 @@ async fn apply_success_state_changes(
 }
 
 fn get_countersigning_op_hashes(
-    txn: &mut Transaction,
+    txn: &Transaction,
     this_cells_action_hash: ActionHash,
 ) -> DatabaseResult<Vec<DhtOpHash>> {
     Ok(txn
@@ -281,20 +282,25 @@ pub(super) async fn force_publish_countersigning_session(
     cell_id: CellId,
     preflight_request: PreflightRequest,
 ) -> WorkflowResult<bool> {
+    // Read the chain lock from the merged store (#5370). It isn't necessarily for
+    // the current session; we can't check that until we have the session data.
+    let chain_lock = space
+        .dht_store
+        .as_read()
+        .get_chain_lock(cell_id.agent_pubkey().clone())
+        .await?;
+
     // Query database for current countersigning session.
     let reader_closure = {
-        let author = cell_id.agent_pubkey().clone();
         let preflight_request = preflight_request.clone();
         move |txn: &Txn<DbKindAuthored>| {
-            // This chain lock isn't necessarily for the current session, we can't check that until later.
             if let Some((session_record, _, session_data)) = current_countersigning_session(txn)? {
                 let lock_subject = session_data.preflight_request.fingerprint()?;
                 if lock_subject != preflight_request.fingerprint()? {
                     return SourceChainResult::Ok(None);
                 }
 
-                let chain_lock = holochain_state::chain_lock::get_chain_lock(txn, &author)?;
-                if let Some(chain_lock) = chain_lock {
+                if let Some(chain_lock) = &chain_lock {
                     // This is the case where we have already locked the chain for another session and are
                     // receiving another signature bundle from a different session. We don't need this, so
                     // it's safe to short circuit.
