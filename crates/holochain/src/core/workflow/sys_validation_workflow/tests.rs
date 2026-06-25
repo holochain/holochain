@@ -2,7 +2,7 @@ use super::*;
 use crate::retry_until_timeout;
 use crate::sweettest::*;
 use crate::test_utils::host_fn_caller::*;
-use crate::test_utils::{assert_new_store_limbo_empty, wait_for_new_store_integration};
+use crate::test_utils::{assert_limbo_empty, wait_for_integration};
 use crate::{conductor::ConductorHandle, core::MAX_TAG_SIZE};
 use holo_hash::fixt::{AgentPubKeyFixturator, EntryHashFixturator};
 use holochain_types::test_utils::ActionRefMut;
@@ -474,9 +474,8 @@ async fn run_test(
     // Init is not run because we aren't calling the zome.
     let expected_count: i64 = 9 + 14;
 
-    wait_for_new_store_integration(&dht_store, expected_count, num_attempts, delay_per_attempt)
-        .await;
-    assert_new_store_limbo_empty(&dht_store).await;
+    wait_for_integration(&dht_store, expected_count, num_attempts, delay_per_attempt).await;
+    assert_limbo_empty(&dht_store).await;
 
     // Authors an op with an oversized link tag, which is rejected and produces
     // an InvalidChainOp warrant.
@@ -486,9 +485,8 @@ async fn run_test(
     // are still integrated (with a rejected status), so they count here too.
     let expected_count = 14 + 1 + expected_count;
 
-    wait_for_new_store_integration(&dht_store, expected_count, num_attempts, delay_per_attempt)
-        .await;
-    assert_new_store_limbo_empty(&dht_store).await;
+    wait_for_integration(&dht_store, expected_count, num_attempts, delay_per_attempt).await;
+    assert_limbo_empty(&dht_store).await;
 }
 
 async fn bob_links_in_a_legit_way(

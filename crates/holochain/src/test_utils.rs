@@ -248,10 +248,10 @@ pub async fn setup_app_inner(
     (AppInterfaceApi::new(conductor_handle), handle)
 }
 
-/// Poll the new DHT store until at least `expected` ops are integrated, or
+/// Poll the DHT store until at least `expected` ops are integrated, or
 /// panic after `num_attempts`. On failure the ops still awaiting validation are
 /// listed so a failing test shows what did not progress.
-pub async fn wait_for_new_store_integration(
+pub async fn wait_for_integration(
     dht_store: &holochain_state::dht_store::DhtStore,
     expected: i64,
     num_attempts: usize,
@@ -266,14 +266,14 @@ pub async fn wait_for_new_store_integration(
     }
     let integrated = dht_store.as_read().count_integrated_ops().await.unwrap();
     panic!(
-        "new-store integration not reached: expected {expected}, integrated {integrated}\n{}",
-        new_store_pending_summary(dht_store).await
+        "integration not reached: expected {expected}, integrated {integrated}\n{}",
+        pending_summary(dht_store).await
     );
 }
 
-/// Assert that nothing is awaiting validation in the new DHT store. On failure
+/// Assert that nothing is awaiting validation in the DHT store. On failure
 /// the still-pending ops are listed so the cause is visible.
-pub async fn assert_new_store_limbo_empty(dht_store: &holochain_state::dht_store::DhtStore) {
+pub async fn assert_limbo_empty(dht_store: &holochain_state::dht_store::DhtStore) {
     let pending_sys = dht_store
         .as_read()
         .ops_pending_sys_validation(10_000)
@@ -286,7 +286,7 @@ pub async fn assert_new_store_limbo_empty(dht_store: &holochain_state::dht_store
         .unwrap();
     assert!(
         pending_sys.is_empty() && pending_app.is_empty(),
-        "new-store limbo not empty: {} pending sys validation, {} pending app validation\n{}{}",
+        "limbo not empty: {} pending sys validation, {} pending app validation\n{}{}",
         pending_sys.len(),
         pending_app.len(),
         format_pending_ops("sys", &pending_sys),
@@ -294,8 +294,8 @@ pub async fn assert_new_store_limbo_empty(dht_store: &holochain_state::dht_store
     );
 }
 
-/// Summarise the ops still awaiting validation in the new DHT store.
-async fn new_store_pending_summary(dht_store: &holochain_state::dht_store::DhtStore) -> String {
+/// Summarise the ops still awaiting validation in the DHT store.
+async fn pending_summary(dht_store: &holochain_state::dht_store::DhtStore) -> String {
     let pending_sys = dht_store
         .as_read()
         .ops_pending_sys_validation(10_000)
@@ -351,7 +351,7 @@ pub async fn show_authored<Db: ReadAccess<DbKindAuthored>>(envs: &[&Db]) {
 }
 
 /// Count ops that passed validation but are not yet integrated, read from the
-/// new DHT store.
+/// DHT store.
 pub async fn get_valid_and_not_integrated_count(
     dht_store: &holochain_state::dht_store::DhtStore,
 ) -> usize {
@@ -359,12 +359,11 @@ pub async fn get_valid_and_not_integrated_count(
         .as_read()
         .count_valid_not_integrated_ops()
         .await
-        .unwrap()
-        .max(0) as usize
+        .unwrap() as usize
 }
 
 /// Count ops that passed validation and have been integrated, read from the
-/// new DHT store.
+/// DHT store.
 pub async fn get_valid_and_integrated_count(
     dht_store: &holochain_state::dht_store::DhtStore,
 ) -> usize {
@@ -372,8 +371,7 @@ pub async fn get_valid_and_integrated_count(
         .as_read()
         .count_valid_integrated_ops()
         .await
-        .unwrap()
-        .max(0) as usize
+        .unwrap() as usize
 }
 
 /// Helper for displaying agent infos stored on a conductor

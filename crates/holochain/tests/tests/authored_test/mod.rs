@@ -1,6 +1,6 @@
 use holo_hash::AnyDhtHash;
 use holochain::sweettest::*;
-use holochain::test_utils::wait_for_new_store_integration;
+use holochain::test_utils::wait_for_integration;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::prelude::*;
@@ -76,7 +76,7 @@ async fn authored_test() {
     // Init is not run because we aren't calling the zome.
     let expected_count = 3 + 14;
 
-    wait_for_new_store_integration(
+    wait_for_integration(
         bob.dht_store(),
         expected_count as i64,
         num_attempts,
@@ -110,12 +110,14 @@ async fn authored_test() {
         .unwrap();
 
     let basis: AnyLinkableHash = entry_hash.clone().into();
+    let ops_at_basis = bob
+        .dht_store()
+        .as_read()
+        .get_ops_at_basis(&basis)
+        .await
+        .unwrap();
     assert!(
-        bob.dht_store()
-            .as_read()
-            .chain_op_exists_at_basis(&basis)
-            .await
-            .unwrap(),
+        !ops_at_basis.is_empty(),
         "bob should have an integrated op at the entry basis"
     );
 

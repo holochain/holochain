@@ -9,7 +9,7 @@ use crate::core::{SysValidationError, ValidationOutcome};
 use crate::sweettest::*;
 use crate::test_utils::{
     get_valid_and_integrated_count, get_valid_and_not_integrated_count, host_fn_caller::*,
-    new_invocation, new_zome_call_params, wait_for_new_store_integration,
+    new_invocation, new_zome_call_params, wait_for_integration,
 };
 use ::fixt::fixt;
 use hdk::hdi::test_utils::set_zome_types;
@@ -1505,10 +1505,11 @@ async fn skip_issuing_warrant_if_one_found() {
     );
 }
 
-// The expected invalid ops, read from the new DHT store. A rejected op is one
-// whose terminal validation outcome is `Rejected`, keyed by the action hash and
-// the chain-op type.
-async fn expected_invalid_entry(dht_store: &DhtStore, invalid_action_hash: &ActionHash) -> bool {
+// The expected invalid ops, from the DHT store.
+async fn expected_invalid_store_entry_op(
+    dht_store: &DhtStore,
+    invalid_action_hash: &ActionHash,
+) -> bool {
     matches!(
         dht_store
             .as_read()
@@ -1520,7 +1521,10 @@ async fn expected_invalid_entry(dht_store: &DhtStore, invalid_action_hash: &Acti
 }
 
 // Now we expect an invalid link
-async fn expected_invalid_link(dht_store: &DhtStore, invalid_link_hash: &ActionHash) -> bool {
+async fn expected_invalid_register_add_link_op(
+    dht_store: &DhtStore,
+    invalid_link_hash: &ActionHash,
+) -> bool {
     matches!(
         dht_store
             .as_read()
@@ -1532,7 +1536,7 @@ async fn expected_invalid_link(dht_store: &DhtStore, invalid_link_hash: &ActionH
 }
 
 // Now we're trying to remove an invalid link
-async fn expected_invalid_remove_link(
+async fn expected_invalid_remove_link_op(
     dht_store: &DhtStore,
     invalid_remove_hash: &ActionHash,
 ) -> bool {
@@ -1587,7 +1591,7 @@ async fn run_test(
     let alice_store = conductors[0]
         .get_dht_store(alice_cell_id.dna_hash())
         .unwrap();
-    wait_for_new_store_integration(
+    wait_for_integration(
         &alice_store,
         expected_count as i64,
         num_attempts,
@@ -1611,7 +1615,7 @@ async fn run_test(
     let alice_store = conductors[0]
         .get_dht_store(alice_cell_id.dna_hash())
         .unwrap();
-    wait_for_new_store_integration(
+    wait_for_integration(
         &alice_store,
         expected_count as i64,
         num_attempts,
@@ -1620,7 +1624,7 @@ async fn run_test(
     .await;
 
     assert_limbo_is_empty(&alice_store).await;
-    assert!(expected_invalid_entry(&alice_store, &invalid_action_hash).await);
+    assert!(expected_invalid_store_entry_op(&alice_store, &invalid_action_hash).await);
     // Expect having one invalid op for the store entry.
     assert_eq!(
         get_valid_and_integrated_count(&alice_store).await,
@@ -1640,7 +1644,7 @@ async fn run_test(
     let alice_store = conductors[0]
         .get_dht_store(alice_cell_id.dna_hash())
         .unwrap();
-    wait_for_new_store_integration(
+    wait_for_integration(
         &alice_store,
         expected_count as i64,
         num_attempts,
@@ -1649,7 +1653,7 @@ async fn run_test(
     .await;
 
     assert_limbo_is_empty(&alice_store).await;
-    assert!(expected_invalid_entry(&alice_store, &invalid_action_hash).await);
+    assert!(expected_invalid_store_entry_op(&alice_store, &invalid_action_hash).await);
     // Expect having one invalid op for the store entry.
     assert_eq!(
         get_valid_and_integrated_count(&alice_store).await,
@@ -1679,7 +1683,7 @@ async fn run_test(
     let alice_store = conductors[0]
         .get_dht_store(alice_cell_id.dna_hash())
         .unwrap();
-    wait_for_new_store_integration(
+    wait_for_integration(
         &alice_store,
         expected_count as i64,
         num_attempts,
@@ -1688,8 +1692,8 @@ async fn run_test(
     .await;
 
     assert_limbo_is_empty(&alice_store).await;
-    assert!(expected_invalid_entry(&alice_store, &invalid_action_hash).await);
-    assert!(expected_invalid_link(&alice_store, &invalid_link_hash).await);
+    assert!(expected_invalid_store_entry_op(&alice_store, &invalid_action_hash).await);
+    assert!(expected_invalid_register_add_link_op(&alice_store, &invalid_link_hash).await);
     // Expect having two invalid ops for the two store entries.
     assert_eq!(
         get_valid_and_integrated_count(&alice_store).await,
@@ -1717,7 +1721,7 @@ async fn run_test(
     let alice_store = conductors[0]
         .get_dht_store(alice_cell_id.dna_hash())
         .unwrap();
-    wait_for_new_store_integration(
+    wait_for_integration(
         &alice_store,
         expected_count as i64,
         num_attempts,
@@ -1726,8 +1730,8 @@ async fn run_test(
     .await;
 
     assert_limbo_is_empty(&alice_store).await;
-    assert!(expected_invalid_entry(&alice_store, &invalid_action_hash).await);
-    assert!(expected_invalid_link(&alice_store, &invalid_link_hash).await);
+    assert!(expected_invalid_store_entry_op(&alice_store, &invalid_action_hash).await);
+    assert!(expected_invalid_register_add_link_op(&alice_store, &invalid_link_hash).await);
     // Expect having two invalid ops for the two store entries.
     assert_eq!(
         get_valid_and_integrated_count(&alice_store).await,
@@ -1757,7 +1761,7 @@ async fn run_test(
     let alice_store = conductors[0]
         .get_dht_store(alice_cell_id.dna_hash())
         .unwrap();
-    wait_for_new_store_integration(
+    wait_for_integration(
         &alice_store,
         expected_count as i64,
         num_attempts,
@@ -1766,9 +1770,9 @@ async fn run_test(
     .await;
 
     assert_limbo_is_empty(&alice_store).await;
-    assert!(expected_invalid_entry(&alice_store, &invalid_action_hash).await);
-    assert!(expected_invalid_link(&alice_store, &invalid_link_hash).await);
-    assert!(expected_invalid_remove_link(&alice_store, &invalid_remove_hash).await);
+    assert!(expected_invalid_store_entry_op(&alice_store, &invalid_action_hash).await);
+    assert!(expected_invalid_register_add_link_op(&alice_store, &invalid_link_hash).await);
+    assert!(expected_invalid_remove_link_op(&alice_store, &invalid_remove_hash).await);
     // 3 invalid ops above plus 1 extra invalid ops that `remove_invalid_link` commits.
     assert_eq!(
         get_valid_and_integrated_count(&alice_store).await,
@@ -1803,7 +1807,7 @@ async fn run_test_entry_def_id(
     let alice_store = conductors[0]
         .get_dht_store(alice_cell_id.dna_hash())
         .unwrap();
-    wait_for_new_store_integration(
+    wait_for_integration(
         &alice_store,
         expected_count as i64,
         num_attempts,
@@ -1812,7 +1816,7 @@ async fn run_test_entry_def_id(
     .await;
 
     assert_limbo_is_empty(&alice_store).await;
-    assert!(expected_invalid_entry(&alice_store, &invalid_action_hash).await);
+    assert!(expected_invalid_store_entry_op(&alice_store, &invalid_action_hash).await);
     // Expect having two invalid ops for the two store entries plus the 3 from the previous test.
     assert_eq!(
         get_valid_and_integrated_count(&alice_store).await,

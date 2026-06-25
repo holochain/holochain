@@ -97,8 +97,16 @@ async fn do_not_block_or_send_to_self() {
 
     assert_eq!(WorkComplete::Complete, work_complete);
 
-    assert!(!get_requires_receipt(&dht_store, valid_op_hash).await);
-    assert!(!get_requires_receipt(&dht_store, rejected_op_hash).await);
+    assert!(!dht_store
+        .as_read()
+        .op_requires_receipt(&valid_op_hash)
+        .await
+        .unwrap());
+    assert!(!dht_store
+        .as_read()
+        .op_requires_receipt(&rejected_op_hash)
+        .await
+        .unwrap());
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -146,7 +154,11 @@ async fn block_invalid_op_author() {
 
     // The op was rejected, but the `require_receipt` flag should still be cleared
     // so we don't reprocess the op.
-    assert!(!get_requires_receipt(&dht_store, op_hash).await);
+    assert!(!dht_store
+        .as_read()
+        .op_requires_receipt(&op_hash)
+        .await
+        .unwrap());
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -189,7 +201,11 @@ async fn continues_if_receipt_cannot_be_signed() {
     .unwrap();
 
     assert_eq!(WorkComplete::Complete, work_complete);
-    assert!(!get_requires_receipt(&dht_store, op_hash).await);
+    assert!(!dht_store
+        .as_read()
+        .op_requires_receipt(&op_hash)
+        .await
+        .unwrap());
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -235,7 +251,11 @@ async fn send_validation_receipt() {
     assert_eq!(WorkComplete::Complete, work_complete);
 
     // Should no longer require a receipt
-    assert!(!get_requires_receipt(&dht_store, op_hash).await);
+    assert!(!dht_store
+        .as_read()
+        .op_requires_receipt(&op_hash)
+        .await
+        .unwrap());
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -295,12 +315,20 @@ async fn errors_for_some_ops_does_not_prevent_the_workflow_proceeding() {
 
     // Sending the receipt to this author returned an error,
     // so we did NOT clear the wants receipt flag.
-    assert!(get_requires_receipt(&dht_store, op_hash1).await);
+    assert!(dht_store
+        .as_read()
+        .op_requires_receipt(&op_hash1)
+        .await
+        .unwrap());
 
     // But even after we got the above error, we proceeded to
     // send the receipt for the second author which DID work,
     // so its flag is cleared.
-    assert!(!get_requires_receipt(&dht_store, op_hash2).await);
+    assert!(!dht_store
+        .as_read()
+        .op_requires_receipt(&op_hash2)
+        .await
+        .unwrap());
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -367,10 +395,18 @@ async fn skips_authors_not_recently_online_and_clears_require_receipt() {
 
     // Author1 was not recently online, so require_receipt should be cleared
     // without attempting to send. A new publish will re-set it.
-    assert!(!get_requires_receipt(&dht_store, op_hash1).await);
+    assert!(!dht_store
+        .as_read()
+        .op_requires_receipt(&op_hash1)
+        .await
+        .unwrap());
 
     // Author2 was online and sending succeeded, so require_receipt is also cleared.
-    assert!(!get_requires_receipt(&dht_store, op_hash2).await);
+    assert!(!dht_store
+        .as_read()
+        .op_requires_receipt(&op_hash2)
+        .await
+        .unwrap());
 }
 
 async fn create_op_with_status(
@@ -439,12 +475,4 @@ async fn create_op_with_status(
     // record_incoming_ops sets require_receipt = true, matching the legacy fixture.
 
     Ok((author, test_op_hash))
-}
-
-async fn get_requires_receipt(dht_store: &DhtStore, op_hash: DhtOpHash) -> bool {
-    dht_store
-        .as_read()
-        .op_requires_receipt(&op_hash)
-        .await
-        .unwrap()
 }

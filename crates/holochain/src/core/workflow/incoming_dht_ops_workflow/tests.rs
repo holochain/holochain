@@ -102,13 +102,8 @@ async fn can_retry_failed_op() {
 }
 
 async fn verify_is_pending_validation_receipt(dht_store: &DhtStore, hash: DhtOpHash) {
-    let pending_hashes = get_pending_op_hashes(dht_store).await;
-
-    tracing::info!("Found {} ops", pending_hashes.len());
-
-    assert!(pending_hashes
-        .into_iter()
-        .any(|pending_hash| pending_hash == hash));
+    let found = dht_store.as_read().limbo_op_exists(&hash).await.unwrap();
+    assert!(found, "op should be pending in limbo: {hash:?}");
 }
 
 async fn verify_ops_present(dht_store: &DhtStore, hash_list: Vec<DhtOpHash>, present: bool) {
@@ -116,12 +111,4 @@ async fn verify_ops_present(dht_store: &DhtStore, hash_list: Vec<DhtOpHash>, pre
         let found = dht_store.as_read().limbo_op_exists(&hash).await.unwrap();
         assert_eq!(present, found);
     }
-}
-
-async fn get_pending_op_hashes(dht_store: &DhtStore) -> Vec<DhtOpHash> {
-    dht_store
-        .as_read()
-        .limbo_op_hashes_requiring_receipt()
-        .await
-        .unwrap()
 }
