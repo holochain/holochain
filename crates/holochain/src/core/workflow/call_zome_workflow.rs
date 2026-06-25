@@ -107,8 +107,7 @@ pub async fn call_zome_workflow(
                             // Newly authored data is integrated directly at
                             // flush, so it is ready to publish immediately.
                             // Trigger integration (for any dependent ops) and
-                            // publish directly, rather than relying on
-                            // integration to trigger publish.
+                            // publish directly.
                             trigger_integrate_dht_ops.trigger(&"call_zome_workflow");
                             trigger_publish_dht_ops.trigger(&"call_zome_workflow");
                             // Authored ops integrate at flush, bypassing the
