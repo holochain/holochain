@@ -2201,6 +2201,60 @@ mod tests {
         assert_eq!(row.validation_status, i64::from(RecordValidity::Accepted));
     }
 
+    // Build a unique action hash from the author's first byte and the seq, so
+    // that two inserts for different (author, seq) pairs never collide on the
+    // primary key.
+    async fn insert_test_action(
+        db: &crate::handles::DbWrite<Dht>,
+        author: &AgentPubKey,
+        seq: u32,
+    ) -> (ActionHash, Timestamp) {
+        let mut hash_bytes = vec![0u8; 36];
+        hash_bytes[0] = author.get_raw_36()[0];
+        hash_bytes[1] = (seq & 0xff) as u8;
+        hash_bytes[2] = ((seq >> 8) & 0xff) as u8;
+        let hash = ActionHash::from_raw_36(hash_bytes);
+        let ts = Timestamp::from_micros(1_000_000 + seq as i64);
+        let action = Action {
+            header: ActionHeader {
+                author: author.clone(),
+                timestamp: ts,
+                action_seq: seq,
+                prev_action: None,
+            },
+            data: ActionData::InitZomesComplete(InitZomesCompleteData {}),
+        };
+        let hashed = HoloHashed::with_pre_hashed(action, hash.clone());
+        let signed = SignedHashed::with_presigned(hashed, Signature([0u8; 64]));
+        db.insert_action(&signed, None).await.unwrap();
+        (hash, ts)
+    }
+
+    #[tokio::test]
+    async fn chain_head_for_author_returns_max_seq() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let author = AgentPubKey::from_raw_36(vec![0x01; 36]);
+        let other = AgentPubKey::from_raw_36(vec![0x02; 36]);
+
+        insert_test_action(&db, &author, 0).await;
+        let head = insert_test_action(&db, &author, 1).await;
+        // Other author at a higher seq — must not affect `author`'s head.
+        insert_test_action(&db, &other, 5).await;
+
+        let got = db.as_ref().chain_head_for_author(&author).await.unwrap();
+        assert_eq!(got, Some((head.0, 1, head.1)));
+    }
+
+    #[tokio::test]
+    async fn chain_head_for_author_empty_chain_is_none() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let author = AgentPubKey::from_raw_36(vec![0x03; 36]);
+        assert_eq!(
+            db.as_ref().chain_head_for_author(&author).await.unwrap(),
+            None
+        );
+    }
+
     #[tokio::test]
     async fn set_chain_op_receipts_complete_round_trip() {
         let db = test_open_db(dht_db_id()).await.unwrap();
