@@ -7,7 +7,9 @@ use crate::models::dht::{
     DumpChainOpRow, K2ChainOpForWireRow, K2OpHashRow, K2OpIdSinceRow, K2OpPresentRow,
     K2WarrantForWireRow,
 };
-use holo_hash::{AgentPubKey, AnyLinkableHash, DhtOpHash};
+use holo_hash::AgentPubKey;
+#[cfg(any(test, feature = "inspection"))]
+use holo_hash::{AnyLinkableHash, DhtOpHash};
 
 impl DbRead<Dht> {
     /// `(hash, basis, size)` for every integrated, locally-validated op
@@ -110,22 +112,26 @@ impl DbRead<Dht> {
 
     /// Count of integrated, locally-validated `ChainOp` rows that passed
     /// validation (rejected and GET-cached ops excluded).
-    pub async fn count_valid_integrated_ops(&self) -> sqlx::Result<i64> {
-        sync_queries::count_valid_integrated_ops(self.pool()).await
+    #[cfg(any(test, feature = "inspection"))]
+    pub async fn count_valid_integrated_ops(&self) -> sqlx::Result<u64> {
+        Ok(sync_queries::count_valid_integrated_ops(self.pool()).await? as u64)
     }
 
     /// Count of `LimboChainOp` rows that passed both sys- and app-validation
     /// but are not yet integrated.
-    pub async fn count_valid_not_integrated_ops(&self) -> sqlx::Result<i64> {
-        sync_queries::count_valid_not_integrated_ops(self.pool()).await
+    #[cfg(any(test, feature = "inspection"))]
+    pub async fn count_valid_not_integrated_ops(&self) -> sqlx::Result<u64> {
+        Ok(sync_queries::count_valid_not_integrated_ops(self.pool()).await? as u64)
     }
 
     /// Count of not-yet-integrated chain ops authored by `author`.
+    #[cfg(any(test, feature = "inspection"))]
     pub async fn count_pending_ops_for_author(&self, author: &AgentPubKey) -> sqlx::Result<i64> {
         sync_queries::count_pending_ops_for_author(self.pool(), author).await
     }
 
     /// Hashes of integrated, rejected chain ops (GET-cached copies excluded).
+    #[cfg(any(test, feature = "inspection"))]
     pub async fn rejected_integrated_op_hashes(&self) -> sqlx::Result<Vec<DhtOpHash>> {
         Ok(sync_queries::rejected_integrated_op_hashes(self.pool())
             .await?
@@ -135,21 +141,25 @@ impl DbRead<Dht> {
     }
 
     /// Total count of every op (integrated and limbo) held in this DHT store.
+    #[cfg(any(test, feature = "inspection"))]
     pub async fn count_all_ops(&self) -> sqlx::Result<i64> {
         sync_queries::count_all_ops(self.pool()).await
     }
 
     /// Whether the integrated chain op `op_hash` requires a validation receipt.
+    #[cfg(any(test, feature = "inspection"))]
     pub async fn op_requires_receipt(&self, op_hash: &DhtOpHash) -> sqlx::Result<bool> {
         sync_queries::op_requires_receipt(self.pool(), op_hash).await
     }
 
     /// Whether `op_hash` is present in the limbo (not-yet-integrated) chain ops.
+    #[cfg(any(test, feature = "inspection"))]
     pub async fn limbo_op_exists(&self, op_hash: &DhtOpHash) -> sqlx::Result<bool> {
         sync_queries::limbo_op_exists(self.pool(), op_hash).await
     }
 
     /// Hashes of limbo chain ops flagged as requiring a validation receipt.
+    #[cfg(any(test, feature = "inspection"))]
     pub async fn limbo_op_hashes_requiring_receipt(&self) -> sqlx::Result<Vec<DhtOpHash>> {
         Ok(sync_queries::limbo_op_hashes_requiring_receipt(self.pool())
             .await?
@@ -158,12 +168,18 @@ impl DbRead<Dht> {
             .collect())
     }
 
-    /// Whether any integrated chain op exists with the given DHT `basis`.
-    pub async fn chain_op_exists_at_basis(&self, basis: &AnyLinkableHash) -> sqlx::Result<bool> {
-        sync_queries::chain_op_exists_at_basis(self.pool(), basis).await
+    /// Hashes of integrated chain ops with the given DHT `basis`.
+    #[cfg(any(test, feature = "inspection"))]
+    pub async fn get_ops_at_basis(&self, basis: &AnyLinkableHash) -> sqlx::Result<Vec<DhtOpHash>> {
+        Ok(sync_queries::get_ops_at_basis(self.pool(), basis)
+            .await?
+            .into_iter()
+            .map(DhtOpHash::from_raw_36)
+            .collect())
     }
 
     /// Count of rows in the public `Entry` table.
+    #[cfg(any(test, feature = "inspection"))]
     pub async fn count_entries(&self) -> sqlx::Result<i64> {
         sync_queries::count_entries(self.pool()).await
     }

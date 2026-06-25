@@ -1529,7 +1529,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn chain_op_exists_at_basis_matches_basis_hash() {
+    async fn get_ops_at_basis_matches_basis_hash() {
         let db = test_open_db(dht_db_id()).await.unwrap();
 
         let action = seed_action_for_op(&db, 1).await;
@@ -1549,16 +1549,18 @@ mod tests {
         .await
         .unwrap();
 
-        assert!(db
-            .as_ref()
-            .chain_op_exists_at_basis(&sample_basis(7))
-            .await
-            .unwrap());
         assert!(!db
             .as_ref()
-            .chain_op_exists_at_basis(&sample_basis(8))
+            .get_ops_at_basis(&sample_basis(7))
             .await
-            .unwrap());
+            .unwrap()
+            .is_empty());
+        assert!(db
+            .as_ref()
+            .get_ops_at_basis(&sample_basis(8))
+            .await
+            .unwrap()
+            .is_empty());
     }
 
     #[tokio::test]

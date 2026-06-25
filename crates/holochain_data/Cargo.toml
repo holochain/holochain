@@ -43,7 +43,11 @@ workspace = true
 
 [features]
 default = []
-test-utils = []
+# Exposes the read-only inspection queries (op counts, existence checks, etc.)
+# that are otherwise only compiled for this crate's own tests. Lets tooling read
+# the database directly; `test-utils` turns it on for test consumers.
+inspection = []
+test-utils = ["inspection"]
 unstable-migration = [
   "holochain_zome_types/unstable-migration",
   "holochain_types/unstable-migration",

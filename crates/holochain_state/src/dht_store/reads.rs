@@ -42,17 +42,20 @@ impl DhtStore<DbRead<Dht>> {
 
     /// Count integrated, locally-validated chain ops that passed validation
     /// (rejected and GET-cached ops excluded).
-    pub async fn count_valid_integrated_ops(&self) -> StateQueryResult<i64> {
+    #[cfg(any(test, feature = "inspection"))]
+    pub async fn count_valid_integrated_ops(&self) -> StateQueryResult<u64> {
         Ok(self.db().count_valid_integrated_ops().await?)
     }
 
     /// Count chain ops that passed both sys- and app-validation but are not yet
     /// integrated.
-    pub async fn count_valid_not_integrated_ops(&self) -> StateQueryResult<i64> {
+    #[cfg(any(test, feature = "inspection"))]
+    pub async fn count_valid_not_integrated_ops(&self) -> StateQueryResult<u64> {
         Ok(self.db().count_valid_not_integrated_ops().await?)
     }
 
     /// Count chain ops authored by `author` that are not yet integrated.
+    #[cfg(any(test, feature = "inspection"))]
     pub async fn count_pending_ops_for_author(
         &self,
         author: &AgentPubKey,
@@ -62,6 +65,7 @@ impl DhtStore<DbRead<Dht>> {
 
     /// Hashes of integrated chain ops that were rejected (GET-cached copies
     /// excluded).
+    #[cfg(any(test, feature = "inspection"))]
     pub async fn rejected_integrated_op_hashes(&self) -> StateQueryResult<Vec<DhtOpHash>> {
         Ok(self.db().rejected_integrated_op_hashes().await?)
     }
@@ -88,34 +92,40 @@ impl DhtStore<DbRead<Dht>> {
     }
 
     /// Total count of every op (integrated and limbo) held in the DHT store.
+    #[cfg(any(test, feature = "inspection"))]
     pub async fn count_all_ops(&self) -> StateQueryResult<i64> {
         Ok(self.db().count_all_ops().await?)
     }
 
     /// Whether the integrated chain op `op_hash` requires a validation receipt.
+    #[cfg(any(test, feature = "inspection"))]
     pub async fn op_requires_receipt(&self, op_hash: &DhtOpHash) -> StateQueryResult<bool> {
         Ok(self.db().op_requires_receipt(op_hash).await?)
     }
 
     /// Whether `op_hash` is present in the limbo (not-yet-integrated) chain ops.
+    #[cfg(any(test, feature = "inspection"))]
     pub async fn limbo_op_exists(&self, op_hash: &DhtOpHash) -> StateQueryResult<bool> {
         Ok(self.db().limbo_op_exists(op_hash).await?)
     }
 
     /// Hashes of limbo chain ops flagged as requiring a validation receipt.
+    #[cfg(any(test, feature = "inspection"))]
     pub async fn limbo_op_hashes_requiring_receipt(&self) -> StateQueryResult<Vec<DhtOpHash>> {
         Ok(self.db().limbo_op_hashes_requiring_receipt().await?)
     }
 
-    /// Whether any integrated chain op exists with the given DHT `basis`.
-    pub async fn chain_op_exists_at_basis(
+    /// Hashes of integrated chain ops with the given DHT `basis`.
+    #[cfg(any(test, feature = "inspection"))]
+    pub async fn get_ops_at_basis(
         &self,
         basis: &AnyLinkableHash,
-    ) -> StateQueryResult<bool> {
-        Ok(self.db().chain_op_exists_at_basis(basis).await?)
+    ) -> StateQueryResult<Vec<DhtOpHash>> {
+        Ok(self.db().get_ops_at_basis(basis).await?)
     }
 
     /// Count of rows in the public `Entry` table.
+    #[cfg(any(test, feature = "inspection"))]
     pub async fn count_entries(&self) -> StateQueryResult<i64> {
         Ok(self.db().count_entries().await?)
     }
