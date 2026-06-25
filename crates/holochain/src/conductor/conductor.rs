@@ -26,7 +26,7 @@
 //! // conductors are cloneable
 //! let conductor2 = conductor.clone();
 //!
-//! assert_eq!(conductor.list_dna_hashes(), vec![]);
+//! assert!(conductor.list_dna_hashes().await.unwrap().is_empty());
 //! conductor.shutdown();
 //!
 //! }
@@ -547,9 +547,20 @@ mod dna_impls {
     use crate::core::ribosome::Ribosome;
 
     impl Conductor {
-        /// Get the list of hashes of installed Dnas in this Conductor
-        pub fn list_dna_hashes(&self) -> HashSet<DnaHash> {
-            self.ribosome_store().share_ref(|ds| ds.list_dna_hashes())
+        /// Get the list of hashes of all installed DNAs in this Conductor.
+        ///
+        /// This reads from the DNA definition store rather than the in-memory
+        /// ribosome store. Ribosomes are loaded on demand, so the in-memory
+        /// store may hold only a partial set (for example, the ribosomes of
+        /// disabled or awaiting-memproof apps are not loaded). The database is
+        /// the authoritative record of every registered and installed DNA.
+        pub async fn list_dna_hashes(&self) -> ConductorResult<HashSet<DnaHash>> {
+            Ok(self
+                .spaces
+                .dna_def_store
+                .as_read()
+                .list_dna_hashes()
+                .await?)
         }
 
         /// Get a [`DnaDef`] from the [`RibosomeStore`]
@@ -614,9 +625,11 @@ mod dna_impls {
             // Retrieve DNA definitions from wasm database
             let mut dna_defs_with_cell_id = Vec::new();
             for cell_id in all_cells {
-                if let Some(def) = self.spaces.dna_def_store.as_read().get(&cell_id).await? {
-                    dna_defs_with_cell_id.push((cell_id, def));
-                }
+                let def = match self.spaces.dna_def_store.as_read().get(&cell_id).await? {
+                    Some(def) => def,
+                    None => return Err(ConductorError::DnaDefMissing(cell_id)),
+                };
+                dna_defs_with_cell_id.push((cell_id, def));
             }
 
             let entry_defs = self.spaces.entry_def_store.as_read().get_all().await?;
@@ -1564,6 +1577,14 @@ mod app_impls {
             self.load_wasms_into_ribosome_for_app(app).await?;
 
             crate::conductor::conductor::genesis_cells(self.clone(), cells_to_genesis).await?;
+
+            // Evict the modules loaded for genesis from the in-memory cache, mirroring
+            // the non-deferred install path. They will be rebuilt on demand if needed.
+            for cell in app.all_cells() {
+                if let Ok(ribosome) = self.get_ribosome(&cell) {
+                    ribosome.genesis_complete().await;
+                }
+            }
 
             self.update_state({
                 let installed_app_id = installed_app_id.clone();

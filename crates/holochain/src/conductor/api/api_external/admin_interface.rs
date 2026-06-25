@@ -118,7 +118,7 @@ impl AdminInterfaceApi {
                 Ok(AdminResponse::AppUninstalled)
             }
             ListDnas => {
-                let dna_list = self.conductor_handle.list_dna_hashes();
+                let dna_list = self.conductor_handle.list_dna_hashes().await?;
                 Ok(AdminResponse::DnasListed(dna_list.into_iter().collect()))
             }
             GenerateAgentPubKey => {
