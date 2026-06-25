@@ -52,6 +52,77 @@ async fn delete_live_ephemeral_scheduled_functions_roundtrip() {
 }
 
 #[tokio::test]
+async fn chain_lock_acquire_get_release_roundtrip() {
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+    let author = agent(5);
+    let subject = vec![9u8; 32];
+    let expires_at = Timestamp::from_micros(10_000);
+    let now = Timestamp::from_micros(0);
+
+    // Initially there is no lock.
+    assert!(store
+        .as_read()
+        .get_chain_lock(author.clone())
+        .await
+        .unwrap()
+        .is_none());
+
+    // Acquiring succeeds and reports the caller now holds the lock.
+    let acquired = store
+        .acquire_chain_lock(&author, &subject, expires_at, now)
+        .await
+        .unwrap();
+    assert!(acquired);
+
+    // The lock is now readable with the expected subject.
+    let lock = store
+        .as_read()
+        .get_chain_lock(author.clone())
+        .await
+        .unwrap()
+        .expect("expected an active lock");
+    assert_eq!(lock.subject(), subject.as_slice());
+
+    // Releasing removes the lock.
+    store.release_chain_lock(&author).await.unwrap();
+    assert!(store
+        .as_read()
+        .get_chain_lock(author)
+        .await
+        .unwrap()
+        .is_none());
+}
+
+#[tokio::test]
+async fn chain_lock_get_returns_expired_lock() {
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+    let author = agent(6);
+
+    // Acquire a lock that expires at t=100.
+    store
+        .acquire_chain_lock(
+            &author,
+            &[1u8; 32],
+            Timestamp::from_micros(100),
+            Timestamp::from_micros(0),
+        )
+        .await
+        .unwrap();
+
+    // The store's `get_chain_lock` must still return the lock even though it has
+    // expired (now = 200 > 100). Several countersigning sites rely on this
+    // "respect even expired locks" semantic, which differs from the underlying
+    // `holochain_data` reader that filters expired rows.
+    let lock = store
+        .as_read()
+        .get_chain_lock(author)
+        .await
+        .unwrap()
+        .expect("expired lock must still be returned");
+    assert!(lock.is_expired_at(Timestamp::from_micros(200)));
+}
+
+#[tokio::test]
 async fn upsert_scheduled_function_none_schedule_writes_ephemeral_row() {
     let store = DhtStore::new_test(dht_id()).await.unwrap();
     let author = agent(2);
