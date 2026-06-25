@@ -229,6 +229,23 @@ impl DhtStore<DbRead<Dht>> {
         Ok(self.db().count_author_actions_capped(author, 3).await? >= 3)
     }
 
+    /// The author's source-chain head from the merged store, or `None`
+    /// pre-genesis.
+    pub async fn chain_head_for_author(
+        &self,
+        author: &AgentPubKey,
+    ) -> StateQueryResult<Option<crate::source_chain::HeadInfo>> {
+        Ok(self
+            .db()
+            .chain_head_for_author(author)
+            .await?
+            .map(|(action, seq, timestamp)| crate::source_chain::HeadInfo {
+                action,
+                seq,
+                timestamp,
+            }))
+    }
+
     /// Validation receipts for every chain op of `action_hash`, grouped into a
     /// [`ValidationReceiptSet`](holochain_zome_types::prelude::ValidationReceiptSet) per op.
     ///

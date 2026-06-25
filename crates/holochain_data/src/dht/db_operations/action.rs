@@ -44,6 +44,15 @@ impl DbRead<Dht> {
         action::count_author_actions_capped(self.pool(), author, cap).await
     }
 
+    /// The author's chain head from the merged store: the highest-sequence
+    /// action they authored, or `None` for an empty chain (pre-genesis).
+    pub async fn chain_head_for_author(
+        &self,
+        author: &AgentPubKey,
+    ) -> sqlx::Result<Option<(ActionHash, u32, holochain_timestamp::Timestamp)>> {
+        action::chain_head_for_author(self.pool(), author).await
+    }
+
     /// Integrated `RegisterAgentActivity` actions for `author`, ordered by
     /// chain sequence. `include_entries` joins the public entry (Full mode).
     pub async fn get_agent_activity(

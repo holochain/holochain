@@ -148,6 +148,31 @@ where
         .await
 }
 
+/// The author's chain head: the highest-sequence action they authored.
+/// Returns `None` for an empty chain (pre-genesis).
+pub(crate) async fn chain_head_for_author<'e, E>(
+    executor: E,
+    author: &AgentPubKey,
+) -> sqlx::Result<Option<(ActionHash, u32, holochain_timestamp::Timestamp)>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let row: Option<(Vec<u8>, i64, i64)> = sqlx::query_as(
+        "SELECT hash, seq, timestamp FROM Action
+         WHERE author = ? ORDER BY seq DESC LIMIT 1",
+    )
+    .bind(author.get_raw_36())
+    .fetch_optional(executor)
+    .await?;
+    Ok(row.map(|(hash_bytes, seq, ts)| {
+        (
+            ActionHash::from_raw_36(hash_bytes),
+            seq as u32,
+            holochain_timestamp::Timestamp::from_micros(ts),
+        )
+    }))
+}
+
 /// All actions authored by `author` that have an integrated
 /// `RegisterAgentActivity` op, ordered by chain sequence. When
 /// `include_entries` is set, the public
