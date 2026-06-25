@@ -246,6 +246,36 @@ impl DhtStore<DbRead<Dht>> {
             }))
     }
 
+    /// Get the source-chain lock for `author`, if one exists.
+    ///
+    /// Returns *any* lock row for the author, including one that has already
+    /// expired — matching the legacy
+    /// [`get_chain_lock`](crate::chain_lock::get_chain_lock) semantics. Callers
+    /// are responsible for checking [`ChainLock::is_expired_at`] when expiry
+    /// matters; several countersigning call sites must respect an expired lock
+    /// (a lock that exists at all means a session is mid-flight and the chain
+    /// must not be re-used until it is cleaned up).
+    ///
+    /// This is why a `Timestamp::MIN` sentinel is passed to the underlying
+    /// `holochain_data` reader: that reader filters out locks whose
+    /// `expires_at <= now`, so `MIN` makes the expiry filter a no-op and every
+    /// existing row is returned.
+    pub async fn get_chain_lock(
+        &self,
+        author: AgentPubKey,
+    ) -> StateQueryResult<Option<crate::chain_lock::ChainLock>> {
+        Ok(self
+            .db()
+            .get_chain_lock(author, Timestamp::MIN)
+            .await?
+            .map(|row| {
+                crate::chain_lock::ChainLock::from_parts(
+                    row.subject,
+                    Timestamp::from_micros(row.expires_at_timestamp),
+                )
+            }))
+    }
+
     /// Validation receipts for every chain op of `action_hash`, grouped into a
     /// [`ValidationReceiptSet`](holochain_zome_types::prelude::ValidationReceiptSet) per op.
     ///

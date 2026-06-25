@@ -902,6 +902,33 @@ impl DhtStore<DbWrite<Dht>> {
             .await?)
     }
 
+    /// Try to acquire the source-chain lock for `author`.
+    ///
+    /// Returns `Ok(true)` when the caller now holds the lock (no lock existed,
+    /// the existing lock had expired relative to `now`, or the existing lock's
+    /// `subject` matched and was therefore extended), and `Ok(false)` when a
+    /// different subject still holds an unexpired lock.
+    pub async fn acquire_chain_lock(
+        &self,
+        author: &AgentPubKey,
+        subject: &[u8],
+        expires_at: Timestamp,
+        now: Timestamp,
+    ) -> StateMutationResult<bool> {
+        Ok(self
+            .db
+            .acquire_chain_lock(author, subject, expires_at, now)
+            .await?)
+    }
+
+    /// Release the source-chain lock for `author` by deleting the lock row.
+    ///
+    /// Releasing a non-existent lock is a no-op.
+    pub async fn release_chain_lock(&self, author: &AgentPubKey) -> StateMutationResult<()> {
+        self.db.release_chain_lock(author).await?;
+        Ok(())
+    }
+
     /// Downgrade this writable store to a read-only store.
     pub fn as_read(&self) -> DhtStoreRead {
         DhtStore::new(self.db.as_ref().clone())
