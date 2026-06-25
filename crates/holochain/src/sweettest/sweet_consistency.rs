@@ -133,7 +133,7 @@ async fn await_op_integration(
             // consistency cannot have been reached; sleep and retry.
             for (_, dht_store) in cells.iter() {
                 let (validation_limbo, integration_limbo, _) = dht_store
-                    .integration_state_counts()
+                    .limbo_state_counts()
                     .await
                     .map_err(|e| e.to_string())?;
                 if validation_limbo > 0 || integration_limbo > 0 {

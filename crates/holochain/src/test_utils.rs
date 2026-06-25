@@ -253,7 +253,7 @@ pub async fn setup_app_inner(
 /// listed so a failing test shows what did not progress.
 pub async fn wait_for_integration(
     dht_store: &holochain_state::dht_store::DhtStore,
-    expected: i64,
+    expected: u64,
     num_attempts: usize,
     delay: Duration,
 ) {

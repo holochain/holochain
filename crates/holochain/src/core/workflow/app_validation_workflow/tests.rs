@@ -1561,11 +1561,8 @@ async fn expected_invalid_remove_link_op(
 
 // Assert nothing remains in validation or integration limbo in the DHT store.
 async fn assert_limbo_is_empty(dht_store: &DhtStore) {
-    let (validation_limbo, integration_limbo, _) = dht_store
-        .as_read()
-        .integration_state_counts()
-        .await
-        .unwrap();
+    let (validation_limbo, integration_limbo, _) =
+        dht_store.as_read().limbo_state_counts().await.unwrap();
     assert_eq!(
         (validation_limbo, integration_limbo),
         (0, 0),
@@ -1602,7 +1599,7 @@ async fn run_test(
         .unwrap();
     wait_for_integration(
         &alice_store,
-        expected_count as i64,
+        expected_count as u64,
         num_attempts,
         delay_per_attempt,
     )
@@ -1626,7 +1623,7 @@ async fn run_test(
         .unwrap();
     wait_for_integration(
         &alice_store,
-        expected_count as i64,
+        expected_count as u64,
         num_attempts,
         delay_per_attempt,
     )
@@ -1655,7 +1652,7 @@ async fn run_test(
         .unwrap();
     wait_for_integration(
         &alice_store,
-        expected_count as i64,
+        expected_count as u64,
         num_attempts,
         delay_per_attempt,
     )
@@ -1694,7 +1691,7 @@ async fn run_test(
         .unwrap();
     wait_for_integration(
         &alice_store,
-        expected_count as i64,
+        expected_count as u64,
         num_attempts,
         delay_per_attempt,
     )
@@ -1732,7 +1729,7 @@ async fn run_test(
         .unwrap();
     wait_for_integration(
         &alice_store,
-        expected_count as i64,
+        expected_count as u64,
         num_attempts,
         delay_per_attempt,
     )
@@ -1772,7 +1769,7 @@ async fn run_test(
         .unwrap();
     wait_for_integration(
         &alice_store,
-        expected_count as i64,
+        expected_count as u64,
         num_attempts,
         delay_per_attempt,
     )
@@ -1818,7 +1815,7 @@ async fn run_test_entry_def_id(
         .unwrap();
     wait_for_integration(
         &alice_store,
-        expected_count as i64,
+        expected_count as u64,
         num_attempts,
         delay_per_attempt,
     )

@@ -910,7 +910,7 @@ impl SweetConductor {
     pub async fn all_ops_integrated(&self, dna_hash: &DnaHash) -> ConductorApiResult<bool> {
         let dht_store = self.get_dht_store(dna_hash)?;
         let (validation_limbo, integration_limbo, _) =
-            dht_store.as_read().integration_state_counts().await?;
+            dht_store.as_read().limbo_state_counts().await?;
         Ok(validation_limbo == 0 && integration_limbo == 0)
     }
 

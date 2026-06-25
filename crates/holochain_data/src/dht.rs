@@ -952,7 +952,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn integration_state_counts_split_and_exclude_cached() {
+    async fn limbo_state_counts_split_and_exclude_cached() {
         let db = test_open_db(dht_db_id()).await.unwrap();
 
         // One cached ChainOp (locally_validated = 0) — must NOT count as
@@ -1031,7 +1031,7 @@ mod tests {
             .unwrap();
 
         let (validation_limbo, integration_limbo, integrated) =
-            db.as_ref().integration_state_counts().await.unwrap();
+            db.as_ref().limbo_state_counts().await.unwrap();
         assert_eq!(validation_limbo, 1);
         assert_eq!(integration_limbo, 1);
         // Only the locally-validated ChainOp counts; the cached op is excluded.

@@ -480,7 +480,7 @@ async fn run_test(
 
     // 9 ops from the three authored records plus 14 genesis ops (both agents).
     // Init is not run because we aren't calling the zome.
-    let expected_count: i64 = 9 + 14;
+    let expected_count: u64 = 9 + 14;
 
     wait_for_integration(&dht_store, expected_count, num_attempts, delay_per_attempt).await;
     assert_limbo_empty(&dht_store).await;

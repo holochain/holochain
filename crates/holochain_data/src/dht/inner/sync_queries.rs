@@ -621,7 +621,7 @@ fn limbo_chain_op_not_ready_pred() -> String {
 ///   with a terminal `sys_validation_status` (1 or 2).
 /// - `validation_limbo` = limbo ops not yet ready: the complement of the
 ///   above within each limbo table.
-pub(crate) async fn integration_state_counts<'e, E>(executor: E) -> sqlx::Result<(i64, i64, i64)>
+pub(crate) async fn limbo_state_counts<'e, E>(executor: E) -> sqlx::Result<(i64, i64, i64)>
 where
     E: Executor<'e, Database = Sqlite>,
 {
@@ -800,11 +800,12 @@ pub(crate) async fn get_ops_at_basis<'e, E>(
 where
     E: Executor<'e, Database = Sqlite>,
 {
-    let rows: Vec<(Vec<u8>,)> =
-        sqlx::query_as("SELECT hash FROM ChainOp WHERE basis_hash = ? ORDER BY hash")
-            .bind(basis.get_raw_36())
-            .fetch_all(executor)
-            .await?;
+    let rows: Vec<(Vec<u8>,)> = sqlx::query_as(
+        "SELECT hash FROM ChainOp WHERE basis_hash = ? AND locally_validated = 1 ORDER BY hash",
+    )
+    .bind(basis.get_raw_36())
+    .fetch_all(executor)
+    .await?;
     Ok(rows.into_iter().map(|(h,)| h).collect())
 }
 

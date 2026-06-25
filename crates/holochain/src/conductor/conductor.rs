@@ -3614,8 +3614,7 @@ pub fn wire_rows_to_v2_ops(
 pub async fn integration_dump(
     dht_store: &DhtStoreRead,
 ) -> ConductorApiResult<IntegrationStateDump> {
-    let (validation_limbo, integration_limbo, integrated) =
-        dht_store.integration_state_counts().await?;
+    let (validation_limbo, integration_limbo, integrated) = dht_store.limbo_state_counts().await?;
     Ok(IntegrationStateDump {
         validation_limbo,
         integration_limbo,

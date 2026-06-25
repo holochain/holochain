@@ -78,7 +78,7 @@ async fn authored_test() {
 
     wait_for_integration(
         bob.dht_store(),
-        expected_count as i64,
+        expected_count as u64,
         num_attempts,
         delay_per_attempt,
     )

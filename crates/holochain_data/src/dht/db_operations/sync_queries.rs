@@ -99,15 +99,15 @@ impl DbRead<Dht> {
 
     /// Total count of every integrated op + warrant (no `locally_validated`
     /// filter).
-    pub async fn count_integrated_ops(&self) -> sqlx::Result<i64> {
-        sync_queries::count_integrated_ops(self.pool()).await
+    pub async fn count_integrated_ops(&self) -> sqlx::Result<u64> {
+        Ok(sync_queries::count_integrated_ops(self.pool()).await? as u64)
     }
 
     /// `(validation_limbo, integration_limbo, integrated)` counts for the
     /// integration-state report. Integrated counts locally-validated
     /// `ChainOp` rows (cache-only copies excluded) plus all `WarrantOp` rows.
-    pub async fn integration_state_counts(&self) -> sqlx::Result<(i64, i64, i64)> {
-        sync_queries::integration_state_counts(self.pool()).await
+    pub async fn limbo_state_counts(&self) -> sqlx::Result<(i64, i64, i64)> {
+        sync_queries::limbo_state_counts(self.pool()).await
     }
 
     /// Count of integrated, locally-validated `ChainOp` rows that passed
@@ -126,8 +126,8 @@ impl DbRead<Dht> {
 
     /// Count of not-yet-integrated chain ops authored by `author`.
     #[cfg(any(test, feature = "inspection"))]
-    pub async fn count_pending_ops_for_author(&self, author: &AgentPubKey) -> sqlx::Result<i64> {
-        sync_queries::count_pending_ops_for_author(self.pool(), author).await
+    pub async fn count_pending_ops_for_author(&self, author: &AgentPubKey) -> sqlx::Result<u64> {
+        Ok(sync_queries::count_pending_ops_for_author(self.pool(), author).await? as u64)
     }
 
     /// Hashes of integrated, rejected chain ops (GET-cached copies excluded).
@@ -142,8 +142,8 @@ impl DbRead<Dht> {
 
     /// Total count of every op (integrated and limbo) held in this DHT store.
     #[cfg(any(test, feature = "inspection"))]
-    pub async fn count_all_ops(&self) -> sqlx::Result<i64> {
-        sync_queries::count_all_ops(self.pool()).await
+    pub async fn count_all_ops(&self) -> sqlx::Result<u64> {
+        Ok(sync_queries::count_all_ops(self.pool()).await? as u64)
     }
 
     /// Whether the integrated chain op `op_hash` requires a validation receipt.
@@ -180,8 +180,8 @@ impl DbRead<Dht> {
 
     /// Count of rows in the public `Entry` table.
     #[cfg(any(test, feature = "inspection"))]
-    pub async fn count_entries(&self) -> sqlx::Result<i64> {
-        sync_queries::count_entries(self.pool()).await
+    pub async fn count_entries(&self) -> sqlx::Result<u64> {
+        Ok(sync_queries::count_entries(self.pool()).await? as u64)
     }
 
     /// Integrated chain-op rows for the integration dump, paginated forward

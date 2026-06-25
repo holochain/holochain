@@ -112,13 +112,13 @@ where
     /// locally-validated `ChainOp` rows (GET-cached copies excluded) plus all
     /// `WarrantOp` rows; `integration_limbo` is the limbo subset ready for
     /// integration and `validation_limbo` the remainder still in validation.
-    pub async fn integration_state_counts(
+    pub async fn limbo_state_counts(
         &self,
     ) -> crate::query::StateQueryResult<(usize, usize, usize)> {
         let (validation_limbo, integration_limbo, integrated) = self
             .db
             .as_ref()
-            .integration_state_counts()
+            .limbo_state_counts()
             .await
             .map_err(crate::query::StateQueryError::Sqlx)?;
         Ok((
@@ -191,7 +191,7 @@ where
             .count_integrated_ops()
             .await
             .map_err(crate::query::StateQueryError::Sqlx)?;
-        Ok(n.max(0) as u64)
+        Ok(n)
     }
 
     /// Number of stored slices for the arc, or 0 if none.

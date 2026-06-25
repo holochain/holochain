@@ -36,7 +36,7 @@ impl DhtStore<DbRead<Dht>> {
     }
 
     /// Count integrated ops (chain ops plus warrants) held in the DHT store.
-    pub async fn count_integrated_ops(&self) -> StateQueryResult<i64> {
+    pub async fn count_integrated_ops(&self) -> StateQueryResult<u64> {
         Ok(self.db().count_integrated_ops().await?)
     }
 
@@ -59,7 +59,7 @@ impl DhtStore<DbRead<Dht>> {
     pub async fn count_pending_ops_for_author(
         &self,
         author: &AgentPubKey,
-    ) -> StateQueryResult<i64> {
+    ) -> StateQueryResult<u64> {
         Ok(self.db().count_pending_ops_for_author(author).await?)
     }
 
@@ -93,7 +93,7 @@ impl DhtStore<DbRead<Dht>> {
 
     /// Total count of every op (integrated and limbo) held in the DHT store.
     #[cfg(any(test, feature = "inspection"))]
-    pub async fn count_all_ops(&self) -> StateQueryResult<i64> {
+    pub async fn count_all_ops(&self) -> StateQueryResult<u64> {
         Ok(self.db().count_all_ops().await?)
     }
 
@@ -126,7 +126,7 @@ impl DhtStore<DbRead<Dht>> {
 
     /// Count of rows in the public `Entry` table.
     #[cfg(any(test, feature = "inspection"))]
-    pub async fn count_entries(&self) -> StateQueryResult<i64> {
+    pub async fn count_entries(&self) -> StateQueryResult<u64> {
         Ok(self.db().count_entries().await?)
     }
 
