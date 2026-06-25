@@ -414,7 +414,7 @@ mod tests {
         conductors[0]
             .get_dht_store(dna_file.dna_hash())
             .unwrap()
-            .record_incoming_ops(vec![unintegrated_op])
+            .record_incoming_ops(vec![(unintegrated_op, false)])
             .await
             .unwrap();
 

@@ -1,5 +1,5 @@
+use super::IncomingDhtOp;
 use crate::core::workflow::WorkflowResult;
-use holochain_types::prelude::DhtOpHashed;
 use holochain_types::share::RwShare;
 
 type InOpBatchSnd = tokio::sync::oneshot::Sender<WorkflowResult<()>>;
@@ -8,7 +8,7 @@ type InOpBatchRcv = tokio::sync::oneshot::Receiver<WorkflowResult<()>>;
 #[derive(Debug)]
 pub struct InOpBatchEntry {
     pub snd: InOpBatchSnd,
-    pub ops: Vec<DhtOpHashed>,
+    pub ops: Vec<IncomingDhtOp>,
 }
 
 /// A batch of incoming ops memory.
@@ -24,7 +24,7 @@ impl IncomingOpsBatch {
     /// if result.0.is_some() -- the batch should be run now
     pub fn check_insert(
         &self,
-        ops: Vec<DhtOpHashed>,
+        ops: Vec<IncomingDhtOp>,
     ) -> (Option<Vec<InOpBatchEntry>>, InOpBatchRcv) {
         let (snd, rcv) = tokio::sync::oneshot::channel();
         let entry = InOpBatchEntry { snd, ops };

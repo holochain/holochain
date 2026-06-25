@@ -166,11 +166,15 @@ impl DhtStore<DbRead<Dht>> {
 
     /// Drop any op whose hash is already recorded in the DHT store.
     /// Input order is preserved for surviving ops.
+    ///
+    /// The bool coupled with each op indicates whether to set the validation
+    /// receipt required flag. This flag must be preserved through the
+    /// filtering.
     pub async fn filter_existing_ops(
         &self,
-        ops: Vec<DhtOpHashed>,
-    ) -> StateQueryResult<Vec<DhtOpHashed>> {
-        let hashes: Vec<DhtOpHash> = ops.iter().map(|o| o.as_hash().clone()).collect();
+        ops: Vec<(DhtOpHashed, bool)>,
+    ) -> StateQueryResult<Vec<(DhtOpHashed, bool)>> {
+        let hashes: Vec<DhtOpHash> = ops.iter().map(|(o, _)| o.as_hash().clone()).collect();
         let present = self.db().op_hashes_present(&hashes).await?;
         Ok(ops
             .into_iter()
@@ -3070,7 +3074,7 @@ mod tests {
         Dht::new(Arc::new(holo_hash::DnaHash::from_raw_36(vec![0u8; 36])))
     }
 
-    fn make_chain_op(seed: u8) -> DhtOpHashed {
+    fn make_chain_op(seed: u8, require_validation_receipt: bool) -> (DhtOpHashed, bool) {
         let author = AgentPubKey::from_raw_36(vec![seed; 36]);
         let action = Action::Create(Create {
             author,
@@ -3086,13 +3090,23 @@ mod tests {
             weight: Default::default(),
         });
         let chain_op = ChainOp::RegisterAgentActivity(Signature::from([seed; 64]), action);
-        DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(chain_op)))
+        (
+            DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(chain_op))),
+            require_validation_receipt,
+        )
     }
 
     /// Build a synthetic `DhtOpHashed` with the given pre-computed hash.
-    fn make_chain_op_with_hash(seed: u8, hash: DhtOpHash) -> DhtOpHashed {
-        let op = make_chain_op(seed);
-        HoloHashed::with_pre_hashed(op.into_inner().0, hash)
+    fn make_chain_op_with_hash(
+        seed: u8,
+        hash: DhtOpHash,
+        require_validation_receipt: bool,
+    ) -> (DhtOpHashed, bool) {
+        let op = make_chain_op(seed, require_validation_receipt);
+        (
+            HoloHashed::with_pre_hashed(op.0.into_inner().0, hash),
+            require_validation_receipt,
+        )
     }
 
     /// Regression: a **private** entry must be `Hidden` from a non-author, even
@@ -3139,7 +3153,7 @@ mod tests {
             RecordEntry::Present(entry.clone()),
         );
         let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(chain_op)));
-        store.record_incoming_ops(vec![op]).await.unwrap();
+        store.record_incoming_ops(vec![(op, false)]).await.unwrap();
 
         // A non-author gets the record, but the private entry is Hidden.
         let record = store
@@ -3182,8 +3196,8 @@ mod tests {
         let store = crate::dht_store::DhtStore::new_test(dht_id())
             .await
             .unwrap();
-        let op = make_chain_op(1);
-        let hash = op.as_hash().clone();
+        let op = make_chain_op(1, false);
+        let hash = op.0.as_hash().clone();
 
         store.record_incoming_ops(vec![op]).await.unwrap();
 
@@ -3196,17 +3210,20 @@ mod tests {
         let store = crate::dht_store::DhtStore::new_test(dht_id())
             .await
             .unwrap();
-        let known = make_chain_op(2);
-        let unknown = make_chain_op(3);
-        let known_hash = known.as_hash().clone();
-        let unknown_hash = unknown.as_hash().clone();
+        let known = make_chain_op(2, false);
+        let unknown = make_chain_op(3, false);
+        let known_hash = known.0.as_hash().clone();
+        let unknown_hash = unknown.0.as_hash().clone();
 
         store.record_incoming_ops(vec![known]).await.unwrap();
 
-        let input = vec![make_chain_op_with_hash(20, known_hash.clone()), unknown];
+        let input = vec![
+            make_chain_op_with_hash(20, known_hash.clone(), false),
+            unknown,
+        ];
         let filtered = store.as_read().filter_existing_ops(input).await.unwrap();
         assert_eq!(filtered.len(), 1);
-        assert_eq!(filtered[0].as_hash(), &unknown_hash);
+        assert_eq!(filtered[0].0.as_hash(), &unknown_hash);
     }
 
     #[tokio::test]
@@ -3214,8 +3231,8 @@ mod tests {
         let store = crate::dht_store::DhtStore::new_test(dht_id())
             .await
             .unwrap();
-        let op = make_chain_op(10);
-        let hash = op.as_hash().clone();
+        let op = make_chain_op(10, false);
+        let hash = op.0.as_hash().clone();
 
         store.record_incoming_ops(vec![op]).await.unwrap();
 
@@ -3233,8 +3250,8 @@ mod tests {
         let store = crate::dht_store::DhtStore::new_test(dht_id())
             .await
             .unwrap();
-        let op = make_chain_op(11);
-        let hash = op.as_hash().clone();
+        let op = make_chain_op(11, false);
+        let hash = op.0.as_hash().clone();
 
         store.record_incoming_ops(vec![op]).await.unwrap();
         store
@@ -3256,7 +3273,7 @@ mod tests {
         let store = crate::dht_store::DhtStore::new_test(dht_id())
             .await
             .unwrap();
-        let ops: Vec<_> = (12..16).map(make_chain_op).collect();
+        let ops: Vec<_> = (12..16).map(|seed| make_chain_op(seed, false)).collect();
         store.record_incoming_ops(ops).await.unwrap();
 
         let pending = store.as_read().ops_pending_sys_validation(2).await.unwrap();
@@ -3268,8 +3285,8 @@ mod tests {
         let store = crate::dht_store::DhtStore::new_test(dht_id())
             .await
             .unwrap();
-        let op = make_chain_op(50);
-        let hash = op.as_hash().clone();
+        let op = make_chain_op(50, false);
+        let hash = op.0.as_hash().clone();
 
         store.record_incoming_ops(vec![op]).await.unwrap();
         store
@@ -3291,8 +3308,8 @@ mod tests {
         let store = crate::dht_store::DhtStore::new_test(dht_id())
             .await
             .unwrap();
-        let op = make_chain_op(51);
-        let hash = op.as_hash().clone();
+        let op = make_chain_op(51, false);
+        let hash = op.0.as_hash().clone();
 
         // Insert but don't record sys-validation outcome.
         store.record_incoming_ops(vec![op]).await.unwrap();
@@ -3314,8 +3331,8 @@ mod tests {
         let store = crate::dht_store::DhtStore::new_test(dht_id())
             .await
             .unwrap();
-        let op = make_chain_op(52);
-        let hash = op.as_hash().clone();
+        let op = make_chain_op(52, false);
+        let hash = op.0.as_hash().clone();
 
         store.record_incoming_ops(vec![op]).await.unwrap();
         store
@@ -3344,8 +3361,8 @@ mod tests {
         let store = crate::dht_store::DhtStore::new_test(dht_id())
             .await
             .unwrap();
-        let op = make_chain_op(30);
-        let action = match op.as_content() {
+        let op = make_chain_op(30, false);
+        let action = match op.0.as_content() {
             DhtOp::ChainOp(c) => c.action().clone(),
             _ => unreachable!(),
         };
@@ -3383,7 +3400,10 @@ mod tests {
             _ => unreachable!(),
         };
 
-        store.record_incoming_ops(vec![op_a]).await.unwrap();
+        store
+            .record_incoming_ops(vec![(op_a, false)])
+            .await
+            .unwrap();
 
         let result = store
             .as_read()
@@ -3400,9 +3420,9 @@ mod tests {
         let store = crate::dht_store::DhtStore::new_test(dht_id())
             .await
             .unwrap();
-        let op = make_chain_op(60);
-        let hash = op.as_hash().clone();
-        let author = match op.as_content() {
+        let op = make_chain_op(60, true);
+        let hash = op.0.as_hash().clone();
+        let author = match op.0.as_content() {
             DhtOp::ChainOp(c) => c.action().author().clone(),
             _ => unreachable!(),
         };
@@ -3441,7 +3461,7 @@ mod tests {
         when: i64,
     ) {
         let hash = op.as_hash().clone();
-        store.record_incoming_ops(vec![op]).await.unwrap();
+        store.record_incoming_ops(vec![(op, false)]).await.unwrap();
         store
             .record_chain_op_sys_validation_outcomes(vec![(hash.clone(), SysOutcome::Accepted)])
             .await
@@ -3687,7 +3707,10 @@ mod tests {
         // Integrate a warrant whose warrantee is this author.
         let warrant = make_warrant_for(&author, 30);
         let wh = warrant.as_hash().clone();
-        store.record_incoming_ops(vec![warrant]).await.unwrap();
+        store
+            .record_incoming_ops(vec![(warrant, false)])
+            .await
+            .unwrap();
         store
             .record_warrant_sys_validation_outcomes(vec![(wh, SysOutcome::Accepted)])
             .await
@@ -4065,7 +4088,10 @@ mod tests {
         // A warrant for this author should be attached to a Complete response.
         let warrant = make_warrant_for(&author, 40);
         let wh = warrant.as_hash().clone();
-        store.record_incoming_ops(vec![warrant]).await.unwrap();
+        store
+            .record_incoming_ops(vec![(warrant, false)])
+            .await
+            .unwrap();
         store
             .record_warrant_sys_validation_outcomes(vec![(wh, SysOutcome::Accepted)])
             .await
@@ -4420,8 +4446,8 @@ mod tests {
         let store = crate::dht_store::DhtStore::new_test(dht_id())
             .await
             .unwrap();
-        let op = make_chain_op(61);
-        let hash = op.as_hash().clone();
+        let op = make_chain_op(61, false);
+        let hash = op.0.as_hash().clone();
         store.record_incoming_ops(vec![op]).await.unwrap();
         store
             .record_chain_op_sys_validation_outcomes(vec![(hash.clone(), SysOutcome::Accepted)])
@@ -4530,8 +4556,8 @@ mod tests {
         let store = crate::dht_store::DhtStore::new_test(dht_id())
             .await
             .unwrap();
-        let op = make_chain_op(90);
-        let action = match op.as_content() {
+        let op = make_chain_op(90, false);
+        let action = match op.0.as_content() {
             DhtOp::ChainOp(c) => c.action().clone(),
             _ => unreachable!(),
         };
@@ -4628,7 +4654,7 @@ mod tests {
         let op = holochain_types::dht_op::DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(
             chain_op,
         )));
-        store.record_incoming_ops(vec![op]).await.unwrap();
+        store.record_incoming_ops(vec![(op, false)]).await.unwrap();
 
         let empty_scratch = crate::scratch::Scratch::new().into_sync();
         let result = store
@@ -4752,8 +4778,8 @@ mod tests {
         // `make_chain_op` records a RegisterAgentActivity op: the Create action
         // (referencing entry `seed+100`) lands in the store, but the entry does not.
         let seed = 94u8;
-        let op = make_chain_op(seed);
-        let action = match op.as_content() {
+        let op = make_chain_op(seed, false);
+        let action = match op.0.as_content() {
             DhtOp::ChainOp(c) => c.action().clone(),
             _ => unreachable!(),
         };
@@ -4842,7 +4868,7 @@ mod tests {
             chain_op,
         )));
         let op_hash = op.as_hash().clone();
-        store.record_incoming_ops(vec![op]).await.unwrap();
+        store.record_incoming_ops(vec![(op, false)]).await.unwrap();
         store
             .record_chain_op_sys_validation_outcomes(vec![(op_hash.clone(), SysOutcome::Accepted)])
             .await
@@ -4902,8 +4928,8 @@ mod tests {
         let entry = make_entry(seed);
 
         // First insert a RegisterAgentActivity op so the action is in the store.
-        let act_op = make_chain_op(seed);
-        let action = match act_op.as_content() {
+        let act_op = make_chain_op(seed, false);
+        let action = match act_op.0.as_content() {
             DhtOp::ChainOp(c) => c.action().clone(),
             _ => unreachable!(),
         };
@@ -5189,7 +5215,7 @@ mod tests {
             chain_op,
         )));
         let op_hash = op.as_hash().clone();
-        store.record_incoming_ops(vec![op]).await.unwrap();
+        store.record_incoming_ops(vec![(op, false)]).await.unwrap();
         store
             .record_chain_op_sys_validation_outcomes(vec![(op_hash.clone(), SysOutcome::Accepted)])
             .await
@@ -5432,7 +5458,7 @@ mod tests {
                 Box::new(chain_op),
             ));
             let op_hash = op.as_hash().clone();
-            store.record_incoming_ops(vec![op]).await.unwrap();
+            store.record_incoming_ops(vec![(op, false)]).await.unwrap();
             store
                 .record_chain_op_sys_validation_outcomes(vec![(
                     op_hash.clone(),
@@ -5665,7 +5691,7 @@ mod tests {
             DhtOp::ChainOp(c) => holo_hash::ActionHash::with_data_sync(&c.action()),
             _ => unreachable!(),
         };
-        store.record_incoming_ops(vec![op]).await.unwrap();
+        store.record_incoming_ops(vec![(op, false)]).await.unwrap();
         store
             .record_chain_op_sys_validation_outcomes(vec![(op_hash.clone(), SysOutcome::Accepted)])
             .await
@@ -6239,5 +6265,61 @@ mod tests {
             .unwrap();
 
         assert!(matches!(resp.status, ChainStatus::Closed(ref head) if head.action_seq == 1));
+    }
+
+    /// `record_incoming_ops` must respect the request validation receipt flag.
+    /// A published op (flag = true) should request a validation receipt once integrated,
+    /// while an op received through gossip (flag = false) should not.
+    #[tokio::test]
+    async fn record_incoming_ops_respects_require_receipt_flag() {
+        use crate::dht_store::{AppOutcome, SysOutcome};
+
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+
+        let published = make_chain_op(70, true);
+        let gossiped = make_chain_op(71, false);
+        let published_hash = published.0.as_hash().clone();
+        let gossiped_hash = gossiped.0.as_hash().clone();
+
+        // Published op requests a validation receipt; gossiped op does not.
+        store
+            .record_incoming_ops(vec![published, gossiped])
+            .await
+            .unwrap();
+
+        // Integrate both so they are eligible to have receipts sent.
+        for hash in [&published_hash, &gossiped_hash] {
+            store
+                .record_chain_op_sys_validation_outcomes(vec![(hash.clone(), SysOutcome::Accepted)])
+                .await
+                .unwrap();
+            store
+                .record_app_validation_outcomes(vec![(hash.clone(), AppOutcome::Accepted)])
+                .await
+                .unwrap();
+        }
+        store
+            .integrate_ready_ops(holochain_types::prelude::Timestamp::now())
+            .await
+            .unwrap();
+
+        let receipts = store
+            .as_read()
+            .pending_validation_receipts(vec![])
+            .await
+            .unwrap();
+
+        assert!(
+            receipts
+                .iter()
+                .any(|(r, _)| r.dht_op_hash == published_hash),
+            "published op (require_receipt) should be pending a validation receipt"
+        );
+        assert!(
+            receipts.iter().all(|(r, _)| r.dht_op_hash != gossiped_hash),
+            "gossiped op (no require_receipt) should not be pending a validation receipt"
+        );
     }
 }

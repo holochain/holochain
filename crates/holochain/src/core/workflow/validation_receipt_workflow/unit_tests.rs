@@ -448,7 +448,10 @@ async fn create_op_with_status(
     // New-DB: write the same op through the full validation + integration
     // pipeline so that DhtStore::pending_validation_receipts sees it.
     // The hash is derived from the same op content, so test_op_hash matches.
-    dht_store.record_incoming_ops(vec![op]).await.unwrap();
+    dht_store
+        .record_incoming_ops(vec![(op, true)])
+        .await
+        .unwrap();
 
     let sys_outcome = match validation_status {
         ValidationStatus::Valid => SysOutcome::Accepted,

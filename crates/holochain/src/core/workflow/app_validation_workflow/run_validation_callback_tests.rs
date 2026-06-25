@@ -109,7 +109,7 @@ async fn validation_callback_must_get_action() {
     test_space
         .space
         .dht_store
-        .record_incoming_ops(vec![dht_op_hashed])
+        .record_incoming_ops(vec![(dht_op_hashed, false)])
         .await
         .unwrap();
 
@@ -219,11 +219,12 @@ async fn validation_callback_awaiting_deps_hashes() {
     test_space
         .space
         .dht_store
-        .record_incoming_ops(vec![DhtOpHashed::from_content_sync(
-            ChainOp::RegisterAgentActivity(
+        .record_incoming_ops(vec![(
+            DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(
                 create_action_signed_hashed.signature().clone(),
                 create_action.clone(),
-            ),
+            )),
+            false,
         )])
         .await
         .unwrap();

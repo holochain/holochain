@@ -909,7 +909,7 @@ impl TestCase {
         self.test_space
             .space
             .dht_store
-            .record_incoming_ops(vec![op_hashed])
+            .record_incoming_ops(vec![(op_hashed, false)])
             .await
             .unwrap();
 

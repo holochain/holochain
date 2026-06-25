@@ -463,7 +463,7 @@ impl Spaces {
     pub async fn handle_publish(
         &self,
         dna_hash: &DnaHash,
-        ops: Vec<holochain_types::dht_v2::DhtOp>,
+        ops: Vec<(holochain_types::dht_v2::DhtOp, bool)>,
     ) -> ConductorResult<()> {
         let space = self.get_or_create_space(dna_hash)?;
         let trigger = match self
@@ -481,8 +481,8 @@ impl Spaces {
 
         let mut legacy_ops = Vec::with_capacity(ops.len());
         for op in &ops {
-            match holochain_types::dht_v2::to_legacy_dht_op(op) {
-                Ok(legacy) => legacy_ops.push(legacy),
+            match holochain_types::dht_v2::to_legacy_dht_op(&op.0) {
+                Ok(legacy) => legacy_ops.push((legacy, op.1)),
                 Err(err) => {
                     tracing::warn!(
                         ?err,

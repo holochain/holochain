@@ -270,7 +270,7 @@ fn mock_authored_db_provider_with_db(
 async fn insert_validated_op_to_store(dht_store: &DhtStore, op: &DhtOpHashed) {
     let op_hash = op.as_hash().clone();
     dht_store
-        .record_incoming_ops(vec![op.clone()])
+        .record_incoming_ops(vec![(op.clone(), false)])
         .await
         .unwrap();
     dht_store

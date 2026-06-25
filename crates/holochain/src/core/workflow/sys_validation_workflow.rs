@@ -645,7 +645,13 @@ async fn move_and_check_warrant_deps(
                 // deps arrive via the network cascade and only land in the legacy
                 // DHT DB via `copy_cached_op_to_dht`. We therefore insert the op
                 // directly into `LimboChainOp` via `record_incoming_ops`.
-                if let Err(e) = workspace.dht_store.record_incoming_ops(vec![op]).await {
+                //
+                // Set flag to request a validation receipt for the op to false.
+                if let Err(e) = workspace
+                    .dht_store
+                    .record_incoming_ops(vec![(op, false)])
+                    .await
+                {
                     tracing::error!(error = ?e, "Error mirroring warrant dep op into new DhtStore limbo");
                 }
             }
