@@ -701,14 +701,7 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
                     crate::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE,
                 );
 
-                // #5370: receipt-receive cut over to the DhtStore. The legacy
-                // `ValidationReceipt` write (`add_if_unique`) is gated by a
-                // foreign key to the legacy `DhtOp` table, which is no longer
-                // dual-written, so it failed to record receipts for
-                // self-authored ops (and erred out the whole handler before the
-                // mirror ran). Record the receipt in the DhtStore — whose FK is
-                // the live `ChainOp` — and use the returned count to decide
-                // completion.
+                // Record the receipt and read back the running count for this op.
                 let receipt_count = self
                     .space
                     .dht_store
