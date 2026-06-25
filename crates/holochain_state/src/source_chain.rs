@@ -766,7 +766,13 @@ where
     ) -> SourceChainResult<Self> {
         let scratch = Scratch::new().into_sync();
         let author = Arc::new(author);
-        let head_info = Some(vault.read_async(chain_head_db_nonempty).await?);
+        let head_info = Some(
+            dht_store
+                .as_read()
+                .chain_head_for_author(author.as_ref())
+                .await?
+                .ok_or(SourceChainError::ChainEmpty)?,
+        );
         Ok(Self {
             scratch,
             vault,
@@ -793,7 +799,10 @@ where
     ) -> SourceChainResult<Self> {
         let scratch = Scratch::new().into_sync();
         let author = Arc::new(author);
-        let head_info = vault.read_async(chain_head_db).await?;
+        let head_info = dht_store
+            .as_read()
+            .chain_head_for_author(author.as_ref())
+            .await?;
         Ok(Self {
             scratch,
             vault,
@@ -2205,7 +2214,7 @@ mod tests {
             source_chain::genesis(
                 db.clone(),
                 dht_db.to_db(),
-                extra_dht_store,
+                extra_dht_store.clone(),
                 keystore.clone(),
                 fake_dna_hash(1),
                 carol.clone(),
@@ -2216,7 +2225,7 @@ mod tests {
             let carol_chain = SourceChain::new(
                 db.clone(),
                 dht_db.clone(),
-                dht_store.clone(),
+                extra_dht_store,
                 keystore.clone(),
                 carol.clone(),
             )
@@ -2335,7 +2344,7 @@ mod tests {
                 source_chain::genesis(
                     db.clone(),
                     dht_db.to_db(),
-                    extra_dht_store,
+                    extra_dht_store.clone(),
                     keystore.clone(),
                     fake_dna_hash(1),
                     bob.clone(),
@@ -2346,7 +2355,7 @@ mod tests {
                 let bob_chain = SourceChain::new(
                     db.clone(),
                     dht_db.clone(),
-                    dht_store.clone(),
+                    extra_dht_store,
                     keystore.clone(),
                     bob.clone(),
                 )
@@ -3035,6 +3044,61 @@ mod tests {
             "expected at least one ChainOpPublish row with withhold_publish=1 \
              after countersigning flush, got 0"
         );
+    }
+
+    /// Verify that [`SourceChain::new`] reads the chain head from the DHT store, not the
+    /// authored DB.
+    ///
+    /// Design: after genesis + one flush, we construct a *fresh* authored DB (empty — nothing
+    /// written to it). The DHT store still holds all written data. If `new` reads from the
+    /// authored DB the construction will fail with `ChainEmpty`; if it reads from the DHT
+    /// store it will succeed and return the correct head.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn chain_head_read_from_store() -> SourceChainResult<()> {
+        let TestCase {
+            chain,
+            agent_key: alice,
+            dht: dht_db,
+            dht_store,
+            keystore,
+            ..
+        } = TestCase::new().await;
+
+        // Author one action and flush it so the DHT store has a head beyond genesis.
+        let storage_arcs = vec![DhtArc::Empty];
+        chain
+            .put_weightless(
+                builder::CloseChain { new_target: None },
+                None,
+                ChainTopOrdering::Strict,
+            )
+            .await?;
+        let (flushed_actions, _) = chain.flush(storage_arcs).await?;
+        let expected_head = flushed_actions
+            .last()
+            .expect("flush must return at least one action")
+            .as_hash()
+            .clone();
+
+        // Construct a fresh authored DB that has never had genesis written to it.
+        // - Old code (`vault.read_async(chain_head_db_nonempty)`): fails with `ChainEmpty`.
+        // - New code (`dht_store.chain_head_for_author(...)`): succeeds.
+        let fresh_authored = test_authored_db();
+        let chain2 = SourceChain::new(
+            fresh_authored.to_db(),
+            dht_db.to_db(),
+            dht_store.clone(),
+            keystore,
+            alice,
+        )
+        .await?;
+
+        assert_eq!(
+            chain2.persisted_head_info().map(|h| h.action),
+            Some(expected_head),
+        );
+
+        Ok(())
     }
 
     struct TestCase {
