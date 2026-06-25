@@ -30,6 +30,8 @@ mod weighted_selection;
 mod op_store;
 pub use op_store::*;
 
+mod publish_metadata;
+
 mod hc_report;
 pub use hc_report::*;
 

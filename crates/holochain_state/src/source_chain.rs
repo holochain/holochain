@@ -677,9 +677,14 @@ impl SourceChain {
                 // Mirror warrants into the new DhtStore so `ops_pending_sys_validation`
                 // picks them up via `LimboWarrant`.
                 if !warrant_ops_for_new_db.is_empty() {
+                    // Warrants do not require validation receipts, set all to false.
+                    let warrant_ops_with_validation_receipt_required_flag = warrant_ops_for_new_db
+                        .into_iter()
+                        .map(|op| (op, false))
+                        .collect();
                     if let Err(err) = self
                         .dht_store
-                        .record_incoming_ops(warrant_ops_for_new_db)
+                        .record_incoming_ops(warrant_ops_with_validation_receipt_required_flag)
                         .await
                     {
                         tracing::warn!(?err, "Error mirroring warrant ops into new DhtStore");

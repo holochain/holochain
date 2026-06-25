@@ -540,7 +540,7 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
     fn handle_publish(
         &self,
         _dna_hash: DnaHash,
-        _ops: Vec<holochain_types::dht_v2::DhtOp>,
+        _ops: Vec<(holochain_types::dht_v2::DhtOp, bool)>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async { unimplemented!() })
     }

@@ -125,17 +125,25 @@ fn k2_op_id_from_raw(op_hash_36: &[u8], basis_36: &[u8]) -> OpId {
 }
 
 impl OpStore for HolochainOpStore {
-    fn process_incoming_ops(&self, op_list: Vec<Bytes>) -> BoxFut<'_, K2Result<Vec<OpId>>> {
+    // K2 delivers published and gossiped ops through the same callback,
+    // without differentiating between ops received through publish and
+    // ops received through gossip. The metadata is how a publisher tags
+    // its own ops in Holochain so the receiver in Holochain (here) can tell.
+    fn process_incoming_ops(&self, op_list: Vec<IncomingOp>) -> BoxFut<'_, K2Result<Vec<OpId>>> {
         Box::pin(async move {
             let mut dht_ops = Vec::with_capacity(op_list.len());
             let mut ids = Vec::with_capacity(op_list.len());
             for op_bytes in op_list {
-                let op = decode::<_, DhtOp>(&op_bytes)
+                let op = decode::<_, DhtOp>(&op_bytes.op_data)
                     .map_err(|e| K2Error::other_src("Could not decode op", e))?;
                 // Native v2 rehash + basis; equals the sender's id since both
                 // sides hash the same v2 op.
                 ids.push(op.to_hash().to_located_k2_op_id(&op.dht_basis()));
-                dht_ops.push(op);
+                let require_validation_receipt =
+                    crate::publish_metadata::get_require_validation_receipt_from_metadata(
+                        &op_bytes.metadata,
+                    );
+                dht_ops.push((op, require_validation_receipt));
             }
 
             use crate::types::event::HcP2pHandler;

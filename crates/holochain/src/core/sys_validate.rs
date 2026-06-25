@@ -429,7 +429,10 @@ pub struct IncomingDhtOpSender {
 #[async_trait::async_trait]
 impl DhtOpSender for IncomingDhtOpSender {
     async fn send_op(&self, op: DhtOp) -> SysValidationResult<()> {
-        let ops = vec![op];
+        // Ops fetched here are validation dependencies sys validation fetched,
+        // not data published by an author awaiting a receipt. Like ops fetched
+        // through gossip, they do not require a validation receipt.
+        let ops = vec![(op, false)];
         Ok(incoming_dht_ops_workflow(
             self.space.as_ref().clone(),
             self.sys_validation_trigger.clone(),

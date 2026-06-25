@@ -73,7 +73,7 @@ async fn sys_validation_produces_invalid_chain_op_warrant() {
         .spaces
         .dht_store(dna.dna_hash())
         .unwrap()
-        .record_incoming_ops(vec![op])
+        .record_incoming_ops(vec![(op, false)])
         .await
         .unwrap();
 
@@ -219,7 +219,11 @@ async fn sys_validation_produces_forked_chain_warrant() {
         .spaces
         .dht_store(dna.dna_hash())
         .unwrap()
-        .record_incoming_ops(vec![prev_op_hashed, original_op_hashed, forked_op_hashed])
+        .record_incoming_ops(vec![
+            (prev_op_hashed, false),
+            (original_op_hashed, false),
+            (forked_op_hashed, false),
+        ])
         .await
         .unwrap();
 
@@ -388,7 +392,11 @@ async fn sys_validation_produces_two_warrants_when_receiving_both_forked_ops() {
         .spaces
         .dht_store(dna.dna_hash())
         .unwrap()
-        .record_incoming_ops(vec![prev_op_hashed, op1_hashed, op2_hashed])
+        .record_incoming_ops(vec![
+            (prev_op_hashed, false),
+            (op1_hashed, false),
+            (op2_hashed, false),
+        ])
         .await
         .unwrap();
 

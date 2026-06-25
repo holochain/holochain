@@ -123,7 +123,7 @@ async fn test_cell_handle_publish() {
 
     spaces
         .spaces
-        .handle_publish(&dna, vec![v2_op])
+        .handle_publish(&dna, vec![(v2_op, true)])
         .await
         .unwrap();
 

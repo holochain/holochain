@@ -124,7 +124,7 @@ async fn main_workflow() {
     // validation; the workflow reads ops to validate from the new store.
     app_validation_workspace
         .dht_store
-        .record_incoming_ops(vec![dht_delete_op_hashed])
+        .record_incoming_ops(vec![(dht_delete_op_hashed, false)])
         .await
         .unwrap();
     app_validation_workspace
@@ -183,7 +183,7 @@ async fn main_workflow() {
     // read comes from the DhtStore, so the dependency must live there).
     app_validation_workspace
         .dht_store
-        .record_incoming_ops(vec![dht_create_op_hashed])
+        .record_incoming_ops(vec![(dht_create_op_hashed, false)])
         .await
         .unwrap();
 
@@ -351,7 +351,10 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
     });
     app_validation_workspace
         .dht_store
-        .record_incoming_ops(vec![dht_delete_op_hashed, dht_create_op_hashed_for_store])
+        .record_incoming_ops(vec![
+            (dht_delete_op_hashed, false),
+            (dht_create_op_hashed_for_store, false),
+        ])
         .await
         .unwrap();
     app_validation_workspace
@@ -513,7 +516,10 @@ async fn validate_ops_in_sequence_must_get_action() {
     });
     app_validation_workspace
         .dht_store
-        .record_incoming_ops(vec![dht_delete_op_hashed, dht_create_op_hashed_for_store])
+        .record_incoming_ops(vec![
+            (dht_delete_op_hashed, false),
+            (dht_create_op_hashed_for_store, false),
+        ])
         .await
         .unwrap();
     app_validation_workspace
@@ -690,7 +696,10 @@ async fn handle_error_in_op_validation() {
     let expected_failed_dht_op_hash = dht_create_op_hash.clone();
     app_validation_workspace
         .dht_store
-        .record_incoming_ops(vec![dht_create_op_hashed, dht_store_entry_op_hashed])
+        .record_incoming_ops(vec![
+            (dht_create_op_hashed, false),
+            (dht_store_entry_op_hashed, false),
+        ])
         .await
         .unwrap();
     app_validation_workspace
@@ -1096,7 +1105,7 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
     // Mirror into the DhtStore so the workflow can read from it.
     app_validation_workspace
         .dht_store
-        .record_incoming_ops(vec![dht_create_op_hashed_for_store])
+        .record_incoming_ops(vec![(dht_create_op_hashed_for_store, false)])
         .await
         .unwrap();
     app_validation_workspace

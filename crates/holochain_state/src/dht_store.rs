@@ -461,13 +461,18 @@ impl DhtStore<DbWrite<Dht>> {
     /// `serialized_size` is provided by the
     /// caller and should reflect the size of the op as received from the network.
     ///
+    /// The bool indicates if a validation receipt is required for the op.
+    ///
     /// All writes happen in a single transaction.  The `Action` and both limbo
     /// tables use `PRIMARY KEY ON CONFLICT IGNORE`, so duplicates are
     /// silently skipped.
-    pub async fn record_incoming_ops(&self, ops: Vec<DhtOpHashed>) -> StateMutationResult<()> {
+    pub async fn record_incoming_ops(
+        &self,
+        ops: Vec<(DhtOpHashed, bool)>,
+    ) -> StateMutationResult<()> {
         let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
         let now = Timestamp::now();
-        for op in ops {
+        for (op, require_receipt) in ops {
             let op_hash = op.as_hash().clone();
             let serialized_size = holochain_serialized_bytes::encode(op.as_content())
                 .map_err(StateMutationError::from)?
@@ -509,7 +514,7 @@ impl DhtStore<DbWrite<Dht>> {
                         op_type: i64::from(chain_op.get_type()),
                         basis_hash: &basis_hash,
                         storage_center_loc,
-                        require_receipt: true,
+                        require_receipt,
                         when_received: now,
                         serialized_size,
                     })

@@ -50,7 +50,7 @@ impl holochain_p2p::event::HcP2pHandler for Conductor {
     fn handle_publish(
         &self,
         dna_hash: DnaHash,
-        ops: Vec<holochain_types::dht_v2::DhtOp>,
+        ops: Vec<(holochain_types::dht_v2::DhtOp, bool)>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
             self.spaces

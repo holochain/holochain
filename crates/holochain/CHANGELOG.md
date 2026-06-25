@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE**: Bump Kitsune2 to `0.5.0-dev.4`.
+- Use Kitsune2's new op publish metadata channel to pass through a validation-receipt-required flag. Published ops request a validation receipt from holders, while gossip-fetched ops no longer do. Previously every incoming op was unconditionally marked as requiring a receipt.
 - **BREAKING CHANGE**: `get_agent_activity` can now return `ChainStatus::Closed` when an agent's source-chain head is a `CloseChain` action. `ChainStatus` is sent over the wire in agent-activity responses, so a node returning `Closed` cannot be understood by a pre-feature node. `Closed` ranks above `Valid` but below `Forked`/`Invalid`, so a chain that is also forked or invalid still reports `Forked`/`Invalid`. \#5766
 - Fix `get_agent_activity` status-only requests (`ActivityRequest::Status`) which previously always returned `ChainStatus::Empty` instead of the real chain status. \#5766
 - **BREAKING CHANGE** Inline zome definitions are no longer embedded in `DnaDef`. The `ZomeDef::Inline` variant now carries an `InlineZomeDef` (an `InlineHash` identifier plus its dependencies) instead of the executable closures. The closures are held on `DnaFile` in a new, non-serialized `inline_zomes` field (constructed via `DnaFile::new_inline`) and executed by a dedicated inline ribosome. WASM zomes are unaffected at the API level; this only changes code that builds inline-zome DNAs directly, such as tests using sweettest. \#5828
