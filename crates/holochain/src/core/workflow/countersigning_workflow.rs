@@ -11,7 +11,7 @@ use {
     crate::core::queue_consumer::{TriggerSender, WorkComplete},
     holo_hash::AgentPubKey,
     holochain_keystore::MetaLairClient,
-    holochain_state::chain_lock::get_chain_lock,
+    holochain_state::DhtStore,
     std::sync::Arc,
     tokio::sync::broadcast::Sender,
     tokio::task::AbortHandle,
@@ -721,6 +721,7 @@ async fn force_abandon_session(
             tracing::info!("There is a committed session to remove for: {:?}", author);
             abandon_session(
                 authored_db,
+                space.dht_store.clone(),
                 author.clone(),
                 cs_action.action().clone(),
                 cs_entry_hash,
@@ -728,28 +729,22 @@ async fn force_abandon_session(
             .await?;
         }
         _ => {
-            // There is no matching, committed session but there may be a lock to remove
-            authored_db
-                .write_async({
-                    let author = author.clone();
-                    move |txn| {
-                        let chain_lock = get_chain_lock(txn, &author)?;
-
-                        match chain_lock {
-                            Some(lock) if lock.subject() == abandon_fingerprint => {
-                                unlock_chain(txn, &author)
-                            }
-                            _ => {
-                                tracing::warn!(
-                                    "No matching session or lock to remove for: {:?}",
-                                    author
-                                );
-                                Ok(())
-                            }
-                        }
-                    }
-                })
+            // There is no matching, committed session but there may be a lock to
+            // remove. #5370: the chain lock lives in the merged store.
+            let chain_lock = space
+                .dht_store
+                .as_read()
+                .get_chain_lock(author.clone())
                 .await?;
+
+            match chain_lock {
+                Some(lock) if lock.subject() == abandon_fingerprint => {
+                    space.dht_store.release_chain_lock(author).await?;
+                }
+                _ => {
+                    tracing::warn!("No matching session or lock to remove for: {:?}", author);
+                }
+            }
         }
     }
 
@@ -810,6 +805,7 @@ pub async fn countersigning_publish(
 #[cfg(feature = "unstable-countersigning")]
 async fn abandon_session(
     authored_db: DbWrite<DbKindAuthored>,
+    dht_store: DhtStore,
     author: AgentPubKey,
     cs_action: Action,
     cs_entry_hash: EntryHash,
@@ -819,12 +815,13 @@ async fn abandon_session(
             // Do the dangerous thing and remove the countersigning session.
             remove_countersigning_session(txn, cs_action, cs_entry_hash)?;
 
-            // Once the session is removed we can unlock the chain.
-            unlock_chain(txn, &author)?;
-
             Ok(())
         })
         .await?;
+
+    // Once the session is removed we can unlock the chain. #5370: the chain lock
+    // lives in the merged store.
+    dht_store.release_chain_lock(&author).await?;
 
     Ok(())
 }

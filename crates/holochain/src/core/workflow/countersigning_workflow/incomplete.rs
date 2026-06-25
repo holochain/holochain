@@ -325,6 +325,7 @@ pub async fn inner_countersigning_session_incomplete(
         tracing::debug!("All other agents have abandoned the countersigning session, abandoning session for agent {:?}", author);
         countersigning_workflow::abandon_session(
             authored_db,
+            space.dht_store.clone(),
             author.clone(),
             cs_record.action().clone(),
             cs_entry_hash,
