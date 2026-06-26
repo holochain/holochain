@@ -177,6 +177,13 @@ where
 /// `RegisterAgentActivity` op, ordered by chain sequence. When
 /// `include_entries` is set, the public
 /// `Entry` blob is joined in (Full mode); otherwise the entry column is `NULL`.
+///
+/// Ops withheld from publishing (in-flight countersigning sessions, where
+/// `ChainOpPublish.withhold_publish` is set) are excluded: such an op is
+/// authored locally but must not surface as live agent activity until the
+/// session completes and the withhold flag is cleared. The `LEFT JOIN` leaves
+/// ordinary ops — which have either no `ChainOpPublish` row (network/other-agent
+/// activity) or a row with `withhold_publish` `NULL` — unaffected.
 pub(crate) async fn get_agent_activity<'e, E>(
     executor: E,
     author: &AgentPubKey,
@@ -192,7 +199,8 @@ where
          FROM ChainOp c
          JOIN Action a ON c.action_hash = a.hash
          LEFT JOIN Entry e ON a.entry_hash = e.hash
-         WHERE a.author = ? AND c.op_type = ?
+         LEFT JOIN ChainOpPublish cp ON cp.op_hash = c.hash
+         WHERE a.author = ? AND c.op_type = ? AND cp.withhold_publish IS NULL
          ORDER BY a.seq ASC"
     } else {
         "SELECT a.hash, a.author, a.seq, a.prev_hash, a.timestamp, a.action_type,
@@ -200,7 +208,8 @@ where
                 c.validation_status, NULL AS entry_blob
          FROM ChainOp c
          JOIN Action a ON c.action_hash = a.hash
-         WHERE a.author = ? AND c.op_type = ?
+         LEFT JOIN ChainOpPublish cp ON cp.op_hash = c.hash
+         WHERE a.author = ? AND c.op_type = ? AND cp.withhold_publish IS NULL
          ORDER BY a.seq ASC"
     };
     let rows: Vec<AgentActivityRow> = sqlx::query_as(sql)

@@ -3620,6 +3620,76 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn get_agent_activity_excludes_withheld_publish_ops() {
+        // A self-authored op whose `ChainOpPublish.withhold_publish` is set
+        // (an in-flight countersigning session) must NOT surface as live agent
+        // activity until the session completes and the withhold flag is cleared.
+        // Ordinary self-authored ops (withhold NULL) are always visible.
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let author = AgentPubKey::from_raw_36(vec![23u8; 36]);
+        let prev = ActionHash::from_raw_36(vec![0u8; 36]);
+
+        // seqs 0 and 1: ordinary self-authored ops (withhold NULL -> visible).
+        store
+            .test_insert_authored_chain_op(make_fork_op(&author, &prev, 0, 1), None, None, None)
+            .await
+            .unwrap();
+        store
+            .test_insert_authored_chain_op(make_fork_op(&author, &prev, 1, 2), None, None, None)
+            .await
+            .unwrap();
+        // seq 2: a withheld countersigning op (withhold_publish = true -> hidden).
+        let withheld = make_fork_op(&author, &prev, 2, 3);
+        let withheld_hash = withheld.as_hash().clone();
+        store
+            .test_insert_authored_chain_op(withheld, None, None, Some(true))
+            .await
+            .unwrap();
+
+        let opts = GetAgentActivityOptions {
+            include_valid_activity: true,
+            include_rejected_activity: false,
+            include_warrants: false,
+            include_full_records: false,
+        };
+
+        // While withheld, only seqs 0 and 1 are reported.
+        let resp = store
+            .as_read()
+            .get_agent_activity(&author, &ChainQueryFilter::new(), &opts)
+            .await
+            .unwrap();
+        match resp.valid_activity {
+            ChainItems::Hashes(h) => {
+                assert_eq!(h.len(), 2, "withheld op must be hidden");
+                assert_eq!(h[0].0, 0);
+                assert_eq!(h[1].0, 1);
+            }
+            other => panic!("expected Hashes, got {other:?}"),
+        }
+
+        // Clearing the withhold flag (as session completion does) reveals seq 2.
+        store
+            .test_set_chain_op_publish(&withheld_hash, None, None, None)
+            .await
+            .unwrap();
+        let resp = store
+            .as_read()
+            .get_agent_activity(&author, &ChainQueryFilter::new(), &opts)
+            .await
+            .unwrap();
+        match resp.valid_activity {
+            ChainItems::Hashes(h) => {
+                assert_eq!(h.len(), 3, "revealed op must be visible after clearing withhold");
+                assert_eq!(h[2].0, 2);
+            }
+            other => panic!("expected Hashes, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
     async fn get_agent_activity_detects_fork() {
         let store = crate::dht_store::DhtStore::new_test(dht_id())
             .await
