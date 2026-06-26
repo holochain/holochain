@@ -55,6 +55,7 @@ use crate::core::ribosome::host_fn::ed_25519_x_salsa20_poly1305_encrypt::ed_2551
 use crate::core::ribosome::host_fn::emit_signal::emit_signal;
 use crate::core::ribosome::host_fn::get::get;
 use crate::core::ribosome::host_fn::get_details::get_details;
+use crate::core::ribosome::host_fn::get_init_properties::get_init_properties;
 use crate::core::ribosome::host_fn::get_links::get_links;
 use crate::core::ribosome::host_fn::get_links_details::get_links_details;
 use crate::core::ribosome::host_fn::get_validation_receipts::get_validation_receipts;
@@ -572,6 +573,7 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__hc__capability_info_1", capability_info)
             .with_host_function(&mut ns, "__hc__get_1", get)
             .with_host_function(&mut ns, "__hc__get_details_1", get_details)
+            .with_host_function(&mut ns, "__hc__get_init_properties_1", get_init_properties)
             .with_host_function(&mut ns, "__hc__get_links_1", get_links)
             .with_host_function(&mut ns, "__hc__get_links_details_1", get_links_details)
             .with_host_function(&mut ns, "__hc__count_links_1", count_links)
@@ -1348,6 +1350,7 @@ pub mod wasm_test {
                 "__hc__get_1",
                 "__hc__get_agent_activity_1",
                 "__hc__get_details_1",
+                "__hc__get_init_properties_1",
                 "__hc__get_links_1",
                 "__hc__get_links_details_1",
                 "__hc__get_validation_receipts_1",

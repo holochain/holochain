@@ -2,6 +2,7 @@ use crate::hdk::HDK;
 use crate::prelude::CloseChainInput;
 use hdi::prelude::{ExternResult, MigrationTarget, OpenChainInput};
 use holo_hash::ActionHash;
+use holochain_zome_types::init::InitProperties;
 
 /// Close your current source chain to indicate that you are planning to migrate to a new DNA.
 ///
@@ -27,4 +28,15 @@ pub fn open_chain(
             close_hash,
         })
     })
+}
+
+/// Read the init properties supplied for this cell's role at install time.
+///
+/// Only callable from the `init` callback. The properties are opaque, app-defined bytes persisted
+/// by the conductor and never written to the DHT. They are intended to seed a freshly migrated
+/// chain, for example by carrying a signed summary and the action hash of the `CloseChain` action
+/// from the chain being migrated from. Returns `None` when no init properties were supplied for
+/// this cell's role.
+pub fn get_init_properties() -> ExternResult<Option<InitProperties>> {
+    HDK.with(|h| h.borrow().get_init_properties(()))
 }

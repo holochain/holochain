@@ -50,3 +50,17 @@ impl CallbackResult for InitCallbackResult {
         }
     }
 }
+
+/// Opaque, app-defined bytes made available to a cell during its `init` callback.
+///
+/// Supplied per role at install time (the `init_properties` field of
+/// `holochain_types::app::RoleSettings::Provisioned`), persisted conductor-side, and read back
+/// during `init` via the `hdk::migrate::get_init_properties` host function.
+///
+/// The bytes are never interpreted by the conductor and never written to the DHT. The app alone
+/// decides how to decode them. They are one way an app can use to seed a freshly migrated chain,
+/// for example by carrying a signed summary and the action hash of the `CloseChain` action from the
+/// chain it migrated from.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
+#[serde(transparent)]
+pub struct InitProperties(pub SerializedBytes);
