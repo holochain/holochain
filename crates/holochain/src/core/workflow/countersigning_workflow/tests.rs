@@ -601,7 +601,7 @@ async fn attempts_resolution_if_only_invalid_signatures_received() {
 
             net.expect_get_agent_activity().returning({
                 let activity_response = activity_response.clone();
-                move |_, _, _| Ok(vec![activity_response.clone()])
+                move |_, _, _, _| Ok(vec![activity_response.clone()])
             });
 
             net
@@ -662,7 +662,7 @@ async fn recover_from_commit_when_other_agent_abandons() {
 
             net.expect_get_agent_activity().returning({
                 let activity_response = activity_response.clone();
-                move |_, _, _| Ok(vec![activity_response.clone()])
+                move |_, _, _, _| Ok(vec![activity_response.clone()])
             });
 
             net
@@ -725,7 +725,7 @@ async fn recover_from_commit_after_restart_when_other_agent_abandons() {
 
             net.expect_get_agent_activity().returning({
                 let activity_response = activity_response.clone();
-                move |_, _, _| Ok(vec![activity_response.clone()])
+                move |_, _, _, _| Ok(vec![activity_response.clone()])
             });
 
             net
@@ -759,7 +759,7 @@ async fn recover_from_commit_after_restart_when_other_agent_abandons() {
 
             net.expect_get_agent_activity().returning({
                 let activity_response = activity_response.clone();
-                move |_, _, _| Ok(vec![activity_response.clone()])
+                move |_, _, _, _| Ok(vec![activity_response.clone()])
             });
 
             net
@@ -822,7 +822,7 @@ async fn recover_from_commit_after_restart_when_other_agent_completes() {
 
             net.expect_get_agent_activity().returning({
                 let activity_response = activity_response.clone();
-                move |_, _, _| Ok(vec![activity_response.clone()])
+                move |_, _, _, _| Ok(vec![activity_response.clone()])
             });
 
             net
@@ -852,7 +852,7 @@ async fn recover_from_commit_after_restart_when_other_agent_completes() {
 
             net.expect_get_agent_activity().returning({
                 let activity_response = activity_response.clone();
-                move |_, _, _| Ok(vec![activity_response.clone()])
+                move |_, _, _, _| Ok(vec![activity_response.clone()])
             });
 
             net.expect_publish_countersign().return_once(|_, _| Ok(()));
@@ -928,7 +928,7 @@ async fn retry_in_unknown_state_when_activity_authorities_do_not_agree() {
             net.expect_get_agent_activity().returning({
                 let pick_response = pick_response.clone();
                 let assorted_responses = assorted_responses.clone();
-                move |_, _, _| {
+                move |_, _, _, _| {
                     let pick = pick_response.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
                         % assorted_responses.len();
                     Ok(vec![assorted_responses[pick].clone()])
@@ -1032,7 +1032,7 @@ async fn retry_when_activity_authorities_are_missing_data() {
             net.expect_get_agent_activity().returning({
                 let pick_response = pick_response.clone();
                 let assorted_responses = assorted_responses.clone();
-                move |_, _, _| {
+                move |_, _, _, _| {
                     let pick = pick_response.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
                         % assorted_responses.len();
                     Ok(vec![assorted_responses[pick].clone()])
@@ -1136,7 +1136,7 @@ async fn stay_in_unknown_state_when_bad_signatures_are_fetched() {
             net.expect_get_agent_activity().returning({
                 let pick_response = pick_response.clone();
                 let assorted_responses = assorted_responses.clone();
-                move |_, _, _| {
+                move |_, _, _, _| {
                     let pick = pick_response.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
                         % assorted_responses.len();
                     Ok(vec![assorted_responses[pick].clone()])
@@ -1305,7 +1305,7 @@ async fn respect_retry_limit_on_timeout_with_no_signatures_received() {
 
             net.expect_get_agent_activity().returning({
                 let activity_response = activity_response.clone();
-                move |_, _, _| Ok(vec![activity_response.clone()])
+                move |_, _, _, _| Ok(vec![activity_response.clone()])
             });
 
             net
@@ -1375,7 +1375,7 @@ async fn respect_unlimited_retries_on_timeout_with_no_signatures_received() {
 
             net.expect_get_agent_activity().returning({
                 let activity_response = activity_response.clone();
-                move |_, _, _| Ok(vec![activity_response.clone()])
+                move |_, _, _, _| Ok(vec![activity_response.clone()])
             });
 
             net
@@ -1437,7 +1437,7 @@ async fn retry_limit_applies_after_a_restart() {
 
             net.expect_get_agent_activity().returning({
                 let activity_response = activity_response.clone();
-                move |_, _, _| Ok(vec![activity_response.clone()])
+                move |_, _, _, _| Ok(vec![activity_response.clone()])
             });
 
             net
@@ -1503,7 +1503,7 @@ async fn network_errors_do_not_count_towards_retry_limit() {
             net.expect_authority_for_hash().returning(|_| Ok(true));
 
             net.expect_get_agent_activity()
-                .returning(move |_, _, _| Err(HolochainP2pError::Other("test".into())));
+                .returning(move |_, _, _, _| Err(HolochainP2pError::Other("test".into())));
 
             net
         }
@@ -1527,7 +1527,7 @@ async fn network_errors_do_not_count_towards_retry_limit() {
 
             net.expect_get_agent_activity().returning({
                 let activity_response = activity_response.clone();
-                move |_, _, _| Ok(vec![activity_response.clone()])
+                move |_, _, _, _| Ok(vec![activity_response.clone()])
             });
 
             net
@@ -1595,7 +1595,7 @@ async fn recover_and_complete_after_resolution_failures() {
             net.expect_authority_for_hash().returning(|_| Ok(true));
 
             net.expect_get_agent_activity()
-                .returning(move |_, _, _| Err(HolochainP2pError::Other("test".into())));
+                .returning(move |_, _, _, _| Err(HolochainP2pError::Other("test".into())));
 
             net
         }
@@ -1617,7 +1617,7 @@ async fn recover_and_complete_after_resolution_failures() {
 
             net.expect_get_agent_activity().returning({
                 let activity_response = activity_response.clone();
-                move |_, _, _| Ok(vec![activity_response.clone()])
+                move |_, _, _, _| Ok(vec![activity_response.clone()])
             });
 
             net
@@ -1647,7 +1647,7 @@ async fn recover_and_complete_after_resolution_failures() {
 
             net.expect_get_agent_activity().returning({
                 let activity_response = activity_response.clone();
-                move |_, _, _| Ok(vec![activity_response.clone()])
+                move |_, _, _, _| Ok(vec![activity_response.clone()])
             });
 
             net.expect_publish_countersign().return_once(|_, _| Ok(()));
@@ -1679,7 +1679,7 @@ async fn recover_and_complete_after_resolution_failures() {
 
             net.expect_get_agent_activity().returning({
                 let activity_response = activity_response.clone();
-                move |_, _, _| Ok(vec![activity_response.clone()])
+                move |_, _, _, _| Ok(vec![activity_response.clone()])
             });
 
             net.expect_publish_countersign().return_once(|_, _| Ok(()));
@@ -1740,7 +1740,7 @@ async fn retry_on_network_errors_even_with_no_retries_configured() {
             net.expect_authority_for_hash().returning(|_| Ok(true));
 
             net.expect_get_agent_activity()
-                .returning(move |_, _, _| Err(HolochainP2pError::Other("test".into())));
+                .returning(move |_, _, _, _| Err(HolochainP2pError::Other("test".into())));
 
             net
         }
