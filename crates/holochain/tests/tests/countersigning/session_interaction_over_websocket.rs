@@ -12,10 +12,7 @@ use hdk::prelude::{
     CapSecret, CellId, FunctionName, PreflightRequest, PreflightRequestAcceptance, Role,
 };
 use holo_hash::{ActionHash, AgentPubKey};
-use holochain::prelude::{
-    CountersigningSessionState, Signal, SystemSignal, CAP_SECRET_BYTES,
-};
-use holochain_types::dht_v2::DhtOp;
+use holochain::prelude::{CountersigningSessionState, Signal, SystemSignal, CAP_SECRET_BYTES};
 use holochain::sweettest::{
     authenticate_app_ws_client, websocket_client_by_port, SweetLocalRendezvous, WsPollRecv,
 };
@@ -27,6 +24,7 @@ use holochain_conductor_api::conductor::{ConductorTuningParams, KeystoreConfig};
 use holochain_conductor_api::AppRequest;
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppResponse};
 use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError};
+use holochain_types::dht_v2::DhtOp;
 use holochain_types::test_utils::{fake_dna_zomes, write_fake_dna_file};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::{ReceiveMessage, WebsocketReceiver, WebsocketSender};
