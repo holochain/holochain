@@ -13,8 +13,9 @@ use hdk::prelude::{
 };
 use holo_hash::{ActionHash, AgentPubKey};
 use holochain::prelude::{
-    CountersigningSessionState, DhtOp, Signal, SystemSignal, CAP_SECRET_BYTES,
+    CountersigningSessionState, Signal, SystemSignal, CAP_SECRET_BYTES,
 };
+use holochain_types::dht_v2::DhtOp;
 use holochain::sweettest::{
     authenticate_app_ws_client, websocket_client_by_port, SweetLocalRendezvous, WsPollRecv,
 };
@@ -868,17 +869,19 @@ fn sort_dht(dht: &mut [DhtOp]) {
     dht.sort_by(|a, b| match a {
         DhtOp::ChainOp(chain_op_a) => {
             if let DhtOp::ChainOp(chain_op_b) = b {
+                let action_a = chain_op_a.signed_action().data();
+                let action_b = chain_op_b.signed_action().data();
                 let type_a = format!(
                     "{}{}{}",
-                    chain_op_a.get_type(),
-                    chain_op_a.author(),
-                    chain_op_a.action().action_seq(),
+                    chain_op_a.op_type(),
+                    action_a.header.author,
+                    action_a.header.action_seq,
                 );
                 let type_b = format!(
                     "{}{}{}",
-                    chain_op_b.get_type(),
-                    chain_op_b.author(),
-                    chain_op_b.action().action_seq(),
+                    chain_op_b.op_type(),
+                    action_b.header.author,
+                    action_b.header.action_seq,
                 );
                 type_a.partial_cmp(&type_b).unwrap()
             } else {
