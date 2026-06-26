@@ -1146,6 +1146,34 @@ impl DhtStore<DbWrite<Dht>> {
         Ok(())
     }
 
+    /// Test-only: insert an entry into the store, routing a private entry to
+    /// the `PrivateEntry` table (owned by `private_author`) and a public entry
+    /// to the `Entry` table. Mirrors the entry write in the flush path so that
+    /// store reads which resolve a full record — e.g.
+    /// [`current_countersigning_session`](DhtStore::current_countersigning_session) —
+    /// can find the entry of a hand-authored op inserted via
+    /// [`test_insert_authored_chain_op`](DhtStore::test_insert_authored_chain_op).
+    pub async fn test_insert_entry(
+        &self,
+        entry_hash: &holo_hash::EntryHash,
+        entry: &holochain_types::prelude::Entry,
+        private_author: Option<&AgentPubKey>,
+    ) -> StateMutationResult<()> {
+        match private_author {
+            Some(author) => self
+                .db
+                .insert_private_entry(entry_hash, author, entry)
+                .await
+                .map_err(StateMutationError::from)?,
+            None => self
+                .db
+                .insert_entry(entry_hash, entry)
+                .await
+                .map_err(StateMutationError::from)?,
+        }
+        Ok(())
+    }
+
     /// Test-only: read the `last_publish_time` recorded for a chain op.
     pub async fn test_chain_op_publish_time(
         &self,

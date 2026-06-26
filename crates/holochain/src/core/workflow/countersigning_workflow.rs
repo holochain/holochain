@@ -599,9 +599,12 @@ async fn apply_timeout(
         return Ok(());
     }
 
-    let authored = space.get_or_create_authored_db(cell_id.agent_pubkey().clone())?;
-
-    let current_session = authored.read_async(current_countersigning_session).await?;
+    // Read the current countersigning session from the merged store (#5370).
+    let current_session = space
+        .dht_store
+        .as_read()
+        .current_countersigning_session(cell_id.agent_pubkey())
+        .await?;
 
     let mut has_committed_session = false;
     if let Some((_, _, session_data)) = current_session {
@@ -710,8 +713,11 @@ async fn force_abandon_session(
 
     let abandon_fingerprint = preflight_request.fingerprint()?;
 
-    let maybe_session_data = authored_db
-        .read_async(current_countersigning_session)
+    // Read the current countersigning session from the merged store (#5370).
+    let maybe_session_data = space
+        .dht_store
+        .as_read()
+        .current_countersigning_session(author)
         .await?;
 
     match maybe_session_data {

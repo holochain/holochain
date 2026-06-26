@@ -10,9 +10,6 @@ use holo_hash::AgentPubKey;
 use holochain_cascade::CascadeImpl;
 use holochain_p2p::actor::{GetActivityOptions, NetworkRequestOptions};
 use holochain_p2p::DynHolochainP2pDna;
-use holochain_state::prelude::{
-    current_countersigning_session, CurrentCountersigningSessionOpt, SourceChainResult,
-};
 use holochain_types::activity::ChainItems;
 use holochain_zome_types::prelude::{
     ChainQueryFilter, ChainQueryFilterRange, ChainStatus, SignedAction,
@@ -34,13 +31,11 @@ pub async fn inner_countersigning_session_incomplete(
 ) -> WorkflowResult<(SessionCompletionDecision, Vec<SessionResolutionOutcome>)> {
     let authored_db = space.get_or_create_authored_db(author.clone())?;
 
-    let maybe_current_session = authored_db
-        .read_async({
-            move |txn| -> SourceChainResult<CurrentCountersigningSessionOpt> {
-                let maybe_current_session = current_countersigning_session(txn)?;
-                Ok(maybe_current_session)
-            }
-        })
+    // Read the current countersigning session from the merged store (#5370).
+    let maybe_current_session = space
+        .dht_store
+        .as_read()
+        .current_countersigning_session(&author)
         .await?;
 
     if maybe_current_session.is_none() {

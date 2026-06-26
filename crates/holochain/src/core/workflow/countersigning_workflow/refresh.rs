@@ -3,10 +3,7 @@ use crate::core::workflow::countersigning_workflow::{
     CountersigningSessionState, CountersigningWorkspace, ResolutionRequiredReason,
     SessionResolutionSummary,
 };
-use holochain_sqlite::db::ReadAccess;
-use holochain_state::prelude::{
-    current_countersigning_session, CurrentCountersigningSessionOpt, SourceChainResult,
-};
+use holochain_state::prelude::{CurrentCountersigningSessionOpt, SourceChainResult};
 use holochain_types::prelude::{Signal, SystemSignal};
 use holochain_zome_types::cell::CellId;
 use std::sync::Arc;
@@ -43,7 +40,9 @@ pub async fn refresh_workspace_state(
     let mut locked_for_agent = false;
 
     let agent = cell_id.agent_pubkey().clone();
-    if let Ok(authored_db) = space.get_or_create_authored_db(agent.clone()) {
+    // Ensure the authored database exists (genesis path); the session itself is
+    // now read from the merged store (#5370).
+    if space.get_or_create_authored_db(agent.clone()).is_ok() {
         // #5370: the chain lock now lives in the merged store. `get_chain_lock`
         // returns any lock row including expired ones, so a stale lock still marks
         // the chain as locked and drives the recovery path below.
@@ -67,8 +66,11 @@ pub async fn refresh_workspace_state(
                 CurrentCountersigningSessionOpt,
                 bool,
             )> = async {
-                let maybe_current_session =
-                    authored_db.read_async(current_countersigning_session).await?;
+                let maybe_current_session = space
+                    .dht_store
+                    .as_read()
+                    .current_countersigning_session(&agent)
+                    .await?;
                 tracing::trace!("Current session: {:?}", maybe_current_session);
 
                 // If we've not made a commit and the entry hasn't been committed then
