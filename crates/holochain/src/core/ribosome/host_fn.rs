@@ -245,6 +245,9 @@ host_fn_api_impls! {
     // Open your chain, pointing to the previous DNA
     fn open_chain(zt::chain::OpenChainInput) -> holo_hash::ActionHash;
 
+    // Read the init properties supplied for this cell's role at install time.
+    fn get_init_properties(()) -> Option<zt::init::InitProperties>;
+
     // Get validation receipts for an action
     fn get_validation_receipts(zt::validate::GetValidationReceiptsInput) -> Vec<zt::validate::ValidationReceiptSet>;
 }

@@ -322,19 +322,34 @@ impl Spaces {
     where
         F: Send + FnOnce(ConductorState) -> ConductorResult<ConductorState> + 'static,
     {
-        let (state, _) = self.update_state_prime(|s| Ok((f(s)?, ()))).await?;
+        let (state, _) = self
+            .update_state_prime(|s| Ok((f(s)?, ())), "", &InitPropertiesMap::new())
+            .await?;
         Ok(state)
     }
 
-    /// Update the internal state with a pure function mapping old state to new,
-    /// which may also produce an output value which will be the output of
-    /// this function
+    /// Update the internal state with a pure function mapping old state
+    /// to new, and atomically persist the result alongside any `init_properties`
+    /// for `app_id`. This may also produce an output value which will be the output
+    /// of this function. When `init_properties` is empty the `app_id` is not used.
+    ///
+    /// The load, transform, and save steps run atomically inside a single
+    /// database transaction on the conductor store, and concurrent callers
+    /// are serialized — so no read-modify-write interleaving can silently
+    /// drop updates.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-    pub async fn update_state_prime<F, O>(&self, f: F) -> ConductorResult<(ConductorState, O)>
+    pub async fn update_state_prime<F, O>(
+        &self,
+        f: F,
+        app_id: &str,
+        init_properties: &InitPropertiesMap,
+    ) -> ConductorResult<(ConductorState, O)>
     where
         F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)> + Send + 'static,
         O: Send + 'static,
     {
+        let app_id: InstalledAppId = app_id.into();
+        let init_properties = init_properties.clone();
         timed!([1, 10, 1000], "update_state_prime", {
             self.conductor_db
                 .write_async(move |txn| {
@@ -349,6 +364,12 @@ impl Spaces {
                     };
                     let (new_state, output) = f(state)?;
                     mutations::insert_conductor_state(txn, (&new_state).try_into()?)?;
+
+                    let mut stmt = txn.prepare_cached("INSERT INTO InitProperties (app_id, role_name, properties) VALUES (?, ?, ?)")?;
+                    for (role_name, properties) in init_properties {
+                        stmt.execute(holochain_sqlite::rusqlite::params![&app_id, role_name, properties.0.bytes()])?;
+                    }
+
                     Result::<_, ConductorError>::Ok((new_state, output))
                 })
                 .await

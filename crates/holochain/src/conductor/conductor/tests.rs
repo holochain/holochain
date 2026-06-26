@@ -81,10 +81,13 @@ async fn app_ids_are_unique() {
     )
     .unwrap();
 
-    conductor.add_disabled_app_to_db(app.clone()).await.unwrap();
+    conductor
+        .add_disabled_app_to_db(app.clone(), InitPropertiesMap::new())
+        .await
+        .unwrap();
 
     assert_matches!(
-        conductor.add_disabled_app_to_db(app.clone()).await,
+        conductor.add_disabled_app_to_db(app.clone(), InitPropertiesMap::new()).await,
         Err(ConductorError::AppAlreadyInstalled(id)) if id == app_id
     );
 }
