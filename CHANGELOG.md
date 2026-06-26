@@ -14,6 +14,63 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20260626.142244
+
+## [hcterm-0.6.2-rc.0](crates/hcterm/CHANGELOG.md#0.6.2-rc.0)
+
+## [holochain\_cli-0.6.2-rc.0](crates/holochain_cli/CHANGELOG.md#0.6.2-rc.0)
+
+## [holochain\_cli\_bundle-0.6.2-rc.0](crates/holochain_cli_bundle/CHANGELOG.md#0.6.2-rc.0)
+
+## [holochain\_cli\_sandbox-0.6.2-rc.0](crates/holochain_cli_sandbox/CHANGELOG.md#0.6.2-rc.0)
+
+## [holochain\_client-0.8.2-rc.0](crates/holochain_client/CHANGELOG.md#0.8.2-rc.0)
+
+## [holochain-0.6.2-rc.0](crates/holochain/CHANGELOG.md#0.6.2-rc.0)
+
+- **BREAKING CHANGE**: Implement the DNA migration design, adding a new `InitProperties` type to be used in the `init_properties` field on `RoleSettings::Provisioned`. The bytes are opaque to the conductor and stored in the conductor database thus never written to the DHT. They are written during the installation and are intended to seed a freshly migrated chain during `init`. They can only be retrieved from the `init` callback via the `get_init_properties` host function and its HDK wrapper. They are cleared upon a successful init or if the associated app is uninstalled. \#5827
+- Make Sweettest documentation available on docs.rs.
+
+## [holochain\_cascade-0.6.2-rc.0](crates/holochain_cascade/CHANGELOG.md#0.6.2-rc.0)
+
+## [holochain\_conductor\_config-0.6.2-rc.0](crates/holochain_conductor_config/CHANGELOG.md#0.6.2-rc.0)
+
+## [holochain\_test\_wasm\_common-0.6.2-rc.0](crates/holochain_test_wasm_common/CHANGELOG.md#0.6.2-rc.0)
+
+## [holochain\_wasm\_test\_utils-0.6.2-rc.0](crates/holochain_wasm_test_utils/CHANGELOG.md#0.6.2-rc.0)
+
+## [holochain\_websocket-0.6.2-rc.0](crates/holochain_websocket/CHANGELOG.md#0.6.2-rc.0)
+
+## [hdk-0.6.2-rc.0](crates/hdk/CHANGELOG.md#0.6.2-rc.0)
+
+## [holochain\_conductor\_api-0.6.2-rc.0](crates/holochain_conductor_api/CHANGELOG.md#0.6.2-rc.0)
+
+## [holochain\_p2p-0.6.2-rc.0](crates/holochain_p2p/CHANGELOG.md#0.6.2-rc.0)
+
+## [hdi-0.7.2-rc.0](crates/hdi/CHANGELOG.md#0.7.2-rc.0)
+
+## [holochain\_state-0.6.2-rc.0](crates/holochain_state/CHANGELOG.md#0.6.2-rc.0)
+
+## [hdk\_derive-0.6.2-rc.0](crates/hdk_derive/CHANGELOG.md#0.6.2-rc.0)
+
+## [holochain\_chc-0.3.2-rc.0](crates/holochain_chc/CHANGELOG.md#0.3.2-rc.0)
+
+## [holochain\_state\_types-0.6.2-rc.0](crates/holochain_state_types/CHANGELOG.md#0.6.2-rc.0)
+
+## [holochain\_types-0.6.2-rc.0](crates/holochain_types/CHANGELOG.md#0.6.2-rc.0)
+
+## [holochain\_keystore-0.6.2-rc.0](crates/holochain_keystore/CHANGELOG.md#0.6.2-rc.0)
+
+## [holochain\_sqlite-0.6.2-rc.0](crates/holochain_sqlite/CHANGELOG.md#0.6.2-rc.0)
+
+## [holochain\_zome\_types-0.6.2-rc.0](crates/holochain_zome_types/CHANGELOG.md#0.6.2-rc.0)
+
+## [holochain\_integrity\_types-0.6.2-rc.0](crates/holochain_integrity_types/CHANGELOG.md#0.6.2-rc.0)
+
+## [holo\_hash-0.6.2-rc.0](crates/holo_hash/CHANGELOG.md#0.6.2-rc.0)
+
+## [fixt-0.6.2-rc.0](crates/fixt/CHANGELOG.md#0.6.2-rc.0)
+
 # 20260512.142547
 
 ## [hc\_service\_check-0.3.1](crates/hc_service_check/CHANGELOG.md#0.3.1)
