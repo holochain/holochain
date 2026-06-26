@@ -16,7 +16,6 @@ pub type DynSweetRendezvous = Arc<dyn SweetRendezvous>;
 /// Local rendezvous infrastructure for unit testing.
 pub struct SweetLocalRendezvous {
     bs_addr: String,
-    #[cfg(feature = "transport-iroh")]
     relay_addr: String,
     bootstrap_hnd: Mutex<Option<kitsune2_bootstrap_srv::BootstrapSrv>>,
     bootstrap_addr: SocketAddr,
@@ -75,7 +74,6 @@ impl SweetLocalRendezvous {
 
         Arc::new(Self {
             bs_addr: format!("http://{bootstrap_addr}"),
-            #[cfg(feature = "transport-iroh")]
             relay_addr: format!("http://{bootstrap_addr}"),
             bootstrap_hnd,
             bootstrap_addr,

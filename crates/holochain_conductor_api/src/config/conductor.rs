@@ -28,14 +28,6 @@
 //!   ## Use the iroh relay server.
 //!   relay_url: https://use1-1.relay.n0.iroh-canary.iroh.link./
 //!
-//!   ## Override the default WebRTC STUN configuration.
-//!   ## This is OPTIONAL. If this is not specified, it will default
-//!   ## to what you can see here:
-//!   webrtc_config: {
-//!     "iceServers": [
-//!       { "urls": ["stun:stun.l.google.com:19302"] }
-//!     ]
-//!   }
 //! "#;
 //!
 //!use holochain_conductor_api::conductor::ConductorConfig;
@@ -1061,6 +1053,7 @@ admin_interfaces:
                     "backoffMinMs": "3500",
                 },
                 "irohTransport": {
+                    "connectTimeoutS": 22,
                     "relayUrl": "https://use1-1.relay.n0.iroh-canary.iroh.link./",
                     "relayAllowPlainText": "true"
                 },
@@ -1100,6 +1093,7 @@ admin_interfaces:
                     "serverUrl": "https://dev-test-bootstrap2.holochain.org/",
                 },
                 "irohTransport": {
+                    "connectTimeoutS": 22,
                     "relayUrl": "https://use1-1.relay.n0.iroh-canary.iroh.link./",
                 },
             })
@@ -1129,6 +1123,7 @@ admin_interfaces:
                     "serverUrl": "https://dev-test-bootstrap2.holochain.org/",
                 },
                 "irohTransport": {
+                    "connectTimeoutS": 22,
                     "relayUrl": "https://use1-1.relay.n0.iroh-canary.iroh.link./",
                 },
                 "k2Gossip": {
