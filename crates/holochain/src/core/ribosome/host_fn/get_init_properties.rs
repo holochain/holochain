@@ -1,4 +1,4 @@
-use crate::core::ribosome::{CallContext, HostContext, Ribosome, RibosomeError};
+use crate::core::ribosome::{CallContext, HostContext, RibosomeError, RibosomeT};
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
@@ -10,7 +10,7 @@ use wasmer::RuntimeError;
 /// conductor database for the app and role that this cell is provisioned for.
 /// Returns `None` when no init properties were supplied for the role.
 pub fn get_init_properties(
-    _ribosome: Arc<Ribosome>,
+    _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     _input: (),
 ) -> Result<Option<InitProperties>, RuntimeError> {
@@ -41,16 +41,16 @@ pub fn get_init_properties(
 mod tests {
     use super::*;
     use crate::conductor::api::MockCellConductorReadHandleT;
-    use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
-    use crate::fixt::{
-        CallContextFixturator, InitHostAccessFixturator, ZomeCallHostAccessFixturator,
-    };
+    use crate::fixt::{CallContextFixturator, InitHostAccessFixturator, RealRibosomeFixturator, ZomeCallHostAccessFixturator};
     use ::fixt::prelude::*;
+    use holochain_wasm_test_utils::TestWasm;
 
     /// In an `init` context the properties resolved from the conductor are returned.
     #[tokio::test(flavor = "multi_thread")]
     async fn get_init_properties_returns_resolved_properties() {
-        let ribosome = MockRibosomeBuilder::new().build().await.unwrap();
+        let ribosome = RealRibosomeFixturator::new(crate::fixt::Zomes(vec![TestWasm::Foo]))
+            .next()
+            .unwrap();
         let expected = InitProperties(SerializedBytes::from(UnsafeBytes::from(vec![1, 2, 3])));
 
         let mut handle = MockCellConductorReadHandleT::new();
@@ -74,7 +74,9 @@ mod tests {
     /// An `init` context with no properties stored for the role returns `None`.
     #[tokio::test(flavor = "multi_thread")]
     async fn get_init_properties_returns_none_when_unset() {
-        let ribosome = MockRibosomeBuilder::new().build().await.unwrap();
+        let ribosome = RealRibosomeFixturator::new(crate::fixt::Zomes(vec![TestWasm::Foo]))
+            .next()
+            .unwrap();
 
         let mut handle = MockCellConductorReadHandleT::new();
         handle
@@ -95,7 +97,9 @@ mod tests {
     /// Calling `get_init_properties` outside of an `init` context is denied.
     #[tokio::test(flavor = "multi_thread")]
     async fn get_init_properties_denied_outside_init() {
-        let ribosome = MockRibosomeBuilder::new().build().await.unwrap();
+        let ribosome = RealRibosomeFixturator::new(crate::fixt::Zomes(vec![TestWasm::Foo]))
+            .next()
+            .unwrap();
 
         // A plain zome-call host context is not an `init` context.
         let host_access = fixt!(ZomeCallHostAccess, Predictable);

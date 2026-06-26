@@ -14,7 +14,7 @@
 //!    in the DNA's `trusted_signers` and that the signature is valid.
 
 use holo_hash::ActionHash;
-use holochain::sweettest::{SweetAgents, SweetCell, SweetConductor, SweetConductorConfig, SweetDnaFile};
+use holochain::sweettest::{SweetAgents, SweetCell, SweetConductor, SweetDnaFile};
 use holochain_conductor_api::CellInfo;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;

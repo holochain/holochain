@@ -348,6 +348,8 @@ impl Spaces {
         F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)> + Send + 'static,
         O: Send + 'static,
     {
+        let app_id: InstalledAppId = app_id.into();
+        let init_properties = init_properties.clone();
         timed!([1, 10, 1000], "update_state_prime", {
             self.conductor_db
                 .write_async(move |txn| {
@@ -362,6 +364,12 @@ impl Spaces {
                     };
                     let (new_state, output) = f(state)?;
                     mutations::insert_conductor_state(txn, (&new_state).try_into()?)?;
+
+                    let mut stmt = txn.prepare_cached("INSERT INTO InitProperties (app_id, role_name, properties) VALUES (?, ?, ?)")?;
+                    for (role_name, properties) in init_properties {
+                        stmt.execute(holochain_sqlite::rusqlite::params![&app_id, role_name, properties.0.bytes()])?;
+                    }
+
                     Result::<_, ConductorError>::Ok((new_state, output))
                 })
                 .await

@@ -56,6 +56,9 @@ pub static SCHEMA_CONDUCTOR: Lazy<Schema> = Lazy::new(|| Schema {
         M {
             forward: include_str!("sql/conductor/schema/1-up.sql").into(),
         },
+        M {
+            forward: include_str!("sql/conductor/schema/2-up.sql").into(),
+        },
     ],
 });
 

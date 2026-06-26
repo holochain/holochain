@@ -2881,9 +2881,22 @@ mod accessor_impls {
             let role_name = role_name.clone();
             Ok(self
                 .spaces
-                .conductor_store
-                .as_read()
-                .get_init_properties(&app_id, &role_name)
+                .conductor_db
+                .read_async(move |txn| -> StateQueryResult<Option<InitProperties>> {
+                    let mut stmt = txn.prepare(
+                        "SELECT properties FROM InitProperties WHERE app_id = ? AND role_name = ?",
+                    )?;
+
+                    let blob = stmt
+                        .query_row([&app_id, &role_name], |row| row.get::<_, Vec<u8>>(0))
+                        .optional()?;
+
+                    Ok(blob.map(|b| {
+                        InitProperties(holochain_serialized_bytes::SerializedBytes::from(
+                            UnsafeBytes::from(b),
+                        ))
+                    }))
+                })
                 .await?)
         }
 
@@ -2906,8 +2919,15 @@ mod accessor_impls {
             let app_id = app.id().clone();
             let role_name = role_name.clone();
             self.spaces
-                .conductor_store
-                .delete_init_properties(&app_id, &role_name)
+                .conductor_db
+                .write_async(move |txn| -> StateMutationResult<usize> {
+                    let mut stmt = txn
+                        .prepare("DELETE FROM InitProperties WHERE app_id = ? AND role_name = ?")?;
+
+                    println!("Deleting init properties");
+
+                    Ok(stmt.execute([&app_id, &role_name])?)
+                })
                 .await?;
             Ok(())
         }
