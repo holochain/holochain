@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE**: Bump Kitsune2 to `0.5.0-dev.5`.
+- **BREAKING CHANGE**: Removed the tx5/WebRTC network transport. The iroh (QUIC) transport is now the only supported network backend. The `transport-tx5-backend-go-pion` feature flag is removed from `holochain`, `holochain_p2p`, and `holochain_cascade`.
+- **BREAKING CHANGE**: Removed the `signal_url` and `webrtc_config` fields from `NetworkConfig`, which configured the tx5 signaling server and WebRTC peer-connection options. Because `NetworkConfig` rejects unknown fields, conductor config YAML that still sets `signal_url` or `webrtc_config` under `network` will now fail to parse and must be updated.
+- **BREAKING CHANGE**: `hc sandbox` no longer offers the `webrtc` network type. Only `mem` and `quic` (iroh) transports remain.
+- Removed the `hc_service_check` crate (the `hc-service-check` tool), which checked the health of tx5 network services.
 - Fix a queue consumer bug where the integration workflow failed with a transient `database is locked` error due to write contention, and hence had its pending work dropped with no retry.
 - Improve the sweettest consistency-check failure report when consistency is not reached.
 - **BREAKING CHANGE**: Implement the DNA migration design, adding a new `InitProperties` type to be used in the `init_properties` field on `RoleSettings::Provisioned`. The bytes are opaque to the conductor and stored in the conductor database thus never written to the DHT. They are written during the installation and are intended to seed a freshly migrated chain during `init`. They can only be retrieved from the `init` callback via the `get_init_properties` host function and its HDK wrapper. They are cleared upon a successful init or if the associated app is uninstalled. \#5827
