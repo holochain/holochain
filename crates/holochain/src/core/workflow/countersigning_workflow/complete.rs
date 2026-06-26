@@ -211,11 +211,23 @@ async fn apply_success_state_changes(
     let authored_db = space.get_or_create_authored_db(author.clone())?;
     let dht_db = space.dht_db.clone();
 
-    // Load the op hashes for this session so that we can publish them.
+    // Load the op hashes for this session so that we can publish them, and clear
+    // the authored-DB withhold-publish flag for the session's ops. #5370: the
+    // store mirror is cleared below via `clear_op_withhold_publishes`; the
+    // authored clear stays as a dual-write until `remove_countersigning_session`
+    // (which reads the authored withhold flag to guard against removing a
+    // published session) is migrated to read the store.
     let this_cell_actions_op_basis_hashes = authored_db
-        .read_async({
+        .write_async({
             let this_cells_action_hash = this_cells_action_hash.clone();
             move |txn| -> SourceChainResult<Vec<DhtOpHash>> {
+                txn.execute(
+                    "UPDATE DhtOp SET withhold_publish = NULL WHERE action_hash = :action_hash",
+                    named_params! {
+                        ":action_hash": this_cells_action_hash,
+                    },
+                )
+                .map_err(holochain_state::prelude::StateMutationError::from)?;
                 Ok(get_countersigning_op_hashes(txn, this_cells_action_hash)?)
             }
         })
