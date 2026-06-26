@@ -96,6 +96,9 @@ pub enum ConductorError {
     #[error("App status could not be changed: {0}")]
     AppStatusError(String),
 
+    #[error("Init properties error: {0}")]
+    InitPropertiesError(String),
+
     #[error(transparent)]
     HolochainP2pError(#[from] holochain_p2p::HolochainP2pError),
 

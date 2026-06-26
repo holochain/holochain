@@ -306,38 +306,50 @@ impl Spaces {
     where
         F: Send + FnOnce(ConductorState) -> ConductorResult<ConductorState> + 'static,
     {
-        let (state, _) = self.update_state_prime(|s| Ok((f(s)?, ()))).await?;
+        let (state, _) = self
+            .update_state_prime(|s| Ok((f(s)?, ())), "", &InitPropertiesMap::new())
+            .await?;
         Ok(state)
     }
 
-    /// Update the internal state with a pure function mapping old state to new,
-    /// which may also produce an output value which will be the output of
-    /// this function.
+    /// Update the internal state with a pure function mapping old state
+    /// to new, and atomically persist the result alongside any `init_properties`
+    /// for `app_id`. This may also produce an output value which will be the output
+    /// of this function. When `init_properties` is empty the `app_id` is not used.
     ///
     /// The load, transform, and save steps run atomically inside a single
     /// database transaction on the conductor store, and concurrent callers
     /// are serialized — so no read-modify-write interleaving can silently
     /// drop updates.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-    pub async fn update_state_prime<F, O>(&self, f: F) -> ConductorResult<(ConductorState, O)>
+    pub async fn update_state_prime<F, O>(
+        &self,
+        f: F,
+        app_id: &str,
+        init_properties: &InitPropertiesMap,
+    ) -> ConductorResult<(ConductorState, O)>
     where
         F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)> + Send + 'static,
         O: Send + 'static,
     {
         timed!([1, 10, 1000], "update_state_prime", {
             self.conductor_store
-                .update_state(move |snapshot| -> ConductorResult<_> {
-                    let state = match snapshot {
-                        Some(snapshot) => {
-                            crate::conductor::state_persistence::snapshot_to_state(snapshot)?
-                        }
-                        None => ConductorState::default(),
-                    };
-                    let (new_state, output) = f(state)?;
-                    let new_snapshot =
-                        crate::conductor::state_persistence::state_to_snapshot(&new_state)?;
-                    Ok((new_snapshot, (new_state, output)))
-                })
+                .update_state(
+                    move |snapshot| -> ConductorResult<_> {
+                        let state = match snapshot {
+                            Some(snapshot) => {
+                                crate::conductor::state_persistence::snapshot_to_state(snapshot)?
+                            }
+                            None => ConductorState::default(),
+                        };
+                        let (new_state, output) = f(state)?;
+                        let new_snapshot =
+                            crate::conductor::state_persistence::state_to_snapshot(&new_state)?;
+                        Ok((new_snapshot, (new_state, output)))
+                    },
+                    app_id,
+                    init_properties,
+                )
                 .await
         })
     }
