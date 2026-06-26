@@ -16,7 +16,6 @@ Feature flags worth knowing (defined in the `Makefile`):
 - `DEFAULT_FEATURES` = `transport-iroh,slow_tests,build_wasms,sqlite-encrypted`.
 - Wasmer backends are tested separately: `wasmer-sys-cranelift` (default), `wasmer-sys-llvm`, or `wasmer-wasmi`. At least one must be enabled or the crate fails to compile.
 - `UNSTABLE_FEATURES` adds `unstable-sharding,unstable-functions,unstable-migration` — use the `*-unstable` Make targets to exercise them.
-- Transports: iroh (default) vs `transport-tx5-backend-go-pion` (use `*-transport_tx5` Make targets). Don't enable both.
 
 ## Architecture
 

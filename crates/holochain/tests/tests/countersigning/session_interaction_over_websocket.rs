@@ -62,7 +62,7 @@ async fn countersigning_session_interaction_calls() {
     // Start local bootstrap and signal servers.
     let local_services = SweetLocalRendezvous::new().await;
     let bootstrap_url = local_services.bootstrap_addr().to_string();
-    let signal_url = local_services.sig_addr().to_string();
+    let signal_url = local_services.relay_addr().to_string();
 
     let network_seed = uuid::Uuid::new_v4().to_string();
 
@@ -624,11 +624,6 @@ impl Agent {
         let mut config = create_config(admin_port, environment_path.clone().into());
         config.network.request_timeout_s = 10;
         config.network.advanced = Some(serde_json::json!({
-            // Allow plaintext signal for testing, and set a short timeout for network requests
-            // so that shutting down a conductor won't keep tx5 busy for too long.
-            "tx5Transport": {
-                "signalAllowPlainText": true,
-            },
             // Gossip faster to speed up the test.
             "k2Gossip": {
                 "initiateIntervalMs": 1000,

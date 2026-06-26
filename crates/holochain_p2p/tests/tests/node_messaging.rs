@@ -1271,22 +1271,7 @@ async fn spawn_test(
                 let conductor_store = conductor_store.clone();
                 Box::pin(async move { conductor_store })
             }),
-            #[cfg(feature = "transport-tx5-backend-go-pion")]
-            network_config: Some(serde_json::json!({
-                "coreBootstrap": {
-                    "serverUrl": format!("http://{bootstrap_addr}"),
-                },
-                "tx5Transport": {
-                    "serverUrl": format!("ws://{bootstrap_addr}"),
-                    "signalAllowPlainText": true,
-                    "timeoutS": 30,
-                    "webrtcConnectTimeoutS": 25,
-                }
-            })),
-            #[cfg(all(
-                feature = "transport-iroh",
-                not(feature = "transport-tx5-backend-go-pion")
-            ))]
+            #[cfg(feature = "transport-iroh")]
             network_config: Some(serde_json::json!({
                 "coreBootstrap": {
                     "serverUrl": format!("http://{bootstrap_addr}"),

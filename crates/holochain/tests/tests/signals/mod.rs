@@ -26,7 +26,7 @@ fn to_signal_message(signal: Signal) -> SignalMessage {
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "windows", ignore = "flaky")]
-async fn remote_signals_work_after_sbd_restart() {
+async fn remote_signals_work_after_relay_restart() {
     holochain_trace::test_run();
 
     const MAX: u64 = 30;
@@ -91,8 +91,8 @@ async fn remote_signals_work_after_sbd_restart() {
 
     assert_eq!("hello", &msg);
 
-    // restart the signal (sbd) server so we get new ids
-    vous.start_sig().await;
+    // restart the relay server so we get new ids
+    vous.start_relay().await;
 
     // wait for that to propagate in holochain
     tokio::time::sleep(std::time::Duration::from_secs(2)).await;

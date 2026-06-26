@@ -61,8 +61,6 @@ jobs:
             target: wasmer-sys-cranelift
           - os: ubuntu-latest
             target: wasmer-sys-cranelift-unstable
-          - os: ubuntu-latest
-            target: wasmer-sys-cranelift-transport_tx5
           - os: macos-latest
             target: wasmer-sys-cranelift
           - os: depot-windows-2025-8

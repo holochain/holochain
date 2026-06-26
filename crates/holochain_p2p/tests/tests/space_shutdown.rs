@@ -32,11 +32,6 @@ async fn space_shutdown() {
             network_config: Some(serde_json::json!({
                 "coreBootstrap": {
                     "serverUrl": "https://not_a_host"
-                },
-                "tx5Transport": {
-                    "serverUrl": "wss://not_a_host",
-                    "timeoutS": 30,
-                    "webrtcConnectTimeoutS": 25,
                 }
             })),
             get_dht_store: Arc::new(move |_space| {

@@ -2,13 +2,12 @@ use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 
 /// How conductors should learn about each other / speak to each other.
-/// Signal/TURN + bootstrap in tx5 mode.
 pub trait SweetRendezvous: 'static + Send + Sync {
     /// Get the bootstrap address.
     fn bootstrap_addr(&self) -> &str;
 
     /// Get the signal server address.
-    fn sig_addr(&self) -> &str;
+    fn relay_addr(&self) -> &str;
 }
 
 /// Trait object rendezvous.
@@ -17,8 +16,8 @@ pub type DynSweetRendezvous = Arc<dyn SweetRendezvous>;
 /// Local rendezvous infrastructure for unit testing.
 pub struct SweetLocalRendezvous {
     bs_addr: String,
-    #[cfg(any(feature = "transport-tx5-backend-go-pion", feature = "transport-iroh"))]
-    sig_addr: String,
+    #[cfg(feature = "transport-iroh")]
+    relay_addr: String,
     bootstrap_hnd: Mutex<Option<kitsune2_bootstrap_srv::BootstrapSrv>>,
     bootstrap_addr: SocketAddr,
 }
@@ -43,11 +42,6 @@ async fn spawn_test_bootstrap(
     let _ = rustls::crypto::ring::default_provider().install_default();
 
     let mut config = kitsune2_bootstrap_srv::Config::testing();
-    #[cfg(feature = "transport-tx5-backend-go-pion")]
-    {
-        config.sbd.limit_clients = 100;
-        config.sbd.disable_rate_limiting = true;
-    }
 
     if let Some(bind_addr) = bind_addr {
         config.listen_address_list = vec![bind_addr];
@@ -81,13 +75,8 @@ impl SweetLocalRendezvous {
 
         Arc::new(Self {
             bs_addr: format!("http://{bootstrap_addr}"),
-            #[cfg(feature = "transport-tx5-backend-go-pion")]
-            sig_addr: format!("ws://{bootstrap_addr}"),
-            #[cfg(all(
-                feature = "transport-iroh",
-                not(feature = "transport-tx5-backend-go-pion")
-            ))]
-            sig_addr: format!("http://{bootstrap_addr}"),
+            #[cfg(feature = "transport-iroh")]
+            relay_addr: format!("http://{bootstrap_addr}"),
             bootstrap_hnd,
             bootstrap_addr,
         })
@@ -109,7 +98,7 @@ impl SweetLocalRendezvous {
     }
 
     /// Start (or restart) the signal server.
-    pub async fn start_sig(&self) {
+    pub async fn start_relay(&self) {
         self.drop_sig().await;
 
         let (bootstrap, _) = spawn_test_bootstrap(Some(self.bootstrap_addr))
@@ -127,7 +116,7 @@ impl SweetRendezvous for SweetLocalRendezvous {
     }
 
     /// Get the signal server address.
-    fn sig_addr(&self) -> &str {
-        self.sig_addr.as_str()
+    fn relay_addr(&self) -> &str {
+        self.relay_addr.as_str()
     }
 }

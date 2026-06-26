@@ -63,6 +63,3 @@ wasmer-sys-cranelift = ["holochain_client/wasmer-sys-cranelift"]
 wasmer-wasmi = ["holochain_client/wasmer-wasmi"]
 
 transport-iroh = ["holochain_client/transport-iroh"]
-transport-tx5-backend-go-pion = [
-  "holochain_client/transport-tx5-backend-go-pion",
-]

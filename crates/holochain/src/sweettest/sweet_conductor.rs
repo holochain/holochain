@@ -175,14 +175,6 @@ impl SweetConductor {
             {
                 panic!("Must use rendezvous SweetConductor if rendezvous: is specified in config.network.bootstrap_service");
             }
-            if config
-                .network
-                .signal_url
-                .as_str()
-                .starts_with("rendezvous:")
-            {
-                panic!("Must use rendezvous SweetConductor if rendezvous: is specified in config.network.signal_url");
-            }
             if config.network.relay_url.as_str().starts_with("rendezvous:") {
                 panic!("Must use rendezvous SweetConductor if rendezvous: is specified in config.network.relay_url");
             }
