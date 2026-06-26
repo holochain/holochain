@@ -276,6 +276,50 @@ impl DhtStore<DbRead<Dht>> {
             }))
     }
 
+    /// Whether `author`'s source-chain head is a committed countersigning
+    /// session, and if so the session record, its entry hash, and the decoded
+    /// [`CounterSigningSessionData`](holochain_zome_types::countersigning::CounterSigningSessionData).
+    ///
+    /// This is the merged-store counterpart of the legacy
+    /// [`current_countersigning_session`](crate::source_chain::current_countersigning_session):
+    /// it reads the chain head and head record from the store rather than the
+    /// authored database. `author` is threaded through to
+    /// [`retrieve_record`](Self::retrieve_record) so the author's own
+    /// (potentially private) countersigning entry is visible.
+    ///
+    /// Returns `None` when the chain is empty (pre-genesis), the head record is
+    /// unavailable, or the head action does not carry a `CounterSign` entry. A
+    /// `Some` result guarantees the `CounterSign` entry blob is present in the
+    /// store — the match requires it — so callers need not re-check the entry.
+    pub async fn current_countersigning_session(
+        &self,
+        author: &AgentPubKey,
+    ) -> StateQueryResult<
+        Option<(
+            holochain_zome_types::record::Record,
+            holo_hash::EntryHash,
+            holochain_zome_types::countersigning::CounterSigningSessionData,
+        )>,
+    > {
+        use holochain_types::prelude::Entry;
+
+        let head = match self.chain_head_for_author(author).await? {
+            Some(h) => h,
+            None => return Ok(None),
+        };
+        let record = match self.retrieve_record(&head.action, Some(author)).await? {
+            Some(r) => r,
+            None => return Ok(None),
+        };
+        let (sah, entry) = record.clone().into_inner();
+        Ok(match (sah.action().entry_hash(), entry.into_option()) {
+            (Some(entry_hash), Some(Entry::CounterSign(cs, _))) => {
+                Some((record, entry_hash.clone(), *cs))
+            }
+            _ => None,
+        })
+    }
+
     /// Validation receipts for every chain op of `action_hash`, grouped into a
     /// [`ValidationReceiptSet`](holochain_zome_types::prelude::ValidationReceiptSet) per op.
     ///
@@ -3228,6 +3272,181 @@ mod tests {
         );
     }
 
+    /// Builds the `(EntryHash, Entry, Action)` for a committed countersigning
+    /// session at `seq` on `author`'s chain. The session is the minimal valid
+    /// shape: two signing agents (`author` at index 0, `other` at index 1).
+    fn countersigning_head(
+        author: &AgentPubKey,
+        other: &AgentPubKey,
+        seq: u32,
+        visibility: holochain_zome_types::entry_def::EntryVisibility,
+    ) -> (
+        EntryHash,
+        holochain_types::prelude::Entry,
+        Action,
+        holochain_zome_types::countersigning::PreflightRequest,
+    ) {
+        use holochain_types::prelude::{AppEntryBytes, Entry};
+        use holochain_zome_types::countersigning::{
+            ActionBase, CounterSigningAgentState, CounterSigningSessionData,
+            CounterSigningSessionTimes, CreateBase, PreflightBytes, PreflightRequest,
+        };
+
+        let app_entry_type = EntryType::App(AppEntryDef::new(0.into(), 0.into(), visibility));
+        let session_times = CounterSigningSessionTimes::try_new(
+            Timestamp::from_micros(1_000),
+            Timestamp::from_micros(1_000_000_000),
+        )
+        .unwrap();
+        let preflight_request = PreflightRequest::try_new(
+            EntryHash::from_raw_36(vec![5u8; 36]),
+            vec![(author.clone(), vec![]), (other.clone(), vec![])],
+            vec![],
+            0,
+            false,
+            session_times,
+            ActionBase::Create(CreateBase::new(app_entry_type.clone())),
+            PreflightBytes(vec![]),
+        )
+        .unwrap();
+        let session_data = CounterSigningSessionData::try_new(
+            preflight_request.clone(),
+            vec![
+                (
+                    CounterSigningAgentState::new(0, ActionHash::from_raw_36(vec![10u8; 36]), 2),
+                    Signature::from([0u8; 64]),
+                ),
+                (
+                    CounterSigningAgentState::new(1, ActionHash::from_raw_36(vec![11u8; 36]), 2),
+                    Signature::from([1u8; 64]),
+                ),
+            ],
+            vec![],
+        )
+        .unwrap();
+
+        let entry = Entry::CounterSign(
+            Box::new(session_data),
+            AppEntryBytes(holochain_serialized_bytes::SerializedBytes::from(
+                holochain_serialized_bytes::UnsafeBytes::from(vec![1u8; 8]),
+            )),
+        );
+        let entry_hash = EntryHash::with_data_sync(&entry);
+        let action = Action::Create(Create {
+            author: author.clone(),
+            timestamp: Timestamp::from_micros(2_000),
+            action_seq: seq,
+            prev_action: ActionHash::from_raw_36(vec![3u8; 36]),
+            entry_type: app_entry_type,
+            entry_hash: entry_hash.clone(),
+            weight: Default::default(),
+        });
+        (entry_hash, entry, action, preflight_request)
+    }
+
+    #[tokio::test]
+    async fn current_countersigning_session_returns_session_at_chain_head() {
+        use holochain_types::prelude::RecordEntry;
+        use holochain_zome_types::entry_def::EntryVisibility;
+
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let alice = AgentPubKey::from_raw_36(vec![1u8; 36]);
+        let bob = AgentPubKey::from_raw_36(vec![2u8; 36]);
+
+        let (cs_entry_hash, cs_entry, head_action, preflight_request) =
+            countersigning_head(&alice, &bob, 3, EntryVisibility::Public);
+        let head_hash = ActionHash::with_data_sync(&head_action);
+
+        // Record a StoreRecord op so both the head action and the CounterSign
+        // entry land in the store.
+        let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(ChainOp::StoreRecord(
+            Signature::from([7u8; 64]),
+            head_action,
+            RecordEntry::Present(cs_entry),
+        ))));
+        store.record_incoming_ops(vec![(op, false)]).await.unwrap();
+
+        let (record, entry_hash, returned_session) = store
+            .as_read()
+            .current_countersigning_session(&alice)
+            .await
+            .unwrap()
+            .expect("the chain head is a countersigning session");
+
+        assert_eq!(entry_hash, cs_entry_hash);
+        assert_eq!(record.action_address(), &head_hash);
+        assert_eq!(
+            returned_session.preflight_request().fingerprint().unwrap(),
+            preflight_request.fingerprint().unwrap(),
+        );
+    }
+
+    #[tokio::test]
+    async fn current_countersigning_session_none_when_head_is_normal_entry() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let alice = AgentPubKey::from_raw_36(vec![4u8; 36]);
+
+        // A normal app entry at the chain head (seq 1), recorded as a StoreRecord
+        // op so the action and entry are both present.
+        let entry = holochain_types::prelude::Entry::App(holochain_types::prelude::AppEntryBytes(
+            holochain_serialized_bytes::SerializedBytes::from(
+                holochain_serialized_bytes::UnsafeBytes::from(vec![9u8; 8]),
+            ),
+        ));
+        let entry_hash = EntryHash::with_data_sync(&entry);
+        let action = Action::Create(Create {
+            author: alice.clone(),
+            timestamp: Timestamp::from_micros(2_000),
+            action_seq: 1,
+            prev_action: ActionHash::from_raw_36(vec![3u8; 36]),
+            entry_type: EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                holochain_zome_types::entry_def::EntryVisibility::Public,
+            )),
+            entry_hash,
+            weight: Default::default(),
+        });
+        let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(ChainOp::StoreRecord(
+            Signature::from([7u8; 64]),
+            action,
+            holochain_types::prelude::RecordEntry::Present(entry),
+        ))));
+        store.record_incoming_ops(vec![(op, false)]).await.unwrap();
+
+        let result = store
+            .as_read()
+            .current_countersigning_session(&alice)
+            .await
+            .unwrap();
+        assert!(
+            result.is_none(),
+            "a normal entry at the chain head is not a countersigning session"
+        );
+    }
+
+    #[tokio::test]
+    async fn current_countersigning_session_none_for_empty_chain() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let alice = AgentPubKey::from_raw_36(vec![6u8; 36]);
+
+        let result = store
+            .as_read()
+            .current_countersigning_session(&alice)
+            .await
+            .unwrap();
+        assert!(
+            result.is_none(),
+            "an empty chain has no countersigning session"
+        );
+    }
+
     #[tokio::test]
     async fn op_exists_returns_false_for_unknown_hash() {
         let store = crate::dht_store::DhtStore::new_test(dht_id())
@@ -3682,7 +3901,11 @@ mod tests {
             .unwrap();
         match resp.valid_activity {
             ChainItems::Hashes(h) => {
-                assert_eq!(h.len(), 3, "revealed op must be visible after clearing withhold");
+                assert_eq!(
+                    h.len(),
+                    3,
+                    "revealed op must be visible after clearing withhold"
+                );
                 assert_eq!(h[2].0, 2);
             }
             other => panic!("expected Hashes, got {other:?}"),

@@ -1954,8 +1954,11 @@ impl TestHarness {
 
         let signed = SignedAction::from(sah.clone());
 
+        // Sign the op with the real action signature. The store record is
+        // reconstructed from this op (#5370), and the completion path verifies
+        // the record's signature, so a fixt signature would be rejected.
         let store_entry_op = ChainOp::StoreEntry(
-            fixt!(Signature),
+            sah.signature().clone(),
             my_action.clone().try_into().unwrap(),
             entry.clone(),
         );
@@ -1966,14 +1969,42 @@ impl TestHarness {
             .space
             .get_or_create_authored_db(self.author.clone())
             .unwrap()
-            .write_async(move |txn| -> StateMutationResult<()> {
-                insert_action(txn, &sah)?;
-                insert_entry(txn, &entry_hash, &entry)?;
-                insert_op_authored(txn, &dht_op)?;
-                set_withhold_publish(txn, &dht_op.hash)?;
+            .write_async({
+                let sah = sah.clone();
+                let entry = entry.clone();
+                let entry_hash = entry_hash.clone();
+                let dht_op = dht_op.clone();
+                move |txn| -> StateMutationResult<()> {
+                    insert_action(txn, &sah)?;
+                    insert_entry(txn, &entry_hash, &entry)?;
+                    insert_op_authored(txn, &dht_op)?;
+                    set_withhold_publish(txn, &dht_op.hash)?;
 
-                Ok(())
+                    Ok(())
+                }
             })
+            .await
+            .unwrap();
+
+        // #5370: mirror the commit to the merged store so the store-backed
+        // session reads (`current_countersigning_session`, chain head) see it.
+        // The session op is withheld from publishing until the session
+        // succeeds, matching the flush path. The entry must be routed by
+        // visibility so a private session entry lands in `PrivateEntry`.
+        let private_author = my_action
+            .entry_visibility()
+            .is_some_and(|v| matches!(v, holochain_zome_types::entry_def::EntryVisibility::Private))
+            .then_some(&self.author);
+        self.test_space
+            .space
+            .dht_store
+            .test_insert_entry(&entry_hash, &entry, private_author)
+            .await
+            .unwrap();
+        self.test_space
+            .space
+            .dht_store
+            .test_insert_authored_chain_op(dht_op, None, None, Some(true))
             .await
             .unwrap();
 

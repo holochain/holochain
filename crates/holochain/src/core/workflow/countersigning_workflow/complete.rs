@@ -5,7 +5,6 @@ use crate::core::workflow::{WorkflowError, WorkflowResult};
 use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, EntryHash};
 use holochain_keystore::{AgentPubKeyExt, MetaLairClient};
 use holochain_p2p::DynHolochainP2pDna;
-use holochain_sqlite::db::ReadAccess;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_state::integrate::authored_ops_to_dht_db_without_check;
 use holochain_state::prelude::*;
@@ -23,8 +22,6 @@ pub(crate) async fn inner_countersigning_session_complete(
     integration_trigger: TriggerSender,
     publish_trigger: TriggerSender,
 ) -> WorkflowResult<Option<EntryHash>> {
-    let authored_db = space.get_or_create_authored_db(author.clone())?;
-
     // Using iterators is fine in this function as there can only be a maximum of 8 actions.
     let (this_cells_action_hash, entry_hash) = match signed_actions
         .iter()
@@ -46,40 +43,36 @@ pub(crate) async fn inner_countersigning_session_complete(
         .get_chain_lock(author.clone())
         .await?;
 
+    // Read the current countersigning session from the merged store (#5370). A
+    // `Some` result guarantees the `CounterSign` entry is present in the store,
+    // so no separate entry-presence check is needed.
+    let maybe_current_session = space
+        .dht_store
+        .as_read()
+        .current_countersigning_session(&author)
+        .await?;
+
     // Do a quick check to see if this entry hash matches the current locked session, so we don't
     // check signatures unless there is an active session.
-    let reader_closure = {
-        let entry_hash = entry_hash.clone();
-        move |txn: &Txn<DbKindAuthored>| {
-            if let Some((session_record, cs_entry_hash, session_data)) =
-                current_countersigning_session(txn)?
-            {
-                let lock_subject = session_data.preflight_request.fingerprint()?;
-
-                if let Some(chain_lock) = &chain_lock {
-                    // This is the case where we have already locked the chain for another session and are
-                    // receiving another signature bundle from a different session. We don't need this, so
-                    // it's safe to short circuit.
-                    if cs_entry_hash != entry_hash || chain_lock.subject() != lock_subject {
-                        return SourceChainResult::Ok(None);
-                    }
-
-                    let transaction: holochain_state::prelude::CascadeTxnWrapper = txn.into();
-
-                    // Ensure that the entry is present in the database.
-                    // We've looked up the session as a Record, but that permits the entry to be
-                    // missing. The cs_entry_hash is stored on the action rather than being a
-                    // guarantee that the action is present.
-                    if transaction.contains_entry(&entry_hash)? {
-                        return Ok(Some((session_record, session_data)));
-                    }
+    let maybe_matched_session = match maybe_current_session {
+        Some((session_record, cs_entry_hash, session_data)) => {
+            let lock_subject = session_data.preflight_request.fingerprint()?;
+            match &chain_lock {
+                // This is the case where we have already locked the chain for another session and are
+                // receiving another signature bundle from a different session. We don't need this, so
+                // it's safe to short circuit.
+                Some(chain_lock)
+                    if cs_entry_hash == entry_hash && chain_lock.subject() == lock_subject =>
+                {
+                    Some((session_record, session_data))
                 }
+                _ => None,
             }
-            SourceChainResult::Ok(None)
         }
+        None => None,
     };
 
-    let (session_record, session_data) = match authored_db.read_async(reader_closure).await? {
+    let (session_record, session_data) = match maybe_matched_session {
         Some(cs) => cs,
         None => {
             // If there is no active session then we can short circuit.
@@ -302,32 +295,34 @@ pub(super) async fn force_publish_countersigning_session(
         .get_chain_lock(cell_id.agent_pubkey().clone())
         .await?;
 
-    // Query database for current countersigning session.
-    let reader_closure = {
-        let preflight_request = preflight_request.clone();
-        move |txn: &Txn<DbKindAuthored>| {
-            if let Some((session_record, _, session_data)) = current_countersigning_session(txn)? {
-                let lock_subject = session_data.preflight_request.fingerprint()?;
-                if lock_subject != preflight_request.fingerprint()? {
-                    return SourceChainResult::Ok(None);
-                }
+    // Read the current countersigning session from the merged store (#5370).
+    let maybe_current_session = space
+        .dht_store
+        .as_read()
+        .current_countersigning_session(cell_id.agent_pubkey())
+        .await?;
 
-                if let Some(chain_lock) = &chain_lock {
+    let maybe_session_record = match maybe_current_session {
+        Some((session_record, _, session_data)) => {
+            let lock_subject = session_data.preflight_request.fingerprint()?;
+            if lock_subject != preflight_request.fingerprint()? {
+                None
+            } else {
+                match &chain_lock {
                     // This is the case where we have already locked the chain for another session and are
                     // receiving another signature bundle from a different session. We don't need this, so
                     // it's safe to short circuit.
-                    if chain_lock.subject() != lock_subject {
-                        return SourceChainResult::Ok(None);
+                    Some(chain_lock) if chain_lock.subject() == lock_subject => {
+                        Some(session_record)
                     }
-
-                    return Ok(Some(session_record));
+                    _ => None,
                 }
             }
-            SourceChainResult::Ok(None)
         }
+        None => None,
     };
-    let authored_db = space.get_or_create_authored_db(cell_id.agent_pubkey().clone())?;
-    let session_record = match authored_db.read_async(reader_closure).await? {
+
+    let session_record = match maybe_session_record {
         Some(cs) => cs,
         None => {
             // If there is no active session then we can short circuit.

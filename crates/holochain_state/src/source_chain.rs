@@ -1633,6 +1633,8 @@ pub type CurrentCountersigningSessionOpt = Option<(Record, EntryHash, CounterSig
 
 /// Check if there is a current countersigning session and if so, return the
 /// session data and the entry hash.
+// #5370: kept for the legacy authored path; retire with DbKindAuthored. The
+// merged-store equivalent is `DhtStore::current_countersigning_session`.
 pub fn current_countersigning_session(
     txn: &Txn<DbKindAuthored>,
 ) -> SourceChainResult<CurrentCountersigningSessionOpt> {
