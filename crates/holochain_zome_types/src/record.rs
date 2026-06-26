@@ -27,11 +27,13 @@ impl HashableContent for SignedAction {
     }
 
     fn hashable_content(&self) -> HashableContentBytes {
-        HashableContentBytes::Content(
-            self.action()
-                .try_into()
-                .expect("Could not serialize HashableContent"),
-        )
+        // A `SignedAction` must hash to the same canonical `ActionHash` as its
+        // inner `Action`. #5822 flipped `Action`'s hash to the content-derived
+        // v2 projection but missed this impl, which used to serialize the legacy
+        // action bytes — so hashing a bare `SignedAction` produced a hash that
+        // disagreed with `Action`, `SignedActionHashed`, and every stored
+        // `action_hash`. Delegate to the inner `Action` to keep the identity.
+        self.action().hashable_content()
     }
 }
 
