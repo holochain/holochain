@@ -702,7 +702,7 @@ pub mod wasm_test {
                     agent_pubkey: alice_cell.agent_pubkey().clone(),
                     chain_query_filter: ChainQueryFilter::new(),
                     activity_request: ActivityRequest::Full,
-                    get_options: GetOptions::default(),
+                    get_options: GetOptions::from(GetStrategy::Local),
                 },
             )
             .await;
@@ -777,7 +777,7 @@ pub mod wasm_test {
                     agent_pubkey: alice_cell.agent_pubkey().clone(),
                     chain_query_filter: ChainQueryFilter::new(),
                     activity_request: ActivityRequest::Full,
-                    get_options: GetOptions::default(),
+                    get_options: GetOptions::from(GetStrategy::Local),
                 },
             )
             .await;
@@ -800,7 +800,7 @@ pub mod wasm_test {
                     agent_pubkey: bob_cell.agent_pubkey().clone(),
                     chain_query_filter: ChainQueryFilter::new(),
                     activity_request: ActivityRequest::Full,
-                    get_options: GetOptions::default(),
+                    get_options: GetOptions::from(GetStrategy::Local),
                 },
             )
             .await;
@@ -1131,7 +1131,7 @@ pub mod wasm_test {
                         agent_pubkey: bob_pubkey.clone(),
                         chain_query_filter: ChainQueryFilter::new(),
                         activity_request: ActivityRequest::Full,
-                        get_options: GetOptions::default(),
+                        get_options: GetOptions::from(GetStrategy::Local),
                     },
                 )
                 .await;
@@ -1198,7 +1198,7 @@ pub mod wasm_test {
                     agent_pubkey: alice_pubkey.clone(),
                     chain_query_filter: ChainQueryFilter::new(),
                     activity_request: ActivityRequest::Full,
-                    get_options: GetOptions::default(),
+                    get_options: GetOptions::from(GetStrategy::Local),
                 },
             )
             .await;
@@ -1211,7 +1211,7 @@ pub mod wasm_test {
                     agent_pubkey: bob_pubkey.clone(),
                     chain_query_filter: ChainQueryFilter::new(),
                     activity_request: ActivityRequest::Full,
-                    get_options: GetOptions::default(),
+                    get_options: GetOptions::from(GetStrategy::Local),
                 },
             )
             .await;
@@ -1236,7 +1236,7 @@ pub mod wasm_test {
                     agent_pubkey: alice_pubkey.clone(),
                     chain_query_filter: ChainQueryFilter::new(),
                     activity_request: ActivityRequest::Full,
-                    get_options: GetOptions::default(),
+                    get_options: GetOptions::from(GetStrategy::Local),
                 },
             )
             .await;
@@ -1249,7 +1249,7 @@ pub mod wasm_test {
                     agent_pubkey: bob_pubkey.clone(),
                     chain_query_filter: ChainQueryFilter::new(),
                     activity_request: ActivityRequest::Full,
-                    get_options: GetOptions::default(),
+                    get_options: GetOptions::from(GetStrategy::Local),
                 },
             )
             .await;
