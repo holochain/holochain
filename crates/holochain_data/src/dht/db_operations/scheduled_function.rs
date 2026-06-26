@@ -17,6 +17,19 @@ impl DbRead<Dht> {
         scheduled_function::get_expired_persisted_scheduled_functions(self.pool(), author, now)
             .await
     }
+
+    /// Return live scheduled-function rows for `author` at `now`.
+    ///
+    /// A row is "live" when `start_at <= now AND now <= end_at`, mirroring the
+    /// legacy `live_scheduled_fns` predicate. Returns
+    /// `(zome_name, scheduled_fn, maybe_schedule_blob, ephemeral)` tuples.
+    pub async fn get_live_scheduled_functions(
+        &self,
+        author: &AgentPubKey,
+        now: Timestamp,
+    ) -> sqlx::Result<Vec<(String, String, Vec<u8>, bool)>> {
+        scheduled_function::get_live_scheduled_functions(self.pool(), author, now).await
+    }
 }
 
 impl DbWrite<Dht> {

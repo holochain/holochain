@@ -983,6 +983,7 @@ pub fn delete_live_ephemeral_scheduled_fns(
     Ok(())
 }
 
+// #5370 — no production callers; reads authored DB which is being retired.
 pub fn reschedule_expired(
     txn: &mut Transaction,
     now: Timestamp,

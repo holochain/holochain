@@ -14,6 +14,7 @@ use holochain_types::prelude::{Schedule, ScheduledFn, Timestamp};
 use holochain_zome_types::schedule::ScheduleError;
 
 use crate::mutations::{StateMutationError, StateMutationResult};
+use crate::query::StateQueryResult;
 
 /// Summary of a single op promoted by [`DhtStore::integrate_ready_ops`].
 ///
@@ -319,6 +320,36 @@ impl DhtStore<DbWrite<Dht>> {
                 scheduled_fn.fn_name().0.as_str(),
             )
             .await?)
+    }
+
+    /// Return the live scheduled functions for `author` at `now`.
+    ///
+    /// A function is "live" when `start_at <= now AND now <= end_at`,
+    /// mirroring the legacy `live_scheduled_fns` predicate exactly.
+    /// Returns `(ScheduledFn, Option<Schedule>, ephemeral)` tuples ordered by
+    /// `start_at ASC`.
+    pub async fn live_scheduled_functions(
+        &self,
+        author: &AgentPubKey,
+        now: Timestamp,
+    ) -> StateQueryResult<Vec<(ScheduledFn, Option<Schedule>, bool)>> {
+        let rows = self
+            .db
+            .as_ref()
+            .get_live_scheduled_functions(author, now)
+            .await?;
+
+        let mut result = Vec::with_capacity(rows.len());
+        for (zome_name, fn_name, maybe_schedule_blob, ephemeral) in rows {
+            let maybe_schedule: Option<Schedule> =
+                holochain_serialized_bytes::decode(&maybe_schedule_blob)?;
+            result.push((
+                ScheduledFn::new(zome_name.into(), fn_name.into()),
+                maybe_schedule,
+                ephemeral,
+            ));
+        }
+        Ok(result)
     }
 
     /// Insert a `SignedValidationReceipt` into the `ValidationReceipt` table

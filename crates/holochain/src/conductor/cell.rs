@@ -37,7 +37,6 @@ use holochain_serialized_bytes::SerializedBytes;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::*;
-use holochain_state::schedule::live_scheduled_fns;
 use holochain_types::cell_config_overrides::CellConfigOverrides;
 use kitsune2_api::BoxFut;
 use std::hash::Hash;
@@ -240,19 +239,14 @@ impl Cell {
         };
 
         let author = self.id.agent_pubkey().clone();
-        let live_fns = authored_db
-            .write_async(move |txn| {
-                // Rescheduling should not fail as the data in the database
-                // should be valid schedules only.
-                reschedule_expired(txn, now, &author)?;
-                let lives = live_scheduled_fns(txn, now, &author);
-                // We know what to run so we can delete the ephemerals.
-                if lives.is_ok() {
-                    // Failing to delete should rollback this attempt.
-                    delete_live_ephemeral_scheduled_fns(txn, now, &author)?;
-                }
-                lives
-            })
+        self.space
+            .dht_store
+            .reschedule_expired_persisted(&author, now)
+            .await;
+        let live_fns = self
+            .space
+            .dht_store
+            .live_scheduled_functions(&author, now)
             .await;
 
         match live_fns {
@@ -271,10 +265,24 @@ impl Cell {
                     error!("error deleting live ephemeral scheduled functions: {:?}", e);
                 }
 
-                self.space
-                    .dht_store
-                    .reschedule_expired_persisted(&author_for_new_db, now)
-                    .await;
+                // Also remove live ephemeral rows from the legacy authored DB before
+                // dispatching so that `is_scheduled` checks (which read authored DB)
+                // immediately reflect the correct state when a signal is received.
+                {
+                    let author_for_cleanup = author.clone();
+                    let authored_db_clone = authored_db.clone();
+                    if let Err(e) = authored_db_clone
+                        .write_async(move |txn| {
+                            delete_live_ephemeral_scheduled_fns(txn, now, &author_for_cleanup)
+                        })
+                        .await
+                    {
+                        error!(
+                            "error deleting live ephemeral fns from authored db: {:?}",
+                            e
+                        );
+                    }
+                }
 
                 let mut tasks = vec![];
                 let mut dispatched: Vec<(ScheduledFn, bool)> = Vec::with_capacity(live_fns.len());
@@ -444,6 +452,20 @@ impl Cell {
                                     "error upserting scheduled function {:?}: {:?}",
                                     scheduled_fn, e
                                 );
+                                // Upsert failed (e.g. invalid crontab string): remove the
+                                // stale row so it does not trigger an extra dispatch on the
+                                // next scheduler tick.
+                                if let Err(e2) = self
+                                    .space
+                                    .dht_store
+                                    .unschedule_function(&author_for_new_db, &scheduled_fn)
+                                    .await
+                                {
+                                    error!(
+                                        "error unscheduling function {:?} after failed upsert: {:?}",
+                                        scheduled_fn, e2
+                                    );
+                                }
                             }
                         }
                     }

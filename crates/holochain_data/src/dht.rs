@@ -2299,4 +2299,76 @@ mod tests {
             .expect("row");
         assert_eq!(row.receipts_complete, Some(1));
     }
+
+    #[tokio::test]
+    async fn live_scheduled_functions_predicate() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let alice = AgentPubKey::from_raw_36(vec![0x01; 36]);
+        let bob = AgentPubKey::from_raw_36(vec![0x02; 36]);
+        let now = Timestamp::from_micros(500);
+        let payload = b"schedule-blob";
+
+        // Alice: ephemeral, live (start_at=200 <= now=500 <= end_at=MAX).
+        db.upsert_scheduled_function(InsertScheduledFunction {
+            author: &alice,
+            zome_name: "z",
+            scheduled_fn: "ephemeral_live",
+            maybe_schedule: payload,
+            start_at: Timestamp::from_micros(200),
+            end_at: Timestamp::from_micros(i64::MAX),
+            ephemeral: true,
+        })
+        .await
+        .unwrap();
+
+        // Alice: persisted, future (start_at=700 > now=500 → not live).
+        db.upsert_scheduled_function(InsertScheduledFunction {
+            author: &alice,
+            zome_name: "z",
+            scheduled_fn: "persisted_future",
+            maybe_schedule: payload,
+            start_at: Timestamp::from_micros(700),
+            end_at: Timestamp::from_micros(900),
+            ephemeral: false,
+        })
+        .await
+        .unwrap();
+
+        // Alice: ephemeral, already past end_at (now=500 > end_at=400 → not live).
+        db.upsert_scheduled_function(InsertScheduledFunction {
+            author: &alice,
+            zome_name: "z",
+            scheduled_fn: "past",
+            maybe_schedule: payload,
+            start_at: Timestamp::from_micros(100),
+            end_at: Timestamp::from_micros(400),
+            ephemeral: true,
+        })
+        .await
+        .unwrap();
+
+        // Bob: ephemeral, live — must NOT be returned for alice.
+        db.upsert_scheduled_function(InsertScheduledFunction {
+            author: &bob,
+            zome_name: "z",
+            scheduled_fn: "ephemeral_live",
+            maybe_schedule: payload,
+            start_at: Timestamp::from_micros(200),
+            end_at: Timestamp::from_micros(i64::MAX),
+            ephemeral: true,
+        })
+        .await
+        .unwrap();
+
+        let live = db
+            .as_ref()
+            .get_live_scheduled_functions(&alice, now)
+            .await
+            .unwrap();
+
+        assert_eq!(live.len(), 1, "expected exactly one live fn for alice");
+        assert_eq!(live[0].0, "z");
+        assert_eq!(live[0].1, "ephemeral_live");
+        assert!(live[0].3, "expected ephemeral=true for the live fn");
+    }
 }

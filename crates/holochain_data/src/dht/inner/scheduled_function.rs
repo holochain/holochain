@@ -111,6 +111,46 @@ where
         .collect())
 }
 
+/// Return live scheduled-function rows for `author` where `now` falls between
+/// `start_at` and `end_at` (inclusive on both sides), mirroring the legacy
+/// `live_scheduled_fns` predicate (`start <= now AND now <= end`).
+///
+/// Returns `(zome_name, scheduled_fn, maybe_schedule_blob, ephemeral)` tuples,
+/// ordered by `start_at ASC`.
+pub(crate) async fn get_live_scheduled_functions<'e, E>(
+    executor: E,
+    author: &AgentPubKey,
+    now: Timestamp,
+) -> sqlx::Result<Vec<(String, String, Vec<u8>, bool)>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    #[derive(sqlx::FromRow)]
+    struct Row {
+        zome_name: String,
+        scheduled_fn: String,
+        maybe_schedule: Vec<u8>,
+        ephemeral: i64,
+    }
+
+    let rows: Vec<Row> = sqlx::query_as(
+        "SELECT zome_name, scheduled_fn, maybe_schedule, ephemeral
+         FROM ScheduledFunction
+         WHERE author = ? AND start_at <= ? AND ? <= end_at
+         ORDER BY start_at ASC",
+    )
+    .bind(author.get_raw_36())
+    .bind(now.as_micros())
+    .bind(now.as_micros())
+    .fetch_all(executor)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .map(|r| (r.zome_name, r.scheduled_fn, r.maybe_schedule, r.ephemeral != 0))
+        .collect())
+}
+
 /// Delete all live ephemeral scheduled-function rows for `author` whose
 /// `start_at` is at or before `now`. Returns the number of rows deleted.
 pub(crate) async fn delete_live_ephemeral_scheduled_functions<'e, E>(
