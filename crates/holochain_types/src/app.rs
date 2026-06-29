@@ -150,6 +150,8 @@ pub type ModifiersMap = HashMap<RoleName, DnaModifiersOpt<YamlProperties>>;
 /// Alias
 pub type ExistingCellsMap = HashMap<RoleName, CellId>;
 /// Alias
+pub type InitPropertiesMap = HashMap<RoleName, InitProperties>;
+/// Alias
 pub type RoleSettingsMap = HashMap<RoleName, RoleSettings>;
 /// Alias
 pub type RoleSettingsMapYaml = HashMap<RoleName, RoleSettingsYaml>;
@@ -179,6 +181,12 @@ pub enum RoleSettings {
         /// Overwrites the dna modifiers from the dna manifest. Only
         /// modifier fields for which `Some(T)` is provided will be overwritten.
         modifiers: Option<DnaModifiersOpt<YamlProperties>>,
+        /// Opaque, app-defined bytes made available to the cell during `init`.
+        ///
+        /// Not interpreted by the conductor and never written to the DHT. The bytes are persisted
+        /// by the conductor alongside the app at install time and read back during `init` via the
+        /// `hdk::migrate::get_init_properties` host function.
+        init_properties: Option<InitProperties>,
     },
 }
 
@@ -187,6 +195,7 @@ impl Default for RoleSettings {
         Self::Provisioned {
             membrane_proof: None,
             modifiers: None,
+            init_properties: None,
         }
     }
 }
@@ -197,9 +206,11 @@ impl From<RoleSettingsYaml> for RoleSettings {
             RoleSettingsYaml::Provisioned {
                 membrane_proof,
                 modifiers,
+                init_properties,
             } => Self::Provisioned {
                 membrane_proof,
                 modifiers,
+                init_properties,
             },
             #[allow(deprecated)]
             RoleSettingsYaml::UseExisting { cell_id } => Self::UseExisting { cell_id },
@@ -232,6 +243,12 @@ pub enum RoleSettingsYaml {
         /// Overwrites the dna modifiers from the dna manifest. Only
         /// modifier fields for which `Some(T)` is provided will be overwritten.
         modifiers: Option<DnaModifiersOpt<YamlProperties>>,
+        /// Opaque, app-defined bytes made available to the cell during `init`.
+        ///
+        /// Not interpreted by the conductor and never written to the DHT. The bytes are persisted
+        /// conductor-side at install time and read back during `init` via the
+        /// `hdk::migrate::get_init_properties` host function.
+        init_properties: Option<InitProperties>,
     },
 }
 
@@ -1165,10 +1182,11 @@ mod tests {
         let role_settings: RoleSettings = RoleSettings::Provisioned {
             membrane_proof: None,
             modifiers: None,
+            init_properties: None,
         };
         assert_eq!(
             serde_json::to_string(&role_settings).unwrap(),
-            "{\"type\":\"provisioned\",\"value\":{\"membrane_proof\":null,\"modifiers\":null}}"
+            "{\"type\":\"provisioned\",\"value\":{\"membrane_proof\":null,\"modifiers\":null,\"init_properties\":null}}"
         );
     }
 

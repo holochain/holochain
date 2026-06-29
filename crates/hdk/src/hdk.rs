@@ -99,6 +99,7 @@ pub trait HdkT: HdiT {
     // Migrate DNA
     fn close_chain(&self, input: CloseChainInput) -> ExternResult<ActionHash>;
     fn open_chain(&self, input: OpenChainInput) -> ExternResult<ActionHash>;
+    fn get_init_properties(&self, input: ()) -> ExternResult<Option<InitProperties>>;
     // Validation receipts
     fn get_validation_receipts(
         &self,
@@ -184,6 +185,7 @@ mockall::mock! {
         fn delete_clone_cell(&self, input: DeleteCloneCellInput) -> ExternResult<()>;
         fn close_chain(&self, input: CloseChainInput) -> ExternResult<ActionHash>;
         fn open_chain(&self, input: OpenChainInput) -> ExternResult<ActionHash>;
+        fn get_init_properties(&self, input: ()) -> ExternResult<Option<InitProperties>>;
         fn get_validation_receipts(&self, input: GetValidationReceiptsInput) -> ExternResult<Vec<ValidationReceiptSet>>;
     }
 
@@ -461,6 +463,10 @@ impl HdkT for ErrHdk {
         Self::err()
     }
 
+    fn get_init_properties(&self, _input: ()) -> ExternResult<Option<InitProperties>> {
+        Self::err()
+    }
+
     // Validation receipts
     fn get_validation_receipts(
         &self,
@@ -713,6 +719,10 @@ impl HdkT for HostHdk {
 
     fn open_chain(&self, input: OpenChainInput) -> ExternResult<ActionHash> {
         host_call::<OpenChainInput, ActionHash>(__hc__open_chain_1, input)
+    }
+
+    fn get_init_properties(&self, _input: ()) -> ExternResult<Option<InitProperties>> {
+        host_call::<(), Option<InitProperties>>(__hc__get_init_properties_1, ())
     }
 
     fn get_validation_receipts(
