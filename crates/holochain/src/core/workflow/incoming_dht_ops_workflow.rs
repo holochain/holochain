@@ -94,7 +94,9 @@ fn batch_process_entry(
     }
 
     tracing::debug!("Inserting {} ops", to_pending.len());
-    add_to_pending(txn, &to_pending)?;
+    // #5370: legacy DhtOp dual-write removed; `add_to_pending` (and the
+    // op_exists_inner dedup read above) remain as dead code pending DbKindDht
+    // retirement.
 
     Ok(to_pending)
 }
@@ -279,6 +281,8 @@ async fn should_keep(op: &DhtOp) -> WorkflowResult<()> {
     Ok(())
 }
 
+// #5370: dead pending full DbKindDht retirement.
+#[allow(dead_code)]
 fn add_to_pending(txn: &mut Txn<DbKindDht>, ops: &[IncomingDhtOp]) -> StateMutationResult<()> {
     for op in ops {
         insert_op_dht(

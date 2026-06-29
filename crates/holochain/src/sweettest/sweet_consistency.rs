@@ -131,7 +131,7 @@ async fn await_op_integration(
             // consistency cannot have been reached; sleep and retry.
             for (_, dht_store) in cells.iter() {
                 let (validation_limbo, integration_limbo, _) = dht_store
-                    .integration_state_counts()
+                    .limbo_state_counts()
                     .await
                     .map_err(|e| e.to_string())?;
                 if validation_limbo > 0 || integration_limbo > 0 {
@@ -202,7 +202,7 @@ async fn await_op_integration(
         println!("\nConsistency not reached.\n");
         for (index, (_, dht_store)) in cells.iter().enumerate() {
             let (validation_limbo, integration_limbo, integrated) =
-                match dht_store.integration_state_counts().await {
+                match dht_store.limbo_state_counts().await {
                     Ok(counts) => counts,
                     Err(e) => {
                         println!(
@@ -393,9 +393,11 @@ mod tests {
             || async {
                 conductors[0]
                     .all_ops_integrated(dna_file.dna_hash())
+                    .await
                     .unwrap()
                     && conductors[1]
                         .all_ops_integrated(dna_file.dna_hash())
+                        .await
                         .unwrap()
             },
             Some(5000),

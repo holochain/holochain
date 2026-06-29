@@ -25,16 +25,9 @@ async fn dump_full_state() {
         .await;
     // Await integration.
     retry_until_timeout!({
-        if !conductor
-            .get_dht_db(cell_id.dna_hash())
-            .unwrap()
-            .test_read(|txn| {
-                txn.query_row(
-                    "SELECT EXISTS (SELECT 1 FROM DhtOp WHERE when_integrated ISNULL)",
-                    [],
-                    |row| row.get::<_, bool>(0),
-                )
-            })
+        if conductor
+            .all_ops_integrated(cell_id.dna_hash())
+            .await
             .unwrap()
         {
             break;

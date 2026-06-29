@@ -28,6 +28,22 @@ impl DbRead<Dht> {
         warrant::get_warrants_by_warrantee(self.pool(), warrantee).await
     }
 
+    /// Warrants authored by `author` (the warrant issuer).
+    pub async fn get_warrants_by_author(
+        &self,
+        author: AgentPubKey,
+    ) -> sqlx::Result<Vec<WarrantRow>> {
+        warrant::get_warrants_by_author(self.pool(), author).await
+    }
+
+    /// Terminal validation status of an integrated warrant op, or `None`.
+    pub async fn warrant_op_validation_status(
+        &self,
+        op_hash: &DhtOpHash,
+    ) -> sqlx::Result<Option<i64>> {
+        warrant::warrant_op_validation_status(self.pool(), op_hash).await
+    }
+
     /// Serialized `WarrantProof`s of pending-or-valid warrants against
     /// `warrantee`. See
     /// `warrant::pending_or_valid_warrant_proofs_by_warrantee`.

@@ -9,7 +9,6 @@ use {
         SerializedBytes, ValidateCallbackResult,
     },
     holochain::prelude::InlineZomeSet,
-    holochain_state::query::{CascadeTxnWrapper, Store},
     holochain_zome_types::Entry,
     serde::{Deserialize, Serialize},
     std::time::Duration,
@@ -239,18 +238,17 @@ async fn warrant_is_published() {
         loop {
             let alice_pubkey = alice.agent_pubkey().clone();
             let warrants = conductors[2]
-                .get_spaces()
-                .dht_db(dna_hash)
+                .get_dht_store(dna_hash)
                 .unwrap()
-                .test_read(move |txn| {
-                    let store = CascadeTxnWrapper::from(txn);
-                    store.get_warrants_for_agent(&alice_pubkey, true).unwrap()
-                });
+                .as_read()
+                .get_warrants_by_warrantee(alice_pubkey)
+                .await
+                .unwrap();
 
             if warrants.len() == 1 {
-                assert_eq!(warrants[0].warrant().warrantee, *alice.agent_pubkey());
+                assert_eq!(warrants[0].data().warrantee, *alice.agent_pubkey());
                 // Make sure that Bob authored the warrant and it's not been authored by Carol.
-                assert_eq!(warrants[0].warrant().author, *bob.agent_pubkey());
+                assert_eq!(warrants[0].data().author, *bob.agent_pubkey());
                 break;
             }
             tokio::time::sleep(Duration::from_millis(100)).await;

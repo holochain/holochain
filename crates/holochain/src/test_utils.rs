@@ -14,8 +14,6 @@ use hdk::prelude::ZomeName;
 use holo_hash::*;
 use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_conductor_api::conductor::NetworkConfig;
-use holochain_conductor_api::IntegrationStateDump;
-use holochain_conductor_api::IntegrationStateDumps;
 use holochain_conductor_api::ZomeCallParamsSigned;
 use holochain_keystore::MetaLairClient;
 use holochain_nonce::fresh_nonce;
@@ -28,7 +26,6 @@ use holochain_types::prelude::*;
 use holochain_types::test_utils::fake_dna_zomes;
 use holochain_wasm_test_utils::TestWasm;
 pub use itertools;
-use rusqlite::named_params;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tempfile::TempDir;
@@ -251,41 +248,12 @@ pub async fn setup_app_inner(
     (AppInterfaceApi::new(conductor_handle), handle)
 }
 
-/// Wait for num_attempts * delay, or until all published ops have been integrated.
-#[cfg_attr(feature = "instrument", tracing::instrument(skip(db)))]
-pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
-    db: &Db,
-    num_published: usize,
-    num_attempts: usize,
-    delay: Duration,
-) -> Result<(), String> {
-    let mut num_integrated = 0;
-    for i in 0..num_attempts {
-        num_integrated = get_integrated_count(db).await;
-        if num_integrated >= num_published {
-            if num_integrated > num_published {
-                tracing::warn!("num integrated ops > num published ops, meaning you may not be accounting for all nodes in this test.
-                Consistency may not be complete.")
-            }
-            return Ok(());
-        } else {
-            let total_time_waited = delay * i as u32;
-            tracing::debug!(?num_integrated, ?total_time_waited, counts = ?query_integration(db).await, "consistency-status");
-        }
-        tokio::time::sleep(delay).await;
-    }
-
-    Err(format!(
-        "Consistency not achieved after {num_attempts} attempts. Expected {num_published} ops, but only {num_integrated} integrated.",
-    ))
-}
-
-/// Poll the new DHT store until at least `expected` ops are integrated, or
+/// Poll the DHT store until at least `expected` ops are integrated, or
 /// panic after `num_attempts`. On failure the ops still awaiting validation are
 /// listed so a failing test shows what did not progress.
-pub async fn wait_for_new_store_integration(
+pub async fn wait_for_integration(
     dht_store: &holochain_state::dht_store::DhtStore,
-    expected: i64,
+    expected: u64,
     num_attempts: usize,
     delay: Duration,
 ) {
@@ -298,14 +266,14 @@ pub async fn wait_for_new_store_integration(
     }
     let integrated = dht_store.as_read().count_integrated_ops().await.unwrap();
     panic!(
-        "new-store integration not reached: expected {expected}, integrated {integrated}\n{}",
-        new_store_pending_summary(dht_store).await
+        "integration not reached: expected {expected}, integrated {integrated}\n{}",
+        pending_summary(dht_store).await
     );
 }
 
-/// Assert that nothing is awaiting validation in the new DHT store. On failure
+/// Assert that nothing is awaiting validation in the DHT store. On failure
 /// the still-pending ops are listed so the cause is visible.
-pub async fn assert_new_store_limbo_empty(dht_store: &holochain_state::dht_store::DhtStore) {
+pub async fn assert_limbo_empty(dht_store: &holochain_state::dht_store::DhtStore) {
     let pending_sys = dht_store
         .as_read()
         .ops_pending_sys_validation(10_000)
@@ -318,7 +286,7 @@ pub async fn assert_new_store_limbo_empty(dht_store: &holochain_state::dht_store
         .unwrap();
     assert!(
         pending_sys.is_empty() && pending_app.is_empty(),
-        "new-store limbo not empty: {} pending sys validation, {} pending app validation\n{}{}",
+        "limbo not empty: {} pending sys validation, {} pending app validation\n{}{}",
         pending_sys.len(),
         pending_app.len(),
         format_pending_ops("sys", &pending_sys),
@@ -326,8 +294,8 @@ pub async fn assert_new_store_limbo_empty(dht_store: &holochain_state::dht_store
     );
 }
 
-/// Summarise the ops still awaiting validation in the new DHT store.
-async fn new_store_pending_summary(dht_store: &holochain_state::dht_store::DhtStore) -> String {
+/// Summarise the ops still awaiting validation in the DHT store.
+async fn pending_summary(dht_store: &holochain_state::dht_store::DhtStore) -> String {
     let pending_sys = dht_store
         .as_read()
         .ops_pending_sys_validation(10_000)
@@ -382,96 +350,28 @@ pub async fn show_authored<Db: ReadAccess<DbKindAuthored>>(envs: &[&Db]) {
     }
 }
 
-/// Get multiple db states with compact Display representation
-pub async fn get_integration_dumps<Db: ReadAccess<DbKindDht>>(
-    dbs: &[&Db],
-) -> IntegrationStateDumps {
-    let mut output = Vec::new();
-    for db in dbs {
-        let db = *db;
-        output.push(query_integration(db).await);
-    }
-    IntegrationStateDumps(output)
+/// Count ops that passed validation but are not yet integrated, read from the
+/// DHT store.
+pub async fn get_valid_and_not_integrated_count(
+    dht_store: &holochain_state::dht_store::DhtStore,
+) -> usize {
+    dht_store
+        .as_read()
+        .count_valid_not_integrated_ops()
+        .await
+        .unwrap() as usize
 }
 
-/// Show the current db state.
-///
-/// Reads the legacy `DhtOp` table directly. This helper backs the legacy
-/// `wait_for_integration` path used by the app-validation workflow tests, which
-/// still assert against the dual-written legacy table; the consistency harness
-/// and admin dump read the new DHT store instead.
-pub async fn query_integration<Db: ReadAccess<DbKindDht>>(db: &Db) -> IntegrationStateDump {
-    db.read_async(move |txn| -> DatabaseResult<IntegrationStateDump> {
-        let integrated = txn.query_row(
-            "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NOT NULL",
-            [],
-            |row| row.get(0),
-        )?;
-        let integration_limbo = txn.query_row(
-            "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NULL AND validation_stage = 3",
-            [],
-            |row| row.get(0),
-        )?;
-        let validation_limbo = txn.query_row(
-            "
-            SELECT count(hash) FROM DhtOp
-            WHERE when_integrated IS NULL
-            AND
-            (validation_stage IS NULL OR validation_stage < 3)
-            ",
-            [],
-            |row| row.get(0),
-        )?;
-        Ok(IntegrationStateDump {
-            validation_limbo,
-            integration_limbo,
-            integrated,
-        })
-    })
-    .await
-    .unwrap()
-}
-
-async fn get_integrated_count<Db: ReadAccess<DbKindDht>>(db: &Db) -> usize {
-    db.read_async(move |txn| -> DatabaseResult<usize> {
-        Ok(txn.query_row(
-            "SELECT COUNT(hash) FROM DhtOp WHERE DhtOp.when_integrated IS NOT NULL",
-            [],
-            |row| row.get(0),
-        )?)
-    })
-    .await
-    .unwrap()
-}
-
-/// Get count of ops that have been successfully validated but not integrated
-pub async fn get_valid_and_not_integrated_count<Db: ReadAccess<DbKindDht>>(db: &Db) -> usize {
-    db.read_async(move |txn| -> DatabaseResult<usize> {
-        Ok(txn.query_row(
-            "SELECT COUNT(hash) FROM DhtOp WHERE when_integrated IS NULL AND validation_status = :status",
-            named_params!{
-                ":status": ValidationStatus::Valid,
-            },
-            |row| row.get(0),
-        )?)
-    })
-    .await
-    .unwrap()
-}
-
-/// Get count of ops that have been successfully validated and integrated
-pub async fn get_valid_and_integrated_count<Db: ReadAccess<DbKindDht>>(db: &Db) -> usize {
-    db.read_async(move |txn| -> DatabaseResult<usize> {
-        Ok(txn.query_row(
-            "SELECT COUNT(hash) FROM DhtOp WHERE when_integrated IS NOT NULL AND validation_status = :status",
-            named_params!{
-                ":status": ValidationStatus::Valid,
-            },
-            |row| row.get(0),
-        )?)
-    })
-    .await
-    .unwrap()
+/// Count ops that passed validation and have been integrated, read from the
+/// DHT store.
+pub async fn get_valid_and_integrated_count(
+    dht_store: &holochain_state::dht_store::DhtStore,
+) -> usize {
+    dht_store
+        .as_read()
+        .count_valid_integrated_ops()
+        .await
+        .unwrap() as usize
 }
 
 /// Helper for displaying agent infos stored on a conductor

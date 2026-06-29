@@ -143,7 +143,7 @@ async fn uninstall_app() {
 
     // Await integration of both actions.
     retry_fn_until_timeout(
-        || async { conductor.all_ops_integrated(dna.dna_hash()).unwrap() },
+        || async { conductor.all_ops_integrated(dna.dna_hash()).await.unwrap() },
         None,
         None,
     )

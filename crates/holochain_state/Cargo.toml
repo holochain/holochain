@@ -72,7 +72,13 @@ default = []
 
 fuzzing = ["holochain_types/fuzzing", "holochain_zome_types/fuzzing"]
 
+# Exposes the read-only inspection queries (op counts, existence checks, etc.)
+# on the DhtStore that are otherwise only compiled for tests. `test_utils`
+# turns it on for test consumers.
+inspection = ["holochain_data/inspection"]
+
 test_utils = [
+  "inspection",
   "holochain_data/test-utils",
   "holochain_keystore/test_utils",
   "holochain_types/test_utils",

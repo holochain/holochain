@@ -755,6 +755,110 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn warrants_by_author_and_op_validation_status() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let author_a = AgentPubKey::from_raw_36(vec![3u8; 36]);
+        let author_b = AgentPubKey::from_raw_36(vec![5u8; 36]);
+        let warrantee = AgentPubKey::from_raw_36(vec![4u8; 36]);
+        let hash_a = DhtOpHash::from_raw_36(vec![0xA1; 36]);
+        let hash_b = DhtOpHash::from_raw_36(vec![0xB2; 36]);
+
+        for (hash, author, status) in [(&hash_a, &author_a, 2), (&hash_b, &author_b, 1)] {
+            db.insert_warrant(InsertWarrant {
+                hash,
+                author,
+                timestamp: Timestamp::from_micros(1),
+                warrantee: &warrantee,
+                proof: &[9u8; 32],
+                signature: &[8u8; 64],
+                reason: None,
+                storage_center_loc: 0,
+                when_received: Timestamp::from_micros(1),
+                when_integrated: Timestamp::from_micros(2),
+                validation_status: status,
+                serialized_size: 0,
+            })
+            .await
+            .unwrap();
+        }
+
+        let by_a = db
+            .as_ref()
+            .get_warrants_by_author(author_a.clone())
+            .await
+            .unwrap();
+        assert_eq!(by_a.len(), 1);
+        assert_eq!(by_a[0].author, author_a.get_raw_36().to_vec());
+
+        assert_eq!(
+            db.as_ref()
+                .warrant_op_validation_status(&hash_a)
+                .await
+                .unwrap(),
+            Some(2)
+        );
+        assert_eq!(
+            db.as_ref()
+                .warrant_op_validation_status(&hash_b)
+                .await
+                .unwrap(),
+            Some(1)
+        );
+        assert_eq!(
+            db.as_ref()
+                .warrant_op_validation_status(&DhtOpHash::from_raw_36(vec![0x99; 36]))
+                .await
+                .unwrap(),
+            None
+        );
+
+        // A limbo (not-yet-integrated) warrant whose sys-validation has been
+        // decided is read from LimboWarrantOp.
+        let limbo_hash = DhtOpHash::from_raw_36(vec![0xC3; 36]);
+        db.insert_limbo_warrant(InsertLimboWarrant {
+            hash: &limbo_hash,
+            author: &author_a,
+            timestamp: Timestamp::from_micros(1),
+            warrantee: &warrantee,
+            proof: &[9u8; 32],
+            signature: &[8u8; 64],
+            reason: None,
+            storage_center_loc: 0,
+            when_received: Timestamp::from_micros(1),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+        assert_eq!(
+            db.as_ref()
+                .warrant_op_validation_status(&limbo_hash)
+                .await
+                .unwrap(),
+            None,
+            "pending limbo warrant has no decided status"
+        );
+        db.set_limbo_warrant_sys_validation_status(&limbo_hash, Some(2))
+            .await
+            .unwrap();
+        assert_eq!(
+            db.as_ref()
+                .warrant_op_validation_status(&limbo_hash)
+                .await
+                .unwrap(),
+            Some(2)
+        );
+
+        // author_a now has both an integrated and a limbo warrant; both are
+        // listed.
+        let by_a = db
+            .as_ref()
+            .get_warrants_by_author(author_a.clone())
+            .await
+            .unwrap();
+        assert_eq!(by_a.len(), 2);
+    }
+
+    #[tokio::test]
     async fn chain_op_roundtrip() {
         let db = test_open_db(dht_db_id()).await.unwrap();
         let action_hash = seed_action_for_op(&db, 2).await;
@@ -848,7 +952,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn integration_state_counts_split_and_exclude_cached() {
+    async fn limbo_state_counts_split_and_exclude_cached() {
         let db = test_open_db(dht_db_id()).await.unwrap();
 
         // One cached ChainOp (locally_validated = 0) — must NOT count as
@@ -927,11 +1031,546 @@ mod tests {
             .unwrap();
 
         let (validation_limbo, integration_limbo, integrated) =
-            db.as_ref().integration_state_counts().await.unwrap();
+            db.as_ref().limbo_state_counts().await.unwrap();
         assert_eq!(validation_limbo, 1);
         assert_eq!(integration_limbo, 1);
         // Only the locally-validated ChainOp counts; the cached op is excluded.
         assert_eq!(integrated, 1);
+    }
+
+    #[tokio::test]
+    async fn count_valid_integrated_ops_counts_only_locally_validated_accepted_chain_ops() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+
+        // Cached (locally_validated = 0) accepted ChainOp — excluded.
+        let cached_action = seed_action_for_op(&db, 1).await;
+        db.insert_chain_op(InsertChainOp {
+            op_hash: &DhtOpHash::from_raw_36(vec![0x11; 36]),
+            action_hash: &cached_action,
+            op_type: 1,
+            basis_hash: &sample_basis(1),
+            storage_center_loc: 0,
+            validation_status: RecordValidity::Accepted,
+            locally_validated: false,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(1),
+            when_integrated: Timestamp::from_micros(2),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+
+        // Integrated accepted ChainOp — counted.
+        let valid_action = seed_action_for_op(&db, 2).await;
+        db.insert_chain_op(InsertChainOp {
+            op_hash: &DhtOpHash::from_raw_36(vec![0x22; 36]),
+            action_hash: &valid_action,
+            op_type: 1,
+            basis_hash: &sample_basis(2),
+            storage_center_loc: 0,
+            validation_status: RecordValidity::Accepted,
+            locally_validated: true,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(1),
+            when_integrated: Timestamp::from_micros(2),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+
+        // Integrated rejected ChainOp — excluded.
+        let rejected_action = seed_action_for_op(&db, 3).await;
+        db.insert_chain_op(InsertChainOp {
+            op_hash: &DhtOpHash::from_raw_36(vec![0x33; 36]),
+            action_hash: &rejected_action,
+            op_type: 1,
+            basis_hash: &sample_basis(3),
+            storage_center_loc: 0,
+            validation_status: RecordValidity::Rejected,
+            locally_validated: true,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(1),
+            when_integrated: Timestamp::from_micros(2),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+
+        // A still-in-limbo op — excluded (not integrated).
+        let limbo_action = seed_action_for_op(&db, 4).await;
+        db.insert_limbo_chain_op(InsertLimboChainOp {
+            op_hash: &DhtOpHash::from_raw_36(vec![0x44; 36]),
+            action_hash: &limbo_action,
+            op_type: 1,
+            basis_hash: &sample_basis(4),
+            storage_center_loc: 0,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(1),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+
+        let count = db.as_ref().count_valid_integrated_ops().await.unwrap();
+        assert_eq!(count, 1);
+    }
+
+    #[tokio::test]
+    async fn count_valid_not_integrated_ops_counts_fully_validated_limbo_chain_ops() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+
+        // Fully validated (sys = 1, app = 1) limbo op — counted.
+        let valid_action = seed_action_for_op(&db, 1).await;
+        let valid_op = DhtOpHash::from_raw_36(vec![0x11; 36]);
+        db.insert_limbo_chain_op(InsertLimboChainOp {
+            op_hash: &valid_op,
+            action_hash: &valid_action,
+            op_type: 1,
+            basis_hash: &sample_basis(1),
+            storage_center_loc: 0,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(1),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+        db.set_limbo_chain_op_sys_validation_status(&valid_op, Some(1))
+            .await
+            .unwrap();
+        db.set_limbo_chain_op_app_validation_status(&valid_op, Some(1))
+            .await
+            .unwrap();
+
+        // Sys accepted but app still pending — excluded.
+        let sys_only_action = seed_action_for_op(&db, 2).await;
+        let sys_only_op = DhtOpHash::from_raw_36(vec![0x22; 36]);
+        db.insert_limbo_chain_op(InsertLimboChainOp {
+            op_hash: &sys_only_op,
+            action_hash: &sys_only_action,
+            op_type: 1,
+            basis_hash: &sample_basis(2),
+            storage_center_loc: 0,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(1),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+        db.set_limbo_chain_op_sys_validation_status(&sys_only_op, Some(1))
+            .await
+            .unwrap();
+
+        // Sys rejected — excluded.
+        let rejected_action = seed_action_for_op(&db, 3).await;
+        let rejected_op = DhtOpHash::from_raw_36(vec![0x33; 36]);
+        db.insert_limbo_chain_op(InsertLimboChainOp {
+            op_hash: &rejected_op,
+            action_hash: &rejected_action,
+            op_type: 1,
+            basis_hash: &sample_basis(3),
+            storage_center_loc: 0,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(1),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+        db.set_limbo_chain_op_sys_validation_status(&rejected_op, Some(2))
+            .await
+            .unwrap();
+
+        // An already-integrated accepted op — excluded (it is integrated, not
+        // awaiting integration).
+        let integrated_action = seed_action_for_op(&db, 4).await;
+        db.insert_chain_op(InsertChainOp {
+            op_hash: &DhtOpHash::from_raw_36(vec![0x44; 36]),
+            action_hash: &integrated_action,
+            op_type: 1,
+            basis_hash: &sample_basis(4),
+            storage_center_loc: 0,
+            validation_status: RecordValidity::Accepted,
+            locally_validated: true,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(1),
+            when_integrated: Timestamp::from_micros(2),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+
+        let count = db.as_ref().count_valid_not_integrated_ops().await.unwrap();
+        assert_eq!(count, 1);
+    }
+
+    async fn seed_action_for_op_with_author(
+        db: &crate::handles::DbWrite<Dht>,
+        seed: u8,
+        author: &AgentPubKey,
+    ) -> ActionHash {
+        let action = Action {
+            header: ActionHeader {
+                author: author.clone(),
+                timestamp: Timestamp::from_micros(1_000_000 + seed as i64),
+                action_seq: seed as u32,
+                prev_action: Some(ActionHash::from_raw_36(vec![seed.wrapping_sub(1); 36])),
+            },
+            data: ActionData::InitZomesComplete(InitZomesCompleteData {}),
+        };
+        let hashed = HoloHashed::with_pre_hashed(action, ActionHash::from_raw_36(vec![seed; 36]));
+        let signed = SignedHashed::with_presigned(hashed, Signature([seed; 64]));
+        db.insert_action(&signed, None).await.unwrap();
+        signed.as_hash().clone()
+    }
+
+    #[tokio::test]
+    async fn count_pending_ops_for_author_counts_only_that_authors_limbo_ops() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        // sample_action / seed_action_for_op author is all-ones.
+        let author_a = AgentPubKey::from_raw_36(vec![1u8; 36]);
+        let author_b = AgentPubKey::from_raw_36(vec![0xB2; 36]);
+
+        // Author A: two pending limbo ops.
+        for (seed, op_byte) in [(1u8, 0x11u8), (2, 0x22)] {
+            let action = seed_action_for_op(&db, seed).await;
+            db.insert_limbo_chain_op(InsertLimboChainOp {
+                op_hash: &DhtOpHash::from_raw_36(vec![op_byte; 36]),
+                action_hash: &action,
+                op_type: 1,
+                basis_hash: &sample_basis(seed),
+                storage_center_loc: 0,
+                require_receipt: false,
+                when_received: Timestamp::from_micros(1),
+                serialized_size: 0,
+            })
+            .await
+            .unwrap();
+        }
+
+        // Author A: one already-integrated chain op (excluded — not pending).
+        let a_integrated = seed_action_for_op(&db, 4).await;
+        db.insert_chain_op(InsertChainOp {
+            op_hash: &DhtOpHash::from_raw_36(vec![0x44; 36]),
+            action_hash: &a_integrated,
+            op_type: 1,
+            basis_hash: &sample_basis(4),
+            storage_center_loc: 0,
+            validation_status: RecordValidity::Accepted,
+            locally_validated: true,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(1),
+            when_integrated: Timestamp::from_micros(2),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+
+        // Author B: one pending limbo op (excluded from A's count).
+        let b_pending = seed_action_for_op_with_author(&db, 3, &author_b).await;
+        db.insert_limbo_chain_op(InsertLimboChainOp {
+            op_hash: &DhtOpHash::from_raw_36(vec![0x33; 36]),
+            action_hash: &b_pending,
+            op_type: 1,
+            basis_hash: &sample_basis(3),
+            storage_center_loc: 0,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(1),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+
+        assert_eq!(
+            db.as_ref()
+                .count_pending_ops_for_author(&author_a)
+                .await
+                .unwrap(),
+            2
+        );
+        assert_eq!(
+            db.as_ref()
+                .count_pending_ops_for_author(&author_b)
+                .await
+                .unwrap(),
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn rejected_integrated_op_hashes_returns_only_locally_validated_rejected() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+
+        // Integrated accepted — excluded.
+        let accepted = seed_action_for_op(&db, 1).await;
+        db.insert_chain_op(InsertChainOp {
+            op_hash: &DhtOpHash::from_raw_36(vec![0x11; 36]),
+            action_hash: &accepted,
+            op_type: 1,
+            basis_hash: &sample_basis(1),
+            storage_center_loc: 0,
+            validation_status: RecordValidity::Accepted,
+            locally_validated: true,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(1),
+            when_integrated: Timestamp::from_micros(2),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+
+        // Integrated rejected — included.
+        let rejected_op = DhtOpHash::from_raw_36(vec![0x22; 36]);
+        let rejected = seed_action_for_op(&db, 2).await;
+        db.insert_chain_op(InsertChainOp {
+            op_hash: &rejected_op,
+            action_hash: &rejected,
+            op_type: 1,
+            basis_hash: &sample_basis(2),
+            storage_center_loc: 0,
+            validation_status: RecordValidity::Rejected,
+            locally_validated: true,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(1),
+            when_integrated: Timestamp::from_micros(2),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+
+        // Cached rejected (locally_validated = 0) — excluded.
+        let cached = seed_action_for_op(&db, 3).await;
+        db.insert_chain_op(InsertChainOp {
+            op_hash: &DhtOpHash::from_raw_36(vec![0x33; 36]),
+            action_hash: &cached,
+            op_type: 1,
+            basis_hash: &sample_basis(3),
+            storage_center_loc: 0,
+            validation_status: RecordValidity::Rejected,
+            locally_validated: false,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(1),
+            when_integrated: Timestamp::from_micros(2),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+
+        let hashes = db.as_ref().rejected_integrated_op_hashes().await.unwrap();
+        assert_eq!(hashes, vec![rejected_op]);
+    }
+
+    #[tokio::test]
+    async fn count_all_ops_counts_integrated_and_limbo_chain_ops() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+
+        let integrated_action = seed_action_for_op(&db, 1).await;
+        db.insert_chain_op(InsertChainOp {
+            op_hash: &DhtOpHash::from_raw_36(vec![0x11; 36]),
+            action_hash: &integrated_action,
+            op_type: 1,
+            basis_hash: &sample_basis(1),
+            storage_center_loc: 0,
+            validation_status: RecordValidity::Accepted,
+            locally_validated: true,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(1),
+            when_integrated: Timestamp::from_micros(2),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+
+        let limbo_action = seed_action_for_op(&db, 2).await;
+        db.insert_limbo_chain_op(InsertLimboChainOp {
+            op_hash: &DhtOpHash::from_raw_36(vec![0x22; 36]),
+            action_hash: &limbo_action,
+            op_type: 1,
+            basis_hash: &sample_basis(2),
+            storage_center_loc: 0,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(1),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+
+        assert_eq!(db.as_ref().count_all_ops().await.unwrap(), 2);
+    }
+
+    #[tokio::test]
+    async fn op_requires_receipt_reflects_chain_op_flag() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+
+        let needs_action = seed_action_for_op(&db, 1).await;
+        let needs = DhtOpHash::from_raw_36(vec![0x11; 36]);
+        db.insert_chain_op(InsertChainOp {
+            op_hash: &needs,
+            action_hash: &needs_action,
+            op_type: 1,
+            basis_hash: &sample_basis(1),
+            storage_center_loc: 0,
+            validation_status: RecordValidity::Accepted,
+            locally_validated: true,
+            require_receipt: true,
+            when_received: Timestamp::from_micros(1),
+            when_integrated: Timestamp::from_micros(2),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+
+        let no_need_action = seed_action_for_op(&db, 2).await;
+        let no_need = DhtOpHash::from_raw_36(vec![0x22; 36]);
+        db.insert_chain_op(InsertChainOp {
+            op_hash: &no_need,
+            action_hash: &no_need_action,
+            op_type: 1,
+            basis_hash: &sample_basis(2),
+            storage_center_loc: 0,
+            validation_status: RecordValidity::Accepted,
+            locally_validated: true,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(1),
+            when_integrated: Timestamp::from_micros(2),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+
+        assert!(db.as_ref().op_requires_receipt(&needs).await.unwrap());
+        assert!(!db.as_ref().op_requires_receipt(&no_need).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn limbo_op_exists_only_for_unintegrated_ops() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+
+        let limbo_action = seed_action_for_op(&db, 1).await;
+        let limbo_op = DhtOpHash::from_raw_36(vec![0x11; 36]);
+        db.insert_limbo_chain_op(InsertLimboChainOp {
+            op_hash: &limbo_op,
+            action_hash: &limbo_action,
+            op_type: 1,
+            basis_hash: &sample_basis(1),
+            storage_center_loc: 0,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(1),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+
+        let integrated_action = seed_action_for_op(&db, 2).await;
+        let integrated_op = DhtOpHash::from_raw_36(vec![0x22; 36]);
+        db.insert_chain_op(InsertChainOp {
+            op_hash: &integrated_op,
+            action_hash: &integrated_action,
+            op_type: 1,
+            basis_hash: &sample_basis(2),
+            storage_center_loc: 0,
+            validation_status: RecordValidity::Accepted,
+            locally_validated: true,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(1),
+            when_integrated: Timestamp::from_micros(2),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+
+        assert!(db.as_ref().limbo_op_exists(&limbo_op).await.unwrap());
+        assert!(!db.as_ref().limbo_op_exists(&integrated_op).await.unwrap());
+        assert!(!db
+            .as_ref()
+            .limbo_op_exists(&DhtOpHash::from_raw_36(vec![0x99; 36]))
+            .await
+            .unwrap());
+    }
+
+    #[tokio::test]
+    async fn limbo_op_hashes_requiring_receipt_filters_on_flag() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+
+        let needs_action = seed_action_for_op(&db, 1).await;
+        let needs = DhtOpHash::from_raw_36(vec![0x11; 36]);
+        db.insert_limbo_chain_op(InsertLimboChainOp {
+            op_hash: &needs,
+            action_hash: &needs_action,
+            op_type: 1,
+            basis_hash: &sample_basis(1),
+            storage_center_loc: 0,
+            require_receipt: true,
+            when_received: Timestamp::from_micros(1),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+
+        let no_need_action = seed_action_for_op(&db, 2).await;
+        db.insert_limbo_chain_op(InsertLimboChainOp {
+            op_hash: &DhtOpHash::from_raw_36(vec![0x22; 36]),
+            action_hash: &no_need_action,
+            op_type: 1,
+            basis_hash: &sample_basis(2),
+            storage_center_loc: 0,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(1),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+
+        assert_eq!(
+            db.as_ref()
+                .limbo_op_hashes_requiring_receipt()
+                .await
+                .unwrap(),
+            vec![needs]
+        );
+    }
+
+    #[tokio::test]
+    async fn get_ops_at_basis_matches_basis_hash() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+
+        let action = seed_action_for_op(&db, 1).await;
+        db.insert_chain_op(InsertChainOp {
+            op_hash: &DhtOpHash::from_raw_36(vec![0x11; 36]),
+            action_hash: &action,
+            op_type: 1,
+            basis_hash: &sample_basis(7),
+            storage_center_loc: 0,
+            validation_status: RecordValidity::Accepted,
+            locally_validated: true,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(1),
+            when_integrated: Timestamp::from_micros(2),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+
+        assert!(!db
+            .as_ref()
+            .get_ops_at_basis(&sample_basis(7))
+            .await
+            .unwrap()
+            .is_empty());
+        assert!(db
+            .as_ref()
+            .get_ops_at_basis(&sample_basis(8))
+            .await
+            .unwrap()
+            .is_empty());
+    }
+
+    #[tokio::test]
+    async fn count_entries_counts_entry_rows() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        assert_eq!(db.as_ref().count_entries().await.unwrap(), 0);
+
+        let (hash, entry) = sample_entry(7);
+        db.insert_entry(&hash, &entry).await.unwrap();
+        assert_eq!(db.as_ref().count_entries().await.unwrap(), 1);
     }
 
     #[tokio::test]
