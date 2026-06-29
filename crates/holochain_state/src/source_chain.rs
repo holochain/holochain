@@ -23,7 +23,7 @@ use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_cell::SELECT_VALID_AGENT_PUB_KEY;
 use holochain_sqlite::sql::sql_conductor::SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET;
 use holochain_sqlite::sql::sql_conductor::SELECT_VALID_UNRESTRICTED_CAP_GRANT;
-use holochain_state_types::SourceChainDumpRecord;
+use holochain_state_types::SourceChainDump;
 use holochain_types::sql::AsSql;
 use kitsune2_api::DhtArc;
 use std::sync::atomic::AtomicBool;
@@ -1278,7 +1278,7 @@ where
     }
 
     pub async fn dump(&self) -> SourceChainResult<SourceChainDump> {
-        dump_state(self.author_db().clone().into(), (*self.author).clone()).await
+        dump_state(&self.dht_store.as_read(), (*self.author).clone()).await
     }
 }
 
@@ -1660,70 +1660,26 @@ pub fn current_countersigning_session(
     }
 }
 
-/// dump the entire source chain as a pretty-printed json string
+/// Dump the entire source chain from the merged DHT store.
+///
+/// Reads from the merged per-DNA `holochain_data` store rather than the legacy
+/// authored database. Private entries are included — the query looks in both
+/// the public `Entry` table and the author's `PrivateEntry` table — so the
+/// dump faithfully reflects the author's own chain. `published_ops_count` is
+/// the number of integrated ops that have been published at least once.
+///
+/// This is the production path backing the admin `DumpState` and `DumpFullState`
+/// APIs. It is **not** gated behind `inspection` or `test_utils`.
+// #5370: `vault` (DbRead<DbKindAuthored>) parameter removed; reads the merged store.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn dump_state(
-    vault: DbRead<DbKindAuthored>,
+    dht_store: &DhtStoreRead,
     author: AgentPubKey,
 ) -> Result<SourceChainDump, SourceChainError> {
-    Ok(vault
-        .read_async(move |txn| {
-            let records = txn
-                .prepare(
-                    "
-                SELECT DISTINCT
-                Action.blob AS action_blob, Entry.blob AS entry_blob,
-                Action.hash AS action_hash
-                FROM Action
-                JOIN DhtOp ON DhtOp.action_hash = Action.hash
-                LEFT JOIN Entry ON Action.entry_hash = Entry.hash
-                WHERE
-                Action.author = :author
-                ORDER BY Action.seq ASC
-                ",
-                )?
-                .query_and_then(
-                    named_params! {
-                        ":author": author,
-                    },
-                    |row| {
-                        let action: SignedAction = from_blob(row.get("action_blob")?)?;
-                        let (action, signature) = action.into();
-                        let action_address = row.get("action_hash")?;
-                        let entry: Option<Vec<u8>> = row.get("entry_blob")?;
-                        let entry: Option<Entry> = match entry {
-                            Some(entry) => Some(from_blob(entry)?),
-                            None => None,
-                        };
-                        StateQueryResult::Ok(SourceChainDumpRecord {
-                            signature,
-                            action_address,
-                            action,
-                            entry,
-                        })
-                    },
-                )?
-                .collect::<StateQueryResult<Vec<_>>>()?;
-            let published_ops_count = txn.query_row(
-                "
-                SELECT COUNT(DhtOp.hash) FROM DhtOp
-                JOIN Action ON DhtOp.action_hash = Action.hash
-                WHERE
-                Action.author = :author
-                AND
-                last_publish_time IS NOT NULL
-                ",
-                named_params! {
-                ":author": author,
-                },
-                |row| row.get(0),
-            )?;
-            StateQueryResult::Ok(SourceChainDump {
-                records,
-                published_ops_count,
-            })
-        })
-        .await?)
+    dht_store
+        .dump_source_chain(&author)
+        .await
+        .map_err(SourceChainError::other)
 }
 
 // ---------------------------------------------------------------------------
@@ -2593,16 +2549,75 @@ mod tests {
         Ok(())
     }
 
+    /// Verify that `DhtStore::dump_source_chain` returns records in seq order,
+    /// resolves private-entry records' entry data from `PrivateEntry`, and
+    /// reports the correct published-op count.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn dump_state_from_store() -> SourceChainResult<()> {
+        let TestCase {
+            chain,
+            agent_key,
+            dht_store,
+            ..
+        } = TestCase::new().await;
+
+        // Add a private-entry action (seq 3) on top of the genesis 3-action chain.
+        let private_entry = Entry::App(fixt!(AppEntryBytes));
+        let private_entry_hash = EntryHash::with_data_sync(&private_entry);
+        let create = builder::Create {
+            entry_type: EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Private,
+            )),
+            entry_hash: private_entry_hash.clone(),
+        };
+        chain
+            .put_weightless(create, Some(private_entry.clone()), ChainTopOrdering::default())
+            .await?;
+        chain.flush(vec![DhtArc::Empty]).await?;
+
+        let dump = dht_store.as_read().dump_source_chain(&agent_key).await?;
+
+        // Four records: Dna(0), AgentValidationPkg(1), Create/AgentId(2), Create/Private(3).
+        assert_eq!(dump.records.len(), 4, "expected 4 records after genesis + 1");
+
+        // Verify seq order.
+        for (i, rec) in dump.records.iter().enumerate() {
+            assert_eq!(
+                rec.action.action_seq(),
+                i as u32,
+                "record {i} out of order"
+            );
+        }
+
+        // The private-entry record (seq 3) must expose its entry.
+        let private_rec = &dump.records[3];
+        assert_eq!(
+            private_rec.entry.as_ref(),
+            Some(&private_entry),
+            "private-entry record must include the entry"
+        );
+
+        // No publishing has occurred — published_ops_count must be 0.
+        assert_eq!(
+            dump.published_ops_count, 0,
+            "no ops have been published yet"
+        );
+
+        Ok(())
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     async fn source_chain_buffer_dump_entries_json() -> SourceChainResult<()> {
         let TestCase {
             chain: _,
             agent_key,
-            authored,
+            dht_store,
             ..
         } = TestCase::new().await;
 
-        let json = dump_state(authored.clone().into(), agent_key.clone()).await?;
+        let json = dump_state(&dht_store.as_read(), agent_key.clone()).await?;
         let json = serde_json::to_string_pretty(&json)?;
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
 

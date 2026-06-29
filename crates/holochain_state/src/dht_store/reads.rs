@@ -2185,6 +2185,58 @@ impl DhtStore<DbRead<Dht>> {
         out.truncate(limit as usize);
         Ok(out.into_iter().map(|(_, _, op)| op).collect())
     }
+
+    /// Dump the author's source chain as a [`SourceChainDump`].
+    ///
+    /// Reads all actions authored by `author` from the merged DHT store in
+    /// chain-sequence order, resolves each action's entry from both the public
+    /// `Entry` table and the author's private `PrivateEntry` table, and counts
+    /// the ops that have been published at least once.
+    ///
+    /// This is the production path behind the admin `DumpState` / `DumpFullState`
+    /// APIs. It is **not** gated behind `inspection`.
+    pub async fn dump_source_chain(
+        &self,
+        author: &AgentPubKey,
+    ) -> StateQueryResult<holochain_state_types::SourceChainDump> {
+        use holochain_state_types::{SourceChainDump, SourceChainDumpRecord};
+        use holochain_zome_types::dht_v2::to_legacy_signed_action;
+
+        // All actions for this author in seq order (v2 SignedActionHashed).
+        let v2_actions = self.db().get_actions_by_author(author.clone()).await?;
+
+        let mut records = Vec::with_capacity(v2_actions.len());
+        for v2_sah in &v2_actions {
+            // Convert to the legacy (v1) SignedActionHashed.
+            let sah = to_legacy_signed_action(v2_sah);
+            let action_address = sah.as_hash().clone();
+            let signature = sah.signature().clone();
+            let action = sah.action().clone();
+
+            // Resolve the entry (public OR private) when the action references one.
+            let entry = match action.entry_hash() {
+                Some(entry_hash) => self.db().get_entry(entry_hash.clone(), Some(author)).await?,
+                None => None,
+            };
+
+            records.push(SourceChainDumpRecord {
+                signature,
+                action_address,
+                action,
+                entry,
+            });
+        }
+
+        let published_ops_count = self
+            .db()
+            .count_published_ops_for_author(author)
+            .await? as usize;
+
+        Ok(SourceChainDump {
+            records,
+            published_ops_count,
+        })
+    }
 }
 
 /// Whether `action`'s entry (if any) is declared private.
