@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## 0.6.2-rc.0
 
-- **BREAKING CHANGE**: Implement the DNA migration design, adding a new `InitProperties` type to be used in the `init_properties` field on `RoleSettings::Provisioned`. The bytes are opaque to the conductor and stored in the conductor database thus never written to the DHT. They are written during the installation and are intended to seed a freshly migrated chain during `init`. They can only be retrieved from the `init` callback via the `get_init_properties` host function and its HDK wrapper. They are cleared upon a successful init or if the associated app is uninstalled. \#5827
+- **BREAKING CHANGE**: Implement the DNA migration design, adding a new `InitProperties` type to be used in the `init_properties` field on `RoleSettings::Provisioned`. The bytes are opaque to the conductor and stored in the conductor database thus never written to the DHT. They are written during the installation and are intended to seed a freshly migrated chain during `init`. They can only be retrieved from the `init` callback via the `get_init_properties` host function and its HDK wrapper. They are cleared upon a successful init. \#5827
 - Make Sweettest documentation available on docs.rs.
 
 ## 0.6.1
