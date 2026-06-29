@@ -737,6 +737,99 @@ async fn apply_countersigning_success_no_op_when_row_absent() {
 }
 
 #[tokio::test]
+async fn remove_countersigning_session_deletes_withheld_session() {
+    use holo_hash::HasHash;
+
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+    let (op, _) = build_test_store_record_op_hashed(40);
+    let chain_op = match op.as_content() {
+        DhtOp::ChainOp(c) => (**c).clone(),
+        DhtOp::WarrantOp(_) => unreachable!(),
+    };
+    let action = chain_op.action();
+    let action_hash = ActionHash::with_data_sync(&action);
+    let entry_hash = action.entry_hash().unwrap().clone();
+
+    // Withheld self-authored op (withhold_publish = Some(true)) plus its entry.
+    store
+        .test_insert_authored_chain_op(op.clone(), None, None, Some(true))
+        .await
+        .unwrap();
+    let entry = match chain_op.entry().into_option() {
+        Some(e) => e.clone(),
+        None => unreachable!(),
+    };
+    store
+        .test_insert_entry(&entry_hash, &entry, None)
+        .await
+        .unwrap();
+
+    store
+        .remove_countersigning_session(action_hash.clone(), entry_hash.clone())
+        .await
+        .unwrap();
+
+    assert!(store
+        .db()
+        .as_ref()
+        .get_action(action_hash)
+        .await
+        .unwrap()
+        .is_none());
+    assert!(store
+        .db()
+        .as_ref()
+        .get_chain_op(op.as_hash().clone())
+        .await
+        .unwrap()
+        .is_none());
+    assert!(store
+        .db()
+        .as_ref()
+        .get_entry(entry_hash, None)
+        .await
+        .unwrap()
+        .is_none());
+}
+
+#[tokio::test]
+async fn remove_countersigning_session_refuses_published() {
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+    let (op, _) = build_test_store_record_op_hashed(41);
+    let chain_op = match op.as_content() {
+        DhtOp::ChainOp(c) => (**c).clone(),
+        DhtOp::WarrantOp(_) => unreachable!(),
+    };
+    let action = chain_op.action();
+    let action_hash = ActionHash::with_data_sync(&action);
+    let entry_hash = action.entry_hash().unwrap().clone();
+
+    // Published op: withhold_publish cleared (None).
+    store
+        .test_insert_authored_chain_op(op.clone(), None, None, None)
+        .await
+        .unwrap();
+
+    let err = store
+        .remove_countersigning_session(action_hash.clone(), entry_hash)
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        crate::mutations::StateMutationError::CannotRemoveFullyPublished
+    ));
+
+    // The op was not removed.
+    assert!(store
+        .db()
+        .as_ref()
+        .get_action(action_hash)
+        .await
+        .unwrap()
+        .is_some());
+}
+
+#[tokio::test]
 async fn record_published_op_hashes_updates_publish_time() {
     let store = DhtStore::new_test(dht_id()).await.unwrap();
     // Seed an op in ChainOp via the standard pipeline.

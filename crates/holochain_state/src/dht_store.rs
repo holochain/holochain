@@ -5,8 +5,11 @@
 //! obtain a reference from [`Space`](crate) and invoke named methods; they do
 //! not need to interact with the underlying handle directly.
 
-use holo_hash::{AgentPubKey, DhtOpHash, HasHash};
-use holochain_data::dht::{InsertLimboChainOp, InsertLimboWarrant, InsertScheduledFunction};
+use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, EntryHash, HasHash};
+use holochain_data::dht::{
+    InsertLimboChainOp, InsertLimboWarrant, InsertScheduledFunction,
+    RemoveCountersigningSessionOutcome,
+};
 use holochain_data::kind::Dht;
 use holochain_data::DbWrite;
 use holochain_types::dht_op::{DhtOp, DhtOpHashed};
@@ -958,6 +961,40 @@ impl DhtStore<DbWrite<Dht>> {
     pub async fn release_chain_lock(&self, author: &AgentPubKey) -> StateMutationResult<()> {
         self.db.release_chain_lock(author).await?;
         Ok(())
+    }
+
+    /// Force-remove a self-authored countersigning session (its `Action`,
+    /// `ChainOp`/`ChainOpPublish` rows and entry) from the merged store,
+    /// identified by `(action_hash, entry_hash)`.
+    ///
+    /// This is the merged-store replacement for the legacy
+    /// `mutations::remove_countersigning_session` and is defensive about
+    /// sessions whose ops have already been published: if any of the action's
+    /// ops has a `ChainOpPublish` row with `withhold_publish IS NULL` the
+    /// removal is refused with [`StateMutationError::CannotRemoveFullyPublished`]
+    /// and no rows are touched. The guard and deletes run in a single
+    /// transaction.
+    pub async fn remove_countersigning_session(
+        &self,
+        action_hash: ActionHash,
+        entry_hash: EntryHash,
+    ) -> StateMutationResult<()> {
+        let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
+        let outcome = tx
+            .remove_countersigning_session(&action_hash, &entry_hash)
+            .await
+            .map_err(StateMutationError::from)?;
+        match outcome {
+            RemoveCountersigningSessionOutcome::AlreadyPublished => {
+                // Drop the transaction without committing (no rows were
+                // written) and refuse the removal.
+                Err(StateMutationError::CannotRemoveFullyPublished)
+            }
+            RemoveCountersigningSessionOutcome::Removed => {
+                tx.commit().await.map_err(StateMutationError::from)?;
+                Ok(())
+            }
+        }
     }
 
     /// Downgrade this writable store to a read-only store.
