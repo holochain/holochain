@@ -709,6 +709,7 @@ async fn force_abandon_session(
     workspace: Arc<CountersigningWorkspace>,
     signal_tx: &Sender<Signal>,
 ) -> SourceChainResult<()> {
+    // #5370: kept to clean the legacy authored DB in `abandon_session`.
     let authored_db = space.get_or_create_authored_db(author.clone())?;
 
     let abandon_fingerprint = preflight_request.fingerprint()?;
@@ -810,17 +811,32 @@ pub async fn countersigning_publish(
 /// Abandon a countersigning session.
 #[cfg(feature = "unstable-countersigning")]
 async fn abandon_session(
+    // #5370: still needed to keep the legacy authored DB in sync — see the
+    // authored-DB removal below. Drop with `DbKindAuthored`.
     authored_db: DbWrite<DbKindAuthored>,
     dht_store: DhtStore,
     author: AgentPubKey,
     cs_action: Action,
     cs_entry_hash: EntryHash,
 ) -> StateMutationResult<()> {
+    // Do the dangerous thing and remove the countersigning session from the
+    // merged store. The store's published guard is authoritative: it refuses
+    // (with `CannotRemoveFullyPublished`) if any of the session's ops have
+    // already been published. #5370: the session's source-chain rows live in the
+    // merged store.
+    dht_store
+        .remove_countersigning_session(cs_action.to_hash(), cs_entry_hash.clone())
+        .await?;
+
+    // #5370: also remove the session from the legacy authored DB. The
+    // source-chain head is still computed from the authored `Action` table at
+    // flush's as-at check, and — unlike the merged store — it is not filtered by
+    // the withhold-publish flag, so the withheld session entry would otherwise
+    // remain the authored chain head and wedge the next commit. Remove this once
+    // the source-chain authored writes move to the merged store.
     authored_db
         .write_async(move |txn| -> StateMutationResult<()> {
-            // Do the dangerous thing and remove the countersigning session.
             remove_countersigning_session(txn, cs_action, cs_entry_hash)?;
-
             Ok(())
         })
         .await?;

@@ -24,12 +24,11 @@ use holo_hash::{AgentPubKey, DnaHash, EntryHash};
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::{HolochainP2pError, MockHolochainP2pDnaT};
 use holochain_state::prelude::{
-    chain_head_db, current_countersigning_session, insert_op_authored,
-    remove_countersigning_session, set_withhold_publish, AppEntryBytesFixturator, HeadInfo,
+    chain_head_db, current_countersigning_session, insert_op_authored, set_withhold_publish,
+    AppEntryBytesFixturator, HeadInfo,
 };
 use holochain_state::prelude::{insert_action, insert_entry, CounterSigningSessionData};
 use holochain_state::prelude::{StateMutationError, StateMutationResult};
-use holochain_state::query::from_blob;
 use holochain_state::source_chain;
 use holochain_types::activity::AgentActivityResponse;
 use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
@@ -2026,26 +2025,14 @@ impl TestHarness {
         &self,
         action_hash: ActionHash,
     ) -> StateMutationResult<()> {
-        let authored = self
-            .test_space
+        // #5370: session removal now goes through the merged store, whose guard
+        // refuses to remove a session once any of its ops has been published —
+        // i.e. its store `ChainOpPublish` withhold flag has been cleared on
+        // success. The entry hash is irrelevant to the published guard.
+        self.test_space
             .space
-            .get_or_create_authored_db(self.author.clone())
-            .unwrap();
-        authored
-            .write_async({
-                move |txn| {
-                    let blob: Vec<u8> = txn.query_row(
-                        "SELECT blob FROM Action WHERE hash = ?",
-                        [action_hash],
-                        |r| r.get(0),
-                    )?;
-                    remove_countersigning_session(
-                        txn,
-                        from_blob::<SignedAction>(blob)?.action().clone(),
-                        fixt!(EntryHash),
-                    )
-                }
-            })
+            .dht_store
+            .remove_countersigning_session(action_hash, fixt!(EntryHash))
             .await
     }
 }

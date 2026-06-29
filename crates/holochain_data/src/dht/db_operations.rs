@@ -18,6 +18,7 @@ mod limbo_warrant;
 mod link;
 mod move_to_limbo;
 mod op_exists;
+mod remove_countersigning_session;
 mod scheduled_function;
 mod slice_hash;
 mod sync_queries;

@@ -20,6 +20,7 @@ pub(crate) mod limbo_warrant;
 pub(crate) mod link;
 pub(crate) mod move_to_limbo;
 pub(crate) mod op_exists;
+pub(crate) mod remove_countersigning_session;
 pub(crate) mod scheduled_function;
 pub(crate) mod slice_hash;
 pub(crate) mod sync_queries;

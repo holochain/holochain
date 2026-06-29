@@ -29,6 +29,7 @@ pub async fn inner_countersigning_session_incomplete(
     author: AgentPubKey,
     preflight_request: PreflightRequest,
 ) -> WorkflowResult<(SessionCompletionDecision, Vec<SessionResolutionOutcome>)> {
+    // #5370: kept to clean the legacy authored DB in `abandon_session`.
     let authored_db = space.get_or_create_authored_db(author.clone())?;
 
     // Read the current countersigning session from the merged store (#5370).

@@ -24,6 +24,7 @@ pub use inner::limbo_chain_op::InsertLimboChainOp;
 pub use inner::limbo_chain_op::LimboChainOpJoinedRow;
 pub use inner::limbo_warrant::InsertLimboWarrant;
 pub use inner::link::InsertLink;
+pub use inner::remove_countersigning_session::RemoveCountersigningSessionOutcome;
 pub use inner::scheduled_function::InsertScheduledFunction;
 pub use inner::updated_record::InsertUpdatedRecord;
 pub use inner::warrant::InsertWarrant;
@@ -2153,6 +2154,192 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(row.withhold_publish, None);
+    }
+
+    /// Seed a self-authored countersigning-style record: a `Create` action plus
+    /// one `ChainOp` per `op_byte` (each with a `ChainOpPublish` row carrying
+    /// `withhold`), and the entry stored in `Entry` (public) or `PrivateEntry`
+    /// (when `private_author` is `Some`). Returns the action hash and op hashes.
+    async fn seed_countersigning_record(
+        db: &crate::handles::DbWrite<Dht>,
+        seed: u8,
+        entry_hash: &EntryHash,
+        op_specs: &[(u8, Option<bool>)],
+        private_author: Option<&AgentPubKey>,
+    ) -> (ActionHash, Vec<DhtOpHash>) {
+        let author = AgentPubKey::from_raw_36(vec![seed; 36]);
+        let action_hash = ActionHash::from_raw_36(vec![seed; 36]);
+        let action = Action {
+            header: ActionHeader {
+                author: author.clone(),
+                timestamp: Timestamp::from_micros(1_000_000 + seed as i64),
+                action_seq: seed as u32,
+                prev_action: Some(ActionHash::from_raw_36(vec![seed.wrapping_sub(1); 36])),
+            },
+            data: ActionData::Create(holochain_integrity_types::dht_v2::CreateData {
+                entry_type: holochain_integrity_types::EntryType::AgentPubKey,
+                entry_hash: entry_hash.clone(),
+            }),
+        };
+        let hashed = HoloHashed::with_pre_hashed(action, action_hash.clone());
+        let signed = SignedHashed::with_presigned(hashed, Signature([seed; 64]));
+        db.insert_action(&signed, Some(RecordValidity::Accepted))
+            .await
+            .unwrap();
+
+        let mut op_hashes = Vec::new();
+        for (op_byte, withhold) in op_specs {
+            let op_hash = DhtOpHash::from_raw_36(vec![*op_byte; 36]);
+            db.insert_chain_op(InsertChainOp {
+                op_hash: &op_hash,
+                action_hash: &action_hash,
+                op_type: 1,
+                basis_hash: &sample_basis(seed),
+                storage_center_loc: 0,
+                validation_status: RecordValidity::Accepted,
+                locally_validated: true,
+                require_receipt: false,
+                when_received: Timestamp::from_micros(1),
+                when_integrated: Timestamp::from_micros(2),
+                serialized_size: 0,
+            })
+            .await
+            .unwrap();
+            db.insert_chain_op_publish(&op_hash, None, None, *withhold)
+                .await
+                .unwrap();
+            op_hashes.push(op_hash);
+        }
+
+        let entry = Entry::Agent(author.clone());
+        match private_author {
+            Some(a) => db
+                .insert_private_entry(entry_hash, a, &entry)
+                .await
+                .unwrap(),
+            None => db.insert_entry(entry_hash, &entry).await.unwrap(),
+        }
+
+        (action_hash, op_hashes)
+    }
+
+    #[tokio::test]
+    async fn remove_countersigning_session_deletes_withheld_public_entry() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let entry_hash = EntryHash::from_raw_36(vec![0x77; 36]);
+        // Two withheld self-authored ops for one action (e.g. StoreRecord +
+        // StoreEntry) plus the public entry.
+        let (action_hash, op_hashes) = seed_countersigning_record(
+            &db,
+            0x30,
+            &entry_hash,
+            &[(0xA1, Some(true)), (0xA2, Some(true))],
+            None,
+        )
+        .await;
+
+        let outcome = db
+            .remove_countersigning_session(&action_hash, &entry_hash)
+            .await
+            .unwrap();
+        assert_eq!(outcome, RemoveCountersigningSessionOutcome::Removed);
+
+        // Action, both ops, both publish rows, and the public entry are gone.
+        assert!(db.as_ref().get_action(action_hash).await.unwrap().is_none());
+        for op_hash in op_hashes {
+            assert!(db
+                .as_ref()
+                .get_chain_op(op_hash.clone())
+                .await
+                .unwrap()
+                .is_none());
+            assert!(db
+                .as_ref()
+                .get_chain_op_publish(op_hash)
+                .await
+                .unwrap()
+                .is_none());
+        }
+        assert!(db
+            .as_ref()
+            .get_entry(entry_hash, None)
+            .await
+            .unwrap()
+            .is_none());
+    }
+
+    #[tokio::test]
+    async fn remove_countersigning_session_deletes_private_entry() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let author = AgentPubKey::from_raw_36(vec![0x31; 36]);
+        let entry_hash = EntryHash::from_raw_36(vec![0x78; 36]);
+        let (action_hash, _) = seed_countersigning_record(
+            &db,
+            0x31,
+            &entry_hash,
+            &[(0xB1, Some(true))],
+            Some(&author),
+        )
+        .await;
+
+        // The private entry is present before removal.
+        assert!(db
+            .as_ref()
+            .get_entry(entry_hash.clone(), Some(&author))
+            .await
+            .unwrap()
+            .is_some());
+
+        let outcome = db
+            .remove_countersigning_session(&action_hash, &entry_hash)
+            .await
+            .unwrap();
+        assert_eq!(outcome, RemoveCountersigningSessionOutcome::Removed);
+
+        assert!(db.as_ref().get_action(action_hash).await.unwrap().is_none());
+        assert!(db
+            .as_ref()
+            .get_entry(entry_hash, Some(&author))
+            .await
+            .unwrap()
+            .is_none());
+    }
+
+    #[tokio::test]
+    async fn remove_countersigning_session_refuses_when_published() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let entry_hash = EntryHash::from_raw_36(vec![0x79; 36]);
+        // One withheld op and one published op (withhold cleared) for the same
+        // action: the published op must block removal.
+        let (action_hash, op_hashes) = seed_countersigning_record(
+            &db,
+            0x32,
+            &entry_hash,
+            &[(0xC1, Some(true)), (0xC2, None)],
+            None,
+        )
+        .await;
+
+        let outcome = db
+            .remove_countersigning_session(&action_hash, &entry_hash)
+            .await
+            .unwrap();
+        assert_eq!(
+            outcome,
+            RemoveCountersigningSessionOutcome::AlreadyPublished
+        );
+
+        // Nothing was deleted.
+        assert!(db.as_ref().get_action(action_hash).await.unwrap().is_some());
+        for op_hash in op_hashes {
+            assert!(db.as_ref().get_chain_op(op_hash).await.unwrap().is_some());
+        }
+        assert!(db
+            .as_ref()
+            .get_entry(entry_hash, None)
+            .await
+            .unwrap()
+            .is_some());
     }
 
     #[tokio::test]

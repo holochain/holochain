@@ -1120,6 +1120,10 @@ pub fn schedule_fn(
 ///
 /// Note that this mutation is defensive about sessions that have any of their ops published to the
 /// network. If any of the ops have been published, the session cannot be removed.
+///
+/// #5370: superseded by [`crate::dht_store::DhtStore::remove_countersigning_session`], which
+/// performs the equivalent operation against the merged store. Retained for retirement together
+/// with `DbKindAuthored`.
 pub fn remove_countersigning_session(
     txn: &mut Transaction,
     cs_action: Action,
