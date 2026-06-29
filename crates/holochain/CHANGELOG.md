@@ -7,12 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.7.0-dev.31
+
 - Fix a queue consumer bug where the integration workflow failed with a transient `database is locked` error due to write contention, and hence had its pending work dropped with no retry.
 - Improve the sweettest consistency-check failure report when consistency is not reached.
 - **BREAKING CHANGE**: Implement the DNA migration design, adding a new `InitProperties` type to be used in the `init_properties` field on `RoleSettings::Provisioned`. The bytes are opaque to the conductor and stored in the conductor database thus never written to the DHT. They are written during the installation and are intended to seed a freshly migrated chain during `init`. They can only be retrieved from the `init` callback via the `get_init_properties` host function and its HDK wrapper. They are cleared upon a successful init or if the associated app is uninstalled. \#5827
 - **BREAKING CHANGE**: Bump Kitsune2 to `0.5.0-dev.4`.
-- Use Kitsune2's new op publish metadata channel to pass through a validation-receipt-required flag. Published ops request a validation receipt from holders, while gossip-fetched ops no longer do. Previously every incoming op was unconditionally marked as requiring a receipt.
-- **BREAKING CHANGE**: `get_agent_activity` can now return `ChainStatus::Closed` when an agent's source-chain head is a `CloseChain` action. `ChainStatus` is sent over the wire in agent-activity responses, so a node returning `Closed` cannot be understood by a pre-feature node. `Closed` ranks above `Valid` but below `Forked`/`Invalid`, so a chain that is also forked or invalid still reports `Forked`/`Invalid`. \#5766
+- Use Kitsune2’s new op publish metadata channel to pass through a validation-receipt-required flag. Published ops request a validation receipt from holders, while gossip-fetched ops no longer do. Previously every incoming op was unconditionally marked as requiring a receipt.
+- **BREAKING CHANGE**: `get_agent_activity` can now return `ChainStatus::Closed` when an agent’s source-chain head is a `CloseChain` action. `ChainStatus` is sent over the wire in agent-activity responses, so a node returning `Closed` cannot be understood by a pre-feature node. `Closed` ranks above `Valid` but below `Forked`/`Invalid`, so a chain that is also forked or invalid still reports `Forked`/`Invalid`. \#5766
 - Fix `get_agent_activity` status-only requests (`ActivityRequest::Status`) which previously always returned `ChainStatus::Empty` instead of the real chain status. \#5766
 - **BREAKING CHANGE** Inline zome definitions are no longer embedded in `DnaDef`. The `ZomeDef::Inline` variant now carries an `InlineZomeDef` (an `InlineHash` identifier plus its dependencies) instead of the executable closures. The closures are held on `DnaFile` in a new, non-serialized `inline_zomes` field (constructed via `DnaFile::new_inline`) and executed by a dedicated inline ribosome. WASM zomes are unaffected at the API level; this only changes code that builds inline-zome DNAs directly, such as tests using sweettest. \#5828
 - **BREAKING CHANGE** `ZomeDef` no longer uses the custom `untagged` serialization that encoded a Wasm zome as a bare `WasmZome`. Because the `DnaHash` is derived from the serialized integrity zomes, the hash of an otherwise-identical DNA changes with this release. There is no migration path for existing installs of Holochain, and startup errors would be expected if the data state is not cleared. \#5828
@@ -21,7 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **BREAKING CHANGE** `InlineZome::uuid` is replaced by `InlineZome::hash`, which returns an `InlineHash` derived from the previous UUID via blake2b. \#5828
 - **BREAKING CHANGE** Removed `DnaWithRole::replace_dna`. \#5828
 - Add two hash types to `holo_hash`: `InlineHash` (`hash_type::Inline`, prefix `uhCsk`), which identifies an inline zome, and `ZomeHash` (`hash_type::Zome`), which is either a WASM or inline zome hash. \#5828
-- Add `DnaDef::replace_coordinators`, which swaps a DNA's coordinator zomes while preserving install order and rejects a coordinator whose dependency does not point at an existing integrity zome with the new `ZomeError::DanglingZomeDependency`. \#5828
+- Add `DnaDef::replace_coordinators`, which swaps a DNA’s coordinator zomes while preserving install order and rejects a coordinator whose dependency does not point at an existing integrity zome with the new `ZomeError::DanglingZomeDependency`. \#5828
 - Restructure the ribosome so that the WASM, inline, and mock backends each implement a common `RibosomeImplT` trait behind a single `Ribosome` type, replacing the previous `RealRibosome`/`RibosomeT` design. This is primarily an internal change but affects custom ribosome implementations and some sweettest internals. \#5828
 
 ## 0.7.0-dev.30
