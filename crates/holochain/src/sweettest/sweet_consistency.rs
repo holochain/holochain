@@ -202,7 +202,7 @@ async fn await_op_integration(
         println!("\nConsistency not reached.\n");
         for (index, (_, dht_store)) in cells.iter().enumerate() {
             let (validation_limbo, integration_limbo, integrated) =
-                match dht_store.integration_state_counts().await {
+                match dht_store.limbo_state_counts().await {
                     Ok(counts) => counts,
                     Err(e) => {
                         println!(
