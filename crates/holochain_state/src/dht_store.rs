@@ -161,6 +161,20 @@ impl<Db> DhtStore<Db> {
 }
 
 impl DhtStore<DbWrite<Dht>> {
+    /// Acquire the per-author source-chain write permit for this store.
+    ///
+    /// Serializes source-chain flushes for a single `(DNA, author)` chain so
+    /// two concurrent flushes cannot both pass the as-at check and fork the
+    /// chain. Different authors — and the same author on different DNAs — never
+    /// block one another. See
+    /// [`DbWrite::acquire_chain_write_permit`](holochain_data::DbWrite::acquire_chain_write_permit).
+    pub async fn acquire_chain_write_permit(
+        &self,
+        author: &AgentPubKey,
+    ) -> tokio::sync::OwnedSemaphorePermit {
+        self.db.acquire_chain_write_permit(author).await
+    }
+
     /// Delete all live ephemeral scheduled-function rows for `author` at or
     /// before `now`. Returns the number of rows deleted.
     pub async fn delete_live_ephemeral_scheduled_functions(

@@ -10,6 +10,7 @@ mod cap_grant;
 mod chain_lock;
 mod chain_op;
 mod chain_op_publish;
+mod chain_write_permit;
 mod deleted_link;
 mod deleted_record;
 mod entry;
