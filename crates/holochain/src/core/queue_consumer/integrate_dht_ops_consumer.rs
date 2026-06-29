@@ -34,7 +34,6 @@ pub fn spawn_integrate_dht_ops_consumer(
                 trigger_receipt.clone(),
                 network.clone(),
                 conductor.clone(),
-                conductor.clone(),
             )
         },
     );

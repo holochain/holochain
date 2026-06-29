@@ -217,6 +217,7 @@ async fn zero_arc_can_link_to_uncached_base() {
         || async {
             conductors[0]
                 .all_ops_of_author_integrated(dna_file.dna_hash(), alice.agent_pubkey())
+                .await
                 .unwrap()
         },
         None,
@@ -283,7 +284,12 @@ async fn zero_arc_can_delete_link() {
 
     // Wait for Alice to integrate all ops.
     retry_fn_until_timeout(
-        || async { conductors[0].all_ops_integrated(alice.dna_hash()).unwrap() },
+        || async {
+            conductors[0]
+                .all_ops_integrated(alice.dna_hash())
+                .await
+                .unwrap()
+        },
         None,
         None,
     )

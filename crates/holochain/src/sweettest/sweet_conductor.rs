@@ -18,7 +18,6 @@ use holochain_conductor_api::{
     AdminRequest, AdminResponse, AppAuthenticationRequest, CellInfo, ProvisionedCell,
 };
 use holochain_keystore::MetaLairClient;
-use holochain_sqlite::error::DatabaseResult;
 use holochain_state::mutations::StateMutationResult;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::source_chain::SourceChain;
@@ -29,7 +28,6 @@ use holochain_websocket::*;
 use kitsune2_api::DhtArc;
 use nanoid::nanoid;
 use rand::Rng;
-use rusqlite::named_params;
 use std::collections::HashMap;
 use std::net::ToSocketAddrs;
 use std::path::Path;
@@ -907,91 +905,38 @@ impl SweetConductor {
         self.rendezvous.as_ref()
     }
 
-    /// Check if all ops in the DHT database have been integrated.
-    pub fn all_ops_integrated(&self, dna_hash: &DnaHash) -> ConductorApiResult<bool> {
-        let dht_db = self.get_dht_db(dna_hash)?;
-        dht_db.test_read(|txn| {
-            let all_integrated = txn
-                .query_row(
-                    "SELECT NOT EXISTS(SELECT 1 FROM DhtOp WHERE when_integrated IS NULL)",
-                    [],
-                    |row| row.get::<_, bool>(0),
-                )
-                .unwrap();
-            Ok(all_integrated)
-        })
+    /// Check if all ops in the DHT store have been integrated, i.e. nothing
+    /// remains in validation or integration limbo.
+    pub async fn all_ops_integrated(&self, dna_hash: &DnaHash) -> ConductorApiResult<bool> {
+        let dht_store = self.get_dht_store(dna_hash)?;
+        let (validation_limbo, integration_limbo, _) =
+            dht_store.as_read().limbo_state_counts().await?;
+        Ok(validation_limbo == 0 && integration_limbo == 0)
     }
 
-    /// Check if all ops of a specific author have been integrated in the DHT database.
-    pub fn all_ops_of_author_integrated(
+    /// Check if all ops of a specific author have been integrated, i.e. none
+    /// of their chain ops remain in limbo in the DHT store.
+    pub async fn all_ops_of_author_integrated(
         &self,
         dna_hash: &DnaHash,
         author: &AgentPubKey,
     ) -> ConductorApiResult<bool> {
-        let dht_db = self.get_dht_db(dna_hash)?;
-        let author = author.clone();
-        dht_db.test_read(move |txn| {
-            let all_integrated = txn
-                .query_row(
-                    "SELECT NOT EXISTS(
-                            SELECT 1
-                            FROM DhtOp
-                            JOIN Action
-                            ON Action.hash = DhtOp.action_hash
-                            WHERE Action.author = :author
-                            AND DhtOp.when_integrated IS NULL
-                        )",
-                    named_params! {":author": author},
-                    |row| row.get::<_, bool>(0),
-                )
-                .unwrap();
-            Ok(all_integrated)
-        })
+        let dht_store = self.get_dht_store(dna_hash)?;
+        Ok(dht_store
+            .as_read()
+            .count_pending_ops_for_author(author)
+            .await?
+            == 0)
     }
 
-    /// Get all invalid integrated ops from the DHT database.
+    /// Get the hashes of all invalid (rejected) integrated ops from the DHT
+    /// store.
     pub async fn get_invalid_integrated_ops(
         &self,
-        dht_db: &DbWrite<DbKindDht>,
-    ) -> ConductorApiResult<Vec<DhtOpHashed>> {
-        use holo_hash::DhtOpHash;
-        use holochain_state::query::map_sql_dht_op;
-        use holochain_zome_types::prelude::ValidationStatus;
-
-        let result = dht_db
-            .read_async(move |txn| -> DatabaseResult<_> {
-                let mut stmt = txn.prepare(
-                    "
-                    SELECT
-                        DhtOp.hash as hash, DhtOp.type as dht_type, DhtOp.validation_status,
-                        Action.blob as action_blob, Entry.blob as entry_blob
-                    FROM
-                        DhtOp
-                        JOIN Action ON Action.hash = DhtOp.action_hash
-                        LEFT JOIN Entry ON Entry.hash = Action.entry_hash
-                    WHERE
-                        DhtOp.when_integrated IS NOT NULL
-                        AND DhtOp.validation_status = :status
-                    ORDER BY
-                        DhtOp.when_integrated ASC
-                ",
-                )?;
-                let rows = stmt.query_map(
-                    named_params! { ":status": ValidationStatus::Rejected },
-                    |row| {
-                        let hash: DhtOpHash = row.get("hash").unwrap();
-                        let op = map_sql_dht_op(false, "dht_type", row).unwrap();
-                        Ok(DhtOpHashed::with_pre_hashed(op, hash))
-                    },
-                )?;
-                let mut ops = Vec::new();
-                for row in rows {
-                    ops.push(row?);
-                }
-                Ok(ops)
-            })
-            .await?;
-        Ok(result)
+        dna_hash: &DnaHash,
+    ) -> ConductorApiResult<Vec<holo_hash::DhtOpHash>> {
+        let dht_store = self.get_dht_store(dna_hash)?;
+        Ok(dht_store.as_read().rejected_integrated_op_hashes().await?)
     }
 
     /// Manually trigger scheduled fn dispatch

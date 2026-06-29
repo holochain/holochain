@@ -29,6 +29,8 @@ pub async fn validation_receipt_workflow(
     keystore: MetaLairClient,
     running_cell_ids: HashSet<CellId>,
 ) -> WorkflowResult<WorkComplete> {
+    // #5370: `vault` (DbKindDht) input kept as dead code pending retirement.
+    let _ = &vault;
     if running_cell_ids.is_empty() {
         return Ok(WorkComplete::Complete);
     }
@@ -85,14 +87,8 @@ pub async fn validation_receipt_workflow(
             if !recently_online {
                 let op_hashes: Vec<DhtOpHash> =
                     receipts.iter().map(|r| r.dht_op_hash.clone()).collect();
-                for receipt in receipts {
-                    vault
-                        .write_async(move |txn| {
-                            set_require_receipt(txn, &receipt.dht_op_hash, false)
-                        })
-                        .await?;
-                }
-                // Mirror: clear `require_receipt` on the new-DB `ChainOp` rows.
+                // #5370: legacy DhtOp require_receipt dual-write removed; the
+                // new-DB clear below is the only write now.
                 dht_store.clear_require_receipts(op_hashes).await?;
                 continue;
             }
@@ -112,14 +108,8 @@ pub async fn validation_receipt_workflow(
                 // Mark them sent so we don't keep trying
                 let op_hashes: Vec<DhtOpHash> =
                     receipts.iter().map(|r| r.dht_op_hash.clone()).collect();
-                for receipt in receipts {
-                    vault
-                        .write_async(move |txn| {
-                            set_require_receipt(txn, &receipt.dht_op_hash, false)
-                        })
-                        .await?;
-                }
-                // Mirror: clear `require_receipt` on the new-DB `ChainOp` rows.
+                // #5370: legacy DhtOp require_receipt dual-write removed; the
+                // new-DB clear below is the only write now.
                 dht_store.clear_require_receipts(op_hashes).await?;
             }
             Err(e) => {

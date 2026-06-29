@@ -13,9 +13,7 @@ use holochain::{
     test_utils::retry_fn_until_timeout,
 };
 use holochain_sqlite::prelude::ReadAccess;
-use holochain_state::prelude::{
-    dump_db, insert_op_dht, set_validation_status, set_when_integrated,
-};
+use holochain_state::prelude::{insert_op_dht, set_validation_status, set_when_integrated};
 use holochain_state::query::{from_blob, CascadeTxnWrapper, StateQueryResult, Store};
 use holochain_timestamp::Timestamp;
 use holochain_types::dht_op::DhtOpHashed;
@@ -158,21 +156,20 @@ async fn warrant_is_gossiped() {
         || async {
             let alice_pubkey = alice_cell.agent_pubkey().clone();
             let invalid_ops = carol_conductor
-                .get_invalid_integrated_ops(&carol_conductor.get_dht_db(&dna_hash).unwrap())
+                .get_invalid_integrated_ops(&dna_hash)
                 .await
                 .unwrap();
             invalid_ops.len() == 3 && {
                 let warrants = carol_conductor
-                    .get_spaces()
-                    .dht_db(&dna_hash)
+                    .get_dht_store(&dna_hash)
                     .unwrap()
-                    .test_read(move |txn| {
-                        let store = CascadeTxnWrapper::from(txn);
-                        store.get_warrants_for_agent(&alice_pubkey, true).unwrap()
-                    });
+                    .as_read()
+                    .get_warrants_by_warrantee(alice_pubkey)
+                    .await
+                    .unwrap();
                 !warrants.is_empty()
-                    && warrants[0].warrant().warrantee == *alice_cell.agent_pubkey()
-                    && warrants[0].warrant().author == *bob_cell.agent_pubkey() // Make sure that Bob authored the warrant and it's not been authored by Carol.
+                    && warrants[0].data().warrantee == *alice_cell.agent_pubkey()
+                    && warrants[0].data().author == *bob_cell.agent_pubkey() // Make sure that Bob authored the warrant and it's not been authored by Carol.
             }
         },
         Some(60_000),
@@ -311,18 +308,12 @@ async fn author_of_invalid_warrant_is_blocked() {
 
             let alice_pubkey = alice.agent_pubkey().clone();
             let warrants = conductors[0]
-                .get_dht_db(dna_file.dna_hash())
+                .get_dht_store(dna_file.dna_hash())
                 .unwrap()
-                .test_read(move |txn| {
-                    dump_db(txn);
-
-                    txn.query_row("select count(*) from Warrant", [], |r| r.get::<_, i32>(0))
-                        .map(|c| tracing::warn!("Warrant count: {}", c))
-                        .unwrap();
-
-                    let store = CascadeTxnWrapper::from(txn);
-                    store.get_warrants_for_agent(&alice_pubkey, false).unwrap()
-                });
+                .as_read()
+                .get_warrants_by_warrantee(alice_pubkey)
+                .await
+                .unwrap();
 
             tracing::warn!("Warrants: {:#?}", warrants);
 

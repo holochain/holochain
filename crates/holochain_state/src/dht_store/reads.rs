@@ -36,8 +36,132 @@ impl DhtStore<DbRead<Dht>> {
     }
 
     /// Count integrated ops (chain ops plus warrants) held in the DHT store.
-    pub async fn count_integrated_ops(&self) -> StateQueryResult<i64> {
+    pub async fn count_integrated_ops(&self) -> StateQueryResult<u64> {
         Ok(self.db().count_integrated_ops().await?)
+    }
+
+    /// Count integrated, locally-validated chain ops that passed validation
+    /// (rejected and GET-cached ops excluded).
+    #[cfg(any(test, feature = "inspection"))]
+    pub async fn count_valid_integrated_ops(&self) -> StateQueryResult<u64> {
+        Ok(self.db().count_valid_integrated_ops().await?)
+    }
+
+    /// Count chain ops that passed both sys- and app-validation but are not yet
+    /// integrated.
+    #[cfg(any(test, feature = "inspection"))]
+    pub async fn count_valid_not_integrated_ops(&self) -> StateQueryResult<u64> {
+        Ok(self.db().count_valid_not_integrated_ops().await?)
+    }
+
+    /// Count chain ops authored by `author` that are not yet integrated.
+    #[cfg(any(test, feature = "inspection"))]
+    pub async fn count_pending_ops_for_author(
+        &self,
+        author: &AgentPubKey,
+    ) -> StateQueryResult<u64> {
+        Ok(self.db().count_pending_ops_for_author(author).await?)
+    }
+
+    /// Hashes of integrated chain ops that were rejected (GET-cached copies
+    /// excluded).
+    #[cfg(any(test, feature = "inspection"))]
+    pub async fn rejected_integrated_op_hashes(&self) -> StateQueryResult<Vec<DhtOpHash>> {
+        Ok(self.db().rejected_integrated_op_hashes().await?)
+    }
+
+    /// `(op_hash, basis, storage_center_loc)` for every integrated chain op.
+    /// Used to verify DHT-location consistency across conductors.
+    pub async fn integrated_op_locations(
+        &self,
+    ) -> StateQueryResult<Vec<(DhtOpHash, holo_hash::AnyLinkableHash, u32)>> {
+        Ok(self
+            .db()
+            .integrated_op_locations()
+            .await?
+            .into_iter()
+            .map(|r| {
+                let basis: AnyLinkableHash = ExternalHash::from_raw_36(r.basis_hash).into();
+                (
+                    DhtOpHash::from_raw_36(r.hash),
+                    basis,
+                    r.storage_center_loc as u32,
+                )
+            })
+            .collect())
+    }
+
+    /// Total count of every op (integrated and limbo) held in the DHT store.
+    #[cfg(any(test, feature = "inspection"))]
+    pub async fn count_all_ops(&self) -> StateQueryResult<u64> {
+        Ok(self.db().count_all_ops().await?)
+    }
+
+    /// Whether the integrated chain op `op_hash` requires a validation receipt.
+    #[cfg(any(test, feature = "inspection"))]
+    pub async fn op_requires_receipt(&self, op_hash: &DhtOpHash) -> StateQueryResult<bool> {
+        Ok(self.db().op_requires_receipt(op_hash).await?)
+    }
+
+    /// Whether `op_hash` is present in the limbo (not-yet-integrated) chain ops.
+    #[cfg(any(test, feature = "inspection"))]
+    pub async fn limbo_op_exists(&self, op_hash: &DhtOpHash) -> StateQueryResult<bool> {
+        Ok(self.db().limbo_op_exists(op_hash).await?)
+    }
+
+    /// Hashes of limbo chain ops flagged as requiring a validation receipt.
+    #[cfg(any(test, feature = "inspection"))]
+    pub async fn limbo_op_hashes_requiring_receipt(&self) -> StateQueryResult<Vec<DhtOpHash>> {
+        Ok(self.db().limbo_op_hashes_requiring_receipt().await?)
+    }
+
+    /// Hashes of integrated chain ops with the given DHT `basis`.
+    #[cfg(any(test, feature = "inspection"))]
+    pub async fn get_ops_at_basis(
+        &self,
+        basis: &AnyLinkableHash,
+    ) -> StateQueryResult<Vec<DhtOpHash>> {
+        Ok(self.db().get_ops_at_basis(basis).await?)
+    }
+
+    /// Count of rows in the public `Entry` table.
+    #[cfg(any(test, feature = "inspection"))]
+    pub async fn count_entries(&self) -> StateQueryResult<u64> {
+        Ok(self.db().count_entries().await?)
+    }
+
+    /// Integrated warrants authored by `author` (the warrant issuer),
+    /// reconstructed as `WarrantOp`s.
+    pub async fn warrants_by_author(
+        &self,
+        author: AgentPubKey,
+    ) -> StateQueryResult<Vec<holochain_types::warrant::WarrantOp>> {
+        self.db()
+            .get_warrants_by_author(author)
+            .await?
+            .into_iter()
+            .map(warrant_row_to_signed_warrant)
+            .map(|r| r.map(holochain_types::warrant::WarrantOp::from))
+            .collect()
+    }
+
+    /// Terminal validation status of an integrated warrant op, or `None` if no
+    /// such warrant op exists.
+    pub async fn warrant_validation_status(
+        &self,
+        op_hash: &DhtOpHash,
+    ) -> StateQueryResult<Option<ValidationStatus>> {
+        Ok(self
+            .db()
+            .warrant_op_validation_status(op_hash)
+            .await?
+            .map(|s| {
+                if s == 2 {
+                    ValidationStatus::Rejected
+                } else {
+                    ValidationStatus::Valid
+                }
+            }))
     }
 
     /// Drop any op whose hash is already recorded in the DHT store.
@@ -429,6 +553,20 @@ impl DhtStore<DbRead<Dht>> {
             .get_action(hash.clone())
             .await?
             .map(|v2| holochain_zome_types::dht_v2::to_legacy_signed_action(&v2)))
+    }
+
+    /// The signed action carried by the integrated chain op `op_hash`, if the
+    /// op is held in the store. Used by the receipt-receive path to inspect the
+    /// action's entry type.
+    pub async fn action_for_op(
+        &self,
+        op_hash: &DhtOpHash,
+    ) -> StateQueryResult<Option<holochain_zome_types::record::SignedActionHashed>> {
+        let Some(row) = self.db().get_chain_op(op_hash.clone()).await? else {
+            return Ok(None);
+        };
+        let action_hash = holo_hash::ActionHash::from_raw_36(row.action_hash);
+        self.retrieve_action(&action_hash).await
     }
 
     /// Retrieve the signed action for `hash`, checking the store first and

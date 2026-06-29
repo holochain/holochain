@@ -158,3 +158,57 @@ where
     .fetch_all(executor)
     .await
 }
+
+/// Warrants authored by `author` (the warrant issuer), whether still in limbo
+/// or integrated. The shared `Warrant` table holds the content; op metadata
+/// comes from `WarrantOp` (integrated) or `LimboWarrantOp` (in validation),
+/// with `when_integrated` defaulted to `0` for limbo warrants. Ordered by
+/// timestamp descending.
+pub(crate) async fn get_warrants_by_author<'e, E>(
+    executor: E,
+    author: AgentPubKey,
+) -> sqlx::Result<Vec<WarrantRow>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_as(
+        "SELECT w.hash, w.author, w.timestamp, w.warrantee, w.proof, w.signature, w.reason,
+                COALESCE(op.storage_center_loc, lop.storage_center_loc) AS storage_center_loc,
+                COALESCE(op.when_received, lop.when_received) AS when_received,
+                COALESCE(op.when_integrated, 0) AS when_integrated,
+                COALESCE(op.serialized_size, lop.serialized_size) AS serialized_size
+         FROM Warrant w
+         LEFT JOIN WarrantOp op ON op.hash = w.hash
+         LEFT JOIN LimboWarrantOp lop ON lop.hash = w.hash
+         WHERE w.author = ? AND (op.hash IS NOT NULL OR lop.hash IS NOT NULL)
+         ORDER BY w.timestamp DESC",
+    )
+    .bind(author.get_raw_36())
+    .fetch_all(executor)
+    .await
+}
+
+/// Validation outcome of a warrant op (`1` = valid, `2` = rejected), taken
+/// from the integrated `WarrantOp` if present, otherwise from the limbo
+/// warrant's `sys_validation_status` (warrants have no app-validation stage).
+/// Returns `None` if no warrant op exists or its validation is still pending.
+pub(crate) async fn warrant_op_validation_status<'e, E>(
+    executor: E,
+    op_hash: &DhtOpHash,
+) -> sqlx::Result<Option<i64>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let hash = op_hash.get_raw_36().to_vec();
+    let (status,): (Option<i64>,) = sqlx::query_as(
+        "SELECT COALESCE(
+            (SELECT validation_status FROM WarrantOp WHERE hash = ?),
+            (SELECT sys_validation_status FROM LimboWarrantOp WHERE hash = ?)
+        )",
+    )
+    .bind(hash.clone())
+    .bind(hash)
+    .fetch_one(executor)
+    .await?;
+    Ok(status)
+}

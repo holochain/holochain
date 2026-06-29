@@ -16,14 +16,12 @@ use hdk::hdi::test_utils::set_zome_types;
 use hdk::prelude::*;
 use holo_hash::fixt::ActionHashFixturator;
 use holo_hash::fixt::EntryHashFixturator;
-use holo_hash::{fixt::AgentPubKeyFixturator, ActionHash, AnyDhtHash, DhtOpHash, EntryHash};
+use holo_hash::{fixt::AgentPubKeyFixturator, ActionHash, DhtOpHash, EntryHash};
 use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_p2p::actor::MockHcP2p;
 use holochain_p2p::HolochainP2pDna;
-use holochain_sqlite::error::DatabaseResult;
-use holochain_state::dht_store::SysOutcome;
+use holochain_state::dht_store::{DhtStore, SysOutcome};
 use holochain_state::mutations::insert_op_dht;
-use holochain_state::prelude::{from_blob, StateQueryResult};
 use holochain_state::test_utils::test_db_dir;
 use holochain_state::validation_db::ValidationStage;
 use holochain_types::dht_op::DhtOpHashed;
@@ -34,7 +32,6 @@ use holochain_zome_types::fixt::{CreateFixturator, DeleteFixturator, SignatureFi
 use holochain_zome_types::timestamp::Timestamp;
 use holochain_zome_types::Action;
 use matches::assert_matches;
-use rusqlite::{named_params, Transaction};
 use std::convert::{TryFrom, TryInto};
 use std::hash::Hash;
 use std::sync::Arc;
@@ -1129,7 +1126,7 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
 
     // Check that genesis ops are currently validated and integrated
     assert_eq!(
-        get_valid_and_integrated_count(&app_validation_workspace.dht_db).await,
+        get_valid_and_integrated_count(&app_validation_workspace.dht_store).await,
         7
     );
 
@@ -1173,13 +1170,13 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
 
     // The op should be marked as valid but not integrated.
     assert_eq!(
-        get_valid_and_not_integrated_count(&app_validation_workspace.dht_db).await,
+        get_valid_and_not_integrated_count(&app_validation_workspace.dht_store).await,
         1
     );
 
     // Check that the new op is not integrated yet
     assert_eq!(
-        get_valid_and_integrated_count(&app_validation_workspace.dht_db).await,
+        get_valid_and_integrated_count(&app_validation_workspace.dht_store).await,
         7
     );
 }
@@ -1325,13 +1322,12 @@ async fn app_validation_produces_warrants() {
         {
             let alice_pubkey = alice_pubkey.clone();
             conductors[2]
-                .spaces
-                .dht_db(dna_hash)
+                .get_dht_store(dna_hash)
                 .unwrap()
-                .test_read(move |txn| {
-                    let store = CascadeTxnWrapper::from(txn);
-                    store.get_warrants_for_agent(&alice_pubkey, true).unwrap()
-                })
+                .as_read()
+                .get_warrants_by_warrantee(alice_pubkey)
+                .await
+                .unwrap()
                 .len()
         },
         1
@@ -1480,16 +1476,15 @@ async fn skip_issuing_warrant_if_one_found() {
         || async {
             let alice_pubkey = alice.agent_pubkey().clone();
             let warrants = conductors[2]
-                .get_spaces()
-                .dht_db(dna_file.dna_hash())
+                .get_dht_store(dna_file.dna_hash())
                 .unwrap()
-                .test_read(move |txn| {
-                    let store = CascadeTxnWrapper::from(txn);
-                    store.get_warrants_for_agent(&alice_pubkey, true).unwrap()
-                });
+                .as_read()
+                .get_warrants_by_warrantee(alice_pubkey)
+                .await
+                .unwrap();
 
             // Check for any warrant against Alice
-            if !warrants.is_empty() && warrants[0].warrant().warrantee == *alice.agent_pubkey() {
+            if !warrants.is_empty() && warrants[0].data().warrantee == *alice.agent_pubkey() {
                 return true;
             }
 
@@ -1504,13 +1499,12 @@ async fn skip_issuing_warrant_if_one_found() {
     // Now there's at least one valid warrant, check that there's just one warrant.
     let alice_pubkey = alice.agent_pubkey().clone();
     let warrants = conductors[2]
-        .get_spaces()
-        .dht_db(dna_file.dna_hash())
+        .get_dht_store(dna_file.dna_hash())
         .unwrap()
-        .test_read(move |txn| {
-            let store = CascadeTxnWrapper::from(txn);
-            store.get_warrants_for_agent(&alice_pubkey, false).unwrap()
-        });
+        .as_read()
+        .get_warrants_by_warrantee(alice_pubkey)
+        .await
+        .unwrap();
 
     assert_eq!(
         1,
@@ -1520,116 +1514,60 @@ async fn skip_issuing_warrant_if_one_found() {
     );
 }
 
-// These are the expected invalid ops
-fn expected_invalid_entry(
-    txn: &Transaction,
+// The expected invalid ops, from the DHT store.
+async fn expected_invalid_store_entry_op(
+    dht_store: &DhtStore,
     invalid_action_hash: &ActionHash,
-    invalid_entry_hash: &AnyDhtHash,
 ) -> bool {
-    let sql = "
-        SELECT count(hash) FROM DhtOp WHERE
-        type = :store_entry AND action_hash = :invalid_action_hash
-            AND basis_hash = :invalid_entry_hash AND validation_status = :rejected
-    ";
-
-    let count: usize = txn
-        .query_row(
-            sql,
-            named_params! {
-                ":invalid_action_hash": invalid_action_hash,
-                ":invalid_entry_hash": invalid_entry_hash,
-                ":store_entry": ChainOpType::StoreEntry,
-                ":rejected": ValidationStatus::Rejected,
-            },
-            |row| row.get(0),
-        )
-        .unwrap();
-    count == 1
+    matches!(
+        dht_store
+            .as_read()
+            .op_validation_status(invalid_action_hash, ChainOpType::StoreEntry)
+            .await
+            .unwrap(),
+        Some(ValidationStatus::Rejected)
+    )
 }
 
 // Now we expect an invalid link
-fn expected_invalid_link(txn: &Transaction, invalid_link_hash: &ActionHash) -> bool {
-    let sql = "
-        SELECT count(hash) FROM DhtOp WHERE
-        type = :create_link AND action_hash = :invalid_link_hash
-            AND validation_status = :rejected
-    ";
-
-    let count: usize = txn
-        .query_row(
-            sql,
-            named_params! {
-                ":invalid_link_hash": invalid_link_hash,
-                ":create_link": ChainOpType::RegisterAddLink,
-                ":rejected": ValidationStatus::Rejected,
-            },
-            |row| row.get(0),
-        )
-        .unwrap();
-    count == 1
+async fn expected_invalid_register_add_link_op(
+    dht_store: &DhtStore,
+    invalid_link_hash: &ActionHash,
+) -> bool {
+    matches!(
+        dht_store
+            .as_read()
+            .op_validation_status(invalid_link_hash, ChainOpType::RegisterAddLink)
+            .await
+            .unwrap(),
+        Some(ValidationStatus::Rejected)
+    )
 }
 
 // Now we're trying to remove an invalid link
-fn expected_invalid_remove_link(txn: &Transaction, invalid_remove_hash: &ActionHash) -> bool {
-    let sql = "
-        SELECT count(hash) FROM DhtOp WHERE
-        (type = :delete_link AND action_hash = :invalid_remove_hash
-            AND validation_status = :rejected)
-    ";
-
-    let count: usize = txn
-        .query_row(
-            sql,
-            named_params! {
-                ":invalid_remove_hash": invalid_remove_hash,
-                ":delete_link": ChainOpType::RegisterRemoveLink,
-                ":rejected": ValidationStatus::Rejected,
-            },
-            |row| row.get(0),
-        )
-        .unwrap();
-    count == 1
-}
-
-fn limbo_is_empty(txn: &Transaction) -> bool {
-    let not_empty: bool = txn
-        .query_row(
-            "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE when_integrated IS NULL)",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap();
-    !not_empty
-}
-
-fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
-    txn.prepare(
-        "
-        SELECT DhtOp.type, Action.hash, Action.blob
-        FROM DhtOp
-        JOIN Action ON DhtOp.action_hash = Action.hash
-        WHERE
-        when_integrated IS NULL
-    ",
+async fn expected_invalid_remove_link_op(
+    dht_store: &DhtStore,
+    invalid_remove_hash: &ActionHash,
+) -> bool {
+    matches!(
+        dht_store
+            .as_read()
+            .op_validation_status(invalid_remove_hash, ChainOpType::RegisterRemoveLink)
+            .await
+            .unwrap(),
+        Some(ValidationStatus::Rejected)
     )
-    .unwrap()
-    .query_and_then([], |row| {
-        let op_type: DhtOpType = row.get("type")?;
-        match op_type {
-            DhtOpType::Chain(op_type) => {
-                let hash: ActionHash = row.get("hash")?;
-                let action: SignedAction = from_blob(row.get("blob")?)?;
-                Ok(ChainOpLite::from_type(op_type, hash, &action)?.into())
-            }
-            DhtOpType::Warrant(_) => {
-                let warrant: SignedWarrant = from_blob(row.get("blob")?)?;
-                Ok(warrant.into())
-            }
-        }
-    })
-    .unwrap()
-    .collect::<StateQueryResult<Vec<DhtOpLite>>>()
-    .unwrap()
+}
+
+// Assert nothing remains in validation or integration limbo in the DHT store.
+async fn assert_limbo_is_empty(dht_store: &DhtStore) {
+    let (validation_limbo, integration_limbo, _) =
+        dht_store.as_read().limbo_state_counts().await.unwrap();
+    assert_eq!(
+        (validation_limbo, integration_limbo),
+        (0, 0),
+        "limbo not empty: {validation_limbo} validating, {integration_limbo} awaiting integration"
+    );
 }
 
 async fn run_test(
@@ -1656,65 +1594,46 @@ async fn run_test(
     // Plus another 16 for genesis + init
     // Plus 2 for Cap Grant
     let expected_count = 3 + 16 + 2;
-    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
-        .await
+    let alice_store = conductors[0]
+        .get_dht_store(alice_cell_id.dna_hash())
         .unwrap();
+    wait_for_integration(
+        &alice_store,
+        expected_count as u64,
+        num_attempts,
+        delay_per_attempt,
+    )
+    .await;
 
-    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-
-    alice_db
-        .read_async(move |txn| -> DatabaseResult<()> {
-            // Validation should be empty
-            let limbo = show_limbo(txn);
-            assert!(limbo_is_empty(txn), "{limbo:?}");
-
-            Ok(())
-        })
-        .await
-        .unwrap();
+    assert_limbo_is_empty(&alice_store).await;
     assert_eq!(
-        get_valid_and_integrated_count(&alice_db).await,
+        get_valid_and_integrated_count(&alice_store).await,
         expected_count
     );
 
-    let (invalid_action_hash, invalid_entry_hash) =
+    let (invalid_action_hash, _invalid_entry_hash) =
         commit_invalid(&bob_cell_id, &conductors[1].raw_handle(), dna_file).await;
-    let invalid_entry_hash: AnyDhtHash = invalid_entry_hash.into();
 
     // Integration should have 3 ops in it
     // StoreEntry should be invalid.
     // RegisterAgentActivity will be valid.
     let expected_count = 3 + expected_count;
-    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
-        .await
+    let alice_store = conductors[0]
+        .get_dht_store(alice_cell_id.dna_hash())
         .unwrap();
+    wait_for_integration(
+        &alice_store,
+        expected_count as u64,
+        num_attempts,
+        delay_per_attempt,
+    )
+    .await;
 
-    alice_db
-        .read_async({
-            let check_invalid_action_hash = invalid_action_hash.clone();
-            let check_invalid_entry_hash = invalid_entry_hash.clone();
-
-            move |txn| -> DatabaseResult<()> {
-                // Validation should be empty
-                let limbo = show_limbo(txn);
-                assert!(limbo_is_empty(txn), "{limbo:?}");
-
-                assert!(expected_invalid_entry(
-                    txn,
-                    &check_invalid_action_hash,
-                    &check_invalid_entry_hash
-                ));
-
-                Ok(())
-            }
-        })
-        .await
-        .unwrap();
+    assert_limbo_is_empty(&alice_store).await;
+    assert!(expected_invalid_store_entry_op(&alice_store, &invalid_action_hash).await);
     // Expect having one invalid op for the store entry.
     assert_eq!(
-        get_valid_and_integrated_count(&alice_db).await,
+        get_valid_and_integrated_count(&alice_store).await,
         expected_count - 1
     );
 
@@ -1728,35 +1647,22 @@ async fn run_test(
 
     // Integration should have 6 ops in it
     let expected_count = 6 + expected_count;
-    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
-        .await
+    let alice_store = conductors[0]
+        .get_dht_store(alice_cell_id.dna_hash())
         .unwrap();
+    wait_for_integration(
+        &alice_store,
+        expected_count as u64,
+        num_attempts,
+        delay_per_attempt,
+    )
+    .await;
 
-    alice_db
-        .read_async({
-            let check_invalid_action_hash = invalid_action_hash.clone();
-            let check_invalid_entry_hash = invalid_entry_hash.clone();
-
-            move |txn| -> DatabaseResult<()> {
-                // Validation should be empty
-                let limbo = show_limbo(txn);
-                assert!(limbo_is_empty(txn), "{limbo:?}");
-
-                assert!(expected_invalid_entry(
-                    txn,
-                    &check_invalid_action_hash,
-                    &check_invalid_entry_hash
-                ));
-
-                Ok(())
-            }
-        })
-        .await
-        .unwrap();
+    assert_limbo_is_empty(&alice_store).await;
+    assert!(expected_invalid_store_entry_op(&alice_store, &invalid_action_hash).await);
     // Expect having one invalid op for the store entry.
     assert_eq!(
-        get_valid_and_integrated_count(&alice_db).await,
+        get_valid_and_integrated_count(&alice_store).await,
         expected_count - 1
     );
 
@@ -1780,37 +1686,23 @@ async fn run_test(
 
     // Integration should have 9 ops in it
     let expected_count = 9 + expected_count;
-    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
-        .await
+    let alice_store = conductors[0]
+        .get_dht_store(alice_cell_id.dna_hash())
         .unwrap();
+    wait_for_integration(
+        &alice_store,
+        expected_count as u64,
+        num_attempts,
+        delay_per_attempt,
+    )
+    .await;
 
-    alice_db
-        .read_async({
-            let check_invalid_action_hash = invalid_action_hash.clone();
-            let check_invalid_entry_hash = invalid_entry_hash.clone();
-            let check_invalid_link_hash = invalid_link_hash.clone();
-
-            move |txn| -> DatabaseResult<()> {
-                // Validation should be empty
-                let limbo = show_limbo(txn);
-                assert!(limbo_is_empty(txn), "{limbo:?}");
-
-                assert!(expected_invalid_entry(
-                    txn,
-                    &check_invalid_action_hash,
-                    &check_invalid_entry_hash
-                ));
-                assert!(expected_invalid_link(txn, &check_invalid_link_hash));
-
-                Ok(())
-            }
-        })
-        .await
-        .unwrap();
+    assert_limbo_is_empty(&alice_store).await;
+    assert!(expected_invalid_store_entry_op(&alice_store, &invalid_action_hash).await);
+    assert!(expected_invalid_register_add_link_op(&alice_store, &invalid_link_hash).await);
     // Expect having two invalid ops for the two store entries.
     assert_eq!(
-        get_valid_and_integrated_count(&alice_db).await,
+        get_valid_and_integrated_count(&alice_store).await,
         expected_count - 2
     );
 
@@ -1832,37 +1724,23 @@ async fn run_test(
 
     // Integration should have 9 ops in it
     let expected_count = 9 + expected_count;
-    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
-        .await
+    let alice_store = conductors[0]
+        .get_dht_store(alice_cell_id.dna_hash())
         .unwrap();
+    wait_for_integration(
+        &alice_store,
+        expected_count as u64,
+        num_attempts,
+        delay_per_attempt,
+    )
+    .await;
 
-    alice_db
-        .read_async({
-            let check_invalid_action_hash = invalid_action_hash.clone();
-            let check_invalid_entry_hash = invalid_entry_hash.clone();
-            let check_invalid_link_hash = invalid_link_hash.clone();
-
-            move |txn| -> DatabaseResult<()> {
-                // Validation should be empty
-                let limbo = show_limbo(txn);
-                assert!(limbo_is_empty(txn), "{limbo:?}");
-
-                assert!(expected_invalid_entry(
-                    txn,
-                    &check_invalid_action_hash,
-                    &check_invalid_entry_hash
-                ));
-                assert!(expected_invalid_link(txn, &check_invalid_link_hash));
-
-                Ok(())
-            }
-        })
-        .await
-        .unwrap();
+    assert_limbo_is_empty(&alice_store).await;
+    assert!(expected_invalid_store_entry_op(&alice_store, &invalid_action_hash).await);
+    assert!(expected_invalid_register_add_link_op(&alice_store, &invalid_link_hash).await);
     // Expect having two invalid ops for the two store entries.
     assert_eq!(
-        get_valid_and_integrated_count(&alice_db).await,
+        get_valid_and_integrated_count(&alice_store).await,
         expected_count - 2
     );
 
@@ -1886,38 +1764,24 @@ async fn run_test(
 
     // Integration should have 12 ops in it
     let expected_count = 12 + expected_count;
-    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
-        .await
+    let alice_store = conductors[0]
+        .get_dht_store(alice_cell_id.dna_hash())
         .unwrap();
+    wait_for_integration(
+        &alice_store,
+        expected_count as u64,
+        num_attempts,
+        delay_per_attempt,
+    )
+    .await;
 
-    alice_db
-        .read_async({
-            let check_invalid_action_hash = invalid_action_hash.clone();
-            let check_invalid_entry_hash = invalid_entry_hash.clone();
-            let check_invalid_link_hash = invalid_link_hash.clone();
-
-            move |txn| -> DatabaseResult<()> {
-                // Validation should be empty
-                let limbo = show_limbo(txn);
-                assert!(limbo_is_empty(txn), "{limbo:?}");
-
-                assert!(expected_invalid_entry(
-                    txn,
-                    &check_invalid_action_hash,
-                    &check_invalid_entry_hash
-                ));
-                assert!(expected_invalid_link(txn, &check_invalid_link_hash));
-                assert!(expected_invalid_remove_link(txn, &invalid_remove_hash));
-
-                Ok(())
-            }
-        })
-        .await
-        .unwrap();
+    assert_limbo_is_empty(&alice_store).await;
+    assert!(expected_invalid_store_entry_op(&alice_store, &invalid_action_hash).await);
+    assert!(expected_invalid_register_add_link_op(&alice_store, &invalid_link_hash).await);
+    assert!(expected_invalid_remove_link_op(&alice_store, &invalid_remove_hash).await);
     // 3 invalid ops above plus 1 extra invalid ops that `remove_invalid_link` commits.
     assert_eq!(
-        get_valid_and_integrated_count(&alice_db).await,
+        get_valid_and_integrated_count(&alice_store).await,
         expected_count - (3 + 1)
     );
     expected_count
@@ -1940,37 +1804,28 @@ async fn run_test_entry_def_id(
     let num_attempts = 100;
     let delay_per_attempt = Duration::from_millis(100);
 
-    let (invalid_action_hash, invalid_entry_hash) =
+    let (invalid_action_hash, _invalid_entry_hash) =
         commit_invalid_post(&bob_cell_id, &conductors[1].raw_handle(), dna_file).await;
-    let invalid_entry_hash: AnyDhtHash = invalid_entry_hash.into();
 
     // Integration should have 3 ops in it
     // StoreEntry and StoreRecord should be invalid.
     let expected_count = 3 + expected_count;
-    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
-        .await
+    let alice_store = conductors[0]
+        .get_dht_store(alice_cell_id.dna_hash())
         .unwrap();
+    wait_for_integration(
+        &alice_store,
+        expected_count as u64,
+        num_attempts,
+        delay_per_attempt,
+    )
+    .await;
 
-    alice_db
-        .read_async(move |txn| -> DatabaseResult<()> {
-            // Validation should be empty
-            let limbo = show_limbo(txn);
-            assert!(limbo_is_empty(txn), "{limbo:?}");
-
-            assert!(expected_invalid_entry(
-                txn,
-                &invalid_action_hash,
-                &invalid_entry_hash
-            ));
-
-            Ok(())
-        })
-        .await
-        .unwrap();
+    assert_limbo_is_empty(&alice_store).await;
+    assert!(expected_invalid_store_entry_op(&alice_store, &invalid_action_hash).await);
     // Expect having two invalid ops for the two store entries plus the 3 from the previous test.
     assert_eq!(
-        get_valid_and_integrated_count(&alice_db).await,
+        get_valid_and_integrated_count(&alice_store).await,
         expected_count - 5
     );
 }
