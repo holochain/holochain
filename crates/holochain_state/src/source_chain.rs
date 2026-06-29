@@ -331,72 +331,87 @@ impl SourceChain {
             .map(|op| (op.1.clone(), op.0.dht_basis()))
             .collect::<Vec<_>>();
 
-        // Write the entries, actions and ops to the database in one transaction.
         let author = self.author.clone();
         let persisted_head = self.head_info.as_ref().map(|h| h.action.clone());
 
         let now = Timestamp::now();
 
-        // Snapshots reused by the new-DB write block after the legacy closure
-        // consumes the originals; these clones are cheap
-        // (Vec<HoloHashed<_>> / Vec<ScheduledFn>).
-        let entries_for_new_db = entries.clone();
-        let actions_for_new_db = actions.clone();
-        let ops_for_new_db = ops.clone();
-        let scheduled_fns_for_new_db = scheduled_fns.clone();
+        // #5370: clones reused by the authoritative merged-store write below,
+        // after the transitional authored dual-write consumes the originals.
+        // The authored dual-write — and therefore these clones — is kept only
+        // until the source-chain *readers* that still query the legacy authored
+        // DB are migrated to the merged store: `SourceChain::query`,
+        // `valid_cap_grant`, `valid_create_agent_key_action` /
+        // `delete_valid_agent_pub_key`, and `zomes_initialized`. Cheap clones
+        // (`Vec<HoloHashed<_>>` / `Vec<ScheduledFn>`).
+        let entries_for_authored = entries.clone();
+        let actions_for_authored = actions.clone();
+        let ops_for_authored = ops.clone();
+        let scheduled_fns_for_authored = scheduled_fns.clone();
 
-        // Take out a write lock as late as possible, after doing everything we can in memory and
-        // before starting any database read/write operations.
-        let write_permit = self.vault.acquire_write_permit().await?;
-
-        // If there are records to write, then we need to respect the chain lock.
-        // #5370: the lock now lives in the merged store. Reading it here (outside
-        // the authored write txn) opens a tiny TOCTOU window, but this is a coarse
-        // countersigning-session guard and the window is acceptable.
-        if !records.is_empty() {
-            let chain_lock = self
+        // Acquire the per-author chain write permit on the merged store and
+        // perform the source-chain write under it, gated by an as-at check
+        // against the store head. The permit serializes flushes for this
+        // (DNA, author) chain so a concurrent flush cannot also pass the
+        // as-at and fork the chain.
+        //
+        // The permit is acquired and released *inside* this async block so it
+        // is not held when the relaxed-ordering rebase below recurses into
+        // `flush` (which re-acquires it).
+        let chain_flush_result: SourceChainResult<Vec<SignedActionHashed>> = async {
+            let _chain_write_permit = self
                 .dht_store
-                .as_read()
-                .get_chain_lock(author.as_ref().clone())
-                .await?;
-            match chain_lock {
-                Some(chain_lock) => {
-                    // If the chain is locked, the lock must be for this entry.
-                    if chain_lock.subject() != lock_subject {
-                        return Err(SourceChainError::ChainLocked);
-                    }
-                    // If the lock is expired then we can't write this countersigning session.
-                    else if chain_lock.is_expired_at(now) {
-                        return Err(SourceChainError::LockExpired);
-                    }
+                .acquire_chain_write_permit(author.as_ref())
+                .await;
 
-                    // Otherwise, the lock matches this entry and has not expired. We can proceed!
-                }
-                None => {
-                    // If this is a countersigning entry but there is no chain lock then maybe
-                    // the session expired before the entry could be written or maybe the app
-                    // has just made a mistake. Either way, it's not valid to write this entry!
-                    if is_countersigning_session {
-                        return Err(SourceChainError::CountersigningWriteWithoutSession);
+            // If there are records to write, then we need to respect the chain
+            // lock. #5370: the lock now lives in the merged store. Reading it
+            // here opens a tiny TOCTOU window (the lock is mutated by the
+            // countersigning workflow, not by flush, so the chain permit does
+            // not stabilise it), but this is a coarse countersigning-session
+            // guard and the window is acceptable.
+            if !records.is_empty() {
+                let chain_lock = self
+                    .dht_store
+                    .as_read()
+                    .get_chain_lock(author.as_ref().clone())
+                    .await?;
+                match chain_lock {
+                    Some(chain_lock) => {
+                        // If the chain is locked, the lock must be for this entry.
+                        if chain_lock.subject() != lock_subject {
+                            return Err(SourceChainError::ChainLocked);
+                        }
+                        // If the lock is expired then we can't write this countersigning session.
+                        else if chain_lock.is_expired_at(now) {
+                            return Err(SourceChainError::LockExpired);
+                        }
+
+                        // Otherwise, the lock matches this entry and has not expired. We can proceed!
+                    }
+                    None => {
+                        // If this is a countersigning entry but there is no chain lock then maybe
+                        // the session expired before the entry could be written or maybe the app
+                        // has just made a mistake. Either way, it's not valid to write this entry!
+                        if is_countersigning_session {
+                            return Err(SourceChainError::CountersigningWriteWithoutSession);
+                        }
                     }
                 }
             }
-        }
 
-        let chain_flush_result = self
-            .vault
-            .write_async_with_permit(write_permit, move |txn| {
-                for scheduled_fn in scheduled_fns {
-                    schedule_fn(txn, author.as_ref(), scheduled_fn, None, now)?;
-                }
-
-                if actions.last().is_none() {
-                    // Nothing to write
-                    return Ok(Vec::new());
-                }
-
-                // As at check.
-                let head_info = chain_head_db(txn)?;
+            // As-at check against the STORE head, under the permit, before the
+            // write. Only meaningful when there are actions that move the head.
+            // The permit guarantees no concurrent flush commits between this
+            // read and the write below, and no other code path writes this
+            // author's chain head, so reading on a pool connection (rather than
+            // inside `tx`) is safe.
+            if !actions.is_empty() {
+                let head_info = self
+                    .dht_store
+                    .as_read()
+                    .chain_head_for_author(author.as_ref())
+                    .await?;
                 let latest_head = head_info.as_ref().map(|h| h.action.clone());
 
                 if persisted_head != latest_head {
@@ -407,24 +422,187 @@ impl SourceChain {
                         head_info,
                     ));
                 }
+            }
 
-                for entry in entries {
-                    insert_entry(txn, entry.as_hash(), entry.as_content())?;
-                }
-                for shh in actions.iter() {
-                    insert_action(txn, shh)?;
-                }
-                for (op, op_hash, op_order, timestamp, _dep) in &ops {
-                    insert_op_lite_into_authored(txn, op, op_hash, op_order, timestamp)?;
-                    // If this is a countersigning session we want to withhold
-                    // publishing the ops until the session is successful.
-                    if is_countersigning_session {
-                        set_withhold_publish(txn, op_hash)?;
+            // #5370: transitional authored source-chain dual-write. The merged
+            // store below is the authority for serialization (the chain permit)
+            // and the as-at, but the legacy authored DB is still written because
+            // production source-chain readers — `SourceChain::query`,
+            // `valid_cap_grant`, `valid_create_agent_key_action` /
+            // `delete_valid_agent_pub_key`, and `zomes_initialized` — still query
+            // it. This write is no longer guarded by its own as-at; the store
+            // as-at above (under the chain permit) gates it. Remove once those
+            // readers are migrated to the merged store.
+            {
+                let author = author.clone();
+                self.vault
+                    .write_async(move |txn| -> SourceChainResult<()> {
+                        for scheduled_fn in scheduled_fns_for_authored {
+                            schedule_fn(txn, author.as_ref(), scheduled_fn, None, now)?;
+                        }
+                        for entry in entries_for_authored {
+                            insert_entry(txn, entry.as_hash(), entry.as_content())?;
+                        }
+                        for shh in actions_for_authored.iter() {
+                            insert_action(txn, shh)?;
+                        }
+                        for (op, op_hash, op_order, timestamp, _dep) in &ops_for_authored {
+                            insert_op_lite_into_authored(txn, op, op_hash, op_order, timestamp)?;
+                            // If this is a countersigning session we want to
+                            // withhold publishing the ops until the session is
+                            // successful.
+                            if is_countersigning_session {
+                                set_withhold_publish(txn, op_hash)?;
+                            }
+                        }
+                        Ok(())
+                    })
+                    .await?;
+            }
+
+            // The authoritative source-chain write: entries, actions, ops and
+            // scheduled fns into the merged store, in one transaction.
+            let mut tx = self
+                .dht_store
+                .db()
+                .begin()
+                .await
+                .map_err(SourceChainError::other)?;
+
+            // Collect the set of entry hashes whose authoring action declares
+            // them as private. Entries whose hash matches one of these go to
+            // `PrivateEntry`; every other entry — including any whose hash is
+            // not referenced by an in-batch action — goes to the public `Entry`
+            // table.
+            let private_entry_hashes = actions
+                .iter()
+                .filter_map(|sah| {
+                    let action = sah.action();
+                    let visibility = action.entry_visibility()?;
+                    if *visibility == EntryVisibility::Private {
+                        action.entry_hash().cloned()
+                    } else {
+                        None
                     }
+                })
+                .collect::<std::collections::HashSet<_>>();
+
+            for entry_hashed in &entries {
+                let entry_hash = entry_hashed.as_hash();
+                let entry = entry_hashed.as_content();
+                if private_entry_hashes.contains(entry_hash) {
+                    tx.insert_private_entry(entry_hash, author.as_ref(), entry)
+                        .await
+                        .map_err(SourceChainError::other)?;
+                } else {
+                    tx.insert_entry(entry_hash, entry)
+                        .await
+                        .map_err(SourceChainError::other)?;
                 }
-                SourceChainResult::Ok(actions)
-            })
-            .await;
+            }
+
+            // Track which action hashes were successfully inserted into the
+            // store. Ops whose action insert failed must also be skipped to
+            // avoid FK violations on ChainOp.action_hash.
+            let mut inserted_action_hashes = std::collections::HashSet::<ActionHash>::new();
+
+            for sah in &actions {
+                let new_sah = holochain_zome_types::dht_v2::from_legacy_signed_action(sah);
+
+                tx.insert_action(
+                    &new_sah,
+                    Some(holochain_zome_types::dht_v2::RecordValidity::Accepted),
+                )
+                .await
+                .map_err(SourceChainError::other)?;
+
+                // Record that this action hash is present in the store.
+                inserted_action_hashes.insert(sah.as_hash().clone());
+
+                crate::dht_store::action_indexes::insert_action_indexes(
+                    &mut tx,
+                    new_sah.as_hash(),
+                    &new_sah.hashed.content.data,
+                )
+                .await
+                .map_err(SourceChainError::other)?;
+
+                // For Create/Update of a CapGrant entry type, insert a CapGrant index row.
+                if let Some((cap_access, tag)) = cap_grant_index_params(sah, &entries) {
+                    tx.insert_cap_grant(new_sah.as_hash(), cap_access, tag.as_deref())
+                        .await
+                        .map_err(SourceChainError::other)?;
+                }
+            }
+
+            for (op, op_hash, _op_order, timestamp, _dep) in &ops {
+                let op_as_chain = match op.as_chain_op() {
+                    Some(c) => c,
+                    None => continue, // warrant ops: skip for this slice
+                };
+                // Skip ops whose action hash was not recorded as successfully inserted.
+                if !inserted_action_hashes.contains(op_as_chain.action_hash()) {
+                    continue;
+                }
+                let basis_hash = op_as_chain.dht_basis().clone();
+                let storage_center_loc = basis_hash.get_loc();
+
+                let serialized_size = encoded_chain_op_size(op_as_chain, &actions, &entries);
+                tx.insert_chain_op(holochain_data::dht::InsertChainOp {
+                    op_hash,
+                    action_hash: op_as_chain.action_hash(),
+                    op_type: i64::from(op_as_chain.get_type()),
+                    basis_hash: &basis_hash,
+                    storage_center_loc,
+                    validation_status: holochain_zome_types::dht_v2::RecordValidity::Accepted,
+                    locally_validated: true,
+                    require_receipt: false,
+                    when_received: *timestamp,
+                    when_integrated: *timestamp,
+                    serialized_size,
+                })
+                .await
+                .map_err(SourceChainError::other)?;
+
+                // Always insert a ChainOpPublish row for self-authored ops so the
+                // publish workflow can track them without a separate lookup.
+                // Countersigning ops are withheld from publishing until the
+                // session succeeds.
+                let withhold = if is_countersigning_session {
+                    Some(true)
+                } else {
+                    None
+                };
+                tx.insert_chain_op_publish(op_hash, None, None, withhold)
+                    .await
+                    .map_err(SourceChainError::other)?;
+            }
+
+            // Scheduled functions flushed from the scratch are always written
+            // with `maybe_schedule = None` (see schedule_fn in mutations.rs).
+            // None => start=now, end=Timestamp::max(), ephemeral=true.
+            for scheduled_fn in &scheduled_fns {
+                let maybe_schedule_blob =
+                    serialize_maybe_schedule_none().map_err(SourceChainError::other)?;
+                let _ = tx
+                    .upsert_scheduled_function(holochain_data::dht::InsertScheduledFunction {
+                        author: author.as_ref(),
+                        zome_name: scheduled_fn.zome_name().0.as_ref(),
+                        scheduled_fn: scheduled_fn.fn_name().0.as_ref(),
+                        maybe_schedule: &maybe_schedule_blob,
+                        start_at: now,
+                        end_at: Timestamp::max(),
+                        ephemeral: true,
+                    })
+                    .await
+                    .map_err(SourceChainError::other)?;
+            }
+
+            tx.commit().await.map_err(SourceChainError::other)?;
+
+            SourceChainResult::Ok(actions)
+        }
+        .await;
 
         match chain_flush_result {
             Err(SourceChainError::HeadMoved(actions, entries, old_head, Some(new_head_info))) => {
@@ -465,167 +643,12 @@ impl SourceChain {
                     ))
                 }
             }
-            Ok((actions, permit)) => {
-                drop(permit);
-
-                // Write the authored-side data to the new holochain_data DHT DB.
-                // Strict on failure: if anything here fails, the whole flush fails.
-                {
-                    // `author` was moved into the legacy closure above; re-clone from `self`.
-                    let author = self.author.clone();
-                    let mut tx = self
-                        .dht_store
-                        .db()
-                        .begin()
-                        .await
-                        .map_err(SourceChainError::other)?;
-
-                    // Collect the set of entry hashes whose authoring action declares
-                    // them as private. Entries whose hash matches one of these go to
-                    // `PrivateEntry`; every other entry — including any whose hash is
-                    // not referenced by an in-batch action — goes to the public `Entry`
-                    // table, matching the legacy authored-DB write below.
-                    let private_entry_hashes = actions_for_new_db
-                        .iter()
-                        .filter_map(|sah| {
-                            let action = sah.action();
-                            let visibility = action.entry_visibility()?;
-                            if *visibility == EntryVisibility::Private {
-                                action.entry_hash().cloned()
-                            } else {
-                                None
-                            }
-                        })
-                        .collect::<std::collections::HashSet<_>>();
-
-                    for entry_hashed in &entries_for_new_db {
-                        let entry_hash = entry_hashed.as_hash();
-                        let entry = entry_hashed.as_content();
-                        if private_entry_hashes.contains(entry_hash) {
-                            tx.insert_private_entry(entry_hash, author.as_ref(), entry)
-                                .await
-                                .map_err(SourceChainError::other)?;
-                        } else {
-                            tx.insert_entry(entry_hash, entry)
-                                .await
-                                .map_err(SourceChainError::other)?;
-                        }
-                    }
-
-                    // Track which action hashes were successfully inserted into the new DB.
-                    // Ops whose action insert failed must also be skipped to avoid FK
-                    // violations on ChainOp.action_hash.
-                    let mut inserted_action_hashes = std::collections::HashSet::<ActionHash>::new();
-
-                    for sah in &actions_for_new_db {
-                        let new_sah = holochain_zome_types::dht_v2::from_legacy_signed_action(sah);
-
-                        tx.insert_action(
-                            &new_sah,
-                            Some(holochain_zome_types::dht_v2::RecordValidity::Accepted),
-                        )
-                        .await
-                        .map_err(SourceChainError::other)?;
-
-                        // Record that this action hash is present in the new DB.
-                        inserted_action_hashes.insert(sah.as_hash().clone());
-
-                        crate::dht_store::action_indexes::insert_action_indexes(
-                            &mut tx,
-                            new_sah.as_hash(),
-                            &new_sah.hashed.content.data,
-                        )
-                        .await
-                        .map_err(SourceChainError::other)?;
-
-                        // For Create/Update of a CapGrant entry type, insert a CapGrant index row.
-                        if let Some((cap_access, tag)) =
-                            cap_grant_index_params(sah, &entries_for_new_db)
-                        {
-                            tx.insert_cap_grant(new_sah.as_hash(), cap_access, tag.as_deref())
-                                .await
-                                .map_err(SourceChainError::other)?;
-                        }
-                    }
-
-                    for (op, op_hash, _op_order, timestamp, _dep) in &ops_for_new_db {
-                        let op_as_chain = match op.as_chain_op() {
-                            Some(c) => c,
-                            None => continue, // warrant ops: skip for this slice
-                        };
-                        // Skip ops whose action hash was not recorded as successfully inserted.
-                        if !inserted_action_hashes.contains(op_as_chain.action_hash()) {
-                            continue;
-                        }
-                        let basis_hash = op_as_chain.dht_basis().clone();
-                        let storage_center_loc = basis_hash.get_loc();
-
-                        let serialized_size = encoded_chain_op_size(
-                            op_as_chain,
-                            &actions_for_new_db,
-                            &entries_for_new_db,
-                        );
-                        tx.insert_chain_op(holochain_data::dht::InsertChainOp {
-                            op_hash,
-                            action_hash: op_as_chain.action_hash(),
-                            op_type: i64::from(op_as_chain.get_type()),
-                            basis_hash: &basis_hash,
-                            storage_center_loc,
-                            validation_status:
-                                holochain_zome_types::dht_v2::RecordValidity::Accepted,
-                            locally_validated: true,
-                            require_receipt: false,
-                            when_received: *timestamp,
-                            when_integrated: *timestamp,
-                            serialized_size,
-                        })
-                        .await
-                        .map_err(SourceChainError::other)?;
-
-                        // Always insert a ChainOpPublish row for self-authored ops so the
-                        // publish workflow can track them without a separate lookup.
-                        // Countersigning ops are withheld from publishing until the
-                        // session succeeds.
-                        let withhold = if is_countersigning_session {
-                            Some(true)
-                        } else {
-                            None
-                        };
-                        tx.insert_chain_op_publish(op_hash, None, None, withhold)
-                            .await
-                            .map_err(SourceChainError::other)?;
-                    }
-
-                    // Scheduled functions flushed from the scratch are always written
-                    // with `maybe_schedule = None` (see schedule_fn in mutations.rs).
-                    // None => start=now, end=Timestamp::max(), ephemeral=true.
-                    for scheduled_fn in &scheduled_fns_for_new_db {
-                        let maybe_schedule_blob =
-                            serialize_maybe_schedule_none().map_err(SourceChainError::other)?;
-                        let _ = tx
-                            .upsert_scheduled_function(
-                                holochain_data::dht::InsertScheduledFunction {
-                                    author: author.as_ref(),
-                                    zome_name: scheduled_fn.zome_name().0.as_ref(),
-                                    scheduled_fn: scheduled_fn.fn_name().0.as_ref(),
-                                    maybe_schedule: &maybe_schedule_blob,
-                                    start_at: now,
-                                    end_at: Timestamp::max(),
-                                    ephemeral: true,
-                                },
-                            )
-                            .await
-                            .map_err(SourceChainError::other)?;
-                    }
-
-                    tx.commit().await.map_err(SourceChainError::other)?;
-                }
-
+            Ok(actions) => {
                 // #5370: legacy DhtOp authored-ops dual-write removed; authored
-                // ops are written to the DhtStore above (insert_chain_op +
-                // ChainOpPublish). `authored_ops_to_dht_db`, `ops_to_integrate`
-                // and the `dht_db` input remain as dead code pending DbKindDht
-                // retirement.
+                // ops are written to the DhtStore in the permit-scoped block
+                // above (insert_chain_op + ChainOpPublish). `authored_ops_to_dht_db`,
+                // `ops_to_integrate` and the `dht_db` input remain as dead code
+                // pending DbKindDht retirement.
                 let _ = &ops_to_integrate;
 
                 // Insert warrants into DHT database.
@@ -1851,9 +1874,13 @@ mod tests {
 
         let storage_arcs = vec![DhtArc::Empty];
         chain_1.flush(storage_arcs.clone()).await?;
-        let seq = db
-            .write_async(move |txn| chain_head_db_nonempty(txn))
+        // #5370: the source chain is now written to the merged store, not the
+        // authored DB, so the head is read from the store.
+        let seq = dht_store
+            .as_read()
+            .chain_head_for_author(&alice)
             .await?
+            .expect("chain head present after flush")
             .seq;
         assert_eq!(seq, 3);
 
@@ -1861,16 +1888,24 @@ mod tests {
             chain_2.flush(storage_arcs.clone()).await,
             Err(SourceChainError::HeadMoved(_, _, _, _))
         ));
-        let seq = db
-            .write_async(move |txn| chain_head_db_nonempty(txn))
+        // #5370: the source chain is now written to the merged store, not the
+        // authored DB, so the head is read from the store.
+        let seq = dht_store
+            .as_read()
+            .chain_head_for_author(&alice)
             .await?
+            .expect("chain head present after flush")
             .seq;
         assert_eq!(seq, 3);
 
         chain_3.flush(storage_arcs).await?;
-        let seq = db
-            .write_async(move |txn| chain_head_db_nonempty(txn))
+        // #5370: the source chain is now written to the merged store, not the
+        // authored DB, so the head is read from the store.
+        let seq = dht_store
+            .as_read()
+            .chain_head_for_author(&alice)
             .await?
+            .expect("chain head present after flush")
             .seq;
         assert_eq!(seq, 4);
 
@@ -1944,9 +1979,13 @@ mod tests {
 
         let storage_arcs = vec![DhtArc::Empty];
         chain_1.flush(storage_arcs.clone()).await?;
-        let seq = db
-            .write_async(move |txn| chain_head_db_nonempty(txn))
+        // #5370: the source chain is now written to the merged store, not the
+        // authored DB, so the head is read from the store.
+        let seq = dht_store
+            .as_read()
+            .chain_head_for_author(&alice)
             .await?
+            .expect("chain head present after flush")
             .seq;
         assert_eq!(seq, 3);
 
@@ -1956,35 +1995,36 @@ mod tests {
         ));
 
         chain_3.flush(storage_arcs).await?;
-        let head = db
-            .write_async(move |txn| chain_head_db_nonempty(txn))
-            .await?;
+        // #5370: the head is read from the merged store, not the authored DB.
+        let head = dht_store
+            .as_read()
+            .chain_head_for_author(&alice)
+            .await?
+            .expect("chain head present after flush");
 
         // not equal since action hash change due to rebasing
         assert_ne!(head.action, old_h2);
         assert_eq!(head.seq, 4);
 
-        db.read_async(move |txn| -> DatabaseResult<()> {
-            // get the full record
-            let store = CascadeTxnWrapper::from(txn);
-            let h1_record_entry_fetched = store
-                .get_record(&h1.clone().into())
-                .expect("error retrieving")
-                .expect("entry not found")
-                .into_inner()
-                .1;
-            let h2_record_entry_fetched = store
-                .get_record(&head.action.clone().into())
-                .expect("error retrieving")
-                .expect("entry not found")
-                .into_inner()
-                .1;
-            assert_eq!(RecordEntry::Present(entry_1), h1_record_entry_fetched);
-            assert_eq!(RecordEntry::Present(entry_2), h2_record_entry_fetched);
-
-            Ok(())
-        })
-        .await?;
+        // #5370: the full records are read from the merged store. h1 is public;
+        // h2 (the head) is a private entry, so the author key is passed so the
+        // store attaches the author's `PrivateEntry`.
+        let h1_record_entry_fetched = dht_store
+            .as_read()
+            .retrieve_record(&h1, Some(&alice))
+            .await?
+            .expect("h1 record present in store")
+            .into_inner()
+            .1;
+        let h2_record_entry_fetched = dht_store
+            .as_read()
+            .retrieve_record(&head.action, Some(&alice))
+            .await?
+            .expect("h2 record present in store")
+            .into_inner()
+            .1;
+        assert_eq!(RecordEntry::Present(entry_1), h1_record_entry_fetched);
+        assert_eq!(RecordEntry::Present(entry_2), h2_record_entry_fetched);
 
         Ok(())
     }
@@ -2573,22 +2613,26 @@ mod tests {
             entry_hash: private_entry_hash.clone(),
         };
         chain
-            .put_weightless(create, Some(private_entry.clone()), ChainTopOrdering::default())
+            .put_weightless(
+                create,
+                Some(private_entry.clone()),
+                ChainTopOrdering::default(),
+            )
             .await?;
         chain.flush(vec![DhtArc::Empty]).await?;
 
         let dump = dht_store.as_read().dump_source_chain(&agent_key).await?;
 
         // Four records: Dna(0), AgentValidationPkg(1), Create/AgentId(2), Create/Private(3).
-        assert_eq!(dump.records.len(), 4, "expected 4 records after genesis + 1");
+        assert_eq!(
+            dump.records.len(),
+            4,
+            "expected 4 records after genesis + 1"
+        );
 
         // Verify seq order.
         for (i, rec) in dump.records.iter().enumerate() {
-            assert_eq!(
-                rec.action.action_seq(),
-                i as u32,
-                "record {i} out of order"
-            );
+            assert_eq!(rec.action.action_seq(), i as u32, "record {i} out of order");
         }
 
         // The private-entry record (seq 3) must expose its entry.
@@ -3128,6 +3172,65 @@ mod tests {
         assert_eq!(
             chain2.persisted_head_info().map(|h| h.action),
             Some(expected_head),
+        );
+
+        Ok(())
+    }
+
+    /// #5370: the flush as-at now reads the *merged store* head, not the legacy
+    /// authored DB. Two source chains for the same author share the store; once
+    /// one flushes, the other's stale `persisted_head` must be detected as
+    /// `HeadMoved`, and a normal flush's action must be visible via the store.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn flush_as_at_detects_head_moved_against_store() -> SourceChainResult<()> {
+        let TestCase {
+            chain: chain_1,
+            agent_key: alice,
+            authored: db,
+            dht: dht_db,
+            dht_store,
+            keystore,
+        } = TestCase::new().await;
+
+        // A second chain reading the same store head; it goes stale once
+        // chain_1 flushes.
+        let chain_2 = SourceChain::new(
+            db.clone(),
+            dht_db.to_db(),
+            dht_store.clone(),
+            keystore.clone(),
+            alice.clone(),
+        )
+        .await?;
+
+        let action_builder = builder::CloseChain { new_target: None };
+        chain_1
+            .put(action_builder.clone(), None, ChainTopOrdering::Strict)
+            .await?;
+        chain_2
+            .put(action_builder, None, ChainTopOrdering::Strict)
+            .await?;
+
+        // chain_1 flushes: its action becomes the store head and is visible via
+        // the store.
+        let (flushed, _) = chain_1.flush(vec![DhtArc::Empty]).await?;
+        let flushed_head = flushed
+            .last()
+            .expect("flush returns at least one action")
+            .as_hash()
+            .clone();
+        let store_head = dht_store
+            .as_read()
+            .chain_head_for_author(&alice)
+            .await?
+            .expect("store head present after flush");
+        assert_eq!(store_head.action, flushed_head);
+
+        // chain_2's persisted_head is now stale; a strict flush must detect the
+        // moved store head and fail with HeadMoved.
+        assert_matches!(
+            chain_2.flush(vec![DhtArc::Empty]).await,
+            Err(SourceChainError::HeadMoved(_, _, _, _))
         );
 
         Ok(())
