@@ -326,27 +326,24 @@ fn format_pending_ops(stage: &str, ops: &[holochain_types::dht_op::DhtOpHashed])
     out
 }
 
-/// Show authored data for each cell environment
+/// Show an agent's authored chain for each (agent, store) pair.
+///
+/// Reads from the merged DHT store rather than the legacy authored database.
+/// Intended for debugging in tests.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(envs)))]
-pub async fn show_authored<Db: ReadAccess<DbKindAuthored>>(envs: &[&Db]) {
-    for (i, &db) in envs.iter().enumerate() {
-        db.read_async(move |txn| -> DatabaseResult<()> {
-            txn.prepare("SELECT DISTINCT Action.seq, Action.type, Action.entry_hash FROM Action JOIN DhtOp ON Action.hash = DhtOp.hash")
-            .unwrap()
-            .query_map([], |row| {
-                let action_type: String = row.get("type")?;
-                let seq: u32 = row.get("seq")?;
-                let entry: Option<EntryHash> = row.get("entry_hash")?;
-                Ok((action_type, seq, entry))
-            })
-            .unwrap()
-            .for_each(|r|{
-                let (action_type, seq, entry) = r.unwrap();
-                tracing::debug!(chain = %i, %seq, ?action_type, ?entry);
-            });
-
-            Ok(())
-        }).await.unwrap();
+pub async fn show_authored(envs: &[(AgentPubKey, &holochain_state::dht_store::DhtStore)]) {
+    for (i, (author, store)) in envs.iter().enumerate() {
+        let actions = store
+            .as_read()
+            .dump_source_chain(author)
+            .await
+            .expect("show_authored: dump_source_chain failed");
+        for rec in &actions.records {
+            let action_type = rec.action.action_type().to_string();
+            let seq = rec.action.action_seq();
+            let entry = rec.action.entry_hash().cloned();
+            tracing::debug!(chain = %i, %seq, ?action_type, ?entry);
+        }
     }
 }
 

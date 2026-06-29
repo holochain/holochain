@@ -53,6 +53,15 @@ impl DbRead<Dht> {
         chain_op_publish::get_chain_op_publish(self.pool(), op_hash).await
     }
 
+    /// Count integrated ops authored by `author` that have been published at
+    /// least once. Used by the source-chain dump to compute `published_ops_count`.
+    pub async fn count_published_ops_for_author(
+        &self,
+        author: &AgentPubKey,
+    ) -> sqlx::Result<i64> {
+        chain_op_publish::count_published_ops_for_author(self.pool(), author).await
+    }
+
     /// Ops eligible to be published for `author`. See
     /// `chain_op_publish::get_ops_to_publish`.
     pub async fn get_ops_to_publish(

@@ -2559,13 +2559,11 @@ mod misc_impls {
         /// Create a JSON dump of the cell's state
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
-            let cell = self.cell_by_id(cell_id).await?;
-            let authored_db = cell.get_or_create_authored_db()?;
             let dht_store = self.get_or_create_dht_store(cell_id.dna_hash())?;
             let agent_pub_key = cell_id.agent_pubkey().clone();
             let peer_dump = peer_store_dump(self, cell_id).await?;
             let source_chain_dump =
-                source_chain::dump_state(authored_db.clone().into(), agent_pub_key).await?;
+                source_chain::dump_state(&dht_store.as_read(), agent_pub_key).await?;
 
             let out = JsonDump {
                 peer_dump,
@@ -2627,11 +2625,9 @@ mod misc_impls {
             cell_id: &CellId,
             dht_ops_cursor: Option<DhtOpsCursor>,
         ) -> ConductorApiResult<FullStateDump> {
-            let authored_db =
-                self.get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())?;
             let dht_store = self.get_or_create_dht_store(cell_id.dna_hash())?;
             let source_chain_dump =
-                source_chain::dump_state(authored_db.into(), cell_id.agent_pubkey().clone())
+                source_chain::dump_state(&dht_store.as_read(), cell_id.agent_pubkey().clone())
                     .await?;
             let peer_dump = peer_store_dump(self, cell_id).await?;
 

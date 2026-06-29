@@ -34,13 +34,10 @@ async fn dump_full_state() {
         }
     });
 
-    let authored_db = conductor
-        .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())
-        .unwrap();
     let dht_store = conductor.get_dht_store(cell_id.dna_hash()).unwrap();
     let peer_dump = peer_store_dump(&conductor, cell_id).await.unwrap();
     let source_chain_dump =
-        source_chain::dump_state(authored_db.into(), cell_id.agent_pubkey().clone())
+        source_chain::dump_state(&dht_store.as_read(), cell_id.agent_pubkey().clone())
             .await
             .unwrap();
     let expected_state_dump = FullStateDump {
