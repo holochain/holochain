@@ -3118,6 +3118,99 @@ mod tests {
         Ok(())
     }
 
+    /// Concurrent strict flushes from the same chain head must not fork the
+    /// chain. Two `SourceChain` handles for the same `(DNA, author)` observe the
+    /// same store head, each stage one strict action, then flush in true
+    /// parallel. The per-`(DNA, author)` chain write permit acquired in `flush`,
+    /// combined with the as-at check against the store head, serializes the two
+    /// flushes: exactly one commits and the other gets `HeadMoved`. The store
+    /// head must advance by exactly one — never forking into two actions at the
+    /// same sequence. Both flushing both successfully would be the fork bug the
+    /// permit prevents, in which case this test fails.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn concurrent_strict_flushes_do_not_fork_chain() -> SourceChainResult<()> {
+        let TestCase {
+            chain: _chain,
+            agent_key: alice,
+            authored: db,
+            dht: dht_db,
+            dht_store,
+            keystore,
+        } = TestCase::new().await;
+
+        // The head sequence both chains start contending from (the genesis head).
+        let pre_seq = dht_store
+            .as_read()
+            .chain_head_for_author(&alice)
+            .await?
+            .expect("genesis chain head present")
+            .seq;
+
+        // Two fresh chains for the same author, both observing the same head.
+        let chain_a = SourceChain::new(
+            db.clone(),
+            dht_db.to_db(),
+            dht_store.clone(),
+            keystore.clone(),
+            alice.clone(),
+        )
+        .await?;
+        let chain_b = SourceChain::new(
+            db.clone(),
+            dht_db.to_db(),
+            dht_store.clone(),
+            keystore.clone(),
+            alice.clone(),
+        )
+        .await?;
+
+        // Each stages one strict action from the same head; the flush loser gets
+        // a clean `HeadMoved` (strict ordering means no relaxed rebase/retry).
+        let action_builder = builder::CloseChain { new_target: None };
+        chain_a
+            .put(action_builder.clone(), None, ChainTopOrdering::Strict)
+            .await?;
+        chain_b
+            .put(action_builder, None, ChainTopOrdering::Strict)
+            .await?;
+
+        // Flush both in true parallel on the multi-threaded runtime via spawned
+        // tasks. `SourceChain` is `Clone` + `Send` + `'static`, so each owned
+        // handle moves into its own task.
+        let arcs_a = vec![DhtArc::Empty];
+        let arcs_b = arcs_a.clone();
+        let task_a = tokio::spawn(async move { chain_a.flush(arcs_a).await });
+        let task_b = tokio::spawn(async move { chain_b.flush(arcs_b).await });
+        let (res_a, res_b) = tokio::join!(task_a, task_b);
+        let res_a = res_a.expect("flush task a did not panic");
+        let res_b = res_b.expect("flush task b did not panic");
+
+        // Exactly one flush committed (`Ok`) and exactly one was rejected with
+        // `HeadMoved`. Don't assume which won the race.
+        let oks = [&res_a, &res_b].iter().filter(|r| r.is_ok()).count();
+        assert_eq!(
+            oks, 1,
+            "exactly one flush must commit; a={res_a:?}, b={res_b:?}"
+        );
+        let loser = if res_a.is_err() { &res_a } else { &res_b };
+        assert_matches!(loser, Err(SourceChainError::HeadMoved(_, _, _, _)));
+
+        // No fork: the store head advanced by exactly one.
+        let new_seq = dht_store
+            .as_read()
+            .chain_head_for_author(&alice)
+            .await?
+            .expect("chain head present after flush")
+            .seq;
+        assert_eq!(
+            new_seq,
+            pre_seq + 1,
+            "store head must advance by exactly one, not fork"
+        );
+
+        Ok(())
+    }
+
     struct TestCase {
         chain: SourceChain,
         agent_key: AgentPubKey,
