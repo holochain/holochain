@@ -841,7 +841,6 @@ mod network_impls {
     use crate::conductor::api::error::{
         zome_call_response_to_conductor_api_result, ConductorApiError,
     };
-    use futures::future::join_all;
     use holochain_conductor_api::ZomeCallParamsSigned;
     use holochain_conductor_api::{DnaStorageInfo, StorageBlob, StorageInfo};
     use holochain_sqlite::stats::{get_size_on_disk, get_used_size};
@@ -1020,39 +1019,15 @@ mod network_impls {
             dna_hash: &DnaHash,
             used_by: &[InstalledAppId],
         ) -> ConductorResult<StorageBlob> {
-            let authored_dbs = self.spaces.get_all_authored_dbs(dna_hash)?;
-            let dht_db = self.spaces.dht_db(dna_hash)?;
+            // The DHT and source-chain (authored) data now live together in the
+            // merged store, so its size is what we report. The legacy
+            // DbKindDht is no longer measured here; it is retired later. // #5370
+            let dht_store = self.get_or_create_dht_store(dna_hash)?.as_read();
             let cache_db = self.spaces.cache(dna_hash)?;
 
             Ok(StorageBlob::Dna(DnaStorageInfo {
-                authored_data_size_on_disk: join_all(
-                    authored_dbs
-                        .iter()
-                        .map(|db| db.read_async(get_size_on_disk)),
-                )
-                .await
-                .into_iter()
-                .map(|r| r.map_err(ConductorError::DatabaseError))
-                .collect::<Result<Vec<_>, _>>()?
-                .into_iter()
-                .sum(),
-                authored_data_size: join_all(
-                    authored_dbs.iter().map(|db| db.read_async(get_used_size)),
-                )
-                .await
-                .into_iter()
-                .map(|r| r.map_err(ConductorError::DatabaseError))
-                .collect::<Result<Vec<_>, _>>()?
-                .into_iter()
-                .sum(),
-                dht_data_size_on_disk: dht_db
-                    .read_async(get_size_on_disk)
-                    .map_err(ConductorError::DatabaseError)
-                    .await?,
-                dht_data_size: dht_db
-                    .read_async(get_used_size)
-                    .map_err(ConductorError::DatabaseError)
-                    .await?,
+                dht_data_size_on_disk: dht_store.size_on_disk().await? as usize,
+                dht_data_size: dht_store.used_size().await? as usize,
                 cache_data_size_on_disk: cache_db
                     .read_async(get_size_on_disk)
                     .map_err(ConductorError::DatabaseError)
