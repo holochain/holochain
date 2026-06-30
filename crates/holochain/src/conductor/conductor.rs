@@ -2264,19 +2264,17 @@ mod scheduler_impls {
             self: Arc<Self>,
             interval_period: std::time::Duration,
         ) -> StateMutationResult<()> {
-            // Clear all ephemeral cruft in all cells before starting a scheduler.
-            let tasks = self
-                .spaces
-                .get_from_spaces(|space| {
-                    let all_dbs = space.get_all_authored_dbs();
-
-                    all_dbs.into_iter().map(|db| async move {
-                        db.write_async(|txn| delete_all_ephemeral_scheduled_fns(txn))
-                            .await
-                    })
-                })
-                .into_iter()
-                .flatten();
+            // Clear all ephemeral cruft in all spaces before starting a
+            // scheduler. One call per space clears every author, since the
+            // merged store is per-DNA.
+            let tasks = self.spaces.get_from_spaces(|space| {
+                let dht_store = space.dht_store.clone();
+                async move {
+                    if let Err(e) = dht_store.delete_all_ephemeral_scheduled_functions().await {
+                        error!("error clearing ephemeral scheduled functions: {:?}", e);
+                    }
+                }
+            });
 
             futures::future::join_all(tasks).await;
 

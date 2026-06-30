@@ -172,6 +172,49 @@ where
     Ok(result.rows_affected())
 }
 
+/// Delete every ephemeral scheduled-function row in the store, regardless of
+/// author or liveness. Returns the number of rows deleted.
+///
+/// Used at conductor startup to clear ephemeral schedules left over from a
+/// previous run — ephemeral schedules do not survive a reboot.
+pub(crate) async fn delete_all_ephemeral_scheduled_functions<'e, E>(
+    executor: E,
+) -> sqlx::Result<u64>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let result = sqlx::query("DELETE FROM ScheduledFunction WHERE ephemeral = 1")
+        .execute(executor)
+        .await?;
+    Ok(result.rows_affected())
+}
+
+/// Return `true` if a scheduled-function row exists for the given
+/// `(author, zome_name, scheduled_fn)` tuple, regardless of liveness — i.e.
+/// whether `now` falls within the row's `[start_at, end_at]` window.
+pub(crate) async fn is_function_scheduled<'e, E>(
+    executor: E,
+    author: &AgentPubKey,
+    zome_name: &str,
+    scheduled_fn: &str,
+) -> sqlx::Result<bool>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let row: (i64,) = sqlx::query_as(
+        "SELECT EXISTS (
+            SELECT 1 FROM ScheduledFunction
+            WHERE author = ? AND zome_name = ? AND scheduled_fn = ?
+         )",
+    )
+    .bind(author.get_raw_36())
+    .bind(zome_name)
+    .bind(scheduled_fn)
+    .fetch_one(executor)
+    .await?;
+    Ok(row.0 != 0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
