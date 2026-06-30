@@ -17,14 +17,8 @@ use holo_hash::DnaHash;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holochain_keystore::MetaLairClient;
-use holochain_sqlite::rusqlite;
-use holochain_sqlite::rusqlite::params;
 use holochain_sqlite::rusqlite::Transaction;
-use holochain_sqlite::sql::sql_cell::SELECT_VALID_AGENT_PUB_KEY;
-use holochain_sqlite::sql::sql_conductor::SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET;
-use holochain_sqlite::sql::sql_conductor::SELECT_VALID_UNRESTRICTED_CAP_GRANT;
 use holochain_state_types::SourceChainDump;
-use holochain_types::sql::AsSql;
 use kitsune2_api::DhtArc;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
@@ -732,40 +726,17 @@ impl SourceChain {
     ///
     /// Valid means that there's no [`Update`] or [`Delete`] action for the key on the chain.
     /// Returns the create action if it is valid, and an [`SourceChainError::InvalidAgentKey`] otherwise.
+    // #5370: reads the agent's valid key-create from the merged store instead
+    // of the legacy authored DB (`SELECT_VALID_AGENT_PUB_KEY`).
     pub async fn valid_create_agent_key_action(&self) -> SourceChainResult<Action> {
-        let agent_key_entry_hash: EntryHash = self.agent_pubkey().clone().into();
-        self.author_db()
-            .read_async({
-                let agent_key = self.agent_pubkey().clone();
-                let cell_id = self.cell_id().as_ref().clone();
-                move |txn| {
-                    txn.query_row(
-                        SELECT_VALID_AGENT_PUB_KEY,
-                        named_params! {
-                            ":author": agent_key.clone(),
-                            ":type": ActionType::Create.to_string(),
-                            ":entry_type": EntryType::AgentPubKey.to_string(),
-                            ":entry_hash": agent_key_entry_hash
-                        },
-                        |row| {
-                            let create_agent_signed_action = from_blob::<SignedAction>(row.get(0)?)
-                                .map_err(|_| rusqlite::Error::BlobSizeError)?;
-                            let create_agent_action = create_agent_signed_action.action().clone();
-                            Ok(create_agent_action)
-                        },
-                    )
-                    .map_err(|err| match err {
-                        rusqlite::Error::BlobSizeError | rusqlite::Error::QueryReturnedNoRows => {
-                            SourceChainError::InvalidAgentKey(agent_key, cell_id)
-                        }
-                        _ => {
-                            tracing::error!(?err, "Error looking up valid agent pub key");
-                            SourceChainError::other(err)
-                        }
-                    })
-                }
+        let agent_key = self.agent_pubkey().clone();
+        self.dht_store
+            .as_read()
+            .valid_create_agent_key_action(&agent_key)
+            .await?
+            .ok_or_else(|| {
+                SourceChainError::InvalidAgentKey(agent_key, self.cell_id().as_ref().clone())
             })
-            .await
     }
 
     /// Deletes the current [`AgentPubKey`] of the source chain if it is valid and returns a [`SourceChainError::InvalidAgentKey`]
@@ -966,69 +937,26 @@ where
             return Ok(Some(author_grant));
         }
 
-        // remote caller
-        let maybe_cap_grant = self
-            .vault
-            .read_async({
-                let author = self.agent_pubkey().clone();
-                move |txn| -> Result<_, DatabaseError> {
-                    // closure to process resulting rows from query
-                    let query_row_fn = |row: &Row| {
-                        from_blob::<Entry>(row.get("blob")?)
-                            .and_then(|entry| {
-                                entry.as_cap_grant().ok_or_else(|| {
-                                    crate::query::StateQueryError::SerializedBytesError(
-                                        SerializedBytesError::Deserialize(
-                                            "could not deserialize cap grant from entry"
-                                                .to_string(),
-                                        ),
-                                    )
-                                })
-                            })
-                            .map_err(|err| {
-                                holochain_sqlite::rusqlite::Error::InvalidColumnType(
-                                    0,
-                                    err.to_string(),
-                                    holochain_sqlite::rusqlite::types::Type::Blob,
-                                )
-                            })
-                    };
-
-                    // query cap grants depending on whether cap secret provided or not
-                    let cap_grants = if let Some(cap_secret) = &check_secret {
-                        let cap_secret_blob = to_blob(cap_secret).map_err(|err| {
-                            DatabaseError::SerializedBytes(SerializedBytesError::Serialize(
-                                err.to_string(),
-                            ))
-                        })?;
-
-                        // cap grant for cap secret must exist
-                        // that has not been updated or deleted
-                        let mut stmt = txn.prepare(SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET)?;
-                        let rows = stmt.query(params![cap_secret_blob, author])?;
-                        let cap_grant: Vec<CapGrant> = rows.map(query_row_fn).collect()?;
-                        cap_grant
-                    } else {
-                        // unrestricted cap grant must exist
-                        // that has not been updated or deleted
-                        let mut stmt = txn.prepare(SELECT_VALID_UNRESTRICTED_CAP_GRANT)?;
-                        let rows = stmt.query(params![CapAccess::Unrestricted.as_sql(), author])?;
-                        let cap_grants: Vec<CapGrant> = rows.map(query_row_fn).collect()?;
-                        cap_grants
-                    };
-                    // loop over all found cap grants and check if one of them
-                    // is valid for assignee and function
-                    for cap_grant in cap_grants {
-                        if cap_grant.is_valid(&check_function, &check_agent, check_secret.as_ref())
-                        {
-                            return Ok(Some(cap_grant));
-                        }
-                    }
-                    Ok(None)
-                }
-            })
+        // Remote caller. #5370: the candidate grants are read from the merged
+        // store instead of the legacy authored DB
+        // (`SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET` /
+        // `SELECT_VALID_UNRESTRICTED_CAP_GRANT`). The store read applies the
+        // same access-type pre-filter and "not updated/deleted" exclusion as the
+        // legacy SQL; the exact secret/assignee/function match remains the
+        // authority of `CapGrant::is_valid` below.
+        let cap_grants = self
+            .dht_store
+            .as_read()
+            .valid_cap_grants(self.agent_pubkey(), check_secret.as_ref())
             .await?;
-        Ok(maybe_cap_grant)
+        // Loop over all found cap grants and check if one of them is valid for
+        // assignee and function.
+        for cap_grant in cap_grants {
+            if cap_grant.is_valid(&check_function, &check_agent, check_secret.as_ref()) {
+                return Ok(Some(cap_grant));
+            }
+        }
+        Ok(None)
     }
 
     /// Query Actions in the source chain.
@@ -1831,6 +1759,24 @@ mod tests {
         Ok(())
     }
 
+    // The genesis agent-key `Create` is read back from the merged store as the
+    // valid agent-key action.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn valid_create_agent_key_action_reads_from_store() {
+        let TestCase {
+            chain, agent_key, ..
+        } = TestCase::new().await;
+
+        let action = chain.valid_create_agent_key_action().await.unwrap();
+
+        // It is the agent-key `Create`: an `AgentPubKey`-typed `Create` whose
+        // entry hash is the agent key.
+        assert_matches!(action, Action::Create(_));
+        assert_eq!(action.entry_type(), Some(&EntryType::AgentPubKey));
+        let agent_key_entry_hash: EntryHash = agent_key.into();
+        assert_eq!(action.entry_hash(), Some(&agent_key_entry_hash));
+    }
+
     // Test that a valid agent pub key can be deleted and that repeated deletes fail.
     #[tokio::test(flavor = "multi_thread")]
     async fn delete_valid_agent_pub_key() {
@@ -1844,6 +1790,45 @@ mod tests {
         // pub key can be found.
         let result = chain.delete_valid_agent_pub_key().await.unwrap_err();
         assert_matches!(result, SourceChainError::InvalidAgentKey(invalid_key, cell_id) if invalid_key == *chain.author && cell_id == *chain.cell_id());
+    }
+
+    // An `Update` targeting the agent-key entry invalidates the key, just like
+    // a `Delete` does, so `valid_create_agent_key_action` returns
+    // `InvalidAgentKey`.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn updated_agent_key_is_invalid() {
+        let TestCase {
+            chain, agent_key, ..
+        } = TestCase::new().await;
+
+        // Valid before any modification.
+        let create = chain.valid_create_agent_key_action().await.unwrap();
+        let agent_key_entry_hash: EntryHash = agent_key.clone().into();
+
+        // Author an `Update` whose original entry is the agent-key entry. This
+        // populates the `UpdatedRecord` index (keyed on `original_entry_hash`)
+        // for the agent key.
+        let action_builder = builder::Update {
+            entry_type: EntryType::AgentPubKey,
+            entry_hash: agent_key_entry_hash.clone(),
+            original_action_address: create.to_hash(),
+            original_entry_address: agent_key_entry_hash,
+        };
+        chain
+            .put_weightless(
+                action_builder,
+                Some(Entry::Agent(agent_key.clone())),
+                ChainTopOrdering::default(),
+            )
+            .await
+            .unwrap();
+        chain.flush(vec![DhtArc::Empty]).await.unwrap();
+
+        let result = chain.valid_create_agent_key_action().await.unwrap_err();
+        assert_matches!(
+            result,
+            SourceChainError::InvalidAgentKey(invalid_key, _) if invalid_key == agent_key
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]

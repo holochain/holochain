@@ -9,7 +9,9 @@ use super::DhtStore;
 use crate::prelude::ActionSequenceAndHash;
 use crate::query::StateQueryResult;
 use crate::scratch::SyncScratch;
-use holo_hash::{AgentPubKey, AnyLinkableHash, DhtOpHash, ExternalHash, HasHash};
+use holo_hash::{
+    ActionHash, AgentPubKey, AnyLinkableHash, DhtOpHash, EntryHash, ExternalHash, HasHash,
+};
 use holochain_data::kind::Dht;
 use holochain_data::DbRead;
 use holochain_types::chain::ChainItem;
@@ -22,7 +24,8 @@ use holochain_types::warrant::WarrantOp;
 use holochain_zome_types::chain::{ChainFilter, LimitConditions};
 use holochain_zome_types::dht_v2::RecordValidity;
 use holochain_zome_types::prelude::{
-    Action, ChainFork, ChainHead, ChainQueryFilter, ChainStatus, HighestObserved, SignedWarrant,
+    Action, CapGrant, CapSecret, ChainFork, ChainHead, ChainQueryFilter, ChainStatus, EntryType,
+    HighestObserved, SignedWarrant,
 };
 use holochain_zome_types::validate::ValidationStatus;
 use std::collections::{HashMap, HashSet};
@@ -2215,7 +2218,11 @@ impl DhtStore<DbRead<Dht>> {
 
             // Resolve the entry (public OR private) when the action references one.
             let entry = match action.entry_hash() {
-                Some(entry_hash) => self.db().get_entry(entry_hash.clone(), Some(author)).await?,
+                Some(entry_hash) => {
+                    self.db()
+                        .get_entry(entry_hash.clone(), Some(author))
+                        .await?
+                }
                 None => None,
             };
 
@@ -2227,10 +2234,7 @@ impl DhtStore<DbRead<Dht>> {
             });
         }
 
-        let published_ops_count = self
-            .db()
-            .count_published_ops_for_author(author)
-            .await? as usize;
+        let published_ops_count = self.db().count_published_ops_for_author(author).await? as usize;
 
         Ok(SourceChainDump {
             records,
@@ -2279,7 +2283,9 @@ impl DhtStore<DbRead<Dht>> {
             let entry = if include_entries && (!private_entry || !public_only) {
                 match sah.action().entry_hash() {
                     Some(entry_hash) => {
-                        self.db().get_entry(entry_hash.clone(), Some(author)).await?
+                        self.db()
+                            .get_entry(entry_hash.clone(), Some(author))
+                            .await?
                     }
                     None => None,
                 }
@@ -2291,6 +2297,157 @@ impl DhtStore<DbRead<Dht>> {
         }
 
         Ok(records)
+    }
+
+    /// The author's valid agent-key `Create` action, read from the merged store.
+    ///
+    /// Faithfully reproduces the legacy `SELECT_VALID_AGENT_PUB_KEY` query that
+    /// ran over the authored database: the author's `Create` action whose entry
+    /// is the `AgentPubKey` entry (`entry_hash == author.into()`) and that has
+    /// NOT been updated or deleted **by the author**. Returns `None` when no
+    /// such action exists or it has been modified, so the caller maps that to
+    /// [`SourceChainError::InvalidAgentKey`](crate::source_chain::SourceChainError::InvalidAgentKey).
+    ///
+    /// The "not updated/deleted" exclusion matches the legacy SQL exactly via
+    /// [`entry_updated_or_deleted_by_author`](Self::entry_updated_or_deleted_by_author).
+    pub async fn valid_create_agent_key_action(
+        &self,
+        author: &AgentPubKey,
+    ) -> StateQueryResult<Option<Action>> {
+        let agent_key_entry_hash: EntryHash = author.clone().into();
+
+        // The agent-key `Create` is written to the author's chain at genesis;
+        // find it among the author's actions. The merged-store `Action` table
+        // carries `action_type` but not `entry_type`, so the `Create` +
+        // entry-hash match (with an `AgentPubKey` entry-type guard) reproduces
+        // the legacy `type`/`entry_type`/`entry_hash` filter.
+        let actions = self.db().get_actions_by_author(author.clone()).await?;
+        let create = actions.iter().find_map(|v2_sah| {
+            let action = holochain_zome_types::dht_v2::to_legacy_signed_action(v2_sah)
+                .action()
+                .clone();
+            let is_agent_key_create = matches!(action, Action::Create(_))
+                && action.entry_type() == Some(&EntryType::AgentPubKey)
+                && action.entry_hash() == Some(&agent_key_entry_hash);
+            is_agent_key_create.then_some(action)
+        });
+
+        let Some(create) = create else {
+            return Ok(None);
+        };
+
+        // Agent key must not have been updated or deleted by the author.
+        if self
+            .entry_updated_or_deleted_by_author(&agent_key_entry_hash, author)
+            .await?
+        {
+            return Ok(None);
+        }
+
+        Ok(Some(create))
+    }
+
+    /// The author's candidate capability grants for the `is_valid` loop in
+    /// [`SourceChain::valid_cap_grant`](crate::source_chain::SourceChain::valid_cap_grant),
+    /// read from the merged store.
+    ///
+    /// Faithfully reproduces the legacy `SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET`
+    /// / `SELECT_VALID_UNRESTRICTED_CAP_GRANT` queries:
+    ///
+    /// - When `check_secret` is `Some`, only grants that carry a secret
+    ///   (`Transferable` / `Assigned`) are considered — matching the legacy
+    ///   `Entry.cap_secret = ?` pre-filter. The exact-secret match is left to
+    ///   the caller's [`CapGrant::is_valid`], which is equivalent because
+    ///   `is_valid` requires `secret == given` for both secret-bearing variants
+    ///   (and a secret-bearing check can therefore never match an `Unrestricted`
+    ///   grant, just as the legacy `cap_secret` filter excluded them).
+    /// - When `check_secret` is `None`, only `Unrestricted` grants are
+    ///   considered — matching the legacy `access_type = Unrestricted` filter.
+    ///
+    /// Candidates are restricted to grants authored by `author` (the `CapGrant`
+    /// index join already filters on `Action.author`) and dropped when their
+    /// entry has been updated or deleted by the author — the same "not
+    /// updated/deleted" semantics as the legacy SQL.
+    pub async fn valid_cap_grants(
+        &self,
+        author: &AgentPubKey,
+        check_secret: Option<&CapSecret>,
+    ) -> StateQueryResult<Vec<CapGrant>> {
+        // `CapAccess` integer encoding (see the DHT schema): 0=Unrestricted,
+        // 1=Transferable, 2=Assigned. A secret-bearing check looks only at the
+        // grants that carry a secret; an unrestricted check only at unrestricted
+        // grants.
+        let access_types: &[i64] = if check_secret.is_some() {
+            &[1, 2]
+        } else {
+            &[0]
+        };
+
+        let mut grants = Vec::new();
+        for &access in access_types {
+            let rows = self
+                .db()
+                .get_cap_grants_by_access(author.clone(), access)
+                .await?;
+            for row in rows {
+                let action_hash = ActionHash::from_raw_36(row.action_hash);
+                // Resolve the grant's entry hash from its create/update action.
+                let Some(v2_sah) = self.db().get_action(action_hash).await? else {
+                    continue;
+                };
+                let action = holochain_zome_types::dht_v2::to_legacy_signed_action(&v2_sah);
+                let Some(entry_hash) = action.action().entry_hash().cloned() else {
+                    continue;
+                };
+                // Skip grants whose entry was updated or deleted by the author.
+                if self
+                    .entry_updated_or_deleted_by_author(&entry_hash, author)
+                    .await?
+                {
+                    continue;
+                }
+                // Cap-grant entries are private; resolve from the author's
+                // `PrivateEntry` store and deserialize.
+                let Some(entry) = self.db().get_entry(entry_hash, Some(author)).await? else {
+                    continue;
+                };
+                if let Some(grant) = entry.as_cap_grant() {
+                    grants.push(grant);
+                }
+            }
+        }
+        Ok(grants)
+    }
+
+    /// `true` if `entry_hash` has been updated or deleted by `author` in the
+    /// merged store — the "not updated/deleted" exclusion shared by the
+    /// agent-key and cap-grant validity reads.
+    ///
+    /// Matches the legacy SQL `ModifiedAction.author = :author AND
+    /// (original_entry_hash = :entry_hash OR deletes_entry_hash = :entry_hash)`:
+    /// the `UpdatedRecord` / `DeletedRecord` indexes are keyed on the original /
+    /// deleted *entry* hash (see
+    /// [`get_update_actions_for_entry`](holochain_data::DbRead::get_update_actions_for_entry)
+    /// / [`get_delete_actions_for_entry`](holochain_data::DbRead::get_delete_actions_for_entry)),
+    /// and the author filter restricts to the author's own modifications. The
+    /// author's own `Update`/`Delete` actions populate these indexes at
+    /// source-chain flush time.
+    async fn entry_updated_or_deleted_by_author(
+        &self,
+        entry_hash: &EntryHash,
+        author: &AgentPubKey,
+    ) -> StateQueryResult<bool> {
+        let updates = self.db().get_update_actions_for_entry(entry_hash).await?;
+        if updates
+            .iter()
+            .any(|sah| &sah.hashed.content.header.author == author)
+        {
+            return Ok(true);
+        }
+        let deletes = self.db().get_delete_actions_for_entry(entry_hash).await?;
+        Ok(deletes
+            .iter()
+            .any(|sah| &sah.hashed.content.header.author == author))
     }
 }
 
