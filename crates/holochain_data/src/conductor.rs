@@ -281,6 +281,66 @@ where
     Ok(())
 }
 
+/// Insert the init properties for a role of an installed app.
+async fn put_init_properties<'e, E>(
+    executor: E,
+    app_id: &str,
+    role_name: &str,
+    properties: &InitProperties,
+) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query("INSERT INTO InitProperties (app_id, role_name, properties) VALUES (?, ?, ?)")
+        .bind(app_id)
+        .bind(role_name)
+        .bind(properties.0.bytes())
+        .execute(executor)
+        .await?;
+    Ok(())
+}
+
+/// Get the init properties for a role of an installed app.
+async fn get_init_properties<'e, E>(
+    executor: E,
+    app_id: &str,
+    role_name: &str,
+) -> sqlx::Result<Option<InitProperties>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let blob: Option<Vec<u8>> = sqlx::query_scalar(
+        "SELECT properties FROM InitProperties WHERE app_id = ? AND role_name = ?",
+    )
+    .bind(app_id)
+    .bind(role_name)
+    .fetch_optional(executor)
+    .await?;
+
+    Ok(blob.map(|b| {
+        InitProperties(holochain_serialized_bytes::SerializedBytes::from(
+            holochain_serialized_bytes::UnsafeBytes::from(b),
+        ))
+    }))
+}
+
+/// Delete the init properties for a role of an installed app.
+async fn delete_init_properties<'e, E>(
+    executor: E,
+    app_id: &str,
+    role_name: &str,
+) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query("DELETE FROM InitProperties WHERE app_id = ? AND role_name = ?")
+        .bind(app_id)
+        .bind(role_name)
+        .execute(executor)
+        .await?;
+    Ok(())
+}
+
 // ============================================================================
 // Nonce Witnessing Operations
 // ============================================================================
@@ -549,6 +609,15 @@ impl DbRead<Conductor> {
         get_all_installed_apps(self.pool()).await
     }
 
+    /// Get the init properties for a role of an installed app.
+    pub async fn get_init_properties(
+        &self,
+        app_id: &str,
+        role_name: &str,
+    ) -> sqlx::Result<Option<InitProperties>> {
+        get_init_properties(self.pool(), app_id, role_name).await
+    }
+
     /// Check if a nonce has already been seen
     pub async fn nonce_already_seen(
         &self,
@@ -646,6 +715,21 @@ impl DbWrite<Conductor> {
         delete_installed_app(self.pool(), app_id).await
     }
 
+    /// Insert the init properties for a role of an installed app.
+    pub async fn put_init_properties(
+        &self,
+        app_id: &str,
+        role_name: &str,
+        properties: &InitProperties,
+    ) -> sqlx::Result<()> {
+        put_init_properties(self.pool(), app_id, role_name, properties).await
+    }
+
+    /// Delete the init properties for a role of an installed app.
+    pub async fn delete_init_properties(&self, app_id: &str, role_name: &str) -> sqlx::Result<()> {
+        delete_init_properties(self.pool(), app_id, role_name).await
+    }
+
     /// Witness a nonce (check if it's fresh and record it)
     pub async fn witness_nonce(
         &self,
@@ -696,6 +780,15 @@ impl TxRead<Conductor> {
         &mut self,
     ) -> sqlx::Result<Vec<(String, InstalledAppCommon, AppStatus)>> {
         get_all_installed_apps(self.conn_mut()).await
+    }
+
+    /// Get the init properties for a role of an installed app.
+    pub async fn get_init_properties(
+        &mut self,
+        app_id: &str,
+        role_name: &str,
+    ) -> sqlx::Result<Option<InitProperties>> {
+        get_init_properties(self.conn_mut(), app_id, role_name).await
     }
 
     /// Check if a nonce has already been seen.
@@ -795,6 +888,25 @@ impl TxWrite<Conductor> {
         delete_installed_app(self.conn_mut(), app_id).await
     }
 
+    /// Insert the init properties for a role of an installed app.
+    pub async fn put_init_properties(
+        &mut self,
+        app_id: &str,
+        role_name: &str,
+        properties: &InitProperties,
+    ) -> sqlx::Result<()> {
+        put_init_properties(self.conn_mut(), app_id, role_name, properties).await
+    }
+
+    /// Delete the init properties for a role of an installed app.
+    pub async fn delete_init_properties(
+        &mut self,
+        app_id: &str,
+        role_name: &str,
+    ) -> sqlx::Result<()> {
+        delete_init_properties(self.conn_mut(), app_id, role_name).await
+    }
+
     /// Witness a nonce (check if it's fresh and record it).
     pub async fn witness_nonce(
         &mut self,
@@ -815,11 +927,13 @@ impl TxWrite<Conductor> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::handles::DbRead;
+    use crate::handles::{DbRead, DbWrite};
     use crate::test_open_db;
     use holo_hash::{AgentPubKey, DnaHash};
+    use holochain_serialized_bytes::{SerializedBytes, UnsafeBytes};
     use holochain_zome_types::block::{BlockTarget, CellBlockReason};
     use holochain_zome_types::cell::CellId;
+    use holochain_zome_types::init::InitProperties;
 
     #[tokio::test]
     async fn conductor_schema_created() {
@@ -1081,6 +1195,139 @@ mod tests {
             .await
             .expect("Failed to count clones after delete");
         assert_eq!(clone_count, 0, "Clone cell should be cascade deleted");
+    }
+
+    /// Insert a test app row so init properties have a parent to reference.
+    async fn insert_test_app(db: &DbWrite<Conductor>, app_id: &str) {
+        sqlx::query(
+            "INSERT INTO InstalledApp (app_id, agent_pub_key, status, disabled_reason, manifest_blob, role_assignments_blob, installed_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)"
+        )
+            .bind(app_id)
+            .bind(vec![1u8; 36])
+            .bind("enabled")
+            .bind(None::<String>)
+            .bind(vec![0u8; 100])
+            .bind(vec![0u8; 10])
+            .bind(1234567890_i64)
+            .execute(db.pool())
+            .await
+            .expect("Failed to insert app");
+    }
+
+    fn test_init_properties(bytes: Vec<u8>) -> InitProperties {
+        InitProperties(SerializedBytes::from(UnsafeBytes::from(bytes)))
+    }
+
+    #[tokio::test]
+    async fn init_properties_roundtrip() {
+        const APP_NAME: &str = "test-app";
+        const ROLE_NAME: &str = "role1";
+
+        let db = test_open_db(Conductor)
+            .await
+            .expect("Failed to set up test database");
+        insert_test_app(&db, APP_NAME).await;
+
+        // Absent before any write.
+        assert_eq!(
+            db.as_ref()
+                .get_init_properties(APP_NAME, ROLE_NAME)
+                .await
+                .unwrap(),
+            None
+        );
+
+        let props = test_init_properties(vec![1, 2, 3]);
+        db.put_init_properties(APP_NAME, ROLE_NAME, &props)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            db.as_ref()
+                .get_init_properties(APP_NAME, ROLE_NAME)
+                .await
+                .unwrap(),
+            Some(props)
+        );
+
+        // A second insert for the same app_id and role_name combination violates the PRIMARY KEY
+        // constraint.
+        let dup_err = db
+            .put_init_properties(APP_NAME, ROLE_NAME, &test_init_properties(vec![4, 5, 6]))
+            .await
+            .unwrap_err();
+        let dup_msg = dup_err.to_string();
+        assert!(
+            dup_msg.contains("UNIQUE") || dup_msg.contains("unique"),
+            "Expected unique-constraint error, got: {dup_msg}"
+        );
+
+        // Explicit delete removes the row.
+        db.delete_init_properties(APP_NAME, ROLE_NAME)
+            .await
+            .unwrap();
+        assert_eq!(
+            db.as_ref()
+                .get_init_properties(APP_NAME, ROLE_NAME)
+                .await
+                .unwrap(),
+            None
+        );
+    }
+
+    #[tokio::test]
+    async fn init_properties_cascade_delete() {
+        const APP_NAME: &str = "test-app";
+        const ROLE1_NAME: &str = "role1";
+        const ROLE2_NAME: &str = "role2";
+
+        let db = test_open_db(Conductor)
+            .await
+            .expect("Failed to set up test database");
+        insert_test_app(&db, APP_NAME).await;
+
+        db.put_init_properties(APP_NAME, ROLE1_NAME, &test_init_properties(vec![1, 2, 3]))
+            .await
+            .unwrap();
+        db.put_init_properties(APP_NAME, ROLE2_NAME, &test_init_properties(vec![4, 5, 6]))
+            .await
+            .unwrap();
+
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM InitProperties")
+            .fetch_one(db.pool())
+            .await
+            .unwrap();
+        assert_eq!(count, 2);
+
+        // Deleting the app cascades to its init properties.
+        db.delete_installed_app(APP_NAME).await.unwrap();
+
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM InitProperties")
+            .fetch_one(db.pool())
+            .await
+            .unwrap();
+        assert_eq!(count, 0, "Init properties should be cascade deleted");
+    }
+
+    /// Init properties cannot reference an app that does not exist.
+    #[tokio::test]
+    async fn init_properties_foreign_key() {
+        let db = test_open_db(Conductor)
+            .await
+            .expect("Failed to set up test database");
+
+        let err = db
+            .put_init_properties("non-existent-app", "role1", &test_init_properties(vec![1]))
+            .await
+            .unwrap_err();
+
+        let err_msg = err.to_string();
+        assert!(
+            err_msg.contains("FOREIGN KEY") || err_msg.contains("foreign key"),
+            "Expected foreign key error, got: {}",
+            err_msg
+        );
     }
 
     // ========================================================================

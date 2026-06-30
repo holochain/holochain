@@ -94,7 +94,7 @@ impl event::HcP2pHandler for WrapEvtSender {
     fn handle_publish(
         &self,
         dna_hash: DnaHash,
-        ops: Vec<holochain_types::dht_v2::DhtOp>,
+        ops: Vec<(holochain_types::dht_v2::DhtOp, bool)>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         let op_count = ops.len();
         timing_trace!(
@@ -1893,9 +1893,14 @@ impl actor::HcP2p for HolochainP2pActor {
 
             // -- actually publish the op hashes -- //
 
-            let op_hash_list: Vec<OpId> = op_hash_list
+            let op_hash_list: Vec<PublishOp> = op_hash_list
                 .into_iter()
-                .map(|h| h.to_located_k2_op_id(&basis_hash))
+                .map(|h| PublishOp {
+                    op_id: h.to_located_k2_op_id(&basis_hash),
+                    // Published ops request a receipt from the
+                    // receiving validator.
+                    metadata: crate::publish_metadata::encode_publish_metadata(true),
+                })
                 .collect();
 
             let urls: std::collections::HashSet<Url> = get_responsive_remote_agents_near_location(
@@ -3032,7 +3037,7 @@ mod tests {
         fn handle_publish(
             &self,
             _dna_hash: DnaHash,
-            _ops: Vec<holochain_types::dht_v2::DhtOp>,
+            _ops: Vec<(holochain_types::dht_v2::DhtOp, bool)>,
         ) -> BoxFut<'_, HolochainP2pResult<()>> {
             // Increment counter
             let mut count = self.handle_publish_count.lock().unwrap();

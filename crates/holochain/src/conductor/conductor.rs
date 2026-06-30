@@ -1235,6 +1235,7 @@ mod app_impls {
                         defer_memproofs: false,
                         ignore_genesis_failure: false,
                     }),
+                    InitPropertiesMap::new(),
                 )
                 .await?;
 
@@ -1249,6 +1250,7 @@ mod app_impls {
             agent_key: Option<AgentPubKey>,
             ops: AppRoleResolution,
             flags: InstallAppCommonFlags,
+            init_properties: InitPropertiesMap,
         ) -> ConductorResult<InstalledApp> {
             let agent_key = match agent_key {
                 Some(key) => key,
@@ -1318,8 +1320,9 @@ mod app_impls {
                         }
                     }
 
-                    // Update the db
-                    let disabled_app = self.add_disabled_app_to_db(app).await?;
+                    // Write the app row and init_properties atomically so the app
+                    // can never be enabled into a state where init_properties are missing.
+                    let disabled_app = self.add_disabled_app_to_db(app, init_properties).await?;
 
                     // Return the result, which be may be an error if no_rollback was specified
                     genesis_result.map(|_| disabled_app)
@@ -1363,6 +1366,7 @@ mod app_impls {
             let modifiers = get_modifiers_map_from_role_settings(&roles_settings);
             let membrane_proofs = get_memproof_map_from_role_settings(&roles_settings);
             let existing_cells = get_existing_cells_map_from_role_settings(&roles_settings);
+            let init_properties = get_init_properties_map_from_role_settings(&roles_settings);
 
             let bundle = {
                 let original_bundle = source.resolve().await?;
@@ -1395,9 +1399,41 @@ mod app_impls {
                 .resolve_cells(membrane_proofs, existing_cells)
                 .await?;
 
-            self.clone()
-                .install_app_common(installed_app_id, manifest, agent_key, ops, flags)
-                .await
+            // Reject any init_properties whose role name is unknown or belongs to a
+            // non-provisioned role (UseExisting / CloneOnly cells have no init callback).
+            for role_name in init_properties.keys() {
+                let role = manifest
+                    .app_roles()
+                    .into_iter()
+                    .find(|r| &r.name == role_name)
+                    .ok_or_else(|| {
+                        ConductorError::InitPropertiesError(format!(
+                            "init_properties specifies unknown role '{role_name}'"
+                        ))
+                    })?;
+                if !matches!(
+                    role.provisioning,
+                    None | Some(CellProvisioning::Create { .. })
+                ) {
+                    return Err(ConductorError::InitPropertiesError(format!(
+                        "init_properties specifies role '{role_name}' which is not a provisioned cell"
+                    )));
+                }
+            }
+
+            let app = self
+                .clone()
+                .install_app_common(
+                    installed_app_id.clone(),
+                    manifest,
+                    agent_key,
+                    ops,
+                    flags,
+                    init_properties,
+                )
+                .await?;
+
+            Ok(app)
         }
 
         /// Uninstall an app, removing all traces of it including its cells.
@@ -2118,12 +2154,18 @@ mod app_status_impls {
         pub(crate) async fn add_disabled_app_to_db(
             &self,
             app: InstalledAppCommon,
+            init_properties: InitPropertiesMap,
         ) -> ConductorResult<InstalledApp> {
+            let app_id = app.id().to_string();
             let (_, disabled_app) = self
-                .update_state_prime(move |mut state| {
-                    let disabled_app = state.add_app(app)?;
-                    Ok((state, disabled_app))
-                })
+                .update_state_prime_and_init_properties(
+                    move |mut state| {
+                        let disabled_app = state.add_app(app)?;
+                        Ok((state, disabled_app))
+                    },
+                    &app_id,
+                    &init_properties,
+                )
                 .await?;
             Ok(disabled_app)
         }
@@ -2185,9 +2227,30 @@ mod state_impls {
         }
 
         /// Update the internal state with a pure function mapping old state to new,
-        /// which may also produce an output value which will be the output of
-        /// this function
-        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+        /// optionally writing `init_properties` rows for `app_id` in the same transaction.
+        ///
+        /// When `init_properties` is empty the `app_id` is not used. Callers
+        /// that do not need to persist init properties should use [`Self::update_state_prime`].
+        ///
+        /// Any value produced by the state change will be the output of this function.
+        pub(crate) async fn update_state_prime_and_init_properties<F, O>(
+            &self,
+            f: F,
+            app_id: &str,
+            init_properties: &InitPropertiesMap,
+        ) -> ConductorResult<(ConductorState, O)>
+        where
+            F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)> + Send + 'static,
+            O: Send + 'static,
+        {
+            self.check_running()?;
+            self.spaces
+                .update_state_prime(f, app_id, init_properties)
+                .await
+        }
+
+        /// Convenience wrapper around [`Self::update_state_prime_and_init_properties`] for callers
+        /// that do not need to persist init properties.
         pub(crate) async fn update_state_prime<F, O>(
             &self,
             f: F,
@@ -2196,8 +2259,8 @@ mod state_impls {
             F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)> + Send + 'static,
             O: Send + 'static,
         {
-            self.check_running()?;
-            self.spaces.update_state_prime(f).await
+            self.update_state_prime_and_init_properties(f, "", &InitPropertiesMap::new())
+                .await
         }
     }
 }
@@ -3033,6 +3096,61 @@ mod accessor_impls {
                 .find_app_containing_cell(cell_id)
                 .cloned())
         }
+
+        /// Read the init properties supplied at install time for the role that
+        /// the given cell is provisioned for.
+        ///
+        /// Returns `None` if no app contains the cell, the cell is not a
+        /// provisioned cell of any role, or no init properties were supplied
+        /// for that role.
+        pub async fn get_init_properties_for_cell(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorResult<Option<InitProperties>> {
+            let state = self.get_state().await?;
+            let Some(app) = state.find_app_containing_cell(cell_id) else {
+                return Ok(None);
+            };
+            let Some((role_name, _)) = app
+                .provisioned_cells()
+                .find(|(_, provisioned_cell_id)| provisioned_cell_id == cell_id)
+            else {
+                return Ok(None);
+            };
+            let app_id = app.id().clone();
+            let role_name = role_name.clone();
+            Ok(self
+                .spaces
+                .conductor_store
+                .as_read()
+                .get_init_properties(&app_id, &role_name)
+                .await?)
+        }
+
+        /// Remove the init properties for the role that the given cell is provisioned for.
+        /// Called after a successful `init` so the seed material does not remain past its use.
+        pub async fn delete_init_properties_for_cell(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorResult<()> {
+            let state = self.get_state().await?;
+            let Some(app) = state.find_app_containing_cell(cell_id) else {
+                return Ok(());
+            };
+            let Some((role_name, _)) = app
+                .provisioned_cells()
+                .find(|(_, provisioned_cell_id)| provisioned_cell_id == cell_id)
+            else {
+                return Ok(());
+            };
+            let app_id = app.id().clone();
+            let role_name = role_name.clone();
+            self.spaces
+                .conductor_store
+                .delete_init_properties(&app_id, &role_name)
+                .await?;
+            Ok(())
+        }
     }
 }
 
@@ -3662,8 +3780,7 @@ pub fn wire_rows_to_v2_ops(
 pub async fn integration_dump(
     dht_store: &DhtStoreRead,
 ) -> ConductorApiResult<IntegrationStateDump> {
-    let (validation_limbo, integration_limbo, integrated) =
-        dht_store.integration_state_counts().await?;
+    let (validation_limbo, integration_limbo, integrated) = dht_store.limbo_state_counts().await?;
     Ok(IntegrationStateDump {
         validation_limbo,
         integration_limbo,
@@ -3749,6 +3866,27 @@ fn get_memproof_map_from_role_settings(role_settings: &Option<RoleSettingsMap>) 
                 RoleSettings::Provisioned { membrane_proof, .. } => membrane_proof
                     .as_ref()
                     .map(|m| (role_name.clone(), m.clone())),
+            })
+            .collect(),
+        None => HashMap::new(),
+    }
+}
+
+/// Extract the init properties from the RoleSettingsMap into their own HashMap
+fn get_init_properties_map_from_role_settings(
+    roles_settings: &Option<RoleSettingsMap>,
+) -> InitPropertiesMap {
+    match roles_settings {
+        Some(role_settings_map) => role_settings_map
+            .iter()
+            .filter_map(|(role_name, role_settings)| match role_settings {
+                #[allow(deprecated)]
+                RoleSettings::UseExisting { .. } => None,
+                RoleSettings::Provisioned {
+                    init_properties, ..
+                } => init_properties
+                    .as_ref()
+                    .map(|p| (role_name.clone(), p.clone())),
             })
             .collect(),
         None => HashMap::new(),

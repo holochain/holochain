@@ -123,8 +123,6 @@ async fn await_op_integration(
     timeout: Duration,
 ) -> Result<(), String> {
     let start = Instant::now();
-    // Declare op rows here so they can be accessed for reporting after timeout.
-    let mut rows_per_db = Vec::new();
     let result = tokio::time::timeout(timeout, async {
         'compare_dbs_loop: loop {
             tokio::time::sleep(Duration::from_millis(500)).await;
@@ -133,7 +131,7 @@ async fn await_op_integration(
             // consistency cannot have been reached; sleep and retry.
             for (_, dht_store) in cells.iter() {
                 let (validation_limbo, integration_limbo, _) = dht_store
-                    .integration_state_counts()
+                    .limbo_state_counts()
                     .await
                     .map_err(|e| e.to_string())?;
                 if validation_limbo > 0 || integration_limbo > 0 {
@@ -146,7 +144,7 @@ async fn await_op_integration(
             let queries = cells
                 .iter()
                 .map(|(_, dht_store)| integrated_op_rows(dht_store));
-            rows_per_db = futures::future::join_all(queries)
+            let rows_per_db = futures::future::join_all(queries)
                 .await
                 .into_iter()
                 .collect::<Result<Vec<_>, String>>()?;
@@ -154,7 +152,7 @@ async fn await_op_integration(
             // Build a set of all op hashes and create lists of hashes for each DHT DB.
             let mut all_hashes = HashSet::new();
             let mut hash_lists = Vec::new();
-            for (index, dht_op_rows) in rows_per_db.clone().into_iter().enumerate() {
+            for (index, dht_op_rows) in rows_per_db.into_iter().enumerate() {
                 tracing::debug!(
                     "Agent {} with key {} has {} ops in their DHT store",
                     index,
@@ -196,21 +194,46 @@ async fn await_op_integration(
 
     if !consistent {
         // Print a report now that consistency hasn't been reached.
+        //
+        // Re-read each node's state fresh rather than relying on whatever the
+        // wait loop left behind. The loop only records integrated rows once
+        // every node has integrated them. Reporting the limbo counts alongside
+        // the integrated.
         println!("\nConsistency not reached.\n");
-        for (index, mut rows) in rows_per_db.into_iter().enumerate() {
+        for (index, (_, dht_store)) in cells.iter().enumerate() {
+            let (validation_limbo, integration_limbo, integrated) =
+                match dht_store.limbo_state_counts().await {
+                    Ok(counts) => counts,
+                    Err(e) => {
+                        println!(
+                            "Agent {} with key {}: failed to read integration state: {e}",
+                            index, cells[index].0
+                        );
+                        continue;
+                    }
+                };
+            println!(
+                "Agent {} with key {}: {} in validation limbo, {} in integration limbo, {} integrated",
+                index, cells[index].0, validation_limbo, integration_limbo, integrated
+            );
+
+            let mut rows = match integrated_op_rows(dht_store).await {
+                Ok(rows) => rows,
+                Err(e) => {
+                    println!("  failed to read integrated ops: {e}");
+                    continue;
+                }
+            };
             // Sort rows by author first, then action sequence.
             rows.sort_by_key(|row| (row.author.clone(), row.action_seq));
+            println!("The following ops are in the DHT store:");
             println!(
-                "Agent {} with key {} has the following ops in the DHT store:",
-                index, cells[index].0
-            );
-            println!(
-                "{:53}  {:10}  {:21}  {:53}  {:20}",
+                "{:53}  {:10}  {:28}  {:53}  {:20}",
                 "Author", "Action seq", "Op type", "Op hash", "When integrated"
             );
             for row in rows {
                 println!(
-                    "{:53}  {:10}  {:21}  {:53}  {:20}",
+                    "{:53}  {:10}  {:28}  {:53}  {:20}",
                     row.author,
                     row.action_seq,
                     format!("{:?}", row.op_type),
@@ -370,9 +393,11 @@ mod tests {
             || async {
                 conductors[0]
                     .all_ops_integrated(dna_file.dna_hash())
+                    .await
                     .unwrap()
                     && conductors[1]
                         .all_ops_integrated(dna_file.dna_hash())
+                        .await
                         .unwrap()
             },
             Some(5000),
@@ -412,7 +437,7 @@ mod tests {
         conductors[0]
             .get_dht_store(dna_file.dna_hash())
             .unwrap()
-            .record_incoming_ops(vec![unintegrated_op])
+            .record_incoming_ops(vec![(unintegrated_op, false)])
             .await
             .unwrap();
 

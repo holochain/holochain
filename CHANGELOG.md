@@ -14,6 +14,77 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20260629.004342
+
+## [hcterm-0.7.0-dev.31](crates/hcterm/CHANGELOG.md#0.7.0-dev.31)
+
+## [holochain\_cli-0.7.0-dev.31](crates/holochain_cli/CHANGELOG.md#0.7.0-dev.31)
+
+## [holochain\_cli\_bundle-0.7.0-dev.30](crates/holochain_cli_bundle/CHANGELOG.md#0.7.0-dev.30)
+
+## [holochain\_cli\_client-0.7.0-dev.31](crates/holochain_cli_client/CHANGELOG.md#0.7.0-dev.31)
+
+## [holochain\_cli\_sandbox-0.7.0-dev.31](crates/holochain_cli_sandbox/CHANGELOG.md#0.7.0-dev.31)
+
+## [holochain\_client-0.9.0-dev.31](crates/holochain_client/CHANGELOG.md#0.9.0-dev.31)
+
+## [holochain-0.7.0-dev.31](crates/holochain/CHANGELOG.md#0.7.0-dev.31)
+
+- Fix a queue consumer bug where the integration workflow failed with a transient `database is locked` error due to write contention, and hence had its pending work dropped with no retry.
+- Improve the sweettest consistency-check failure report when consistency is not reached.
+- **BREAKING CHANGE**: Implement the DNA migration design, adding a new `InitProperties` type to be used in the `init_properties` field on `RoleSettings::Provisioned`. The bytes are opaque to the conductor and stored in the conductor database thus never written to the DHT. They are written during the installation and are intended to seed a freshly migrated chain during `init`. They can only be retrieved from the `init` callback via the `get_init_properties` host function and its HDK wrapper. They are cleared upon a successful init or if the associated app is uninstalled. \#5827
+- **BREAKING CHANGE**: Bump Kitsune2 to `0.5.0-dev.4`.
+- Use Kitsune2’s new op publish metadata channel to pass through a validation-receipt-required flag. Published ops request a validation receipt from holders, while gossip-fetched ops no longer do. Previously every incoming op was unconditionally marked as requiring a receipt.
+- **BREAKING CHANGE**: `get_agent_activity` can now return `ChainStatus::Closed` when an agent’s source-chain head is a `CloseChain` action. `ChainStatus` is sent over the wire in agent-activity responses, so a node returning `Closed` cannot be understood by a pre-feature node. `Closed` ranks above `Valid` but below `Forked`/`Invalid`, so a chain that is also forked or invalid still reports `Forked`/`Invalid`. \#5766
+- Fix `get_agent_activity` status-only requests (`ActivityRequest::Status`) which previously always returned `ChainStatus::Empty` instead of the real chain status. \#5766
+- **BREAKING CHANGE** Inline zome definitions are no longer embedded in `DnaDef`. The `ZomeDef::Inline` variant now carries an `InlineZomeDef` (an `InlineHash` identifier plus its dependencies) instead of the executable closures. The closures are held on `DnaFile` in a new, non-serialized `inline_zomes` field (constructed via `DnaFile::new_inline`) and executed by a dedicated inline ribosome. WASM zomes are unaffected at the API level; this only changes code that builds inline-zome DNAs directly, such as tests using sweettest. \#5828
+- **BREAKING CHANGE** `ZomeDef` no longer uses the custom `untagged` serialization that encoded a Wasm zome as a bare `WasmZome`. Because the `DnaHash` is derived from the serialized integrity zomes, the hash of an otherwise-identical DNA changes with this release. There is no migration path for existing installs of Holochain, and startup errors would be expected if the data state is not cleared. \#5828
+- **BREAKING CHANGE** `WasmZome` is renamed to `WasmZomeDef`. \#5828
+- **BREAKING CHANGE** `ZomeDef::wasm_hash` (and the `IntegrityZomeDef`/`CoordinatorZomeDef` wrappers) is replaced by `zome_hash`, which returns a `ZomeHash` for both WASM and inline zomes. `DnaDef::get_wasm_zome` now returns `ZomeResult<&WasmZomeDef>`. \#5828
+- **BREAKING CHANGE** `InlineZome::uuid` is replaced by `InlineZome::hash`, which returns an `InlineHash` derived from the previous UUID via blake2b. \#5828
+- **BREAKING CHANGE** Removed `DnaWithRole::replace_dna`. \#5828
+- Add two hash types to `holo_hash`: `InlineHash` (`hash_type::Inline`, prefix `uhCsk`), which identifies an inline zome, and `ZomeHash` (`hash_type::Zome`), which is either a WASM or inline zome hash. \#5828
+- Add `DnaDef::replace_coordinators`, which swaps a DNA’s coordinator zomes while preserving install order and rejects a coordinator whose dependency does not point at an existing integrity zome with the new `ZomeError::DanglingZomeDependency`. \#5828
+- Restructure the ribosome so that the WASM, inline, and mock backends each implement a common `RibosomeImplT` trait behind a single `Ribosome` type, replacing the previous `RealRibosome`/`RibosomeT` design. This is primarily an internal change but affects custom ribosome implementations and some sweettest internals. \#5828
+
+## [holochain\_cascade-0.7.0-dev.31](crates/holochain_cascade/CHANGELOG.md#0.7.0-dev.31)
+
+## [holochain\_conductor\_config-0.7.0-dev.30](crates/holochain_conductor_config/CHANGELOG.md#0.7.0-dev.30)
+
+## [holochain\_test\_wasm\_common-0.7.0-dev.20](crates/holochain_test_wasm_common/CHANGELOG.md#0.7.0-dev.20)
+
+## [holochain\_wasm\_test\_utils-0.7.0-dev.31](crates/holochain_wasm_test_utils/CHANGELOG.md#0.7.0-dev.31)
+
+## [holochain\_websocket-0.7.0-dev.30](crates/holochain_websocket/CHANGELOG.md#0.7.0-dev.30)
+
+## [hdk-0.7.0-dev.20](crates/hdk/CHANGELOG.md#0.7.0-dev.20)
+
+## [holochain\_p2p-0.7.0-dev.31](crates/holochain_p2p/CHANGELOG.md#0.7.0-dev.31)
+
+## [hdi-0.8.0-dev.14](crates/hdi/CHANGELOG.md#0.8.0-dev.14)
+
+## [holochain\_state-0.7.0-dev.31](crates/holochain_state/CHANGELOG.md#0.7.0-dev.31)
+
+## [hdk\_derive-0.7.0-dev.14](crates/hdk_derive/CHANGELOG.md#0.7.0-dev.14)
+
+## [holochain\_data-0.7.0-dev.20](crates/holochain_data/CHANGELOG.md#0.7.0-dev.20)
+
+## [holochain\_conductor\_api-0.7.0-dev.30](crates/holochain_conductor_api/CHANGELOG.md#0.7.0-dev.30)
+
+## [holochain\_state\_types-0.7.0-dev.14](crates/holochain_state_types/CHANGELOG.md#0.7.0-dev.14)
+
+## [holochain\_types-0.7.0-dev.30](crates/holochain_types/CHANGELOG.md#0.7.0-dev.30)
+
+## [holochain\_keystore-0.7.0-dev.19](crates/holochain_keystore/CHANGELOG.md#0.7.0-dev.19)
+
+## [holochain\_sqlite-0.7.0-dev.23](crates/holochain_sqlite/CHANGELOG.md#0.7.0-dev.23)
+
+## [holochain\_zome\_types-0.7.0-dev.19](crates/holochain_zome_types/CHANGELOG.md#0.7.0-dev.19)
+
+## [holochain\_integrity\_types-0.7.0-dev.14](crates/holochain_integrity_types/CHANGELOG.md#0.7.0-dev.14)
+
+## [holo\_hash-0.7.0-dev.10](crates/holo_hash/CHANGELOG.md#0.7.0-dev.10)
+
 # 20260622.004637
 
 ## [hcterm-0.7.0-dev.30](crates/hcterm/CHANGELOG.md#0.7.0-dev.30)

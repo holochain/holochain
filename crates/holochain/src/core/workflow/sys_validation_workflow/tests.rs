@@ -2,7 +2,7 @@ use super::*;
 use crate::retry_until_timeout;
 use crate::sweettest::*;
 use crate::test_utils::host_fn_caller::*;
-use crate::test_utils::{assert_new_store_limbo_empty, wait_for_new_store_integration};
+use crate::test_utils::{assert_limbo_empty, wait_for_integration};
 use crate::{conductor::ConductorHandle, core::MAX_TAG_SIZE};
 use holo_hash::fixt::{AgentPubKeyFixturator, EntryHashFixturator};
 use holochain_types::test_utils::ActionRefMut;
@@ -73,7 +73,7 @@ async fn sys_validation_produces_invalid_chain_op_warrant() {
         .spaces
         .dht_store(dna.dna_hash())
         .unwrap()
-        .record_incoming_ops(vec![op])
+        .record_incoming_ops(vec![(op, false)])
         .await
         .unwrap();
 
@@ -219,7 +219,11 @@ async fn sys_validation_produces_forked_chain_warrant() {
         .spaces
         .dht_store(dna.dna_hash())
         .unwrap()
-        .record_incoming_ops(vec![prev_op_hashed, original_op_hashed, forked_op_hashed])
+        .record_incoming_ops(vec![
+            (prev_op_hashed, false),
+            (original_op_hashed, false),
+            (forked_op_hashed, false),
+        ])
         .await
         .unwrap();
 
@@ -388,7 +392,11 @@ async fn sys_validation_produces_two_warrants_when_receiving_both_forked_ops() {
         .spaces
         .dht_store(dna.dna_hash())
         .unwrap()
-        .record_incoming_ops(vec![prev_op_hashed, op1_hashed, op2_hashed])
+        .record_incoming_ops(vec![
+            (prev_op_hashed, false),
+            (op1_hashed, false),
+            (op2_hashed, false),
+        ])
         .await
         .unwrap();
 
@@ -472,11 +480,10 @@ async fn run_test(
 
     // 9 ops from the three authored records plus 14 genesis ops (both agents).
     // Init is not run because we aren't calling the zome.
-    let expected_count: i64 = 9 + 14;
+    let expected_count: u64 = 9 + 14;
 
-    wait_for_new_store_integration(&dht_store, expected_count, num_attempts, delay_per_attempt)
-        .await;
-    assert_new_store_limbo_empty(&dht_store).await;
+    wait_for_integration(&dht_store, expected_count, num_attempts, delay_per_attempt).await;
+    assert_limbo_empty(&dht_store).await;
 
     // Authors an op with an oversized link tag, which is rejected and produces
     // an InvalidChainOp warrant.
@@ -486,9 +493,8 @@ async fn run_test(
     // are still integrated (with a rejected status), so they count here too.
     let expected_count = 14 + 1 + expected_count;
 
-    wait_for_new_store_integration(&dht_store, expected_count, num_attempts, delay_per_attempt)
-        .await;
-    assert_new_store_limbo_empty(&dht_store).await;
+    wait_for_integration(&dht_store, expected_count, num_attempts, delay_per_attempt).await;
+    assert_limbo_empty(&dht_store).await;
 }
 
 async fn bob_links_in_a_legit_way(

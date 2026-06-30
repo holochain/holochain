@@ -17,6 +17,16 @@ pub use incoming_ops_batch::IncomingOpsBatch;
 #[cfg(test)]
 mod tests;
 
+/// An incoming DHT op paired with a flag to request a validation receipt.
+///
+/// Published ops request validation receipts, other ops like gossiped ones
+/// do not.
+#[derive(Debug, Clone)]
+pub struct IncomingDhtOp {
+    pub op: DhtOpHashed,
+    pub require_validation_receipt: bool,
+}
+
 struct OpsClaim {
     incoming_op_hashes: IncomingOpHashes,
     working_hashes: Vec<DhtOpHash>,
@@ -25,8 +35,8 @@ struct OpsClaim {
 impl OpsClaim {
     fn acquire(
         incoming_op_hashes: IncomingOpHashes,
-        ops: Vec<DhtOpHashed>,
-    ) -> (Self, Vec<DhtOpHashed>) {
+        ops: Vec<IncomingDhtOp>,
+    ) -> (Self, Vec<IncomingDhtOp>) {
         let keep_incoming_op_hashes = incoming_op_hashes.clone();
 
         // Lock the shared state while we claim the ops we're going to work on
@@ -38,9 +48,9 @@ impl OpsClaim {
         let mut working_ops = Vec::with_capacity(ops.len());
 
         for op in ops {
-            if !set.contains(&op.hash) {
-                set.insert(op.hash.clone());
-                working_hashes.push(op.hash.clone());
+            if !set.contains(&op.op.hash) {
+                set.insert(op.op.hash.clone());
+                working_hashes.push(op.op.hash.clone());
                 working_ops.push(op);
             }
         }
@@ -73,18 +83,20 @@ impl Drop for OpsClaim {
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(txn, ops)))]
 fn batch_process_entry(
     txn: &mut Txn<DbKindDht>,
-    ops: Vec<DhtOpHashed>,
-) -> WorkflowResult<Vec<DhtOpHashed>> {
+    ops: Vec<IncomingDhtOp>,
+) -> WorkflowResult<Vec<IncomingDhtOp>> {
     // add incoming ops to the validation limbo
     let mut to_pending = Vec::with_capacity(ops.len());
     for op in ops {
-        if !op_exists_inner(txn, &op.hash)? {
+        if !op_exists_inner(txn, &op.op.hash)? {
             to_pending.push(op);
         }
     }
 
     tracing::debug!("Inserting {} ops", to_pending.len());
-    add_to_pending(txn, &to_pending)?;
+    // #5370: legacy DhtOp dual-write removed; `add_to_pending` (and the
+    // op_exists_inner dedup read above) remain as dead code pending DbKindDht
+    // retirement.
 
     Ok(to_pending)
 }
@@ -99,7 +111,7 @@ pub struct IncomingOpHashes(Arc<parking_lot::Mutex<HashSet<DhtOpHash>>>);
 pub async fn incoming_dht_ops_workflow(
     space: Space,
     sys_validation_trigger: TriggerSender,
-    ops: Vec<DhtOp>,
+    ops: Vec<(DhtOp, bool)>,
 ) -> WorkflowResult<()> {
     let Space {
         incoming_op_hashes,
@@ -109,10 +121,13 @@ pub async fn incoming_dht_ops_workflow(
         ..
     } = space;
 
-    // Compute hashes for all the ops
+    // Convert DhtOps to IncomingOps by computing hashes
     let ops = ops
         .into_iter()
-        .map(DhtOpHashed::from_content_sync)
+        .map(|(op, require_validation_receipt)| IncomingDhtOp {
+            op: DhtOpHashed::from_content_sync(op),
+            require_validation_receipt,
+        })
         .collect();
 
     // Filter out ops that are already being tracked, to avoid doing duplicate work
@@ -127,7 +142,7 @@ pub async fn incoming_dht_ops_workflow(
     let mut filter_ops = Vec::with_capacity(num_ops);
     for op in ops {
         // It's cheaper to check if the signature is valid before proceeding to open a write transaction.
-        let keeper = should_keep(&op.content).await;
+        let keeper = should_keep(&op.op.content).await;
         match keeper {
             Ok(()) => filter_ops.push(op),
             Err(e) => {
@@ -172,9 +187,17 @@ pub async fn incoming_dht_ops_workflow(
                     let senders = Arc::new(parking_lot::Mutex::new(Vec::new()));
                     let senders2 = senders.clone();
 
-                    // All ops received in this batch, written to both stores.
-                    let batch_ops: Vec<DhtOpHashed> =
-                        entries.iter().flat_map(|e| e.ops.iter().cloned()).collect();
+                    // Clone all ops received in this batch with the flag to
+                    // request validation receipt for later write to the new
+                    // store.
+                    let batch_ops: Vec<(DhtOpHashed, bool)> = entries
+                        .iter()
+                        .flat_map(|e| {
+                            e.ops
+                                .iter()
+                                .map(|op| (op.op.clone(), op.require_validation_receipt))
+                        })
+                        .collect();
 
                     // Legacy DHT table — still read by the cascade for
                     // dependency resolution. `batch_process_entry` skips ops
@@ -258,18 +281,20 @@ async fn should_keep(op: &DhtOp) -> WorkflowResult<()> {
     Ok(())
 }
 
-fn add_to_pending(txn: &mut Txn<DbKindDht>, ops: &[DhtOpHashed]) -> StateMutationResult<()> {
+// #5370: dead pending full DbKindDht retirement.
+#[allow(dead_code)]
+fn add_to_pending(txn: &mut Txn<DbKindDht>, ops: &[IncomingDhtOp]) -> StateMutationResult<()> {
     for op in ops {
         insert_op_dht(
             txn,
-            op,
-            holochain_serialized_bytes::encode(op.as_content())?.len() as u32,
+            &op.op,
+            holochain_serialized_bytes::encode(op.op.as_content())?.len() as u32,
             todo_no_cache_transfer_data(),
         )?;
 
-        // As validators right now, we always try to send
-        // validation receipts.
-        set_require_receipt(txn, op.as_hash(), true)?;
+        // Only record that a validation receipt is required when the publisher
+        // requested one.
+        set_require_receipt(txn, op.op.as_hash(), op.require_validation_receipt)?;
     }
 
     Ok(())

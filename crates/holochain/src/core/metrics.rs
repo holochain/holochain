@@ -76,6 +76,24 @@ pub(crate) fn op_validation_attempts_metric() -> &'static OpValidationAttemptsMe
     })
 }
 
+/// Record integration metrics once per source-chain flush that integrated
+/// locally-authored ops.
+///
+/// In the v2 model, locally-authored ops are integrated immediately at source
+/// chain flush, bypassing the integration workflow's `summaries` path that
+/// records [`op_integration_delay_metric`] / [`op_validation_attempts_metric`]
+/// for network-received ops. Authored ops have no integration delay and need no
+/// validation retries, so both samples are always zero — a single zeroed sample
+/// per flush is therefore enough to keep these histograms exporting for
+/// authored data, without recomputing the per-op count here. Per-op emission is
+/// left to the future shared inline-integration helper that will own the
+/// integrate/publish/metrics step for authored data.
+pub(crate) fn record_authored_op_integration(dna_hash: &DnaHash) {
+    let attributes = [KeyValue::new("dna_hash", dna_hash.to_string())];
+    op_integration_delay_metric().record(0.0, &attributes);
+    op_validation_attempts_metric().record(0, &attributes);
+}
+
 pub(crate) type WasmUsageMetric = metrics::Counter<u64>;
 
 static WASM_USAGE_METRIC: OnceLock<WasmUsageMetric> = OnceLock::new();

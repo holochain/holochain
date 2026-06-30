@@ -134,7 +134,7 @@ async fn integrate_store_record(
     );
     let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(chain_op)));
     let op_hash = op.as_hash().clone();
-    store.record_incoming_ops(vec![op]).await.unwrap();
+    store.record_incoming_ops(vec![(op, false)]).await.unwrap();
     store
         .record_chain_op_sys_validation_outcomes(vec![(op_hash.clone(), SysOutcome::Accepted)])
         .await
@@ -186,7 +186,7 @@ async fn integrate_store_entry(
     let chain_op = ChainOp::StoreEntry(Signature::from([seed; 64]), new_entry_action, entry);
     let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(chain_op)));
     let op_hash = op.as_hash().clone();
-    store.record_incoming_ops(vec![op]).await.unwrap();
+    store.record_incoming_ops(vec![(op, false)]).await.unwrap();
     store
         .record_chain_op_sys_validation_outcomes(vec![(op_hash.clone(), SysOutcome::Accepted)])
         .await
@@ -371,7 +371,7 @@ async fn integrate_link_op(
         create_link,
     ))));
     let op_hash = op.as_hash().clone();
-    store.record_incoming_ops(vec![op]).await.unwrap();
+    store.record_incoming_ops(vec![(op, false)]).await.unwrap();
     store
         .record_chain_op_sys_validation_outcomes(vec![(op_hash.clone(), SysOutcome::Accepted)])
         .await
@@ -645,7 +645,7 @@ async fn integrate_activity_op(
         ChainOp::RegisterAgentActivity(Signature::from([seed; 64]), action),
     )));
     let op_hash = op.as_hash().clone();
-    store.record_incoming_ops(vec![op]).await.unwrap();
+    store.record_incoming_ops(vec![(op, false)]).await.unwrap();
     store
         .record_chain_op_sys_validation_outcomes(vec![(op_hash.clone(), SysOutcome::Accepted)])
         .await

@@ -42,7 +42,6 @@ use holochain_cascade::MockCascade;
 use holochain_keystore::test_keystore;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_sqlite::prelude::DatabaseResult;
 use holochain_types::test_utils::valid_arbitrary_chain;
 use holochain_types::test_utils::ActionRefMut;
 use holochain_zome_types::Action;
@@ -133,7 +132,6 @@ async fn incoming_ops_filters_private_entry() {
     let dna = fixt!(DnaHash);
     let spaces = TestSpaces::new([dna.clone()]).await;
     let space = Arc::new(spaces.test_spaces[&dna].space.clone());
-    let vault = space.dht_db.clone();
     let keystore = test_keystore();
     let (tx, _rx) = TriggerSender::new();
 
@@ -160,29 +158,14 @@ async fn incoming_ops_filters_private_entry() {
 
     let ops_sender = IncomingDhtOpSender::new(space.clone(), tx.clone());
     ops_sender.send_store_entry(record.clone()).await.unwrap();
-    let num_ops: usize = vault
-        .read_async(move |txn| -> DatabaseResult<usize> {
-            Ok(txn.query_row("SELECT COUNT(rowid) FROM DhtOp", [], |row| row.get(0))?)
-        })
-        .await
-        .unwrap();
+    let num_ops = space.dht_store.as_read().count_all_ops().await.unwrap();
     assert_eq!(num_ops, 0);
 
     let ops_sender = IncomingDhtOpSender::new(space.clone(), tx.clone());
     ops_sender.send_store_record(record.clone()).await.unwrap();
-    let num_ops: usize = vault
-        .read_async(move |txn| -> DatabaseResult<usize> {
-            Ok(txn.query_row("SELECT COUNT(rowid) FROM DhtOp", [], |row| row.get(0))?)
-        })
-        .await
-        .unwrap();
+    let num_ops = space.dht_store.as_read().count_all_ops().await.unwrap();
     assert_eq!(num_ops, 1);
-    let num_entries: usize = vault
-        .read_async(move |txn| -> DatabaseResult<usize> {
-            Ok(txn.query_row("SELECT COUNT(rowid) FROM Entry", [], |row| row.get(0))?)
-        })
-        .await
-        .unwrap();
+    let num_entries = space.dht_store.as_read().count_entries().await.unwrap();
     assert_eq!(num_entries, 0);
 }
 

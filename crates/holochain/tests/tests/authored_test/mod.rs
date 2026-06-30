@@ -77,13 +77,12 @@ async fn authored_test() {
     let expected_count = 3 + 14;
 
     wait_for_integration(
-        bob.dht_db(),
-        expected_count,
+        bob.dht_store(),
+        expected_count as u64,
         num_attempts,
         delay_per_attempt,
     )
-    .await
-    .unwrap();
+    .await;
 
     bob
         .authored_db()
@@ -110,26 +109,17 @@ async fn authored_test() {
         .await
         .unwrap();
 
-    bob.dht_db()
-        .read_async({
-            let basis: AnyDhtHash = entry_hash.clone().into();
-
-            move |txn| -> DatabaseResult<()> {
-                let has_integrated_entry: bool = txn.query_row(
-                    "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE basis_hash = :hash)",
-                    named_params! {
-                        ":hash": basis,
-                    },
-                    |row| row.get(0),
-                )?;
-
-                assert!(has_integrated_entry);
-
-                Ok(())
-            }
-        })
+    let basis: AnyLinkableHash = entry_hash.clone().into();
+    let ops_at_basis = bob
+        .dht_store()
+        .as_read()
+        .get_ops_at_basis(&basis)
         .await
         .unwrap();
+    assert!(
+        !ops_at_basis.is_empty(),
+        "bob should have an integrated op at the entry basis"
+    );
 
     // Now bob commits the entry
     let _: ActionHash = conductor

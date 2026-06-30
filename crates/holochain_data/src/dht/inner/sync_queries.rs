@@ -28,6 +28,8 @@ use crate::models::dht::{
     K2WarrantForWireRow,
 };
 use holo_hash::AgentPubKey;
+#[cfg(any(test, feature = "inspection"))]
+use holo_hash::{AnyLinkableHash, DhtOpHash};
 use sqlx::{Executor, QueryBuilder, Sqlite};
 
 /// Inclusive `[storage_start_loc, storage_end_loc]` arc bounds.
@@ -619,7 +621,7 @@ fn limbo_chain_op_not_ready_pred() -> String {
 ///   with a terminal `sys_validation_status` (1 or 2).
 /// - `validation_limbo` = limbo ops not yet ready: the complement of the
 ///   above within each limbo table.
-pub(crate) async fn integration_state_counts<'e, E>(executor: E) -> sqlx::Result<(i64, i64, i64)>
+pub(crate) async fn limbo_state_counts<'e, E>(executor: E) -> sqlx::Result<(i64, i64, i64)>
 where
     E: Executor<'e, Database = Sqlite>,
 {
@@ -649,4 +651,173 @@ where
         .fetch_one(executor)
         .await?;
     Ok(counts)
+}
+
+/// Count of integrated, locally-validated `ChainOp` rows that passed validation
+/// (`validation_status = 1`). GET-cached copies (`locally_validated = 0`) and
+/// rejected ops are excluded.
+#[cfg(any(test, feature = "inspection"))]
+pub(crate) async fn count_valid_integrated_ops<'e, E>(executor: E) -> sqlx::Result<i64>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let (n,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM ChainOp WHERE locally_validated = 1 AND validation_status = 1",
+    )
+    .fetch_one(executor)
+    .await?;
+    Ok(n)
+}
+
+/// Count of `LimboChainOp` rows that have passed both sys- and app-validation
+/// (`sys_validation_status = 1 AND app_validation_status = 1`) but are not yet
+/// integrated.
+#[cfg(any(test, feature = "inspection"))]
+pub(crate) async fn count_valid_not_integrated_ops<'e, E>(executor: E) -> sqlx::Result<i64>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let (n,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM LimboChainOp \
+         WHERE sys_validation_status = 1 AND app_validation_status = 1",
+    )
+    .fetch_one(executor)
+    .await?;
+    Ok(n)
+}
+
+/// Count of not-yet-integrated `LimboChainOp` rows authored by `author`.
+#[cfg(any(test, feature = "inspection"))]
+pub(crate) async fn count_pending_ops_for_author<'e, E>(
+    executor: E,
+    author: &AgentPubKey,
+) -> sqlx::Result<i64>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let (n,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM LimboChainOp \
+         JOIN Action ON Action.hash = LimboChainOp.action_hash \
+         WHERE Action.author = ?",
+    )
+    .bind(author.get_raw_36())
+    .fetch_one(executor)
+    .await?;
+    Ok(n)
+}
+
+/// Hashes of integrated, locally-validated chain ops that were rejected.
+/// GET-cached copies (`locally_validated = 0`) are excluded. Ordered by hash
+/// for a stable result.
+#[cfg(any(test, feature = "inspection"))]
+pub(crate) async fn rejected_integrated_op_hashes<'e, E>(executor: E) -> sqlx::Result<Vec<Vec<u8>>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let rows: Vec<(Vec<u8>,)> = sqlx::query_as(
+        "SELECT hash FROM ChainOp \
+         WHERE locally_validated = 1 AND validation_status = 2 \
+         ORDER BY hash",
+    )
+    .fetch_all(executor)
+    .await?;
+    Ok(rows.into_iter().map(|(h,)| h).collect())
+}
+
+/// Total count of every op held in this DHT store: integrated `ChainOp` and
+/// `WarrantOp` plus their limbo counterparts.
+#[cfg(any(test, feature = "inspection"))]
+pub(crate) async fn count_all_ops<'e, E>(executor: E) -> sqlx::Result<i64>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let (n,): (i64,) = sqlx::query_as(
+        "SELECT
+            (SELECT COUNT(*) FROM ChainOp)
+            + (SELECT COUNT(*) FROM LimboChainOp)
+            + (SELECT COUNT(*) FROM WarrantOp)
+            + (SELECT COUNT(*) FROM LimboWarrantOp)",
+    )
+    .fetch_one(executor)
+    .await?;
+    Ok(n)
+}
+
+/// Whether the integrated chain op `op_hash` is flagged as requiring a
+/// validation receipt. Returns `false` when the op is not an integrated
+/// chain op.
+#[cfg(any(test, feature = "inspection"))]
+pub(crate) async fn op_requires_receipt<'e, E>(
+    executor: E,
+    op_hash: &DhtOpHash,
+) -> sqlx::Result<bool>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let row: Option<(bool,)> = sqlx::query_as("SELECT require_receipt FROM ChainOp WHERE hash = ?")
+        .bind(op_hash.get_raw_36())
+        .fetch_optional(executor)
+        .await?;
+    Ok(row.map(|(b,)| b).unwrap_or(false))
+}
+
+/// Whether `op_hash` is present in the limbo (not-yet-integrated) chain ops.
+#[cfg(any(test, feature = "inspection"))]
+pub(crate) async fn limbo_op_exists<'e, E>(executor: E, op_hash: &DhtOpHash) -> sqlx::Result<bool>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let (b,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM LimboChainOp WHERE hash = ?)")
+        .bind(op_hash.get_raw_36())
+        .fetch_one(executor)
+        .await?;
+    Ok(b)
+}
+
+/// Hashes of limbo chain ops flagged as requiring a validation receipt.
+/// Ordered by hash for a stable result.
+#[cfg(any(test, feature = "inspection"))]
+pub(crate) async fn limbo_op_hashes_requiring_receipt<'e, E>(
+    executor: E,
+) -> sqlx::Result<Vec<Vec<u8>>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let rows: Vec<(Vec<u8>,)> =
+        sqlx::query_as("SELECT hash FROM LimboChainOp WHERE require_receipt = 1 ORDER BY hash")
+            .fetch_all(executor)
+            .await?;
+    Ok(rows.into_iter().map(|(h,)| h).collect())
+}
+
+/// Hashes of integrated chain ops with the given DHT `basis`. Ordered by hash
+/// for a stable result.
+#[cfg(any(test, feature = "inspection"))]
+pub(crate) async fn get_ops_at_basis<'e, E>(
+    executor: E,
+    basis: &AnyLinkableHash,
+) -> sqlx::Result<Vec<Vec<u8>>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let rows: Vec<(Vec<u8>,)> = sqlx::query_as(
+        "SELECT hash FROM ChainOp WHERE basis_hash = ? AND locally_validated = 1 ORDER BY hash",
+    )
+    .bind(basis.get_raw_36())
+    .fetch_all(executor)
+    .await?;
+    Ok(rows.into_iter().map(|(h,)| h).collect())
+}
+
+/// Count of rows in the public `Entry` table (private entries live in
+/// `PrivateEntry` and are not counted here).
+#[cfg(any(test, feature = "inspection"))]
+pub(crate) async fn count_entries<'e, E>(executor: E) -> sqlx::Result<i64>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let (n,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM Entry")
+        .fetch_one(executor)
+        .await?;
+    Ok(n)
 }

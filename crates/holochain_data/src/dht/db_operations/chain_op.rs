@@ -1,6 +1,6 @@
 //! `DbRead<Dht>` / `DbWrite<Dht>` API for the `ChainOp` table.
 
-use super::super::inner::chain_op::{self, InsertChainOp, PendingReceiptRow};
+use super::super::inner::chain_op::{self, InsertChainOp, OpLocationRow, PendingReceiptRow};
 use crate::handles::{DbRead, DbWrite};
 use crate::kind::Dht;
 use crate::models::dht::ChainOpRow;
@@ -35,6 +35,11 @@ impl DbRead<Dht> {
 
     pub async fn get_chain_ops_by_basis(&self, basis: AnyDhtHash) -> sqlx::Result<Vec<ChainOpRow>> {
         chain_op::get_chain_ops_by_basis(self.pool(), basis).await
+    }
+
+    /// `(hash, basis_hash, storage_center_loc)` for every integrated chain op.
+    pub async fn integrated_op_locations(&self) -> sqlx::Result<Vec<OpLocationRow>> {
+        chain_op::integrated_op_locations(self.pool()).await
     }
 
     pub async fn get_chain_ops_for_action(

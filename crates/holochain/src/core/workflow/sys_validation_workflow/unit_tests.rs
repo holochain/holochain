@@ -368,6 +368,7 @@ async fn validate_valid_warrant_with_cached_dependency() {
 
     let status = test_case
         .get_warrant_validation_outcome(warrant_op_hash)
+        .await
         .unwrap();
 
     assert!(
@@ -453,6 +454,7 @@ async fn validate_valid_warrant_with_fetched_dependency() {
 
     let status = test_case
         .get_warrant_validation_outcome(warrant_op_hash)
+        .await
         .unwrap();
 
     assert!(
@@ -522,20 +524,28 @@ async fn reject_invalid_warrant() {
     let work_complete = test_case.run().await;
     assert!(matches!(work_complete, WorkComplete::Incomplete(_)));
 
-    // Check that the dependency got sys validated
-    let (stage, state) = holochain_state::validation_db::get_dht_op_validation_state(
-        &test_case.dht_db_handle().into(),
-        valid_action.as_hash().clone(),
-        holochain_zome_types::op::ChainOpType::StoreRecord,
-    )
-    .await
-    .unwrap()
-    .unwrap();
-    assert!(matches!(
-        stage,
-        Some(holochain_state::validation_db::ValidationStage::SysValidated)
-    ));
-    assert!(state.is_none());
+    // Check that the dependency got sys validated: it should no longer be
+    // pending sys-validation in the DHT store, and must not yet carry a
+    // terminal (app/integration) outcome.
+    let dht_store = &test_case.test_space.space.dht_store;
+    let pending = dht_store
+        .as_read()
+        .ops_pending_sys_validation(100)
+        .await
+        .unwrap();
+    assert!(
+        !pending.iter().any(|op| op.as_hash() == &valid_op_hash),
+        "dependency op should no longer be pending sys-validation"
+    );
+    assert!(dht_store
+        .as_read()
+        .op_validation_status(
+            valid_action.as_hash(),
+            holochain_zome_types::op::ChainOpType::StoreRecord,
+        )
+        .await
+        .unwrap()
+        .is_none());
 
     // Mark the sys-validated dependency as valid in the DHT store (this test
     // can't run the app-validation + integration workflows), so the warrant-
@@ -547,6 +557,7 @@ async fn reject_invalid_warrant() {
 
     let status = test_case
         .get_warrant_validation_outcome(warrant_op_hash)
+        .await
         .unwrap();
 
     assert!(
@@ -620,6 +631,7 @@ async fn validate_warrant_with_validated_dependency() {
     // Get the warrant validation outcome
     let status = test_case
         .get_warrant_validation_outcome(warrant_op_hash)
+        .await
         .unwrap();
 
     assert!(
@@ -692,6 +704,7 @@ async fn avoid_duplicate_warrant() {
     // Get the warrant validation outcome
     let status = test_case
         .get_warrant_validation_outcome(warrant_op_hash)
+        .await
         .unwrap();
 
     assert!(
@@ -721,7 +734,11 @@ async fn avoid_duplicate_warrant() {
     );
 
     let dht_warrants = test_case
-        .get_authored_warrants(&test_case.dht_db_handle(), other_warrant_agent.clone())
+        .test_space
+        .space
+        .dht_store
+        .as_read()
+        .warrants_by_author(other_warrant_agent.clone())
         .await
         .unwrap();
     assert_eq!(
@@ -732,7 +749,11 @@ async fn avoid_duplicate_warrant() {
 
     // Check that the original warrant is still present
     let dht_warrants = test_case
-        .get_authored_warrants(&test_case.dht_db_handle(), warrant_agent.clone())
+        .test_space
+        .space
+        .dht_store
+        .as_read()
+        .warrants_by_author(warrant_agent.clone())
         .await
         .unwrap();
     assert_eq!(
@@ -783,6 +804,8 @@ impl TestCase {
         self.dna_hash.hash.clone()
     }
 
+    // #5370: legacy DhtOp test accessor now unused; retire with DbKindDht.
+    #[allow(dead_code)]
     fn dht_db_handle(&self) -> DbWrite<DbKindDht> {
         self.test_space.space.dht_db.clone()
     }
@@ -886,7 +909,7 @@ impl TestCase {
         self.test_space
             .space
             .dht_store
-            .record_incoming_ops(vec![op_hashed])
+            .record_incoming_ops(vec![(op_hashed, false)])
             .await
             .unwrap();
 
@@ -1025,35 +1048,18 @@ impl TestCase {
         .is_some());
     }
 
-    fn get_warrant_validation_outcome(
+    async fn get_warrant_validation_outcome(
         &self,
         warrant_op_hash: DhtOpHash,
     ) -> holochain_state::prelude::StateQueryResult<
         Option<holochain_zome_types::prelude::ValidationStatus>,
     > {
-        self.dht_db_handle().test_read(
-            move |txn| -> holochain_state::prelude::StateQueryResult<
-                Option<holochain_zome_types::prelude::ValidationStatus>,
-            > {
-                let status = txn.query_row(
-                    r#"
-            SELECT
-              DhtOp.validation_status
-            FROM
-              DhtOp
-              JOIN Warrant ON DhtOp.action_hash = Warrant.hash
-            WHERE
-              DhtOp.hash = :hash
-            "#,
-                    rusqlite::named_params! {
-                        ":hash": &warrant_op_hash,
-                    },
-                    |row| row.get::<_, Option<holochain_zome_types::prelude::ValidationStatus>>(0),
-                )?;
-
-                Ok(status)
-            },
-        )
+        self.test_space
+            .space
+            .dht_store
+            .as_read()
+            .warrant_validation_status(&warrant_op_hash)
+            .await
     }
 
     async fn get_authored_warrants<T: DbKindT>(

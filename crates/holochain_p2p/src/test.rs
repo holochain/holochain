@@ -17,7 +17,7 @@ use kitsune2_api::GossipStateSummary;
 use kitsune2_api::GossipStateSummaryRequest;
 use kitsune2_api::{
     Bootstrap, BootstrapFactory, Builder, Config, DhtArc, DynBootstrap, DynFetch, DynPeerStore,
-    DynPublish, DynTransport, K2Result, OpId, Publish, PublishFactory, SpaceId, Url,
+    DynPublish, DynTransport, K2Result, Publish, PublishFactory, PublishOp, SpaceId, Url,
 };
 use std::collections::HashMap;
 
@@ -84,7 +84,7 @@ impl GossipFactory for NoopGossipFactory {
 pub struct NoopPublish;
 
 impl Publish for NoopPublish {
-    fn publish_ops(&self, _op_ids: Vec<OpId>, _target: Url) -> BoxFut<'_, K2Result<()>> {
+    fn publish_ops(&self, _ops: Vec<PublishOp>, _target: Url) -> BoxFut<'_, K2Result<()>> {
         Box::pin(async { Ok(()) })
     }
 

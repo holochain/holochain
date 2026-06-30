@@ -49,6 +49,7 @@ pub async fn call_zome_workflow(
     args: CallZomeWorkflowArgs,
     trigger_validate_dht_ops: TriggerSender,
     trigger_integrate_dht_ops: TriggerSender,
+    trigger_publish_dht_ops: TriggerSender,
     trigger_countersigning: TriggerSender,
 ) -> WorkflowResult<ZomeCallResult> {
     let coordinator_zome = args
@@ -103,9 +104,18 @@ pub async fn call_zome_workflow(
                             }
                         }
                         None => {
-                            // Newly created data must be integrated.
-                            // Publishing will be triggered after integration completes.
+                            // Newly authored data is integrated directly at
+                            // flush, so it is ready to publish immediately.
+                            // Trigger integration (for any dependent ops) and
+                            // publish directly.
                             trigger_integrate_dht_ops.trigger(&"call_zome_workflow");
+                            trigger_publish_dht_ops.trigger(&"call_zome_workflow");
+                            // Authored ops integrate at flush, bypassing the
+                            // integration workflow, so record their integration
+                            // metrics here.
+                            crate::core::metrics::record_authored_op_integration(
+                                &network.dna_hash(),
+                            );
                         }
                     }
 

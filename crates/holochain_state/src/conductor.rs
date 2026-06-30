@@ -10,7 +10,9 @@ use holo_hash::AgentPubKey;
 use holochain_data::conductor::{AppInterfaceModel, Block, BlockTargetId, Nonce256Bits};
 use holochain_data::kind::Conductor;
 use holochain_data::{TxRead, TxWrite};
-use holochain_types::prelude::{AppStatus, InstalledAppCommon, Timestamp};
+use holochain_types::prelude::{
+    AppStatus, InitProperties, InitPropertiesMap, InstalledAppCommon, Timestamp,
+};
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -99,6 +101,15 @@ impl ConductorStore<holochain_data::DbRead<Conductor>> {
         Ok(self.db.get_installed_app(app_id).await?)
     }
 
+    /// Get the init properties for a role of an installed app.
+    pub async fn get_init_properties(
+        &self,
+        app_id: &str,
+        role_name: &str,
+    ) -> StateQueryResult<Option<InitProperties>> {
+        Ok(self.db.get_init_properties(app_id, role_name).await?)
+    }
+
     /// Get all installed apps.
     pub async fn get_all_installed_apps(
         &self,
@@ -155,7 +166,9 @@ impl ConductorStore<holochain_data::DbRead<Conductor>> {
 }
 
 impl ConductorStore<holochain_data::DbWrite<Conductor>> {
-    /// Atomically update the persisted conductor state.
+    /// Atomically update the persisted conductor state, optionally writing
+    /// `init_properties` rows for `app_id` in the same transaction.
+    /// When `init_properties` is empty the `app_id` is not used.
     ///
     /// Loads the current snapshot (if any), applies `f`, and saves the
     /// result, all within a single database transaction. An internal
@@ -165,7 +178,12 @@ impl ConductorStore<holochain_data::DbWrite<Conductor>> {
     /// The closure receives `None` when the conductor has no persisted
     /// state yet (the tag is unset); it must produce a new snapshot to
     /// persist.
-    pub async fn update_state<F, O, E>(&self, f: F) -> Result<O, E>
+    pub async fn update_state<F, O, E>(
+        &self,
+        f: F,
+        app_id: &str,
+        init_properties: &InitPropertiesMap,
+    ) -> Result<O, E>
     where
         F: FnOnce(Option<ConductorStateSnapshot>) -> Result<(ConductorStateSnapshot, O), E>,
         E: From<StateMutationError>,
@@ -179,6 +197,11 @@ impl ConductorStore<holochain_data::DbWrite<Conductor>> {
         save_snapshot_in_tx(&mut tx, &new_snapshot)
             .await
             .map_err(StateMutationError::from)?;
+        for (role_name, properties) in init_properties {
+            tx.put_init_properties(app_id, role_name.as_str(), properties)
+                .await
+                .map_err(StateMutationError::from)?;
+        }
         tx.commit().await.map_err(StateMutationError::from)?;
         Ok(output)
     }
@@ -197,6 +220,28 @@ impl ConductorStore<holochain_data::DbWrite<Conductor>> {
     /// Insert a block into the database.
     pub async fn block(&self, input: Block) -> StateMutationResult<()> {
         Ok(self.db.block(input).await?)
+    }
+
+    /// Insert or update the init properties for a role of an installed app.
+    pub async fn put_init_properties(
+        &self,
+        app_id: &str,
+        role_name: &str,
+        properties: &InitProperties,
+    ) -> StateMutationResult<()> {
+        Ok(self
+            .db
+            .put_init_properties(app_id, role_name, properties)
+            .await?)
+    }
+
+    /// Delete the init properties for a role of an installed app.
+    pub async fn delete_init_properties(
+        &self,
+        app_id: &str,
+        role_name: &str,
+    ) -> StateMutationResult<()> {
+        Ok(self.db.delete_init_properties(app_id, role_name).await?)
     }
 
     /// Downgrade this writable store to a read-only store.
@@ -320,6 +365,32 @@ async fn save_snapshot_in_tx(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use holochain_serialized_bytes::{SerializedBytes, UnsafeBytes};
+    use holochain_types::prelude::{
+        AppManifest, AppManifestV0, AppRoleAssignment, AppStatus, DisabledAppReason, RoleName,
+    };
+
+    fn test_init_props(bytes: Vec<u8>) -> InitProperties {
+        InitProperties(SerializedBytes::from(UnsafeBytes::from(bytes)))
+    }
+
+    fn make_test_app(app_id: &str) -> InstalledAppCommon {
+        InstalledAppCommon::new(
+            app_id,
+            AgentPubKey::from_raw_36(vec![0u8; 36]),
+            std::iter::empty::<(RoleName, AppRoleAssignment)>(),
+            AppManifest::V0(AppManifestV0 {
+                name: app_id.to_string(),
+                description: None,
+                roles: vec![],
+                allow_deferred_memproofs: false,
+                bootstrap_url: None,
+                relay_url: None,
+            }),
+            Timestamp::now(),
+        )
+        .unwrap()
+    }
 
     #[tokio::test]
     async fn load_state_returns_none_when_unset() {
@@ -333,17 +404,21 @@ mod tests {
 
         // Initialize with a tag
         store
-            .update_state(|snap| -> StateMutationResult<_> {
-                assert!(snap.is_none());
-                Ok((
-                    ConductorStateSnapshot {
-                        tag: "conductor-A".to_string(),
-                        installed_apps: vec![],
-                        app_interfaces: vec![],
-                    },
-                    (),
-                ))
-            })
+            .update_state(
+                |snap| -> StateMutationResult<_> {
+                    assert!(snap.is_none());
+                    Ok((
+                        ConductorStateSnapshot {
+                            tag: "conductor-A".to_string(),
+                            installed_apps: vec![],
+                            app_interfaces: vec![],
+                        },
+                        (),
+                    ))
+                },
+                "",
+                &InitPropertiesMap::new(),
+            )
             .await
             .unwrap();
 
@@ -369,33 +444,41 @@ mod tests {
 
         // Save two interfaces.
         store
-            .update_state(|_| -> StateMutationResult<_> {
-                Ok((
-                    ConductorStateSnapshot {
-                        tag: "t".to_string(),
-                        installed_apps: vec![],
-                        app_interfaces: vec![(iface(1111), vec![]), (iface(2222), vec![])],
-                    },
-                    (),
-                ))
-            })
+            .update_state(
+                |_| -> StateMutationResult<_> {
+                    Ok((
+                        ConductorStateSnapshot {
+                            tag: "t".to_string(),
+                            installed_apps: vec![],
+                            app_interfaces: vec![(iface(1111), vec![]), (iface(2222), vec![])],
+                        },
+                        (),
+                    ))
+                },
+                "",
+                &InitPropertiesMap::new(),
+            )
             .await
             .unwrap();
 
         // Replace with just one interface.
         store
-            .update_state(|snap| -> StateMutationResult<_> {
-                let snap = snap.unwrap();
-                assert_eq!(snap.app_interfaces.len(), 2);
-                Ok((
-                    ConductorStateSnapshot {
-                        tag: snap.tag,
-                        installed_apps: snap.installed_apps,
-                        app_interfaces: vec![(iface(1111), vec![])],
-                    },
-                    (),
-                ))
-            })
+            .update_state(
+                |snap| -> StateMutationResult<_> {
+                    let snap = snap.unwrap();
+                    assert_eq!(snap.app_interfaces.len(), 2);
+                    Ok((
+                        ConductorStateSnapshot {
+                            tag: snap.tag,
+                            installed_apps: snap.installed_apps,
+                            app_interfaces: vec![(iface(1111), vec![])],
+                        },
+                        (),
+                    ))
+                },
+                "",
+                &InitPropertiesMap::new(),
+            )
             .await
             .unwrap();
 
@@ -410,16 +493,20 @@ mod tests {
 
         // Seed a known state.
         store
-            .update_state(|_| -> StateMutationResult<_> {
-                Ok((
-                    ConductorStateSnapshot {
-                        tag: "seed".to_string(),
-                        installed_apps: vec![],
-                        app_interfaces: vec![],
-                    },
-                    (),
-                ))
-            })
+            .update_state(
+                |_| -> StateMutationResult<_> {
+                    Ok((
+                        ConductorStateSnapshot {
+                            tag: "seed".to_string(),
+                            installed_apps: vec![],
+                            app_interfaces: vec![],
+                        },
+                        (),
+                    ))
+                },
+                "",
+                &InitPropertiesMap::new(),
+            )
             .await
             .unwrap();
 
@@ -432,7 +519,11 @@ mod tests {
             }
         }
         let result: Result<(), Boom> = store
-            .update_state(|_| -> Result<(ConductorStateSnapshot, ()), Boom> { Err(Boom) })
+            .update_state(
+                |_| -> Result<(ConductorStateSnapshot, ()), Boom> { Err(Boom) },
+                "",
+                &InitPropertiesMap::new(),
+            )
             .await;
         assert!(result.is_err());
 
@@ -454,23 +545,27 @@ mod tests {
             let store = store.clone();
             joins.push(tokio::spawn(async move {
                 store
-                    .update_state(move |snap| -> StateMutationResult<_> {
-                        let mut snap = snap.unwrap_or_default();
-                        if snap.tag.is_empty() {
-                            snap.tag = "t".to_string();
-                        }
-                        let model = AppInterfaceModel {
-                            port,
-                            id: String::new(),
-                            driver_type: "websocket".to_string(),
-                            websocket_port: Some(port),
-                            danger_bind_addr: None,
-                            allowed_origins_blob: None,
-                            installed_app_id: None,
-                        };
-                        snap.app_interfaces.push((model, vec![]));
-                        Ok((snap, ()))
-                    })
+                    .update_state(
+                        move |snap| -> StateMutationResult<_> {
+                            let mut snap = snap.unwrap_or_default();
+                            if snap.tag.is_empty() {
+                                snap.tag = "t".to_string();
+                            }
+                            let model = AppInterfaceModel {
+                                port,
+                                id: String::new(),
+                                driver_type: "websocket".to_string(),
+                                websocket_port: Some(port),
+                                danger_bind_addr: None,
+                                allowed_origins_blob: None,
+                                installed_app_id: None,
+                            };
+                            snap.app_interfaces.push((model, vec![]));
+                            Ok((snap, ()))
+                        },
+                        "",
+                        &InitPropertiesMap::new(),
+                    )
                     .await
                     .unwrap();
             }));
@@ -493,21 +588,130 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn update_state_writes_init_properties_in_same_transaction() {
+        let store = ConductorStore::new_test().await.unwrap();
+
+        let app_id = "my-app";
+        let role = "my-role";
+        let props: InitPropertiesMap = [(role.to_string(), test_init_props(vec![1, 2, 3]))].into();
+
+        store
+            .update_state(
+                move |_| -> StateMutationResult<_> {
+                    Ok((
+                        ConductorStateSnapshot {
+                            tag: "t".to_string(),
+                            installed_apps: vec![(
+                                app_id.to_string(),
+                                make_test_app(app_id),
+                                AppStatus::Disabled(DisabledAppReason::NeverStarted),
+                            )],
+                            app_interfaces: vec![],
+                        },
+                        (),
+                    ))
+                },
+                app_id,
+                &props,
+            )
+            .await
+            .unwrap();
+
+        assert!(
+            store
+                .as_read()
+                .get_installed_app(app_id)
+                .await
+                .unwrap()
+                .is_some(),
+            "app row should be present"
+        );
+        assert_eq!(
+            store
+                .as_read()
+                .get_init_properties(app_id, role)
+                .await
+                .unwrap(),
+            Some(test_init_props(vec![1, 2, 3])),
+            "init_properties should be present"
+        );
+    }
+
+    #[tokio::test]
+    async fn update_state_init_properties_failure_rolls_back_state_change() {
+        let store = ConductorStore::new_test().await.unwrap();
+
+        // Seed an initial state.
+        store
+            .update_state(
+                |_| -> StateMutationResult<_> {
+                    Ok((
+                        ConductorStateSnapshot {
+                            tag: "initial".to_string(),
+                            installed_apps: vec![],
+                            app_interfaces: vec![],
+                        },
+                        (),
+                    ))
+                },
+                "",
+                &InitPropertiesMap::new(),
+            )
+            .await
+            .unwrap();
+
+        // Attempt a state change that also tries to write init_properties for an
+        // app that will not exist after the snapshot is saved. The FK violation
+        // must roll back the entire transaction, including the state change.
+        let props: InitPropertiesMap =
+            [("role".to_string(), test_init_props(vec![4, 5, 6]))].into();
+
+        let result: StateMutationResult<()> = store
+            .update_state(
+                |_| -> StateMutationResult<_> {
+                    Ok((
+                        ConductorStateSnapshot {
+                            tag: "changed".to_string(),
+                            installed_apps: vec![],
+                            app_interfaces: vec![],
+                        },
+                        (),
+                    ))
+                },
+                "nonexistent-app",
+                &props,
+            )
+            .await;
+
+        assert!(result.is_err(), "FK violation should return an error");
+
+        let loaded = store.as_read().load_state().await.unwrap().unwrap();
+        assert_eq!(
+            loaded.tag, "initial",
+            "state change should have been rolled back"
+        );
+    }
+
+    #[tokio::test]
     async fn conductor_tag_roundtrip() {
         let store = ConductorStore::new_test().await.unwrap();
         assert_eq!(store.as_read().get_conductor_tag().await.unwrap(), None);
 
         store
-            .update_state(|_| -> StateMutationResult<_> {
-                Ok((
-                    ConductorStateSnapshot {
-                        tag: "hello".to_string(),
-                        installed_apps: vec![],
-                        app_interfaces: vec![],
-                    },
-                    (),
-                ))
-            })
+            .update_state(
+                |_| -> StateMutationResult<_> {
+                    Ok((
+                        ConductorStateSnapshot {
+                            tag: "hello".to_string(),
+                            installed_apps: vec![],
+                            app_interfaces: vec![],
+                        },
+                        (),
+                    ))
+                },
+                "",
+                &InitPropertiesMap::new(),
+            )
             .await
             .unwrap();
 

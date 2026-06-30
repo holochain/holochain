@@ -124,7 +124,11 @@ mod tests {
     ) -> ConductorResult<ConductorState> {
         let snapshot = state_to_snapshot(&state)?;
         store
-            .update_state(|_| -> ConductorResult<_> { Ok((snapshot, ())) })
+            .update_state(
+                |_| -> ConductorResult<_> { Ok((snapshot, ())) },
+                "",
+                &InitPropertiesMap::new(),
+            )
             .await?;
 
         let loaded_snapshot = store.as_read().load_state().await?.unwrap();

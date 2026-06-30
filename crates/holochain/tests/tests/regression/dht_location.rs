@@ -3,7 +3,6 @@ use holochain::sweettest::{
     await_consistency, SweetConductor, SweetConductorBatch, SweetDnaFile, SweetInlineZomes,
 };
 use holochain::test_utils::inline_zomes::simple_crud_zome;
-use holochain_state::prelude::StateQueryResult;
 use std::collections::HashSet;
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -52,8 +51,8 @@ async fn dht_location_consistency() {
         .await
         .unwrap();
 
-    let alice_info = get_location_info_from(&conductors[0], alice.dna_hash().clone());
-    let bob_info = get_location_info_from(&conductors[1], bob.dna_hash().clone());
+    let alice_info = get_location_info_from(&conductors[0], alice.dna_hash().clone()).await;
+    let bob_info = get_location_info_from(&conductors[1], bob.dna_hash().clone()).await;
 
     // Demonstrates that the hash/location calculations are consistent between authoring data
     // locally and reconstructing it after syncing over the network.
@@ -69,41 +68,25 @@ async fn dht_location_consistency() {
     }
 }
 
-fn get_location_info_from(
+async fn get_location_info_from(
     conductor: &SweetConductor,
     dna_hash: DnaHash,
 ) -> HashSet<FoundLocationInfo> {
-    let dht = conductor.get_dht_db(&dna_hash).unwrap();
-    dht.test_read(|txn| -> StateQueryResult<HashSet<FoundLocationInfo>> {
-        let mut stmt = txn.prepare(
-            r#"
-        SELECT
-          hash,
-          basis_hash,
-          storage_center_loc
-        FROM
-          DhtOp
-        "#,
-        )?;
-
-        let mut out = HashSet::new();
-        let mut rows = stmt.query([])?;
-        while let Some(row) = rows.next()? {
-            let dht_op_hash = row.get::<_, DhtOpHash>(0)?;
-            let op_basis = row.get::<_, OpBasis>(1)?;
-            let storage_center_loc = row.get::<_, u32>(2)?;
-
+    let dht_store = conductor.get_dht_store(&dna_hash).unwrap();
+    dht_store
+        .as_read()
+        .integrated_op_locations()
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|(dht_op_hash, op_basis, storage_center_loc)| {
             let op_id = dht_op_hash.to_located_k2_op_id(&op_basis);
-
-            out.insert(FoundLocationInfo {
+            FoundLocationInfo {
                 dht_op_hash,
                 op_basis,
                 storage_center_loc,
                 op_id,
-            });
-        }
-
-        Ok(out)
-    })
-    .unwrap()
+            }
+        })
+        .collect()
 }
