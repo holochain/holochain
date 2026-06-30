@@ -2924,8 +2924,6 @@ mod accessor_impls {
                     let mut stmt = txn
                         .prepare("DELETE FROM InitProperties WHERE app_id = ? AND role_name = ?")?;
 
-                    println!("Deleting init properties");
-
                     Ok(stmt.execute([&app_id, &role_name])?)
                 })
                 .await?;

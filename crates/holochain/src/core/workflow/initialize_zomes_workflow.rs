@@ -70,8 +70,6 @@ where
         // material to outlive the init callback. Do this before post-commit so cleanup is not
         // skipped if `send_post_commit` fails.
 
-        println!("Requesting deletion of init properties");
-
         conductor_handle
             .delete_init_properties_for_cell(&cell_id)
             .await
