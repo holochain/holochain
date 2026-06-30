@@ -2,12 +2,10 @@ use crate::chain_lock::ChainLock;
 // #5370: import kept (function still used by callers) pending DbKindDht retirement.
 #[allow(unused_imports)]
 use crate::integrate::authored_ops_to_dht_db;
-use crate::integrate::authored_ops_to_dht_db_without_check;
 use crate::prelude::*;
 use crate::query::chain_head::AuthoredChainHeadQuery;
 use crate::scratch::ScratchError;
 use crate::scratch::SyncScratchError;
-use crate::source_chain;
 use async_recursion::async_recursion;
 pub use error::*;
 use holo_hash::ActionHash;
@@ -1198,40 +1196,24 @@ pub async fn genesis(
     }
 
     // Clone the actions and agent entry for the new-DB write block.
-    // The originals are moved into the legacy authored write closure below.
+    // #5370: the originals are no longer moved into a legacy authored write
+    // (that write has been removed); the clones feed the store-mirror block
+    // below unchanged.
     let dna_action_for_new_db = dna_action.clone();
     let agent_validation_action_for_new_db = agent_validation_action.clone();
     let agent_action_for_new_db = agent_action.clone();
-    // `agent_entry` is `Option<Entry>` — clone before move.
+    // `agent_entry` is `Option<Entry>`; clone it for the store-mirror block.
     let agent_entry_for_new_db = agent_entry.clone();
     // Entry hash for the agent entry (AgentPubKey → EntryHash via Into).
     let agent_entry_hash: EntryHash = agent_pubkey.into();
 
-    let mut ops_to_integrate = Vec::new();
-
-    let ops_to_integrate = authored
-        .write_async(move |txn| {
-            ops_to_integrate.extend(source_chain::put_raw(txn, dna_action, dna_ops, None)?);
-            ops_to_integrate.extend(source_chain::put_raw(
-                txn,
-                agent_validation_action,
-                avh_ops,
-                None,
-            )?);
-            ops_to_integrate.extend(source_chain::put_raw(
-                txn,
-                agent_action,
-                agent_ops,
-                agent_entry,
-            )?);
-            SourceChainResult::Ok(ops_to_integrate)
-        })
-        .await?;
-
-    // We don't check for authorityship here because during genesis we have no opportunity
-    // to discover that the network is sharded and that we should not be an authority for
-    // these items, so we assume we are an authority.
-    authored_ops_to_dht_db_without_check(ops_to_integrate, authored.clone().into(), dht_db).await?;
+    // #5370: the legacy authored-DB genesis write has been removed. The genesis
+    // actions, the agent entry and their ops are now written solely to the
+    // merged DhtStore in the block below. `put_raw`,
+    // `authored_ops_to_dht_db_without_check` and the `authored` / `dht_db`
+    // inputs remain dead pending DbKindAuthored / DbKindDht retirement.
+    let _ = &authored;
+    let _ = &dht_db;
 
     // Write the genesis actions, entries and ops to the new holochain_data DHT DB.
     {
@@ -1314,6 +1296,8 @@ pub async fn genesis(
 
 /// Should only be used to put items into the Authored DB.
 /// Hash transfer fields (source, transfer_method, transfer_time) are not set.
+// #5370: production-unused after the genesis authored-DB write was removed;
+// retained pending DbKindAuthored retirement.
 pub fn put_raw(
     txn: &mut Transaction,
     shh: SignedActionHashed,
@@ -1990,7 +1974,7 @@ mod tests {
         // to access carol's chain
         {
             let extra_dht_store = crate::test_utils::test_dht_store(fake_dna_hash(1)).await;
-            source_chain::genesis(
+            genesis(
                 db.clone(),
                 dht_db.to_db(),
                 extra_dht_store.clone(),
@@ -2120,7 +2104,7 @@ mod tests {
         {
             {
                 let extra_dht_store = crate::test_utils::test_dht_store(fake_dna_hash(1)).await;
-                source_chain::genesis(
+                genesis(
                     db.clone(),
                     dht_db.to_db(),
                     extra_dht_store.clone(),
@@ -2347,6 +2331,54 @@ mod tests {
         assert_eq!(res.len(), 5);
         assert_eq!(*res[3].action_address(), h1);
         assert_eq!(*res[4].action_address(), h2);
+
+        Ok(())
+    }
+
+    /// #5370: genesis writes to the merged store only (the legacy authored-DB
+    /// write was removed). After `genesis`, the store reports the author has
+    /// genesis, the chain head is the seq-2 AgentId `Create`, and the head
+    /// record is retrievable from the store.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn genesis_writes_to_merged_store() -> SourceChainResult<()> {
+        holochain_trace::test_run();
+        let authored = test_authored_db();
+        let dht_db = test_dht_db();
+        let keystore = test_keystore();
+        let dna_hash = fixt!(DnaHash);
+        let dht_store = crate::test_utils::test_dht_store(dna_hash.clone()).await;
+        let author = keystore.new_sign_keypair_random().await.unwrap();
+
+        genesis(
+            authored.to_db(),
+            dht_db.to_db(),
+            dht_store.clone(),
+            keystore.clone(),
+            dna_hash,
+            author.clone(),
+            None,
+        )
+        .await
+        .unwrap();
+
+        let store = dht_store.as_read();
+
+        // `has_genesis` requires all three genesis actions to be present.
+        assert!(store.has_genesis(&author).await?);
+
+        // The chain head is the seq-2 AgentId `Create`.
+        let head = store
+            .chain_head_for_author(&author)
+            .await?
+            .expect("chain head present after genesis");
+        assert_eq!(head.seq, 2);
+
+        let head_record = store
+            .retrieve_record(&head.action, Some(&author))
+            .await?
+            .expect("head record present in store");
+        assert_eq!(head_record.action().action_seq(), 2);
+        assert!(matches!(head_record.action(), Action::Create(_)));
 
         Ok(())
     }
