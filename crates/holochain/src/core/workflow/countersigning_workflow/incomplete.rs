@@ -29,9 +29,6 @@ pub async fn inner_countersigning_session_incomplete(
     author: AgentPubKey,
     preflight_request: PreflightRequest,
 ) -> WorkflowResult<(SessionCompletionDecision, Vec<SessionResolutionOutcome>)> {
-    // #5370: kept to clean the legacy authored DB in `abandon_session`.
-    let authored_db = space.get_or_create_authored_db(author.clone())?;
-
     // Read the current countersigning session from the merged store (#5370).
     let maybe_current_session = space
         .dht_store
@@ -320,7 +317,6 @@ pub async fn inner_countersigning_session_incomplete(
         // Note that for a two party session, this just means one other agent!
         tracing::debug!("All other agents have abandoned the countersigning session, abandoning session for agent {:?}", author);
         countersigning_workflow::abandon_session(
-            authored_db,
             space.dht_store.clone(),
             author.clone(),
             cs_record.action().clone(),

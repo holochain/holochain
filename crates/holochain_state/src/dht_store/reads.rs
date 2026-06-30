@@ -94,6 +94,23 @@ impl DhtStore<DbRead<Dht>> {
             .collect())
     }
 
+    /// Op hashes of the integrated chain ops for `action_hash`.
+    ///
+    /// #5370: backs the countersigning success path's withhold-publish clear,
+    /// replacing the legacy authored-DB `get_countersigning_op_hashes` query.
+    pub async fn chain_op_hashes_for_action(
+        &self,
+        action_hash: holo_hash::ActionHash,
+    ) -> StateQueryResult<Vec<DhtOpHash>> {
+        Ok(self
+            .db()
+            .get_chain_ops_for_action(action_hash)
+            .await?
+            .into_iter()
+            .map(|r| DhtOpHash::from_raw_36(r.hash))
+            .collect())
+    }
+
     /// Total count of every op (integrated and limbo) held in the DHT store.
     #[cfg(any(test, feature = "inspection"))]
     pub async fn count_all_ops(&self) -> StateQueryResult<u64> {

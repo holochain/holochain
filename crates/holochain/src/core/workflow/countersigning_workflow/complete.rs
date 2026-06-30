@@ -2,16 +2,14 @@ use crate::conductor::space::Space;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::weigh_placeholder;
 use crate::core::workflow::{WorkflowError, WorkflowResult};
-use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, EntryHash};
+use holo_hash::{ActionHash, AgentPubKey, EntryHash};
 use holochain_keystore::{AgentPubKeyExt, MetaLairClient};
 use holochain_p2p::DynHolochainP2pDna;
-use holochain_sqlite::error::DatabaseResult;
 use holochain_state::integrate::authored_ops_to_dht_db_without_check;
 use holochain_state::prelude::*;
 use holochain_timestamp::Timestamp;
 use holochain_types::dht_op::ChainOp;
 use holochain_zome_types::prelude::SignedAction;
-use rusqlite::{named_params, Transaction};
 
 pub(crate) async fn inner_countersigning_session_complete(
     space: Space,
@@ -205,17 +203,13 @@ async fn apply_success_state_changes(
     let dht_db = space.dht_db.clone();
 
     // Load the op hashes for this session so that we can publish them. #5370:
-    // the session's withhold-publish flag is cleared on the merged store below
-    // via `clear_op_withhold_publishes`. The authored-DB withhold flag no longer
-    // needs clearing here: `remove_countersigning_session` now reads the store's
-    // `ChainOpPublish` to guard against removing a published session.
-    let this_cell_actions_op_basis_hashes = authored_db
-        .read_async({
-            let this_cells_action_hash = this_cells_action_hash.clone();
-            move |txn| -> SourceChainResult<Vec<DhtOpHash>> {
-                Ok(get_countersigning_op_hashes(txn, this_cells_action_hash)?)
-            }
-        })
+    // read the session's ops from the merged store (now the sole source-chain
+    // write) instead of the legacy authored DB. The session's withhold-publish
+    // flag is cleared on the merged store below via `clear_op_withhold_publishes`.
+    let this_cell_actions_op_basis_hashes = space
+        .dht_store
+        .as_read()
+        .chain_op_hashes_for_action(this_cells_action_hash)
         .await?;
 
     // All checks have passed so unlock the chain. #5370: the lock lives in the
@@ -227,10 +221,10 @@ async fn apply_success_state_changes(
         .await
         .map_err(WorkflowError::from)?;
 
-    // If all signatures are valid (above) and i signed then i must have
-    // validated it previously so i now agree that i authored it.
-    // TODO: perhaps this should be `authored_ops_to_dht_db`, i.e. the arc check should
-    //       be performed, because we may not be an authority for these ops
+    // #5370: legacy authored->dht_db integration. The source chain is no longer
+    // written to the authored DB, so this is now a no-op (the ops are not found
+    // in the authored DB) and remains only until the legacy DbKindDht reader is
+    // retired. The ops are already integrated in the merged store by flush.
     let hashes_for_new_db = this_cell_actions_op_basis_hashes.clone();
     authored_ops_to_dht_db_without_check(
         this_cell_actions_op_basis_hashes,
@@ -248,24 +242,6 @@ async fn apply_success_state_changes(
     integration_trigger.trigger(&"integrate countersigning_success");
 
     Ok(())
-}
-
-fn get_countersigning_op_hashes(
-    txn: &Transaction,
-    this_cells_action_hash: ActionHash,
-) -> DatabaseResult<Vec<DhtOpHash>> {
-    Ok(txn
-        .prepare("SELECT basis_hash, hash FROM DhtOp WHERE action_hash = :action_hash")?
-        .query_map(
-            named_params! {
-                ":action_hash": this_cells_action_hash
-            },
-            |row| {
-                let hash: DhtOpHash = row.get("hash")?;
-                Ok(hash)
-            },
-        )?
-        .collect::<Result<Vec<_>, _>>()?)
 }
 
 /// When the workflow has attempted to resolve a countersigning session but wasn't able to find a deterministic answer by querying peer state,
