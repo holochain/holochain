@@ -5,6 +5,7 @@ use crate::handles::{DbRead, DbWrite};
 use crate::kind::Dht;
 use holo_hash::{AgentPubKey, EntryHash};
 use holochain_integrity_types::entry::Entry;
+use std::collections::HashMap;
 
 impl DbWrite<Dht> {
     pub async fn insert_entry(&self, hash: &EntryHash, entry: &Entry) -> sqlx::Result<()> {
@@ -30,5 +31,17 @@ impl DbRead<Dht> {
         author: Option<&AgentPubKey>,
     ) -> sqlx::Result<Option<Entry>> {
         entry::get_entry(self.pool(), hash, author).await
+    }
+
+    /// Batch-reads entries by hash in a single query per chunk, keyed by entry
+    /// hash. Visibility matches [`get_entry`](Self::get_entry): public entries
+    /// always resolve, and `author = Some(_)` additionally surfaces that
+    /// author's private entries. Hashes with no entry are absent from the map.
+    pub async fn get_entries_by_hashes(
+        &self,
+        hashes: &[EntryHash],
+        author: Option<&AgentPubKey>,
+    ) -> sqlx::Result<HashMap<EntryHash, Entry>> {
+        entry::get_entries_by_hashes(self.pool(), hashes, author).await
     }
 }

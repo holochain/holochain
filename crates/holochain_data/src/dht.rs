@@ -215,6 +215,60 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn entry_batch_fetch_by_hashes() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let author = AgentPubKey::from_raw_36(vec![9u8; 36]);
+
+        // Two public entries and one private entry owned by `author`.
+        let (pub_hash_a, pub_entry_a) = sample_entry(20);
+        let (pub_hash_b, pub_entry_b) = sample_entry(21);
+        let (priv_hash, priv_entry) = sample_entry(22);
+        db.insert_entry(&pub_hash_a, &pub_entry_a).await.unwrap();
+        db.insert_entry(&pub_hash_b, &pub_entry_b).await.unwrap();
+        db.insert_private_entry(&priv_hash, &author, &priv_entry)
+            .await
+            .unwrap();
+
+        // A hash that was never inserted.
+        let missing_hash = EntryHash::from_raw_36(vec![99u8; 36]);
+
+        // With the owning author, the private entry resolves alongside the
+        // public ones; the missing hash is simply absent from the map.
+        let map = db
+            .as_ref()
+            .get_entries_by_hashes(
+                &[
+                    pub_hash_a.clone(),
+                    pub_hash_b.clone(),
+                    priv_hash.clone(),
+                    missing_hash.clone(),
+                ],
+                Some(&author),
+            )
+            .await
+            .unwrap();
+        assert_eq!(map.len(), 3);
+        assert_eq!(map.get(&pub_hash_a), Some(&pub_entry_a));
+        assert_eq!(map.get(&pub_hash_b), Some(&pub_entry_b));
+        assert_eq!(map.get(&priv_hash), Some(&priv_entry));
+        assert_eq!(map.get(&missing_hash), None);
+
+        // Without an author the private entry is excluded, public entries still
+        // resolve, and duplicate input hashes collapse to one map entry.
+        let map_public = db
+            .as_ref()
+            .get_entries_by_hashes(
+                &[pub_hash_a.clone(), pub_hash_a.clone(), priv_hash.clone()],
+                None,
+            )
+            .await
+            .unwrap();
+        assert_eq!(map_public.len(), 1);
+        assert_eq!(map_public.get(&pub_hash_a), Some(&pub_entry_a));
+        assert_eq!(map_public.get(&priv_hash), None);
+    }
+
     /// Verifies that a TxWrite bundling an Action + Entry insert can be rolled back
     /// and neither survives. Also exercises the Tx* wrapper methods.
     #[tokio::test]
