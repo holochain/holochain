@@ -12,9 +12,8 @@ use holochain::{
     },
     test_utils::retry_fn_until_timeout,
 };
-use holochain_sqlite::prelude::ReadAccess;
 use holochain_state::prelude::{insert_op_dht, set_validation_status, set_when_integrated};
-use holochain_state::query::{from_blob, CascadeTxnWrapper, StateQueryResult, Store};
+use holochain_state::query::{CascadeTxnWrapper, Store};
 use holochain_timestamp::Timestamp;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::prelude::WarrantOp;
@@ -23,7 +22,6 @@ use holochain_zome_types::prelude::{ChainIntegrityWarrant, ValidationStatus, War
 use holochain_zome_types::record::SignedAction;
 use holochain_zome_types::warrant::WarrantProof;
 use holochain_zome_types::Entry;
-use rusqlite::named_params;
 use serde::{Deserialize, Serialize};
 
 // Alice creates an invalid op and publishes it to Bob. Bob issues a warrant and
@@ -233,22 +231,17 @@ async fn author_of_invalid_warrant_is_blocked() {
     // Wait for Alice and Bob to sync.
     await_consistency([&alice, &bob]).await.unwrap();
 
-    let alice_authored_db = conductors[0]
-        .get_spaces()
-        .get_or_create_authored_db(dna_file.dna_hash(), alice.agent_pubkey().clone())
-        .unwrap();
-    let action = alice_authored_db
-        .read_async(move |txn| -> StateQueryResult<SignedAction> {
-            let action: Vec<u8> = txn.query_row(
-                "SELECT blob FROM Action WHERE hash = :hash",
-                named_params! {":hash": valid_action_hash},
-                |row| row.get(0),
-            )?;
-
-            from_blob(action)
-        })
+    // Fetch Alice's signed action from the merged store. The authored data now
+    // lives in the merged per-DNA store keyed by the action's author, so read it
+    // from there rather than the now-empty per-agent authored database.
+    let action: SignedAction = alice
+        .dht_store()
+        .as_read()
+        .retrieve_action(&valid_action_hash)
         .await
-        .unwrap();
+        .unwrap()
+        .expect("Alice's valid action should be in the merged store")
+        .into();
 
     // Now Bob needs to create a warrant against Alice's perfectly valid action.
     let warrant = Warrant::new(
