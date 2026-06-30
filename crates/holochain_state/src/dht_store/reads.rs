@@ -2237,6 +2237,61 @@ impl DhtStore<DbRead<Dht>> {
             published_ops_count,
         })
     }
+
+    /// Read the author's committed source-chain records from the merged store.
+    ///
+    /// Returns every action authored by `author`, in ascending chain-sequence
+    /// order, as a legacy [`Record`](holochain_zome_types::record::Record).
+    /// This is the committed-record source behind
+    /// [`SourceChain::query`](crate::source_chain::SourceChain::query): no
+    /// [`ChainQueryFilter`] filtering or fork disambiguation is applied here.
+    /// The caller overlays the scratch and then applies
+    /// [`ChainQueryFilter::filter_records`], which is the authoritative filter,
+    /// exactly as the legacy authored-DB query did (the SQL pre-filtering there
+    /// was only an optimisation over the same `filter_records`).
+    ///
+    /// Entry inclusion mirrors the legacy row mapper: an entry is attached only
+    /// when `include_entries` is set and the entry is either public or
+    /// `public_only` is `false`. A private entry is therefore redacted (`None`)
+    /// under `public_only`. The private entry itself is resolved via
+    /// `get_entry(.., Some(author))`, so an author always sees their own private
+    /// entries and never another agent's.
+    pub async fn source_chain_records(
+        &self,
+        author: &AgentPubKey,
+        include_entries: bool,
+        public_only: bool,
+    ) -> StateQueryResult<Vec<holochain_zome_types::record::Record>> {
+        use holochain_zome_types::dht_v2::to_legacy_signed_action;
+        use holochain_zome_types::prelude::EntryVisibility;
+
+        let v2_actions = self.db().get_actions_by_author(author.clone()).await?;
+
+        let mut records = Vec::with_capacity(v2_actions.len());
+        for v2_sah in &v2_actions {
+            let sah = to_legacy_signed_action(v2_sah);
+
+            let private_entry = sah
+                .action()
+                .entry_type()
+                .is_some_and(|e| *e.visibility() == EntryVisibility::Private);
+
+            let entry = if include_entries && (!private_entry || !public_only) {
+                match sah.action().entry_hash() {
+                    Some(entry_hash) => {
+                        self.db().get_entry(entry_hash.clone(), Some(author)).await?
+                    }
+                    None => None,
+                }
+            } else {
+                None
+            };
+
+            records.push(holochain_zome_types::record::Record::new(sah, entry));
+        }
+
+        Ok(records)
+    }
 }
 
 /// Whether `action`'s entry (if any) is declared private.
