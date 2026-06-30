@@ -328,15 +328,6 @@ impl SourceChain {
 
         let now = Timestamp::now();
 
-        // #5370: clone reused by the transitional authored scheduled-functions
-        // dual-write below, after the merged-store write consumes the original.
-        // The source chain itself is no longer written to the authored DB — the
-        // merged store is the sole source-chain write. Only scheduled functions
-        // are still dual-written, because the scheduling reader `fn_is_scheduled`
-        // still queries the authored DB. Remove once scheduling is migrated to
-        // the merged store. Cheap clone (`Vec<ScheduledFn>`).
-        let scheduled_fns_for_authored = scheduled_fns.clone();
-
         // Acquire the per-author chain write permit on the merged store and
         // perform the source-chain write under it, gated by an as-at check
         // against the store head. The permit serializes flushes for this
@@ -410,25 +401,6 @@ impl SourceChain {
                         head_info,
                     ));
                 }
-            }
-
-            // #5370: transitional authored scheduled-functions dual-write. The
-            // source chain (entries, actions, ops) is no longer written to the
-            // authored DB — the merged-store write below is the sole authority
-            // for it. Only scheduled functions are still written here, because
-            // the scheduling reader `fn_is_scheduled` still queries the authored
-            // DB. Remove this block once scheduling is migrated to the merged
-            // store.
-            {
-                let author = author.clone();
-                self.vault
-                    .write_async(move |txn| -> SourceChainResult<()> {
-                        for scheduled_fn in scheduled_fns_for_authored {
-                            schedule_fn(txn, author.as_ref(), scheduled_fn, None, now)?;
-                        }
-                        Ok(())
-                    })
-                    .await?;
             }
 
             // The authoritative source-chain write: entries, actions, ops and

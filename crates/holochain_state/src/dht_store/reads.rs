@@ -18,7 +18,7 @@ use holochain_types::chain::ChainItem;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::prelude::{
     ActionHashedContainer, AgentActivityResponse, ChainItems, ChainItemsSource,
-    MustGetAgentActivityResponse, RegisterAgentActivity, Timestamp,
+    MustGetAgentActivityResponse, RegisterAgentActivity, ScheduledFn, Timestamp,
 };
 use holochain_types::warrant::WarrantOp;
 use holochain_zome_types::chain::{ChainFilter, LimitConditions};
@@ -53,6 +53,28 @@ impl DhtStore<DbRead<Dht>> {
     /// space within pages.
     pub async fn used_size(&self) -> StateQueryResult<u64> {
         Ok(self.db().get_used_size().await?)
+    }
+
+    /// Returns `true` if a scheduled-function row exists for `author` and
+    /// `scheduled_fn`, regardless of liveness — i.e. whether the current time
+    /// falls within the row's `[start_at, end_at]` window.
+    ///
+    /// This is a membership check on the scheduled-functions table: it stays
+    /// `true` for a persisted cron function between firings, and becomes
+    /// `false` once an ephemeral function is consumed.
+    pub async fn is_function_scheduled(
+        &self,
+        author: &AgentPubKey,
+        scheduled_fn: &ScheduledFn,
+    ) -> StateQueryResult<bool> {
+        Ok(self
+            .db()
+            .is_function_scheduled(
+                author,
+                scheduled_fn.zome_name().0.as_ref(),
+                scheduled_fn.fn_name().0.as_str(),
+            )
+            .await?)
     }
 
     /// Count integrated, locally-validated chain ops that passed validation

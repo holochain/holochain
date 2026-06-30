@@ -188,6 +188,16 @@ impl DhtStore<DbWrite<Dht>> {
             .await?)
     }
 
+    /// Delete every ephemeral scheduled-function row for this DNA, regardless
+    /// of author or liveness. Returns the number of rows deleted.
+    ///
+    /// Called once per space at conductor startup to clear ephemeral schedules
+    /// left over from a previous run — ephemeral schedules do not survive a
+    /// reboot. A single call covers every author, since the store is per-DNA.
+    pub async fn delete_all_ephemeral_scheduled_functions(&self) -> DhtStoreResult<u64> {
+        Ok(self.db.delete_all_ephemeral_scheduled_functions().await?)
+    }
+
     /// Re-evaluate every expired persisted scheduled function for `author` at
     /// `now`.
     ///

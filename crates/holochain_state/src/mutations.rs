@@ -960,6 +960,10 @@ pub fn unlock_chain(txn: &mut Transaction, author: &AgentPubKey) -> StateMutatio
     Ok(())
 }
 
+// #5370 — no production callers; writes the authored DB which is being
+// retired. Scheduling now uses the merged store
+// (`DhtStore::delete_all_ephemeral_scheduled_functions`). Kept only for the
+// self-contained `schedule_test_low_level` test until DbKindAuthored is removed.
 pub fn delete_all_ephemeral_scheduled_fns(txn: &mut Transaction) -> StateMutationResult<()> {
     txn.execute(
         holochain_sqlite::sql::sql_cell::schedule::DELETE_ALL_EPHEMERAL,
@@ -968,6 +972,10 @@ pub fn delete_all_ephemeral_scheduled_fns(txn: &mut Transaction) -> StateMutatio
     Ok(())
 }
 
+// #5370 — no production callers; writes the authored DB which is being
+// retired. Scheduling now uses the merged store
+// (`DhtStore::delete_live_ephemeral_scheduled_functions`). Kept only for the
+// self-contained `schedule_test_low_level` test until DbKindAuthored is removed.
 pub fn delete_live_ephemeral_scheduled_fns(
     txn: &mut Transaction,
     now: Timestamp,
@@ -1023,6 +1031,10 @@ pub fn reschedule_expired(
 }
 
 /// Remove a function from the schedule.
+// #5370 — no production callers (its previous caller in `Cell::dispatch_scheduled_fns`
+// was removed); writes the authored DB which is being retired. Reachable only via
+// the `schedule_fn`/`reschedule_expired` legacy helpers, themselves #5370-dead. Kept
+// for the self-contained `schedule_test_low_level` test until DbKindAuthored is removed.
 pub fn unschedule_fn(txn: &mut Transaction, author: &AgentPubKey, scheduled_fn: &ScheduledFn) {
     match txn.execute(
         holochain_sqlite::sql::sql_cell::schedule::DELETE,
@@ -1046,6 +1058,10 @@ pub fn unschedule_fn(txn: &mut Transaction, author: &AgentPubKey, scheduled_fn: 
 /// Set a function to be called by the scheduler at a later time determined by `maybe_schedule`.
 ///
 /// If the function was already scheduled, its schedule will be updated.
+// #5370 — no production callers; writes the authored DB which is being retired.
+// Scheduling now uses the merged store (`DhtStore::upsert_scheduled_function`).
+// Kept only for the self-contained `schedule_test_low_level` test (and reached
+// by the #5370-dead `reschedule_expired`) until DbKindAuthored is removed.
 pub fn schedule_fn(
     txn: &mut Transaction,
     author: &AgentPubKey,

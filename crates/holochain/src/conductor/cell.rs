@@ -227,17 +227,6 @@ impl Cell {
     }
 
     pub(super) async fn dispatch_scheduled_fns(self: Arc<Self>, now: Timestamp) {
-        let authored_db = match self.get_or_create_authored_db() {
-            Ok(db) => db,
-            Err(e) => {
-                error!(
-                    "error getting authored db, cannot dispatch scheduled functions: {:?}",
-                    e
-                );
-                return;
-            }
-        };
-
         let author = self.id.agent_pubkey().clone();
         self.space
             .dht_store
@@ -263,25 +252,6 @@ impl Cell {
                     .await
                 {
                     error!("error deleting live ephemeral scheduled functions: {:?}", e);
-                }
-
-                // Also remove live ephemeral rows from the legacy authored DB before
-                // dispatching so that `is_scheduled` checks (which read authored DB)
-                // immediately reflect the correct state when a signal is received.
-                {
-                    let author_for_cleanup = author.clone();
-                    let authored_db_clone = authored_db.clone();
-                    if let Err(e) = authored_db_clone
-                        .write_async(move |txn| {
-                            delete_live_ephemeral_scheduled_fns(txn, now, &author_for_cleanup)
-                        })
-                        .await
-                    {
-                        error!(
-                            "error deleting live ephemeral fns from authored db: {:?}",
-                            e
-                        );
-                    }
                 }
 
                 let mut tasks = vec![];
@@ -328,8 +298,8 @@ impl Cell {
                 let results: Vec<CellResult<ZomeCallResult>> =
                     futures::future::join_all(tasks).await;
 
-                // Pre-compute what each dispatched function should do in the new DHT DB,
-                // mirroring the decisions the legacy `write_async` block will make below.
+                // Decide what each dispatched function should do in the merged
+                // store based on its zome-call result.
                 // `None`         => skip (ephemeral fn, no persistent state to update)
                 // `Some(None)`   => delete (unschedule the persisted fn)
                 // `Some(Some(s))`=> insert/upsert with schedule `s`
@@ -342,7 +312,7 @@ impl Cell {
                                 match extern_io.decode::<Option<Schedule>>() {
                                     Ok(Some(s)) => Some(Some(s)),
                                     // Persisted fn returned None or failed to decode →
-                                    // legacy will unschedule it.
+                                    // unschedule it.
                                     Ok(None) | Err(_) => {
                                         if *ephemeral {
                                             None
@@ -352,7 +322,7 @@ impl Cell {
                                     }
                                 }
                             }
-                            // Any error in the zome call → legacy unschedules persisted fns.
+                            // Any error in the zome call → unschedule persisted fns.
                             _ => {
                                 if *ephemeral {
                                     None
@@ -365,60 +335,7 @@ impl Cell {
                     })
                     .collect();
 
-                let author = self.id.agent_pubkey().clone();
-                // In case of an error, a persisted fn needs to be unscheduled.
-                let legacy_write = authored_db
-                    .write_async(move |txn| {
-                        for ((scheduled_fn, ephemeral), result) in dispatched.into_iter().zip(results.iter()) {
-                            match result {
-                                Ok(Ok(ZomeCallResponse::Ok(extern_io))) => {
-                                    let next_schedule: Schedule = match extern_io.decode() {
-                                        Ok(Some(v)) => v,
-                                        Ok(None) => {
-                                            // If the schedule of a persisted fn is `None` then it should be unscheduled.
-                                            if !ephemeral {
-                                                unschedule_fn(txn, &author, &scheduled_fn);
-                                            }
-                                            continue;
-                                        }
-                                        Err(e) => {
-                                            error!("scheduled zome call error in ExternIO::decode: {:?}", e);
-                                            if !ephemeral {
-                                                unschedule_fn(txn, &author, &scheduled_fn);
-                                            }
-                                            continue;
-                                        }
-                                    };
-                                    if let Err(e) = schedule_fn(
-                                        txn,
-                                        &author,
-                                        scheduled_fn.clone(),
-                                        Some(next_schedule),
-                                        now,
-                                    ) {
-                                        error!("scheduled zome call error in schedule_fn: {:?}", e);
-                                        if !ephemeral {
-                                            unschedule_fn(txn, &author, &scheduled_fn);
-                                        }
-                                        continue;
-                                    }
-                                }
-                                errorish => {
-                                    error!("scheduled zome call error: {:?}", errorish);
-                                    if !ephemeral {
-                                        unschedule_fn(txn, &author, &scheduled_fn);
-                                    }
-                                },
-                            }
-                        }
-                        Result::<(), DatabaseError>::Ok(())
-                    })
-                    .await;
-                if let Err(ref err) = legacy_write {
-                    error!("error applying legacy scheduled-fn updates: {:?}", err);
-                }
-
-                // Mirror the unschedule/reschedule decisions in the new DHT DB.
+                // Apply the unschedule/reschedule decisions to the merged store.
                 for (scheduled_fn, action) in new_db_decisions {
                     match action {
                         // Ephemeral fn: no persistent state to update.
