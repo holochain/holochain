@@ -7,6 +7,8 @@ pub mod sql_cell {
     pub const DELETE_ACTIONS_AFTER_SEQ: &str =
         include_str!("sql/cell/delete_actions_after_seq.sql");
 
+    // #5370: production-unused — agent-key validity now reads from the merged
+    // store (`DhtStoreRead::valid_create_agent_key_action`).
     pub const SELECT_VALID_AGENT_PUB_KEY: &str =
         include_str!("sql/cell/select_valid_agent_pub_key.sql");
 
@@ -53,8 +55,11 @@ pub mod sql_conductor {
         include_str!("sql/conductor/from_block_span_where_overlapping.sql");
     pub const IS_BLOCKED: &str = include_str!("sql/conductor/is_blocked.sql");
     pub const IS_ANY_BLOCKED: &str = include_str!("sql/conductor/is_any_blocked.sql");
+    // #5370: production-unused — cap-grant validity now reads from the merged
+    // store (`DhtStoreRead::valid_cap_grants`).
     pub const SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET: &str =
         include_str!("sql/conductor/select_valid_cap_grant_for_cap_secret.sql");
+    // #5370: production-unused — see `SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET`.
     pub const SELECT_VALID_UNRESTRICTED_CAP_GRANT: &str =
         include_str!("sql/conductor/select_valid_unrestricted_cap_grant.sql");
 }
