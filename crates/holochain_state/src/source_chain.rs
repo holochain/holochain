@@ -1038,210 +1038,25 @@ where
     pub async fn query(&self, query: QueryFilter) -> SourceChainResult<Vec<Record>> {
         let public_only = self.public_only;
 
-        let entry_type_filters_count = query.entry_type.as_ref().map_or(0, |t| t.len());
-        let action_type_filters_count = query.action_type.as_ref().map_or(0, |t| t.len());
-
-        let (scratch_seq_start, scratch_seq_end) =
-            self.scratch.apply(|scratch| match &query.sequence_range {
-                ChainQueryFilterRange::ActionHashRange(start, end) => {
-                    let start_seq = scratch.actions().find_map(|a| {
-                        if a.as_hash() == start {
-                            Some(a.seq())
-                        } else {
-                            None
-                        }
-                    });
-                    let end_seq = scratch.actions().find_map(|a| {
-                        if a.as_hash() == end {
-                            Some(a.seq())
-                        } else {
-                            None
-                        }
-                    });
-
-                    (start_seq, end_seq)
-                }
-                ChainQueryFilterRange::ActionHashTerminated(end, _) => {
-                    let end_seq = scratch.actions().find_map(|a| {
-                        if a.as_hash() == end {
-                            Some(a.seq())
-                        } else {
-                            None
-                        }
-                    });
-                    (None, end_seq)
-                }
-                _ => (None, None),
-            })?;
-
+        // #5370: the source chain is now read from the merged store, not the
+        // legacy authored DB. Fetch the author's committed records (no
+        // filtering applied here). Ordering and filtering are handled below to
+        // exactly match the legacy authored-DB query, whose final authority was
+        // also `ChainQueryFilter::filter_records` (the SQL pre-filtering there
+        // was only an optimisation over the same `filter_records`).
         let mut records = self
-            .vault
-            .read_async({
-                let query = query.clone();
-                move |txn| {
-                    // This type is similar to what `named_params!` from rusqlite creates, except for the use of
-                    // boxing to allow references to be passed to the query. The reserved capacity here should
-                    // account for the number of parameters inserted below, including the variable inputs like
-                    // entry_types and actions_types.
-                    let mut args: Vec<(String, Box<dyn rusqlite::ToSql>)> = Vec::with_capacity(
-                        6 + entry_type_filters_count + action_type_filters_count,
-                    );
-
-                    // Build the SELECT part of the query
-                    let mut sql =
-                        "SELECT DISTINCT Action.hash AS action_hash, Action.blob AS action_blob"
-                            .to_string();
-                    if query.include_entries {
-                        sql.push_str(", Entry.blob AS entry_blob");
-                    }
-
-                    // Build the FROM and JOIN parts of the query
-                    sql.push_str("\nFROM Action");
-                    if query.include_entries {
-                        sql.push_str("\nLEFT JOIN Entry On Action.entry_hash = Entry.hash");
-                    }
-
-                    match &query.sequence_range {
-                        ChainQueryFilterRange::Unbounded => {
-                            sql.push_str("\nWHERE 1=1");
-                        }
-                        ChainQueryFilterRange::ActionSeqRange(start, end) => {
-                            args.push((":range_start".to_string(), Box::new(start)));
-                            args.push((":range_end".to_string(), Box::new(end)));
-
-                            sql.push_str("\nWHERE Action.seq BETWEEN :range_start AND :range_end");
-                        }
-                        ChainQueryFilterRange::ActionHashRange(
-                            start_action_hash,
-                            end_action_hash,
-                        ) => {
-                            let start_seq = match scratch_seq_start {
-                                Some(scratch_start) => scratch_start,
-                                None => txn.query_row(
-                                    "SELECT seq from Action WHERE hash = :range_start_hash",
-                                    named_params! {":range_start_hash": start_action_hash.clone()},
-                                    |row| row.get::<_, u32>(0),
-                                )?,
-                            };
-                            let end_seq = match scratch_seq_end {
-                                Some(scratch_end) => scratch_end,
-                                None => txn.query_row(
-                                    "SELECT seq from Action WHERE hash = :range_end_hash",
-                                    named_params! {":range_end_hash": end_action_hash.clone()},
-                                    |row| row.get::<_, u32>(0),
-                                )?,
-                            };
-
-                            sql.push_str(&format!(
-                                "\nWHERE Action.seq BETWEEN {start_seq} AND {end_seq}"
-                            ));
-                        }
-                        ChainQueryFilterRange::ActionHashTerminated(
-                            end_action_hash,
-                            prior_count,
-                        ) => {
-                            let end_seq = match scratch_seq_end {
-                                Some(scratch_end) => scratch_end,
-                                None => txn.query_row(
-                                    "SELECT seq from Action WHERE hash = :range_end_hash",
-                                    named_params! {":range_end_hash": end_action_hash.clone()},
-                                    |row| row.get::<_, u32>(0),
-                                )?,
-                            };
-
-                            let start_seq = end_seq.saturating_sub(*prior_count);
-
-                            sql.push_str(&format!(
-                                "\nWHERE Action.seq BETWEEN {start_seq} AND {end_seq}"
-                            ));
-                        }
-                    }
-
-                    match query.sequence_range {
-                        ChainQueryFilterRange::Unbounded
-                        | ChainQueryFilterRange::ActionSeqRange(_, _) => {
-                            if let Some(action_types) = &query.action_type {
-                                if !action_types.is_empty() {
-                                    for (i, _) in action_types.iter().enumerate() {
-                                        args.push((
-                                            format!(":action_type_{i}"),
-                                            Box::new(action_types[i].as_sql()),
-                                        ));
-                                    }
-
-                                    sql.push_str(
-                                        format!(
-                                            "\nAND Action.type IN ({})",
-                                            named_param_seq("action_type", action_types.len())
-                                        )
-                                        .as_str(),
-                                    );
-                                }
-                            }
-
-                            if let Some(entry_types) = &query.entry_type {
-                                if !entry_types.is_empty() {
-                                    for (i, _) in entry_types.iter().enumerate() {
-                                        args.push((
-                                            format!(":entry_type_{i}"),
-                                            Box::new(entry_types[i].as_sql()),
-                                        ));
-                                    }
-
-                                    sql.push_str(
-                                        format!(
-                                            "\nAND Action.entry_type IN ({})",
-                                            named_param_seq("entry_type", entry_types.len())
-                                        )
-                                        .as_str(),
-                                    );
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
-
-                    sql.push_str("\nORDER BY Action.seq");
-                    sql.push_str(if query.order_descending {
-                        " DESC"
-                    } else {
-                        " ASC"
-                    });
-                    let mut stmt = txn.prepare(&sql)?;
-
-                    let records = stmt
-                        .query_and_then(
-                            args.iter()
-                                .map(|a| (a.0.as_str(), a.1.as_ref()))
-                                .collect::<Vec<(&str, &dyn rusqlite::ToSql)>>()
-                                .as_slice(),
-                            |row| {
-                                let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-                                let (action, signature) = action.into();
-                                let private_entry = action
-                                    .entry_type()
-                                    .is_some_and(|e| *e.visibility() == EntryVisibility::Private);
-                                let hash: ActionHash = row.get("action_hash")?;
-                                let action = ActionHashed::with_pre_hashed(action, hash);
-                                let sah = SignedActionHashed::with_presigned(action, signature);
-                                let entry =
-                                    if query.include_entries && (!private_entry || !public_only) {
-                                        let entry: Option<Vec<u8>> = row.get("entry_blob")?;
-                                        match entry {
-                                            Some(entry) => Some(from_blob::<Entry>(entry)?),
-                                            None => None,
-                                        }
-                                    } else {
-                                        None
-                                    };
-                                StateQueryResult::Ok(Record::new(sah, entry))
-                            },
-                        )?
-                        .collect::<StateQueryResult<Vec<_>>>();
-                    records
-                }
-            })
+            .dht_store
+            .as_read()
+            .source_chain_records(self.author.as_ref(), query.include_entries, public_only)
             .await?;
+
+        // The store returns committed records in ascending sequence order. The
+        // legacy SQL applied `order_descending` to the committed records only
+        // (the scratch was always appended in ascending order below), so mirror
+        // that here by reversing the committed records for a descending query.
+        if query.order_descending {
+            records.reverse();
+        }
 
         // Just take anything from the scratch for now. More filtering is possibly needed against
         // the results returned from the database anyway.
@@ -1303,19 +1118,6 @@ where
     pub async fn dump(&self) -> SourceChainResult<SourceChainDump> {
         dump_state(&self.dht_store.as_read(), (*self.author).clone()).await
     }
-}
-
-fn named_param_seq(base_name: &str, repeat: usize) -> String {
-    if repeat == 0 {
-        return String::new();
-    }
-
-    let mut seq = format!(":{base_name}");
-    for i in 0..repeat {
-        seq.push_str(format!(", :{base_name}_{i}").as_str());
-    }
-
-    seq
 }
 
 pub fn chain_lock_subject_for_entry(entry: Option<&Entry>) -> SourceChainResult<Vec<u8>> {
@@ -2842,6 +2644,122 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn source_chain_query_private_entry_redacted_under_public_only() {
+        let TestCase {
+            mut chain,
+            agent_key: alice,
+            keystore,
+            ..
+        } = TestCase::new().await;
+
+        let private_entry_type = EntryType::App(AppEntryDef {
+            zome_index: 0.into(),
+            entry_index: 0.into(),
+            visibility: EntryVisibility::Private,
+        });
+        let public_entry_type = EntryType::App(AppEntryDef {
+            zome_index: 0.into(),
+            entry_index: 1.into(),
+            visibility: EntryVisibility::Public,
+        });
+
+        // Commit a Create with a PRIVATE entry to the merged store via flush.
+        let chain_top = chain.chain_head_nonempty().unwrap();
+        let private_entry_hashed = EntryHashed::from_content_sync(Entry::App(fixt!(AppEntryBytes)));
+        let private_create = Action::Create(Create {
+            author: alice.clone(),
+            timestamp: Timestamp::now(),
+            action_seq: chain_top.seq + 1,
+            prev_action: chain_top.action.as_hash().clone(),
+            entry_type: private_entry_type.clone(),
+            entry_hash: private_entry_hashed.hash.clone(),
+            weight: EntryRateWeight::default(),
+        });
+        let sig = alice.sign(&keystore, &private_create).await.unwrap();
+        let private_sah = SignedActionHashed::from_content_sync((private_create, sig).into());
+        let private_action_hash = private_sah.as_hash().clone();
+        chain
+            .scratch()
+            .apply({
+                let private_sah = private_sah.clone();
+                move |scratch| {
+                    scratch.add_action(private_sah, ChainTopOrdering::Strict);
+                    scratch.add_entry(private_entry_hashed, ChainTopOrdering::Strict);
+                }
+            })
+            .unwrap();
+        chain.flush(vec![DhtArc::Empty]).await.unwrap();
+
+        // Add an uncommitted public Create to the scratch.
+        let chain_top = chain.chain_head_nonempty().unwrap();
+        let public_entry_hashed = EntryHashed::from_content_sync(Entry::App(fixt!(AppEntryBytes)));
+        let public_create = Action::Create(Create {
+            author: alice.clone(),
+            timestamp: Timestamp::now(),
+            action_seq: chain_top.seq + 1,
+            prev_action: chain_top.action.as_hash().clone(),
+            entry_type: public_entry_type.clone(),
+            entry_hash: public_entry_hashed.hash.clone(),
+            weight: EntryRateWeight::default(),
+        });
+        let sig = alice.sign(&keystore, &public_create).await.unwrap();
+        let public_sah = SignedActionHashed::from_content_sync((public_create, sig).into());
+        let scratch_action_hash = public_sah.as_hash().clone();
+        chain
+            .scratch()
+            .apply({
+                let public_sah = public_sah.clone();
+                move |scratch| {
+                    scratch.add_action(public_sah, ChainTopOrdering::Strict);
+                    scratch.add_entry(public_entry_hashed, ChainTopOrdering::Strict);
+                }
+            })
+            .unwrap();
+
+        // With full visibility, the committed private entry is present and the
+        // uncommitted scratch record is visible.
+        let q = ChainQueryFilter::default().include_entries(true);
+        let records = chain.query(q.clone()).await.unwrap();
+        let committed_private = records
+            .iter()
+            .find(|r| r.action_address() == &private_action_hash)
+            .expect("committed private record present");
+        assert!(
+            matches!(committed_private.entry(), RecordEntry::Present(_)),
+            "private entry should be present without public_only"
+        );
+        assert!(
+            records
+                .iter()
+                .any(|r| r.action_address() == &scratch_action_hash),
+            "uncommitted scratch record should be visible"
+        );
+
+        // With public_only set, the committed private entry is redacted (the
+        // action remains) but the scratch record — this agent's own data — still
+        // carries its entry.
+        chain.public_only();
+        let records = chain.query(q).await.unwrap();
+        let committed_private = records
+            .iter()
+            .find(|r| r.action_address() == &private_action_hash)
+            .expect("committed private action still present under public_only");
+        assert!(
+            matches!(committed_private.entry(), RecordEntry::Hidden),
+            "private entry should be redacted (Hidden) under public_only, got {:?}",
+            committed_private.entry()
+        );
+        let scratch_record = records
+            .iter()
+            .find(|r| r.action_address() == &scratch_action_hash)
+            .expect("scratch record still visible under public_only");
+        assert!(
+            matches!(scratch_record.entry(), RecordEntry::Present(_)),
+            "scratch entry (own data) should remain present under public_only"
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]
