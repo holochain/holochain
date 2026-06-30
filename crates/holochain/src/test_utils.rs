@@ -504,6 +504,43 @@ pub async fn fake_genesis_for_agent(
     source_chain::genesis(vault, dht_db, dht_store, keystore, dna_hash, agent, None).await
 }
 
+/// Run genesis using a caller-supplied `DhtStore`.
+///
+/// Use this when you need the same store for both genesis and a workspace so
+/// that the workspace can read the chain head written during genesis.
+pub async fn fake_genesis_with_store(
+    vault: DbWrite<DbKindAuthored>,
+    dht_db: DbWrite<DbKindDht>,
+    dna_hash: DnaHash,
+    keystore: MetaLairClient,
+    dht_store: holochain_state::DhtStore,
+) -> SourceChainResult<()> {
+    fake_genesis_for_agent_with_store(
+        vault,
+        dht_db,
+        dna_hash,
+        fake_agent_pubkey_1(),
+        keystore,
+        dht_store,
+    )
+    .await
+}
+
+/// Run genesis for a specific agent using a caller-supplied `DhtStore`.
+///
+/// Use this when you need the same store for both genesis and a workspace so
+/// that the workspace can read the chain head written during genesis.
+pub async fn fake_genesis_for_agent_with_store(
+    vault: DbWrite<DbKindAuthored>,
+    dht_db: DbWrite<DbKindDht>,
+    dna_hash: DnaHash,
+    agent: AgentPubKey,
+    keystore: MetaLairClient,
+    dht_store: holochain_state::DhtStore,
+) -> SourceChainResult<()> {
+    source_chain::genesis(vault, dht_db, dht_store, keystore, dna_hash, agent, None).await
+}
+
 /// Force all dht ops without enough validation receipts to be published.
 pub async fn force_publish_dht_ops(
     vault: &DbWrite<DbKindAuthored>,
