@@ -12,6 +12,7 @@ pub(crate) mod cap_grant;
 pub(crate) mod chain_lock;
 pub(crate) mod chain_op;
 pub(crate) mod chain_op_publish;
+pub(crate) mod db_size;
 pub(crate) mod deleted_link;
 pub(crate) mod deleted_record;
 pub(crate) mod entry;

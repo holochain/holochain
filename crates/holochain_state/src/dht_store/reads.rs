@@ -43,6 +43,18 @@ impl DhtStore<DbRead<Dht>> {
         Ok(self.db().count_integrated_ops().await?)
     }
 
+    /// Total bytes occupied on disk by this DNA's merged store, including the
+    /// unused (free) bytes within each page.
+    pub async fn size_on_disk(&self) -> StateQueryResult<u64> {
+        Ok(self.db().get_size_on_disk().await?)
+    }
+
+    /// Bytes actually in use by this DNA's merged store, excluding the free
+    /// space within pages.
+    pub async fn used_size(&self) -> StateQueryResult<u64> {
+        Ok(self.db().get_used_size().await?)
+    }
+
     /// Count integrated, locally-validated chain ops that passed validation
     /// (rejected and GET-cached ops excluded).
     #[cfg(any(test, feature = "inspection"))]

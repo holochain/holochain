@@ -11,6 +11,7 @@ mod chain_lock;
 mod chain_op;
 mod chain_op_publish;
 mod chain_write_permit;
+mod db_size;
 mod deleted_link;
 mod deleted_record;
 mod entry;

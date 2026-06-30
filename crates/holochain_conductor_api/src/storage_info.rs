@@ -3,8 +3,9 @@ use holochain_types::prelude::*;
 /// Storage info for DNA used by one or more hApps.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct DnaStorageInfo {
-    pub authored_data_size: usize,
-    pub authored_data_size_on_disk: usize,
+    /// Size of the DHT data. Since the authored and DHT databases were merged
+    /// into a single per-DNA store, this also covers each agent's source-chain
+    /// (authored) data.
     pub dht_data_size: usize,
     pub dht_data_size_on_disk: usize,
     pub cache_data_size: usize,
