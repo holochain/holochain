@@ -330,17 +330,13 @@ impl SourceChain {
 
         let now = Timestamp::now();
 
-        // #5370: clones reused by the authoritative merged-store write below,
-        // after the transitional authored dual-write consumes the originals.
-        // The authored dual-write — and therefore these clones — is kept only
-        // until the source-chain *readers* that still query the legacy authored
-        // DB are migrated to the merged store: `SourceChain::query`,
-        // `valid_cap_grant`, `valid_create_agent_key_action` /
-        // `delete_valid_agent_pub_key`, and `zomes_initialized`. Cheap clones
-        // (`Vec<HoloHashed<_>>` / `Vec<ScheduledFn>`).
-        let entries_for_authored = entries.clone();
-        let actions_for_authored = actions.clone();
-        let ops_for_authored = ops.clone();
+        // #5370: clone reused by the transitional authored scheduled-functions
+        // dual-write below, after the merged-store write consumes the original.
+        // The source chain itself is no longer written to the authored DB — the
+        // merged store is the sole source-chain write. Only scheduled functions
+        // are still dual-written, because the scheduling reader `fn_is_scheduled`
+        // still queries the authored DB. Remove once scheduling is migrated to
+        // the merged store. Cheap clone (`Vec<ScheduledFn>`).
         let scheduled_fns_for_authored = scheduled_fns.clone();
 
         // Acquire the per-author chain write permit on the merged store and
@@ -418,36 +414,19 @@ impl SourceChain {
                 }
             }
 
-            // #5370: transitional authored source-chain dual-write. The merged
-            // store below is the authority for serialization (the chain permit)
-            // and the as-at, but the legacy authored DB is still written because
-            // production source-chain readers — `SourceChain::query`,
-            // `valid_cap_grant`, `valid_create_agent_key_action` /
-            // `delete_valid_agent_pub_key`, and `zomes_initialized` — still query
-            // it. This write is no longer guarded by its own as-at; the store
-            // as-at above (under the chain permit) gates it. Remove once those
-            // readers are migrated to the merged store.
+            // #5370: transitional authored scheduled-functions dual-write. The
+            // source chain (entries, actions, ops) is no longer written to the
+            // authored DB — the merged-store write below is the sole authority
+            // for it. Only scheduled functions are still written here, because
+            // the scheduling reader `fn_is_scheduled` still queries the authored
+            // DB. Remove this block once scheduling is migrated to the merged
+            // store.
             {
                 let author = author.clone();
                 self.vault
                     .write_async(move |txn| -> SourceChainResult<()> {
                         for scheduled_fn in scheduled_fns_for_authored {
                             schedule_fn(txn, author.as_ref(), scheduled_fn, None, now)?;
-                        }
-                        for entry in entries_for_authored {
-                            insert_entry(txn, entry.as_hash(), entry.as_content())?;
-                        }
-                        for shh in actions_for_authored.iter() {
-                            insert_action(txn, shh)?;
-                        }
-                        for (op, op_hash, op_order, timestamp, _dep) in &ops_for_authored {
-                            insert_op_lite_into_authored(txn, op, op_hash, op_order, timestamp)?;
-                            // If this is a countersigning session we want to
-                            // withhold publishing the ops until the session is
-                            // successful.
-                            if is_countersigning_session {
-                                set_withhold_publish(txn, op_hash)?;
-                            }
                         }
                         Ok(())
                     })
@@ -2332,31 +2311,27 @@ mod tests {
             .unwrap();
         source_chain.flush(vec![DhtArc::Empty]).await.unwrap();
 
-        vault
-            .read_async({
-                let check_h1 = h1.clone();
-                let check_h2 = h2.clone();
+        // #5370: the source chain is now written to the merged store, not the
+        // authored DB, so the head and full records are read from the store.
+        let head = dht_store
+            .as_read()
+            .chain_head_for_author(author.as_ref())
+            .await?
+            .expect("chain head present after flush");
+        assert_eq!(head.action, h2);
 
-                move |txn| -> DatabaseResult<()> {
-                    assert_eq!(chain_head_db_nonempty(txn).unwrap().action, check_h2);
-                    // get the full record
-                    let store = CascadeTxnWrapper::from(txn);
-                    let h1_record_fetched = store
-                        .get_record(&check_h1.clone().into())
-                        .expect("error retrieving")
-                        .expect("entry not found");
-                    let h2_record_fetched = store
-                        .get_record(&check_h2.clone().into())
-                        .expect("error retrieving")
-                        .expect("entry not found");
-                    assert_eq!(check_h1, *h1_record_fetched.action_address());
-                    assert_eq!(check_h2, *h2_record_fetched.action_address());
-
-                    Ok(())
-                }
-            })
-            .await
-            .unwrap();
+        let h1_record_fetched = dht_store
+            .as_read()
+            .retrieve_record(&h1, Some(author.as_ref()))
+            .await?
+            .expect("h1 record present in store");
+        let h2_record_fetched = dht_store
+            .as_read()
+            .retrieve_record(&h2, Some(author.as_ref()))
+            .await?
+            .expect("h2 record present in store");
+        assert_eq!(h1, *h1_record_fetched.action_address());
+        assert_eq!(h2, *h2_record_fetched.action_address());
 
         // check that you can iterate on the chain
         let source_chain = SourceChain::new(

@@ -23,11 +23,10 @@ use holo_hash::ActionHash;
 use holo_hash::{AgentPubKey, DnaHash, EntryHash};
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::{HolochainP2pError, MockHolochainP2pDnaT};
-use holochain_state::prelude::{
-    chain_head_db, current_countersigning_session, insert_op_authored, set_withhold_publish,
-    AppEntryBytesFixturator, HeadInfo,
-};
 use holochain_state::prelude::{insert_action, insert_entry, CounterSigningSessionData};
+use holochain_state::prelude::{
+    insert_op_authored, set_withhold_publish, AppEntryBytesFixturator, HeadInfo,
+};
 use holochain_state::prelude::{StateMutationError, StateMutationResult};
 use holochain_state::source_chain;
 use holochain_types::activity::AgentActivityResponse;
@@ -2011,14 +2010,16 @@ impl TestHarness {
     }
 
     async fn read_chain_head_hash(&self) -> HeadInfo {
-        let authored = self
-            .test_space
+        // #5370: the chain head lives in the merged store, which is now the sole
+        // source-chain write.
+        self.test_space
             .space
-            .get_or_create_authored_db(self.author.clone())
-            .unwrap();
-        let chain_head = authored.read_async(chain_head_db).await.unwrap();
-
-        chain_head.unwrap()
+            .dht_store
+            .as_read()
+            .chain_head_for_author(&self.author)
+            .await
+            .unwrap()
+            .unwrap()
     }
 
     async fn try_remove_countersigning_entry(
@@ -2135,14 +2136,14 @@ impl TestHarness {
     }
 
     pub async fn expect_session_removed(&self, preflight_request: PreflightRequest) {
-        let authored = self
+        // #5370: the session lives in the merged store, which is now the sole
+        // source-chain write, so verify removal against the store.
+        let session = self
             .test_space
             .space
-            .get_or_create_authored_db(self.author.clone())
-            .unwrap();
-
-        let session = authored
-            .read_async(current_countersigning_session)
+            .dht_store
+            .as_read()
+            .current_countersigning_session(&self.author)
             .await
             .unwrap();
 
