@@ -2322,30 +2322,51 @@ impl DhtStore<DbRead<Dht>> {
 
         let v2_actions = self.db().get_actions_by_author(author.clone()).await?;
 
-        let mut records = Vec::with_capacity(v2_actions.len());
-        for v2_sah in &v2_actions {
-            let sah = to_legacy_signed_action(v2_sah);
+        // Convert each action to its legacy form once, and decide which entries
+        // to attach. Collect the entry hashes that actually need fetching so
+        // they can be read in a single batch — fetching them one-at-a-time was
+        // an N+1 over the chain length.
+        let sahs: Vec<holochain_zome_types::record::SignedActionHashed> =
+            v2_actions.iter().map(to_legacy_signed_action).collect();
+        let mut wanted_entry_hashes: Vec<EntryHash> = Vec::new();
+        // For each action, `Some(hash)` means "attach this entry if present";
+        // `None` means "no entry" (condition not met, or no entry hash).
+        let attach: Vec<Option<EntryHash>> = sahs
+            .iter()
+            .map(|sah| {
+                let private_entry = sah
+                    .action()
+                    .entry_type()
+                    .is_some_and(|e| *e.visibility() == EntryVisibility::Private);
 
-            let private_entry = sah
-                .action()
-                .entry_type()
-                .is_some_and(|e| *e.visibility() == EntryVisibility::Private);
-
-            let entry = if include_entries && (!private_entry || !public_only) {
-                match sah.action().entry_hash() {
-                    Some(entry_hash) => {
-                        self.db()
-                            .get_entry(entry_hash.clone(), Some(author))
-                            .await?
+                if include_entries && (!private_entry || !public_only) {
+                    if let Some(entry_hash) = sah.action().entry_hash() {
+                        wanted_entry_hashes.push(entry_hash.clone());
+                        return Some(entry_hash.clone());
                     }
-                    None => None,
                 }
-            } else {
                 None
-            };
+            })
+            .collect();
 
-            records.push(holochain_zome_types::record::Record::new(sah, entry));
-        }
+        // Batch-fetch the needed entries. The author context resolves the
+        // author's own private entries, exactly as the per-action
+        // `get_entry(.., Some(author))` did.
+        let entries = self
+            .db()
+            .get_entries_by_hashes(&wanted_entry_hashes, Some(author))
+            .await?;
+
+        // Assemble records in chain order. An absent hash maps to `None`,
+        // matching the previous `get_entry` miss behaviour.
+        let records = sahs
+            .into_iter()
+            .zip(attach)
+            .map(|(sah, want)| {
+                let entry = want.and_then(|h| entries.get(&h).cloned());
+                holochain_zome_types::record::Record::new(sah, entry)
+            })
+            .collect();
 
         Ok(records)
     }
@@ -2440,9 +2461,15 @@ impl DhtStore<DbRead<Dht>> {
                 .db()
                 .get_cap_grants_by_access(author.clone(), access)
                 .await?;
+
+            // Resolve each grant's entry hash (from its create/update action)
+            // and drop grants whose entry was updated or deleted by the author.
+            // The per-grant `get_action` / modification checks stay one-by-one
+            // (cap-grant counts are small), but the grant entries are then read
+            // in a single batch rather than one query per grant.
+            let mut candidate_hashes: Vec<EntryHash> = Vec::new();
             for row in rows {
                 let action_hash = ActionHash::from_raw_36(row.action_hash);
-                // Resolve the grant's entry hash from its create/update action.
                 let Some(v2_sah) = self.db().get_action(action_hash).await? else {
                     continue;
                 };
@@ -2457,9 +2484,19 @@ impl DhtStore<DbRead<Dht>> {
                 {
                     continue;
                 }
-                // Cap-grant entries are private; resolve from the author's
-                // `PrivateEntry` store and deserialize.
-                let Some(entry) = self.db().get_entry(entry_hash, Some(author)).await? else {
+                candidate_hashes.push(entry_hash);
+            }
+
+            // Cap-grant entries are private; resolve them from the author's
+            // `PrivateEntry` store in one batch and deserialize. Iterating
+            // `candidate_hashes` (which preserves row order and any duplicates)
+            // keeps the produced grants identical to the per-grant lookup.
+            let entries = self
+                .db()
+                .get_entries_by_hashes(&candidate_hashes, Some(author))
+                .await?;
+            for entry_hash in candidate_hashes {
+                let Some(entry) = entries.get(&entry_hash) else {
                     continue;
                 };
                 if let Some(grant) = entry.as_cap_grant() {
