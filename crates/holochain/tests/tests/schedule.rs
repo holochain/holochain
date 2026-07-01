@@ -650,7 +650,11 @@ async fn schedule_test_low_level() -> anyhow::Result<()> {
     assert_eq!(
         vec![
             (persisted_scheduled_fn, Some(persisted_schedule), false),
-            (ephemeral_scheduled_fn, Some(ephemeral_future_schedule), true),
+            (
+                ephemeral_scheduled_fn,
+                Some(ephemeral_future_schedule),
+                true
+            ),
         ],
         store
             .live_scheduled_functions(&author, the_distant_future)
