@@ -305,7 +305,7 @@ impl DhtStore<DbRead<Dht>> {
     /// Returns *any* lock row for the author, including one that has already
     /// expired — matching the legacy
     /// [`get_chain_lock`](crate::chain_lock::get_chain_lock) semantics. Callers
-    /// are responsible for checking [`ChainLock::is_expired_at`] when expiry
+    /// are responsible for checking `ChainLock::is_expired_at` when expiry
     /// matters; several countersigning call sites must respect an expired lock
     /// (a lock that exists at all means a session is mid-flight and the chain
     /// must not be re-used until it is cleaned up).
@@ -2240,7 +2240,7 @@ impl DhtStore<DbRead<Dht>> {
         Ok(out.into_iter().map(|(_, _, op)| op).collect())
     }
 
-    /// Dump the author's source chain as a [`SourceChainDump`].
+    /// Dump the author's source chain as a `SourceChainDump`.
     ///
     /// Reads all actions authored by `author` from the merged DHT store in
     /// chain-sequence order, resolves each action's entry from both the public
@@ -2381,7 +2381,7 @@ impl DhtStore<DbRead<Dht>> {
     /// [`SourceChainError::InvalidAgentKey`](crate::source_chain::SourceChainError::InvalidAgentKey).
     ///
     /// The "not updated/deleted" exclusion matches the legacy SQL exactly via
-    /// [`entry_updated_or_deleted_by_author`](Self::entry_updated_or_deleted_by_author).
+    /// `entry_updated_or_deleted_by_author`.
     pub async fn valid_create_agent_key_action(
         &self,
         author: &AgentPubKey,

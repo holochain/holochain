@@ -10,9 +10,8 @@ use holo_hash::{ActionHash, EntryHash};
 
 impl TxWrite<Dht> {
     /// Force-remove a self-authored countersigning session using the caller's
-    /// transaction. See
-    /// [`remove_countersigning_session::remove_countersigning_session`] for the
-    /// guard and deletion semantics; commit or rollback is the caller's
+    /// transaction. See the inner `remove_countersigning_session` for the guard
+    /// and deletion semantics; commit or rollback is the caller's
     /// responsibility.
     pub async fn remove_countersigning_session(
         &mut self,
