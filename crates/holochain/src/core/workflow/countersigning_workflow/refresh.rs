@@ -46,13 +46,19 @@ pub async fn refresh_workspace_state(
         // #5370: the chain lock now lives in the merged store. `get_chain_lock`
         // returns any lock row including expired ones, so a stale lock still marks
         // the chain as locked and drives the recovery path below.
-        let lock = space
-            .dht_store
-            .as_read()
-            .get_chain_lock(agent.clone())
-            .await
-            .ok()
-            .flatten();
+        let lock = match space.dht_store.as_read().get_chain_lock(agent.clone()).await {
+            Ok(lock) => lock,
+            Err(e) => {
+                // A store read failure must not be treated as "no lock": that
+                // would drive the cleanup path below to abandon a live session.
+                tracing::error!(
+                    "Error querying countersigning chain lock for agent {:?}: {:?}",
+                    agent,
+                    e
+                );
+                return;
+            }
+        };
 
         // If the chain is locked, then we need to check the session state.
         if lock.is_some() {
