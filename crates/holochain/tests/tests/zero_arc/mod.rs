@@ -481,7 +481,10 @@ async fn zero_arc_get_details_discover_updates() {
 
             false
         },
-        None,
+        // A zero-arc node fetches this over the network via direct get
+        // requests, which can exceed the 5s default on slower CI runners
+        // (notably Windows); allow some headroom to avoid flaky failures.
+        Some(15_000),
         None,
     )
     .await
@@ -507,7 +510,10 @@ async fn zero_arc_get_details_discover_updates() {
                 false
             }
         },
-        None,
+        // A zero-arc node fetches this over the network via direct get
+        // requests, which can exceed the 5s default on slower CI runners
+        // (notably Windows); allow some headroom to avoid flaky failures.
+        Some(15_000),
         None,
     )
     .await
@@ -592,7 +598,10 @@ async fn zero_arc_delete_link_get_links() {
 
             links.iter().any(|link| link.create_link_hash == link_hash)
         },
-        None,
+        // A zero-arc node fetches this over the network via direct get
+        // requests, which can exceed the 5s default on slower CI runners
+        // (notably Windows); allow some headroom to avoid flaky failures.
+        Some(15_000),
         None,
     )
     .await
