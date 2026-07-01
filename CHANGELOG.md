@@ -14,6 +14,70 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20260701.171007
+
+## [hcterm-0.7.0-dev.32](crates/hcterm/CHANGELOG.md#0.7.0-dev.32)
+
+## [holochain\_cli-0.7.0-dev.32](crates/holochain_cli/CHANGELOG.md#0.7.0-dev.32)
+
+## [holochain\_cli\_bundle-0.7.0-dev.31](crates/holochain_cli_bundle/CHANGELOG.md#0.7.0-dev.31)
+
+## [holochain\_cli\_client-0.7.0-dev.32](crates/holochain_cli_client/CHANGELOG.md#0.7.0-dev.32)
+
+## [holochain\_cli\_sandbox-0.7.0-dev.32](crates/holochain_cli_sandbox/CHANGELOG.md#0.7.0-dev.32)
+
+## [holochain\_client-0.9.0-dev.32](crates/holochain_client/CHANGELOG.md#0.9.0-dev.32)
+
+## [holochain-0.7.0-dev.32](crates/holochain/CHANGELOG.md#0.7.0-dev.32)
+
+- **BREAKING CHANGE** Compiled wasmer modules are now cached in the WASM database (a new `CompiledWasm` table) instead of in a `wasm-cache` directory under the data root. Modules are compiled on demand, persisted as serialized bytes, and rebuilt from those bytes on later loads. The `holochain::conductor::conductor::WASM_CACHE` constant and the on-disk cache directory have been removed. \#5834
+- WASM is now loaded on demand. At startup the conductor builds ribosomes only for enabled apps, and loads an app’s ribosomes when it is installed or enabled rather than for every installed cell up front. After a cell completes genesis its compiled modules are evicted from the in-memory cache (to be rebuilt from the stored serialized module on the next zome call), reducing idle memory use. \#5834
+- **BREAKING CHANGE** `Conductor::get_dna_definitions` is now `async` and reads DNA definitions from the DNA-definition store rather than from loaded ribosomes. \#5834
+- Add the `AppStatusFilter::AwaitingMemproofs` variant so `ListApps` can filter for apps that are awaiting membrane proofs. \#5834
+- **BREAKING CHANGE**: Bump Kitsune2 to `0.5.0-dev.6`.
+- **BREAKING CHANGE**: Removed the tx5/WebRTC network transport. The iroh (QUIC) transport is now the only supported network backend. The `transport-tx5-backend-go-pion` feature flag is removed from `holochain`, `holochain_p2p`, and `holochain_cascade`.
+- **BREAKING CHANGE**: Removed the `signal_url` and `webrtc_config` fields from `NetworkConfig`, which configured the tx5 signaling server and WebRTC peer-connection options. Because `NetworkConfig` rejects unknown fields, conductor config YAML that still sets `signal_url` or `webrtc_config` under `network` will now fail to parse and must be updated.
+- **BREAKING CHANGE**: `hc sandbox` no longer offers the `webrtc` network type. Only `mem` and `quic` (iroh) transports remain.
+- Removed the `hc_service_check` crate (the `hc-service-check` tool), which checked the health of tx5 network services.
+
+## [holochain\_cascade-0.7.0-dev.32](crates/holochain_cascade/CHANGELOG.md#0.7.0-dev.32)
+
+## [holochain\_conductor\_config-0.7.0-dev.31](crates/holochain_conductor_config/CHANGELOG.md#0.7.0-dev.31)
+
+## [holochain\_test\_wasm\_common-0.7.0-dev.21](crates/holochain_test_wasm_common/CHANGELOG.md#0.7.0-dev.21)
+
+## [holochain\_wasm\_test\_utils-0.7.0-dev.32](crates/holochain_wasm_test_utils/CHANGELOG.md#0.7.0-dev.32)
+
+## [holochain\_websocket-0.7.0-dev.31](crates/holochain_websocket/CHANGELOG.md#0.7.0-dev.31)
+
+## [hdk-0.7.0-dev.21](crates/hdk/CHANGELOG.md#0.7.0-dev.21)
+
+## [holochain\_p2p-0.7.0-dev.32](crates/holochain_p2p/CHANGELOG.md#0.7.0-dev.32)
+
+## [hdi-0.8.0-dev.15](crates/hdi/CHANGELOG.md#0.8.0-dev.15)
+
+## [holochain\_state-0.7.0-dev.32](crates/holochain_state/CHANGELOG.md#0.7.0-dev.32)
+
+## [hdk\_derive-0.7.0-dev.15](crates/hdk_derive/CHANGELOG.md#0.7.0-dev.15)
+
+## [holochain\_data-0.7.0-dev.21](crates/holochain_data/CHANGELOG.md#0.7.0-dev.21)
+
+## [holochain\_conductor\_api-0.7.0-dev.31](crates/holochain_conductor_api/CHANGELOG.md#0.7.0-dev.31)
+
+## [holochain\_state\_types-0.7.0-dev.15](crates/holochain_state_types/CHANGELOG.md#0.7.0-dev.15)
+
+## [holochain\_types-0.7.0-dev.31](crates/holochain_types/CHANGELOG.md#0.7.0-dev.31)
+
+## [holochain\_keystore-0.7.0-dev.20](crates/holochain_keystore/CHANGELOG.md#0.7.0-dev.20)
+
+## [holochain\_sqlite-0.7.0-dev.24](crates/holochain_sqlite/CHANGELOG.md#0.7.0-dev.24)
+
+## [holochain\_zome\_types-0.7.0-dev.20](crates/holochain_zome_types/CHANGELOG.md#0.7.0-dev.20)
+
+## [holochain\_integrity\_types-0.7.0-dev.15](crates/holochain_integrity_types/CHANGELOG.md#0.7.0-dev.15)
+
+## [holo\_hash-0.7.0-dev.11](crates/holo_hash/CHANGELOG.md#0.7.0-dev.11)
+
 # 20260629.004342
 
 ## [hcterm-0.7.0-dev.31](crates/hcterm/CHANGELOG.md#0.7.0-dev.31)
