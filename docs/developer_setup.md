@@ -99,8 +99,8 @@ exercises each backend, and there is a Make target for each:
   make test-workspace-wasmer-wasmi
   ```
 
-The `Makefile` also has variants that turn on the unstable features (`*-unstable`) and the tx5 transport
-(`*-transport_tx5`); use those targets if you need to reproduce one of those CI runs.
+The `Makefile` also has a variant that turns on the unstable features (`*-unstable`); use that target if you need to 
+reproduce one of those CI runs.
 
 ### Static checks before submitting a PR
 

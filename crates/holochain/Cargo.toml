@@ -246,11 +246,6 @@ transport-iroh = [
   "holochain_cascade/transport-iroh",
 ]
 
-transport-tx5-backend-go-pion = [
-  "holochain_p2p/transport-tx5-backend-go-pion",
-  "holochain_cascade/transport-tx5-backend-go-pion",
-]
-
 # Extremely verbose wasm memory read/write logging
 wasmer-debug-memory = ["holochain_wasmer_host/debug-memory"]
 

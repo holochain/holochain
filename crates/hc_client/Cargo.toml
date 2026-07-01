@@ -64,7 +64,6 @@ wasmer-sys-cranelift = [
 wasmer-wasmi = ["holochain_client/wasmer-wasmi", "holochain?/wasmer-wasmi"]
 
 transport-iroh = ["holochain?/transport-iroh"]
-transport-tx5-backend-go-pion = ["holochain?/transport-tx5-backend-go-pion"]
 
 [lints]
 workspace = true

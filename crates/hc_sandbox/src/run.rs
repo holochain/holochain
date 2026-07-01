@@ -104,8 +104,8 @@ pub async fn run_async(
             generated_config.network.advanced = Some(serde_json::json!({
                 // Allow plaintext signal for hc sandbox to have it work with local
                 // signaling servers spawned by kitsune2-bootstrap-srv
-                "tx5Transport": {
-                    "signalAllowPlainText": true,
+                "irohTransport": {
+                    "relayAllowPlainText": true,
                 }
             }));
             generated_config

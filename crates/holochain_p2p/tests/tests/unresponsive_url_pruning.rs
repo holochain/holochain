@@ -361,11 +361,6 @@ impl TestCase {
                 network_config: Some(serde_json::json!({
                     "coreBootstrap": {
                         "serverUrl": "https://not-used"
-                    },
-                    "tx5Transport": {
-                        "serverUrl": "wss://not-used",
-                        "timeoutS": 30,
-                        "webrtcConnectTimeoutS": 25,
                     }
                 })),
                 ..Default::default()

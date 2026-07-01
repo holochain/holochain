@@ -777,21 +777,13 @@ async fn network_stats() {
         .admin_ws_client::<AdminResponse>()
         .await;
 
-    #[cfg(feature = "transport-tx5-backend-go-pion")]
-    const EXPECT: &str = "BackendGoPion";
-    #[cfg(all(
-        feature = "transport-iroh",
-        not(feature = "transport-tx5-backend-go-pion")
-    ))]
-    const EXPECT: &str = "iroh";
-
     let req = AdminRequest::DumpNetworkStats;
     let res: AdminResponse = client.request(req).await.unwrap();
     match res {
         AdminResponse::NetworkStatsDumped(stats) => {
             println!("{stats:?}");
 
-            assert_eq!(EXPECT, stats.transport_stats.backend);
+            assert_eq!("iroh", stats.transport_stats.backend);
         }
         _ => panic!("unexpected"),
     }

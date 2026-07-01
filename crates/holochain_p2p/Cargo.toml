@@ -45,7 +45,6 @@ kitsune2_bootstrap_srv = { version = "0.5.0-dev.4", default-features = false, op
 kitsune2_api = "0.5.0-dev.4"
 kitsune2_core = "0.5.0-dev.4"
 kitsune2_transport_iroh = { version = "0.5.0-dev.4", default-features = false, optional = true }
-kitsune2_transport_tx5 = { version = "0.5.0-dev.4", default-features = false, optional = true }
 bytes = "1.10"
 holochain_sqlite = { version = "^0.7.0-dev.23", path = "../holochain_sqlite" }
 parking_lot = "0.12.3"
@@ -89,12 +88,6 @@ transport-iroh = [
   "dep:kitsune2_transport_iroh",
   "kitsune2/transport-iroh",
   "kitsune2_bootstrap_srv/iroh-relay",
-]
-
-transport-tx5-backend-go-pion = [
-  "kitsune2_transport_tx5/backend-go-pion",
-  "kitsune2/transport-tx5-backend-go-pion",
-  "kitsune2_bootstrap_srv/sbd",
 ]
 
 # Enables tracing instrumentation

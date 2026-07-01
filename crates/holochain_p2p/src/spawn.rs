@@ -232,7 +232,7 @@ impl Default for HolochainP2pConfig {
 /// See [`NetworkCompatParams::proto_ver`].
 pub const HCP2P_PROTO_VER: u32 = 2;
 
-/// Some parameters used as part of a protocol compatibility check during tx5 preflight
+/// Some parameters used as part of a protocol compatibility check during preflight
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
 pub struct NetworkCompatParams {
     /// The current protocol version. This should be incremented whenever
