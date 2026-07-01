@@ -3696,9 +3696,37 @@ mod tests {
         (entry_hash, entry, action, preflight_request)
     }
 
+    /// Insert `action` and its `entry` as an INTEGRATED self-authored chain
+    /// head: a `RegisterAgentActivity` op (so `chain_head_for_author`, which
+    /// scopes to the integrated agent-activity chain, sees the head) plus the
+    /// entry in the store.
+    ///
+    /// This mirrors the source-chain flush, which writes each self-authored op
+    /// already integrated. `record_incoming_ops` instead lands ops in limbo,
+    /// whose actions are deliberately excluded from the chain head — so it is
+    /// not a faithful stand-in for a committed self-authored head here.
+    async fn insert_integrated_head(
+        store: &DhtStore<DbWrite<Dht>>,
+        action: Action,
+        entry_hash: &EntryHash,
+        entry: &holochain_types::prelude::Entry,
+        private_author: Option<&AgentPubKey>,
+    ) {
+        let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(
+            ChainOp::RegisterAgentActivity(Signature::from([7u8; 64]), action),
+        )));
+        store
+            .test_insert_authored_chain_op(op, None, None, None)
+            .await
+            .unwrap();
+        store
+            .test_insert_entry(entry_hash, entry, private_author)
+            .await
+            .unwrap();
+    }
+
     #[tokio::test]
     async fn current_countersigning_session_returns_session_at_chain_head() {
-        use holochain_types::prelude::RecordEntry;
         use holochain_zome_types::entry_def::EntryVisibility;
 
         let store = crate::dht_store::DhtStore::new_test(dht_id())
@@ -3711,14 +3739,11 @@ mod tests {
             countersigning_head(&alice, &bob, 3, EntryVisibility::Public);
         let head_hash = ActionHash::with_data_sync(&head_action);
 
-        // Record a StoreRecord op so both the head action and the CounterSign
-        // entry land in the store.
-        let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(ChainOp::StoreRecord(
-            Signature::from([7u8; 64]),
-            head_action,
-            RecordEntry::Present(cs_entry),
-        ))));
-        store.record_incoming_ops(vec![(op, false)]).await.unwrap();
+        // Insert the head as a committed self-authored op: an integrated
+        // `RegisterAgentActivity` op (so it is the chain head) plus the
+        // `CounterSign` entry in the store. This is the shape a real
+        // source-chain flush produces.
+        insert_integrated_head(&store, head_action, &cs_entry_hash, &cs_entry, None).await;
 
         let (record, entry_hash, returned_session) = store
             .as_read()
@@ -3742,8 +3767,10 @@ mod tests {
             .unwrap();
         let alice = AgentPubKey::from_raw_36(vec![4u8; 36]);
 
-        // A normal app entry at the chain head (seq 1), recorded as a StoreRecord
-        // op so the action and entry are both present.
+        // A normal app entry at the chain head (seq 1), inserted as an
+        // integrated self-authored head so the head is genuinely found and the
+        // `None` result comes from the entry being an ordinary App entry rather
+        // than a `CounterSign`.
         let entry = holochain_types::prelude::Entry::App(holochain_types::prelude::AppEntryBytes(
             holochain_serialized_bytes::SerializedBytes::from(
                 holochain_serialized_bytes::UnsafeBytes::from(vec![9u8; 8]),
@@ -3760,15 +3787,10 @@ mod tests {
                 0.into(),
                 holochain_zome_types::entry_def::EntryVisibility::Public,
             )),
-            entry_hash,
+            entry_hash: entry_hash.clone(),
             weight: Default::default(),
         });
-        let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(ChainOp::StoreRecord(
-            Signature::from([7u8; 64]),
-            action,
-            holochain_types::prelude::RecordEntry::Present(entry),
-        ))));
-        store.record_incoming_ops(vec![(op, false)]).await.unwrap();
+        insert_integrated_head(&store, action, &entry_hash, &entry, None).await;
 
         let result = store
             .as_read()
