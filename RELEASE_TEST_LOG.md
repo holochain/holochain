@@ -2,6 +2,27 @@
 
 This file documents results of release tests as described in the [Holochain release process](RELEASE.md).
 
+## 2026-07-01: v0.6.2-rc.0
+
+*Success*
+- Ran a test with 3 nodes.
+- Peer discovery was slow on the first round of testing but we redid the peer
+  discovery part of the test and it went much quicker.
+- There was no noticeable delay with initial sync.
+- Signals were sent with 100% reliability.
+- Entries created by all nodes were received by all peers, in less than a
+  minute.
+- After shutting down one node and creating data with the other nodes, when the
+  offline node came back online, it took less than a minute for all data to be
+  synced.
+- A 3rd set of entries was created by all nodes. The nodes that remained online
+  the whole time synced immediately, however, the node that went offline but
+  was now back online took roughly 2 minutes to sync, it is likely that the 3rd
+  set was created before that node re-established full arc and therefore that
+  node had to wait for a gossip round instead of publish.
+- As mentioned above: a new round of peer discovery happened with a new network
+  seed and the peers discovered eachother within 10s of seconds.
+
 ## 2026-01-23: v0.6.1-rc.0
 
 *Success*
