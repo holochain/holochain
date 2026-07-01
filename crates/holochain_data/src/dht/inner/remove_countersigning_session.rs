@@ -3,7 +3,7 @@
 use holo_hash::{ActionHash, EntryHash};
 use sqlx::SqliteConnection;
 
-/// Outcome of [`remove_countersigning_session`].
+/// Outcome of `remove_countersigning_session`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RemoveCountersigningSessionOutcome {
     /// The session's rows were deleted.

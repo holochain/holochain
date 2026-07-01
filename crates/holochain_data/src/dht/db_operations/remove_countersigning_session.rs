@@ -10,9 +10,9 @@ use holo_hash::{ActionHash, EntryHash};
 
 impl DbWrite<Dht> {
     /// Force-remove a self-authored countersigning session, wrapped in a single
-    /// transaction so the published guard and the deletes are atomic. See
-    /// [`remove_countersigning_session::remove_countersigning_session`] for the
-    /// guard and deletion semantics.
+    /// transaction so the published guard and the deletes are atomic. See the
+    /// inner `remove_countersigning_session` for the guard and deletion
+    /// semantics.
     pub async fn remove_countersigning_session(
         &self,
         action_hash: &ActionHash,
