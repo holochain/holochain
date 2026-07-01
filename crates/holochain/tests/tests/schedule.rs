@@ -2,12 +2,8 @@ use hdk::prelude::{BoxApi, ExternIO, InlineZomeResult};
 use holochain::sweettest::{
     SweetCell, SweetConductor, SweetConductorConfig, SweetDnaFile, SweetLocalRendezvous,
 };
-use holochain::test_utils::{host_fn_caller::HostFnCaller, RibosomeTestFixture};
-use holochain_sqlite::error::DatabaseError;
-use holochain_state::mutations::schedule_fn;
+use holochain::test_utils::RibosomeTestFixture;
 use holochain_state::prelude::*;
-use holochain_state::schedule::fn_is_scheduled;
-use holochain_state::schedule::live_scheduled_fns;
 use holochain_timestamp::Timestamp;
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::signal::Signal;
@@ -455,35 +451,36 @@ async fn schedule_persisted_expired() {
     let cell = app.into_cells()[0].clone();
     let pubkey = cell.agent_pubkey().clone();
     let mut app_signal = conductor.subscribe_to_app_signals("app".into());
-    let host_fn_caller =
-        HostFnCaller::create_for_zome(cell.cell_id(), &conductor.raw_handle(), &dna.0, 0).await;
 
     // Should not be scheduled
-    assert!(!is_scheduled_in_authored_db(&host_fn_caller, cell.cell_id().agent_pubkey()).await);
+    assert!(!is_scheduled(&cell).await);
 
-    // Schedule function with expired start time
-    host_fn_caller
-        .authored_db
-        .write_async(move |txn| {
-            let now = Timestamp::now();
-            let expired = (now - std::time::Duration::from_secs(120)).unwrap();
-            schedule_fn(
-                txn,
-                &pubkey,
-                ScheduledFn::new(COORDINATOR.into(), SCHEDULED_FN.into()),
-                Some(Schedule::Persisted("0 * * * * * *".into())), // every minute
-                expired,
-            )
-            .unwrap();
-            Result::<(), DatabaseError>::Ok(())
-        })
+    // Schedule the function on the merged store, which the running scheduler reads.
+    //
+    // The original test wrote an *expired* periodic cron directly to the authored
+    // DB and relied on it never firing. Now that the live scheduler reads the
+    // merged store, an expired periodic cron (e.g. `0 * * * * * *`) would be
+    // rescheduled to its next occurrence, which could land inside the 3s wait and
+    // fire (~5% flake). A fixed far-future date cron keeps the intent — a
+    // persisted schedule that is not due must not fire — while being fully
+    // deterministic: the function is a member of the schedule table but is never
+    // live during the test, so the scheduler evaluates its liveness and correctly
+    // declines to dispatch it, and `reschedule_expired_persisted` leaves the
+    // (unexpired) row untouched.
+    cell.dht_store()
+        .upsert_scheduled_function(
+            &pubkey,
+            &ScheduledFn::new(COORDINATOR.into(), SCHEDULED_FN.into()),
+            &Some(Schedule::Persisted("0 0 0 * * * 2099".into())),
+            Timestamp::now(),
+        )
         .await
         .unwrap();
 
-    // Should be scheduled but expired
-    assert!(is_scheduled_in_authored_db(&host_fn_caller, cell.cell_id().agent_pubkey()).await);
+    // Should be scheduled but not due, so it must not fire within the wait.
+    assert!(is_scheduled(&cell).await);
     assert!(wait_for_signal(&mut app_signal).await.is_err());
-    assert!(is_scheduled_in_authored_db(&host_fn_caller, cell.cell_id().agent_pubkey()).await);
+    assert!(is_scheduled(&cell).await);
 }
 
 /// Helper for creating a zome with just one schedulable function called [`SCHEDULED_FN`]
@@ -516,28 +513,6 @@ async fn is_scheduled(cell: &SweetCell) -> bool {
         .unwrap()
 }
 
-/// Authored-DB membership read for the self-contained legacy test
-/// (`schedule_persisted_expired`) which writes the authored DB directly. The
-/// authored DB is no longer the production scheduling store (#5370); this is
-/// retained only so that test keeps exercising `fn_is_scheduled`.
-async fn is_scheduled_in_authored_db(host_fn_caller: &HostFnCaller, pubkey: &AgentPubKey) -> bool {
-    let pubkey = pubkey.clone();
-    host_fn_caller
-        .authored_db
-        .read_async(move |txn| {
-            Result::<bool, DatabaseError>::Ok(
-                fn_is_scheduled(
-                    txn,
-                    ScheduledFn::new(COORDINATOR.into(), SCHEDULED_FN.into()),
-                    &pubkey,
-                )
-                .unwrap(),
-            )
-        })
-        .await
-        .unwrap()
-}
-
 /// Helper for waiting for next signal from cell
 async fn wait_for_signal(
     app_signal: &mut broadcast::Receiver<Signal>,
@@ -558,118 +533,131 @@ async fn wait_for_signal(
 #[cfg(feature = "test_utils")]
 async fn schedule_test_low_level() -> anyhow::Result<()> {
     holochain_trace::test_run();
-    let RibosomeTestFixture {
-        alice_pubkey,
-        alice_host_fn_caller,
-        ..
-    } = RibosomeTestFixture::new(TestWasm::Schedule).await;
+    let RibosomeTestFixture { alice_cell, .. } = RibosomeTestFixture::new(TestWasm::Schedule).await;
 
-    alice_host_fn_caller
-        .authored_db
-        .write_async(move |txn| {
-            let now = Timestamp::now();
-            let the_past = (now - std::time::Duration::from_millis(1)).unwrap();
-            let the_future = (now + std::time::Duration::from_millis(1000)).unwrap();
-            let the_distant_future = (now + std::time::Duration::from_millis(2000)).unwrap();
+    // Exercise the merged store's scheduling semantics directly. The conductor's
+    // background scheduler dispatches (and prunes live ephemeral rows) only for
+    // the running cells' own authors, so scheduling under a distinct synthetic
+    // author isolates these table-level assertions from the scheduler entirely
+    // and keeps them deterministic (the legacy test relied on a single authored-DB
+    // write transaction holding the write lock for isolation).
+    let store = alice_cell.dht_store();
+    let author = AgentPubKey::from_raw_36(vec![0xdb; 36]);
 
-            let ephemeral_scheduled_fn = ScheduledFn::new("foo".into(), "bar".into());
-            let persisted_scheduled_fn = ScheduledFn::new("1".into(), "2".into());
-            let persisted_schedule = Schedule::Persisted("* * * * * * *".into());
+    let now = Timestamp::now();
+    let the_past = (now - std::time::Duration::from_millis(1)).unwrap();
+    let the_future = (now + std::time::Duration::from_millis(1000)).unwrap();
+    let the_distant_future = (now + std::time::Duration::from_millis(2000)).unwrap();
 
-            schedule_fn(
-                txn,
-                &alice_pubkey,
-                persisted_scheduled_fn.clone(),
-                Some(persisted_schedule.clone()),
-                now,
-            )
-            .unwrap();
-            schedule_fn(
-                txn,
-                &alice_pubkey,
-                ephemeral_scheduled_fn.clone(),
-                None,
-                now,
-            )
-            .unwrap();
+    let ephemeral_scheduled_fn = ScheduledFn::new("foo".into(), "bar".into());
+    let persisted_scheduled_fn = ScheduledFn::new("1".into(), "2".into());
+    let persisted_schedule = Schedule::Persisted("* * * * * * *".into());
 
-            assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &alice_pubkey).unwrap());
-            assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &alice_pubkey).unwrap());
+    // Membership check against the merged store for the synthetic author.
+    let fn_scheduled = |scheduled_fn: ScheduledFn| {
+        let author = &author;
+        async move {
+            store
+                .as_read()
+                .is_function_scheduled(author, &scheduled_fn)
+                .await
+                .unwrap()
+        }
+    };
 
-            // Deleting live ephemeral scheduled fns from now should delete.
-            delete_live_ephemeral_scheduled_fns(txn, now, &alice_pubkey).unwrap();
-            assert!(!fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &alice_pubkey,).unwrap());
-            assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &alice_pubkey,).unwrap());
-
-            schedule_fn(
-                txn,
-                &alice_pubkey,
-                ephemeral_scheduled_fn.clone(),
-                None,
-                now,
-            )
-            .unwrap();
-            assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &alice_pubkey,).unwrap());
-            assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &alice_pubkey,).unwrap());
-
-            // Deleting live ephemeral fns from a past time should do nothing.
-            delete_live_ephemeral_scheduled_fns(txn, the_past, &alice_pubkey).unwrap();
-            assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &alice_pubkey,).unwrap());
-            assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &alice_pubkey,).unwrap());
-
-            // Deleting live ephemeral fns from the future should delete.
-            delete_live_ephemeral_scheduled_fns(txn, the_future, &alice_pubkey).unwrap();
-            assert!(!fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &alice_pubkey,).unwrap());
-            assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &alice_pubkey,).unwrap());
-
-            // Deleting all ephemeral fns should delete.
-            schedule_fn(
-                txn,
-                &alice_pubkey,
-                ephemeral_scheduled_fn.clone(),
-                None,
-                now,
-            )
-            .unwrap();
-            assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &alice_pubkey,).unwrap());
-            delete_all_ephemeral_scheduled_fns(txn).unwrap();
-            assert!(!fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &alice_pubkey,).unwrap());
-            assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &alice_pubkey,).unwrap());
-
-            let ephemeral_future_schedule =
-                Schedule::Ephemeral(std::time::Duration::from_millis(1001));
-            schedule_fn(
-                txn,
-                &alice_pubkey,
-                ephemeral_scheduled_fn.clone(),
-                Some(ephemeral_future_schedule.clone()),
-                now,
-            )
-            .unwrap();
-            assert_eq!(
-                vec![(
-                    persisted_scheduled_fn.clone(),
-                    Some(persisted_schedule.clone()),
-                    false,
-                )],
-                live_scheduled_fns(txn, the_future, &alice_pubkey,).unwrap(),
-            );
-            assert_eq!(
-                vec![
-                    (persisted_scheduled_fn, Some(persisted_schedule), false),
-                    (
-                        ephemeral_scheduled_fn,
-                        Some(ephemeral_future_schedule),
-                        true
-                    ),
-                ],
-                live_scheduled_fns(txn, the_distant_future, &alice_pubkey,).unwrap(),
-            );
-
-            Result::<(), DatabaseError>::Ok(())
-        })
+    store
+        .upsert_scheduled_function(
+            &author,
+            &persisted_scheduled_fn,
+            &Some(persisted_schedule.clone()),
+            now,
+        )
         .await
         .unwrap();
+    store
+        .upsert_scheduled_function(&author, &ephemeral_scheduled_fn, &None, now)
+        .await
+        .unwrap();
+
+    assert!(fn_scheduled(persisted_scheduled_fn.clone()).await);
+    assert!(fn_scheduled(ephemeral_scheduled_fn.clone()).await);
+
+    // Deleting live ephemeral scheduled fns from now should delete.
+    store
+        .delete_live_ephemeral_scheduled_functions(&author, now)
+        .await
+        .unwrap();
+    assert!(!fn_scheduled(ephemeral_scheduled_fn.clone()).await);
+    assert!(fn_scheduled(persisted_scheduled_fn.clone()).await);
+
+    store
+        .upsert_scheduled_function(&author, &ephemeral_scheduled_fn, &None, now)
+        .await
+        .unwrap();
+    assert!(fn_scheduled(ephemeral_scheduled_fn.clone()).await);
+    assert!(fn_scheduled(persisted_scheduled_fn.clone()).await);
+
+    // Deleting live ephemeral fns from a past time should do nothing.
+    store
+        .delete_live_ephemeral_scheduled_functions(&author, the_past)
+        .await
+        .unwrap();
+    assert!(fn_scheduled(ephemeral_scheduled_fn.clone()).await);
+    assert!(fn_scheduled(persisted_scheduled_fn.clone()).await);
+
+    // Deleting live ephemeral fns from the future should delete.
+    store
+        .delete_live_ephemeral_scheduled_functions(&author, the_future)
+        .await
+        .unwrap();
+    assert!(!fn_scheduled(ephemeral_scheduled_fn.clone()).await);
+    assert!(fn_scheduled(persisted_scheduled_fn.clone()).await);
+
+    // Deleting all ephemeral fns should delete.
+    store
+        .upsert_scheduled_function(&author, &ephemeral_scheduled_fn, &None, now)
+        .await
+        .unwrap();
+    assert!(fn_scheduled(ephemeral_scheduled_fn.clone()).await);
+    store
+        .delete_all_ephemeral_scheduled_functions()
+        .await
+        .unwrap();
+    assert!(!fn_scheduled(ephemeral_scheduled_fn.clone()).await);
+    assert!(fn_scheduled(persisted_scheduled_fn.clone()).await);
+
+    let ephemeral_future_schedule = Schedule::Ephemeral(std::time::Duration::from_millis(1001));
+    store
+        .upsert_scheduled_function(
+            &author,
+            &ephemeral_scheduled_fn,
+            &Some(ephemeral_future_schedule.clone()),
+            now,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        vec![(
+            persisted_scheduled_fn.clone(),
+            Some(persisted_schedule.clone()),
+            false,
+        )],
+        store
+            .live_scheduled_functions(&author, the_future)
+            .await
+            .unwrap(),
+    );
+    assert_eq!(
+        vec![
+            (persisted_scheduled_fn, Some(persisted_schedule), false),
+            (ephemeral_scheduled_fn, Some(ephemeral_future_schedule), true),
+        ],
+        store
+            .live_scheduled_functions(&author, the_distant_future)
+            .await
+            .unwrap(),
+    );
+
     Ok(())
 }
 
