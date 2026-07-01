@@ -22,6 +22,7 @@ impl DbRead<Dht> {
         &self,
         warrant_hash: DhtOpHash,
     ) -> sqlx::Result<Option<WarrantPublishRow>> {
-        warrant_publish::get_warrant_publish(self.pool(), warrant_hash).await
+        let mut conn = self.timed_conn().await?;
+        warrant_publish::get_warrant_publish(&mut *conn, warrant_hash).await
     }
 }

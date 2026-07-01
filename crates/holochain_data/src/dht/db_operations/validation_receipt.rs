@@ -31,7 +31,8 @@ impl DbRead<Dht> {
         &self,
         op_hash: DhtOpHash,
     ) -> sqlx::Result<Vec<ValidationReceiptRow>> {
-        validation_receipt::get_validation_receipts(self.pool(), op_hash).await
+        let mut conn = self.timed_conn().await?;
+        validation_receipt::get_validation_receipts(&mut *conn, op_hash).await
     }
 
     /// Validation receipts for every op of `action_hash`, joined with op type
@@ -41,6 +42,7 @@ impl DbRead<Dht> {
         &self,
         action_hash: ActionHash,
     ) -> sqlx::Result<Vec<ValidationReceiptForActionRow>> {
-        validation_receipt::validation_receipts_for_action(self.pool(), action_hash).await
+        let mut conn = self.timed_conn().await?;
+        validation_receipt::validation_receipts_for_action(&mut *conn, action_hash).await
     }
 }

@@ -2,7 +2,7 @@
 
 use holo_hash::{AgentPubKey, EntryHash};
 use holochain_integrity_types::entry::Entry;
-use sqlx::{Executor, QueryBuilder, Sqlite};
+use sqlx::{Executor, QueryBuilder, Sqlite, SqliteConnection};
 use std::collections::{HashMap, HashSet};
 
 pub(crate) async fn insert_entry<'e, E>(
@@ -59,14 +59,11 @@ where
 /// The input is de-duplicated and chunked so arbitrarily long chains stay well
 /// within SQLite's bound-parameter limit (each hash is bound up to twice per
 /// query — once for the public branch and once for the private branch).
-pub(crate) async fn get_entries_by_hashes<'e, E>(
-    executor: E,
+pub(crate) async fn get_entries_by_hashes(
+    executor: &mut SqliteConnection,
     hashes: &[EntryHash],
     author: Option<&AgentPubKey>,
-) -> sqlx::Result<HashMap<EntryHash, Entry>>
-where
-    E: Executor<'e, Database = Sqlite> + Copy,
-{
+) -> sqlx::Result<HashMap<EntryHash, Entry>> {
     // SQLite caps bound parameters at ~32766; 500 hashes (bound at most twice
     // each, plus the author) stays comfortably under that on every supported
     // build.
@@ -104,7 +101,7 @@ where
             qb.push(")");
         }
 
-        let rows: Vec<(Vec<u8>, Vec<u8>)> = qb.build_query_as().fetch_all(executor).await?;
+        let rows: Vec<(Vec<u8>, Vec<u8>)> = qb.build_query_as().fetch_all(&mut *executor).await?;
 
         for (hash_bytes, blob) in rows {
             let hash = EntryHash::from_raw_36(hash_bytes);

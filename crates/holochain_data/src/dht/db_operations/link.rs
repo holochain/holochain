@@ -15,6 +15,7 @@ impl DbWrite<Dht> {
 
 impl DbRead<Dht> {
     pub async fn get_links_by_base(&self, base: AnyLinkableHash) -> sqlx::Result<Vec<LinkRow>> {
-        link::get_links_by_base(self.pool(), base).await
+        let mut conn = self.timed_conn().await?;
+        link::get_links_by_base(&mut *conn, base).await
     }
 }

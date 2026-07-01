@@ -64,28 +64,32 @@ impl DbRead<Dht> {
         &self,
         hash: DhtOpHash,
     ) -> sqlx::Result<Option<LimboChainOpRow>> {
-        limbo_chain_op::get_limbo_chain_op(self.pool(), hash).await
+        let mut conn = self.timed_conn().await?;
+        limbo_chain_op::get_limbo_chain_op(&mut *conn, hash).await
     }
 
     pub async fn limbo_chain_ops_pending_sys_validation(
         &self,
         limit: u32,
     ) -> sqlx::Result<Vec<LimboChainOpRow>> {
-        limbo_chain_op::limbo_chain_ops_pending_sys_validation(self.pool(), limit).await
+        let mut conn = self.timed_conn().await?;
+        limbo_chain_op::limbo_chain_ops_pending_sys_validation(&mut *conn, limit).await
     }
 
     pub async fn limbo_chain_ops_pending_app_validation(
         &self,
         limit: u32,
     ) -> sqlx::Result<Vec<LimboChainOpRow>> {
-        limbo_chain_op::limbo_chain_ops_pending_app_validation(self.pool(), limit).await
+        let mut conn = self.timed_conn().await?;
+        limbo_chain_op::limbo_chain_ops_pending_app_validation(&mut *conn, limit).await
     }
 
     pub async fn limbo_chain_ops_ready_for_integration(
         &self,
         limit: u32,
     ) -> sqlx::Result<Vec<LimboChainOpRow>> {
-        limbo_chain_op::limbo_chain_ops_ready_for_integration(self.pool(), limit).await
+        let mut conn = self.timed_conn().await?;
+        limbo_chain_op::limbo_chain_ops_ready_for_integration(&mut *conn, limit).await
     }
 
     /// Fetch limbo chain ops pending sys-validation joined with their `Action`
@@ -94,7 +98,8 @@ impl DbRead<Dht> {
         &self,
         limit: u32,
     ) -> sqlx::Result<Vec<limbo_chain_op::LimboChainOpJoinedRow>> {
-        limbo_chain_op::limbo_chain_ops_pending_sys_validation_with_action(self.pool(), limit).await
+        let mut conn = self.timed_conn().await?;
+        limbo_chain_op::limbo_chain_ops_pending_sys_validation_with_action(&mut *conn, limit).await
     }
 
     /// Fetch limbo chain ops pending app-validation joined with their `Action`
@@ -103,6 +108,7 @@ impl DbRead<Dht> {
         &self,
         limit: u32,
     ) -> sqlx::Result<Vec<limbo_chain_op::LimboChainOpJoinedRow>> {
-        limbo_chain_op::limbo_chain_ops_pending_app_validation_with_action(self.pool(), limit).await
+        let mut conn = self.timed_conn().await?;
+        limbo_chain_op::limbo_chain_ops_pending_app_validation_with_action(&mut *conn, limit).await
     }
 }

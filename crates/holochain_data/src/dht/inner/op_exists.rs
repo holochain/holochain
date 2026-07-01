@@ -1,7 +1,7 @@
 //! Existence checks for op hashes across all op-bearing DHT tables.
 
 use holo_hash::DhtOpHash;
-use sqlx::{Executor, Sqlite};
+use sqlx::{Executor, Sqlite, SqliteConnection};
 
 /// Returns `true` if the given op hash appears in any of the op-bearing
 /// tables (`ChainOp`, `LimboChainOp`, `WarrantOp`, `LimboWarrantOp`).
@@ -39,16 +39,16 @@ where
 ///
 /// Performs N round-trips for simplicity. If profiling shows it
 /// matters, switch to a single `WHERE ... IN (?, ?, ...)` query later.
-pub(crate) async fn op_hashes_present<'e, E>(
-    executor: E,
+///
+/// Takes a `&mut SqliteConnection` rather than a generic executor because it
+/// re-borrows the connection for each per-hash query.
+pub(crate) async fn op_hashes_present(
+    executor: &mut SqliteConnection,
     hashes: &[DhtOpHash],
-) -> sqlx::Result<Vec<bool>>
-where
-    E: Executor<'e, Database = Sqlite> + Copy,
-{
+) -> sqlx::Result<Vec<bool>> {
     let mut out = Vec::with_capacity(hashes.len());
     for h in hashes {
-        out.push(op_exists(executor, h).await?);
+        out.push(op_exists(&mut *executor, h).await?);
     }
     Ok(out)
 }

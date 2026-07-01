@@ -14,8 +14,8 @@ impl DbRead<Dht> {
         author: &AgentPubKey,
         now: Timestamp,
     ) -> sqlx::Result<Vec<(String, String, Vec<u8>)>> {
-        scheduled_function::get_expired_persisted_scheduled_functions(self.pool(), author, now)
-            .await
+        let mut conn = self.timed_conn().await?;
+        scheduled_function::get_expired_persisted_scheduled_functions(&mut *conn, author, now).await
     }
 
     /// Return live scheduled-function rows for `author` at `now`.
@@ -28,7 +28,8 @@ impl DbRead<Dht> {
         author: &AgentPubKey,
         now: Timestamp,
     ) -> sqlx::Result<Vec<(String, String, Vec<u8>, bool)>> {
-        scheduled_function::get_live_scheduled_functions(self.pool(), author, now).await
+        let mut conn = self.timed_conn().await?;
+        scheduled_function::get_live_scheduled_functions(&mut *conn, author, now).await
     }
 
     /// Return `true` if a scheduled-function row exists for the given
@@ -39,8 +40,8 @@ impl DbRead<Dht> {
         zome_name: &str,
         scheduled_fn: &str,
     ) -> sqlx::Result<bool> {
-        scheduled_function::is_function_scheduled(self.pool(), author, zome_name, scheduled_fn)
-            .await
+        let mut conn = self.timed_conn().await?;
+        scheduled_function::is_function_scheduled(&mut *conn, author, zome_name, scheduled_fn).await
     }
 }
 
