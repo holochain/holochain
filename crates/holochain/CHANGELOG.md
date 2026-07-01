@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE** Compiled wasmer modules are now cached in the WASM database (a new `CompiledWasm` table) instead of in a `wasm-cache` directory under the data root. Modules are compiled on demand, persisted as serialized bytes, and rebuilt from those bytes on later loads. The `holochain::conductor::conductor::WASM_CACHE` constant and the on-disk cache directory have been removed. \#5834
+- WASM is now loaded on demand. At startup the conductor builds ribosomes only for enabled apps, and loads an app's ribosomes when it is installed or enabled rather than for every installed cell up front. After a cell completes genesis its compiled modules are evicted from the in-memory cache (to be rebuilt from the stored serialized module on the next zome call), reducing idle memory use. \#5834
+- **BREAKING CHANGE** `Conductor::get_dna_definitions` is now `async` and reads DNA definitions from the DNA-definition store rather than from loaded ribosomes. \#5834
+- Add the `AppStatusFilter::AwaitingMemproofs` variant so `ListApps` can filter for apps that are awaiting membrane proofs. \#5834
 - **BREAKING CHANGE**: Bump Kitsune2 to `0.5.0-dev.6`.
 - **BREAKING CHANGE**: Removed the tx5/WebRTC network transport. The iroh (QUIC) transport is now the only supported network backend. The `transport-tx5-backend-go-pion` feature flag is removed from `holochain`, `holochain_p2p`, and `holochain_cascade`.
 - **BREAKING CHANGE**: Removed the `signal_url` and `webrtc_config` fields from `NetworkConfig`, which configured the tx5 signaling server and WebRTC peer-connection options. Because `NetworkConfig` rejects unknown fields, conductor config YAML that still sets `signal_url` or `webrtc_config` under `network` will now fail to parse and must be updated.

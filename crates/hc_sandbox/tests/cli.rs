@@ -1,10 +1,10 @@
 use holochain_cli_sandbox::cli::LaunchInfo;
 use holochain_client::{AdminWebsocket, AllowedOrigins};
-use holochain_conductor_api::AppResponse;
 use holochain_conductor_api::{
     AdminInterfaceConfig, AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest,
     InterfaceDriver,
 };
+use holochain_conductor_api::{AppResponse, AppStatusFilter};
 use holochain_conductor_config::config::{read_config, write_config};
 use holochain_types::app::InstalledAppId;
 use holochain_types::prelude::{SerializedBytes, SerializedBytesError, YamlProperties};
@@ -222,9 +222,9 @@ async fn generate_sandbox_and_connect() {
 }
 
 /// Generates a new sandbox with a single app deployed with membrane_proof_deferred
-/// set to true and tries to list DNA
+/// set to true and tries to list apps
 #[tokio::test(flavor = "multi_thread")]
-async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
+async fn generate_sandbox_memproof_deferred_and_call_list_apps() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     package_fixture_if_not_packaged().await;
     let app_path = std::env::current_dir()
@@ -255,9 +255,11 @@ async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
 
     // Connect to admin websocket and list DNAs
     let admin_ws = admin_client_from_launch(&launch_info).await;
-    let dnas = admin_ws.list_dnas().await.expect("Failed to list DNAs");
-    // Just verify we can list DNAs without error
-    assert!(!dnas.is_empty(), "Expected at least one DNA");
+    let apps = admin_ws
+        .list_apps(Some(AppStatusFilter::AwaitingMemproofs))
+        .await
+        .expect("Failed to list apps");
+    assert_eq!(1, apps.len(), "Expected one app awaiting memproofs");
 
     shutdown_sandbox(hc_admin).await;
 }

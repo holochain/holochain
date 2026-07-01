@@ -68,15 +68,13 @@ use futures::future::BoxFuture;
 use futures::FutureExt;
 use holochain_state::prelude::WasmStore;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::module::CacheKey;
+use holochain_util::timed;
 use holochain_wasmer_host::module::InstanceWithStore;
-use holochain_wasmer_host::module::ModuleCache;
 use holochain_wasmer_host::prelude::*;
 use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner};
 use once_cell::sync::Lazy;
 use opentelemetry::KeyValue;
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use wasmer::AsStoreMut;
@@ -91,6 +89,8 @@ use wasmer::RuntimeError;
 use wasmer::Store;
 use wasmer::Type;
 
+pub mod module_cache;
+
 #[cfg(any(feature = "wasmer-sys-cranelift", feature = "wasmer-sys-llvm"))]
 mod wasmer_sys;
 #[cfg(any(feature = "wasmer-sys-cranelift", feature = "wasmer-sys-llvm"))]
@@ -99,10 +99,9 @@ use wasmer_sys::*;
 #[cfg(feature = "wasmer-wasmi")]
 mod wasmer_wasmi;
 
+use crate::core::ribosome::real_ribosome::module_cache::{make_module_cache, ModuleCache};
 #[cfg(feature = "wasmer-wasmi")]
 use wasmer_wasmi::*;
-
-pub(crate) type ModuleCacheLock = parking_lot::RwLock<ModuleCache>;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 #[non_exhaustive]
@@ -126,31 +125,6 @@ impl WasmBackend {
     }
 }
 
-pub(crate) fn make_module_cache(
-    backend: WasmBackend,
-    filesystem_path: Option<PathBuf>,
-) -> Option<Arc<ModuleCacheLock>> {
-    match backend {
-        #[cfg(feature = "wasmer-sys-cranelift")]
-        WasmBackend::Cranelift => Some(Arc::new(ModuleCacheLock::new(ModuleCache::new(
-            holochain_wasmer_host::module::sys::make_cranelift_engine,
-            holochain_wasmer_host::module::sys::make_runtime_engine,
-            filesystem_path,
-        )))),
-        #[cfg(feature = "wasmer-sys-llvm")]
-        WasmBackend::Llvm => Some(Arc::new(ModuleCacheLock::new(ModuleCache::new(
-            holochain_wasmer_host::module::sys::make_llvm_engine,
-            holochain_wasmer_host::module::sys::make_runtime_engine,
-            filesystem_path,
-        )))),
-        #[cfg(feature = "wasmer-wasmi")]
-        WasmBackend::Wasmi => {
-            let _file_system_path = filesystem_path;
-            None
-        }
-    }
-}
-
 /// A production ribosome to execute WASM code.
 ///
 /// Note that this is cloned on every invocation so keep clones cheap!
@@ -161,14 +135,8 @@ pub struct RealRibosome {
     /// The DNA definition, allowing lookups of `ZomeDef`s.
     dna_def: Arc<Mutex<DnaDefHashed>>,
 
-    /// Handle to the WASM store, where source code is stored.
-    ///
-    /// Used to populate the in-memory cache on demand.
-    wasm_store: WasmStore,
-
-    /// File system and in-memory cache for wasm modules.
-    #[cfg_attr(feature = "wasmer-wasmi", allow(unused))]
-    wasmer_module_cache: Option<Arc<ModuleCacheLock>>,
+    /// Database and in-memory cache for WASM modules.
+    wasmer_module_cache: Arc<ModuleCache>,
 }
 
 type ContextMap = Lazy<Arc<Mutex<HashMap<u64, Arc<CallContext>>>>>;
@@ -270,100 +238,33 @@ impl RealRibosome {
     pub async fn new(
         backend: WasmBackend,
         dna_def: DnaDefHashed,
-        wasm_store: WasmStore,
-        wasmer_module_cache: Option<Arc<ModuleCacheLock>>,
+        wasmer_module_cache: Arc<ModuleCache>,
     ) -> RibosomeResult<Self> {
         Ok(Self {
             backend,
             dna_def: Arc::new(Mutex::new(dna_def)),
-            wasm_store,
             wasmer_module_cache,
         })
     }
 
-    #[cfg(any(test, feature = "test_utils"))]
-    pub fn empty(backend: WasmBackend, dna_def: DnaDef, wasm_store: WasmStore) -> Self {
-        Self {
-            backend,
-            dna_def: Arc::new(Mutex::new(DnaDefHashed::from_content_sync(dna_def))),
-            wasm_store,
-            wasmer_module_cache: make_module_cache(backend, None),
-        }
-    }
-
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
-    pub async fn build_module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
-        let wasm_hash = self
-            .dna_def
-            .lock()
-            .get_wasm_zome(zome_name)?
-            .clone()
-            .wasm_hash;
+    async fn get_from_cache_or_build(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
+        let cache_key = self.get_module_cache_key(zome_name)?;
 
-        let wasm = self
-            .wasm_store
-            .as_read()
-            .get(&wasm_hash)
-            .await?
-            .ok_or_else(|| RibosomeError::ZomeSourceMissing(zome_name.to_string()))?;
-
-        match self.backend {
-            #[cfg(feature = "wasmer-sys-cranelift")]
-            WasmBackend::Cranelift => {
-                self.get_from_cache_or_build(zome_name, wasm.content.code)
-                    .await
-            }
-            #[cfg(feature = "wasmer-sys-llvm")]
-            WasmBackend::Llvm => {
-                self.get_from_cache_or_build(zome_name, wasm.content.code)
-                    .await
-            }
-            #[cfg(feature = "wasmer-wasmi")]
-            WasmBackend::Wasmi => Ok(holochain_wasmer_host::module::wasmi::build_module(
-                &wasm.content.code,
-            )?),
-        }
+        Ok(timed!([1, 1000, 10_000], self.wasmer_module_cache.get(&cache_key)).await?)
     }
 
-    #[cfg(any(feature = "wasmer-sys-cranelift", feature = "wasmer-sys-llvm"))]
-    async fn get_from_cache_or_build(
-        &self,
-        zome_name: &ZomeName,
-        wasm: bytes::Bytes,
-    ) -> RibosomeResult<Arc<Module>> {
-        if self.wasmer_module_cache.is_some() {
-            let cache_key = self.get_module_cache_key(zome_name)?;
-            let cache_lock = self.wasmer_module_cache.clone().unwrap();
-
-            tokio::task::spawn_blocking(move || {
-                use holochain_util::timed;
-
-                let cache = timed!([1, 10, 1000], cache_lock.write());
-                Ok(timed!([1, 1000, 10_000], cache.get(cache_key, &wasm))?)
-            })
-            .await?
-        } else {
-            panic!("Missing module cache")
-        }
-    }
-
-    // Create a key for module cache.
-    // Format: [WasmHash] as bytes
-    // watch out for cache misses in the tests that make things slooow if you change this!
+    /// Create a key for module cache.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-    pub fn get_module_cache_key(&self, zome_name: &ZomeName) -> Result<CacheKey, DnaError> {
-        let mut key = [0; 32];
+    pub fn get_module_cache_key(&self, zome_name: &ZomeName) -> Result<WasmHash, DnaError> {
         let wasm_zome_hash = self.dna_def.lock().get_wasm_zome_hash(zome_name)?;
-        let bytes = wasm_zome_hash.get_raw_32();
-        key.copy_from_slice(bytes);
-        Ok(key)
+        Ok(wasm_zome_hash)
     }
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn get_module_for_zome(&self, zome: &Zome<ZomeDef>) -> RibosomeResult<Arc<Module>> {
         match &zome.def {
-            // TODO move cache write to here
-            ZomeDef::Wasm(_) => self.build_module(zome.zome_name()).await,
+            ZomeDef::Wasm(_) => self.get_from_cache_or_build(zome.zome_name()).await,
             _ => RibosomeResult::Err(RibosomeError::DnaError(DnaError::ZomeError(
                 ZomeError::NonWasmZome(zome.zome_name().clone()),
             ))),
@@ -460,8 +361,7 @@ impl RealRibosome {
         let empty_ribosome = RealRibosome::new(
             backend,
             empty_dna_def_hashed.clone(),
-            wasm_store,
-            make_module_cache(backend, None),
+            Arc::new(make_module_cache(backend, wasm_store)),
         )
         .await?;
         let empty_ribosome = Ribosome::new(empty_dna_def_hashed, empty_ribosome).await?;
@@ -806,8 +706,7 @@ impl RibosomeImplT for RealRibosome {
     }
 
     fn list_zome_fns(&self, zome_name: &ZomeName) -> RibosomeResult<Vec<FunctionName>> {
-        // TODO do not cache here
-        let module = tokio_helper::block_forever_on(self.build_module(zome_name))?;
+        let module = tokio_helper::block_forever_on(self.get_from_cache_or_build(zome_name))?;
 
         let mut extern_fns: Vec<FunctionName> = module
             .info()
@@ -827,6 +726,59 @@ impl RibosomeImplT for RealRibosome {
         *self.dna_def.lock() = dna_def;
         Ok(())
     }
+
+    fn genesis_complete(&self) -> BoxFuture<'static, ()> {
+        let zome_names: Vec<_> = {
+            self.dna_def
+                .lock()
+                .all_zomes()
+                .map(|(zome_name, _)| zome_name)
+                .cloned()
+                .collect()
+        };
+        let keys: Vec<_> = zome_names
+            .into_iter()
+            .filter_map(|name| self.get_module_cache_key(&name).ok())
+            .collect();
+        let cache = self.wasmer_module_cache.clone();
+
+        Box::pin(async move {
+            for key in keys {
+                // Note that at this point, we have no way to tell which cells the module is
+                // installed on behalf of. If multiple apps are using the same WASM then this
+                // may cause a cache miss for other apps next time they make a zome call. That is
+                // a relatively cheap fix, to reload the compiled module from the database.
+                cache.evict_from_memory_cache(&key).await;
+            }
+        })
+    }
+
+    #[cfg(feature = "test_utils")]
+    fn is_memory_cached(&self, zome_name: &ZomeName) -> RibosomeResult<bool> {
+        let key = self.get_module_cache_key(zome_name)?;
+        Ok(self.wasmer_module_cache.is_in_memory_cache(&key))
+    }
+
+    #[cfg(feature = "test_utils")]
+    fn is_compiled_wasm_stored(
+        &self,
+        zome_name: ZomeName,
+    ) -> BoxFuture<'static, RibosomeResult<bool>> {
+        let key_result = self.get_module_cache_key(&zome_name);
+        let cache = self.wasmer_module_cache.clone();
+
+        Box::pin(async move {
+            let key = key_result?;
+            cache.is_compiled_wasm_stored(&key).await.map_err(|err| {
+                tracing::error!(
+                    ?err,
+                    ?zome_name,
+                    "Failed to check if a compiled WASM has been stored"
+                );
+                RibosomeError::ZomeSourceMissing(zome_name.to_string())
+            })
+        })
+    }
 }
 
 #[cfg(test)]
@@ -843,7 +795,6 @@ mod test {
     use holochain_nonce::fresh_nonce;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::zome_io::ZomeCallParams;
-    use parking_lot::Mutex;
     use std::collections::HashMap;
     use std::sync::Arc;
     use std::time::Duration;

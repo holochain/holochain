@@ -33,6 +33,7 @@ mod test_utils;
 mod validate;
 mod warrant_issuance;
 mod warrants;
+pub mod wasm_caching;
 mod websocket;
 mod websocket_stress;
 mod zero_arc;

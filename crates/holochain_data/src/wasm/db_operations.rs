@@ -21,6 +21,16 @@ impl DbRead<Wasm> {
         reads::get_wasm(self.pool(), hash).await
     }
 
+    /// Check if a compiled, serialized WASM module exists in the database by its original WASM hash.
+    pub async fn compiled_wasm_exists(&self, hash: &WasmHash) -> sqlx::Result<bool> {
+        reads::compiled_wasm_exists(self.pool(), hash).await
+    }
+
+    /// Get a compiled, serialized WASM module by hash.
+    pub async fn get_compiled_wasm(&self, hash: &WasmHash) -> sqlx::Result<Option<bytes::Bytes>> {
+        reads::get_compiled_wasm(self.pool(), hash).await
+    }
+
     /// Check if a DNA definition exists in the database.
     pub async fn dna_def_exists(&self, cell_id: &CellId) -> sqlx::Result<bool> {
         reads::dna_def_exists(self.pool(), cell_id).await
@@ -56,6 +66,15 @@ impl DbWrite<Wasm> {
     /// Store WASM bytecode.
     pub async fn put_wasm(&self, wasm: DnaWasmHashed) -> sqlx::Result<()> {
         writes::put_wasm(self.pool(), wasm).await
+    }
+
+    /// Store a compiled, serialized WASM module under its original WASM hash..
+    pub async fn put_compiled_wasm(
+        &self,
+        hash: WasmHash,
+        serialized: bytes::Bytes,
+    ) -> sqlx::Result<()> {
+        writes::put_compiled_wasm(self.pool(), hash, &serialized).await
     }
 
     /// Store a DNA definition and its associated zomes.

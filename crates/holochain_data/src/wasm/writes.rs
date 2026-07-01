@@ -1,5 +1,5 @@
 use crate::models::wasm::{CoordinatorZomeModel, DnaDefModel, EntryDefModel, IntegrityZomeModel};
-use holo_hash::{AgentPubKey, HashableContentExtSync};
+use holo_hash::{AgentPubKey, HashableContentExtSync, WasmHash};
 use holochain_types::prelude::{DnaDef, DnaWasmHashed, EntryDef, WasmZomeDef, ZomeDef};
 use holochain_zome_types::zome::InlineZomeDef;
 use sqlx::{Acquire, Executor, Sqlite};
@@ -13,6 +13,18 @@ where
 {
     let (wasm, hash) = wasm.into_inner();
     inner_writes::put_wasm(executor, hash.get_raw_39(), &wasm.code).await
+}
+
+/// Store a compiled, serialized WASM module.
+pub(super) async fn put_compiled_wasm<'e, E>(
+    executor: E,
+    wasm_hash: WasmHash,
+    wasm_serialized: &[u8],
+) -> sqlx::Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    inner_writes::put_compiled_wasm(executor, wasm_hash.get_raw_39(), wasm_serialized).await
 }
 
 /// Store a DNA definition and its associated zomes.

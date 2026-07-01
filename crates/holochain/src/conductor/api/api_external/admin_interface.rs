@@ -73,7 +73,8 @@ impl AdminInterfaceApi {
             GetDnaDefinition(cell_id) => {
                 let dna_def = self
                     .conductor_handle
-                    .get_dna_def(&cell_id)
+                    .get_dna_definition(&cell_id)
+                    .await?
                     .ok_or(ConductorApiError::CellMissing(*cell_id))?;
                 Ok(AdminResponse::DnaDefinitionReturned(dna_def.content))
             }
@@ -101,7 +102,7 @@ impl AdminInterfaceApi {
                     .clone()
                     .install_app_bundle(*payload)
                     .await?;
-                let dna_definitions = self.conductor_handle.get_dna_definitions(&app)?;
+                let dna_definitions = self.conductor_handle.get_dna_definitions(&app).await?;
                 Ok(AdminResponse::AppInstalled(AppInfo::from_installed_app(
                     &app,
                     &dna_definitions,
@@ -118,7 +119,7 @@ impl AdminInterfaceApi {
                 Ok(AdminResponse::AppUninstalled)
             }
             ListDnas => {
-                let dna_list = self.conductor_handle.list_dna_hashes();
+                let dna_list = self.conductor_handle.list_dna_hashes().await?;
                 Ok(AdminResponse::DnasListed(dna_list.into_iter().collect()))
             }
             GenerateAgentPubKey => {

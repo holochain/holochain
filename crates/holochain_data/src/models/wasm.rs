@@ -42,6 +42,15 @@ impl WasmModel {
     }
 }
 
+/// Database model for compiled WASM storage.
+///
+/// Maps to the `CompiledWasm` table.
+#[derive(Debug, Clone, FromRow)]
+pub struct CompiledWasmModel {
+    /// The compiled, serialized WASM.
+    pub serialized: Vec<u8>,
+}
+
 /// Database model for DNA definition.
 ///
 /// Maps to the `DnaDef` table. This is a flattened version of the

@@ -84,8 +84,11 @@ pub enum ConductorError {
     #[error(transparent)]
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
 
-    #[error("Wasm code was not found in the wasm store")]
+    #[error("Wasm code was not found in the WASM store")]
     WasmMissing,
+
+    #[error("DNA definition was not found in the store: {0}")]
+    DnaDefMissing(CellId),
 
     #[error("Tried to access an app that was not installed: {0}")]
     AppNotInstalled(InstalledAppId),

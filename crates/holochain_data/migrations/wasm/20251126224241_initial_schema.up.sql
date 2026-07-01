@@ -6,6 +6,14 @@ CREATE TABLE IF NOT EXISTS Wasm (
     code            BLOB           NOT NULL
 );
 
+-- Compiled, serialized WASM module storage
+CREATE TABLE IF NOT EXISTS CompiledWasm (
+    hash            BLOB           PRIMARY KEY ON CONFLICT IGNORE,
+    serialized        BLOB           NOT NULL,
+
+    FOREIGN KEY (hash) REFERENCES Wasm (hash) ON DELETE CASCADE
+);
+
 -- DnaDef storage (flattened from DnaDef struct)
 CREATE TABLE IF NOT EXISTS DnaDef (
     hash            BLOB           NOT NULL,
