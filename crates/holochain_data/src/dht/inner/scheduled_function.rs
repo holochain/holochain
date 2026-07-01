@@ -147,7 +147,14 @@ where
 
     Ok(rows
         .into_iter()
-        .map(|r| (r.zome_name, r.scheduled_fn, r.maybe_schedule, r.ephemeral != 0))
+        .map(|r| {
+            (
+                r.zome_name,
+                r.scheduled_fn,
+                r.maybe_schedule,
+                r.ephemeral != 0,
+            )
+        })
         .collect())
 }
 
