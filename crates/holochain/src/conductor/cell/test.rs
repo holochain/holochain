@@ -42,7 +42,6 @@ async fn test_cell_handle_publish() {
     let data_root_path: DataRootPath = db_dir.clone().into();
     let config = SweetConductorConfig::standard().tune_network_config(|nc| {
         nc.disable_bootstrap = true;
-        nc.signal_url = url2::Url2::parse("ws://dummy.url");
     });
     let handle = Conductor::builder()
         .config(config.into())

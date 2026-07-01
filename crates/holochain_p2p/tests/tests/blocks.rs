@@ -541,22 +541,7 @@ impl TestActor {
                 let peer_meta_db = peer_meta_db.clone();
                 Box::pin(async move { Ok(peer_meta_db) })
             }),
-            #[cfg(feature = "transport-tx5-backend-go-pion")]
-            network_config: Some(serde_json::json!({
-                "coreBootstrap": {
-                    "serverUrl": format!("http://{bootstrap_addr}"),
-                },
-                "tx5Transport": {
-                    "serverUrl": format!("ws://{bootstrap_addr}"),
-                    "signalAllowPlainText": true,
-                    "timeoutS": 30,
-                    "webrtcConnectTimeoutS": 25,
-                }
-            })),
-            #[cfg(all(
-                feature = "transport-iroh",
-                not(feature = "transport-tx5-backend-go-pion")
-            ))]
+            #[cfg(feature = "transport-iroh")]
             network_config: Some(serde_json::json!({
                 "coreBootstrap": {
                     "serverUrl": format!("http://{bootstrap_addr}"),

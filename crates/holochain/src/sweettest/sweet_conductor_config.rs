@@ -63,7 +63,6 @@ impl SweetConductorConfig {
             .with_gossip_round_timeout_ms(10_000);
 
         network_config.bootstrap_url = url2::url2!("rendezvous:");
-        network_config.signal_url = url2::url2!("rendezvous:");
         network_config.relay_url = url2::url2!("rendezvous:");
 
         SweetConductorConfig::from(network_config).tune_conductor(|tune| {
@@ -92,12 +91,8 @@ impl SweetConductorConfig {
             network.bootstrap_url = url2::url2!("{}", rendezvous.bootstrap_addr());
         }
 
-        if network.signal_url.as_str() == "rendezvous:" {
-            network.signal_url = url2::url2!("{}", rendezvous.sig_addr());
-        }
-
         if network.relay_url.as_str() == "rendezvous:" {
-            network.relay_url = url2::url2!("{}", rendezvous.sig_addr());
+            network.relay_url = url2::url2!("{}", rendezvous.relay_addr());
         }
 
         self

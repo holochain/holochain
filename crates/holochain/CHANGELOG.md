@@ -11,6 +11,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - WASM is now loaded on demand. At startup the conductor builds ribosomes only for enabled apps, and loads an app's ribosomes when it is installed or enabled rather than for every installed cell up front. After a cell completes genesis its compiled modules are evicted from the in-memory cache (to be rebuilt from the stored serialized module on the next zome call), reducing idle memory use. \#5834
 - **BREAKING CHANGE** `Conductor::get_dna_definitions` is now `async` and reads DNA definitions from the DNA-definition store rather than from loaded ribosomes. \#5834
 - Add the `AppStatusFilter::AwaitingMemproofs` variant so `ListApps` can filter for apps that are awaiting membrane proofs. \#5834
+- **BREAKING CHANGE**: Bump Kitsune2 to `0.5.0-dev.6`.
+- **BREAKING CHANGE**: Removed the tx5/WebRTC network transport. The iroh (QUIC) transport is now the only supported network backend. The `transport-tx5-backend-go-pion` feature flag is removed from `holochain`, `holochain_p2p`, and `holochain_cascade`.
+- **BREAKING CHANGE**: Removed the `signal_url` and `webrtc_config` fields from `NetworkConfig`, which configured the tx5 signaling server and WebRTC peer-connection options. Because `NetworkConfig` rejects unknown fields, conductor config YAML that still sets `signal_url` or `webrtc_config` under `network` will now fail to parse and must be updated.
+- **BREAKING CHANGE**: `hc sandbox` no longer offers the `webrtc` network type. Only `mem` and `quic` (iroh) transports remain.
+- Removed the `hc_service_check` crate (the `hc-service-check` tool), which checked the health of tx5 network services.
 
 ## 0.7.0-dev.31
 

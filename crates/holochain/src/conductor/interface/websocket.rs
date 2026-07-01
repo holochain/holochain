@@ -756,7 +756,6 @@ mod test {
         let config = SweetConductorConfig::standard()
             .tune_network_config(|nc| {
                 nc.disable_bootstrap = true;
-                nc.signal_url = url2::Url2::parse("ws://dummy.url");
             })
             .into();
         let conductor_handle = ConductorBuilder::new()

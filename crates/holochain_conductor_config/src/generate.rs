@@ -178,7 +178,6 @@ mod test {
 
         let network_config = NetworkConfig {
             bootstrap_url: url2::url2!("test-boot:"),
-            signal_url: url2::url2!("test-sig:"),
             ..Default::default()
         };
 

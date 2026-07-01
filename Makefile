@@ -1,10 +1,9 @@
 # holochain Makefile
 
 # All default features of binaries excluding mutually exclusive features wasmer-sys-cranelift & wasmer-wasmi
-# and tx5 transport and iroh transport
+# and iroh transport
 COMMON_DEFAULT_FEATURES=slow_tests,build_wasms,sqlite-encrypted
 DEFAULT_FEATURES=transport-iroh,$(COMMON_DEFAULT_FEATURES)
-DEFAULT_FEATURES_TRANSPORT_TX5=transport-tx5-backend-go-pion,$(COMMON_DEFAULT_FEATURES)
 UNSTABLE_FEATURES=unstable-sharding,unstable-functions,unstable-migration,$(DEFAULT_FEATURES)
 
 # mark everything as phony because it doesn't represent a file-system output
@@ -95,14 +94,6 @@ build-workspace-wasmer-wasmi:
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer-wasmi
 
-build-workspace-wasmer-sys-cranelift-transport_tx5:
-	cargo build \
-		--workspace \
-		--locked \
-		--all-targets \
-		--no-default-features \
-		--features $(DEFAULT_FEATURES_TRANSPORT_TX5),wasmer-sys-cranelift
-
 # execute tests on all crates with the cranelift wasmer compiler and iroh transport
 test-workspace-wasmer-sys-cranelift:
 	RUST_BACKTRACE=1 cargo nextest run \
@@ -134,14 +125,6 @@ test-workspace-wasmer-wasmi:
 		--locked \
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer-wasmi
-
-# execute tests on all crates with wasmer compiler and tx5 transport
-test-workspace-wasmer-sys-cranelift-transport_tx5:
-	RUST_BACKTRACE=1 cargo nextest run \
-		--workspace \
-		--locked \
-		--no-default-features \
-		--features $(DEFAULT_FEATURES_TRANSPORT_TX5),wasmer-sys-cranelift
 
 clean:
 	cargo clean

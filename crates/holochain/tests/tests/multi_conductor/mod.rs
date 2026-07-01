@@ -22,14 +22,6 @@ async fn test_publish() {
 
     let config = ConductorConfig {
         network: NetworkConfig {
-            #[cfg(feature = "transport-tx5-backend-go-pion")]
-            webrtc_config: Some(serde_json::json!({
-                // It's really hard to test this since it just goes straight
-                // to the webrtc implementation internals, so just adding
-                // here so I can manually verify it is getting at least
-                // passed in via tracing.
-                "ususedFieldTest": true,
-            })),
             disable_gossip: true,
             ..Default::default()
         },

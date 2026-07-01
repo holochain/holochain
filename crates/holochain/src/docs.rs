@@ -24,9 +24,6 @@
 /// The special `NETAUDIT` target is a cross-crate tracing target for
 /// getting a handle on what conductor is doing with remote communications
 /// under the hood. Specific traces are output in:
-/// - sbd-client
-/// - tx5-connection
-/// - tx5
 /// - holochain_p2p
 ///
 /// Where appropriate, try to set some standardized properties on the trace:
@@ -34,8 +31,6 @@
 /// - `m` - module or crate in which the trace is defined
 /// - `t` - type or additional internal context for making sense of the trace
 /// - `a` - action or event described by the trace
-///
-/// E.g.: `m="tx5" t="signal" a="connected"`
 ///
 /// To see the output, use a tracing configuration such as
 /// `RUST_LOG=off,NETAUDIT=trace`.
