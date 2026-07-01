@@ -1238,6 +1238,66 @@ impl DhtStore<DbWrite<Dht>> {
         Ok(())
     }
 
+    /// Test-only: insert an integrated self-authored chain op
+    /// (`locally_validated = true`, `when_integrated = now`) plus its
+    /// `ChainOpPublish` row, WITHOUT inserting the parent `Action`.
+    ///
+    /// A committed record produces several ops that share one action — a
+    /// `Create`, for instance, yields `StoreRecord`, `RegisterAgentActivity`,
+    /// and `StoreEntry` ops — all written integrated by the source-chain flush.
+    /// Use this after
+    /// [`test_insert_authored_chain_op`](DhtStore::test_insert_authored_chain_op),
+    /// which inserts the action once, to add the sibling op types for the same
+    /// action without colliding on the `Action` primary key. This matters for
+    /// the chain-head lookup, which only recognises the integrated
+    /// `RegisterAgentActivity` op.
+    pub async fn test_insert_additional_integrated_op(
+        &self,
+        op: DhtOpHashed,
+        withhold_publish: Option<bool>,
+    ) -> StateMutationResult<()> {
+        use holochain_data::dht::InsertChainOp;
+        use holochain_zome_types::dht_v2::RecordValidity;
+
+        let op_hash = op.as_hash().clone();
+        let serialized_size = holochain_serialized_bytes::encode(op.as_content())
+            .map_err(StateMutationError::from)?
+            .len() as u32;
+        let chain_op = match op.into_inner().0 {
+            DhtOp::ChainOp(c) => c,
+            DhtOp::WarrantOp(_) => {
+                panic!("test_insert_additional_integrated_op requires a ChainOp")
+            }
+        };
+
+        let action_hash = holo_hash::ActionHash::with_data_sync(chain_op.signed_action().action());
+        let basis_hash = chain_op.dht_basis();
+        let storage_center_loc = basis_hash.get_loc();
+        let now = Timestamp::now();
+
+        let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
+        tx.insert_chain_op(InsertChainOp {
+            op_hash: &op_hash,
+            action_hash: &action_hash,
+            op_type: i64::from(chain_op.get_type()),
+            basis_hash: &basis_hash,
+            storage_center_loc,
+            validation_status: RecordValidity::Accepted,
+            locally_validated: true,
+            require_receipt: true,
+            when_received: now,
+            when_integrated: now,
+            serialized_size,
+        })
+        .await
+        .map_err(StateMutationError::from)?;
+        tx.insert_chain_op_publish(&op_hash, None, None, withhold_publish)
+            .await
+            .map_err(StateMutationError::from)?;
+        tx.commit().await.map_err(StateMutationError::from)?;
+        Ok(())
+    }
+
     /// Test-only: insert an entry into the store, routing a private entry to
     /// the `PrivateEntry` table (owned by `private_author`) and a public entry
     /// to the `Entry` table. Mirrors the entry write in the flush path so that

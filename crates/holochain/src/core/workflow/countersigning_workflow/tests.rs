@@ -2006,6 +2006,21 @@ impl TestHarness {
             .await
             .unwrap();
 
+        // The real flush emits a `RegisterAgentActivity` op for every action.
+        // The chain-head lookup (used by `current_countersigning_session` and
+        // `read_chain_head_hash`) scopes to the integrated agent-activity op, so
+        // mirror it here — withheld like the session's other ops — otherwise the
+        // committed session head is invisible to the store reads.
+        let agent_activity_op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(
+            ChainOp::RegisterAgentActivity(sah.signature().clone(), my_action.clone()),
+        )));
+        self.test_space
+            .space
+            .dht_store
+            .test_insert_additional_integrated_op(agent_activity_op, Some(true))
+            .await
+            .unwrap();
+
         signed
     }
 
