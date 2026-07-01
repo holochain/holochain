@@ -45,6 +45,15 @@ kitsune2_bootstrap_srv = { version = "0.5.0-dev.6", default-features = false, op
 kitsune2_api = "0.5.0-dev.6"
 kitsune2_core = "0.5.0-dev.6"
 kitsune2_transport_iroh = { version = "0.5.0-dev.6", default-features = false, optional = true }
+# TEMPORARY PIN (see PR #5849): iroh 1.0.0 otherwise resolves quinn 0.11.11 /
+# quinn-proto 0.11.15 / socket2 0.6.4, which regress QUIC connection establishment
+# on Windows and break the zero-arc integration tests. These are transitive deps of
+# iroh, declared here only to hold the resolution to the last known-good versions
+# (activated with the iroh transport below). Remove once the upstream Windows
+# regression is fixed and the newer versions are verified.
+quinn = { version = "=0.11.9", default-features = false, optional = true }
+quinn-proto = { version = "=0.11.14", default-features = false, optional = true }
+socket2 = { version = "=0.6.3", default-features = false, optional = true }
 bytes = "1.10"
 holochain_sqlite = { version = "^0.7.0-dev.23", path = "../holochain_sqlite" }
 parking_lot = "0.12.3"
@@ -86,6 +95,10 @@ sqlite = ["holo_hash/sqlite", "holochain_keystore/sqlite"]
 
 transport-iroh = [
   "dep:kitsune2_transport_iroh",
+  # Hold the QUIC stack at the last Windows-safe versions (see the pin above).
+  "dep:quinn",
+  "dep:quinn-proto",
+  "dep:socket2",
   "kitsune2/transport-iroh",
   "kitsune2_bootstrap_srv/iroh-relay",
 ]
