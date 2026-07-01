@@ -26,7 +26,7 @@ holochain_nonce = { version = "^0.7.0-dev.2", path = "../holochain_nonce" }
 holochain_types = { version = "^0.7.0-dev.30", path = "../holochain_types" }
 holochain_websocket = { version = "^0.7.0-dev.30", path = "../holochain_websocket" }
 holochain_zome_types = { version = "^0.7.0-dev.19", path = "../holochain_zome_types" }
-kitsune2_api = "0.5.0-dev.6"
+kitsune2_api = "0.5.0-dev.4"
 lair_keystore_api = { version = "0.7.1", optional = true }
 parking_lot = "0.12.1"
 rand = { version = "0.8" }
@@ -42,8 +42,8 @@ holochain = { version = "^0.7.0-dev.31", path = "../holochain", default-features
 ] }
 holochain_wasm_test_utils = { version = "^0.7.0-dev.31", path = "../test_utils/wasm" }
 
-kitsune2_core = "0.5.0-dev.6"
-kitsune2_test_utils = "0.5.0-dev.6"
+kitsune2_core = "0.5.0-dev.4"
+kitsune2_test_utils = "0.5.0-dev.4"
 yaml_serde = "0.10"
 
 [features]
