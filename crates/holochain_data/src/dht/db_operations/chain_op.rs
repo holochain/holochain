@@ -30,23 +30,27 @@ impl DbWrite<Dht> {
 
 impl DbRead<Dht> {
     pub async fn get_chain_op(&self, hash: DhtOpHash) -> sqlx::Result<Option<ChainOpRow>> {
-        chain_op::get_chain_op(self.pool(), hash).await
+        let mut conn = self.timed_conn().await?;
+        chain_op::get_chain_op(&mut *conn, hash).await
     }
 
     pub async fn get_chain_ops_by_basis(&self, basis: AnyDhtHash) -> sqlx::Result<Vec<ChainOpRow>> {
-        chain_op::get_chain_ops_by_basis(self.pool(), basis).await
+        let mut conn = self.timed_conn().await?;
+        chain_op::get_chain_ops_by_basis(&mut *conn, basis).await
     }
 
     /// `(hash, basis_hash, storage_center_loc)` for every integrated chain op.
     pub async fn integrated_op_locations(&self) -> sqlx::Result<Vec<OpLocationRow>> {
-        chain_op::integrated_op_locations(self.pool()).await
+        let mut conn = self.timed_conn().await?;
+        chain_op::integrated_op_locations(&mut *conn).await
     }
 
     pub async fn get_chain_ops_for_action(
         &self,
         action_hash: ActionHash,
     ) -> sqlx::Result<Vec<ChainOpRow>> {
-        chain_op::get_chain_ops_for_action(self.pool(), action_hash).await
+        let mut conn = self.timed_conn().await?;
+        chain_op::get_chain_ops_for_action(&mut *conn, action_hash).await
     }
 
     /// Terminal validation outcome of the chain op for `(action_hash,
@@ -57,12 +61,14 @@ impl DbRead<Dht> {
         action_hash: &ActionHash,
         op_type: i64,
     ) -> sqlx::Result<Option<i64>> {
-        chain_op::op_validation_outcome(self.pool(), action_hash, op_type).await
+        let mut conn = self.timed_conn().await?;
+        chain_op::op_validation_outcome(&mut *conn, action_hash, op_type).await
     }
 
     /// Return integrated, validated `ChainOp` rows that still require a
     /// validation receipt to be sent.
     pub async fn pending_validation_receipts(&self) -> sqlx::Result<Vec<PendingReceiptRow>> {
-        chain_op::pending_validation_receipts(self.pool()).await
+        let mut conn = self.timed_conn().await?;
+        chain_op::pending_validation_receipts(&mut *conn).await
     }
 }

@@ -30,7 +30,8 @@ impl DbRead<Dht> {
         hash: EntryHash,
         author: Option<&AgentPubKey>,
     ) -> sqlx::Result<Option<Entry>> {
-        entry::get_entry(self.pool(), hash, author).await
+        let mut conn = self.timed_conn().await?;
+        entry::get_entry(&mut *conn, hash, author).await
     }
 
     /// Batch-reads entries by hash in a single query per chunk, keyed by entry
@@ -42,6 +43,7 @@ impl DbRead<Dht> {
         hashes: &[EntryHash],
         author: Option<&AgentPubKey>,
     ) -> sqlx::Result<HashMap<EntryHash, Entry>> {
-        entry::get_entries_by_hashes(self.pool(), hashes, author).await
+        let mut conn = self.timed_conn().await?;
+        entry::get_entries_by_hashes(&mut conn, hashes, author).await
     }
 }

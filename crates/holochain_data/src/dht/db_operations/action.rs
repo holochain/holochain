@@ -23,7 +23,8 @@ impl DbRead<Dht> {
     /// Fetch a single action by hash, returning it with its stored signature
     /// and hash as a [`SignedActionHashed`].
     pub async fn get_action(&self, hash: ActionHash) -> sqlx::Result<Option<SignedActionHashed>> {
-        action::get_action(self.pool(), hash).await
+        let mut conn = self.timed_conn().await?;
+        action::get_action(&mut *conn, hash).await
     }
 
     /// Fetch all actions for a given author, ordered by `action_seq` ascending.
@@ -31,7 +32,8 @@ impl DbRead<Dht> {
         &self,
         author: AgentPubKey,
     ) -> sqlx::Result<Vec<SignedActionHashed>> {
-        action::get_actions_by_author(self.pool(), author).await
+        let mut conn = self.timed_conn().await?;
+        action::get_actions_by_author(&mut *conn, author).await
     }
 
     /// Count actions authored by `author`, capped at `cap`. See
@@ -41,7 +43,8 @@ impl DbRead<Dht> {
         author: &AgentPubKey,
         cap: i64,
     ) -> sqlx::Result<i64> {
-        action::count_author_actions_capped(self.pool(), author, cap).await
+        let mut conn = self.timed_conn().await?;
+        action::count_author_actions_capped(&mut *conn, author, cap).await
     }
 
     /// The author's chain head from the merged store: the highest-sequence
@@ -50,7 +53,8 @@ impl DbRead<Dht> {
         &self,
         author: &AgentPubKey,
     ) -> sqlx::Result<Option<(ActionHash, u32, holochain_timestamp::Timestamp)>> {
-        action::chain_head_for_author(self.pool(), author).await
+        let mut conn = self.timed_conn().await?;
+        action::chain_head_for_author(&mut *conn, author).await
     }
 
     /// Integrated `RegisterAgentActivity` actions for `author`, ordered by
@@ -60,7 +64,8 @@ impl DbRead<Dht> {
         author: AgentPubKey,
         include_entries: bool,
     ) -> sqlx::Result<Vec<AgentActivityItem>> {
-        action::get_agent_activity(self.pool(), &author, include_entries).await
+        let mut conn = self.timed_conn().await?;
+        action::get_agent_activity(&mut *conn, &author, include_entries).await
     }
 
     /// Bounded `RegisterAgentActivity` scan: `author`'s integrated actions with
@@ -72,7 +77,8 @@ impl DbRead<Dht> {
         chain_top_seq: u32,
         until_seq: Option<u32>,
     ) -> sqlx::Result<Vec<SignedActionHashed>> {
-        action::get_filtered_agent_activity(self.pool(), &author, chain_top_seq, until_seq).await
+        let mut conn = self.timed_conn().await?;
+        action::get_filtered_agent_activity(&mut *conn, &author, chain_top_seq, until_seq).await
     }
 
     /// The chain sequence and authored timestamp of `action_hash`, if it is an
@@ -82,7 +88,8 @@ impl DbRead<Dht> {
         author: AgentPubKey,
         action_hash: ActionHash,
     ) -> sqlx::Result<Option<(u32, holochain_timestamp::Timestamp)>> {
-        action::get_action_seq_and_timestamp(self.pool(), &author, &action_hash).await
+        let mut conn = self.timed_conn().await?;
+        action::get_action_seq_and_timestamp(&mut *conn, &author, &action_hash).await
     }
 
     /// Fetch all actions with `prev_hash = prev_hash` and `hash != exclude_hash`.
@@ -92,7 +99,8 @@ impl DbRead<Dht> {
         prev_hash: &ActionHash,
         exclude_hash: &ActionHash,
     ) -> sqlx::Result<Vec<SignedActionHashed>> {
-        action::get_actions_by_prev_hash(self.pool(), prev_hash, exclude_hash).await
+        let mut conn = self.timed_conn().await?;
+        action::get_actions_by_prev_hash(&mut *conn, prev_hash, exclude_hash).await
     }
 
     /// The entry's `StoreEntry` create actions at `validation_status`.
@@ -102,7 +110,8 @@ impl DbRead<Dht> {
         author: Option<&AgentPubKey>,
         validation_status: RecordValidity,
     ) -> sqlx::Result<Vec<SignedActionHashed>> {
-        action::get_create_actions_for_entry(self.pool(), entry_hash, author, validation_status)
+        let mut conn = self.timed_conn().await?;
+        action::get_create_actions_for_entry(&mut *conn, entry_hash, author, validation_status)
             .await
     }
 
@@ -111,7 +120,8 @@ impl DbRead<Dht> {
         &self,
         entry_hash: &EntryHash,
     ) -> sqlx::Result<Vec<SignedActionHashed>> {
-        action::get_delete_actions_for_entry(self.pool(), entry_hash).await
+        let mut conn = self.timed_conn().await?;
+        action::get_delete_actions_for_entry(&mut *conn, entry_hash).await
     }
 
     /// The `Update` actions from `entry_hash`.
@@ -119,7 +129,8 @@ impl DbRead<Dht> {
         &self,
         entry_hash: &EntryHash,
     ) -> sqlx::Result<Vec<SignedActionHashed>> {
-        action::get_update_actions_for_entry(self.pool(), entry_hash).await
+        let mut conn = self.timed_conn().await?;
+        action::get_update_actions_for_entry(&mut *conn, entry_hash).await
     }
 
     /// Live `StoreEntry` create actions for `entry_hash` (valid, integrated,
@@ -129,7 +140,8 @@ impl DbRead<Dht> {
         entry_hash: &EntryHash,
         author: Option<&AgentPubKey>,
     ) -> sqlx::Result<Vec<SignedActionHashed>> {
-        action::get_live_entry_creates(self.pool(), entry_hash, author).await
+        let mut conn = self.timed_conn().await?;
+        action::get_live_entry_creates(&mut *conn, entry_hash, author).await
     }
 
     /// The `Delete` actions targeting `record_action_hash`.
@@ -137,7 +149,8 @@ impl DbRead<Dht> {
         &self,
         record_action_hash: &ActionHash,
     ) -> sqlx::Result<Vec<SignedActionHashed>> {
-        action::get_delete_actions_for_record(self.pool(), record_action_hash).await
+        let mut conn = self.timed_conn().await?;
+        action::get_delete_actions_for_record(&mut *conn, record_action_hash).await
     }
 
     /// The `Update` actions that update `record_action_hash`.
@@ -145,7 +158,8 @@ impl DbRead<Dht> {
         &self,
         record_action_hash: &ActionHash,
     ) -> sqlx::Result<Vec<SignedActionHashed>> {
-        action::get_update_actions_for_record(self.pool(), record_action_hash).await
+        let mut conn = self.timed_conn().await?;
+        action::get_update_actions_for_record(&mut *conn, record_action_hash).await
     }
 
     /// The live `CreateLink` actions on `base` (excluding tombstoned links).
@@ -153,7 +167,8 @@ impl DbRead<Dht> {
         &self,
         base: &AnyLinkableHash,
     ) -> sqlx::Result<Vec<SignedActionHashed>> {
-        action::get_live_link_actions(self.pool(), base).await
+        let mut conn = self.timed_conn().await?;
+        action::get_live_link_actions(&mut *conn, base).await
     }
 
     /// All `CreateLink` actions on `base` (live and tombstoned).
@@ -161,7 +176,8 @@ impl DbRead<Dht> {
         &self,
         base: &AnyLinkableHash,
     ) -> sqlx::Result<Vec<SignedActionHashed>> {
-        action::get_link_create_actions(self.pool(), base).await
+        let mut conn = self.timed_conn().await?;
+        action::get_link_create_actions(&mut *conn, base).await
     }
 
     /// The `DeleteLink` actions tombstoning `create_link_hash`.
@@ -169,7 +185,8 @@ impl DbRead<Dht> {
         &self,
         create_link_hash: &ActionHash,
     ) -> sqlx::Result<Vec<SignedActionHashed>> {
-        action::get_delete_link_actions(self.pool(), create_link_hash).await
+        let mut conn = self.timed_conn().await?;
+        action::get_delete_link_actions(&mut *conn, create_link_hash).await
     }
 
     /// Authority-serving create-link actions for `base` (locally-validated only),
@@ -178,7 +195,8 @@ impl DbRead<Dht> {
         &self,
         base: &AnyLinkableHash,
     ) -> sqlx::Result<Vec<(SignedActionHashed, RecordValidity)>> {
-        action::get_authority_link_creates(self.pool(), base).await
+        let mut conn = self.timed_conn().await?;
+        action::get_authority_link_creates(&mut *conn, base).await
     }
 
     /// Authority-serving delete-link actions targeting `base`'s links
@@ -187,7 +205,8 @@ impl DbRead<Dht> {
         &self,
         base: &AnyLinkableHash,
     ) -> sqlx::Result<Vec<(SignedActionHashed, RecordValidity)>> {
-        action::get_authority_delete_links(self.pool(), base).await
+        let mut conn = self.timed_conn().await?;
+        action::get_authority_delete_links(&mut *conn, base).await
     }
 
     /// Authority-serving `StoreRecord` action for `action_hash` (locally-validated
@@ -196,7 +215,8 @@ impl DbRead<Dht> {
         &self,
         action_hash: &ActionHash,
     ) -> sqlx::Result<Option<(SignedActionHashed, RecordValidity)>> {
-        action::get_authority_store_record(self.pool(), action_hash).await
+        let mut conn = self.timed_conn().await?;
+        action::get_authority_store_record(&mut *conn, action_hash).await
     }
 
     /// Authority-serving deletes targeting record `record_action_hash`
@@ -205,7 +225,8 @@ impl DbRead<Dht> {
         &self,
         record_action_hash: &ActionHash,
     ) -> sqlx::Result<Vec<(SignedActionHashed, RecordValidity)>> {
-        action::get_authority_deletes_for_record(self.pool(), record_action_hash).await
+        let mut conn = self.timed_conn().await?;
+        action::get_authority_deletes_for_record(&mut *conn, record_action_hash).await
     }
 
     /// Authority-serving updates targeting record `record_action_hash`
@@ -214,7 +235,8 @@ impl DbRead<Dht> {
         &self,
         record_action_hash: &ActionHash,
     ) -> sqlx::Result<Vec<(SignedActionHashed, RecordValidity)>> {
-        action::get_authority_updates_for_record(self.pool(), record_action_hash).await
+        let mut conn = self.timed_conn().await?;
+        action::get_authority_updates_for_record(&mut *conn, record_action_hash).await
     }
 
     /// Authority-serving create actions for entry `entry_hash` (locally-validated
@@ -223,7 +245,8 @@ impl DbRead<Dht> {
         &self,
         entry_hash: &EntryHash,
     ) -> sqlx::Result<Vec<(SignedActionHashed, RecordValidity)>> {
-        action::get_authority_entry_creates(self.pool(), entry_hash).await
+        let mut conn = self.timed_conn().await?;
+        action::get_authority_entry_creates(&mut *conn, entry_hash).await
     }
 
     /// Authority-serving deletes targeting entry `entry_hash` (locally-validated
@@ -232,7 +255,8 @@ impl DbRead<Dht> {
         &self,
         entry_hash: &EntryHash,
     ) -> sqlx::Result<Vec<(SignedActionHashed, RecordValidity)>> {
-        action::get_authority_deletes_for_entry(self.pool(), entry_hash).await
+        let mut conn = self.timed_conn().await?;
+        action::get_authority_deletes_for_entry(&mut *conn, entry_hash).await
     }
 
     /// Authority-serving updates targeting entry `entry_hash` (locally-validated
@@ -241,6 +265,7 @@ impl DbRead<Dht> {
         &self,
         entry_hash: &EntryHash,
     ) -> sqlx::Result<Vec<(SignedActionHashed, RecordValidity)>> {
-        action::get_authority_updates_for_entry(self.pool(), entry_hash).await
+        let mut conn = self.timed_conn().await?;
+        action::get_authority_updates_for_entry(&mut *conn, entry_hash).await
     }
 }
