@@ -335,8 +335,16 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     // The fetched activity carries alice's real signatures, so it passes the
     // signature gate and lands in the DhtStore. Wait for the background fetch to
     // store the chain.
-    await_action_in_store(&test_space.space.dht_store, create_action_signed_hashed.as_hash()).await;
-    await_action_in_store(&test_space.space.dht_store, delete_action_signed_hashed.as_hash()).await;
+    await_action_in_store(
+        &test_space.space.dht_store,
+        create_action_signed_hashed.as_hash(),
+    )
+    .await;
+    await_action_in_store(
+        &test_space.space.dht_store,
+        delete_action_signed_hashed.as_hash(),
+    )
+    .await;
 
     // app validation outcome should be accepted, now that bob's missing agent
     // activity is available in the DhtStore
@@ -503,7 +511,10 @@ impl TestCase {
 }
 
 // Wait for the given action to be fetched into the DhtStore.
-async fn await_action_in_store(dht_store: &holochain_state::dht_store::DhtStore, hash: &ActionHash) {
+async fn await_action_in_store(
+    dht_store: &holochain_state::dht_store::DhtStore,
+    hash: &ActionHash,
+) {
     loop {
         if dht_store
             .as_read()

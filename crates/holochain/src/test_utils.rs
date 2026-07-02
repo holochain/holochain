@@ -477,10 +477,7 @@ pub fn fake_valid_dna_file(network_seed: &str) -> DnaFile {
 /// `dna_hash` must match the DNA the caller's `dht_db` was opened for; the
 /// helper reuses it for the genesis `Action::Dna` and for the new-DB
 /// `DhtStore` so the legacy and mirrored writes land in the same DNA space.
-pub async fn fake_genesis(
-    dna_hash: DnaHash,
-    keystore: MetaLairClient,
-) -> SourceChainResult<()> {
+pub async fn fake_genesis(dna_hash: DnaHash, keystore: MetaLairClient) -> SourceChainResult<()> {
     fake_genesis_for_agent(dna_hash, fake_agent_pubkey_1(), keystore).await
 }
 

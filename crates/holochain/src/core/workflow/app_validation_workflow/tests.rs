@@ -7,6 +7,7 @@ use crate::core::workflow::app_validation_workflow::{
 };
 use crate::core::{SysValidationError, ValidationOutcome};
 use crate::sweettest::*;
+use crate::test_utils::conditional_consistency::*;
 use crate::test_utils::{
     get_valid_and_integrated_count, get_valid_and_not_integrated_count, host_fn_caller::*,
     new_invocation, new_zome_call_params, wait_for_integration,
@@ -36,9 +37,6 @@ use std::convert::{TryFrom, TryInto};
 use std::hash::Hash;
 use std::sync::Arc;
 use std::time::Duration;
-use {
-    crate::test_utils::conditional_consistency::*,
-};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn main_workflow() {

@@ -47,14 +47,9 @@ async fn inform_kitsune_about_integrated_ops() {
                 Ok(())
             });
         let hc_p2p = Arc::new(hc_p2p);
-        integrate_dht_ops_workflow(
-            dht_store,
-            tx,
-            hc_p2p,
-            mock_authored_db_provider_none(),
-        )
-        .await
-        .unwrap();
+        integrate_dht_ops_workflow(dht_store, tx, hc_p2p, mock_authored_db_provider_none())
+            .await
+            .unwrap();
     }
 }
 
@@ -69,14 +64,9 @@ async fn kitsune_not_informed_when_no_ops_integrated() {
     hc_p2p.expect_dna_hash().return_const(dna_hash.clone());
     hc_p2p.expect_new_integrated_data().never();
     let hc_p2p = Arc::new(hc_p2p);
-    integrate_dht_ops_workflow(
-        dht_store,
-        tx,
-        hc_p2p,
-        mock_authored_db_provider_none(),
-    )
-    .await
-    .unwrap();
+    integrate_dht_ops_workflow(dht_store, tx, hc_p2p, mock_authored_db_provider_none())
+        .await
+        .unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]

@@ -68,8 +68,7 @@ pub async fn inner_countersigning_session_incomplete(
         .filter(|a| **a != author)
         .collect::<Vec<_>>();
 
-    let cascade =
-        CascadeImpl::empty(space.dht_store.clone()).with_network(network);
+    let cascade = CascadeImpl::empty(space.dht_store.clone()).with_network(network);
 
     let get_activity_options = GetActivityOptions {
         network_req_options: NetworkRequestOptions {
