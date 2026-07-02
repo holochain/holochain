@@ -37,6 +37,33 @@ impl Histogram {
     }
 }
 
+/// Metric for `hc.db.write_txn.duration`.
+pub(crate) type WriteTxnDurationMetric = Histogram;
+
+/// Create a [`WriteTxnDurationMetric`] bound to the given database identifier.
+///
+/// The histogram carries the same `kind`/`id` attributes as
+/// [`create_connection_use_time_metric`]. It is recorded when a write
+/// transaction is committed, mirroring how `holochain_sqlite` timed its
+/// exclusive write transactions.
+pub(crate) fn create_write_txn_duration_metric<I: DatabaseIdentifier>(
+    identifier: &I,
+) -> WriteTxnDurationMetric {
+    let histogram = meter("hc.db")
+        .f64_histogram("hc.db.write_txn.duration")
+        .with_unit("s")
+        .with_description("The time spent executing a write transaction")
+        .build();
+    let attributes = vec![
+        KeyValue::new("kind", db_kind_name(identifier.db_kind())),
+        KeyValue::new("id", identifier.database_id().to_string()),
+    ];
+    Histogram {
+        histogram,
+        attributes,
+    }
+}
+
 /// Metric for `hc.db.connections.use_time`.
 pub(crate) type ConnectionUseTimeMetric = Histogram;
 
