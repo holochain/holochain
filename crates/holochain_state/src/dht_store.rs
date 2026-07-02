@@ -1205,7 +1205,7 @@ impl DhtStore<DbWrite<Dht>> {
         let now = Timestamp::now();
 
         let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
-        tx.insert_action(&new_sah, None)
+        tx.insert_action(&new_sah, Some(RecordValidity::Accepted))
             .await
             .map_err(StateMutationError::from)?;
         tx.insert_chain_op(InsertChainOp {
@@ -1245,9 +1245,7 @@ impl DhtStore<DbWrite<Dht>> {
     /// Use this after
     /// [`test_insert_authored_chain_op`](DhtStore::test_insert_authored_chain_op),
     /// which inserts the action once, to add the sibling op types for the same
-    /// action without colliding on the `Action` primary key. This matters for
-    /// the chain-head lookup, which only recognises the integrated
-    /// `RegisterAgentActivity` op.
+    /// action without colliding on the `Action` primary key.
     pub async fn test_insert_additional_integrated_op(
         &self,
         op: DhtOpHashed,
