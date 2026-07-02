@@ -12,10 +12,6 @@ pub use error::*;
 // `Action`/`Record`/`SignedActionHashed` to their legacy shape. A handful of
 // functions read through to v2-native `DhtStore` methods; those convert at
 // the point of use instead of relying on the module-wide shadow.
-use holochain_types::prelude::LegacySignedAction;
-use holochain_zome_types::dependencies::holochain_integrity_types::action::Action;
-use holochain_zome_types::dependencies::holochain_integrity_types::record::Record;
-use holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
@@ -26,6 +22,10 @@ use holochain_data::kind::Dht;
 use holochain_data::{DbRead, DbWrite};
 use holochain_keystore::MetaLairClient;
 use holochain_state_types::SourceChainDump;
+use holochain_types::prelude::LegacySignedAction;
+use holochain_zome_types::dependencies::holochain_integrity_types::action::Action;
+use holochain_zome_types::dependencies::holochain_integrity_types::record::Record;
+use holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed;
 use kitsune2_api::DhtArc;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
@@ -1158,8 +1158,7 @@ pub async fn genesis(
         membrane_proof,
     });
     let agent_validation_action = ActionHashed::from_content_sync(agent_validation_action);
-    let agent_validation_action =
-        sign_legacy_action(&keystore, agent_validation_action).await?;
+    let agent_validation_action = sign_legacy_action(&keystore, agent_validation_action).await?;
     let avh_addr = agent_validation_action.as_hash().clone();
     let agent_validation_record = Record::new(agent_validation_action, None);
     let avh_ops = produce_op_lites_from_records(vec![&agent_validation_record])?;
@@ -1404,8 +1403,7 @@ pub(crate) fn encoded_chain_op_size(
     let Some(sah) = actions.iter().find(|sah| sah.as_hash() == action_hash) else {
         return 0;
     };
-    let signed_action: LegacySignedAction =
-        (sah.action().clone(), sah.signature().clone()).into();
+    let signed_action: LegacySignedAction = (sah.action().clone(), sah.signature().clone()).into();
     let maybe_entry: Option<Entry> = signed_action
         .data()
         .entry_hash()

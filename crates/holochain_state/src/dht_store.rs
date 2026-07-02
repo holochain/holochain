@@ -549,10 +549,10 @@ impl DhtStore<DbWrite<Dht>> {
             match op.into_inner().0 {
                 DhtOp::ChainOp(chain_op) => {
                     let signed_action = chain_op.signed_action();
-                    let action_hash = holo_hash::ActionHash::with_data_sync(signed_action.action());
-                    let sah = holochain_zome_types::record::SignedActionHashed::with_presigned(
+                    let action_hash = holo_hash::ActionHash::with_data_sync(signed_action.data());
+                    let sah = holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed::with_presigned(
                         holo_hash::HoloHashed::with_pre_hashed(
-                            signed_action.action().clone(),
+                            signed_action.data().clone(),
                             action_hash.clone(),
                         ),
                         signed_action.signature().clone(),
@@ -1211,10 +1211,10 @@ impl DhtStore<DbWrite<Dht>> {
         };
 
         let signed_action = chain_op.signed_action();
-        let action_hash = holo_hash::ActionHash::with_data_sync(signed_action.action());
-        let sah = holochain_zome_types::record::SignedActionHashed::with_presigned(
+        let action_hash = holo_hash::ActionHash::with_data_sync(signed_action.data());
+        let sah = holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed::with_presigned(
             holo_hash::HoloHashed::with_pre_hashed(
-                signed_action.action().clone(),
+                signed_action.data().clone(),
                 action_hash.clone(),
             ),
             signed_action.signature().clone(),
@@ -1286,7 +1286,7 @@ impl DhtStore<DbWrite<Dht>> {
             }
         };
 
-        let action_hash = holo_hash::ActionHash::with_data_sync(chain_op.signed_action().action());
+        let action_hash = holo_hash::ActionHash::with_data_sync(chain_op.signed_action().data());
         let basis_hash = chain_op.dht_basis();
         let storage_center_loc = basis_hash.get_loc();
         let now = Timestamp::now();
