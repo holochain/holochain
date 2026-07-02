@@ -398,9 +398,11 @@ fixturator!(
 );
 
 pub fn record_with_no_entry(signature: Signature, action: Action) -> Record {
-    let shh =
-        SignedActionHashed::with_presigned(ActionHashed::from_content_sync(action), signature);
-    Record::new(shh, None)
+    let shh = SignedActionHashed::with_presigned(
+        holo_hash::HoloHashed::from_content_sync(action),
+        signature,
+    );
+    Record::new(shh, RecordEntry::NA)
 }
 
 fixturator!(
@@ -620,8 +622,15 @@ fixturator!(
     constructor fn from_builder(ActionBuilderCommon, ActionHash, EntryHash);
 );
 
+// The legacy per-variant `Action` enum. `Action` (unqualified, via the
+// prelude) resolves to the v2 `ActionHeader` + `ActionData` struct, which can't
+// use the enum `variants [..]` form. This alias drives a per-variant fixturator
+// (`LegacyActionFixturator`) that the v2 `Action` fixturator below projects
+// onto the v2 shape.
+type LegacyAction = holochain_integrity_types::action::Action;
+
 fixturator!(
-    Action;
+    LegacyAction;
     variants [
         Dna(Dna)
         AgentValidationPkg(AgentValidationPkg)
@@ -636,23 +645,51 @@ fixturator!(
     ];
 
     curve PublicCurve {
-        match fixt!(Action) {
-            Action::Create(_) => Action::Create(fixt!(Create, PublicCurve)),
-            Action::Update(_) => Action::Update(fixt!(Update, PublicCurve)),
+        match fixt!(LegacyAction) {
+            LegacyAction::Create(_) => LegacyAction::Create(fixt!(Create, PublicCurve)),
+            LegacyAction::Update(_) => LegacyAction::Update(fixt!(Update, PublicCurve)),
             other_type => other_type,
         }
     };
 );
 
+// Build a legacy action variant with the per-variant fixturators, then project
+// it onto the v2 `Action` shape. The projection is total and drops only the
+// legacy `weight` field, which the v2 model omits.
 fixturator!(
-    ActionHashed;
-    constructor fn from_content_sync_exact(Action);
+    Action;
+    curve Empty crate::dht_v2::from_legacy_action(
+        &LegacyActionFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap(),
+    );
+    curve Unpredictable crate::dht_v2::from_legacy_action(
+        &LegacyActionFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+    );
+    curve Predictable crate::dht_v2::from_legacy_action(
+        &LegacyActionFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+    );
+    curve PublicCurve crate::dht_v2::from_legacy_action(
+        &LegacyActionFixturator::new_indexed(PublicCurve, get_fixt_index!())
+            .next()
+            .unwrap(),
+    );
 );
+
+// Build a v2 `SignedActionHashed` (`SignedHashed<v2 Action>`) directly from a v2
+// action and signature, hashing the action content.
+fn signed_action_hashed_from_parts(action: Action, signature: Signature) -> SignedActionHashed {
+    SignedActionHashed::with_presigned(holo_hash::HoloHashed::from_content_sync(action), signature)
+}
 
 fixturator!(
     with_vec 0 5;
     SignedActionHashed;
-    constructor fn with_presigned(ActionHashed, Signature);
+    vanilla fn signed_action_hashed_from_parts(Action, Signature);
 );
 
 fixturator!(
