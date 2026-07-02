@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE**: `DnaStorageInfo` (returned by the `StorageInfo` admin call) drops its `authored_data_size`/`authored_data_size_on_disk` and `cache_data_size`/`cache_data_size_on_disk` fields. An agent's source-chain data now lives in the per-DNA DHT database and is counted in `dht_data_size`/`dht_data_size_on_disk`; the separate cache figure is removed. \#5844
+
 ## 0.7.0-dev.32
 
 - **BREAKING CHANGE** Compiled wasmer modules are now cached in the WASM database (a new `CompiledWasm` table) instead of in a `wasm-cache` directory under the data root. Modules are compiled on demand, persisted as serialized bytes, and rebuilt from those bytes on later loads. The `holochain::conductor::conductor::WASM_CACHE` constant and the on-disk cache directory have been removed. \#5834
