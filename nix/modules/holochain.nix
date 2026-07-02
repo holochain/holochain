@@ -5,7 +5,7 @@
     let
       rustToolchain = config.rustHelper.mkRust {
         track = "stable";
-        version = "1.95.0";
+        version = "1.96.1";
       };
 
       craneLib = (inputs.crane.mkLib pkgs).overrideToolchain rustToolchain;
