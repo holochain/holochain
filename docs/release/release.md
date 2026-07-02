@@ -4,12 +4,12 @@
 
 ![release holochain workflow](./release-holochain_1.png)
 
-This requires you have GitHub credentials with appropriate permissions.
+This requires your GitHub account to have appropriate permissions.
 
 1. Visit https://github.com/holochain/holochain/actions
-2. Select the "release holochain" workflow
-3. Press the "Run workflow" button
-4. (Optional) Pick a branch that is different from _develop_ for this release, e.g. _develop-0.1_ in case there are backports to be released
+2. Select the "release holochain" workflow (pinned workflow)
+3. Click the "Run workflow" dropdown
+4. (Optional) If creating a release from a maintenance branch, set the source branch to that branch, e.g. _develop-0.6_ to release backported changes for `v0.6.x`.
 5. Indicate whether this is a dry-run (keep _true_) or a real release (change the field to _false_)
 6. Confirm by clicking on "Run workflow"
 
@@ -27,13 +27,15 @@ The _release-automation_ tool parses **each crate**'s _CHANGELOG.md_ file to rea
 If both of them are missing from the frontmatter, [_patch_ is used as the default](https://github.com/holochain/holochain/blob/bc621e3e06e998d35750b2bac6b0e1f0d371c2a2/crates/release-automation/src/lib/common.rs#L150-L154).
 
 For both, this is the complete list of valid variants:
-* _major_
-* _minor_
-* _patch_
+* _minor_ (used to release new latest versions, e.g. 0.6.0-rc.2 -> 0.6.0)
+* _patch_ (used to release backports, such as 0.6.1 -> 0.6.2)
+* _!pre\_minor \<pre-release-suffix\>_ (e.g. `!pre_minor dev`, used on latest for weekly releases OR e.g. `!pre_minor rc`, used on latest for RC releases before a new minor version bump e.g. 0.6.0-dev.10 -> 0.6.0-rc.0 -> 0.6.0)
+* _!pre\_patch \<pre-release-suffix\>_ (e.g. `!pre_patch rc`, used for verifying backports before doing a patch release e.g. 0.6.0 -> 0.6.1-rc.0 -> 0.6.1)
+
+Also, theoretically supported but never yet used:
 * _!pre \<pre-release-suffix\>_ (e.g. `!pre dev`)
-* _!pre\_major \<pre-release-suffix\>_ (e.g. `!pre_patch rc`)
-* _!pre\_minor \<pre-release-suffix\>_ (e.g. `!pre_patch beta`)
-* _!pre\_patch \<pre-release-suffix\>_ (e.g. `!pre_patch alpha`)
+* _major_
+* _!pre\_major \<pre-release-suffix\>_ (e.g. `!pre_major rc`)
 
 **The exclamation mark is required for the values that take a pre-release-suffix**, as the parser relies on [YAML tags for explicit type hints](https://yaml.org/spec/1.2.2/#tags).*
 
@@ -71,123 +73,11 @@ For any of the _pre_ modes, if at the time of release a pre-release suffix is fo
         * if **it is not followed** by a dot and an integer: ".0" will be added to the suffix
     * if the **existing suffix is different** than the requested one: replace it with `-<pre-release-suffix>.0`
 
-### Artificial examples of consecutive releases
-
-For an almost exhaustive list of tested transition cases look at the `fn increment_semver_consistency` test in [../../crates/release-automation/src/lib/common.rs](../../crates/release-automation/src/lib/common.rs).
-
-#### Setting without and with `default_`
-
-The _pre-release-suffix_ pertains no special meaning and is parsed as an arbitrary string.
-However, it will have an incremental number >= 0 maintained on each consecutive release within the same pre-release-suffix.
-
-Without `default_`:
-
-* _0.0.1_
-    * setting `semver_increment_mode: !pre_patch lorem` in the changelog here
-    * the tooling will remove the setting in the changelog in the release process, and subsequently default back to `patch`
-* _0.0.2-lorem.0_
-* _0.0.2_
-* _0.0.3_
-
-With
-
-* _0.0.1_
-    * setting `default_semver_increment_mode: !pre_patch lorem` here
-* _0.0.2-lorem.0_
-* _0.0.2-lorem.1_
-* _0.0.2-lorem.2_
-
-### Real world example: hdi 0.1 minor bump
-
-1. Before the next release: [hdi: mark for minor version bump #1550](https://github.com/holochain/holochain/pull/1550/commits)
-
-    A developer proposed a PR for the `develop` branch based upon the decision to bump the hdi's minor version.
-    The following shows the diff of the PR.
-
-    1. It adjusts the release-prepare workflow's settings to allow for the resulting versions.
-    2. It adds a frontmatter to the hdi's _CHANGELOG.md_ setting the attribute `semver_increment_mode: minor`.
-
-    ```diff
-    diff --git a/.github/workflows/release-prepare.yml b/.github/workflows/release-prepare.yml
-    index 8c43f29b69..a1693df80e 100644
-    --- a/.github/workflows/release-prepare.yml
-    +++ b/.github/workflows/release-prepare.yml
-    @@ -226,7 +226,7 @@ jobs:
-                    --no-verify-pre \
-                    --force-tag-creation \
-                    --match-filter="^(holochain|holochain_cli)$" \
-    -                --disallowed-version-reqs=">=0.1" \
-    +                --disallowed-version-reqs=">=0.2" \
-                    --steps=BumpReleaseVersions
-
-                cargo sweep -f
-    diff --git a/crates/hdi/CHANGELOG.md b/crates/hdi/CHANGELOG.md
-    index 60262e972c..482ccc678e 100644
-    --- a/crates/hdi/CHANGELOG.md
-    +++ b/crates/hdi/CHANGELOG.md
-    @@ -1,8 +1,13 @@
-    +---
-    +semver_increment_mode: minor
-    +---
-    +
-    # Changelog
-
-    The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-    ## Unreleased
-    +- Initial minor version bump. This indicates our impression that we have made significant progress towards stabilizing the detereministic integrity layer's API. [\#1550](https://github.com/holochain/holochain/pull/1550)
-
-    ## 0.0.21
-    ```
-
-2. The next time a release is triggered on the develop branch (which is the default), the `release-automation` will consider the attribute for the hdi crate.
-
-    In this case, the [following shows a snippet of the version bump commit that was produced](https://github.com/holochain/holochain/pull/1561/commits/1a291fb210f5e9e506339721f3a8a9d5760f3af6):
-
-    ```diff
-    diff --git a/crates/hdi/CHANGELOG.md b/crates/hdi/CHANGELOG.md
-    index 482ccc678e..475626926e 100644
-    --- a/crates/hdi/CHANGELOG.md
-    +++ b/crates/hdi/CHANGELOG.md
-    @@ -1,13 +1,12 @@
-    ----
-    -semver_increment_mode: minor
-    ----
-    -
-    # Changelog
-
-    The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-    ## Unreleased
-    -- Initial minor version bump. This indicates our impression that we have made significant progress towards stabilizing the detereministic integrity layer's API. [\#1550](https://github.com/holochain/holochain/pull/1550)
-    +
-    +## 0.1.0
-    +
-    +- Initial minor version bump. This indicates our impression that we have made significant progress towards stabilizing the detereministic integrity layer’s API. [\#1550](https://github.com/holochain/holochain/pull/1550)
-
-    diff --git a/crates/hdi/Cargo.toml b/crates/hdi/Cargo.toml
-    index b4bf947dc8..7262cfbb3a 100644
-    --- a/crates/hdi/Cargo.toml
-    +++ b/crates/hdi/Cargo.toml
-    @@ -1,6 +1,6 @@
-    [package]
-    name = "hdi"
-    -version = "0.0.22-dev.0"
-    +version = "0.1.0"
-    ```
-
-    Note that the release process removed the `semver_increment_mode` attribute so that it doesn't affect the next release.
-
-3. Post-release: [Merge release-20220907.100911 back into develop #1561](https://github.com/holochain/holochain/pull/1561)
-
-    This PR was created automatically by the release process to merge the release changes back into the _develop_ branch.
-
-
 ## Changing multiple frontmatters at once
 
 When we plan to change the versions of many or all workspace crates, there's a command that can be used to overwrite the frontmatter of multiple crates' changelogs in one go:
 
-```console
+```sh
 nix run .#release-automation -- --workspace-path=$PWD --log-level=debug --match-filter=".*" changelog set-frontmatter <(cat <<EOF
 (...)
 EOF
@@ -197,31 +87,62 @@ EOF
 The `--match-filter` argument takes a regular expression to select to filter the crate names.
 The ellipsis give the position of the new YAML code for the frontmatters.
 
-### Example: initiate a beta-rc cycle
+### Case: Latest `develop` is nearly ready to be released as the next minor version
 
-
-```console
+```sh
 nix run .#release-automation -- --workspace-path=$PWD --log-level=debug --match-filter=".*" changelog set-frontmatter <(cat <<EOF
-default_semver_increment_mode: !pre_minor beta-rc
+default_semver_increment_mode: !pre_minor rc
 EOF
 )
 ```
 
-### Example: initiate a one-time minor version bump
+### Case: The `develop` branch is producing RCs and is ready to be released
 
-```console
+```sh
 nix run .#release-automation -- --workspace-path=$PWD --log-level=debug --match-filter=".*" changelog set-frontmatter <(cat <<EOF
-semver_increment_mode: !minor
+default_semver_increment_mode: !pre_patch rc
+semver_increment_mode: minor
 EOF
 )
 ```
 
-### Example: initiate a one-time patch version bump
+### Case: A maintenance branch like `develop-0.6` is ready for a new patch release
 
-```console
+```sh
 nix run .#release-automation -- --workspace-path=$PWD --log-level=debug --match-filter=".*" changelog set-frontmatter <(cat <<EOF
-default_semver_increment_mode: !pre_patch beta-rc
-semver_increment_mode: !patch
+default_semver_increment_mode: !pre_patch rc
+semver_increment_mode: patch
 EOF
 )
 ```
+
+### Case: The `develop` branch has been released
+
+Say that 0.6.0 has been released, then `develop` needs to be branched to `develop-0.6` and the `develop` branch needs to
+be prepared for `0.7.0-dev.x` development.
+
+```sh
+nix run .#release-automation -- --workspace-path=$PWD --log-level=debug --match-filter=".*" changelog set-frontmatter <(cat <<EOF
+default_semver_increment_mode: !pre_minor dev
+EOF
+)
+```
+
+> [!Note]
+> The order of branching and changing mode is really important. If the release automation does not see a 0.6.0 release on the branch
+> then it will try to switch to RC releases for 0.6 and not bump to 0.7.
+
+## Companion change
+
+There is a "safety" feature in `./nix/modules/scripts.nix` with a `--allowed-semver-increment-modes`. This should always be updated
+to match the semver increment mode from the frontmatter that you expect to be used.
+
+After using `semver_increment_mode`, which will be automatically removed by the release process, this also needs updating. So for example with:
+
+```yaml
+default_semver_increment_mode: !pre_patch rc
+semver_increment_mode: patch
+```
+
+The `semver_increment_mode` will be removed by the release but the `--allowed-semver-increment-modes` stays as `patch`. So after the release, that flag
+needs to be switched back to `!pre_patch rc` or PRs will fail to pass CI.
