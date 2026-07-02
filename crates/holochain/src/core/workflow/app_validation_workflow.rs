@@ -863,7 +863,6 @@ pub struct AppValidationWorkspace {
     authored_db: DbWrite<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
     dht_store: DhtStore,
-    cache: DbWrite<DbKindCache>,
     keystore: MetaLairClient,
 }
 
@@ -873,14 +872,12 @@ impl AppValidationWorkspace {
         authored_db: DbWrite<DbKindAuthored>,
         dht_db: DbWrite<DbKindDht>,
         dht_store: DhtStore,
-        cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
     ) -> Self {
         Self {
             authored_db,
             dht_db,
             dht_store,
-            cache,
             keystore,
         }
     }
@@ -890,7 +887,6 @@ impl AppValidationWorkspace {
             self.authored_db.clone().into(),
             self.dht_db.clone().into(),
             self.dht_store.clone(),
-            self.cache.clone(),
             self.keystore.clone(),
             None,
         )
@@ -898,7 +894,7 @@ impl AppValidationWorkspace {
     }
 
     pub fn full_cascade(&self, network: DynHolochainP2pDna) -> CascadeImpl {
-        CascadeImpl::empty(self.dht_store.clone()).with_network(network, self.cache.clone())
+        CascadeImpl::empty(self.dht_store.clone()).with_network(network)
     }
 }
 

@@ -235,7 +235,6 @@ impl TestCase {
                 .unwrap(),
             conductor.get_dht_db(&dna_hash).unwrap(),
             conductor.get_dht_store(&dna_hash).unwrap(),
-            conductor.get_cache_db(&cell_id).await.unwrap(),
             conductor.keystore(),
             agent.clone(),
         )

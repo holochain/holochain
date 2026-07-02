@@ -13,13 +13,13 @@ use fixt::fixt;
 use hdk::prelude::{CreateLinkFixturator, EntryFixturator, RegisterCreateLink};
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::{ActionHash, AgentPubKey, HashableContentExtSync};
+use holochain_keystore::MetaLairClient;
 use holochain_p2p::MockHolochainP2pDnaT;
-use holochain_sqlite::exports::FallibleIterator;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_types::{
     chain::MustGetAgentActivityResponse,
-    db::{DbKindCache, DbWrite},
     dht_op::{ChainOp, DhtOpHashed, WireOps},
+    prelude::SignedActionHashedExt,
     record::WireRecordOps,
 };
 use holochain_wasm_test_utils::TestWasm;
@@ -152,18 +152,21 @@ async fn validation_callback_awaiting_deps_hashes() {
     let TestCase {
         zomes_to_invoke,
         ribosome,
+        keystore,
         alice,
         bob,
         workspace,
         test_space,
     } = TestCase::new(zomes).await;
 
-    // a create by alice
+    // a create by alice, signed with alice's real key
     let mut create = fixt!(Create);
     create.author = alice.clone();
     let create_action = Action::Create(create.clone());
     let create_action_signed_hashed =
-        SignedHashed::new_unchecked(create_action.clone(), fixt!(Signature));
+        SignedActionHashed::sign(&keystore, create_action.clone().into_hashed())
+            .await
+            .unwrap();
     // a delete by bob that references alice's create
     let mut delete = fixt!(Delete);
     delete.author = bob.clone();
@@ -205,29 +208,9 @@ async fn validation_callback_awaiting_deps_hashes() {
     .unwrap();
     assert_matches!(outcome, Outcome::AwaitingDeps(hashes) if hashes == vec![create_action.clone().to_hash().into()]);
 
-    // await while missing record is being fetched in background task
-    await_actions_in_cache(
-        &test_space.space.cache_db,
-        vec![create_action_signed_hashed.as_hash().clone()],
-    )
-    .await;
-
-    // The fetched op carries a synthetic signature, so the signature gate keeps
-    // it out of the DhtStore (it reaches only the legacy cache, confirmed
-    // above). Mirror it into the DhtStore — which the cascade's local read now
-    // consults — standing in for the verified fetch a real signature would allow.
-    test_space
-        .space
-        .dht_store
-        .record_incoming_ops(vec![(
-            DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(
-                create_action_signed_hashed.signature().clone(),
-                create_action.clone(),
-            )),
-            false,
-        )])
-        .await
-        .unwrap();
+    // The fetched op carries alice's real signature, so it passes the signature
+    // gate and lands in the DhtStore. Wait for the background fetch to store it.
+    await_action_in_store(&test_space.space.dht_store, &create_action.to_hash()).await;
 
     // app validation outcome should be accepted, now that the missing record
     // has been fetched
@@ -273,19 +256,22 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     let TestCase {
         zomes_to_invoke,
         ribosome,
+        keystore,
         alice,
         workspace,
         test_space,
         ..
     } = TestCase::new(zomes).await;
 
-    // a create by alice
+    // a create by alice, signed with alice's real key
     let mut create = fixt!(Create);
     create.author = alice.clone();
     create.action_seq = 0;
     let create_action = Action::Create(create.clone());
     let create_action_signed_hashed =
-        SignedActionHashed::new_unchecked(create_action.clone(), fixt!(Signature));
+        SignedActionHashed::sign(&keystore, create_action.clone().into_hashed())
+            .await
+            .unwrap();
     // a delete by alice that references the create
     let mut delete = fixt!(Delete);
     delete.author = alice.clone();
@@ -296,7 +282,9 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     delete.deletes_address = create_action.clone().to_hash();
     let delete_action = Action::Delete(delete.clone());
     let delete_action_signed_hashed =
-        SignedActionHashed::new_unchecked(delete_action.clone(), fixt!(Signature));
+        SignedActionHashed::sign(&keystore, delete_action.clone().into_hashed())
+            .await
+            .unwrap();
     let delete_action_op = Op::RegisterDelete(RegisterDelete {
         delete: SignedHashed::new_unchecked(delete.clone(), fixt!(Signature)),
     });
@@ -344,47 +332,14 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     .unwrap();
     assert_matches!(outcome, Outcome::AwaitingDeps(hashes) if hashes == vec![expected_chain_top.hashed.author().clone().into()]);
 
-    // await while bob's chain is being fetched in background task
-    await_actions_in_cache(
-        &test_space.space.cache_db,
-        vec![
-            create_action_signed_hashed.as_hash().clone(),
-            delete_action_signed_hashed.as_hash().clone(),
-        ],
-    )
-    .await;
-
-    // The fetched activity carries synthetic signatures, so the signature gate
-    // keeps it out of the DhtStore (it reaches only the legacy cache, confirmed
-    // above). Cache bob's chain into the DhtStore as integrated agent activity —
-    // which the cascade's local agent-activity read consults — standing in for
-    // the verified fetch a real signature would allow.
-    let rendered_activity = |sah: &SignedActionHashed| holochain_types::dht_op::RenderedOps {
-        entry: None,
-        ops: vec![holochain_types::dht_op::RenderedOp::new(
-            sah.hashed.content.clone(),
-            sah.signature().clone(),
-            None,
-            holochain_zome_types::op::ChainOpType::RegisterAgentActivity,
-        )
-        .unwrap()],
-        warrant: None,
-    };
-    test_space
-        .space
-        .dht_store
-        .cache_chain_ops(&rendered_activity(&create_action_signed_hashed))
-        .await
-        .unwrap();
-    test_space
-        .space
-        .dht_store
-        .cache_chain_ops(&rendered_activity(&delete_action_signed_hashed))
-        .await
-        .unwrap();
+    // The fetched activity carries alice's real signatures, so it passes the
+    // signature gate and lands in the DhtStore. Wait for the background fetch to
+    // store the chain.
+    await_action_in_store(&test_space.space.dht_store, create_action_signed_hashed.as_hash()).await;
+    await_action_in_store(&test_space.space.dht_store, delete_action_signed_hashed.as_hash()).await;
 
     // app validation outcome should be accepted, now that bob's missing agent
-    // activity is available in alice's cache
+    // activity is available in the DhtStore
     let outcome = run_validation_callback(invocation, &ribosome, workspace, network, false)
         .await
         .unwrap();
@@ -416,7 +371,6 @@ async fn validation_callback_rejects_op_depending_on_invalid_op() {
             .into(),
         test_space.space.dht_db.clone().into(),
         test_space.space.dht_store.clone(),
-        test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
     )
@@ -497,6 +451,7 @@ struct TestCase {
     zomes_to_invoke: ZomesToInvoke,
     test_space: TestSpace,
     ribosome: Ribosome,
+    keystore: MetaLairClient,
     alice: AgentPubKey,
     bob: AgentPubKey,
     workspace: HostFnWorkspaceRead,
@@ -517,8 +472,11 @@ impl TestCase {
             .await
             .unwrap();
         let test_space = TestSpace::new(dna_hash.clone());
-        let alice = fixt!(AgentPubKey);
-        let bob = fixt!(AgentPubKey);
+        // Real keypairs so fetched ops carry verifiable signatures and land in
+        // the DhtStore, the source every cascade read resolves against.
+        let keystore = holochain_keystore::test_keystore();
+        let alice = keystore.new_sign_keypair_random().await.unwrap();
+        let bob = keystore.new_sign_keypair_random().await.unwrap();
         let workspace = HostFnWorkspaceRead::new(
             test_space
                 .space
@@ -527,8 +485,7 @@ impl TestCase {
                 .into(),
             test_space.space.dht_db.clone().into(),
             test_space.space.dht_store.clone(),
-            test_space.space.cache_db.clone(),
-            fixt!(MetaLairClient),
+            keystore.clone(),
             None,
         )
         .await
@@ -537,6 +494,7 @@ impl TestCase {
             zomes_to_invoke,
             test_space,
             ribosome,
+            keystore,
             alice,
             bob,
             workspace,
@@ -544,21 +502,16 @@ impl TestCase {
     }
 }
 
-// wait for provided actions to arrive in cache db
-async fn await_actions_in_cache(cache_db: &DbWrite<DbKindCache>, hashes: Vec<ActionHash>) {
-    let hashes = Arc::new(hashes.clone());
+// Wait for the given action to be fetched into the DhtStore.
+async fn await_action_in_store(dht_store: &holochain_state::dht_store::DhtStore, hash: &ActionHash) {
     loop {
-        let hashes = hashes.clone();
-        let all_actions_in_cache = cache_db.test_read(move |txn| {
-            let mut stmt = txn.prepare("SELECT hash FROM Action").unwrap();
-            let rows = stmt.query([]).unwrap();
-            let action_hashes_in_cache: Vec<ActionHash> =
-                rows.map(|row| row.get(0)).collect().unwrap();
-            hashes
-                .iter()
-                .all(|hash| action_hashes_in_cache.contains(hash))
-        });
-        if all_actions_in_cache {
+        if dht_store
+            .as_read()
+            .retrieve_action(hash)
+            .await
+            .unwrap()
+            .is_some()
+        {
             return;
         }
         tokio::time::sleep(Duration::from_millis(5)).await;

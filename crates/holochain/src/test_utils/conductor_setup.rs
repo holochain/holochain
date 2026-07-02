@@ -28,7 +28,6 @@ pub struct CellHostFnCaller {
     pub cell_id: CellId,
     pub authored_db: DbWrite<DbKindAuthored>,
     pub dht_db: DbWrite<DbKindDht>,
-    pub cache: DbWrite<DbKindCache>,
     pub ribosome: RealRibosome,
     pub network: HolochainP2pDna,
     pub keystore: MetaLairClient,
@@ -45,7 +44,6 @@ impl CellHostFnCaller {
     ) -> Self {
         let authored_db = handle.get_authored_db(cell_id.dna_hash()).unwrap();
         let dht_db = handle.get_dht_db(cell_id.dna_hash()).unwrap();
-        let cache = handle.get_cache_db(cell_id).await.unwrap();
         let keystore = handle.keystore().clone();
         let network = handle
             .holochain_p2p()
@@ -59,7 +57,6 @@ impl CellHostFnCaller {
             cell_id: cell_id.clone(),
             authored_db,
             dht_db,
-            cache,
             ribosome,
             network,
             keystore,
@@ -77,7 +74,6 @@ impl CellHostFnCaller {
         HostFnCaller {
             authored_db: self.authored_db.clone(),
             dht_db: self.dht_db.clone(),
-            cache: self.cache.clone(),
             ribosome: self.ribosome.clone(),
             zome_path,
             network: self.network.clone(),

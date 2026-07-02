@@ -920,7 +920,6 @@ impl TestCase {
     async fn run_as_agent(&mut self, agent: &AgentPubKey) -> WorkComplete {
         let workspace = SysValidationWorkspace::new(
             self.test_space.space.dht_store.clone(),
-            self.test_space.space.cache_db.clone(),
             self.dna_hash.hash.clone(),
             std::time::Duration::from_secs(10),
         );

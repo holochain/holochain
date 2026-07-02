@@ -646,7 +646,6 @@ impl Space {
             self.get_or_create_authored_db(author.clone())?.clone(),
             self.dht_db.clone(),
             self.dht_store.clone(),
-            self.cache_db.clone(),
             keystore,
             author,
         )

@@ -13,7 +13,6 @@ use holochain::{
     test_utils::retry_fn_until_timeout,
 };
 use holochain_state::prelude::{insert_op_dht, set_validation_status, set_when_integrated};
-use holochain_state::query::{CascadeTxnWrapper, Store};
 use holochain_timestamp::Timestamp;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::prelude::WarrantOp;
@@ -56,18 +55,17 @@ async fn warranted_agent_is_blocked() {
 
     await_consistency([&alice_cell, &bob_cell]).await.unwrap();
 
-    // The warrant against Alice and the warrant op should have been written to Bob's authored database.
+    // The warrant against Alice should have been recorded in Bob's DHT store.
     retry_fn_until_timeout(
         || async {
-            let alice_pubkey = alice_cell.agent_pubkey().clone();
             let warrants = bob_conductor
                 .get_spaces()
-                .get_all_authored_dbs(&dna_hash)
-                .unwrap()[0]
-                .test_read(move |txn| {
-                    let store = CascadeTxnWrapper::from(txn);
-                    store.get_warrants_for_agent(&alice_pubkey, false).unwrap()
-                });
+                .dht_store(&dna_hash)
+                .unwrap()
+                .as_read()
+                .warrants_by_author(bob_cell.agent_pubkey().clone())
+                .await
+                .unwrap();
 
             tracing::info!("number of warrants: {}", warrants.len());
 

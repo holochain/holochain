@@ -112,7 +112,6 @@ use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::DynHolochainP2pDna;
-use holochain_sqlite::prelude::*;
 use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::*;
 use std::convert::TryInto;
@@ -483,7 +482,7 @@ async fn fetch_missing_dependencies(
     network: DynHolochainP2pDna,
     current_validation_dependencies: SysValDeps,
 ) -> usize {
-    let network_cascade = Arc::new(workspace.network_and_cache_cascade(network));
+    let network_cascade = Arc::new(workspace.network_cascade(network));
     let missing_dependencies = current_validation_dependencies
         .lock()
         .expect("poisoned")
@@ -1469,7 +1468,6 @@ fn update_check(entry_update: &Update, original_action: &Action) -> SysValidatio
 pub struct SysValidationWorkspace {
     scratch: Option<SyncScratch>,
     dht_store: DhtStore,
-    cache: DbWrite<DbKindCache>,
     dna_hash: DnaHash,
     sys_validation_retry_delay: Duration,
 }
@@ -1477,14 +1475,12 @@ pub struct SysValidationWorkspace {
 impl SysValidationWorkspace {
     pub fn new(
         dht_store: DhtStore,
-        cache: DbWrite<DbKindCache>,
         dna_hash: DnaHash,
         sys_validation_retry_delay: Duration,
     ) -> Self {
         Self {
             scratch: None,
             dht_store,
-            cache,
             dna_hash,
             sys_validation_retry_delay,
         }
@@ -1492,15 +1488,15 @@ impl SysValidationWorkspace {
 
     /// Create a cascade with local data only
     pub fn local_cascade(&self) -> CascadeImpl {
-        let cascade = CascadeImpl::empty(self.dht_store.clone()).with_cache(self.cache.clone());
+        let cascade = CascadeImpl::empty(self.dht_store.clone());
         match &self.scratch {
             Some(scratch) => cascade.with_scratch(scratch.clone()),
             None => cascade,
         }
     }
 
-    pub fn network_and_cache_cascade(&self, network: DynHolochainP2pDna) -> CascadeImpl {
-        CascadeImpl::empty(self.dht_store.clone()).with_network(network, self.cache.clone())
+    pub fn network_cascade(&self, network: DynHolochainP2pDna) -> CascadeImpl {
+        CascadeImpl::empty(self.dht_store.clone()).with_network(network)
     }
 }
 

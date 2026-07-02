@@ -172,7 +172,6 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn adds_init_marker() {
         let test_db = test_authored_db();
-        let test_cache = test_cache_db();
         let test_dht = test_dht_db();
         let keystore = test_keystore();
         let db = test_db.to_db();
@@ -200,7 +199,6 @@ mod tests {
             db.clone(),
             test_dht.to_db(),
             dht_store,
-            test_cache.to_db(),
             keystore,
             author.clone(),
         )

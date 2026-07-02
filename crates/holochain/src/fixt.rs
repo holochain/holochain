@@ -168,7 +168,6 @@ fixturator!(
     curve Empty {
         let authored_db = holochain_state::test_utils::test_authored_db_with_id(get_fixt_index!() as u8);
         let dht_db = holochain_state::test_utils::test_dht_db_with_id(get_fixt_index!() as u8);
-        let cache = holochain_state::test_utils::test_cache_db();
         let keystore = holochain_keystore::test_keystore();
         tokio_helper::block_forever_on(async {
             let dht_store = holochain_state::test_utils::test_dht_store(fake_dna_hash(get_fixt_index!() as u8)).await;
@@ -177,7 +176,6 @@ fixturator!(
                 authored_db.to_db(),
                 dht_db.to_db(),
                 dht_store,
-                cache.to_db(),
                 keystore,
                 Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
             ).await.unwrap()
@@ -186,7 +184,6 @@ fixturator!(
     curve Unpredictable {
         let authored_db = holochain_state::test_utils::test_authored_db_with_id(get_fixt_index!() as u8);
         let dht_db = holochain_state::test_utils::test_dht_db_with_id(get_fixt_index!() as u8);
-        let cache = holochain_state::test_utils::test_cache_db();
         let keystore = holochain_keystore::test_keystore();
         tokio_helper::block_forever_on(async {
             let dht_store = holochain_state::test_utils::test_dht_store(fake_dna_hash(get_fixt_index!() as u8)).await;
@@ -195,7 +192,6 @@ fixturator!(
                 authored_db.to_db(),
                 dht_db.to_db(),
                 dht_store,
-                cache.to_db(),
                 keystore,
                 Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
             ).await.unwrap()
@@ -204,7 +200,6 @@ fixturator!(
     curve Predictable {
         let authored_db = holochain_state::test_utils::test_authored_db_with_id(get_fixt_index!() as u8);
         let dht_db = holochain_state::test_utils::test_dht_db_with_id(get_fixt_index!() as u8);
-        let cache = holochain_state::test_utils::test_cache_db_with_id(get_fixt_index!() as u8);
         let agent = fixt!(AgentPubKey, Predictable, get_fixt_index!());
         let keystore = holochain_keystore::test_keystore();
         tokio_helper::block_forever_on(async {
@@ -214,7 +209,6 @@ fixturator!(
                 authored_db.to_db(),
                 dht_db.to_db(),
                 dht_store,
-                cache.to_db(),
                 keystore,
                 Some(agent),
             ).await.unwrap()
@@ -227,7 +221,6 @@ fixturator!(
     curve Empty {
         let authored_db = holochain_state::test_utils::test_authored_db_with_id(get_fixt_index!() as u8);
         let dht_db = holochain_state::test_utils::test_dht_db_with_id(get_fixt_index!() as u8);
-        let cache = holochain_state::test_utils::test_cache_db();
         let keystore = holochain_keystore::test_keystore();
         tokio_helper::block_forever_on(async {
             let dht_store = holochain_state::test_utils::test_dht_store(fake_dna_hash(get_fixt_index!() as u8)).await;
@@ -236,7 +229,6 @@ fixturator!(
                 authored_db.to_db().into(),
                 dht_db.to_db().into(),
                 dht_store,
-                cache.to_db(),
                 keystore,
                 Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
             ).await.unwrap()
@@ -245,7 +237,6 @@ fixturator!(
     curve Unpredictable {
         let authored_db = holochain_state::test_utils::test_authored_db_with_id(get_fixt_index!() as u8);
         let dht_db = holochain_state::test_utils::test_dht_db_with_id(get_fixt_index!() as u8);
-        let cache = holochain_state::test_utils::test_cache_db();
         let keystore = holochain_keystore::test_keystore();
         tokio_helper::block_forever_on(async {
             let dht_store = holochain_state::test_utils::test_dht_store(fake_dna_hash(get_fixt_index!() as u8)).await;
@@ -254,7 +245,6 @@ fixturator!(
                 authored_db.to_db().into(),
                 dht_db.to_db().into(),
                 dht_store,
-                cache.to_db(),
                 keystore,
                 Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
             ).await.unwrap()
@@ -263,7 +253,6 @@ fixturator!(
     curve Predictable {
         let authored_db = holochain_state::test_utils::test_authored_db_with_id(get_fixt_index!() as u8);
         let dht_db = holochain_state::test_utils::test_dht_db_with_id(get_fixt_index!() as u8);
-        let cache = holochain_state::test_utils::test_cache_db_with_id(get_fixt_index!() as u8);
         let agent = fixt!(AgentPubKey, Predictable, get_fixt_index!());
         let keystore = holochain_keystore::test_keystore();
         tokio_helper::block_forever_on(async {
@@ -273,7 +262,6 @@ fixturator!(
                 authored_db.to_db().into(),
                 dht_db.to_db().into(),
                 dht_store,
-                cache.to_db(),
                 keystore,
                 Some(agent),
             ).await.unwrap()

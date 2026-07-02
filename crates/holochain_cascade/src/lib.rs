@@ -36,10 +36,6 @@ use holochain_p2p::{DynHolochainP2pDna, HolochainP2pError};
 use holochain_state::dht_store::DhtStore;
 use holochain_state::host_fn_workspace::HostFnStores;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
-use holochain_state::mutations::insert_action;
-use holochain_state::mutations::insert_entry;
-use holochain_state::mutations::insert_op_lite;
-use holochain_state::mutations::set_validation_status;
 use holochain_state::prelude::*;
 use holochain_state::query::link::GetLinksFilter;
 use holochain_state::scratch::SyncScratch;
@@ -104,7 +100,6 @@ pub struct CascadeOptions {
 /// See the module-level docs for more info.
 #[derive(Clone)]
 pub struct CascadeImpl {
-    cache: Option<DbWrite<DbKindCache>>,
     scratch: Option<SyncScratch>,
     network: Option<DynHolochainP2pDna>,
     private_data: Option<Arc<AgentPubKey>>,
@@ -157,15 +152,7 @@ impl CascadeImpl {
         }
     }
 
-    /// Add the cache to the cascade.
-    pub fn with_cache(self, cache: DbWrite<DbKindCache>) -> Self {
-        Self {
-            cache: Some(cache),
-            ..self
-        }
-    }
-
-    /// Add the cache to the cascade.
+    /// Add the scratch to the cascade.
     pub fn with_scratch(self, scratch: SyncScratch) -> Self {
         Self {
             scratch: Some(scratch),
@@ -173,16 +160,11 @@ impl CascadeImpl {
         }
     }
 
-    /// Add the network and cache to the cascade.
-    pub fn with_network(
-        self,
-        network: DynHolochainP2pDna,
-        cache_db: DbWrite<DbKindCache>,
-    ) -> CascadeImpl {
+    /// Add the network to the cascade.
+    pub fn with_network(self, network: DynHolochainP2pDna) -> CascadeImpl {
         CascadeImpl {
             scratch: self.scratch,
             private_data: self.private_data,
-            cache: Some(cache_db),
             network: Some(network),
             dht_store: self.dht_store,
 
@@ -194,7 +176,6 @@ impl CascadeImpl {
     pub fn empty(dht_store: DhtStore) -> Self {
         Self {
             network: None,
-            cache: None,
             scratch: None,
             private_data: None,
             dht_store,
@@ -215,7 +196,6 @@ impl CascadeImpl {
         let HostFnStores {
             authored: _,
             dht: _,
-            cache,
             scratch,
             dht_store,
         } = workspace.stores();
@@ -223,7 +203,6 @@ impl CascadeImpl {
             dht_store.expect("HostFnWorkspace always populates dht_store; this is a bug");
         let private_data = workspace.author();
         CascadeImpl {
-            cache: Some(cache),
             private_data,
             scratch,
             network: Some(network),
@@ -238,14 +217,12 @@ impl CascadeImpl {
         let HostFnStores {
             authored: _,
             dht: _,
-            cache,
             scratch,
             dht_store,
         } = stores;
         let dht_store =
             dht_store.expect("HostFnWorkspace always populates dht_store; this is a bug");
         Self {
-            cache: Some(cache),
             scratch,
             network: None,
             private_data: author,
@@ -253,11 +230,6 @@ impl CascadeImpl {
 
             zome_call_origin: None,
         }
-    }
-
-    /// Getter
-    pub fn cache(&self) -> Option<&DbWrite<DbKindCache>> {
-        self.cache.as_ref()
     }
 
     /// Get Entry data along with all CRUD actions associated with it.

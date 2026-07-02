@@ -62,13 +62,8 @@ async fn sys_validation_produces_invalid_chain_op_warrant() {
     .unwrap();
     matches::assert_matches!(outcome, Outcome::Rejected(_));
 
-    //- Inject the invalid op directly into bob's DHT db (legacy) and new DHT store
+    //- Inject the invalid op directly into bob's DHT store
     let op = DhtOpHashed::from_content_sync(op);
-    let db = conductor.spaces.dht_db(dna.dna_hash()).unwrap();
-    let op_for_legacy = op.clone();
-    db.test_write(move |txn| {
-        insert_op_dht(txn, &op_for_legacy, 0, None).unwrap();
-    });
     conductor
         .spaces
         .dht_store(dna.dna_hash())
@@ -85,20 +80,18 @@ async fn sys_validation_produces_invalid_chain_op_warrant() {
         .sys_validation
         .trigger(&"test");
 
+    let warrant_author = alice.agent().clone();
     retry_fn_until_timeout(
         || async {
-            let key = bob_pubkey.clone();
             let num_of_warrants = conductor
                 .spaces
-                .get_all_authored_dbs(dna.dna_hash())
-                .unwrap()[0]
-                .test_read(move |txn| {
-                    let store = CascadeTxnWrapper::from(txn);
-
-                    let warrants = store.get_warrants_for_agent(&key, false).unwrap();
-
-                    warrants.len()
-                });
+                .dht_store(dna.dna_hash())
+                .unwrap()
+                .as_read()
+                .warrants_by_author(warrant_author.clone())
+                .await
+                .unwrap()
+                .len();
             num_of_warrants == 1
         },
         Some(10000),
@@ -202,19 +195,10 @@ async fn sys_validation_produces_forked_chain_warrant() {
     matches::assert_matches!(outcome, Outcome::Accepted);
 
     // Inject genesis + original action (as already-integrated data) and the
-    // forked op (as pending validation) into Bob's DHT db (legacy) and new DHT store
+    // forked op (as pending validation) into Bob's DHT store
     let prev_op_hashed = DhtOpHashed::from_content_sync(prev_op);
     let original_op_hashed = DhtOpHashed::from_content_sync(original_op);
     let forked_op_hashed = DhtOpHashed::from_content_sync(forked_op);
-    let db = conductor.spaces.dht_db(dna.dna_hash()).unwrap();
-    let prev_for_legacy = prev_op_hashed.clone();
-    let orig_for_legacy = original_op_hashed.clone();
-    let fork_for_legacy = forked_op_hashed.clone();
-    db.test_write(move |txn| {
-        insert_op_dht(txn, &prev_for_legacy, 0, None).unwrap();
-        insert_op_dht(txn, &orig_for_legacy, 0, None).unwrap();
-        insert_op_dht(txn, &fork_for_legacy, 0, None).unwrap();
-    });
     conductor
         .spaces
         .dht_store(dna.dna_hash())
@@ -237,15 +221,14 @@ async fn sys_validation_produces_forked_chain_warrant() {
             .sys_validation
             .trigger(&"test");
 
-        let query_author = alice_pubkey.clone();
         let warrants: Vec<WarrantOp> = conductor
             .spaces
-            .get_or_create_authored_db(dna.dna_hash(), bob_pubkey.clone())
+            .dht_store(dna.dna_hash())
             .unwrap()
-            .test_read(move |txn| {
-                let store = CascadeTxnWrapper::from(txn);
-                store.get_warrants_for_agent(&query_author, false).unwrap()
-            });
+            .as_read()
+            .warrants_by_author(bob_pubkey.clone())
+            .await
+            .unwrap();
 
         if !warrants.is_empty() {
             let warrant = &warrants[0];
@@ -375,19 +358,10 @@ async fn sys_validation_produces_two_warrants_when_receiving_both_forked_ops() {
     .unwrap();
     matches::assert_matches!(outcome2, Outcome::Accepted);
 
-    // Inject the previous action and both forked ops into Bob's DHT db (legacy) and new DHT store
+    // Inject the previous action and both forked ops into Bob's DHT store
     let prev_op_hashed = DhtOpHashed::from_content_sync(prev_op);
     let op1_hashed = DhtOpHashed::from_content_sync(op1);
     let op2_hashed = DhtOpHashed::from_content_sync(op2);
-    let db = conductor.spaces.dht_db(dna.dna_hash()).unwrap();
-    let prev_for_legacy = prev_op_hashed.clone();
-    let op1_for_legacy = op1_hashed.clone();
-    let op2_for_legacy = op2_hashed.clone();
-    db.test_write(move |txn| {
-        insert_op_dht(txn, &prev_for_legacy, 0, None).unwrap();
-        insert_op_dht(txn, &op1_for_legacy, 0, None).unwrap();
-        insert_op_dht(txn, &op2_for_legacy, 0, None).unwrap();
-    });
     conductor
         .spaces
         .dht_store(dna.dna_hash())
@@ -410,15 +384,14 @@ async fn sys_validation_produces_two_warrants_when_receiving_both_forked_ops() {
             .sys_validation
             .trigger(&"test");
 
-        let query_author = alice_pubkey.clone();
         let warrants: Vec<WarrantOp> = conductor
             .spaces
-            .get_or_create_authored_db(dna.dna_hash(), bob_pubkey.clone())
+            .dht_store(dna.dna_hash())
             .unwrap()
-            .test_read(move |txn| {
-                let store = CascadeTxnWrapper::from(txn);
-                store.get_warrants_for_agent(&query_author, false).unwrap()
-            });
+            .as_read()
+            .warrants_by_author(bob_pubkey.clone())
+            .await
+            .unwrap();
 
         if warrants.len() == 2 {
             // Verify we have exactly 2 warrants

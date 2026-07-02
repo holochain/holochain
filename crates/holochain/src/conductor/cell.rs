@@ -773,7 +773,6 @@ impl Cell {
                     self.get_or_create_authored_db()?,
                     self.dht_db().clone(),
                     self.space.dht_store.clone(),
-                    self.cache().clone(),
                     keystore.clone(),
                     self.id.agent_pubkey().clone(),
                 )
@@ -825,7 +824,6 @@ impl Cell {
             self.get_or_create_authored_db()?,
             self.dht_db().clone(),
             self.space.dht_store.clone(),
-            self.cache().clone(),
             keystore.clone(),
             id.agent_pubkey().clone(),
         )

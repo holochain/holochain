@@ -85,7 +85,6 @@ pub struct HostFnCaller {
     pub authored_db: DbWrite<DbKindAuthored>,
     pub dht_db: DbWrite<DbKindDht>,
     pub dht_store: DhtStore,
-    pub cache: DbWrite<DbKindCache>,
     pub ribosome: Ribosome,
     pub zome_path: ZomePath,
     pub network: HolochainP2pDna,
@@ -117,7 +116,6 @@ impl HostFnCaller {
             .unwrap();
         let dht_db = handle.get_dht_db(cell_id.dna_hash()).unwrap();
         let dht_store = handle.get_dht_store(cell_id.dna_hash()).unwrap();
-        let cache = handle.get_cache_db(cell_id).await.unwrap();
         let keystore = handle.keystore().clone();
         let network = holochain_p2p::HolochainP2pDna::new(
             handle.holochain_p2p().clone(),
@@ -143,7 +141,6 @@ impl HostFnCaller {
             authored_db,
             dht_db,
             dht_store,
-            cache,
             ribosome,
             zome_path,
             network,
@@ -167,7 +164,6 @@ impl HostFnCaller {
             authored_db,
             dht_db,
             dht_store,
-            cache,
             network,
             keystore,
             ribosome,
@@ -182,7 +178,6 @@ impl HostFnCaller {
             authored_db,
             dht_db,
             dht_store,
-            cache,
             keystore.clone(),
             cell_id.agent_pubkey().clone(),
         )

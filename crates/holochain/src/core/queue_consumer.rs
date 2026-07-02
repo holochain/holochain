@@ -83,11 +83,7 @@ pub async fn spawn_queue_consumer_tasks(
     space: &Space,
     conductor: ConductorHandle,
 ) -> ConductorResult<(QueueTriggers, InitialQueueTriggers)> {
-    let Space {
-        dht_db,
-        cache_db: cache,
-        ..
-    } = space;
+    let Space { dht_db, .. } = space;
 
     let keystore = conductor.keystore().clone();
     let dna_hash = Arc::new(cell_id.dna_hash().clone());
@@ -138,7 +134,6 @@ pub async fn spawn_queue_consumer_tasks(
                 authored_db.clone(),
                 dht_db.clone(),
                 space.dht_store.clone(),
-                cache.clone(),
                 keystore.clone(),
             ),
             conductor.clone(),
@@ -154,7 +149,6 @@ pub async fn spawn_queue_consumer_tasks(
         spawn_sys_validation_consumer(
             SysValidationWorkspace::new(
                 space.dht_store.clone(),
-                cache.clone(),
                 cell_id.dna_hash().clone(),
                 conductor
                     .get_config()

@@ -11,7 +11,6 @@ pub struct HostFnWorkspace<
     source_chain: Option<SourceChain<SourceChainDb, SourceChainDht>>,
     authored: DbRead<DbKindAuthored>,
     dht: DbRead<DbKindDht>,
-    cache: DbWrite<DbKindCache>,
     dht_store: DhtStore,
     /// Did the root call that started this call chain
     /// come from an init callback.
@@ -30,7 +29,6 @@ pub struct SourceChainWorkspace {
 pub struct HostFnStores {
     pub authored: DbRead<DbKindAuthored>,
     pub dht: DbRead<DbKindDht>,
-    pub cache: DbWrite<DbKindCache>,
     pub scratch: Option<SyncScratch>,
     pub dht_store: Option<DhtStore>,
 }
@@ -42,7 +40,6 @@ impl SourceChainWorkspace {
         authored: DbWrite<DbKindAuthored>,
         dht: DbWrite<DbKindDht>,
         dht_store: DhtStore,
-        cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         author: AgentPubKey,
     ) -> SourceChainResult<Self> {
@@ -54,7 +51,7 @@ impl SourceChainWorkspace {
             author,
         )
         .await?;
-        Self::new_inner(authored, dht, cache, dht_store, source_chain, false)
+        Self::new_inner(authored, dht, dht_store, source_chain, false)
     }
 
     /// Create a source chain workspace where the root caller is the init callback.
@@ -62,7 +59,6 @@ impl SourceChainWorkspace {
         authored: DbWrite<DbKindAuthored>,
         dht: DbWrite<DbKindDht>,
         dht_store: DhtStore,
-        cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         author: AgentPubKey,
     ) -> SourceChainResult<Self> {
@@ -74,7 +70,7 @@ impl SourceChainWorkspace {
             author,
         )
         .await?;
-        Self::new_inner(authored, dht, cache, dht_store, source_chain, true)
+        Self::new_inner(authored, dht, dht_store, source_chain, true)
     }
 
     /// Create a source chain with a blank chain head.
@@ -85,7 +81,6 @@ impl SourceChainWorkspace {
         authored: DbWrite<DbKindAuthored>,
         dht: DbWrite<DbKindDht>,
         dht_store: DhtStore,
-        cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         author: AgentPubKey,
     ) -> SourceChainResult<Self> {
@@ -97,13 +92,12 @@ impl SourceChainWorkspace {
             author,
         )
         .await?;
-        Self::new_inner(authored, dht, cache, dht_store, source_chain, false)
+        Self::new_inner(authored, dht, dht_store, source_chain, false)
     }
 
     fn new_inner(
         authored: DbWrite<DbKindAuthored>,
         dht: DbWrite<DbKindDht>,
-        cache: DbWrite<DbKindCache>,
         dht_store: DhtStore,
         source_chain: SourceChain,
         init_is_root: bool,
@@ -113,7 +107,6 @@ impl SourceChainWorkspace {
                 source_chain: Some(source_chain.clone()),
                 authored: authored.into(),
                 dht: dht.into(),
-                cache,
                 dht_store,
                 init_is_root,
             },
@@ -137,7 +130,6 @@ where
         authored: SourceChainDb,
         dht: SourceChainDht,
         dht_store: DhtStore,
-        cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         author: Option<AgentPubKey>,
     ) -> SourceChainResult<Self> {
@@ -158,7 +150,6 @@ where
             source_chain,
             authored: authored.into(),
             dht: dht.into(),
-            cache,
             dht_store,
             init_is_root: false,
         })
@@ -176,20 +167,9 @@ where
         HostFnStores {
             authored: self.authored.clone(),
             dht: self.dht.clone(),
-            cache: self.cache.clone(),
             scratch: self.source_chain.as_ref().map(|sc| sc.scratch()),
             dht_store: Some(self.dht_store.clone()),
         }
-    }
-
-    pub fn databases(
-        &self,
-    ) -> (
-        DbRead<DbKindAuthored>,
-        DbRead<DbKindDht>,
-        DbWrite<DbKindCache>,
-    ) {
-        (self.authored.clone(), self.dht.clone(), self.cache.clone())
     }
 }
 
@@ -205,7 +185,6 @@ impl From<HostFnWorkspace> for HostFnWorkspaceRead {
             source_chain: workspace.source_chain.map(|sc| sc.into()),
             authored: workspace.authored,
             dht: workspace.dht,
-            cache: workspace.cache,
             dht_store: workspace.dht_store,
             init_is_root: workspace.init_is_root,
         }
@@ -224,7 +203,6 @@ impl From<SourceChainWorkspace> for HostFnWorkspaceRead {
             source_chain: Some(workspace.source_chain.into()),
             authored: workspace.inner.authored,
             dht: workspace.inner.dht,
-            cache: workspace.inner.cache,
             dht_store: workspace.inner.dht_store,
             init_is_root: workspace.inner.init_is_root,
         }

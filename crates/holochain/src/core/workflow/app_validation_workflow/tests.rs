@@ -38,7 +38,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use {
     crate::test_utils::conditional_consistency::*,
-    holochain_state::query::{CascadeTxnWrapper, Store},
 };
 
 #[tokio::test(flavor = "multi_thread")]
@@ -83,7 +82,6 @@ async fn main_workflow() {
             .unwrap(),
         conductor.get_dht_db(&dna_hash).unwrap(),
         conductor.get_dht_store(&dna_hash).unwrap(),
-        conductor.get_cache_db(&cell_id).await.unwrap(),
         conductor.keystore(),
     ));
 
@@ -317,7 +315,6 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
             .unwrap(),
         conductor.get_dht_db(&dna_hash).unwrap(),
         conductor.get_dht_store(&dna_hash).unwrap(),
-        conductor.get_cache_db(&cell_id).await.unwrap(),
         conductor.keystore(),
     ));
 
@@ -462,7 +459,6 @@ async fn validate_ops_in_sequence_must_get_action() {
             .unwrap(),
         conductor.get_dht_db(&dna_hash).unwrap(),
         conductor.get_dht_store(&dna_hash).unwrap(),
-        conductor.get_cache_db(&cell_id).await.unwrap(),
         conductor.keystore(),
     ));
 
@@ -659,7 +655,6 @@ async fn handle_error_in_op_validation() {
             .unwrap(),
         conductor.get_dht_db(&dna_hash).unwrap(),
         conductor.get_dht_store(&dna_hash).unwrap(),
-        conductor.get_cache_db(&cell_id).await.unwrap(),
         conductor.keystore(),
     ));
 
@@ -1063,7 +1058,6 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
             .unwrap(),
         conductor.get_dht_db(&dna_hash).unwrap(),
         conductor.get_dht_store(&dna_hash).unwrap(),
-        conductor.get_cache_db(&cell_id).await.unwrap(),
         conductor.keystore(),
     ));
 
@@ -1297,14 +1291,16 @@ async fn app_validation_produces_warrants() {
     conductors[2].startup().await;
 
     //- Ensure that bob authored a warrant
-    let alice_pubkey = alice.agent_pubkey().clone();
-    conductors[1].spaces.get_all_authored_dbs(dna_hash).unwrap()[0].test_read(move |txn| {
-        let store = CascadeTxnWrapper::from(txn);
-
-        let warrants = store.get_warrants_for_agent(&alice_pubkey, false).unwrap();
-        // 3 warrants, one for each op
-        assert_eq!(warrants.len(), 1);
-    });
+    let warrants = conductors[1]
+        .spaces
+        .dht_store(dna_hash)
+        .unwrap()
+        .as_read()
+        .warrants_by_author(bob.agent_pubkey().clone())
+        .await
+        .unwrap();
+    // 3 warrants, one for each op
+    assert_eq!(warrants.len(), 1);
 
     // TODO: ensure that bob blocked alice
 
@@ -1437,15 +1433,14 @@ async fn skip_issuing_warrant_if_one_found() {
 
     tokio::time::timeout(Duration::from_secs(5), async {
         loop {
-            let alice_pubkey = alice.agent_pubkey().clone();
             let warrants = conductors[1]
                 .get_spaces()
-                .get_all_authored_dbs(dna_file.dna_hash())
-                .unwrap()[0]
-                .test_read(move |txn| {
-                    let store = CascadeTxnWrapper::from(txn);
-                    store.get_warrants_for_agent(&alice_pubkey, false).unwrap()
-                });
+                .dht_store(dna_file.dna_hash())
+                .unwrap()
+                .as_read()
+                .warrants_by_author(_bob.agent_pubkey().clone())
+                .await
+                .unwrap();
 
             if !warrants.is_empty() {
                 break;

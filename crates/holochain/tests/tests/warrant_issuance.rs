@@ -6,7 +6,6 @@ use holochain::sweettest::{
     await_consistency, SweetConductorBatch, SweetConductorConfig, SweetDnaFile, SweetInlineZomes,
 };
 use holochain_serialized_bytes::prelude::SerializedBytes;
-use holochain_state::query::{CascadeTxnWrapper, Store};
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_zome_types::action::ChainTopOrdering;
 use holochain_zome_types::entry::CreateInput;
@@ -67,16 +66,15 @@ async fn invalid_op_warrant_issuance_can_be_disabled() {
     // A warrant would have been created as part of app validating all of Alice's
     // ops, so once consistency is reached, the authored DB can be checked
     // for warrants.
-    let alice_pubkey = alice.agent_pubkey().clone();
-    conductors[1]
+    let warrants = conductors[1]
         .get_spaces()
-        .get_all_authored_dbs(dna_hash)
-        .unwrap()[0]
-        .test_read(move |txn| {
-            let store = CascadeTxnWrapper::from(txn);
-            let warrants = store.get_warrants_for_agent(&alice_pubkey, false).unwrap();
-            assert!(warrants.is_empty());
-        });
+        .dht_store(dna_hash)
+        .unwrap()
+        .as_read()
+        .warrants_by_author(bob.agent_pubkey().clone())
+        .await
+        .unwrap();
+    assert!(warrants.is_empty());
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -144,22 +142,19 @@ async fn skip_self_validation_to_cause_warrant() {
     // Should sync the data to Bob.
     await_consistency([&alice, &bob]).await.unwrap();
 
-    let alice_pubkey = alice.agent_pubkey().clone();
     let warrants = conductors[1]
         .get_spaces()
-        .get_all_authored_dbs(dna_file.dna_hash())
-        .unwrap()[0]
-        .test_read({
-            let alice_pubkey = alice_pubkey.clone();
-            move |txn| {
-                let store = CascadeTxnWrapper::from(txn);
-                store.get_warrants_for_agent(&alice_pubkey, false).unwrap()
-            }
-        });
+        .dht_store(dna_file.dna_hash())
+        .unwrap()
+        .as_read()
+        .warrants_by_author(bob.agent_pubkey().clone())
+        .await
+        .unwrap();
 
     assert_eq!(1, warrants.len(), "Should have issued a warrant");
     assert_eq!(
-        warrants[0].warrantee, alice_pubkey,
+        &warrants[0].warrantee,
+        alice.agent_pubkey(),
         "Warrant should be against Alice"
     );
 }
