@@ -6,6 +6,11 @@ use holochain_zome_types::op::ChainOpType;
 use holochain_zome_types::prelude::*;
 use thiserror::Error;
 
+// The legacy per-variant `Action`, carried by errors raised from the legacy
+// `ChainOp`/`ChainOpLite` machinery in `crate::dht_op`, which still operates
+// on legacy actions. Shadows the v2 `Action` re-exported by `prelude::*`.
+use holochain_zome_types::dependencies::holochain_integrity_types::action::Action;
+
 #[derive(Debug, Error)]
 pub enum DhtOpError {
     #[error(

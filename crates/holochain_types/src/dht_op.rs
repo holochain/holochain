@@ -13,6 +13,27 @@ use holochain_zome_types::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 
+// This module is a scoped LEGACY ISLAND: `ChainOp`, `DhtOp`, `DhtOpLite`,
+// `ChainOpLite`, `ChainOpUniqueForm`, and `produce_ops_from_record` operate on
+// the legacy per-variant `Action` enum, not the v2 `ActionHeader` +
+// `ActionData` shape that `crate::prelude::Action` now resolves to. These
+// explicit imports shadow the v2 re-exports so the rest of this file keeps
+// resolving `Action`/`Record`/`SignedActionHashed` to their legacy shape,
+// matching the legacy SQLite schema and the upstream crates (sys-validation,
+// integration, source chain, cascade) that still consume these types.
+// `RenderedOp::new` is the one exception — it bridges from the v2 wire
+// action to both forms — and fully-qualifies the v2 types it needs instead.
+use holochain_zome_types::dependencies::holochain_integrity_types::action::Action;
+use holochain_zome_types::dependencies::holochain_integrity_types::record::Record;
+use holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed;
+
+/// A legacy action with its signature (no hash). The v2 equivalent —
+/// canonical everywhere outside this legacy op machinery — is
+/// [`holochain_zome_types::record::SignedAction`]; that name now resolves to
+/// the v2 shape, so the legacy `ChainOp` accessors below use this alias
+/// instead.
+pub type LegacySignedAction = holochain_zome_types::signature::Signed<Action>;
+
 mod error;
 pub use error::*;
 
@@ -416,19 +437,23 @@ impl ChainOp {
     }
 
     /// Get the signed action from this op
-    pub fn signed_action(&self) -> SignedAction {
+    pub fn signed_action(&self) -> LegacySignedAction {
         match self {
-            Self::StoreRecord(s, a, _) => SignedAction::new(a.clone(), s.clone()),
-            Self::StoreEntry(s, a, _) => SignedAction::new(a.clone().into(), s.clone()),
-            Self::RegisterAgentActivity(s, a) => SignedAction::new(a.clone(), s.clone()),
-            Self::RegisterUpdatedContent(s, a, _) => SignedAction::new(a.clone().into(), s.clone()),
-            Self::RegisterUpdatedRecord(s, a, _) => SignedAction::new(a.clone().into(), s.clone()),
-            Self::RegisterDeletedBy(s, a) => SignedAction::new(a.clone().into(), s.clone()),
-            Self::RegisterDeletedEntryAction(s, a) => {
-                SignedAction::new(a.clone().into(), s.clone())
+            Self::StoreRecord(s, a, _) => LegacySignedAction::new(a.clone(), s.clone()),
+            Self::StoreEntry(s, a, _) => LegacySignedAction::new(a.clone().into(), s.clone()),
+            Self::RegisterAgentActivity(s, a) => LegacySignedAction::new(a.clone(), s.clone()),
+            Self::RegisterUpdatedContent(s, a, _) => {
+                LegacySignedAction::new(a.clone().into(), s.clone())
             }
-            Self::RegisterAddLink(s, a) => SignedAction::new(a.clone().into(), s.clone()),
-            Self::RegisterRemoveLink(s, a) => SignedAction::new(a.clone().into(), s.clone()),
+            Self::RegisterUpdatedRecord(s, a, _) => {
+                LegacySignedAction::new(a.clone().into(), s.clone())
+            }
+            Self::RegisterDeletedBy(s, a) => LegacySignedAction::new(a.clone().into(), s.clone()),
+            Self::RegisterDeletedEntryAction(s, a) => {
+                LegacySignedAction::new(a.clone().into(), s.clone())
+            }
+            Self::RegisterAddLink(s, a) => LegacySignedAction::new(a.clone().into(), s.clone()),
+            Self::RegisterRemoveLink(s, a) => LegacySignedAction::new(a.clone().into(), s.clone()),
         }
     }
 
@@ -482,7 +507,7 @@ impl ChainOp {
     /// From a type, action and an entry (if there is one)
     pub fn from_type(
         op_type: ChainOpType,
-        action: SignedAction,
+        action: LegacySignedAction,
         entry: Option<Entry>,
     ) -> DhtOpResult<Self> {
         let (action, signature) = action.into();
@@ -1216,16 +1241,26 @@ impl RenderedOp {
     /// Try to create a new rendered op from wire data.
     /// This function computes all the hashes and
     /// reconstructs the full actions.
+    ///
+    /// `action` is the wire's v2 action — the canonical source of truth. The
+    /// op hash and the v2 signed action are computed directly from it; the
+    /// legacy signed action (for the legacy SQLite cache schema) is derived
+    /// from that same v2 form via [`holochain_zome_types::dht_v2::to_legacy_signed_action`],
+    /// which carries the v2 hash over unchanged (`ActionHash` hashing already
+    /// ignores the legacy-only `weight` field, so no identity is lost).
     pub fn new(
-        action: Action,
+        action: holochain_zome_types::Action,
         signature: Signature,
         validation_status: Option<ValidationStatus>,
         op_type: ChainOpType,
     ) -> DhtOpResult<Self> {
-        let (action, op_hash) = ChainOpUniqueForm::op_hash(op_type, action)?;
-        let action_hashed = ActionHashed::from_content_sync(action);
-        let action = SignedActionHashed::with_presigned(action_hashed, signature);
-        let signed_action_v2 = holochain_zome_types::dht_v2::from_legacy_signed_action(&action);
+        let op_hash = crate::dht_v2::ChainOpUniqueForm::op_hash(op_type, &action);
+        let action_hashed = holo_hash::HoloHashed::from_content_sync(action);
+        let signed_action_v2 = holochain_zome_types::dht_v2::SignedActionHashed::with_presigned(
+            action_hashed,
+            signature,
+        );
+        let action = holochain_zome_types::dht_v2::to_legacy_signed_action(&signed_action_v2);
         let op_light =
             ChainOpLite::from_type(op_type, action.as_hash().clone(), action.action())?.into();
         Ok(Self {

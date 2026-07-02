@@ -228,7 +228,16 @@ pub fn to_legacy_dht_op(op: &DhtOp) -> crate::dht_op::DhtOpResult<crate::dht_op:
                 OpEntry::Present(entry) => Some(entry.clone()),
                 OpEntry::Hidden | OpEntry::ActionOnly => None,
             });
-            let legacy = LegacyChainOp::from_type(chain_op.op_type(), legacy_sah.into(), entry)?;
+            // `LegacyChainOp::from_type` takes a `LegacySignedAction`
+            // (`Signed<legacy Action>`, unhashed — it only stores the action
+            // and signature, not the hash), so drop the hash carried on
+            // `legacy_sah` here.
+            let (legacy_hashed, legacy_signature) = legacy_sah.into_inner();
+            let legacy_signed_action = crate::dht_op::LegacySignedAction::new(
+                legacy_hashed.into_content(),
+                legacy_signature,
+            );
+            let legacy = LegacyChainOp::from_type(chain_op.op_type(), legacy_signed_action, entry)?;
             Ok(LegacyDhtOp::ChainOp(Box::new(legacy)))
         }
         DhtOp::WarrantOp(w) => Ok(LegacyDhtOp::WarrantOp(Box::new(
