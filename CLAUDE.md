@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `cargo nextest run -p <crate-name> <test_name>` — run a single test (nextest is the configured runner; see `.config/nextest.toml`).
 - `cargo fmt --all` — format before submitting.
 - `scripts/format-toml.sh` - format TOML files, if any have changed, before submitting.
-- Toolchain is pinned in `rust-toolchain.toml` (currently 1.95.0) — do not bump without discussion.
+- Toolchain is pinned in `rust-toolchain.toml` (currently 1.96.1) — do not bump without discussion.
 
 Feature flags worth knowing (defined in the `Makefile`):
 - `DEFAULT_FEATURES` = `transport-iroh,slow_tests,build_wasms,sqlite-encrypted`.

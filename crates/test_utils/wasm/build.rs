@@ -83,7 +83,7 @@ fn build_test_wasms(
             cmd.stderr(Stdio::piped());
             cmd.env(
                 "RUSTFLAGS",
-                "-C opt-level=z --cfg getrandom_backend=\"custom\"",
+                "-C opt-level=z -C link-arg=--import-undefined --cfg getrandom_backend=\"custom\"",
             );
             cmd.arg("build")
                 .arg("--manifest-path")
