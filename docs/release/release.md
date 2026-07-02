@@ -128,8 +128,9 @@ EOF
 )
 ```
 
-Note: the order of branching and changing mode is really important. If the release automation does not see a 0.6.0 release on the branch
-then it will try to switch to RC releases for 0.6 and not bump to 0.7.
+> [!Note]
+> The order of branching and changing mode is really important. If the release automation does not see a 0.6.0 release on the branch
+> then it will try to switch to RC releases for 0.6 and not bump to 0.7.
 
 ## Companion change
 
