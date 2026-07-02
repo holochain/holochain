@@ -809,7 +809,9 @@ impl CascadeImpl {
             ChainItems::Full(records) => records
                 .iter()
                 .filter_map(|r| match r.entry {
-                    RecordEntry::NotStored => r.action().entry_hash().map(|h| h.clone().into()),
+                    RecordEntry::NotStored => {
+                        r.action().data.entry_hash().map(|h| h.clone().into())
+                    }
                     _ => None,
                 })
                 .collect(),
@@ -832,8 +834,8 @@ impl CascadeImpl {
                 .iter()
                 .filter_map(|r| match r {
                     Some(r) => r
-                        .signed_action()
                         .action()
+                        .data
                         .entry_hash()
                         .map(|entry_hash| (entry_hash, &r.entry)),
                     None => None,
@@ -844,7 +846,7 @@ impl CascadeImpl {
                 ChainItems::Full(records) => {
                     for record in records.iter_mut() {
                         if let RecordEntry::NotStored = record.entry {
-                            if let Some(entry_hash) = record.action().entry_hash() {
+                            if let Some(entry_hash) = record.action().data.entry_hash() {
                                 if let Some(entry) = entry_lookup.get(entry_hash) {
                                     record.entry = (*entry).clone();
                                 }

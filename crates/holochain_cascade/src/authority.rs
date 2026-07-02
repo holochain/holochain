@@ -42,7 +42,11 @@ pub async fn handle_get_entry(store: DhtStoreRead, hash: EntryHash) -> CascadeRe
     let entry_type = create_rows
         .iter()
         .chain(update_rows.iter())
-        .find_map(|(sah, _)| sah.action().entry_type().cloned());
+        .find_map(|(sah, _)| match &sah.hashed.content.data {
+            ActionData::Create(d) => Some(d.entry_type.clone()),
+            ActionData::Update(d) => Some(d.entry_type.clone()),
+            _ => None,
+        });
 
     let creates = judged_actions(create_rows, &mut rejected);
     let deletes = judged_actions(delete_rows, &mut rejected);
@@ -78,10 +82,13 @@ pub async fn handle_get_record(
             if status == ValidationStatus::Rejected {
                 rejected.insert(&sah);
             }
-            if let Some(entry_hash) = sah.action().entry_hash().cloned() {
+            if let Some(entry_hash) = sah.hashed.content.data.entry_hash().cloned() {
                 entry = store.retrieve_entry(&entry_hash, None).await?;
             }
-            Some(Judged::new(SignedAction::from(sah), status))
+            Some(Judged::new(
+                SignedAction::new(sah.hashed.content.clone(), sah.signature.clone()),
+                status,
+            ))
         }
         None => None,
     };
@@ -191,7 +198,8 @@ struct RejectedRecords {
 
 impl RejectedRecords {
     fn insert(&mut self, action: &SignedActionHashed) {
-        self.authors.insert(action.action().author().clone());
+        self.authors
+            .insert(action.hashed.content.header.author.clone());
         self.action_hashes.insert(action.as_hash().clone());
     }
 
@@ -219,7 +227,10 @@ fn judged_actions(
             if status == ValidationStatus::Rejected {
                 rejected.insert(&sah);
             }
-            Judged::new(SignedAction::from(sah), status)
+            Judged::new(
+                SignedAction::new(sah.hashed.content.clone(), sah.signature.clone()),
+                status,
+            )
         })
         .collect()
 }
@@ -252,8 +263,8 @@ fn filter_link_creates(
 ) -> Vec<(SignedActionHashed, ValidationStatus)> {
     rows.into_iter()
         .filter(|(sah, _)| {
-            let action = sah.action();
-            let Action::CreateLink(create_link) = action else {
+            let action = &sah.hashed.content;
+            let ActionData::CreateLink(create_link) = &action.data else {
                 return false;
             };
             if !key
@@ -268,17 +279,17 @@ fn filter_link_creates(
                 }
             }
             if let Some(author) = &key.author {
-                if action.author() != author {
+                if &action.header.author != author {
                     return false;
                 }
             }
             if let Some(before) = key.before {
-                if action.timestamp() > before {
+                if action.header.timestamp > before {
                     return false;
                 }
             }
             if let Some(after) = key.after {
-                if action.timestamp() < after {
+                if action.header.timestamp < after {
                     return false;
                 }
             }

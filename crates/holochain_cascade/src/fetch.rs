@@ -114,7 +114,7 @@ impl CascadeImpl {
                     .iter()
                     .map(|ra| {
                         RenderedOp::new(
-                            ra.action.action().clone(),
+                            holochain_types::dht_v2::from_legacy_action(ra.action.action()),
                             ra.action.signature().clone(),
                             None,
                             ChainOpType::RegisterAgentActivity,

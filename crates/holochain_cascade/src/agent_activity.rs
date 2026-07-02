@@ -220,7 +220,39 @@ fn merge_activity_responses(
     }
 }
 
-pub(crate) fn compute_chain_status<T: ActionSequenceAndHash>(
+/// Sequence-number/hash pair used to sort and detect forks in a chain of
+/// activity items, whether those items are full v2 [`Record`]s or bare
+/// `(u32, ActionHash)` pairs.
+///
+/// A local trait rather than `holochain_types::prelude::ActionSequenceAndHash`
+/// because that trait is implemented for the legacy `Record`, not the v2
+/// `Record` this crate reads from the `DhtStore`.
+pub(crate) trait ChainSequenceAndHash {
+    fn action_seq(&self) -> u32;
+    fn address(&self) -> &ActionHash;
+}
+
+impl ChainSequenceAndHash for Record {
+    fn action_seq(&self) -> u32 {
+        self.action().header.action_seq
+    }
+
+    fn address(&self) -> &ActionHash {
+        self.action_address()
+    }
+}
+
+impl ChainSequenceAndHash for (u32, ActionHash) {
+    fn action_seq(&self) -> u32 {
+        self.0
+    }
+
+    fn address(&self) -> &ActionHash {
+        &self.1
+    }
+}
+
+pub(crate) fn compute_chain_status<T: ChainSequenceAndHash>(
     valid: impl Iterator<Item = T>,
     rejected: impl Iterator<Item = T>,
 ) -> (ChainStatus, Vec<T>, Vec<T>) {
