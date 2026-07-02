@@ -3344,25 +3344,17 @@ impl Conductor {
         }
 
         // For any DNAs no longer represented in any installed app,
-        // delete DHT and cache databases or purge data.
+        // delete the DHT database or purge data.
         for dna_hash in dnas_to_purge {
-            // Delete all data from DHT and cache databases.
+            // Delete all data from the DHT database.
             // Database files will be deleted after this step, but
             // the DB continues to exist in memory while the conductor
             // is running, supposedly because the pool holds the connection
             // open.
             let dht_db = self.spaces.dht_db(dna_hash)?;
-            let cache_db = self.spaces.cache(dna_hash)?;
-            futures::future::join_all([
-                dht_db.write_async(|txn| purge_data(txn)).boxed(),
-                cache_db.write_async(|txn| purge_data(txn)).boxed(),
-            ])
-            .await
-            .into_iter()
-            .collect::<Result<Vec<()>, _>>()?;
+            dht_db.write_async(|txn| purge_data(txn)).await?;
 
             self.delete_or_purge_database(dht_db).await?;
-            self.delete_or_purge_database(cache_db).await?;
 
             // Remove (or purge) the per-DNA mirrored store so a reinstall
             // doesn't inherit stale rows from the previous installation.
@@ -3549,14 +3541,6 @@ mod test_utils_impls {
 
         pub fn get_dht_store(&self, dna_hash: &DnaHash) -> ConductorApiResult<DhtStore> {
             Ok(self.get_or_create_dht_store(dna_hash)?)
-        }
-
-        pub async fn get_cache_db(
-            &self,
-            cell_id: &CellId,
-        ) -> ConductorApiResult<DbWrite<DbKindCache>> {
-            let cell = self.cell_by_id(cell_id).await?;
-            Ok(cell.cache().clone())
         }
 
         pub fn get_spaces(&self) -> Spaces {

@@ -7,7 +7,6 @@ use holochain_sqlite::prelude::*;
 use holochain_sqlite::rusqlite::Statement;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::prelude::*;
-use holochain_zome_types::test_utils::fake_cell_id;
 use shrinkwraprs::Shrinkwrap;
 use std::path::Path;
 use std::path::PathBuf;
@@ -40,19 +39,6 @@ pub fn test_dht_db_with_id(id: u8) -> TestDb<DbKindDht> {
 
 pub fn test_dht_db_with_dna_hash(hash: DnaHash) -> TestDb<DbKindDht> {
     test_db(DbKindDht(Arc::new(hash)))
-}
-
-/// Create a [`TestDb`] of [`DbKindCache`], backed by a temp directory.
-pub fn test_cache_db() -> TestDb<DbKindCache> {
-    test_cache_db_with_id(1)
-}
-
-pub fn test_cache_db_with_id(id: u8) -> TestDb<DbKindCache> {
-    test_db(DbKindCache(Arc::new(fake_cell_id(id).dna_hash().clone())))
-}
-
-pub fn test_cache_db_with_dna_hash(hash: DnaHash) -> TestDb<DbKindCache> {
-    test_db(DbKindCache(Arc::new(hash)))
 }
 
 /// Create a [`TestDb`] of [DbKindConductor], backed by a temp directory.
@@ -162,7 +148,7 @@ impl<Kind: DbKindT> TestDb<Kind> {
 
     pub fn dna_hash(&self) -> Option<Arc<DnaHash>> {
         match self.db.kind().kind() {
-            DbKind::Cache(hash) | DbKind::Dht(hash) => Some(hash),
+            DbKind::Dht(hash) => Some(hash),
             DbKind::Authored(cell_id) => Some(Arc::new(cell_id.dna_hash().clone())),
             _ => None,
         }

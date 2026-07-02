@@ -188,10 +188,6 @@ async fn uninstall_app() {
         .get_or_create_authored_db(dna.dna_hash(), app_2.agent().clone())
         .unwrap();
     let dht_db = conductor.get_dht_db(dna.dna_hash()).unwrap();
-    let cache_db = conductor
-        .get_cache_db(&CellId::new(dna.dna_hash().clone(), app_1.agent().clone()))
-        .await
-        .unwrap();
 
     // - Check that both authored database files exist
     std::fs::File::open(authored_db_1.path()).unwrap();
@@ -208,9 +204,8 @@ async fn uninstall_app() {
     #[cfg(not(windows))]
     std::fs::File::open(authored_db_1.path()).unwrap_err();
     std::fs::File::open(authored_db_2.path()).unwrap();
-    // - DHT and cache databases should still exist.
+    // - The DHT database should still exist.
     std::fs::File::open(dht_db.path()).unwrap();
-    std::fs::File::open(cache_db.path()).unwrap();
 
     // - Ensure that the remaining app can still access both hashes
     assert!(conductor
@@ -241,9 +236,8 @@ async fn uninstall_app() {
     {
         // - Check that second authored DB file is deleted since the cell was removed.
         std::fs::File::open(authored_db_2.path()).unwrap_err();
-        // - Now the DHT and cache databases should be gone too.
+        // - Now the DHT database should be gone too.
         std::fs::File::open(dht_db.path()).unwrap_err();
-        std::fs::File::open(cache_db.path()).unwrap_err();
     }
 
     // - Ensure that the apps are removed

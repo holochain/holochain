@@ -1,7 +1,5 @@
 use holo_hash::{AgentPubKey, DnaHash};
-use holochain_sqlite::db::{
-    DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbKindT, DbWrite,
-};
+use holochain_sqlite::db::{DbKindAuthored, DbKindConductor, DbKindDht, DbKindT, DbWrite};
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::prelude::{DbKindPeerMetaStore, DbKindWasm};
 use holochain_zome_types::cell::CellId;
@@ -21,9 +19,6 @@ async fn check_schema_migrations_execute() {
     // Run anyway to be safe because the migrations are listed separately.
     let dht = DbWrite::test_in_mem(DbKindDht(Arc::new(DnaHash::from_raw_36(vec![1; 36])))).unwrap();
     check_migrations_run(dht, "./src/sql/cell/schema").await;
-    let cache =
-        DbWrite::test_in_mem(DbKindCache(Arc::new(DnaHash::from_raw_36(vec![1; 36])))).unwrap();
-    check_migrations_run(cache, "./src/sql/cell/schema").await;
 
     let conductor = DbWrite::test_in_mem(DbKindConductor).unwrap();
     check_migrations_run(conductor, "./src/sql/conductor/schema").await;

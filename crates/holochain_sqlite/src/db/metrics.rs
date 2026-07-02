@@ -59,7 +59,6 @@ fn db_kind_name(kind: DbKind) -> String {
     match kind {
         DbKind::Authored(_) => "authored",
         DbKind::Dht(_) => "dht",
-        DbKind::Cache(_) => "cache",
         DbKind::Conductor => "conductor",
         DbKind::Wasm => "wasm",
         DbKind::PeerMetaStore(_) => "peer_meta_store",

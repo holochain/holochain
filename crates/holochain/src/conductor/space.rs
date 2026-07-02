@@ -19,8 +19,8 @@ use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::DynHcP2p;
 use holochain_sqlite::prelude::{
-    DatabaseResult, DbKey, DbKindAuthored, DbKindCache, DbKindDht, DbSyncLevel, DbSyncStrategy,
-    DbWrite, PoolConfig,
+    DatabaseResult, DbKey, DbKindAuthored, DbKindDht, DbSyncLevel, DbSyncStrategy, DbWrite,
+    PoolConfig,
 };
 use holochain_state::{host_fn_workspace::SourceChainWorkspace, prelude::*};
 use holochain_util::timed;
@@ -62,10 +62,6 @@ pub struct Spaces {
 pub struct Space {
     /// The dna hash for this space.
     pub dna_hash: Arc<DnaHash>,
-
-    /// The caches databases. These are shared across cells.
-    /// There is one per unique Dna.
-    pub cache_db: DbWrite<DbKindCache>,
 
     /// The authored databases. These are per-agent.
     /// There is one per unique combination of Dna and AgentPubKey.
@@ -410,11 +406,6 @@ impl Spaces {
         }
     }
 
-    /// Get the cache database (this will create the space if it doesn't already exist).
-    pub fn cache(&self, dna_hash: &DnaHash) -> DatabaseResult<DbWrite<DbKindCache>> {
-        self.get_or_create_space_ref(dna_hash, |space| space.cache_db.clone())
-    }
-
     /// Get or create the authored database for this author (this will create the space if it doesn't already exist).
     pub fn get_or_create_authored_db(
         &self,
@@ -556,16 +547,7 @@ impl Space {
             DbSyncStrategy::Resilient => (DbSyncLevel::Normal, holochain_data::DbSyncLevel::Normal),
         };
 
-        let (cache, dht_db, peer_meta_store, dht_store) = tokio::task::block_in_place(|| {
-            let cache = DbWrite::open_with_pool_config(
-                root_db_dir.as_ref(),
-                DbKindCache(dna_hash.clone()),
-                PoolConfig {
-                    synchronous_level: db_sync_level,
-                    key: db_key.clone(),
-                    max_readers: db_max_readers,
-                },
-            )?;
+        let (dht_db, peer_meta_store, dht_store) = tokio::task::block_in_place(|| {
             let dht_db = DbWrite::open_with_pool_config(
                 root_db_dir.as_ref(),
                 DbKindDht(dna_hash.clone()),
@@ -596,7 +578,7 @@ impl Space {
                 ))
                 .map_err(|e| DatabaseError::Other(e.into()))?;
             let dht_store = DhtStore::new(new_dht_db);
-            DatabaseResult::Ok((cache, dht_db, peer_meta_store, dht_store))
+            DatabaseResult::Ok((dht_db, peer_meta_store, dht_store))
         })?;
 
         let witnessing_workspace = WitnessingWorkspace::default();
@@ -604,7 +586,6 @@ impl Space {
         let incoming_ops_batch = IncomingOpsBatch::default();
         let r = Self {
             dna_hash,
-            cache_db: cache,
             authored_dbs: Arc::new(parking_lot::Mutex::new(HashMap::new())),
             dht_db,
             dht_store,
@@ -820,12 +801,6 @@ mod tests {
 
         // db_max_readers applied to space
         assert_eq!(space.db_max_readers, custom_max_readers);
-
-        // db_max_readers applied to cache db
-        assert_eq!(
-            space.cache_db.connection_pool_max_size(),
-            custom_max_readers as u32 + 1
-        );
 
         // db_max_readers applied to dht db
         assert_eq!(

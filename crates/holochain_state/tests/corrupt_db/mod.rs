@@ -1,34 +1,8 @@
 use ::fixt::*;
-use holo_hash::fixt::DnaHashFixturator;
-use holochain_sqlite::prelude::DatabaseError;
 use holochain_sqlite::rusqlite::Connection;
 use holochain_state::prelude::{mutations_helpers, *};
 use std::{path::Path, sync::Arc};
 use tempfile::TempDir;
-
-/// Checks a corrupt cache will be wiped on load.
-#[tokio::test(flavor = "multi_thread")]
-async fn corrupt_cache_creates_new_db() {
-    holochain_trace::test_run();
-
-    let kind = DbKindCache(Arc::new(fixt!(DnaHash)));
-
-    // - Create a corrupt cache db.
-    let testdir = create_corrupt_db(kind.clone());
-
-    // - Try to open it.
-    let db = DbWrite::test(testdir.path(), kind).unwrap();
-
-    // - It opens successfully but the data is wiped.
-    let n: usize = db
-        .read_async(move |txn| {
-            txn.query_row("SELECT COUNT(rowid) FROM DhtOp", [], |row| row.get(0))
-                .map_err(DatabaseError::from)
-        })
-        .await
-        .unwrap();
-    assert_eq!(n, 0);
-}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn corrupt_source_chain_panics() {

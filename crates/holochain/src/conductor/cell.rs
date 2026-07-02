@@ -902,10 +902,6 @@ impl Cell {
         &self.space.dht_db
     }
 
-    pub(crate) fn cache(&self) -> &DbWrite<DbKindCache> {
-        &self.space.cache_db
-    }
-
     pub(crate) fn notify_authored_ops_moved_to_limbo(&self) {
         self.queue_triggers
             .integrate_dht_ops
