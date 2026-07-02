@@ -8,11 +8,6 @@ pub struct DnaStorageInfo {
     /// Size in bytes on disk of the DhtStore, including free space reserved by
     /// the database.
     pub dht_data_size_on_disk: usize,
-    /// Size in bytes of the data in use by the cache store.
-    pub cache_data_size: usize,
-    /// Size in bytes on disk of the cache store, including free space reserved
-    /// by the database.
-    pub cache_data_size_on_disk: usize,
     /// The hash of the DNA this storage information is for.
     pub dna_hash: DnaHash,
     /// The installed apps that make use of this DNA.

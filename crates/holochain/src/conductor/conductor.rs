@@ -843,7 +843,6 @@ mod network_impls {
     };
     use holochain_conductor_api::ZomeCallParamsSigned;
     use holochain_conductor_api::{DnaStorageInfo, StorageBlob, StorageInfo};
-    use holochain_sqlite::stats::{get_size_on_disk, get_used_size};
     use holochain_state::conductor::WitnessNonceResult;
     use holochain_zome_types::block::BlockTargetId;
     use kitsune2_api::Url;
@@ -1021,19 +1020,10 @@ mod network_impls {
         ) -> ConductorResult<StorageBlob> {
             // Get the storage sizes from the DhtStore.
             let dht_store = self.get_or_create_dht_store(dna_hash)?.as_read();
-            let cache_db = self.spaces.cache(dna_hash)?;
 
             Ok(StorageBlob::Dna(DnaStorageInfo {
                 dht_data_size_on_disk: dht_store.size_on_disk().await? as usize,
                 dht_data_size: dht_store.used_size().await? as usize,
-                cache_data_size_on_disk: cache_db
-                    .read_async(get_size_on_disk)
-                    .map_err(ConductorError::DatabaseError)
-                    .await?,
-                cache_data_size: cache_db
-                    .read_async(get_used_size)
-                    .map_err(ConductorError::DatabaseError)
-                    .await?,
                 dna_hash: dna_hash.clone(),
                 used_by: used_by.to_vec(),
             }))
