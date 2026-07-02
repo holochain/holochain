@@ -264,11 +264,9 @@ pub mod wasm_test {
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use matches::assert_matches;
-    use rusqlite::named_params;
 
     use crate::test_utils::new_zome_call_params;
     use crate::test_utils::RibosomeTestFixture;
-    use holochain_sqlite::prelude::DatabaseResult;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn call_test() {
@@ -344,22 +342,15 @@ pub mod wasm_test {
                 .decode()
                 .unwrap();
 
-        // Check alice's source chain contains the new value
-        let has_hash: bool = handle
-            .get_spaces()
-            .get_or_create_authored_db(alice.dna_hash(), alice.agent_pubkey().clone())
-            .unwrap()
-            .read_async(move |txn| -> DatabaseResult<bool> {
-                Ok(txn.query_row(
-                    "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE action_hash = :hash)",
-                    named_params! {
-                        ":hash": action_hash
-                    },
-                    |row| row.get(0),
-                )?)
-            })
+        // Check alice's source chain contains the new value by looking the
+        // action up in the DhtStore.
+        let has_hash = alice
+            .dht_store()
+            .as_read()
+            .retrieve_action(&action_hash)
             .await
-            .unwrap();
+            .unwrap()
+            .is_some();
         assert!(has_hash);
     }
 
@@ -393,20 +384,15 @@ pub mod wasm_test {
             )
             .await;
 
-        // Check alice's source chain contains the new value
-        let has_hash: bool = alice
-            .authored_db()
-            .read_async(move |txn| -> DatabaseResult<bool> {
-                Ok(txn.query_row(
-                    "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE action_hash = :hash)",
-                    named_params! {
-                        ":hash": action_hash
-                    },
-                    |row| row.get(0),
-                )?)
-            })
+        // Check alice's source chain contains the new value by looking the
+        // action up in the DhtStore.
+        let has_hash = alice
+            .dht_store()
+            .as_read()
+            .retrieve_action(&action_hash)
             .await
-            .unwrap();
+            .unwrap()
+            .is_some();
         assert!(has_hash);
     }
 

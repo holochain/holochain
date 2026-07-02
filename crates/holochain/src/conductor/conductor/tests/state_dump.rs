@@ -7,6 +7,7 @@ use holo_hash::ActionHash;
 use holochain_conductor_api::FullStateDump;
 use holochain_state::source_chain;
 use holochain_wasm_test_utils::TestWasm;
+use std::time::Duration;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn dump_full_state() {
@@ -34,13 +35,30 @@ async fn dump_full_state() {
         }
     });
 
-    let authored_db = conductor
-        .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())
-        .unwrap();
     let dht_store = conductor.get_dht_store(cell_id.dna_hash()).unwrap();
+
+    // Wait for publishing to quiesce so the two dumps below observe the same
+    // `published_ops_count`. The publish workflow runs in the background and
+    // raises that count as it records publish times, so building the expected
+    // and actual dumps a moment apart would otherwise race it. With a recency
+    // window wide enough to exclude anything published during the test, an op
+    // only remains in `get_ops_to_publish` until it has been published at least
+    // once; an empty result therefore means every publishable op has a recorded
+    // publish time and the count is stable.
+    retry_until_timeout!(30_000, 100, {
+        let pending = dht_store
+            .as_read()
+            .get_ops_to_publish(cell_id.agent_pubkey(), Duration::from_secs(60 * 60))
+            .await
+            .unwrap();
+        if pending.is_empty() {
+            break;
+        }
+    });
+
     let peer_dump = peer_store_dump(&conductor, cell_id).await.unwrap();
     let source_chain_dump =
-        source_chain::dump_state(authored_db.into(), cell_id.agent_pubkey().clone())
+        source_chain::dump_state(&dht_store.as_read(), cell_id.agent_pubkey().clone())
             .await
             .unwrap();
     let expected_state_dump = FullStateDump {

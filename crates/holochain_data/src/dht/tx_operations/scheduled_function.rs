@@ -55,4 +55,10 @@ impl TxWrite<Dht> {
         scheduled_function::delete_live_ephemeral_scheduled_functions(self.conn_mut(), author, now)
             .await
     }
+
+    /// Delete every ephemeral scheduled-function row, regardless of author or
+    /// liveness. Returns the number of rows deleted.
+    pub async fn delete_all_ephemeral_scheduled_functions(&mut self) -> sqlx::Result<u64> {
+        scheduled_function::delete_all_ephemeral_scheduled_functions(self.conn_mut()).await
+    }
 }

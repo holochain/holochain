@@ -50,6 +50,7 @@ pub fn compute_schedule_params(
     }
 }
 
+// #5370: dead once DbKindAuthored is retired.
 pub fn fn_is_scheduled(
     txn: &Transaction,
     scheduled_fn: ScheduledFn,
@@ -83,6 +84,7 @@ pub fn fn_is_scheduled(
 ///
 /// Returns the list of scheduled functions with their next schedule and a bool indicating
 /// if the schedule is ephemeral or not.
+// #5370: dead once DbKindAuthored is retired.
 pub fn live_scheduled_fns(
     txn: &Transaction,
     now: Timestamp,

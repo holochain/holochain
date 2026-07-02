@@ -3174,6 +3174,7 @@ dependencies = [
  "holochain_zome_types",
  "indexmap 2.14.0",
  "libsqlite3-sys",
+ "opentelemetry 0.31.0",
  "serde_json",
  "sodoken",
  "sqlx",

@@ -36,6 +36,7 @@ impl DbRead<Dht> {
         author: AgentPubKey,
         now: Timestamp,
     ) -> sqlx::Result<Option<ChainLockRow>> {
-        chain_lock::get_chain_lock(self.pool(), author, now).await
+        let mut conn = self.timed_conn().await?;
+        chain_lock::get_chain_lock(&mut *conn, author, now).await
     }
 }

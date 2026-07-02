@@ -5,8 +5,12 @@
 //! handle only allows read operations. You can obtain a [`DbRead`] from a [`DbWrite`],
 //! but not the reverse.
 
+use crate::metrics::{create_connection_use_time_metric, ConnectionUseTimeMetric};
 use crate::DatabaseIdentifier;
+use sqlx::pool::PoolConnection;
 use sqlx::{Pool, Sqlite, SqliteConnection, Transaction};
+use std::ops::{Deref, DerefMut};
+use std::time::Instant;
 
 /// A read-only database handle.
 ///
@@ -16,6 +20,9 @@ use sqlx::{Pool, Sqlite, SqliteConnection, Transaction};
 pub struct DbRead<I: DatabaseIdentifier> {
     pub(crate) pool: Pool<Sqlite>,
     pub(crate) identifier: I,
+    /// Records `hc.db.connections.use_time` for connections borrowed from
+    /// [`pool`](Self::pool) via [`timed_conn`](Self::timed_conn).
+    use_time_metric: ConnectionUseTimeMetric,
 }
 
 impl<I: DatabaseIdentifier> DbRead<I> {
@@ -24,7 +31,24 @@ impl<I: DatabaseIdentifier> DbRead<I> {
     /// This is primarily for internal use. Users should obtain handles
     /// via [`open_db`](crate::open_db) or by converting from a [`DbWrite`] handle.
     pub(crate) fn new(pool: Pool<Sqlite>, identifier: I) -> Self {
-        Self { pool, identifier }
+        let use_time_metric = create_connection_use_time_metric(&identifier);
+        Self {
+            pool,
+            identifier,
+            use_time_metric,
+        }
+    }
+
+    /// Acquire a connection from the pool, timing its use.
+    ///
+    /// The returned [`TimedConn`] dereferences to a [`SqliteConnection`] and,
+    /// when dropped, records the elapsed time it was held as the
+    /// `hc.db.connections.use_time` metric. Read operations route through this
+    /// so that connection-use is measured the same way `holochain_sqlite`
+    /// measured borrowed rusqlite connections.
+    pub(crate) async fn timed_conn(&self) -> sqlx::Result<TimedConn> {
+        let conn = self.pool.acquire().await?;
+        Ok(TimedConn::new(conn, self.use_time_metric.clone()))
     }
 
     /// Get a reference to the database identifier.
@@ -230,5 +254,49 @@ impl<I: DatabaseIdentifier> AsRef<TxRead<I>> for TxWrite<I> {
 impl<I: DatabaseIdentifier> AsMut<TxRead<I>> for TxWrite<I> {
     fn as_mut(&mut self) -> &mut TxRead<I> {
         &mut self.0
+    }
+}
+
+/// A pooled connection whose use is timed.
+///
+/// Obtained from [`DbRead::timed_conn`]. Dereferences to the borrowed
+/// [`SqliteConnection`] (so it can be passed to any `sqlx::Executor`-bound
+/// operation), and records the time it was held as the
+/// `hc.db.connections.use_time` metric when dropped. The connection is
+/// returned to the pool by the inner [`PoolConnection`]'s own drop.
+pub(crate) struct TimedConn {
+    conn: PoolConnection<Sqlite>,
+    use_time_metric: ConnectionUseTimeMetric,
+    acquired_at: Instant,
+}
+
+impl TimedConn {
+    fn new(conn: PoolConnection<Sqlite>, use_time_metric: ConnectionUseTimeMetric) -> Self {
+        Self {
+            conn,
+            use_time_metric,
+            acquired_at: Instant::now(),
+        }
+    }
+}
+
+impl Deref for TimedConn {
+    type Target = SqliteConnection;
+
+    fn deref(&self) -> &Self::Target {
+        &self.conn
+    }
+}
+
+impl DerefMut for TimedConn {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.conn
+    }
+}
+
+impl Drop for TimedConn {
+    fn drop(&mut self) {
+        self.use_time_metric
+            .record(self.acquired_at.elapsed().as_secs_f64());
     }
 }

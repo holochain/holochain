@@ -17,6 +17,7 @@ mod db_operations;
 mod inner;
 mod tx_operations;
 
+pub use db_operations::ChainWritePermit;
 pub use inner::chain_op::InsertChainOp;
 pub use inner::deleted_link::InsertDeletedLink;
 pub use inner::deleted_record::InsertDeletedRecord;
@@ -24,6 +25,7 @@ pub use inner::limbo_chain_op::InsertLimboChainOp;
 pub use inner::limbo_chain_op::LimboChainOpJoinedRow;
 pub use inner::limbo_warrant::InsertLimboWarrant;
 pub use inner::link::InsertLink;
+pub use inner::remove_countersigning_session::RemoveCountersigningSessionOutcome;
 pub use inner::scheduled_function::InsertScheduledFunction;
 pub use inner::updated_record::InsertUpdatedRecord;
 pub use inner::warrant::InsertWarrant;
@@ -115,7 +117,9 @@ mod tests {
         let author_a = AgentPubKey::from_raw_36(vec![1u8; 36]);
         let a_inserted: Vec<_> = (0..2u8).map(sample_action).collect();
         for action in &a_inserted {
-            db.insert_action(action, None).await.unwrap();
+            db.insert_action(action, Some(RecordValidity::Accepted))
+                .await
+                .unwrap();
         }
 
         let other_author = AgentPubKey::from_raw_36(vec![0x99; 36]);
@@ -136,7 +140,9 @@ mod tests {
             ),
             Signature([0xCC; 64]),
         );
-        db.insert_action(&other, None).await.unwrap();
+        db.insert_action(&other, Some(RecordValidity::Accepted))
+            .await
+            .unwrap();
 
         let a_results = db.as_ref().get_actions_by_author(author_a).await.unwrap();
         assert_eq!(a_results, a_inserted);
@@ -147,6 +153,23 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(b_results, vec![other]);
+    }
+
+    #[tokio::test]
+    async fn actions_by_author_excludes_unvalidated() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let author = AgentPubKey::from_raw_36(vec![1u8; 36]);
+        // Pending (network-arrived) rows are not part of the author's committed
+        // chain, so they are excluded.
+        for action in (0..2u8).map(sample_action) {
+            db.insert_action(&action, None).await.unwrap();
+        }
+        assert!(db
+            .as_ref()
+            .get_actions_by_author(author)
+            .await
+            .unwrap()
+            .is_empty());
     }
 
     fn sample_entry(seed: u8) -> (EntryHash, Entry) {
@@ -212,6 +235,60 @@ mod tests {
                 .unwrap(),
             Some(entry)
         );
+    }
+
+    #[tokio::test]
+    async fn entry_batch_fetch_by_hashes() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let author = AgentPubKey::from_raw_36(vec![9u8; 36]);
+
+        // Two public entries and one private entry owned by `author`.
+        let (pub_hash_a, pub_entry_a) = sample_entry(20);
+        let (pub_hash_b, pub_entry_b) = sample_entry(21);
+        let (priv_hash, priv_entry) = sample_entry(22);
+        db.insert_entry(&pub_hash_a, &pub_entry_a).await.unwrap();
+        db.insert_entry(&pub_hash_b, &pub_entry_b).await.unwrap();
+        db.insert_private_entry(&priv_hash, &author, &priv_entry)
+            .await
+            .unwrap();
+
+        // A hash that was never inserted.
+        let missing_hash = EntryHash::from_raw_36(vec![99u8; 36]);
+
+        // With the owning author, the private entry resolves alongside the
+        // public ones; the missing hash is simply absent from the map.
+        let map = db
+            .as_ref()
+            .get_entries_by_hashes(
+                &[
+                    pub_hash_a.clone(),
+                    pub_hash_b.clone(),
+                    priv_hash.clone(),
+                    missing_hash.clone(),
+                ],
+                Some(&author),
+            )
+            .await
+            .unwrap();
+        assert_eq!(map.len(), 3);
+        assert_eq!(map.get(&pub_hash_a), Some(&pub_entry_a));
+        assert_eq!(map.get(&pub_hash_b), Some(&pub_entry_b));
+        assert_eq!(map.get(&priv_hash), Some(&priv_entry));
+        assert_eq!(map.get(&missing_hash), None);
+
+        // Without an author the private entry is excluded, public entries still
+        // resolve, and duplicate input hashes collapse to one map entry.
+        let map_public = db
+            .as_ref()
+            .get_entries_by_hashes(
+                &[pub_hash_a.clone(), pub_hash_a.clone(), priv_hash.clone()],
+                None,
+            )
+            .await
+            .unwrap();
+        assert_eq!(map_public.len(), 1);
+        assert_eq!(map_public.get(&pub_hash_a), Some(&pub_entry_a));
+        assert_eq!(map_public.get(&priv_hash), None);
     }
 
     /// Verifies that a TxWrite bundling an Action + Entry insert can be rolled back
@@ -2030,6 +2107,79 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn promote_aggregates_record_validity_onto_action() {
+        async fn record_validity(
+            db: &crate::handles::DbWrite<Dht>,
+            action_hash: &ActionHash,
+        ) -> Option<i64> {
+            sqlx::query_scalar("SELECT record_validity FROM Action WHERE hash = ?")
+                .bind(action_hash.get_raw_36())
+                .fetch_one(db.pool())
+                .await
+                .unwrap()
+        }
+
+        let db = test_open_db(dht_db_id()).await.unwrap();
+
+        // A network-received action is inserted pending (record_validity = NULL).
+        let action_hash = seed_action_for_op(&db, 0).await;
+        assert_eq!(record_validity(&db, &action_hash).await, None);
+
+        // Integrating an accepted op aggregates Accepted onto the action.
+        let accepted_op = DhtOpHash::from_raw_36(vec![0xE1; 36]);
+        db.insert_limbo_chain_op(InsertLimboChainOp {
+            op_hash: &accepted_op,
+            action_hash: &action_hash,
+            op_type: 1,
+            basis_hash: &sample_basis(1),
+            storage_center_loc: 0,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(100),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+        db.promote_limbo_chain_op(
+            &accepted_op,
+            RecordValidity::Accepted,
+            Timestamp::from_micros(500),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            record_validity(&db, &action_hash).await,
+            Some(i64::from(RecordValidity::Accepted))
+        );
+
+        // A later rejected op for the same action rejects the record: any
+        // rejected op wins over accepted ones.
+        let rejected_op = DhtOpHash::from_raw_36(vec![0xE2; 36]);
+        db.insert_limbo_chain_op(InsertLimboChainOp {
+            op_hash: &rejected_op,
+            action_hash: &action_hash,
+            op_type: 2,
+            basis_hash: &sample_basis(2),
+            storage_center_loc: 0,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(200),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+        db.promote_limbo_chain_op(
+            &rejected_op,
+            RecordValidity::Rejected,
+            Timestamp::from_micros(600),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            record_validity(&db, &action_hash).await,
+            Some(i64::from(RecordValidity::Rejected))
+        );
+    }
+
+    #[tokio::test]
     async fn promote_limbo_chain_op_missing_returns_false() {
         let db = test_open_db(dht_db_id()).await.unwrap();
         let op_hash = DhtOpHash::from_raw_36(vec![0xA1; 36]);
@@ -2155,6 +2305,192 @@ mod tests {
         assert_eq!(row.withhold_publish, None);
     }
 
+    /// Seed a self-authored countersigning-style record: a `Create` action plus
+    /// one `ChainOp` per `op_byte` (each with a `ChainOpPublish` row carrying
+    /// `withhold`), and the entry stored in `Entry` (public) or `PrivateEntry`
+    /// (when `private_author` is `Some`). Returns the action hash and op hashes.
+    async fn seed_countersigning_record(
+        db: &crate::handles::DbWrite<Dht>,
+        seed: u8,
+        entry_hash: &EntryHash,
+        op_specs: &[(u8, Option<bool>)],
+        private_author: Option<&AgentPubKey>,
+    ) -> (ActionHash, Vec<DhtOpHash>) {
+        let author = AgentPubKey::from_raw_36(vec![seed; 36]);
+        let action_hash = ActionHash::from_raw_36(vec![seed; 36]);
+        let action = Action {
+            header: ActionHeader {
+                author: author.clone(),
+                timestamp: Timestamp::from_micros(1_000_000 + seed as i64),
+                action_seq: seed as u32,
+                prev_action: Some(ActionHash::from_raw_36(vec![seed.wrapping_sub(1); 36])),
+            },
+            data: ActionData::Create(holochain_integrity_types::dht_v2::CreateData {
+                entry_type: holochain_integrity_types::EntryType::AgentPubKey,
+                entry_hash: entry_hash.clone(),
+            }),
+        };
+        let hashed = HoloHashed::with_pre_hashed(action, action_hash.clone());
+        let signed = SignedHashed::with_presigned(hashed, Signature([seed; 64]));
+        db.insert_action(&signed, Some(RecordValidity::Accepted))
+            .await
+            .unwrap();
+
+        let mut op_hashes = Vec::new();
+        for (op_byte, withhold) in op_specs {
+            let op_hash = DhtOpHash::from_raw_36(vec![*op_byte; 36]);
+            db.insert_chain_op(InsertChainOp {
+                op_hash: &op_hash,
+                action_hash: &action_hash,
+                op_type: 1,
+                basis_hash: &sample_basis(seed),
+                storage_center_loc: 0,
+                validation_status: RecordValidity::Accepted,
+                locally_validated: true,
+                require_receipt: false,
+                when_received: Timestamp::from_micros(1),
+                when_integrated: Timestamp::from_micros(2),
+                serialized_size: 0,
+            })
+            .await
+            .unwrap();
+            db.insert_chain_op_publish(&op_hash, None, None, *withhold)
+                .await
+                .unwrap();
+            op_hashes.push(op_hash);
+        }
+
+        let entry = Entry::Agent(author.clone());
+        match private_author {
+            Some(a) => db
+                .insert_private_entry(entry_hash, a, &entry)
+                .await
+                .unwrap(),
+            None => db.insert_entry(entry_hash, &entry).await.unwrap(),
+        }
+
+        (action_hash, op_hashes)
+    }
+
+    #[tokio::test]
+    async fn remove_countersigning_session_deletes_withheld_public_entry() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let entry_hash = EntryHash::from_raw_36(vec![0x77; 36]);
+        // Two withheld self-authored ops for one action (e.g. StoreRecord +
+        // StoreEntry) plus the public entry.
+        let (action_hash, op_hashes) = seed_countersigning_record(
+            &db,
+            0x30,
+            &entry_hash,
+            &[(0xA1, Some(true)), (0xA2, Some(true))],
+            None,
+        )
+        .await;
+
+        let outcome = db
+            .remove_countersigning_session(&action_hash, &entry_hash)
+            .await
+            .unwrap();
+        assert_eq!(outcome, RemoveCountersigningSessionOutcome::Removed);
+
+        // Action, both ops, both publish rows, and the public entry are gone.
+        assert!(db.as_ref().get_action(action_hash).await.unwrap().is_none());
+        for op_hash in op_hashes {
+            assert!(db
+                .as_ref()
+                .get_chain_op(op_hash.clone())
+                .await
+                .unwrap()
+                .is_none());
+            assert!(db
+                .as_ref()
+                .get_chain_op_publish(op_hash)
+                .await
+                .unwrap()
+                .is_none());
+        }
+        assert!(db
+            .as_ref()
+            .get_entry(entry_hash, None)
+            .await
+            .unwrap()
+            .is_none());
+    }
+
+    #[tokio::test]
+    async fn remove_countersigning_session_deletes_private_entry() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let author = AgentPubKey::from_raw_36(vec![0x31; 36]);
+        let entry_hash = EntryHash::from_raw_36(vec![0x78; 36]);
+        let (action_hash, _) = seed_countersigning_record(
+            &db,
+            0x31,
+            &entry_hash,
+            &[(0xB1, Some(true))],
+            Some(&author),
+        )
+        .await;
+
+        // The private entry is present before removal.
+        assert!(db
+            .as_ref()
+            .get_entry(entry_hash.clone(), Some(&author))
+            .await
+            .unwrap()
+            .is_some());
+
+        let outcome = db
+            .remove_countersigning_session(&action_hash, &entry_hash)
+            .await
+            .unwrap();
+        assert_eq!(outcome, RemoveCountersigningSessionOutcome::Removed);
+
+        assert!(db.as_ref().get_action(action_hash).await.unwrap().is_none());
+        assert!(db
+            .as_ref()
+            .get_entry(entry_hash, Some(&author))
+            .await
+            .unwrap()
+            .is_none());
+    }
+
+    #[tokio::test]
+    async fn remove_countersigning_session_refuses_when_published() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let entry_hash = EntryHash::from_raw_36(vec![0x79; 36]);
+        // One withheld op and one published op (withhold cleared) for the same
+        // action: the published op must block removal.
+        let (action_hash, op_hashes) = seed_countersigning_record(
+            &db,
+            0x32,
+            &entry_hash,
+            &[(0xC1, Some(true)), (0xC2, None)],
+            None,
+        )
+        .await;
+
+        let outcome = db
+            .remove_countersigning_session(&action_hash, &entry_hash)
+            .await
+            .unwrap();
+        assert_eq!(
+            outcome,
+            RemoveCountersigningSessionOutcome::AlreadyPublished
+        );
+
+        // Nothing was deleted.
+        assert!(db.as_ref().get_action(action_hash).await.unwrap().is_some());
+        for op_hash in op_hashes {
+            assert!(db.as_ref().get_chain_op(op_hash).await.unwrap().is_some());
+        }
+        assert!(db
+            .as_ref()
+            .get_entry(entry_hash, None)
+            .await
+            .unwrap()
+            .is_some());
+    }
+
     #[tokio::test]
     async fn set_chain_op_validation_status_updates() {
         // The transition only applies to network-cached ops; seed one with
@@ -2201,6 +2537,65 @@ mod tests {
         assert_eq!(row.validation_status, i64::from(RecordValidity::Accepted));
     }
 
+    // Build a unique action hash from the author's first byte and the seq, so
+    // that two inserts for different (author, seq) pairs never collide on the
+    // primary key.
+    async fn insert_test_action(
+        db: &crate::handles::DbWrite<Dht>,
+        author: &AgentPubKey,
+        seq: u32,
+    ) -> (ActionHash, Timestamp) {
+        let mut hash_bytes = vec![0u8; 36];
+        hash_bytes[0] = author.get_raw_36()[0];
+        hash_bytes[1] = (seq & 0xff) as u8;
+        hash_bytes[2] = ((seq >> 8) & 0xff) as u8;
+        let hash = ActionHash::from_raw_36(hash_bytes);
+        let ts = Timestamp::from_micros(1_000_000 + seq as i64);
+        let action = Action {
+            header: ActionHeader {
+                author: author.clone(),
+                timestamp: ts,
+                action_seq: seq,
+                prev_action: None,
+            },
+            data: ActionData::InitZomesComplete(InitZomesCompleteData {}),
+        };
+        let hashed = HoloHashed::with_pre_hashed(action, hash.clone());
+        let signed = SignedHashed::with_presigned(hashed, Signature([0u8; 64]));
+        // The head lookup reads the `Action` row's own `record_validity`, so a
+        // self-authored (`Accepted`) action is recognised as the head without
+        // any accompanying op.
+        db.insert_action(&signed, Some(RecordValidity::Accepted))
+            .await
+            .unwrap();
+        (hash, ts)
+    }
+
+    #[tokio::test]
+    async fn chain_head_for_author_returns_max_seq() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let author = AgentPubKey::from_raw_36(vec![0x01; 36]);
+        let other = AgentPubKey::from_raw_36(vec![0x02; 36]);
+
+        insert_test_action(&db, &author, 0).await;
+        let head = insert_test_action(&db, &author, 1).await;
+        // Other author at a higher seq — must not affect `author`'s head.
+        insert_test_action(&db, &other, 5).await;
+
+        let got = db.as_ref().chain_head_for_author(&author).await.unwrap();
+        assert_eq!(got, Some((head.0, 1, head.1)));
+    }
+
+    #[tokio::test]
+    async fn chain_head_for_author_empty_chain_is_none() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let author = AgentPubKey::from_raw_36(vec![0x03; 36]);
+        assert_eq!(
+            db.as_ref().chain_head_for_author(&author).await.unwrap(),
+            None
+        );
+    }
+
     #[tokio::test]
     async fn set_chain_op_receipts_complete_round_trip() {
         let db = test_open_db(dht_db_id()).await.unwrap();
@@ -2244,5 +2639,77 @@ mod tests {
             .unwrap()
             .expect("row");
         assert_eq!(row.receipts_complete, Some(1));
+    }
+
+    #[tokio::test]
+    async fn live_scheduled_functions_predicate() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let alice = AgentPubKey::from_raw_36(vec![0x01; 36]);
+        let bob = AgentPubKey::from_raw_36(vec![0x02; 36]);
+        let now = Timestamp::from_micros(500);
+        let payload = b"schedule-blob";
+
+        // Alice: ephemeral, live (start_at=200 <= now=500 <= end_at=MAX).
+        db.upsert_scheduled_function(InsertScheduledFunction {
+            author: &alice,
+            zome_name: "z",
+            scheduled_fn: "ephemeral_live",
+            maybe_schedule: payload,
+            start_at: Timestamp::from_micros(200),
+            end_at: Timestamp::from_micros(i64::MAX),
+            ephemeral: true,
+        })
+        .await
+        .unwrap();
+
+        // Alice: persisted, future (start_at=700 > now=500 → not live).
+        db.upsert_scheduled_function(InsertScheduledFunction {
+            author: &alice,
+            zome_name: "z",
+            scheduled_fn: "persisted_future",
+            maybe_schedule: payload,
+            start_at: Timestamp::from_micros(700),
+            end_at: Timestamp::from_micros(900),
+            ephemeral: false,
+        })
+        .await
+        .unwrap();
+
+        // Alice: ephemeral, already past end_at (now=500 > end_at=400 → not live).
+        db.upsert_scheduled_function(InsertScheduledFunction {
+            author: &alice,
+            zome_name: "z",
+            scheduled_fn: "past",
+            maybe_schedule: payload,
+            start_at: Timestamp::from_micros(100),
+            end_at: Timestamp::from_micros(400),
+            ephemeral: true,
+        })
+        .await
+        .unwrap();
+
+        // Bob: ephemeral, live — must NOT be returned for alice.
+        db.upsert_scheduled_function(InsertScheduledFunction {
+            author: &bob,
+            zome_name: "z",
+            scheduled_fn: "ephemeral_live",
+            maybe_schedule: payload,
+            start_at: Timestamp::from_micros(200),
+            end_at: Timestamp::from_micros(i64::MAX),
+            ephemeral: true,
+        })
+        .await
+        .unwrap();
+
+        let live = db
+            .as_ref()
+            .get_live_scheduled_functions(&alice, now)
+            .await
+            .unwrap();
+
+        assert_eq!(live.len(), 1, "expected exactly one live fn for alice");
+        assert_eq!(live[0].0, "z");
+        assert_eq!(live[0].1, "ephemeral_live");
+        assert!(live[0].3, "expected ephemeral=true for the live fn");
     }
 }

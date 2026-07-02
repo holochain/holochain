@@ -3,12 +3,7 @@ use crate::core::workflow::countersigning_workflow::{
     CountersigningSessionState, CountersigningWorkspace, ResolutionRequiredReason,
     SessionResolutionSummary,
 };
-use holochain_sqlite::db::ReadAccess;
-use holochain_state::chain_lock::get_chain_lock;
-use holochain_state::mutations::unlock_chain;
-use holochain_state::prelude::{
-    current_countersigning_session, CurrentCountersigningSessionOpt, SourceChainResult,
-};
+use holochain_state::prelude::{CurrentCountersigningSessionOpt, SourceChainResult};
 use holochain_types::prelude::{Signal, SystemSignal};
 use holochain_zome_types::cell::CellId;
 use std::sync::Arc;
@@ -45,15 +40,30 @@ pub async fn refresh_workspace_state(
     let mut locked_for_agent = false;
 
     let agent = cell_id.agent_pubkey().clone();
-    if let Ok(authored_db) = space.get_or_create_authored_db(agent.clone()) {
-        let lock = authored_db
-            .read_async({
-                let agent = agent.clone();
-                move |txn| get_chain_lock(txn, &agent)
-            })
+    // Ensure the authored database exists (genesis path); the session itself is
+    // read from the DhtStore.
+    if space.get_or_create_authored_db(agent.clone()).is_ok() {
+        // `get_chain_lock` returns any lock row including expired ones, so a
+        // stale lock still marks the chain as locked and drives the recovery
+        // path below.
+        let lock = match space
+            .dht_store
+            .as_read()
+            .get_chain_lock(agent.clone())
             .await
-            .ok()
-            .flatten();
+        {
+            Ok(lock) => lock,
+            Err(e) => {
+                // A store read failure must not be treated as "no lock": that
+                // would drive the cleanup path below to abandon a live session.
+                tracing::error!(
+                    "Error querying countersigning chain lock for agent {:?}: {:?}",
+                    agent,
+                    e
+                );
+                return;
+            }
+        };
 
         // If the chain is locked, then we need to check the session state.
         if lock.is_some() {
@@ -63,27 +73,30 @@ pub async fn refresh_workspace_state(
             // the state of the session and need to unlock the chain.
             // This might happen if we were in the coordination phase of countersigning and the
             // conductor restarted.
-            let query_session_and_maybe_unlock_result = authored_db
-                    .write_async({
-                        let agent = agent.clone();
-                        move |txn| -> SourceChainResult<(CurrentCountersigningSessionOpt, bool)> {
-                            let maybe_current_session = current_countersigning_session(txn)?;
-                            tracing::trace!("Current session: {:?}", maybe_current_session);
+            let query_session_and_maybe_unlock_result: SourceChainResult<(
+                CurrentCountersigningSessionOpt,
+                bool,
+            )> = async {
+                let maybe_current_session = space
+                    .dht_store
+                    .as_read()
+                    .current_countersigning_session(&agent)
+                    .await?;
+                tracing::trace!("Current session: {:?}", maybe_current_session);
 
-                            // If we've not made a commit and the entry hasn't been committed then
-                            // there is no way to recover the session.
-                            // We also can't have published a signature yet, so it's safe to unlock
-                            // the chain here and abandon the session.
-                            if maybe_current_session.is_none() && !session_registered_for_agent {
-                                tracing::info!("Found a chain lock, but no corresponding countersigning session or workspace reference. Unlocking chain for agent {:?}", agent);
-                                unlock_chain(txn, &agent)?;
-                                Ok((None, true))
-                            } else {
-                                Ok((maybe_current_session, false))
-                            }
-                        }
-                    })
-                    .await;
+                // If we've not made a commit and the entry hasn't been committed then
+                // there is no way to recover the session.
+                // We also can't have published a signature yet, so it's safe to unlock
+                // the chain here and abandon the session.
+                if maybe_current_session.is_none() && !session_registered_for_agent {
+                    tracing::info!("Found a chain lock, but no corresponding countersigning session or workspace reference. Unlocking chain for agent {:?}", agent);
+                    space.dht_store.release_chain_lock(&agent).await?;
+                    Ok((None, true))
+                } else {
+                    Ok((maybe_current_session, false))
+                }
+            }
+            .await;
 
             match query_session_and_maybe_unlock_result {
                 Ok((maybe_current_session, unlocked)) => {

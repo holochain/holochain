@@ -14,8 +14,33 @@ impl DbRead<Dht> {
         author: &AgentPubKey,
         now: Timestamp,
     ) -> sqlx::Result<Vec<(String, String, Vec<u8>)>> {
-        scheduled_function::get_expired_persisted_scheduled_functions(self.pool(), author, now)
-            .await
+        let mut conn = self.timed_conn().await?;
+        scheduled_function::get_expired_persisted_scheduled_functions(&mut *conn, author, now).await
+    }
+
+    /// Return live scheduled-function rows for `author` at `now`.
+    ///
+    /// A row is "live" when `start_at <= now AND now <= end_at`. Returns
+    /// `(zome_name, scheduled_fn, maybe_schedule_blob, ephemeral)` tuples.
+    pub async fn get_live_scheduled_functions(
+        &self,
+        author: &AgentPubKey,
+        now: Timestamp,
+    ) -> sqlx::Result<Vec<(String, String, Vec<u8>, bool)>> {
+        let mut conn = self.timed_conn().await?;
+        scheduled_function::get_live_scheduled_functions(&mut *conn, author, now).await
+    }
+
+    /// Return `true` if a scheduled-function row exists for the given
+    /// `(author, zome_name, scheduled_fn)` tuple, regardless of liveness.
+    pub async fn is_function_scheduled(
+        &self,
+        author: &AgentPubKey,
+        zome_name: &str,
+        scheduled_fn: &str,
+    ) -> sqlx::Result<bool> {
+        let mut conn = self.timed_conn().await?;
+        scheduled_function::is_function_scheduled(&mut *conn, author, zome_name, scheduled_fn).await
     }
 }
 
@@ -49,5 +74,11 @@ impl DbWrite<Dht> {
     ) -> sqlx::Result<u64> {
         scheduled_function::delete_live_ephemeral_scheduled_functions(self.pool(), author, now)
             .await
+    }
+
+    /// Delete every ephemeral scheduled-function row, regardless of author or
+    /// liveness. Returns the number of rows deleted.
+    pub async fn delete_all_ephemeral_scheduled_functions(&self) -> sqlx::Result<u64> {
+        scheduled_function::delete_all_ephemeral_scheduled_functions(self.pool()).await
     }
 }

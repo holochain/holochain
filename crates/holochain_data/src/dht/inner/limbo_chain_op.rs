@@ -419,6 +419,30 @@ pub(crate) async fn promote_to_chain_op(
         .await?;
     }
 
+    // Aggregate the action's record validity from all its integrated ops (see
+    // docs/design/state_model.md, "Record Validity Aggregation"): any rejected
+    // op rejects the record; otherwise an accepted op accepts it. A validator
+    // may hold only some of a record's ops under the sharding model, so this
+    // reflects the ops known locally. Network-received actions are inserted
+    // pending (`NULL`) and gain their status here on first integration.
+    sqlx::query(
+        "UPDATE Action
+         SET record_validity = (
+             SELECT CASE
+                 WHEN COUNT(CASE WHEN validation_status = 2 THEN 1 END) > 0 THEN 2
+                 WHEN COUNT(CASE WHEN validation_status = 1 THEN 1 END) > 0 THEN 1
+                 ELSE NULL
+             END
+             FROM ChainOp
+             WHERE action_hash = ?
+         )
+         WHERE hash = ?",
+    )
+    .bind(&limbo.action_hash)
+    .bind(&limbo.action_hash)
+    .execute(&mut *conn)
+    .await?;
+
     // DELETE the limbo row.
     sqlx::query("DELETE FROM LimboChainOp WHERE hash = ?")
         .bind(op_hash.get_raw_36())

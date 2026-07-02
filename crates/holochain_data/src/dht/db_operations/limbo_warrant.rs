@@ -56,20 +56,23 @@ impl DbRead<Dht> {
         &self,
         hash: DhtOpHash,
     ) -> sqlx::Result<Option<LimboWarrantRow>> {
-        limbo_warrant::get_limbo_warrant(self.pool(), hash).await
+        let mut conn = self.timed_conn().await?;
+        limbo_warrant::get_limbo_warrant(&mut *conn, hash).await
     }
 
     pub async fn limbo_warrants_pending_sys_validation(
         &self,
         limit: u32,
     ) -> sqlx::Result<Vec<LimboWarrantRow>> {
-        limbo_warrant::limbo_warrants_pending_sys_validation(self.pool(), limit).await
+        let mut conn = self.timed_conn().await?;
+        limbo_warrant::limbo_warrants_pending_sys_validation(&mut *conn, limit).await
     }
 
     pub async fn limbo_warrants_ready_for_integration(
         &self,
         limit: u32,
     ) -> sqlx::Result<Vec<LimboWarrantRow>> {
-        limbo_warrant::limbo_warrants_ready_for_integration(self.pool(), limit).await
+        let mut conn = self.timed_conn().await?;
+        limbo_warrant::limbo_warrants_ready_for_integration(&mut *conn, limit).await
     }
 }

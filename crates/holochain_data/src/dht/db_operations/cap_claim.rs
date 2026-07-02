@@ -24,7 +24,8 @@ impl DbRead<Dht> {
         author: AgentPubKey,
         grantor: AgentPubKey,
     ) -> sqlx::Result<Vec<CapClaimRow>> {
-        cap_claim::get_cap_claims_by_grantor(self.pool(), author, grantor).await
+        let mut conn = self.timed_conn().await?;
+        cap_claim::get_cap_claims_by_grantor(&mut *conn, author, grantor).await
     }
 
     pub async fn get_cap_claims_by_tag(
@@ -32,6 +33,7 @@ impl DbRead<Dht> {
         author: AgentPubKey,
         tag: &str,
     ) -> sqlx::Result<Vec<CapClaimRow>> {
-        cap_claim::get_cap_claims_by_tag(self.pool(), author, tag).await
+        let mut conn = self.timed_conn().await?;
+        cap_claim::get_cap_claims_by_tag(&mut *conn, author, tag).await
     }
 }
