@@ -112,6 +112,11 @@ where
     row.map(row_to_signed_action_hashed).transpose()
 }
 
+/// The author's committed source chain, ordered by sequence.
+///
+/// Restricted to accepted rows (`record_validity = Accepted`): integrated
+/// actions whose ops all pass validation. Pending (limbo) and rejected rows are
+/// excluded, so this agrees with [`chain_head_for_author`].
 pub(crate) async fn get_actions_by_author<'e, E>(
     executor: E,
     author: AgentPubKey,
@@ -122,9 +127,10 @@ where
     let rows: Vec<ActionRow> = sqlx::query_as(
         "SELECT hash, author, seq, prev_hash, timestamp, action_type,
                 action_data, signature, entry_hash, private_entry, record_validity
-         FROM Action WHERE author = ? ORDER BY seq ASC",
+         FROM Action WHERE author = ? AND record_validity = ? ORDER BY seq ASC",
     )
     .bind(author.get_raw_36())
+    .bind(i64::from(RecordValidity::Accepted))
     .fetch_all(executor)
     .await?;
     rows.into_iter().map(row_to_signed_action_hashed).collect()
@@ -154,15 +160,16 @@ where
 ///
 /// Acceptability is read from the `Action` row's own `record_validity` state,
 /// not by joining to an op row, so the result never depends on holding a
-/// particular op such as `RegisterAgentActivity`. `record_validity` is
-/// `Accepted` only for actions written by the local source-chain flush; network
-/// arrivals are inserted as pending (`NULL`) and stay pending, so limbo copies
-/// of the author's chain — including a peer's forged high-sequence action —
-/// are excluded and cannot falsely trip the flush as-at / head-moved check. The
+/// particular op such as `RegisterAgentActivity`. `record_validity` is the
+/// action's aggregated integration status: a self-authored action is `Accepted`
+/// when the flush writes it, and a network-received action becomes `Accepted`
+/// once its ops integrate. Pending (limbo) and rejected actions are excluded, so
+/// a forged high-sequence action — which cannot pass validation to reach
+/// `Accepted` — cannot falsely trip the flush as-at / head-moved check. The
 /// flush writes the action and its ops in one transaction, so a freshly
-/// committed head is immediately visible here. Withheld in-flight
-/// countersigning actions are self-authored and keep `Accepted`, so they remain
-/// part of the head; only their publishing is withheld.
+/// committed head is immediately visible here. Withheld in-flight countersigning
+/// actions are self-authored and keep `Accepted`, so they remain part of the
+/// head; only their publishing is withheld.
 pub(crate) async fn chain_head_for_author<'e, E>(
     executor: E,
     author: &AgentPubKey,
