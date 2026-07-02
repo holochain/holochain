@@ -50,10 +50,7 @@ pub fn compute_schedule_params(
     }
 }
 
-// #5370 — no production callers; reads the authored DB which is being retired.
-// Membership is now read from the merged store via
-// `DhtStore::is_function_scheduled`. Now reached only from the #5370-dead
-// `schedule_fn`; retained for retirement together with `DbKindAuthored`.
+// #5370: dead once DbKindAuthored is retired.
 pub fn fn_is_scheduled(
     txn: &Transaction,
     scheduled_fn: ScheduledFn,
@@ -87,10 +84,7 @@ pub fn fn_is_scheduled(
 ///
 /// Returns the list of scheduled functions with their next schedule and a bool indicating
 /// if the schedule is ephemeral or not.
-// #5370 — no production callers; reads the authored DB which is being retired.
-// Live scheduling is now read from the merged store via
-// `DhtStore::live_scheduled_functions`. Now fully unused; retained for
-// retirement together with `DbKindAuthored`.
+// #5370: dead once DbKindAuthored is retired.
 pub fn live_scheduled_fns(
     txn: &Transaction,
     now: Timestamp,

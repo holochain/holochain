@@ -29,7 +29,7 @@ pub async fn inner_countersigning_session_incomplete(
     author: AgentPubKey,
     preflight_request: PreflightRequest,
 ) -> WorkflowResult<(SessionCompletionDecision, Vec<SessionResolutionOutcome>)> {
-    // Read the current countersigning session from the merged store (#5370).
+    // Read the current countersigning session from the DhtStore.
     let maybe_current_session = space
         .dht_store
         .as_read()

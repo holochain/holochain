@@ -1,4 +1,4 @@
-//! Force-remove a self-authored countersigning session from the merged store.
+//! Force-remove a self-authored countersigning session.
 
 use holo_hash::{ActionHash, EntryHash};
 use sqlx::SqliteConnection;
@@ -16,14 +16,9 @@ pub enum RemoveCountersigningSessionOutcome {
 /// Force-remove a self-authored countersigning session identified by its
 /// action hash and entry hash.
 ///
-/// This is the merged-store equivalent of the legacy
-/// `holochain_state::mutations::remove_countersigning_session`, which operated
-/// on the authored DHT database:
-///
 /// 1. **Published guard.** A self-authored op is "published" when it has a
 ///    `ChainOpPublish` row whose `withhold_publish` flag has been cleared
-///    (`NULL`) — mirroring the authored semantics where published ops carried a
-///    `NULL` withhold flag. If any of the action's ops is published the function
+///    (`NULL`). If any of the action's ops is published the function
 ///    makes no changes and returns
 ///    [`RemoveCountersigningSessionOutcome::AlreadyPublished`]: once a session's
 ///    ops have been shared with the network it is unacceptable to remove them.

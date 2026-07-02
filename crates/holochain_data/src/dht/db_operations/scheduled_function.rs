@@ -20,8 +20,7 @@ impl DbRead<Dht> {
 
     /// Return live scheduled-function rows for `author` at `now`.
     ///
-    /// A row is "live" when `start_at <= now AND now <= end_at`, mirroring the
-    /// legacy `live_scheduled_fns` predicate. Returns
+    /// A row is "live" when `start_at <= now AND now <= end_at`. Returns
     /// `(zome_name, scheduled_fn, maybe_schedule_blob, ephemeral)` tuples.
     pub async fn get_live_scheduled_functions(
         &self,

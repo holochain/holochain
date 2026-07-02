@@ -33,17 +33,17 @@ pub(crate) async fn inner_countersigning_session_complete(
         None => return Ok(None),
     };
 
-    // Read the chain lock from the merged store (#5370). It isn't necessarily for
-    // the current session; we can't check that until we have the session data.
+    // Read the chain lock from the DhtStore. It isn't necessarily for the
+    // current session; we can't check that until we have the session data.
     let chain_lock = space
         .dht_store
         .as_read()
         .get_chain_lock(author.clone())
         .await?;
 
-    // Read the current countersigning session from the merged store (#5370). A
-    // `Some` result guarantees the `CounterSign` entry is present in the store,
-    // so no separate entry-presence check is needed.
+    // Read the current countersigning session from the DhtStore. A `Some`
+    // result guarantees the `CounterSign` entry is present in the store, so no
+    // separate entry-presence check is needed.
     let maybe_current_session = space
         .dht_store
         .as_read()
@@ -202,29 +202,24 @@ async fn apply_success_state_changes(
     let authored_db = space.get_or_create_authored_db(author.clone())?;
     let dht_db = space.dht_db.clone();
 
-    // Load the op hashes for this session so that we can publish them. #5370:
-    // read the session's ops from the merged store (now the sole source-chain
-    // write) instead of the legacy authored DB. The session's withhold-publish
-    // flag is cleared on the merged store below via `clear_op_withhold_publishes`.
+    // Load the op hashes for this session so that we can publish them. The
+    // session's withhold-publish flag is cleared on the DhtStore below via
+    // `clear_op_withhold_publishes`.
     let this_cell_actions_op_basis_hashes = space
         .dht_store
         .as_read()
         .chain_op_hashes_for_action(this_cells_action_hash)
         .await?;
 
-    // All checks have passed so unlock the chain. #5370: the lock lives in the
-    // merged store. The withhold-publish flag is cleared on the merged store
-    // below via `clear_op_withhold_publishes`.
+    // All checks have passed so unlock the chain. The withhold-publish flag is
+    // cleared on the DhtStore below via `clear_op_withhold_publishes`.
     space
         .dht_store
         .release_chain_lock(author)
         .await
         .map_err(WorkflowError::from)?;
 
-    // #5370: legacy authored->dht_db integration. The source chain is no longer
-    // written to the authored DB, so this is now a no-op (the ops are not found
-    // in the authored DB) and remains only until the legacy DbKindDht reader is
-    // retired. The ops are already integrated in the merged store by flush.
+    // #5370: no-op; remove once DbKindDht is retired.
     let hashes_for_new_db = this_cell_actions_op_basis_hashes.clone();
     authored_ops_to_dht_db_without_check(
         this_cell_actions_op_basis_hashes,
@@ -255,15 +250,15 @@ pub(super) async fn force_publish_countersigning_session(
     cell_id: CellId,
     preflight_request: PreflightRequest,
 ) -> WorkflowResult<bool> {
-    // Read the chain lock from the merged store (#5370). It isn't necessarily for
-    // the current session; we can't check that until we have the session data.
+    // Read the chain lock from the DhtStore. It isn't necessarily for the
+    // current session; we can't check that until we have the session data.
     let chain_lock = space
         .dht_store
         .as_read()
         .get_chain_lock(cell_id.agent_pubkey().clone())
         .await?;
 
-    // Read the current countersigning session from the merged store (#5370).
+    // Read the current countersigning session from the DhtStore.
     let maybe_current_session = space
         .dht_store
         .as_read()

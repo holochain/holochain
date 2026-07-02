@@ -193,7 +193,7 @@ impl DhtStore<DbWrite<Dht>> {
     ///
     /// Called once per space at conductor startup to clear ephemeral schedules
     /// left over from a previous run — ephemeral schedules do not survive a
-    /// reboot. A single call covers every author, since the store is per-DNA.
+    /// reboot. A single call covers every author.
     pub async fn delete_all_ephemeral_scheduled_functions(&self) -> DhtStoreResult<u64> {
         Ok(self.db.delete_all_ephemeral_scheduled_functions().await?)
     }
@@ -351,8 +351,7 @@ impl DhtStore<DbWrite<Dht>> {
 
     /// Return the live scheduled functions for `author` at `now`.
     ///
-    /// A function is "live" when `start_at <= now AND now <= end_at`,
-    /// mirroring the legacy `live_scheduled_fns` predicate exactly.
+    /// A function is "live" when `start_at <= now AND now <= end_at`.
     /// Returns `(ScheduledFn, Option<Schedule>, ephemeral)` tuples ordered by
     /// `start_at ASC`.
     pub async fn live_scheduled_functions(
@@ -962,7 +961,7 @@ impl DhtStore<DbWrite<Dht>> {
 
     /// Try to acquire the source-chain lock for `author`.
     ///
-    /// Returns `Ok(true)` when the caller now holds the lock (no lock existed,
+    /// Returns `Ok(true)` when the caller holds the lock (no lock existed,
     /// the existing lock had expired relative to `now`, or the existing lock's
     /// `subject` matched and was therefore extended), and `Ok(false)` when a
     /// different subject still holds an unexpired lock.
@@ -988,16 +987,14 @@ impl DhtStore<DbWrite<Dht>> {
     }
 
     /// Force-remove a self-authored countersigning session (its `Action`,
-    /// `ChainOp`/`ChainOpPublish` rows and entry) from the merged store,
+    /// `ChainOp`/`ChainOpPublish` rows and entry) from the DhtStore,
     /// identified by `(action_hash, entry_hash)`.
     ///
-    /// This is the merged-store replacement for the legacy
-    /// `mutations::remove_countersigning_session` and is defensive about
-    /// sessions whose ops have already been published: if any of the action's
-    /// ops has a `ChainOpPublish` row with `withhold_publish IS NULL` the
-    /// removal is refused with [`StateMutationError::CannotRemoveFullyPublished`]
-    /// and no rows are touched. The guard and deletes run in a single
-    /// transaction.
+    /// This is defensive about sessions whose ops have already been published:
+    /// if any of the action's ops has a `ChainOpPublish` row with
+    /// `withhold_publish IS NULL` the removal is refused with
+    /// [`StateMutationError::CannotRemoveFullyPublished`] and no rows are
+    /// touched. The guard and deletes run in a single transaction.
     pub async fn remove_countersigning_session(
         &self,
         action_hash: ActionHash,

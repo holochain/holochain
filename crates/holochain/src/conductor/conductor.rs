@@ -1019,9 +1019,7 @@ mod network_impls {
             dna_hash: &DnaHash,
             used_by: &[InstalledAppId],
         ) -> ConductorResult<StorageBlob> {
-            // The DHT and source-chain (authored) data now live together in the
-            // merged store, so its size is what we report. The legacy
-            // DbKindDht is no longer measured here; it is retired later. // #5370
+            // Get the storage sizes from the DhtStore.
             let dht_store = self.get_or_create_dht_store(dna_hash)?.as_read();
             let cache_db = self.spaces.cache(dna_hash)?;
 
@@ -2265,8 +2263,7 @@ mod scheduler_impls {
             interval_period: std::time::Duration,
         ) -> StateMutationResult<()> {
             // Clear all ephemeral cruft in all spaces before starting a
-            // scheduler. One call per space clears every author, since the
-            // merged store is per-DNA.
+            // scheduler. One call per space clears every author.
             let tasks = self.spaces.get_from_spaces(|space| {
                 let dht_store = space.dht_store.clone();
                 async move {

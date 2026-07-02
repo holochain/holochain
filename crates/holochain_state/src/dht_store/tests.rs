@@ -67,14 +67,14 @@ async fn chain_lock_acquire_get_release_roundtrip() {
         .unwrap()
         .is_none());
 
-    // Acquiring succeeds and reports the caller now holds the lock.
+    // Acquiring succeeds and reports the caller holds the lock.
     let acquired = store
         .acquire_chain_lock(&author, &subject, expires_at, now)
         .await
         .unwrap();
     assert!(acquired);
 
-    // The lock is now readable with the expected subject.
+    // The lock is readable with the expected subject.
     let lock = store
         .as_read()
         .get_chain_lock(author.clone())
@@ -1097,8 +1097,8 @@ async fn op_validation_status_returns_status_only_when_locally_validated() {
 #[tokio::test]
 async fn op_validation_status_reads_decided_limbo_op() {
     // A limbo op that has a validation decision but is NOT yet integrated must
-    // still surface its outcome (matching the legacy pre-integration behavior),
-    // so a warrant dependency is ready as soon as it is validated.
+    // still surface its outcome, so a warrant dependency is ready as soon as it
+    // is validated.
     let store = DhtStore::new_test(dht_id()).await.unwrap();
 
     // sys + app accepted (not integrated) -> Valid.

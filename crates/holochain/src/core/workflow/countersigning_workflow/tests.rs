@@ -1889,7 +1889,7 @@ impl TestHarness {
     }
 
     async fn unlock_chain(&self) {
-        // #5370: the chain lock lives in the merged store.
+        // The chain lock lives in the DhtStore.
         self.test_space
             .space
             .dht_store
@@ -1953,8 +1953,8 @@ impl TestHarness {
         let signed = SignedAction::from(sah.clone());
 
         // Sign the op with the real action signature. The store record is
-        // reconstructed from this op (#5370), and the completion path verifies
-        // the record's signature, so a fixt signature would be rejected.
+        // reconstructed from this op, and the completion path verifies the
+        // record's signature, so a fixt signature would be rejected.
         let store_entry_op = ChainOp::StoreEntry(
             sah.signature().clone(),
             my_action.clone().try_into().unwrap(),
@@ -1984,8 +1984,8 @@ impl TestHarness {
             .await
             .unwrap();
 
-        // #5370: mirror the commit to the merged store so the store-backed
-        // session reads (`current_countersigning_session`, chain head) see it.
+        // Mirror the commit to the DhtStore so the store-backed session reads
+        // (`current_countersigning_session`, chain head) see it.
         // The session op is withheld from publishing until the session
         // succeeds, matching the flush path. The entry must be routed by
         // visibility so a private session entry lands in `PrivateEntry`.
@@ -2025,8 +2025,7 @@ impl TestHarness {
     }
 
     async fn read_chain_head_hash(&self) -> HeadInfo {
-        // #5370: the chain head lives in the merged store, which is now the sole
-        // source-chain write.
+        // The chain head lives in the DhtStore.
         self.test_space
             .space
             .dht_store
@@ -2041,7 +2040,7 @@ impl TestHarness {
         &self,
         action_hash: ActionHash,
     ) -> StateMutationResult<()> {
-        // #5370: session removal now goes through the merged store, whose guard
+        // Session removal goes through the DhtStore, whose guard
         // refuses to remove a session once any of its ops has been published —
         // i.e. its store `ChainOpPublish` withhold flag has been cleared on
         // success. The entry hash is irrelevant to the published guard.
@@ -2123,7 +2122,7 @@ impl TestHarness {
     }
 
     async fn expect_chain_locked(&self) {
-        // #5370: the chain lock lives in the merged store.
+        // The chain lock lives in the DhtStore.
         let lock = self
             .test_space
             .space
@@ -2137,7 +2136,7 @@ impl TestHarness {
     }
 
     pub async fn expect_chain_unlocked(&self) {
-        // #5370: the chain lock lives in the merged store.
+        // The chain lock lives in the DhtStore.
         let lock = self
             .test_space
             .space
@@ -2151,8 +2150,8 @@ impl TestHarness {
     }
 
     pub async fn expect_session_removed(&self, preflight_request: PreflightRequest) {
-        // #5370: the session lives in the merged store, which is now the sole
-        // source-chain write, so verify removal against the store.
+        // The session lives in the DhtStore, so verify removal against the
+        // store.
         let session = self
             .test_space
             .space

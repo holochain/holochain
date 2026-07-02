@@ -342,8 +342,8 @@ pub mod wasm_test {
                 .decode()
                 .unwrap();
 
-        // Check alice's source chain contains the new value. The authored data
-        // now lives in the merged store, so look the action up there.
+        // Check alice's source chain contains the new value by looking the
+        // action up in the DhtStore.
         let has_hash = alice
             .dht_store()
             .as_read()
@@ -384,8 +384,8 @@ pub mod wasm_test {
             )
             .await;
 
-        // Check alice's source chain contains the new value. The authored data
-        // now lives in the merged store, so look the action up there.
+        // Check alice's source chain contains the new value by looking the
+        // action up in the DhtStore.
         let has_hash = alice
             .dht_store()
             .as_read()

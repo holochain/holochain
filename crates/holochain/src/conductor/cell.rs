@@ -335,7 +335,7 @@ impl Cell {
                     })
                     .collect();
 
-                // Apply the unschedule/reschedule decisions to the merged store.
+                // Apply the unschedule/reschedule decisions to the DhtStore.
                 for (scheduled_fn, action) in new_db_decisions {
                     match action {
                         // Ephemeral fn: no persistent state to update.

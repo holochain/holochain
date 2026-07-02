@@ -158,9 +158,6 @@ mod tests {
     use std::sync::Arc;
 
     async fn get_chain(cell: &SweetCell, keystore: MetaLairClient) -> SourceChain {
-        // Use the cell's actual merged store (which holds its genesis chain),
-        // not a fresh empty one — `SourceChain::new` now derives the persisted
-        // chain head from the store.
         SourceChain::new(
             cell.authored_db().clone(),
             cell.dht_db().clone(),
