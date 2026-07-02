@@ -11,6 +11,7 @@ mod chain_lock;
 mod chain_op;
 mod chain_op_publish;
 mod chain_write_permit;
+pub use chain_write_permit::ChainWritePermit;
 mod db_size;
 mod deleted_link;
 mod deleted_record;
