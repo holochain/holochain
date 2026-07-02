@@ -116,7 +116,9 @@ mod tests {
         let author_a = AgentPubKey::from_raw_36(vec![1u8; 36]);
         let a_inserted: Vec<_> = (0..2u8).map(sample_action).collect();
         for action in &a_inserted {
-            db.insert_action(action, None).await.unwrap();
+            db.insert_action(action, Some(RecordValidity::Accepted))
+                .await
+                .unwrap();
         }
 
         let other_author = AgentPubKey::from_raw_36(vec![0x99; 36]);
@@ -137,7 +139,9 @@ mod tests {
             ),
             Signature([0xCC; 64]),
         );
-        db.insert_action(&other, None).await.unwrap();
+        db.insert_action(&other, Some(RecordValidity::Accepted))
+            .await
+            .unwrap();
 
         let a_results = db.as_ref().get_actions_by_author(author_a).await.unwrap();
         assert_eq!(a_results, a_inserted);
@@ -148,6 +152,23 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(b_results, vec![other]);
+    }
+
+    #[tokio::test]
+    async fn actions_by_author_excludes_unvalidated() {
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let author = AgentPubKey::from_raw_36(vec![1u8; 36]);
+        // Pending (network-arrived) rows are not part of the author's committed
+        // chain, so they are excluded.
+        for action in (0..2u8).map(sample_action) {
+            db.insert_action(&action, None).await.unwrap();
+        }
+        assert!(db
+            .as_ref()
+            .get_actions_by_author(author)
+            .await
+            .unwrap()
+            .is_empty());
     }
 
     fn sample_entry(seed: u8) -> (EntryHash, Entry) {
@@ -2082,6 +2103,79 @@ mod tests {
         assert_eq!(row.locally_validated, 1); // promoted from limbo = locally validated
         assert_eq!(row.when_received, 100);
         assert_eq!(row.storage_center_loc, 42);
+    }
+
+    #[tokio::test]
+    async fn promote_aggregates_record_validity_onto_action() {
+        async fn record_validity(
+            db: &crate::handles::DbWrite<Dht>,
+            action_hash: &ActionHash,
+        ) -> Option<i64> {
+            sqlx::query_scalar("SELECT record_validity FROM Action WHERE hash = ?")
+                .bind(action_hash.get_raw_36())
+                .fetch_one(db.pool())
+                .await
+                .unwrap()
+        }
+
+        let db = test_open_db(dht_db_id()).await.unwrap();
+
+        // A network-received action is inserted pending (record_validity = NULL).
+        let action_hash = seed_action_for_op(&db, 0).await;
+        assert_eq!(record_validity(&db, &action_hash).await, None);
+
+        // Integrating an accepted op aggregates Accepted onto the action.
+        let accepted_op = DhtOpHash::from_raw_36(vec![0xE1; 36]);
+        db.insert_limbo_chain_op(InsertLimboChainOp {
+            op_hash: &accepted_op,
+            action_hash: &action_hash,
+            op_type: 1,
+            basis_hash: &sample_basis(1),
+            storage_center_loc: 0,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(100),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+        db.promote_limbo_chain_op(
+            &accepted_op,
+            RecordValidity::Accepted,
+            Timestamp::from_micros(500),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            record_validity(&db, &action_hash).await,
+            Some(i64::from(RecordValidity::Accepted))
+        );
+
+        // A later rejected op for the same action rejects the record: any
+        // rejected op wins over accepted ones.
+        let rejected_op = DhtOpHash::from_raw_36(vec![0xE2; 36]);
+        db.insert_limbo_chain_op(InsertLimboChainOp {
+            op_hash: &rejected_op,
+            action_hash: &action_hash,
+            op_type: 2,
+            basis_hash: &sample_basis(2),
+            storage_center_loc: 0,
+            require_receipt: false,
+            when_received: Timestamp::from_micros(200),
+            serialized_size: 0,
+        })
+        .await
+        .unwrap();
+        db.promote_limbo_chain_op(
+            &rejected_op,
+            RecordValidity::Rejected,
+            Timestamp::from_micros(600),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            record_validity(&db, &action_hash).await,
+            Some(i64::from(RecordValidity::Rejected))
+        );
     }
 
     #[tokio::test]
