@@ -7,6 +7,17 @@ use holochain_trace;
 use holochain_types::prelude::fixt::*;
 use tracing::*;
 
+// This test module exercises the scoped LEGACY ISLAND in `dht_op.rs`
+// (`ChainOp`, `DhtOp`, `produce_ops_from_record`), which operates on the
+// legacy per-variant `Action` enum, not the v2 `ActionHeader` + `ActionData`
+// shape that `crate::prelude::Action` refers to. These explicit imports shadow
+// the v2 re-exports pulled in by the glob imports above, so `Action`/
+// `Record`/`SignedActionHashed` resolve to their legacy shape here too,
+// matching `dht_op.rs` itself.
+use holochain_zome_types::dependencies::holochain_integrity_types::action::Action;
+use holochain_zome_types::dependencies::holochain_integrity_types::record::Record;
+use holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed;
+
 struct RecordTest {
     entry_type: EntryType,
     entry_hash: EntryHash,
@@ -327,7 +338,7 @@ fn from_type_op() {
         for op in ops {
             check_identity(
                 op,
-                SignedAction::from(record.signed_action().clone()),
+                LegacySignedAction::new(record.action().clone(), record.signature().clone()),
                 record.entry().clone().into_option(),
             );
         }

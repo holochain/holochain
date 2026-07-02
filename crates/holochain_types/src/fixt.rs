@@ -64,15 +64,13 @@ fn new_entry_record(entry: Entry, action_type: ActionType, index: usize) -> Reco
             let c = CreateFixturator::new_indexed(et, index).next().unwrap();
             let c = NewEntryAction::Create(c);
             let record: Record = RecordFixturator::new_indexed(c, index).next().unwrap();
-            let (shh, _) = record.into_inner();
-            Record::new(shh, Some(entry))
+            Record::new(record.signed_action, RecordEntry::Present(entry))
         }
         ActionType::Update => {
             let u = UpdateFixturator::new_indexed(et, index).next().unwrap();
             let u = NewEntryAction::Update(u);
             let record: Record = RecordFixturator::new_indexed(u, index).next().unwrap();
-            let (shh, _) = record.into_inner();
-            Record::new(shh, Some(entry))
+            Record::new(record.signed_action, RecordEntry::Present(entry))
         }
         _ => panic!("You choose {action_type:?} for a Record with en Entry"),
     }
@@ -88,7 +86,7 @@ fixturator!(
     vanilla fn record_with_no_entry(Signature, Action);
     curve NewEntryAction {
         let s = SignatureFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap();
-        record_with_no_entry(s, get_fixt_curve!().into())
+        record_with_no_entry(s, crate::dht_v2::from_legacy_action(&get_fixt_curve!().into()))
     };
     curve Entry {
         let et = match get_fixt_curve!() {
@@ -98,8 +96,8 @@ fixturator!(
             Entry::CapGrant(_) => EntryType::CapGrant,
         };
         let new = NewEntryActionFixturator::new_indexed(et, get_fixt_index!()).next().unwrap();
-        let (shh, _) = RecordFixturator::new_indexed(new, get_fixt_index!()).next().unwrap().into_inner();
-        Record::new(shh, Some(get_fixt_curve!()))
+        let shh = RecordFixturator::new_indexed(new, get_fixt_index!()).next().unwrap().signed_action;
+        Record::new(shh, RecordEntry::Present(get_fixt_curve!()))
     };
     curve NewEntryRecord {
         new_entry_record(get_fixt_curve!().0, get_fixt_curve!().1, get_fixt_index!())

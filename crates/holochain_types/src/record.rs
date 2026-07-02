@@ -196,7 +196,7 @@ mod tests {
 
         assert_eq!(
             shh.as_hash(),
-            &HoloHashed::from_content_sync(action.clone()).into_hash()
+            &HoloHashed::<Action>::from_content_sync(action.clone()).into_hash()
         );
         assert_eq!(shh.hashed.content, action);
         assert_eq!(shh.signature, signature);
