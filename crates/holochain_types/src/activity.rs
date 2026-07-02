@@ -60,7 +60,7 @@ impl AgentActivityResponse {
             ChainItems::Full(records) => ChainItems::Hashes(
                 records
                     .into_iter()
-                    .map(|r| (r.action().action_seq(), r.address().clone()))
+                    .map(|r| (r.action().header.action_seq, r.action_address().clone()))
                     .collect(),
             ),
             ChainItems::Hashes(h) => ChainItems::Hashes(h),
@@ -93,7 +93,7 @@ impl From<AgentActivityResponse> for AgentActivity {
         let valid_activity = match a.valid_activity {
             ChainItems::Full(records) => records
                 .into_iter()
-                .map(|el| (el.action().action_seq(), el.action_address().clone()))
+                .map(|el| (el.action().header.action_seq, el.action_address().clone()))
                 .collect(),
             ChainItems::Hashes(h) => h,
             ChainItems::NotRequested => Vec::new(),
@@ -101,7 +101,7 @@ impl From<AgentActivityResponse> for AgentActivity {
         let rejected_activity = match a.rejected_activity {
             ChainItems::Full(records) => records
                 .into_iter()
-                .map(|el| (el.action().action_seq(), el.action_address().clone()))
+                .map(|el| (el.action().header.action_seq, el.action_address().clone()))
                 .collect(),
             ChainItems::Hashes(h) => h,
             ChainItems::NotRequested => Vec::new(),

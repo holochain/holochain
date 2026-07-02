@@ -60,27 +60,31 @@ impl ChainItem for ActionHashed {
     }
 }
 
+// `SignedActionHashed` here is the v2 `SignedHashed<Action>` (a flat
+// `ActionHeader` + `ActionData` envelope), so this impl reads the header
+// fields directly rather than delegating to the legacy `ActionHashed`
+// accessors used by the `impl ChainItem for ActionHashed` above.
 impl ChainItem for SignedActionHashed {
     type Hash = ActionHash;
 
     fn seq(&self) -> u32 {
-        self.hashed.seq()
+        self.hashed.content.header.action_seq
     }
 
     fn get_timestamp(&self) -> Timestamp {
-        self.hashed.timestamp()
+        self.hashed.content.header.timestamp
     }
 
     fn get_hash(&self) -> &Self::Hash {
-        self.hashed.get_hash()
+        self.hashed.as_hash()
     }
 
     fn prev_hash(&self) -> Option<&Self::Hash> {
-        self.hashed.prev_hash()
+        self.hashed.content.header.prev_action.as_ref()
     }
 
     fn to_display(&self) -> String {
-        format!("{}", self.hashed.content)
+        format!("{:?}", self.hashed.content)
     }
 }
 
@@ -178,9 +182,9 @@ impl From<(PrevActionErrorKind, Action)> for PrevActionError {
     fn from((inner, action): (PrevActionErrorKind, Action)) -> Self {
         PrevActionError {
             source: inner,
-            seq: action.action_seq(),
+            seq: action.header.action_seq,
             action_hash: action.to_hash(),
-            action_display: format!("{action}"),
+            action_display: format!("{action:?}"),
         }
     }
 }
