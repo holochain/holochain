@@ -3614,22 +3614,10 @@ pub(crate) async fn genesis_cells(
                 .get_or_create_space(cell_id_inner.dna_hash())
                 .map_err(|e| CellError::FailedToCreateDnaSpace(ConductorError::from(e).into()))?;
 
-            let authored_db =
-                space.get_or_create_authored_db(cell_id_inner.agent_pubkey().clone())?;
-            let dht_db = space.dht_db;
             let dht_store = space.dht_store;
             let ribosome = conductor.get_ribosome(&cell_id_inner).map_err(Box::new)?;
 
-            Cell::genesis(
-                cell_id_inner.clone(),
-                conductor,
-                authored_db,
-                dht_db,
-                dht_store,
-                ribosome,
-                proof,
-            )
-            .await
+            Cell::genesis(cell_id_inner.clone(), conductor, dht_store, ribosome, proof).await
         })
         .map_err(CellError::from)
         .map(|genesis_result| (cell_id, genesis_result.and_then(|r| r)))

@@ -153,8 +153,6 @@ pub async fn spawn_queue_consumer_tasks(
     let tx_sys = queue_consumer_map.spawn_once_sys_validation(dna_hash.clone(), || {
         spawn_sys_validation_consumer(
             SysValidationWorkspace::new(
-                authored_db.clone(),
-                dht_db.clone(),
                 space.dht_store.clone(),
                 cache.clone(),
                 cell_id.dna_hash().clone(),

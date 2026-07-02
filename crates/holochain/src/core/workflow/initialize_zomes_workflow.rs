@@ -187,8 +187,6 @@ mod tests {
         // DhtStore-backed; `fake_genesis` would discard its own DhtStore).
         let dht_store = holochain_state::test_utils::test_dht_store(dna_hash.clone()).await;
         holochain_state::source_chain::genesis(
-            db.clone(),
-            test_dht.to_db(),
             dht_store.clone(),
             keystore.clone(),
             dna_hash.clone(),

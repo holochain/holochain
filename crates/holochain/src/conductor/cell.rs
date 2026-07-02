@@ -117,18 +117,13 @@ impl Cell {
         overrides: CellConfigOverrides,
     ) -> CellResult<(Self, InitialQueueTriggers)> {
         let conductor_api = Arc::new(CellConductorApi::new(conductor_handle.clone(), id.clone()));
-        let authored_db = space.get_or_create_authored_db(id.agent_pubkey().clone())?;
 
         // check if genesis has been run
         let has_genesis = {
             // check if genesis ran.
-            GenesisWorkspace::new(
-                authored_db.clone(),
-                space.dht_db.clone(),
-                space.dht_store.clone(),
-            )
-            .has_genesis(id.agent_pubkey().clone())
-            .await?
+            GenesisWorkspace::new(space.dht_store.clone())
+                .has_genesis(id.agent_pubkey().clone())
+                .await?
         };
 
         if has_genesis {
@@ -163,12 +158,9 @@ impl Cell {
     /// Performs the Genesis workflow for the Cell, ensuring that its initial
     /// records are committed. This is a prerequisite for any other interaction
     /// with the SourceChain
-    #[allow(clippy::too_many_arguments)]
     pub async fn genesis(
         cell_id: CellId,
         conductor_handle: ConductorHandle,
-        authored_db: DbWrite<DbKindAuthored>,
-        dht_db: DbWrite<DbKindDht>,
         dht_store: DhtStore,
         ribosome: Ribosome,
         membrane_proof: Option<MembraneProof>,
@@ -176,7 +168,7 @@ impl Cell {
         let conductor_api = CellConductorApi::new(conductor_handle.clone(), cell_id.clone());
 
         // run genesis
-        let workspace = GenesisWorkspace::new(authored_db, dht_db, dht_store);
+        let workspace = GenesisWorkspace::new(dht_store);
 
         // exit early if genesis has already run
         if workspace

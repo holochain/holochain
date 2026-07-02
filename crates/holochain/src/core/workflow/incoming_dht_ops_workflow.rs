@@ -4,8 +4,6 @@ use super::sys_validation_workflow::counterfeit_check_action;
 use super::{error::WorkflowResult, sys_validation_workflow::counterfeit_check_warrant};
 use crate::{conductor::space::Space, core::queue_consumer::TriggerSender};
 use holo_hash::DhtOpHash;
-use holochain_sqlite::error::DatabaseResult;
-use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
 use incoming_ops_batch::InOpBatchEntry;
 use std::{collections::HashSet, sync::Arc};
@@ -77,30 +75,6 @@ impl Drop for OpsClaim {
     }
 }
 
-// TODO(read-migration): once legacy DhtOp writes are removed, switch
-// this intra-transaction dedup to rely on the new DhtStore. For now
-// it remains on the legacy txn to preserve same-transaction semantics.
-#[cfg_attr(feature = "instrument", tracing::instrument(skip(txn, ops)))]
-fn batch_process_entry(
-    txn: &mut Txn<DbKindDht>,
-    ops: Vec<IncomingDhtOp>,
-) -> WorkflowResult<Vec<IncomingDhtOp>> {
-    // add incoming ops to the validation limbo
-    let mut to_pending = Vec::with_capacity(ops.len());
-    for op in ops {
-        if !op_exists_inner(txn, &op.op.hash)? {
-            to_pending.push(op);
-        }
-    }
-
-    tracing::debug!("Inserting {} ops", to_pending.len());
-    // #5370: legacy DhtOp dual-write removed; `add_to_pending` (and the
-    // op_exists_inner dedup read above) remain as dead code pending DbKindDht
-    // retirement.
-
-    Ok(to_pending)
-}
-
 #[derive(Default, Clone)]
 pub struct IncomingOpHashes(Arc<parking_lot::Mutex<HashSet<DhtOpHash>>>);
 
@@ -116,7 +90,6 @@ pub async fn incoming_dht_ops_workflow(
     let Space {
         incoming_op_hashes,
         incoming_ops_batch,
-        dht_db,
         dht_store,
         ..
     } = space;
@@ -157,108 +130,68 @@ pub async fn incoming_dht_ops_workflow(
         }
     }
 
-    // Do not pre-filter against the new store here. The legacy DHT table and
-    // the new store deduplicate independently, so an op present in one but
-    // missing from the other must still be written to the other; filtering up
-    // front against only the new store would let an op that is in the new store
-    // but missing from the legacy table be skipped forever, so the legacy
-    // mirror could never catch up (and vice versa). Each write path below
-    // deduplicates against its own store, so both stores self-heal.
-    if filter_ops.is_empty() {
-        // TODO(read-migration): restore this trace once dedup-filtering moves
-        // onto the new DhtStore (after the legacy DhtOp table is removed). At
-        // that point an empty `filter_ops` again means "all ops were already
-        // present", which is worth tracing.
-        // tracing::trace!(
-        //     "Skipping the rest of the incoming_dht_ops_workflow because all ops were filtered out"
-        // );
-        return Ok(());
-    }
-
     let (mut maybe_batch, rcv) = incoming_ops_batch.check_insert(filter_ops);
 
     let incoming_ops_batch = incoming_ops_batch.clone();
     if maybe_batch.is_some() {
         // there was no already running batch task, so spawn one:
-        tokio::task::spawn({
-            let dht_db = dht_db.clone();
-            async move {
-                while let Some(entries) = maybe_batch {
-                    let senders = Arc::new(parking_lot::Mutex::new(Vec::new()));
-                    let senders2 = senders.clone();
-
-                    // Clone all ops received in this batch with the flag to
-                    // request validation receipt for later write to the new
-                    // store.
-                    let batch_ops: Vec<(DhtOpHashed, bool)> = entries
-                        .iter()
-                        .flat_map(|e| {
-                            e.ops
-                                .iter()
-                                .map(|op| (op.op.clone(), op.require_validation_receipt))
-                        })
-                        .collect();
-
-                    // Legacy DHT table — still read by the cascade for
-                    // dependency resolution. `batch_process_entry` skips ops
-                    // already in the table, so this is a safe backfill.
-                    let legacy_result = dht_db
-                        .write_async(move |txn| {
-                            for entry in entries {
-                                let InOpBatchEntry { snd, ops } = entry;
-                                let res = batch_process_entry(txn, ops);
-                                senders2.lock().push((snd, res.map(|_| ())));
-                            }
-
-                            WorkflowResult::Ok(())
-                        })
-                        .await;
-
-                    // New DHT store — read by sys-validation. Skip ops already
-                    // present anywhere in the store so integrated ops are not
-                    // re-added to limbo, then record the genuinely new ops.
-                    // Gate this on the legacy write succeeding: if legacy failed
-                    // we leave the ops un-stored so they are redelivered, rather
-                    // than recording them only in the new store (which would be a
-                    // permanent mirror gap, since gossip would then consider us
-                    // to already hold them).
-                    let mut recorded_new = false;
-                    if let Err(err) = legacy_result {
-                        tracing::error!(?err, "incoming_dht_ops_workflow legacy mirror error");
-                    } else {
-                        match dht_store.as_read().filter_existing_ops(batch_ops).await {
-                            Ok(new_ops) if new_ops.is_empty() => {}
-                            Ok(new_ops) => match dht_store.record_incoming_ops(new_ops).await {
-                                Ok(()) => recorded_new = true,
-                                Err(err) => tracing::error!(
-                                    ?err,
-                                    "incoming_dht_ops_workflow new-DB write error"
-                                ),
-                            },
-                            Err(err) => {
-                                tracing::error!(
-                                    ?err,
-                                    "incoming_dht_ops_workflow new-DB filter error"
-                                )
-                            }
-                        }
-                    }
-
-                    for (snd, res) in senders.lock().drain(..) {
-                        let _ = snd.send(res);
-                    }
-
-                    // sys-validation reads the new store, so only trigger when
-                    // genuinely new ops were recorded there.
-                    if recorded_new {
-                        tracing::debug!(
-                            "Incoming dht ops workflow is now triggering the sys_validation_trigger"
-                        );
-                        sys_validation_trigger.trigger(&"incoming_dht_ops_workflow");
-                    }
-
-                    maybe_batch = incoming_ops_batch.check_end();
+        tokio::task::spawn(async move {
+            while let Some(entries) = maybe_batch {
+                // Collect the ops from this batch, paired with the flag to
+                // request a validation receipt, keeping the senders to notify
+                // once the batch is stored.
+                let mut senders = Vec::with_capacity(entries.len());
+                let mut batch_ops: Vec<(DhtOpHashed, bool)> = Vec::new();
+                for entry in entries {
+                    let InOpBatchEntry { snd, ops } = entry;
+                    batch_ops.extend(
+                        ops.into_iter()
+                            .map(|op| (op.op, op.require_validation_receipt)),
+                    );
+                    senders.push(snd);
                 }
+
+                // Skip ops already present anywhere in the store so integrated
+                // ops are not re-added to limbo, then record the genuinely new
+                // ops. On failure the ops are left un-stored so they are
+                // redelivered.
+                let mut recorded_new = false;
+                let result: WorkflowResult<()> =
+                    match dht_store.as_read().filter_existing_ops(batch_ops).await {
+                        Ok(new_ops) if new_ops.is_empty() => Ok(()),
+                        Ok(new_ops) => match dht_store.record_incoming_ops(new_ops).await {
+                            Ok(()) => {
+                                recorded_new = true;
+                                Ok(())
+                            }
+                            Err(err) => {
+                                tracing::error!(?err, "incoming_dht_ops_workflow write error");
+                                Err(err.into())
+                            }
+                        },
+                        Err(err) => {
+                            tracing::error!(?err, "incoming_dht_ops_workflow filter error");
+                            Err(err.into())
+                        }
+                    };
+
+                for snd in senders {
+                    let _ = snd.send(match &result {
+                        Ok(()) => Ok(()),
+                        Err(err) => Err(super::error::WorkflowError::other(err.to_string())),
+                    });
+                }
+
+                // sys-validation reads the store, so only trigger when
+                // genuinely new ops were recorded there.
+                if recorded_new {
+                    tracing::debug!(
+                        "Incoming dht ops workflow is now triggering the sys_validation_trigger"
+                    );
+                    sys_validation_trigger.trigger(&"incoming_dht_ops_workflow");
+                }
+
+                maybe_batch = incoming_ops_batch.check_end();
             }
         });
     }
@@ -281,45 +214,3 @@ async fn should_keep(op: &DhtOp) -> WorkflowResult<()> {
     Ok(())
 }
 
-// #5370: dead pending full DbKindDht retirement.
-#[allow(dead_code)]
-fn add_to_pending(txn: &mut Txn<DbKindDht>, ops: &[IncomingDhtOp]) -> StateMutationResult<()> {
-    for op in ops {
-        insert_op_dht(
-            txn,
-            &op.op,
-            holochain_serialized_bytes::encode(op.op.as_content())?.len() as u32,
-            todo_no_cache_transfer_data(),
-        )?;
-
-        // Only record that a validation receipt is required when the publisher
-        // requested one.
-        set_require_receipt(txn, op.op.as_hash(), op.require_validation_receipt)?;
-    }
-
-    Ok(())
-}
-
-fn op_exists_inner(txn: &rusqlite::Transaction<'_>, hash: &DhtOpHash) -> DatabaseResult<bool> {
-    Ok(txn.query_row(
-        "
-        SELECT EXISTS(
-            SELECT
-            1
-            FROM DhtOp
-            WHERE
-            DhtOp.hash = :hash
-        )
-        ",
-        named_params! {
-            ":hash": hash,
-        },
-        |row| row.get(0),
-    )?)
-}
-
-pub async fn op_exists(vault: &DbWrite<DbKindDht>, hash: DhtOpHash) -> DatabaseResult<bool> {
-    vault
-        .read_async(move |txn| op_exists_inner(txn, &hash))
-        .await
-}

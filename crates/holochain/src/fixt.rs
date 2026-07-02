@@ -172,7 +172,7 @@ fixturator!(
         let keystore = holochain_keystore::test_keystore();
         tokio_helper::block_forever_on(async {
             let dht_store = holochain_state::test_utils::test_dht_store(fake_dna_hash(get_fixt_index!() as u8)).await;
-            fake_genesis_with_store(authored_db.to_db(), dht_db.to_db(), fake_dna_hash(get_fixt_index!() as u8), keystore.clone(), dht_store.clone()).await.unwrap();
+            fake_genesis_with_store(fake_dna_hash(get_fixt_index!() as u8), keystore.clone(), dht_store.clone()).await.unwrap();
             HostFnWorkspace::new(
                 authored_db.to_db(),
                 dht_db.to_db(),
@@ -190,7 +190,7 @@ fixturator!(
         let keystore = holochain_keystore::test_keystore();
         tokio_helper::block_forever_on(async {
             let dht_store = holochain_state::test_utils::test_dht_store(fake_dna_hash(get_fixt_index!() as u8)).await;
-            fake_genesis_with_store(authored_db.to_db(), dht_db.to_db(), fake_dna_hash(get_fixt_index!() as u8), keystore.clone(), dht_store.clone()).await.unwrap();
+            fake_genesis_with_store(fake_dna_hash(get_fixt_index!() as u8), keystore.clone(), dht_store.clone()).await.unwrap();
             HostFnWorkspace::new(
                 authored_db.to_db(),
                 dht_db.to_db(),
@@ -209,7 +209,7 @@ fixturator!(
         let keystore = holochain_keystore::test_keystore();
         tokio_helper::block_forever_on(async {
             let dht_store = holochain_state::test_utils::test_dht_store(fake_dna_hash(get_fixt_index!() as u8)).await;
-            fake_genesis_for_agent_with_store(authored_db.to_db(), dht_db.to_db(), fake_dna_hash(get_fixt_index!() as u8), agent.clone(), keystore.clone(), dht_store.clone()).await.unwrap();
+            fake_genesis_for_agent_with_store(fake_dna_hash(get_fixt_index!() as u8), agent.clone(), keystore.clone(), dht_store.clone()).await.unwrap();
             HostFnWorkspace::new(
                 authored_db.to_db(),
                 dht_db.to_db(),
@@ -231,7 +231,7 @@ fixturator!(
         let keystore = holochain_keystore::test_keystore();
         tokio_helper::block_forever_on(async {
             let dht_store = holochain_state::test_utils::test_dht_store(fake_dna_hash(get_fixt_index!() as u8)).await;
-            fake_genesis_with_store(authored_db.to_db(), dht_db.to_db(), fake_dna_hash(get_fixt_index!() as u8), keystore.clone(), dht_store.clone()).await.unwrap();
+            fake_genesis_with_store(fake_dna_hash(get_fixt_index!() as u8), keystore.clone(), dht_store.clone()).await.unwrap();
             HostFnWorkspaceRead::new(
                 authored_db.to_db().into(),
                 dht_db.to_db().into(),
@@ -249,7 +249,7 @@ fixturator!(
         let keystore = holochain_keystore::test_keystore();
         tokio_helper::block_forever_on(async {
             let dht_store = holochain_state::test_utils::test_dht_store(fake_dna_hash(get_fixt_index!() as u8)).await;
-            fake_genesis_with_store(authored_db.to_db(), dht_db.to_db(), fake_dna_hash(get_fixt_index!() as u8), keystore.clone(), dht_store.clone()).await.unwrap();
+            fake_genesis_with_store(fake_dna_hash(get_fixt_index!() as u8), keystore.clone(), dht_store.clone()).await.unwrap();
             HostFnWorkspaceRead::new(
                 authored_db.to_db().into(),
                 dht_db.to_db().into(),
@@ -268,7 +268,7 @@ fixturator!(
         let keystore = holochain_keystore::test_keystore();
         tokio_helper::block_forever_on(async {
             let dht_store = holochain_state::test_utils::test_dht_store(fake_dna_hash(get_fixt_index!() as u8)).await;
-            fake_genesis_for_agent_with_store(authored_db.to_db(), dht_db.to_db(), fake_dna_hash(get_fixt_index!() as u8), agent.clone(), keystore.clone(), dht_store.clone()).await.unwrap();
+            fake_genesis_for_agent_with_store(fake_dna_hash(get_fixt_index!() as u8), agent.clone(), keystore.clone(), dht_store.clone()).await.unwrap();
             HostFnWorkspaceRead::new(
                 authored_db.to_db().into(),
                 dht_db.to_db().into(),

@@ -17,10 +17,7 @@ use holo_hash::DnaHash;
 use holo_hash::HasHash;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::MockHolochainP2pDnaT;
-use holochain_sqlite::db::DbKindCache;
-use holochain_sqlite::db::DbKindDht;
 use holochain_sqlite::db::DbKindT;
-use holochain_sqlite::db::DbWrite;
 use holochain_state::mutations::StateMutationResult;
 use holochain_types::dht_op::ChainOp;
 use holochain_types::dht_op::DhtOp;
@@ -804,16 +801,6 @@ impl TestCase {
         self.dna_hash.hash.clone()
     }
 
-    // #5370: legacy DhtOp test accessor now unused; retire with DbKindDht.
-    #[allow(dead_code)]
-    fn dht_db_handle(&self) -> DbWrite<DbKindDht> {
-        self.test_space.space.dht_db.clone()
-    }
-
-    fn cache_db_handle(&self) -> DbWrite<DbKindCache> {
-        self.test_space.space.cache_db.clone()
-    }
-
     async fn sign_action(&self, action: Action) -> SignedActionHashed {
         let action_hashed = ActionHashed::from_content_sync(action);
         SignedActionHashed::sign(&self.keystore, action_hashed)
@@ -826,31 +813,13 @@ impl TestCase {
         self
     }
 
-    async fn save_op_to_db<T: DbKindT>(
-        &self,
-        db: DbWrite<T>,
-        op: DhtOp,
-    ) -> StateMutationResult<DhtOpHash> {
-        let op = DhtOpHashed::from_content_sync(op);
-
-        let test_op_hash = op.as_hash().clone();
-        db.write_async({
-            move |txn| -> StateMutationResult<()> {
-                holochain_state::mutations::insert_op_untyped(txn, &op, 0)?;
-                Ok(())
-            }
-        })
-        .await
-        .unwrap();
-
-        Ok(test_op_hash)
-    }
-
-    /// Write a chain op to the legacy cache database and to the new DHT store as
-    /// a cached (not locally-validated) row, so it is visible to both the legacy
-    /// `copy_cached_op_to_dht` path and to `move_warranted_op_to_limbo`.
+    /// Write a chain op to the DHT store as a cached (not locally-validated)
+    /// row, so it is visible to `move_warranted_op_to_limbo`.
     async fn save_chain_op_as_cached(&self, chain_op: ChainOp) -> StateMutationResult<DhtOpHash> {
-        // Build the RenderedOps first so we can pass it to cache_chain_ops.
+        let op_hash = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(chain_op.clone())))
+            .as_hash()
+            .clone();
+
         let action = chain_op.action();
         let signature = chain_op.signature().clone();
         let op_type = chain_op.get_type();
@@ -870,12 +839,6 @@ impl TestCase {
             warrant: None,
         };
 
-        // Legacy cache write (required by copy_cached_op_to_dht).
-        let op_hash = self
-            .save_op_to_db(self.cache_db_handle(), DhtOp::ChainOp(Box::new(chain_op)))
-            .await?;
-
-        // New DhtStore write so move_warranted_op_to_limbo can find the row.
         self.test_space
             .space
             .dht_store
@@ -885,27 +848,12 @@ impl TestCase {
         Ok(op_hash)
     }
 
-    /// Write an op to both the legacy DHT database and the new DHT store so that
-    /// both the legacy write path and the new `ops_pending_sys_validation` read
-    /// path see the op.
+    /// Write an op to the DHT store so that `ops_pending_sys_validation`
+    /// returns it.
     async fn save_op_to_dht(&self, op: DhtOp) -> StateMutationResult<DhtOpHash> {
         let op_hashed = DhtOpHashed::from_content_sync(op);
         let hash = op_hashed.as_hash().clone();
 
-        // Write to the legacy DB so that other legacy paths (app-validation query,
-        // integration, etc.) also see this op.
-        let op_for_legacy = op_hashed.clone();
-        self.test_space
-            .space
-            .dht_db
-            .write_async(move |txn| -> StateMutationResult<()> {
-                holochain_state::mutations::insert_op_untyped(txn, &op_for_legacy, 0)?;
-                Ok(())
-            })
-            .await
-            .unwrap();
-
-        // Write to the new DHT store so that `ops_pending_sys_validation` returns it.
         self.test_space
             .space
             .dht_store
@@ -971,11 +919,6 @@ impl TestCase {
 
     async fn run_as_agent(&mut self, agent: &AgentPubKey) -> WorkComplete {
         let workspace = SysValidationWorkspace::new(
-            self.test_space
-                .space
-                .get_or_create_authored_db(agent.clone())
-                .unwrap(),
-            self.test_space.space.dht_db.clone(),
             self.test_space.space.dht_store.clone(),
             self.test_space.space.cache_db.clone(),
             self.dna_hash.hash.clone(),

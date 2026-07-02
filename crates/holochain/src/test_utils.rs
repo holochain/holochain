@@ -478,12 +478,10 @@ pub fn fake_valid_dna_file(network_seed: &str) -> DnaFile {
 /// helper reuses it for the genesis `Action::Dna` and for the new-DB
 /// `DhtStore` so the legacy and mirrored writes land in the same DNA space.
 pub async fn fake_genesis(
-    vault: DbWrite<DbKindAuthored>,
-    dht_db: DbWrite<DbKindDht>,
     dna_hash: DnaHash,
     keystore: MetaLairClient,
 ) -> SourceChainResult<()> {
-    fake_genesis_for_agent(vault, dht_db, dna_hash, fake_agent_pubkey_1(), keystore).await
+    fake_genesis_for_agent(dna_hash, fake_agent_pubkey_1(), keystore).await
 }
 
 /// Run genesis on the source chain for a specific agent for testing.
@@ -492,15 +490,13 @@ pub async fn fake_genesis(
 /// helper reuses it for the genesis `Action::Dna` and for the new-DB
 /// `DhtStore` so the legacy and mirrored writes land in the same DNA space.
 pub async fn fake_genesis_for_agent(
-    vault: DbWrite<DbKindAuthored>,
-    dht_db: DbWrite<DbKindDht>,
     dna_hash: DnaHash,
     agent: AgentPubKey,
     keystore: MetaLairClient,
 ) -> SourceChainResult<()> {
     let dht_store = holochain_state::test_utils::test_dht_store(dna_hash.clone()).await;
 
-    source_chain::genesis(vault, dht_db, dht_store, keystore, dna_hash, agent, None).await
+    source_chain::genesis(dht_store, keystore, dna_hash, agent, None).await
 }
 
 /// Run genesis using a caller-supplied `DhtStore`.
@@ -508,21 +504,11 @@ pub async fn fake_genesis_for_agent(
 /// Use this when you need the same store for both genesis and a workspace so
 /// that the workspace can read the chain head written during genesis.
 pub async fn fake_genesis_with_store(
-    vault: DbWrite<DbKindAuthored>,
-    dht_db: DbWrite<DbKindDht>,
     dna_hash: DnaHash,
     keystore: MetaLairClient,
     dht_store: holochain_state::DhtStore,
 ) -> SourceChainResult<()> {
-    fake_genesis_for_agent_with_store(
-        vault,
-        dht_db,
-        dna_hash,
-        fake_agent_pubkey_1(),
-        keystore,
-        dht_store,
-    )
-    .await
+    fake_genesis_for_agent_with_store(dna_hash, fake_agent_pubkey_1(), keystore, dht_store).await
 }
 
 /// Run genesis for a specific agent using a caller-supplied `DhtStore`.
@@ -530,14 +516,12 @@ pub async fn fake_genesis_with_store(
 /// Use this when you need the same store for both genesis and a workspace so
 /// that the workspace can read the chain head written during genesis.
 pub async fn fake_genesis_for_agent_with_store(
-    vault: DbWrite<DbKindAuthored>,
-    dht_db: DbWrite<DbKindDht>,
     dna_hash: DnaHash,
     agent: AgentPubKey,
     keystore: MetaLairClient,
     dht_store: holochain_state::DhtStore,
 ) -> SourceChainResult<()> {
-    source_chain::genesis(vault, dht_db, dht_store, keystore, dna_hash, agent, None).await
+    source_chain::genesis(dht_store, keystore, dna_hash, agent, None).await
 }
 
 /// Force all dht ops without enough validation receipts to be published.

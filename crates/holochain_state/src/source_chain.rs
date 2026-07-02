@@ -1,7 +1,4 @@
 use crate::chain_lock::ChainLock;
-// #5370: import retained pending DbKindDht retirement.
-#[allow(unused_imports)]
-use crate::integrate::authored_ops_to_dht_db;
 use crate::prelude::*;
 use crate::query::chain_head::AuthoredChainHeadQuery;
 use crate::scratch::ScratchError;
@@ -258,14 +255,12 @@ impl SourceChain {
     ///    flush fails with [`SourceChainError::HeadMoved`]; under
     ///    [`ChainTopOrdering::Relaxed`] the actions are rebased onto the new head and
     ///    the flush is retried recursively.
-    /// 3. Inserts entries, actions, and ops into the authored database in a single
+    /// 3. Inserts entries, actions, and ops into the DhtStore in a single
     ///    transaction. Ops belonging to a countersigning session are marked as withheld
     ///    from publishing.
-    /// 4. Integrates authored ops into the DHT database according to `storage_arcs`.
-    /// 5. Verifies warrant signatures and inserts valid warrants into the DHT database.
+    /// 4. Verifies warrant signatures and records valid warrants into the DhtStore.
     ///
-    /// The `storage_arcs` should reflect the current target arcs for authored ops
-    /// integration. Returns an empty vec with zero warrants if the scratch is empty.
+    /// Returns an empty vec with zero warrants if the scratch is empty.
     ///
     /// # Errors
     ///
@@ -278,8 +273,7 @@ impl SourceChain {
     ///   entry is written without an active chain lock.
     #[async_recursion]
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
-    // #5370: `storage_arcs` is only used in the recursive call; retained for
-    // the authored-ops write path.
+    // `storage_arcs` is only used in the recursive rebase call.
     #[allow(clippy::only_used_in_recursion)]
     pub async fn flush(
         &self,
@@ -318,11 +312,6 @@ impl SourceChain {
 
         // If the lock isn't empty this is a countersigning session.
         let is_countersigning_session = !lock_subject.is_empty();
-
-        let ops_to_integrate = ops
-            .iter()
-            .map(|op| (op.1.clone(), op.0.dht_basis()))
-            .collect::<Vec<_>>();
 
         let author = self.author.clone();
         let persisted_head = self.head_info.as_ref().map(|h| h.action.clone());
@@ -587,82 +576,47 @@ impl SourceChain {
                 }
             }
             Ok(actions) => {
-                // #5370: `authored_ops_to_dht_db`, `ops_to_integrate` and the
-                // `dht_db` input are dead code pending DbKindDht retirement.
-                let _ = &ops_to_integrate;
-
-                // Insert warrants into DHT database.
-                // Check signatures first
-                let mut warrants_to_insert = Vec::new();
+                // Verify warrant signatures, then record the valid ones into the
+                // DhtStore so `ops_pending_sys_validation` picks them up via
+                // `LimboWarrant`.
+                let mut warrant_ops = Vec::new();
                 for warrant in warrants {
                     match warrant
                         .author
                         .verify_signature(warrant.signature(), warrant.data())
                         .await
                     {
-                        Ok(true) => warrants_to_insert.push(warrant),
+                        Ok(true) => warrant_ops.push(DhtOpHashed::from_content_sync(DhtOp::from(
+                            WarrantOp::from(warrant),
+                        ))),
                         Ok(false) => {
                             tracing::info!(
-                        "Invalid signature of a warrant in the scratch space. Skipping warrant"
-                    );
+                                "Invalid signature of a warrant in the scratch space. Skipping warrant"
+                            );
                             continue;
                         }
                         Err(err) => {
-                            tracing::warn!(?err, "Could not verify warrant signature before inserting from scratch space into DHT database. Skipping warrant");
+                            tracing::warn!(?err, "Could not verify warrant signature before recording from scratch space into the DhtStore. Skipping warrant");
                             continue;
                         }
                     }
                 }
 
-                // Write warrants to the DHT database and collect the
-                // successfully-inserted ops to insert into the DhtStore.
-                let (total_inserted_warrants, warrant_ops_for_new_db) = match self
-                    .dht_db
-                    // #5370: the `_txn` input and `insert_op_dht` are dead
-                    // pending DbKindDht retirement. Warrants are inserted into
-                    // the DhtStore below.
-                    .write_async(|_txn| -> DatabaseResult<(u32, Vec<DhtOpHashed>)> {
-                        let mut inserted_warrants = 0u32;
-                        let mut inserted_ops: Vec<DhtOpHashed> = Vec::new();
-                        for warrant in warrants_to_insert {
-                            let warrant_op = DhtOpHashed::from_content_sync(DhtOp::from(
-                                WarrantOp::from(warrant),
-                            ));
-                            inserted_warrants += 1;
-                            inserted_ops.push(warrant_op);
-                        }
-                        Ok((inserted_warrants, inserted_ops))
-                    })
-                    .await
-                {
-                    Ok(pair) => pair,
-                    Err(err) => {
-                        tracing::warn!(
-                            ?err,
-                            "Error inserting warrants from scratch space into DHT database"
-                        );
-                        (0, Vec::new())
-                    }
-                };
-
-                // Mirror warrants into the new DhtStore so `ops_pending_sys_validation`
-                // picks them up via `LimboWarrant`.
-                if !warrant_ops_for_new_db.is_empty() {
+                let total_warrants = warrant_ops.len() as u32;
+                if !warrant_ops.is_empty() {
                     // Warrants do not require validation receipts, set all to false.
-                    let warrant_ops_with_validation_receipt_required_flag = warrant_ops_for_new_db
-                        .into_iter()
-                        .map(|op| (op, false))
-                        .collect();
+                    let warrant_ops_with_validation_receipt_required_flag =
+                        warrant_ops.into_iter().map(|op| (op, false)).collect();
                     if let Err(err) = self
                         .dht_store
                         .record_incoming_ops(warrant_ops_with_validation_receipt_required_flag)
                         .await
                     {
-                        tracing::warn!(?err, "Error mirroring warrant ops into new DhtStore");
+                        tracing::warn!(?err, "Error recording warrant ops into the DhtStore");
                     }
                 }
 
-                SourceChainResult::Ok((actions, total_inserted_warrants))
+                SourceChainResult::Ok((actions, total_warrants))
             }
             Err(e) => Err(e),
         }
@@ -1067,11 +1021,8 @@ async fn rebase_actions_on(
     Ok(actions)
 }
 
-#[allow(clippy::too_many_arguments)]
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn genesis(
-    authored: DbWrite<DbKindAuthored>,
-    dht_db: DbWrite<DbKindDht>,
     dht_store: DhtStore,
     keystore: MetaLairClient,
     dna_hash: DnaHash,
@@ -1164,13 +1115,6 @@ pub async fn genesis(
     let agent_entry_for_new_db = agent_entry.clone();
     // Entry hash for the agent entry (AgentPubKey → EntryHash via Into).
     let agent_entry_hash: EntryHash = agent_pubkey.into();
-
-    // The genesis actions, the agent entry and their ops are written to the
-    // DhtStore in the block below. #5370: `put_raw`,
-    // `authored_ops_to_dht_db_without_check` and the `authored` / `dht_db`
-    // inputs are dead pending DbKindAuthored / DbKindDht retirement.
-    let _ = &authored;
-    let _ = &dht_db;
 
     // Write the genesis actions, entries and ops to the DhtStore.
     {
@@ -1920,8 +1864,6 @@ mod tests {
         {
             let extra_dht_store = crate::test_utils::test_dht_store(fake_dna_hash(1)).await;
             genesis(
-                db.clone(),
-                dht_db.to_db(),
                 extra_dht_store.clone(),
                 keystore.clone(),
                 fake_dna_hash(1),
@@ -2050,8 +1992,6 @@ mod tests {
             {
                 let extra_dht_store = crate::test_utils::test_dht_store(fake_dna_hash(1)).await;
                 genesis(
-                    db.clone(),
-                    dht_db.to_db(),
                     extra_dht_store.clone(),
                     keystore.clone(),
                     fake_dna_hash(1),
@@ -2200,8 +2140,6 @@ mod tests {
             .await
             .unwrap();
         genesis(
-            vault.clone(),
-            dht_db.to_db(),
             dht_store.clone(),
             keystore.clone(),
             dna_hash,
@@ -2285,16 +2223,12 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn genesis_writes_to_merged_store() -> SourceChainResult<()> {
         holochain_trace::test_run();
-        let authored = test_authored_db();
-        let dht_db = test_dht_db();
         let keystore = test_keystore();
         let dna_hash = fixt!(DnaHash);
         let dht_store = crate::test_utils::test_dht_store(dna_hash.clone()).await;
         let author = keystore.new_sign_keypair_random().await.unwrap();
 
         genesis(
-            authored.to_db(),
-            dht_db.to_db(),
             dht_store.clone(),
             keystore.clone(),
             dna_hash,
@@ -3200,8 +3134,6 @@ mod tests {
             let dht_store = crate::test_utils::test_dht_store(dna_hash.clone()).await;
             let agent_key = keystore.new_sign_keypair_random().await.unwrap();
             genesis(
-                authored.to_db(),
-                dht.to_db(),
                 dht_store.clone(),
                 keystore.clone(),
                 dna_hash,
