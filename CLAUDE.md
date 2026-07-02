@@ -48,6 +48,7 @@ Design references: `docs/design/state_model.md` and `docs/design/data_model.md` 
   - Use `#[tokio::test]` by default; only switch to `#[tokio::test(flavor = "multi_thread")]` when the test genuinely needs it.
   - Do not introduce new `proptest` or fuzzing suites.
   - Test functions must not be prefixed with `test_` — the `#[test]` / `#[tokio::test]` attribute already marks them.
+  - Test-support code exposed from library crates must be feature-gated so it never compiles into production builds. Read-only inspection queries (op counts, existence checks) use `#[cfg(any(test, feature = "inspection"))]`; test-only writes and fixture builders use `#[cfg(feature = "test_utils")]` (which also enables `inspection`).
 - **Errors**: prefer `thiserror` for crate error types; `anyhow` is for application/binary code, not library APIs.
 - **Compiler warnings are not OK** in shared code (CONTRIBUTING.md). Fix, surgically `#[allow(...)]`, or escalate — don't disable globally.
 - **Public API docs**: `///` rustdoc on public items; module/crate docs should describe structure.

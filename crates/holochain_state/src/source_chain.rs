@@ -112,7 +112,11 @@ impl SourceChain {
         // Take out the lock. We verified above that no lock exists, so this must
         // succeed; the bool guards against a concurrent writer slipping a lock in
         // between the check and here, in which case we reject as `ChainLocked`
-        // rather than extending or stealing the lock.
+        // rather than extending or stealing the lock. The head read above and
+        // this lock acquisition are separate operations, not one transaction: a
+        // concurrent flush can move the head in between, but a stale captured
+        // head is rejected by the as-at check when the session commits, so the
+        // session fails cleanly rather than forking the chain.
         let acquired = self
             .dht_store
             .acquire_chain_lock(
@@ -1335,7 +1339,7 @@ pub fn current_countersigning_session(
 /// integrated ops that have been published at least once.
 ///
 /// This is the production path backing the admin `DumpState` and `DumpFullState`
-/// APIs. It is **not** gated behind `inspection` or `test_utils`.
+/// APIs.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn dump_state(
     dht_store: &DhtStoreRead,
