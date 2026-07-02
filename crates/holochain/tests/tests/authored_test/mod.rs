@@ -5,13 +5,10 @@ use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::prelude::*;
 use std::time::Duration;
 
-/// Returns whether `cell`'s merged store holds a locally-validated op at
+/// Returns whether `cell`'s `DhtStore` holds a locally-validated op at
 /// `basis` whose action was authored by `author`.
 ///
-/// The authored data now lives in the merged per-DNA store keyed by the real
-/// action author, so "authored by X" means "an op at this basis whose action
-/// author == X". This preserves the intent of the old authored-DB existence
-/// query without relying on the now-empty per-agent authored database.
+/// "Authored by X" means "an op at this basis whose action author == X".
 async fn store_has_op_at_basis_authored_by(
     cell: &SweetCell,
     basis: &AnyLinkableHash,
@@ -116,8 +113,8 @@ async fn authored_test() {
     let triggers = handle.get_cell_triggers(bob.cell_id()).await.unwrap();
     triggers.publish_dht_ops.trigger(&"");
 
-    // Bob should now have an op at the entry basis authored by Bob, because
-    // they committed it.
+    // Bob has an op at the entry basis authored by Bob, because they
+    // committed it.
     assert!(
         store_has_op_at_basis_authored_by(&bob, &basis, bob.agent_pubkey()).await,
         "bob should have an op at the entry basis authored by bob after committing"

@@ -960,10 +960,7 @@ pub fn unlock_chain(txn: &mut Transaction, author: &AgentPubKey) -> StateMutatio
     Ok(())
 }
 
-// #5370 — no production callers; writes the authored DB which is being
-// retired. Scheduling now uses the merged store
-// (`DhtStore::delete_all_ephemeral_scheduled_functions`). Now fully unused;
-// retained for retirement together with `DbKindAuthored`.
+// #5370: dead once DbKindAuthored is retired.
 pub fn delete_all_ephemeral_scheduled_fns(txn: &mut Transaction) -> StateMutationResult<()> {
     txn.execute(
         holochain_sqlite::sql::sql_cell::schedule::DELETE_ALL_EPHEMERAL,
@@ -972,10 +969,7 @@ pub fn delete_all_ephemeral_scheduled_fns(txn: &mut Transaction) -> StateMutatio
     Ok(())
 }
 
-// #5370 — no production callers; writes the authored DB which is being
-// retired. Scheduling now uses the merged store
-// (`DhtStore::delete_live_ephemeral_scheduled_functions`). Now fully unused;
-// retained for retirement together with `DbKindAuthored`.
+// #5370: dead once DbKindAuthored is retired.
 pub fn delete_live_ephemeral_scheduled_fns(
     txn: &mut Transaction,
     now: Timestamp,
@@ -991,7 +985,7 @@ pub fn delete_live_ephemeral_scheduled_fns(
     Ok(())
 }
 
-// #5370 — no production callers; reads authored DB which is being retired.
+// #5370: dead once DbKindAuthored is retired.
 pub fn reschedule_expired(
     txn: &mut Transaction,
     now: Timestamp,
@@ -1031,10 +1025,7 @@ pub fn reschedule_expired(
 }
 
 /// Remove a function from the schedule.
-// #5370 — no production callers (its previous caller in `Cell::dispatch_scheduled_fns`
-// was removed); writes the authored DB which is being retired. Reachable only via
-// the `schedule_fn`/`reschedule_expired` legacy helpers, themselves #5370-dead.
-// Retained for retirement together with `DbKindAuthored`.
+// #5370: dead once DbKindAuthored is retired.
 pub fn unschedule_fn(txn: &mut Transaction, author: &AgentPubKey, scheduled_fn: &ScheduledFn) {
     match txn.execute(
         holochain_sqlite::sql::sql_cell::schedule::DELETE,
@@ -1058,10 +1049,7 @@ pub fn unschedule_fn(txn: &mut Transaction, author: &AgentPubKey, scheduled_fn: 
 /// Set a function to be called by the scheduler at a later time determined by `maybe_schedule`.
 ///
 /// If the function was already scheduled, its schedule will be updated.
-// #5370 — no production callers; writes the authored DB which is being retired.
-// Scheduling now uses the merged store (`DhtStore::upsert_scheduled_function`).
-// Now reached only from the #5370-dead `reschedule_expired`; retained for
-// retirement together with `DbKindAuthored`.
+// #5370: dead once DbKindAuthored is retired.
 pub fn schedule_fn(
     txn: &mut Transaction,
     author: &AgentPubKey,
@@ -1137,9 +1125,7 @@ pub fn schedule_fn(
 /// Note that this mutation is defensive about sessions that have any of their ops published to the
 /// network. If any of the ops have been published, the session cannot be removed.
 ///
-/// #5370: superseded by [`crate::dht_store::DhtStore::remove_countersigning_session`], which
-/// performs the equivalent operation against the merged store. Retained for retirement together
-/// with `DbKindAuthored`.
+/// #5370: dead once DbKindAuthored is retired.
 pub fn remove_countersigning_session(
     txn: &mut Transaction,
     cs_action: Action,

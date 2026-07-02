@@ -41,12 +41,17 @@ pub async fn refresh_workspace_state(
 
     let agent = cell_id.agent_pubkey().clone();
     // Ensure the authored database exists (genesis path); the session itself is
-    // now read from the merged store (#5370).
+    // read from the DhtStore.
     if space.get_or_create_authored_db(agent.clone()).is_ok() {
-        // #5370: the chain lock now lives in the merged store. `get_chain_lock`
-        // returns any lock row including expired ones, so a stale lock still marks
-        // the chain as locked and drives the recovery path below.
-        let lock = match space.dht_store.as_read().get_chain_lock(agent.clone()).await {
+        // `get_chain_lock` returns any lock row including expired ones, so a
+        // stale lock still marks the chain as locked and drives the recovery
+        // path below.
+        let lock = match space
+            .dht_store
+            .as_read()
+            .get_chain_lock(agent.clone())
+            .await
+        {
             Ok(lock) => lock,
             Err(e) => {
                 // A store read failure must not be treated as "no lock": that

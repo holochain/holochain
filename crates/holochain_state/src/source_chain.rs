@@ -1,5 +1,5 @@
 use crate::chain_lock::ChainLock;
-// #5370: import kept (function still used by callers) pending DbKindDht retirement.
+// #5370: import retained pending DbKindDht retirement.
 #[allow(unused_imports)]
 use crate::integrate::authored_ops_to_dht_db;
 use crate::prelude::*;
@@ -59,8 +59,7 @@ pub type SourceChainRead = SourceChain<DbRead<DbKindAuthored>, DbRead<DbKindDht>
 impl SourceChain {
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn unlock_chain(&self) -> SourceChainResult<()> {
-        // #5370: the chain lock now lives in the merged store, not the legacy
-        // authored DB.
+        // The chain lock lives in the DhtStore.
         self.dht_store
             .release_chain_lock(self.author.as_ref())
             .await?;
@@ -86,8 +85,7 @@ impl SourceChain {
         // Check for a chain lock.
         // Note that the lock may not be valid anymore, but we must respect it here anyway.
         // `get_chain_lock` returns any lock row, including an expired one, so an
-        // expired lock still rejects acceptance exactly as the legacy authored-DB
-        // path did.
+        // expired lock still rejects acceptance.
         if self
             .dht_store
             .as_read()
@@ -276,9 +274,8 @@ impl SourceChain {
     ///   entry is written without an active chain lock.
     #[async_recursion]
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
-    // #5370: `storage_arcs` is now only used in the recursive call after the
-    // legacy DhtOp authored-ops dual-write was removed; restored when that
-    // write path is fully retired.
+    // #5370: `storage_arcs` is only used in the recursive call; retained for
+    // the authored-ops write path.
     #[allow(clippy::only_used_in_recursion)]
     pub async fn flush(
         &self,
@@ -328,7 +325,7 @@ impl SourceChain {
 
         let now = Timestamp::now();
 
-        // Acquire the per-author chain write permit on the merged store and
+        // Acquire the per-author chain write permit on the DhtStore and
         // perform the source-chain write under it, gated by an as-at check
         // against the store head. The permit serializes flushes for this
         // (DNA, author) chain so a concurrent flush cannot also pass the
@@ -344,11 +341,10 @@ impl SourceChain {
                 .await;
 
             // If there are records to write, then we need to respect the chain
-            // lock. #5370: the lock now lives in the merged store. Reading it
-            // here opens a tiny TOCTOU window (the lock is mutated by the
-            // countersigning workflow, not by flush, so the chain permit does
-            // not stabilise it), but this is a coarse countersigning-session
-            // guard and the window is acceptable.
+            // lock. Reading it here opens a tiny TOCTOU window (the lock is
+            // mutated by the countersigning workflow, not by flush, so the
+            // chain permit does not stabilise it), but this is a coarse
+            // countersigning-session guard and the window is acceptable.
             if !records.is_empty() {
                 let chain_lock = self
                     .dht_store
@@ -404,7 +400,7 @@ impl SourceChain {
             }
 
             // The authoritative source-chain write: entries, actions, ops and
-            // scheduled fns into the merged store, in one transaction.
+            // scheduled fns into the DhtStore, in one transaction.
             let mut tx = self
                 .dht_store
                 .db()
@@ -587,11 +583,8 @@ impl SourceChain {
                 }
             }
             Ok(actions) => {
-                // #5370: legacy DhtOp authored-ops dual-write removed; authored
-                // ops are written to the DhtStore in the permit-scoped block
-                // above (insert_chain_op + ChainOpPublish). `authored_ops_to_dht_db`,
-                // `ops_to_integrate` and the `dht_db` input remain as dead code
-                // pending DbKindDht retirement.
+                // #5370: `authored_ops_to_dht_db`, `ops_to_integrate` and the
+                // `dht_db` input are dead code pending DbKindDht retirement.
                 let _ = &ops_to_integrate;
 
                 // Insert warrants into DHT database.
@@ -617,13 +610,13 @@ impl SourceChain {
                     }
                 }
 
-                // Write warrants to DHT database (legacy) and collect the
-                // successfully-inserted ops for mirroring into the new DhtStore.
+                // Write warrants to the DHT database and collect the
+                // successfully-inserted ops to insert into the DhtStore.
                 let (total_inserted_warrants, warrant_ops_for_new_db) = match self
                     .dht_db
-                    // #5370: legacy DhtOp warrant dual-write removed; the
-                    // `_txn` input and `insert_op_dht` are dead. Warrants are
-                    // mirrored into the DhtStore below.
+                    // #5370: the `_txn` input and `insert_op_dht` are dead
+                    // pending DbKindDht retirement. Warrants are inserted into
+                    // the DhtStore below.
                     .write_async(|_txn| -> DatabaseResult<(u32, Vec<DhtOpHashed>)> {
                         let mut inserted_warrants = 0u32;
                         let mut inserted_ops: Vec<DhtOpHashed> = Vec::new();
@@ -675,8 +668,6 @@ impl SourceChain {
     ///
     /// Valid means that there's no [`Update`] or [`Delete`] action for the key on the chain.
     /// Returns the create action if it is valid, and an [`SourceChainError::InvalidAgentKey`] otherwise.
-    // #5370: reads the agent's valid key-create from the merged store instead
-    // of the legacy authored DB (`SELECT_VALID_AGENT_PUB_KEY`).
     pub async fn valid_create_agent_key_action(&self) -> SourceChainResult<Action> {
         let agent_key = self.agent_pubkey().clone();
         self.dht_store
@@ -886,12 +877,9 @@ where
             return Ok(Some(author_grant));
         }
 
-        // Remote caller. #5370: the candidate grants are read from the merged
-        // store instead of the legacy authored DB
-        // (`SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET` /
-        // `SELECT_VALID_UNRESTRICTED_CAP_GRANT`). The store read applies the
-        // same access-type pre-filter and "not updated/deleted" exclusion as the
-        // legacy SQL; the exact secret/assignee/function match remains the
+        // Remote caller. The candidate grants are read from the DhtStore, which
+        // applies the access-type pre-filter and "not updated/deleted"
+        // exclusion; the exact secret/assignee/function match remains the
         // authority of `CapGrant::is_valid` below.
         let cap_grants = self
             .dht_store
@@ -915,22 +903,19 @@ where
     pub async fn query(&self, query: QueryFilter) -> SourceChainResult<Vec<Record>> {
         let public_only = self.public_only;
 
-        // #5370: the source chain is now read from the merged store, not the
-        // legacy authored DB. Fetch the author's committed records (no
-        // filtering applied here). Ordering and filtering are handled below to
-        // exactly match the legacy authored-DB query, whose final authority was
-        // also `ChainQueryFilter::filter_records` (the SQL pre-filtering there
-        // was only an optimisation over the same `filter_records`).
+        // Fetch the author's committed records from the DhtStore (no filtering
+        // applied here). Ordering and filtering are handled below;
+        // `ChainQueryFilter::filter_records` is the final authority.
         let mut records = self
             .dht_store
             .as_read()
             .source_chain_records(self.author.as_ref(), query.include_entries, public_only)
             .await?;
 
-        // The store returns committed records in ascending sequence order. The
-        // legacy SQL applied `order_descending` to the committed records only
-        // (the scratch was always appended in ascending order below), so mirror
-        // that here by reversing the committed records for a descending query.
+        // The store returns committed records in ascending sequence order.
+        // `order_descending` applies to the committed records only (the scratch
+        // is always appended in ascending order below), so reverse the
+        // committed records for a descending query.
         if query.order_descending {
             records.reverse();
         }
@@ -956,7 +941,7 @@ where
     }
 
     pub async fn get_chain_lock(&self) -> SourceChainResult<Option<ChainLock>> {
-        // #5370: the chain lock now lives in the merged store.
+        // The chain lock lives in the DhtStore.
         Ok(self
             .dht_store
             .as_read()
@@ -1135,10 +1120,10 @@ pub async fn genesis(
     let (agent_action, agent_entry) = agent_record.clone().into_inner();
     let agent_entry = agent_entry.into_option();
 
-    // Pre-compute (op, op_hash, timestamp) tuples for the new-DB write block.
+    // Pre-compute (op, op_hash, timestamp) tuples for the DhtStore write block.
     // This matches what put_raw does internally via ChainOpUniqueForm::op_hash,
     // but done upfront so we can keep the actions and ops available for the
-    // new-DB write without moving them into the legacy closure.
+    // DhtStore write without moving them into the dht_db closure.
     //
     // Each triple is (ChainOpLite, DhtOpHash, Timestamp) for one op.
     let mut ops_with_hashes_for_new_db: Vec<(ChainOpLite, DhtOpHash, Timestamp)> = Vec::new();
@@ -1167,27 +1152,23 @@ pub async fn genesis(
         }
     }
 
-    // Clone the actions and agent entry for the new-DB write block.
-    // #5370: the originals are no longer moved into a legacy authored write
-    // (that write has been removed); the clones feed the store-mirror block
-    // below unchanged.
+    // Clone the actions and agent entry for the DhtStore write block below.
     let dna_action_for_new_db = dna_action.clone();
     let agent_validation_action_for_new_db = agent_validation_action.clone();
     let agent_action_for_new_db = agent_action.clone();
-    // `agent_entry` is `Option<Entry>`; clone it for the store-mirror block.
+    // `agent_entry` is `Option<Entry>`; clone it for the DhtStore write block.
     let agent_entry_for_new_db = agent_entry.clone();
     // Entry hash for the agent entry (AgentPubKey → EntryHash via Into).
     let agent_entry_hash: EntryHash = agent_pubkey.into();
 
-    // #5370: the legacy authored-DB genesis write has been removed. The genesis
-    // actions, the agent entry and their ops are now written solely to the
-    // merged DhtStore in the block below. `put_raw`,
+    // The genesis actions, the agent entry and their ops are written to the
+    // DhtStore in the block below. #5370: `put_raw`,
     // `authored_ops_to_dht_db_without_check` and the `authored` / `dht_db`
-    // inputs remain dead pending DbKindAuthored / DbKindDht retirement.
+    // inputs are dead pending DbKindAuthored / DbKindDht retirement.
     let _ = &authored;
     let _ = &dht_db;
 
-    // Write the genesis actions, entries and ops to the new holochain_data DHT DB.
+    // Write the genesis actions, entries and ops to the DhtStore.
     {
         let mut tx = dht_store
             .db()
@@ -1268,8 +1249,7 @@ pub async fn genesis(
 
 /// Should only be used to put items into the Authored DB.
 /// Hash transfer fields (source, transfer_method, transfer_time) are not set.
-// #5370: production-unused after the genesis authored-DB write was removed;
-// retained pending DbKindAuthored retirement.
+// #5370: production-unused pending DbKindAuthored retirement.
 pub fn put_raw(
     txn: &mut Transaction,
     shh: SignedActionHashed,
@@ -1321,8 +1301,7 @@ pub type CurrentCountersigningSessionOpt = Option<(Record, EntryHash, CounterSig
 
 /// Check if there is a current countersigning session and if so, return the
 /// session data and the entry hash.
-// #5370: kept for the legacy authored path; retire with DbKindAuthored. The
-// merged-store equivalent is `DhtStore::current_countersigning_session`.
+// #5370: dead once DbKindAuthored is retired.
 pub fn current_countersigning_session(
     txn: &Txn<DbKindAuthored>,
 ) -> SourceChainResult<CurrentCountersigningSessionOpt> {
@@ -1348,17 +1327,15 @@ pub fn current_countersigning_session(
     }
 }
 
-/// Dump the entire source chain from the merged DHT store.
+/// Dump the entire source chain from the DhtStore.
 ///
-/// Reads from the merged per-DNA `holochain_data` store rather than the legacy
-/// authored database. Private entries are included — the query looks in both
-/// the public `Entry` table and the author's `PrivateEntry` table — so the
-/// dump faithfully reflects the author's own chain. `published_ops_count` is
-/// the number of integrated ops that have been published at least once.
+/// Private entries are included — the query looks in both the public `Entry`
+/// table and the author's `PrivateEntry` table — so the dump faithfully
+/// reflects the author's own chain. `published_ops_count` is the number of
+/// integrated ops that have been published at least once.
 ///
 /// This is the production path backing the admin `DumpState` and `DumpFullState`
 /// APIs. It is **not** gated behind `inspection` or `test_utils`.
-// #5370: `vault` (DbRead<DbKindAuthored>) parameter removed; reads the merged store.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn dump_state(
     dht_store: &DhtStoreRead,
@@ -1413,10 +1390,8 @@ fn cap_grant_index_params(
         CapAccess::Transferable { .. } => 1_i64,
         CapAccess::Assigned { .. } => 2_i64,
     };
-    // Deliberate empty→NULL normalisation: the new schema stores an absent tag
-    // as NULL rather than an empty string (the legacy DB stores ""). This is a
-    // behavioural difference that becomes visible at read-cutover and must be
-    // accounted for when reads switch to the new DB.
+    // Deliberate empty→NULL normalisation: the schema stores an absent tag as
+    // NULL rather than an empty string.
     let tag = if cap_grant.tag.is_empty() {
         None
     } else {
@@ -1426,11 +1401,9 @@ fn cap_grant_index_params(
     Some((cap_access_i64, tag))
 }
 
-/// Serialize `None` as an `Option<Schedule>` blob — the same encoding that
-/// the legacy `schedule_fn` mutation uses when `maybe_schedule` is `None`.
+/// Serialize `None` as an `Option<Schedule>` blob.
 ///
-/// In the legacy code (`mutations.rs::schedule_fn`), `None` is serialized via
-/// `to_blob::<Option<Schedule>>(&None)`, which calls
+/// `None` is serialized via
 /// `holochain_serialized_bytes::encode(&None::<Schedule>)`.
 fn serialize_maybe_schedule_none(
 ) -> Result<Vec<u8>, holochain_serialized_bytes::SerializedBytesError> {
@@ -1539,8 +1512,7 @@ mod tests {
 
         let storage_arcs = vec![DhtArc::Empty];
         chain_1.flush(storage_arcs.clone()).await?;
-        // #5370: the source chain is now written to the merged store, not the
-        // authored DB, so the head is read from the store.
+        // Read the chain head from the DhtStore.
         let seq = dht_store
             .as_read()
             .chain_head_for_author(&alice)
@@ -1553,8 +1525,7 @@ mod tests {
             chain_2.flush(storage_arcs.clone()).await,
             Err(SourceChainError::HeadMoved(_, _, _, _))
         ));
-        // #5370: the source chain is now written to the merged store, not the
-        // authored DB, so the head is read from the store.
+        // Read the chain head from the DhtStore.
         let seq = dht_store
             .as_read()
             .chain_head_for_author(&alice)
@@ -1564,8 +1535,7 @@ mod tests {
         assert_eq!(seq, 3);
 
         chain_3.flush(storage_arcs).await?;
-        // #5370: the source chain is now written to the merged store, not the
-        // authored DB, so the head is read from the store.
+        // Read the chain head from the DhtStore.
         let seq = dht_store
             .as_read()
             .chain_head_for_author(&alice)
@@ -1644,8 +1614,7 @@ mod tests {
 
         let storage_arcs = vec![DhtArc::Empty];
         chain_1.flush(storage_arcs.clone()).await?;
-        // #5370: the source chain is now written to the merged store, not the
-        // authored DB, so the head is read from the store.
+        // Read the chain head from the DhtStore.
         let seq = dht_store
             .as_read()
             .chain_head_for_author(&alice)
@@ -1660,7 +1629,7 @@ mod tests {
         ));
 
         chain_3.flush(storage_arcs).await?;
-        // #5370: the head is read from the merged store, not the authored DB.
+        // Read the chain head from the DhtStore.
         let head = dht_store
             .as_read()
             .chain_head_for_author(&alice)
@@ -1671,9 +1640,9 @@ mod tests {
         assert_ne!(head.action, old_h2);
         assert_eq!(head.seq, 4);
 
-        // #5370: the full records are read from the merged store. h1 is public;
-        // h2 (the head) is a private entry, so the author key is passed so the
-        // store attaches the author's `PrivateEntry`.
+        // The full records are read from the DhtStore. h1 is public; h2 (the
+        // head) is a private entry, so the author key is passed so the store
+        // attaches the author's `PrivateEntry`.
         let h1_record_entry_fetched = dht_store
             .as_read()
             .retrieve_record(&h1, Some(&alice))
@@ -1694,7 +1663,7 @@ mod tests {
         Ok(())
     }
 
-    // The genesis agent-key `Create` is read back from the merged store as the
+    // The genesis agent-key `Create` is read back from the DhtStore as the
     // valid agent-key action.
     #[tokio::test(flavor = "multi_thread")]
     async fn valid_create_agent_key_action_reads_from_store() {
@@ -2267,8 +2236,7 @@ mod tests {
             .unwrap();
         source_chain.flush(vec![DhtArc::Empty]).await.unwrap();
 
-        // #5370: the source chain is now written to the merged store, not the
-        // authored DB, so the head and full records are read from the store.
+        // The head and full records are read from the DhtStore.
         let head = dht_store
             .as_read()
             .chain_head_for_author(author.as_ref())
@@ -2307,10 +2275,9 @@ mod tests {
         Ok(())
     }
 
-    /// #5370: genesis writes to the merged store only (the legacy authored-DB
-    /// write was removed). After `genesis`, the store reports the author has
-    /// genesis, the chain head is the seq-2 AgentId `Create`, and the head
-    /// record is retrievable from the store.
+    /// After `genesis`, the store reports the author has done genesis, the
+    /// chain head is the seq-2 AgentId `Create`, and the head record is
+    /// retrievable from the store.
     #[tokio::test(flavor = "multi_thread")]
     async fn genesis_writes_to_merged_store() -> SourceChainResult<()> {
         holochain_trace::test_run();
@@ -2630,7 +2597,7 @@ mod tests {
             visibility: EntryVisibility::Public,
         });
 
-        // Commit a Create with a PRIVATE entry to the merged store via flush.
+        // Commit a Create with a PRIVATE entry to the DhtStore via flush.
         let chain_top = chain.chain_head_nonempty().unwrap();
         let private_entry_hashed = EntryHashed::from_content_sync(Entry::App(fixt!(AppEntryBytes)));
         let private_create = Action::Create(Create {
@@ -2781,7 +2748,7 @@ mod tests {
         let warrantee = fixt!(AgentPubKey);
 
         // The warrant is authored by `agent_key` (the warrant issuer). Read it
-        // back via the DhtStore (limbo + integrated) rather than the legacy DB.
+        // back via the DhtStore (limbo + integrated).
         let actual_warrants = dht_store
             .as_read()
             .warrants_by_author(agent_key.clone())
@@ -3059,10 +3026,10 @@ mod tests {
         Ok(())
     }
 
-    /// #5370: the flush as-at now reads the *merged store* head, not the legacy
-    /// authored DB. Two source chains for the same author share the store; once
-    /// one flushes, the other's stale `persisted_head` must be detected as
-    /// `HeadMoved`, and a normal flush's action must be visible via the store.
+    /// The flush as-at check reads the store head. Two source chains for the
+    /// same author share the store; once one flushes, the other's stale
+    /// `persisted_head` must be detected as `HeadMoved`, and a normal flush's
+    /// action must be visible via the store.
     #[tokio::test(flavor = "multi_thread")]
     async fn flush_as_at_detects_head_moved_against_store() -> SourceChainResult<()> {
         let TestCase {
@@ -3108,7 +3075,7 @@ mod tests {
             .expect("store head present after flush");
         assert_eq!(store_head.action, flushed_head);
 
-        // chain_2's persisted_head is now stale; a strict flush must detect the
+        // chain_2's persisted_head is stale; a strict flush must detect the
         // moved store head and fail with HeadMoved.
         assert_matches!(
             chain_2.flush(vec![DhtArc::Empty]).await,

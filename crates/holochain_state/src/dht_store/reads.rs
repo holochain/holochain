@@ -43,13 +43,13 @@ impl DhtStore<DbRead<Dht>> {
         Ok(self.db().count_integrated_ops().await?)
     }
 
-    /// Total bytes occupied on disk by this DNA's merged store, including the
+    /// Total bytes occupied on disk by this DNA's DhtStore, including the
     /// unused (free) bytes within each page.
     pub async fn size_on_disk(&self) -> StateQueryResult<u64> {
         Ok(self.db().get_size_on_disk().await?)
     }
 
-    /// Bytes actually in use by this DNA's merged store, excluding the free
+    /// Bytes actually in use by this DNA's DhtStore, excluding the free
     /// space within pages.
     pub async fn used_size(&self) -> StateQueryResult<u64> {
         Ok(self.db().get_used_size().await?)
@@ -129,9 +129,6 @@ impl DhtStore<DbRead<Dht>> {
     }
 
     /// Op hashes of the integrated chain ops for `action_hash`.
-    ///
-    /// #5370: backs the countersigning success path's withhold-publish clear,
-    /// replacing the legacy authored-DB `get_countersigning_op_hashes` query.
     pub async fn chain_op_hashes_for_action(
         &self,
         action_hash: holo_hash::ActionHash,
@@ -283,8 +280,7 @@ impl DhtStore<DbRead<Dht>> {
         Ok(self.db().count_author_actions_capped(author, 3).await? >= 3)
     }
 
-    /// The author's source-chain head from the merged store, or `None`
-    /// pre-genesis.
+    /// The author's source-chain head, or `None` pre-genesis.
     pub async fn chain_head_for_author(
         &self,
         author: &AgentPubKey,
@@ -303,10 +299,9 @@ impl DhtStore<DbRead<Dht>> {
     /// Get the source-chain lock for `author`, if one exists.
     ///
     /// Returns *any* lock row for the author, including one that has already
-    /// expired — matching the legacy
-    /// [`get_chain_lock`](crate::chain_lock::get_chain_lock) semantics. Callers
-    /// are responsible for checking `ChainLock::is_expired_at` when expiry
-    /// matters; several countersigning call sites must respect an expired lock
+    /// expired. Callers are responsible for checking `ChainLock::is_expired_at`
+    /// when expiry matters; several countersigning call sites must respect an
+    /// expired lock
     /// (a lock that exists at all means a session is mid-flight and the chain
     /// must not be re-used until it is cleaned up).
     ///
@@ -334,12 +329,9 @@ impl DhtStore<DbRead<Dht>> {
     /// session, and if so the session record, its entry hash, and the decoded
     /// [`CounterSigningSessionData`](holochain_zome_types::countersigning::CounterSigningSessionData).
     ///
-    /// This is the merged-store counterpart of the legacy
-    /// [`current_countersigning_session`](crate::source_chain::current_countersigning_session):
-    /// it reads the chain head and head record from the store rather than the
-    /// authored database. `author` is threaded through to
-    /// [`retrieve_record`](Self::retrieve_record) so the author's own
-    /// (potentially private) countersigning entry is visible.
+    /// This reads the chain head and head record from the store. `author` is
+    /// threaded through to [`retrieve_record`](Self::retrieve_record) so the
+    /// author's own (potentially private) countersigning entry is visible.
     ///
     /// Returns `None` when the chain is empty (pre-genesis), the head record is
     /// unavailable, or the head action does not carry a `CounterSign` entry. A
@@ -1199,8 +1191,8 @@ impl DhtStore<DbRead<Dht>> {
     /// filtered by link type, tag prefix, author, and time. Builds each
     /// [`holochain_zome_types::link::Link`] from its `CreateLink` action.
     ///
-    /// Time bounds mirror the legacy `LinksQuery`: `after` is inclusive
-    /// (`timestamp >= after`) and `before` is inclusive (`timestamp <= before`).
+    /// Time bounds: `after` is inclusive (`timestamp >= after`) and `before` is
+    /// inclusive (`timestamp <= before`).
     pub async fn get_links(
         &self,
         base: &holo_hash::AnyLinkableHash,
@@ -2242,7 +2234,7 @@ impl DhtStore<DbRead<Dht>> {
 
     /// Dump the author's source chain as a `SourceChainDump`.
     ///
-    /// Reads all actions authored by `author` from the merged DHT store in
+    /// Reads all actions authored by `author` from the DhtStore in
     /// chain-sequence order, resolves each action's entry from both the public
     /// `Entry` table and the author's private `PrivateEntry` table, and counts
     /// the ops that have been published at least once.
@@ -2261,7 +2253,7 @@ impl DhtStore<DbRead<Dht>> {
 
         let mut records = Vec::with_capacity(v2_actions.len());
         for v2_sah in &v2_actions {
-            // Convert to the legacy (v1) SignedActionHashed.
+            // Convert to the v1 SignedActionHashed.
             let sah = to_legacy_signed_action(v2_sah);
             let action_address = sah.as_hash().clone();
             let signature = sah.signature().clone();
@@ -2293,24 +2285,21 @@ impl DhtStore<DbRead<Dht>> {
         })
     }
 
-    /// Read the author's committed source-chain records from the merged store.
+    /// Read the author's committed source-chain records.
     ///
     /// Returns every action authored by `author`, in ascending chain-sequence
-    /// order, as a legacy [`Record`](holochain_zome_types::record::Record).
+    /// order, as a [`Record`](holochain_zome_types::record::Record).
     /// This is the committed-record source behind
     /// [`SourceChain::query`](crate::source_chain::SourceChain::query): no
     /// [`ChainQueryFilter`] filtering or fork disambiguation is applied here.
     /// The caller overlays the scratch and then applies
-    /// [`ChainQueryFilter::filter_records`], which is the authoritative filter,
-    /// exactly as the legacy authored-DB query did (the SQL pre-filtering there
-    /// was only an optimisation over the same `filter_records`).
+    /// [`ChainQueryFilter::filter_records`], which is the authoritative filter.
     ///
-    /// Entry inclusion mirrors the legacy row mapper: an entry is attached only
-    /// when `include_entries` is set and the entry is either public or
-    /// `public_only` is `false`. A private entry is therefore redacted (`None`)
-    /// under `public_only`. The private entry itself is resolved via
-    /// `get_entry(.., Some(author))`, so an author always sees their own private
-    /// entries and never another agent's.
+    /// An entry is attached only when `include_entries` is set and the entry is
+    /// either public or `public_only` is `false`. A private entry is therefore
+    /// redacted (`None`) under `public_only`. The private entry itself is
+    /// resolved via `get_entry(.., Some(author))`, so an author always sees
+    /// their own private entries and never another agent's.
     pub async fn source_chain_records(
         &self,
         author: &AgentPubKey,
@@ -2322,10 +2311,10 @@ impl DhtStore<DbRead<Dht>> {
 
         let v2_actions = self.db().get_actions_by_author(author.clone()).await?;
 
-        // Convert each action to its legacy form once, and decide which entries
-        // to attach. Collect the entry hashes that actually need fetching so
-        // they can be read in a single batch — fetching them one-at-a-time was
-        // an N+1 over the chain length.
+        // Convert each action to its v1 form once, and decide which entries to
+        // attach. Collect the entry hashes that actually need fetching so they
+        // can be read in a single batch rather than one-at-a-time (an N+1 over
+        // the chain length).
         let sahs: Vec<holochain_zome_types::record::SignedActionHashed> =
             v2_actions.iter().map(to_legacy_signed_action).collect();
         let mut wanted_entry_hashes: Vec<EntryHash> = Vec::new();
@@ -2371,16 +2360,15 @@ impl DhtStore<DbRead<Dht>> {
         Ok(records)
     }
 
-    /// The author's valid agent-key `Create` action, read from the merged store.
+    /// The author's valid agent-key `Create` action.
     ///
-    /// Faithfully reproduces the legacy `SELECT_VALID_AGENT_PUB_KEY` query that
-    /// ran over the authored database: the author's `Create` action whose entry
-    /// is the `AgentPubKey` entry (`entry_hash == author.into()`) and that has
-    /// NOT been updated or deleted **by the author**. Returns `None` when no
-    /// such action exists or it has been modified, so the caller maps that to
+    /// Returns the author's `Create` action whose entry is the `AgentPubKey`
+    /// entry (`entry_hash == author.into()`) and that has NOT been updated or
+    /// deleted **by the author**. Returns `None` when no such action exists or
+    /// it has been modified, so the caller maps that to
     /// [`SourceChainError::InvalidAgentKey`](crate::source_chain::SourceChainError::InvalidAgentKey).
     ///
-    /// The "not updated/deleted" exclusion matches the legacy SQL exactly via
+    /// The "not updated/deleted" exclusion is applied via
     /// `entry_updated_or_deleted_by_author`.
     pub async fn valid_create_agent_key_action(
         &self,
@@ -2389,10 +2377,9 @@ impl DhtStore<DbRead<Dht>> {
         let agent_key_entry_hash: EntryHash = author.clone().into();
 
         // The agent-key `Create` is written to the author's chain at genesis;
-        // find it among the author's actions. The merged-store `Action` table
-        // carries `action_type` but not `entry_type`, so the `Create` +
-        // entry-hash match (with an `AgentPubKey` entry-type guard) reproduces
-        // the legacy `type`/`entry_type`/`entry_hash` filter.
+        // find it among the author's actions. The `Action` table carries
+        // `action_type` but not `entry_type`, so filter on `Create` + the entry
+        // hash with an `AgentPubKey` entry-type guard.
         let actions = self.db().get_actions_by_author(author.clone()).await?;
         let create = actions.iter().find_map(|v2_sah| {
             let action = holochain_zome_types::dht_v2::to_legacy_signed_action(v2_sah)
@@ -2420,26 +2407,20 @@ impl DhtStore<DbRead<Dht>> {
     }
 
     /// The author's candidate capability grants for the `is_valid` loop in
-    /// [`SourceChain::valid_cap_grant`](crate::source_chain::SourceChain::valid_cap_grant),
-    /// read from the merged store.
-    ///
-    /// Faithfully reproduces the legacy `SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET`
-    /// / `SELECT_VALID_UNRESTRICTED_CAP_GRANT` queries:
+    /// [`SourceChain::valid_cap_grant`](crate::source_chain::SourceChain::valid_cap_grant).
     ///
     /// - When `check_secret` is `Some`, only grants that carry a secret
-    ///   (`Transferable` / `Assigned`) are considered — matching the legacy
-    ///   `Entry.cap_secret = ?` pre-filter. The exact-secret match is left to
-    ///   the caller's [`CapGrant::is_valid`], which is equivalent because
-    ///   `is_valid` requires `secret == given` for both secret-bearing variants
-    ///   (and a secret-bearing check can therefore never match an `Unrestricted`
-    ///   grant, just as the legacy `cap_secret` filter excluded them).
+    ///   (`Transferable` / `Assigned`) are considered. The exact-secret match is
+    ///   left to the caller's [`CapGrant::is_valid`], which is equivalent
+    ///   because `is_valid` requires `secret == given` for both secret-bearing
+    ///   variants (a secret-bearing check therefore never matches an
+    ///   `Unrestricted` grant).
     /// - When `check_secret` is `None`, only `Unrestricted` grants are
-    ///   considered — matching the legacy `access_type = Unrestricted` filter.
+    ///   considered.
     ///
     /// Candidates are restricted to grants authored by `author` (the `CapGrant`
-    /// index join already filters on `Action.author`) and dropped when their
-    /// entry has been updated or deleted by the author — the same "not
-    /// updated/deleted" semantics as the legacy SQL.
+    /// index join filters on `Action.author`) and dropped when their entry has
+    /// been updated or deleted by the author.
     pub async fn valid_cap_grants(
         &self,
         author: &AgentPubKey,
@@ -2507,13 +2488,11 @@ impl DhtStore<DbRead<Dht>> {
         Ok(grants)
     }
 
-    /// `true` if `entry_hash` has been updated or deleted by `author` in the
-    /// merged store — the "not updated/deleted" exclusion shared by the
-    /// agent-key and cap-grant validity reads.
+    /// `true` if `entry_hash` has been updated or deleted by `author` — the
+    /// "not updated/deleted" exclusion shared by the agent-key and cap-grant
+    /// validity reads.
     ///
-    /// Matches the legacy SQL `ModifiedAction.author = :author AND
-    /// (original_entry_hash = :entry_hash OR deletes_entry_hash = :entry_hash)`:
-    /// the `UpdatedRecord` / `DeletedRecord` indexes are keyed on the original /
+    /// The `UpdatedRecord` / `DeletedRecord` indexes are keyed on the original /
     /// deleted *entry* hash (see
     /// [`get_update_actions_for_entry`](holochain_data::DbRead::get_update_actions_for_entry)
     /// / [`get_delete_actions_for_entry`](holochain_data::DbRead::get_delete_actions_for_entry)),

@@ -455,18 +455,14 @@ async fn schedule_persisted_expired() {
     // Should not be scheduled
     assert!(!is_scheduled(&cell).await);
 
-    // Schedule the function on the merged store, which the running scheduler reads.
+    // Schedule the function on the DhtStore, which the running scheduler reads.
     //
-    // The original test wrote an *expired* periodic cron directly to the authored
-    // DB and relied on it never firing. Now that the live scheduler reads the
-    // merged store, an expired periodic cron (e.g. `0 * * * * * *`) would be
-    // rescheduled to its next occurrence, which could land inside the 3s wait and
-    // fire (~5% flake). A fixed far-future date cron keeps the intent — a
-    // persisted schedule that is not due must not fire — while being fully
-    // deterministic: the function is a member of the schedule table but is never
-    // live during the test, so the scheduler evaluates its liveness and correctly
-    // declines to dispatch it, and `reschedule_expired_persisted` leaves the
-    // (unexpired) row untouched.
+    // A fixed far-future date cron keeps the intent — a persisted schedule that
+    // is not due must not fire — while being fully deterministic: the function
+    // is a member of the schedule table but is never live during the test, so
+    // the scheduler evaluates its liveness and correctly declines to dispatch
+    // it, and `reschedule_expired_persisted` leaves the (unexpired) row
+    // untouched.
     cell.dht_store()
         .upsert_scheduled_function(
             &pubkey,
@@ -500,7 +496,7 @@ fn create_schedule_zome(
 }
 
 /// Helper for checking if [`SCHEDULED_FN`] has been scheduled, reading the
-/// merged DHT store (membership, regardless of liveness).
+/// DhtStore (membership, regardless of liveness).
 async fn is_scheduled(cell: &SweetCell) -> bool {
     let pubkey = cell.cell_id().agent_pubkey().clone();
     cell.dht_store()
@@ -535,12 +531,11 @@ async fn schedule_test_low_level() -> anyhow::Result<()> {
     holochain_trace::test_run();
     let RibosomeTestFixture { alice_cell, .. } = RibosomeTestFixture::new(TestWasm::Schedule).await;
 
-    // Exercise the merged store's scheduling semantics directly. The conductor's
+    // Exercise the DhtStore's scheduling semantics directly. The conductor's
     // background scheduler dispatches (and prunes live ephemeral rows) only for
     // the running cells' own authors, so scheduling under a distinct synthetic
     // author isolates these table-level assertions from the scheduler entirely
-    // and keeps them deterministic (the legacy test relied on a single authored-DB
-    // write transaction holding the write lock for isolation).
+    // and keeps them deterministic.
     let store = alice_cell.dht_store();
     let author = AgentPubKey::from_raw_36(vec![0xdb; 36]);
 
@@ -553,7 +548,7 @@ async fn schedule_test_low_level() -> anyhow::Result<()> {
     let persisted_scheduled_fn = ScheduledFn::new("1".into(), "2".into());
     let persisted_schedule = Schedule::Persisted("* * * * * * *".into());
 
-    // Membership check against the merged store for the synthetic author.
+    // Membership check against the DhtStore for the synthetic author.
     let fn_scheduled = |scheduled_fn: ScheduledFn| {
         let author = &author;
         async move {
@@ -582,7 +577,7 @@ async fn schedule_test_low_level() -> anyhow::Result<()> {
     assert!(fn_scheduled(persisted_scheduled_fn.clone()).await);
     assert!(fn_scheduled(ephemeral_scheduled_fn.clone()).await);
 
-    // Deleting live ephemeral scheduled fns from now should delete.
+    // Deleting live ephemeral scheduled fns as of `now` should delete.
     store
         .delete_live_ephemeral_scheduled_functions(&author, now)
         .await

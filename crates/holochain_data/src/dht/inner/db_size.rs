@@ -1,7 +1,6 @@
 //! Database size statistics derived from the `dbstat` virtual table.
 //!
-//! These mirror the legacy `holochain_sqlite::stats` helpers so that the
-//! merged DHT store can report per-DNA storage usage. They rely on the
+//! These let the DHT database report per-DNA storage usage. They rely on the
 //! `dbstat` virtual table, which is compiled into the bundled SQLCipher build
 //! (`SQLITE_ENABLE_DBSTAT_VTAB`).
 

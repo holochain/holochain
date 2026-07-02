@@ -21,9 +21,7 @@ impl DbWrite<Dht> {
     /// different authors — and the same author on different DNAs — never block
     /// one another. The DNA is identified by the database's stable
     /// [`database_id`](crate::DatabaseIdentifier::database_id) (the DHT
-    /// database is per-DNA), combined with the author key. This mirrors the
-    /// granularity of the legacy `holochain_sqlite` authored-DB write permit,
-    /// which was keyed by the per-cell `DbKind::Authored(CellId)`.
+    /// database is per-DNA), combined with the author key.
     pub async fn acquire_chain_write_permit(&self, author: &AgentPubKey) -> OwnedSemaphorePermit {
         let key = (self.identifier().database_id().to_string(), author.clone());
         chain_write_semaphore(key)
@@ -36,11 +34,9 @@ impl DbWrite<Dht> {
 /// Fetch (or lazily create) the single-permit semaphore for a
 /// `(database_id, author)` key.
 ///
-/// Mirrors the keyed-`Lazy`-static semaphore pattern used by the legacy
-/// `holochain_sqlite` write permit, but keyed per author so each chain
-/// serializes independently. The map is never pruned; the number of live keys
-/// is bounded by the installed `(DNA, author)` cells, matching the legacy
-/// per-cell authored-DB semaphore map.
+/// The semaphore is keyed per author so each chain serializes independently.
+/// The map is never pruned; the number of live keys is bounded by the
+/// installed `(DNA, author)` cells.
 fn chain_write_semaphore(key: (String, AgentPubKey)) -> Arc<Semaphore> {
     type SemaphoreMap = HashMap<(String, AgentPubKey), Arc<Semaphore>>;
     static MAP: LazyLock<Mutex<SemaphoreMap>> = LazyLock::new(|| Mutex::new(HashMap::new()));

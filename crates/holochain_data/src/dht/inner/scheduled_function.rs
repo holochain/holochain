@@ -112,8 +112,7 @@ where
 }
 
 /// Return live scheduled-function rows for `author` where `now` falls between
-/// `start_at` and `end_at` (inclusive on both sides), mirroring the legacy
-/// `live_scheduled_fns` predicate (`start <= now AND now <= end`).
+/// `start_at` and `end_at` (inclusive on both sides): `start <= now AND now <= end`.
 ///
 /// Returns `(zome_name, scheduled_fn, maybe_schedule_blob, ephemeral)` tuples,
 /// ordered by `start_at ASC`.

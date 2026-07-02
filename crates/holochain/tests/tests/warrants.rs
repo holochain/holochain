@@ -231,16 +231,14 @@ async fn author_of_invalid_warrant_is_blocked() {
     // Wait for Alice and Bob to sync.
     await_consistency([&alice, &bob]).await.unwrap();
 
-    // Fetch Alice's signed action from the merged store. The authored data now
-    // lives in the merged per-DNA store keyed by the action's author, so read it
-    // from there rather than the now-empty per-agent authored database.
+    // Fetch Alice's signed action from the DhtStore.
     let action: SignedAction = alice
         .dht_store()
         .as_read()
         .retrieve_action(&valid_action_hash)
         .await
         .unwrap()
-        .expect("Alice's valid action should be in the merged store")
+        .expect("Alice's valid action should be in the DhtStore")
         .into();
 
     // Now Bob needs to create a warrant against Alice's perfectly valid action.

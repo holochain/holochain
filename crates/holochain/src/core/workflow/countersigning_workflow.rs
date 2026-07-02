@@ -599,7 +599,7 @@ async fn apply_timeout(
         return Ok(());
     }
 
-    // Read the current countersigning session from the merged store (#5370).
+    // Read the current countersigning session from the DhtStore.
     let current_session = space
         .dht_store
         .as_read()
@@ -711,7 +711,7 @@ async fn force_abandon_session(
 ) -> SourceChainResult<()> {
     let abandon_fingerprint = preflight_request.fingerprint()?;
 
-    // Read the current countersigning session from the merged store (#5370).
+    // Read the current countersigning session from the DhtStore.
     let maybe_session_data = space
         .dht_store
         .as_read()
@@ -733,7 +733,7 @@ async fn force_abandon_session(
         }
         _ => {
             // There is no matching, committed session but there may be a lock to
-            // remove. #5370: the chain lock lives in the merged store.
+            // remove.
             let chain_lock = space
                 .dht_store
                 .as_read()
@@ -813,17 +813,14 @@ async fn abandon_session(
     cs_entry_hash: EntryHash,
 ) -> StateMutationResult<()> {
     // Do the dangerous thing and remove the countersigning session from the
-    // merged store, which is now the sole source-chain write. The store's
-    // published guard is authoritative: it refuses (with
+    // DhtStore. The store's published guard is authoritative: it refuses (with
     // `CannotRemoveFullyPublished`) if any of the session's ops have already
-    // been published. #5370: the session's source-chain rows live in the merged
-    // store.
+    // been published.
     dht_store
         .remove_countersigning_session(cs_action.to_hash(), cs_entry_hash)
         .await?;
 
-    // Once the session is removed we can unlock the chain. #5370: the chain lock
-    // lives in the merged store.
+    // Once the session is removed we can unlock the chain.
     dht_store.release_chain_lock(&author).await?;
 
     Ok(())

@@ -1,10 +1,9 @@
 //! OpenTelemetry instrumentation for the database layer.
 //!
-//! Mirrors the connection-use-time metric historically emitted by
-//! `holochain_sqlite`, so that reads served from the merged `holochain_data`
-//! store keep reporting `hc.db.connections.use_time`. The metric is created
-//! once per database handle and recorded each time a borrowed connection is
-//! returned to the pool (see [`crate::handles::TimedConn`]).
+//! Emits the `hc.db.connections.use_time` metric for reads served by the
+//! `holochain_data` store. The metric is created once per database handle and
+//! recorded each time a borrowed connection is returned to the pool (see
+//! [`crate::handles::TimedConn`]).
 
 use crate::kind::DbKind;
 use crate::DatabaseIdentifier;

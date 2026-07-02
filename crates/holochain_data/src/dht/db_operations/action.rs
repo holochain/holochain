@@ -47,8 +47,8 @@ impl DbRead<Dht> {
         action::count_author_actions_capped(&mut *conn, author, cap).await
     }
 
-    /// The author's chain head from the merged store: the highest-sequence
-    /// action they authored, or `None` for an empty chain (pre-genesis).
+    /// The author's chain head: the highest-sequence action they authored, or
+    /// `None` for an empty chain (pre-genesis).
     pub async fn chain_head_for_author(
         &self,
         author: &AgentPubKey,

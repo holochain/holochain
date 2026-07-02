@@ -328,7 +328,6 @@ fn format_pending_ops(stage: &str, ops: &[holochain_types::dht_op::DhtOpHashed])
 
 /// Show an agent's authored chain for each (agent, store) pair.
 ///
-/// Reads from the merged DHT store rather than the legacy authored database.
 /// Intended for debugging in tests.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(envs)))]
 pub async fn show_authored(envs: &[(AgentPubKey, &holochain_state::dht_store::DhtStore)]) {
