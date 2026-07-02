@@ -11,14 +11,17 @@ use crate::op::ChainOpType;
 use crate::signature::Signed;
 use holochain_integrity_types::record::SignedHashed;
 
-/// Convert a legacy [`crate::record::SignedActionHashed`] (using the
-/// variant-per-type `Action` enum) into the v2 [`SignedActionHashed`] (which
-/// uses a flat [`ActionHeader`] + [`ActionData`] envelope).
+/// Convert a legacy [`holochain_integrity_types::record::SignedActionHashed`]
+/// (using the variant-per-type `Action` enum) into the v2
+/// [`SignedActionHashed`] (which uses a flat [`ActionHeader`] +
+/// [`ActionData`] envelope).
 ///
 /// The hash is carried over from the original — the v2 hash is content-derived,
 /// so re-hashing would change it; the pre-hashed constructor preserves the
 /// existing hash as the canonical identity during the dual-write transition.
-pub fn from_legacy_signed_action(shh: &crate::record::SignedActionHashed) -> SignedActionHashed {
+pub fn from_legacy_signed_action(
+    shh: &holochain_integrity_types::record::SignedActionHashed,
+) -> SignedActionHashed {
     // The action-only projection is shared with the `HashableContent` impls so
     // that the carried-over hash here is exactly the content-derived v2 hash.
     let v2_action = holochain_integrity_types::dht_v2::from_legacy_action(shh.action());
@@ -27,7 +30,8 @@ pub fn from_legacy_signed_action(shh: &crate::record::SignedActionHashed) -> Sig
 }
 
 /// Reverse of [`from_legacy_signed_action`]: build a legacy
-/// [`crate::record::SignedActionHashed`] from a v2 [`SignedActionHashed`].
+/// [`holochain_integrity_types::record::SignedActionHashed`] from a v2
+/// [`SignedActionHashed`].
 ///
 /// **Lossy.** Legacy actions carry a `weight` field (rate-limit metadata)
 /// that the v2 model deliberately discards; the reconstructed legacy
@@ -39,12 +43,14 @@ pub fn from_legacy_signed_action(shh: &crate::record::SignedActionHashed) -> Sig
 /// hash will not match the stored hash** for ops that originally carried
 /// non-default weights. Cross-version conductor compatibility is broken
 /// by this; that is intentional during the storage migration.
-pub fn to_legacy_signed_action(sah: &SignedActionHashed) -> crate::record::SignedActionHashed {
-    use crate::action::{
+pub fn to_legacy_signed_action(
+    sah: &SignedActionHashed,
+) -> holochain_integrity_types::record::SignedActionHashed {
+    use holo_hash::ActionHash;
+    use holochain_integrity_types::action::{
         Action as LegacyAction, AgentValidationPkg, CloseChain, Create, CreateLink, Delete,
         DeleteLink, Dna, InitZomesComplete, OpenChain, Update,
     };
-    use holo_hash::ActionHash;
 
     let v2_action = &sah.hashed.content;
     let header = &v2_action.header;

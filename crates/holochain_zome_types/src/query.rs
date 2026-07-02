@@ -2,7 +2,6 @@
 
 use crate::prelude::*;
 use holo_hash::EntryHash;
-use holo_hash::HasHash;
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash};
 use holochain_integrity_types::{LinkTag, LinkTypeFilter};
 pub use holochain_serialized_bytes::prelude::*;
@@ -416,10 +415,10 @@ impl ChainQueryFilter {
 
     /// Filter a vector of records according to the query.
     pub fn filter_records(&self, records: Vec<Record>) -> Vec<Record> {
-        let actions = self.filter_actions(
+        let actions = self.filter_signed_actions(
             records
                 .iter()
-                .map(|record| record.action_hashed().clone())
+                .map(|record| record.signed_action.clone())
                 .collect(),
         );
         let action_hashset = actions
@@ -430,6 +429,133 @@ impl ChainQueryFilter {
             .into_iter()
             .filter(|record| action_hashset.contains(record.action_address()))
             .collect()
+    }
+
+    /// Fork disambiguation for v2 [`SignedActionHashed`], used by
+    /// [`Self::filter_records`]. Mirrors [`Self::disambiguate_forks`], which
+    /// operates on any [`ActionHashedContainer`] (currently only implemented
+    /// for the legacy per-variant action shape).
+    fn disambiguate_forks_v2(&self, actions: Vec<SignedActionHashed>) -> Vec<SignedActionHashed> {
+        match &self.sequence_range {
+            ChainQueryFilterRange::Unbounded => actions,
+            ChainQueryFilterRange::ActionSeqRange(start, end) => actions
+                .into_iter()
+                .filter(|action| {
+                    let seq = action.hashed.content.header.action_seq;
+                    *start <= seq && seq <= *end
+                })
+                .collect(),
+            ChainQueryFilterRange::ActionHashRange(start, end) => {
+                let mut action_hashmap = actions
+                    .into_iter()
+                    .map(|action| (action.as_hash().clone(), action))
+                    .collect::<HashMap<ActionHash, SignedActionHashed>>();
+                let mut filtered_actions = Vec::new();
+                let mut maybe_next_action = action_hashmap.remove(end);
+                while let Some(next_action) = maybe_next_action {
+                    maybe_next_action = next_action
+                        .hashed
+                        .content
+                        .header
+                        .prev_action
+                        .as_ref()
+                        .and_then(|prev_action| action_hashmap.remove(prev_action));
+                    let is_start = next_action.as_hash() == start;
+                    filtered_actions.push(next_action);
+
+                    // This comes after the push to make the range inclusive.
+                    if is_start {
+                        break;
+                    }
+                }
+                filtered_actions
+            }
+            ChainQueryFilterRange::ActionHashTerminated(end, n) => {
+                let mut action_hashmap = actions
+                    .iter()
+                    .map(|action| (action.as_hash().clone(), action.clone()))
+                    .collect::<HashMap<ActionHash, SignedActionHashed>>();
+                let mut filtered_actions = Vec::new();
+                let mut maybe_next_action = action_hashmap.remove(end);
+                let mut i = 0;
+                while let Some(next_action) = maybe_next_action {
+                    maybe_next_action = next_action
+                        .hashed
+                        .content
+                        .header
+                        .prev_action
+                        .as_ref()
+                        .and_then(|prev_action| action_hashmap.remove(prev_action));
+                    filtered_actions.push(next_action.clone());
+
+                    // This comes after the push to make the range inclusive.
+                    if i == *n {
+                        break;
+                    }
+                    i += 1;
+                }
+                filtered_actions
+            }
+        }
+    }
+
+    /// Type/entry filtering for v2 [`SignedActionHashed`], used by
+    /// [`Self::filter_records`]. Mirrors [`Self::filter_actions`].
+    fn filter_signed_actions(&self, actions: Vec<SignedActionHashed>) -> Vec<SignedActionHashed> {
+        self.disambiguate_forks_v2(actions)
+            .into_iter()
+            .filter(|action| {
+                let data = &action.hashed.content.data;
+                self.action_type
+                    .as_ref()
+                    .map(|action_types| action_types.contains(&legacy_action_type(data)))
+                    .unwrap_or(true)
+                    && self
+                        .entry_type
+                        .as_ref()
+                        .map(|entry_types| {
+                            entry_type_of(data)
+                                .map(|entry_type| entry_types.contains(entry_type))
+                                .unwrap_or(false)
+                        })
+                        .unwrap_or(true)
+                    && self
+                        .entry_hashes
+                        .as_ref()
+                        .map(|entry_hashes| match data.entry_hash() {
+                            Some(entry_hash) => entry_hashes.contains(entry_hash),
+                            None => false,
+                        })
+                        .unwrap_or(true)
+            })
+            .collect()
+    }
+}
+
+/// The [`ActionType`] discriminant of a v2 [`ActionData`] variant, in the
+/// legacy per-variant-enum [`ActionType`] (the type [`ChainQueryFilter`]
+/// filters against, shared unchanged by the v2 model).
+fn legacy_action_type(data: &ActionData) -> ActionType {
+    match data {
+        ActionData::Dna(_) => ActionType::Dna,
+        ActionData::AgentValidationPkg(_) => ActionType::AgentValidationPkg,
+        ActionData::InitZomesComplete(_) => ActionType::InitZomesComplete,
+        ActionData::Create(_) => ActionType::Create,
+        ActionData::Update(_) => ActionType::Update,
+        ActionData::Delete(_) => ActionType::Delete,
+        ActionData::CreateLink(_) => ActionType::CreateLink,
+        ActionData::DeleteLink(_) => ActionType::DeleteLink,
+        ActionData::CloseChain(_) => ActionType::CloseChain,
+        ActionData::OpenChain(_) => ActionType::OpenChain,
+    }
+}
+
+/// The entry type referenced by a v2 [`ActionData`] variant, if any.
+fn entry_type_of(data: &ActionData) -> Option<&EntryType> {
+    match data {
+        ActionData::Create(d) => Some(&d.entry_type),
+        ActionData::Update(d) => Some(&d.entry_type),
+        _ => None,
     }
 }
 

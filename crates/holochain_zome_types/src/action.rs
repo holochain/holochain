@@ -1,10 +1,18 @@
 use crate::timestamp::Timestamp;
 use conversions::WrongActionError;
 use holo_hash::ActionHash;
-pub use holochain_integrity_types::action::builder::{ActionBuilder, ActionBuilderCommon};
-pub use holochain_integrity_types::action::*;
 use holochain_serialized_bytes::prelude::*;
 use thiserror::Error;
+
+// Legacy per-variant `Action` enum and its builders. Only `Action` itself is
+// shadowed by the v2 re-export below — every other legacy item (`Create`,
+// `Update`, `ActionType`, `EntryType`, etc.) stays reachable under these
+// names, since v2 reuses most of them.
+pub use holochain_integrity_types::action::builder::{ActionBuilder, ActionBuilderCommon};
+pub use holochain_integrity_types::action::*;
+
+/// The canonical action content type: a common header plus per-variant data.
+pub use holochain_integrity_types::dht_v2::{Action, ActionData};
 
 #[derive(Error, Debug)]
 pub enum ActionError {
@@ -64,72 +72,20 @@ impl ActionExt for Action {
         new_prev_seq: u32,
         new_prev_timestamp: Timestamp,
     ) -> Result<(), ActionError> {
+        if matches!(self.data, ActionData::Dna(_)) {
+            return Err(ActionError::Rebase("Rebased a DNA Action".to_string()));
+        }
         let new_seq = new_prev_seq + 1;
-        let new_timestamp = self.timestamp().max(
+        let new_timestamp = self.header.timestamp.max(
             (new_prev_timestamp + std::time::Duration::from_nanos(1))
                 .map_err(|e| ActionError::Rebase(e.to_string()))?,
         );
-        match self {
-            Self::Dna(_) => return Err(ActionError::Rebase("Rebased a DNA Action".to_string())),
-            Self::AgentValidationPkg(AgentValidationPkg {
-                timestamp,
-                action_seq,
-                prev_action,
-                ..
-            })
-            | Self::InitZomesComplete(InitZomesComplete {
-                timestamp,
-                action_seq,
-                prev_action,
-                ..
-            })
-            | Self::CreateLink(CreateLink {
-                timestamp,
-                action_seq,
-                prev_action,
-                ..
-            })
-            | Self::DeleteLink(DeleteLink {
-                timestamp,
-                action_seq,
-                prev_action,
-                ..
-            })
-            | Self::Delete(Delete {
-                timestamp,
-                action_seq,
-                prev_action,
-                ..
-            })
-            | Self::CloseChain(CloseChain {
-                timestamp,
-                action_seq,
-                prev_action,
-                ..
-            })
-            | Self::OpenChain(OpenChain {
-                timestamp,
-                action_seq,
-                prev_action,
-                ..
-            })
-            | Self::Create(Create {
-                timestamp,
-                action_seq,
-                prev_action,
-                ..
-            })
-            | Self::Update(Update {
-                timestamp,
-                action_seq,
-                prev_action,
-                ..
-            }) => {
-                *timestamp = new_timestamp;
-                *action_seq = new_seq;
-                *prev_action = new_prev_action;
-            }
-        };
+        // Every non-DNA variant shares the same header shape, so rebasing is a
+        // single update to the common header fields rather than a per-variant
+        // match.
+        self.header.timestamp = new_timestamp;
+        self.header.action_seq = new_seq;
+        self.header.prev_action = Some(new_prev_action);
         Ok(())
     }
 }

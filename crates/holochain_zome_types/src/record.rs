@@ -1,42 +1,12 @@
 //! Defines a Record, the basic unit of Holochain data.
 
-use crate::signature::Signed;
-use crate::Action;
-use holo_hash::hash_type;
-use holo_hash::HashableContent;
-use holo_hash::HashableContentBytes;
+// Legacy record-support types (`RecordEntry`, `SignedHashed`, etc.) that v2
+// reuses unchanged.
 pub use holochain_integrity_types::record::*;
 
-/// A combination of an action and its signature.
-///
-/// Has implementations From and Into its tuple form.
-pub type SignedAction = Signed<Action>;
-
-impl SignedAction {
-    /// Accessor for the Action
-    pub fn action(&self) -> &Action {
-        self
-    }
-}
-
-impl HashableContent for SignedAction {
-    type HashType = hash_type::Action;
-
-    fn hash_type(&self) -> Self::HashType {
-        hash_type::Action
-    }
-
-    fn hashable_content(&self) -> HashableContentBytes {
-        // A `SignedAction` must hash to the same canonical `ActionHash` as its
-        // inner `Action`, so delegate to the inner `Action`'s hashable content
-        // to keep the identity consistent with `Action`, `SignedActionHashed`,
-        // and every stored `action_hash`.
-        self.action().hashable_content()
-    }
-}
-
-impl From<SignedActionHashed> for SignedAction {
-    fn from(shh: SignedActionHashed) -> SignedAction {
-        (shh.hashed.content, shh.signature).into()
-    }
-}
+/// The canonical chain record: a signed, hashed v2 action plus its entry.
+pub use crate::dht_v2::Record;
+/// A v2 action with its signature (no hash).
+pub use crate::dht_v2::SignedAction;
+/// A v2 action that is both content-addressed and signed.
+pub use crate::dht_v2::SignedActionHashed;

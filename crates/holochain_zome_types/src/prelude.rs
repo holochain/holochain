@@ -43,3 +43,10 @@ pub use crate::zome::*;
 pub use crate::zome_io::ExternIO;
 pub use crate::zome_io::*;
 pub use holochain_integrity_types::prelude::*;
+
+// `holochain_integrity_types::prelude` re-exports the legacy per-variant
+// `Action`, `Record`, and `SignedActionHashed`, which share a name with the
+// v2 versions re-exported above (`crate::action::*`, `crate::record::*`).
+// These explicit re-exports resolve the ambiguity in favor of the v2 types.
+pub use crate::action::Action;
+pub use crate::record::{Record, SignedActionHashed};
