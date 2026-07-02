@@ -16,7 +16,7 @@ use serde::Serialize;
 // This module is a scoped LEGACY ISLAND: `ChainOp`, `DhtOp`, `DhtOpLite`,
 // `ChainOpLite`, `ChainOpUniqueForm`, and `produce_ops_from_record` operate on
 // the legacy per-variant `Action` enum, not the v2 `ActionHeader` +
-// `ActionData` shape that `crate::prelude::Action` now resolves to. These
+// `ActionData` shape that `crate::prelude::Action` refers to. These
 // explicit imports shadow the v2 re-exports so the rest of this file keeps
 // resolving `Action`/`Record`/`SignedActionHashed` to their legacy shape,
 // matching the legacy SQLite schema and the upstream crates (sys-validation,
@@ -29,9 +29,8 @@ use holochain_zome_types::dependencies::holochain_integrity_types::record::Signe
 
 /// A legacy action with its signature (no hash). The v2 equivalent —
 /// canonical everywhere outside this legacy op machinery — is
-/// [`holochain_zome_types::record::SignedAction`]; that name now resolves to
-/// the v2 shape, so the legacy `ChainOp` accessors below use this alias
-/// instead.
+/// [`holochain_zome_types::record::SignedAction`], whose name refers to the
+/// v2 shape, so the legacy `ChainOp` accessors below use this alias instead.
 pub type LegacySignedAction = holochain_zome_types::signature::Signed<Action>;
 
 mod error;
