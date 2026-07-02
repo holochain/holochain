@@ -4,6 +4,18 @@ use crate::scratch::ScratchError;
 use crate::scratch::SyncScratchError;
 use async_recursion::async_recursion;
 pub use error::*;
+// The authoring pipeline is a scoped LEGACY ISLAND: actions are built,
+// signed, and staged in the scratch as legacy `Action`/`SignedActionHashed`/
+// `Record`, matching what `scratch.rs` and the legacy SQL query machinery in
+// `query.rs` expect. These explicit imports shadow the v2 re-exports pulled
+// in via `crate::prelude::*` so the rest of this module keeps resolving
+// `Action`/`Record`/`SignedActionHashed` to their legacy shape. A handful of
+// functions read through to v2-native `DhtStore` methods; those convert at
+// the point of use instead of relying on the module-wide shadow.
+use holochain_types::prelude::LegacySignedAction;
+use holochain_zome_types::dependencies::holochain_integrity_types::action::Action;
+use holochain_zome_types::dependencies::holochain_integrity_types::record::Record;
+use holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
@@ -137,7 +149,7 @@ impl SourceChain<DbWrite<Dht>> {
     ) -> SourceChainResult<ActionHash> {
         let action = ActionHashed::from_content_sync(action);
         let hash = action.as_hash().clone();
-        let action = SignedActionHashed::sign(&self.keystore, action).await?;
+        let action = sign_legacy_action(&self.keystore, action).await?;
         let record = Record::new(action, maybe_entry);
         self.scratch
             .apply(|scratch| insert_record_scratch(scratch, record, chain_top_ordering))?;
@@ -620,7 +632,15 @@ impl SourceChain<DbWrite<Dht>> {
     ///
     /// Valid means that there's no [`Update`] or [`Delete`] action for the key on the chain.
     /// Returns the create action if it is valid, and an [`SourceChainError::InvalidAgentKey`] otherwise.
-    pub async fn valid_create_agent_key_action(&self) -> SourceChainResult<Action> {
+    ///
+    /// Returns the v2 `Action` directly from [`DhtStore::valid_create_agent_key_action`]
+    /// (the source of truth) rather than converting to the legacy shape this
+    /// module otherwise uses for authoring — this is a read, not a step in
+    /// building a new action, and the returned action's hash (used by
+    /// [`Self::delete_valid_agent_pub_key`]) is identical either way.
+    pub async fn valid_create_agent_key_action(
+        &self,
+    ) -> SourceChainResult<holochain_zome_types::prelude::Action> {
         let agent_key = self.agent_pubkey().clone();
         self.dht_store
             .as_read()
@@ -865,7 +885,17 @@ where
     ///
     /// This returns a Vec rather than an iterator because it is intended to be
     /// used by the `query` host function, which crosses the wasm boundary.
-    pub async fn query(&self, query: QueryFilter) -> SourceChainResult<Vec<Record>> {
+    ///
+    /// Returns v2 [`holochain_zome_types::prelude::Record`]s, matching
+    /// [`DhtStore::source_chain_records`]. The scratch (this module's LEGACY
+    /// ISLAND) is overlaid afterwards; each staged legacy action is converted
+    /// to v2 with [`holochain_zome_types::dht_v2::from_legacy_signed_action`]
+    /// before merging into the v2 result — the one cross-boundary point in
+    /// this file.
+    pub async fn query(
+        &self,
+        query: QueryFilter,
+    ) -> SourceChainResult<Vec<holochain_zome_types::prelude::Record>> {
         let public_only = self.public_only;
 
         // Fetch the author's committed records from the DhtStore (no filtering
@@ -895,10 +925,18 @@ where
                         Some(eh) if query.include_entries => scratch.get_entry(eh).ok()?,
                         _ => None,
                     };
-                    Some(Record::new(sah.clone(), entry))
+                    let v2_sah = holochain_zome_types::dht_v2::from_legacy_signed_action(sah);
+                    let record_entry = holochain_zome_types::record::RecordEntry::new(
+                        sah.action().entry_visibility(),
+                        entry,
+                    );
+                    Some(holochain_zome_types::prelude::Record::new(
+                        v2_sah,
+                        record_entry,
+                    ))
                 })
                 .collect();
-            scratch_records.sort_unstable_by_key(|e| e.action().action_seq());
+            scratch_records.sort_unstable_by_key(|e| e.action().header.action_seq);
             records.extend(scratch_records);
         })?;
 
@@ -1009,6 +1047,69 @@ fn build_ops_from_actions(
     Ok((actions_output, ops))
 }
 
+/// Sign a hashed legacy action, computing the signature over the legacy
+/// per-variant `Action` content directly.
+///
+/// `holochain_types::record::SignedActionHashedExt::sign` only signs the v2
+/// `Action` shape (that crate's ambient `Action` always resolves to v2). The
+/// authoring pipeline stays on the legacy `Action` shape until Phase 5, so
+/// this local helper signs the legacy content directly instead of
+/// round-tripping through a v2 conversion, which would also silently drop
+/// the legacy `weight` field via `to_legacy_signed_action`'s default.
+async fn sign_legacy_action(
+    keystore: &MetaLairClient,
+    action_hashed: ActionHashed,
+) -> holochain_keystore::LairResult<SignedActionHashed> {
+    let signature = action_hashed
+        .content
+        .signer()
+        .sign(keystore, &action_hashed.content)
+        .await?;
+    Ok(SignedActionHashed::with_presigned(action_hashed, signature))
+}
+
+/// Rebase a legacy action onto a new chain head, updating its
+/// timestamp/seq/prev_action fields in place.
+///
+/// Mirrors `holochain_zome_types::action::ActionExt::rebase_on`, which only
+/// implements this for the v2 `Action` shape; see [`sign_legacy_action`] for
+/// why the authoring pipeline can't round-trip through v2 here.
+fn rebase_legacy_action(
+    action: &mut Action,
+    new_prev_action: ActionHash,
+    new_prev_seq: u32,
+    new_prev_timestamp: Timestamp,
+) -> Result<(), ActionError> {
+    if matches!(action, Action::Dna(_)) {
+        return Err(ActionError::Rebase("Rebased a DNA Action".to_string()));
+    }
+    let new_seq = new_prev_seq + 1;
+    let new_timestamp = action.timestamp().max(
+        (new_prev_timestamp + std::time::Duration::from_nanos(1))
+            .map_err(|e| ActionError::Rebase(e.to_string()))?,
+    );
+    macro_rules! set_common_fields {
+        ($i:ident) => {{
+            $i.timestamp = new_timestamp;
+            $i.action_seq = new_seq;
+            $i.prev_action = new_prev_action;
+        }};
+    }
+    match action {
+        Action::Dna(_) => unreachable!("DNA action rejected above"),
+        Action::AgentValidationPkg(a) => set_common_fields!(a),
+        Action::InitZomesComplete(a) => set_common_fields!(a),
+        Action::CreateLink(a) => set_common_fields!(a),
+        Action::DeleteLink(a) => set_common_fields!(a),
+        Action::CloseChain(a) => set_common_fields!(a),
+        Action::OpenChain(a) => set_common_fields!(a),
+        Action::Create(a) => set_common_fields!(a),
+        Action::Update(a) => set_common_fields!(a),
+        Action::Delete(a) => set_common_fields!(a),
+    }
+    Ok(())
+}
+
 async fn rebase_actions_on(
     keystore: &MetaLairClient,
     mut actions: Vec<SignedActionHashed>,
@@ -1017,12 +1118,12 @@ async fn rebase_actions_on(
     actions.sort_by_key(|shh| shh.action().action_seq());
     for shh in actions.iter_mut() {
         let mut action = shh.action().clone();
-        action.rebase_on(head.action.clone(), head.seq, head.timestamp)?;
+        rebase_legacy_action(&mut action, head.action.clone(), head.seq, head.timestamp)?;
         head.seq = action.action_seq();
         head.timestamp = action.timestamp();
         let hh = ActionHashed::from_content_sync(action);
         head.action = hh.as_hash().clone();
-        let new_shh = SignedActionHashed::sign(keystore, hh).await?;
+        let new_shh = sign_legacy_action(keystore, hh).await?;
         *shh = new_shh;
     }
     Ok(actions)
@@ -1042,7 +1143,7 @@ pub async fn genesis(
         hash: dna_hash,
     });
     let dna_action = ActionHashed::from_content_sync(dna_action);
-    let dna_action = SignedActionHashed::sign(&keystore, dna_action).await?;
+    let dna_action = sign_legacy_action(&keystore, dna_action).await?;
     let dna_action_address = dna_action.as_hash().clone();
     let dna_record = Record::new(dna_action, None);
     let dna_ops = produce_op_lites_from_records(vec![&dna_record])?;
@@ -1058,7 +1159,7 @@ pub async fn genesis(
     });
     let agent_validation_action = ActionHashed::from_content_sync(agent_validation_action);
     let agent_validation_action =
-        SignedActionHashed::sign(&keystore, agent_validation_action).await?;
+        sign_legacy_action(&keystore, agent_validation_action).await?;
     let avh_addr = agent_validation_action.as_hash().clone();
     let agent_validation_record = Record::new(agent_validation_action, None);
     let avh_ops = produce_op_lites_from_records(vec![&agent_validation_record])?;
@@ -1076,7 +1177,7 @@ pub async fn genesis(
         weight: Default::default(),
     });
     let agent_action = ActionHashed::from_content_sync(agent_action);
-    let agent_action = SignedActionHashed::sign(&keystore, agent_action).await?;
+    let agent_action = sign_legacy_action(&keystore, agent_action).await?;
     let agent_record = Record::new(agent_action, Some(Entry::Agent(agent_pubkey.clone())));
     let agent_ops = produce_op_lites_from_records(vec![&agent_record])?;
     let (agent_action, agent_entry) = agent_record.clone().into_inner();
@@ -1303,9 +1404,10 @@ pub(crate) fn encoded_chain_op_size(
     let Some(sah) = actions.iter().find(|sah| sah.as_hash() == action_hash) else {
         return 0;
     };
-    let signed_action: SignedAction = (sah.action().clone(), sah.signature().clone()).into();
+    let signed_action: LegacySignedAction =
+        (sah.action().clone(), sah.signature().clone()).into();
     let maybe_entry: Option<Entry> = signed_action
-        .action()
+        .data()
         .entry_hash()
         .and_then(|eh| entries.iter().find(|e| e.as_hash() == eh))
         .map(|e| e.as_content().clone());

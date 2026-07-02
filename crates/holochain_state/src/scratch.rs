@@ -8,6 +8,15 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use thiserror::Error;
 
+// The scratch is part of the authoring pipeline's LEGACY ISLAND: staged
+// actions are legacy `Action`/`SignedActionHashed`/`Record`, matching what
+// `source_chain.rs` builds and what the legacy SQL query machinery in
+// `query.rs` overlays them onto. These explicit imports shadow the v2
+// re-exports pulled in via `crate::prelude::*` so the rest of this file keeps
+// resolving `Action`/`Record`/`SignedActionHashed` to their legacy shape.
+use holochain_zome_types::dependencies::holochain_integrity_types::record::Record;
+use holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed;
+
 /// The "scratch" is an in-memory space to stage Actions to be committed at the
 /// end of the CallZome workflow.
 ///
