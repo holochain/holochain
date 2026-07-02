@@ -80,9 +80,8 @@ impl ActionExt for Action {
             (new_prev_timestamp + std::time::Duration::from_nanos(1))
                 .map_err(|e| ActionError::Rebase(e.to_string()))?,
         );
-        // Every non-DNA variant shares the same header shape, so rebasing is a
-        // single update to the common header fields rather than a per-variant
-        // match.
+        // Every non-DNA variant shares the same header shape, so rebasing
+        // reduces to a single update of the common header fields.
         self.header.timestamp = new_timestamp;
         self.header.action_seq = new_seq;
         self.header.prev_action = Some(new_prev_action);

@@ -231,7 +231,7 @@ mod tests {
     use holochain_integrity_types::record::SignedHashed;
     use holochain_timestamp::Timestamp;
 
-    fn legacy_signed_create() -> crate::record::SignedActionHashed {
+    fn legacy_signed_create() -> holochain_integrity_types::record::SignedActionHashed {
         let action = LegacyAction::Create(Create {
             author: AgentPubKey::from_raw_36(vec![1u8; 36]),
             timestamp: Timestamp::from_micros(1_000),
@@ -250,7 +250,7 @@ mod tests {
         SignedHashed::with_presigned(hashed, Signature::from([7u8; 64]))
     }
 
-    fn legacy_signed_create_link() -> crate::record::SignedActionHashed {
+    fn legacy_signed_create_link() -> holochain_integrity_types::record::SignedActionHashed {
         let action = LegacyAction::CreateLink(CreateLink {
             author: AgentPubKey::from_raw_36(vec![1u8; 36]),
             timestamp: Timestamp::from_micros(2_000),
