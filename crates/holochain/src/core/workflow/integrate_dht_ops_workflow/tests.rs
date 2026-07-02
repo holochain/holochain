@@ -10,9 +10,7 @@ use holochain_sqlite::error::{DatabaseError, DatabaseResult};
 use holochain_state::dht_store::DhtStore;
 use holochain_state::mutations;
 use holochain_state::prelude::SysOutcome;
-use holochain_state::test_utils::{
-    test_authored_db_with_id, test_dht_db_with_dna_hash, test_dht_store, TestDb,
-};
+use holochain_state::test_utils::{test_authored_db_with_id, test_dht_store, TestDb};
 use holochain_types::prelude::{ChainOp, DhtOp, DhtOpHashed};
 use kitsune2_api::StoredOp;
 use must_future::MustBoxFuture;
@@ -32,7 +30,6 @@ async fn inform_kitsune_about_integrated_ops() {
         let dna_hash = fixt!(DnaHash);
         let (op, hashed) = make_op();
         let dht_store = test_dht_store(dna_hash.clone()).await;
-        let vault = test_dht_db_with_dna_hash(dna_hash.clone()).to_db();
         insert_validated_op_to_store(&dht_store, &hashed).await;
 
         let (tx, _rx) = TriggerSender::new();
@@ -51,7 +48,6 @@ async fn inform_kitsune_about_integrated_ops() {
             });
         let hc_p2p = Arc::new(hc_p2p);
         integrate_dht_ops_workflow(
-            vault,
             dht_store,
             tx,
             hc_p2p,
@@ -67,7 +63,6 @@ async fn kitsune_not_informed_when_no_ops_integrated() {
     let dna_hash = fixt!(DnaHash);
     // An empty store — nothing ready for integration.
     let dht_store = test_dht_store(dna_hash.clone()).await;
-    let vault = test_dht_db_with_dna_hash(dna_hash.clone()).to_db();
 
     let (tx, _rx) = TriggerSender::new();
     let mut hc_p2p = MockHolochainP2pDnaT::new();
@@ -75,7 +70,6 @@ async fn kitsune_not_informed_when_no_ops_integrated() {
     hc_p2p.expect_new_integrated_data().never();
     let hc_p2p = Arc::new(hc_p2p);
     integrate_dht_ops_workflow(
-        vault,
         dht_store,
         tx,
         hc_p2p,
@@ -93,7 +87,6 @@ async fn single_local_author_marks_both_databases() {
     let (_op, hashed) = make_store_entry_op(author.clone());
 
     let dht_store = test_dht_store(dna_hash.clone()).await;
-    let vault = test_dht_db_with_dna_hash(dna_hash.clone()).to_db();
     insert_validated_op_to_store(&dht_store, &hashed).await;
 
     let authored_db = Arc::new(test_authored_db_with_id(1));
@@ -125,7 +118,7 @@ async fn single_local_author_marks_both_databases() {
     });
     let mock_network = Arc::new(hc_p2p);
 
-    integrate_dht_ops_workflow(vault, dht_store.clone(), tx, mock_network, mock)
+    integrate_dht_ops_workflow(dht_store.clone(), tx, mock_network, mock)
         .await
         .unwrap();
 
@@ -152,7 +145,6 @@ async fn multiple_local_authors_marked_integrated() {
     let (_op_b, hashed_b) = make_store_entry_op(author_b.clone());
 
     let dht_store = test_dht_store(dna_hash.clone()).await;
-    let vault = test_dht_db_with_dna_hash(dna_hash.clone()).to_db();
     insert_validated_op_to_store(&dht_store, &hashed_a).await;
     insert_validated_op_to_store(&dht_store, &hashed_b).await;
 
@@ -204,7 +196,7 @@ async fn multiple_local_authors_marked_integrated() {
         });
     let mock_network = Arc::new(hc_p2p);
 
-    integrate_dht_ops_workflow(vault, dht_store.clone(), tx, mock_network, mock)
+    integrate_dht_ops_workflow(dht_store.clone(), tx, mock_network, mock)
         .await
         .unwrap();
 

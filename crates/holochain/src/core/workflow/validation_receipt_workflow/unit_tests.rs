@@ -20,8 +20,6 @@ use std::sync::Arc;
 async fn no_running_cells() {
     holochain_trace::test_run();
 
-    let test_db = holochain_state::test_utils::test_dht_db();
-    let vault = test_db.to_db();
     let keystore = holochain_keystore::test_keystore();
 
     let mut dna = MockHolochainP2pDnaT::new();
@@ -33,7 +31,6 @@ async fn no_running_cells() {
     let dht_store = test_dht_store(dna_hash.clone()).await;
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
-        vault,
         dht_store,
         dna,
         keystore,
@@ -86,7 +83,6 @@ async fn do_not_block_or_send_to_self() {
 
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
-        vault.clone(),
         dht_store.clone(),
         dna,
         keystore,
@@ -141,7 +137,6 @@ async fn block_invalid_op_author() {
 
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
-        vault.clone(),
         dht_store.clone(),
         dna,
         keystore,
@@ -191,7 +186,6 @@ async fn continues_if_receipt_cannot_be_signed() {
 
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
-        vault.clone(),
         dht_store.clone(),
         dna,
         keystore,
@@ -239,7 +233,6 @@ async fn send_validation_receipt() {
 
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
-        vault.clone(),
         dht_store.clone(),
         dna,
         keystore,
@@ -302,7 +295,6 @@ async fn errors_for_some_ops_does_not_prevent_the_workflow_proceeding() {
 
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
-        vault.clone(),
         dht_store.clone(),
         dna,
         keystore,
@@ -382,7 +374,6 @@ async fn skips_authors_not_recently_online_and_clears_require_receipt() {
 
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
-        vault.clone(),
         dht_store.clone(),
         dna,
         keystore,

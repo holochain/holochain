@@ -5,7 +5,6 @@ use crate::core::workflow::{WorkflowError, WorkflowResult};
 use holo_hash::{ActionHash, AgentPubKey, EntryHash};
 use holochain_keystore::{AgentPubKeyExt, MetaLairClient};
 use holochain_p2p::DynHolochainP2pDna;
-use holochain_state::integrate::authored_ops_to_dht_db_without_check;
 use holochain_state::prelude::*;
 use holochain_timestamp::Timestamp;
 use holochain_types::dht_op::ChainOp;
@@ -199,9 +198,6 @@ async fn apply_success_state_changes(
     this_cells_action_hash: ActionHash,
     integration_trigger: TriggerSender,
 ) -> Result<(), WorkflowError> {
-    let authored_db = space.get_or_create_authored_db(author.clone())?;
-    let dht_db = space.dht_db.clone();
-
     // Load the op hashes for this session so that we can publish them. The
     // session's withhold-publish flag is cleared on the DhtStore below via
     // `clear_op_withhold_publishes`.
@@ -219,18 +215,9 @@ async fn apply_success_state_changes(
         .await
         .map_err(WorkflowError::from)?;
 
-    // #5370: no-op; remove once DbKindDht is retired.
-    let hashes_for_new_db = this_cell_actions_op_basis_hashes.clone();
-    authored_ops_to_dht_db_without_check(
-        this_cell_actions_op_basis_hashes,
-        authored_db.into(),
-        dht_db,
-    )
-    .await?;
-
     space
         .dht_store
-        .clear_op_withhold_publishes(hashes_for_new_db)
+        .clear_op_withhold_publishes(this_cell_actions_op_basis_hashes)
         .await
         .map_err(WorkflowError::from)?;
 

@@ -18,19 +18,16 @@ mod unit_tests;
 
 #[cfg_attr(
     feature = "instrument",
-    tracing::instrument(skip(vault, dht_store, network, keystore, apply_block))
+    tracing::instrument(skip(dht_store, network, keystore, apply_block))
 )]
 /// Send validation receipts to their authors in serial, skipping authors not recently online.
 pub async fn validation_receipt_workflow(
     dna_hash: Arc<DnaHash>,
-    vault: DbWrite<DbKindDht>,
     dht_store: DhtStore,
     network: DynHolochainP2pDna,
     keystore: MetaLairClient,
     running_cell_ids: HashSet<CellId>,
 ) -> WorkflowResult<WorkComplete> {
-    // #5370: `vault` (DbKindDht) input kept as dead code pending retirement.
-    let _ = &vault;
     if running_cell_ids.is_empty() {
         return Ok(WorkComplete::Complete);
     }
@@ -87,8 +84,6 @@ pub async fn validation_receipt_workflow(
             if !recently_online {
                 let op_hashes: Vec<DhtOpHash> =
                     receipts.iter().map(|r| r.dht_op_hash.clone()).collect();
-                // #5370: legacy DhtOp require_receipt dual-write removed; the
-                // new-DB clear below is the only write now.
                 dht_store.clear_require_receipts(op_hashes).await?;
                 continue;
             }
@@ -108,8 +103,6 @@ pub async fn validation_receipt_workflow(
                 // Mark them sent so we don't keep trying
                 let op_hashes: Vec<DhtOpHash> =
                     receipts.iter().map(|r| r.dht_op_hash.clone()).collect();
-                // #5370: legacy DhtOp require_receipt dual-write removed; the
-                // new-DB clear below is the only write now.
                 dht_store.clear_require_receipts(op_hashes).await?;
             }
             Err(e) => {

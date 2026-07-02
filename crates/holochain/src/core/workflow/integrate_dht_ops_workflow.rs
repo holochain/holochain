@@ -8,8 +8,6 @@ use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
 use holochain_p2p::DynHolochainP2pDna;
-use holochain_sqlite::db::DbKindDht;
-use holochain_sqlite::prelude::DbWrite;
 use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::*;
 use holochain_zome_types::dht_v2::OpValidity;
@@ -22,29 +20,20 @@ mod tests;
 
 #[cfg_attr(
     feature = "instrument",
-    tracing::instrument(skip(vault, dht_store, trigger_receipt, network, authored_db_provider))
+    tracing::instrument(skip(dht_store, trigger_receipt, network, authored_db_provider))
 )]
 pub async fn integrate_dht_ops_workflow(
-    vault: DbWrite<DbKindDht>,
     dht_store: DhtStore,
     trigger_receipt: TriggerSender,
     network: DynHolochainP2pDna,
     authored_db_provider: Arc<dyn super::provider::authored_db_provider::AuthoredDbProvider>,
 ) -> WorkflowResult<WorkComplete> {
-    // #5370: `vault` (DbKindDht) input kept as dead code pending retirement.
-    let _ = &vault;
     let start = std::time::Instant::now();
     let when_integrated = Timestamp::now();
 
     let summaries = dht_store.integrate_ready_ops(when_integrated).await?;
 
-    // #5370: legacy DhtOp dual-write removed; nothing reads DbKindDht. The
-    // `vault` input and `set_all_awaiting_integration_to_integrated` remain as
-    // dead code pending full DbKindDht retirement.
-    let legacy_marked_pairs: Vec<(DhtOpHash, Option<AgentPubKey>)> = Vec::new();
-
     let changed = summaries.len();
-    let legacy_marked = legacy_marked_pairs.len();
     let ops_ps = changed as f64 / start.elapsed().as_micros() as f64 * 1_000_000.0;
     tracing::debug!(?changed, %ops_ps, "ops integrated");
     let dna_hash = network.dna_hash().clone();
@@ -94,13 +83,7 @@ pub async fn integrate_dht_ops_workflow(
         )],
     );
 
-    // Record op integration delay + validation attempts metrics. The
-    // summaries path covers limbo-promoted ops; locally-authored ops bypass
-    // limbo and only appear in `legacy_marked_pairs` — emit zeroed records
-    // for them so the metrics fire on every integration tick that integrated
-    // anything, matching develop's per-op emission.
-    let summary_hashes: std::collections::HashSet<DhtOpHash> =
-        summaries.iter().map(|s| s.op_hash.clone()).collect();
+    // Record op integration delay + validation attempts metrics.
     let delay_metric = op_integration_delay_metric();
     let attempts_metric = op_validation_attempts_metric();
     for s in &summaries {
@@ -121,41 +104,13 @@ pub async fn integrate_dht_ops_workflow(
             )],
         );
     }
-    for (op_hash, _) in &legacy_marked_pairs {
-        if summary_hashes.contains(op_hash) {
-            continue;
-        }
-        delay_metric.record(
-            0.0,
-            &[opentelemetry::KeyValue::new(
-                "dna_hash",
-                dna_hash_str.clone(),
-            )],
-        );
-        attempts_metric.record(
-            0,
-            &[opentelemetry::KeyValue::new(
-                "dna_hash",
-                dna_hash_str.clone(),
-            )],
-        );
-    }
 
-    if changed > 0 || legacy_marked > 0 {
-        // Combine new-DB pairs with legacy-only pairs (e.g. locally-authored ops
-        // that bypassed LimboChainOp). Deduplicate in case an op appears in both.
-        let mut seen = std::collections::HashSet::new();
-        let all_integrated_pairs: Vec<(DhtOpHash, Option<AgentPubKey>)> = new_db_pairs
-            .into_iter()
-            .chain(legacy_marked_pairs)
-            .filter(|(h, _)| seen.insert(h.clone()))
-            .collect();
-
+    if changed > 0 {
         update_local_authored_status(
             authored_db_provider.clone(),
             &dna_hash,
             when_integrated,
-            all_integrated_pairs,
+            new_db_pairs,
         )
         .await?;
 
