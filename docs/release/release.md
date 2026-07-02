@@ -9,7 +9,7 @@ This requires your GitHub account to have appropriate permissions.
 1. Visit https://github.com/holochain/holochain/actions
 2. Select the "release holochain" workflow (pinned workflow)
 3. Click the "Run workflow" dropdown
-4. (Optional) Pick a branch that is different from _develop_ for this release, e.g. _develop-0.6_ in case there are backports to be released
+4. (Optional) If creating a release from a maintenance branch, set the source branch to that branch, e.g. _develop-0.6_ to release backported changes for `v0.6.x`.
 5. Indicate whether this is a dry-run (keep _true_) or a real release (change the field to _false_)
 6. Confirm by clicking on "Run workflow"
 
@@ -33,6 +33,7 @@ For both, this is the complete list of valid variants:
 * _!pre\_patch \<pre-release-suffix\>_ (e.g. `!pre_patch rc`, used for verifying backports before doing a patch release e.g. 0.6.0 -> 0.6.1-rc.0 -> 0.6.1)
 
 Also, theoretically supported but never yet used:
+* _!pre \<pre-release-suffix\>_ (e.g. `!pre dev`)
 * _major_
 * _!pre\_major \<pre-release-suffix\>_ (e.g. `!pre_major rc`)
 
@@ -76,7 +77,7 @@ For any of the _pre_ modes, if at the time of release a pre-release suffix is fo
 
 When we plan to change the versions of many or all workspace crates, there's a command that can be used to overwrite the frontmatter of multiple crates' changelogs in one go:
 
-```console
+```sh
 nix run .#release-automation -- --workspace-path=$PWD --log-level=debug --match-filter=".*" changelog set-frontmatter <(cat <<EOF
 (...)
 EOF
@@ -88,7 +89,7 @@ The ellipsis give the position of the new YAML code for the frontmatters.
 
 ### Case: Latest `develop` is nearly ready to be released as the next minor version
 
-```console
+```sh
 nix run .#release-automation -- --workspace-path=$PWD --log-level=debug --match-filter=".*" changelog set-frontmatter <(cat <<EOF
 default_semver_increment_mode: !pre_minor rc
 EOF
@@ -97,7 +98,7 @@ EOF
 
 ### Case: The `develop` branch is producing RCs and is ready to be released
 
-```console
+```sh
 nix run .#release-automation -- --workspace-path=$PWD --log-level=debug --match-filter=".*" changelog set-frontmatter <(cat <<EOF
 default_semver_increment_mode: !pre_patch rc
 semver_increment_mode: minor
@@ -107,7 +108,7 @@ EOF
 
 ### Case: A maintenance branch like `develop-0.6` is ready for a new patch release
 
-```console
+```sh
 nix run .#release-automation -- --workspace-path=$PWD --log-level=debug --match-filter=".*" changelog set-frontmatter <(cat <<EOF
 default_semver_increment_mode: !pre_patch rc
 semver_increment_mode: patch
@@ -120,7 +121,7 @@ EOF
 Say that 0.6.0 has been released, then `develop` needs to be branched to `develop-0.6` and the `develop` branch needs to
 be prepared for `0.7.0-dev.x` development.
 
-```console
+```sh
 nix run .#release-automation -- --workspace-path=$PWD --log-level=debug --match-filter=".*" changelog set-frontmatter <(cat <<EOF
 default_semver_increment_mode: !pre_minor dev
 EOF
