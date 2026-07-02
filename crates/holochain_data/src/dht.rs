@@ -2467,27 +2467,12 @@ mod tests {
         };
         let hashed = HoloHashed::with_pre_hashed(action, hash.clone());
         let signed = SignedHashed::with_presigned(hashed, Signature([0u8; 64]));
-        db.insert_action(&signed, None).await.unwrap();
-
-        // The head lookup scopes through the integrated `RegisterAgentActivity`
-        // op, so seed one for this action. `op_hash` reuses `hash_bytes`, which
-        // is unique per `(author, seq)`.
-        let op_hash = DhtOpHash::from_raw_36(hash.get_raw_36().to_vec());
-        db.insert_chain_op(InsertChainOp {
-            op_hash: &op_hash,
-            action_hash: &hash,
-            op_type: i64::from(holochain_zome_types::op::ChainOpType::RegisterAgentActivity),
-            basis_hash: &author.clone().into(),
-            storage_center_loc: 0,
-            validation_status: RecordValidity::Accepted,
-            locally_validated: true,
-            require_receipt: false,
-            when_received: ts,
-            when_integrated: ts,
-            serialized_size: 0,
-        })
-        .await
-        .unwrap();
+        // The head lookup reads the `Action` row's own `record_validity`, so a
+        // self-authored (`Accepted`) action is recognised as the head without
+        // any accompanying op.
+        db.insert_action(&signed, Some(RecordValidity::Accepted))
+            .await
+            .unwrap();
         (hash, ts)
     }
 

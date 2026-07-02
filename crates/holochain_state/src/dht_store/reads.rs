@@ -3675,15 +3675,15 @@ mod tests {
         (entry_hash, entry, action, preflight_request)
     }
 
-    /// Insert `action` and its `entry` as an INTEGRATED self-authored chain
-    /// head: a `RegisterAgentActivity` op (so `chain_head_for_author`, which
-    /// scopes to the integrated agent-activity chain, sees the head) plus the
-    /// entry in the store.
+    /// Insert `action` and its `entry` as a committed self-authored chain head:
+    /// an integrated op whose `Action` is written with `record_validity =
+    /// Accepted` (so `chain_head_for_author`, which reads that state, sees the
+    /// head) plus the entry in the store.
     ///
-    /// This mirrors the source-chain flush, which writes each self-authored op
-    /// already integrated. `record_incoming_ops` instead lands ops in limbo,
-    /// whose actions are deliberately excluded from the chain head — so it is
-    /// not a faithful stand-in for a committed self-authored head here.
+    /// This mirrors the source-chain flush, which writes each self-authored
+    /// action as `Accepted`. `record_incoming_ops` instead inserts actions as
+    /// pending (`NULL`), which are deliberately excluded from the chain head —
+    /// so it is not a faithful stand-in for a committed self-authored head here.
     async fn insert_integrated_head(
         store: &DhtStore<DbWrite<Dht>>,
         action: Action,

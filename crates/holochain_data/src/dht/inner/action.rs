@@ -148,21 +148,21 @@ where
         .await
 }
 
-/// The author's chain head: the highest-sequence action they authored that has
-/// an integrated `RegisterAgentActivity` op. Returns `None` for an empty chain
+/// The author's committed source-chain head: the highest-sequence action they
+/// authored that is marked accepted. Returns `None` for an empty chain
 /// (pre-genesis).
 ///
-/// Scoping through the integrated `RegisterAgentActivity` `ChainOp` (rather than
-/// scanning the raw `Action` table) deliberately excludes limbo arrivals: the
-/// `Action` table also holds unintegrated network ops recorded via
-/// `record_incoming_ops`, and a peer could otherwise inject a high-seq op forged
-/// as the local author to falsely trip the flush as-at / head-moved check and
-/// DoS the local chain writer. This is safe for self-authored data because the
-/// source-chain flush inserts each self-authored `ChainOp` with `when_integrated`
-/// already set (see `source_chain.rs`), so a freshly committed head is
-/// immediately visible here. Withheld in-flight countersigning actions are still
-/// integrated (only publishing is withheld), so they remain part of the head and
-/// are intentionally not filtered out.
+/// Acceptability is read from the `Action` row's own `record_validity` state,
+/// not by joining to an op row, so the result never depends on holding a
+/// particular op such as `RegisterAgentActivity`. `record_validity` is
+/// `Accepted` only for actions written by the local source-chain flush; network
+/// arrivals are inserted as pending (`NULL`) and stay pending, so limbo copies
+/// of the author's chain — including a peer's forged high-sequence action —
+/// are excluded and cannot falsely trip the flush as-at / head-moved check. The
+/// flush writes the action and its ops in one transaction, so a freshly
+/// committed head is immediately visible here. Withheld in-flight
+/// countersigning actions are self-authored and keep `Accepted`, so they remain
+/// part of the head; only their publishing is withheld.
 pub(crate) async fn chain_head_for_author<'e, E>(
     executor: E,
     author: &AgentPubKey,
@@ -171,13 +171,12 @@ where
     E: Executor<'e, Database = Sqlite>,
 {
     let row: Option<(Vec<u8>, i64, i64)> = sqlx::query_as(
-        "SELECT a.hash, a.seq, a.timestamp FROM ChainOp c
-         JOIN Action a ON c.action_hash = a.hash
-         WHERE a.author = ? AND c.op_type = ?
-         ORDER BY a.seq DESC LIMIT 1",
+        "SELECT hash, seq, timestamp FROM Action
+         WHERE author = ? AND record_validity = ?
+         ORDER BY seq DESC LIMIT 1",
     )
     .bind(author.get_raw_36())
-    .bind(i64::from(ChainOpType::RegisterAgentActivity))
+    .bind(i64::from(RecordValidity::Accepted))
     .fetch_optional(executor)
     .await?;
     Ok(row.map(|(hash_bytes, seq, ts)| {
