@@ -171,7 +171,7 @@ impl DhtStore<DbWrite<Dht>> {
     pub async fn acquire_chain_write_permit(
         &self,
         author: &AgentPubKey,
-    ) -> tokio::sync::OwnedSemaphorePermit {
+    ) -> holochain_data::dht::ChainWritePermit {
         self.db.acquire_chain_write_permit(author).await
     }
 

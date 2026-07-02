@@ -8,6 +8,16 @@ use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
+/// A held source-chain write permit for one `(DNA, author)` chain.
+///
+/// Returned by [`DbWrite::acquire_chain_write_permit`]; holding it serializes
+/// flushes for that chain and dropping it releases the permit. Wrapping the
+/// underlying semaphore permit keeps the public API stable if the
+/// serialization mechanism changes.
+pub struct ChainWritePermit {
+    _permit: OwnedSemaphorePermit,
+}
+
 impl DbWrite<Dht> {
     /// Acquire the per-author source-chain write permit for this DHT database.
     ///
@@ -22,12 +32,13 @@ impl DbWrite<Dht> {
     /// one another. The DNA is identified by the database's stable
     /// [`database_id`](crate::DatabaseIdentifier::database_id) (the DHT
     /// database is per-DNA), combined with the author key.
-    pub async fn acquire_chain_write_permit(&self, author: &AgentPubKey) -> OwnedSemaphorePermit {
+    pub async fn acquire_chain_write_permit(&self, author: &AgentPubKey) -> ChainWritePermit {
         let key = (self.identifier().database_id().to_string(), author.clone());
-        chain_write_semaphore(key)
+        let permit = chain_write_semaphore(key)
             .acquire_owned()
             .await
-            .expect("chain write semaphore is never closed")
+            .expect("chain write semaphore is never closed");
+        ChainWritePermit { _permit: permit }
     }
 }
 

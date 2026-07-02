@@ -17,6 +17,7 @@ mod db_operations;
 mod inner;
 mod tx_operations;
 
+pub use db_operations::ChainWritePermit;
 pub use inner::chain_op::InsertChainOp;
 pub use inner::deleted_link::InsertDeletedLink;
 pub use inner::deleted_record::InsertDeletedRecord;
