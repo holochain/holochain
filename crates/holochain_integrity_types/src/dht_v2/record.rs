@@ -88,9 +88,9 @@ impl Record {
 
     /// A mutable reference to the action content of this record.
     ///
-    /// This bypasses the record's hash and signature guarantees: after
-    /// mutating through this reference, the hash and signature no longer
-    /// match the action. Intended only for constructing fixtures in tests.
+    /// This bypasses the record's hash and signature guarantees: a mutation
+    /// through this reference leaves the hash and signature inconsistent with
+    /// the action. Intended only for constructing fixtures in tests.
     #[cfg(feature = "test_utils")]
     pub fn as_action_mut(&mut self) -> &mut Action {
         &mut self.signed_action.hashed.content
