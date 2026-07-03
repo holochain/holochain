@@ -2301,6 +2301,7 @@ mod scheduler_impls {
 mod misc_impls {
     use super::{state_dump_helpers::peer_store_dump, *};
     use holochain_conductor_api::{CellInfo, JsonDump};
+    use holochain_zome_types::dht_v2::DeleteData;
     use holochain_zome_types::{action::builder, Entry};
     use kitsune2_api::{SpaceId, TransportStats};
     use std::sync::atomic::Ordering;
@@ -2382,7 +2383,7 @@ mod misc_impls {
                 .await?
                 .into_iter()
                 .find_map(|record| {
-                    if record.action_hash() == &action_hash {
+                    if record.action_address() == &action_hash {
                         match record.entry {
                             RecordEntry::Present(entry) => Some(entry),
                             _ => None,
@@ -2453,8 +2454,11 @@ mod misc_impls {
                     .await?
                     .iter()
                     .filter_map(|record| {
-                        if let Action::Delete(delete) = record.action() {
-                            Some((delete.deletes_address.clone(), delete.timestamp))
+                        if let ActionData::Delete(DeleteData {
+                            deletes_address, ..
+                        }) = &record.action().data
+                        {
+                            Some((deletes_address.clone(), record.action().timestamp()))
                         } else {
                             None
                         }
@@ -2466,7 +2470,7 @@ mod misc_impls {
                 // create a list of CapGrantInfo structs for each cell
                 let mut cap_grants: Vec<CapGrantInfo> = vec![];
                 for grant_record in grant_list {
-                    let cap_action_hash = grant_record.action_hash().clone();
+                    let cap_action_hash = grant_record.action_address().clone();
                     let mut revoke_time: Option<Timestamp> = None;
 
                     // skip grant info if include_revoked is false

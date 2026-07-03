@@ -5,6 +5,7 @@ use crate::core::ribosome::HostFnAccess;
 use holochain_cascade::error::CascadeResult;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
+use holochain_zome_types::dht_v2::CreateLinkData;
 use std::sync::Arc;
 use wasmer::RuntimeError;
 
@@ -48,9 +49,12 @@ pub fn delete_link<'a>(
 
             let base_address = match maybe_add_link {
                 Some(add_link_signed_action_hash) => {
-                    match add_link_signed_action_hash.action() {
-                        Action::CreateLink(link_add_action) => {
-                            Ok(link_add_action.base_address.clone())
+                    // The cascade returns a v2 signed action; read the
+                    // `CreateLink` data via `ActionData` rather than the
+                    // legacy `Action::CreateLink` variant match.
+                    match &add_link_signed_action_hash.hashed.content.data {
+                        ActionData::CreateLink(CreateLinkData { base_address, .. }) => {
+                            Ok(base_address.clone())
                         }
                         // the add link action hash provided was found but didn't point to an AddLink
                         // action (it is something else) so we cannot proceed

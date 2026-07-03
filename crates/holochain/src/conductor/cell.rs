@@ -603,7 +603,10 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
                 // If the action has an app entry type get the entry def
                 // from the conductor.
                 let required_receipt_count =
-                    match action.as_ref().and_then(|h| h.action().entry_type()) {
+                    match action
+                        .as_ref()
+                        .and_then(|h| h.hashed.content.entry_type())
+                    {
                         Some(EntryType::App(AppEntryDef {
                             zome_index,
                             entry_index,
