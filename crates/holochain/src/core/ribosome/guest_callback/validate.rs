@@ -8,7 +8,8 @@ use holochain_p2p::DynHolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_types::prelude::*;
-use holochain_zome_types::op::Op;
+// The guest `validate(op: Op)` callback decodes the v2 `Op`; dispatch it here.
+use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::Op;
 use std::sync::Arc;
 
 /// An invocation of the validate callback function.
@@ -128,7 +129,7 @@ mod test {
     use crate::fixt::ValidateHostAccessFixturator;
     use ::fixt::prelude::*;
     use holochain_types::prelude::*;
-    use holochain_zome_types::op::Op;
+    use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::Op;
     use rand::seq::SliceRandom;
 
     #[tokio::test(flavor = "multi_thread")]
@@ -262,7 +263,7 @@ mod slow_tests {
     use holochain_types::inline_zome::InlineZomeSet;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::op::Op;
+    use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::Op;
     use std::sync::Arc;
 
     #[tokio::test(flavor = "multi_thread")]
