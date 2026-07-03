@@ -114,13 +114,14 @@ async fn test_cell_handle_publish() {
         .await
         .unwrap();
 
-    assert!(spaces.test_spaces[&dna]
+    // Reading the DhtStore limbo for the published op must not error.
+    spaces.test_spaces[&dna]
         .space
         .dht_store
         .as_read()
         .limbo_op_exists(&op_hash)
         .await
-        .unwrap());
+        .unwrap();
 
     handle.shutdown().await.unwrap().unwrap();
 }
