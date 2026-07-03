@@ -46,9 +46,14 @@ CREATE TABLE Entry (
 
 -- Private entries (local author only).
 CREATE TABLE PrivateEntry (
-    hash   BLOB PRIMARY KEY ON CONFLICT IGNORE,
+    hash   BLOB NOT NULL,
     author BLOB NOT NULL,
-    blob   BLOB NOT NULL
+    blob   BLOB NOT NULL,
+    -- Keyed on (hash, author): the same private entry content can be authored
+    -- independently by different agents (the author lives in the action, not
+    -- the entry, so identical entries share a hash). A per-hash key would let
+    -- the first author's row shadow every other agent's.
+    PRIMARY KEY (hash, author) ON CONFLICT IGNORE
 ) STRICT, WITHOUT ROWID;
 
 -- Capability grants index.

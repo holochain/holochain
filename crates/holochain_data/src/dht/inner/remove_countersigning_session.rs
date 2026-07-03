@@ -52,6 +52,15 @@ pub(crate) async fn remove_countersigning_session(
         return Ok(RemoveCountersigningSessionOutcome::AlreadyPublished);
     }
 
+    // Capture the session action's author before the `Action` row is deleted:
+    // countersign entries are shared across counterparties, so the
+    // `PrivateEntry` row must be removed for this author only.
+    let author: Option<Vec<u8>> =
+        sqlx::query_scalar("SELECT author FROM Action WHERE hash = ?1")
+            .bind(action_hash.get_raw_36())
+            .fetch_optional(&mut *conn)
+            .await?;
+
     // Delete the publish rows first (FK: ChainOpPublish -> ChainOp), then the
     // ops (FK: ChainOp -> Action), then the action, then the entry from both
     // the public and private tables. Foreign keys do not cascade for these
@@ -79,8 +88,9 @@ pub(crate) async fn remove_countersigning_session(
         .execute(&mut *conn)
         .await?;
 
-    sqlx::query("DELETE FROM PrivateEntry WHERE hash = ?1")
+    sqlx::query("DELETE FROM PrivateEntry WHERE hash = ?1 AND author = ?2")
         .bind(entry_hash.get_raw_36())
+        .bind(author)
         .execute(&mut *conn)
         .await?;
 
