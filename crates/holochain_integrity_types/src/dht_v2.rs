@@ -22,7 +22,7 @@ use crate::action::ZomeIndex;
 use crate::entry_def::EntryVisibility;
 use crate::{
     link::{LinkTag, LinkType},
-    EntryType, MembraneProof,
+    AppEntryDef, EntryType, MembraneProof,
 };
 use holo_hash::{
     ActionHash, AgentPubKey, AnyLinkableHash, DnaHash, EntryHash, HashableContent,
@@ -409,6 +409,15 @@ impl Action {
         match &self.data {
             ActionData::Create(d) => Some(&d.entry_type),
             ActionData::Update(d) => Some(&d.entry_type),
+            _ => None,
+        }
+    }
+
+    /// The [`AppEntryDef`] of the entry this action references, if it is an
+    /// application-defined entry.
+    pub fn app_entry_def(&self) -> Option<&AppEntryDef> {
+        match self.entry_type()? {
+            EntryType::App(app_entry_def) => Some(app_entry_def),
             _ => None,
         }
     }
@@ -866,6 +875,31 @@ mod tests {
             deletes_entry_address: EntryHash::from_raw_36(vec![10u8; 36]),
         }));
         assert!(delete.entry_data().is_none());
+    }
+
+    #[test]
+    fn action_app_entry_def_some_for_app_entry_type() {
+        let app_entry_def = AppEntryDef::new(
+            crate::action::EntryDefIndex(1),
+            crate::action::ZomeIndex(2),
+            EntryVisibility::Public,
+        );
+        let create = sample_action(ActionData::Create(CreateData {
+            entry_type: EntryType::App(app_entry_def.clone()),
+            entry_hash: EntryHash::from_raw_36(vec![3u8; 36]),
+        }));
+        assert_eq!(create.app_entry_def(), Some(&app_entry_def));
+    }
+
+    #[test]
+    fn action_app_entry_def_none_for_non_app_entry_type() {
+        let create = sample_action(sample_create_data());
+        assert_eq!(create.app_entry_def(), None);
+
+        let dna = sample_action(ActionData::Dna(DnaData {
+            dna_hash: DnaHash::from_raw_36(vec![5u8; 36]),
+        }));
+        assert_eq!(dna.app_entry_def(), None);
     }
 
     #[test]
