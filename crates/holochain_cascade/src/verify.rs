@@ -50,10 +50,14 @@ pub(crate) async fn verify_rendered_ops_batch(rendered_all: Vec<RenderedOps>) ->
 
 async fn verify_rendered_ops_signatures(rendered: &RenderedOps) -> bool {
     for op in &rendered.ops {
-        let action = op.action.action();
+        // Verify over `signed_action_v2` — the same v2 bytes the action was
+        // signed over. `op.action` is the legacy cache shape and is not used
+        // for signature checks.
+        let sa = &op.signed_action_v2;
+        let action = &sa.hashed.content;
         match action
             .signer()
-            .verify_signature(op.action.signature(), action)
+            .verify_signature(sa.signature(), action)
             .await
         {
             Ok(true) => {}
@@ -110,10 +114,12 @@ pub(crate) async fn verify_activity_signatures(
 ) -> (Vec<RegisterAgentActivity>, Vec<WarrantOp>) {
     let mut verified_activity = Vec::with_capacity(activity.len());
     for ra in activity {
-        let action = ra.action.action();
+        // `ra.action` is legacy; project to v2 and verify over those bytes,
+        // the same bytes the action was signed over.
+        let action = holochain_types::dht_v2::from_legacy_action(ra.action.action());
         match action
             .signer()
-            .verify_signature(ra.action.signature(), action)
+            .verify_signature(ra.action.signature(), &action)
             .await
         {
             Ok(true) => verified_activity.push(ra),

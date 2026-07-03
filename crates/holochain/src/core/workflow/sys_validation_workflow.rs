@@ -1089,6 +1089,27 @@ async fn validate_chain_op(
     }
 }
 
+/// Verify `sig` against the v2 action content already carried by
+/// `signed_action` — the same v2 bytes it was signed over. Used by the
+/// warrant checks below, which hold their dependency actions in v2 form
+/// (via [`ValidationDependencyValue::as_signed_action`]/
+/// `as_signed_action_and_validation_status`) and so verify directly rather
+/// than going through [`verify_action_signature`] (which takes the legacy
+/// per-variant shape).
+async fn verify_v2_action_signature(
+    sig: &Signature,
+    signed_action: &SignedActionHashed,
+) -> SysValidationResult<()> {
+    let v2_action = &signed_action.hashed.content;
+    if v2_action.signer().verify_signature(sig, v2_action).await? {
+        Ok(())
+    } else {
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::CounterfeitAction(sig.clone(), Box::new(v2_action.clone())),
+        ))
+    }
+}
+
 async fn validate_warrant_op(
     op: &WarrantOp,
     validation_dependencies: SysValDeps,
@@ -1127,6 +1148,7 @@ async fn validate_warrant_op(
                     (action.clone(), validation_status)
                 };
                 verify_action_signature(action_sig, &action).await?;
+                verify_v2_action_signature(action_sig, &action).await?;
 
                 match validation_status {
                     ValidationStatus::Valid => {
@@ -1220,6 +1242,8 @@ async fn validate_warrant_op(
 
                 verify_action_signature(a1_sig, &action1).await?;
                 verify_action_signature(a2_sig, &action2).await?;
+                verify_v2_action_signature(a1_sig, &action1).await?;
+                verify_v2_action_signature(a2_sig, &action2).await?;
 
                 Ok(())
             }
@@ -1230,10 +1254,10 @@ async fn validate_warrant_op(
 /// Verify a freshly authored legacy record's signature before converting it
 /// to v2 and running [`sys_validate_record`] on it.
 ///
-/// This must run before any legacy -> v2 conversion of the record: the v2
-/// projection's serialization differs from the legacy signed bytes, and the
-/// conversion is lossy on weight, so it can never be used to (re-)verify a
-/// signature.
+/// [`verify_action_signature`] projects the action to v2 internally and
+/// checks the signature against those bytes; this function simply takes the
+/// record in the legacy, per-variant shape it is still available in at the
+/// call site, ahead of the explicit conversion to v2.
 pub async fn counterfeit_check_authored_record(record: &LegacyRecord) -> SysValidationOutcome<()> {
     match counterfeit_check_action(record.signature(), record.action()).await {
         Ok(()) => Ok(()),
@@ -1250,6 +1274,12 @@ pub async fn counterfeit_check_authored_record(record: &LegacyRecord) -> SysVali
 ///
 /// Note that the conditions on the action being validated are slightly stronger than the usual system validation workflow. This is because
 /// it is intended to be used for validation of records which have been authored locally so we should always be able to check the previous action.
+///
+/// The caller must already have verified the record's signature (e.g. via
+/// [`counterfeit_check_action`] on the original record). This function
+/// reconstructs a legacy action internally for structural checks that still
+/// need the legacy per-variant shape (`store_entry`, `register_updated_content`,
+/// ...); that reconstruction never touches the signature.
 pub async fn sys_validate_record(
     record: &Record,
     cascade: Arc<impl Cascade + Send + Sync>,
@@ -1338,6 +1368,10 @@ async fn sys_validate_record_inner(
 
 /// Check if the chain op has valid signature and author.
 /// Ops that fail this check should be dropped.
+///
+/// Takes the action in the legacy, per-op-type representation callers hold
+/// at this point in the op pipeline; [`verify_action_signature`] projects it
+/// to v2 internally before checking the signature.
 pub async fn counterfeit_check_action(
     signature: &Signature,
     action: &Action,

@@ -299,10 +299,10 @@ pub async fn inline_validation(
         let mut to_app_validate: Vec<Record> = Vec::with_capacity(scratch_records.len());
         // Loop forwards through all the new records
         for record in scratch_records {
-            // The record's signature is over the legacy serialized bytes;
-            // verify it before converting to v2 below (the v2 projection
-            // drops the rate-limit weight and cannot reconstruct the signed
-            // bytes).
+            // Verifies the signature over the v2 projection of the action
+            // (computed internally). This takes the record in the legacy,
+            // per-variant shape it is still available in at this point,
+            // ahead of the explicit conversion to v2 below.
             counterfeit_check_authored_record(&record)
                 .await
                 .or_else(|outcome_or_err| outcome_or_err.into_workflow_error())?;

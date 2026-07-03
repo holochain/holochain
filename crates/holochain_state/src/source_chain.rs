@@ -1047,24 +1047,22 @@ fn build_ops_from_actions(
     Ok((actions_output, ops))
 }
 
-/// Sign a hashed legacy action, computing the signature over the legacy
-/// per-variant `Action` content directly.
+/// Sign a hashed legacy action, computing the signature over the v2
+/// projection of its content.
 ///
-/// `holochain_types::record::SignedActionHashedExt::sign` only signs the v2
-/// `Action` shape (that crate's ambient `Action` always resolves to v2). The
-/// authoring pipeline stays on the legacy `Action` shape until Phase 5, so
-/// this local helper signs the legacy content directly instead of
-/// round-tripping through a v2 conversion, which would also silently drop
-/// the legacy `weight` field via `to_legacy_signed_action`'s default.
+/// The authoring pipeline stays on the legacy `Action` shape until Phase 5,
+/// so `action_hashed` carries the legacy, per-variant content (its hash is
+/// already the content-derived v2 hash). The signature itself is computed
+/// over `from_legacy_action(&action_hashed.content)` — the same v2 bytes
+/// every verifier in the system (`holochain::core::sys_validate::
+/// verify_action_signature` and the cascade's rendered-op / activity
+/// signature checks) projects to and checks against.
 async fn sign_legacy_action(
     keystore: &MetaLairClient,
     action_hashed: ActionHashed,
 ) -> holochain_keystore::LairResult<SignedActionHashed> {
-    let signature = action_hashed
-        .content
-        .signer()
-        .sign(keystore, &action_hashed.content)
-        .await?;
+    let v2 = holochain_zome_types::dht_v2::from_legacy_action(&action_hashed.content);
+    let signature = action_hashed.content.signer().sign(keystore, &v2).await?;
     Ok(SignedActionHashed::with_presigned(action_hashed, signature))
 }
 
@@ -1072,8 +1070,9 @@ async fn sign_legacy_action(
 /// timestamp/seq/prev_action fields in place.
 ///
 /// Mirrors `holochain_zome_types::action::ActionExt::rebase_on`, which only
-/// implements this for the v2 `Action` shape; see [`sign_legacy_action`] for
-/// why the authoring pipeline can't round-trip through v2 here.
+/// implements this for the v2 `Action` shape; the authoring pipeline stays
+/// on the legacy per-variant shape until Phase 5, so this operates on the
+/// legacy fields directly.
 fn rebase_legacy_action(
     action: &mut Action,
     new_prev_action: ActionHash,
@@ -2296,7 +2295,8 @@ mod tests {
                 entry_hash: entry_hashed.hash.clone(),
                 weight: EntryRateWeight::default(),
             });
-            let sig = alice.sign(&keystore, &action).await.unwrap();
+            let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
+            let sig = alice.sign(&keystore, &v2_action).await.unwrap();
             let signed_action = SignedActionHashed::from_content_sync((action.clone(), sig).into());
 
             chain
@@ -2329,7 +2329,8 @@ mod tests {
                 entry_hash: entry_hashed.hash.clone(),
                 weight: EntryRateWeight::default(),
             });
-            let sig = alice.sign(&keystore, &action).await.unwrap();
+            let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
+            let sig = alice.sign(&keystore, &v2_action).await.unwrap();
             let signed_action = SignedActionHashed::from_content_sync((action, sig).into());
 
             chain
@@ -2462,7 +2463,8 @@ mod tests {
             entry_hash: private_entry_hashed.hash.clone(),
             weight: EntryRateWeight::default(),
         });
-        let sig = alice.sign(&keystore, &private_create).await.unwrap();
+        let v2_private_create = holochain_zome_types::dht_v2::from_legacy_action(&private_create);
+        let sig = alice.sign(&keystore, &v2_private_create).await.unwrap();
         let private_sah = SignedActionHashed::from_content_sync((private_create, sig).into());
         let private_action_hash = private_sah.as_hash().clone();
         chain
@@ -2489,7 +2491,8 @@ mod tests {
             entry_hash: public_entry_hashed.hash.clone(),
             weight: EntryRateWeight::default(),
         });
-        let sig = alice.sign(&keystore, &public_create).await.unwrap();
+        let v2_public_create = holochain_zome_types::dht_v2::from_legacy_action(&public_create);
+        let sig = alice.sign(&keystore, &v2_public_create).await.unwrap();
         let public_sah = SignedActionHashed::from_content_sync((public_create, sig).into());
         let scratch_action_hash = public_sah.as_hash().clone();
         chain

@@ -38,21 +38,19 @@ pub const MAX_TAG_SIZE: usize = 1000;
 
 /// Verify the signature for this action.
 ///
-/// This runs on the legacy action representation: the signature is over the
-/// legacy serialized bytes, so verification must happen before any v2
-/// conversion (which is lossy on weight and would never match).
+/// Signatures are computed and checked over the v2 `Action` projection:
+/// this projects `action` to v2 internally and verifies `sig` against those
+/// bytes, regardless of which representation the caller holds `action` in.
 pub async fn verify_action_signature(
     sig: &Signature,
     action: &LegacyAction,
 ) -> SysValidationResult<()> {
-    if action.signer().verify_signature(sig, action).await? {
+    let v2 = from_legacy_action(action);
+    if v2.signer().verify_signature(sig, &v2).await? {
         Ok(())
     } else {
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::CounterfeitAction(
-                (*sig).clone(),
-                Box::new(from_legacy_action(action)),
-            ),
+            ValidationOutcome::CounterfeitAction((*sig).clone(), Box::new(v2)),
         ))
     }
 }

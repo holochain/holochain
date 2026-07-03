@@ -111,3 +111,64 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
         MustBoxFuture::new(async move { Ok(pub_key.verify_detached(sig.into(), data).await) })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_keystore::test_keystore;
+    use holo_hash::DnaHash;
+    use holochain_zome_types::dependencies::holochain_integrity_types::action::{
+        Action as LegacyAction, Dna,
+    };
+    use holochain_zome_types::dht_v2::from_legacy_action;
+
+    /// Mirrors the two production call sites this crate's `sign`/
+    /// `verify_signature` feed: `holochain_state::source_chain::
+    /// sign_legacy_action` (signs `from_legacy_action(&legacy)`) and
+    /// `holochain::core::sys_validate::verify_action_signature` (verifies
+    /// against `from_legacy_action(&legacy)` too). A signature produced this
+    /// way must verify against the v2 projection, and must NOT verify
+    /// against the legacy bytes directly — the two representations
+    /// serialize differently, which is exactly the invariant this change
+    /// depends on.
+    // `test_keystore()` spawns lair onto a blocking task, which requires a
+    // multi-threaded runtime.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn v2_projected_signature_round_trips_and_rejects_legacy_bytes() {
+        let keystore = test_keystore();
+        let author = holo_hash::AgentPubKey::new_random(&keystore).await.unwrap();
+
+        let legacy = LegacyAction::Dna(Dna {
+            author: author.clone(),
+            timestamp: holochain_zome_types::timestamp::Timestamp::now(),
+            hash: DnaHash::from_raw_36(vec![7u8; 36]),
+        });
+
+        // Sign, exactly as `sign_legacy_action` does: project to v2 first.
+        let v2 = from_legacy_action(&legacy);
+        let signature = legacy.signer().sign(&keystore, &v2).await.unwrap();
+
+        // Verify, exactly as `verify_action_signature` does: project again
+        // and check over the same v2 bytes.
+        let v2_check = from_legacy_action(&legacy);
+        assert!(
+            v2_check
+                .signer()
+                .verify_signature(&signature, &v2_check)
+                .await
+                .unwrap(),
+            "a signature computed over the v2 projection must verify against it"
+        );
+
+        // The legacy and v2 serializations differ, so the same signature
+        // must not verify against the legacy bytes.
+        assert!(
+            !legacy
+                .signer()
+                .verify_signature(&signature, &legacy)
+                .await
+                .unwrap(),
+            "a v2-projected signature must not verify against the legacy bytes"
+        );
+    }
+}
