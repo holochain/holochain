@@ -82,7 +82,10 @@ pub(crate) async fn witnessing_workflow(
         let actions = actions
             .into_iter()
             .map(|legacy| {
-                SignedAction::new(from_legacy_action(legacy.data()), legacy.signature().clone())
+                SignedAction::new(
+                    from_legacy_action(legacy.data()),
+                    legacy.signature().clone(),
+                )
             })
             .collect();
         if let Err(e) = network

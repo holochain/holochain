@@ -400,15 +400,16 @@ pub fn check_update_reference(
     update: &Update,
     original_entry_action: &Action,
 ) -> SysValidationResult<()> {
-    let (entry_hash, entry_type) = original_entry_action.entry_data().ok_or_else(|| {
-        ValidationOutcome::NotNewEntry(Box::new(original_entry_action.clone()))
-    })?;
+    let (entry_hash, entry_type) = original_entry_action
+        .entry_data()
+        .ok_or_else(|| ValidationOutcome::NotNewEntry(Box::new(original_entry_action.clone())))?;
 
     if update.entry_type != *entry_type {
-        return Err(
-            ValidationOutcome::UpdateTypeMismatch(entry_type.clone(), update.entry_type.clone())
-                .into(),
-        );
+        return Err(ValidationOutcome::UpdateTypeMismatch(
+            entry_type.clone(),
+            update.entry_type.clone(),
+        )
+        .into());
     }
 
     if update.original_entry_address != *entry_hash {

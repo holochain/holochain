@@ -1234,9 +1234,7 @@ async fn validate_warrant_op(
 /// projection's serialization differs from the legacy signed bytes, and the
 /// conversion is lossy on weight, so it can never be used to (re-)verify a
 /// signature.
-pub async fn counterfeit_check_authored_record(
-    record: &LegacyRecord,
-) -> SysValidationOutcome<()> {
+pub async fn counterfeit_check_authored_record(record: &LegacyRecord) -> SysValidationOutcome<()> {
     match counterfeit_check_action(record.signature(), record.action()).await {
         Ok(()) => Ok(()),
         Err(SysValidationError::ValidationOutcome(validation_outcome)) => {

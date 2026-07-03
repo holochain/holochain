@@ -102,8 +102,7 @@ pub async fn send_post_commit(
     call_zome_handle: Option<CellConductorReadHandle>,
 ) -> Result<(), tokio::sync::mpsc::error::SendError<()>> {
     let cell_id = workspace.source_chain().cell_id();
-    let actions: Vec<SignedActionHashed> =
-        actions.iter().map(from_legacy_signed_action).collect();
+    let actions: Vec<SignedActionHashed> = actions.iter().map(from_legacy_signed_action).collect();
 
     for zome in zomes {
         conductor_handle
