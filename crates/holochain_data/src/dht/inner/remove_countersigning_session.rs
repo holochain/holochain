@@ -55,11 +55,10 @@ pub(crate) async fn remove_countersigning_session(
     // Capture the session action's author before the `Action` row is deleted:
     // countersign entries are shared across counterparties, so the
     // `PrivateEntry` row must be removed for this author only.
-    let author: Option<Vec<u8>> =
-        sqlx::query_scalar("SELECT author FROM Action WHERE hash = ?1")
-            .bind(action_hash.get_raw_36())
-            .fetch_optional(&mut *conn)
-            .await?;
+    let author: Option<Vec<u8>> = sqlx::query_scalar("SELECT author FROM Action WHERE hash = ?1")
+        .bind(action_hash.get_raw_36())
+        .fetch_optional(&mut *conn)
+        .await?;
 
     // Delete the publish rows first (FK: ChainOpPublish -> ChainOp), then the
     // ops (FK: ChainOp -> Action), then the action, then the entry from both

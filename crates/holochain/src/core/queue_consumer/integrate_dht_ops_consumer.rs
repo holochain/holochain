@@ -9,7 +9,7 @@ use std::sync::Arc;
 /// Spawn the QueueConsumer for DhtOpIntegration workflow
 #[cfg_attr(
     feature = "instrument",
-    tracing::instrument(skip(dht_store, trigger_receipt, tm, network, conductor))
+    tracing::instrument(skip(dht_store, trigger_receipt, tm, network))
 )]
 pub fn spawn_integrate_dht_ops_consumer(
     dna_hash: Arc<DnaHash>,
@@ -17,7 +17,6 @@ pub fn spawn_integrate_dht_ops_consumer(
     tm: TaskManagerClient,
     trigger_receipt: TriggerSender,
     network: DynHolochainP2pDna,
-    conductor: crate::conductor::ConductorHandle,
 ) -> TriggerSender {
     let (tx, rx) = TriggerSender::new();
 
@@ -27,12 +26,7 @@ pub fn spawn_integrate_dht_ops_consumer(
         tm,
         (tx.clone(), rx),
         move || {
-            integrate_dht_ops_workflow(
-                dht_store.clone(),
-                trigger_receipt.clone(),
-                network.clone(),
-                conductor.clone(),
-            )
+            integrate_dht_ops_workflow(dht_store.clone(), trigger_receipt.clone(), network.clone())
         },
     );
 

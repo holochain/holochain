@@ -116,7 +116,6 @@ pub async fn spawn_queue_consumer_tasks(
             conductor.task_manager(),
             tx_receipt.clone(),
             network.clone(),
-            conductor.clone(),
         )
     });
 
