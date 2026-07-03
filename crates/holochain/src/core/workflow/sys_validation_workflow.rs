@@ -114,6 +114,16 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::*;
+// The op pipeline (`ChainOp`/`DhtOpHashed`) and the per-op-type structural
+// checks it feeds (`store_entry`, `register_updated_content`, ...) stay on
+// the legacy action representation; `LegacyAction` pins that explicitly
+// wherever the ambient default (v2) would otherwise apply.
+use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
+use holochain_zome_types::dependencies::holochain_integrity_types::record::Record as LegacyRecord;
+use holochain_zome_types::dht_v2::{
+    from_legacy_action, to_legacy_signed_action, DeleteData, DeleteLinkData, UpdateData,
+};
+use rusqlite::Transaction;
 use std::convert::TryInto;
 use std::sync::Arc;
 use std::time::Duration;
@@ -1214,6 +1224,25 @@ async fn validate_warrant_op(
                 Ok(())
             }
         },
+    }
+}
+
+/// Verify a freshly authored legacy record's signature before converting it
+/// to v2 and running [`sys_validate_record`] on it.
+///
+/// This must run before any legacy -> v2 conversion of the record: the v2
+/// projection's serialization differs from the legacy signed bytes, and the
+/// conversion is lossy on weight, so it can never be used to (re-)verify a
+/// signature.
+pub async fn counterfeit_check_authored_record(
+    record: &LegacyRecord,
+) -> SysValidationOutcome<()> {
+    match counterfeit_check_action(record.signature(), record.action()).await {
+        Ok(()) => Ok(()),
+        Err(SysValidationError::ValidationOutcome(validation_outcome)) => {
+            validation_outcome.into_outcome()
+        }
+        Err(e) => Err(OutcomeOrError::Err(e)),
     }
 }
 
