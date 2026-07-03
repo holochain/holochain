@@ -19,6 +19,7 @@ pub use op::{
 pub use record::Record;
 
 use crate::action::ZomeIndex;
+use crate::entry_def::EntryVisibility;
 use crate::{
     link::{LinkTag, LinkType},
     EntryType, MembraneProof,
@@ -337,6 +338,103 @@ pub struct Action {
     pub header: ActionHeader,
     /// The per-variant payload.
     pub data: ActionData,
+}
+
+impl Action {
+    /// The public key of the agent who "authored" this action.
+    ///
+    /// This is not necessarily the agent who signed the action; see
+    /// [`Action::signer`].
+    pub fn author(&self) -> &AgentPubKey {
+        &self.header.author
+    }
+
+    /// The public key of the agent who signed this action.
+    ///
+    /// This is not necessarily the agent who "authored" the action: a
+    /// `CloseChain` action during an agent-key migration is signed with the
+    /// new key rather than the author key, because the new key must be
+    /// known in order for the migration to be effective.
+    pub fn signer(&self) -> &AgentPubKey {
+        match &self.data {
+            ActionData::CloseChain(CloseChainData {
+                new_target: Some(crate::action::MigrationTarget::Agent(agent)),
+            }) => agent,
+            _ => self.author(),
+        }
+    }
+
+    /// The microsecond timestamp at which this action was authored.
+    pub fn timestamp(&self) -> Timestamp {
+        self.header.timestamp
+    }
+
+    /// This action's position on the authoring agent's source chain.
+    pub fn action_seq(&self) -> u32 {
+        self.header.action_seq
+    }
+
+    /// The hash of the preceding action on the source chain.
+    ///
+    /// `None` only for the genesis `Dna` action.
+    pub fn prev_action(&self) -> Option<&ActionHash> {
+        self.header.prev_action.as_ref()
+    }
+
+    /// A mutable reference to the preceding action hash.
+    ///
+    /// `None` only for the genesis `Dna` action.
+    pub fn prev_action_mut(&mut self) -> Option<&mut ActionHash> {
+        self.header.prev_action.as_mut()
+    }
+
+    /// `true` if this action's sequence number falls within the genesis
+    /// portion of the chain.
+    pub fn is_genesis(&self) -> bool {
+        self.action_seq() < crate::action::POST_GENESIS_SEQ_THRESHOLD
+    }
+
+    /// The [`ActionType`] discriminant of this action.
+    pub fn action_type(&self) -> ActionType {
+        self.data.action_type()
+    }
+
+    /// The hash of the entry this action references, if any.
+    pub fn entry_hash(&self) -> Option<&EntryHash> {
+        self.data.entry_hash()
+    }
+
+    /// The type of the entry this action references, if any.
+    pub fn entry_type(&self) -> Option<&EntryType> {
+        match &self.data {
+            ActionData::Create(d) => Some(&d.entry_type),
+            ActionData::Update(d) => Some(&d.entry_type),
+            _ => None,
+        }
+    }
+
+    /// The hash and type of the entry this action references, if any.
+    pub fn entry_data(&self) -> Option<(&EntryHash, &EntryType)> {
+        match &self.data {
+            ActionData::Create(d) => Some((&d.entry_hash, &d.entry_type)),
+            ActionData::Update(d) => Some((&d.entry_hash, &d.entry_type)),
+            _ => None,
+        }
+    }
+
+    /// Pulls the entry hash and type out of this action by value, if any.
+    pub fn into_entry_data(self) -> Option<(EntryHash, EntryType)> {
+        match self.data {
+            ActionData::Create(d) => Some((d.entry_hash, d.entry_type)),
+            ActionData::Update(d) => Some((d.entry_hash, d.entry_type)),
+            _ => None,
+        }
+    }
+
+    /// The visibility of the entry this action references, if any.
+    pub fn entry_visibility(&self) -> Option<&EntryVisibility> {
+        self.entry_type().map(|entry_type| entry_type.visibility())
+    }
 }
 
 impl HashableContent for Action {
@@ -682,5 +780,150 @@ mod tests {
             let decoded: ActionData = holochain_serialized_bytes::decode(&bytes).unwrap();
             assert_eq!(decoded.action_type(), data.action_type());
         }
+    }
+
+    fn sample_action(data: ActionData) -> Action {
+        Action {
+            header: ActionHeader {
+                author: AgentPubKey::from_raw_36(vec![1u8; 36]),
+                timestamp: Timestamp::from_micros(42),
+                action_seq: 5,
+                prev_action: Some(ActionHash::from_raw_36(vec![2u8; 36])),
+            },
+            data,
+        }
+    }
+
+    fn sample_create_data() -> ActionData {
+        ActionData::Create(CreateData {
+            entry_type: EntryType::AgentPubKey,
+            entry_hash: EntryHash::from_raw_36(vec![3u8; 36]),
+        })
+    }
+
+    #[test]
+    fn action_accessors_read_header_fields() {
+        let a = sample_action(sample_create_data());
+        assert_eq!(a.author(), &AgentPubKey::from_raw_36(vec![1u8; 36]));
+        assert_eq!(a.timestamp(), Timestamp::from_micros(42));
+        assert_eq!(a.action_seq(), 5);
+        assert_eq!(
+            a.prev_action(),
+            Some(&ActionHash::from_raw_36(vec![2u8; 36]))
+        );
+        assert_eq!(a.action_type(), ActionType::Create);
+    }
+
+    #[test]
+    fn action_prev_action_mut_writes_through_the_header() {
+        let mut a = sample_action(sample_create_data());
+        let new_prev = ActionHash::from_raw_36(vec![9u8; 36]);
+        *a.prev_action_mut().expect("has a prev action") = new_prev.clone();
+        assert_eq!(a.prev_action(), Some(&new_prev));
+    }
+
+    #[test]
+    fn action_entry_type_and_data_some_for_create_and_update() {
+        let create = sample_action(sample_create_data());
+        assert_eq!(create.entry_type(), Some(&EntryType::AgentPubKey));
+        assert_eq!(
+            create.entry_data(),
+            Some((
+                &EntryHash::from_raw_36(vec![3u8; 36]),
+                &EntryType::AgentPubKey
+            ))
+        );
+        assert_eq!(
+            create.entry_hash(),
+            Some(&EntryHash::from_raw_36(vec![3u8; 36]))
+        );
+
+        let update = sample_action(ActionData::Update(UpdateData {
+            original_action_address: ActionHash::from_raw_36(vec![6u8; 36]),
+            original_entry_address: EntryHash::from_raw_36(vec![7u8; 36]),
+            entry_type: EntryType::CapClaim,
+            entry_hash: EntryHash::from_raw_36(vec![8u8; 36]),
+        }));
+        assert_eq!(update.entry_type(), Some(&EntryType::CapClaim));
+        assert_eq!(
+            update.entry_data(),
+            Some((&EntryHash::from_raw_36(vec![8u8; 36]), &EntryType::CapClaim))
+        );
+    }
+
+    #[test]
+    fn action_entry_type_and_data_none_for_non_entry_actions() {
+        let dna = sample_action(ActionData::Dna(DnaData {
+            dna_hash: DnaHash::from_raw_36(vec![5u8; 36]),
+        }));
+        assert_eq!(dna.entry_type(), None);
+        assert_eq!(dna.entry_data(), None);
+        assert_eq!(dna.entry_hash(), None);
+        assert_eq!(dna.entry_visibility(), None);
+
+        let delete = sample_action(ActionData::Delete(DeleteData {
+            deletes_address: ActionHash::from_raw_36(vec![9u8; 36]),
+            deletes_entry_address: EntryHash::from_raw_36(vec![10u8; 36]),
+        }));
+        assert!(delete.entry_data().is_none());
+    }
+
+    #[test]
+    fn action_into_entry_data_moves_the_fields_out() {
+        let create = sample_action(sample_create_data());
+        let (hash, ty) = create.into_entry_data().expect("create has entry data");
+        assert_eq!(hash, EntryHash::from_raw_36(vec![3u8; 36]));
+        assert_eq!(ty, EntryType::AgentPubKey);
+
+        let dna = sample_action(ActionData::Dna(DnaData {
+            dna_hash: DnaHash::from_raw_36(vec![5u8; 36]),
+        }));
+        assert!(dna.into_entry_data().is_none());
+    }
+
+    #[test]
+    fn action_entry_visibility_reads_through_entry_type() {
+        let create = sample_action(sample_create_data());
+        assert_eq!(create.entry_visibility(), Some(&EntryVisibility::Public));
+
+        let cap_claim = sample_action(ActionData::Create(CreateData {
+            entry_type: EntryType::CapClaim,
+            entry_hash: EntryHash::from_raw_36(vec![3u8; 36]),
+        }));
+        assert_eq!(
+            cap_claim.entry_visibility(),
+            Some(&EntryVisibility::Private)
+        );
+    }
+
+    #[test]
+    fn action_is_genesis_below_threshold() {
+        let mut a = sample_action(sample_create_data());
+        a.header.action_seq = 0;
+        assert!(a.is_genesis());
+        a.header.action_seq = crate::action::POST_GENESIS_SEQ_THRESHOLD;
+        assert!(!a.is_genesis());
+    }
+
+    #[test]
+    fn action_signer_defaults_to_author() {
+        let a = sample_action(sample_create_data());
+        assert_eq!(a.signer(), a.author());
+    }
+
+    #[test]
+    fn action_signer_uses_the_migration_agent_for_close_chain() {
+        let new_agent = AgentPubKey::from_raw_36(vec![7u8; 36]);
+        let a = sample_action(ActionData::CloseChain(CloseChainData {
+            new_target: Some(crate::action::MigrationTarget::Agent(new_agent.clone())),
+        }));
+        assert_eq!(a.signer(), &new_agent);
+        assert_ne!(a.signer(), a.author());
+    }
+
+    #[test]
+    fn action_signer_uses_author_for_close_chain_without_agent_target() {
+        let a = sample_action(ActionData::CloseChain(CloseChainData { new_target: None }));
+        assert_eq!(a.signer(), a.author());
     }
 }
