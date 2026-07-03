@@ -575,28 +575,28 @@ async fn move_and_check_warrant_deps(
         .expect("poisoned")
         .get_pending_warrant_dependencies();
     for (action_hash, op_type) in warrant_deps {
-        // Move a cached copy of the warranted op into limbo so it gets
-        // validated. If there is nothing to move, the op is either already
-        // integrated/in limbo, or it will be re-fetched and cached on a
-        // later tick.
-        match workspace
+        // The warranted op has to be in limbo to be validated. If it is already
+        // present in the DhtStore as an op of the warranted type, move it into
+        // limbo. Otherwise it arrives from the network cascade as a cached
+        // record (under a different op type), so materialise the op of the
+        // required type from that record and record it into limbo. If neither
+        // is available yet, it is re-fetched and cached on a later tick.
+        let moved = match workspace
             .dht_store
             .move_warranted_op_to_limbo(&action_hash, op_type)
             .await
         {
-            Ok(true) => {
-                *warrant_deps_copied += 1;
-            }
+            Ok(true) => true,
             Ok(false) => {
-                tracing::debug!(
-                    ?action_hash,
-                    ?op_type,
-                    "Warranted op not yet present in the DhtStore"
-                );
+                materialise_warranted_op_into_limbo(workspace, &action_hash, op_type).await
             }
             Err(e) => {
                 tracing::debug!(error = ?e, "Could not move warranted op to limbo (may already be integrated)");
+                false
             }
+        };
+        if moved {
+            *warrant_deps_copied += 1;
         }
 
         match workspace
@@ -622,6 +622,56 @@ async fn move_and_check_warrant_deps(
             }
         }
     }
+}
+
+/// Build the warranted op of `op_type` from the cached record for `action_hash`
+/// and record it into limbo so it can be validated. Returns whether an op was
+/// recorded. The record is fetched into the cache by the network cascade during
+/// dependency resolution; if it is not cached yet, nothing is recorded and the
+/// caller retries on a later tick.
+async fn materialise_warranted_op_into_limbo(
+    workspace: &Arc<SysValidationWorkspace>,
+    action_hash: &ActionHash,
+    op_type: ChainOpType,
+) -> bool {
+    let record = match workspace
+        .dht_store
+        .as_read()
+        .retrieve_record(action_hash, None)
+        .await
+    {
+        Ok(Some(record)) => record,
+        Ok(None) => return false,
+        Err(e) => {
+            tracing::debug!(error = ?e, "Could not read warranted record from the DhtStore");
+            return false;
+        }
+    };
+
+    let signed_action = SignedAction::new(
+        record.action().clone(),
+        record.signed_action().signature().clone(),
+    );
+    let entry = record.entry().as_option().cloned();
+    let chain_op = match ChainOp::from_type(op_type, signed_action, entry) {
+        Ok(chain_op) => chain_op,
+        Err(e) => {
+            tracing::debug!(error = ?e, "Could not build warranted op from its record");
+            return false;
+        }
+    };
+    let op = DhtOpHashed::from_content_sync(DhtOp::from(chain_op));
+
+    // Warranted deps do not require a validation receipt.
+    if let Err(e) = workspace
+        .dht_store
+        .record_incoming_ops(vec![(op, false)])
+        .await
+    {
+        tracing::error!(error = ?e, "Could not record warranted op into limbo");
+        return false;
+    }
+    true
 }
 
 async fn retrieve_dependencies(
