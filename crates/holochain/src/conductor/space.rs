@@ -607,14 +607,7 @@ impl Space {
         keystore: MetaLairClient,
         author: AgentPubKey,
     ) -> SourceChainResult<SourceChain> {
-        SourceChain::raw_empty(
-            self.get_or_create_authored_db(author.clone())?,
-            self.dht_db.clone(),
-            self.dht_store.clone(),
-            keystore,
-            author,
-        )
-        .await
+        SourceChain::raw_empty(self.dht_store.clone(), keystore, author).await
     }
 
     /// Create a SourceChainWorkspace from this Space
@@ -623,14 +616,7 @@ impl Space {
         keystore: MetaLairClient,
         author: AgentPubKey,
     ) -> ConductorResult<SourceChainWorkspace> {
-        Ok(SourceChainWorkspace::new(
-            self.get_or_create_authored_db(author.clone())?.clone(),
-            self.dht_db.clone(),
-            self.dht_store.clone(),
-            keystore,
-            author,
-        )
-        .await?)
+        Ok(SourceChainWorkspace::new(self.dht_store.clone(), keystore, author).await?)
     }
 
     /// Get or create the authored database for an agent in this space

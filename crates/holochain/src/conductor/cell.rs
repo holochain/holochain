@@ -34,7 +34,6 @@ use holochain_nonce::fresh_nonce;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pError, HolochainP2pResult};
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::*;
 use holochain_types::cell_config_overrides::CellConfigOverrides;
@@ -770,8 +769,6 @@ impl Cell {
             Some(l) => l,
             None => {
                 SourceChainWorkspace::new(
-                    self.get_or_create_authored_db()?,
-                    self.dht_db().clone(),
                     self.space.dht_store.clone(),
                     keystore.clone(),
                     self.id.agent_pubkey().clone(),
@@ -821,8 +818,6 @@ impl Cell {
 
         // Create the workspace
         let workspace = SourceChainWorkspace::init_as_root(
-            self.get_or_create_authored_db()?,
-            self.dht_db().clone(),
             self.space.dht_store.clone(),
             keystore.clone(),
             id.agent_pubkey().clone(),
@@ -888,18 +883,6 @@ impl Cell {
             .conductor_handle
             .get_ribosome(self.id())
             .map_err(|_| DnaError::DnaMissing(self.dna_hash().to_owned()))?)
-    }
-
-    /// Accessor for the authored database backing this Cell
-    pub(crate) fn get_or_create_authored_db(&self) -> CellResult<DbWrite<DbKindAuthored>> {
-        Ok(self
-            .space
-            .get_or_create_authored_db(self.id.agent_pubkey().clone())?)
-    }
-
-    /// Accessor for the authored database backing this Cell
-    pub(crate) fn dht_db(&self) -> &DbWrite<DbKindDht> {
-        &self.space.dht_db
     }
 
     pub(crate) fn notify_authored_ops_moved_to_limbo(&self) {

@@ -1772,8 +1772,6 @@ mod clone_cell_impls {
             if app_role.is_provisioned {
                 // Check source chain if agent key is valid
                 let source_chain = SourceChain::new(
-                    self.get_or_create_authored_db(app_role.dna_hash(), app.agent_key().clone())?,
-                    self.get_or_create_dht_db(app_role.dna_hash())?,
                     self.get_or_create_dht_store(app_role.dna_hash())?,
                     self.keystore.clone(),
                     app.agent_key().clone(),
@@ -2321,11 +2319,6 @@ mod misc_impls {
             cell.check_or_run_zome_init().await?;
 
             let source_chain = SourceChain::new(
-                self.get_or_create_authored_db(
-                    cell_id.dna_hash(),
-                    cell.id().agent_pubkey().clone(),
-                )?,
-                self.get_or_create_dht_db(cell_id.dna_hash())?,
                 self.get_or_create_dht_store(cell_id.dna_hash())?,
                 self.keystore.clone(),
                 cell_id.agent_pubkey().clone(),
@@ -2374,11 +2367,6 @@ mod misc_impls {
             cell.check_or_run_zome_init().await?;
 
             let source_chain = SourceChain::new(
-                self.get_or_create_authored_db(
-                    cell_id.dna_hash(),
-                    cell.id().agent_pubkey().clone(),
-                )?,
-                self.get_or_create_dht_db(cell_id.dna_hash())?,
                 self.get_or_create_dht_store(cell_id.dna_hash())?,
                 self.keystore.clone(),
                 cell_id.agent_pubkey().clone(),
@@ -2448,12 +2436,6 @@ mod misc_impls {
             for cell_id in cell_set.iter() {
                 // create a source chain read to query for the cap grant
                 let chain = SourceChainRead::new(
-                    self.get_or_create_authored_db(
-                        cell_id.dna_hash(),
-                        cell_id.agent_pubkey().clone(),
-                    )?
-                    .into(),
-                    self.get_or_create_dht_db(cell_id.dna_hash())?.into(),
                     self.get_or_create_dht_store(cell_id.dna_hash())?,
                     self.keystore().clone(),
                     cell_id.agent_pubkey().clone(),

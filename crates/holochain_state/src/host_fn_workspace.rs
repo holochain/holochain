@@ -4,13 +4,8 @@ use holochain_keystore::MetaLairClient;
 use std::sync::Arc;
 
 #[derive(Clone)]
-pub struct HostFnWorkspace<
-    SourceChainDb = DbWrite<DbKindAuthored>,
-    SourceChainDht = DbWrite<DbKindDht>,
-> {
-    source_chain: Option<SourceChain<SourceChainDb, SourceChainDht>>,
-    authored: DbRead<DbKindAuthored>,
-    dht: DbRead<DbKindDht>,
+pub struct HostFnWorkspace {
+    source_chain: Option<SourceChain>,
     dht_store: DhtStore,
     /// Did the root call that started this call chain
     /// come from an init callback.
@@ -27,50 +22,30 @@ pub struct SourceChainWorkspace {
 }
 
 pub struct HostFnStores {
-    pub authored: DbRead<DbKindAuthored>,
-    pub dht: DbRead<DbKindDht>,
     pub scratch: Option<SyncScratch>,
     pub dht_store: Option<DhtStore>,
 }
 
-pub type HostFnWorkspaceRead = HostFnWorkspace<DbRead<DbKindAuthored>, DbRead<DbKindDht>>;
+pub type HostFnWorkspaceRead = HostFnWorkspace;
 
 impl SourceChainWorkspace {
     pub async fn new(
-        authored: DbWrite<DbKindAuthored>,
-        dht: DbWrite<DbKindDht>,
         dht_store: DhtStore,
         keystore: MetaLairClient,
         author: AgentPubKey,
     ) -> SourceChainResult<Self> {
-        let source_chain = SourceChain::new(
-            authored.clone(),
-            dht.clone(),
-            dht_store.clone(),
-            keystore,
-            author,
-        )
-        .await?;
-        Self::new_inner(authored, dht, dht_store, source_chain, false)
+        let source_chain = SourceChain::new(dht_store.clone(), keystore, author).await?;
+        Self::new_inner(dht_store, source_chain, false)
     }
 
     /// Create a source chain workspace where the root caller is the init callback.
     pub async fn init_as_root(
-        authored: DbWrite<DbKindAuthored>,
-        dht: DbWrite<DbKindDht>,
         dht_store: DhtStore,
         keystore: MetaLairClient,
         author: AgentPubKey,
     ) -> SourceChainResult<Self> {
-        let source_chain = SourceChain::new(
-            authored.clone(),
-            dht.clone(),
-            dht_store.clone(),
-            keystore,
-            author,
-        )
-        .await?;
-        Self::new_inner(authored, dht, dht_store, source_chain, true)
+        let source_chain = SourceChain::new(dht_store.clone(), keystore, author).await?;
+        Self::new_inner(dht_store, source_chain, true)
     }
 
     /// Create a source chain with a blank chain head.
@@ -78,26 +53,15 @@ impl SourceChainWorkspace {
     /// This type is only useful for when a source chain
     /// really needs to be constructed before genesis runs.
     pub async fn raw_empty(
-        authored: DbWrite<DbKindAuthored>,
-        dht: DbWrite<DbKindDht>,
         dht_store: DhtStore,
         keystore: MetaLairClient,
         author: AgentPubKey,
     ) -> SourceChainResult<Self> {
-        let source_chain = SourceChain::raw_empty(
-            authored.clone(),
-            dht.clone(),
-            dht_store.clone(),
-            keystore,
-            author,
-        )
-        .await?;
-        Self::new_inner(authored, dht, dht_store, source_chain, false)
+        let source_chain = SourceChain::raw_empty(dht_store.clone(), keystore, author).await?;
+        Self::new_inner(dht_store, source_chain, false)
     }
 
     fn new_inner(
-        authored: DbWrite<DbKindAuthored>,
-        dht: DbWrite<DbKindDht>,
         dht_store: DhtStore,
         source_chain: SourceChain,
         init_is_root: bool,
@@ -105,8 +69,6 @@ impl SourceChainWorkspace {
         Ok(Self {
             inner: HostFnWorkspace {
                 source_chain: Some(source_chain.clone()),
-                authored: authored.into(),
-                dht: dht.into(),
                 dht_store,
                 init_is_root,
             },
@@ -121,41 +83,24 @@ impl SourceChainWorkspace {
     }
 }
 
-impl<SourceChainDb, SourceChainDht> HostFnWorkspace<SourceChainDb, SourceChainDht>
-where
-    SourceChainDb: ReadAccess<DbKindAuthored>,
-    SourceChainDht: ReadAccess<DbKindDht>,
-{
+impl HostFnWorkspace {
     pub async fn new(
-        authored: SourceChainDb,
-        dht: SourceChainDht,
         dht_store: DhtStore,
         keystore: MetaLairClient,
         author: Option<AgentPubKey>,
     ) -> SourceChainResult<Self> {
         let source_chain = match author {
-            Some(author) => Some(
-                SourceChain::new(
-                    authored.clone(),
-                    dht.clone(),
-                    dht_store.clone(),
-                    keystore,
-                    author,
-                )
-                .await?,
-            ),
+            Some(author) => Some(SourceChain::new(dht_store.clone(), keystore, author).await?),
             None => None,
         };
         Ok(Self {
             source_chain,
-            authored: authored.into(),
-            dht: dht.into(),
             dht_store,
             init_is_root: false,
         })
     }
 
-    pub fn source_chain(&self) -> &Option<SourceChain<SourceChainDb, SourceChainDht>> {
+    pub fn source_chain(&self) -> &Option<SourceChain> {
         &self.source_chain
     }
 
@@ -165,8 +110,6 @@ where
 
     pub fn stores(&self) -> HostFnStores {
         HostFnStores {
-            authored: self.authored.clone(),
-            dht: self.dht.clone(),
             scratch: self.source_chain.as_ref().map(|sc| sc.scratch()),
             dht_store: Some(self.dht_store.clone()),
         }
@@ -179,33 +122,9 @@ impl SourceChainWorkspace {
     }
 }
 
-impl From<HostFnWorkspace> for HostFnWorkspaceRead {
-    fn from(workspace: HostFnWorkspace) -> Self {
-        Self {
-            source_chain: workspace.source_chain.map(|sc| sc.into()),
-            authored: workspace.authored,
-            dht: workspace.dht,
-            dht_store: workspace.dht_store,
-            init_is_root: workspace.init_is_root,
-        }
-    }
-}
-
 impl From<SourceChainWorkspace> for HostFnWorkspace {
     fn from(workspace: SourceChainWorkspace) -> Self {
         workspace.inner
-    }
-}
-
-impl From<SourceChainWorkspace> for HostFnWorkspaceRead {
-    fn from(workspace: SourceChainWorkspace) -> Self {
-        Self {
-            source_chain: Some(workspace.source_chain.into()),
-            authored: workspace.inner.authored,
-            dht: workspace.inner.dht,
-            dht_store: workspace.inner.dht_store,
-            init_is_root: workspace.inner.init_is_root,
-        }
     }
 }
 

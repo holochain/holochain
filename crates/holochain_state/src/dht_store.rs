@@ -5,7 +5,7 @@
 //! obtain a reference from [`Space`](crate) and invoke named methods; they do
 //! not need to interact with the underlying handle directly.
 
-use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, EntryHash, HasHash};
+use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, DnaHash, EntryHash, HasHash};
 use holochain_data::dht::{
     InsertLimboChainOp, InsertLimboWarrant, InsertScheduledFunction,
     RemoveCountersigningSessionOutcome,
@@ -161,6 +161,11 @@ impl<Db> DhtStore<Db> {
 }
 
 impl DhtStore<DbWrite<Dht>> {
+    /// The DNA hash this store belongs to.
+    pub fn dna_hash(&self) -> &DnaHash {
+        self.db.identifier().dna_hash()
+    }
+
     /// Acquire the per-author source-chain write permit for this store.
     ///
     /// Serializes source-chain flushes for a single `(DNA, author)` chain so

@@ -159,8 +159,6 @@ mod tests {
 
     async fn get_chain(cell: &SweetCell, keystore: MetaLairClient) -> SourceChain {
         SourceChain::new(
-            cell.authored_db().clone(),
-            cell.dht_db().clone(),
             cell.dht_store().clone(),
             keystore,
             cell.agent_pubkey().clone(),
@@ -171,10 +169,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn adds_init_marker() {
-        let test_db = test_authored_db();
-        let test_dht = test_dht_db();
         let keystore = test_keystore();
-        let db = test_db.to_db();
         let author = fake_agent_pubkey_1();
 
         let dna_def = DnaDefFixturator::new(Unpredictable).next().unwrap();
@@ -195,15 +190,9 @@ mod tests {
         .await
         .unwrap();
 
-        let workspace = SourceChainWorkspace::new(
-            db.clone(),
-            test_dht.to_db(),
-            dht_store,
-            keystore,
-            author.clone(),
-        )
-        .await
-        .unwrap();
+        let workspace = SourceChainWorkspace::new(dht_store, keystore, author.clone())
+            .await
+            .unwrap();
         let ribosome = MockRibosomeBuilder::new()
             .with_init_handler(|_, _| Ok(InitCallbackResult::Pass))
             .with_validate_handler(|_, _| Ok(ValidateCallbackResult::Valid))

@@ -859,38 +859,20 @@ impl Default for OutcomeSummary {
 }
 
 pub struct AppValidationWorkspace {
-    // Writeable because of warrants
-    authored_db: DbWrite<DbKindAuthored>,
-    dht_db: DbWrite<DbKindDht>,
     dht_store: DhtStore,
     keystore: MetaLairClient,
 }
 
 impl AppValidationWorkspace {
-    pub fn new(
-        // Writeable because of warrants
-        authored_db: DbWrite<DbKindAuthored>,
-        dht_db: DbWrite<DbKindDht>,
-        dht_store: DhtStore,
-        keystore: MetaLairClient,
-    ) -> Self {
+    pub fn new(dht_store: DhtStore, keystore: MetaLairClient) -> Self {
         Self {
-            authored_db,
-            dht_db,
             dht_store,
             keystore,
         }
     }
 
     pub async fn validation_workspace(&self) -> AppValidationResult<HostFnWorkspaceRead> {
-        Ok(HostFnWorkspace::new(
-            self.authored_db.clone().into(),
-            self.dht_db.clone().into(),
-            self.dht_store.clone(),
-            self.keystore.clone(),
-            None,
-        )
-        .await?)
+        Ok(HostFnWorkspace::new(self.dht_store.clone(), self.keystore.clone(), None).await?)
     }
 
     pub fn full_cascade(&self, network: DynHolochainP2pDna) -> CascadeImpl {

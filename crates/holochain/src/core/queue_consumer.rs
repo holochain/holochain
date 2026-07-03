@@ -83,12 +83,9 @@ pub async fn spawn_queue_consumer_tasks(
     space: &Space,
     conductor: ConductorHandle,
 ) -> ConductorResult<(QueueTriggers, InitialQueueTriggers)> {
-    let Space { dht_db, .. } = space;
-
     let keystore = conductor.keystore().clone();
     let dna_hash = Arc::new(cell_id.dna_hash().clone());
     let queue_consumer_map = conductor.get_queue_consumer_workflows();
-    let authored_db = space.get_or_create_authored_db(cell_id.agent_pubkey().clone())?;
 
     // Publish
     let tx_publish = spawn_publish_dht_ops_consumer(
@@ -128,12 +125,7 @@ pub async fn spawn_queue_consumer_tasks(
     let tx_app = queue_consumer_map.spawn_once_app_validation(dna_hash.clone(), || {
         spawn_app_validation_consumer(
             dna_hash.clone(),
-            AppValidationWorkspace::new(
-                authored_db.clone(),
-                dht_db.clone(),
-                space.dht_store.clone(),
-                keystore.clone(),
-            ),
+            AppValidationWorkspace::new(space.dht_store.clone(), keystore.clone()),
             conductor.clone(),
             tx_integration.clone(),
             tx_publish.clone(),

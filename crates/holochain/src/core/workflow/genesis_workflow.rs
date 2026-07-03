@@ -132,8 +132,7 @@ mod tests {
     use crate::conductor::api::MockCellConductorApiT;
     use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
     use holochain_keystore::test_keystore;
-    use holochain_state::prelude::test_dht_db;
-    use holochain_state::{prelude::test_authored_db, source_chain::SourceChain};
+    use holochain_state::source_chain::SourceChain;
     use holochain_trace;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
@@ -176,10 +175,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn genesis_initializes_source_chain() {
         holochain_trace::test_run();
-        let test_db = test_authored_db();
-        let dht_db = test_dht_db();
         let keystore = test_keystore();
-        let vault = test_db.to_db();
         let dna = fake_dna_file("a");
         let author = fake_agent_pubkey_1();
 
@@ -207,15 +203,9 @@ mod tests {
 
         {
             let dht_store = dht_store;
-            let source_chain = SourceChain::new(
-                vault.clone(),
-                dht_db.to_db(),
-                dht_store,
-                keystore,
-                author.clone(),
-            )
-            .await
-            .unwrap();
+            let source_chain = SourceChain::new(dht_store, keystore, author.clone())
+                .await
+                .unwrap();
             let actions = source_chain
                 .query(Default::default())
                 .await

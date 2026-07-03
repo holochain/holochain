@@ -66,12 +66,6 @@ async fn register_agent_activity() {
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
-        test_space
-            .space
-            .get_or_create_authored_db(fixt!(AgentPubKey))
-            .unwrap()
-            .into(),
-        test_space.space.dht_db.clone().into(),
         test_space.space.dht_store.clone(),
         fixt!(MetaLairClient),
         None,
@@ -120,12 +114,6 @@ async fn store_entry_create_app_entry() {
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
-        test_space
-            .space
-            .get_or_create_authored_db(fixt!(AgentPubKey))
-            .unwrap()
-            .into(),
-        test_space.space.dht_db.clone().into(),
         test_space.space.dht_store.clone(),
         fixt!(MetaLairClient),
         None,
@@ -168,12 +156,6 @@ async fn store_entry_create_non_app_entry() {
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
-        test_space
-            .space
-            .get_or_create_authored_db(fixt!(AgentPubKey))
-            .unwrap()
-            .into(),
-        test_space.space.dht_db.clone().into(),
         test_space.space.dht_store.clone(),
         fixt!(MetaLairClient),
         None,
@@ -224,12 +206,6 @@ async fn store_entry_update_app_entry() {
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
-        test_space
-            .space
-            .get_or_create_authored_db(fixt!(AgentPubKey))
-            .unwrap()
-            .into(),
-        test_space.space.dht_db.clone().into(),
         test_space.space.dht_store.clone(),
         fixt!(MetaLairClient),
         None,
@@ -274,12 +250,6 @@ async fn store_entry_update_non_app_entry() {
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
-        test_space
-            .space
-            .get_or_create_authored_db(fixt!(AgentPubKey))
-            .unwrap()
-            .into(),
-        test_space.space.dht_db.clone().into(),
         test_space.space.dht_store.clone(),
         fixt!(MetaLairClient),
         None,
@@ -325,12 +295,6 @@ async fn store_record_create_app_entry() {
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
-        test_space
-            .space
-            .get_or_create_authored_db(fixt!(AgentPubKey))
-            .unwrap()
-            .into(),
-        test_space.space.dht_db.clone().into(),
         test_space.space.dht_store.clone(),
         fixt!(MetaLairClient),
         None,
@@ -366,12 +330,6 @@ async fn store_record_create_non_app_entry() {
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
-        test_space
-            .space
-            .get_or_create_authored_db(fixt!(AgentPubKey))
-            .unwrap()
-            .into(),
-        test_space.space.dht_db.clone().into(),
         test_space.space.dht_store.clone(),
         fixt!(MetaLairClient),
         None,
@@ -416,12 +374,6 @@ async fn store_record_create_wrong_entry() {
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
-        test_space
-            .space
-            .get_or_create_authored_db(fixt!(AgentPubKey))
-            .unwrap()
-            .into(),
-        test_space.space.dht_db.clone().into(),
         test_space.space.dht_store.clone(),
         fixt!(MetaLairClient),
         None,
@@ -457,12 +409,6 @@ async fn store_record_create_link() {
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
-        test_space
-            .space
-            .get_or_create_authored_db(fixt!(AgentPubKey))
-            .unwrap()
-            .into(),
-        test_space.space.dht_db.clone().into(),
         test_space.space.dht_store.clone(),
         fixt!(MetaLairClient),
         None,
@@ -515,12 +461,6 @@ async fn store_record_update_app_entry() {
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
-        test_space
-            .space
-            .get_or_create_authored_db(fixt!(AgentPubKey))
-            .unwrap()
-            .into(),
-        test_space.space.dht_db.clone().into(),
         test_space.space.dht_store.clone(),
         fixt!(MetaLairClient),
         None,
@@ -560,12 +500,6 @@ async fn store_record_update_non_app_entry() {
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
-        test_space
-            .space
-            .get_or_create_authored_db(fixt!(AgentPubKey))
-            .unwrap()
-            .into(),
-        test_space.space.dht_db.clone().into(),
         test_space.space.dht_store.clone(),
         fixt!(MetaLairClient),
         None,
@@ -633,12 +567,6 @@ async fn store_record_update_of_update_app_entry() {
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
-        test_space
-            .space
-            .get_or_create_authored_db(fixt!(AgentPubKey))
-            .unwrap()
-            .into(),
-        test_space.space.dht_db.clone().into(),
         test_space.space.dht_store.clone(),
         fixt!(MetaLairClient),
         None,
@@ -686,12 +614,6 @@ async fn store_record_delete_without_entry() {
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
-        test_space
-            .space
-            .get_or_create_authored_db(fixt!(AgentPubKey))
-            .unwrap()
-            .into(),
-        test_space.space.dht_db.clone().into(),
         test_space.space.dht_store.clone(),
         fixt!(MetaLairClient),
         None,
@@ -738,12 +660,6 @@ async fn store_record_delete_non_app_entry() {
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
-        test_space
-            .space
-            .get_or_create_authored_db(fixt!(AgentPubKey))
-            .unwrap()
-            .into(),
-        test_space.space.dht_db.clone().into(),
         test_space.space.dht_store.clone(),
         fixt!(MetaLairClient),
         None,
@@ -789,12 +705,6 @@ async fn store_record_delete_link() {
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
-        test_space
-            .space
-            .get_or_create_authored_db(fixt!(AgentPubKey))
-            .unwrap()
-            .into(),
-        test_space.space.dht_db.clone().into(),
         test_space.space.dht_store.clone(),
         fixt!(MetaLairClient),
         None,
@@ -852,12 +762,6 @@ async fn register_update_app_entry() {
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
-        test_space
-            .space
-            .get_or_create_authored_db(fixt!(AgentPubKey))
-            .unwrap()
-            .into(),
-        test_space.space.dht_db.clone().into(),
         test_space.space.dht_store.clone(),
         fixt!(MetaLairClient),
         None,
@@ -898,12 +802,6 @@ async fn register_update_non_app_entry() {
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
-        test_space
-            .space
-            .get_or_create_authored_db(fixt!(AgentPubKey))
-            .unwrap()
-            .into(),
-        test_space.space.dht_db.clone().into(),
         test_space.space.dht_store.clone(),
         fixt!(MetaLairClient),
         None,
@@ -952,12 +850,6 @@ async fn register_delete_create_app_entry() {
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
-        test_space
-            .space
-            .get_or_create_authored_db(fixt!(AgentPubKey))
-            .unwrap()
-            .into(),
-        test_space.space.dht_db.clone().into(),
         test_space.space.dht_store.clone(),
         fixt!(MetaLairClient),
         None,
@@ -1008,12 +900,6 @@ async fn register_delete_create_non_app_entry() {
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
-        test_space
-            .space
-            .get_or_create_authored_db(fixt!(AgentPubKey))
-            .unwrap()
-            .into(),
-        test_space.space.dht_db.clone().into(),
         test_space.space.dht_store.clone(),
         fixt!(MetaLairClient),
         None,
@@ -1070,12 +956,6 @@ async fn register_delete_update_app_entry() {
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
-        test_space
-            .space
-            .get_or_create_authored_db(fixt!(AgentPubKey))
-            .unwrap()
-            .into(),
-        test_space.space.dht_db.clone().into(),
         test_space.space.dht_store.clone(),
         fixt!(MetaLairClient),
         None,
@@ -1126,12 +1006,6 @@ async fn register_delete_update_non_app_entry() {
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
-        test_space
-            .space
-            .get_or_create_authored_db(fixt!(AgentPubKey))
-            .unwrap()
-            .into(),
-        test_space.space.dht_db.clone().into(),
         test_space.space.dht_store.clone(),
         fixt!(MetaLairClient),
         None,
@@ -1174,12 +1048,6 @@ async fn register_create_link() {
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
-        test_space
-            .space
-            .get_or_create_authored_db(fixt!(AgentPubKey))
-            .unwrap()
-            .into(),
-        test_space.space.dht_db.clone().into(),
         test_space.space.dht_store.clone(),
         fixt!(MetaLairClient),
         None,
@@ -1215,12 +1083,6 @@ async fn register_delete_link() {
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
     let workspace = HostFnWorkspaceRead::new(
-        test_space
-            .space
-            .get_or_create_authored_db(fixt!(AgentPubKey))
-            .unwrap()
-            .into(),
-        test_space.space.dht_db.clone().into(),
         test_space.space.dht_store.clone(),
         fixt!(MetaLairClient),
         None,

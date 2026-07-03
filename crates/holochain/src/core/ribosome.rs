@@ -204,7 +204,7 @@ impl HostContext {
         match self.clone() {
             Self::ZomeCall(ZomeCallHostAccess { workspace, .. })
             | Self::Init(InitHostAccess { workspace, .. })
-            | Self::PostCommit(PostCommitHostAccess { workspace, .. }) => Some(workspace.into()),
+            | Self::PostCommit(PostCommitHostAccess { workspace, .. }) => Some(workspace),
             Self::Validate(ValidateHostAccess { workspace, .. }) => Some(workspace),
             _ => None,
         }

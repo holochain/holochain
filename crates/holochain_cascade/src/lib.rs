@@ -185,20 +185,11 @@ impl CascadeImpl {
     }
 
     /// Construct a [Cascade] with network access
-    pub fn from_workspace_and_network<AuthorDb, DhtDb>(
-        workspace: &HostFnWorkspace<AuthorDb, DhtDb>,
+    pub fn from_workspace_and_network(
+        workspace: &HostFnWorkspace,
         network: DynHolochainP2pDna,
-    ) -> CascadeImpl
-    where
-        AuthorDb: ReadAccess<DbKindAuthored>,
-        DhtDb: ReadAccess<DbKindDht>,
-    {
-        let HostFnStores {
-            authored: _,
-            dht: _,
-            scratch,
-            dht_store,
-        } = workspace.stores();
+    ) -> CascadeImpl {
+        let HostFnStores { scratch, dht_store } = workspace.stores();
         let dht_store =
             dht_store.expect("HostFnWorkspace always populates dht_store; this is a bug");
         let private_data = workspace.author();
@@ -214,12 +205,7 @@ impl CascadeImpl {
 
     /// Construct a [Cascade] with local-only access to the provided stores
     pub fn from_workspace_stores(stores: HostFnStores, author: Option<Arc<AgentPubKey>>) -> Self {
-        let HostFnStores {
-            authored: _,
-            dht: _,
-            scratch,
-            dht_store,
-        } = stores;
+        let HostFnStores { scratch, dht_store } = stores;
         let dht_store =
             dht_store.expect("HostFnWorkspace always populates dht_store; this is a bug");
         Self {

@@ -372,12 +372,6 @@ async fn validation_callback_rejects_op_depending_on_invalid_op() {
     let test_space = TestSpace::new(dna_hash.clone());
     let alice = fixt!(AgentPubKey);
     let workspace = HostFnWorkspaceRead::new(
-        test_space
-            .space
-            .get_or_create_authored_db(alice.clone())
-            .unwrap()
-            .into(),
-        test_space.space.dht_db.clone().into(),
         test_space.space.dht_store.clone(),
         fixt!(MetaLairClient),
         None,
@@ -485,19 +479,10 @@ impl TestCase {
         let keystore = holochain_keystore::test_keystore();
         let alice = keystore.new_sign_keypair_random().await.unwrap();
         let bob = keystore.new_sign_keypair_random().await.unwrap();
-        let workspace = HostFnWorkspaceRead::new(
-            test_space
-                .space
-                .get_or_create_authored_db(alice.clone())
-                .unwrap()
-                .into(),
-            test_space.space.dht_db.clone().into(),
-            test_space.space.dht_store.clone(),
-            keystore.clone(),
-            None,
-        )
-        .await
-        .unwrap();
+        let workspace =
+            HostFnWorkspaceRead::new(test_space.space.dht_store.clone(), keystore.clone(), None)
+                .await
+                .unwrap();
         Self {
             zomes_to_invoke,
             test_space,

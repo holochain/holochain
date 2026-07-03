@@ -161,8 +161,6 @@ impl HostFnCaller {
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self), fields(cell_id = %self.zome_path.cell_id())))]
     pub async fn unpack(&self) -> (Arc<Ribosome>, Arc<CallContext>, SourceChainWorkspace) {
         let HostFnCaller {
-            authored_db,
-            dht_db,
             dht_store,
             network,
             keystore,
@@ -170,19 +168,15 @@ impl HostFnCaller {
             signal_tx,
             zome_path,
             call_zome_handle,
+            ..
         } = self.clone();
 
         let (cell_id, zome_name) = zome_path.into();
 
-        let workspace = SourceChainWorkspace::new(
-            authored_db,
-            dht_db,
-            dht_store,
-            keystore.clone(),
-            cell_id.agent_pubkey().clone(),
-        )
-        .await
-        .unwrap();
+        let workspace =
+            SourceChainWorkspace::new(dht_store, keystore.clone(), cell_id.agent_pubkey().clone())
+                .await
+                .unwrap();
         let host_access = ZomeCallHostAccess::new(
             workspace.clone().into(),
             keystore,
