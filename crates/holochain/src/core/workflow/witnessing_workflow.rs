@@ -9,6 +9,7 @@ use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, EntryHash};
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::prelude::*;
+use holochain_zome_types::dht_v2::from_legacy_action;
 use std::collections::HashMap;
 
 /// A cheaply cloneable, thread-safe and in-memory store for
@@ -75,6 +76,15 @@ pub(crate) async fn witnessing_workflow(
     // For each complete session notify the agents of success.
     for (agents, actions) in notify_agents {
         tracing::debug!("Witnessing ready, notifying agents {:?}", agents);
+        // The network message carries v2 signed actions; the witnessing map
+        // itself stays legacy (built directly from legacy `ChainOp`s above),
+        // so convert at this network boundary.
+        let actions = actions
+            .into_iter()
+            .map(|legacy| {
+                SignedAction::new(from_legacy_action(legacy.data()), legacy.signature().clone())
+            })
+            .collect();
         if let Err(e) = network
             .countersigning_session_negotiation(
                 agents,
@@ -152,7 +162,9 @@ pub(crate) fn receive_incoming_countersigning_ops(
 
 type AgentsToNotify = Vec<AgentPubKey>;
 type Ops = Vec<(DhtOpHash, ChainOp)>;
-type SignedActions = Vec<SignedAction>;
+// The witnessing map holds legacy `ChainOp`s, so the actions notified to
+// cosigning agents stay on the legacy representation too.
+type SignedActions = Vec<LegacySignedAction>;
 
 impl WitnessingWorkspace {
     /// Create a new empty countersigning workspace.
@@ -235,7 +247,7 @@ impl WitnessingWorkspace {
                                 // Agents to notify.
                                 agents.push(action.author().clone());
                                 // Signed actions to notify them with.
-                                actions.push(SignedAction::new(action, signature));
+                                actions.push(LegacySignedAction::new(action, signature));
                                 // Ops to validate.
                                 ops.push((op_hash, op));
                                 (agents, ops, actions)

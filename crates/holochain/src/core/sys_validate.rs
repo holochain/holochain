@@ -10,6 +10,14 @@ use holochain_keystore::AgentPubKeyExt;
 pub use holochain_state::source_chain::SourceChainError;
 pub use holochain_state::source_chain::SourceChainResult;
 use holochain_types::prelude::*;
+use holochain_zome_types::dht_v2::{from_legacy_action, CreateData, DnaData, UpdateData};
+// Signature verification and the countersigning action-set check operate on
+// the legacy action representation: every signature in the system is over
+// the legacy serialized bytes, which differ from the v2 projection, and the
+// v2 -> legacy conversion is lossy on weight, so it cannot reconstruct the
+// signed bytes. `LegacyAction`/`LegacyRecord` pin those code paths.
+use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
+use holochain_zome_types::dependencies::holochain_integrity_types::record::Record as LegacyRecord;
 use std::sync::Arc;
 
 mod error;
@@ -28,13 +36,23 @@ pub const MAX_ENTRY_SIZE: usize = ENTRY_SIZE_LIMIT;
 /// fast lookup so they should be small.
 pub const MAX_TAG_SIZE: usize = 1000;
 
-/// Verify the signature for this action
-pub async fn verify_action_signature(sig: &Signature, action: &Action) -> SysValidationResult<()> {
+/// Verify the signature for this action.
+///
+/// This runs on the legacy action representation: the signature is over the
+/// legacy serialized bytes, so verification must happen before any v2
+/// conversion (which is lossy on weight and would never match).
+pub async fn verify_action_signature(
+    sig: &Signature,
+    action: &LegacyAction,
+) -> SysValidationResult<()> {
     if action.signer().verify_signature(sig, action).await? {
         Ok(())
     } else {
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::CounterfeitAction((*sig).clone(), Box::new((*action).clone())),
+            ValidationOutcome::CounterfeitAction(
+                (*sig).clone(),
+                Box::new(from_legacy_action(action)),
+            ),
         ))
     }
 }
@@ -55,6 +73,10 @@ pub async fn verify_warrant_signature(warrant_op: &WarrantOp) -> SysValidationRe
 }
 
 /// Verify the countersigning session contains the specified action.
+///
+/// Countersigning session actions are built with `EntryRateWeight` (a legacy
+/// concept the v2 model discards), so this stays on the legacy
+/// representation throughout.
 pub fn check_countersigning_session_data_contains_action(
     entry_hash: EntryHash,
     session_data: &CounterSigningSessionData,
@@ -69,10 +91,10 @@ pub fn check_countersigning_session_data_contains_action(
         .map_err(SysValidationError::from)?
         .iter()
         .any(|session_action| match (&action, session_action) {
-            (NewEntryActionRef::Create(create), Action::Create(session_create)) => {
+            (NewEntryActionRef::Create(create), LegacyAction::Create(session_create)) => {
                 create == &session_create
             }
-            (NewEntryActionRef::Update(update), Action::Update(session_update)) => {
+            (NewEntryActionRef::Update(update), LegacyAction::Update(session_update)) => {
                 update == &session_update
             }
             _ => false,
@@ -160,7 +182,7 @@ pub async fn check_countersigning_session_data(
 /// - Dna can never have a prev_action, and must have seq == 0.
 /// - All other actions must have prev_action, and seq > 0.
 pub fn check_prev_action(action: &Action) -> SysValidationResult<()> {
-    let is_dna = matches!(action, Action::Dna(_));
+    let is_dna = matches!(action.data, ActionData::Dna(_));
     let has_prev = action.prev_action().is_some();
     let is_first = action.action_seq() == 0;
     #[allow(clippy::collapsible_else_if)]
@@ -184,10 +206,12 @@ pub fn check_prev_action(action: &Action) -> SysValidationResult<()> {
 
 /// Check that Dna actions are only added to empty source chains
 pub fn check_valid_if_dna(action: &Action, dna_hash: &DnaHash) -> SysValidationResult<()> {
-    match action {
-        Action::Dna(a) => {
-            if a.hash != *dna_hash {
-                Err(ValidationOutcome::WrongDna(a.hash.clone(), dna_hash.clone()).into())
+    match &action.data {
+        ActionData::Dna(DnaData {
+            dna_hash: action_dna_hash,
+        }) => {
+            if action_dna_hash != dna_hash {
+                Err(ValidationOutcome::WrongDna(action_dna_hash.clone(), dna_hash.clone()).into())
             } else {
                 Ok(())
             }
@@ -201,35 +225,30 @@ pub fn check_agent_validation_pkg_predecessor(
     action: &Action,
     prev_action: &Action,
 ) -> SysValidationResult<()> {
-    let maybe_error = match (prev_action, action) {
-        (
-            Action::AgentValidationPkg(AgentValidationPkg { .. }),
-            Action::Create(Create {
+    let is_agent_pubkey_entry_action = |a: &Action| {
+        matches!(
+            &a.data,
+            ActionData::Create(CreateData {
+                entry_type: EntryType::AgentPubKey,
+                ..
+            }) | ActionData::Update(UpdateData {
                 entry_type: EntryType::AgentPubKey,
                 ..
             })
-            | Action::Update(Update {
-                entry_type: EntryType::AgentPubKey,
-                ..
-            }),
-        ) => None,
-        (Action::AgentValidationPkg(AgentValidationPkg { .. }), _) => Some(
+        )
+    };
+    let prev_is_avp = matches!(prev_action.data, ActionData::AgentValidationPkg(_));
+    let action_is_agent_pubkey_entry = is_agent_pubkey_entry_action(action);
+
+    let maybe_error = match (prev_is_avp, action_is_agent_pubkey_entry) {
+        (true, true) => None,
+        (true, false) => Some(
             "Every AgentValidationPkg must be followed by a Create or Update for an AgentPubKey",
         ),
-        (
-            _,
-            Action::Create(Create {
-                entry_type: EntryType::AgentPubKey,
-                ..
-            })
-            | Action::Update(Update {
-                entry_type: EntryType::AgentPubKey,
-                ..
-            }),
-        ) => Some(
+        (false, true) => Some(
             "Every Create or Update for an AgentPubKey must be preceded by an AgentValidationPkg",
         ),
-        _ => None,
+        (false, false) => None,
     };
 
     if let Some(error) = maybe_error {
@@ -293,7 +312,7 @@ pub fn check_entry_visibility(op: &ChainOp) -> SysValidationResult<()> {
 
     let err = |reason: &str| {
         Err(ValidationOutcome::MalformedDhtOp(
-            Box::new(op.action()),
+            Box::new(from_legacy_action(&op.action())),
             op.get_type(),
             reason.to_string(),
         )
@@ -337,8 +356,8 @@ pub fn check_entry_hash(hash: &EntryHash, entry: &Entry) -> SysValidationResult<
 /// Check the action should have an entry.
 /// Is either a Create or Update
 pub fn check_new_entry_action(action: &Action) -> SysValidationResult<()> {
-    match action {
-        Action::Create(_) | Action::Update(_) => Ok(()),
+    match action.data {
+        ActionData::Create(_) | ActionData::Update(_) => Ok(()),
         _ => Err(ValidationOutcome::NotNewEntry(Box::new(action.clone())).into()),
     }
 }
@@ -373,21 +392,28 @@ pub fn check_tag_size(tag: &LinkTag) -> SysValidationResult<()> {
 
 /// Check a Update's entry type is the same for
 /// original and new entry.
+///
+/// `original_entry_action` is looked up from the validation dependencies,
+/// which store v2 actions, so this takes the v2 `Action` directly rather
+/// than the legacy `NewEntryActionRef` (which cannot represent a v2 action).
 pub fn check_update_reference(
     update: &Update,
-    original_entry_action: &NewEntryActionRef<'_>,
+    original_entry_action: &Action,
 ) -> SysValidationResult<()> {
-    if update.entry_type != *original_entry_action.entry_type() {
-        return Err(ValidationOutcome::UpdateTypeMismatch(
-            original_entry_action.entry_type().clone(),
-            update.entry_type.clone(),
-        )
-        .into());
+    let (entry_hash, entry_type) = original_entry_action.entry_data().ok_or_else(|| {
+        ValidationOutcome::NotNewEntry(Box::new(original_entry_action.clone()))
+    })?;
+
+    if update.entry_type != *entry_type {
+        return Err(
+            ValidationOutcome::UpdateTypeMismatch(entry_type.clone(), update.entry_type.clone())
+                .into(),
+        );
     }
 
-    if update.original_entry_address != *original_entry_action.entry_hash() {
+    if update.original_entry_address != *entry_hash {
         return Err(ValidationOutcome::UpdateHashMismatch(
-            original_entry_action.entry_hash().clone(),
+            entry_hash.clone(),
             update.original_entry_address.clone(),
         )
         .into());
@@ -404,16 +430,16 @@ pub trait DhtOpSender {
     async fn send_op(&self, op: DhtOp) -> SysValidationResult<()>;
 
     /// Send a StoreRecord DhtOp
-    async fn send_store_record(&self, record: Record) -> SysValidationResult<()>;
+    async fn send_store_record(&self, record: LegacyRecord) -> SysValidationResult<()>;
 
     /// Send a StoreEntry DhtOp
-    async fn send_store_entry(&self, record: Record) -> SysValidationResult<()>;
+    async fn send_store_entry(&self, record: LegacyRecord) -> SysValidationResult<()>;
 
     /// Send a RegisterAddLink DhtOp
-    async fn send_register_add_link(&self, record: Record) -> SysValidationResult<()>;
+    async fn send_register_add_link(&self, record: LegacyRecord) -> SysValidationResult<()>;
 
     /// Send a RegisterAgentActivity DhtOp
-    async fn send_register_agent_activity(&self, record: Record) -> SysValidationResult<()>;
+    async fn send_register_agent_activity(&self, record: LegacyRecord) -> SysValidationResult<()>;
 }
 
 /// Allows you to send an op to the
@@ -442,11 +468,11 @@ impl DhtOpSender for IncomingDhtOpSender {
         .map_err(Box::new)?)
     }
 
-    async fn send_store_record(&self, record: Record) -> SysValidationResult<()> {
+    async fn send_store_record(&self, record: LegacyRecord) -> SysValidationResult<()> {
         self.send_op(make_store_record(record).into()).await
     }
 
-    async fn send_store_entry(&self, record: Record) -> SysValidationResult<()> {
+    async fn send_store_entry(&self, record: LegacyRecord) -> SysValidationResult<()> {
         // TODO: MD: isn't it already too late if we've received a private entry from the network at this point?
         let is_public_entry = record
             .action()
@@ -460,7 +486,7 @@ impl DhtOpSender for IncomingDhtOpSender {
         Ok(())
     }
 
-    async fn send_register_add_link(&self, record: Record) -> SysValidationResult<()> {
+    async fn send_register_add_link(&self, record: LegacyRecord) -> SysValidationResult<()> {
         if let Some(op) = make_register_add_link(record) {
             self.send_op(op.into()).await?;
         }
@@ -468,7 +494,7 @@ impl DhtOpSender for IncomingDhtOpSender {
         Ok(())
     }
 
-    async fn send_register_agent_activity(&self, record: Record) -> SysValidationResult<()> {
+    async fn send_register_agent_activity(&self, record: LegacyRecord) -> SysValidationResult<()> {
         self.send_op(make_register_agent_activity(record).into())
             .await
     }
@@ -481,7 +507,7 @@ impl DhtOpSender for IncomingDhtOpSender {
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_store_record(record: Record) -> ChainOp {
+fn make_store_record(record: LegacyRecord) -> ChainOp {
     // Extract the data
     let (shh, record_entry) = record.privatized().0.into_inner();
     let (action, signature) = shh.into_inner();
@@ -498,7 +524,7 @@ fn make_store_record(record: Record) -> ChainOp {
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_store_entry(record: Record) -> Option<ChainOp> {
+fn make_store_entry(record: LegacyRecord) -> Option<ChainOp> {
     // Extract the data
     let (shh, record_entry) = record.into_inner();
     let (action, signature) = shh.into_inner();
@@ -519,7 +545,7 @@ fn make_store_entry(record: Record) -> Option<ChainOp> {
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_register_add_link(record: Record) -> Option<ChainOp> {
+fn make_register_add_link(record: LegacyRecord) -> Option<ChainOp> {
     // Extract the data
     let (shh, _) = record.into_inner();
     let (action, signature) = shh.into_inner();
@@ -538,7 +564,7 @@ fn make_register_add_link(record: Record) -> Option<ChainOp> {
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_register_agent_activity(record: Record) -> ChainOp {
+fn make_register_agent_activity(record: LegacyRecord) -> ChainOp {
     // Extract the data
     let (shh, _) = record.into_inner();
     let (action, signature) = shh.into_inner();
