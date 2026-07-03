@@ -5,6 +5,8 @@
 use hdi::prelude::*;
 use hdi::test_utils::set_zome_types;
 
+mod op_v2;
+
 fn to_coords(t: impl Into<ZomeLinkTypesKey>) -> (u8, u8) {
     let t = t.into();
     (t.zome_index.0, t.type_index.0)
