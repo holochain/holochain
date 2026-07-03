@@ -1,6 +1,6 @@
-//! v2 of [`FlatOp`](crate::flat_op::FlatOp), expressed over the v2
-//! `holochain_integrity_types::dht_v2::Action`. Transitional staging module;
-//! promoted to replace `flat_op` in the legacy-deletion phase.
+//! [`FlatOp`] flattens a v2 [`Op`](holochain_integrity_types::dht_v2::Op)
+//! into a flatter, more accessible shape than [`Op`]'s deeply nested variants,
+//! expressed over the v2 `holochain_integrity_types::dht_v2::Action`.
 
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, DnaHash, EntryHash};
 use holochain_integrity_types::dht_v2::Action;
@@ -13,26 +13,26 @@ pub use flat_op_activity::*;
 pub use flat_op_entry::*;
 pub use flat_op_record::*;
 
-/// v2 of [`FlatOp`](crate::flat_op::FlatOp), over the v2 `dht_v2::Action`.
+/// A flattened view of a v2 [`Op`](holochain_integrity_types::dht_v2::Op),
+/// grouped by authority (record, entry, agent activity, link) rather than by
+/// the underlying action variant.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FlatOp<ET, LT>
 where
     ET: UnitEnum,
 {
-    /// See [`crate::flat_op::FlatOp::StoreRecord`].
+    /// Received by the action authority; see [`OpRecord`].
     StoreRecord(OpRecord<ET, LT>),
-    /// See [`crate::flat_op::FlatOp::StoreEntry`].
+    /// Received by the entry authority; see [`OpEntry`].
     StoreEntry(OpEntry<ET>),
-    /// See [`crate::flat_op::FlatOp::RegisterAgentActivity`].
+    /// Received by the chain authority for every action; see [`OpActivity`].
     RegisterAgentActivity(OpActivity<<ET as UnitEnum>::Unit, LT>),
     /// A link create or delete operation, grouped into [`OpLink`] to mirror the
-    /// [`OpRecord`]/[`OpEntry`]/[`OpActivity`] sub-types. See
-    /// [`crate::flat_op::FlatOp::RegisterCreateLink`] /
-    /// [`crate::flat_op::FlatOp::RegisterDeleteLink`].
+    /// [`OpRecord`]/[`OpEntry`]/[`OpActivity`] sub-types.
     RegisterLink(OpLink<LT>),
-    /// See [`crate::flat_op::FlatOp::RegisterUpdate`].
+    /// Received by the entry authority when an entry is updated; see [`OpUpdate`].
     RegisterUpdate(OpUpdate<ET>),
-    /// See [`crate::flat_op::FlatOp::RegisterDelete`].
+    /// Received by the entry authority when an entry is deleted; see [`OpDelete`].
     RegisterDelete(OpDelete),
 }
 

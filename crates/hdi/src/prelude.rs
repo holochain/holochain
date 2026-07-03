@@ -9,7 +9,7 @@ pub use crate::entry_types;
 /// Needed as a noop for map_extern! when trace is off.
 #[cfg(not(feature = "trace"))]
 pub use crate::error;
-pub use crate::flat_op::*;
+pub use crate::flat_op_v2::*;
 pub use crate::hash::*;
 pub use crate::hash_path::anchor::Anchor;
 pub use crate::hash_path::path::Component;
@@ -24,7 +24,7 @@ pub use crate::map_extern;
 pub use crate::map_extern::ExternResult;
 pub use crate::map_extern_infallible;
 pub use crate::map_extern_preamble;
-pub use crate::op::*;
+pub use crate::op_v2::*;
 pub use crate::x_salsa20_poly1305::ed_25519_x_salsa20_poly1305_decrypt;
 pub use crate::x_salsa20_poly1305::x_25519_x_salsa20_poly1305_decrypt;
 pub use crate::x_salsa20_poly1305::x_salsa20_poly1305_decrypt;
@@ -60,6 +60,23 @@ pub use std::convert::TryFrom;
 pub use tracing;
 #[cfg(feature = "trace")]
 pub use tracing::{debug, error, info, instrument, trace, warn};
+
+// `holochain_integrity_types::prelude` re-exports the legacy per-variant
+// `Op`/`Action`/`Record` types (and the `Op` variant structs), which share
+// names with the v2 `dht_v2` versions. These explicit re-exports resolve
+// the ambiguity in favor of the v2 types.
+pub use holochain_integrity_types::dht_v2::{
+    Action, ActionData, ActionHeader, ActionType, AgentValidationPkgData, CloseChainData,
+    CreateData, CreateLinkData, DeleteData, DeleteLinkData, DnaData, InitZomesCompleteData, Op,
+    OpenChainData, Record, RegisterAgentActivity, RegisterCreateLink, RegisterDelete,
+    RegisterDeleteLink, RegisterUpdate, StoreEntry, StoreRecord, UpdateData,
+};
+
+/// A v2 [`Action`] that is both hashed and signed. `holochain_integrity_types`
+/// only defines this alias over the legacy per-variant `Action`
+/// (`holochain_integrity_types::record::SignedActionHashed`); this alias
+/// hides that name behind the v2 [`Action`].
+pub type SignedActionHashed = holochain_integrity_types::record::SignedHashed<Action>;
 
 /// Needed as a noop for map_extern! when trace is off.
 #[doc(hidden)]

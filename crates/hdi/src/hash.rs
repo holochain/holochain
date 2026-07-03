@@ -215,5 +215,5 @@ where
 /// which already has associated methods to access the [`ActionHash`] of the inner [`Action`]. In
 /// normal usage it is unlikely to be required to separately hash a [`Action`] like this.
 pub fn hash_action(input: Action) -> ExternResult<ActionHash> {
-    Ok(ActionHashed::from_content_sync(input).into_hash())
+    Ok(HoloHashed::<Action>::from_content_sync(input).into_hash())
 }

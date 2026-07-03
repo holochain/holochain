@@ -1,7 +1,6 @@
-//! v2 of [`OpHelper`](crate::op::OpHelper): flattens a v2
-//! [`Op`](holochain_integrity_types::dht_v2::Op) into the v2
-//! [`FlatOp`](crate::flat_op_v2::FlatOp). Transitional staging module; promoted
-//! to replace `op`'s helper in the legacy-deletion phase.
+//! [`OpHelper`] flattens a v2 [`Op`](holochain_integrity_types::dht_v2::Op)
+//! into the v2 [`FlatOp`](crate::flat_op_v2::FlatOp), for use in the
+//! `validate` callback.
 
 use crate::prelude::*;
 
@@ -19,11 +18,18 @@ pub trait OpHelper {
 }
 
 use crate::flat_op_v2;
-use crate::op::{
-    activity_entry, activity_link_type, get_app_entry_type_for_record_authority,
-    get_app_entry_type_for_store_entry_authority, in_scope_link_type, ActivityEntry,
-};
 use holochain_integrity_types::dht_v2::{self, ActionData};
+
+/// All possible variants that a [`dht_v2::RegisterAgentActivity`] with an
+/// action that has an [`EntryType`] can produce.
+#[derive(Debug)]
+pub(crate) enum ActivityEntry<Unit> {
+    App { entry_type: Option<Unit> },
+    PrivateApp { entry_type: Option<Unit> },
+    Agent(AgentPubKey),
+    CapClaim,
+    CapGrant,
+}
 
 impl OpHelper for dht_v2::Op {
     fn flattened<ET, LT>(&self) -> Result<flat_op_v2::FlatOp<ET, LT>, WasmError>
@@ -302,10 +308,10 @@ impl OpHelper for dht_v2::Op {
                                 agent,
                                 action: a.clone(),
                             },
-                            ActivityEntry::CapClaim(_) => {
+                            ActivityEntry::CapClaim => {
                                 flat_op_v2::OpActivity::CreateCapClaim { action: a.clone() }
                             }
-                            ActivityEntry::CapGrant(_) => {
+                            ActivityEntry::CapGrant => {
                                 flat_op_v2::OpActivity::CreateCapGrant { action: a.clone() }
                             }
                         }
@@ -334,12 +340,12 @@ impl OpHelper for dht_v2::Op {
                                 new_key,
                                 action: a.clone(),
                             },
-                            ActivityEntry::CapClaim(_) => flat_op_v2::OpActivity::UpdateCapClaim {
+                            ActivityEntry::CapClaim => flat_op_v2::OpActivity::UpdateCapClaim {
                                 original_action_hash: d.original_action_address.clone(),
                                 original_entry_hash: d.original_entry_address.clone(),
                                 action: a.clone(),
                             },
-                            ActivityEntry::CapGrant(_) => flat_op_v2::OpActivity::UpdateCapGrant {
+                            ActivityEntry::CapGrant => flat_op_v2::OpActivity::UpdateCapGrant {
                                 original_action_hash: d.original_action_address.clone(),
                                 original_entry_hash: d.original_entry_address.clone(),
                                 action: a.clone(),
@@ -447,6 +453,170 @@ fn cap_grant_entry(entry: &Entry) -> Result<CapGrantEntry, WasmError> {
             "Entry type does not match. CapGrant expected but got: {entry:?}"
         )))),
     }
+}
+
+/// Produces the user-defined entry type enum. Even if the entry is private, this will succeed.
+/// To be used only in the context of a StoreEntry authority.
+pub(crate) fn get_app_entry_type_for_store_entry_authority<ET>(
+    entry_def: &AppEntryDef,
+    entry: &Entry,
+) -> Result<ET, WasmError>
+where
+    ET: EntryTypesHelper + UnitEnum,
+    <ET as UnitEnum>::Unit: Into<ZomeEntryTypesKey>,
+    WasmError: From<<ET as EntryTypesHelper>::Error>,
+{
+    let entry_type = <ET as EntryTypesHelper>::deserialize_from_type(
+        entry_def.zome_index,
+        entry_def.entry_index,
+        entry,
+    )?;
+    match entry_type {
+        Some(entry_type) => Ok(entry_type),
+        None => Err(deny_other_zome()),
+    }
+}
+
+/// Produces the user-defined entry type enum or the unit enum if entry is not present.
+/// To be used only in the context of a StoreRecord or AgentActivity authority.
+/// If the entry's availability does not match the defined visibility, an error will result.
+pub(crate) fn get_app_entry_type_for_record_authority<ET>(
+    entry_def: &AppEntryDef,
+    entry: Option<&Entry>,
+) -> Result<UnitEnumEither<ET>, WasmError>
+where
+    ET: EntryTypesHelper + UnitEnum,
+    <ET as UnitEnum>::Unit: Into<ZomeEntryTypesKey>,
+    WasmError: From<<ET as EntryTypesHelper>::Error>,
+{
+    let AppEntryDef {
+        zome_index,
+        entry_index: entry_def_index,
+        visibility,
+        ..
+    } = entry_def;
+    match (entry, visibility) {
+        (Some(entry), EntryVisibility::Public) => {
+            get_app_entry_type_for_store_entry_authority(entry_def, entry).map(UnitEnumEither::Enum)
+        }
+
+        (None, EntryVisibility::Private) => {
+            match get_unit_entry_type::<ET>(*zome_index, *entry_def_index)? {
+                Some(unit) => Ok(UnitEnumEither::Unit(unit)),
+                None => Err(deny_other_zome()),
+            }
+        }
+
+        (Some(_), EntryVisibility::Private) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Entry visibility is private but an entry was provided! entry_def: {entry_def:?}"
+        )))),
+
+        (None, EntryVisibility::Public) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Entry visibility is public but no entry is available. entry_def: {entry_def:?}"
+        )))),
+    }
+}
+
+/// Maps [`dht_v2::RegisterAgentActivity`] ops to their
+/// entries. The entry type will be [`None`] if
+/// the zome id is not a dependency of this zome.
+pub(crate) fn activity_entry<ET>(
+    entry_type: &EntryType,
+    entry_hash: &EntryHash,
+) -> Result<ActivityEntry<<ET as UnitEnum>::Unit>, WasmError>
+where
+    ET: UnitEnum,
+    <ET as UnitEnum>::Unit: Into<ZomeEntryTypesKey>,
+{
+    match entry_type {
+        EntryType::App(AppEntryDef {
+            zome_index,
+            entry_index: entry_def_index,
+            visibility,
+        }) => {
+            let unit = get_unit_entry_type::<ET>(*zome_index, *entry_def_index)?;
+            match visibility {
+                EntryVisibility::Public => Ok(ActivityEntry::App { entry_type: unit }),
+                EntryVisibility::Private => Ok(ActivityEntry::PrivateApp { entry_type: unit }),
+            }
+        }
+        EntryType::AgentPubKey => Ok(ActivityEntry::Agent(entry_hash.clone().into())),
+        EntryType::CapClaim => Ok(ActivityEntry::CapClaim),
+        EntryType::CapGrant => Ok(ActivityEntry::CapGrant),
+    }
+}
+
+/// Get the app defined link type from a [`ZomeIndex`] and [`LinkType`].
+/// If the [`ZomeIndex`] is not a dependency of this zome then return a host error.
+pub(crate) fn in_scope_link_type<LT>(
+    zome_index: ZomeIndex,
+    link_type: LinkType,
+) -> Result<LT, WasmError>
+where
+    LT: LinkTypesHelper,
+    WasmError: From<<LT as LinkTypesHelper>::Error>,
+{
+    match <LT as LinkTypesHelper>::from_type(*zome_index, *link_type)? {
+        Some(link_type) => Ok(link_type),
+        None => Err(deny_other_zome()),
+    }
+}
+
+/// Get the app defined link type from a [`ZomeIndex`] and [`LinkType`].
+/// If the [`ZomeIndex`] is not a dependency of this zome then return a host error.
+pub(crate) fn activity_link_type<LT>(
+    zome_index: ZomeIndex,
+    link_type: LinkType,
+) -> Result<Option<LT>, WasmError>
+where
+    LT: LinkTypesHelper,
+    WasmError: From<<LT as LinkTypesHelper>::Error>,
+{
+    Ok(<LT as LinkTypesHelper>::from_type(*zome_index, *link_type)?)
+}
+
+/// Produce the unit variant given a zome id and entry def index.
+/// Returns [`None`] if the zome id is not a dependency of this zome.
+/// Returns a [`WasmErrorInner::Guest`] error if the zome id is a
+/// dependency but the [`EntryDefIndex`] is out of range.
+fn get_unit_entry_type<ET>(
+    zome_index: ZomeIndex,
+    entry_def_index: EntryDefIndex,
+) -> Result<Option<<ET as UnitEnum>::Unit>, WasmError>
+where
+    ET: UnitEnum,
+    <ET as UnitEnum>::Unit: Into<ZomeEntryTypesKey>,
+{
+    let entries = zome_info()?.zome_types.entries;
+    let unit = entries.find(
+        <ET as UnitEnum>::unit_iter(),
+        ScopedEntryDefIndex {
+            zome_index,
+            zome_type: entry_def_index,
+        },
+    );
+    let unit = match unit {
+        Some(unit) => Some(unit),
+        None => {
+            if entries.dependencies().any(|z| z == zome_index) {
+                return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                    "Entry type: {entry_def_index:?} is out of range for this zome."
+                ))));
+            } else {
+                None
+            }
+        }
+    };
+    Ok(unit)
+}
+
+/// Produce an error because this zome
+/// should never be called with a zome id
+/// that is not a dependency.
+fn deny_other_zome() -> WasmError {
+    wasm_error!(WasmErrorInner::Host(
+        "Op called for zome it was not defined in. This is a Holochain bug".to_string()
+    ))
 }
 
 #[cfg(test)]
