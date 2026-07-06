@@ -40,9 +40,15 @@ pub async fn refresh_workspace_state(
     let mut locked_for_agent = false;
 
     let agent = cell_id.agent_pubkey().clone();
-    // Ensure the authored database exists (genesis path); the session itself is
-    // read from the DhtStore.
-    if space.get_or_create_authored_db(agent.clone()).is_ok() {
+    // Only an agent whose chain has been genesised can hold a countersigning
+    // session; the session state itself is read from the DhtStore.
+    if space
+        .dht_store
+        .as_read()
+        .has_genesis(&agent)
+        .await
+        .unwrap_or(false)
+    {
         // `get_chain_lock` returns any lock row including expired ones, so a
         // stale lock still marks the chain as locked and drives the recovery
         // path below.

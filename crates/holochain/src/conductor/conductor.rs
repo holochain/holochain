@@ -95,7 +95,6 @@ use holochain_zome_types::prelude::{AppCapGrantInfo, ClonedCell, Signature, Time
 use indexmap::IndexMap;
 use itertools::Itertools;
 use kitsune2_api::AgentInfoSigned;
-use rusqlite::Transaction;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
@@ -3253,48 +3252,15 @@ impl Conductor {
         self.admin_websocket_ports.share_mut(|p| p.push(port));
     }
 
-    async fn delete_or_purge_database<Kind: DbKindT + Send + Sync + 'static>(
-        &self,
-        db: DbWrite<Kind>,
-    ) -> ConductorResult<()> {
-        let mut path = db.path().clone();
-        if let Err(err) = ffs::remove_file(&path).await {
-            tracing::warn!(?err, "Could not remove primary DB file, probably because it is still in use. Purging all data instead.");
-            db.write_async(|txn| purge_data(txn)).await?;
-        } else {
-            tracing::info!("Deleted primary DB file {}", path.display());
-        }
-        path.set_extension("");
-        let stem = path.to_string_lossy();
-        for ext in ["shm", "wal"] {
-            let path = PathBuf::from(format!("{stem}-{ext}"));
-            if let Err(err) = ffs::remove_file(&path).await {
-                let err = err.remove_backtrace();
-                tracing::warn!(?err, "Failed to remove DB support file");
-            } else {
-                tracing::info!("Deleted file {}", path.display());
-            }
-        }
-        Ok(())
-    }
-
     /// Delete cell databases.
     ///
-    /// All data used by that cell (across Authored, DHT, and Cache databases) will also be deleted.
+    /// All DHT data for a DNA no longer used by any installed app is deleted.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn delete_cell_databases(
         &self,
         app_id: &InstalledAppId,
         cell_ids: Vec<CellId>,
     ) -> ConductorResult<()> {
-        // Delete authored database or purge data
-        for cell_id in cell_ids.clone() {
-            let authored_db = self
-                .spaces
-                .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())?;
-            self.delete_or_purge_database(authored_db).await?;
-        }
-
         // Find DNAs of this app which are not used by any other app or agent.
         let remaining_dnas = self
             .get_state()
@@ -3314,21 +3280,10 @@ impl Conductor {
             tracing::info!(?dnas_to_purge, "Purging DNAs");
         }
 
-        // For any DNAs no longer represented in any installed app,
-        // delete the DHT database or purge data.
+        // For any DNAs no longer represented in any installed app, delete the
+        // per-DNA store so a reinstall doesn't inherit stale rows from the
+        // previous installation.
         for dna_hash in dnas_to_purge {
-            // Delete all data from the DHT database.
-            // Database files will be deleted after this step, but
-            // the DB continues to exist in memory while the conductor
-            // is running, supposedly because the pool holds the connection
-            // open.
-            let dht_db = self.spaces.dht_db(dna_hash)?;
-            dht_db.write_async(|txn| purge_data(txn)).await?;
-
-            self.delete_or_purge_database(dht_db).await?;
-
-            // Remove (or purge) the per-DNA mirrored store so a reinstall
-            // doesn't inherit stale rows from the previous installation.
             let dht_store = self.spaces.dht_store(dna_hash)?;
             let dht_store_id = holochain_data::kind::Dht::new(Arc::new(dna_hash.clone()));
             let dht_store_path = self.spaces.db_dir.as_ref().as_ref().join(
@@ -3542,15 +3497,6 @@ mod test_utils_impls {
 }
 
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-fn purge_data(txn: &mut Transaction) -> DatabaseResult<()> {
-    txn.execute("DELETE FROM DhtOp", ())?;
-    txn.execute("DELETE FROM Action", ())?;
-    txn.execute("DELETE FROM Entry", ())?;
-    txn.execute("DELETE FROM ValidationReceipt", ())?;
-    txn.execute("DELETE FROM ChainLock", ())?;
-    txn.execute("DELETE FROM ScheduledFunctions", ())?;
-    Ok(())
-}
 
 /// Perform Genesis on the source chains for each of the specified CellIds.
 ///
