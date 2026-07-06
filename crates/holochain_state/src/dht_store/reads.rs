@@ -3536,13 +3536,19 @@ mod tests {
     use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, EntryHash, HoloHashed};
     use holochain_data::kind::Dht;
     use holochain_data::DbWrite;
-    use holochain_types::chain::ChainItem;
     use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
     use holochain_types::prelude::MustGetAgentActivityResponse;
     use holochain_types::prelude::Signature;
     use holochain_types::prelude::Timestamp;
-    use holochain_zome_types::action::{Action, Create, EntryType};
+    // This test module seeds the store via the legacy op pipeline
+    // (`ChainOp`/`DhtOpHashed`/`Scratch`); pin `Action` to its legacy shape.
+    // Reads through the (v2) `DhtStore` produce v2 `Record`/`Action` values,
+    // asserted via their own accessors below without needing the bare
+    // `Action` name.
     use holochain_zome_types::chain::ChainFilter;
+    use holochain_zome_types::dependencies::holochain_integrity_types::action::{
+        Action, Create, EntryType,
+    };
     use holochain_zome_types::entry_def::EntryVisibility;
     use holochain_zome_types::prelude::AppEntryDef;
     use std::sync::Arc;
@@ -4059,7 +4065,13 @@ mod tests {
             _ => unreachable!(),
         };
 
-        let result = store.as_read().find_fork_for_action(&action).await.unwrap();
+        // `find_fork_for_action` takes the v2 action shape.
+        let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
+        let result = store
+            .as_read()
+            .find_fork_for_action(&v2_action)
+            .await
+            .unwrap();
         assert!(result.is_none());
     }
 
@@ -4097,9 +4109,11 @@ mod tests {
             .await
             .unwrap();
 
+        // `find_fork_for_action` takes the v2 action shape.
+        let v2_action_b = holochain_zome_types::dht_v2::from_legacy_action(&action_b);
         let result = store
             .as_read()
-            .find_fork_for_action(&action_b)
+            .find_fork_for_action(&v2_action_b)
             .await
             .unwrap();
         let (got_hash, got_sig) = result.expect("fork should be detected");
@@ -4525,7 +4539,8 @@ mod tests {
         seq: u32,
         prev: &ActionHash,
         seed: u8,
-    ) -> holochain_zome_types::record::SignedActionHashed {
+    ) -> holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed
+    {
         let action = Action::Create(Create {
             author: author.clone(),
             timestamp: Timestamp::from_micros(seed as i64 * 10_000),
@@ -4540,7 +4555,7 @@ mod tests {
             weight: Default::default(),
         });
         let action_hashed = holochain_zome_types::action::ActionHashed::from_content_sync(action);
-        holochain_zome_types::record::SignedActionHashed::with_presigned(
+        holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed::with_presigned(
             action_hashed,
             Signature::from([seed; 64]),
         )
@@ -4878,8 +4893,8 @@ mod tests {
             MustGetAgentActivityResponse::Activity { activity, warrants } => {
                 assert_eq!(activity.len(), 3);
                 // Returned newest-first (seq DESC).
-                assert_eq!(activity[0].action.seq(), 2);
-                assert_eq!(activity[2].action.seq(), 0);
+                assert_eq!(activity[0].action.action().action_seq(), 2);
+                assert_eq!(activity[2].action.action().action_seq(), 0);
                 assert_eq!(warrants.len(), 1);
             }
             other => panic!("expected Activity, got {other:?}"),
@@ -4928,8 +4943,8 @@ mod tests {
         match resp {
             MustGetAgentActivityResponse::Activity { activity, .. } => {
                 assert_eq!(activity.len(), 2);
-                assert_eq!(activity[0].action.seq(), 2);
-                assert_eq!(activity[1].action.seq(), 1);
+                assert_eq!(activity[0].action.action().action_seq(), 2);
+                assert_eq!(activity[1].action.action().action_seq(), 1);
             }
             other => panic!("expected Activity, got {other:?}"),
         }
@@ -4978,8 +4993,8 @@ mod tests {
         match resp {
             MustGetAgentActivityResponse::Activity { activity, .. } => {
                 assert_eq!(activity.len(), 2);
-                assert_eq!(activity[0].action.seq(), 2);
-                assert_eq!(activity[1].action.seq(), 1);
+                assert_eq!(activity[0].action.action().action_seq(), 2);
+                assert_eq!(activity[1].action.action().action_seq(), 1);
             }
             other => panic!("expected Activity, got {other:?}"),
         }
@@ -5103,7 +5118,10 @@ mod tests {
 
         match resp {
             MustGetAgentActivityResponse::Activity { activity, .. } => {
-                let seqs: Vec<u32> = activity.iter().map(|a| a.action.seq()).collect();
+                let seqs: Vec<u32> = activity
+                    .iter()
+                    .map(|a| a.action.action().action_seq())
+                    .collect();
                 assert!(
                     seqs.contains(&3),
                     "scratch action at seq 3 should be in merged activity; got {seqs:?}"
@@ -5153,7 +5171,10 @@ mod tests {
                     3,
                     "store-only read must not include scratch actions"
                 );
-                let seqs: Vec<u32> = activity.iter().map(|a| a.action.seq()).collect();
+                let seqs: Vec<u32> = activity
+                    .iter()
+                    .map(|a| a.action.action().action_seq())
+                    .collect();
                 assert!(
                     !seqs.contains(&3),
                     "scratch action at seq 3 must not appear"
@@ -5250,7 +5271,8 @@ mod tests {
     fn make_signed_action_for_entry(
         seed: u8,
         entry_hash: EntryHash,
-    ) -> holochain_zome_types::record::SignedActionHashed {
+    ) -> holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed
+    {
         let action = Action::Create(Create {
             author: AgentPubKey::from_raw_36(vec![seed; 36]),
             timestamp: Timestamp::from_micros(seed as i64 * 1000),
@@ -5265,7 +5287,7 @@ mod tests {
             weight: Default::default(),
         });
         let action_hashed = holochain_zome_types::action::ActionHashed::from_content_sync(action);
-        holochain_zome_types::record::SignedActionHashed::with_presigned(
+        holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed::with_presigned(
             action_hashed,
             Signature::from([seed; 64]),
         )
@@ -5273,7 +5295,10 @@ mod tests {
 
     /// Build a `SignedActionHashed` (legacy) for a `Create` with no entry
     /// (simulates an action that is in the scratch but whose entry is missing).
-    fn make_signed_action_no_entry(seed: u8) -> holochain_zome_types::record::SignedActionHashed {
+    fn make_signed_action_no_entry(
+        seed: u8,
+    ) -> holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed
+    {
         // Use a Dna action — it carries no entry hash.
         use holochain_zome_types::action::Dna;
         let action = Action::Dna(Dna {
@@ -5282,7 +5307,7 @@ mod tests {
             hash: holo_hash::DnaHash::from_raw_36(vec![seed; 36]),
         });
         let action_hashed = holochain_zome_types::action::ActionHashed::from_content_sync(action);
-        holochain_zome_types::record::SignedActionHashed::with_presigned(
+        holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed::with_presigned(
             action_hashed,
             Signature::from([seed; 64]),
         )
@@ -5290,7 +5315,7 @@ mod tests {
 
     /// Build a scratch containing a single action.
     fn scratch_with_action(
-        sah: holochain_zome_types::record::SignedActionHashed,
+        sah: holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed,
     ) -> crate::scratch::SyncScratch {
         let mut scratch = crate::scratch::Scratch::new();
         scratch.add_action(sah, holochain_zome_types::action::ChainTopOrdering::Relaxed);
@@ -5299,7 +5324,7 @@ mod tests {
 
     /// Build a scratch containing an action + its entry.
     fn scratch_with_action_and_entry(
-        sah: holochain_zome_types::record::SignedActionHashed,
+        sah: holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed,
         entry: holochain_types::prelude::Entry,
         entry_hash: EntryHash,
     ) -> crate::scratch::SyncScratch {
@@ -5668,7 +5693,7 @@ mod tests {
             weight: Default::default(),
         });
         let action_hashed = holochain_zome_types::action::ActionHashed::from_content_sync(delete);
-        let sah = holochain_zome_types::record::SignedActionHashed::with_presigned(
+        let sah = holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed::with_presigned(
             action_hashed,
             Signature::from([seed; 64]),
         );
@@ -6041,7 +6066,7 @@ mod tests {
             weight: Default::default(),
         });
         let delete_hashed = holochain_zome_types::action::ActionHashed::from_content_sync(delete);
-        let delete_sah = holochain_zome_types::record::SignedActionHashed::with_presigned(
+        let delete_sah = holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed::with_presigned(
             delete_hashed,
             Signature::from([seed.wrapping_add(10); 64]),
         );
@@ -6068,7 +6093,7 @@ mod tests {
             weight: Default::default(),
         });
         let update_hashed = holochain_zome_types::action::ActionHashed::from_content_sync(update);
-        let update_sah = holochain_zome_types::record::SignedActionHashed::with_presigned(
+        let update_sah = holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed::with_presigned(
             update_hashed,
             Signature::from([seed.wrapping_add(20); 64]),
         );
@@ -6313,7 +6338,7 @@ mod tests {
             weight: Default::default(),
         });
         scratch.add_action(
-            holochain_zome_types::record::SignedActionHashed::with_presigned(
+            holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed::with_presigned(
                 holochain_zome_types::action::ActionHashed::from_content_sync(delete),
                 Signature::from([seed.wrapping_add(10); 64]),
             ),
@@ -6337,7 +6362,7 @@ mod tests {
             weight: Default::default(),
         });
         scratch.add_action(
-            holochain_zome_types::record::SignedActionHashed::with_presigned(
+            holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed::with_presigned(
                 holochain_zome_types::action::ActionHashed::from_content_sync(update),
                 Signature::from([seed.wrapping_add(20); 64]),
             ),
@@ -6480,7 +6505,8 @@ mod tests {
         link_type: u8,
         tag_bytes: Vec<u8>,
         seed: u8,
-    ) -> holochain_zome_types::record::SignedActionHashed {
+    ) -> holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed
+    {
         use holochain_zome_types::action::CreateLink;
         use holochain_zome_types::link::LinkTag;
 
@@ -6500,7 +6526,7 @@ mod tests {
             weight: Default::default(),
         });
         let action_hashed = holochain_zome_types::action::ActionHashed::from_content_sync(action);
-        holochain_zome_types::record::SignedActionHashed::with_presigned(
+        holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed::with_presigned(
             action_hashed,
             Signature::from([seed; 64]),
         )
@@ -6511,7 +6537,8 @@ mod tests {
         base: &holo_hash::AnyLinkableHash,
         create_link_hash: holo_hash::ActionHash,
         seed: u8,
-    ) -> holochain_zome_types::record::SignedActionHashed {
+    ) -> holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed
+    {
         use holochain_zome_types::action::DeleteLink;
 
         let action = Action::DeleteLink(DeleteLink {
@@ -6523,7 +6550,7 @@ mod tests {
             link_add_address: create_link_hash,
         });
         let action_hashed = holochain_zome_types::action::ActionHashed::from_content_sync(action);
-        holochain_zome_types::record::SignedActionHashed::with_presigned(
+        holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed::with_presigned(
             action_hashed,
             Signature::from([seed; 64]),
         )
@@ -6858,23 +6885,31 @@ mod tests {
     // it. These are ported from the pre-v2 cascade `get_agent_activity_query`
     // unit tests and exercise `build_agent_activity_response` directly.
 
-    fn mk_record(action: Action) -> holochain_types::prelude::Record {
-        let shh = holochain_zome_types::record::SignedActionHashed::with_presigned(
-            holochain_zome_types::action::ActionHashed::from_content_sync(action),
-            Signature::from([0; 64]),
-        );
-        holochain_types::prelude::Record::new(shh, None)
+    // `build_agent_activity_response` (unlike the (v2) DhtStore reads exercised
+    // elsewhere in this file) is generic over any `T: ActionHashedContainer +
+    // Clone` with `Vec<T>: ChainItemsSource`; the legacy `ActionHashed` (=
+    // `HoloHashed<legacy Action>`) is the only type satisfying both bounds
+    // (legacy `Record` implements `ActionHashedContainer` but not
+    // `ChainItemsSource`; v2 `Record` is the reverse), so these helpers build
+    // a bare hashed legacy action rather than a full `Record`.
+    type LegacyActionHashed =
+        holochain_zome_types::dependencies::holochain_integrity_types::action::ActionHashed;
+
+    fn mk_record(action: Action) -> LegacyActionHashed {
+        LegacyActionHashed::from_content_sync(action)
     }
 
-    fn mk_dna(author: &AgentPubKey) -> holochain_types::prelude::Record {
-        mk_record(Action::Dna(holochain_zome_types::action::Dna {
-            author: author.clone(),
-            timestamp: Timestamp::from_micros(0),
-            hash: holo_hash::DnaHash::from_raw_36(vec![0u8; 36]),
-        }))
+    fn mk_dna(author: &AgentPubKey) -> LegacyActionHashed {
+        mk_record(Action::Dna(
+            holochain_zome_types::dependencies::holochain_integrity_types::action::Dna {
+                author: author.clone(),
+                timestamp: Timestamp::from_micros(0),
+                hash: holo_hash::DnaHash::from_raw_36(vec![0u8; 36]),
+            },
+        ))
     }
 
-    fn mk_create(author: &AgentPubKey, seq: u32) -> holochain_types::prelude::Record {
+    fn mk_create(author: &AgentPubKey, seq: u32) -> LegacyActionHashed {
         mk_record(Action::Create(Create {
             author: author.clone(),
             timestamp: Timestamp::from_micros(seq as i64 * 1000),
@@ -6890,9 +6925,9 @@ mod tests {
         }))
     }
 
-    fn mk_close(author: &AgentPubKey, seq: u32) -> holochain_types::prelude::Record {
+    fn mk_close(author: &AgentPubKey, seq: u32) -> LegacyActionHashed {
         mk_record(Action::CloseChain(
-            holochain_zome_types::action::CloseChain {
+            holochain_zome_types::dependencies::holochain_integrity_types::action::CloseChain {
                 author: author.clone(),
                 timestamp: Timestamp::from_micros(seq as i64 * 1000),
                 action_seq: seq,
@@ -6902,10 +6937,7 @@ mod tests {
         ))
     }
 
-    fn status_of(
-        valid: Vec<holochain_types::prelude::Record>,
-        rejected: Vec<holochain_types::prelude::Record>,
-    ) -> ChainStatus {
+    fn status_of(valid: Vec<LegacyActionHashed>, rejected: Vec<LegacyActionHashed>) -> ChainStatus {
         let agent = AgentPubKey::from_raw_36(vec![0u8; 36]);
         let options = GetAgentActivityOptions {
             include_valid_activity: true,
@@ -6930,7 +6962,7 @@ mod tests {
         let close = mk_close(&agent, 2);
         let close_head = ChainHead {
             action_seq: 2,
-            hash: close.action_address().clone(),
+            hash: close.as_hash().clone(),
         };
         let status = status_of(vec![mk_dna(&agent), mk_create(&agent, 1), close], vec![]);
         assert_eq!(status, ChainStatus::Closed(close_head));
