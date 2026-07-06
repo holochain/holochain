@@ -14,6 +14,14 @@ use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::fixt::EntryHashFixturator;
 use holochain_cascade::CascadeSource;
 use holochain_cascade::MockCascade;
+// This whole module is a LEGACY island: `validate_op`/`ChainOp`/`DhtOp` are the
+// legacy op-pipeline types, so `Action` (otherwise the v2 struct via
+// `crate::prelude::*`) is pinned to the legacy per-variant enum. Signing
+// (`SignedActionHashed::sign`) and the `PrevActionError` conversions still
+// only operate on the v2 projection, so actions are converted at those
+// boundaries via `from_legacy_action`.
+use holochain_zome_types::dependencies::holochain_integrity_types::action::Action;
+use holochain_zome_types::dht_v2::from_legacy_action;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -109,7 +117,11 @@ async fn non_dna_op_as_first_action() {
     assert_eq!(
         Outcome::Rejected(
             ValidationOutcome::PrevActionError(
-                (PrevActionErrorKind::InvalidRoot, Action::Create(create)).into()
+                (
+                    PrevActionErrorKind::InvalidRoot,
+                    from_legacy_action(&Action::Create(create)),
+                )
+                    .into()
             )
             .to_string()
         ),
@@ -176,8 +188,8 @@ async fn validate_valid_create_op() {
 
     // Op to validate
     let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
+    create_action.author = previous_action.hashed.content.author().clone();
+    create_action.action_seq = previous_action.hashed.content.action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::App(AppEntryDef {
@@ -221,8 +233,8 @@ async fn validate_create_op_with_prev_from_network() {
 
     // Op to validate
     let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
+    create_action.author = previous_action.hashed.content.author().clone();
+    create_action.action_seq = previous_action.hashed.content.action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::App(AppEntryDef {
@@ -274,8 +286,8 @@ async fn validate_create_op_with_prev_action_not_found() {
 
     // Op to validate
     let mut create_action = fixt!(Create);
-    create_action.author = signed_action.action().author().clone();
-    create_action.action_seq = signed_action.action().action_seq() + 1;
+    create_action.author = signed_action.hashed.content.author().clone();
+    create_action.action_seq = signed_action.hashed.content.action_seq() + 1;
     create_action.prev_action = signed_action.as_hash().clone();
     create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::App(AppEntryDef {
@@ -324,7 +336,7 @@ async fn validate_create_op_author_mismatch_with_prev() {
     // Op to validate
     let mut create_action = fixt!(Create);
     create_action.author = mismatched_author.clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
+    create_action.action_seq = previous_action.hashed.content.action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::App(AppEntryDef {
@@ -351,7 +363,7 @@ async fn validate_create_op_author_mismatch_with_prev() {
                         test_case.agent.clone(),
                         mismatched_author.clone(),
                     ),
-                    Action::Create(create_action),
+                    from_legacy_action(&Action::Create(create_action)),
                 )
                     .into(),
             )
@@ -380,8 +392,8 @@ async fn validate_create_op_with_timestamp_same_as_prev() {
 
     // Op to validate
     let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
+    create_action.author = previous_action.hashed.content.author().clone();
+    create_action.action_seq = previous_action.hashed.content.action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = common_timestamp;
     create_action.entry_type = EntryType::App(AppEntryDef {
@@ -422,8 +434,8 @@ async fn validate_create_op_with_timestamp_before_prev() {
 
     // Op to validate
     let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
+    create_action.author = previous_action.hashed.content.author().clone();
+    create_action.action_seq = previous_action.hashed.content.action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = (Timestamp::now() - std::time::Duration::from_secs(10)).unwrap();
     create_action.entry_type = EntryType::App(AppEntryDef {
@@ -450,7 +462,7 @@ async fn validate_create_op_with_timestamp_before_prev() {
                         validation_package_action.timestamp,
                         create_action.timestamp,
                     ),
-                    Action::Create(create_action),
+                    from_legacy_action(&Action::Create(create_action)),
                 )
                     .into(),
             )
@@ -476,7 +488,7 @@ async fn validate_create_op_seq_number_decrements() {
 
     // Op to validate
     let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
+    create_action.author = previous_action.hashed.content.author().clone();
     create_action.action_seq = 9; // Should be 11, has gone down instead of up
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now();
@@ -501,7 +513,7 @@ async fn validate_create_op_seq_number_decrements() {
             ValidationOutcome::PrevActionError(
                 (
                     PrevActionErrorKind::InvalidSeq(9, 10),
-                    Action::Create(create_action),
+                    from_legacy_action(&Action::Create(create_action)),
                 )
                     .into(),
             )
@@ -527,7 +539,7 @@ async fn validate_create_op_seq_number_reused() {
 
     // Op to validate
     let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
+    create_action.author = previous_action.hashed.content.author().clone();
     create_action.action_seq = 10; // Should be 11, but has been re-used
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now();
@@ -552,7 +564,7 @@ async fn validate_create_op_seq_number_reused() {
             ValidationOutcome::PrevActionError(
                 (
                     PrevActionErrorKind::InvalidSeq(10, 10),
-                    Action::Create(create_action),
+                    from_legacy_action(&Action::Create(create_action)),
                 )
                     .into(),
             )
@@ -584,8 +596,8 @@ async fn validate_create_op_not_preceeded_by_avp() {
 
     // Op to validate
     let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
+    create_action.author = previous_action.hashed.content.author().clone();
+    create_action.action_seq = previous_action.hashed.content.action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::AgentPubKey;
@@ -606,11 +618,11 @@ async fn validate_create_op_not_preceeded_by_avp() {
                 PrevActionErrorKind::InvalidSuccessor(
                     "Every Create or Update for an AgentPubKey must be preceded by an AgentValidationPkg".to_string(),
                     Box::new((
-                        previous_action.action().clone(),
-                        Action::Create(create_action.clone()),
+                        previous_action.hashed.content.clone(),
+                        from_legacy_action(&Action::Create(create_action.clone())),
                     )),
                 ),
-                Action::Create(create_action),
+                from_legacy_action(&Action::Create(create_action)),
             )
                 .into(),
         )
@@ -639,8 +651,8 @@ async fn validate_avp_op_not_followed_by_create() {
 
     // Op to validate
     let mut create_link_action = fixt!(CreateLink);
-    create_link_action.author = previous_action.action().author().clone();
-    create_link_action.action_seq = previous_action.action().action_seq() + 1;
+    create_link_action.author = previous_action.hashed.content.author().clone();
+    create_link_action.action_seq = previous_action.hashed.content.action_seq() + 1;
     create_link_action.prev_action = previous_action.as_hash().clone();
     create_link_action.timestamp = Timestamp::now();
     let op = ChainOp::RegisterAgentActivity(
@@ -662,11 +674,11 @@ async fn validate_avp_op_not_followed_by_create() {
                 PrevActionErrorKind::InvalidSuccessor(
                     "Every AgentValidationPkg must be followed by a Create or Update for an AgentPubKey".to_string(),
                     Box::new((
-                        previous_action.action().clone(),
-                        Action::CreateLink(create_link_action.clone()),
+                        previous_action.hashed.content.clone(),
+                        from_legacy_action(&Action::CreateLink(create_link_action.clone())),
                     )),
                 ),
-                Action::CreateLink(create_link_action),
+                from_legacy_action(&Action::CreateLink(create_link_action)),
             )
                 .into(),
         )
@@ -696,8 +708,8 @@ async fn validate_valid_store_record_with_no_entry() {
 
     // Op to validate
     let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
+    create_action.author = previous_action.hashed.content.author().clone();
+    create_action.action_seq = previous_action.hashed.content.action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::CapClaim;
@@ -737,8 +749,8 @@ async fn validate_store_record_leaks_entry() {
 
     // Op to validate
     let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
+    create_action.author = previous_action.hashed.content.author().clone();
+    create_action.action_seq = previous_action.hashed.content.action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::App(AppEntryDef {
@@ -783,8 +795,8 @@ async fn validate_store_record_with_entry_having_wrong_entry_type() {
     let app_entry = Entry::App(fixt!(AppEntryBytes));
     let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
     let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
+    create_action.author = previous_action.hashed.content.author().clone();
+    create_action.action_seq = previous_action.hashed.content.action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::AgentPubKey; // Claiming to be a public key but is actually an app entry
@@ -827,8 +839,8 @@ async fn validate_store_record_with_entry_having_wrong_entry_hash() {
     let app_entry = Entry::App(fixt!(AppEntryBytes));
     let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
     let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
+    create_action.author = previous_action.hashed.content.author().clone();
+    create_action.action_seq = previous_action.hashed.content.action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::App(AppEntryDef::new(
@@ -898,8 +910,8 @@ async fn validate_store_record_with_large_entry() {
     ));
     let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
     let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
+    create_action.author = previous_action.hashed.content.author().clone();
+    create_action.action_seq = previous_action.hashed.content.action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::App(AppEntryDef::new(
@@ -962,8 +974,8 @@ async fn validate_valid_store_record_update() {
     let app_entry = Entry::App(fixt!(AppEntryBytes));
     let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
     let mut update_action = fixt!(Update);
-    update_action.author = previous_action.action().author().clone();
-    update_action.action_seq = previous_action.action().action_seq() + 1;
+    update_action.author = previous_action.hashed.content.author().clone();
+    update_action.action_seq = previous_action.hashed.content.action_seq() + 1;
     update_action.prev_action = previous_action.as_hash().clone();
     update_action.timestamp = Timestamp::now();
     update_action.entry_type = EntryType::App(AppEntryDef::new(
@@ -973,7 +985,7 @@ async fn validate_valid_store_record_update() {
     ));
     update_action.entry_hash = entry_hash.as_hash().clone();
     update_action.original_entry_address = to_update_signed_action
-        .action()
+        .hashed.content
         .entry_hash()
         .unwrap()
         .clone();
@@ -1026,8 +1038,8 @@ async fn validate_store_record_update_prev_which_is_not_updateable() {
     let app_entry = Entry::App(fixt!(AppEntryBytes));
     let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
     let mut update_action = fixt!(Update);
-    update_action.author = previous_action.action().author().clone();
-    update_action.action_seq = previous_action.action().action_seq() + 1;
+    update_action.author = previous_action.hashed.content.author().clone();
+    update_action.action_seq = previous_action.hashed.content.action_seq() + 1;
     update_action.prev_action = previous_action.as_hash().clone();
     update_action.timestamp = Timestamp::now();
     update_action.entry_type = EntryType::App(AppEntryDef::new(
@@ -1053,7 +1065,7 @@ async fn validate_store_record_update_prev_which_is_not_updateable() {
 
     assert_eq!(
         Outcome::Rejected(
-            ValidationOutcome::NotNewEntry(Box::new(to_update_signed_action.action().clone()))
+            ValidationOutcome::NotNewEntry(Box::new(to_update_signed_action.hashed.content.clone()))
                 .to_string()
         ),
         outcome
@@ -1099,8 +1111,8 @@ async fn validate_store_record_update_changes_entry_type() {
     let app_entry = Entry::App(fixt!(AppEntryBytes));
     let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
     let mut update_action = fixt!(Update);
-    update_action.author = previous_action.action().author().clone();
-    update_action.action_seq = previous_action.action().action_seq() + 1;
+    update_action.author = previous_action.hashed.content.author().clone();
+    update_action.action_seq = previous_action.hashed.content.action_seq() + 1;
     update_action.prev_action = previous_action.as_hash().clone();
     update_action.timestamp = Timestamp::now();
     // Different entry type defined here
@@ -1111,7 +1123,7 @@ async fn validate_store_record_update_changes_entry_type() {
     ));
     update_action.entry_hash = entry_hash.as_hash().clone();
     update_action.original_entry_address = to_update_signed_action
-        .action()
+        .hashed.content
         .entry_hash()
         .unwrap()
         .clone();
@@ -1165,8 +1177,8 @@ async fn validate_store_entry_with_entry_having_wrong_entry_type() {
     let app_entry = Entry::App(fixt!(AppEntryBytes));
     let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
     let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
+    create_action.author = previous_action.hashed.content.author().clone();
+    create_action.action_seq = previous_action.hashed.content.action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::AgentPubKey; // Claiming to be a public key but is actually an app entry
@@ -1209,8 +1221,8 @@ async fn validate_store_entry_with_entry_having_wrong_entry_hash() {
     let app_entry = Entry::App(fixt!(AppEntryBytes));
     let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
     let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
+    create_action.author = previous_action.hashed.content.author().clone();
+    create_action.action_seq = previous_action.hashed.content.action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::App(AppEntryDef::new(
@@ -1280,8 +1292,8 @@ async fn validate_store_entry_with_large_entry() {
     ));
     let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
     let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
+    create_action.author = previous_action.hashed.content.author().clone();
+    create_action.action_seq = previous_action.hashed.content.action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::App(AppEntryDef::new(
@@ -1344,8 +1356,8 @@ async fn validate_valid_store_entry_update() {
     let app_entry = Entry::App(fixt!(AppEntryBytes));
     let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
     let mut update_action = fixt!(Update);
-    update_action.author = previous_action.action().author().clone();
-    update_action.action_seq = previous_action.action().action_seq() + 1;
+    update_action.author = previous_action.hashed.content.author().clone();
+    update_action.action_seq = previous_action.hashed.content.action_seq() + 1;
     update_action.prev_action = previous_action.as_hash().clone();
     update_action.timestamp = Timestamp::now();
     update_action.entry_type = EntryType::App(AppEntryDef::new(
@@ -1355,7 +1367,7 @@ async fn validate_valid_store_entry_update() {
     ));
     update_action.entry_hash = entry_hash.as_hash().clone();
     update_action.original_entry_address = to_update_signed_action
-        .action()
+        .hashed.content
         .entry_hash()
         .unwrap()
         .clone();
@@ -1405,8 +1417,8 @@ async fn validate_store_entry_update_prev_which_is_not_updateable() {
     let app_entry = Entry::App(fixt!(AppEntryBytes));
     let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
     let mut update_action = fixt!(Update);
-    update_action.author = previous_action.action().author().clone();
-    update_action.action_seq = previous_action.action().action_seq() + 1;
+    update_action.author = previous_action.hashed.content.author().clone();
+    update_action.action_seq = previous_action.hashed.content.action_seq() + 1;
     update_action.prev_action = previous_action.as_hash().clone();
     update_action.timestamp = Timestamp::now();
     update_action.entry_type = EntryType::App(AppEntryDef::new(
@@ -1432,7 +1444,7 @@ async fn validate_store_entry_update_prev_which_is_not_updateable() {
 
     assert_eq!(
         Outcome::Rejected(
-            ValidationOutcome::NotNewEntry(Box::new(to_update_signed_action.action().clone()))
+            ValidationOutcome::NotNewEntry(Box::new(to_update_signed_action.hashed.content.clone()))
                 .to_string()
         ),
         outcome,
@@ -1478,8 +1490,8 @@ async fn validate_store_entry_update_changes_entry_type() {
     let app_entry = Entry::App(fixt!(AppEntryBytes));
     let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
     let mut update_action = fixt!(Update);
-    update_action.author = previous_action.action().author().clone();
-    update_action.action_seq = previous_action.action().action_seq() + 1;
+    update_action.author = previous_action.hashed.content.author().clone();
+    update_action.action_seq = previous_action.hashed.content.action_seq() + 1;
     update_action.prev_action = previous_action.as_hash().clone();
     update_action.timestamp = Timestamp::now();
     // Different entry type defined here
@@ -1490,7 +1502,7 @@ async fn validate_store_entry_update_changes_entry_type() {
     ));
     update_action.entry_hash = entry_hash.as_hash().clone();
     update_action.original_entry_address = to_update_signed_action
-        .action()
+        .hashed.content
         .entry_hash()
         .unwrap()
         .clone();
@@ -1513,7 +1525,7 @@ async fn validate_store_entry_update_changes_entry_type() {
         Outcome::Rejected(
             ValidationOutcome::UpdateTypeMismatch(
                 to_update_signed_action
-                    .action()
+                    .hashed.content
                     .entry_type()
                     .unwrap()
                     .clone(),
@@ -1555,7 +1567,7 @@ async fn validate_valid_register_updated_content() {
     update_action.entry_type = to_update_signed_action.hashed.entry_type().unwrap().clone();
     update_action.entry_hash = entry_hash.as_hash().clone();
     update_action.original_entry_address = to_update_signed_action
-        .action()
+        .hashed.content
         .entry_hash()
         .unwrap()
         .clone();
@@ -1663,7 +1675,7 @@ async fn validate_valid_register_updated_record() {
     update_action.entry_type = to_update_signed_action.hashed.entry_type().unwrap().clone();
     update_action.entry_hash = entry_hash.as_hash().clone();
     update_action.original_entry_address = to_update_signed_action
-        .action()
+        .hashed.content
         .entry_hash()
         .unwrap()
         .clone();
@@ -1848,7 +1860,7 @@ async fn validate_register_deleted_by_wrong_delete_target() {
 
     assert_eq!(
         Outcome::Rejected(
-            ValidationOutcome::NotNewEntry(Box::new(to_delete_signed_action.action().clone()))
+            ValidationOutcome::NotNewEntry(Box::new(to_delete_signed_action.hashed.content.clone()))
                 .to_string()
         ),
         outcome
@@ -1962,7 +1974,7 @@ async fn validate_register_deleted_entry_action_wrong_delete_target() {
 
     assert_eq!(
         Outcome::Rejected(
-            ValidationOutcome::NotNewEntry(Box::new(to_delete_signed_action.action().clone()))
+            ValidationOutcome::NotNewEntry(Box::new(to_delete_signed_action.hashed.content.clone()))
                 .to_string()
         ),
         outcome
@@ -1997,7 +2009,7 @@ async fn validate_delete_a_delete_is_rejected() {
         .unwrap();
     assert_eq!(
         Outcome::Rejected(
-            ValidationOutcome::NotNewEntry(Box::new(delete_action_signed_hashed.action().clone()))
+            ValidationOutcome::NotNewEntry(Box::new(delete_action_signed_hashed.hashed.content.clone()))
                 .to_string()
         ),
         outcome
@@ -2013,7 +2025,7 @@ async fn validate_delete_a_delete_is_rejected() {
         .unwrap();
     assert_eq!(
         Outcome::Rejected(
-            ValidationOutcome::NotNewEntry(Box::new(delete_action_signed_hashed.action().clone()))
+            ValidationOutcome::NotNewEntry(Box::new(delete_action_signed_hashed.hashed.content.clone()))
                 .to_string()
         ),
         outcome
@@ -2211,7 +2223,7 @@ async fn action_after_close_chain() {
             ValidationOutcome::PrevActionError(
                 (
                     PrevActionErrorKind::ActionAfterChainClose,
-                    Action::Create(create)
+                    from_legacy_action(&Action::Create(create))
                 )
                     .into()
             )
@@ -2237,7 +2249,7 @@ async fn crash_case() {
     create_action.timestamp = Timestamp::now();
     create_action.action_seq = 10;
     let action = Action::AgentValidationPkg(create_action);
-    let action_hashed = ActionHashed::from_content_sync(action);
+    let action_hashed = HoloHashed::from_content_sync(from_legacy_action(&action));
     let signed_action = SignedActionHashed::sign(&keystore, action_hashed)
         .await
         .unwrap();
@@ -2266,7 +2278,10 @@ async fn crash_case() {
             async move {
                 // TODO this line creates the problem, expects a None value
                 Ok(Some((
-                    Record::new(signed_action, Some(Entry::Agent(fixt!(AgentPubKey)))),
+                    Record::new(
+                        signed_action,
+                        RecordEntry::Present(Entry::Agent(fixt!(AgentPubKey))),
+                    ),
                     CascadeSource::Local,
                 )))
             }
@@ -2320,7 +2335,7 @@ impl TestCase {
     }
 
     pub async fn sign_action(&self, action: Action) -> SignedActionHashed {
-        let action_hashed = ActionHashed::from_content_sync(action);
+        let action_hashed = HoloHashed::from_content_sync(from_legacy_action(&action));
         SignedActionHashed::sign(&self.keystore, action_hashed)
             .await
             .unwrap()
@@ -2379,10 +2394,10 @@ impl TestCase {
     }
 }
 
-fn test_op(previous: &SignedHashed<Action>) -> DhtOp {
+fn test_op(previous: &SignedActionHashed) -> DhtOp {
     let mut create_action = fixt!(Create);
-    create_action.author = previous.action().author().clone();
-    create_action.action_seq = previous.action().action_seq() + 1;
+    create_action.author = previous.hashed.content.author().clone();
+    create_action.action_seq = previous.hashed.content.action_seq() + 1;
     create_action.prev_action = previous.as_hash().clone();
     create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::App(AppEntryDef {
