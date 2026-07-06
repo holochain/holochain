@@ -154,6 +154,8 @@ mod tests {
     use holochain_state::test_utils::test_db_dir;
     use holochain_types::inline_zome::InlineZomeSet;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::action::ActionData;
+    use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
     use matches::assert_matches;
     use std::sync::Arc;
 
@@ -236,7 +238,7 @@ mod tests {
         let scratch = workspace.source_chain().snapshot().unwrap();
         assert_matches!(
             scratch.actions().next().unwrap().action(),
-            Action::InitZomesComplete(_)
+            LegacyAction::InitZomesComplete(_)
         );
     }
 
@@ -267,7 +269,10 @@ mod tests {
         //   record committed during init()
         assert_matches!(
             source_chain.query(Default::default()).await.unwrap()[4].action(),
-            Action::InitZomesComplete(_)
+            Action {
+                data: ActionData::InitZomesComplete(_),
+                ..
+            }
         );
     }
 

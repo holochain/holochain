@@ -257,7 +257,7 @@ mod tests {
         test_utils::retry_fn_until_timeout,
     };
     use ::fixt::fixt;
-    use hdk::prelude::{ActionFixturator, SignatureFixturator};
+    use hdk::prelude::{LegacyActionFixturator, SignatureFixturator};
     use holo_hash::ActionHash;
     use holochain_serialized_bytes::SerializedBytes;
     use holochain_types::dht_op::{ChainOp, DhtOpHashed};
@@ -430,7 +430,7 @@ mod tests {
             .await
             .unwrap();
 
-        let op = ChainOp::RegisterAgentActivity(fixt!(Signature), fixt!(Action));
+        let op = ChainOp::RegisterAgentActivity(fixt!(Signature), fixt!(LegacyAction));
         let unintegrated_op = DhtOpHashed::from_content_sync(op);
         // Stage the op into the DHT store's validation limbo so it is present
         // but not integrated.

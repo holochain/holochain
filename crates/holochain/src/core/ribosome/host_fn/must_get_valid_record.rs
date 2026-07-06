@@ -154,6 +154,8 @@ mod tests {
     use ::fixt::prelude::*;
     use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
+    use holochain_zome_types::dht_v2::from_legacy_action;
 
     // This test ensures the ValidationStatus::Rejected arm is hit and returns a
     // HostShortCircuit carrying ValidateCallbackResult::Invalid with the expected message.
@@ -171,7 +173,7 @@ mod tests {
         let mut create = fixt!(Create);
         // Set author to the cell's agent to keep data coherent.
         create.author = alice_cell.agent_pubkey().clone();
-        let create_action = Action::Create(create.clone());
+        let create_action = from_legacy_action(&LegacyAction::Create(create.clone()));
         let create_entry = fixt!(Entry);
         let create_entry_hash = create_action.entry_hash().unwrap().clone();
 

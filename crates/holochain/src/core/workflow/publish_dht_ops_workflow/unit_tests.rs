@@ -3,7 +3,6 @@ use crate::core::queue_consumer::WorkComplete;
 use crate::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
 use crate::prelude::*;
 use ::fixt::prelude::*;
-use hdk::prelude::Action;
 use holo_hash::fixt::ActionHashFixturator;
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::fixt::DnaHashFixturator;
@@ -16,6 +15,7 @@ use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::*;
 use holochain_state::test_utils::test_dht_store;
+use holochain_zome_types::dependencies::holochain_integrity_types::action::Action;
 use std::sync::Arc;
 use std::time::Duration;
 

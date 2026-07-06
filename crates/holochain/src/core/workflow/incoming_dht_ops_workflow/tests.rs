@@ -5,6 +5,8 @@ use holo_hash::fixt::DnaHashFixturator;
 use holochain_keystore::test_keystore;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_state::dht_store::DhtStore;
+use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
+use holochain_zome_types::dht_v2::from_legacy_action;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn incoming_ops_to_limbo() {
@@ -22,8 +24,9 @@ async fn incoming_ops_to_limbo() {
     for _ in 0..10 {
         let mut action = fixt!(CreateLink);
         action.author = author.clone();
-        let action = Action::CreateLink(action);
-        let signature = author.sign(&keystore, &action).await.unwrap();
+        let action = LegacyAction::CreateLink(action);
+        let v2_action = from_legacy_action(&action);
+        let signature = author.sign(&keystore, &v2_action).await.unwrap();
 
         let op = ChainOp::RegisterAgentActivity(signature, action);
         let hash = DhtOpHash::with_data_sync(&op);
@@ -64,7 +67,7 @@ async fn can_retry_failed_op() {
 
     let mut action = fixt!(CreateLink);
     action.author = author.clone();
-    let action = Action::CreateLink(action);
+    let action = LegacyAction::CreateLink(action);
     // Create a dummy signature that will fail validation
     let signature = Signature([0; SIGNATURE_BYTES]);
 
@@ -84,7 +87,8 @@ async fn can_retry_failed_op() {
     verify_ops_present(&dht_store, vec![hash], false).await;
 
     // Now fix the signature
-    let signature = author.sign(&keystore, &action).await.unwrap();
+    let v2_action = from_legacy_action(&action);
+    let signature = author.sign(&keystore, &v2_action).await.unwrap();
     let op = ChainOp::RegisterAgentActivity(signature, action).into();
     let hash = DhtOpHash::with_data_sync(&op);
 
@@ -126,8 +130,9 @@ async fn require_validation_receipt_follows_publish_flag() {
     for _ in 0..2 {
         let mut action = fixt!(CreateLink);
         action.author = author.clone();
-        let action = Action::CreateLink(action);
-        let signature = author.sign(&keystore, &action).await.unwrap();
+        let action = LegacyAction::CreateLink(action);
+        let v2_action = from_legacy_action(&action);
+        let signature = author.sign(&keystore, &v2_action).await.unwrap();
         let op: DhtOp = ChainOp::RegisterAgentActivity(signature, action).into();
         let hash = DhtOpHash::with_data_sync(&op);
         ops.push((op, hash));

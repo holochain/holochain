@@ -336,7 +336,10 @@ async fn check_all_gets_for_private_entry(
         let details = unwrap_to!(entry=> Details::Entry).clone();
         let actions = details.actions;
         for action in actions {
-            assert_eq!(action.action().author(), zome.cell_id().agent_pubkey());
+            assert_eq!(
+                action.hashed.content.author(),
+                zome.cell_id().agent_pubkey()
+            );
         }
     }
 }

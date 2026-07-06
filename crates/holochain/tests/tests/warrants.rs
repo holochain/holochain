@@ -1,7 +1,7 @@
 use hdk::prelude::{
-    ActionHashed, ActivityRequest, CellId, ChainFilter, ChainTopOrdering, CreateInput, EntryDef,
-    EntryDefIndex, EntryVisibility, GetAgentActivityInput, MustGetAgentActivityInput, Op,
-    SerializedBytes, ValidateCallbackResult,
+    ActivityRequest, CellId, ChainFilter, ChainTopOrdering, CreateInput, EntryDef, EntryDefIndex,
+    EntryVisibility, GetAgentActivityInput, MustGetAgentActivityInput, Op, SerializedBytes,
+    ValidateCallbackResult,
 };
 use holo_hash::{ActionHash, DnaHash};
 use holochain::{
@@ -18,6 +18,8 @@ use holochain_types::prelude::WarrantOp;
 use holochain_zome_types::op::ChainOpType;
 use holochain_zome_types::prelude::{ChainIntegrityWarrant, Warrant};
 use holochain_zome_types::record::SignedAction;
+use holochain_zome_types::prelude::{ChainIntegrityWarrant, ValidationStatus, Warrant};
+use holochain_zome_types::record::SignedActionHashed;
 use holochain_zome_types::warrant::WarrantProof;
 use holochain_zome_types::Entry;
 use serde::{Deserialize, Serialize};
@@ -229,23 +231,19 @@ async fn author_of_invalid_warrant_is_blocked() {
     await_consistency([&alice, &bob]).await.unwrap();
 
     // Fetch Alice's signed action from the DhtStore.
-    let action: SignedAction = alice
+    let action: SignedActionHashed = alice
         .dht_store()
         .as_read()
         .retrieve_action(&valid_action_hash)
         .await
         .unwrap()
-        .expect("Alice's valid action should be in the DhtStore")
-        .into();
+        .expect("Alice's valid action should be in the DhtStore");
 
     // Now Bob needs to create a warrant against Alice's perfectly valid action.
     let warrant = Warrant::new(
         WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
             action_author: alice.agent_pubkey().clone(),
-            action: (
-                ActionHashed::from_content_sync(action.action().clone()).hash,
-                action.signature().clone(),
-            ),
+            action: (action.hashed.hash.clone(), action.signature.clone()),
             chain_op_type: ChainOpType::StoreRecord,
             reason: "test warrant".into(),
         }),

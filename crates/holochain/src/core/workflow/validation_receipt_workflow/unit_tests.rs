@@ -4,7 +4,6 @@ use crate::prelude::CreateFixturator;
 use crate::prelude::DhtOpHashed;
 use crate::prelude::SignatureFixturator;
 use ::fixt::fixt;
-use hdk::prelude::Action;
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::HasHash;
@@ -13,6 +12,7 @@ use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::*;
 use holochain_state::test_utils::test_dht_store;
+use holochain_zome_types::dependencies::holochain_integrity_types::action::Action;
 use std::sync::Arc;
 
 #[tokio::test(flavor = "multi_thread")]

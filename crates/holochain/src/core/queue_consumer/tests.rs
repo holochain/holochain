@@ -7,6 +7,7 @@ use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::fixt::EntryHashFixturator;
 use holochain_conductor_api::conductor::ConductorTuningParams;
 use holochain_state::test_utils::test_dht_store;
+use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
 
 #[tokio::test]
 async fn test_trigger_receiver_waits_for_sender() {
@@ -224,7 +225,7 @@ async fn test_concurrency() {
 
 #[tokio::test(flavor = "current_thread", start_paused = true)]
 async fn publish_loop() {
-    let action = Action::Create(Create {
+    let action = LegacyAction::Create(Create {
         author: fixt!(AgentPubKey),
         timestamp: Timestamp::now(),
         action_seq: 5,

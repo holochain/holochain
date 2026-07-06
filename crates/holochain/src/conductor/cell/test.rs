@@ -14,6 +14,7 @@ use holochain_state::prelude::*;
 use holochain_trace::test_run;
 use holochain_types::cell_config_overrides::CellConfigOverrides;
 use holochain_zome_types::action;
+use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 
@@ -87,13 +88,18 @@ async fn test_cell_handle_publish() {
     .await
     .unwrap();
 
-    let action = action::Action::Dna(action::Dna {
+    let action = LegacyAction::Dna(action::Dna {
         author: agent.clone(),
         timestamp: Timestamp::now(),
         hash: dna.clone(),
     });
-    let hh = ActionHashed::from_content_sync(action.clone());
-    let shh = SignedActionHashed::sign(&keystore, hh).await.unwrap();
+    let v2_action = holochain_types::dht_v2::from_legacy_action(&action);
+    let shh = SignedActionHashed::sign(
+        &keystore,
+        holo_hash::HoloHashed::from_content_sync(v2_action),
+    )
+    .await
+    .unwrap();
     let op = ChainOp::StoreRecord(shh.signature().clone(), action.clone(), RecordEntry::NA);
     let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
 
