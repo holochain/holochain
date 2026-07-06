@@ -169,10 +169,12 @@ async fn validate_op_with_dependency_not_held() {
 
     let mut network = MockHolochainP2pDnaT::default();
     let mut ops: WireRecordOps = WireRecordOps::new();
-    ops.action = Some(Judged::valid(holochain_zome_types::dht_v2::SignedAction::new(
-        previous_action.hashed.content.clone(),
-        previous_action.signature.clone(),
-    )));
+    ops.action = Some(Judged::valid(
+        holochain_zome_types::dht_v2::SignedAction::new(
+            previous_action.hashed.content.clone(),
+            previous_action.signature.clone(),
+        ),
+    ));
     let response = WireOps::Record(ops);
     network
         .expect_get()
@@ -417,10 +419,12 @@ async fn validate_valid_warrant_with_fetched_dependency() {
         let warranted_action = warranted_action.clone();
         move |_hash, _, _| {
             let mut ops: WireRecordOps = WireRecordOps::new();
-            ops.action = Some(Judged::valid(holochain_zome_types::dht_v2::SignedAction::new(
-                warranted_action.hashed.content.clone(),
-                warranted_action.signature.clone(),
-            )));
+            ops.action = Some(Judged::valid(
+                holochain_zome_types::dht_v2::SignedAction::new(
+                    warranted_action.hashed.content.clone(),
+                    warranted_action.signature.clone(),
+                ),
+            ));
             ops.entry = Some(entry);
             let response = WireOps::Record(ops);
             Ok(vec![response])

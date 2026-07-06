@@ -985,7 +985,8 @@ async fn validate_valid_store_record_update() {
     ));
     update_action.entry_hash = entry_hash.as_hash().clone();
     update_action.original_entry_address = to_update_signed_action
-        .hashed.content
+        .hashed
+        .content
         .entry_hash()
         .unwrap()
         .clone();
@@ -1065,8 +1066,10 @@ async fn validate_store_record_update_prev_which_is_not_updateable() {
 
     assert_eq!(
         Outcome::Rejected(
-            ValidationOutcome::NotNewEntry(Box::new(to_update_signed_action.hashed.content.clone()))
-                .to_string()
+            ValidationOutcome::NotNewEntry(Box::new(
+                to_update_signed_action.hashed.content.clone()
+            ))
+            .to_string()
         ),
         outcome
     );
@@ -1123,7 +1126,8 @@ async fn validate_store_record_update_changes_entry_type() {
     ));
     update_action.entry_hash = entry_hash.as_hash().clone();
     update_action.original_entry_address = to_update_signed_action
-        .hashed.content
+        .hashed
+        .content
         .entry_hash()
         .unwrap()
         .clone();
@@ -1367,7 +1371,8 @@ async fn validate_valid_store_entry_update() {
     ));
     update_action.entry_hash = entry_hash.as_hash().clone();
     update_action.original_entry_address = to_update_signed_action
-        .hashed.content
+        .hashed
+        .content
         .entry_hash()
         .unwrap()
         .clone();
@@ -1444,8 +1449,10 @@ async fn validate_store_entry_update_prev_which_is_not_updateable() {
 
     assert_eq!(
         Outcome::Rejected(
-            ValidationOutcome::NotNewEntry(Box::new(to_update_signed_action.hashed.content.clone()))
-                .to_string()
+            ValidationOutcome::NotNewEntry(Box::new(
+                to_update_signed_action.hashed.content.clone()
+            ))
+            .to_string()
         ),
         outcome,
     );
@@ -1502,7 +1509,8 @@ async fn validate_store_entry_update_changes_entry_type() {
     ));
     update_action.entry_hash = entry_hash.as_hash().clone();
     update_action.original_entry_address = to_update_signed_action
-        .hashed.content
+        .hashed
+        .content
         .entry_hash()
         .unwrap()
         .clone();
@@ -1525,7 +1533,8 @@ async fn validate_store_entry_update_changes_entry_type() {
         Outcome::Rejected(
             ValidationOutcome::UpdateTypeMismatch(
                 to_update_signed_action
-                    .hashed.content
+                    .hashed
+                    .content
                     .entry_type()
                     .unwrap()
                     .clone(),
@@ -1567,7 +1576,8 @@ async fn validate_valid_register_updated_content() {
     update_action.entry_type = to_update_signed_action.hashed.entry_type().unwrap().clone();
     update_action.entry_hash = entry_hash.as_hash().clone();
     update_action.original_entry_address = to_update_signed_action
-        .hashed.content
+        .hashed
+        .content
         .entry_hash()
         .unwrap()
         .clone();
@@ -1675,7 +1685,8 @@ async fn validate_valid_register_updated_record() {
     update_action.entry_type = to_update_signed_action.hashed.entry_type().unwrap().clone();
     update_action.entry_hash = entry_hash.as_hash().clone();
     update_action.original_entry_address = to_update_signed_action
-        .hashed.content
+        .hashed
+        .content
         .entry_hash()
         .unwrap()
         .clone();
@@ -1860,8 +1871,10 @@ async fn validate_register_deleted_by_wrong_delete_target() {
 
     assert_eq!(
         Outcome::Rejected(
-            ValidationOutcome::NotNewEntry(Box::new(to_delete_signed_action.hashed.content.clone()))
-                .to_string()
+            ValidationOutcome::NotNewEntry(Box::new(
+                to_delete_signed_action.hashed.content.clone()
+            ))
+            .to_string()
         ),
         outcome
     );
@@ -1974,8 +1987,10 @@ async fn validate_register_deleted_entry_action_wrong_delete_target() {
 
     assert_eq!(
         Outcome::Rejected(
-            ValidationOutcome::NotNewEntry(Box::new(to_delete_signed_action.hashed.content.clone()))
-                .to_string()
+            ValidationOutcome::NotNewEntry(Box::new(
+                to_delete_signed_action.hashed.content.clone()
+            ))
+            .to_string()
         ),
         outcome
     );
@@ -2009,8 +2024,10 @@ async fn validate_delete_a_delete_is_rejected() {
         .unwrap();
     assert_eq!(
         Outcome::Rejected(
-            ValidationOutcome::NotNewEntry(Box::new(delete_action_signed_hashed.hashed.content.clone()))
-                .to_string()
+            ValidationOutcome::NotNewEntry(Box::new(
+                delete_action_signed_hashed.hashed.content.clone()
+            ))
+            .to_string()
         ),
         outcome
     );
@@ -2025,8 +2042,10 @@ async fn validate_delete_a_delete_is_rejected() {
         .unwrap();
     assert_eq!(
         Outcome::Rejected(
-            ValidationOutcome::NotNewEntry(Box::new(delete_action_signed_hashed.hashed.content.clone()))
-                .to_string()
+            ValidationOutcome::NotNewEntry(Box::new(
+                delete_action_signed_hashed.hashed.content.clone()
+            ))
+            .to_string()
         ),
         outcome
     );

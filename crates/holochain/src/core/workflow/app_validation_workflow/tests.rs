@@ -55,8 +55,7 @@ async fn main_workflow() {
                     }) => deletes_address.clone(),
                     _ => unreachable!(),
                 };
-                let result =
-                    api.must_get_action(MustGetActionInput::new(deletes_address.clone()));
+                let result = api.must_get_action(MustGetActionInput::new(deletes_address.clone()));
                 if result.is_ok() {
                     Ok(ValidateCallbackResult::Valid)
                 } else {
@@ -417,8 +416,7 @@ async fn validate_ops_in_sequence_must_get_action() {
                     }) => deletes_address.clone(),
                     _ => unreachable!(),
                 };
-                let result =
-                    api.must_get_action(MustGetActionInput::new(deletes_address.clone()));
+                let result = api.must_get_action(MustGetActionInput::new(deletes_address.clone()));
                 if result.is_ok() {
                     Ok(ValidateCallbackResult::Valid)
                 } else {

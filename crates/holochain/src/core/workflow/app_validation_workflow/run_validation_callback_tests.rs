@@ -97,10 +97,8 @@ async fn validation_callback_must_get_action() {
     delete.author = bob.clone();
     delete.deletes_address = create_action.clone().to_hash();
     let delete_action_v2 = from_legacy_action(&LegacyAction::Delete(delete.clone()));
-    let delete_action_signed_hashed = SignedActionHashed::new_unchecked(
-        delete_action_v2,
-        fixt!(Signature),
-    );
+    let delete_action_signed_hashed =
+        SignedActionHashed::new_unchecked(delete_action_v2, fixt!(Signature));
     let delete_action_op = Op::RegisterDelete(RegisterDelete {
         delete: delete_action_signed_hashed.clone(),
     });
@@ -186,10 +184,8 @@ async fn validation_callback_awaiting_deps_hashes() {
             .await
             .unwrap();
     let create_action = LegacyAction::Create(create.clone());
-    let create_action_signed_hashed = SignedActionHashed::new_unchecked(
-        from_legacy_action(&create_action),
-        fixt!(Signature),
-    );
+    let create_action_signed_hashed =
+        SignedActionHashed::new_unchecked(from_legacy_action(&create_action), fixt!(Signature));
     // a delete by bob that references alice's create
     let mut delete = fixt!(Delete);
     delete.author = bob.clone();
@@ -303,10 +299,8 @@ async fn validation_callback_awaiting_deps_agent_activity() {
             .await
             .unwrap();
     let create_action = LegacyAction::Create(create.clone());
-    let create_action_signed_hashed = SignedActionHashed::new_unchecked(
-        from_legacy_action(&create_action),
-        fixt!(Signature),
-    );
+    let create_action_signed_hashed =
+        SignedActionHashed::new_unchecked(from_legacy_action(&create_action), fixt!(Signature));
     // a delete by alice that references the create
     let mut delete = fixt!(Delete);
     delete.author = alice.clone();
