@@ -17,6 +17,10 @@ use ::fixt::prelude::*;
 use holo_hash::fixt::ActionHashFixturator;
 use holo_hash::fixt::EntryHashFixturator;
 use holochain_cascade::CascadeSource;
+// `sign_action` fixtures are built from the legacy per-variant `Create`
+// action; `from_legacy_action` converts to the v2 shape actually signed.
+use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
+use holochain_zome_types::dht_v2::{from_legacy_action, to_legacy_signed_action};
 
 /// Test that a valid ChainFork warrant is accepted when both actions:
 /// - Have the same author
@@ -172,7 +176,7 @@ async fn validate_chain_fork_warrant_rejected_action_seq_differs() {
         visibility: EntryVisibility::Public,
     });
     create1.entry_hash = fixt!(EntryHash);
-    let action1 = test_case.sign_action(Action::Create(create1)).await;
+    let action1 = test_case.sign_action(LegacyAction::Create(create1)).await;
 
     let mut create2 = fixt!(Create);
     create2.author = test_case.chain_author.clone();
@@ -185,7 +189,7 @@ async fn validate_chain_fork_warrant_rejected_action_seq_differs() {
         visibility: EntryVisibility::Public,
     });
     create2.entry_hash = fixt!(EntryHash);
-    let action2 = test_case.sign_action(Action::Create(create2)).await;
+    let action2 = test_case.sign_action(LegacyAction::Create(create2)).await;
 
     let warrant_op = test_case
         .create_chain_fork_warrant(&action1, &action2)
@@ -218,7 +222,7 @@ async fn validate_chain_fork_warrant_rejected_seq_mismatch() {
     let (action1, action2, _) = test_case.create_forking_actions().await;
 
     // Create a warrant with a mismatched seq (actions have seq=5, warrant declares seq=99)
-    let chain_author = action1.action().author().clone();
+    let chain_author = action1.hashed.content.author().clone();
     let warrant_op = test_case
         .create_chain_fork_warrant_with_seq(&action1, &action2, chain_author, 99)
         .await;
@@ -427,7 +431,7 @@ impl ChainForkWarrantTestCase {
             visibility: EntryVisibility::Public,
         });
         create1.entry_hash = fixt!(EntryHash);
-        let action1 = self.sign_action(Action::Create(create1)).await;
+        let action1 = self.sign_action(LegacyAction::Create(create1)).await;
 
         // Second action (different entry hash makes it a different action)
         let mut create2 = fixt!(Create);
@@ -441,7 +445,7 @@ impl ChainForkWarrantTestCase {
             visibility: EntryVisibility::Public,
         });
         create2.entry_hash = fixt!(EntryHash); // Different entry hash
-        let action2 = self.sign_action(Action::Create(create2)).await;
+        let action2 = self.sign_action(LegacyAction::Create(create2)).await;
 
         (action1, action2, prev_action_hash)
     }
@@ -464,7 +468,7 @@ impl ChainForkWarrantTestCase {
             zome_index: 0.into(),
             visibility: EntryVisibility::Public,
         });
-        let action1 = self.sign_action(Action::Create(create1)).await;
+        let action1 = self.sign_action(LegacyAction::Create(create1)).await;
 
         // Second action with different author
         let mut create2 = fixt!(Create);
@@ -477,7 +481,7 @@ impl ChainForkWarrantTestCase {
             zome_index: 0.into(),
             visibility: EntryVisibility::Public,
         });
-        let action2 = self.sign_action(Action::Create(create2)).await;
+        let action2 = self.sign_action(LegacyAction::Create(create2)).await;
 
         (action1, action2)
     }
@@ -495,7 +499,7 @@ impl ChainForkWarrantTestCase {
             zome_index: 0.into(),
             visibility: EntryVisibility::Public,
         });
-        let action1 = self.sign_action(Action::Create(create1)).await;
+        let action1 = self.sign_action(LegacyAction::Create(create1)).await;
 
         // Second action with DIFFERENT prev_action
         let mut create2 = fixt!(Create);
@@ -508,14 +512,13 @@ impl ChainForkWarrantTestCase {
             zome_index: 0.into(),
             visibility: EntryVisibility::Public,
         });
-        let action2 = self.sign_action(Action::Create(create2)).await;
+        let action2 = self.sign_action(LegacyAction::Create(create2)).await;
 
         (action1, action2)
     }
 
-    async fn sign_action(&self, action: Action) -> SignedActionHashed {
-        use holochain_zome_types::action::ActionHashed;
-        let action_hashed = ActionHashed::from_content_sync(action);
+    async fn sign_action(&self, action: LegacyAction) -> SignedActionHashed {
+        let action_hashed = holo_hash::HoloHashed::from_content_sync(from_legacy_action(&action));
         SignedActionHashed::sign(&self.keystore, action_hashed)
             .await
             .unwrap()
@@ -533,7 +536,7 @@ impl ChainForkWarrantTestCase {
             visibility: EntryVisibility::Public,
         });
         create.entry_hash = fixt!(EntryHash);
-        self.sign_action(Action::Create(create)).await
+        self.sign_action(LegacyAction::Create(create)).await
     }
 
     /// Insert an action as a warranted dependency that has been validated with the
@@ -566,8 +569,10 @@ impl ChainForkWarrantTestCase {
         action: &SignedActionHashed,
         reason: &str,
     ) -> DhtOpHashed {
-        let chain_op =
-            ChainOp::RegisterAgentActivity(action.signature.clone(), action.hashed.content.clone());
+        let chain_op = ChainOp::RegisterAgentActivity(
+            action.signature.clone(),
+            to_legacy_signed_action(action).action().clone(),
+        );
         crate::core::workflow::sys_validation_workflow::make_invalid_chain_warrant_op(
             &self.keystore,
             self.warrant_author.clone(),
@@ -587,7 +592,7 @@ impl ChainForkWarrantTestCase {
     ) -> holochain_types::warrant::WarrantOp {
         use holochain_zome_types::warrant::{ChainIntegrityWarrant, Warrant, WarrantProof};
 
-        let action_author = action.action().author().clone();
+        let action_author = action.hashed.content.author().clone();
         let warrant = Warrant::new(
             WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
                 action_author: action_author.clone(),
@@ -611,7 +616,7 @@ impl ChainForkWarrantTestCase {
         action1: &SignedActionHashed,
         action2: &SignedActionHashed,
     ) -> holochain_types::warrant::WarrantOp {
-        let chain_author = action1.action().author().clone();
+        let chain_author = action1.hashed.content.author().clone();
         self.create_chain_fork_warrant_with_chain_author(action1, action2, chain_author)
             .await
     }
@@ -623,7 +628,7 @@ impl ChainForkWarrantTestCase {
         action2: &SignedActionHashed,
         chain_author: AgentPubKey,
     ) -> holochain_types::warrant::WarrantOp {
-        let seq = action1.action().action_seq();
+        let seq = action1.hashed.content.action_seq();
         self.create_chain_fork_warrant_with_seq(action1, action2, chain_author, seq)
             .await
     }
