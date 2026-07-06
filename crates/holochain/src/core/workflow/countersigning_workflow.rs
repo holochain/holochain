@@ -619,26 +619,25 @@ async fn apply_timeout(
         .share_mut(|inner, _| {
             Ok(inner.session.as_mut().and_then(|session| {
                 let expired = match session {
-                    CountersigningSessionState::Accepted(preflight_request) => {
-                        if preflight_request.session_times.end < Timestamp::now() {
-                            if has_committed_session {
-                                *session = CountersigningSessionState::Unknown {
-                                    preflight_request: preflight_request.clone(),
-                                    resolution: SessionResolutionSummary {
-                                        required_reason: ResolutionRequiredReason::Timeout,
-                                        ..Default::default()
-                                    },
-                                    force_abandon: false,
-                                    force_publish: false,
-                                };
-                                false
-                            } else {
-                                true
-                            }
-                        } else {
+                    CountersigningSessionState::Accepted(preflight_request)
+                        if preflight_request.session_times.end < Timestamp::now() =>
+                    {
+                        if has_committed_session {
+                            *session = CountersigningSessionState::Unknown {
+                                preflight_request: preflight_request.clone(),
+                                resolution: SessionResolutionSummary {
+                                    required_reason: ResolutionRequiredReason::Timeout,
+                                    ..Default::default()
+                                },
+                                force_abandon: false,
+                                force_publish: false,
+                            };
                             false
+                        } else {
+                            true
                         }
                     }
+                    CountersigningSessionState::Accepted(_) => false,
                     CountersigningSessionState::SignaturesCollected {
                         preflight_request,
                         signature_bundles,

@@ -8,6 +8,7 @@ use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::prelude::*;
 use holochain_timestamp::Timestamp;
 use holochain_types::dht_op::ChainOp;
+use holochain_zome_types::dht_v2::to_legacy_signed_action;
 use holochain_zome_types::prelude::SignedAction;
 
 pub(crate) async fn inner_countersigning_session_complete(
@@ -26,7 +27,7 @@ pub(crate) async fn inner_countersigning_session_complete(
         .and_then(|sa| {
             sa.entry_hash()
                 .cloned()
-                .map(|eh| (ActionHash::with_data_sync(sa), eh))
+                .map(|eh| (ActionHash::with_data_sync(sa.data()), eh))
         }) {
         Some(a) => a,
         None => return Ok(None),
@@ -82,15 +83,15 @@ pub(crate) async fn inner_countersigning_session_complete(
     let mut i_am_an_author = false;
     for sa in &signed_actions {
         if !sa
-            .action()
+            .data()
             .author()
-            .verify_signature(sa.signature(), sa.action())
+            .verify_signature(sa.signature(), sa.data())
             .await?
         {
             tracing::warn!("Invalid signature found: {:?}", sa);
             return Ok(None);
         }
-        if sa.action().author() == &author {
+        if sa.data().author() == &author {
             i_am_an_author = true;
         }
     }
@@ -108,7 +109,7 @@ pub(crate) async fn inner_countersigning_session_complete(
     // Hash actions.
     let incoming_actions: Vec<_> = signed_actions
         .iter()
-        .map(ActionHash::with_data_sync)
+        .map(|sa| ActionHash::with_data_sync(sa.data()))
         .collect();
 
     let mut integrity_check_passed = false;
@@ -153,7 +154,16 @@ pub(crate) async fn inner_countersigning_session_complete(
         if *action.author() == author {
             continue;
         }
-        let op = ChainOp::RegisterAgentActivity(signature, action);
+        // `ChainOp` is a legacy-island type (see `holochain_types::dht_op`), so
+        // the action carried here has to be the legacy per-variant shape even
+        // though the signature was verified over the v2 action above.
+        let legacy_action = to_legacy_signed_action(&SignedActionHashed::new_unchecked(
+            action,
+            signature.clone(),
+        ))
+        .action()
+        .clone();
+        let op = ChainOp::RegisterAgentActivity(signature, legacy_action);
         let basis = op.dht_basis();
         if let Err(e) = network.publish_countersign(basis, op).await {
             tracing::error!(
@@ -177,9 +187,9 @@ pub(crate) async fn inner_countersigning_session_complete(
 #[allow(clippy::too_many_arguments)]
 async fn reveal_countersigning_session(
     space: Space,
-    network: DynHolochainP2pDna,
-    keystore: MetaLairClient,
-    session_record: Record,
+    _network: DynHolochainP2pDna,
+    _keystore: MetaLairClient,
+    _session_record: Record,
     author: &AgentPubKey,
     this_cells_action_hash: ActionHash,
     integration_trigger: TriggerSender,

@@ -755,7 +755,7 @@ pub mod wasm_test {
 
         // Entry get must not error.
         if let Some((countersigned_entry_hash_bob, _)) =
-            countersigned_action_bob.action().entry_data()
+            countersigned_action_bob.hashed.content.entry_data()
         {
             let _countersigned_entry_bob: EntryHashed = conductors[1]
                 .call(&bob, "must_get_entry", countersigned_entry_hash_bob)
@@ -789,7 +789,7 @@ pub mod wasm_test {
         assert_eq!(alice_activity.valid_activity.len(), 7);
         assert_eq!(
             &alice_activity.valid_activity[5].1,
-            countersigned_action_alice.action_address(),
+            countersigned_action_alice.as_hash(),
         );
 
         let bob_activity: AgentActivity = conductors[1]
@@ -807,7 +807,7 @@ pub mod wasm_test {
         assert_eq!(bob_activity.valid_activity.len(), 7);
         assert_eq!(
             &bob_activity.valid_activity[5].1,
-            countersigned_action_bob.action_address(),
+            countersigned_action_bob.as_hash(),
         );
     }
 
@@ -1033,7 +1033,7 @@ pub mod wasm_test {
 
         // Entry get must not error.
         if let Some((countersigned_entry_hash_bob, _)) =
-            countersigned_action_bob.action().entry_data()
+            countersigned_action_bob.hashed.content.entry_data()
         {
             let _countersigned_entry_bob: EntryHashed = conductor
                 .call(&bob, "must_get_entry", countersigned_entry_hash_bob)
@@ -1065,7 +1065,7 @@ pub mod wasm_test {
         assert_eq!(alice_activity.valid_activity.len(), 8);
         assert_eq!(
             &alice_activity.valid_activity[6].1,
-            countersigned_action_alice.action_address(),
+            countersigned_action_alice.as_hash(),
         );
 
         let bob_activity: AgentActivity = conductor
@@ -1083,7 +1083,7 @@ pub mod wasm_test {
         assert_eq!(bob_activity.valid_activity.len(), 6);
         assert_eq!(
             &bob_activity.valid_activity[4].1,
-            countersigned_action_bob.action_address(),
+            countersigned_action_bob.as_hash(),
         );
     }
 
