@@ -1291,8 +1291,8 @@ fn build_rendered_store_record_for_move(seed: u8) -> (RenderedOps, holo_hash::Ac
     let entry_hashed = EntryHashed::with_pre_hashed(entry, entry_hash);
     // `RenderedOp::new` takes the wire's v2 action.
     let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
-    let rendered = RenderedOp::new(v2_action, sig, None, ChainOpType::StoreRecord)
-        .expect("rendered op build");
+    let rendered =
+        RenderedOp::new(v2_action, sig, None, ChainOpType::StoreRecord).expect("rendered op build");
     let action_hash = rendered.action.as_hash().clone();
     let ops = RenderedOps {
         entry: Some(entry_hashed),
@@ -1663,7 +1663,8 @@ fn build_rendered_store_entry(
     let entry_hashed = EntryHashed::with_pre_hashed(entry, entry_hash.clone());
     // `RenderedOp::new` takes the wire's v2 action.
     let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
-    let rendered = RenderedOp::new(v2_action, sig, None, ChainOpType::StoreEntry).expect("rendered op");
+    let rendered =
+        RenderedOp::new(v2_action, sig, None, ChainOpType::StoreEntry).expect("rendered op");
     let ops = RenderedOps {
         entry: Some(entry_hashed),
         ops: vec![rendered],
@@ -1775,7 +1776,8 @@ fn build_rendered_store_record_ops(
     let entry_hashed = EntryHashed::with_pre_hashed(entry, entry_hash.clone());
     // `RenderedOp::new` takes the wire's v2 action.
     let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
-    let rendered = RenderedOp::new(v2_action, sig, None, ChainOpType::StoreRecord).expect("rendered op");
+    let rendered =
+        RenderedOp::new(v2_action, sig, None, ChainOpType::StoreRecord).expect("rendered op");
     let ops = RenderedOps {
         entry: Some(entry_hashed),
         ops: vec![rendered],
@@ -2026,7 +2028,8 @@ fn build_rendered_create_link_with_meta(seed: u8) -> (RenderedOps, AnyLinkableHa
 
     // `RenderedOp::new` takes the wire's v2 action.
     let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
-    let rendered = RenderedOp::new(v2_action, sig, None, ChainOpType::RegisterAddLink).expect("rendered op");
+    let rendered =
+        RenderedOp::new(v2_action, sig, None, ChainOpType::RegisterAddLink).expect("rendered op");
     let create_link_hash = rendered.action.as_hash().clone();
     let ops = RenderedOps {
         entry: None,
@@ -2055,7 +2058,8 @@ fn build_rendered_delete_link_for(
     });
     // `RenderedOp::new` takes the wire's v2 action.
     let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
-    let rendered = RenderedOp::new(v2_action, sig, None, ChainOpType::RegisterRemoveLink).expect("rendered op");
+    let rendered = RenderedOp::new(v2_action, sig, None, ChainOpType::RegisterRemoveLink)
+        .expect("rendered op");
     RenderedOps {
         entry: None,
         ops: vec![rendered],
@@ -2441,13 +2445,10 @@ async fn integrate_upgrades_cached_op_to_locally_validated() {
     // Cache the op first (locally_validated = 0). The authority read excludes it.
     let rendered = RenderedOps {
         entry: None,
-        ops: vec![RenderedOp::new(
-            v2_action,
-            sig.clone(),
-            None,
-            ChainOpType::RegisterAddLink,
-        )
-        .expect("rendered op build")],
+        ops: vec![
+            RenderedOp::new(v2_action, sig.clone(), None, ChainOpType::RegisterAddLink)
+                .expect("rendered op build"),
+        ],
         warrant: None,
     };
     store.cache_chain_ops(&rendered).await.unwrap();

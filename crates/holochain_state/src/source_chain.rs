@@ -1606,7 +1606,10 @@ mod tests {
         // returned action is a v2 `Action`.
         // It is the agent-key `Create`: an `AgentPubKey`-typed `Create` whose
         // entry hash is the agent key.
-        assert_matches!(action.data, holochain_zome_types::action::ActionData::Create(_));
+        assert_matches!(
+            action.data,
+            holochain_zome_types::action::ActionData::Create(_)
+        );
         assert_eq!(action.entry_type(), Some(&EntryType::AgentPubKey));
         let agent_key_entry_hash: EntryHash = agent_key.into();
         assert_eq!(action.entry_hash(), Some(&agent_key_entry_hash));
@@ -2303,8 +2306,10 @@ mod tests {
             });
             let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
             let sig = alice.sign(&keystore, &v2_action).await.unwrap();
-            let signed_action =
-                SignedActionHashed::with_presigned(ActionHashed::from_content_sync(action.clone()), sig);
+            let signed_action = SignedActionHashed::with_presigned(
+                ActionHashed::from_content_sync(action.clone()),
+                sig,
+            );
 
             chain
                 .scratch()
@@ -2473,8 +2478,10 @@ mod tests {
         });
         let v2_private_create = holochain_zome_types::dht_v2::from_legacy_action(&private_create);
         let sig = alice.sign(&keystore, &v2_private_create).await.unwrap();
-        let private_sah =
-            SignedActionHashed::with_presigned(ActionHashed::from_content_sync(private_create), sig);
+        let private_sah = SignedActionHashed::with_presigned(
+            ActionHashed::from_content_sync(private_create),
+            sig,
+        );
         let private_action_hash = private_sah.as_hash().clone();
         chain
             .scratch()
