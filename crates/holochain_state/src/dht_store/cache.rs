@@ -143,7 +143,8 @@ mod tests {
     use holochain_types::dht_op::{RenderedOp, RenderedOps};
     use holochain_types::prelude::{AppEntryBytes, Entry, EntryHashed, Signature};
     use holochain_types::warrant::WarrantOp;
-    use holochain_zome_types::action::{
+    // Builds legacy `RenderedOps`/`Action` to seed the op-cache directly.
+    use holochain_zome_types::dependencies::holochain_integrity_types::action::{
         Action, Create, CreateLink, Delete, DeleteLink, EntryType, Update,
     };
     use holochain_zome_types::entry_def::EntryVisibility;
@@ -181,7 +182,9 @@ mod tests {
         });
         let entry_hashed = EntryHashed::with_pre_hashed(entry.clone(), entry_hash);
 
-        let rendered = RenderedOp::new(action, sig, None, ChainOpType::StoreRecord)
+        // `RenderedOp::new` takes the wire's v2 action.
+        let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
+        let rendered = RenderedOp::new(v2_action, sig, None, ChainOpType::StoreRecord)
             .expect("rendered op build");
 
         RenderedOps {
@@ -217,7 +220,9 @@ mod tests {
             weight: Default::default(),
         });
 
-        let rendered = RenderedOp::new(action, sig, None, ChainOpType::RegisterAddLink)
+        // `RenderedOp::new` takes the wire's v2 action.
+        let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
+        let rendered = RenderedOp::new(v2_action, sig, None, ChainOpType::RegisterAddLink)
             .expect("rendered op build");
         RenderedOps {
             entry: None,
@@ -244,7 +249,9 @@ mod tests {
             base_address: base,
             link_add_address: link_add,
         });
-        let rendered = RenderedOp::new(action, sig, None, ChainOpType::RegisterRemoveLink)
+        // `RenderedOp::new` takes the wire's v2 action.
+        let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
+        let rendered = RenderedOp::new(v2_action, sig, None, ChainOpType::RegisterRemoveLink)
             .expect("rendered op build");
         RenderedOps {
             entry: None,
@@ -280,7 +287,9 @@ mod tests {
             weight: Default::default(),
         });
         let entry_hashed = EntryHashed::with_pre_hashed(entry.clone(), entry_hash);
-        let rendered = RenderedOp::new(action, sig, None, ChainOpType::RegisterUpdatedRecord)
+        // `RenderedOp::new` takes the wire's v2 action.
+        let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
+        let rendered = RenderedOp::new(v2_action, sig, None, ChainOpType::RegisterUpdatedRecord)
             .expect("rendered op build");
         RenderedOps {
             entry: Some(entry_hashed),
@@ -305,7 +314,9 @@ mod tests {
             deletes_entry_address: deletes_entry,
             weight: Default::default(),
         });
-        let rendered = RenderedOp::new(action, sig, None, ChainOpType::RegisterDeletedBy)
+        // `RenderedOp::new` takes the wire's v2 action.
+        let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
+        let rendered = RenderedOp::new(v2_action, sig, None, ChainOpType::RegisterDeletedBy)
             .expect("rendered op build");
         RenderedOps {
             entry: None,
@@ -331,7 +342,9 @@ mod tests {
             entry_hash: EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]),
             weight: Default::default(),
         });
-        let rendered = RenderedOp::new(action, sig, None, ChainOpType::RegisterAgentActivity)
+        // `RenderedOp::new` takes the wire's v2 action.
+        let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
+        let rendered = RenderedOp::new(v2_action, sig, None, ChainOpType::RegisterAgentActivity)
             .expect("rendered op build");
         RenderedOps {
             entry: None,
