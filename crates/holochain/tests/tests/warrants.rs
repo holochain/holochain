@@ -12,12 +12,11 @@ use holochain::{
     },
     test_utils::retry_fn_until_timeout,
 };
-use holochain_state::prelude::{insert_op_dht, set_validation_status, set_when_integrated};
 use holochain_timestamp::Timestamp;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::prelude::WarrantOp;
 use holochain_zome_types::op::ChainOpType;
-use holochain_zome_types::prelude::{ChainIntegrityWarrant, ValidationStatus, Warrant};
+use holochain_zome_types::prelude::{ChainIntegrityWarrant, Warrant};
 use holochain_zome_types::record::SignedAction;
 use holochain_zome_types::warrant::WarrantProof;
 use holochain_zome_types::Entry;
@@ -258,28 +257,14 @@ async fn author_of_invalid_warrant_is_blocked() {
         .await
         .unwrap();
 
-    // Insert the warrant into Bob's DHT database.
     let warrant_op_hashed = DhtOpHashed::from_content_sync(warrant_op);
 
-    {
-        let warrant_op_hashed = warrant_op_hashed.clone();
-        conductors[1]
-            .get_dht_db(dna_file.dna_hash())
-            .unwrap()
-            .test_write(move |txn| {
-                insert_op_dht(txn, &warrant_op_hashed, 0, None).unwrap();
-                set_validation_status(txn, &warrant_op_hashed.hash, ValidationStatus::Valid)
-                    .unwrap();
-                set_when_integrated(txn, &warrant_op_hashed.hash, Timestamp::now()).unwrap();
-            });
-    }
-
-    // Also seed the warrant in Bob's new DhtStore so K2 gossip can find and
-    // serve it. Use the test-only helper instead of
-    // `record_locally_validated_warrants`: the latter (correctly) drives the
-    // integration workflow to block the warrantee, which would prevent Bob
-    // from gossiping the warrant to Alice. This test injects an objectively
-    // invalid warrant to verify Alice rejects it, so Bob must not act on it.
+    // Seed the warrant in Bob's DhtStore so K2 gossip can find and serve it.
+    // Use the test-only helper instead of `record_locally_validated_warrants`:
+    // the latter (correctly) drives the integration workflow to block the
+    // warrantee, which would prevent Bob from gossiping the warrant to Alice.
+    // This test injects an objectively invalid warrant to verify Alice rejects
+    // it, so Bob must not act on it.
     conductors[1]
         .get_spaces()
         .dht_store(dna_file.dna_hash())

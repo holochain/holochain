@@ -2,18 +2,14 @@ use crate::conductor::space::TestSpace;
 use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
 use crate::core::ribosome::ZomesToInvoke;
 use crate::core::validation::OutcomeOrError;
-use crate::core::workflow::app_validation_workflow::{
-    get_zomes_to_invoke, put_validation_limbo, Outcome,
-};
+use crate::core::workflow::app_validation_workflow::{get_zomes_to_invoke, Outcome};
 use crate::fixt::MetaLairClientFixturator;
 use crate::sweettest::{SweetDnaFile, SweetInlineZomes};
 use fixt::fixt;
 use holo_hash::fixt::{ActionHashFixturator, AgentPubKeyFixturator, EntryHashFixturator};
-use holo_hash::{HasHash, HashableContentExtSync};
+use holo_hash::HashableContentExtSync;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
-use holochain_state::mutations::insert_op_dht;
-use holochain_state::validation_db::ValidationStage;
 use holochain_types::dht_op::{ChainOp, DhtOpHashed};
 use holochain_types::rate_limit::{EntryRateWeight, RateWeight};
 use holochain_zome_types::action::{AppEntryDef, Create, Delete, EntryType, Update, ZomeIndex};
@@ -31,24 +27,19 @@ use holochain_zome_types::Action;
 use matches::assert_matches;
 use std::sync::Arc;
 
-/// Mirror a dependency op into both the legacy DHT DB and the `DhtStore`.
+/// Seed a dependency op into the `DhtStore`.
 ///
 /// `get_zomes_to_invoke` resolves the original action via the cascade, whose
-/// local read is now `DhtStore`-backed. Tests that seed a dependency must
-/// therefore populate the `DhtStore`; the legacy write is kept so any reader
-/// still on the old path continues to see the op.
-async fn mirror_dependency_op(test_space: &TestSpace, dht_op: DhtOpHashed) {
+/// local read is `DhtStore`-backed, so a dependency op must be recorded into
+/// the store to be resolvable.
+async fn seed_dependency_op(test_space: &TestSpace, dht_op: DhtOpHashed) {
     test_space
         .space
         .dht_store
-        // For this op, a validation receipt should not be requested
-        .record_incoming_ops(vec![(dht_op.clone(), false)])
+        // For this op, a validation receipt should not be requested.
+        .record_incoming_ops(vec![(dht_op, false)])
         .await
         .unwrap();
-    test_space.space.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_op, 0, None).unwrap();
-        put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
-    });
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -628,7 +619,7 @@ async fn store_record_delete_without_entry() {
         original_action,
         RecordEntry::NA,
     ));
-    mirror_dependency_op(&test_space, dht_op).await;
+    seed_dependency_op(&test_space, dht_op).await;
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
         .await
@@ -674,7 +665,7 @@ async fn store_record_delete_non_app_entry() {
         original_action,
         RecordEntry::NA,
     ));
-    mirror_dependency_op(&test_space, dht_op).await;
+    seed_dependency_op(&test_space, dht_op).await;
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
         .await
@@ -719,7 +710,7 @@ async fn store_record_delete_link() {
         original_action,
         RecordEntry::NA,
     ));
-    mirror_dependency_op(&test_space, dht_op).await;
+    seed_dependency_op(&test_space, dht_op).await;
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
         .await
@@ -864,7 +855,7 @@ async fn register_delete_create_app_entry() {
         original_action,
         RecordEntry::NA,
     ));
-    mirror_dependency_op(&test_space, dht_op).await;
+    seed_dependency_op(&test_space, dht_op).await;
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
         .await
@@ -914,7 +905,7 @@ async fn register_delete_create_non_app_entry() {
         original_action,
         RecordEntry::NA,
     ));
-    mirror_dependency_op(&test_space, dht_op).await;
+    seed_dependency_op(&test_space, dht_op).await;
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
         .await
@@ -970,7 +961,7 @@ async fn register_delete_update_app_entry() {
         original_action,
         RecordEntry::NA,
     ));
-    mirror_dependency_op(&test_space, dht_op).await;
+    seed_dependency_op(&test_space, dht_op).await;
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
         .await
@@ -1020,7 +1011,7 @@ async fn register_delete_update_non_app_entry() {
         original_action,
         RecordEntry::NA,
     ));
-    mirror_dependency_op(&test_space, dht_op).await;
+    seed_dependency_op(&test_space, dht_op).await;
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
         .await

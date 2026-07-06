@@ -28,13 +28,8 @@ async fn sys_validation_agent_activity_test() {
         .await;
 
     let changed = cell_1
-        .dht_db()
-        .write_async(move |txn| -> DatabaseResult<usize> {
-            Ok(txn.execute(
-                "UPDATE Action SET seq = 4 WHERE hash = ? OR hash = ?",
-                [a, b],
-            )?)
-        })
+        .dht_store()
+        .test_set_action_seq(&[a, b], 4)
         .await
         .unwrap();
 

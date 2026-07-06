@@ -26,8 +26,6 @@ use tempfile::TempDir;
 /// A "factory" for HostFnCaller, which will produce them when given a ZomeName
 pub struct CellHostFnCaller {
     pub cell_id: CellId,
-    pub authored_db: DbWrite<DbKindAuthored>,
-    pub dht_db: DbWrite<DbKindDht>,
     pub ribosome: RealRibosome,
     pub network: HolochainP2pDna,
     pub keystore: MetaLairClient,
@@ -42,8 +40,6 @@ impl CellHostFnCaller {
         handle: &ConductorHandle,
         dna_file: &DnaFile,
     ) -> Self {
-        let authored_db = handle.get_authored_db(cell_id.dna_hash()).unwrap();
-        let dht_db = handle.get_dht_db(cell_id.dna_hash()).unwrap();
         let keystore = handle.keystore().clone();
         let network = handle
             .holochain_p2p()
@@ -55,8 +51,6 @@ impl CellHostFnCaller {
         let signal_tx = handle.signal_broadcaster();
         CellHostFnCaller {
             cell_id: cell_id.clone(),
-            authored_db,
-            dht_db,
             ribosome,
             network,
             keystore,
@@ -72,8 +66,6 @@ impl CellHostFnCaller {
         let zome_path = (self.cell_id.clone(), zome_name).into();
         let call_zome_handle = self.cell_conductor_api.clone().into_call_zome_handle();
         HostFnCaller {
-            authored_db: self.authored_db.clone(),
-            dht_db: self.dht_db.clone(),
             ribosome: self.ribosome.clone(),
             zome_path,
             network: self.network.clone(),

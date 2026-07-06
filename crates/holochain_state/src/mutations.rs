@@ -243,27 +243,6 @@ pub fn insert_op_when(
     Ok(())
 }
 
-/// Insert a [`DhtOpLite`] into an authored database.
-/// This sets the sql fields so the authored database
-/// can be used in queries with other databases.
-/// Because we are sharing queries across databases
-/// we need the data in the same shape.
-#[cfg_attr(feature = "instrument", tracing::instrument(skip(txn)))]
-pub fn insert_op_lite_into_authored(
-    txn: &mut Txn<DbKindAuthored>,
-    op_lite: &DhtOpLite,
-    hash: &DhtOpHash,
-    order: &OpOrder,
-    authored_timestamp: &Timestamp,
-) -> StateMutationResult<()> {
-    insert_op_lite(txn, op_lite, hash, order, authored_timestamp, 0, None)?;
-    set_validation_status(txn, hash, ValidationStatus::Valid)?;
-    set_when_sys_validated(txn, hash, Timestamp::now())?;
-    set_when_app_validated(txn, hash, Timestamp::now())?;
-    set_when_integrated(txn, hash, Timestamp::now())?;
-    Ok(())
-}
-
 /// Insert a [`DhtOpLite`] into the database.
 pub fn insert_op_lite(
     txn: &mut Transaction,
@@ -688,17 +667,6 @@ pub fn set_last_publish_time(
 ) -> StateMutationResult<()> {
     dht_op_update!(txn, hash, {
         "last_publish_time": unix_epoch.as_secs(),
-    })?;
-    Ok(())
-}
-
-/// Set withhold publish for a [DhtOp].
-pub fn set_withhold_publish(
-    txn: &mut Txn<DbKindAuthored>,
-    hash: &DhtOpHash,
-) -> StateMutationResult<()> {
-    dht_op_update!(txn, hash, {
-        "withhold_publish": true,
     })?;
     Ok(())
 }

@@ -82,8 +82,6 @@ pub enum MaybeLinkable {
 /// can be called from Rust instead of Wasm
 #[derive(Clone)]
 pub struct HostFnCaller {
-    pub authored_db: DbWrite<DbKindAuthored>,
-    pub dht_db: DbWrite<DbKindDht>,
     pub dht_store: DhtStore,
     pub ribosome: Ribosome,
     pub zome_path: ZomePath,
@@ -111,10 +109,6 @@ impl HostFnCaller {
         dna_file: &DnaFile,
         zome_index: usize,
     ) -> HostFnCaller {
-        let authored_db = handle
-            .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())
-            .unwrap();
-        let dht_db = handle.get_dht_db(cell_id.dna_hash()).unwrap();
         let dht_store = handle.get_dht_store(cell_id.dna_hash()).unwrap();
         let keystore = handle.keystore().clone();
         let network = holochain_p2p::HolochainP2pDna::new(
@@ -138,8 +132,6 @@ impl HostFnCaller {
         let call_zome_handle =
             CellConductorApi::new(handle.clone(), cell_id.clone()).into_call_zome_handle();
         HostFnCaller {
-            authored_db,
-            dht_db,
             dht_store,
             ribosome,
             zome_path,
@@ -148,14 +140,6 @@ impl HostFnCaller {
             signal_tx,
             call_zome_handle,
         }
-    }
-
-    pub fn authored_db(&self) -> DbWrite<DbKindAuthored> {
-        self.authored_db.clone()
-    }
-
-    pub fn dht_db(&self) -> DbWrite<DbKindDht> {
-        self.dht_db.clone()
     }
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self), fields(cell_id = %self.zome_path.cell_id())))]

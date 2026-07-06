@@ -34,7 +34,6 @@ pub mod dht_store;
 pub mod dna_def;
 pub mod entry_def;
 pub mod host_fn_workspace;
-pub mod integrate;
 pub mod mutations;
 pub mod peer_metadata_store;
 #[allow(missing_docs)]

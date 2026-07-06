@@ -23,10 +23,8 @@ use holo_hash::ActionHash;
 use holo_hash::{AgentPubKey, DnaHash, EntryHash};
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::{HolochainP2pError, MockHolochainP2pDnaT};
-use holochain_state::prelude::{insert_action, insert_entry, CounterSigningSessionData};
-use holochain_state::prelude::{
-    insert_op_authored, set_withhold_publish, AppEntryBytesFixturator, HeadInfo,
-};
+use holochain_state::prelude::CounterSigningSessionData;
+use holochain_state::prelude::{AppEntryBytesFixturator, HeadInfo};
 use holochain_state::prelude::{StateMutationError, StateMutationResult};
 use holochain_state::source_chain;
 use holochain_types::activity::AgentActivityResponse;
@@ -1958,28 +1956,7 @@ impl TestHarness {
         let dht_op = DhtOp::ChainOp(Box::new(store_entry_op));
         let dht_op = DhtOpHashed::from_content_sync(dht_op);
 
-        self.test_space
-            .space
-            .get_or_create_authored_db(self.author.clone())
-            .unwrap()
-            .write_async({
-                let sah = sah.clone();
-                let entry = entry.clone();
-                let entry_hash = entry_hash.clone();
-                let dht_op = dht_op.clone();
-                move |txn| -> StateMutationResult<()> {
-                    insert_action(txn, &sah)?;
-                    insert_entry(txn, &entry_hash, &entry)?;
-                    insert_op_authored(txn, &dht_op)?;
-                    set_withhold_publish(txn, &dht_op.hash)?;
-
-                    Ok(())
-                }
-            })
-            .await
-            .unwrap();
-
-        // Mirror the commit to the DhtStore so the store-backed session reads
+        // Write the commit to the DhtStore so the store-backed session reads
         // (`current_countersigning_session`, chain head) see it.
         // The session op is withheld from publishing until the session
         // succeeds, matching the flush path. The entry must be routed by

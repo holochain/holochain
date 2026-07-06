@@ -181,6 +181,33 @@ impl DhtStore<DbRead<Dht>> {
         Ok(self.db().count_entries().await?)
     }
 
+    /// Count of public `Entry` rows that belong to a private-visibility action.
+    /// This is always zero — private entries live only in the separate
+    /// `PrivateEntry` table and are never placed in the shared `Entry` table.
+    #[cfg(any(test, feature = "inspection"))]
+    pub async fn count_private_entries_in_public_table(&self) -> StateQueryResult<u64> {
+        Ok(self.db().count_private_entries_in_public_table().await?)
+    }
+
+    /// All validation receipts stored for the op `op_hash`, decoded from their
+    /// blobs. Used by tests that verify receipt delivery and signatures.
+    #[cfg(any(test, feature = "inspection"))]
+    pub async fn validation_receipts_for_op(
+        &self,
+        op_hash: &DhtOpHash,
+    ) -> StateQueryResult<Vec<holochain_types::prelude::SignedValidationReceipt>> {
+        self.db()
+            .get_validation_receipts(op_hash.clone())
+            .await?
+            .into_iter()
+            .map(|row| {
+                holochain_serialized_bytes::decode(&row.blob).map_err(|e| {
+                    crate::query::StateQueryError::Other(format!("decode receipt: {e}"))
+                })
+            })
+            .collect()
+    }
+
     /// Integrated warrants authored by `author` (the warrant issuer),
     /// reconstructed as `WarrantOp`s.
     pub async fn warrants_by_author(

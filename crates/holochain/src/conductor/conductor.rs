@@ -2971,21 +2971,6 @@ mod accessor_impls {
             self.spaces.get_or_create_space(dna_hash)
         }
 
-        pub(crate) fn get_or_create_authored_db(
-            &self,
-            dna_hash: &DnaHash,
-            author: AgentPubKey,
-        ) -> DatabaseResult<DbWrite<DbKindAuthored>> {
-            self.spaces.get_or_create_authored_db(dna_hash, author)
-        }
-
-        pub(crate) fn get_or_create_dht_db(
-            &self,
-            dna_hash: &DnaHash,
-        ) -> DatabaseResult<DbWrite<DbKindDht>> {
-            self.spaces.dht_db(dna_hash)
-        }
-
         pub(crate) fn get_or_create_dht_store(
             &self,
             dna_hash: &DnaHash,
@@ -3461,10 +3446,6 @@ mod test_utils_impls {
             self.app_broadcast.subscribe(installed_app_id)
         }
 
-        pub fn get_dht_db(&self, dna_hash: &DnaHash) -> ConductorApiResult<DbWrite<DbKindDht>> {
-            Ok(self.get_or_create_dht_db(dna_hash)?)
-        }
-
         pub fn get_dht_store(&self, dna_hash: &DnaHash) -> ConductorApiResult<DhtStore> {
             Ok(self.get_or_create_dht_store(dna_hash)?)
         }
@@ -3495,8 +3476,6 @@ mod test_utils_impls {
         }
     }
 }
-
-#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 
 /// Perform Genesis on the source chains for each of the specified CellIds.
 ///

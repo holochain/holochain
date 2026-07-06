@@ -17,7 +17,6 @@ use holo_hash::DnaHash;
 use holo_hash::HasHash;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::MockHolochainP2pDnaT;
-use holochain_sqlite::db::DbKindT;
 use holochain_state::mutations::StateMutationResult;
 use holochain_types::dht_op::ChainOp;
 use holochain_types::dht_op::DhtOp;
@@ -713,23 +712,6 @@ async fn avoid_duplicate_warrant() {
     );
 
     // Check that no new warrant was issued
-    let authored_warrants = test_case
-        .get_authored_warrants(
-            &test_case
-                .test_space
-                .space
-                .get_or_create_authored_db(other_warrant_agent.clone())
-                .unwrap(),
-            other_warrant_agent.clone(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(
-        0,
-        authored_warrants.len(),
-        "No new warrant should have been issued"
-    );
-
     let dht_warrants = test_case
         .test_space
         .space
@@ -1002,54 +984,5 @@ impl TestCase {
             .as_read()
             .warrant_validation_status(&warrant_op_hash)
             .await
-    }
-
-    async fn get_authored_warrants<T: DbKindT>(
-        &self,
-        db: &holochain_sqlite::prelude::DbRead<T>,
-        author: AgentPubKey,
-    ) -> holochain_state::prelude::StateQueryResult<Vec<holochain_types::warrant::WarrantOp>> {
-        db.read_async(
-            move |txn| -> holochain_state::prelude::StateQueryResult<
-                Vec<holochain_types::warrant::WarrantOp>,
-            > {
-                let mut stmt = txn.prepare(
-                    r#"
-            SELECT
-                Warrant.blob as action_blob,
-                Warrant.author as author,
-                NULL as entry_blob,
-                DhtOp.type as dht_type,
-                DhtOp.hash as dht_hash,
-                DhtOp.num_validation_attempts,
-                DhtOp.op_order
-            FROM DhtOp
-                JOIN Warrant ON DhtOp.action_hash = Warrant.hash
-            WHERE
-                Warrant.author = :author
-            "#,
-                )?;
-
-                let mut rows = stmt.query(rusqlite::named_params! {
-                    ":author": author,
-                })?;
-
-                let mut ops = Vec::new();
-                while let Ok(Some(row)) = rows.next() {
-                    let op = holochain_state::query::map_sql_dht_op(true, "dht_type", row)?;
-                    let hash = row.get("dht_hash")?;
-                    ops.push(DhtOpHashed::with_pre_hashed(op, hash))
-                }
-
-                Ok(ops
-                    .into_iter()
-                    .filter_map(|o| match o.content {
-                        DhtOp::WarrantOp(warrant_op) => Some(*warrant_op),
-                        _ => None,
-                    })
-                    .collect())
-            },
-        )
-        .await
     }
 }
