@@ -22,7 +22,6 @@ use holochain_sqlite::prelude::{DatabaseResult, DbKey, DbSyncLevel, DbSyncStrate
 use holochain_state::{host_fn_workspace::SourceChainWorkspace, prelude::*};
 use holochain_util::timed;
 use lair_keystore_api::prelude::SharedLockedArray;
-use rusqlite::OptionalExtension;
 use std::convert::TryInto;
 use std::path::PathBuf;
 use std::{
@@ -549,25 +548,6 @@ impl Space {
     ) -> ConductorResult<SourceChainWorkspace> {
         Ok(SourceChainWorkspace::new(self.dht_store.clone(), keystore, author).await?)
     }
-}
-
-/// Get the holochain conductor state
-#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-pub async fn query_conductor_state(
-    db: &DbRead<DbKindConductor>,
-) -> ConductorResult<Option<ConductorState>> {
-    db.read_async(|txn| {
-        let state = txn
-            .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
-                row.get("blob")
-            })
-            .optional()?;
-        match state {
-            Some(state) => ConductorResult::Ok(Some(from_blob(state)?)),
-            None => ConductorResult::Ok(None),
-        }
-    })
-    .await
 }
 
 #[cfg(test)]

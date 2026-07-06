@@ -9,7 +9,6 @@ use holochain_sqlite::prelude::DatabaseResult;
 use holochain_sqlite::rusqlite;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Transaction;
-use holochain_sqlite::sql::sql_conductor;
 use holochain_types::prelude::*;
 use holochain_types::sql::AsSql;
 
@@ -353,20 +352,6 @@ pub fn upsert_dna_def(
     Ok(())
 }
 
-/// Insert [`ConductorState`](https://docs.rs/holochain/latest/holochain/conductor/state/struct.ConductorState.html)
-/// into the database.
-pub fn insert_conductor_state(
-    txn: &mut Txn<DbKindConductor>,
-    bytes: SerializedBytes,
-) -> StateMutationResult<()> {
-    let bytes: Vec<u8> = UnsafeBytes::from(bytes).into();
-    sql_insert!(txn, ConductorState, {
-        "id": 1,
-        "blob": bytes,
-    })?;
-    Ok(())
-}
-
 pub fn insert_nonce(
     txn: &Transaction<'_>,
     agent: &AgentPubKey,
@@ -378,127 +363,6 @@ pub fn insert_nonce(
         "nonce": nonce.into_inner(),
         "expires": expires,
     })?;
-    Ok(())
-}
-
-fn pluck_overlapping_block_bounds(
-    txn: &Transaction<'_>,
-    block: Block,
-) -> DatabaseResult<(Option<i64>, Option<i64>)> {
-    // Find existing min/max blocks that overlap the new block.
-    let target_id = BlockTargetId::from(block.target().clone());
-    let target_reason = BlockTargetReason::from(block.target().clone());
-    let params = named_params! {
-        ":target_id": target_id,
-        ":target_reason": target_reason,
-        ":start_us": block.start(),
-        ":end_us": block.end(),
-    };
-    let maybe_min_maybe_max: (Option<i64>, Option<i64>) = txn.query_row(
-        &format!(
-            "SELECT min(start_us), max(end_us) {}",
-            sql_conductor::FROM_BLOCK_SPAN_WHERE_OVERLAPPING
-        ),
-        params,
-        |row| Ok((row.get(0)?, row.get(1)?)),
-    )?;
-
-    // Flush all overlapping blocks.
-    txn.execute(
-        &format!(
-            "DELETE {}",
-            sql_conductor::FROM_BLOCK_SPAN_WHERE_OVERLAPPING
-        ),
-        params,
-    )?;
-    Ok(maybe_min_maybe_max)
-}
-
-fn insert_block_inner(txn: &mut Txn<DbKindConductor>, block: Block) -> DatabaseResult<()> {
-    sql_insert!(txn, BlockSpan, {
-        "target_id": BlockTargetId::from(block.target().clone()),
-        "target_reason": BlockTargetReason::from(block.target().clone()),
-        "start_us": block.start(),
-        "end_us": block.end(),
-    })?;
-    Ok(())
-}
-
-pub fn insert_block(txn: &mut Txn<DbKindConductor>, block: Block) -> DatabaseResult<()> {
-    let maybe_min_maybe_max = pluck_overlapping_block_bounds(txn, block.clone())?;
-
-    // Build one new block from the extremums.
-    insert_block_inner(
-        txn,
-        Block::new(
-            block.target().clone(),
-            InclusiveTimestampInterval::try_new(
-                match maybe_min_maybe_max.0 {
-                    Some(min) => std::cmp::min(Timestamp(min), block.start()),
-                    None => block.start(),
-                },
-                match maybe_min_maybe_max.1 {
-                    Some(max) => std::cmp::max(Timestamp(max), block.end()),
-                    None => block.end(),
-                },
-            )?,
-        ),
-    )
-}
-
-pub fn insert_unblock(txn: &mut Txn<DbKindConductor>, unblock: Block) -> DatabaseResult<()> {
-    let maybe_min_maybe_max = pluck_overlapping_block_bounds(txn, unblock.clone())?;
-
-    // Reinstate anything outside the unblock bounds.
-    if let (Some(min), _) = maybe_min_maybe_max {
-        let unblock0 = unblock.clone();
-        let preblock_start = Timestamp(min);
-        // Unblocks are inclusive so we reinstate the preblock up to but not
-        // including the unblock start.
-        match unblock0.start() - core::time::Duration::from_micros(1) {
-            Ok(preblock_end) => {
-                if preblock_start <= preblock_end {
-                    insert_block_inner(
-                        txn,
-                        Block::new(
-                            unblock0.target().clone(),
-                            InclusiveTimestampInterval::try_new(preblock_start, preblock_end)?,
-                        ),
-                    )?
-                }
-            }
-            // It's an underflow not overflow but whatever, do nothing as the
-            // preblock is unrepresentable.
-            Err(TimestampError::Overflow) => {}
-            // Probably not possible but if it is, handle gracefully.
-            Err(e) => return Err(e.into()),
-        };
-    }
-
-    if let (_, Some(max)) = maybe_min_maybe_max {
-        let postblock_end = Timestamp(max);
-        // Unblocks are inclusive so we reinstate the postblock after but not
-        // including the unblock end.
-        match unblock.end() + core::time::Duration::from_micros(1) {
-            Ok(postblock_start) => {
-                if postblock_start <= postblock_end {
-                    insert_block_inner(
-                        txn,
-                        Block::new(
-                            unblock.target().clone(),
-                            InclusiveTimestampInterval::try_new(postblock_start, postblock_end)?,
-                        ),
-                    )?
-                }
-            }
-            // Do nothing if building the postblock is a timestamp overflow.
-            // This means the postblock is unrepresentable.
-            Err(TimestampError::Overflow) => {}
-            // Probably not possible but if it is, handle gracefully.
-            Err(e) => return Err(e.into()),
-        }
-    }
-
     Ok(())
 }
 

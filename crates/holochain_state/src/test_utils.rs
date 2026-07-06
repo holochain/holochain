@@ -3,32 +3,15 @@
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 use holochain_keystore::MetaLairClient;
-use holochain_sqlite::prelude::*;
 use holochain_sqlite::rusqlite::Statement;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::prelude::*;
-use shrinkwraprs::Shrinkwrap;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tempfile::TempDir;
 
 pub mod mutations_helpers;
-
-/// Create a [`TestDb`] of [DbKindConductor], backed by a temp directory.
-pub fn test_conductor_db() -> TestDb<DbKindConductor> {
-    test_db(DbKindConductor)
-}
-
-/// Create a [`TestDb`] of [DbKindWasm], backed by a temp directory.
-pub fn test_wasm_db() -> TestDb<DbKindWasm> {
-    test_db(DbKindWasm)
-}
-
-/// Create a [`TestDb`] of [`DbKindPeerMetaStore`], backed by a temp directory.
-pub fn test_peer_meta_store_db(dna_hash: DnaHash) -> TestDb<DbKindPeerMetaStore> {
-    test_db(DbKindPeerMetaStore(Arc::new(dna_hash)))
-}
 
 /// Create an in-memory [`crate::dht_store::DhtStore`] for use in tests.
 ///
@@ -38,23 +21,6 @@ pub async fn test_dht_store(dna_hash: DnaHash) -> crate::dht_store::DhtStore {
         .await
         .expect("Failed to open test DHT database");
     crate::dht_store::DhtStore::new(db)
-}
-
-fn test_db<Kind: DbKindT>(kind: Kind) -> TestDb<Kind> {
-    let tmpdir = tempfile::Builder::new()
-        .prefix("holochain-test-environments-")
-        .suffix(&nanoid::nanoid!())
-        .tempdir()
-        .unwrap();
-    TestDb {
-        db: DbWrite::test(tmpdir.path(), kind).expect("Couldn't create test database"),
-        dir: tmpdir.into(),
-    }
-}
-
-/// Create a [`DbWrite`] of [`DbKindT`] in memory.
-pub fn test_in_mem_db<Kind: DbKindT>(kind: Kind) -> DbWrite<Kind> {
-    DbWrite::test_in_mem(kind).expect("Couldn't create test database")
 }
 
 /// Create a fresh set of test environments with a new TempDir
@@ -76,80 +42,8 @@ pub fn test_dbs_in(path: impl AsRef<Path>) -> TestDbs {
     TestDbs::new(tempdir)
 }
 
-/// A test database in a temp directory
-#[derive(Shrinkwrap)]
-pub struct TestDb<Kind: DbKindT> {
-    /// sqlite database
-    #[shrinkwrap(main_field)]
-    db: DbWrite<Kind>,
-    /// temp directory for this environment
-    dir: TestDir,
-}
-
-impl<Kind: DbKindT> TestDb<Kind> {
-    /// Accessor
-    pub fn to_db(&self) -> DbWrite<Kind> {
-        self.db.clone()
-    }
-
-    /// Accessor
-    pub fn persist(&mut self) {
-        self.dir.persist()
-    }
-
-    /// Dump db to a location.
-    pub fn dump(&self, out: &Path) -> std::io::Result<()> {
-        std::fs::create_dir(out).ok();
-        for entry in std::fs::read_dir(&self.dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.is_file() {
-                let mut out = out.to_owned();
-                out.push(format!(
-                    "backup.{}",
-                    path.extension().unwrap().to_string_lossy()
-                ));
-                std::fs::copy(path, out)?;
-            }
-        }
-        Ok(())
-    }
-
-    /// Dump db into `/tmp/test_dbs`.
-    pub async fn dump_tmp(&self) {
-        dump_tmp(&self.db).await;
-    }
-
-    pub fn dna_hash(&self) -> Option<Arc<DnaHash>> {
-        match self.db.kind().kind() {
-            DbKind::Dht(hash) => Some(hash),
-            DbKind::Authored(cell_id) => Some(Arc::new(cell_id.dna_hash().clone())),
-            _ => None,
-        }
-    }
-}
-
-/// Dump db into `/tmp/test_dbs`.
-pub async fn dump_tmp<Kind: DbKindT>(env: &DbWrite<Kind>) {
-    let mut tmp = std::env::temp_dir();
-    tmp.push("test_dbs");
-    std::fs::create_dir(&tmp).ok();
-    tmp.push("backup.sqlite");
-    println!("dumping db to {}", tmp.display());
-    std::fs::write(&tmp, b"").unwrap();
-    env.read_async(move |txn| -> DatabaseResult<usize> {
-        Ok(txn.execute("VACUUM main into ?", [tmp.to_string_lossy()])?)
-    })
-    .await
-    .unwrap();
-}
-
 /// A container for all three non-cell environments
 pub struct TestDbs {
-    /// A test conductor environment
-    conductor: DbWrite<DbKindConductor>,
-    /// A test wasm environment
-    wasm: DbWrite<DbKindWasm>,
     /// The shared root temp dir for these environments
     dir: TestDir,
     /// The keystore sender for these environments
@@ -213,11 +107,7 @@ impl TestDir {
 impl TestDbs {
     /// Create all four non-cell environments at once with a custom keystore
     pub fn with_keystore(tempdir: TempDir, keystore: MetaLairClient) -> Self {
-        let conductor = DbWrite::test(tempdir.path(), DbKindConductor).unwrap();
-        let wasm = DbWrite::test(tempdir.path(), DbKindWasm).unwrap();
         Self {
-            conductor,
-            wasm,
             dir: TestDir::new(tempdir),
             keystore,
         }
@@ -226,14 +116,6 @@ impl TestDbs {
     /// Create all three non-cell environments at once with a test keystore
     pub fn new(tempdir: TempDir) -> Self {
         Self::with_keystore(tempdir, holochain_keystore::test_keystore())
-    }
-
-    pub fn conductor(&self) -> DbWrite<DbKindConductor> {
-        self.conductor.clone()
-    }
-
-    pub fn wasm(&self) -> DbWrite<DbKindWasm> {
-        self.wasm.clone()
     }
 
     /// Get the root path for these environments
@@ -289,53 +171,4 @@ pub fn dump_db(txn: &Transaction) {
     tracing::debug!("DhtOps:");
     let stmt = txn.prepare("SELECT * FROM DhtOp").unwrap();
     dump(stmt);
-}
-
-#[cfg(test)]
-mod tests {
-    use holochain_sqlite::error::DatabaseResult;
-    use holochain_sqlite::rusqlite::Transaction;
-
-    fn _dbg_db_schema(db_name: &str, conn: &Transaction) {
-        #[allow(dead_code)]
-        #[derive(Debug)]
-        pub struct Schema {
-            pub ty: String,
-            pub name: String,
-            pub tbl_name: String,
-            pub rootpage: u64,
-            pub sql: Option<String>,
-        }
-
-        let mut statement = conn.prepare("select * from sqlite_schema").unwrap();
-        let iter = statement
-            .query_map([], |row| {
-                Ok(Schema {
-                    ty: row.get(0)?,
-                    name: row.get(1)?,
-                    tbl_name: row.get(2)?,
-                    rootpage: row.get(3)?,
-                    sql: row.get(4)?,
-                })
-            })
-            .unwrap();
-
-        println!("~~~ {} START ~~~", &db_name);
-        for i in iter {
-            dbg!(&i);
-        }
-        println!("~~~ {} END ~~~", &db_name);
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    pub async fn dbg_db_schema() {
-        super::test_conductor_db()
-            .db
-            .read_async(move |txn| -> DatabaseResult<()> {
-                _dbg_db_schema("conductor", txn);
-                Ok(())
-            })
-            .await
-            .unwrap();
-    }
 }
