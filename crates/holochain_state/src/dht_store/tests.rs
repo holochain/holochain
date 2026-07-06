@@ -2,7 +2,11 @@ use super::*;
 use holo_hash::{ActionHash, AnyLinkableHash, DnaHash, EntryHash};
 use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed, RenderedOp, RenderedOps};
 use holochain_types::prelude::Signature;
-use holochain_zome_types::action::{Action, Create, CreateLink, DeleteLink, EntryType};
+// This test module seeds the op-cache/limbo pipeline directly with legacy
+// `ChainOp`/`DhtOp` and `RenderedOps`; pin `Action` to its legacy shape.
+use holochain_zome_types::dependencies::holochain_integrity_types::action::{
+    Action, Create, CreateLink, DeleteLink, EntryType,
+};
 use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::op::ChainOpType;
 use holochain_zome_types::prelude::AppEntryDef;
@@ -246,7 +250,9 @@ fn build_test_store_record_op_hashed(seed: u8) -> (DhtOpHashed, bool) {
     use holo_hash::{ActionHash, EntryHash};
     use holochain_serialized_bytes::UnsafeBytes;
     use holochain_types::prelude::{AppEntryBytes, Entry, RecordEntry, Signature};
-    use holochain_zome_types::action::{Action, Create, EntryType};
+    use holochain_zome_types::dependencies::holochain_integrity_types::action::{
+        Action, Create, EntryType,
+    };
     use holochain_zome_types::entry_def::EntryVisibility;
     use holochain_zome_types::prelude::AppEntryDef;
 
@@ -1283,8 +1289,10 @@ fn build_rendered_store_record_for_move(seed: u8) -> (RenderedOps, holo_hash::Ac
         weight: Default::default(),
     });
     let entry_hashed = EntryHashed::with_pre_hashed(entry, entry_hash);
-    let rendered =
-        RenderedOp::new(action, sig, None, ChainOpType::StoreRecord).expect("rendered op build");
+    // `RenderedOp::new` takes the wire's v2 action.
+    let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
+    let rendered = RenderedOp::new(v2_action, sig, None, ChainOpType::StoreRecord)
+        .expect("rendered op build");
     let action_hash = rendered.action.as_hash().clone();
     let ops = RenderedOps {
         entry: Some(entry_hashed),
@@ -1411,7 +1419,9 @@ fn store_record_op_with_hashes(
     use holo_hash::{ActionHash, EntryHash};
     use holochain_serialized_bytes::UnsafeBytes;
     use holochain_types::prelude::{AppEntryBytes, Entry, RecordEntry, Signature};
-    use holochain_zome_types::action::{Action, Create, EntryType};
+    use holochain_zome_types::dependencies::holochain_integrity_types::action::{
+        Action, Create, EntryType,
+    };
     use holochain_zome_types::entry_def::EntryVisibility;
     use holochain_zome_types::prelude::AppEntryDef;
 
@@ -1651,8 +1661,9 @@ fn build_rendered_store_entry(
     });
     let action_hash = holo_hash::ActionHash::with_data_sync(&action);
     let entry_hashed = EntryHashed::with_pre_hashed(entry, entry_hash.clone());
-    let rendered =
-        RenderedOp::new(action, sig, None, ChainOpType::StoreEntry).expect("rendered op");
+    // `RenderedOp::new` takes the wire's v2 action.
+    let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
+    let rendered = RenderedOp::new(v2_action, sig, None, ChainOpType::StoreEntry).expect("rendered op");
     let ops = RenderedOps {
         entry: Some(entry_hashed),
         ops: vec![rendered],
@@ -1762,8 +1773,9 @@ fn build_rendered_store_record_ops(
     });
     let action_hash = holo_hash::ActionHash::with_data_sync(&action);
     let entry_hashed = EntryHashed::with_pre_hashed(entry, entry_hash.clone());
-    let rendered =
-        RenderedOp::new(action, sig, None, ChainOpType::StoreRecord).expect("rendered op");
+    // `RenderedOp::new` takes the wire's v2 action.
+    let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
+    let rendered = RenderedOp::new(v2_action, sig, None, ChainOpType::StoreRecord).expect("rendered op");
     let ops = RenderedOps {
         entry: Some(entry_hashed),
         ops: vec![rendered],
@@ -2012,8 +2024,9 @@ fn build_rendered_create_link_with_meta(seed: u8) -> (RenderedOps, AnyLinkableHa
         weight: Default::default(),
     });
 
-    let rendered =
-        RenderedOp::new(action, sig, None, ChainOpType::RegisterAddLink).expect("rendered op");
+    // `RenderedOp::new` takes the wire's v2 action.
+    let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
+    let rendered = RenderedOp::new(v2_action, sig, None, ChainOpType::RegisterAddLink).expect("rendered op");
     let create_link_hash = rendered.action.as_hash().clone();
     let ops = RenderedOps {
         entry: None,
@@ -2040,8 +2053,9 @@ fn build_rendered_delete_link_for(
         base_address: base.clone(),
         link_add_address: create_link_hash,
     });
-    let rendered =
-        RenderedOp::new(action, sig, None, ChainOpType::RegisterRemoveLink).expect("rendered op");
+    // `RenderedOp::new` takes the wire's v2 action.
+    let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
+    let rendered = RenderedOp::new(v2_action, sig, None, ChainOpType::RegisterRemoveLink).expect("rendered op");
     RenderedOps {
         entry: None,
         ops: vec![rendered],
@@ -2266,8 +2280,10 @@ fn build_cached_create_link(base: &holo_hash::AnyLinkableHash, seed: u8) -> Rend
         tag: holochain_zome_types::link::LinkTag(vec![1, 2, 3]),
         weight: Default::default(),
     });
+    // `RenderedOp::new` takes the wire's v2 action.
+    let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
     let rendered = RenderedOp::new(
-        action,
+        v2_action,
         Signature::from([seed; 64]),
         None,
         ChainOpType::RegisterAddLink,
@@ -2419,12 +2435,14 @@ async fn integrate_upgrades_cached_op_to_locally_validated() {
         weight: Default::default(),
     });
     let sig = Signature::from([6u8; 64]);
+    // `RenderedOp::new` takes the wire's v2 action.
+    let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
 
     // Cache the op first (locally_validated = 0). The authority read excludes it.
     let rendered = RenderedOps {
         entry: None,
         ops: vec![RenderedOp::new(
-            action.clone(),
+            v2_action,
             sig.clone(),
             None,
             ChainOpType::RegisterAddLink,
@@ -2759,6 +2777,10 @@ mod publish_query {
     use holo_hash::fixt::{ActionHashFixturator, AgentPubKeyFixturator, DnaHashFixturator};
     use holochain_types::fixt::SignatureFixturator;
     use holochain_types::prelude::*;
+    // Disambiguates the `Action` brought in ambiguously by `super::*` (legacy)
+    // and `holochain_types::prelude::*` (v2): this module seeds legacy
+    // `ChainOp`s, so pin explicitly to the legacy shape.
+    use holochain_zome_types::dependencies::holochain_integrity_types::action::Action;
     use holochain_zome_types::fixt::{
         AppEntryBytesFixturator, AppEntryDefFixturator, CreateFixturator,
     };
