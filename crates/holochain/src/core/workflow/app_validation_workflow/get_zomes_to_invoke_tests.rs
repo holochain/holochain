@@ -13,17 +13,22 @@ use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_types::dht_op::{ChainOp, DhtOpHashed};
 use holochain_types::rate_limit::{EntryRateWeight, RateWeight};
 use holochain_zome_types::action::{AppEntryDef, Create, Delete, EntryType, Update, ZomeIndex};
+// `get_zomes_to_invoke` dispatches on the v2 `Op`; the bare `Op`/`Record`
+// names otherwise resolve ambiguously since no legacy `op`/`Action` glob is
+// imported here. `LegacyAction` is the per-variant enum the fixturated
+// `Create`/`Update`/`Delete`/`CreateLink`/`DeleteLink` structs plug into
+// before being projected to the v2 `Action` via `from_legacy_action`.
+use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
+use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
+    from_legacy_action, Op, RegisterAgentActivity, RegisterCreateLink, RegisterDelete,
+    RegisterDeleteLink, RegisterUpdate, StoreEntry, StoreRecord,
+};
 use holochain_zome_types::fixt::{
     ActionFixturator, CreateFixturator, CreateLinkFixturator, DeleteLinkFixturator,
     EntryFixturator, SignatureFixturator, UpdateFixturator,
 };
-use holochain_zome_types::op::{
-    EntryCreationAction, Op, RegisterAgentActivity, RegisterCreateLink, RegisterDelete,
-    RegisterDeleteLink, RegisterUpdate, StoreEntry, StoreRecord,
-};
-use holochain_zome_types::record::{Record, RecordEntry, SignedActionHashed, SignedHashed};
+use holochain_zome_types::record::{Record, RecordEntry, SignedActionHashed};
 use holochain_zome_types::timestamp::Timestamp;
-use holochain_zome_types::Action;
 use matches::assert_matches;
 use std::sync::Arc;
 
@@ -96,8 +101,8 @@ async fn store_entry_create_app_entry() {
         timestamp: Timestamp::now(),
         weight: EntryRateWeight::default(),
     };
-    let action = EntryCreationAction::Create(create);
-    let action = SignedHashed::new_unchecked(action, fixt!(Signature));
+    let action = from_legacy_action(&LegacyAction::Create(create));
+    let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
     let op = Op::StoreEntry(StoreEntry {
         action: action.clone(),
         entry,
@@ -138,8 +143,8 @@ async fn store_entry_create_non_app_entry() {
         timestamp: Timestamp::now(),
         weight: EntryRateWeight::default(),
     };
-    let action = EntryCreationAction::Create(create);
-    let action = SignedHashed::new_unchecked(action, fixt!(Signature));
+    let action = from_legacy_action(&LegacyAction::Create(create));
+    let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
     let op = Op::StoreEntry(StoreEntry {
         action: action.clone(),
         entry,
@@ -188,8 +193,8 @@ async fn store_entry_update_app_entry() {
         timestamp: Timestamp::now(),
         weight: EntryRateWeight::default(),
     };
-    let action = EntryCreationAction::Update(update);
-    let action = SignedHashed::new_unchecked(action, fixt!(Signature));
+    let action = from_legacy_action(&LegacyAction::Update(update));
+    let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
     let op = Op::StoreEntry(StoreEntry {
         action: action.clone(),
         entry,
@@ -232,8 +237,8 @@ async fn store_entry_update_non_app_entry() {
         timestamp: Timestamp::now(),
         weight: EntryRateWeight::default(),
     };
-    let action = EntryCreationAction::Update(update);
-    let action = SignedHashed::new_unchecked(action, fixt!(Signature));
+    let action = from_legacy_action(&LegacyAction::Update(update));
+    let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
     let op = Op::StoreEntry(StoreEntry {
         action: action.clone(),
         entry,
@@ -267,7 +272,7 @@ async fn store_record_create_app_entry() {
         .unwrap();
 
     let entry = fixt!(Entry);
-    let action = Action::Create(Create {
+    let create = Create {
         action_seq: 0,
         author: fixt!(AgentPubKey),
         entry_hash: entry.clone().to_hash(),
@@ -279,9 +284,13 @@ async fn store_record_create_app_entry() {
         prev_action: fixt!(ActionHash),
         timestamp: Timestamp::now(),
         weight: EntryRateWeight::default(),
-    });
+    };
+    let action = from_legacy_action(&LegacyAction::Create(create));
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
-    let record = Record::new(action.clone(), None);
+    let record = Record::new(
+        action.clone(),
+        RecordEntry::new(action.hashed.content.entry_visibility(), None),
+    );
     let op = Op::StoreRecord(StoreRecord { record });
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
@@ -306,7 +315,7 @@ async fn store_record_create_non_app_entry() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let ribosome = MockRibosomeBuilder::new().build().await.unwrap();
 
-    let action = Action::Create(Create {
+    let create = Create {
         action_seq: 0,
         author: fixt!(AgentPubKey),
         entry_hash: fixt!(AgentPubKey).into(),
@@ -314,9 +323,13 @@ async fn store_record_create_non_app_entry() {
         prev_action: fixt!(ActionHash),
         timestamp: Timestamp::now(),
         weight: EntryRateWeight::default(),
-    });
+    };
+    let action = from_legacy_action(&LegacyAction::Create(create));
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
-    let record = Record::new(action.clone(), None);
+    let record = Record::new(
+        action.clone(),
+        RecordEntry::new(action.hashed.content.entry_visibility(), None),
+    );
     let op = Op::StoreRecord(StoreRecord { record });
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
@@ -345,7 +358,7 @@ async fn store_record_create_wrong_entry() {
         .unwrap();
 
     let entry = fixt!(Entry);
-    let action = Action::Create(Create {
+    let create = Create {
         action_seq: 0,
         author: fixt!(AgentPubKey),
         entry_hash: entry.clone().to_hash(),
@@ -358,9 +371,13 @@ async fn store_record_create_wrong_entry() {
         prev_action: fixt!(ActionHash),
         timestamp: Timestamp::now(),
         weight: EntryRateWeight::default(),
-    });
+    };
+    let action = from_legacy_action(&LegacyAction::Create(create));
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
-    let record = Record::new(action.clone(), None);
+    let record = Record::new(
+        action.clone(),
+        RecordEntry::new(action.hashed.content.entry_visibility(), None),
+    );
     let op = Op::StoreRecord(StoreRecord { record });
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
@@ -393,9 +410,12 @@ async fn store_record_create_link() {
 
     let mut create_link = fixt!(CreateLink);
     create_link.zome_index = zome_index;
-    let action = Action::CreateLink(create_link);
+    let action = from_legacy_action(&LegacyAction::CreateLink(create_link));
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
-    let record = Record::new(action.clone(), None);
+    let record = Record::new(
+        action.clone(),
+        RecordEntry::new(action.hashed.content.entry_visibility(), None),
+    );
     let op = Op::StoreRecord(StoreRecord { record });
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
@@ -431,7 +451,7 @@ async fn store_record_update_app_entry() {
         entry_index: 0.into(),
         visibility: Default::default(),
     });
-    let action = Action::Update(Update {
+    let update = Update {
         action_seq: 0,
         author: fixt!(AgentPubKey),
         entry_hash: fixt!(EntryHash),
@@ -445,9 +465,13 @@ async fn store_record_update_app_entry() {
         prev_action: fixt!(ActionHash),
         timestamp: Timestamp::now(),
         weight: EntryRateWeight::default(),
-    });
+    };
+    let action = from_legacy_action(&LegacyAction::Update(update));
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
-    let record = Record::new(action.clone(), None);
+    let record = Record::new(
+        action.clone(),
+        RecordEntry::new(action.hashed.content.entry_visibility(), None),
+    );
     let op = Op::StoreRecord(StoreRecord { record });
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
@@ -474,7 +498,7 @@ async fn store_record_update_non_app_entry() {
 
     let mut create = fixt!(Create);
     create.entry_type = EntryType::CapGrant;
-    let action = Action::Update(Update {
+    let update = Update {
         action_seq: 0,
         author: fixt!(AgentPubKey),
         entry_hash: fixt!(EntryHash),
@@ -484,9 +508,13 @@ async fn store_record_update_non_app_entry() {
         prev_action: fixt!(ActionHash),
         timestamp: Timestamp::now(),
         weight: EntryRateWeight::default(),
-    });
+    };
+    let action = from_legacy_action(&LegacyAction::Update(update));
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
-    let record = Record::new(action.clone(), None);
+    let record = Record::new(
+        action.clone(),
+        RecordEntry::new(action.hashed.content.entry_visibility(), None),
+    );
     let op = Op::StoreRecord(StoreRecord { record });
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
@@ -522,7 +550,7 @@ async fn store_record_update_of_update_app_entry() {
         entry_index: 0.into(),
         visibility: Default::default(),
     });
-    let update = Action::Update(Update {
+    let update = LegacyAction::Update(Update {
         action_seq: 0,
         author: fixt!(AgentPubKey),
         entry_hash: fixt!(EntryHash),
@@ -537,7 +565,7 @@ async fn store_record_update_of_update_app_entry() {
         timestamp: Timestamp::now(),
         weight: EntryRateWeight::default(),
     });
-    let action = Action::Update(Update {
+    let update_of_update = Update {
         action_seq: 0,
         author: fixt!(AgentPubKey),
         entry_hash: fixt!(EntryHash),
@@ -551,9 +579,13 @@ async fn store_record_update_of_update_app_entry() {
         prev_action: fixt!(ActionHash),
         timestamp: Timestamp::now(),
         weight: EntryRateWeight::default(),
-    });
+    };
+    let action = from_legacy_action(&LegacyAction::Update(update_of_update));
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
-    let record = Record::new(action.clone(), None);
+    let record = Record::new(
+        action.clone(),
+        RecordEntry::new(action.hashed.content.entry_visibility(), None),
+    );
     let op = Op::StoreRecord(StoreRecord { record });
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
@@ -589,8 +621,8 @@ async fn store_record_delete_without_entry() {
         entry_index: 0.into(),
         visibility: Default::default(),
     });
-    let original_action = Action::Create(create);
-    let action = Action::Delete(Delete {
+    let original_action = LegacyAction::Create(create);
+    let delete = Delete {
         action_seq: 0,
         author: fixt!(AgentPubKey),
         deletes_address: original_action.to_hash(),
@@ -598,9 +630,13 @@ async fn store_record_delete_without_entry() {
         prev_action: fixt!(ActionHash),
         timestamp: Timestamp::now(),
         weight: RateWeight::default(),
-    });
+    };
+    let action = from_legacy_action(&LegacyAction::Delete(delete));
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
-    let record = Record::new(action.clone(), None);
+    let record = Record::new(
+        action.clone(),
+        RecordEntry::new(action.hashed.content.entry_visibility(), None),
+    );
     let op = Op::StoreRecord(StoreRecord { record });
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
@@ -635,8 +671,8 @@ async fn store_record_delete_non_app_entry() {
 
     let mut create = fixt!(Create);
     create.entry_type = EntryType::CapGrant;
-    let original_action = Action::Create(create);
-    let action = Action::Delete(Delete {
+    let original_action = LegacyAction::Create(create);
+    let delete = Delete {
         action_seq: 0,
         author: fixt!(AgentPubKey),
         deletes_address: original_action.to_hash(),
@@ -644,9 +680,13 @@ async fn store_record_delete_non_app_entry() {
         prev_action: fixt!(ActionHash),
         timestamp: Timestamp::now(),
         weight: RateWeight::default(),
-    });
+    };
+    let action = from_legacy_action(&LegacyAction::Delete(delete));
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
-    let record = Record::new(action.clone(), None);
+    let record = Record::new(
+        action.clone(),
+        RecordEntry::new(action.hashed.content.entry_visibility(), None),
+    );
     let op = Op::StoreRecord(StoreRecord { record });
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
@@ -686,12 +726,15 @@ async fn store_record_delete_link() {
 
     let mut create_link = fixt!(CreateLink);
     create_link.zome_index = zome_index;
-    let original_action = Action::CreateLink(create_link.clone());
+    let original_action = LegacyAction::CreateLink(create_link.clone());
     let mut delete_link = fixt!(DeleteLink);
     delete_link.link_add_address = original_action.to_hash();
-    let action = Action::DeleteLink(delete_link);
+    let action = from_legacy_action(&LegacyAction::DeleteLink(delete_link));
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
-    let record = Record::new(action.clone(), None);
+    let record = Record::new(
+        action.clone(),
+        RecordEntry::new(action.hashed.content.entry_visibility(), None),
+    );
     let op = Op::StoreRecord(StoreRecord { record });
 
     let test_space = TestSpace::new(dna_file.dna_hash().clone());
@@ -745,7 +788,8 @@ async fn register_update_app_entry() {
         timestamp: Timestamp::now(),
         weight: EntryRateWeight::default(),
     };
-    let update = SignedHashed::new_unchecked(update, fixt!(Signature));
+    let update = from_legacy_action(&LegacyAction::Update(update));
+    let update = SignedActionHashed::new_unchecked(update, fixt!(Signature));
     let op = Op::RegisterUpdate(RegisterUpdate {
         update: update.clone(),
         new_entry: Some(entry),
@@ -785,7 +829,8 @@ async fn register_update_non_app_entry() {
         timestamp: Timestamp::now(),
         weight: EntryRateWeight::default(),
     };
-    let update = SignedHashed::new_unchecked(update, fixt!(Signature));
+    let update = from_legacy_action(&LegacyAction::Update(update));
+    let update = SignedActionHashed::new_unchecked(update, fixt!(Signature));
     let op = Op::RegisterUpdate(RegisterUpdate {
         update: update.clone(),
         new_entry: Some(entry),
@@ -824,7 +869,7 @@ async fn register_delete_create_app_entry() {
         entry_index: 0.into(),
         visibility: Default::default(),
     });
-    let original_action = Action::Create(create);
+    let original_action = LegacyAction::Create(create);
     let delete = Delete {
         action_seq: 1,
         author: fixt!(AgentPubKey),
@@ -834,7 +879,8 @@ async fn register_delete_create_app_entry() {
         timestamp: Timestamp::now(),
         weight: RateWeight::default(),
     };
-    let delete = SignedHashed::new_unchecked(delete, fixt!(Signature));
+    let delete = from_legacy_action(&LegacyAction::Delete(delete));
+    let delete = SignedActionHashed::new_unchecked(delete, fixt!(Signature));
     let op = Op::RegisterDelete(RegisterDelete {
         delete: delete.clone(),
     });
@@ -874,7 +920,7 @@ async fn register_delete_create_non_app_entry() {
 
     let mut create = fixt!(Create);
     create.entry_type = EntryType::CapGrant;
-    let original_action = Action::Create(create);
+    let original_action = LegacyAction::Create(create);
     let delete = Delete {
         action_seq: 1,
         author: fixt!(AgentPubKey),
@@ -884,7 +930,8 @@ async fn register_delete_create_non_app_entry() {
         timestamp: Timestamp::now(),
         weight: RateWeight::default(),
     };
-    let delete = SignedHashed::new_unchecked(delete, fixt!(Signature));
+    let delete = from_legacy_action(&LegacyAction::Delete(delete));
+    let delete = SignedActionHashed::new_unchecked(delete, fixt!(Signature));
     let op = Op::RegisterDelete(RegisterDelete {
         delete: delete.clone(),
     });
@@ -930,7 +977,7 @@ async fn register_delete_update_app_entry() {
         entry_index: 0.into(),
         visibility: Default::default(),
     });
-    let original_action = Action::Update(update);
+    let original_action = LegacyAction::Update(update);
     let delete = Delete {
         action_seq: 1,
         author: fixt!(AgentPubKey),
@@ -940,7 +987,8 @@ async fn register_delete_update_app_entry() {
         timestamp: Timestamp::now(),
         weight: RateWeight::default(),
     };
-    let delete = SignedHashed::new_unchecked(delete, fixt!(Signature));
+    let delete = from_legacy_action(&LegacyAction::Delete(delete));
+    let delete = SignedActionHashed::new_unchecked(delete, fixt!(Signature));
     let op = Op::RegisterDelete(RegisterDelete {
         delete: delete.clone(),
     });
@@ -980,7 +1028,7 @@ async fn register_delete_update_non_app_entry() {
 
     let mut update = fixt!(Update);
     update.entry_type = EntryType::CapClaim;
-    let original_action = Action::Update(update);
+    let original_action = LegacyAction::Update(update);
     let delete = Delete {
         action_seq: 1,
         author: fixt!(AgentPubKey),
@@ -990,7 +1038,8 @@ async fn register_delete_update_non_app_entry() {
         timestamp: Timestamp::now(),
         weight: RateWeight::default(),
     };
-    let delete = SignedHashed::new_unchecked(delete, fixt!(Signature));
+    let delete = from_legacy_action(&LegacyAction::Delete(delete));
+    let delete = SignedActionHashed::new_unchecked(delete, fixt!(Signature));
     let op = Op::RegisterDelete(RegisterDelete {
         delete: delete.clone(),
     });
@@ -1032,7 +1081,8 @@ async fn register_create_link() {
 
     let mut create_link = fixt!(CreateLink);
     create_link.zome_index = zome_index;
-    let create_link = SignedHashed::new_unchecked(create_link, fixt!(Signature));
+    let create_link = from_legacy_action(&LegacyAction::CreateLink(create_link));
+    let create_link = SignedActionHashed::new_unchecked(create_link, fixt!(Signature));
     let op = Op::RegisterCreateLink(RegisterCreateLink {
         create_link: create_link.clone(),
     });
@@ -1066,9 +1116,11 @@ async fn register_delete_link() {
 
     let mut create_link = fixt!(CreateLink);
     create_link.zome_index = zome_index;
-    let delete_link = SignedHashed::new_unchecked(fixt!(DeleteLink), fixt!(Signature));
+    let create_link = from_legacy_action(&LegacyAction::CreateLink(create_link));
+    let delete_link = from_legacy_action(&LegacyAction::DeleteLink(fixt!(DeleteLink)));
+    let delete_link = SignedActionHashed::new_unchecked(delete_link, fixt!(Signature));
     let op = Op::RegisterDeleteLink(RegisterDeleteLink {
-        create_link: create_link.clone(),
+        create_link,
         delete_link,
     });
 

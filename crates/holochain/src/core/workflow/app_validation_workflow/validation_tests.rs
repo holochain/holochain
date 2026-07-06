@@ -3,6 +3,14 @@
 use crate::{core::ribosome::guest_callback::validate::ValidateResult, sweettest::*};
 use holo_hash::{ActionHash, AgentPubKey};
 use holochain_types::{inline_zome::InlineZomeSet, prelude::*};
+// `Op`/`StoreRecord`/.../`RegisterDeleteLink` and `ActionType` otherwise
+// resolve to the legacy per-variant shapes via `holochain_types::prelude::*`;
+// this inline zome's `validate` callback decodes the v2 `Op` the ribosome
+// actually dispatches, so these names are pinned to the v2 forms explicitly.
+use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
+    ActionType, Op, RegisterAgentActivity, RegisterCreateLink, RegisterDelete, RegisterDeleteLink,
+    RegisterUpdate, StoreEntry, StoreRecord,
+};
 use std::{
     collections::{HashMap, HashSet},
     fmt::Write,
@@ -69,7 +77,10 @@ impl ActionLocation {
         let action = action.into();
         Self {
             agent: agents.get(action.author()).unwrap(),
-            action_type: action.action_type().to_string(),
+            // v2 `ActionType` has no `Display` impl (only `Debug`); its
+            // fieldless variants render identically either way (e.g. "Dna",
+            // "Create"), so `Debug` formatting is an exact stand-in here.
+            action_type: format!("{:?}", action.action_type()),
             seq: action.action_seq(),
         }
     }
@@ -77,7 +88,7 @@ impl ActionLocation {
     fn expected(agent: &'static str, action_type: ActionType, seq: u32) -> Self {
         Self {
             agent,
-            action_type: action_type.to_string(),
+            action_type: format!("{action_type:?}"),
             seq,
         }
     }
@@ -232,15 +243,15 @@ async fn app_validation_ops() {
                         }
                     }
                     Op::RegisterUpdate(RegisterUpdate { update, .. }) => {
-                        let (with_entry_def_index, with_zome_index) = match update.hashed.entry_type
-                        {
-                            EntryType::App(AppEntryDef {
-                                entry_index,
-                                zome_index,
-                                ..
-                            }) => (Some(entry_index), Some(zome_index)),
-                            _ => (None, None),
-                        };
+                        let (with_entry_def_index, with_zome_index) =
+                            match update.hashed.content.entry_type() {
+                                Some(EntryType::App(AppEntryDef {
+                                    entry_index,
+                                    zome_index,
+                                    ..
+                                })) => (Some(*entry_index), Some(*zome_index)),
+                                _ => (None, None),
+                            };
                         Event {
                             action: ActionLocation::new(update.hashed.content.clone(), &agents),
                             op_type: ChainOpType::RegisterUpdatedContent,
@@ -250,8 +261,12 @@ async fn app_validation_ops() {
                         }
                     }
                     Op::RegisterDelete(RegisterDelete { delete, .. }) => {
+                        // `Delete` action data never carries an entry type, so
+                        // this is always `(None, None)`; kept as an explicit
+                        // match (rather than a constant) to mirror the other
+                        // arms and stay correct if that ever changes.
                         let (with_entry_def_index, with_zome_index) =
-                            match (*delete.hashed).clone().into_action().entry_type() {
+                            match delete.hashed.content.entry_type() {
                                 Some(EntryType::App(AppEntryDef {
                                     entry_index,
                                     zome_index,
@@ -268,7 +283,7 @@ async fn app_validation_ops() {
                         }
                     }
                     Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => Event {
-                        action: ActionLocation::new(action.action().clone(), &agents),
+                        action: ActionLocation::new(action.hashed.content.clone(), &agents),
                         op_type: ChainOpType::RegisterAgentActivity,
                         called_zome: zome,
                         with_zome_index: None,

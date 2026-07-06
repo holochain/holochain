@@ -26,9 +26,16 @@ use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::{TestWasm, TestWasmPair, TestZomes};
+// `hdk::prelude::*` (v2 `Op`/`Action`/etc.) and `holochain_types::prelude::*`
+// (legacy `Op`/etc., under the same bare names) are both globbed above; pin
+// the names this file's inline-zome `validate` callbacks actually decode
+// (the v2 shapes the ribosome dispatches) with explicit imports.
+use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
+use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
+    ActionData, DeleteData, Op, RegisterAgentActivity, RegisterDelete, StoreEntry, StoreRecord,
+};
 use holochain_zome_types::fixt::{CreateFixturator, DeleteFixturator, SignatureFixturator};
 use holochain_zome_types::timestamp::Timestamp;
-use holochain_zome_types::Action;
 use matches::assert_matches;
 use std::convert::{TryFrom, TryInto};
 use std::hash::Hash;
@@ -42,18 +49,19 @@ async fn main_workflow() {
     let zomes =
         SweetInlineZomes::new(vec![], 0).integrity_function("validate", move |api, op: Op| {
             if let Op::RegisterDelete(RegisterDelete { delete }) = op {
-                let result = api.must_get_action(MustGetActionInput::new(
-                    delete.hashed.deletes_address.clone(),
-                ));
+                let deletes_address = match &delete.hashed.content.data {
+                    ActionData::Delete(DeleteData {
+                        deletes_address, ..
+                    }) => deletes_address.clone(),
+                    _ => unreachable!(),
+                };
+                let result =
+                    api.must_get_action(MustGetActionInput::new(deletes_address.clone()));
                 if result.is_ok() {
                     Ok(ValidateCallbackResult::Valid)
                 } else {
                     Ok(ValidateCallbackResult::UnresolvedDependencies(
-                        UnresolvedDependencies::Hashes(vec![delete
-                            .hashed
-                            .deletes_address
-                            .clone()
-                            .into()]),
+                        UnresolvedDependencies::Hashes(vec![deletes_address.into()]),
                     ))
                 }
             } else {
@@ -93,7 +101,7 @@ async fn main_workflow() {
         zome_index: 0.into(),
         visibility: Default::default(),
     });
-    let create_action = Action::Create(create);
+    let create_action = LegacyAction::Create(create);
     let dht_create_op = ChainOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
     let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
 
@@ -242,7 +250,7 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
         timestamp: Timestamp::now(),
         weight: Default::default(),
     };
-    let create_action = Action::Create(create);
+    let create_action = LegacyAction::Create(create);
     let dht_create_op = ChainOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
     let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
     let create_action_hash = create_action.to_hash();
@@ -257,7 +265,7 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
         timestamp: Timestamp::now(),
         weight: Default::default(),
     };
-    let delete_action = Action::Delete(delete);
+    let delete_action = LegacyAction::Delete(delete);
     let dht_delete_op = ChainOp::RegisterAgentActivity(fixt!(Signature), delete_action.clone());
     let dht_delete_op_hash = DhtOpHash::with_data_sync(&dht_delete_op);
     let dht_delete_op_hashed = DhtOpHashed::from_content_sync(dht_delete_op);
@@ -267,10 +275,16 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
         "validate",
         move |api, op: Op| {
             if let Op::RegisterDelete(RegisterDelete { delete }) = op {
+                let deletes_address = match &delete.hashed.content.data {
+                    ActionData::Delete(DeleteData {
+                        deletes_address, ..
+                    }) => deletes_address.clone(),
+                    _ => unreachable!(),
+                };
                 // chain filter goes from delete action until create action
                 let chain_filter = ChainFilter::until_hash(
                     delete.hashed.content.clone().to_hash(),
-                    delete.hashed.deletes_address.clone(),
+                    deletes_address,
                 );
                 let result = api.must_get_agent_activity(MustGetAgentActivityInput {
                     author: agent.clone(),
@@ -397,18 +411,19 @@ async fn validate_ops_in_sequence_must_get_action() {
         "validate",
         move |api, op: Op| {
             if let Op::RegisterDelete(RegisterDelete { delete }) = op {
-                let result = api.must_get_action(MustGetActionInput::new(
-                    delete.hashed.deletes_address.clone(),
-                ));
+                let deletes_address = match &delete.hashed.content.data {
+                    ActionData::Delete(DeleteData {
+                        deletes_address, ..
+                    }) => deletes_address.clone(),
+                    _ => unreachable!(),
+                };
+                let result =
+                    api.must_get_action(MustGetActionInput::new(deletes_address.clone()));
                 if result.is_ok() {
                     Ok(ValidateCallbackResult::Valid)
                 } else {
                     Ok(ValidateCallbackResult::UnresolvedDependencies(
-                        UnresolvedDependencies::Hashes(vec![delete
-                            .hashed
-                            .deletes_address
-                            .clone()
-                            .into()]),
+                        UnresolvedDependencies::Hashes(vec![deletes_address.into()]),
                     ))
                 }
             } else {
@@ -449,7 +464,7 @@ async fn validate_ops_in_sequence_must_get_action() {
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let create_op = Action::Create(create);
+    let create_op = LegacyAction::Create(create);
     let dht_create_op = ChainOp::RegisterAgentActivity(fixt!(Signature), create_op.clone());
     let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
 
@@ -618,7 +633,7 @@ async fn handle_error_in_op_validation() {
         zome_index: 0.into(),
         visibility: Default::default(),
     });
-    let create_action = Action::Create(create);
+    let create_action = LegacyAction::Create(create);
     let dht_create_op = ChainOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
     let dht_create_op_hash = DhtOpHash::with_data_sync(&dht_create_op);
     let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
@@ -849,7 +864,9 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
     for op in validation_ops.lock().iter() {
         match op {
             Op::StoreEntry(StoreEntry { action, entry: _ }) => {
-                if *action.hashed.entry_type().visibility() == EntryVisibility::Private {
+                // `StoreEntry`'s action data is always `Create` or `Update`, so
+                // it always has an entry type.
+                if *action.hashed.entry_type().unwrap().visibility() == EntryVisibility::Private {
                     num_store_entry_private += 1
                 }
             }

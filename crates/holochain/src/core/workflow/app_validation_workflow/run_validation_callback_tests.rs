@@ -10,7 +10,7 @@ use crate::{
     sweettest::{SweetDnaFile, SweetInlineZomes},
 };
 use fixt::fixt;
-use hdk::prelude::{CreateLinkFixturator, EntryFixturator, RegisterCreateLink};
+use hdk::prelude::{CreateLinkFixturator, EntryFixturator};
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::{ActionHash, AgentPubKey, HashableContentExtSync};
 use holochain_keystore::MetaLairClient;
@@ -23,16 +23,28 @@ use holochain_types::{
     record::WireRecordOps,
 };
 use holochain_wasm_test_utils::TestWasm;
+// The wasm `validate(op: Op)` callback decodes the v2 `Op`; `LegacyAction` is
+// the per-variant enum the fixturated `Create`/`Delete`/`CreateLink` structs
+// plug into before being projected to the v2 `Action` via `from_legacy_action`.
+// `MustGetAgentActivityResponse` (unlike the `Op`/`Record` model) still
+// carries its activity as legacy `RegisterAgentActivity`/`SignedActionHashed`
+// (see `crate::core::ribosome::host_fn::must_get_agent_activity`), so that one
+// stays imported from the legacy `op` module and is bridged with
+// `to_legacy_signed_action`.
+use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
+use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
+    ActionData, DeleteData, Op, RegisterCreateLink, RegisterDelete,
+};
+use holochain_zome_types::dht_v2::{from_legacy_action, to_legacy_signed_action, SignedAction};
 use holochain_zome_types::{
     chain::{ChainFilter, MustGetAgentActivityInput},
     dependencies::holochain_integrity_types::{UnresolvedDependencies, ValidateCallbackResult},
     entry::MustGetActionInput,
     fixt::{CreateFixturator, DeleteFixturator, SignatureFixturator},
     judged::Judged,
-    op::{Op, RegisterAgentActivity, RegisterDelete},
-    record::{SignedActionHashed, SignedHashed},
+    op::RegisterAgentActivity,
+    record::SignedActionHashed,
     validate::ValidationStatus,
-    Action,
 };
 use matches::assert_matches;
 use std::{sync::Arc, time::Duration};
@@ -44,17 +56,18 @@ async fn validation_callback_must_get_action() {
     let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
         move |api, op: Op| {
             if let Op::RegisterDelete(RegisterDelete { delete }) = op {
-                let result =
-                    api.must_get_action(MustGetActionInput(delete.hashed.deletes_address.clone()));
+                let deletes_address = match &delete.hashed.content.data {
+                    ActionData::Delete(DeleteData {
+                        deletes_address, ..
+                    }) => deletes_address.clone(),
+                    _ => unreachable!(),
+                };
+                let result = api.must_get_action(MustGetActionInput(deletes_address.clone()));
                 if result.is_ok() {
                     Ok(ValidateCallbackResult::Valid)
                 } else {
                     Ok(ValidateCallbackResult::UnresolvedDependencies(
-                        UnresolvedDependencies::Hashes(vec![delete
-                            .hashed
-                            .deletes_address
-                            .clone()
-                            .into()]),
+                        UnresolvedDependencies::Hashes(vec![deletes_address.into()]),
                     ))
                 }
             } else {
@@ -78,12 +91,16 @@ async fn validation_callback_must_get_action() {
     // a create by alice
     let mut create = fixt!(Create);
     create.author = alice.clone();
-    let create_action = Action::Create(create.clone());
+    let create_action = LegacyAction::Create(create.clone());
     // a delete by bob that references alice's create
     let mut delete = fixt!(Delete);
     delete.author = bob.clone();
     delete.deletes_address = create_action.clone().to_hash();
-    let delete_action_signed_hashed = SignedHashed::new_unchecked(delete.clone(), fixt!(Signature));
+    let delete_action_v2 = from_legacy_action(&LegacyAction::Delete(delete.clone()));
+    let delete_action_signed_hashed = SignedActionHashed::new_unchecked(
+        delete_action_v2,
+        fixt!(Signature),
+    );
     let delete_action_op = Op::RegisterDelete(RegisterDelete {
         delete: delete_action_signed_hashed.clone(),
     });
@@ -130,17 +147,18 @@ async fn validation_callback_awaiting_deps_hashes() {
     let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
         move |api, op: Op| {
             if let Op::RegisterDelete(RegisterDelete { delete }) = op {
-                let result =
-                    api.must_get_action(MustGetActionInput(delete.hashed.deletes_address.clone()));
+                let deletes_address = match &delete.hashed.content.data {
+                    ActionData::Delete(DeleteData {
+                        deletes_address, ..
+                    }) => deletes_address.clone(),
+                    _ => unreachable!(),
+                };
+                let result = api.must_get_action(MustGetActionInput(deletes_address.clone()));
                 if result.is_ok() {
                     Ok(ValidateCallbackResult::Valid)
                 } else {
                     Ok(ValidateCallbackResult::UnresolvedDependencies(
-                        UnresolvedDependencies::Hashes(vec![delete
-                            .hashed
-                            .deletes_address
-                            .clone()
-                            .into()]),
+                        UnresolvedDependencies::Hashes(vec![deletes_address.into()]),
                     ))
                 }
             } else {
@@ -167,11 +185,19 @@ async fn validation_callback_awaiting_deps_hashes() {
         SignedActionHashed::sign(&keystore, create_action.clone().into_hashed())
             .await
             .unwrap();
+    let create_action = LegacyAction::Create(create.clone());
+    let create_action_signed_hashed = SignedActionHashed::new_unchecked(
+        from_legacy_action(&create_action),
+        fixt!(Signature),
+    );
     // a delete by bob that references alice's create
     let mut delete = fixt!(Delete);
     delete.author = bob.clone();
     delete.deletes_address = create_action.clone().to_hash();
-    let delete_action_signed_hashed = SignedHashed::new_unchecked(delete.clone(), fixt!(Signature));
+    let delete_action_signed_hashed = SignedActionHashed::new_unchecked(
+        from_legacy_action(&LegacyAction::Delete(delete.clone())),
+        fixt!(Signature),
+    );
     let delete_action_op = Op::RegisterDelete(RegisterDelete {
         delete: delete_action_signed_hashed.clone(),
     });
@@ -184,7 +210,10 @@ async fn validation_callback_awaiting_deps_hashes() {
         assert_eq!(hash, action_to_return.as_hash().clone().into());
         Ok(vec![WireOps::Record(WireRecordOps {
             action: Some(Judged::new(
-                action_to_return.clone().into(),
+                SignedAction::new(
+                    action_to_return.hashed.content.clone(),
+                    action_to_return.signature().clone(),
+                ),
                 ValidationStatus::Valid,
             )),
             deletes: vec![],
@@ -227,23 +256,25 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
         move |api, op: Op| {
             if let Op::RegisterDelete(RegisterDelete { delete }) = op {
+                let deletes_address = match &delete.hashed.content.data {
+                    ActionData::Delete(DeleteData {
+                        deletes_address, ..
+                    }) => deletes_address.clone(),
+                    _ => unreachable!(),
+                };
+                let author = delete.hashed.content.author().clone();
                 // chain filter with delete as chain top and create as chain bottom
-                let chain_filter = ChainFilter::until_hash(
-                    delete.as_hash().clone(),
-                    delete.hashed.deletes_address.clone(),
-                );
+                let chain_filter =
+                    ChainFilter::until_hash(delete.as_hash().clone(), deletes_address);
                 let result = api.must_get_agent_activity(MustGetAgentActivityInput {
-                    author: delete.hashed.author.clone(),
+                    author: author.clone(),
                     chain_filter: chain_filter.clone(),
                 });
                 if result.is_ok() {
                     Ok(ValidateCallbackResult::Valid)
                 } else {
                     Ok(ValidateCallbackResult::UnresolvedDependencies(
-                        UnresolvedDependencies::AgentActivity(
-                            delete.hashed.author.clone(),
-                            chain_filter.clone(),
-                        ),
+                        UnresolvedDependencies::AgentActivity(author, chain_filter),
                     ))
                 }
             } else {
@@ -271,6 +302,11 @@ async fn validation_callback_awaiting_deps_agent_activity() {
         SignedActionHashed::sign(&keystore, create_action.clone().into_hashed())
             .await
             .unwrap();
+    let create_action = LegacyAction::Create(create.clone());
+    let create_action_signed_hashed = SignedActionHashed::new_unchecked(
+        from_legacy_action(&create_action),
+        fixt!(Signature),
+    );
     // a delete by alice that references the create
     let mut delete = fixt!(Delete);
     delete.author = alice.clone();
@@ -279,13 +315,14 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     // that must_get_agent_activity returns
     delete.prev_action = create_action.clone().to_hash();
     delete.deletes_address = create_action.clone().to_hash();
-    let delete_action = Action::Delete(delete.clone());
+    let delete_action_v2 = from_legacy_action(&LegacyAction::Delete(delete.clone()));
     let delete_action_signed_hashed =
         SignedActionHashed::sign(&keystore, delete_action.clone().into_hashed())
             .await
             .unwrap();
+        SignedActionHashed::new_unchecked(delete_action_v2.clone(), fixt!(Signature));
     let delete_action_op = Op::RegisterDelete(RegisterDelete {
-        delete: SignedHashed::new_unchecked(delete.clone(), fixt!(Signature)),
+        delete: SignedActionHashed::new_unchecked(delete_action_v2, fixt!(Signature)),
     });
     let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
 
@@ -307,11 +344,11 @@ async fn validation_callback_awaiting_deps_agent_activity() {
 
             Ok(vec![MustGetAgentActivityResponse::activity(vec![
                 RegisterAgentActivity {
-                    action: create_action_signed_hashed.clone(),
+                    action: to_legacy_signed_action(&create_action_signed_hashed),
                     cached_entry: None,
                 },
                 RegisterAgentActivity {
-                    action: delete_action_signed_hashed.clone(),
+                    action: to_legacy_signed_action(&delete_action_signed_hashed),
                     cached_entry: None,
                 },
             ])])
@@ -382,7 +419,7 @@ async fn validation_callback_rejects_op_depending_on_invalid_op() {
     let mut create = fixt!(Create);
     create.author = alice.clone();
     create.action_seq = 0;
-    let create_action = Action::Create(create.clone());
+    let create_action = from_legacy_action(&LegacyAction::Create(create.clone()));
     let create_entry = fixt!(Entry);
     let create_entry_hash = create_action.entry_hash().unwrap().clone();
     // A CreateLink to be validated that does a must_get_valid_record to the invalid Create
@@ -393,8 +430,9 @@ async fn validation_callback_rejects_op_depending_on_invalid_op() {
     // This link type will lead to a must_get_valid_record in the validate callback.
     create_link.link_type = 2.into();
     create_link.base_address = create_action.to_hash().into();
+    let create_link_action = from_legacy_action(&LegacyAction::CreateLink(create_link));
     let create_link_signed_hashed =
-        SignedHashed::new_unchecked(create_link.clone(), fixt!(Signature));
+        SignedActionHashed::new_unchecked(create_link_action, fixt!(Signature));
     let create_link_op = Op::RegisterCreateLink(RegisterCreateLink {
         create_link: create_link_signed_hashed,
     });
