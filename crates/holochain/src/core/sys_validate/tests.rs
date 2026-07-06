@@ -44,7 +44,16 @@ use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::test_utils::valid_arbitrary_chain;
 use holochain_types::test_utils::ActionRefMut;
-use holochain_zome_types::Action;
+// This module builds legacy per-variant actions directly to exercise the
+// `DhtOpSender` trait (`send_store_record`/`send_store_entry`), which takes
+// the legacy `Record` (see `LegacyRecord` in `crate::core::sys_validate`), so
+// `Action` is pinned to the legacy per-variant enum for this whole file. The
+// production checks under test (`check_new_entry_action`, etc.) take the v2
+// `Action`, so are called with `from_legacy_action(&action)` at their call
+// sites, and the legacy `SignedActionHashed` is reached explicitly where a
+// `LegacyRecord`'s signed action needs to be built by hand.
+use holochain_zome_types::dependencies::holochain_integrity_types::action::Action;
+use holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed as LegacySignedActionHashed;
 use matches::assert_matches;
 use std::time::Duration;
 
@@ -92,7 +101,7 @@ fn check_entry_hash_test() {
     let action: Action = ec.clone().into();
 
     // First check it should have an entry
-    assert_matches!(check_new_entry_action(&action), Ok(()));
+    assert_matches!(check_new_entry_action(&from_legacy_action(&action)), Ok(()));
     // Safe to unwrap if new entry
     let eh = action.entry_data().map(|(h, _)| h).unwrap();
     assert_matches!(
@@ -108,7 +117,7 @@ fn check_entry_hash_test() {
     let eh = action.entry_data().map(|(h, _)| h).unwrap();
     assert_matches!(check_entry_hash(eh, &entry), Ok(()));
     assert_matches!(
-        check_new_entry_action(&Action::CreateLink(CreateLink {
+        check_new_entry_action(&from_legacy_action(&Action::CreateLink(CreateLink {
             author: fixt!(AgentPubKey),
             timestamp: Timestamp::now(),
             action_seq: 8,
@@ -119,7 +128,7 @@ fn check_entry_hash_test() {
             link_type: LinkType::new(3),
             tag: ().into(),
             weight: RateWeight::default(),
-        })),
+        }))),
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::NotNewEntry(_)
         ))
@@ -152,9 +161,11 @@ async fn incoming_ops_filters_private_entry() {
     let action = Action::Create(create);
     let signature = author.sign(&keystore, &action).await.unwrap();
 
-    let shh =
-        SignedActionHashed::with_presigned(ActionHashed::from_content_sync(action), signature);
-    let record = Record::new(shh, Some(private_entry));
+    let shh = LegacySignedActionHashed::with_presigned(
+        ActionHashed::from_content_sync(action),
+        signature,
+    );
+    let record = LegacyRecord::new(shh, Some(private_entry));
 
     let ops_sender = IncomingDhtOpSender::new(space.clone(), tx.clone());
     ops_sender.send_store_entry(record.clone()).await.unwrap();
@@ -195,7 +206,7 @@ async fn valid_chain_fact_test() {
     // re-sign it
     last.signed_action = SignedActionHashed::sign(
         &keystore,
-        ActionHashed::from_content_sync(last.action().clone()),
+        holo_hash::HoloHashed::from_content_sync(last.action().clone()),
     )
     .await
     .unwrap();

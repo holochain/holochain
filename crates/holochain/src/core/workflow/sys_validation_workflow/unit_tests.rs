@@ -24,7 +24,6 @@ use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::WireOps;
 use holochain_types::record::SignedActionHashedExt;
 use holochain_types::record::WireRecordOps;
-use holochain_zome_types::action::ActionHashed;
 use holochain_zome_types::action::AppEntryDef;
 use holochain_zome_types::action::EntryType;
 use holochain_zome_types::dna_def::{DnaDef, DnaDefHashed};
@@ -32,7 +31,13 @@ use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::judged::Judged;
 use holochain_zome_types::record::SignedActionHashed;
 use holochain_zome_types::timestamp::Timestamp;
-use holochain_zome_types::Action;
+// This whole module is a LEGACY island: `ChainOp`/`DhtOp` are the legacy
+// op-pipeline types, so `Action` (otherwise the v2 struct via the ambient
+// preludes) is pinned to the legacy per-variant enum. Signing
+// (`SignedActionHashed::sign`) only operates on the v2 projection, so actions
+// are converted at that boundary via `from_legacy_action`.
+use holochain_zome_types::dependencies::holochain_integrity_types::action::Action;
+use holochain_zome_types::dht_v2::from_legacy_action;
 use std::collections::HashSet;
 use std::sync::Arc;
 use {
@@ -101,8 +106,8 @@ async fn validate_op_with_dependency_held_in_dht_store() {
 
     // Op to validate, to go in the dht database
     let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
+    create_action.author = previous_action.hashed.content.author().clone();
+    create_action.action_seq = previous_action.hashed.content.action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::App(AppEntryDef {
@@ -149,8 +154,8 @@ async fn validate_op_with_dependency_not_held() {
 
     // Op to validate, to go in the dht database
     let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
+    create_action.author = previous_action.hashed.content.author().clone();
+    create_action.action_seq = previous_action.hashed.content.action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::App(AppEntryDef {
@@ -164,7 +169,10 @@ async fn validate_op_with_dependency_not_held() {
 
     let mut network = MockHolochainP2pDnaT::default();
     let mut ops: WireRecordOps = WireRecordOps::new();
-    ops.action = Some(Judged::valid(previous_action.clone().into()));
+    ops.action = Some(Judged::valid(holochain_zome_types::dht_v2::SignedAction::new(
+        previous_action.hashed.content.clone(),
+        previous_action.signature.clone(),
+    )));
     let response = WireOps::Record(ops);
     network
         .expect_get()
@@ -210,8 +218,8 @@ async fn validate_op_with_dependency_not_found_on_the_dht() {
 
     // Op to validate, to go in the dht database
     let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = previous_action.action().action_seq() + 1;
+    create_action.author = previous_action.hashed.content.author().clone();
+    create_action.action_seq = previous_action.hashed.content.action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::App(AppEntryDef {
@@ -275,8 +283,8 @@ async fn validate_op_with_wrong_sequence_number_rejected_and_not_forwarded_to_ap
 
     // Op to validate, to go in the dht database
     let mut create_action = fixt!(Create);
-    create_action.author = previous_action.action().author().clone();
-    create_action.action_seq = previous_action.action().action_seq() + 31;
+    create_action.author = previous_action.hashed.content.author().clone();
+    create_action.action_seq = previous_action.hashed.content.action_seq() + 31;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::App(AppEntryDef {
@@ -409,7 +417,10 @@ async fn validate_valid_warrant_with_fetched_dependency() {
         let warranted_action = warranted_action.clone();
         move |_hash, _, _| {
             let mut ops: WireRecordOps = WireRecordOps::new();
-            ops.action = Some(Judged::valid(warranted_action.clone().into()));
+            ops.action = Some(Judged::valid(holochain_zome_types::dht_v2::SignedAction::new(
+                warranted_action.hashed.content.clone(),
+                warranted_action.signature.clone(),
+            )));
             ops.entry = Some(entry);
             let response = WireOps::Record(ops);
             Ok(vec![response])
@@ -784,7 +795,7 @@ impl TestCase {
     }
 
     async fn sign_action(&self, action: Action) -> SignedActionHashed {
-        let action_hashed = ActionHashed::from_content_sync(action);
+        let action_hashed = holo_hash::HoloHashed::from_content_sync(from_legacy_action(&action));
         SignedActionHashed::sign(&self.keystore, action_hashed)
             .await
             .unwrap()
@@ -803,6 +814,8 @@ impl TestCase {
             .clone();
 
         let action = chain_op.action();
+        // Build the RenderedOps first so we can pass it to cache_chain_ops.
+        let action = from_legacy_action(&chain_op.action());
         let signature = chain_op.signature().clone();
         let op_type = chain_op.get_type();
         let entry = match chain_op.entry() {
@@ -878,7 +891,7 @@ impl TestCase {
             holochain_zome_types::prelude::Warrant::new(
                 holochain_zome_types::prelude::WarrantProof::ChainIntegrity(
                     holochain_zome_types::prelude::ChainIntegrityWarrant::InvalidChainOp {
-                        action_author: warranted_action.action().author().clone(),
+                        action_author: warranted_action.hashed.content.author().clone(),
                         action: (
                             warranted_action.as_hash().clone(),
                             warranted_action.signature.clone(),
@@ -889,7 +902,7 @@ impl TestCase {
                 ),
                 issuing_agent.clone(),
                 Timestamp::now(),
-                warranted_action.action().author().clone(),
+                warranted_action.hashed.content.author().clone(),
             ),
         )
         .await
