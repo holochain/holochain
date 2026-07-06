@@ -1,7 +1,15 @@
 use super::*;
 use ::fixt::fixt;
 use holo_hash::fixt::AgentPubKeyFixturator;
-use holochain_zome_types::action::{Action, ActionHashed, ChainTopOrdering};
+// This test module seeds the scratch and the legacy op pipeline
+// (`Scratch`/`ChainOp`/`RegisterAgentActivity` all build on the legacy
+// per-variant `Action`), so `Action`/`ActionHashed`/`SignedActionHashed` pin
+// to their legacy shape here. Reads through the (v2) `DhtStore` produce v2
+// `Record`/`Action` values, asserted via their own accessors below without
+// needing the bare `Action` name.
+use holochain_zome_types::action::ChainTopOrdering;
+use holochain_zome_types::dependencies::holochain_integrity_types::action::{Action, ActionHashed};
+use holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed;
 
 async fn empty_store() -> holochain_state::dht_store::DhtStore {
     let dna_hash = holo_hash::DnaHash::from_raw_36(vec![42u8; 36]);
@@ -689,7 +697,7 @@ fn make_activity_create(
 /// Wrap an action as a `SignedActionHashed` for the scratch.
 fn make_scratch_activity(action: Action, seed: u8) -> SignedActionHashed {
     SignedActionHashed::with_presigned(
-        holochain_zome_types::action::ActionHashed::from_content_sync(action),
+        ActionHashed::from_content_sync(action),
         Signature::from([seed; 64]),
     )
 }
@@ -765,7 +773,10 @@ async fn must_get_agent_activity_reflects_scratch_activity() {
 
     match resp {
         MustGetAgentActivityResponse::Activity { activity, .. } => {
-            let seqs: Vec<u32> = activity.iter().map(|a| a.action.seq()).collect();
+            let seqs: Vec<u32> = activity
+                .iter()
+                .map(|a| a.action.action().action_seq())
+                .collect();
             assert!(
                 seqs.contains(&2),
                 "scratch action at seq 2 should be present; got {seqs:?}"
