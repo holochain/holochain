@@ -19,7 +19,6 @@ use holochain_types::link::{CountLinksResponse, WireLinkKey, WireLinkOps, WireLi
 use holochain_types::prelude::ValidationReceiptBundle;
 use holochain_zome_types::fixt::{CreateFixturator, EntryFixturator, SignatureFixturator};
 use holochain_zome_types::prelude::ChainQueryFilter;
-use holochain_zome_types::Action;
 use kitsune2_api::*;
 use std::sync::Arc;
 
@@ -160,10 +159,11 @@ fn test_dht_op(authored_timestamp: Timestamp) -> holochain_types::dht_v2::DhtOp 
     use holochain_types::dht_v2::{
         from_legacy_action, ChainOp as V2ChainOp, DhtOp as V2DhtOp, OpEntry, SignedAction,
     };
+    use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
 
     let mut create = fixt!(Create);
     create.timestamp = authored_timestamp;
-    let action = from_legacy_action(&Action::Create(create));
+    let action = from_legacy_action(&LegacyAction::Create(create));
     let signed = SignedAction::new(action, fixt!(Signature));
     V2DhtOp::ChainOp(Box::new(V2ChainOp::CreateRecord(
         signed,

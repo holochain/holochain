@@ -3,6 +3,10 @@ use holo_hash::fixt::ActionHashFixturator;
 use holochain_p2p::event::*;
 use holochain_p2p::*;
 use holochain_types::prelude::*;
+// `WireLinkOps.creates` carries the v2 `SignedAction`; project the legacy
+// `CreateLink` fixture through `from_legacy_action` to build one.
+use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
+use holochain_zome_types::dht_v2::from_legacy_action;
 use kitsune2_api::*;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::sync::{Arc, Mutex};
@@ -108,7 +112,10 @@ impl HcP2pHandler for Handler {
             self.calls.lock().unwrap().push("get_links".into());
             Ok(WireLinkOps {
                 creates: vec![Judged::new(
-                    SignedAction::new(Action::CreateLink(fixt!(CreateLink)), fixt!(Signature)),
+                    SignedAction::new(
+                        from_legacy_action(&LegacyAction::CreateLink(fixt!(CreateLink))),
+                        fixt!(Signature),
+                    ),
                     ValidationStatus::Valid,
                 )],
                 deletes: Vec::new(),

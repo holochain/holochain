@@ -291,10 +291,11 @@ fn test_dht_op(
     use holochain_types::dht_v2::{
         from_legacy_action, ChainOp as V2ChainOp, DhtOp as V2DhtOp, OpEntry, SignedAction,
     };
+    use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
 
     let mut create = ::fixt::fixt!(Create);
     create.timestamp = authored_timestamp;
-    let action = from_legacy_action(&Action::Create(create));
+    let action = from_legacy_action(&LegacyAction::Create(create));
     let signed = SignedAction::new(action, ::fixt::fixt!(Signature));
     V2DhtOp::ChainOp(Box::new(V2ChainOp::CreateRecord(
         signed,

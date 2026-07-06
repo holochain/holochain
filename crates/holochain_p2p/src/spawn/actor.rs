@@ -3465,6 +3465,11 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn other_wire_messages_are_not_concurrency_limited() {
+        // `ChainOp` is a legacy-island type: it stores the legacy per-variant
+        // `Action`, not the v2 `ActionHeader` + `ActionData` shape the bare
+        // `Action` name resolves to via this module's glob imports.
+        use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
+
         let dna_hash = DnaHash::from_raw_32(vec![0; 32]);
         let space_id = dna_hash.to_k2_space();
         let from_peer = kitsune2_api::Url::from_str("ws://test:80/1").unwrap();
@@ -3714,7 +3719,7 @@ mod tests {
         let msg = WireMessage::PublishCountersignEvt {
             op: holochain_types::dht_op::ChainOp::RegisterAgentActivity(
                 Signature([0; 64]),
-                Action::InitZomesComplete(InitZomesComplete {
+                LegacyAction::InitZomesComplete(InitZomesComplete {
                     author: AgentPubKey::from_raw_32(vec![1; 32]),
                     timestamp: holochain_types::prelude::Timestamp::now(),
                     action_seq: 0,
