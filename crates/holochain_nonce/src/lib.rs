@@ -43,7 +43,7 @@ pub mod test {
         let now = Timestamp::now();
         let (nonce, expires) = fresh_nonce(now).unwrap();
         let (nonce_2, expires_2) = fresh_nonce(now).unwrap();
-        assert!(nonce != nonce_2);
+        assert_ne!(nonce.as_ref(), nonce_2.as_ref());
         assert_eq!(expires, expires_2);
         assert_eq!(expires, (now + FRESH_NONCE_EXPIRES_AFTER).unwrap());
     }

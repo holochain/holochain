@@ -1,5 +1,4 @@
 use crate::assert_length;
-use crate::encode;
 use crate::hash_type;
 use crate::HashType;
 use crate::HashableContent;
@@ -12,6 +11,7 @@ use futures::FutureExt;
 use hash_type::HashTypeAsync;
 use hash_type::HashTypeSync;
 use must_future::MustBoxFuture;
+use crate::location::blake2b_256;
 
 /// The maximum size to hash synchronously. Anything larger than this will
 /// take too long to hash within a single tokio context
@@ -99,7 +99,7 @@ fn hash_from_content<T: HashType, C: HashableContent<HashType = T>>(content: &C)
     match content.hashable_content() {
         HashableContentBytes::Content(sb) => {
             let bytes: Vec<u8> = holochain_serialized_bytes::UnsafeBytes::from(sb).into();
-            let hash = encode::blake2b_256(&bytes);
+            let hash = blake2b_256(&bytes);
             assert_length!(HOLO_HASH_CORE_LEN, &hash);
             HoloHash::<T>::from_raw_32_and_type(hash, content.hash_type())
         }

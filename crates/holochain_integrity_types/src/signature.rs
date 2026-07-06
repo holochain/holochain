@@ -20,6 +20,14 @@ pub struct Signature(pub [u8; SIGNATURE_BYTES]);
 // What's nice about this is that we can easily handle fixed size signatures.
 secure_primitive!(Signature, SIGNATURE_BYTES);
 
+impl PartialEq for Signature {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl Eq for Signature {}
+
 /// The output of ephemeral signing.
 /// The private key for this public key has been discarded by this point.
 /// The signatures match the public key provided but cannot be reproduced

@@ -1,6 +1,5 @@
 pub use paste;
 pub use serde;
-pub use subtle;
 
 mod types;
 pub use types::*;
@@ -108,20 +107,6 @@ macro_rules! fixed_array_serialization {
 macro_rules! secure_primitive {
     ($t:ty, $len:expr) => {
         $crate::fixed_array_serialization!($t, $len);
-
-        /// Constant time equality check.
-        /// This mitigates timing attacks where a remote agent can reverse engineer data by
-        /// measuring tiny changes in latency associated with optimised equality checks.
-        /// More matching bytes = more latency = vulnerability.
-        /// This type of attack has been successfully demonstrated over a network despite varied latencies.
-        impl PartialEq for $t {
-            fn eq(&self, other: &Self) -> bool {
-                use $crate::subtle::ConstantTimeEq;
-                self.0.ct_eq(&other.0).into()
-            }
-        }
-
-        impl Eq for $t {}
 
         /// The only meaningful debug information for a cryptograhpic secret is the literal bytes.
         /// Also, encodings like base64 are not constant time so debugging could open some weird

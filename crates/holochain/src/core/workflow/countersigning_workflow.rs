@@ -15,6 +15,7 @@ use {
     std::sync::Arc,
     tokio::sync::broadcast::Sender,
     tokio::task::AbortHandle,
+    holochain_types::countersigning_ext::PreflightRequestExt,
 };
 
 /// Accept handler for starting countersigning sessions.

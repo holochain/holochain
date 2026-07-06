@@ -2,7 +2,7 @@
 //! arbitrary bytes.
 //!
 //! Holochain makes extensive use of hashes to address any content. It utilizes
-//! [Blake2b](https://www.blake2.net/) as hashing algorithm. Holochain hashes
+//! [Blake2b](https://www.blake2.net/) as its hashing algorithm. Holochain hashes
 //! have a length of 39 bytes, made up of 3 bytes for identifying the hash, 32
 //! bytes of digest and 4 location bytes. The complete scheme of a hash in byte
 //! format is:

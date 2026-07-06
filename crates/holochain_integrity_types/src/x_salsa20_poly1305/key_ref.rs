@@ -51,8 +51,7 @@ impl std::borrow::Borrow<[u8]> for XSalsa20Poly1305KeyRef {
 
 impl PartialEq for XSalsa20Poly1305KeyRef {
     fn eq(&self, other: &Self) -> bool {
-        use subtle::ConstantTimeEq;
-        self.0.ct_eq(&other.0).into()
+        self.0 == other.0
     }
 }
 

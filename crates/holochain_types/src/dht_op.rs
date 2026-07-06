@@ -270,13 +270,6 @@ impl DhtOp {
         }
     }
 
-    fn to_order(&self) -> OpOrder {
-        match self {
-            Self::ChainOp(op) => OpOrder::new(op.get_type(), op.timestamp()),
-            Self::WarrantOp(op) => OpOrder::new(op.get_type(), op.timestamp()),
-        }
-    }
-
     /// Access to the Timestamp
     pub fn author(&self) -> AgentPubKey {
         match self {
@@ -316,22 +309,6 @@ impl DhtOp {
                     }
                 },
             },
-        }
-    }
-}
-
-impl PartialOrd for DhtOp {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for DhtOp {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        match self.to_order().cmp(&other.to_order()) {
-            // Use signature as a tiebreaker
-            std::cmp::Ordering::Equal => self.signature().cmp(other.signature()),
-            ordering => ordering,
         }
     }
 }

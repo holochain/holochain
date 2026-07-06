@@ -8,7 +8,6 @@
 //! contains more types which are used by Holochain itself.
 
 #![deny(missing_docs)]
-#![allow(non_local_definitions)]
 
 #[allow(missing_docs)]
 pub mod action;
@@ -78,7 +77,6 @@ pub use entry::Entry;
 /// Re-exported dependencies
 pub mod dependencies {
     pub use ::holochain_integrity_types;
-    pub use ::subtle;
 }
 
 /// Helper macro for implementing ToSql, when using rusqlite as a dependency

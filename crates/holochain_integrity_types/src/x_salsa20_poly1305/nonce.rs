@@ -11,3 +11,11 @@ pub type SecretBoxNonce = XSalsa20Poly1305Nonce;
 // future it will be useful to have generation from random bytes as it MUST be UNIQUE.
 // Currently lair does the nonce generation for us.
 secure_primitive!(XSalsa20Poly1305Nonce, NONCE_BYTES);
+
+impl PartialEq for XSalsa20Poly1305Nonce {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl Eq for XSalsa20Poly1305Nonce {}

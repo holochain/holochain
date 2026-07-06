@@ -339,13 +339,11 @@ impl DhtStore<DbWrite<Dht>> {
         &self,
         receipt: &holochain_types::prelude::SignedValidationReceipt,
     ) -> StateMutationResult<u64> {
-        use holo_hash::encode::blake2b_256;
-
         // Derive the receipt hash: serialize the whole SignedValidationReceipt,
         // then take blake2b_256.
         let bytes =
             holochain_serialized_bytes::encode(receipt).map_err(StateMutationError::from)?;
-        let hash_bytes = blake2b_256(&bytes);
+        let hash_bytes = holo_hash::blake2b_256(&bytes);
         let receipt_hash = DhtOpHash::from_raw_32(hash_bytes);
 
         let op_hash = receipt.receipt.dht_op_hash.clone();
