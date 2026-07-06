@@ -1420,7 +1420,6 @@ pub(crate) fn encoded_chain_op_size(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::prelude::*;
     use crate::source_chain::SourceChainResult;
     use ::fixt::fixt;
     use ::fixt::prelude::*;
@@ -1603,9 +1602,11 @@ mod tests {
 
         let action = chain.valid_create_agent_key_action().await.unwrap();
 
+        // `valid_create_agent_key_action` reads from the (v2) DhtStore, so the
+        // returned action is a v2 `Action`.
         // It is the agent-key `Create`: an `AgentPubKey`-typed `Create` whose
         // entry hash is the agent key.
-        assert_matches!(action, Action::Create(_));
+        assert_matches!(action.data, holochain_zome_types::action::ActionData::Create(_));
         assert_eq!(action.entry_type(), Some(&EntryType::AgentPubKey));
         let agent_key_entry_hash: EntryHash = agent_key.into();
         assert_eq!(action.entry_hash(), Some(&agent_key_entry_hash));
@@ -2168,8 +2169,13 @@ mod tests {
             .retrieve_record(&head.action, Some(&author))
             .await?
             .expect("head record present in store");
+        // `retrieve_record` reads from the (v2) DhtStore, so the record's
+        // action is a v2 `Action`.
         assert_eq!(head_record.action().action_seq(), 2);
-        assert!(matches!(head_record.action(), Action::Create(_)));
+        assert!(matches!(
+            head_record.action().data,
+            holochain_zome_types::action::ActionData::Create(_)
+        ));
 
         Ok(())
     }
@@ -2297,7 +2303,8 @@ mod tests {
             });
             let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
             let sig = alice.sign(&keystore, &v2_action).await.unwrap();
-            let signed_action = SignedActionHashed::from_content_sync((action.clone(), sig).into());
+            let signed_action =
+                SignedActionHashed::with_presigned(ActionHashed::from_content_sync(action.clone()), sig);
 
             chain
                 .scratch()
@@ -2331,7 +2338,8 @@ mod tests {
             });
             let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
             let sig = alice.sign(&keystore, &v2_action).await.unwrap();
-            let signed_action = SignedActionHashed::from_content_sync((action, sig).into());
+            let signed_action =
+                SignedActionHashed::with_presigned(ActionHashed::from_content_sync(action), sig);
 
             chain
                 .scratch()
@@ -2465,7 +2473,8 @@ mod tests {
         });
         let v2_private_create = holochain_zome_types::dht_v2::from_legacy_action(&private_create);
         let sig = alice.sign(&keystore, &v2_private_create).await.unwrap();
-        let private_sah = SignedActionHashed::from_content_sync((private_create, sig).into());
+        let private_sah =
+            SignedActionHashed::with_presigned(ActionHashed::from_content_sync(private_create), sig);
         let private_action_hash = private_sah.as_hash().clone();
         chain
             .scratch()
@@ -2493,7 +2502,8 @@ mod tests {
         });
         let v2_public_create = holochain_zome_types::dht_v2::from_legacy_action(&public_create);
         let sig = alice.sign(&keystore, &v2_public_create).await.unwrap();
-        let public_sah = SignedActionHashed::from_content_sync((public_create, sig).into());
+        let public_sah =
+            SignedActionHashed::with_presigned(ActionHashed::from_content_sync(public_create), sig);
         let scratch_action_hash = public_sah.as_hash().clone();
         chain
             .scratch()
@@ -2563,7 +2573,7 @@ mod tests {
         assert_ne!(asc, desc);
 
         let mut desc_sorted = desc;
-        desc_sorted.sort_by_key(|r| r.signed_action.action().action_seq());
+        desc_sorted.sort_by_key(|r| r.action().action_seq());
         assert_eq!(asc, desc_sorted);
     }
 
