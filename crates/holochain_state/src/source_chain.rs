@@ -1,6 +1,5 @@
 use crate::chain_lock::ChainLock;
 use crate::prelude::*;
-use crate::query::chain_head::AuthoredChainHeadQuery;
 use crate::scratch::ScratchError;
 use crate::scratch::SyncScratchError;
 use async_recursion::async_recursion;
@@ -12,7 +11,6 @@ use holo_hash::DnaHash;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holochain_keystore::MetaLairClient;
-use holochain_sqlite::rusqlite::Transaction;
 use holochain_state_types::SourceChainDump;
 use kitsune2_api::DhtArc;
 use std::sync::atomic::AtomicBool;
@@ -510,7 +508,7 @@ impl SourceChain {
             }
 
             // Scheduled functions flushed from the scratch are always written
-            // with `maybe_schedule = None` (see schedule_fn in mutations.rs).
+            // with `maybe_schedule = None`.
             // None => start=now, end=Timestamp::max(), ephemeral=true.
             for scheduled_fn in &scheduled_fns {
                 let maybe_schedule_blob =
@@ -1067,9 +1065,9 @@ pub async fn genesis(
     let agent_entry = agent_entry.into_option();
 
     // Pre-compute (op, op_hash, timestamp) tuples for the DhtStore write block.
-    // This matches what put_raw does internally via ChainOpUniqueForm::op_hash,
-    // but done upfront so we can keep the actions and ops available for the
-    // DhtStore write without moving them into the dht_db closure.
+    // Each op's hash is derived via ChainOpUniqueForm::op_hash upfront so we can
+    // keep the actions and ops available for the DhtStore write without moving
+    // them into the closure.
     //
     // Each triple is (ChainOpLite, DhtOpHash, Timestamp) for one op.
     let mut ops_with_hashes_for_new_db: Vec<(ChainOpLite, DhtOpHash, Timestamp)> = Vec::new();
@@ -1186,85 +1184,7 @@ pub async fn genesis(
     Ok(())
 }
 
-/// Should only be used to put items into the Authored DB.
-/// Hash transfer fields (source, transfer_method, transfer_time) are not set.
-// #5370: production-unused pending DbKindAuthored retirement.
-pub fn put_raw(
-    txn: &mut Transaction,
-    shh: SignedActionHashed,
-    ops: Vec<ChainOpLite>,
-    entry: Option<Entry>,
-) -> StateMutationResult<Vec<DhtOpHash>> {
-    let (action, signature) = shh.into_inner();
-    let (action, hash) = action.into_inner();
-    let mut action = Some(action);
-    let mut hashes = Vec::with_capacity(ops.len());
-    let mut ops_to_integrate = Vec::with_capacity(ops.len());
-    for op in &ops {
-        let op_type = op.get_type();
-        let (h, op_hash) =
-            ChainOpUniqueForm::op_hash(op_type, action.take().expect("This can't be empty"))?;
-        let op_order = OpOrder::new(op_type, h.timestamp());
-        let timestamp = h.timestamp();
-        action = Some(h);
-        hashes.push((op_hash.clone(), op_order, timestamp));
-        ops_to_integrate.push(op_hash);
-    }
-    let shh = SignedActionHashed::with_presigned(
-        ActionHashed::with_pre_hashed(action.expect("This can't be empty"), hash),
-        signature,
-    );
-    if let Some(entry) = entry {
-        insert_entry(txn, &EntryHash::with_data_sync(&entry), &entry)?;
-    }
-    insert_action(txn, &shh)?;
-    for (op, (op_hash, op_order, timestamp)) in ops.into_iter().zip(hashes) {
-        insert_op_lite(txn, &op.into(), &op_hash, &op_order, &timestamp, 0, None)?;
-    }
-    Ok(ops_to_integrate)
-}
-
-/// Get the current chain head of the database, if the chain is nonempty.
-pub fn chain_head_db(txn: &Txn<DbKindAuthored>) -> SourceChainResult<Option<HeadInfo>> {
-    let chain_head = AuthoredChainHeadQuery::new();
-    Ok(chain_head.run(CascadeTxnWrapper::from(txn))?)
-}
-
-/// Get the current chain head of the database.
-/// Error if the chain is empty.
-pub fn chain_head_db_nonempty(txn: &Txn<DbKindAuthored>) -> SourceChainResult<HeadInfo> {
-    chain_head_db(txn)?.ok_or(SourceChainError::ChainEmpty)
-}
-
 pub type CurrentCountersigningSessionOpt = Option<(Record, EntryHash, CounterSigningSessionData)>;
-
-/// Check if there is a current countersigning session and if so, return the
-/// session data and the entry hash.
-// #5370: dead once DbKindAuthored is retired.
-pub fn current_countersigning_session(
-    txn: &Txn<DbKindAuthored>,
-) -> SourceChainResult<CurrentCountersigningSessionOpt> {
-    match chain_head_db(txn) {
-        // We haven't done genesis so no session can be active.
-        Err(e) => Err(e),
-        Ok(None) => Ok(None),
-        Ok(Some(HeadInfo { action: hash, .. })) => {
-            let txn: CascadeTxnWrapper = txn.into();
-            // Get the session data from the database.
-            let record = match txn.get_record(&hash.into())? {
-                Some(record) => record,
-                None => return Ok(None),
-            };
-            let (sah, ee) = record.clone().into_inner();
-            Ok(match (sah.action().entry_hash(), ee.into_option()) {
-                (Some(entry_hash), Some(Entry::CounterSign(cs, _))) => {
-                    Some((record, entry_hash.clone(), *cs))
-                }
-                _ => None,
-            })
-        }
-    }
-}
 
 /// Dump the entire source chain from the DhtStore.
 ///
@@ -2022,24 +1942,12 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn source_chain_buffer_iter_back() -> SourceChainResult<()> {
         holochain_trace::test_run();
-        let test_db = test_authored_db();
         let keystore = test_keystore();
-        let vault = test_db.to_db();
         let dna_hash = fixt!(DnaHash);
         let dht_store = crate::test_utils::test_dht_store(dna_hash.clone()).await;
 
         let author = Arc::new(keystore.new_sign_keypair_random().await.unwrap());
 
-        vault
-            .read_async({
-                move |txn| -> DatabaseResult<()> {
-                    assert_matches!(chain_head_db(txn), Ok(None));
-
-                    Ok(())
-                }
-            })
-            .await
-            .unwrap();
         genesis(
             dht_store.clone(),
             keystore.clone(),
@@ -2672,7 +2580,7 @@ mod tests {
         let TestCase {
             chain,
             agent_key,
-            dht,
+            dht_store,
             ..
         } = TestCase::new().await;
         let warrantee = fixt!(AgentPubKey);
@@ -2703,13 +2611,12 @@ mod tests {
         assert!(actions.is_empty());
         assert_eq!(warrant_count, 0);
 
-        // Check DHT database
-        let warrantee_clone = warrantee.clone();
-        let actual_warrants = dht.test_read(move |txn| {
-            CascadeTxnWrapper::from(txn)
-                .get_warrants_for_agent(&warrantee_clone, false)
-                .unwrap()
-        });
+        // Check the DHT store — the counterfeit warrant must not be present.
+        let actual_warrants = dht_store
+            .as_read()
+            .warrants_by_author(agent_key.clone())
+            .await
+            .unwrap();
         assert!(actual_warrants.is_empty());
     }
 
@@ -2969,14 +2876,12 @@ mod tests {
     struct TestCase {
         chain: SourceChain,
         agent_key: AgentPubKey,
-        dht: TestDb<DbKindDht>,
         dht_store: DhtStore,
         keystore: MetaLairClient,
     }
 
     impl TestCase {
         async fn new() -> Self {
-            let dht = test_dht_db();
             let keystore = test_keystore();
             let dna_hash = fixt!(DnaHash);
             let dht_store = crate::test_utils::test_dht_store(dna_hash.clone()).await;
@@ -2996,7 +2901,6 @@ mod tests {
             Self {
                 chain,
                 agent_key,
-                dht,
                 dht_store,
                 keystore,
             }

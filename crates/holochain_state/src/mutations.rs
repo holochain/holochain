@@ -1,6 +1,4 @@
-use crate::query::from_blob;
 use crate::query::to_blob;
-use crate::schedule::fn_is_scheduled;
 use crate::scratch::Scratch;
 use crate::validation_db::ValidationStage;
 pub use error::*;
@@ -10,12 +8,10 @@ use holochain_nonce::Nonce256Bits;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_sqlite::rusqlite;
 use holochain_sqlite::rusqlite::named_params;
-use holochain_sqlite::rusqlite::types::Null;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor;
 use holochain_types::prelude::*;
 use holochain_types::sql::AsSql;
-use std::str::FromStr;
 
 mod error;
 
@@ -151,27 +147,6 @@ pub fn insert_record_scratch(
     if let Some(entry) = entry.into_option() {
         scratch.add_entry(EntryHashed::from_content_sync(entry), chain_top_ordering);
     }
-}
-
-/// Insert a [DhtOp] into the Authored database.
-pub fn insert_op_authored(
-    txn: &mut Txn<DbKindAuthored>,
-    op: &DhtOpHashed,
-) -> StateMutationResult<()> {
-    insert_op_when(txn, op, 0, None, Timestamp::now())
-}
-
-/// Insert a [DhtOp] into the DHT database.
-///
-/// If `transfer_data` is None, that means that the Op was locally validated
-/// and is being included in the DHT by self-authority
-pub fn insert_op_dht(
-    txn: &mut Txn<DbKindDht>,
-    op: &DhtOpHashed,
-    serialized_size: u32,
-    transfer_data: Option<(AgentPubKey, TransferMethod, Timestamp)>,
-) -> StateMutationResult<()> {
-    insert_op_when(txn, op, serialized_size, transfer_data, Timestamp::now())
 }
 
 /// Marker for the cases where we could include some transfer data, but this is currently
@@ -539,18 +514,6 @@ pub fn set_validation_status(
     Ok(())
 }
 
-/// Set the whether or not a receipt is required of a [DhtOp] in the database.
-pub fn set_require_receipt(
-    txn: &mut Txn<DbKindDht>,
-    hash: &DhtOpHash,
-    require_receipt: bool,
-) -> StateMutationResult<()> {
-    dht_op_update!(txn, hash, {
-        "require_receipt": require_receipt,
-    })?;
-    Ok(())
-}
-
 /// Set the validation stage of a [DhtOp] in the database.
 pub fn set_validation_stage(
     txn: &mut Transaction,
@@ -614,98 +577,6 @@ pub fn set_when_integrated(
     dht_op_update!(txn, hash, {
         "when_integrated": time,
     })?;
-    Ok(())
-}
-
-/// Mark every [DhtOp] that is awaiting integration (validation_stage = 3,
-/// validation_status IS NOT NULL) as integrated in the legacy `DhtOp` table.
-///
-/// Sets `when_integrated = time` and clears `validation_stage` on all matching
-/// rows. Returns the `(DhtOpHash, Option<AgentPubKey>)` pairs of the ops it
-/// marked, so callers can drive publish-trigger updates for locally-authored
-/// ops that bypass the new-DB limbo path.
-///
-/// Used as a dual-write shim during the read-migration window so that legacy
-/// readers see consistent integration state. Will be removed once the legacy
-/// `DhtOp` table is retired.
-pub fn set_all_awaiting_integration_to_integrated(
-    txn: &mut Txn<DbKindDht>,
-    time: Timestamp,
-) -> StateMutationResult<Vec<(DhtOpHash, Option<AgentPubKey>)>> {
-    let mut stmt = txn.prepare(
-        "UPDATE DhtOp
-         SET when_integrated = :when_integrated,
-             validation_stage = NULL
-         WHERE validation_stage = 3
-           AND validation_status IS NOT NULL
-         RETURNING
-           hash,
-           COALESCE(
-             (SELECT author FROM Action  WHERE Action.hash  = DhtOp.action_hash LIMIT 1),
-             (SELECT author FROM Warrant WHERE Warrant.hash = DhtOp.action_hash LIMIT 1)
-           )",
-    )?;
-    let rows = stmt.query_map(
-        named_params! {
-            ":when_integrated": time,
-        },
-        |row| {
-            let hash: DhtOpHash = row.get(0)?;
-            let author: Option<AgentPubKey> = row.get(1)?;
-            Ok((hash, author))
-        },
-    )?;
-    let out: Vec<(DhtOpHash, Option<AgentPubKey>)> = rows.collect::<rusqlite::Result<Vec<_>>>()?;
-    Ok(out)
-}
-
-/// Set when a [DhtOp] was last publish time
-pub fn set_last_publish_time(
-    txn: &mut Txn<DbKindAuthored>,
-    hash: &DhtOpHash,
-    unix_epoch: std::time::Duration,
-) -> StateMutationResult<()> {
-    dht_op_update!(txn, hash, {
-        "last_publish_time": unix_epoch.as_secs(),
-    })?;
-    Ok(())
-}
-
-/// Unset withhold publish for a [DhtOp].
-pub fn unset_withhold_publish(
-    txn: &mut Txn<DbKindAuthored>,
-    hash: &DhtOpHash,
-) -> StateMutationResult<()> {
-    dht_op_update!(txn, hash, {
-        "withhold_publish": Null,
-    })?;
-    Ok(())
-}
-
-/// Set the receipt count for a [DhtOp].
-pub fn set_receipts_complete(
-    txn: &mut Txn<DbKindAuthored>,
-    hash: &DhtOpHash,
-    complete: bool,
-) -> StateMutationResult<()> {
-    set_receipts_complete_redundantly_in_dht_db(txn, hash, complete)
-}
-
-/// Set the receipt count for a [DhtOp].
-pub fn set_receipts_complete_redundantly_in_dht_db(
-    txn: &mut Transaction,
-    hash: &DhtOpHash,
-    complete: bool,
-) -> StateMutationResult<()> {
-    if complete {
-        dht_op_update!(txn, hash, {
-            "receipts_complete": true,
-        })?;
-    } else {
-        dht_op_update!(txn, hash, {
-            "receipts_complete": holochain_sqlite::rusqlite::types::Null,
-        })?;
-    }
     Ok(())
 }
 
@@ -915,208 +786,5 @@ pub fn lock_chain(
 /// countersigning session that is inflight.
 pub fn unlock_chain(txn: &mut Transaction, author: &AgentPubKey) -> StateMutationResult<()> {
     txn.execute("DELETE FROM ChainLock WHERE author = ?", [author])?;
-    Ok(())
-}
-
-// #5370: dead once DbKindAuthored is retired.
-pub fn delete_all_ephemeral_scheduled_fns(txn: &mut Transaction) -> StateMutationResult<()> {
-    txn.execute(
-        holochain_sqlite::sql::sql_cell::schedule::DELETE_ALL_EPHEMERAL,
-        named_params! {},
-    )?;
-    Ok(())
-}
-
-// #5370: dead once DbKindAuthored is retired.
-pub fn delete_live_ephemeral_scheduled_fns(
-    txn: &mut Transaction,
-    now: Timestamp,
-    author: &AgentPubKey,
-) -> StateMutationResult<()> {
-    txn.execute(
-        holochain_sqlite::sql::sql_cell::schedule::DELETE_LIVE_EPHEMERAL,
-        named_params! {
-            ":now": now,
-            ":author" : author,
-        },
-    )?;
-    Ok(())
-}
-
-// #5370: dead once DbKindAuthored is retired.
-pub fn reschedule_expired(
-    txn: &mut Transaction,
-    now: Timestamp,
-    author: &AgentPubKey,
-) -> StateMutationResult<()> {
-    let rows = {
-        let mut stmt = txn.prepare(holochain_sqlite::sql::sql_cell::schedule::EXPIRED)?;
-        let rows = stmt.query_map(
-            named_params! {
-                ":now": now,
-                ":author" : author,
-            },
-            |row| {
-                Ok((
-                    ZomeName(row.get::<_, String>(0)?.into()),
-                    FunctionName(row.get(1)?),
-                    row.get(2)?,
-                ))
-            },
-        )?;
-        let mut ret = vec![];
-        for row in rows {
-            ret.push(row?);
-        }
-        ret
-    };
-    for (zome_name, scheduled_fn, maybe_schedule) in rows {
-        schedule_fn(
-            txn,
-            author,
-            ScheduledFn::new(zome_name, scheduled_fn),
-            from_blob(maybe_schedule)?,
-            now,
-        )?;
-    }
-    Ok(())
-}
-
-/// Remove a function from the schedule.
-// #5370: dead once DbKindAuthored is retired.
-pub fn unschedule_fn(txn: &mut Transaction, author: &AgentPubKey, scheduled_fn: &ScheduledFn) {
-    match txn.execute(
-        holochain_sqlite::sql::sql_cell::schedule::DELETE,
-        named_params! {
-            ":zome_name": scheduled_fn.zome_name().to_string(),
-            ":scheduled_fn": scheduled_fn.fn_name().to_string(),
-            ":author" : author,
-        },
-    ) {
-        Ok(n) => {
-            tracing::debug!("Unscheduled {n} {scheduled_fn:?} for author {author} in database")
-        }
-        Err(e) => {
-            tracing::error!(
-                "Error unscheduling {scheduled_fn:?} for author {author} in database: {e}"
-            );
-        }
-    }
-}
-
-/// Set a function to be called by the scheduler at a later time determined by `maybe_schedule`.
-///
-/// If the function was already scheduled, its schedule will be updated.
-// #5370: dead once DbKindAuthored is retired.
-pub fn schedule_fn(
-    txn: &mut Transaction,
-    author: &AgentPubKey,
-    scheduled_fn: ScheduledFn,
-    maybe_schedule: Option<Schedule>,
-    now: Timestamp,
-) -> StateMutationResult<()> {
-    let (start, end, ephemeral) = match maybe_schedule {
-        Some(Schedule::Persisted(ref schedule_string)) => {
-            // If this cron doesn't parse cleanly we don't even want to
-            // write it to the db.
-            let start = if let Some(start) = cron::Schedule::from_str(schedule_string)
-                .map_err(|e| ScheduleError::Cron(e.to_string()))?
-                .after(
-                    &chrono::DateTime::<chrono::Utc>::try_from(now)
-                        .map_err(ScheduleError::Timestamp)?,
-                )
-                .next()
-            {
-                start
-            } else {
-                // Unschedule and bail if there are no further cron schedules.
-                unschedule_fn(txn, author, &scheduled_fn);
-                return Ok(());
-            };
-            let end = start
-                + chrono::Duration::from_std(holochain_zome_types::schedule::PERSISTED_TIMEOUT)
-                    .map_err(|e| ScheduleError::Cron(e.to_string()))?;
-            (Timestamp::from(start), Timestamp::from(end), false)
-        }
-        Some(Schedule::Ephemeral(duration)) => (
-            (now + duration).map_err(ScheduleError::Timestamp)?,
-            Timestamp::max(),
-            true,
-        ),
-        None => (now, Timestamp::max(), true),
-    };
-    if fn_is_scheduled(txn, scheduled_fn.clone(), author)? {
-        txn.execute(
-            holochain_sqlite::sql::sql_cell::schedule::UPDATE,
-            named_params! {
-                ":zome_name": scheduled_fn.zome_name().to_string(),
-                ":maybe_schedule": to_blob::<Option<Schedule>>(&maybe_schedule)?,
-                ":scheduled_fn": scheduled_fn.fn_name().to_string(),
-                ":start": start,
-                ":end": end,
-                ":ephemeral": ephemeral,
-                ":author" : author,
-            },
-        )?;
-    } else {
-        sql_insert!(txn, ScheduledFunctions, {
-            "zome_name": scheduled_fn.zome_name().to_string(),
-            "maybe_schedule": to_blob::<Option<Schedule>>(&maybe_schedule)?,
-            "scheduled_fn": scheduled_fn.fn_name().to_string(),
-            "start": start,
-            "end": end,
-            "ephemeral": ephemeral,
-            "author" : author,
-        })?;
-    }
-    Ok(())
-}
-
-/// Force remove a countersigning session from the source chain.
-///
-/// This is a dangerous operation and should only be used:
-/// - If the countersigning workflow has determined to a reasonable level of confidence that other
-///   peers abandoned the session.
-/// - If the user decides to force remove the session from their source chain when the
-///   countersigning session is unable to make a decision.
-///
-/// Note that this mutation is defensive about sessions that have any of their ops published to the
-/// network. If any of the ops have been published, the session cannot be removed.
-///
-/// #5370: dead once DbKindAuthored is retired.
-pub fn remove_countersigning_session(
-    txn: &mut Transaction,
-    cs_action: Action,
-    cs_entry_hash: EntryHash,
-) -> StateMutationResult<()> {
-    // Check, just for paranoia's sake that the countersigning session is not fully published.
-    // It is acceptable to delete a countersigning session that has been written to the source chain,
-    // with signatures published. As soon as the session's ops have been published to the network,
-    // it is unacceptable to remove the session from the database.
-    let count = txn.query_row(
-        "SELECT count(*) FROM DhtOp WHERE withhold_publish IS NULL AND action_hash = ?",
-        [cs_action.to_hash()],
-        |row| row.get::<_, usize>(0),
-    )?;
-    if count != 0 {
-        tracing::error!(
-            "Cannot remove countersigning session that has been published to the network: {:?}",
-            cs_action
-        );
-        return Err(StateMutationError::CannotRemoveFullyPublished);
-    }
-
-    tracing::info!("Cleaning up authored data for action {:?}", cs_action);
-
-    let count = txn.execute(
-        "DELETE FROM DhtOp WHERE withhold_publish = 1 AND action_hash = ?",
-        [cs_action.to_hash()],
-    )?;
-    tracing::debug!("Removed {} ops from the authored DHT", count);
-    let count = txn.execute("DELETE FROM Entry WHERE hash = ?", [cs_entry_hash])?;
-    tracing::debug!("Removed {} entries", count);
-    let count = txn.execute("DELETE FROM Action WHERE hash = ?", [cs_action.to_hash()])?;
-    tracing::debug!("Removed {} actions", count);
-
     Ok(())
 }

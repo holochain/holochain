@@ -15,32 +15,6 @@ use tempfile::TempDir;
 
 pub mod mutations_helpers;
 
-/// Create a [`TestDb`] of [`DbKindAuthored`], backed by a temp directory.
-pub fn test_authored_db() -> TestDb<DbKindAuthored> {
-    test_authored_db_with_id(1)
-}
-
-/// Create a test authored database with a DNA hash and agent key based on the input `id`.
-pub fn test_authored_db_with_id(id: u8) -> TestDb<DbKindAuthored> {
-    test_db(DbKindAuthored(Arc::new(CellId::new(
-        fake_dna_hash(id),
-        fake_agent_pub_key(id),
-    ))))
-}
-
-/// Create a [`TestDb`] of [`DbKindDht`], backed by a temp directory.
-pub fn test_dht_db() -> TestDb<DbKindDht> {
-    test_dht_db_with_id(1)
-}
-
-pub fn test_dht_db_with_id(id: u8) -> TestDb<DbKindDht> {
-    test_db(DbKindDht(Arc::new(fake_dna_hash(id))))
-}
-
-pub fn test_dht_db_with_dna_hash(hash: DnaHash) -> TestDb<DbKindDht> {
-    test_db(DbKindDht(Arc::new(hash)))
-}
-
 /// Create a [`TestDb`] of [DbKindConductor], backed by a temp directory.
 pub fn test_conductor_db() -> TestDb<DbKindConductor> {
     test_db(DbKindConductor)

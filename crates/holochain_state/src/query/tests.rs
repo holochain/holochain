@@ -17,7 +17,6 @@ use holochain_zome_types::entry::EntryHashed;
 mod details;
 mod get_exact_complete_record;
 mod links;
-mod links_test;
 mod store;
 
 #[tokio::test(flavor = "multi_thread")]

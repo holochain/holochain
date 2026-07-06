@@ -5,7 +5,6 @@ use crate::conductor::config::ConductorConfig;
 use crate::conductor::config::InterfaceDriver;
 use crate::conductor::ConductorBuilder;
 use crate::conductor::ConductorHandle;
-use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::sweettest::SweetConductorConfig;
 use crate::sweettest::SweetLocalRendezvous;
@@ -18,7 +17,6 @@ use holochain_conductor_api::ZomeCallParamsSigned;
 use holochain_keystore::MetaLairClient;
 use holochain_nonce::fresh_nonce;
 use holochain_serialized_bytes::SerializedBytesError;
-use holochain_sqlite::prelude::DatabaseResult;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::prelude::SourceChainResult;
 use holochain_state::source_chain;
@@ -519,23 +517,6 @@ pub async fn fake_genesis_for_agent_with_store(
     dht_store: holochain_state::DhtStore,
 ) -> SourceChainResult<()> {
     source_chain::genesis(dht_store, keystore, dna_hash, agent, None).await
-}
-
-/// Force all dht ops without enough validation receipts to be published.
-pub async fn force_publish_dht_ops(
-    vault: &DbWrite<DbKindAuthored>,
-    publish_trigger: &mut TriggerSender,
-) -> DatabaseResult<()> {
-    vault
-        .write_async(|txn| {
-            DatabaseResult::Ok(txn.execute(
-                "UPDATE DhtOp SET last_publish_time = NULL WHERE receipts_complete IS NULL",
-                [],
-            )?)
-        })
-        .await?;
-    publish_trigger.trigger(&"force_publish_dht_ops");
-    Ok(())
 }
 
 /// Fixture of two cells running a given TestWasm

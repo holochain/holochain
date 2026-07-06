@@ -1618,68 +1618,6 @@ pub async fn make_fork_warrant_op_inner(
     Ok(op)
 }
 
-/// Detects chain forks by finding actions with the same `prev_action`.
-///
-/// The SQL query returns any action sharing the same `prev_hash` but with a
-/// different hash. The author check is performed in memory: if the authors
-/// match, a fork is confirmed. If they differ, a cross-author `prev_action`
-/// collision error is returned.
-///
-/// This function is retained for unit tests; production code uses the async
-/// [`DhtStoreRead::find_fork_for_action`] instead.
-#[cfg(test)]
-fn detect_fork(
-    txn: &mut Transaction<'_>,
-    action: &Action,
-) -> StateQueryResult<Option<(ActionHash, Signature)>> {
-    use holochain_sqlite::sql::sql_cell::ACTION_HASH_BY_PREV;
-    use holochain_state::query::StateQueryError;
-    let mut statement = txn.prepare(ACTION_HASH_BY_PREV)?;
-    let items = statement
-        .query_map(
-            named_params! {
-                ":prev_hash": action.prev_action(),
-                ":hash": action.to_hash(),
-            },
-            // First, try to deserialize the hash as an ActionHash...
-            |row| match row.get("hash") {
-                Ok(hash) => {
-                    let action_blob: Vec<u8> = row.get("blob")?;
-                    Ok(Some((hash, action_blob)))
-                }
-                // ...if that fails, we can skip it if it deserializes as a WarrantHash
-                //    (checking the row type this way makes it so we don't have to join on the DhtOp table in the query)
-                Err(err) => match row.get::<_, WarrantHash>("hash") {
-                    Ok(_) => Ok(None),
-                    Err(_) => Err(err),
-                },
-            },
-        )?
-        .collect::<Result<Vec<_>, _>>()?;
-
-    let incoming_author = action.author();
-
-    for maybe_tuple in items {
-        let Some((hash, action_blob)) = maybe_tuple else {
-            continue;
-        };
-        let signed_action = from_blob::<SignedAction>(action_blob)?;
-        let existing_author = signed_action.action().author();
-
-        if existing_author != incoming_author {
-            return Err(StateQueryError::Other(format!(
-                "Cross-author prev_action collision: incoming author {incoming_author} \
-                 differs from existing author {existing_author} for prev_action {:?}",
-                action.prev_action()
-            )));
-        }
-
-        return Ok(Some((hash, signed_action.signature().clone())));
-    }
-
-    Ok(None)
-}
-
 #[derive(Debug, Clone)]
 struct OutcomeSummary {
     accepted: usize,

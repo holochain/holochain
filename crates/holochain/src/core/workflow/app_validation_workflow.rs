@@ -879,22 +879,3 @@ impl AppValidationWorkspace {
         CascadeImpl::empty(self.dht_store.clone()).with_network(network)
     }
 }
-
-pub fn put_validation_limbo(
-    txn: &mut Txn<DbKindDht>,
-    hash: &DhtOpHash,
-    stage: ValidationStage,
-) -> WorkflowResult<()> {
-    set_validation_stage(txn, hash, stage)?;
-    Ok(())
-}
-
-pub fn put_integration_limbo(
-    txn: &mut Txn<DbKindDht>,
-    hash: &DhtOpHash,
-    status: ValidationStatus,
-) -> WorkflowResult<()> {
-    set_validation_status(txn, hash, status)?;
-    set_validation_stage(txn, hash, ValidationStage::AwaitingIntegration)?;
-    Ok(())
-}
