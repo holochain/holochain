@@ -3,13 +3,12 @@
 use super::{error::WorkflowResult, incoming_dht_ops_workflow::incoming_dht_ops_workflow};
 use crate::conductor::space::Space;
 use crate::core::queue_consumer::{TriggerSender, WorkComplete};
-use crate::core::ribosome::weigh_placeholder;
 use crate::core::share::Share;
 use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, EntryHash};
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::prelude::*;
-use holochain_zome_types::dht_v2::from_legacy_action;
+use holochain_zome_types::dht_v2::{build_action_set, from_legacy_action};
 use std::collections::HashMap;
 
 /// A cheaply cloneable, thread-safe and in-memory store for
@@ -76,18 +75,6 @@ pub(crate) async fn witnessing_workflow(
     // For each complete session notify the agents of success.
     for (agents, actions) in notify_agents {
         tracing::debug!("Witnessing ready, notifying agents {:?}", agents);
-        // The network message carries v2 signed actions; the witnessing map
-        // itself stays legacy (built directly from legacy `ChainOp`s above),
-        // so convert at this network boundary.
-        let actions = actions
-            .into_iter()
-            .map(|legacy| {
-                SignedAction::new(
-                    from_legacy_action(legacy.data()),
-                    legacy.signature().clone(),
-                )
-            })
-            .collect();
         if let Err(e) = network
             .countersigning_session_negotiation(
                 agents,
@@ -125,8 +112,7 @@ pub(crate) fn receive_incoming_countersigning_ops(
             if let Entry::CounterSign(session_data, _) = entry {
                 let entry_hash = EntryHash::with_data_sync(entry);
                 // Get the required actions for this session.
-                let weight = weigh_placeholder();
-                let action_set = session_data.build_action_set(entry_hash, weight)?;
+                let action_set = build_action_set(session_data, entry_hash)?;
 
                 // Get the expires time for this session.
                 let expires = *session_data.preflight_request().session_times.end();
@@ -165,9 +151,11 @@ pub(crate) fn receive_incoming_countersigning_ops(
 
 type AgentsToNotify = Vec<AgentPubKey>;
 type Ops = Vec<(DhtOpHash, ChainOp)>;
-// The witnessing map holds legacy `ChainOp`s, so the actions notified to
-// cosigning agents stay on the legacy representation too.
-type SignedActions = Vec<LegacySignedAction>;
+// OP-PIPELINE SHIM (Island 1): the witnessing map holds legacy `ChainOp`s, so
+// each session's actions are converted to v2 (the shape the network message
+// and `CountersigningSessionNegotiationMessage::AuthorityResponse` carry) as
+// they are folded out of the session below.
+type SignedActions = Vec<SignedAction>;
 
 impl WitnessingWorkspace {
     /// Create a new empty countersigning workspace.
@@ -249,8 +237,13 @@ impl WitnessingWorkspace {
                                 let signature = op.signature().clone();
                                 // Agents to notify.
                                 agents.push(action.author().clone());
-                                // Signed actions to notify them with.
-                                actions.push(LegacySignedAction::new(action, signature));
+                                // Signed actions to notify them with, converted
+                                // to v2 (see the OP-PIPELINE SHIM note on
+                                // `SignedActions`).
+                                actions.push(SignedAction::new(
+                                    from_legacy_action(&action),
+                                    signature,
+                                ));
                                 // Ops to validate.
                                 ops.push((op_hash, op));
                                 (agents, ops, actions)

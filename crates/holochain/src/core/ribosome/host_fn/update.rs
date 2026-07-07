@@ -1,5 +1,5 @@
 use super::delete::get_original_entry_data;
-use crate::core::ribosome::{weigh_placeholder, Ribosome};
+use crate::core::ribosome::Ribosome;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
@@ -7,6 +7,7 @@ use holochain_wasmer_host::prelude::*;
 use wasmer::RuntimeError;
 
 use holochain_types::prelude::*;
+use holochain_zome_types::dht_v2::{ActionData, UpdateData};
 use std::sync::Arc;
 
 pub fn update(
@@ -29,8 +30,6 @@ pub fn update(
             let (original_entry_address, entry_type) =
                 get_original_entry_data(call_context.clone(), original_action_address.clone())?;
 
-            let weight = weigh_placeholder();
-
             // Countersigned entries have different action handling.
             match entry {
                 Entry::CounterSign(_, _) => tokio_helper::block_forever_on(async move {
@@ -40,7 +39,7 @@ pub fn update(
                         .source_chain()
                         .as_ref()
                         .expect("Must have source chain if write_workspace access is given")
-                        .put_countersigned(entry, chain_top_ordering, weight)
+                        .put_countersigned(entry, chain_top_ordering)
                         .await
                         .map_err(|source_chain_error| -> RuntimeError {
                             wasm_error!(WasmErrorInner::Host(source_chain_error.to_string())).into()
@@ -50,13 +49,13 @@ pub fn update(
                     // build the entry hash
                     let entry_hash = EntryHash::with_data_sync(&entry);
 
-                    // build an action for the entry being updated
-                    let action_builder = builder::Update {
-                        original_entry_address,
+                    // build the v2 action data for the entry being updated
+                    let action_data = ActionData::Update(UpdateData {
                         original_action_address,
+                        original_entry_address,
                         entry_type,
                         entry_hash,
-                    };
+                    });
                     let workspace = call_context.host_context.workspace_write();
 
                     // return the hash of the updated entry
@@ -70,7 +69,7 @@ pub fn update(
                             .expect("Must have source chain if write_workspace access is given");
                         // push the action and the entry into the source chain
                         let action_hash = source_chain
-                            .put_weightless(action_builder, Some(entry), chain_top_ordering)
+                            .put(action_data, Some(entry), chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| -> RuntimeError {
                                 wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))

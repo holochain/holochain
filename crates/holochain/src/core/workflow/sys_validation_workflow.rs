@@ -119,7 +119,6 @@ use holochain_state::prelude::*;
 // the legacy action representation; `LegacyAction` pins that explicitly
 // wherever the ambient default (v2) would otherwise apply.
 use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
-use holochain_zome_types::dependencies::holochain_integrity_types::record::Record as LegacyRecord;
 use holochain_zome_types::dht_v2::{
     from_legacy_action, to_legacy_signed_action, DeleteData, DeleteLinkData, UpdateData,
 };
@@ -1251,15 +1250,10 @@ async fn validate_warrant_op(
     }
 }
 
-/// Verify a freshly authored legacy record's signature before converting it
-/// to v2 and running [`sys_validate_record`] on it.
-///
-/// [`verify_action_signature`] projects the action to v2 internally and
-/// checks the signature against those bytes; this function simply takes the
-/// record in the legacy, per-variant shape it is still available in at the
-/// call site, ahead of the explicit conversion to v2.
-pub async fn counterfeit_check_authored_record(record: &LegacyRecord) -> SysValidationOutcome<()> {
-    match counterfeit_check_action(record.signature(), record.action()).await {
+/// Verify a freshly authored record's signature, checked directly against its
+/// v2 action content, before running [`sys_validate_record`] on it.
+pub async fn counterfeit_check_authored_record(record: &Record) -> SysValidationOutcome<()> {
+    match verify_v2_action_signature(record.signature(), record.signed_action()).await {
         Ok(()) => Ok(()),
         Err(SysValidationError::ValidationOutcome(validation_outcome)) => {
             validation_outcome.into_outcome()
@@ -1309,6 +1303,17 @@ async fn sys_validate_record_inner(
     let action = record.action();
     let maybe_entry = record.entry().as_option();
     counterfeit_check_action(signature, action).await?;
+    // Reconstructed for the still-legacy per-op-type structural checks below
+    // (`store_entry`, `register_updated_content`, ...) and the countersigning
+    // entry-rate-weight lookup. This is a structural, non-signature use of
+    // the legacy shape: the checks below never read the hash or signature of
+    // this value, only field values (entry type, tag, referenced hashes), so
+    // the weight lost in the round trip through v2 is not a correctness
+    // problem here (every action authored today carries the default,
+    // zero weight in the first place).
+    let legacy_action = to_legacy_signed_action(record.signed_action())
+        .action()
+        .clone();
 
     async fn validate(
         action: &Action,

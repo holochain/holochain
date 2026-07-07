@@ -8,6 +8,7 @@ use crate::core::ribosome::HostFnAccess;
 use holo_hash::ActionHash;
 use holo_hash::EntryHash;
 use holochain_types::prelude::*;
+use holochain_zome_types::dht_v2::{ActionData, DeleteData};
 use std::sync::Arc;
 use wasmer::RuntimeError;
 
@@ -37,12 +38,12 @@ pub fn delete(
                     .source_chain()
                     .as_ref()
                     .expect("Must have source chain if write_workspace access is given");
-                let action_builder = builder::Delete {
+                let action_data = ActionData::Delete(DeleteData {
                     deletes_address: deletes_action_hash,
                     deletes_entry_address,
-                };
+                });
                 let action_hash = source_chain
-                    .put_weightless(action_builder, None, chain_top_ordering)
+                    .put(action_data, None, chain_top_ordering)
                     .await
                     .map_err(|source_chain_error| {
                         wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))

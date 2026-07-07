@@ -1,6 +1,5 @@
 use crate::conductor::space::TestSpace;
 use crate::core::queue_consumer::{TriggerReceiver, TriggerSender};
-use crate::core::ribosome::weigh_placeholder;
 use crate::core::workflow::countersigning_workflow::{
     accept_countersigning_request, countersigning_workflow, CountersigningSessionState,
     CountersigningWorkspace, SessionCompletionDecision, SessionResolutionSummary,
@@ -37,7 +36,7 @@ use holochain_zome_types::countersigning::PreflightResponse;
 use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
 use holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed as LegacySignedActionHashed;
 use holochain_zome_types::dht_v2::from_legacy_action;
-use holochain_zome_types::prelude::CreateBase;
+use holochain_zome_types::prelude::{CreateBase, EntryRateWeight};
 use holochain_zome_types::query::{ChainHead, ChainStatus};
 use matches::assert_matches;
 use std::ops::Add;
@@ -1942,7 +1941,7 @@ impl TestHarness {
             entry_hash.clone(),
             session_data,
             self.author.clone(),
-            weigh_placeholder(),
+            EntryRateWeight::default(),
         )
         .unwrap();
         let v2_action = from_legacy_action(&my_action);
@@ -2275,14 +2274,12 @@ impl RemoteAgent {
         entry_hash: &EntryHash,
         keystore: MetaLairClient,
     ) -> SignedAction {
-        let legacy_action = LegacyAction::from_countersigning_data(
+        let action = holochain_zome_types::dht_v2::from_countersigning_data(
             entry_hash.clone(),
             session_data,
             self.agent.clone(),
-            weigh_placeholder(),
         )
         .unwrap();
-        let action = from_legacy_action(&legacy_action);
 
         let hashed = holo_hash::HoloHashed::from_content_sync(action);
         let sah = SignedActionHashed::sign(&keystore, hashed).await.unwrap();

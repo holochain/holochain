@@ -20,17 +20,14 @@ use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::IncompleteCommitReason;
 use holochain_state::source_chain::SourceChainError;
 use holochain_types::prelude::*;
-// The zome call workflow's authoring/inline-validation boundary: the source
-// chain scratch is legacy (authoring stays on the legacy representation);
-// each scratch record is converted to v2 here, after its signature has been
-// verified against the legacy bytes, so everything downstream of this point
-// (`sys_validate_record`, `record_to_op`, `validate_op`, `op_to_record`) is
-// v2.
+// The scratch space authoring/inline-validation path is v2-native end to
+// end: each scratch record's signature is checked against its v2 action
+// content, and everything downstream (`sys_validate_record`, `record_to_op`,
+// `validate_op`, `op_to_record`) consumes that same v2 record.
 use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
     Op, RegisterAgentActivity, RegisterCreateLink, RegisterDelete, RegisterDeleteLink,
     RegisterUpdate, StoreEntry, StoreRecord,
 };
-use holochain_zome_types::dht_v2::from_legacy_signed_action;
 use holochain_zome_types::record::Record;
 use std::sync::Arc;
 use tokio::sync::broadcast;
@@ -299,16 +296,10 @@ pub async fn inline_validation(
         let mut to_app_validate: Vec<Record> = Vec::with_capacity(scratch_records.len());
         // Loop forwards through all the new records
         for record in scratch_records {
-            // Verifies the signature over the v2 projection of the action
-            // (computed internally). This takes the record in the legacy,
-            // per-variant shape it is still available in at this point,
-            // ahead of the explicit conversion to v2 below.
+            // Verifies the signature over the record's v2 action content.
             counterfeit_check_authored_record(&record)
                 .await
                 .or_else(|outcome_or_err| outcome_or_err.into_workflow_error())?;
-
-            let (legacy_sah, entry) = record.into_inner();
-            let record = Record::new(from_legacy_signed_action(&legacy_sah), entry);
 
             sys_validate_record(&record, cascade.clone())
                 .await

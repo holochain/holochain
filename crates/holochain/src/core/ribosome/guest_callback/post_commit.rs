@@ -12,11 +12,6 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_types::prelude::*;
-// The wasm `post_commit` callback decodes v2 `SignedActionHashed` (matching
-// the already-migrated hdk side); `flushed_actions` from the source chain
-// are legacy, so `send_post_commit` converts at this single boundary.
-use holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed as LegacySignedActionHashed;
-use holochain_zome_types::dht_v2::from_legacy_signed_action;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 
@@ -96,13 +91,12 @@ pub async fn send_post_commit(
     workspace: SourceChainWorkspace,
     network: DynHolochainP2pDna,
     keystore: MetaLairClient,
-    actions: Vec<LegacySignedActionHashed>,
+    actions: Vec<SignedActionHashed>,
     zomes: Vec<CoordinatorZome>,
     signal_tx: broadcast::Sender<Signal>,
     call_zome_handle: Option<CellConductorReadHandle>,
 ) -> Result<(), tokio::sync::mpsc::error::SendError<()>> {
     let cell_id = workspace.source_chain().cell_id();
-    let actions: Vec<SignedActionHashed> = actions.iter().map(from_legacy_signed_action).collect();
 
     for zome in zomes {
         conductor_handle

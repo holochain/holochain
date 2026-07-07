@@ -2301,8 +2301,8 @@ mod scheduler_impls {
 mod misc_impls {
     use super::{state_dump_helpers::peer_store_dump, *};
     use holochain_conductor_api::{CellInfo, JsonDump};
-    use holochain_zome_types::dht_v2::DeleteData;
-    use holochain_zome_types::{action::builder, Entry};
+    use holochain_zome_types::dht_v2::{ActionData, CreateData, DeleteData};
+    use holochain_zome_types::Entry;
     use kitsune2_api::{SpaceId, TransportStats};
     use std::sync::atomic::Ordering;
 
@@ -2327,14 +2327,14 @@ mod misc_impls {
 
             let cap_grant_entry = Entry::CapGrant(cap_grant);
             let entry_hash = EntryHash::with_data_sync(&cap_grant_entry);
-            let action_builder = builder::Create {
+            let action_data = ActionData::Create(CreateData {
                 entry_type: EntryType::CapGrant,
                 entry_hash,
-            };
+            });
 
             let action_hash = source_chain
-                .put_weightless(
-                    action_builder,
+                .put(
+                    action_data,
                     Some(cap_grant_entry),
                     ChainTopOrdering::default(),
                 )
@@ -2395,12 +2395,12 @@ mod misc_impls {
                 .ok_or_else(|| ConductorApiError::other("No cap grant found for action hash"))?;
             let entry_hash = EntryHash::with_data_sync(&cap_grant_entry);
 
-            let action_builder = builder::Delete {
+            let action_data = ActionData::Delete(DeleteData {
                 deletes_address: action_hash,
                 deletes_entry_address: entry_hash,
-            };
+            });
             let action_hash = source_chain
-                .put_weightless(action_builder, None, ChainTopOrdering::default())
+                .put(action_data, None, ChainTopOrdering::default())
                 .await?;
 
             source_chain

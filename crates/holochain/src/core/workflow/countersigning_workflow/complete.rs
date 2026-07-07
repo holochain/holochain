@@ -1,6 +1,5 @@
 use crate::conductor::space::Space;
 use crate::core::queue_consumer::TriggerSender;
-use crate::core::ribosome::weigh_placeholder;
 use crate::core::workflow::{WorkflowError, WorkflowResult};
 use holo_hash::{ActionHash, AgentPubKey, EntryHash};
 use holochain_keystore::{AgentPubKeyExt, MetaLairClient};
@@ -8,7 +7,7 @@ use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::prelude::*;
 use holochain_timestamp::Timestamp;
 use holochain_types::dht_op::ChainOp;
-use holochain_zome_types::dht_v2::to_legacy_signed_action;
+use holochain_zome_types::dht_v2::{build_action_set, to_legacy_signed_action};
 use holochain_zome_types::prelude::SignedAction;
 
 pub(crate) async fn inner_countersigning_session_complete(
@@ -114,8 +113,7 @@ pub(crate) async fn inner_countersigning_session_complete(
 
     let mut integrity_check_passed = false;
 
-    let weight = weigh_placeholder();
-    let stored_actions = session_data.build_action_set(entry_hash, weight)?;
+    let stored_actions = build_action_set(&session_data, entry_hash)?;
     if stored_actions.len() == incoming_actions.len() {
         tracing::debug!("Have the right number of actions");
 

@@ -14,7 +14,7 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_types::prelude::*;
-use holochain_zome_types::action::builder;
+use holochain_zome_types::dht_v2::{ActionData, InitZomesCompleteData};
 use tokio::sync::broadcast;
 
 #[derive(Constructor)]
@@ -127,7 +127,7 @@ async fn initialize_zomes_workflow_inner(
     let ws = workspace.clone();
     ws.source_chain()
         .put(
-            builder::InitZomesComplete {},
+            ActionData::InitZomesComplete(InitZomesCompleteData {}),
             None,
             ChainTopOrdering::Strict,
         )
@@ -154,8 +154,7 @@ mod tests {
     use holochain_state::test_utils::test_db_dir;
     use holochain_types::inline_zome::InlineZomeSet;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::action::ActionData;
-    use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
+    use holochain_zome_types::dht_v2::ActionData;
     use matches::assert_matches;
     use std::sync::Arc;
 
@@ -237,8 +236,8 @@ mod tests {
         // Check init is added to the workspace
         let scratch = workspace.source_chain().snapshot().unwrap();
         assert_matches!(
-            scratch.actions().next().unwrap().action(),
-            LegacyAction::InitZomesComplete(_)
+            scratch.actions().next().unwrap().action().data,
+            ActionData::InitZomesComplete(_)
         );
     }
 
