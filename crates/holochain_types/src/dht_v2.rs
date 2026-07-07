@@ -204,6 +204,39 @@ impl DhtOp {
     }
 }
 
+/// A [`ChainOp`] paired with its [`DhtOpHash`].
+pub type ChainOpHashed = HoloHashed<ChainOp>;
+
+/// A [`DhtOp`] paired with its [`DhtOpHash`].
+pub type DhtOpHashed = HoloHashed<DhtOp>;
+
+impl HashableContent for ChainOp {
+    type HashType = hash_type::DhtOp;
+
+    fn hash_type(&self) -> Self::HashType {
+        hash_type::DhtOp
+    }
+
+    fn hashable_content(&self) -> HashableContentBytes {
+        // `to_hash` already routes through `ChainOpUniqueForm`; reuse it
+        // rather than re-serializing, mirroring `HoloHashed`'s own
+        // prehashed-content pattern.
+        HashableContentBytes::Prehashed39(self.to_hash().get_raw_39().to_vec())
+    }
+}
+
+impl HashableContent for DhtOp {
+    type HashType = hash_type::DhtOp;
+
+    fn hash_type(&self) -> Self::HashType {
+        hash_type::DhtOp
+    }
+
+    fn hashable_content(&self) -> HashableContentBytes {
+        HashableContentBytes::Prehashed39(self.to_hash().get_raw_39().to_vec())
+    }
+}
+
 /// Reconstruct a legacy [`crate::dht_op::DhtOp`] from a v2 [`DhtOp`].
 ///
 /// Used on the receive path while the legacy DHT table and
@@ -555,6 +588,50 @@ mod op_hash_tests {
                 ChainOpType::StoreEntry,
             ]
         );
+    }
+
+    #[test]
+    fn v2_hashable_content_matches_legacy_chain_op_hash() {
+        use crate::dht_op::ChainOp as LegacyChainOp;
+        use holochain_zome_types::dependencies::holochain_integrity_types::action::{
+            Action as LegacyAction, Create as LegacyCreate,
+        };
+        use holochain_zome_types::record::RecordEntry;
+
+        let legacy_action = LegacyAction::Create(LegacyCreate {
+            author: AgentPubKey::from_raw_36(vec![1u8; 36]),
+            timestamp: Timestamp::from_micros(1_000),
+            action_seq: 4,
+            prev_action: ActionHash::from_raw_36(vec![2u8; 36]),
+            entry_type: EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
+            entry_hash: EntryHash::from_raw_36(vec![3u8; 36]),
+            weight: Default::default(),
+        });
+        let legacy_op = LegacyChainOp::StoreRecord(
+            Signature::from([7u8; 64]),
+            legacy_action.clone(),
+            RecordEntry::NA,
+        );
+        let legacy_hash = DhtOpHash::with_data_sync(&legacy_op);
+
+        let v2_action = from_legacy_action(&legacy_action);
+        let v2_op = ChainOp::CreateRecord(signed(v2_action, 7), OpEntry::ActionOnly);
+
+        // `ChainOp::to_hash` (used by `dht_basis`/production) agrees with the
+        // legacy op's content-derived hash for the same action.
+        assert_eq!(v2_op.to_hash(), legacy_hash);
+
+        // `HashableContent` (used by `HoloHashed::from_content_sync`, i.e.
+        // `DhtOpHashed`/`ChainOpHashed`) agrees too.
+        let dht_op = DhtOp::ChainOp(Box::new(v2_op.clone()));
+        let hashed: DhtOpHashed = HoloHashed::from_content_sync(dht_op);
+        assert_eq!(*hashed.as_hash(), legacy_hash);
+        let chain_hashed: ChainOpHashed = HoloHashed::from_content_sync(v2_op);
+        assert_eq!(*chain_hashed.as_hash(), legacy_hash);
     }
 
     #[test]
