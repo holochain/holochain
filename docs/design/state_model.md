@@ -69,9 +69,14 @@ CREATE TABLE Entry (
 -- content is isolated and auditable. Private entries are never distributed to other
 -- agents, so only an author's private entries appear here.
 CREATE TABLE PrivateEntry (
-   hash   BLOB PRIMARY KEY,
+   hash   BLOB NOT NULL,
    author BLOB NOT NULL,    -- The agent who authored this entry
-   blob   BLOB NOT NULL
+   blob   BLOB NOT NULL,
+   -- Keyed on (hash, author): the same private entry content can be authored
+   -- independently by different agents (the author lives in the action, not the
+   -- entry, so identical entries share a hash). A per-hash key would let the
+   -- first author's row shadow every other agent's.
+   PRIMARY KEY (hash, author)
 ) WITHOUT ROWID;
 
 -- Scheduled function records (per-author within this DNA's DB).
