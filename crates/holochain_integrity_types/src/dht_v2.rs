@@ -461,6 +461,20 @@ impl HashableContent for Action {
     }
 }
 
+impl crate::record::SignedHashed<Action> {
+    /// The v2 action content, mirroring the legacy
+    /// `SignedActionHashed::action` accessor.
+    pub fn action(&self) -> &Action {
+        &self.hashed.content
+    }
+
+    /// The action hash, mirroring the legacy
+    /// `SignedActionHashed::action_address` accessor.
+    pub fn action_address(&self) -> &ActionHash {
+        &self.hashed.hash
+    }
+}
+
 /// Project a legacy [`crate::action::Action`] onto the v2 [`Action`]
 /// (a flat [`ActionHeader`] + [`ActionData`] envelope), dropping the legacy
 /// `weight` field that the v2 model deliberately discards.
