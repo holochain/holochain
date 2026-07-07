@@ -61,7 +61,7 @@ async fn sys_validation_produces_invalid_chain_op_warrant() {
     .unwrap();
     matches::assert_matches!(outcome, Outcome::Rejected(_));
 
-    //- Inject the invalid op directly into bob's DHT store
+    // Inject the invalid op directly into bob's DHT store
     let op = DhtOpHashed::from_content_sync(op);
     conductor
         .spaces

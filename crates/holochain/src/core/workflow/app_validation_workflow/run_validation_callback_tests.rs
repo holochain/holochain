@@ -208,8 +208,7 @@ async fn validation_callback_awaiting_deps_hashes() {
     .unwrap();
     assert_matches!(outcome, Outcome::AwaitingDeps(hashes) if hashes == vec![create_action.clone().to_hash().into()]);
 
-    // The fetched op carries alice's real signature, so it passes the signature
-    // gate and lands in the DhtStore. Wait for the background fetch to store it.
+    // Wait for the background fetch to put the op into the DhtStore.
     await_action_in_store(&test_space.space.dht_store, &create_action.to_hash()).await;
 
     // app validation outcome should be accepted, now that the missing record
