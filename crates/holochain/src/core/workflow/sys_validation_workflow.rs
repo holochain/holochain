@@ -575,12 +575,13 @@ async fn move_and_check_warrant_deps(
         .expect("poisoned")
         .get_pending_warrant_dependencies();
     for (action_hash, op_type) in warrant_deps {
-        // The warranted op has to be in limbo to be validated. If it is already
-        // present in the DhtStore as an op of the warranted type, move it into
-        // limbo. Otherwise it arrives from the network cascade as a cached
-        // record (under a different op type), so materialise the op of the
-        // required type from that record and record it into limbo. If neither
-        // is available yet, it is re-fetched and cached on a later tick.
+        // The warranted op has to be in limbo to be validated. If a cached
+        // copy of the op is already stored under the warranted type, re-queue
+        // it by moving it into limbo (a table move within the single database).
+        // Otherwise it arrives from the network cascade as a cached record
+        // under a different op type, so materialise the op of the required type
+        // from that record and record it into limbo. If neither is available
+        // yet, it is re-fetched and cached on a later tick.
         let moved = match workspace
             .dht_store
             .move_warranted_op_to_limbo(&action_hash, op_type)
