@@ -1727,7 +1727,10 @@ fn detect_fork(
         let Some((hash, action_blob)) = maybe_tuple else {
             continue;
         };
-        let signed_action = from_blob::<SignedAction>(action_blob)?;
+        // The legacy `Action` table stores the legacy signed-action form, so
+        // deserialize the blob as the legacy `Signed<LegacyAction>`.
+        let signed_action =
+            from_blob::<holochain_zome_types::signature::Signed<LegacyAction>>(action_blob)?;
         let existing_author = signed_action.data().author();
 
         if existing_author != incoming_author {

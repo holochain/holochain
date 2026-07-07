@@ -159,7 +159,10 @@ async fn incoming_ops_filters_private_entry() {
         weight: EntryRateWeight::default(),
     };
     let action = Action::Create(create);
-    let signature = author.sign(&keystore, &action).await.unwrap();
+    let signature = author
+        .sign(&keystore, &from_legacy_action(&action))
+        .await
+        .unwrap();
 
     let shh = LegacySignedActionHashed::with_presigned(
         ActionHashed::from_content_sync(action),
