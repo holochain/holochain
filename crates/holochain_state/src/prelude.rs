@@ -6,7 +6,6 @@ pub use crate::source_chain::*;
 #[cfg(any(test, feature = "test_utils"))]
 pub use crate::test_utils::*;
 pub use crate::validation_db::*;
-pub use crate::validation_receipts::*;
 pub use crate::wasm::*;
 pub use holochain_sqlite::prelude::*;
 pub use holochain_state_types::prelude::*;

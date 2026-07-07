@@ -238,6 +238,37 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn same_private_entry_isolated_per_author() {
+        // Two agents can author the identical private entry: the author is part
+        // of the action, not the entry, so identical content shares one hash.
+        // Each agent must still retrieve their own copy.
+        let db = test_open_db(dht_db_id()).await.unwrap();
+        let (hash, entry) = sample_entry(17);
+        let alice = AgentPubKey::from_raw_36(vec![5u8; 36]);
+        let bob = AgentPubKey::from_raw_36(vec![6u8; 36]);
+
+        db.insert_private_entry(&hash, &alice, &entry)
+            .await
+            .unwrap();
+        db.insert_private_entry(&hash, &bob, &entry).await.unwrap();
+
+        assert_eq!(
+            db.as_ref()
+                .get_entry(hash.clone(), Some(&alice))
+                .await
+                .unwrap(),
+            Some(entry.clone())
+        );
+        assert_eq!(
+            db.as_ref()
+                .get_entry(hash.clone(), Some(&bob))
+                .await
+                .unwrap(),
+            Some(entry)
+        );
+    }
+
+    #[tokio::test]
     async fn entry_batch_fetch_by_hashes() {
         let db = test_open_db(dht_db_id()).await.unwrap();
         let author = AgentPubKey::from_raw_36(vec![9u8; 36]);

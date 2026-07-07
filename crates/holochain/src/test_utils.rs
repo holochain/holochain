@@ -5,7 +5,6 @@ use crate::conductor::config::ConductorConfig;
 use crate::conductor::config::InterfaceDriver;
 use crate::conductor::ConductorBuilder;
 use crate::conductor::ConductorHandle;
-use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::sweettest::SweetConductorConfig;
 use crate::sweettest::SweetLocalRendezvous;
@@ -18,7 +17,6 @@ use holochain_conductor_api::ZomeCallParamsSigned;
 use holochain_keystore::MetaLairClient;
 use holochain_nonce::fresh_nonce;
 use holochain_serialized_bytes::SerializedBytesError;
-use holochain_sqlite::prelude::DatabaseResult;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::prelude::SourceChainResult;
 use holochain_state::source_chain;
@@ -477,13 +475,8 @@ pub fn fake_valid_dna_file(network_seed: &str) -> DnaFile {
 /// `dna_hash` must match the DNA the caller's `dht_db` was opened for; the
 /// helper reuses it for the genesis `Action::Dna` and for the new-DB
 /// `DhtStore` so the legacy and mirrored writes land in the same DNA space.
-pub async fn fake_genesis(
-    vault: DbWrite<DbKindAuthored>,
-    dht_db: DbWrite<DbKindDht>,
-    dna_hash: DnaHash,
-    keystore: MetaLairClient,
-) -> SourceChainResult<()> {
-    fake_genesis_for_agent(vault, dht_db, dna_hash, fake_agent_pubkey_1(), keystore).await
+pub async fn fake_genesis(dna_hash: DnaHash, keystore: MetaLairClient) -> SourceChainResult<()> {
+    fake_genesis_for_agent(dna_hash, fake_agent_pubkey_1(), keystore).await
 }
 
 /// Run genesis on the source chain for a specific agent for testing.
@@ -492,15 +485,13 @@ pub async fn fake_genesis(
 /// helper reuses it for the genesis `Action::Dna` and for the new-DB
 /// `DhtStore` so the legacy and mirrored writes land in the same DNA space.
 pub async fn fake_genesis_for_agent(
-    vault: DbWrite<DbKindAuthored>,
-    dht_db: DbWrite<DbKindDht>,
     dna_hash: DnaHash,
     agent: AgentPubKey,
     keystore: MetaLairClient,
 ) -> SourceChainResult<()> {
     let dht_store = holochain_state::test_utils::test_dht_store(dna_hash.clone()).await;
 
-    source_chain::genesis(vault, dht_db, dht_store, keystore, dna_hash, agent, None).await
+    source_chain::genesis(dht_store, keystore, dna_hash, agent, None).await
 }
 
 /// Run genesis using a caller-supplied `DhtStore`.
@@ -508,21 +499,11 @@ pub async fn fake_genesis_for_agent(
 /// Use this when you need the same store for both genesis and a workspace so
 /// that the workspace can read the chain head written during genesis.
 pub async fn fake_genesis_with_store(
-    vault: DbWrite<DbKindAuthored>,
-    dht_db: DbWrite<DbKindDht>,
     dna_hash: DnaHash,
     keystore: MetaLairClient,
     dht_store: holochain_state::DhtStore,
 ) -> SourceChainResult<()> {
-    fake_genesis_for_agent_with_store(
-        vault,
-        dht_db,
-        dna_hash,
-        fake_agent_pubkey_1(),
-        keystore,
-        dht_store,
-    )
-    .await
+    fake_genesis_for_agent_with_store(dna_hash, fake_agent_pubkey_1(), keystore, dht_store).await
 }
 
 /// Run genesis for a specific agent using a caller-supplied `DhtStore`.
@@ -530,31 +511,12 @@ pub async fn fake_genesis_with_store(
 /// Use this when you need the same store for both genesis and a workspace so
 /// that the workspace can read the chain head written during genesis.
 pub async fn fake_genesis_for_agent_with_store(
-    vault: DbWrite<DbKindAuthored>,
-    dht_db: DbWrite<DbKindDht>,
     dna_hash: DnaHash,
     agent: AgentPubKey,
     keystore: MetaLairClient,
     dht_store: holochain_state::DhtStore,
 ) -> SourceChainResult<()> {
-    source_chain::genesis(vault, dht_db, dht_store, keystore, dna_hash, agent, None).await
-}
-
-/// Force all dht ops without enough validation receipts to be published.
-pub async fn force_publish_dht_ops(
-    vault: &DbWrite<DbKindAuthored>,
-    publish_trigger: &mut TriggerSender,
-) -> DatabaseResult<()> {
-    vault
-        .write_async(|txn| {
-            DatabaseResult::Ok(txn.execute(
-                "UPDATE DhtOp SET last_publish_time = NULL WHERE receipts_complete IS NULL",
-                [],
-            )?)
-        })
-        .await?;
-    publish_trigger.trigger(&"force_publish_dht_ops");
-    Ok(())
+    source_chain::genesis(dht_store, keystore, dna_hash, agent, None).await
 }
 
 /// Fixture of two cells running a given TestWasm

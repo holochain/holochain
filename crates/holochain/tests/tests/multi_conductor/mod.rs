@@ -1,8 +1,7 @@
 use hdk::prelude::*;
 use holochain::sweettest::SweetConductorConfig;
 use holochain::sweettest::*;
-use holochain_sqlite::db::{DbKindT, DbWrite};
-use holochain_sqlite::prelude::DatabaseResult;
+use holochain_state::dht_store::DhtStore;
 use unwrap_to::unwrap_to;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, derive_more::From)]
@@ -286,21 +285,20 @@ async fn private_entries_dont_leak() {
     )
     .await;
 
-    check_for_private_entries(alice.dht_db().clone()).await;
-    check_for_private_entries(conductors[0].get_cache_db(alice.cell_id()).await.unwrap()).await;
-    check_for_private_entries(bobbo.dht_db().clone()).await;
-    check_for_private_entries(conductors[1].get_cache_db(bobbo.cell_id()).await.unwrap()).await;
+    check_for_private_entries(alice.dht_store()).await;
+    check_for_private_entries(bobbo.dht_store()).await;
 }
 
+/// Private entries are never placed in the shared public `Entry` table; they
+/// live only in the separate `PrivateEntry` table. Assert the public table
+/// holds no private-visibility entries.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-async fn check_for_private_entries<Kind: DbKindT>(env: DbWrite<Kind>) {
-    let count: usize = env.read_async(move |txn| -> DatabaseResult<usize> {
-        Ok(txn.query_row(
-            "select count(action.rowid) from action join entry on action.entry_hash = entry.hash where private_entry = 1",
-            [],
-            |row| row.get(0),
-        )?)
-    }).await.unwrap();
+async fn check_for_private_entries(dht_store: &DhtStore) {
+    let count = dht_store
+        .as_read()
+        .count_private_entries_in_public_table()
+        .await
+        .unwrap();
     assert_eq!(count, 0);
 }
 

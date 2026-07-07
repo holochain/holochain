@@ -82,10 +82,7 @@ pub enum MaybeLinkable {
 /// can be called from Rust instead of Wasm
 #[derive(Clone)]
 pub struct HostFnCaller {
-    pub authored_db: DbWrite<DbKindAuthored>,
-    pub dht_db: DbWrite<DbKindDht>,
     pub dht_store: DhtStore,
-    pub cache: DbWrite<DbKindCache>,
     pub ribosome: Ribosome,
     pub zome_path: ZomePath,
     pub network: HolochainP2pDna,
@@ -112,12 +109,7 @@ impl HostFnCaller {
         dna_file: &DnaFile,
         zome_index: usize,
     ) -> HostFnCaller {
-        let authored_db = handle
-            .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())
-            .unwrap();
-        let dht_db = handle.get_dht_db(cell_id.dna_hash()).unwrap();
         let dht_store = handle.get_dht_store(cell_id.dna_hash()).unwrap();
-        let cache = handle.get_cache_db(cell_id).await.unwrap();
         let keystore = handle.keystore().clone();
         let network = holochain_p2p::HolochainP2pDna::new(
             handle.holochain_p2p().clone(),
@@ -140,10 +132,7 @@ impl HostFnCaller {
         let call_zome_handle =
             CellConductorApi::new(handle.clone(), cell_id.clone()).into_call_zome_handle();
         HostFnCaller {
-            authored_db,
-            dht_db,
             dht_store,
-            cache,
             ribosome,
             zome_path,
             network,
@@ -153,41 +142,25 @@ impl HostFnCaller {
         }
     }
 
-    pub fn authored_db(&self) -> DbWrite<DbKindAuthored> {
-        self.authored_db.clone()
-    }
-
-    pub fn dht_db(&self) -> DbWrite<DbKindDht> {
-        self.dht_db.clone()
-    }
-
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self), fields(cell_id = %self.zome_path.cell_id())))]
     pub async fn unpack(&self) -> (Arc<Ribosome>, Arc<CallContext>, SourceChainWorkspace) {
         let HostFnCaller {
-            authored_db,
-            dht_db,
             dht_store,
-            cache,
             network,
             keystore,
             ribosome,
             signal_tx,
             zome_path,
             call_zome_handle,
+            ..
         } = self.clone();
 
         let (cell_id, zome_name) = zome_path.into();
 
-        let workspace = SourceChainWorkspace::new(
-            authored_db,
-            dht_db,
-            dht_store,
-            cache,
-            keystore.clone(),
-            cell_id.agent_pubkey().clone(),
-        )
-        .await
-        .unwrap();
+        let workspace =
+            SourceChainWorkspace::new(dht_store, keystore.clone(), cell_id.agent_pubkey().clone())
+                .await
+                .unwrap();
         let host_access = ZomeCallHostAccess::new(
             workspace.clone().into(),
             keystore,

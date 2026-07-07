@@ -821,3 +821,21 @@ where
         .await?;
     Ok(n)
 }
+
+/// Count of public `Entry` rows whose action carries a private entry. This is
+/// always zero: private entries are stored only in `PrivateEntry`, never in the
+/// shared `Entry` table.
+#[cfg(any(test, feature = "inspection"))]
+pub(crate) async fn count_private_entries_in_public_table<'e, E>(executor: E) -> sqlx::Result<i64>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let (n,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM Entry \
+         JOIN Action ON Action.entry_hash = Entry.hash \
+         WHERE Action.private_entry = 1",
+    )
+    .fetch_one(executor)
+    .await?;
+    Ok(n)
+}

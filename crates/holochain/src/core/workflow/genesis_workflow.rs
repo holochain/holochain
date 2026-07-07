@@ -15,7 +15,6 @@ use crate::core::ribosome::guest_callback::genesis_self_check::{
 };
 use crate::core::ribosome::Ribosome;
 use derive_more::Constructor;
-use holochain_sqlite::prelude::*;
 use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::StateQueryResult;
 use holochain_state::source_chain;
@@ -100,8 +99,6 @@ async fn genesis_workflow_inner<Api: CellConductorApiT>(
     }
 
     source_chain::genesis(
-        workspace.vault.clone(),
-        workspace.dht_db.clone(),
         workspace.dht_store.clone(),
         api.keystore().clone(),
         cell_id.dna_hash().clone(),
@@ -115,23 +112,13 @@ async fn genesis_workflow_inner<Api: CellConductorApiT>(
 
 /// The workspace for Genesis
 pub struct GenesisWorkspace {
-    vault: DbWrite<DbKindAuthored>,
-    dht_db: DbWrite<DbKindDht>,
     dht_store: DhtStore,
 }
 
 impl GenesisWorkspace {
     /// Constructor
-    pub fn new(
-        env: DbWrite<DbKindAuthored>,
-        dht_db: DbWrite<DbKindDht>,
-        dht_store: DhtStore,
-    ) -> Self {
-        Self {
-            vault: env,
-            dht_db,
-            dht_store,
-        }
+    pub fn new(dht_store: DhtStore) -> Self {
+        Self { dht_store }
     }
 
     pub async fn has_genesis(&self, author: AgentPubKey) -> StateQueryResult<bool> {
@@ -145,8 +132,7 @@ mod tests {
     use crate::conductor::api::MockCellConductorApiT;
     use crate::core::ribosome::mock_ribosome::MockRibosomeBuilder;
     use holochain_keystore::test_keystore;
-    use holochain_state::prelude::test_dht_db;
-    use holochain_state::{prelude::test_authored_db, source_chain::SourceChain};
+    use holochain_state::source_chain::SourceChain;
     use holochain_trace;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
@@ -156,15 +142,12 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn has_genesis() {
         holochain_trace::test_run();
-        let test_db = test_authored_db();
-        let dht_db = test_dht_db();
         let keystore = test_keystore();
-        let vault = test_db.to_db();
         let dna = fake_dna_file("b");
         let author = fake_agent_pubkey_1();
         let dht_store = holochain_state::test_utils::test_dht_store(dna.dna_hash().clone()).await;
 
-        let workspace = GenesisWorkspace::new(vault.clone(), dht_db.to_db(), dht_store.clone());
+        let workspace = GenesisWorkspace::new(dht_store.clone());
 
         // Before genesis the store has none of the author's actions.
         assert!(!workspace.has_genesis(author.clone()).await.unwrap());
@@ -185,24 +168,21 @@ mod tests {
 
         // After genesis the store has the three genesis actions, so a fresh
         // workspace over the same store reports genesis complete.
-        let workspace = GenesisWorkspace::new(vault, dht_db.to_db(), dht_store);
+        let workspace = GenesisWorkspace::new(dht_store);
         assert!(workspace.has_genesis(author).await.unwrap());
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn genesis_initializes_source_chain() {
         holochain_trace::test_run();
-        let test_db = test_authored_db();
-        let dht_db = test_dht_db();
         let keystore = test_keystore();
-        let vault = test_db.to_db();
         let dna = fake_dna_file("a");
         let author = fake_agent_pubkey_1();
 
         let dht_store = holochain_state::test_utils::test_dht_store(dna.dna_hash().clone()).await;
 
         {
-            let workspace = GenesisWorkspace::new(vault.clone(), dht_db.to_db(), dht_store.clone());
+            let workspace = GenesisWorkspace::new(dht_store.clone());
 
             let mut api = MockCellConductorApiT::new();
             api.expect_keystore().return_const(keystore.clone());
@@ -223,15 +203,9 @@ mod tests {
 
         {
             let dht_store = dht_store;
-            let source_chain = SourceChain::new(
-                vault.clone(),
-                dht_db.to_db(),
-                dht_store,
-                keystore,
-                author.clone(),
-            )
-            .await
-            .unwrap();
+            let source_chain = SourceChain::new(dht_store, keystore, author.clone())
+                .await
+                .unwrap();
             let actions = source_chain
                 .query(Default::default())
                 .await

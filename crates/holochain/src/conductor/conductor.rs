@@ -95,7 +95,6 @@ use holochain_zome_types::prelude::{AppCapGrantInfo, ClonedCell, Signature, Time
 use indexmap::IndexMap;
 use itertools::Itertools;
 use kitsune2_api::AgentInfoSigned;
-use rusqlite::Transaction;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
@@ -1772,8 +1771,6 @@ mod clone_cell_impls {
             if app_role.is_provisioned {
                 // Check source chain if agent key is valid
                 let source_chain = SourceChain::new(
-                    self.get_or_create_authored_db(app_role.dna_hash(), app.agent_key().clone())?,
-                    self.get_or_create_dht_db(app_role.dna_hash())?,
                     self.get_or_create_dht_store(app_role.dna_hash())?,
                     self.keystore.clone(),
                     app.agent_key().clone(),
@@ -2321,11 +2318,6 @@ mod misc_impls {
             cell.check_or_run_zome_init().await?;
 
             let source_chain = SourceChain::new(
-                self.get_or_create_authored_db(
-                    cell_id.dna_hash(),
-                    cell.id().agent_pubkey().clone(),
-                )?,
-                self.get_or_create_dht_db(cell_id.dna_hash())?,
                 self.get_or_create_dht_store(cell_id.dna_hash())?,
                 self.keystore.clone(),
                 cell_id.agent_pubkey().clone(),
@@ -2374,11 +2366,6 @@ mod misc_impls {
             cell.check_or_run_zome_init().await?;
 
             let source_chain = SourceChain::new(
-                self.get_or_create_authored_db(
-                    cell_id.dna_hash(),
-                    cell.id().agent_pubkey().clone(),
-                )?,
-                self.get_or_create_dht_db(cell_id.dna_hash())?,
                 self.get_or_create_dht_store(cell_id.dna_hash())?,
                 self.keystore.clone(),
                 cell_id.agent_pubkey().clone(),
@@ -2447,18 +2434,13 @@ mod misc_impls {
 
             for cell_id in cell_set.iter() {
                 // create a source chain read to query for the cap grant
-                let chain = SourceChainRead::new(
-                    self.get_or_create_authored_db(
-                        cell_id.dna_hash(),
-                        cell_id.agent_pubkey().clone(),
-                    )?
-                    .into(),
-                    self.get_or_create_dht_db(cell_id.dna_hash())?.into(),
+                let chain = SourceChain::new(
                     self.get_or_create_dht_store(cell_id.dna_hash())?,
                     self.keystore().clone(),
                     cell_id.agent_pubkey().clone(),
                 )
-                .await?;
+                .await?
+                .as_read();
 
                 // query for the cap grant and delete actions (capability revokes)
                 let grant_list = chain.query(grant_query.clone()).await?;
@@ -2990,32 +2972,6 @@ mod accessor_impls {
             self.spaces.get_or_create_space(dna_hash)
         }
 
-        pub(crate) fn get_or_create_authored_db(
-            &self,
-            dna_hash: &DnaHash,
-            author: AgentPubKey,
-        ) -> DatabaseResult<DbWrite<DbKindAuthored>> {
-            self.spaces.get_or_create_authored_db(dna_hash, author)
-        }
-
-        pub(crate) fn get_authored_db_if_present(
-            &self,
-            dna_hash: &DnaHash,
-            author: &AgentPubKey,
-        ) -> DatabaseResult<Option<DbWrite<DbKindAuthored>>> {
-            match self.spaces.get_authored_db_if_present(dna_hash, author)? {
-                Some(db) => Ok(Some(db.clone())),
-                None => Ok(None),
-            }
-        }
-
-        pub(crate) fn get_or_create_dht_db(
-            &self,
-            dna_hash: &DnaHash,
-        ) -> DatabaseResult<DbWrite<DbKindDht>> {
-            self.spaces.dht_db(dna_hash)
-        }
-
         pub(crate) fn get_or_create_dht_store(
             &self,
             dna_hash: &DnaHash,
@@ -3282,48 +3238,15 @@ impl Conductor {
         self.admin_websocket_ports.share_mut(|p| p.push(port));
     }
 
-    async fn delete_or_purge_database<Kind: DbKindT + Send + Sync + 'static>(
-        &self,
-        db: DbWrite<Kind>,
-    ) -> ConductorResult<()> {
-        let mut path = db.path().clone();
-        if let Err(err) = ffs::remove_file(&path).await {
-            tracing::warn!(?err, "Could not remove primary DB file, probably because it is still in use. Purging all data instead.");
-            db.write_async(|txn| purge_data(txn)).await?;
-        } else {
-            tracing::info!("Deleted primary DB file {}", path.display());
-        }
-        path.set_extension("");
-        let stem = path.to_string_lossy();
-        for ext in ["shm", "wal"] {
-            let path = PathBuf::from(format!("{stem}-{ext}"));
-            if let Err(err) = ffs::remove_file(&path).await {
-                let err = err.remove_backtrace();
-                tracing::warn!(?err, "Failed to remove DB support file");
-            } else {
-                tracing::info!("Deleted file {}", path.display());
-            }
-        }
-        Ok(())
-    }
-
     /// Delete cell databases.
     ///
-    /// All data used by that cell (across Authored, DHT, and Cache databases) will also be deleted.
+    /// All DHT data for a DNA no longer used by any installed app is deleted.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn delete_cell_databases(
         &self,
         app_id: &InstalledAppId,
         cell_ids: Vec<CellId>,
     ) -> ConductorResult<()> {
-        // Delete authored database or purge data
-        for cell_id in cell_ids.clone() {
-            let authored_db = self
-                .spaces
-                .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())?;
-            self.delete_or_purge_database(authored_db).await?;
-        }
-
         // Find DNAs of this app which are not used by any other app or agent.
         let remaining_dnas = self
             .get_state()
@@ -3343,29 +3266,10 @@ impl Conductor {
             tracing::info!(?dnas_to_purge, "Purging DNAs");
         }
 
-        // For any DNAs no longer represented in any installed app,
-        // delete DHT and cache databases or purge data.
+        // For any DNAs no longer represented in any installed app, delete the
+        // per-DNA store so a reinstall doesn't inherit stale rows from the
+        // previous installation.
         for dna_hash in dnas_to_purge {
-            // Delete all data from DHT and cache databases.
-            // Database files will be deleted after this step, but
-            // the DB continues to exist in memory while the conductor
-            // is running, supposedly because the pool holds the connection
-            // open.
-            let dht_db = self.spaces.dht_db(dna_hash)?;
-            let cache_db = self.spaces.cache(dna_hash)?;
-            futures::future::join_all([
-                dht_db.write_async(|txn| purge_data(txn)).boxed(),
-                cache_db.write_async(|txn| purge_data(txn)).boxed(),
-            ])
-            .await
-            .into_iter()
-            .collect::<Result<Vec<()>, _>>()?;
-
-            self.delete_or_purge_database(dht_db).await?;
-            self.delete_or_purge_database(cache_db).await?;
-
-            // Remove (or purge) the per-DNA mirrored store so a reinstall
-            // doesn't inherit stale rows from the previous installation.
             let dht_store = self.spaces.dht_store(dna_hash)?;
             let dht_store_id = holochain_data::kind::Dht::new(Arc::new(dna_hash.clone()));
             let dht_store_path = self.spaces.db_dir.as_ref().as_ref().join(
@@ -3543,20 +3447,8 @@ mod test_utils_impls {
             self.app_broadcast.subscribe(installed_app_id)
         }
 
-        pub fn get_dht_db(&self, dna_hash: &DnaHash) -> ConductorApiResult<DbWrite<DbKindDht>> {
-            Ok(self.get_or_create_dht_db(dna_hash)?)
-        }
-
         pub fn get_dht_store(&self, dna_hash: &DnaHash) -> ConductorApiResult<DhtStore> {
             Ok(self.get_or_create_dht_store(dna_hash)?)
-        }
-
-        pub async fn get_cache_db(
-            &self,
-            cell_id: &CellId,
-        ) -> ConductorApiResult<DbWrite<DbKindCache>> {
-            let cell = self.cell_by_id(cell_id).await?;
-            Ok(cell.cache().clone())
         }
 
         pub fn get_spaces(&self) -> Spaces {
@@ -3586,17 +3478,6 @@ mod test_utils_impls {
     }
 }
 
-#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-fn purge_data(txn: &mut Transaction) -> DatabaseResult<()> {
-    txn.execute("DELETE FROM DhtOp", ())?;
-    txn.execute("DELETE FROM Action", ())?;
-    txn.execute("DELETE FROM Entry", ())?;
-    txn.execute("DELETE FROM ValidationReceipt", ())?;
-    txn.execute("DELETE FROM ChainLock", ())?;
-    txn.execute("DELETE FROM ScheduledFunctions", ())?;
-    Ok(())
-}
-
 /// Perform Genesis on the source chains for each of the specified CellIds.
 ///
 /// If genesis fails for any cell, this entire function fails, and all other
@@ -3614,22 +3495,10 @@ pub(crate) async fn genesis_cells(
                 .get_or_create_space(cell_id_inner.dna_hash())
                 .map_err(|e| CellError::FailedToCreateDnaSpace(ConductorError::from(e).into()))?;
 
-            let authored_db =
-                space.get_or_create_authored_db(cell_id_inner.agent_pubkey().clone())?;
-            let dht_db = space.dht_db;
             let dht_store = space.dht_store;
             let ribosome = conductor.get_ribosome(&cell_id_inner).map_err(Box::new)?;
 
-            Cell::genesis(
-                cell_id_inner.clone(),
-                conductor,
-                authored_db,
-                dht_db,
-                dht_store,
-                ribosome,
-                proof,
-            )
-            .await
+            Cell::genesis(cell_id_inner.clone(), conductor, dht_store, ribosome, proof).await
         })
         .map_err(CellError::from)
         .map(|genesis_result| (cell_id, genesis_result.and_then(|r| r)))

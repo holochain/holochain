@@ -5,7 +5,7 @@
 //! obtain a reference from [`Space`](crate) and invoke named methods; they do
 //! not need to interact with the underlying handle directly.
 
-use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, EntryHash, HasHash};
+use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, DnaHash, EntryHash, HasHash};
 use holochain_data::dht::{
     InsertLimboChainOp, InsertLimboWarrant, InsertScheduledFunction,
     RemoveCountersigningSessionOutcome,
@@ -161,6 +161,18 @@ impl<Db> DhtStore<Db> {
 }
 
 impl DhtStore<DbWrite<Dht>> {
+    /// The DNA hash this store belongs to.
+    pub fn dna_hash(&self) -> &DnaHash {
+        self.db.identifier().dna_hash()
+    }
+
+    /// Maximum number of connections in this store's underlying pool. Used by
+    /// tests that assert the configured reader limit reaches the DB pool.
+    #[cfg(any(test, feature = "inspection"))]
+    pub fn connection_pool_max_size(&self) -> u32 {
+        self.db.pool().options().get_max_connections()
+    }
+
     /// Acquire the per-author source-chain write permit for this store.
     ///
     /// Serializes source-chain flushes for a single `(DNA, author)` chain so
@@ -1017,8 +1029,17 @@ impl DhtStore<DbWrite<Dht>> {
             }
         }
     }
+}
 
-    /// Downgrade this writable store to a read-only store.
+impl<Db> DhtStore<Db>
+where
+    Db: AsRef<holochain_data::DbRead<Dht>>,
+{
+    /// Downgrade to a read-only store over the same database handle.
+    ///
+    /// Works for both a writable store (`DbWrite<Dht>`) and a store that is
+    /// already read-only (`DbRead<Dht>`), since both handle types provide
+    /// `AsRef<DbRead<Dht>>`.
     pub fn as_read(&self) -> DhtStoreRead {
         DhtStore::new(self.db.as_ref().clone())
     }
@@ -1371,6 +1392,27 @@ impl DhtStore<DbWrite<Dht>> {
         .execute(self.db.pool())
         .await?;
         Ok(())
+    }
+
+    /// Test-only: overwrite the `seq` of each of the given actions. Used to
+    /// corrupt a source chain for sys-validation tests. Returns the number of
+    /// `Action` rows updated.
+    #[cfg(feature = "test_utils")]
+    pub async fn test_set_action_seq(
+        &self,
+        action_hashes: &[ActionHash],
+        seq: u32,
+    ) -> DhtStoreResult<usize> {
+        let mut updated = 0usize;
+        for hash in action_hashes {
+            let result = sqlx::query("UPDATE Action SET seq = ? WHERE hash = ?")
+                .bind(seq as i64)
+                .bind(hash.get_raw_36())
+                .execute(self.db.pool())
+                .await?;
+            updated += result.rows_affected() as usize;
+        }
+        Ok(updated)
     }
 }
 

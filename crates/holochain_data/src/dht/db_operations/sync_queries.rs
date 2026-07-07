@@ -202,6 +202,14 @@ impl DbRead<Dht> {
         Ok(sync_queries::count_entries(&mut *conn).await? as u64)
     }
 
+    /// Count of public `Entry` rows that belong to a private-visibility action
+    /// (always zero — private entries live only in `PrivateEntry`).
+    #[cfg(any(test, feature = "inspection"))]
+    pub async fn count_private_entries_in_public_table(&self) -> sqlx::Result<u64> {
+        let mut conn = self.timed_conn().await?;
+        Ok(sync_queries::count_private_entries_in_public_table(&mut *conn).await? as u64)
+    }
+
     /// Integrated chain-op rows for the integration dump, paginated forward
     /// from the `(when_integrated, op_hash)` cursor `after` (`None` from the
     /// start, which yields the full set).

@@ -34,7 +34,6 @@ use holochain_nonce::fresh_nonce;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pError, HolochainP2pResult};
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::*;
 use holochain_types::cell_config_overrides::CellConfigOverrides;
@@ -117,18 +116,13 @@ impl Cell {
         overrides: CellConfigOverrides,
     ) -> CellResult<(Self, InitialQueueTriggers)> {
         let conductor_api = Arc::new(CellConductorApi::new(conductor_handle.clone(), id.clone()));
-        let authored_db = space.get_or_create_authored_db(id.agent_pubkey().clone())?;
 
         // check if genesis has been run
         let has_genesis = {
             // check if genesis ran.
-            GenesisWorkspace::new(
-                authored_db.clone(),
-                space.dht_db.clone(),
-                space.dht_store.clone(),
-            )
-            .has_genesis(id.agent_pubkey().clone())
-            .await?
+            GenesisWorkspace::new(space.dht_store.clone())
+                .has_genesis(id.agent_pubkey().clone())
+                .await?
         };
 
         if has_genesis {
@@ -163,12 +157,9 @@ impl Cell {
     /// Performs the Genesis workflow for the Cell, ensuring that its initial
     /// records are committed. This is a prerequisite for any other interaction
     /// with the SourceChain
-    #[allow(clippy::too_many_arguments)]
     pub async fn genesis(
         cell_id: CellId,
         conductor_handle: ConductorHandle,
-        authored_db: DbWrite<DbKindAuthored>,
-        dht_db: DbWrite<DbKindDht>,
         dht_store: DhtStore,
         ribosome: Ribosome,
         membrane_proof: Option<MembraneProof>,
@@ -176,7 +167,7 @@ impl Cell {
         let conductor_api = CellConductorApi::new(conductor_handle.clone(), cell_id.clone());
 
         // run genesis
-        let workspace = GenesisWorkspace::new(authored_db, dht_db, dht_store);
+        let workspace = GenesisWorkspace::new(dht_store);
 
         // exit early if genesis has already run
         if workspace
@@ -778,10 +769,7 @@ impl Cell {
             Some(l) => l,
             None => {
                 SourceChainWorkspace::new(
-                    self.get_or_create_authored_db()?,
-                    self.dht_db().clone(),
                     self.space.dht_store.clone(),
-                    self.cache().clone(),
                     keystore.clone(),
                     self.id.agent_pubkey().clone(),
                 )
@@ -830,10 +818,7 @@ impl Cell {
 
         // Create the workspace
         let workspace = SourceChainWorkspace::init_as_root(
-            self.get_or_create_authored_db()?,
-            self.dht_db().clone(),
             self.space.dht_store.clone(),
-            self.cache().clone(),
             keystore.clone(),
             id.agent_pubkey().clone(),
         )
@@ -898,22 +883,6 @@ impl Cell {
             .conductor_handle
             .get_ribosome(self.id())
             .map_err(|_| DnaError::DnaMissing(self.dna_hash().to_owned()))?)
-    }
-
-    /// Accessor for the authored database backing this Cell
-    pub(crate) fn get_or_create_authored_db(&self) -> CellResult<DbWrite<DbKindAuthored>> {
-        Ok(self
-            .space
-            .get_or_create_authored_db(self.id.agent_pubkey().clone())?)
-    }
-
-    /// Accessor for the authored database backing this Cell
-    pub(crate) fn dht_db(&self) -> &DbWrite<DbKindDht> {
-        &self.space.dht_db
-    }
-
-    pub(crate) fn cache(&self) -> &DbWrite<DbKindCache> {
-        &self.space.cache_db
     }
 
     pub(crate) fn notify_authored_ops_moved_to_limbo(&self) {

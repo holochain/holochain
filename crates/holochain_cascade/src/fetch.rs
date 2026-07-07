@@ -5,91 +5,8 @@
 use super::*;
 
 impl CascadeImpl {
-    #[allow(clippy::result_large_err)] // TODO - investigate this lint
-    fn insert_rendered_op(txn: &mut Txn<DbKindCache>, op: &RenderedOp) -> CascadeResult<()> {
-        let RenderedOp {
-            op_light,
-            op_hash,
-            action,
-            validation_status,
-            ..
-        } = op;
-        let op_order = OpOrder::new(op_light.get_type(), action.action().timestamp());
-        let timestamp = action.action().timestamp();
-        insert_action(txn, action)?;
-        insert_op_lite(
-            txn,
-            op_light,
-            op_hash,
-            &op_order,
-            &timestamp,
-            // Using 0 value because this is the cache database and we only need sizes for gossip
-            // in the DHT database.
-            0,
-            todo_no_cache_transfer_data(),
-        )?;
-        if let Some(status) = validation_status {
-            set_validation_status(txn, op_hash, *status)?;
-        }
-        // We set the integrated to for the cache so it can match the
-        // same query as the vault. This can also be used for garbage collection.
-        set_when_integrated(txn, op_hash, Timestamp::now())?;
-        Ok(())
-    }
-
-    #[allow(clippy::result_large_err)] // TODO - investigate this lint
-    fn insert_rendered_ops(txn: &mut Txn<DbKindCache>, ops: &RenderedOps) -> CascadeResult<()> {
-        let RenderedOps {
-            ops,
-            entry,
-            warrant,
-        } = ops;
-
-        if let Some(warrant) = warrant {
-            let op = DhtOpHashed::from_content_sync(warrant.clone());
-            insert_op_cache(txn, &op)?;
-        }
-        if let Some(entry) = entry {
-            insert_entry(txn, entry.as_hash(), entry.as_content())?;
-        }
-        for op in ops {
-            Self::insert_rendered_op(txn, op)?;
-        }
-        Ok(())
-    }
-
-    /// Insert a set of agent activity into the Cache.
-    #[allow(clippy::result_large_err)] // TODO - investigate this lint
-    fn insert_activity(
-        txn: &mut Txn<DbKindCache>,
-        ops: Vec<RegisterAgentActivity>,
-    ) -> CascadeResult<()> {
-        for op in ops {
-            let RegisterAgentActivity {
-                action:
-                    SignedHashed {
-                        hashed: HoloHashed { content, .. },
-                        signature,
-                    },
-                ..
-            } = op;
-            let op =
-                DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(signature, content));
-            insert_op_cache(txn, &op)?;
-            // We set the integrated to for the cache so it can match the
-            // same query as the vault. This can also be used for garbage collection.
-            set_when_integrated(txn, op.as_hash(), Timestamp::now())?;
-        }
-        Ok(())
-    }
-
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn merge_ops_into_cache(&self, responses: Vec<WireOps>) -> CascadeResult<()> {
-        let cache = some_or_return!(self.cache.as_ref());
-
-        // Extract the warrants, then render outside the cache transaction so
-        // the transform is not counted as transaction time and the rendered
-        // data can be reused by the `DhtStore` cache call below.
         let mut rendered_all: Vec<RenderedOps> = Vec::with_capacity(responses.len());
         let mut response_warrants: Vec<SignedWarrant> = Vec::new();
         for response in responses {
@@ -106,20 +23,8 @@ impl CascadeImpl {
             rendered_all.push(rendered);
         }
 
-        let rendered_for_legacy = rendered_all.clone();
-        cache
-            .write_async(move |txn| {
-                for ops in &rendered_for_legacy {
-                    Self::insert_rendered_ops(txn, ops)?;
-                }
-                CascadeResult::Ok(())
-            })
-            .await?;
-
         // Only signature-verified ops are written to the `DhtStore`, which is
-        // where every cascade read resolves. The cache write above is retained
-        // only so tests using synthetic signatures still find their fetched
-        // ops, and is removed once those tests use real signatures.
+        // where every cascade read resolves.
         let verified = verify_rendered_ops_batch(rendered_all).await;
         self.cache_rendered_ops(&verified).await?;
         self.cache_response_warrants(response_warrants).await;
@@ -129,8 +34,6 @@ impl CascadeImpl {
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn merge_link_ops_into_cache(&self, responses: Vec<WireLinkOps>) -> CascadeResult<()> {
-        let cache = some_or_return!(self.cache.as_ref());
-
         let mut rendered_all: Vec<RenderedOps> = Vec::with_capacity(responses.len());
         let mut response_warrants: Vec<SignedWarrant> = Vec::new();
         for response in responses {
@@ -143,16 +46,6 @@ impl CascadeImpl {
             response_warrants.extend(warrants);
             rendered_all.push(rendered);
         }
-
-        let rendered_for_legacy = rendered_all.clone();
-        cache
-            .write_async(move |txn| {
-                for ops in &rendered_for_legacy {
-                    Self::insert_rendered_ops(txn, ops)?;
-                }
-                CascadeResult::Ok(())
-            })
-            .await?;
 
         let verified = verify_rendered_ops_batch(rendered_all).await;
         self.cache_rendered_ops(&verified).await?;
@@ -210,29 +103,8 @@ impl CascadeImpl {
         &self,
         response: MustGetAgentActivityResponse,
     ) -> CascadeResult<()> {
-        let Some(cache) = self.cache.clone() else {
-            return Ok(());
-        };
-
         // Commit the activity to the chain.
         if let MustGetAgentActivityResponse::Activity { activity, warrants } = response {
-            // TODO: Avoid this clone by committing the ops as references to the db.
-            cache
-                .write_async({
-                    let activity = activity.clone();
-                    let warrants = warrants.clone();
-                    move |txn| {
-                        Self::insert_activity(txn, activity)?;
-                        for warrant in warrants {
-                            let op = DhtOpHashed::from_content_sync(warrant);
-                            insert_op_cache(txn, &op)?;
-                        }
-
-                        CascadeResult::Ok(())
-                    }
-                })
-                .await?;
-
             // Signature verification gates writes into the `DhtStore`.
             let (activity, warrants) = verify_activity_signatures(activity, warrants).await;
 

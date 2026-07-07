@@ -10,7 +10,6 @@ use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::HasHash;
 use holo_hash::{AgentPubKey, DhtOpHash};
 use holochain_p2p::MockHolochainP2pDnaT;
-use holochain_sqlite::prelude::{DbKindDht, DbWrite};
 use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::*;
 use holochain_state::test_utils::test_dht_store;
@@ -20,8 +19,6 @@ use std::sync::Arc;
 async fn no_running_cells() {
     holochain_trace::test_run();
 
-    let test_db = holochain_state::test_utils::test_dht_db();
-    let vault = test_db.to_db();
     let keystore = holochain_keystore::test_keystore();
 
     let mut dna = MockHolochainP2pDnaT::new();
@@ -33,7 +30,6 @@ async fn no_running_cells() {
     let dht_store = test_dht_store(dna_hash.clone()).await;
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
-        vault,
         dht_store,
         dna,
         keystore,
@@ -49,8 +45,6 @@ async fn no_running_cells() {
 async fn do_not_block_or_send_to_self() {
     holochain_trace::test_run();
 
-    let test_db = holochain_state::test_utils::test_dht_db();
-    let vault = test_db.to_db();
     let keystore = holochain_keystore::test_keystore();
 
     let dna_hash = fixt!(DnaHash);
@@ -59,24 +53,16 @@ async fn do_not_block_or_send_to_self() {
     let dht_store = test_dht_store(dna_hash.clone()).await;
 
     // Create a valid op that would require a validation receipt except that it's created by us
-    let (_, valid_op_hash) = create_op_with_status(
-        vault.clone(),
-        &dht_store,
-        Some(author.clone()),
-        ValidationStatus::Valid,
-    )
-    .await
-    .unwrap();
+    let (_, valid_op_hash) =
+        create_op_with_status(&dht_store, Some(author.clone()), ValidationStatus::Valid)
+            .await
+            .unwrap();
 
     // Create a rejected op which would usually cause a block but it's created by us
-    let (_, rejected_op_hash) = create_op_with_status(
-        vault.clone(),
-        &dht_store,
-        Some(author.clone()),
-        ValidationStatus::Rejected,
-    )
-    .await
-    .unwrap();
+    let (_, rejected_op_hash) =
+        create_op_with_status(&dht_store, Some(author.clone()), ValidationStatus::Rejected)
+            .await
+            .unwrap();
 
     let mut dna = MockHolochainP2pDnaT::new();
     dna.expect_send_validation_receipts().never(); // Verify no receipts sent
@@ -86,7 +72,6 @@ async fn do_not_block_or_send_to_self() {
 
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
-        vault.clone(),
         dht_store.clone(),
         dna,
         keystore,
@@ -113,18 +98,15 @@ async fn do_not_block_or_send_to_self() {
 async fn block_invalid_op_author() {
     holochain_trace::test_run();
 
-    let test_db = holochain_state::test_utils::test_dht_db();
-    let vault = test_db.to_db();
     let keystore = holochain_keystore::test_keystore();
 
     let dna_hash = fixt!(DnaHash);
     let dht_store = test_dht_store(dna_hash.clone()).await;
 
     // Any op created by somebody else, which has been rejected by validation.
-    let (_author, op_hash) =
-        create_op_with_status(vault.clone(), &dht_store, None, ValidationStatus::Rejected)
-            .await
-            .unwrap();
+    let (_author, op_hash) = create_op_with_status(&dht_store, None, ValidationStatus::Rejected)
+        .await
+        .unwrap();
 
     // We'll still send a validation receipt, but we should also block them
     let mut dna = MockHolochainP2pDnaT::new();
@@ -141,7 +123,6 @@ async fn block_invalid_op_author() {
 
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
-        vault.clone(),
         dht_store.clone(),
         dna,
         keystore,
@@ -165,18 +146,15 @@ async fn block_invalid_op_author() {
 async fn continues_if_receipt_cannot_be_signed() {
     holochain_trace::test_run();
 
-    let test_db = holochain_state::test_utils::test_dht_db();
-    let vault = test_db.to_db();
     let keystore = holochain_keystore::test_keystore();
 
     let dna_hash = fixt!(DnaHash);
     let dht_store = test_dht_store(dna_hash.clone()).await;
 
     // Any op created by somebody else, which is valid
-    let (_, op_hash) =
-        create_op_with_status(vault.clone(), &dht_store, None, ValidationStatus::Valid)
-            .await
-            .unwrap();
+    let (_, op_hash) = create_op_with_status(&dht_store, None, ValidationStatus::Valid)
+        .await
+        .unwrap();
 
     let mut dna = MockHolochainP2pDnaT::new();
     dna.expect_was_agent_recently_online()
@@ -191,7 +169,6 @@ async fn continues_if_receipt_cannot_be_signed() {
 
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
-        vault.clone(),
         dht_store.clone(),
         dna,
         keystore,
@@ -212,18 +189,15 @@ async fn continues_if_receipt_cannot_be_signed() {
 async fn send_validation_receipt() {
     holochain_trace::test_run();
 
-    let test_db = holochain_state::test_utils::test_dht_db();
-    let vault = test_db.to_db();
     let keystore = holochain_keystore::test_keystore();
 
     let dna_hash = fixt!(DnaHash);
     let dht_store = test_dht_store(dna_hash.clone()).await;
 
     // Any op created by somebody else, which is valid
-    let (_, op_hash) =
-        create_op_with_status(vault.clone(), &dht_store, None, ValidationStatus::Valid)
-            .await
-            .unwrap();
+    let (_, op_hash) = create_op_with_status(&dht_store, None, ValidationStatus::Valid)
+        .await
+        .unwrap();
 
     let mut dna = MockHolochainP2pDnaT::new();
     dna.expect_was_agent_recently_online()
@@ -239,7 +213,6 @@ async fn send_validation_receipt() {
 
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
-        vault.clone(),
         dht_store.clone(),
         dna,
         keystore,
@@ -262,22 +235,18 @@ async fn send_validation_receipt() {
 async fn errors_for_some_ops_does_not_prevent_the_workflow_proceeding() {
     holochain_trace::test_run();
 
-    let test_db = holochain_state::test_utils::test_dht_db();
-    let vault = test_db.to_db();
     let keystore = holochain_keystore::test_keystore();
 
     let dna_hash = fixt!(DnaHash);
     let dht_store = test_dht_store(dna_hash.clone()).await;
 
-    let (author1, op_hash1) =
-        create_op_with_status(vault.clone(), &dht_store, None, ValidationStatus::Valid)
-            .await
-            .unwrap();
+    let (author1, op_hash1) = create_op_with_status(&dht_store, None, ValidationStatus::Valid)
+        .await
+        .unwrap();
 
-    let (author2, op_hash2) =
-        create_op_with_status(vault.clone(), &dht_store, None, ValidationStatus::Valid)
-            .await
-            .unwrap();
+    let (author2, op_hash2) = create_op_with_status(&dht_store, None, ValidationStatus::Valid)
+        .await
+        .unwrap();
 
     let mut dna = MockHolochainP2pDnaT::new();
     dna.expect_was_agent_recently_online()
@@ -302,7 +271,6 @@ async fn errors_for_some_ops_does_not_prevent_the_workflow_proceeding() {
 
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
-        vault.clone(),
         dht_store.clone(),
         dna,
         keystore,
@@ -335,23 +303,19 @@ async fn errors_for_some_ops_does_not_prevent_the_workflow_proceeding() {
 async fn skips_authors_not_recently_online_and_clears_require_receipt() {
     holochain_trace::test_run();
 
-    let test_db = holochain_state::test_utils::test_dht_db();
-    let vault = test_db.to_db();
     let keystore = holochain_keystore::test_keystore();
 
     let dna_hash = fixt!(DnaHash);
     let dht_store = test_dht_store(dna_hash.clone()).await;
 
     // Create ops from two different authors
-    let (author1, op_hash1) =
-        create_op_with_status(vault.clone(), &dht_store, None, ValidationStatus::Valid)
-            .await
-            .unwrap();
+    let (author1, op_hash1) = create_op_with_status(&dht_store, None, ValidationStatus::Valid)
+        .await
+        .unwrap();
 
-    let (author2, op_hash2) =
-        create_op_with_status(vault.clone(), &dht_store, None, ValidationStatus::Valid)
-            .await
-            .unwrap();
+    let (author2, op_hash2) = create_op_with_status(&dht_store, None, ValidationStatus::Valid)
+        .await
+        .unwrap();
 
     let author1_clone = author1.clone();
     let mut dna = MockHolochainP2pDnaT::new();
@@ -382,7 +346,6 @@ async fn skips_authors_not_recently_online_and_clears_require_receipt() {
 
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
-        vault.clone(),
         dht_store.clone(),
         dna,
         keystore,
@@ -410,7 +373,6 @@ async fn skips_authors_not_recently_online_and_clears_require_receipt() {
 }
 
 async fn create_op_with_status(
-    vault: DbWrite<DbKindDht>,
     dht_store: &DhtStore,
     author: Option<AgentPubKey>,
     validation_status: ValidationStatus,
@@ -428,26 +390,9 @@ async fn create_op_with_status(
 
     let test_op_hash = op.as_hash().clone();
 
-    // Legacy DB: write the op in integrated + require_receipt state.
-    vault
-        .write_async({
-            let test_op_hash = test_op_hash.clone();
-            let op = op.clone();
-            move |txn| -> StateMutationResult<()> {
-                holochain_state::mutations::insert_op_dht(txn, &op, 0, None)?;
-                set_require_receipt(txn, &test_op_hash, true)?;
-                set_when_integrated(txn, &test_op_hash, Timestamp::now())?;
-                set_validation_status(txn, &test_op_hash, validation_status)?;
-
-                Ok(())
-            }
-        })
-        .await
-        .unwrap();
-
-    // New-DB: write the same op through the full validation + integration
-    // pipeline so that DhtStore::pending_validation_receipts sees it.
-    // The hash is derived from the same op content, so test_op_hash matches.
+    // Write the op through the full validation + integration pipeline so that
+    // DhtStore::pending_validation_receipts sees it in integrated +
+    // require_receipt state.
     dht_store
         .record_incoming_ops(vec![(op, true)])
         .await

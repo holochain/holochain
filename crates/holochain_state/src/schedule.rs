@@ -1,8 +1,5 @@
 use crate::prelude::*;
-use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::SerializedBytesError;
-use holochain_sqlite::rusqlite::OptionalExtension;
-use holochain_sqlite::rusqlite::{named_params, Transaction};
 use std::str::FromStr;
 
 /// Serialize an `Option<Schedule>` into the blob stored in the `maybe_schedule`
@@ -48,86 +45,4 @@ pub fn compute_schedule_params(
         ))),
         None => Ok(Some((now, Timestamp::max(), true))),
     }
-}
-
-// #5370: dead once DbKindAuthored is retired.
-pub fn fn_is_scheduled(
-    txn: &Transaction,
-    scheduled_fn: ScheduledFn,
-    author: &AgentPubKey,
-) -> StateMutationResult<bool> {
-    Ok(txn
-        .query_row(
-            "
-            SELECT zome_name, scheduled_fn
-            FROM ScheduledFunctions
-            WHERE
-            zome_name=:zome_name
-            AND scheduled_fn=:scheduled_fn
-            AND author = :author
-            LIMIT 1
-            ",
-            named_params! {
-                ":zome_name": scheduled_fn.zome_name().to_string(),
-                ":scheduled_fn": scheduled_fn.fn_name().to_string(),
-                ":author": author,
-            },
-            |row| row.get::<_, String>(0),
-        )
-        .optional()?
-        .is_some())
-}
-
-/// Get a list of "live" scheduled functions.
-///
-/// A scheduled function is "live" if it is in the database with `now` between its start and end times.
-///
-/// Returns the list of scheduled functions with their next schedule and a bool indicating
-/// if the schedule is ephemeral or not.
-// #5370: dead once DbKindAuthored is retired.
-pub fn live_scheduled_fns(
-    txn: &Transaction,
-    now: Timestamp,
-    author: &AgentPubKey,
-) -> StateMutationResult<Vec<(ScheduledFn, Option<Schedule>, bool)>> {
-    let mut stmt = txn.prepare(
-        "
-        SELECT
-        zome_name,
-        scheduled_fn,
-        maybe_schedule,
-        ephemeral
-        FROM ScheduledFunctions
-        WHERE
-        start <= :now
-        AND :now <= end
-        AND author = :author
-        ORDER BY start ASC",
-    )?;
-    let rows = stmt.query_map(
-        named_params! {
-            ":now": now,
-            ":author": author,
-        },
-        |row| {
-            Ok((
-                ScheduledFn::new(
-                    ZomeName(row.get::<_, String>(0)?.into()),
-                    FunctionName(row.get(1)?),
-                ),
-                row.get(2)?,
-                row.get(3)?,
-            ))
-        },
-    )?;
-    let mut ret = vec![];
-    for row in rows {
-        let (scheduled_fn, maybe_schedule_serialized, ephemeral) = row?;
-        ret.push((
-            scheduled_fn,
-            from_blob(maybe_schedule_serialized)?,
-            ephemeral,
-        ));
-    }
-    Ok(ret)
 }

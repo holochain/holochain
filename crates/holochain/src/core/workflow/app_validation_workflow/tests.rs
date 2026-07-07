@@ -2,11 +2,11 @@ use crate::conductor::{Conductor, ConductorHandle};
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::app_validation_workflow::{
-    app_validation_workflow_inner, check_app_entry_def, put_validation_limbo,
-    AppValidationWorkspace, OutcomeSummary,
+    app_validation_workflow_inner, check_app_entry_def, AppValidationWorkspace, OutcomeSummary,
 };
 use crate::core::{SysValidationError, ValidationOutcome};
 use crate::sweettest::*;
+use crate::test_utils::conditional_consistency::*;
 use crate::test_utils::{
     get_valid_and_integrated_count, get_valid_and_not_integrated_count, host_fn_caller::*,
     new_invocation, new_zome_call_params, wait_for_integration,
@@ -21,9 +21,7 @@ use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_p2p::actor::MockHcP2p;
 use holochain_p2p::HolochainP2pDna;
 use holochain_state::dht_store::{DhtStore, SysOutcome};
-use holochain_state::mutations::insert_op_dht;
 use holochain_state::test_utils::test_db_dir;
-use holochain_state::validation_db::ValidationStage;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::prelude::*;
@@ -36,10 +34,6 @@ use std::convert::{TryFrom, TryInto};
 use std::hash::Hash;
 use std::sync::Arc;
 use std::time::Duration;
-use {
-    crate::test_utils::conditional_consistency::*,
-    holochain_state::query::{CascadeTxnWrapper, Store},
-};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn main_workflow() {
@@ -71,19 +65,13 @@ async fn main_workflow() {
     let dna_hash = dna_file.dna_hash().clone();
 
     let mut conductor = SweetConductor::standard().await;
-    let app = conductor
+    conductor
         .setup_app("", std::slice::from_ref(&dna_file))
         .await
         .unwrap();
-    let cell_id = app.cells()[0].cell_id().clone();
 
     let app_validation_workspace = Arc::new(AppValidationWorkspace::new(
-        conductor
-            .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
-            .unwrap(),
-        conductor.get_dht_db(&dna_hash).unwrap(),
         conductor.get_dht_store(&dna_hash).unwrap(),
-        conductor.get_cache_db(&cell_id).await.unwrap(),
         conductor.keystore(),
     ));
 
@@ -305,19 +293,13 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
     let dna_hash = dna_file.dna_hash().clone();
 
     let mut conductor = SweetConductor::standard().await;
-    let app = conductor
+    conductor
         .setup_app("", std::slice::from_ref(&dna_file))
         .await
         .unwrap();
-    let cell_id = app.cells()[0].cell_id().clone();
 
     let app_validation_workspace = Arc::new(AppValidationWorkspace::new(
-        conductor
-            .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
-            .unwrap(),
-        conductor.get_dht_db(&dna_hash).unwrap(),
         conductor.get_dht_store(&dna_hash).unwrap(),
-        conductor.get_cache_db(&cell_id).await.unwrap(),
         conductor.keystore(),
     ));
 
@@ -332,20 +314,9 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
         .len();
     assert_eq!(ops_to_validate, 0);
 
-    // Record both ops into the DhtStore as sys-validated. The create is
-    // also kept in the legacy DB because app validation of the delete resolves
-    // it as a dependency via the cascade, which reads the legacy DB.
+    // Record both ops into the DhtStore as sys-validated.
     let dht_create_op_hashed_for_store = dht_create_op_hashed.clone();
     let dht_create_op_hash_for_store = dht_create_op_hashed.as_hash().clone();
-    app_validation_workspace.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_create_op_hashed, 0, None).unwrap();
-        put_validation_limbo(
-            txn,
-            &dht_create_op_hashed.hash,
-            ValidationStage::SysValidated,
-        )
-        .unwrap();
-    });
     app_validation_workspace
         .dht_store
         .record_incoming_ops(vec![
@@ -450,19 +421,13 @@ async fn validate_ops_in_sequence_must_get_action() {
     let dna_hash = dna_file.dna_hash().clone();
 
     let mut conductor = SweetConductor::standard().await;
-    let app = conductor
+    conductor
         .setup_app("", std::slice::from_ref(&dna_file))
         .await
         .unwrap();
-    let cell_id = app.cells()[0].cell_id().clone();
 
     let app_validation_workspace = Arc::new(AppValidationWorkspace::new(
-        conductor
-            .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
-            .unwrap(),
-        conductor.get_dht_db(&dna_hash).unwrap(),
         conductor.get_dht_store(&dna_hash).unwrap(),
-        conductor.get_cache_db(&cell_id).await.unwrap(),
         conductor.keystore(),
     ));
 
@@ -497,20 +462,9 @@ async fn validate_ops_in_sequence_must_get_action() {
     let dht_delete_op_hash = DhtOpHash::with_data_sync(&dht_delete_op);
     let dht_delete_op_hashed = DhtOpHashed::from_content_sync(dht_delete_op);
 
-    // Record both ops into the DhtStore as sys-validated. The create is
-    // also kept in the legacy DB because app validation of the delete resolves
-    // it as a dependency via the cascade, which reads the legacy DB.
+    // Record both ops into the DhtStore as sys-validated.
     let dht_create_op_hashed_for_store = dht_create_op_hashed.clone();
     let dht_create_op_hash_for_store = dht_create_op_hashed.as_hash().clone();
-    app_validation_workspace.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_create_op_hashed, 0, None).unwrap();
-        put_validation_limbo(
-            txn,
-            &dht_create_op_hashed.hash,
-            ValidationStage::SysValidated,
-        )
-        .unwrap();
-    });
     app_validation_workspace
         .dht_store
         .record_incoming_ops(vec![
@@ -647,19 +601,13 @@ async fn handle_error_in_op_validation() {
     let dna_hash = dna_file.dna_hash().clone();
 
     let mut conductor = SweetConductor::standard().await;
-    let app = conductor
+    conductor
         .setup_app("", std::slice::from_ref(&dna_file))
         .await
         .unwrap();
-    let cell_id = app.cells()[0].cell_id().clone();
 
     let app_validation_workspace = Arc::new(AppValidationWorkspace::new(
-        conductor
-            .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
-            .unwrap(),
-        conductor.get_dht_db(&dna_hash).unwrap(),
         conductor.get_dht_store(&dna_hash).unwrap(),
-        conductor.get_cache_db(&cell_id).await.unwrap(),
         conductor.keystore(),
     ));
 
@@ -1051,19 +999,13 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
     let dna_hash = dna_file.dna_hash().clone();
 
     let mut conductor = SweetConductor::standard().await;
-    let app = conductor
+    conductor
         .setup_app("", std::slice::from_ref(&dna_file))
         .await
         .unwrap();
-    let cell_id = app.cells()[0].cell_id().clone();
 
     let app_validation_workspace = Arc::new(AppValidationWorkspace::new(
-        conductor
-            .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
-            .unwrap(),
-        conductor.get_dht_db(&dna_hash).unwrap(),
         conductor.get_dht_store(&dna_hash).unwrap(),
-        conductor.get_cache_db(&cell_id).await.unwrap(),
         conductor.keystore(),
     ));
 
@@ -1092,14 +1034,9 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
     let dht_create_op_hash = DhtOpHash::with_data_sync(&dht_create_op);
     let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
 
-    // Insert op to validate in DHT DB and mark ready for app validation
+    // Record the op into the DhtStore and mark it ready for app validation.
     let dht_create_op_hashed_for_store = dht_create_op_hashed.clone();
     let dht_create_op_hash_for_store = dht_create_op_hash.clone();
-    app_validation_workspace.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_create_op_hashed, 0, None).unwrap();
-        put_validation_limbo(txn, &dht_create_op_hash, ValidationStage::SysValidated).unwrap();
-    });
-    // Mirror into the DhtStore so the workflow can read from it.
     app_validation_workspace
         .dht_store
         .record_incoming_ops(vec![(dht_create_op_hashed_for_store, false)])
@@ -1297,14 +1234,16 @@ async fn app_validation_produces_warrants() {
     conductors[2].startup().await;
 
     //- Ensure that bob authored a warrant
-    let alice_pubkey = alice.agent_pubkey().clone();
-    conductors[1].spaces.get_all_authored_dbs(dna_hash).unwrap()[0].test_read(move |txn| {
-        let store = CascadeTxnWrapper::from(txn);
-
-        let warrants = store.get_warrants_for_agent(&alice_pubkey, false).unwrap();
-        // 3 warrants, one for each op
-        assert_eq!(warrants.len(), 1);
-    });
+    let warrants = conductors[1]
+        .spaces
+        .dht_store(dna_hash)
+        .unwrap()
+        .as_read()
+        .warrants_by_author(bob.agent_pubkey().clone())
+        .await
+        .unwrap();
+    // 3 warrants, one for each op
+    assert_eq!(warrants.len(), 1);
 
     // TODO: ensure that bob blocked alice
 
@@ -1437,15 +1376,14 @@ async fn skip_issuing_warrant_if_one_found() {
 
     tokio::time::timeout(Duration::from_secs(5), async {
         loop {
-            let alice_pubkey = alice.agent_pubkey().clone();
             let warrants = conductors[1]
                 .get_spaces()
-                .get_all_authored_dbs(dna_file.dna_hash())
-                .unwrap()[0]
-                .test_read(move |txn| {
-                    let store = CascadeTxnWrapper::from(txn);
-                    store.get_warrants_for_agent(&alice_pubkey, false).unwrap()
-                });
+                .dht_store(dna_file.dna_hash())
+                .unwrap()
+                .as_read()
+                .warrants_by_author(_bob.agent_pubkey().clone())
+                .await
+                .unwrap();
 
             if !warrants.is_empty() {
                 break;
