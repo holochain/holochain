@@ -6,8 +6,8 @@ use holochain_keystore::{AgentPubKeyExt, MetaLairClient};
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::prelude::*;
 use holochain_timestamp::Timestamp;
-use holochain_types::dht_op::ChainOp;
-use holochain_zome_types::dht_v2::{build_action_set, to_legacy_signed_action};
+use holochain_types::dht_v2::ChainOp;
+use holochain_zome_types::dht_v2::build_action_set;
 use holochain_zome_types::prelude::SignedAction;
 
 pub(crate) async fn inner_countersigning_session_complete(
@@ -148,20 +148,10 @@ pub(crate) async fn inner_countersigning_session_complete(
 
     // Publish other signers agent activity ops to their agent activity authorities.
     for sa in signed_actions {
-        let (action, signature) = sa.into();
-        if *action.author() == author {
+        if *sa.data().author() == author {
             continue;
         }
-        // `ChainOp` is a legacy-island type (see `holochain_types::dht_op`), so
-        // the action carried here has to be the legacy per-variant shape even
-        // though the signature was verified over the v2 action above.
-        let legacy_action = to_legacy_signed_action(&SignedActionHashed::new_unchecked(
-            action,
-            signature.clone(),
-        ))
-        .action()
-        .clone();
-        let op = ChainOp::RegisterAgentActivity(signature, legacy_action);
+        let op = ChainOp::AgentActivity(sa);
         let basis = op.dht_basis();
         if let Err(e) = network.publish_countersign(basis, op).await {
             tracing::error!(

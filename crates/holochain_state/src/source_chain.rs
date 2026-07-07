@@ -4,17 +4,14 @@ use crate::scratch::ScratchError;
 use crate::scratch::SyncScratchError;
 use async_recursion::async_recursion;
 pub use error::*;
-// The op pipeline (`ChainOp`/`produce_op_lites_from_iter`/
-// `ChainOpUniqueForm::op_hash` in `holochain_types::dht_op`) is a separate,
-// still-legacy island: it consumes the legacy per-variant `Action`, and the
-// legacy SQL query machinery in `query.rs` overlays the (legacy) scratch onto
-// its results. These explicit imports shadow the v2 re-exports pulled in via
-// `crate::prelude::*` so the rest of this module keeps resolving
-// `Action`/`Record`/`SignedActionHashed` to their legacy shape. Authoring
-// itself is v2-native: it builds v2 actions directly (via `v2::build_action`
-// and friends) and stages them in the (v2) scratch, converting to legacy with
-// `to_legacy_signed_action` only immediately before feeding the op pipeline
-// (op hashes are content-derived v2, so this conversion is hash-preserving).
+// The query-read overlay machinery in `query.rs` still consumes the legacy
+// per-variant `Action`. These explicit imports shadow the v2 re-exports
+// pulled in via `crate::prelude::*` so the rest of this module keeps
+// resolving `Action`/`Record`/`SignedActionHashed` to their legacy shape.
+// Authoring and op production are v2-native throughout: actions are built
+// directly (via `v2::build_action` and friends), staged in the (v2) scratch,
+// and turned into ops via `v2::produce_ops_from_record` — no legacy
+// conversion is on this path.
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
@@ -26,12 +23,11 @@ use holochain_data::kind::Dht;
 use holochain_data::{DbRead, DbWrite};
 use holochain_keystore::MetaLairClient;
 use holochain_state_types::SourceChainDump;
-use holochain_types::prelude::LegacySignedAction;
+use holochain_types::dht_v2 as v2;
 use holochain_types::prelude::SignedActionHashedExt;
 use holochain_zome_types::dependencies::holochain_integrity_types::action::Action;
 use holochain_zome_types::dependencies::holochain_integrity_types::record::Record;
 use holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed;
-use holochain_zome_types::dht_v2::{self as v2, to_legacy_signed_action};
 use kitsune2_api::DhtArc;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
@@ -276,8 +272,16 @@ impl SourceChain<DbWrite<Dht>> {
             self.scratch.apply_and_then(|scratch| {
                 let records: Vec<v2::Record> = scratch.records().collect();
 
-                let (actions, ops) =
-                    build_ops_from_actions(scratch.drain_actions().collect::<Vec<_>>())?;
+                // The ops a freshly-authored batch of records produces.
+                // `produce_ops_from_record` is infallible over a well-formed
+                // v2 record — unlike the legacy op pipeline, there is no
+                // per-variant reconstruction that can fail.
+                let ops: Vec<v2::HashedChainOp> = records
+                    .iter()
+                    .flat_map(v2::produce_ops_from_record)
+                    .collect();
+
+                let actions = scratch.drain_actions().collect::<Vec<_>>();
 
                 // Drain out any entries.
                 let entries = scratch.drain_entries().collect::<Vec<_>>();
@@ -300,6 +304,11 @@ impl SourceChain<DbWrite<Dht>> {
 
         // If the lock isn't empty this is a countersigning session.
         let is_countersigning_session = !lock_subject.is_empty();
+
+        let ops_to_integrate = ops
+            .iter()
+            .map(|op| (op.op_hash.clone(), op.basis_hash.clone()))
+            .collect::<Vec<_>>();
 
         let author = self.author.clone();
         let persisted_head = self.head_info.as_ref().map(|h| h.action.clone());
@@ -453,30 +462,26 @@ impl SourceChain<DbWrite<Dht>> {
                 }
             }
 
-            for (op, op_hash, _op_order, timestamp, _dep) in &ops {
-                let op_as_chain = match op.as_chain_op() {
-                    Some(c) => c,
-                    None => continue, // warrant ops: skip for this slice
-                };
+            for op in &ops {
                 // Skip ops whose action hash was not recorded as successfully inserted.
-                if !inserted_action_hashes.contains(op_as_chain.action_hash()) {
+                if !inserted_action_hashes.contains(op.action_hash()) {
                     continue;
                 }
-                let basis_hash = op_as_chain.dht_basis().clone();
-                let storage_center_loc = basis_hash.get_loc();
+                let storage_center_loc = op.storage_center_loc;
+                let timestamp = op.action.action().timestamp();
 
-                let serialized_size = encoded_chain_op_size(op_as_chain, &actions, &entries);
+                let serialized_size = encoded_chain_op_size(op, &entries);
                 tx.insert_chain_op(holochain_data::dht::InsertChainOp {
-                    op_hash,
-                    action_hash: op_as_chain.action_hash(),
-                    op_type: i64::from(op_as_chain.get_type()),
-                    basis_hash: &basis_hash,
+                    op_hash: &op.op_hash,
+                    action_hash: op.action_hash(),
+                    op_type: i64::from(op.op_type),
+                    basis_hash: &op.basis_hash,
                     storage_center_loc,
                     validation_status: holochain_zome_types::dht_v2::RecordValidity::Accepted,
                     locally_validated: true,
                     require_receipt: false,
-                    when_received: *timestamp,
-                    when_integrated: *timestamp,
+                    when_received: timestamp,
+                    when_integrated: timestamp,
                     serialized_size,
                 })
                 .await
@@ -491,7 +496,7 @@ impl SourceChain<DbWrite<Dht>> {
                 } else {
                     None
                 };
-                tx.insert_chain_op_publish(op_hash, None, None, withhold)
+                tx.insert_chain_op_publish(&op.op_hash, None, None, withhold)
                     .await
                     .map_err(SourceChainError::other)?;
             }
@@ -588,6 +593,40 @@ impl SourceChain<DbWrite<Dht>> {
 
                 let total_warrants = warrant_ops.len() as u32;
                 if !warrant_ops.is_empty() {
+                // Write warrants to the DHT database and collect the
+                // successfully-inserted ops to insert into the DhtStore.
+                let (total_inserted_warrants, warrant_ops_for_new_db) = match self
+                    .dht_db
+                    // #5370: the `_txn` input and `insert_op_dht` are dead
+                    // pending DbKindDht retirement. Warrants are inserted into
+                    // the DhtStore below.
+                    .write_async(|_txn| -> DatabaseResult<(u32, Vec<v2::DhtOpHashed>)> {
+                        let mut inserted_warrants = 0u32;
+                        let mut inserted_ops: Vec<v2::DhtOpHashed> = Vec::new();
+                        for warrant in warrants_to_insert {
+                            let warrant_op = v2::DhtOpHashed::from_content_sync(
+                                v2::DhtOp::WarrantOp(Box::new(v2::WarrantOp(warrant))),
+                            );
+                            inserted_warrants += 1;
+                            inserted_ops.push(warrant_op);
+                        }
+                        Ok((inserted_warrants, inserted_ops))
+                    })
+                    .await
+                {
+                    Ok(pair) => pair,
+                    Err(err) => {
+                        tracing::warn!(
+                            ?err,
+                            "Error inserting warrants from scratch space into DHT database"
+                        );
+                        (0, Vec::new())
+                    }
+                };
+
+                // Mirror warrants into the new DhtStore so `ops_pending_sys_validation`
+                // picks them up via `LimboWarrant`.
+                if !warrant_ops_for_new_db.is_empty() {
                     // Warrants do not require validation receipts, set all to false.
                     let warrant_ops_with_validation_receipt_required_flag =
                         warrant_ops.into_iter().map(|op| (op, false)).collect();
@@ -926,7 +965,7 @@ where
 
     /// If there is a countersigning session get the
     /// StoreEntry op to send to the entry authorities.
-    pub fn countersigning_op(&self) -> SourceChainResult<Option<ChainOp>> {
+    pub fn countersigning_op(&self) -> SourceChainResult<Option<v2::ChainOp>> {
         let r = self.scratch.apply(|scratch| {
             scratch
                 .entries()
@@ -940,18 +979,15 @@ where
                                 .map(|eh| eh == entry_hash)
                                 .unwrap_or(false)
                         })
-                        .and_then(|shh| {
-                            // OP-PIPELINE SHIM (Island 1): `ChainOp` is a
-                            // still-legacy island type; convert this v2
-                            // action to legacy immediately before building
-                            // one. Op hashes are content-derived v2
-                            // regardless, so this is hash-preserving.
-                            let legacy_shh = to_legacy_signed_action(shh);
-                            Some(ChainOp::StoreEntry(
-                                legacy_shh.signature().clone(),
-                                legacy_shh.action().clone().try_into().ok()?,
-                                (**entry).clone(),
-                            ))
+                        .map(|shh| {
+                            let signed_action = v2::SignedAction::new(
+                                shh.action().clone(),
+                                shh.signature().clone(),
+                            );
+                            v2::ChainOp::CreateEntry(
+                                signed_action,
+                                v2::OpEntry::Present((**entry).clone()),
+                            )
                         })
                 })
         })?;
@@ -972,55 +1008,6 @@ pub fn chain_lock_subject_for_entry(entry: Option<&Entry>) -> SourceChainResult<
         ),
         _ => Vec::with_capacity(0),
     })
-}
-
-/// Produce the ops for a batch of freshly-authored v2 actions.
-///
-/// OP-PIPELINE SHIM (Island 1 — the hard coupling): `produce_op_lites_from_iter`/
-/// `ChainOpUniqueForm::op_hash` (`holochain_types::dht_op`) are a separate,
-/// still-legacy island that consumes the legacy per-variant `Action`. Each
-/// action is converted to legacy immediately before feeding the op pipeline;
-/// op hashes are content-derived v2 regardless, so this is hash-preserving.
-/// The v2 actions passed in are returned unchanged — only a throwaway legacy
-/// copy is used to compute the ops. Delete this conversion when the op
-/// pipeline migrates to v2.
-#[allow(clippy::complexity)]
-fn build_ops_from_actions(
-    actions: Vec<v2::SignedActionHashed>,
-) -> SourceChainResult<(
-    Vec<v2::SignedActionHashed>,
-    Vec<(DhtOpLite, DhtOpHash, OpOrder, Timestamp, Vec<ActionHash>)>,
-)> {
-    // The op related data ends up here.
-    let mut ops = Vec::with_capacity(actions.len());
-
-    // Loop through each action and produce op related data.
-    for shh in &actions {
-        let legacy_shh = to_legacy_signed_action(shh);
-
-        // &ActionHash, &Action, EntryHash are needed to produce the ops.
-        let entry_hash = legacy_shh.action().entry_hash().cloned();
-        let item = (legacy_shh.as_hash(), legacy_shh.action(), entry_hash);
-        let ops_inner = produce_op_lites_from_iter(vec![item].into_iter())?;
-
-        // We need to take the action by value and put it back each loop.
-        let mut h = Some(legacy_shh.action().clone());
-        for op in ops_inner {
-            let op_type = op.get_type();
-            let op = DhtOpLite::from(op);
-            // Action is required by value to produce the DhtOpHash.
-            let (action, op_hash) =
-                ChainOpUniqueForm::op_hash(op_type, h.expect("This can't be empty"))?;
-            let op_order = OpOrder::new(op_type, action.timestamp());
-            let timestamp = action.timestamp();
-            // Put the action back by value.
-            let deps = op_type.sys_validation_dependencies(&action);
-            h = Some(action);
-            // Collect the DhtOpLite, DhtOpHash and OpOrder.
-            ops.push((op, op_hash, op_order, timestamp, deps));
-        }
-    }
-    Ok((actions, ops))
 }
 
 /// Rebase a batch of v2 actions onto a new chain head, re-signing each one.
@@ -1067,13 +1054,8 @@ pub async fn genesis(
     let dna_action_hashed = HoloHashed::<v2::Action>::from_content_sync(dna_action);
     let dna_action = v2::SignedActionHashed::sign(&keystore, dna_action_hashed).await?;
     let dna_action_address = dna_action.as_hash().clone();
-    // OP-PIPELINE SHIM (Island 1): `produce_op_lites_from_records` needs a
-    // legacy `Record`; op hashes are content-derived v2 regardless, so this
-    // conversion is hash-preserving.
-    let dna_ops = produce_op_lites_from_records(vec![&Record::new(
-        to_legacy_signed_action(&dna_action),
-        None,
-    )])?;
+    let dna_ops =
+        v2::produce_ops_from_record(&v2::Record::new(dna_action.clone(), RecordEntry::NA));
 
     // create the agent validation entry and add it directly to the store
     let agent_validation_header = v2::ActionHeader {
@@ -1091,10 +1073,10 @@ pub async fn genesis(
     let agent_validation_action =
         v2::SignedActionHashed::sign(&keystore, agent_validation_action_hashed).await?;
     let avh_addr = agent_validation_action.as_hash().clone();
-    let avh_ops = produce_op_lites_from_records(vec![&Record::new(
-        to_legacy_signed_action(&agent_validation_action),
-        None,
-    )])?;
+    let avh_ops = v2::produce_ops_from_record(&v2::Record::new(
+        agent_validation_action.clone(),
+        RecordEntry::NA,
+    ));
 
     // create a agent chain record and add it directly to the store
     let agent_header = v2::ActionHeader {
@@ -1113,10 +1095,13 @@ pub async fn genesis(
     let agent_action_hashed = HoloHashed::<v2::Action>::from_content_sync(agent_action);
     let agent_action = v2::SignedActionHashed::sign(&keystore, agent_action_hashed).await?;
     let agent_entry = Some(Entry::Agent(agent_pubkey.clone()));
-    let agent_ops = produce_op_lites_from_records(vec![&Record::new(
-        to_legacy_signed_action(&agent_action),
-        agent_entry.clone(),
-    )])?;
+    let agent_ops = v2::produce_ops_from_record(&v2::Record::new(
+        agent_action.clone(),
+        RecordEntry::new(
+            agent_action.action().entry_visibility(),
+            agent_entry.clone(),
+        ),
+    ));
 
     // Pre-compute (op, op_hash, timestamp) tuples for the DhtStore write block.
     // Each op's hash is derived via ChainOpUniqueForm::op_hash upfront so we can
@@ -1150,6 +1135,13 @@ pub async fn genesis(
             }
         }
     }
+    // The ops for all three genesis records, with hashes and basis already
+    // computed by `produce_ops_from_record`.
+    let ops_with_hashes_for_new_db: Vec<v2::HashedChainOp> = dna_ops
+        .into_iter()
+        .chain(avh_ops)
+        .chain(agent_ops)
+        .collect();
 
     // Clone the actions and agent entry for the DhtStore write block below.
     let dna_action_for_new_db = dna_action.clone();
@@ -1191,43 +1183,37 @@ pub async fn genesis(
         }
 
         // Insert chain ops for all three genesis actions.
-        for (op, op_hash, timestamp) in &ops_with_hashes_for_new_db {
-            let basis_hash = op.dht_basis().clone();
-            let storage_center_loc = basis_hash.get_loc();
+        let genesis_entries_slice: Vec<holochain_types::EntryHashed> = agent_entry_for_new_db
+            .as_ref()
+            .map(|e| {
+                vec![holochain_types::EntryHashed::with_pre_hashed(
+                    e.clone(),
+                    agent_entry_hash.clone(),
+                )]
+            })
+            .unwrap_or_default();
+        for op in &ops_with_hashes_for_new_db {
+            let storage_center_loc = op.storage_center_loc;
+            let timestamp = op.action.action().timestamp();
 
-            let genesis_actions_slice: Vec<v2::SignedActionHashed> = vec![
-                dna_action_for_new_db.clone(),
-                agent_validation_action_for_new_db.clone(),
-                agent_action_for_new_db.clone(),
-            ];
-            let genesis_entries_slice: Vec<holochain_types::EntryHashed> = agent_entry_for_new_db
-                .as_ref()
-                .map(|e| {
-                    vec![holochain_types::EntryHashed::with_pre_hashed(
-                        e.clone(),
-                        agent_entry_hash.clone(),
-                    )]
-                })
-                .unwrap_or_default();
-            let serialized_size =
-                encoded_chain_op_size(op, &genesis_actions_slice, &genesis_entries_slice);
+            let serialized_size = encoded_chain_op_size(op, &genesis_entries_slice);
             tx.insert_chain_op(holochain_data::dht::InsertChainOp {
-                op_hash,
+                op_hash: &op.op_hash,
                 action_hash: op.action_hash(),
-                op_type: i64::from(op.get_type()),
-                basis_hash: &basis_hash,
+                op_type: i64::from(op.op_type),
+                basis_hash: &op.basis_hash,
                 storage_center_loc,
                 validation_status: holochain_zome_types::dht_v2::RecordValidity::Accepted,
                 locally_validated: true,
                 require_receipt: false,
-                when_received: *timestamp,
-                when_integrated: *timestamp,
+                when_received: timestamp,
+                when_integrated: timestamp,
                 serialized_size,
             })
             .await
             .map_err(SourceChainError::other)?;
 
-            tx.insert_chain_op_publish(op_hash, None, None, None)
+            tx.insert_chain_op_publish(&op.op_hash, None, None, None)
                 .await
                 .map_err(SourceChainError::other)?;
         }
@@ -1320,40 +1306,50 @@ fn serialize_maybe_schedule_none(
     holochain_serialized_bytes::encode(&None::<holochain_zome_types::schedule::Schedule>)
 }
 
-/// Encode the wire-form `DhtOp` for a `ChainOpLite` and return its serialized
-/// length in bytes. The action is looked up by hash in `actions`; the entry
-/// (if any) is looked up by `Action::entry_hash` in `entries`. Returns `0`
-/// only if the op cannot be reconstructed because the action is missing —
-/// which would indicate a programming error in the caller.
+/// Encode the wire-form `DhtOp` for a [`v2::HashedChainOp`] and return its
+/// serialized length in bytes. The action is already carried on `op`; the
+/// entry (if any) is looked up by `Action::entry_hash` in `entries`. Always
+/// succeeds: `op`'s `op_type` was derived from its own action by
+/// `produce_ops_from_record`, so the two always agree.
 pub(crate) fn encoded_chain_op_size(
-    op: &holochain_types::dht_op::ChainOpLite,
-    actions: &[v2::SignedActionHashed],
+    op: &v2::HashedChainOp,
     entries: &[holochain_types::EntryHashed],
 ) -> u32 {
-    use holochain_types::dht_op::{ChainOp, DhtOp};
+    use holochain_zome_types::op::ChainOpType;
+    use v2::{ChainOp, DhtOp, OpEntry};
 
-    let action_hash = op.action_hash();
-    let Some(sah) = actions.iter().find(|sah| sah.as_hash() == action_hash) else {
-        return 0;
-    };
-    // OP-PIPELINE SHIM (Island 1): `ChainOp`/`LegacySignedAction` are a
-    // still-legacy island type; convert this v2 action to legacy immediately
-    // before building one.
-    let legacy_sah = to_legacy_signed_action(sah);
-    let signed_action: LegacySignedAction =
-        (legacy_sah.action().clone(), legacy_sah.signature().clone()).into();
-    let maybe_entry: Option<Entry> = signed_action
-        .data()
+    let action = op.action.action();
+    let maybe_entry: Option<Entry> = action
         .entry_hash()
         .and_then(|eh| entries.iter().find(|e| e.as_hash() == eh))
         .map(|e| e.as_content().clone());
+    let signed_action = v2::SignedAction::new(action.clone(), op.action.signature().clone());
+    let op_entry = |entry: Option<Entry>| match entry {
+        Some(entry) => OpEntry::Present(entry),
+        // No privacy signal is available here (only whether the entry was
+        // found in `entries`); `ActionOnly` is the conservative choice — see
+        // `chain_op_from_joined_row`'s NotStored/NA → ActionOnly mapping.
+        None => OpEntry::ActionOnly,
+    };
 
-    match ChainOp::from_type(op.get_type(), signed_action, maybe_entry) {
-        Ok(chain_op) => holochain_serialized_bytes::encode(&DhtOp::from(chain_op))
-            .map(|b| b.len() as u32)
-            .unwrap_or(0),
-        Err(_) => 0,
-    }
+    let chain_op = match op.op_type {
+        ChainOpType::StoreRecord => ChainOp::CreateRecord(signed_action, op_entry(maybe_entry)),
+        ChainOpType::StoreEntry => ChainOp::CreateEntry(signed_action, op_entry(maybe_entry)),
+        ChainOpType::RegisterAgentActivity => ChainOp::AgentActivity(signed_action),
+        ChainOpType::RegisterUpdatedContent => {
+            ChainOp::UpdateEntry(signed_action, op_entry(maybe_entry))
+        }
+        ChainOpType::RegisterUpdatedRecord => {
+            ChainOp::UpdateRecord(signed_action, op_entry(maybe_entry))
+        }
+        ChainOpType::RegisterDeletedEntryAction => ChainOp::DeleteEntry(signed_action),
+        ChainOpType::RegisterDeletedBy => ChainOp::DeleteRecord(signed_action),
+        ChainOpType::RegisterAddLink => ChainOp::CreateLink(signed_action),
+        ChainOpType::RegisterRemoveLink => ChainOp::DeleteLink(signed_action),
+    };
+    holochain_serialized_bytes::encode(&DhtOp::ChainOp(Box::new(chain_op)))
+        .map(|b| b.len() as u32)
+        .unwrap_or(0)
 }
 
 #[cfg(test)]

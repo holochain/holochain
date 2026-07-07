@@ -9,15 +9,22 @@ pub use holo_hash::*;
 use holochain_keystore::AgentPubKeyExt;
 pub use holochain_state::source_chain::SourceChainError;
 pub use holochain_state::source_chain::SourceChainResult;
+// `ChainOp`/`DhtOp`/`OpEntry` are the v2 op-pipeline types. `WarrantOp` here
+// stays the legacy, richer `holochain_types::warrant::WarrantOp` pulled in
+// via the glob below (`.warrant()`/`.get_type()`/`.sign()`) — a separate,
+// general-purpose warrant type from the thin `dht_v2::WarrantOp` variant
+// wrapper, which exists only to let a v2 `DhtOp` carry a warrant.
+use holochain_types::dht_v2::{ChainOp, DhtOp, OpEntry};
 use holochain_types::prelude::*;
-use holochain_zome_types::dht_v2::{from_legacy_action, CreateData, DnaData, UpdateData};
+use holochain_zome_types::dht_v2::{
+    from_legacy_action, ActionData, CreateData, DnaData, SignedAction, UpdateData,
+};
 // Signature verification and the countersigning action-set check operate on
 // the legacy action representation: every signature in the system is over
 // the legacy serialized bytes, which differ from the v2 projection, and the
 // v2 -> legacy conversion is lossy on weight, so it cannot reconstruct the
-// signed bytes. `LegacyAction`/`LegacyRecord` pin those code paths.
+// signed bytes. `LegacyAction` pins those code paths.
 use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
-use holochain_zome_types::dependencies::holochain_integrity_types::record::Record as LegacyRecord;
 use std::sync::Arc;
 
 mod error;
@@ -56,7 +63,14 @@ pub async fn verify_action_signature(
 }
 
 /// Verify the signature for this warrant
-pub async fn verify_warrant_signature(warrant_op: &WarrantOp) -> SysValidationResult<()> {
+///
+/// Takes the v2 op-pipeline `WarrantOp` — its `Deref` chain to
+/// `SignedWarrant`/`Warrant`/`WarrantProof` plus its `warrant()` accessor
+/// give it the same field/method surface as the legacy warrant-processing
+/// type, so this body needs no other change.
+pub async fn verify_warrant_signature(
+    warrant_op: &holochain_types::dht_v2::WarrantOp,
+) -> SysValidationResult<()> {
     if warrant_op
         .author
         .verify_signature(warrant_op.signature(), warrant_op.warrant().clone())
@@ -304,41 +318,60 @@ pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationR
 }
 
 /// Check that the EntryVisibility is congruous with the presence or absence of entry data
+///
+/// v2 `OpEntry` has three states — `Present`/`Hidden`/`ActionOnly` — versus
+/// legacy `RecordEntry`'s four (`Present`/`Hidden`/`NotStored`/`NA`), and
+/// `ChainOp` variants that never carry an entry (`AgentActivity`,
+/// `DeleteEntry`, `DeleteRecord`, `CreateLink`, `DeleteLink`) have no
+/// `OpEntry` slot at all rather than a synthesized `RecordEntry::NA` — so the
+/// match below is reshaped, not a line-for-line port:
+/// - `op.op_entry() == None` (no slot on this variant) is unconditionally
+///   `Ok`, covering both the legacy `RegisterAgentActivity` special case and
+///   the legacy `RecordEntry::NA` those other variants always returned.
+/// - For a `Public` entry-bearing op, legacy's `NotStored` and `NA` states
+///   both already led to the same outcome (error, except the
+///   `RegisterAgentActivity`/`AgentPubKey` carve-out) — so their `ActionOnly`
+///   merge point matches legacy behaviour exactly.
+/// - For a `Private` entry-bearing op, legacy's `NotStored` (Ok) and `NA`
+///   (Err — a malformed op falsely claiming N/A despite entry-bearing
+///   action data) diverge. `ActionOnly` here is treated as `Ok`, matching
+///   `NotStored`: it is by far the common legitimate case (a private entry
+///   this authority never receives), and the malformed-`NA` case it now
+///   also covers carries no information leak either way (the entry is
+///   absent from the op regardless).
 pub fn check_entry_visibility(op: &ChainOp) -> SysValidationResult<()> {
     use EntryVisibility::*;
-    use RecordEntry::*;
+    use OpEntry::*;
 
+    let action = op.signed_action().data();
     let err = |reason: &str| {
         Err(ValidationOutcome::MalformedDhtOp(
-            Box::new(from_legacy_action(&op.action())),
-            op.get_type(),
+            Box::new(action.clone()),
+            op.op_type(),
             reason.to_string(),
         )
         .into())
     };
 
-    match (op.action().entry_type().map(|t| t.visibility()), op.entry()) {
-        (Some(Public), Present(_)) => Ok(()),
-        (Some(Private), Hidden) => Ok(()),
-        (Some(Private), NotStored) => Ok(()),
+    match (action.entry_visibility(), op.op_entry()) {
+        (_, None) => Ok(()),
 
-        (Some(Public), Hidden) => err("RecordEntry::Hidden is only for Private entry type"),
-        (Some(_), NA) => err("There is action entry data but the entry itself is N/A"),
-        (Some(Private), Present(_)) => Err(ValidationOutcome::PrivateEntryLeaked.into()),
-        (Some(Public), NotStored) => {
-            if op.get_type() == ChainOpType::RegisterAgentActivity
-                || op.action().entry_type() == Some(&EntryType::AgentPubKey)
-            {
-                // RegisterAgentActivity is a special case, where the entry data can be omitted.
-                // Agent entries are also a special case. The "entry data" is already present in
+        (Some(Public), Some(Present(_))) => Ok(()),
+        (Some(Private), Some(Hidden)) => Ok(()),
+        (Some(Private), Some(ActionOnly)) => Ok(()),
+
+        (Some(Public), Some(Hidden)) => err("OpEntry::Hidden is only for Private entry type"),
+        (Some(Private), Some(Present(_))) => Err(ValidationOutcome::PrivateEntryLeaked.into()),
+        (Some(Public), Some(ActionOnly)) => {
+            if action.entry_type() == Some(&EntryType::AgentPubKey) {
+                // Agent entries are a special case. The "entry data" is already present in
                 // the action as the entry hash, so no external entry data is needed.
                 Ok(())
             } else {
                 err("Op has public entry type but is missing its data")
             }
         }
-        (None, NA) => Ok(()),
-        (None, _) => err("Entry must be N/A for action with no entry type"),
+        (None, Some(_)) => err("Entry must be absent for action with no entry type"),
     }
 }
 
@@ -395,7 +428,7 @@ pub fn check_tag_size(tag: &LinkTag) -> SysValidationResult<()> {
 /// which store v2 actions, so this takes the v2 `Action` directly rather
 /// than the legacy `NewEntryActionRef` (which cannot represent a v2 action).
 pub fn check_update_reference(
-    update: &Update,
+    update: &UpdateData,
     original_entry_action: &Action,
 ) -> SysValidationResult<()> {
     let (entry_hash, entry_type) = original_entry_action
@@ -429,16 +462,16 @@ pub trait DhtOpSender {
     async fn send_op(&self, op: DhtOp) -> SysValidationResult<()>;
 
     /// Send a StoreRecord DhtOp
-    async fn send_store_record(&self, record: LegacyRecord) -> SysValidationResult<()>;
+    async fn send_store_record(&self, record: Record) -> SysValidationResult<()>;
 
     /// Send a StoreEntry DhtOp
-    async fn send_store_entry(&self, record: LegacyRecord) -> SysValidationResult<()>;
+    async fn send_store_entry(&self, record: Record) -> SysValidationResult<()>;
 
     /// Send a RegisterAddLink DhtOp
-    async fn send_register_add_link(&self, record: LegacyRecord) -> SysValidationResult<()>;
+    async fn send_register_add_link(&self, record: Record) -> SysValidationResult<()>;
 
     /// Send a RegisterAgentActivity DhtOp
-    async fn send_register_agent_activity(&self, record: LegacyRecord) -> SysValidationResult<()>;
+    async fn send_register_agent_activity(&self, record: Record) -> SysValidationResult<()>;
 }
 
 /// Allows you to send an op to the
@@ -467,11 +500,11 @@ impl DhtOpSender for IncomingDhtOpSender {
         .map_err(Box::new)?)
     }
 
-    async fn send_store_record(&self, record: LegacyRecord) -> SysValidationResult<()> {
+    async fn send_store_record(&self, record: Record) -> SysValidationResult<()> {
         self.send_op(make_store_record(record).into()).await
     }
 
-    async fn send_store_entry(&self, record: LegacyRecord) -> SysValidationResult<()> {
+    async fn send_store_entry(&self, record: Record) -> SysValidationResult<()> {
         // TODO: MD: isn't it already too late if we've received a private entry from the network at this point?
         let is_public_entry = record
             .action()
@@ -485,7 +518,7 @@ impl DhtOpSender for IncomingDhtOpSender {
         Ok(())
     }
 
-    async fn send_register_add_link(&self, record: LegacyRecord) -> SysValidationResult<()> {
+    async fn send_register_add_link(&self, record: Record) -> SysValidationResult<()> {
         if let Some(op) = make_register_add_link(record) {
             self.send_op(op.into()).await?;
         }
@@ -493,9 +526,21 @@ impl DhtOpSender for IncomingDhtOpSender {
         Ok(())
     }
 
-    async fn send_register_agent_activity(&self, record: LegacyRecord) -> SysValidationResult<()> {
+    async fn send_register_agent_activity(&self, record: Record) -> SysValidationResult<()> {
         self.send_op(make_register_agent_activity(record).into())
             .await
+    }
+}
+
+/// The v2 `OpEntry` an entry-bearing `ChainOp` variant carries, mapped from a
+/// `Record`'s `RecordEntry` slot. `RecordEntry::NA`/`NotStored` both collapse
+/// to `OpEntry::ActionOnly` — v2 has no third "absent" state (see
+/// `check_entry_visibility`'s doc comment for the full rationale).
+fn record_entry_to_op_entry(entry: RecordEntry) -> OpEntry {
+    match entry {
+        RecordEntry::Present(e) => OpEntry::Present(e),
+        RecordEntry::Hidden => OpEntry::Hidden,
+        RecordEntry::NA | RecordEntry::NotStored => OpEntry::ActionOnly,
     }
 }
 
@@ -506,14 +551,17 @@ impl DhtOpSender for IncomingDhtOpSender {
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_store_record(record: LegacyRecord) -> ChainOp {
+fn make_store_record(record: Record) -> ChainOp {
     // Extract the data
     let (shh, record_entry) = record.privatized().0.into_inner();
-    let (action, signature) = shh.into_inner();
-    let action = action.into_content();
+    let (hashed, signature) = shh.into_inner();
+    let action = hashed.into_content();
 
     // Create the op
-    ChainOp::StoreRecord(signature, action, record_entry)
+    ChainOp::CreateRecord(
+        SignedAction::new(action, signature),
+        record_entry_to_op_entry(record_entry),
+    )
 }
 
 /// Make a StoreEntry ChainOp from a Record.
@@ -523,19 +571,24 @@ fn make_store_record(record: LegacyRecord) -> ChainOp {
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_store_entry(record: LegacyRecord) -> Option<ChainOp> {
+fn make_store_entry(record: Record) -> Option<ChainOp> {
     // Extract the data
     let (shh, record_entry) = record.into_inner();
-    let (action, signature) = shh.into_inner();
+    let (hashed, signature) = shh.into_inner();
+    let action = hashed.into_content();
 
     // Check the entry and exit early if it's not there
-    let entry_box = record_entry.into_option()?;
+    let entry = record_entry.into_option()?;
     // If the action is the wrong type exit early
-    let action = action.into_content().try_into().ok()?;
+    if !matches!(action.data, ActionData::Create(_) | ActionData::Update(_)) {
+        return None;
+    }
 
     // Create the op
-    let op = ChainOp::StoreEntry(signature, action, entry_box);
-    Some(op)
+    Some(ChainOp::CreateEntry(
+        SignedAction::new(action, signature),
+        OpEntry::Present(entry),
+    ))
 }
 
 /// Make a RegisterAddLink ChainOp from a Record.
@@ -544,17 +597,19 @@ fn make_store_entry(record: LegacyRecord) -> Option<ChainOp> {
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_register_add_link(record: LegacyRecord) -> Option<ChainOp> {
+fn make_register_add_link(record: Record) -> Option<ChainOp> {
     // Extract the data
     let (shh, _) = record.into_inner();
-    let (action, signature) = shh.into_inner();
+    let (hashed, signature) = shh.into_inner();
+    let action = hashed.into_content();
 
     // If the action is the wrong type exit early
-    let action = action.into_content().try_into().ok()?;
+    if !matches!(action.data, ActionData::CreateLink(_)) {
+        return None;
+    }
 
     // Create the op
-    let op = ChainOp::RegisterAddLink(signature, action);
-    Some(op)
+    Some(ChainOp::CreateLink(SignedAction::new(action, signature)))
 }
 
 /// Make a RegisterAgentActivity ChainOp from a Record.
@@ -563,17 +618,16 @@ fn make_register_add_link(record: LegacyRecord) -> Option<ChainOp> {
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_register_agent_activity(record: LegacyRecord) -> ChainOp {
+fn make_register_agent_activity(record: Record) -> ChainOp {
     // Extract the data
     let (shh, _) = record.into_inner();
-    let (action, signature) = shh.into_inner();
+    let (hashed, signature) = shh.into_inner();
 
     // TODO something seems to have changed here, should this not be able to fail?
-    // If the action is the wrong type exit early
-    let action = action.into_content();
+    let action = hashed.into_content();
 
     // Create the op
-    ChainOp::RegisterAgentActivity(signature, action)
+    ChainOp::AgentActivity(SignedAction::new(action, signature))
 }
 
 #[cfg(test)]

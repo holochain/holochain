@@ -3,6 +3,9 @@ use holo_hash::fixt::ActionHashFixturator;
 use holochain_p2p::event::*;
 use holochain_p2p::*;
 use holochain_types::prelude::*;
+// The countersigning publish handler is v2-native; shadow the legacy
+// `ChainOp` re-export pulled in via `holochain_types::prelude::*`.
+use holochain_types::dht_v2::ChainOp;
 // `WireLinkOps.creates` carries the v2 `SignedAction`; project the legacy
 // `CreateLink` fixture through `from_legacy_action` to build one.
 use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;

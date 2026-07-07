@@ -140,7 +140,7 @@ impl HcP2pHandler for UnresponsiveHandler {
     fn handle_publish_countersign(
         &self,
         _dna_hash: DnaHash,
-        _op: holochain_types::dht_op::ChainOp,
+        _op: holochain_types::dht_v2::ChainOp,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(std::future::pending())
     }

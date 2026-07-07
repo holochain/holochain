@@ -5,6 +5,11 @@ use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::cell_config_overrides::CellConfigOverrides;
 use holochain_types::prelude::*;
+// The countersigning publish wire (`ChainOp`) is v2-native; shadow the
+// legacy re-export pulled in via `prelude::*` above. `crate::*` glob imports
+// from descendant modules (`actor.rs`, `wire.rs`, `event.rs`, `spawn/actor.rs`)
+// see this same v2 binding.
+use holochain_types::dht_v2::ChainOp;
 use kitsune2_api::{AgentInfoSigned, BoxFut};
 use kitsune2_api::{SpaceId, StoredOp};
 use mockall::automock;
@@ -340,7 +345,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
             .await
     }
 
-    /// Get [`ChainOp::StoreRecord`] or [`ChainOp::StoreEntry`] from the DHT.
+    /// Get [`ChainOp::CreateRecord`] or [`ChainOp::CreateEntry`] from the DHT.
     async fn get(
         &self,
         dht_hash: holo_hash::AnyDhtHash,

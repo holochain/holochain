@@ -3,13 +3,9 @@ use ::fixt::fixt;
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::HoloHashed;
 use holochain_zome_types::action::ChainTopOrdering;
-// The scratch and the (v2) `DhtStore` reads exercised here operate on the v2
-// `Action`/`SignedActionHashed`, so `Action`/`ActionData`/`ActionHeader`/
+// The scratch, the (v2) `DhtStore` reads, and the op-pipeline helpers
+// exercised here are all v2-native, so `Action`/`ActionData`/`ActionHeader`/
 // `SignedActionHashed` resolve to their v2 shape by default in this module.
-// `ChainOp`/`DhtOp` (used by the helpers that integrate ops directly into
-// the store, bypassing the scratch) still operate on the legacy per-variant
-// `Action`; those helpers import it locally as `LegacyAction`.
-use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
 use holochain_zome_types::dht_v2::{
     Action, ActionData, ActionHeader, CreateData, CreateLinkData, DeleteData, DeleteLinkData,
     DnaData, SignedActionHashed,
@@ -132,30 +128,36 @@ async fn integrate_store_record(
     entry: holochain_zome_types::entry::Entry,
 ) -> ActionHash {
     use holochain_state::dht_store::{AppOutcome, SysOutcome};
-    use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
-    use holochain_types::prelude::RecordEntry;
-    use holochain_zome_types::action::{AppEntryDef, Create, EntryType};
+    use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry, SignedAction};
+    use holochain_zome_types::action::AppEntryDef;
     use holochain_zome_types::entry_def::EntryVisibility;
     use holochain_zome_types::prelude::Signature;
 
-    let action = LegacyAction::Create(Create {
-        author: author.clone(),
-        timestamp: holochain_zome_types::prelude::Timestamp::from_micros(seed as i64 * 1000),
-        action_seq: 1,
-        prev_action: holo_hash::ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36]),
-        entry_type: EntryType::App(AppEntryDef::new(
-            0.into(),
-            0.into(),
-            EntryVisibility::Public,
-        )),
-        entry_hash: entry_hash.clone(),
-        weight: Default::default(),
-    });
+    let action = Action {
+        header: ActionHeader {
+            author: author.clone(),
+            timestamp: holochain_zome_types::prelude::Timestamp::from_micros(seed as i64 * 1000),
+            action_seq: 1,
+            prev_action: Some(holo_hash::ActionHash::from_raw_36(vec![
+                seed.wrapping_add(
+                    200
+                );
+                36
+            ])),
+        },
+        data: ActionData::Create(CreateData {
+            entry_type: holochain_zome_types::action::EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
+            entry_hash: entry_hash.clone(),
+        }),
+    };
     let action_hash = holo_hash::ActionHash::with_data_sync(&action);
-    let chain_op = ChainOp::StoreRecord(
-        Signature::from([seed; 64]),
-        action,
-        RecordEntry::Present(entry),
+    let chain_op = ChainOp::CreateRecord(
+        SignedAction::new(action, Signature::from([seed; 64])),
+        OpEntry::Present(entry),
     );
     let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(chain_op)));
     let op_hash = op.as_hash().clone();
@@ -184,31 +186,37 @@ async fn integrate_store_entry(
     entry: holochain_zome_types::entry::Entry,
 ) -> ActionHash {
     use holochain_state::dht_store::{AppOutcome, SysOutcome};
-    use holochain_types::action::NewEntryAction;
-    use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
-    use holochain_zome_types::action::{AppEntryDef, Create, EntryType};
+    use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry, SignedAction};
+    use holochain_zome_types::action::AppEntryDef;
     use holochain_zome_types::entry_def::EntryVisibility;
     use holochain_zome_types::prelude::Signature;
 
-    let action = LegacyAction::Create(Create {
-        author: author.clone(),
-        timestamp: holochain_zome_types::prelude::Timestamp::from_micros(seed as i64 * 1000),
-        action_seq: 1,
-        prev_action: holo_hash::ActionHash::from_raw_36(vec![seed.wrapping_add(200); 36]),
-        entry_type: EntryType::App(AppEntryDef::new(
-            0.into(),
-            0.into(),
-            EntryVisibility::Public,
-        )),
-        entry_hash: entry_hash.clone(),
-        weight: Default::default(),
-    });
-    let action_hash = holo_hash::ActionHash::with_data_sync(&action);
-    let new_entry_action = match action {
-        LegacyAction::Create(c) => NewEntryAction::Create(c),
-        _ => unreachable!(),
+    let action = Action {
+        header: ActionHeader {
+            author: author.clone(),
+            timestamp: holochain_zome_types::prelude::Timestamp::from_micros(seed as i64 * 1000),
+            action_seq: 1,
+            prev_action: Some(holo_hash::ActionHash::from_raw_36(vec![
+                seed.wrapping_add(
+                    200
+                );
+                36
+            ])),
+        },
+        data: ActionData::Create(CreateData {
+            entry_type: holochain_zome_types::action::EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
+            entry_hash: entry_hash.clone(),
+        }),
     };
-    let chain_op = ChainOp::StoreEntry(Signature::from([seed; 64]), new_entry_action, entry);
+    let action_hash = holo_hash::ActionHash::with_data_sync(&action);
+    let chain_op = ChainOp::CreateEntry(
+        SignedAction::new(action, Signature::from([seed; 64])),
+        OpEntry::Present(entry),
+    );
     let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(chain_op)));
     let op_hash = op.as_hash().clone();
     store.record_incoming_ops(vec![(op, false)]).await.unwrap();
@@ -381,33 +389,35 @@ async fn integrate_link_op(
     seed: u8,
 ) -> holo_hash::ActionHash {
     use holochain_state::dht_store::{AppOutcome, SysOutcome};
-    use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
-    use holochain_zome_types::action::CreateLink;
+    use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, SignedAction};
     use holochain_zome_types::link::LinkTag;
 
-    let action = LegacyAction::CreateLink(CreateLink {
-        author: AgentPubKey::from_raw_36(vec![seed; 36]),
-        timestamp: holochain_zome_types::prelude::Timestamp::from_micros(seed as i64 * 1000),
-        action_seq: 2,
-        prev_action: holo_hash::ActionHash::from_raw_36(vec![seed.wrapping_add(60); 36]),
-        base_address: base.clone(),
-        target_address: holo_hash::AnyLinkableHash::from_raw_36_and_type(
-            vec![seed.wrapping_add(20); 36],
-            holo_hash::hash_type::AnyLinkable::Entry,
-        ),
-        zome_index: zome_index.into(),
-        link_type: link_type.into(),
-        tag: LinkTag(tag_bytes),
-        weight: Default::default(),
-    });
-    let create_link = match action {
-        LegacyAction::CreateLink(ref cl) => cl.clone(),
-        _ => unreachable!(),
+    let action = Action {
+        header: ActionHeader {
+            author: AgentPubKey::from_raw_36(vec![seed; 36]),
+            timestamp: holochain_zome_types::prelude::Timestamp::from_micros(seed as i64 * 1000),
+            action_seq: 2,
+            prev_action: Some(holo_hash::ActionHash::from_raw_36(vec![
+                seed.wrapping_add(
+                    60
+                );
+                36
+            ])),
+        },
+        data: ActionData::CreateLink(CreateLinkData {
+            base_address: base.clone(),
+            target_address: holo_hash::AnyLinkableHash::from_raw_36_and_type(
+                vec![seed.wrapping_add(20); 36],
+                holo_hash::hash_type::AnyLinkable::Entry,
+            ),
+            zome_index: zome_index.into(),
+            link_type: link_type.into(),
+            tag: LinkTag(tag_bytes),
+        }),
     };
     let action_hash = holo_hash::ActionHash::with_data_sync(&action);
-    let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(ChainOp::RegisterAddLink(
-        Signature::from([seed; 64]),
-        create_link,
+    let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(ChainOp::CreateLink(
+        SignedAction::new(action, Signature::from([seed; 64])),
     ))));
     let op_hash = op.as_hash().clone();
     store.record_incoming_ops(vec![(op, false)]).await.unwrap();
@@ -688,17 +698,17 @@ async fn dht_count_links_reflects_scratch_create_and_delete() {
 /// store so it is marked accepted and integrated.
 async fn integrate_activity_op(
     store: &holochain_state::dht_store::DhtStore,
-    action: LegacyAction,
+    action: Action,
     seed: u8,
     when: i64,
 ) -> holo_hash::ActionHash {
     use holochain_state::dht_store::{AppOutcome, SysOutcome};
-    use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
+    use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, SignedAction};
 
     let action_hash = holo_hash::ActionHash::with_data_sync(&action);
-    let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(
-        ChainOp::RegisterAgentActivity(Signature::from([seed; 64]), action),
-    )));
+    let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(ChainOp::AgentActivity(
+        SignedAction::new(action, Signature::from([seed; 64])),
+    ))));
     let op_hash = op.as_hash().clone();
     store.record_incoming_ops(vec![(op, false)]).await.unwrap();
     store
@@ -716,41 +726,42 @@ async fn integrate_activity_op(
     action_hash
 }
 
-/// Build a legacy `Create` action (no entry in store) for use as agent activity.
-///
-/// `ChainOp::RegisterAgentActivity` is a legacy-island op, so this builds the
-/// legacy `Action`; [`make_scratch_activity`] converts it to v2 for the
-/// scratch.
+/// Build a `Create` action (no entry in store) for use as agent activity, fed
+/// to both [`integrate_activity_op`] (the store op-pipeline path) and
+/// [`make_scratch_activity`] (the scratch path).
 fn make_activity_create(
     author: &AgentPubKey,
     seq: u32,
     prev: &holo_hash::ActionHash,
     seed: u8,
-) -> LegacyAction {
-    use holochain_zome_types::action::{AppEntryDef, Create, EntryType};
+) -> Action {
+    use holochain_zome_types::action::AppEntryDef;
     use holochain_zome_types::entry_def::EntryVisibility;
 
-    LegacyAction::Create(Create {
-        author: author.clone(),
-        timestamp: holochain_zome_types::prelude::Timestamp::from_micros((seq as i64 + 1) * 1000),
-        action_seq: seq,
-        prev_action: prev.clone(),
-        entry_type: EntryType::App(AppEntryDef::new(
-            0.into(),
-            0.into(),
-            EntryVisibility::Public,
-        )),
-        entry_hash: holo_hash::EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]),
-        weight: Default::default(),
-    })
+    Action {
+        header: ActionHeader {
+            author: author.clone(),
+            timestamp: holochain_zome_types::prelude::Timestamp::from_micros(
+                (seq as i64 + 1) * 1000,
+            ),
+            action_seq: seq,
+            prev_action: Some(prev.clone()),
+        },
+        data: ActionData::Create(CreateData {
+            entry_type: holochain_zome_types::action::EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
+            entry_hash: holo_hash::EntryHash::from_raw_36(vec![seed.wrapping_add(100); 36]),
+        }),
+    }
 }
 
-/// Project a legacy activity action onto v2 and wrap it as a
-/// `SignedActionHashed` for the scratch.
-fn make_scratch_activity(action: LegacyAction, seed: u8) -> SignedActionHashed {
-    let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&action);
+/// Wrap an activity action as a `SignedActionHashed` for the scratch.
+fn make_scratch_activity(action: Action, seed: u8) -> SignedActionHashed {
     SignedActionHashed::with_presigned(
-        HoloHashed::<Action>::from_content_sync(v2_action),
+        HoloHashed::<Action>::from_content_sync(action),
         Signature::from([seed; 64]),
     )
 }

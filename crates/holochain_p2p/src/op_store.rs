@@ -14,8 +14,8 @@
 //! stored hash is the canonical v2 identity. On receive, the op id is the
 //! native v2 rehash (`DhtOp::to_hash` + `DhtOp::dht_basis`), which equals the
 //! sender's id because both sides hash the same v2 op. The incoming workflow
-//! still reconstructs the legacy op (`dht_v2::to_legacy_dht_op`) to feed the
-//! legacy DHT table and `DhtStore::record_incoming_ops` during the migration.
+//! (`DhtStore::record_incoming_ops`) consumes the v2 op directly, with no
+//! legacy reconstruction on this path.
 
 use bytes::{Bytes, BytesMut};
 use futures::future::BoxFuture;

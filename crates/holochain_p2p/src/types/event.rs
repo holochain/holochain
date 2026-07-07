@@ -149,7 +149,7 @@ pub trait HcP2pHandler: 'static + Send + Sync + std::fmt::Debug {
     fn handle_publish_countersign(
         &self,
         dna_hash: DnaHash,
-        op: holochain_types::dht_op::ChainOp,
+        op: ChainOp,
     ) -> BoxFut<'_, HolochainP2pResult<()>>;
 
     /// Messages between agents that drive a countersigning session.

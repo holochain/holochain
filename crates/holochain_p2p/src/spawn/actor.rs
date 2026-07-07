@@ -201,7 +201,7 @@ impl event::HcP2pHandler for WrapEvtSender {
     fn handle_publish_countersign(
         &self,
         dna_hash: DnaHash,
-        op: holochain_types::dht_op::ChainOp,
+        op: ChainOp,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         timing_trace!(
             true,
@@ -3129,7 +3129,7 @@ mod tests {
         fn handle_publish_countersign(
             &self,
             _dna_hash: DnaHash,
-            _op: holochain_types::dht_op::ChainOp,
+            _op: ChainOp,
         ) -> BoxFut<'_, HolochainP2pResult<()>> {
             // Increment counter
             let mut count = self.handle_publish_countersign_count.lock().unwrap();
@@ -3465,11 +3465,6 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn other_wire_messages_are_not_concurrency_limited() {
-        // `ChainOp` is a legacy-island type: it stores the legacy per-variant
-        // `Action`, not the v2 `ActionHeader` + `ActionData` shape the bare
-        // `Action` name resolves to via this module's glob imports.
-        use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
-
         let dna_hash = DnaHash::from_raw_32(vec![0; 32]);
         let space_id = dna_hash.to_k2_space();
         let from_peer = kitsune2_api::Url::from_str("ws://test:80/1").unwrap();
@@ -3717,14 +3712,21 @@ mod tests {
 
         // PublishCountersignEvt is not limited
         let msg = WireMessage::PublishCountersignEvt {
-            op: holochain_types::dht_op::ChainOp::RegisterAgentActivity(
-                Signature([0; 64]),
-                LegacyAction::InitZomesComplete(InitZomesComplete {
-                    author: AgentPubKey::from_raw_32(vec![1; 32]),
-                    timestamp: holochain_types::prelude::Timestamp::now(),
-                    action_seq: 0,
-                    prev_action: ActionHash::from_raw_32(vec![2; 32]),
-                }),
+            op: holochain_types::dht_v2::ChainOp::AgentActivity(
+                holochain_types::dht_v2::SignedAction::new(
+                    holochain_types::dht_v2::Action {
+                        header: holochain_types::dht_v2::ActionHeader {
+                            author: AgentPubKey::from_raw_32(vec![1; 32]),
+                            timestamp: holochain_types::prelude::Timestamp::now(),
+                            action_seq: 0,
+                            prev_action: Some(ActionHash::from_raw_32(vec![2; 32])),
+                        },
+                        data: holochain_types::dht_v2::ActionData::InitZomesComplete(
+                            holochain_types::dht_v2::InitZomesCompleteData {},
+                        ),
+                    },
+                    Signature([0; 64]),
+                ),
             ),
         };
         let msg_data = WireMessage::encode_batch(&[&msg]).unwrap();

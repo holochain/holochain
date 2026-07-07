@@ -13,8 +13,8 @@ use holochain_state::DhtStore;
 use holochain_timestamp::Timestamp;
 use holochain_types::activity::AgentActivityResponse;
 use holochain_types::chain::MustGetAgentActivityResponse;
-use holochain_types::dht_op::{ChainOp, DhtOpHashed, WireOps};
-use holochain_types::dht_v2::DhtOp;
+use holochain_types::dht_op::WireOps;
+use holochain_types::dht_v2::{ChainOp, DhtOp};
 use holochain_types::link::{CountLinksResponse, WireLinkKey, WireLinkOps, WireLinkQuery};
 use holochain_types::prelude::ValidationReceiptBundle;
 use holochain_zome_types::fixt::{CreateFixturator, EntryFixturator, SignatureFixturator};
@@ -59,16 +59,16 @@ impl HcP2pHandler for StubHost {
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         let store = self.store.clone();
         Box::pin(async move {
-            // Mirror the conductor: reconstruct the legacy op form from the v2
-            // wire op before recording into the (still-legacy) store ingest.
-            let hashed: Vec<(DhtOpHashed, bool)> = ops
+            // The op pipeline is v2-native; hash the wire op directly.
+            let hashed: Vec<(holochain_types::dht_v2::DhtOpHashed, bool)> = ops
                 .into_iter()
                 .map(|(op, require_receipt)| {
-                    holochain_types::dht_v2::to_legacy_dht_op(&op)
-                        .map(|op| (DhtOpHashed::from_content_sync(op), require_receipt))
+                    (
+                        holochain_types::dht_v2::DhtOpHashed::from_content_sync(op),
+                        require_receipt,
+                    )
                 })
-                .collect::<Result<_, _>>()
-                .map_err(holochain_p2p::HolochainP2pError::other)?;
+                .collect();
 
             store
                 .record_incoming_ops(hashed)
@@ -171,13 +171,10 @@ fn test_dht_op(authored_timestamp: Timestamp) -> holochain_types::dht_v2::DhtOp 
     )))
 }
 
-/// The `serialized_size` the store records for an op. During the migration the
-/// v2 wire op is reconstructed to its legacy form before recording, so the
-/// stored size is the legacy encoding's length (an approximation of the v2 wire
-/// size, used only for gossip budgeting).
+/// The `serialized_size` the store records for an op: the v2 wire op's own
+/// encoded length (used only for gossip budgeting).
 fn stored_size(op: &holochain_types::dht_v2::DhtOp) -> usize {
-    let legacy = holochain_types::dht_v2::to_legacy_dht_op(op).unwrap();
-    holochain_serialized_bytes::encode(&legacy).unwrap().len()
+    holochain_serialized_bytes::encode(op).unwrap().len()
 }
 
 /// Wrap a hashed op as a K2 [`IncomingOp`] with no metadata, mirroring how

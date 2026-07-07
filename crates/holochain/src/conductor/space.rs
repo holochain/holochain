@@ -20,6 +20,9 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::DynHcP2p;
 use holochain_state::data::{DbKey, DbSyncLevel};
 use holochain_state::{host_fn_workspace::SourceChainWorkspace, prelude::*};
+// The countersigning publish/receive path is v2-native; shadow the legacy
+// `ChainOp` re-export pulled in via `holochain_state::prelude::*`.
+use holochain_types::dht_v2::ChainOp;
 use holochain_util::timed;
 use lair_keystore_api::prelude::SharedLockedArray;
 use std::convert::TryInto;
@@ -388,11 +391,8 @@ impl Spaces {
 
     /// we are receiving a "publish" event from the network.
     ///
-    /// Ops arrive in the v2 wire form. While the legacy DHT table and
-    /// `DhtStore::record_incoming_ops` still consume the legacy op form, we
-    /// reconstruct it here before handing off to the incoming workflow. Ops
-    /// that fail to reconstruct are dropped (logged), matching the workflow's
-    /// own per-op resilience.
+    /// Ops arrive in the v2 wire form and are passed straight through to the
+    /// (v2-native) incoming ops workflow.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, ops)))]
     pub async fn handle_publish(
         &self,
@@ -413,20 +413,7 @@ impl Spaces {
             }
         };
 
-        let mut legacy_ops = Vec::with_capacity(ops.len());
-        for op in &ops {
-            match holochain_types::dht_v2::to_legacy_dht_op(&op.0) {
-                Ok(legacy) => legacy_ops.push((legacy, op.1)),
-                Err(err) => {
-                    tracing::warn!(
-                        ?err,
-                        "Dropping incoming op that failed v2->legacy reconstruction"
-                    )
-                }
-            }
-        }
-
-        incoming_dht_ops_workflow(space, trigger, legacy_ops).await?;
+        incoming_dht_ops_workflow(space, trigger, ops).await?;
 
         Ok(())
     }

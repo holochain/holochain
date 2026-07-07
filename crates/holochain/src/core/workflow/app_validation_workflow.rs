@@ -118,15 +118,16 @@ use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_state::prelude::*;
 // App validation dispatches the v2 `Op` to the wasm `validate` callback; the
 // bare `Op` name (and its variant structs) otherwise resolves to the legacy
-// op module via the glob imports above.
-use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
+// op module via the glob imports above. The op pipeline itself is v2-native:
+// `ChainOp`/`DhtOp`/`OpEntry` similarly shadow the legacy re-exports.
+use holochain_types::dht_v2::{ChainOp, DhtOp, OpEntry};
 use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
     Op, RegisterAgentActivity, RegisterCreateLink, RegisterDelete, RegisterDeleteLink,
     RegisterUpdate, StoreEntry, StoreRecord,
 };
 use holochain_zome_types::dht_v2::{
-    from_legacy_action, to_legacy_signed_action, CreateData, CreateLinkData, DeleteData,
-    DeleteLinkData, UpdateData,
+    to_legacy_signed_action, ActionData, CreateData, CreateLinkData, DeleteData, DeleteLinkData,
+    SignedActionHashed, UpdateData,
 };
 use parking_lot::Mutex;
 use std::collections::HashSet;
@@ -250,9 +251,8 @@ async fn app_validation_workflow_inner(
             _ => unreachable!("warrant ops are never sent to app validation"),
         };
 
-        let op_type = chain_op.get_type();
-        let action = chain_op.action();
-        let dht_op_lite = chain_op.to_lite();
+        let op_type = chain_op.op_type();
+        let action = chain_op.signed_action().data();
 
         // If this is agent activity, track it for the cache.
         let agent_activity_op = matches!(op_type, ChainOpType::RegisterAgentActivity)
@@ -289,13 +289,13 @@ async fn app_validation_workflow_inner(
                     }
                 }
                 if let Outcome::Rejected(_) = &outcome {
-                    warn!(?outcome, ?dht_op_lite, "DhtOp has failed app validation");
+                    warn!(?outcome, ?chain_op, "DhtOp has failed app validation");
                 } else if let Outcome::AwaitingDeps(_) = &outcome {
-                    debug!(?outcome, ?dht_op_lite, "DhtOp cannot be app validated yet");
+                    debug!(?outcome, ?chain_op, "DhtOp cannot be app validated yet");
                 }
 
                 if let Outcome::Rejected(reason) = &outcome {
-                    let action_hash = chain_op.action().to_hash();
+                    let action_hash = chain_op.signed_action().data().to_hash();
 
                     let issue_warrant = if warranted_in_batch.contains(&action_hash) {
                         tracing::trace!(
@@ -307,7 +307,10 @@ async fn app_validation_workflow_inner(
                         match workspace
                             .dht_store
                             .as_read()
-                            .is_action_warranted_as_invalid(&action_hash, chain_op.author())
+                            .is_action_warranted_as_invalid(
+                                &action_hash,
+                                chain_op.signed_action().data().author(),
+                            )
                             .await
                         {
                             Ok(true) => {
@@ -364,6 +367,41 @@ async fn app_validation_workflow_inner(
                         );
                         app_validation_outcomes.push((dht_op_hash, AppOutcome::Rejected));
                     }
+                // Capture the outcome for mirroring into DhtStore (only Accepted/Rejected).
+                let app_outcome_opt = match &outcome {
+                    Outcome::Accepted => Some(AppOutcome::Accepted),
+                    Outcome::AwaitingDeps(_) => None, // status stays NULL; nothing to record
+                    Outcome::Rejected(_) => Some(AppOutcome::Rejected),
+                };
+                let outcome_dht_op_hash = dht_op_hash.clone();
+                let chain_op_debug = format!("{chain_op:?}");
+
+                // #5370: legacy DhtOp validation-status dual-write removed; the
+                // write no longer touches the DB (the `_txn`, `dht_op_hash` and
+                // put_*_limbo calls are dead). Counters/outcome mirroring stay.
+                let write_result = workspace
+                    .dht_db
+                    .write_async(move |_txn| -> WorkflowResult<()> {
+                        match outcome {
+                            Outcome::Accepted => {
+                                accepted_ops.fetch_add(1, Ordering::SeqCst);
+                            }
+                            Outcome::AwaitingDeps(_) => {
+                                awaiting_ops.fetch_add(1, Ordering::SeqCst);
+                            }
+                            Outcome::Rejected(_) => {
+                                rejected_ops.fetch_add(1, Ordering::SeqCst);
+                                tracing::info!("Received invalid op. The op author will be blocked. Op: {chain_op_debug}");
+                            }
+                        }
+                        Ok(())
+                    })
+                    .await;
+                if let Err(err) = write_result {
+                    tracing::error!(?chain_op, ?err, "Error updating dht op in database.");
+                } else if let Some(app_outcome) = app_outcome_opt {
+                    // Capture for mirroring after the legacy write commits.
+                    app_validation_outcomes.push((outcome_dht_op_hash, app_outcome));
                 }
             }
             Err(err) => {
@@ -397,7 +435,13 @@ async fn app_validation_workflow_inner(
 
     // "self-publish" locally-validated warrant ops into the DhtStore as if they
     // were published to us by another node.
+    // mirror locally-validated warrant ops into the new DhtStore schema
+    // (v2-native; project the legacy-typed warrants built above).
     if !warrant_ops_vec.is_empty() {
+        let warrant_ops_vec: Vec<holochain_types::dht_v2::DhtOpHashed> = warrant_ops_vec
+            .iter()
+            .map(holochain_types::dht_v2::from_legacy_dht_op)
+            .collect();
         workspace
             .dht_store
             .record_locally_validated_warrants(warrant_ops_vec)
@@ -508,40 +552,73 @@ pub async fn record_to_op(
     Ok((op, dht_op_hash, hidden_entry))
 }
 
-// **BOUNDARY**: `chain_op` is legacy (the op pipeline reads legacy
-// `DhtOpHashed`); build the v2 `Op` from it, converting the inner action via
-// `from_legacy_action`.
+/// The legacy `ActionType` a v2 action projects to, for the
+/// `DhtOpError::OpActionMismatch` diagnostic below (which is defined against
+/// the legacy discriminant — a different enum from v2's own `ActionType`).
+/// Error-message-only: never used to decide validation outcomes.
+fn legacy_action_type(action: &Action) -> ActionType {
+    let hashed = HoloHashed::from_content_sync(action.clone());
+    let sah = SignedActionHashed::with_presigned(hashed, Signature::from([0u8; 64]));
+    let legacy_action = to_legacy_signed_action(&sah).action().clone();
+    (&legacy_action).into()
+}
+
+/// Build the v2 `Op` (the wasm `validate` callback's input) from a
+/// sys-validated `ChainOp`. Sys validation (`check_entry_visibility` +
+/// `validate_chain_op`'s per-variant checks) has already rejected any op
+/// whose action doesn't match its `ChainOp` variant, so the `OpActionMismatch`
+/// branches below are defence-in-depth, not an expected path.
 async fn chain_op_to_op(chain_op: ChainOp, cascade: Arc<impl Cascade>) -> AppValidationOutcome<Op> {
+    let signed_action = chain_op.signed_action().clone();
+    let hashed = HoloHashed::from_content_sync(signed_action.data().clone());
+    let sah = SignedHashed::with_presigned(hashed, signed_action.signature().clone());
+    let action = signed_action.data();
+
     let op = match chain_op {
-        ChainOp::StoreRecord(signature, action, entry) => {
-            let hashed = HoloHashed::from_content_sync(from_legacy_action(&action));
+        ChainOp::CreateRecord(_, op_entry) => {
+            let visibility = action.entry_visibility().copied();
+            let entry = match op_entry {
+                OpEntry::Present(entry) => Some(entry),
+                OpEntry::Hidden | OpEntry::ActionOnly => None,
+            };
             Op::StoreRecord(StoreRecord {
-                record: Record::new(SignedHashed::with_presigned(hashed, signature), entry),
+                record: Record::new(sah, RecordEntry::new(visibility.as_ref(), entry)),
             })
         }
-        ChainOp::StoreEntry(signature, action, entry) => {
-            let legacy_action: LegacyAction = action.into();
-            let hashed = HoloHashed::from_content_sync(from_legacy_action(&legacy_action));
-            Op::StoreEntry(StoreEntry {
-                action: SignedHashed::with_presigned(hashed, signature),
-                entry,
-            })
+        ChainOp::CreateEntry(_, op_entry) => {
+            let entry = match op_entry {
+                OpEntry::Present(entry) => entry,
+                OpEntry::Hidden | OpEntry::ActionOnly => {
+                    return Err(
+                        AppValidationError::DhtOpError(DhtOpError::ActionWithoutEntry(Box::new(
+                            to_legacy_signed_action(&sah).action().clone(),
+                        )))
+                        .into(),
+                    );
+                }
+            };
+            Op::StoreEntry(StoreEntry { action: sah, entry })
         }
-        ChainOp::RegisterAgentActivity(signature, action) => {
-            let hashed = HoloHashed::from_content_sync(from_legacy_action(&action));
-            Op::RegisterAgentActivity(RegisterAgentActivity {
-                action: SignedHashed::with_presigned(hashed, signature),
-                cached_entry: None,
-            })
-        }
-        ChainOp::RegisterUpdatedContent(signature, update, entry)
-        | ChainOp::RegisterUpdatedRecord(signature, update, entry) => {
+        ChainOp::AgentActivity(_) => Op::RegisterAgentActivity(RegisterAgentActivity {
+            action: sah,
+            cached_entry: None,
+        }),
+        ChainOp::UpdateEntry(_, op_entry) | ChainOp::UpdateRecord(_, op_entry) => {
+            let ActionData::Update(update) = &action.data else {
+                return Err(AppValidationError::DhtOpError(DhtOpError::OpActionMismatch(
+                    ChainOpType::RegisterUpdatedContent,
+                    legacy_action_type(action),
+                ))
+                .into());
+            };
             let entry_visibility = *update.entry_type.visibility();
             let entry_hash = update.entry_hash.clone();
-            let hashed =
-                HoloHashed::from_content_sync(from_legacy_action(&LegacyAction::Update(update)));
+            let entry = match op_entry {
+                OpEntry::Present(entry) => Some(entry),
+                OpEntry::Hidden | OpEntry::ActionOnly => None,
+            };
             let new_entry = match entry_visibility {
-                EntryVisibility::Public => match entry.into_option() {
+                EntryVisibility::Public => match entry {
                     Some(entry) => Some(entry),
                     None => Some(
                         cascade
@@ -554,38 +631,33 @@ async fn chain_op_to_op(chain_op: ChainOp, cascade: Arc<impl Cascade>) -> AppVal
                 _ => None,
             };
             Op::RegisterUpdate(RegisterUpdate {
-                update: SignedHashed::with_presigned(hashed, signature),
+                update: sah,
                 new_entry,
             })
         }
-        ChainOp::RegisterDeletedBy(signature, delete)
-        | ChainOp::RegisterDeletedEntryAction(signature, delete) => {
-            let hashed =
-                HoloHashed::from_content_sync(from_legacy_action(&LegacyAction::Delete(delete)));
-            Op::RegisterDelete(RegisterDelete {
-                delete: SignedHashed::with_presigned(hashed, signature),
-            })
+        ChainOp::DeleteRecord(_) | ChainOp::DeleteEntry(_) => {
+            Op::RegisterDelete(RegisterDelete { delete: sah })
         }
-        ChainOp::RegisterAddLink(signature, create_link) => {
-            let hashed = HoloHashed::from_content_sync(from_legacy_action(
-                &LegacyAction::CreateLink(create_link),
-            ));
-            Op::RegisterCreateLink(RegisterCreateLink {
-                create_link: SignedHashed::with_presigned(hashed, signature),
-            })
-        }
-        ChainOp::RegisterRemoveLink(signature, delete_link) => {
-            let link_add_address = delete_link.link_add_address.clone();
-            let hashed = HoloHashed::from_content_sync(from_legacy_action(
-                &LegacyAction::DeleteLink(delete_link),
-            ));
+        ChainOp::CreateLink(_) => Op::RegisterCreateLink(RegisterCreateLink { create_link: sah }),
+        ChainOp::DeleteLink(_) => {
+            let ActionData::DeleteLink(DeleteLinkData {
+                link_add_address, ..
+            }) = &action.data
+            else {
+                return Err(AppValidationError::DhtOpError(DhtOpError::OpActionMismatch(
+                    ChainOpType::RegisterRemoveLink,
+                    legacy_action_type(action),
+                ))
+                .into());
+            };
+            let link_add_address = link_add_address.clone();
             let create_link = cascade
                 .retrieve_action(link_add_address.clone(), Default::default())
                 .await?
                 .map(|(sh, _)| sh.hashed.content)
                 .ok_or_else(|| Outcome::awaiting(&link_add_address))?;
             Op::RegisterDeleteLink(RegisterDeleteLink {
-                delete_link: SignedHashed::with_presigned(hashed, signature),
+                delete_link: sah,
                 create_link,
             })
         }

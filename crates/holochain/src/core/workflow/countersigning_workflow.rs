@@ -3,6 +3,9 @@
 use crate::core::share::Share;
 use holochain_p2p::{event::CountersigningSessionNegotiationMessage, DynHolochainP2pDna};
 use holochain_state::prelude::*;
+// The countersigning publish path is v2-native; shadow the legacy `ChainOp`
+// re-export pulled in via `holochain_state::prelude::*`.
+use holochain_types::dht_v2::ChainOp;
 use std::time::Duration;
 #[cfg(feature = "unstable-countersigning")]
 use {
