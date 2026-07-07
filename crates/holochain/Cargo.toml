@@ -224,9 +224,7 @@ sqlite-encrypted = [
 ]
 
 # Enables at-rest encryption of the SQLite database.
-encryption = [
-  "holochain_state/encryption",
-]
+encryption = ["holochain_state/encryption"]
 
 # Compile SQLite from source rather than depending on a library.
 # Incompatible with "sqlite-encrypted"
