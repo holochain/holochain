@@ -50,3 +50,15 @@ pub use holochain_integrity_types::prelude::*;
 // These explicit re-exports resolve the ambiguity in favor of the v2 types.
 pub use crate::action::Action;
 pub use crate::record::{Record, SignedActionHashed};
+
+// The validation `Op` and its variant structs share names with the legacy `op`
+// module's versions re-exported by the globs above. These explicit re-exports
+// resolve to the v2 types, so validators and inline zomes decode the v2 `Op`
+// the host encodes. `RegisterAgentActivity` is left as the legacy re-export
+// because it is also the legacy-island `MustGetAgentActivityResponse` payload;
+// the v2 `Op::RegisterAgentActivity` variant still binds the v2 payload in a
+// `match` without naming the struct.
+pub use crate::dht_v2::{
+    Op, RegisterCreateLink, RegisterDelete, RegisterDeleteLink, RegisterUpdate, StoreEntry,
+    StoreRecord,
+};
