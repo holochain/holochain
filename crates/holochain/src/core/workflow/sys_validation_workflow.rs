@@ -458,12 +458,14 @@ async fn sys_validation_workflow_inner(
         }
 
         let warranted = warrants.len();
-        // "self-publish" warrants, i.e. record them as if they were published
-        // to us by another node.
-        workspace
-            .dht_store
-            .record_locally_validated_warrants(warrants)
-            .await?;
+        if warranted > 0 {
+            // "self-publish" warrants, i.e. record them as if they were published
+            // to us by another node.
+            workspace
+                .dht_store
+                .record_locally_validated_warrants(warrants)
+                .await?;
+        }
 
         summary.warranted = warranted;
     }

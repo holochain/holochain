@@ -602,13 +602,10 @@ impl SourceChain {
                     // Warrants do not require validation receipts, set all to false.
                     let warrant_ops_with_validation_receipt_required_flag =
                         warrant_ops.into_iter().map(|op| (op, false)).collect();
-                    if let Err(err) = self
-                        .dht_store
+                    self.dht_store
                         .record_incoming_ops(warrant_ops_with_validation_receipt_required_flag)
                         .await
-                    {
-                        tracing::warn!(?err, "Error recording warrant ops into the DhtStore");
-                    }
+                        .map_err(SourceChainError::other)?;
                 }
 
                 SourceChainResult::Ok((actions, total_warrants))
