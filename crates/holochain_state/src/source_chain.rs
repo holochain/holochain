@@ -10,6 +10,8 @@ use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
+use holochain_data::kind::Dht;
+use holochain_data::{DbRead, DbWrite};
 use holochain_keystore::MetaLairClient;
 use holochain_state_types::SourceChainDump;
 use kitsune2_api::DhtArc;
@@ -20,9 +22,9 @@ use std::sync::Arc;
 mod error;
 
 #[derive(Clone)]
-pub struct SourceChain {
+pub struct SourceChain<Db = DbWrite<Dht>> {
     scratch: SyncScratch,
-    pub(crate) dht_store: DhtStore,
+    pub(crate) dht_store: DhtStore<Db>,
     keystore: MetaLairClient,
     author: Arc<AgentPubKey>,
     cell_id: Arc<CellId>,
@@ -44,13 +46,13 @@ impl HeadInfo {
     }
 }
 
-/// A source chain with read only access to the underlying databases.
-pub type SourceChainRead = SourceChain;
+/// A source chain with read only access to the underlying database.
+pub type SourceChainRead = SourceChain<DbRead<Dht>>;
 
 // TODO: document that many functions here are only reading from the scratch,
 //       not the entire source chain!
 /// Writable functions for a source chain with write access.
-impl SourceChain {
+impl SourceChain<DbWrite<Dht>> {
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn unlock_chain(&self) -> SourceChainResult<()> {
         // The chain lock lives in the DhtStore.
@@ -650,7 +652,7 @@ impl SourceChain {
     }
 }
 
-impl SourceChain {
+impl SourceChain<DbWrite<Dht>> {
     pub async fn new(
         dht_store: DhtStore,
         keystore: MetaLairClient,
@@ -712,6 +714,25 @@ impl SourceChain {
         })
     }
 
+    /// Downgrade this writable source chain to a read-only source chain.
+    pub fn as_read(&self) -> SourceChainRead {
+        SourceChain {
+            scratch: self.scratch.clone(),
+            dht_store: self.dht_store.as_read(),
+            keystore: self.keystore.clone(),
+            author: self.author.clone(),
+            cell_id: self.cell_id.clone(),
+            head_info: self.head_info.clone(),
+            public_only: self.public_only,
+            zomes_initialized: self.zomes_initialized.clone(),
+        }
+    }
+}
+
+impl<Db> SourceChain<Db>
+where
+    Db: AsRef<DbRead<Dht>>,
+{
     pub fn public_only(&mut self) {
         self.public_only = true;
     }

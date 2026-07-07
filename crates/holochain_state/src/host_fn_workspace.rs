@@ -1,11 +1,13 @@
 use crate::prelude::*;
 use holo_hash::AgentPubKey;
+use holochain_data::kind::Dht;
+use holochain_data::{DbRead, DbWrite};
 use holochain_keystore::MetaLairClient;
 use std::sync::Arc;
 
 #[derive(Clone)]
-pub struct HostFnWorkspace {
-    source_chain: Option<SourceChain>,
+pub struct HostFnWorkspace<Db = DbWrite<Dht>> {
+    source_chain: Option<SourceChain<Db>>,
     dht_store: DhtStore,
     /// Did the root call that started this call chain
     /// come from an init callback.
@@ -26,7 +28,7 @@ pub struct HostFnStores {
     pub dht_store: Option<DhtStore>,
 }
 
-pub type HostFnWorkspaceRead = HostFnWorkspace;
+pub type HostFnWorkspaceRead = HostFnWorkspace<DbRead<Dht>>;
 
 impl SourceChainWorkspace {
     pub async fn new(
@@ -83,7 +85,7 @@ impl SourceChainWorkspace {
     }
 }
 
-impl HostFnWorkspace {
+impl HostFnWorkspace<DbWrite<Dht>> {
     pub async fn new(
         dht_store: DhtStore,
         keystore: MetaLairClient,
@@ -100,7 +102,42 @@ impl HostFnWorkspace {
         })
     }
 
-    pub fn source_chain(&self) -> &Option<SourceChain> {
+    /// Downgrade this writable workspace to a read-only workspace, so that
+    /// read-only host contexts (e.g. validation) cannot write to the source
+    /// chain through it.
+    pub fn as_read(&self) -> HostFnWorkspaceRead {
+        HostFnWorkspace {
+            source_chain: self.source_chain.as_ref().map(|sc| sc.as_read()),
+            dht_store: self.dht_store.clone(),
+            init_is_root: self.init_is_root,
+        }
+    }
+}
+
+impl HostFnWorkspace<DbRead<Dht>> {
+    /// Construct a read-only workspace from a writable store handle.
+    ///
+    /// The source chain is built writable (so its head can be read) and then
+    /// downgraded, so callers get a workspace that cannot write to the source
+    /// chain.
+    pub async fn new(
+        dht_store: DhtStore,
+        keystore: MetaLairClient,
+        author: Option<AgentPubKey>,
+    ) -> SourceChainResult<Self> {
+        Ok(
+            HostFnWorkspace::<DbWrite<Dht>>::new(dht_store, keystore, author)
+                .await?
+                .as_read(),
+        )
+    }
+}
+
+impl<Db> HostFnWorkspace<Db>
+where
+    Db: AsRef<DbRead<Dht>>,
+{
+    pub fn source_chain(&self) -> &Option<SourceChain<Db>> {
         &self.source_chain
     }
 
@@ -125,6 +162,12 @@ impl SourceChainWorkspace {
 impl From<SourceChainWorkspace> for HostFnWorkspace {
     fn from(workspace: SourceChainWorkspace) -> Self {
         workspace.inner
+    }
+}
+
+impl From<SourceChainWorkspace> for HostFnWorkspaceRead {
+    fn from(workspace: SourceChainWorkspace) -> Self {
+        workspace.inner.as_read()
     }
 }
 

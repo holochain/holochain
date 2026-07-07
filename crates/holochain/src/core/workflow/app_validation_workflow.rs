@@ -113,7 +113,6 @@ use holochain_cascade::CascadeImpl;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::{NetworkRequestOptions as NetworkGetOptions, NetworkRequestOptions};
 use holochain_p2p::DynHolochainP2pDna;
-use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_state::prelude::*;
 use parking_lot::Mutex;
@@ -872,7 +871,7 @@ impl AppValidationWorkspace {
     }
 
     pub async fn validation_workspace(&self) -> AppValidationResult<HostFnWorkspaceRead> {
-        Ok(HostFnWorkspace::new(self.dht_store.clone(), self.keystore.clone(), None).await?)
+        Ok(HostFnWorkspaceRead::new(self.dht_store.clone(), self.keystore.clone(), None).await?)
     }
 
     pub fn full_cascade(&self, network: DynHolochainP2pDna) -> CascadeImpl {

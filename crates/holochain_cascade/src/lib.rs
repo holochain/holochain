@@ -185,10 +185,16 @@ impl CascadeImpl {
     }
 
     /// Construct a [Cascade] with network access
-    pub fn from_workspace_and_network(
-        workspace: &HostFnWorkspace,
+    ///
+    /// Accepts a writable or read-only workspace; the cascade only reads from
+    /// the store it takes.
+    pub fn from_workspace_and_network<Db>(
+        workspace: &HostFnWorkspace<Db>,
         network: DynHolochainP2pDna,
-    ) -> CascadeImpl {
+    ) -> CascadeImpl
+    where
+        Db: AsRef<holochain_state::DbRead<holochain_state::Dht>>,
+    {
         let HostFnStores { scratch, dht_store } = workspace.stores();
         let dht_store =
             dht_store.expect("HostFnWorkspace always populates dht_store; this is a bug");

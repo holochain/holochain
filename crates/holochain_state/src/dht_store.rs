@@ -1029,8 +1029,17 @@ impl DhtStore<DbWrite<Dht>> {
             }
         }
     }
+}
 
-    /// Downgrade this writable store to a read-only store.
+impl<Db> DhtStore<Db>
+where
+    Db: AsRef<holochain_data::DbRead<Dht>>,
+{
+    /// Downgrade to a read-only store over the same database handle.
+    ///
+    /// Works for both a writable store (`DbWrite<Dht>`) and a store that is
+    /// already read-only (`DbRead<Dht>`), since both handle types provide
+    /// `AsRef<DbRead<Dht>>`.
     pub fn as_read(&self) -> DhtStoreRead {
         DhtStore::new(self.db.as_ref().clone())
     }

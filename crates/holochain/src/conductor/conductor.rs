@@ -2434,12 +2434,13 @@ mod misc_impls {
 
             for cell_id in cell_set.iter() {
                 // create a source chain read to query for the cap grant
-                let chain = SourceChainRead::new(
+                let chain = SourceChain::new(
                     self.get_or_create_dht_store(cell_id.dna_hash())?,
                     self.keystore().clone(),
                     cell_id.agent_pubkey().clone(),
                 )
-                .await?;
+                .await?
+                .as_read();
 
                 // query for the cap grant and delete actions (capability revokes)
                 let grant_list = chain.query(grant_query.clone()).await?;
