@@ -7,9 +7,7 @@
 
 pub use holochain_integrity_types::dht_v2::*;
 
-use crate::countersigning::{
-    ActionBase, CounterSigningError, CounterSigningSessionData,
-};
+use crate::countersigning::{ActionBase, CounterSigningError, CounterSigningSessionData};
 use crate::op::ChainOpType;
 use crate::signature::Signed;
 use holo_hash::{AgentPubKey, EntryHash};

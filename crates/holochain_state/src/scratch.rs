@@ -8,14 +8,20 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use thiserror::Error;
 
-// The scratch is part of the authoring pipeline's LEGACY ISLAND: staged
-// actions are legacy `Action`/`SignedActionHashed`/`Record`, matching what
-// `source_chain.rs` builds and what the legacy SQL query machinery in
-// `query.rs` overlays them onto. These explicit imports shadow the v2
-// re-exports pulled in via `crate::prelude::*` so the rest of this file keeps
-// resolving `Action`/`Record`/`SignedActionHashed` to their legacy shape.
-use holochain_zome_types::dependencies::holochain_integrity_types::record::Record;
-use holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed;
+// The scratch stages v2 `Action`/`SignedActionHashed`/`Record`, matching what
+// `source_chain.rs` builds during authoring. These explicit imports pin the
+// v2 shape (rather than relying on `crate::prelude::*`, which resolves
+// `Action`/`Record`/`SignedActionHashed` to the legacy shape for the benefit
+// of the legacy op-pipeline and its SQL query machinery in `query.rs`).
+use holochain_zome_types::dht_v2::to_legacy_signed_action;
+use holochain_zome_types::record::Record;
+use holochain_zome_types::record::SignedActionHashed;
+// The `Store`/`Stores`/`StoresIter` traits (`query.rs`) belong to the legacy
+// SQL query machinery and are typed over the legacy `SignedActionHashed`/
+// `Record`. `Scratch`'s implementations of those traits convert its v2
+// actions to legacy at the boundary with these aliases.
+use holochain_zome_types::dependencies::holochain_integrity_types::record::Record as LegacyRecord;
+use holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed as LegacySignedActionHashed;
 
 /// The "scratch" is an in-memory space to stage Actions to be committed at the
 /// end of the CallZome workflow.
@@ -37,6 +43,15 @@ pub struct Scratch {
 
 #[derive(Debug, Clone)]
 pub struct SyncScratch(Arc<Mutex<Scratch>>);
+
+// MD: hmm, why does this need to be a separate type? Why collect into this?
+//
+// Holds legacy actions — it feeds `query.rs`'s legacy SQL query machinery
+// (via `Stores`/`StoresIter`), so `Scratch::as_filter` converts each v2
+// scratch action to legacy when building this.
+pub struct FilteredScratch {
+    actions: Vec<LegacySignedActionHashed>,
+}
 
 impl Scratch {
     pub fn new() -> Self {
@@ -95,6 +110,18 @@ impl Scratch {
         self.entries.insert(hash, Arc::new(entry));
     }
 
+    /// Filter the scratch's actions for `query.rs`'s legacy SQL query
+    /// machinery, converting each matching v2 action to legacy.
+    pub fn as_filter(&self, f: impl Fn(&LegacySignedActionHashed) -> bool) -> FilteredScratch {
+        let actions = self
+            .actions
+            .iter()
+            .map(to_legacy_signed_action)
+            .filter(f)
+            .collect();
+        FilteredScratch { actions }
+    }
+
     pub fn into_sync(self) -> SyncScratch {
         SyncScratch(Arc::new(Mutex::new(self)))
     }
@@ -118,7 +145,8 @@ impl Scratch {
                 .entry_hash()
                 // TODO: let's use Arc<Entry> from here on instead of dereferencing
                 .and_then(|eh| self.entries.get(eh).map(|e| (**e).clone()));
-            Record::new(shh, entry)
+            let record_entry = RecordEntry::new(shh.action().entry_visibility(), entry);
+            Record::new(shh, record_entry)
         })
     }
 
@@ -128,13 +156,19 @@ impl Scratch {
     }
 
     fn get_exact_record(&self, hash: &ActionHash) -> StateQueryResult<Option<Record>> {
-        Ok(self.get_action(hash)?.map(|shh| {
-            let entry = shh
-                .action()
-                .entry_hash()
-                .and_then(|eh| self.get_entry(eh).ok());
-            Record::new(shh, entry.flatten())
-        }))
+        // `Store::get_action` (`query.rs`) belongs to the legacy SQL query
+        // machinery and returns a legacy action, so this searches the (v2)
+        // `actions()` directly instead of calling it.
+        let Some(shh) = self.actions().find(|h| h.action_address() == hash).cloned() else {
+            return Ok(None);
+        };
+        let entry = shh
+            .action()
+            .entry_hash()
+            .and_then(|eh| self.get_entry(eh).ok())
+            .flatten();
+        let record_entry = RecordEntry::new(shh.action().entry_visibility(), entry);
+        Ok(Some(Record::new(shh, record_entry)))
     }
 
     fn get_any_record(&self, hash: &EntryHash) -> StateQueryResult<Option<Record>> {
@@ -148,7 +182,8 @@ impl Scratch {
                         .unwrap_or(false)
                 })?
                 .clone();
-            Some(Record::new(shh, Some(entry)))
+            let record_entry = RecordEntry::new(shh.action().entry_visibility(), Some(entry));
+            Some(Record::new(shh, record_entry))
         });
         Ok(r)
     }
@@ -206,6 +241,9 @@ impl SyncScratch {
     }
 }
 
+// `Store` (`query.rs`) belongs to the legacy SQL query machinery and is typed
+// over the legacy `SignedActionHashed`/`Record`; every method here converts
+// the (v2) scratch action to legacy at the return boundary.
 impl Store for Scratch {
     fn get_entry(&self, hash: &EntryHash) -> StateQueryResult<Option<Entry>> {
         Ok(self.entries.get(hash).map(|arc| (**arc).clone()))
@@ -219,11 +257,11 @@ impl Store for Scratch {
         Ok(self.actions().any(|h| h.action_address() == hash))
     }
 
-    fn get_action(&self, hash: &ActionHash) -> StateQueryResult<Option<SignedActionHashed>> {
+    fn get_action(&self, hash: &ActionHash) -> StateQueryResult<Option<LegacySignedActionHashed>> {
         Ok(self
             .actions()
             .find(|&h| h.action_address() == hash)
-            .cloned())
+            .map(to_legacy_signed_action))
     }
 
     fn get_warrants_for_agent(
@@ -245,14 +283,21 @@ impl Store for Scratch {
             .collect())
     }
 
-    fn get_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
-        match hash.clone().into_primitive() {
+    fn get_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<LegacyRecord>> {
+        let record = match hash.clone().into_primitive() {
             AnyDhtHashPrimitive::Entry(hash) => self.get_any_record(&hash),
             AnyDhtHashPrimitive::Action(hash) => self.get_exact_record(&hash),
-        }
+        }?;
+        Ok(record.map(|record| {
+            let (signed_action, entry) = record.into_inner();
+            LegacyRecord {
+                signed_action: to_legacy_signed_action(&signed_action),
+                entry,
+            }
+        }))
     }
 
-    fn get_public_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
+    fn get_public_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<LegacyRecord>> {
         self.get_record(hash)
     }
 
@@ -276,8 +321,37 @@ impl Store for Scratch {
         &self,
         hash: &AnyDhtHash,
         _author: Option<&AgentPubKey>,
-    ) -> StateQueryResult<Option<Record>> {
+    ) -> StateQueryResult<Option<LegacyRecord>> {
         self.get_record(hash)
+    }
+}
+
+impl FilteredScratch {
+    pub fn drain(&mut self) -> impl Iterator<Item = LegacySignedActionHashed> + '_ {
+        self.actions.drain(..)
+    }
+}
+
+impl<Q> Stores<Q> for Scratch
+where
+    Q: Query<Item = Judged<LegacySignedActionHashed>>,
+{
+    type O = FilteredScratch;
+
+    fn get_initial_data(&self, query: Q) -> StateQueryResult<Self::O> {
+        Ok(self.as_filter(query.as_filter()))
+    }
+}
+
+impl StoresIter<Judged<LegacySignedActionHashed>> for FilteredScratch {
+    fn iter(&mut self) -> StateQueryResult<StmtIter<'_, Judged<LegacySignedActionHashed>>> {
+        // We are assuming data in the scratch space is valid even though
+        // it hasn't been validated yet because if it does fail validation
+        // then this transaction will be rolled back.
+        // TODO: Write test to prove this assumption.
+        Ok(Box::new(fallible_iterator::convert(
+            self.drain().map(Judged::valid).map(Ok),
+        )))
     }
 }
 
