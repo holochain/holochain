@@ -21,8 +21,9 @@ impl DbRead<Dht> {
         t_start_micros: i64,
         t_end_micros: i64,
     ) -> sqlx::Result<Vec<K2OpHashRow>> {
+        let mut conn = self.timed_conn().await?;
         sync_queries::op_hashes_in_time_slice(
-            self.pool(),
+            &mut *conn,
             ArcBounds {
                 start: arc_start,
                 end: arc_end,
@@ -42,8 +43,9 @@ impl DbRead<Dht> {
         t_min_micros: i64,
         limit: u32,
     ) -> sqlx::Result<Vec<K2OpIdSinceRow>> {
+        let mut conn = self.timed_conn().await?;
         sync_queries::op_ids_since_time_batch(
-            self.pool(),
+            &mut *conn,
             ArcBounds {
                 start: arc_start,
                 end: arc_end,
@@ -60,7 +62,8 @@ impl DbRead<Dht> {
         &self,
         op_hashes: &[Vec<u8>],
     ) -> sqlx::Result<Vec<K2OpPresentRow>> {
-        sync_queries::check_op_hashes_present(self.pool(), op_hashes).await
+        let mut conn = self.timed_conn().await?;
+        sync_queries::check_op_hashes_present(&mut *conn, op_hashes).await
     }
 
     /// Full chain-op rows (joined with `Action` and optional `Entry`) for
@@ -69,7 +72,8 @@ impl DbRead<Dht> {
         &self,
         op_hashes: &[Vec<u8>],
     ) -> sqlx::Result<Vec<K2ChainOpForWireRow>> {
-        sync_queries::get_chain_ops_for_wire(self.pool(), op_hashes).await
+        let mut conn = self.timed_conn().await?;
+        sync_queries::get_chain_ops_for_wire(&mut *conn, op_hashes).await
     }
 
     /// Full warrant rows for the given op hashes.
@@ -77,7 +81,8 @@ impl DbRead<Dht> {
         &self,
         op_hashes: &[Vec<u8>],
     ) -> sqlx::Result<Vec<K2WarrantForWireRow>> {
-        sync_queries::get_warrants_for_wire(self.pool(), op_hashes).await
+        let mut conn = self.timed_conn().await?;
+        sync_queries::get_warrants_for_wire(&mut *conn, op_hashes).await
     }
 
     /// Earliest authored timestamp across both tables within the arc, or
@@ -87,8 +92,9 @@ impl DbRead<Dht> {
         arc_start: u32,
         arc_end: u32,
     ) -> sqlx::Result<Option<i64>> {
+        let mut conn = self.timed_conn().await?;
         sync_queries::earliest_authored_timestamp_in_arc(
-            self.pool(),
+            &mut *conn,
             ArcBounds {
                 start: arc_start,
                 end: arc_end,
@@ -100,40 +106,46 @@ impl DbRead<Dht> {
     /// Total count of every integrated op + warrant (no `locally_validated`
     /// filter).
     pub async fn count_integrated_ops(&self) -> sqlx::Result<u64> {
-        Ok(sync_queries::count_integrated_ops(self.pool()).await? as u64)
+        let mut conn = self.timed_conn().await?;
+        Ok(sync_queries::count_integrated_ops(&mut *conn).await? as u64)
     }
 
     /// `(validation_limbo, integration_limbo, integrated)` counts for the
     /// integration-state report. Integrated counts locally-validated
     /// `ChainOp` rows (cache-only copies excluded) plus all `WarrantOp` rows.
     pub async fn limbo_state_counts(&self) -> sqlx::Result<(i64, i64, i64)> {
-        sync_queries::limbo_state_counts(self.pool()).await
+        let mut conn = self.timed_conn().await?;
+        sync_queries::limbo_state_counts(&mut *conn).await
     }
 
     /// Count of integrated, locally-validated `ChainOp` rows that passed
     /// validation (rejected and GET-cached ops excluded).
     #[cfg(any(test, feature = "inspection"))]
     pub async fn count_valid_integrated_ops(&self) -> sqlx::Result<u64> {
-        Ok(sync_queries::count_valid_integrated_ops(self.pool()).await? as u64)
+        let mut conn = self.timed_conn().await?;
+        Ok(sync_queries::count_valid_integrated_ops(&mut *conn).await? as u64)
     }
 
     /// Count of `LimboChainOp` rows that passed both sys- and app-validation
     /// but are not yet integrated.
     #[cfg(any(test, feature = "inspection"))]
     pub async fn count_valid_not_integrated_ops(&self) -> sqlx::Result<u64> {
-        Ok(sync_queries::count_valid_not_integrated_ops(self.pool()).await? as u64)
+        let mut conn = self.timed_conn().await?;
+        Ok(sync_queries::count_valid_not_integrated_ops(&mut *conn).await? as u64)
     }
 
     /// Count of not-yet-integrated chain ops authored by `author`.
     #[cfg(any(test, feature = "inspection"))]
     pub async fn count_pending_ops_for_author(&self, author: &AgentPubKey) -> sqlx::Result<u64> {
-        Ok(sync_queries::count_pending_ops_for_author(self.pool(), author).await? as u64)
+        let mut conn = self.timed_conn().await?;
+        Ok(sync_queries::count_pending_ops_for_author(&mut *conn, author).await? as u64)
     }
 
     /// Hashes of integrated, rejected chain ops (GET-cached copies excluded).
     #[cfg(any(test, feature = "inspection"))]
     pub async fn rejected_integrated_op_hashes(&self) -> sqlx::Result<Vec<DhtOpHash>> {
-        Ok(sync_queries::rejected_integrated_op_hashes(self.pool())
+        let mut conn = self.timed_conn().await?;
+        Ok(sync_queries::rejected_integrated_op_hashes(&mut *conn)
             .await?
             .into_iter()
             .map(DhtOpHash::from_raw_36)
@@ -143,25 +155,29 @@ impl DbRead<Dht> {
     /// Total count of every op (integrated and limbo) held in this DHT store.
     #[cfg(any(test, feature = "inspection"))]
     pub async fn count_all_ops(&self) -> sqlx::Result<u64> {
-        Ok(sync_queries::count_all_ops(self.pool()).await? as u64)
+        let mut conn = self.timed_conn().await?;
+        Ok(sync_queries::count_all_ops(&mut *conn).await? as u64)
     }
 
     /// Whether the integrated chain op `op_hash` requires a validation receipt.
     #[cfg(any(test, feature = "inspection"))]
     pub async fn op_requires_receipt(&self, op_hash: &DhtOpHash) -> sqlx::Result<bool> {
-        sync_queries::op_requires_receipt(self.pool(), op_hash).await
+        let mut conn = self.timed_conn().await?;
+        sync_queries::op_requires_receipt(&mut *conn, op_hash).await
     }
 
     /// Whether `op_hash` is present in the limbo (not-yet-integrated) chain ops.
     #[cfg(any(test, feature = "inspection"))]
     pub async fn limbo_op_exists(&self, op_hash: &DhtOpHash) -> sqlx::Result<bool> {
-        sync_queries::limbo_op_exists(self.pool(), op_hash).await
+        let mut conn = self.timed_conn().await?;
+        sync_queries::limbo_op_exists(&mut *conn, op_hash).await
     }
 
     /// Hashes of limbo chain ops flagged as requiring a validation receipt.
     #[cfg(any(test, feature = "inspection"))]
     pub async fn limbo_op_hashes_requiring_receipt(&self) -> sqlx::Result<Vec<DhtOpHash>> {
-        Ok(sync_queries::limbo_op_hashes_requiring_receipt(self.pool())
+        let mut conn = self.timed_conn().await?;
+        Ok(sync_queries::limbo_op_hashes_requiring_receipt(&mut *conn)
             .await?
             .into_iter()
             .map(DhtOpHash::from_raw_36)
@@ -171,7 +187,8 @@ impl DbRead<Dht> {
     /// Hashes of integrated chain ops with the given DHT `basis`.
     #[cfg(any(test, feature = "inspection"))]
     pub async fn get_ops_at_basis(&self, basis: &AnyLinkableHash) -> sqlx::Result<Vec<DhtOpHash>> {
-        Ok(sync_queries::get_ops_at_basis(self.pool(), basis)
+        let mut conn = self.timed_conn().await?;
+        Ok(sync_queries::get_ops_at_basis(&mut *conn, basis)
             .await?
             .into_iter()
             .map(DhtOpHash::from_raw_36)
@@ -181,7 +198,8 @@ impl DbRead<Dht> {
     /// Count of rows in the public `Entry` table.
     #[cfg(any(test, feature = "inspection"))]
     pub async fn count_entries(&self) -> sqlx::Result<u64> {
-        Ok(sync_queries::count_entries(self.pool()).await? as u64)
+        let mut conn = self.timed_conn().await?;
+        Ok(sync_queries::count_entries(&mut *conn).await? as u64)
     }
 
     /// Integrated chain-op rows for the integration dump, paginated forward
@@ -191,7 +209,8 @@ impl DbRead<Dht> {
         &self,
         after: Option<(i64, &[u8])>,
     ) -> sqlx::Result<Vec<DumpChainOpRow>> {
-        sync_queries::integrated_chain_ops_for_dump(self.pool(), after).await
+        let mut conn = self.timed_conn().await?;
+        sync_queries::integrated_chain_ops_for_dump(&mut *conn, after).await
     }
 
     /// Limbo chain-op rows for the integration dump. `ready` selects the
@@ -200,7 +219,8 @@ impl DbRead<Dht> {
         &self,
         ready: bool,
     ) -> sqlx::Result<Vec<K2ChainOpForWireRow>> {
-        sync_queries::limbo_chain_ops_for_dump(self.pool(), ready).await
+        let mut conn = self.timed_conn().await?;
+        sync_queries::limbo_chain_ops_for_dump(&mut *conn, ready).await
     }
 
     /// Chain-op rows authored and shared by `author`, joined for wire
@@ -210,11 +230,13 @@ impl DbRead<Dht> {
         &self,
         author: &AgentPubKey,
     ) -> sqlx::Result<Vec<K2ChainOpForWireRow>> {
-        sync_queries::ops_to_publish_for_wire(self.pool(), author).await
+        let mut conn = self.timed_conn().await?;
+        sync_queries::ops_to_publish_for_wire(&mut *conn, author).await
     }
 
     /// Every integrated warrant row for the integration dump.
     pub async fn integrated_warrants_for_dump(&self) -> sqlx::Result<Vec<K2WarrantForWireRow>> {
-        sync_queries::integrated_warrants_for_dump(self.pool()).await
+        let mut conn = self.timed_conn().await?;
+        sync_queries::integrated_warrants_for_dump(&mut *conn).await
     }
 }

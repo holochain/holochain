@@ -18,14 +18,16 @@ impl DbWrite<Dht> {
 
 impl DbRead<Dht> {
     pub async fn get_warrant(&self, hash: DhtOpHash) -> sqlx::Result<Option<WarrantRow>> {
-        warrant::get_warrant(self.pool(), hash).await
+        let mut conn = self.timed_conn().await?;
+        warrant::get_warrant(&mut *conn, hash).await
     }
 
     pub async fn get_warrants_by_warrantee(
         &self,
         warrantee: AgentPubKey,
     ) -> sqlx::Result<Vec<WarrantRow>> {
-        warrant::get_warrants_by_warrantee(self.pool(), warrantee).await
+        let mut conn = self.timed_conn().await?;
+        warrant::get_warrants_by_warrantee(&mut *conn, warrantee).await
     }
 
     /// Warrants authored by `author` (the warrant issuer).
@@ -33,7 +35,8 @@ impl DbRead<Dht> {
         &self,
         author: AgentPubKey,
     ) -> sqlx::Result<Vec<WarrantRow>> {
-        warrant::get_warrants_by_author(self.pool(), author).await
+        let mut conn = self.timed_conn().await?;
+        warrant::get_warrants_by_author(&mut *conn, author).await
     }
 
     /// Terminal validation status of an integrated warrant op, or `None`.
@@ -41,7 +44,8 @@ impl DbRead<Dht> {
         &self,
         op_hash: &DhtOpHash,
     ) -> sqlx::Result<Option<i64>> {
-        warrant::warrant_op_validation_status(self.pool(), op_hash).await
+        let mut conn = self.timed_conn().await?;
+        warrant::warrant_op_validation_status(&mut *conn, op_hash).await
     }
 
     /// Serialized `WarrantProof`s of pending-or-valid warrants against
@@ -51,6 +55,7 @@ impl DbRead<Dht> {
         &self,
         warrantee: &AgentPubKey,
     ) -> sqlx::Result<Vec<Vec<u8>>> {
-        warrant::pending_or_valid_warrant_proofs_by_warrantee(self.pool(), warrantee).await
+        let mut conn = self.timed_conn().await?;
+        warrant::pending_or_valid_warrant_proofs_by_warrantee(&mut *conn, warrantee).await
     }
 }

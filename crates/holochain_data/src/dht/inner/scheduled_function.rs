@@ -111,6 +111,52 @@ where
         .collect())
 }
 
+/// Return live scheduled-function rows for `author` where `now` falls between
+/// `start_at` and `end_at` (inclusive on both sides): `start <= now AND now <= end`.
+///
+/// Returns `(zome_name, scheduled_fn, maybe_schedule_blob, ephemeral)` tuples,
+/// ordered by `start_at ASC`.
+pub(crate) async fn get_live_scheduled_functions<'e, E>(
+    executor: E,
+    author: &AgentPubKey,
+    now: Timestamp,
+) -> sqlx::Result<Vec<(String, String, Vec<u8>, bool)>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    #[derive(sqlx::FromRow)]
+    struct Row {
+        zome_name: String,
+        scheduled_fn: String,
+        maybe_schedule: Vec<u8>,
+        ephemeral: i64,
+    }
+
+    let rows: Vec<Row> = sqlx::query_as(
+        "SELECT zome_name, scheduled_fn, maybe_schedule, ephemeral
+         FROM ScheduledFunction
+         WHERE author = ? AND start_at <= ? AND ? <= end_at
+         ORDER BY start_at ASC",
+    )
+    .bind(author.get_raw_36())
+    .bind(now.as_micros())
+    .bind(now.as_micros())
+    .fetch_all(executor)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .map(|r| {
+            (
+                r.zome_name,
+                r.scheduled_fn,
+                r.maybe_schedule,
+                r.ephemeral != 0,
+            )
+        })
+        .collect())
+}
+
 /// Delete all live ephemeral scheduled-function rows for `author` whose
 /// `start_at` is at or before `now`. Returns the number of rows deleted.
 pub(crate) async fn delete_live_ephemeral_scheduled_functions<'e, E>(
@@ -130,6 +176,49 @@ where
     .execute(executor)
     .await?;
     Ok(result.rows_affected())
+}
+
+/// Delete every ephemeral scheduled-function row in the store, regardless of
+/// author or liveness. Returns the number of rows deleted.
+///
+/// Used at conductor startup to clear ephemeral schedules left over from a
+/// previous run — ephemeral schedules do not survive a reboot.
+pub(crate) async fn delete_all_ephemeral_scheduled_functions<'e, E>(
+    executor: E,
+) -> sqlx::Result<u64>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let result = sqlx::query("DELETE FROM ScheduledFunction WHERE ephemeral = 1")
+        .execute(executor)
+        .await?;
+    Ok(result.rows_affected())
+}
+
+/// Return `true` if a scheduled-function row exists for the given
+/// `(author, zome_name, scheduled_fn)` tuple, regardless of liveness — i.e.
+/// whether `now` falls within the row's `[start_at, end_at]` window.
+pub(crate) async fn is_function_scheduled<'e, E>(
+    executor: E,
+    author: &AgentPubKey,
+    zome_name: &str,
+    scheduled_fn: &str,
+) -> sqlx::Result<bool>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let row: (i64,) = sqlx::query_as(
+        "SELECT EXISTS (
+            SELECT 1 FROM ScheduledFunction
+            WHERE author = ? AND zome_name = ? AND scheduled_fn = ?
+         )",
+    )
+    .bind(author.get_raw_36())
+    .bind(zome_name)
+    .bind(scheduled_fn)
+    .fetch_one(executor)
+    .await?;
+    Ok(row.0 != 0)
 }
 
 #[cfg(test)]

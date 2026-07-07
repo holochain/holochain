@@ -158,11 +158,10 @@ mod tests {
     use std::sync::Arc;
 
     async fn get_chain(cell: &SweetCell, keystore: MetaLairClient) -> SourceChain {
-        let dht_store = holochain_state::test_utils::test_dht_store(cell.dna_hash().clone()).await;
         SourceChain::new(
             cell.authored_db().clone(),
             cell.dht_db().clone(),
-            dht_store,
+            cell.dht_store().clone(),
             keystore,
             cell.agent_pubkey().clone(),
         )

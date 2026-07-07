@@ -5,8 +5,11 @@
 //! obtain a reference from [`Space`](crate) and invoke named methods; they do
 //! not need to interact with the underlying handle directly.
 
-use holo_hash::{AgentPubKey, DhtOpHash, HasHash};
-use holochain_data::dht::{InsertLimboChainOp, InsertLimboWarrant, InsertScheduledFunction};
+use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, EntryHash, HasHash};
+use holochain_data::dht::{
+    InsertLimboChainOp, InsertLimboWarrant, InsertScheduledFunction,
+    RemoveCountersigningSessionOutcome,
+};
 use holochain_data::kind::Dht;
 use holochain_data::DbWrite;
 use holochain_types::dht_op::{DhtOp, DhtOpHashed};
@@ -14,6 +17,7 @@ use holochain_types::prelude::{Schedule, ScheduledFn, Timestamp};
 use holochain_zome_types::schedule::ScheduleError;
 
 use crate::mutations::{StateMutationError, StateMutationResult};
+use crate::query::StateQueryResult;
 
 /// Summary of a single op promoted by [`DhtStore::integrate_ready_ops`].
 ///
@@ -157,6 +161,20 @@ impl<Db> DhtStore<Db> {
 }
 
 impl DhtStore<DbWrite<Dht>> {
+    /// Acquire the per-author source-chain write permit for this store.
+    ///
+    /// Serializes source-chain flushes for a single `(DNA, author)` chain so
+    /// two concurrent flushes cannot both pass the as-at check and fork the
+    /// chain. Different authors — and the same author on different DNAs — never
+    /// block one another. See
+    /// [`DbWrite::acquire_chain_write_permit`](holochain_data::DbWrite::acquire_chain_write_permit).
+    pub async fn acquire_chain_write_permit(
+        &self,
+        author: &AgentPubKey,
+    ) -> holochain_data::dht::ChainWritePermit {
+        self.db.acquire_chain_write_permit(author).await
+    }
+
     /// Delete all live ephemeral scheduled-function rows for `author` at or
     /// before `now`. Returns the number of rows deleted.
     pub async fn delete_live_ephemeral_scheduled_functions(
@@ -168,6 +186,16 @@ impl DhtStore<DbWrite<Dht>> {
             .db
             .delete_live_ephemeral_scheduled_functions(author, now)
             .await?)
+    }
+
+    /// Delete every ephemeral scheduled-function row for this DNA, regardless
+    /// of author or liveness. Returns the number of rows deleted.
+    ///
+    /// Called once per space at conductor startup to clear ephemeral schedules
+    /// left over from a previous run — ephemeral schedules do not survive a
+    /// reboot. A single call covers every author.
+    pub async fn delete_all_ephemeral_scheduled_functions(&self) -> DhtStoreResult<u64> {
+        Ok(self.db.delete_all_ephemeral_scheduled_functions().await?)
     }
 
     /// Re-evaluate every expired persisted scheduled function for `author` at
@@ -319,6 +347,35 @@ impl DhtStore<DbWrite<Dht>> {
                 scheduled_fn.fn_name().0.as_str(),
             )
             .await?)
+    }
+
+    /// Return the live scheduled functions for `author` at `now`.
+    ///
+    /// A function is "live" when `start_at <= now AND now <= end_at`.
+    /// Returns `(ScheduledFn, Option<Schedule>, ephemeral)` tuples ordered by
+    /// `start_at ASC`.
+    pub async fn live_scheduled_functions(
+        &self,
+        author: &AgentPubKey,
+        now: Timestamp,
+    ) -> StateQueryResult<Vec<(ScheduledFn, Option<Schedule>, bool)>> {
+        let rows = self
+            .db
+            .as_ref()
+            .get_live_scheduled_functions(author, now)
+            .await?;
+
+        let mut result = Vec::with_capacity(rows.len());
+        for (zome_name, fn_name, maybe_schedule_blob, ephemeral) in rows {
+            let maybe_schedule: Option<Schedule> =
+                holochain_serialized_bytes::decode(&maybe_schedule_blob)?;
+            result.push((
+                ScheduledFn::new(zome_name.into(), fn_name.into()),
+                maybe_schedule,
+                ephemeral,
+            ));
+        }
+        Ok(result)
     }
 
     /// Insert a `SignedValidationReceipt` into the `ValidationReceipt` table
@@ -902,6 +959,65 @@ impl DhtStore<DbWrite<Dht>> {
             .await?)
     }
 
+    /// Try to acquire the source-chain lock for `author`.
+    ///
+    /// Returns `Ok(true)` when the caller holds the lock (no lock existed,
+    /// the existing lock had expired relative to `now`, or the existing lock's
+    /// `subject` matched and was therefore extended), and `Ok(false)` when a
+    /// different subject still holds an unexpired lock.
+    pub async fn acquire_chain_lock(
+        &self,
+        author: &AgentPubKey,
+        subject: &[u8],
+        expires_at: Timestamp,
+        now: Timestamp,
+    ) -> StateMutationResult<bool> {
+        Ok(self
+            .db
+            .acquire_chain_lock(author, subject, expires_at, now)
+            .await?)
+    }
+
+    /// Release the source-chain lock for `author` by deleting the lock row.
+    ///
+    /// Releasing a non-existent lock is a no-op.
+    pub async fn release_chain_lock(&self, author: &AgentPubKey) -> StateMutationResult<()> {
+        self.db.release_chain_lock(author).await?;
+        Ok(())
+    }
+
+    /// Force-remove a self-authored countersigning session (its `Action`,
+    /// `ChainOp`/`ChainOpPublish` rows and entry) from the DhtStore,
+    /// identified by `(action_hash, entry_hash)`.
+    ///
+    /// This is defensive about sessions whose ops have already been published:
+    /// if any of the action's ops has a `ChainOpPublish` row with
+    /// `withhold_publish IS NULL` the removal is refused with
+    /// [`StateMutationError::CannotRemoveFullyPublished`] and no rows are
+    /// touched. The guard and deletes run in a single transaction.
+    pub async fn remove_countersigning_session(
+        &self,
+        action_hash: ActionHash,
+        entry_hash: EntryHash,
+    ) -> StateMutationResult<()> {
+        let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
+        let outcome = tx
+            .remove_countersigning_session(&action_hash, &entry_hash)
+            .await
+            .map_err(StateMutationError::from)?;
+        match outcome {
+            RemoveCountersigningSessionOutcome::AlreadyPublished => {
+                // Drop the transaction without committing (no rows were
+                // written) and refuse the removal.
+                Err(StateMutationError::CannotRemoveFullyPublished)
+            }
+            RemoveCountersigningSessionOutcome::Removed => {
+                tx.commit().await.map_err(StateMutationError::from)?;
+                Ok(())
+            }
+        }
+    }
+
     /// Downgrade this writable store to a read-only store.
     pub fn as_read(&self) -> DhtStoreRead {
         DhtStore::new(self.db.as_ref().clone())
@@ -1089,7 +1205,7 @@ impl DhtStore<DbWrite<Dht>> {
         let now = Timestamp::now();
 
         let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
-        tx.insert_action(&new_sah, None)
+        tx.insert_action(&new_sah, Some(RecordValidity::Accepted))
             .await
             .map_err(StateMutationError::from)?;
         tx.insert_chain_op(InsertChainOp {
@@ -1116,6 +1232,92 @@ impl DhtStore<DbWrite<Dht>> {
         .await
         .map_err(StateMutationError::from)?;
         tx.commit().await.map_err(StateMutationError::from)?;
+        Ok(())
+    }
+
+    /// Test-only: insert an integrated self-authored chain op
+    /// (`locally_validated = true`, `when_integrated = now`) plus its
+    /// `ChainOpPublish` row, WITHOUT inserting the parent `Action`.
+    ///
+    /// A committed record produces several ops that share one action — a
+    /// `Create`, for instance, yields `StoreRecord`, `RegisterAgentActivity`,
+    /// and `StoreEntry` ops — all written integrated by the source-chain flush.
+    /// Use this after
+    /// [`test_insert_authored_chain_op`](DhtStore::test_insert_authored_chain_op),
+    /// which inserts the action once, to add the sibling op types for the same
+    /// action without colliding on the `Action` primary key.
+    pub async fn test_insert_additional_integrated_op(
+        &self,
+        op: DhtOpHashed,
+        withhold_publish: Option<bool>,
+    ) -> StateMutationResult<()> {
+        use holochain_data::dht::InsertChainOp;
+        use holochain_zome_types::dht_v2::RecordValidity;
+
+        let op_hash = op.as_hash().clone();
+        let serialized_size = holochain_serialized_bytes::encode(op.as_content())
+            .map_err(StateMutationError::from)?
+            .len() as u32;
+        let chain_op = match op.into_inner().0 {
+            DhtOp::ChainOp(c) => c,
+            DhtOp::WarrantOp(_) => {
+                panic!("test_insert_additional_integrated_op requires a ChainOp")
+            }
+        };
+
+        let action_hash = holo_hash::ActionHash::with_data_sync(chain_op.signed_action().action());
+        let basis_hash = chain_op.dht_basis();
+        let storage_center_loc = basis_hash.get_loc();
+        let now = Timestamp::now();
+
+        let mut tx = self.db.begin().await.map_err(StateMutationError::from)?;
+        tx.insert_chain_op(InsertChainOp {
+            op_hash: &op_hash,
+            action_hash: &action_hash,
+            op_type: i64::from(chain_op.get_type()),
+            basis_hash: &basis_hash,
+            storage_center_loc,
+            validation_status: RecordValidity::Accepted,
+            locally_validated: true,
+            require_receipt: true,
+            when_received: now,
+            when_integrated: now,
+            serialized_size,
+        })
+        .await
+        .map_err(StateMutationError::from)?;
+        tx.insert_chain_op_publish(&op_hash, None, None, withhold_publish)
+            .await
+            .map_err(StateMutationError::from)?;
+        tx.commit().await.map_err(StateMutationError::from)?;
+        Ok(())
+    }
+
+    /// Test-only: insert an entry into the store, routing a private entry to
+    /// the `PrivateEntry` table (owned by `private_author`) and a public entry
+    /// to the `Entry` table. Mirrors the entry write in the flush path so that
+    /// store reads which resolve a full record — e.g.
+    /// [`current_countersigning_session`](DhtStore::current_countersigning_session) —
+    /// can find the entry of a hand-authored op inserted via
+    /// [`test_insert_authored_chain_op`](DhtStore::test_insert_authored_chain_op).
+    pub async fn test_insert_entry(
+        &self,
+        entry_hash: &holo_hash::EntryHash,
+        entry: &holochain_types::prelude::Entry,
+        private_author: Option<&AgentPubKey>,
+    ) -> StateMutationResult<()> {
+        match private_author {
+            Some(author) => self
+                .db
+                .insert_private_entry(entry_hash, author, entry)
+                .await
+                .map_err(StateMutationError::from)?,
+            None => self
+                .db
+                .insert_entry(entry_hash, entry)
+                .await
+                .map_err(StateMutationError::from)?,
+        }
         Ok(())
     }
 

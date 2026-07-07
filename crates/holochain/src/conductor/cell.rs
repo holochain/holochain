@@ -37,7 +37,6 @@ use holochain_serialized_bytes::SerializedBytes;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::*;
-use holochain_state::schedule::live_scheduled_fns;
 use holochain_types::cell_config_overrides::CellConfigOverrides;
 use kitsune2_api::BoxFut;
 use std::hash::Hash;
@@ -228,31 +227,15 @@ impl Cell {
     }
 
     pub(super) async fn dispatch_scheduled_fns(self: Arc<Self>, now: Timestamp) {
-        let authored_db = match self.get_or_create_authored_db() {
-            Ok(db) => db,
-            Err(e) => {
-                error!(
-                    "error getting authored db, cannot dispatch scheduled functions: {:?}",
-                    e
-                );
-                return;
-            }
-        };
-
         let author = self.id.agent_pubkey().clone();
-        let live_fns = authored_db
-            .write_async(move |txn| {
-                // Rescheduling should not fail as the data in the database
-                // should be valid schedules only.
-                reschedule_expired(txn, now, &author)?;
-                let lives = live_scheduled_fns(txn, now, &author);
-                // We know what to run so we can delete the ephemerals.
-                if lives.is_ok() {
-                    // Failing to delete should rollback this attempt.
-                    delete_live_ephemeral_scheduled_fns(txn, now, &author)?;
-                }
-                lives
-            })
+        self.space
+            .dht_store
+            .reschedule_expired_persisted(&author, now)
+            .await;
+        let live_fns = self
+            .space
+            .dht_store
+            .live_scheduled_functions(&author, now)
             .await;
 
         match live_fns {
@@ -270,11 +253,6 @@ impl Cell {
                 {
                     error!("error deleting live ephemeral scheduled functions: {:?}", e);
                 }
-
-                self.space
-                    .dht_store
-                    .reschedule_expired_persisted(&author_for_new_db, now)
-                    .await;
 
                 let mut tasks = vec![];
                 let mut dispatched: Vec<(ScheduledFn, bool)> = Vec::with_capacity(live_fns.len());
@@ -320,8 +298,8 @@ impl Cell {
                 let results: Vec<CellResult<ZomeCallResult>> =
                     futures::future::join_all(tasks).await;
 
-                // Pre-compute what each dispatched function should do in the new DHT DB,
-                // mirroring the decisions the legacy `write_async` block will make below.
+                // Decide what each dispatched function should do in the merged
+                // store based on its zome-call result.
                 // `None`         => skip (ephemeral fn, no persistent state to update)
                 // `Some(None)`   => delete (unschedule the persisted fn)
                 // `Some(Some(s))`=> insert/upsert with schedule `s`
@@ -334,7 +312,7 @@ impl Cell {
                                 match extern_io.decode::<Option<Schedule>>() {
                                     Ok(Some(s)) => Some(Some(s)),
                                     // Persisted fn returned None or failed to decode →
-                                    // legacy will unschedule it.
+                                    // unschedule it.
                                     Ok(None) | Err(_) => {
                                         if *ephemeral {
                                             None
@@ -344,7 +322,7 @@ impl Cell {
                                     }
                                 }
                             }
-                            // Any error in the zome call → legacy unschedules persisted fns.
+                            // Any error in the zome call → unschedule persisted fns.
                             _ => {
                                 if *ephemeral {
                                     None
@@ -357,60 +335,7 @@ impl Cell {
                     })
                     .collect();
 
-                let author = self.id.agent_pubkey().clone();
-                // In case of an error, a persisted fn needs to be unscheduled.
-                let legacy_write = authored_db
-                    .write_async(move |txn| {
-                        for ((scheduled_fn, ephemeral), result) in dispatched.into_iter().zip(results.iter()) {
-                            match result {
-                                Ok(Ok(ZomeCallResponse::Ok(extern_io))) => {
-                                    let next_schedule: Schedule = match extern_io.decode() {
-                                        Ok(Some(v)) => v,
-                                        Ok(None) => {
-                                            // If the schedule of a persisted fn is `None` then it should be unscheduled.
-                                            if !ephemeral {
-                                                unschedule_fn(txn, &author, &scheduled_fn);
-                                            }
-                                            continue;
-                                        }
-                                        Err(e) => {
-                                            error!("scheduled zome call error in ExternIO::decode: {:?}", e);
-                                            if !ephemeral {
-                                                unschedule_fn(txn, &author, &scheduled_fn);
-                                            }
-                                            continue;
-                                        }
-                                    };
-                                    if let Err(e) = schedule_fn(
-                                        txn,
-                                        &author,
-                                        scheduled_fn.clone(),
-                                        Some(next_schedule),
-                                        now,
-                                    ) {
-                                        error!("scheduled zome call error in schedule_fn: {:?}", e);
-                                        if !ephemeral {
-                                            unschedule_fn(txn, &author, &scheduled_fn);
-                                        }
-                                        continue;
-                                    }
-                                }
-                                errorish => {
-                                    error!("scheduled zome call error: {:?}", errorish);
-                                    if !ephemeral {
-                                        unschedule_fn(txn, &author, &scheduled_fn);
-                                    }
-                                },
-                            }
-                        }
-                        Result::<(), DatabaseError>::Ok(())
-                    })
-                    .await;
-                if let Err(ref err) = legacy_write {
-                    error!("error applying legacy scheduled-fn updates: {:?}", err);
-                }
-
-                // Mirror the unschedule/reschedule decisions in the new DHT DB.
+                // Apply the unschedule/reschedule decisions to the DhtStore.
                 for (scheduled_fn, action) in new_db_decisions {
                     match action {
                         // Ephemeral fn: no persistent state to update.
@@ -444,6 +369,20 @@ impl Cell {
                                     "error upserting scheduled function {:?}: {:?}",
                                     scheduled_fn, e
                                 );
+                                // Upsert failed (e.g. invalid crontab string): remove the
+                                // stale row so it does not trigger an extra dispatch on the
+                                // next scheduler tick.
+                                if let Err(e2) = self
+                                    .space
+                                    .dht_store
+                                    .unschedule_function(&author_for_new_db, &scheduled_fn)
+                                    .await
+                                {
+                                    error!(
+                                        "error unscheduling function {:?} after failed upsert: {:?}",
+                                        scheduled_fn, e2
+                                    );
+                                }
                             }
                         }
                     }

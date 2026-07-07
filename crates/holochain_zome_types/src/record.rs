@@ -27,11 +27,11 @@ impl HashableContent for SignedAction {
     }
 
     fn hashable_content(&self) -> HashableContentBytes {
-        HashableContentBytes::Content(
-            self.action()
-                .try_into()
-                .expect("Could not serialize HashableContent"),
-        )
+        // A `SignedAction` must hash to the same canonical `ActionHash` as its
+        // inner `Action`, so delegate to the inner `Action`'s hashable content
+        // to keep the identity consistent with `Action`, `SignedActionHashed`,
+        // and every stored `action_hash`.
+        self.action().hashable_content()
     }
 }
 

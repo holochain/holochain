@@ -3,13 +3,14 @@ use holochain_types::prelude::*;
 /// Storage info for DNA used by one or more hApps.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct DnaStorageInfo {
-    pub authored_data_size: usize,
-    pub authored_data_size_on_disk: usize,
+    /// Size in bytes of the data in use by the DhtStore.
     pub dht_data_size: usize,
+    /// Size in bytes on disk of the DhtStore, including free space reserved by
+    /// the database.
     pub dht_data_size_on_disk: usize,
-    pub cache_data_size: usize,
-    pub cache_data_size_on_disk: usize,
+    /// The hash of the DNA this storage information is for.
     pub dna_hash: DnaHash,
+    /// The installed apps that make use of this DNA.
     pub used_by: Vec<InstalledAppId>,
 }
 

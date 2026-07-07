@@ -841,10 +841,8 @@ mod network_impls {
     use crate::conductor::api::error::{
         zome_call_response_to_conductor_api_result, ConductorApiError,
     };
-    use futures::future::join_all;
     use holochain_conductor_api::ZomeCallParamsSigned;
     use holochain_conductor_api::{DnaStorageInfo, StorageBlob, StorageInfo};
-    use holochain_sqlite::stats::{get_size_on_disk, get_used_size};
     use holochain_state::conductor::WitnessNonceResult;
     use holochain_zome_types::block::BlockTargetId;
     use kitsune2_api::Url;
@@ -1020,47 +1018,12 @@ mod network_impls {
             dna_hash: &DnaHash,
             used_by: &[InstalledAppId],
         ) -> ConductorResult<StorageBlob> {
-            let authored_dbs = self.spaces.get_all_authored_dbs(dna_hash)?;
-            let dht_db = self.spaces.dht_db(dna_hash)?;
-            let cache_db = self.spaces.cache(dna_hash)?;
+            // Get the storage sizes from the DhtStore.
+            let dht_store = self.get_or_create_dht_store(dna_hash)?.as_read();
 
             Ok(StorageBlob::Dna(DnaStorageInfo {
-                authored_data_size_on_disk: join_all(
-                    authored_dbs
-                        .iter()
-                        .map(|db| db.read_async(get_size_on_disk)),
-                )
-                .await
-                .into_iter()
-                .map(|r| r.map_err(ConductorError::DatabaseError))
-                .collect::<Result<Vec<_>, _>>()?
-                .into_iter()
-                .sum(),
-                authored_data_size: join_all(
-                    authored_dbs.iter().map(|db| db.read_async(get_used_size)),
-                )
-                .await
-                .into_iter()
-                .map(|r| r.map_err(ConductorError::DatabaseError))
-                .collect::<Result<Vec<_>, _>>()?
-                .into_iter()
-                .sum(),
-                dht_data_size_on_disk: dht_db
-                    .read_async(get_size_on_disk)
-                    .map_err(ConductorError::DatabaseError)
-                    .await?,
-                dht_data_size: dht_db
-                    .read_async(get_used_size)
-                    .map_err(ConductorError::DatabaseError)
-                    .await?,
-                cache_data_size_on_disk: cache_db
-                    .read_async(get_size_on_disk)
-                    .map_err(ConductorError::DatabaseError)
-                    .await?,
-                cache_data_size: cache_db
-                    .read_async(get_used_size)
-                    .map_err(ConductorError::DatabaseError)
-                    .await?,
+                dht_data_size_on_disk: dht_store.size_on_disk().await? as usize,
+                dht_data_size: dht_store.used_size().await? as usize,
                 dna_hash: dna_hash.clone(),
                 used_by: used_by.to_vec(),
             }))
@@ -2289,19 +2252,16 @@ mod scheduler_impls {
             self: Arc<Self>,
             interval_period: std::time::Duration,
         ) -> StateMutationResult<()> {
-            // Clear all ephemeral cruft in all cells before starting a scheduler.
-            let tasks = self
-                .spaces
-                .get_from_spaces(|space| {
-                    let all_dbs = space.get_all_authored_dbs();
-
-                    all_dbs.into_iter().map(|db| async move {
-                        db.write_async(|txn| delete_all_ephemeral_scheduled_fns(txn))
-                            .await
-                    })
-                })
-                .into_iter()
-                .flatten();
+            // Clear all ephemeral cruft in all spaces before starting a
+            // scheduler. One call per space clears every author.
+            let tasks = self.spaces.get_from_spaces(|space| {
+                let dht_store = space.dht_store.clone();
+                async move {
+                    if let Err(e) = dht_store.delete_all_ephemeral_scheduled_functions().await {
+                        error!("error clearing ephemeral scheduled functions: {:?}", e);
+                    }
+                }
+            });
 
             futures::future::join_all(tasks).await;
 
@@ -2559,13 +2519,11 @@ mod misc_impls {
         /// Create a JSON dump of the cell's state
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
-            let cell = self.cell_by_id(cell_id).await?;
-            let authored_db = cell.get_or_create_authored_db()?;
             let dht_store = self.get_or_create_dht_store(cell_id.dna_hash())?;
             let agent_pub_key = cell_id.agent_pubkey().clone();
             let peer_dump = peer_store_dump(self, cell_id).await?;
             let source_chain_dump =
-                source_chain::dump_state(authored_db.clone().into(), agent_pub_key).await?;
+                source_chain::dump_state(&dht_store.as_read(), agent_pub_key).await?;
 
             let out = JsonDump {
                 peer_dump,
@@ -2627,11 +2585,9 @@ mod misc_impls {
             cell_id: &CellId,
             dht_ops_cursor: Option<DhtOpsCursor>,
         ) -> ConductorApiResult<FullStateDump> {
-            let authored_db =
-                self.get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())?;
             let dht_store = self.get_or_create_dht_store(cell_id.dna_hash())?;
             let source_chain_dump =
-                source_chain::dump_state(authored_db.into(), cell_id.agent_pubkey().clone())
+                source_chain::dump_state(&dht_store.as_read(), cell_id.agent_pubkey().clone())
                     .await?;
             let peer_dump = peer_store_dump(self, cell_id).await?;
 

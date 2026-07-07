@@ -9,20 +9,23 @@ use super::DhtStore;
 use crate::prelude::ActionSequenceAndHash;
 use crate::query::StateQueryResult;
 use crate::scratch::SyncScratch;
-use holo_hash::{AgentPubKey, AnyLinkableHash, DhtOpHash, ExternalHash, HasHash};
+use holo_hash::{
+    ActionHash, AgentPubKey, AnyLinkableHash, DhtOpHash, EntryHash, ExternalHash, HasHash,
+};
 use holochain_data::kind::Dht;
 use holochain_data::DbRead;
 use holochain_types::chain::ChainItem;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::prelude::{
     ActionHashedContainer, AgentActivityResponse, ChainItems, ChainItemsSource,
-    MustGetAgentActivityResponse, RegisterAgentActivity, Timestamp,
+    MustGetAgentActivityResponse, RegisterAgentActivity, ScheduledFn, Timestamp,
 };
 use holochain_types::warrant::WarrantOp;
 use holochain_zome_types::chain::{ChainFilter, LimitConditions};
 use holochain_zome_types::dht_v2::RecordValidity;
 use holochain_zome_types::prelude::{
-    Action, ChainFork, ChainHead, ChainQueryFilter, ChainStatus, HighestObserved, SignedWarrant,
+    Action, CapGrant, CapSecret, ChainFork, ChainHead, ChainQueryFilter, ChainStatus, EntryType,
+    HighestObserved, SignedWarrant,
 };
 use holochain_zome_types::validate::ValidationStatus;
 use std::collections::{HashMap, HashSet};
@@ -38,6 +41,40 @@ impl DhtStore<DbRead<Dht>> {
     /// Count integrated ops (chain ops plus warrants) held in the DHT store.
     pub async fn count_integrated_ops(&self) -> StateQueryResult<u64> {
         Ok(self.db().count_integrated_ops().await?)
+    }
+
+    /// Total bytes occupied on disk by this DNA's DhtStore, including the
+    /// unused (free) bytes within each page.
+    pub async fn size_on_disk(&self) -> StateQueryResult<u64> {
+        Ok(self.db().get_size_on_disk().await?)
+    }
+
+    /// Bytes actually in use by this DNA's DhtStore, excluding the free
+    /// space within pages.
+    pub async fn used_size(&self) -> StateQueryResult<u64> {
+        Ok(self.db().get_used_size().await?)
+    }
+
+    /// Returns `true` if a scheduled-function row exists for `author` and
+    /// `scheduled_fn`, regardless of liveness — i.e. whether the current time
+    /// falls within the row's `[start_at, end_at]` window.
+    ///
+    /// This is a membership check on the scheduled-functions table: it stays
+    /// `true` for a persisted cron function between firings, and becomes
+    /// `false` once an ephemeral function is consumed.
+    pub async fn is_function_scheduled(
+        &self,
+        author: &AgentPubKey,
+        scheduled_fn: &ScheduledFn,
+    ) -> StateQueryResult<bool> {
+        Ok(self
+            .db()
+            .is_function_scheduled(
+                author,
+                scheduled_fn.zome_name().0.as_ref(),
+                scheduled_fn.fn_name().0.as_str(),
+            )
+            .await?)
     }
 
     /// Count integrated, locally-validated chain ops that passed validation
@@ -88,6 +125,20 @@ impl DhtStore<DbRead<Dht>> {
                     r.storage_center_loc as u32,
                 )
             })
+            .collect())
+    }
+
+    /// Op hashes of the integrated chain ops for `action_hash`.
+    pub async fn chain_op_hashes_for_action(
+        &self,
+        action_hash: holo_hash::ActionHash,
+    ) -> StateQueryResult<Vec<DhtOpHash>> {
+        Ok(self
+            .db()
+            .get_chain_ops_for_action(action_hash)
+            .await?
+            .into_iter()
+            .map(|r| DhtOpHash::from_raw_36(r.hash))
             .collect())
     }
 
@@ -227,6 +278,92 @@ impl DhtStore<DbRead<Dht>> {
     /// The count is capped at three, so a long chain does not affect the cost.
     pub async fn has_genesis(&self, author: &AgentPubKey) -> StateQueryResult<bool> {
         Ok(self.db().count_author_actions_capped(author, 3).await? >= 3)
+    }
+
+    /// The author's source-chain head, or `None` pre-genesis.
+    pub async fn chain_head_for_author(
+        &self,
+        author: &AgentPubKey,
+    ) -> StateQueryResult<Option<crate::source_chain::HeadInfo>> {
+        Ok(self
+            .db()
+            .chain_head_for_author(author)
+            .await?
+            .map(|(action, seq, timestamp)| crate::source_chain::HeadInfo {
+                action,
+                seq,
+                timestamp,
+            }))
+    }
+
+    /// Get the source-chain lock for `author`, if one exists.
+    ///
+    /// Returns *any* lock row for the author, including one that has already
+    /// expired. Callers are responsible for checking `ChainLock::is_expired_at`
+    /// when expiry matters; several countersigning call sites must respect an
+    /// expired lock
+    /// (a lock that exists at all means a session is mid-flight and the chain
+    /// must not be re-used until it is cleaned up).
+    ///
+    /// This is why a `Timestamp::MIN` sentinel is passed to the underlying
+    /// `holochain_data` reader: that reader filters out locks whose
+    /// `expires_at <= now`, so `MIN` makes the expiry filter a no-op and every
+    /// existing row is returned.
+    pub async fn get_chain_lock(
+        &self,
+        author: AgentPubKey,
+    ) -> StateQueryResult<Option<crate::chain_lock::ChainLock>> {
+        Ok(self
+            .db()
+            .get_chain_lock(author, Timestamp::MIN)
+            .await?
+            .map(|row| {
+                crate::chain_lock::ChainLock::from_parts(
+                    row.subject,
+                    Timestamp::from_micros(row.expires_at_timestamp),
+                )
+            }))
+    }
+
+    /// Whether `author`'s source-chain head is a committed countersigning
+    /// session, and if so the session record, its entry hash, and the decoded
+    /// [`CounterSigningSessionData`](holochain_zome_types::countersigning::CounterSigningSessionData).
+    ///
+    /// This reads the chain head and head record from the store. `author` is
+    /// threaded through to [`retrieve_record`](Self::retrieve_record) so the
+    /// author's own (potentially private) countersigning entry is visible.
+    ///
+    /// Returns `None` when the chain is empty (pre-genesis), the head record is
+    /// unavailable, or the head action does not carry a `CounterSign` entry. A
+    /// `Some` result guarantees the `CounterSign` entry blob is present in the
+    /// store — the match requires it — so callers need not re-check the entry.
+    pub async fn current_countersigning_session(
+        &self,
+        author: &AgentPubKey,
+    ) -> StateQueryResult<
+        Option<(
+            holochain_zome_types::record::Record,
+            holo_hash::EntryHash,
+            holochain_zome_types::countersigning::CounterSigningSessionData,
+        )>,
+    > {
+        use holochain_types::prelude::Entry;
+
+        let head = match self.chain_head_for_author(author).await? {
+            Some(h) => h,
+            None => return Ok(None),
+        };
+        let record = match self.retrieve_record(&head.action, Some(author)).await? {
+            Some(r) => r,
+            None => return Ok(None),
+        };
+        let (sah, entry) = record.clone().into_inner();
+        Ok(match (sah.action().entry_hash(), entry.into_option()) {
+            (Some(entry_hash), Some(Entry::CounterSign(cs, _))) => {
+                Some((record, entry_hash.clone(), *cs))
+            }
+            _ => None,
+        })
     }
 
     /// Validation receipts for every chain op of `action_hash`, grouped into a
@@ -1054,8 +1191,8 @@ impl DhtStore<DbRead<Dht>> {
     /// filtered by link type, tag prefix, author, and time. Builds each
     /// [`holochain_zome_types::link::Link`] from its `CreateLink` action.
     ///
-    /// Time bounds mirror the legacy `LinksQuery`: `after` is inclusive
-    /// (`timestamp >= after`) and `before` is inclusive (`timestamp <= before`).
+    /// Time bounds: `after` is inclusive (`timestamp >= after`) and `before` is
+    /// inclusive (`timestamp <= before`).
     pub async fn get_links(
         &self,
         base: &holo_hash::AnyLinkableHash,
@@ -2093,6 +2230,291 @@ impl DhtStore<DbRead<Dht>> {
         out.sort_by_key(|(attempts, when_received, _)| (*attempts, *when_received));
         out.truncate(limit as usize);
         Ok(out.into_iter().map(|(_, _, op)| op).collect())
+    }
+
+    /// Dump the author's source chain as a `SourceChainDump`.
+    ///
+    /// Reads all actions authored by `author` from the DhtStore in
+    /// chain-sequence order, resolves each action's entry from both the public
+    /// `Entry` table and the author's private `PrivateEntry` table, and counts
+    /// the ops that have been published at least once.
+    ///
+    /// This is the production path behind the admin `DumpState` / `DumpFullState`
+    /// APIs. It is **not** gated behind `inspection`.
+    pub async fn dump_source_chain(
+        &self,
+        author: &AgentPubKey,
+    ) -> StateQueryResult<holochain_state_types::SourceChainDump> {
+        use holochain_state_types::{SourceChainDump, SourceChainDumpRecord};
+        use holochain_zome_types::dht_v2::to_legacy_signed_action;
+
+        // All actions for this author in seq order (v2 SignedActionHashed).
+        let v2_actions = self.db().get_actions_by_author(author.clone()).await?;
+
+        let mut records = Vec::with_capacity(v2_actions.len());
+        for v2_sah in &v2_actions {
+            // Convert to the v1 SignedActionHashed.
+            let sah = to_legacy_signed_action(v2_sah);
+            let action_address = sah.as_hash().clone();
+            let signature = sah.signature().clone();
+            let action = sah.action().clone();
+
+            // Resolve the entry (public OR private) when the action references one.
+            let entry = match action.entry_hash() {
+                Some(entry_hash) => {
+                    self.db()
+                        .get_entry(entry_hash.clone(), Some(author))
+                        .await?
+                }
+                None => None,
+            };
+
+            records.push(SourceChainDumpRecord {
+                signature,
+                action_address,
+                action,
+                entry,
+            });
+        }
+
+        let published_ops_count = self.db().count_published_ops_for_author(author).await? as usize;
+
+        Ok(SourceChainDump {
+            records,
+            published_ops_count,
+        })
+    }
+
+    /// Read the author's committed source-chain records.
+    ///
+    /// Returns every action authored by `author`, in ascending chain-sequence
+    /// order, as a [`Record`](holochain_zome_types::record::Record).
+    /// This is the committed-record source behind
+    /// [`SourceChain::query`](crate::source_chain::SourceChain::query): no
+    /// [`ChainQueryFilter`] filtering or fork disambiguation is applied here.
+    /// The caller overlays the scratch and then applies
+    /// [`ChainQueryFilter::filter_records`], which is the authoritative filter.
+    ///
+    /// An entry is attached only when `include_entries` is set and the entry is
+    /// either public or `public_only` is `false`. A private entry is therefore
+    /// redacted (`None`) under `public_only`. The private entry itself is
+    /// resolved via `get_entry(.., Some(author))`, so an author always sees
+    /// their own private entries and never another agent's.
+    pub async fn source_chain_records(
+        &self,
+        author: &AgentPubKey,
+        include_entries: bool,
+        public_only: bool,
+    ) -> StateQueryResult<Vec<holochain_zome_types::record::Record>> {
+        use holochain_zome_types::dht_v2::to_legacy_signed_action;
+        use holochain_zome_types::prelude::EntryVisibility;
+
+        let v2_actions = self.db().get_actions_by_author(author.clone()).await?;
+
+        // Convert each action to its v1 form once, and decide which entries to
+        // attach. Collect the entry hashes that actually need fetching so they
+        // can be read in a single batch rather than one-at-a-time (an N+1 over
+        // the chain length).
+        let sahs: Vec<holochain_zome_types::record::SignedActionHashed> =
+            v2_actions.iter().map(to_legacy_signed_action).collect();
+        let mut wanted_entry_hashes: Vec<EntryHash> = Vec::new();
+        // For each action, `Some(hash)` means "attach this entry if present";
+        // `None` means "no entry" (condition not met, or no entry hash).
+        let attach: Vec<Option<EntryHash>> = sahs
+            .iter()
+            .map(|sah| {
+                let private_entry = sah
+                    .action()
+                    .entry_type()
+                    .is_some_and(|e| *e.visibility() == EntryVisibility::Private);
+
+                if include_entries && (!private_entry || !public_only) {
+                    if let Some(entry_hash) = sah.action().entry_hash() {
+                        wanted_entry_hashes.push(entry_hash.clone());
+                        return Some(entry_hash.clone());
+                    }
+                }
+                None
+            })
+            .collect();
+
+        // Batch-fetch the needed entries. The author context resolves the
+        // author's own private entries, exactly as the per-action
+        // `get_entry(.., Some(author))` did.
+        let entries = self
+            .db()
+            .get_entries_by_hashes(&wanted_entry_hashes, Some(author))
+            .await?;
+
+        // Assemble records in chain order. An absent hash maps to `None`,
+        // matching the previous `get_entry` miss behaviour.
+        let records = sahs
+            .into_iter()
+            .zip(attach)
+            .map(|(sah, want)| {
+                let entry = want.and_then(|h| entries.get(&h).cloned());
+                holochain_zome_types::record::Record::new(sah, entry)
+            })
+            .collect();
+
+        Ok(records)
+    }
+
+    /// The author's valid agent-key `Create` action.
+    ///
+    /// Returns the author's `Create` action whose entry is the `AgentPubKey`
+    /// entry (`entry_hash == author.into()`) and that has NOT been updated or
+    /// deleted **by the author**. Returns `None` when no such action exists or
+    /// it has been modified, so the caller maps that to
+    /// [`SourceChainError::InvalidAgentKey`](crate::source_chain::SourceChainError::InvalidAgentKey).
+    ///
+    /// The "not updated/deleted" exclusion is applied via
+    /// `entry_updated_or_deleted_by_author`.
+    pub async fn valid_create_agent_key_action(
+        &self,
+        author: &AgentPubKey,
+    ) -> StateQueryResult<Option<Action>> {
+        let agent_key_entry_hash: EntryHash = author.clone().into();
+
+        // The agent-key `Create` is written to the author's chain at genesis;
+        // find it among the author's actions. The `Action` table carries
+        // `action_type` but not `entry_type`, so filter on `Create` + the entry
+        // hash with an `AgentPubKey` entry-type guard.
+        let actions = self.db().get_actions_by_author(author.clone()).await?;
+        let create = actions.iter().find_map(|v2_sah| {
+            let action = holochain_zome_types::dht_v2::to_legacy_signed_action(v2_sah)
+                .action()
+                .clone();
+            let is_agent_key_create = matches!(action, Action::Create(_))
+                && action.entry_type() == Some(&EntryType::AgentPubKey)
+                && action.entry_hash() == Some(&agent_key_entry_hash);
+            is_agent_key_create.then_some(action)
+        });
+
+        let Some(create) = create else {
+            return Ok(None);
+        };
+
+        // Agent key must not have been updated or deleted by the author.
+        if self
+            .entry_updated_or_deleted_by_author(&agent_key_entry_hash, author)
+            .await?
+        {
+            return Ok(None);
+        }
+
+        Ok(Some(create))
+    }
+
+    /// The author's candidate capability grants for the `is_valid` loop in
+    /// [`SourceChain::valid_cap_grant`](crate::source_chain::SourceChain::valid_cap_grant).
+    ///
+    /// - When `check_secret` is `Some`, only grants that carry a secret
+    ///   (`Transferable` / `Assigned`) are considered. The exact-secret match is
+    ///   left to the caller's [`CapGrant::is_valid`], which is equivalent
+    ///   because `is_valid` requires `secret == given` for both secret-bearing
+    ///   variants (a secret-bearing check therefore never matches an
+    ///   `Unrestricted` grant).
+    /// - When `check_secret` is `None`, only `Unrestricted` grants are
+    ///   considered.
+    ///
+    /// Candidates are restricted to grants authored by `author` (the `CapGrant`
+    /// index join filters on `Action.author`) and dropped when their entry has
+    /// been updated or deleted by the author.
+    pub async fn valid_cap_grants(
+        &self,
+        author: &AgentPubKey,
+        check_secret: Option<&CapSecret>,
+    ) -> StateQueryResult<Vec<CapGrant>> {
+        // `CapAccess` integer encoding (see the DHT schema): 0=Unrestricted,
+        // 1=Transferable, 2=Assigned. A secret-bearing check looks only at the
+        // grants that carry a secret; an unrestricted check only at unrestricted
+        // grants.
+        let access_types: &[i64] = if check_secret.is_some() {
+            &[1, 2]
+        } else {
+            &[0]
+        };
+
+        let mut grants = Vec::new();
+        for &access in access_types {
+            let rows = self
+                .db()
+                .get_cap_grants_by_access(author.clone(), access)
+                .await?;
+
+            // Resolve each grant's entry hash (from its create/update action)
+            // and drop grants whose entry was updated or deleted by the author.
+            // The per-grant `get_action` / modification checks stay one-by-one
+            // (cap-grant counts are small), but the grant entries are then read
+            // in a single batch rather than one query per grant.
+            let mut candidate_hashes: Vec<EntryHash> = Vec::new();
+            for row in rows {
+                let action_hash = ActionHash::from_raw_36(row.action_hash);
+                let Some(v2_sah) = self.db().get_action(action_hash).await? else {
+                    continue;
+                };
+                let action = holochain_zome_types::dht_v2::to_legacy_signed_action(&v2_sah);
+                let Some(entry_hash) = action.action().entry_hash().cloned() else {
+                    continue;
+                };
+                // Skip grants whose entry was updated or deleted by the author.
+                if self
+                    .entry_updated_or_deleted_by_author(&entry_hash, author)
+                    .await?
+                {
+                    continue;
+                }
+                candidate_hashes.push(entry_hash);
+            }
+
+            // Cap-grant entries are private; resolve them from the author's
+            // `PrivateEntry` store in one batch and deserialize. Iterating
+            // `candidate_hashes` (which preserves row order and any duplicates)
+            // keeps the produced grants identical to the per-grant lookup.
+            let entries = self
+                .db()
+                .get_entries_by_hashes(&candidate_hashes, Some(author))
+                .await?;
+            for entry_hash in candidate_hashes {
+                let Some(entry) = entries.get(&entry_hash) else {
+                    continue;
+                };
+                if let Some(grant) = entry.as_cap_grant() {
+                    grants.push(grant);
+                }
+            }
+        }
+        Ok(grants)
+    }
+
+    /// `true` if `entry_hash` has been updated or deleted by `author` — the
+    /// "not updated/deleted" exclusion shared by the agent-key and cap-grant
+    /// validity reads.
+    ///
+    /// The `UpdatedRecord` / `DeletedRecord` indexes are keyed on the original /
+    /// deleted *entry* hash (see
+    /// [`get_update_actions_for_entry`](holochain_data::DbRead::get_update_actions_for_entry)
+    /// / [`get_delete_actions_for_entry`](holochain_data::DbRead::get_delete_actions_for_entry)),
+    /// and the author filter restricts to the author's own modifications. The
+    /// author's own `Update`/`Delete` actions populate these indexes at
+    /// source-chain flush time.
+    async fn entry_updated_or_deleted_by_author(
+        &self,
+        entry_hash: &EntryHash,
+        author: &AgentPubKey,
+    ) -> StateQueryResult<bool> {
+        let updates = self.db().get_update_actions_for_entry(entry_hash).await?;
+        if updates
+            .iter()
+            .any(|sah| &sah.hashed.content.header.author == author)
+        {
+            return Ok(true);
+        }
+        let deletes = self.db().get_delete_actions_for_entry(entry_hash).await?;
+        Ok(deletes
+            .iter()
+            .any(|sah| &sah.hashed.content.header.author == author))
     }
 }
 
@@ -3181,6 +3603,203 @@ mod tests {
         );
     }
 
+    /// Builds the `(EntryHash, Entry, Action)` for a committed countersigning
+    /// session at `seq` on `author`'s chain. The session is the minimal valid
+    /// shape: two signing agents (`author` at index 0, `other` at index 1).
+    fn countersigning_head(
+        author: &AgentPubKey,
+        other: &AgentPubKey,
+        seq: u32,
+        visibility: holochain_zome_types::entry_def::EntryVisibility,
+    ) -> (
+        EntryHash,
+        holochain_types::prelude::Entry,
+        Action,
+        holochain_zome_types::countersigning::PreflightRequest,
+    ) {
+        use holochain_types::prelude::{AppEntryBytes, Entry};
+        use holochain_zome_types::countersigning::{
+            ActionBase, CounterSigningAgentState, CounterSigningSessionData,
+            CounterSigningSessionTimes, CreateBase, PreflightBytes, PreflightRequest,
+        };
+
+        let app_entry_type = EntryType::App(AppEntryDef::new(0.into(), 0.into(), visibility));
+        let session_times = CounterSigningSessionTimes::try_new(
+            Timestamp::from_micros(1_000),
+            Timestamp::from_micros(1_000_000_000),
+        )
+        .unwrap();
+        let preflight_request = PreflightRequest::try_new(
+            EntryHash::from_raw_36(vec![5u8; 36]),
+            vec![(author.clone(), vec![]), (other.clone(), vec![])],
+            vec![],
+            0,
+            false,
+            session_times,
+            ActionBase::Create(CreateBase::new(app_entry_type.clone())),
+            PreflightBytes(vec![]),
+        )
+        .unwrap();
+        let session_data = CounterSigningSessionData::try_new(
+            preflight_request.clone(),
+            vec![
+                (
+                    CounterSigningAgentState::new(0, ActionHash::from_raw_36(vec![10u8; 36]), 2),
+                    Signature::from([0u8; 64]),
+                ),
+                (
+                    CounterSigningAgentState::new(1, ActionHash::from_raw_36(vec![11u8; 36]), 2),
+                    Signature::from([1u8; 64]),
+                ),
+            ],
+            vec![],
+        )
+        .unwrap();
+
+        let entry = Entry::CounterSign(
+            Box::new(session_data),
+            AppEntryBytes(holochain_serialized_bytes::SerializedBytes::from(
+                holochain_serialized_bytes::UnsafeBytes::from(vec![1u8; 8]),
+            )),
+        );
+        let entry_hash = EntryHash::with_data_sync(&entry);
+        let action = Action::Create(Create {
+            author: author.clone(),
+            timestamp: Timestamp::from_micros(2_000),
+            action_seq: seq,
+            prev_action: ActionHash::from_raw_36(vec![3u8; 36]),
+            entry_type: app_entry_type,
+            entry_hash: entry_hash.clone(),
+            weight: Default::default(),
+        });
+        (entry_hash, entry, action, preflight_request)
+    }
+
+    /// Insert `action` and its `entry` as a committed self-authored chain head:
+    /// an integrated op whose `Action` is written with `record_validity =
+    /// Accepted` (so `chain_head_for_author`, which reads that state, sees the
+    /// head) plus the entry in the store.
+    ///
+    /// This mirrors the source-chain flush, which writes each self-authored
+    /// action as `Accepted`. `record_incoming_ops` instead inserts actions as
+    /// pending (`NULL`), which are deliberately excluded from the chain head —
+    /// so it is not a faithful stand-in for a committed self-authored head here.
+    async fn insert_integrated_head(
+        store: &DhtStore<DbWrite<Dht>>,
+        action: Action,
+        entry_hash: &EntryHash,
+        entry: &holochain_types::prelude::Entry,
+        private_author: Option<&AgentPubKey>,
+    ) {
+        let op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(
+            ChainOp::RegisterAgentActivity(Signature::from([7u8; 64]), action),
+        )));
+        store
+            .test_insert_authored_chain_op(op, None, None, None)
+            .await
+            .unwrap();
+        store
+            .test_insert_entry(entry_hash, entry, private_author)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn current_countersigning_session_returns_session_at_chain_head() {
+        use holochain_zome_types::entry_def::EntryVisibility;
+
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let alice = AgentPubKey::from_raw_36(vec![1u8; 36]);
+        let bob = AgentPubKey::from_raw_36(vec![2u8; 36]);
+
+        let (cs_entry_hash, cs_entry, head_action, preflight_request) =
+            countersigning_head(&alice, &bob, 3, EntryVisibility::Public);
+        let head_hash = ActionHash::with_data_sync(&head_action);
+
+        // Insert the head as a committed self-authored op: an integrated
+        // `RegisterAgentActivity` op (so it is the chain head) plus the
+        // `CounterSign` entry in the store. This is the shape a real
+        // source-chain flush produces.
+        insert_integrated_head(&store, head_action, &cs_entry_hash, &cs_entry, None).await;
+
+        let (record, entry_hash, returned_session) = store
+            .as_read()
+            .current_countersigning_session(&alice)
+            .await
+            .unwrap()
+            .expect("the chain head is a countersigning session");
+
+        assert_eq!(entry_hash, cs_entry_hash);
+        assert_eq!(record.action_address(), &head_hash);
+        assert_eq!(
+            returned_session.preflight_request().fingerprint().unwrap(),
+            preflight_request.fingerprint().unwrap(),
+        );
+    }
+
+    #[tokio::test]
+    async fn current_countersigning_session_none_when_head_is_normal_entry() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let alice = AgentPubKey::from_raw_36(vec![4u8; 36]);
+
+        // A normal app entry at the chain head (seq 1), inserted as an
+        // integrated self-authored head so the head is genuinely found and the
+        // `None` result comes from the entry being an ordinary App entry rather
+        // than a `CounterSign`.
+        let entry = holochain_types::prelude::Entry::App(holochain_types::prelude::AppEntryBytes(
+            holochain_serialized_bytes::SerializedBytes::from(
+                holochain_serialized_bytes::UnsafeBytes::from(vec![9u8; 8]),
+            ),
+        ));
+        let entry_hash = EntryHash::with_data_sync(&entry);
+        let action = Action::Create(Create {
+            author: alice.clone(),
+            timestamp: Timestamp::from_micros(2_000),
+            action_seq: 1,
+            prev_action: ActionHash::from_raw_36(vec![3u8; 36]),
+            entry_type: EntryType::App(AppEntryDef::new(
+                0.into(),
+                0.into(),
+                holochain_zome_types::entry_def::EntryVisibility::Public,
+            )),
+            entry_hash: entry_hash.clone(),
+            weight: Default::default(),
+        });
+        insert_integrated_head(&store, action, &entry_hash, &entry, None).await;
+
+        let result = store
+            .as_read()
+            .current_countersigning_session(&alice)
+            .await
+            .unwrap();
+        assert!(
+            result.is_none(),
+            "a normal entry at the chain head is not a countersigning session"
+        );
+    }
+
+    #[tokio::test]
+    async fn current_countersigning_session_none_for_empty_chain() {
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let alice = AgentPubKey::from_raw_36(vec![6u8; 36]);
+
+        let result = store
+            .as_read()
+            .current_countersigning_session(&alice)
+            .await
+            .unwrap();
+        assert!(
+            result.is_none(),
+            "an empty chain has no countersigning session"
+        );
+    }
+
     #[tokio::test]
     async fn op_exists_returns_false_for_unknown_hash() {
         let store = crate::dht_store::DhtStore::new_test(dht_id())
@@ -3570,6 +4189,80 @@ mod tests {
             other => panic!("expected Hashes, got {other:?}"),
         }
         assert!(matches!(resp.status, ChainStatus::Invalid(ref head) if head.action_seq == 1));
+    }
+
+    #[tokio::test]
+    async fn get_agent_activity_excludes_withheld_publish_ops() {
+        // A self-authored op whose `ChainOpPublish.withhold_publish` is set
+        // (an in-flight countersigning session) must NOT surface as live agent
+        // activity until the session completes and the withhold flag is cleared.
+        // Ordinary self-authored ops (withhold NULL) are always visible.
+        let store = crate::dht_store::DhtStore::new_test(dht_id())
+            .await
+            .unwrap();
+        let author = AgentPubKey::from_raw_36(vec![23u8; 36]);
+        let prev = ActionHash::from_raw_36(vec![0u8; 36]);
+
+        // seqs 0 and 1: ordinary self-authored ops (withhold NULL -> visible).
+        store
+            .test_insert_authored_chain_op(make_fork_op(&author, &prev, 0, 1), None, None, None)
+            .await
+            .unwrap();
+        store
+            .test_insert_authored_chain_op(make_fork_op(&author, &prev, 1, 2), None, None, None)
+            .await
+            .unwrap();
+        // seq 2: a withheld countersigning op (withhold_publish = true -> hidden).
+        let withheld = make_fork_op(&author, &prev, 2, 3);
+        let withheld_hash = withheld.as_hash().clone();
+        store
+            .test_insert_authored_chain_op(withheld, None, None, Some(true))
+            .await
+            .unwrap();
+
+        let opts = GetAgentActivityOptions {
+            include_valid_activity: true,
+            include_rejected_activity: false,
+            include_warrants: false,
+            include_full_records: false,
+        };
+
+        // While withheld, only seqs 0 and 1 are reported.
+        let resp = store
+            .as_read()
+            .get_agent_activity(&author, &ChainQueryFilter::new(), &opts)
+            .await
+            .unwrap();
+        match resp.valid_activity {
+            ChainItems::Hashes(h) => {
+                assert_eq!(h.len(), 2, "withheld op must be hidden");
+                assert_eq!(h[0].0, 0);
+                assert_eq!(h[1].0, 1);
+            }
+            other => panic!("expected Hashes, got {other:?}"),
+        }
+
+        // Clearing the withhold flag (as session completion does) reveals seq 2.
+        store
+            .test_set_chain_op_publish(&withheld_hash, None, None, None)
+            .await
+            .unwrap();
+        let resp = store
+            .as_read()
+            .get_agent_activity(&author, &ChainQueryFilter::new(), &opts)
+            .await
+            .unwrap();
+        match resp.valid_activity {
+            ChainItems::Hashes(h) => {
+                assert_eq!(
+                    h.len(),
+                    3,
+                    "revealed op must be visible after clearing withhold"
+                );
+                assert_eq!(h[2].0, 2);
+            }
+            other => panic!("expected Hashes, got {other:?}"),
+        }
     }
 
     #[tokio::test]

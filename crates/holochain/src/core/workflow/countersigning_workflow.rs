@@ -11,7 +11,7 @@ use {
     crate::core::queue_consumer::{TriggerSender, WorkComplete},
     holo_hash::AgentPubKey,
     holochain_keystore::MetaLairClient,
-    holochain_state::chain_lock::get_chain_lock,
+    holochain_state::DhtStore,
     std::sync::Arc,
     tokio::sync::broadcast::Sender,
     tokio::task::AbortHandle,
@@ -599,9 +599,12 @@ async fn apply_timeout(
         return Ok(());
     }
 
-    let authored = space.get_or_create_authored_db(cell_id.agent_pubkey().clone())?;
-
-    let current_session = authored.read_async(current_countersigning_session).await?;
+    // Read the current countersigning session from the DhtStore.
+    let current_session = space
+        .dht_store
+        .as_read()
+        .current_countersigning_session(cell_id.agent_pubkey())
+        .await?;
 
     let mut has_committed_session = false;
     if let Some((_, _, session_data)) = current_session {
@@ -706,12 +709,13 @@ async fn force_abandon_session(
     workspace: Arc<CountersigningWorkspace>,
     signal_tx: &Sender<Signal>,
 ) -> SourceChainResult<()> {
-    let authored_db = space.get_or_create_authored_db(author.clone())?;
-
     let abandon_fingerprint = preflight_request.fingerprint()?;
 
-    let maybe_session_data = authored_db
-        .read_async(current_countersigning_session)
+    // Read the current countersigning session from the DhtStore.
+    let maybe_session_data = space
+        .dht_store
+        .as_read()
+        .current_countersigning_session(author)
         .await?;
 
     match maybe_session_data {
@@ -720,7 +724,7 @@ async fn force_abandon_session(
         {
             tracing::info!("There is a committed session to remove for: {:?}", author);
             abandon_session(
-                authored_db,
+                space.dht_store.clone(),
                 author.clone(),
                 cs_action.action().clone(),
                 cs_entry_hash,
@@ -728,28 +732,22 @@ async fn force_abandon_session(
             .await?;
         }
         _ => {
-            // There is no matching, committed session but there may be a lock to remove
-            authored_db
-                .write_async({
-                    let author = author.clone();
-                    move |txn| {
-                        let chain_lock = get_chain_lock(txn, &author)?;
-
-                        match chain_lock {
-                            Some(lock) if lock.subject() == abandon_fingerprint => {
-                                unlock_chain(txn, &author)
-                            }
-                            _ => {
-                                tracing::warn!(
-                                    "No matching session or lock to remove for: {:?}",
-                                    author
-                                );
-                                Ok(())
-                            }
-                        }
-                    }
-                })
+            // There is no matching, committed session but there may be a lock to
+            // remove.
+            let chain_lock = space
+                .dht_store
+                .as_read()
+                .get_chain_lock(author.clone())
                 .await?;
+
+            match chain_lock {
+                Some(lock) if lock.subject() == abandon_fingerprint => {
+                    space.dht_store.release_chain_lock(author).await?;
+                }
+                _ => {
+                    tracing::warn!("No matching session or lock to remove for: {:?}", author);
+                }
+            }
         }
     }
 
@@ -809,22 +807,21 @@ pub async fn countersigning_publish(
 /// Abandon a countersigning session.
 #[cfg(feature = "unstable-countersigning")]
 async fn abandon_session(
-    authored_db: DbWrite<DbKindAuthored>,
+    dht_store: DhtStore,
     author: AgentPubKey,
     cs_action: Action,
     cs_entry_hash: EntryHash,
 ) -> StateMutationResult<()> {
-    authored_db
-        .write_async(move |txn| -> StateMutationResult<()> {
-            // Do the dangerous thing and remove the countersigning session.
-            remove_countersigning_session(txn, cs_action, cs_entry_hash)?;
-
-            // Once the session is removed we can unlock the chain.
-            unlock_chain(txn, &author)?;
-
-            Ok(())
-        })
+    // Do the dangerous thing and remove the countersigning session from the
+    // DhtStore. The store's published guard is authoritative: it refuses (with
+    // `CannotRemoveFullyPublished`) if any of the session's ops have already
+    // been published.
+    dht_store
+        .remove_countersigning_session(cs_action.to_hash(), cs_entry_hash)
         .await?;
+
+    // Once the session is removed we can unlock the chain.
+    dht_store.release_chain_lock(&author).await?;
 
     Ok(())
 }
