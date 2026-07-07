@@ -2,6 +2,24 @@
 
 This file documents results of release tests as described in the [Holochain release process](RELEASE.md).
 
+## 2026-07-07: v0.6.2
+
+*Success*
+- Ran a test with 4 nodes.
+- Peer discovery was very fast, seemingly instant.
+- There was no noticeable delay with initial sync.
+- Signals were sent with 100% reliability.
+- Entries created by all nodes were received by all peers, within seconds.
+- After shutting down one node and creating data with the other nodes, when the
+  offline node came back online, it took seconds for all data to be synced and
+  become full arc again.
+- A 3rd set of entries was created by all nodes which were received by all
+  peers within seconds.
+
+This is mostly a re-release of `v0.6.2-rc.0`. The performance of this test
+seemingly proves that the slow discovery we saw with the release candidate was
+not a regression.
+
 ## 2026-07-01: v0.6.2-rc.0
 
 *Success*
