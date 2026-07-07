@@ -12,35 +12,35 @@
 //!
 //! A [`ChainOp`] is a container for a [`Record`], sent to a specific type of authority.
 //! Checks that you can rely on sys validation having performed are:
-//! - For a [`ChainOp::StoreRecord`]
-//!    - Check that the [`Action`] is either a [`Action::Dna`] at sequence number 0, or has a previous action with sequence number strictly greater than 0.
+//! - For a [`ChainOp::CreateRecord`]
+//!    - Check that the [`Action`] is either a [`ActionData::Dna`] at sequence number 0, or has a previous action with sequence number strictly greater than 0.
 //!    - If the [`Entry`] is an [`Entry::CounterSign`], then the countersigning session data is mapped to a set of [`Action`]s and each of those actions must be found locally before this op can progress.
-//!    - The [`Action`] must be either a [`Action::Create`] or an [`Action::Update`].
+//!    - The [`Action`] must be either a [`ActionData::Create`] or an [`ActionData::Update`].
 //!    - Run the [store entry checks](#store-entry-checks).
-//! - For a [`ChainOp::StoreEntry`]
+//! - For a [`ChainOp::CreateEntry`]
 //!    - If the [`Entry`] is an [`Entry::CounterSign`], then the countersigning session data is mapped to a set of [`Action`]s and each of those actions must be found locally before this op is accepted.
-//!    - Check that the [`Action`] is either a [`Action::Dna`] at sequence number 0, or has a previous action with sequence number strictly greater than 0.
+//!    - Check that the [`Action`] is either a [`ActionData::Dna`] at sequence number 0, or has a previous action with sequence number strictly greater than 0.
 //!    - Run the [store entry checks](#store-entry-checks).
-//! - For a [`ChainOp::RegisterAgentActivity`]
-//!    - Check that the [`Action`] is either a [`Action::Dna`] at sequence number 0, or has a previous action with sequence number strictly greater than 0.
-//!    - If the [`Action`] is a [`Action::Dna`], then verify the contained DNA hash matches the DNA hash that sys validation is being run for.
-//!    - Check that the previous action is never a [`Action::CloseChain`], since this is always required to be the last action in a chain.
+//! - For a [`ChainOp::AgentActivity`]
+//!    - Check that the [`Action`] is either a [`ActionData::Dna`] at sequence number 0, or has a previous action with sequence number strictly greater than 0.
+//!    - If the [`Action`] is a [`ActionData::Dna`], then verify the contained DNA hash matches the DNA hash that sys validation is being run for.
+//!    - Check that the previous action is never a [`ActionData::CloseChain`], since this is always required to be the last action in a chain.
 //!    - Run the [store record checks](#store-record-checks).
-//! - For a [`ChainOp::RegisterUpdatedContent`]
+//! - For a [`ChainOp::UpdateEntry`]
 //!    - The [`Update::original_action_address`] reference to the [`Action`] being updated must point to an [`Action`] that can be found locally. Once the [`Action`] address has been resolved, the [`Update::original_entry_address`] is checked against the entry address that the referenced [`Action`] specified.
 //!    - If there is an [`Entry`], then the [store entry checks](#store-entry-checks) are run.
-//! - For a [`ChainOp::RegisterUpdatedRecord`]
+//! - For a [`ChainOp::UpdateRecord`]
 //!    - The [`Update::original_action_address`] reference to the [`Action`] being updated must point to an [`Action`] that can be found locally. Once the [`Action`] address has been resolved, the [`Update::original_entry_address`] is checked against the entry address that the referenced [`Action`] specified.
 //!    - If there is an [`Entry`], then the [store entry checks](#store-entry-checks) are run.
-//! - For a [`ChainOp::RegisterDeletedBy`]
-//!    - The [`Delete::deletes_address`] reference to the [`Action`] being deleted must point to an [`Action`] that can be found locally. The action being deleted must be a [`Action::Create`] or [`Action::Update`].
-//! - For a [`ChainOp::RegisterDeletedEntryAction`]
-//!    - The [`Delete::deletes_address`] reference to the [`Action`] being deleted must point to an [`Action`] that can be found locally. The action being deleted must be a [`Action::Create`] or [`Action::Update`].
-//! - For a [`ChainOp::RegisterAddLink`]
+//! - For a [`ChainOp::DeleteRecord`]
+//!    - The [`Delete::deletes_address`] reference to the [`Action`] being deleted must point to an [`Action`] that can be found locally. The action being deleted must be a [`ActionData::Create`] or [`ActionData::Update`].
+//! - For a [`ChainOp::DeleteEntry`]
+//!    - The [`Delete::deletes_address`] reference to the [`Action`] being deleted must point to an [`Action`] that can be found locally. The action being deleted must be a [`ActionData::Create`] or [`ActionData::Update`].
+//! - For a [`ChainOp::CreateLink`]
 //!   - The size of the [`CreateLink::tag`] must be less than or equal to the maximum size that is accepted for this link tag. This is specified in the constant [`MAX_TAG_SIZE`].
-//! - For a [`ChainOp::RegisterRemoveLink`]
+//! - For a [`ChainOp::DeleteLink`]
 //!   - The [`DeleteLink::link_add_address`] reference to the [`Action`] of the link being deleted must point to an [`Action`] that can be found locally. That action being deleted must also
-//!     be a [`Action::CreateLink`].
+//!     be a [`ActionData::CreateLink`].
 //!
 //! A [`WarrantOp`] is produced as a proof that an agent broke the rules of the DHT. That may be the
 //! rules of this workflow or the rules set by the application and checked in the app validation
@@ -58,11 +58,11 @@
 //!
 //! These checks are run when storing a new action for a [`DhtOp`].
 //!
-//! - Check that the [`Action`] is either a [`Action::Dna`] at sequence number 0, or has a previous action with sequence number strictly greater than 0.
+//! - Check that the [`Action`] is either a [`ActionData::Dna`] at sequence number 0, or has a previous action with sequence number strictly greater than 0.
 //! - Checks that the author of the current action is the same as the author of the previous action.
 //! - Checks that the timestamp of the current action is greater than the timestamp of the previous action.
 //! - Checks that the sequence number of the current action is exactly 1 more than the sequence number of the previous action.
-//! - Checks that every [`Action::Create`] or [`Action::Update`] of an `AgentPubKey` is preceded by an [`Action::AgentValidationPkg`].
+//! - Checks that every [`ActionData::Create`] or [`ActionData::Update`] of an `AgentPubKey` is preceded by an [`ActionData::AgentValidationPkg`].
 //! - Runs the store entry checks if there is an entry present on the record.
 //!
 //! ##### Store entry checks
@@ -72,7 +72,7 @@
 //! - The entry type specified in the [`Action`] must match the entry type specified in the [`Entry`].
 //! - The entry hash specified in the [`Action`] must match the entry hash specified in the [`Entry`], which will be hashed as part of the check to obtain a value that is deterministic.
 //! - The size of the [`Entry`] must be less than or equal to the maximum size that is accepted for this entry type. This is specified in the constant [`MAX_ENTRY_SIZE`].
-//! - If the [`Action`] is an [`Action::Update`], then the [`Update::original_action_address`] reference to the [`Action`] being updated must point to an [`Action`] that can be found locally. Once the [`Action`] address has been resolved, the [`Update::original_entry_address`] is checked against the entry address that the referenced [`Action`] specified.
+//! - If the [`Action`] is an [`ActionData::Update`], then the [`Update::original_action_address`] reference to the [`Action`] being updated must point to an [`Action`] that can be found locally. Once the [`Action`] address has been resolved, the [`Update::original_entry_address`] is checked against the entry address that the referenced [`Action`] specified.
 //! - If the [`Entry`] is an [`Entry::CounterSign`], then the pre-flight response signatures are checked.
 //!
 //! #### Workflow description
@@ -127,9 +127,10 @@ use holochain_state::prelude::*;
 // deliberately still legacy (countersigning weight, fork detection's DB row
 // shape).
 use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry};
-// `LegacyAction` still names the legacy per-variant shape needed by the
-// countersigning weight machinery and the `detect_fork` unit test's raw
-// DB-blob shape, both deliberately unconverted (see their own comments).
+// `LegacyAction` names the legacy per-variant shape the `detect_fork` unit
+// test still needs to deserialize a raw DB-blob row; that test is the only
+// remaining consumer, so the import is test-gated.
+#[cfg(test)]
 use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
 use holochain_zome_types::dht_v2::{
     from_legacy_action, to_legacy_signed_action, ActionData, CreateLinkData, DeleteData,
@@ -1600,7 +1601,8 @@ async fn sys_validate_record_inner(
 ///
 /// Takes the v2 action directly — the op pipeline carries v2 actions
 /// end-to-end, so this hashes `action` and checks `signature` over it via
-/// [`verify_v2_action_signature`], with no legacy projection involved.
+/// the same verification the rest of sys validation uses for v2 actions,
+/// with no legacy projection involved.
 pub async fn counterfeit_check_action(
     signature: &Signature,
     action: &Action,

@@ -251,8 +251,12 @@ async fn publish_loop() {
     tokio::time::resume();
     let dht_store = test_dht_store(fixt!(DnaHash)).await;
     // Seed the op as an integrated, self-authored op ready to publish.
+    // `op` is legacy (this module builds legacy `ChainOp`/`DhtOp` via
+    // `holochain_types::prelude::*`); `test_insert_authored_chain_op` is
+    // v2-native, so project it at this boundary via `from_legacy_dht_op`.
+    let v2_op = holochain_types::dht_v2::from_legacy_dht_op(&op);
     dht_store
-        .test_insert_authored_chain_op(op, None, None, None)
+        .test_insert_authored_chain_op(v2_op, None, None, None)
         .await
         .unwrap();
     tokio::time::pause();

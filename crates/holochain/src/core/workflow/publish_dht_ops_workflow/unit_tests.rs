@@ -305,9 +305,13 @@ async fn private_entries_are_not_published() {
     let store_record_op_hash = store_record_op.as_hash().clone();
 
     // Seed all three ops as integrated, self-authored ops in the DHT store.
+    // `test_insert_authored_chain_op` is v2-native; this module otherwise
+    // builds legacy ops throughout (see `crate::prelude::*`), so project
+    // each one at this boundary via `from_legacy_dht_op`.
     for op in [register_agent_activity_op, store_entry_op, store_record_op] {
+        let v2_op = holochain_types::dht_v2::from_legacy_dht_op(&op);
         dht_store
-            .test_insert_authored_chain_op(op, None, None, None)
+            .test_insert_authored_chain_op(v2_op, None, None, None)
             .await
             .unwrap();
     }
@@ -369,8 +373,9 @@ async fn create_op(dht_store: &DhtStore, author: AgentPubKey) -> StateMutationRe
         DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(fixt!(Signature), action));
 
     let op_hash = op.as_hash().clone();
+    let v2_op = holochain_types::dht_v2::from_legacy_dht_op(&op);
     dht_store
-        .test_insert_authored_chain_op(op, None, None, None)
+        .test_insert_authored_chain_op(v2_op, None, None, None)
         .await?;
 
     Ok(op_hash)
@@ -419,8 +424,10 @@ async fn workflow_publishes_warrant_once() {
     let dht_store = test_dht_store(fixt!(DnaHash)).await;
     let agent = fixt!(AgentPubKey);
 
+    let warrant_op = build_warrant_op(&agent);
+    let v2_warrant_op = holochain_types::dht_v2::from_legacy_dht_op(&warrant_op);
     dht_store
-        .test_insert_integrated_warrant(build_warrant_op(&agent))
+        .test_insert_integrated_warrant(v2_warrant_op)
         .await
         .unwrap();
 

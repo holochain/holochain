@@ -5,8 +5,13 @@ use holo_hash::fixt::DnaHashFixturator;
 use holochain_keystore::test_keystore;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_state::dht_store::DhtStore;
+// The op pipeline is v2-native; `ChainOp` fixtures here are built from a
+// legacy per-variant `Action` fixture (`fixt!(CreateLink)`) and projected via
+// `from_legacy_action`, matching the v2 signature basis (every signature in
+// this file is over the v2 action bytes).
+use holochain_types::dht_v2::ChainOp;
 use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
-use holochain_zome_types::dht_v2::from_legacy_action;
+use holochain_zome_types::dht_v2::{from_legacy_action, SignedAction};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn incoming_ops_to_limbo() {
@@ -28,7 +33,7 @@ async fn incoming_ops_to_limbo() {
         let v2_action = from_legacy_action(&action);
         let signature = author.sign(&keystore, &v2_action).await.unwrap();
 
-        let op = ChainOp::RegisterAgentActivity(signature, action);
+        let op = ChainOp::AgentActivity(SignedAction::new(v2_action, signature));
         let hash = DhtOpHash::with_data_sync(&op);
         hash_list.push(hash);
         op_list.push(op);
@@ -68,10 +73,11 @@ async fn can_retry_failed_op() {
     let mut action = fixt!(CreateLink);
     action.author = author.clone();
     let action = LegacyAction::CreateLink(action);
+    let v2_action = from_legacy_action(&action);
     // Create a dummy signature that will fail validation
     let signature = Signature([0; SIGNATURE_BYTES]);
 
-    let op = ChainOp::RegisterAgentActivity(signature, action.clone()).into();
+    let op: DhtOp = ChainOp::AgentActivity(SignedAction::new(v2_action.clone(), signature)).into();
     let hash = DhtOpHash::with_data_sync(&op);
 
     // Try running the workflow and...
@@ -87,9 +93,8 @@ async fn can_retry_failed_op() {
     verify_ops_present(&dht_store, vec![hash], false).await;
 
     // Now fix the signature
-    let v2_action = from_legacy_action(&action);
     let signature = author.sign(&keystore, &v2_action).await.unwrap();
-    let op = ChainOp::RegisterAgentActivity(signature, action).into();
+    let op: DhtOp = ChainOp::AgentActivity(SignedAction::new(v2_action, signature)).into();
     let hash = DhtOpHash::with_data_sync(&op);
 
     // Run the workflow again to simulate a re-send of the op...
@@ -133,7 +138,7 @@ async fn require_validation_receipt_follows_publish_flag() {
         let action = LegacyAction::CreateLink(action);
         let v2_action = from_legacy_action(&action);
         let signature = author.sign(&keystore, &v2_action).await.unwrap();
-        let op: DhtOp = ChainOp::RegisterAgentActivity(signature, action).into();
+        let op: DhtOp = ChainOp::AgentActivity(SignedAction::new(v2_action, signature)).into();
         let hash = DhtOpHash::with_data_sync(&op);
         ops.push((op, hash));
     }

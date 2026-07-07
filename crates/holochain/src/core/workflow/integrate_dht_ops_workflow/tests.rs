@@ -133,8 +133,13 @@ async fn multiple_local_authors_marked_integrated() {
 /// integration (sys + app validation both accepted).
 async fn insert_validated_op_to_store(dht_store: &DhtStore, op: &DhtOpHashed) {
     let op_hash = op.as_hash().clone();
+    // `op` is legacy (this module builds legacy `ChainOp`/`DhtOp` — see the
+    // `holochain_types::prelude::{ChainOp, DhtOp, DhtOpHashed}` import above);
+    // `record_incoming_ops` is v2-native, so project it at this boundary via
+    // `from_legacy_dht_op`.
+    let v2_op = holochain_types::dht_v2::from_legacy_dht_op(op);
     dht_store
-        .record_incoming_ops(vec![(op.clone(), false)])
+        .record_incoming_ops(vec![(v2_op, false)])
         .await
         .unwrap();
     dht_store

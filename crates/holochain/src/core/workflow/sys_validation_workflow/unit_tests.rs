@@ -853,10 +853,25 @@ impl TestCase {
         let op_hashed = DhtOpHashed::from_content_sync(op);
         let hash = op_hashed.as_hash().clone();
 
+        // Write to the legacy DB so that other legacy paths (app-validation query,
+        // integration, etc.) also see this op.
+        let op_for_legacy = op_hashed.clone();
+        self.test_space
+            .space
+            .dht_db
+            .write_async(move |txn| -> StateMutationResult<()> {
+                holochain_state::mutations::insert_op_untyped(txn, &op_for_legacy, 0)?;
+                Ok(())
+            })
+            .await
+            .unwrap();
+
+        // Write to the new DHT store so that `ops_pending_sys_validation` returns it.
+        let v2_op_hashed = holochain_types::dht_v2::from_legacy_dht_op(&op_hashed);
         self.test_space
             .space
             .dht_store
-            .record_incoming_ops(vec![(op_hashed, false)])
+            .record_incoming_ops(vec![(v2_op_hashed, false)])
             .await
             .unwrap();
 

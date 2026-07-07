@@ -12,13 +12,24 @@ use {
     crate::core::workflow::sys_validation_workflow::types::Outcome, ::fixt::fixt,
     holochain_zome_types::fixt::EntryFixturator, std::convert::TryInto,
 };
-// The ops constructed by hand in this module (`ChainOp::from_type`,
-// `insert_action`) are built over the legacy per-variant `Action` enum, so
-// `Action` (otherwise the v2 struct via the ambient preludes) is pinned to
-// the legacy shape here. `detect_fork` and the `ActionRefMut` mutators used
-// in `test_detect_fork` operate on the v2 projection, so actions are
-// converted at those boundaries via `from_legacy_action`/`to_legacy_signed_action`.
+// The ops constructed by hand in this module are built from legacy
+// per-variant `Action` fixtures (`fixt!(Create)`, `fixt!(Dna)`, ...) and
+// projected to v2 via `from_legacy_action`, so `Action` (otherwise the v2
+// struct via the ambient preludes) is pinned to the legacy shape here.
+// `detect_fork` and the `ActionRefMut` mutators used in `test_detect_fork`
+// operate on the v2 projection; `insert_action` writes the legacy `Action`
+// table, so the v2 actions it commits are projected back via
+// `to_legacy_signed_action`.
 use holochain_zome_types::dependencies::holochain_integrity_types::action::Action;
+use holochain_zome_types::dht_v2::SignedAction;
+
+/// Project a v2 op-pipeline op to its legacy form for the still-legacy
+/// `DbKindDht` sqlite mirror that `insert_op_dht` writes into (mirrors the
+/// `to_legacy_dht_op` shim `incoming_dht_ops_workflow::add_to_pending` uses).
+fn to_legacy_op_hashed(op: &DhtOpHashed) -> holochain_types::dht_op::DhtOpHashed {
+    let legacy = holochain_types::dht_v2::to_legacy_dht_op(op.as_content()).unwrap();
+    holochain_types::dht_op::DhtOpHashed::with_pre_hashed(legacy, op.as_hash().clone())
+}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn sys_validation_workflow_test() {
@@ -50,10 +61,12 @@ async fn sys_validation_produces_invalid_chain_op_warrant() {
     let bob_pubkey = fixt!(AgentPubKey);
     let mut mismatched_action = fixt!(Create);
     mismatched_action.author = bob_pubkey.clone();
-    let op = ChainOp::StoreEntry(
-        fixt!(Signature),
-        NewEntryAction::Create(mismatched_action),
-        fixt!(Entry),
+    let op: DhtOp = ChainOp::CreateEntry(
+        SignedAction::new(
+            from_legacy_action(&Action::Create(mismatched_action)),
+            fixt!(Signature),
+        ),
+        OpEntry::Present(fixt!(Entry)),
     )
     .into();
     let dna_hash = dna.dna_hash().clone();
@@ -70,6 +83,11 @@ async fn sys_validation_produces_invalid_chain_op_warrant() {
 
     // Inject the invalid op directly into bob's DHT store
     let op = DhtOpHashed::from_content_sync(op);
+    let db = conductor.spaces.dht_db(dna.dna_hash()).unwrap();
+    let op_for_legacy = to_legacy_op_hashed(&op);
+    db.test_write(move |txn| {
+        insert_op_dht(txn, &op_for_legacy, 0, None).unwrap();
+    });
     conductor
         .spaces
         .dht_store(dna.dna_hash())
@@ -183,23 +201,26 @@ async fn sys_validation_produces_forked_chain_warrant() {
     let forked_action_hash = signed_forked.as_hash().clone();
     let expected_seq = 1u32;
 
-    // Build ChainOps for genesis, original, and forked actions. `ChainOp` is
-    // built over the legacy `Action`, so project each v2 signed action back
-    // to its legacy form (the hash is carried over, so it stays the same
-    // content-derived v2 identity).
-    let (dna_hashed, dna_sig) = to_legacy_signed_action(&signed_dna_action).into_inner();
-    let dna_signed = LegacySignedAction::new(dna_hashed.into_content(), dna_sig);
-    let prev_op = ChainOp::from_type(ChainOpType::StoreRecord, dna_signed, None).unwrap();
+    // Build ChainOps for genesis, original, and forked actions directly from
+    // the v2 signed actions (the hash carried on each `SignedActionHashed` is
+    // the same content-derived v2 identity the op hash is built from).
+    let (dna_hashed, dna_sig) = signed_dna_action.into_inner();
+    let prev_op = ChainOp::CreateRecord(
+        SignedAction::new(dna_hashed.into_content(), dna_sig),
+        OpEntry::ActionOnly,
+    );
 
-    let (orig_hashed, orig_sig) = to_legacy_signed_action(&signed_original).into_inner();
-    let orig_signed = LegacySignedAction::new(orig_hashed.into_content(), orig_sig);
-    let original_op =
-        ChainOp::from_type(ChainOpType::StoreRecord, orig_signed, Some(original_entry)).unwrap();
+    let (orig_hashed, orig_sig) = signed_original.into_inner();
+    let original_op = ChainOp::CreateRecord(
+        SignedAction::new(orig_hashed.into_content(), orig_sig),
+        OpEntry::Present(original_entry),
+    );
 
-    let (fork_hashed, fork_sig) = to_legacy_signed_action(&signed_forked).into_inner();
-    let fork_signed = LegacySignedAction::new(fork_hashed.into_content(), fork_sig);
-    let forked_op =
-        ChainOp::from_type(ChainOpType::StoreRecord, fork_signed, Some(forked_entry)).unwrap();
+    let (fork_hashed, fork_sig) = signed_forked.into_inner();
+    let forked_op = ChainOp::CreateRecord(
+        SignedAction::new(fork_hashed.into_content(), fork_sig),
+        OpEntry::Present(forked_entry),
+    );
 
     // Verify the forked op is valid on its own
     let dna_hash = dna.dna_hash().clone();
@@ -217,6 +238,15 @@ async fn sys_validation_produces_forked_chain_warrant() {
     let prev_op_hashed = DhtOpHashed::from_content_sync(prev_op);
     let original_op_hashed = DhtOpHashed::from_content_sync(original_op);
     let forked_op_hashed = DhtOpHashed::from_content_sync(forked_op);
+    let db = conductor.spaces.dht_db(dna.dna_hash()).unwrap();
+    let prev_for_legacy = to_legacy_op_hashed(&prev_op_hashed);
+    let orig_for_legacy = to_legacy_op_hashed(&original_op_hashed);
+    let fork_for_legacy = to_legacy_op_hashed(&forked_op_hashed);
+    db.test_write(move |txn| {
+        insert_op_dht(txn, &prev_for_legacy, 0, None).unwrap();
+        insert_op_dht(txn, &orig_for_legacy, 0, None).unwrap();
+        insert_op_dht(txn, &fork_for_legacy, 0, None).unwrap();
+    });
     conductor
         .spaces
         .dht_store(dna.dna_hash())
@@ -352,21 +382,27 @@ async fn sys_validation_produces_two_warrants_when_receiving_both_forked_ops() {
     let action1_hash = signed_action1.as_hash().clone();
     let action2_hash = signed_action2.as_hash().clone();
 
-    // Create ChainOps for the previous action and both forked actions.
-    // `ChainOp` is built over the legacy `Action`, so project each v2 signed
-    // action back to its legacy form (the hash is carried over, so it stays
-    // the same content-derived v2 identity).
-    let (dna_hashed, dna_sig) = to_legacy_signed_action(&signed_dna_action).into_inner();
-    let dna_signed_action = LegacySignedAction::new(dna_hashed.into_content(), dna_sig);
-    let prev_op = ChainOp::from_type(ChainOpType::StoreRecord, dna_signed_action, None).unwrap();
+    // Create ChainOps for the previous action and both forked actions,
+    // directly from the v2 signed actions (the hash carried on each
+    // `SignedActionHashed` is the same content-derived v2 identity the op
+    // hash is built from).
+    let (dna_hashed, dna_sig) = signed_dna_action.into_inner();
+    let prev_op = ChainOp::CreateRecord(
+        SignedAction::new(dna_hashed.into_content(), dna_sig),
+        OpEntry::ActionOnly,
+    );
 
-    let (action1_hashed, sig1) = to_legacy_signed_action(&signed_action1).into_inner();
-    let signed_action1 = LegacySignedAction::new(action1_hashed.into_content(), sig1);
-    let op1 = ChainOp::from_type(ChainOpType::StoreRecord, signed_action1, Some(entry1)).unwrap();
+    let (action1_hashed, sig1) = signed_action1.into_inner();
+    let op1 = ChainOp::CreateRecord(
+        SignedAction::new(action1_hashed.into_content(), sig1),
+        OpEntry::Present(entry1),
+    );
 
-    let (action2_hashed, sig2) = to_legacy_signed_action(&signed_action2).into_inner();
-    let signed_action2 = LegacySignedAction::new(action2_hashed.into_content(), sig2);
-    let op2 = ChainOp::from_type(ChainOpType::StoreRecord, signed_action2, Some(entry2)).unwrap();
+    let (action2_hashed, sig2) = signed_action2.into_inner();
+    let op2 = ChainOp::CreateRecord(
+        SignedAction::new(action2_hashed.into_content(), sig2),
+        OpEntry::Present(entry2),
+    );
 
     // Verify both ops are valid on their own
     let dna_hash = dna.dna_hash().clone();
@@ -392,6 +428,15 @@ async fn sys_validation_produces_two_warrants_when_receiving_both_forked_ops() {
     let prev_op_hashed = DhtOpHashed::from_content_sync(prev_op);
     let op1_hashed = DhtOpHashed::from_content_sync(op1);
     let op2_hashed = DhtOpHashed::from_content_sync(op2);
+    let db = conductor.spaces.dht_db(dna.dna_hash()).unwrap();
+    let prev_for_legacy = to_legacy_op_hashed(&prev_op_hashed);
+    let op1_for_legacy = to_legacy_op_hashed(&op1_hashed);
+    let op2_for_legacy = to_legacy_op_hashed(&op2_hashed);
+    db.test_write(move |txn| {
+        insert_op_dht(txn, &prev_for_legacy, 0, None).unwrap();
+        insert_op_dht(txn, &op1_for_legacy, 0, None).unwrap();
+        insert_op_dht(txn, &op2_for_legacy, 0, None).unwrap();
+    });
     conductor
         .spaces
         .dht_store(dna.dna_hash())

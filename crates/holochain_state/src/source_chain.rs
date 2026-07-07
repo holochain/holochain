@@ -5,13 +5,14 @@ use crate::scratch::SyncScratchError;
 use async_recursion::async_recursion;
 pub use error::*;
 // The query-read overlay machinery in `query.rs` still consumes the legacy
-// per-variant `Action`. These explicit imports shadow the v2 re-exports
-// pulled in via `crate::prelude::*` so the rest of this module keeps
-// resolving `Action`/`Record`/`SignedActionHashed` to their legacy shape.
+// per-variant `Record`/`SignedActionHashed`. These explicit imports shadow
+// the v2 re-exports pulled in via `crate::prelude::*` so the rest of this
+// module keeps resolving `Record`/`SignedActionHashed` to their legacy shape.
 // Authoring and op production are v2-native throughout: actions are built
 // directly (via `v2::build_action` and friends), staged in the (v2) scratch,
 // and turned into ops via `v2::produce_ops_from_record` — no legacy
-// conversion is on this path.
+// conversion is on this path. The legacy per-variant `Action` enum is only
+// needed by the test module's fixtures, so that import is test-gated.
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
@@ -25,6 +26,7 @@ use holochain_keystore::MetaLairClient;
 use holochain_state_types::SourceChainDump;
 use holochain_types::dht_v2 as v2;
 use holochain_types::prelude::SignedActionHashedExt;
+#[cfg(test)]
 use holochain_zome_types::dependencies::holochain_integrity_types::action::Action;
 use holochain_zome_types::dependencies::holochain_integrity_types::record::Record;
 use holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed;

@@ -2307,9 +2307,16 @@ async fn crash_case() {
             .boxed()
         });
 
-    let validation_outcome = validate_op(&op, &dna_def.hash, SysValDeps::default())
-        .await
-        .unwrap();
+    // `op` is legacy (this whole module builds legacy `ChainOp`/`DhtOp` — see
+    // the module-level comment); `validate_op` is v2-native, so project it
+    // once here at the boundary via `from_legacy_dht_op`.
+    let legacy_hashed = holochain_types::dht_op::DhtOpHashed::from_content_sync(op);
+    let v2_hashed = holochain_types::dht_v2::from_legacy_dht_op(&legacy_hashed);
+
+    let validation_outcome =
+        validate_op(v2_hashed.as_content(), &dna_def.hash, SysValDeps::default())
+            .await
+            .unwrap();
 
     assert!(matches!(validation_outcome, Outcome::Accepted));
 }
@@ -2391,21 +2398,27 @@ impl TestCase {
 
         let cascade = Arc::new(new_cascade);
 
+        // `self.op` is legacy (this whole module builds legacy `ChainOp`/
+        // `DhtOp` — see the module-level comment); `retrieve_previous_actions_for_ops`
+        // and `validate_op` are v2-native, so project it once here at the
+        // boundary via `from_legacy_dht_op`.
+        let legacy_op = self
+            .op
+            .as_ref()
+            .expect("No op set, invalid test case")
+            .clone();
+        let legacy_hashed = holochain_types::dht_op::DhtOpHashed::from_content_sync(legacy_op);
+        let v2_hashed = holochain_types::dht_v2::from_legacy_dht_op(&legacy_hashed);
+
         retrieve_previous_actions_for_ops(
             self.current_validation_dependencies.clone(),
             cascade.clone(),
-            vec![self
-                .op
-                .as_ref()
-                .expect("No op set, invalid test case")
-                .clone()]
-            .into_iter()
-            .map(DhtOpHashed::from_content_sync),
+            vec![v2_hashed.clone()].into_iter(),
         )
         .await;
 
         validate_op(
-            self.op.as_ref().expect("No op set, invalid test case"),
+            v2_hashed.as_content(),
             &dna_hash,
             self.current_validation_dependencies.clone(),
         )

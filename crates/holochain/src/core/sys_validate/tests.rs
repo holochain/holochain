@@ -44,16 +44,13 @@ use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::test_utils::valid_arbitrary_chain;
 use holochain_types::test_utils::ActionRefMut;
-// This module builds legacy per-variant actions directly to exercise the
-// `DhtOpSender` trait (`send_store_record`/`send_store_entry`), which takes
-// the legacy `Record` (see `LegacyRecord` in `crate::core::sys_validate`), so
-// `Action` is pinned to the legacy per-variant enum for this whole file. The
-// production checks under test (`check_new_entry_action`, etc.) take the v2
-// `Action`, so are called with `from_legacy_action(&action)` at their call
-// sites, and the legacy `SignedActionHashed` is reached explicitly where a
-// `LegacyRecord`'s signed action needs to be built by hand.
+// This module builds legacy per-variant actions directly (fixtures like
+// `fixt!(Create)`), so `Action` is pinned to the legacy per-variant enum for
+// this whole file. The production checks under test (`check_new_entry_action`,
+// etc.) and the `DhtOpSender` trait (`send_store_record`/`send_store_entry`)
+// take the v2 `Action`/`Record`, so actions are projected via
+// `from_legacy_action(&action)` at those call sites.
 use holochain_zome_types::dependencies::holochain_integrity_types::action::Action;
-use holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed as LegacySignedActionHashed;
 use matches::assert_matches;
 use std::time::Duration;
 
@@ -159,16 +156,16 @@ async fn incoming_ops_filters_private_entry() {
         weight: EntryRateWeight::default(),
     };
     let action = Action::Create(create);
-    let signature = author
-        .sign(&keystore, &from_legacy_action(&action))
-        .await
-        .unwrap();
+    let v2_action = from_legacy_action(&action);
+    let signature = author.sign(&keystore, &v2_action).await.unwrap();
 
-    let shh = LegacySignedActionHashed::with_presigned(
-        ActionHashed::from_content_sync(action),
+    // `send_store_entry`/`send_store_record` (below) take the v2 `Record`, so
+    // build one directly rather than a `LegacyRecord`.
+    let shh = SignedActionHashed::with_presigned(
+        holo_hash::HoloHashed::from_content_sync(v2_action),
         signature,
     );
-    let record = LegacyRecord::new(shh, Some(private_entry));
+    let record = Record::new(shh, RecordEntry::Present(private_entry));
 
     let ops_sender = IncomingDhtOpSender::new(space.clone(), tx.clone());
     ops_sender.send_store_entry(record.clone()).await.unwrap();

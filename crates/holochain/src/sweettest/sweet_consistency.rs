@@ -260,7 +260,6 @@ mod tests {
     use hdk::prelude::{LegacyActionFixturator, SignatureFixturator};
     use holo_hash::ActionHash;
     use holochain_serialized_bytes::SerializedBytes;
-    use holochain_types::dht_op::{ChainOp, DhtOpHashed};
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::{
         action::ChainTopOrdering,
@@ -430,8 +429,17 @@ mod tests {
             .await
             .unwrap();
 
-        let op = ChainOp::RegisterAgentActivity(fixt!(Signature), fixt!(LegacyAction));
-        let unintegrated_op = DhtOpHashed::from_content_sync(op);
+        // `record_incoming_ops` is v2-native; this arbitrary op only needs to
+        // exist unvalidated in limbo, so build it directly as v2 rather than
+        // via the legacy `ChainOp`/`DhtOpHashed` this test module otherwise
+        // uses for op reconstruction (see `wire_rows_to_legacy_ops`).
+        let v2_action = holochain_zome_types::dht_v2::from_legacy_action(&fixt!(LegacyAction));
+        let op = holochain_types::dht_v2::ChainOp::AgentActivity(
+            holochain_zome_types::dht_v2::SignedAction::new(v2_action, fixt!(Signature)),
+        );
+        let unintegrated_op = holochain_types::dht_v2::DhtOpHashed::from_content_sync(
+            holochain_types::dht_v2::DhtOp::from(op),
+        );
         // Stage the op into the DHT store's validation limbo so it is present
         // but not integrated.
         conductors[0]

@@ -1405,7 +1405,7 @@ impl DhtStore<DbRead<Dht>> {
     /// observed, and warrants. Store-only (no scratch).
     ///
     /// Builds on legacy `Record`/`ActionHashed` internally — see
-    /// [`build_agent_activity_response_full`] for why — converting to v2 only
+    /// `build_agent_activity_response_full` for why — converting to v2 only
     /// at the `ChainItems::Full` boundary when `include_full_records` is set.
     pub async fn get_agent_activity(
         &self,

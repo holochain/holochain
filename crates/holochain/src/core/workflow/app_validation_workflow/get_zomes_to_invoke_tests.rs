@@ -43,6 +43,14 @@ async fn seed_dependency_op(test_space: &TestSpace, dht_op: DhtOpHashed) {
         .dht_store
         // For this op, a validation receipt should not be requested.
         .record_incoming_ops(vec![(dht_op, false)])
+        // For this op, a validation receipt should not be requested. `dht_op`
+        // is legacy (see the `holochain_types::dht_op::{ChainOp, DhtOpHashed}`
+        // import above); `record_incoming_ops` is v2-native, so project it at
+        // this boundary via `from_legacy_dht_op`.
+        .record_incoming_ops(vec![(
+            holochain_types::dht_v2::from_legacy_dht_op(&dht_op),
+            false,
+        )])
         .await
         .unwrap();
 }

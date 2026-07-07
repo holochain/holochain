@@ -42,6 +42,13 @@ use std::hash::Hash;
 use std::sync::Arc;
 use std::time::Duration;
 
+/// Project a legacy op-pipeline op (this module builds legacy `ChainOp`/
+/// `DhtOp` throughout via `holochain_types::prelude::*`) to v2 for
+/// `DhtStore::record_incoming_ops`, which is v2-native.
+fn to_v2_op_hashed(op: &DhtOpHashed) -> holochain_types::dht_v2::DhtOpHashed {
+    holochain_types::dht_v2::from_legacy_dht_op(op)
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn main_workflow() {
     holochain_trace::test_run();
@@ -116,7 +123,7 @@ async fn main_workflow() {
     // validation; the workflow reads ops to validate from the new store.
     app_validation_workspace
         .dht_store
-        .record_incoming_ops(vec![(dht_delete_op_hashed, false)])
+        .record_incoming_ops(vec![(to_v2_op_hashed(&dht_delete_op_hashed), false)])
         .await
         .unwrap();
     app_validation_workspace
@@ -175,7 +182,7 @@ async fn main_workflow() {
     // read comes from the DhtStore, so the dependency must live there).
     app_validation_workspace
         .dht_store
-        .record_incoming_ops(vec![(dht_create_op_hashed, false)])
+        .record_incoming_ops(vec![(to_v2_op_hashed(&dht_create_op_hashed), false)])
         .await
         .unwrap();
 
@@ -333,8 +340,8 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
     app_validation_workspace
         .dht_store
         .record_incoming_ops(vec![
-            (dht_delete_op_hashed, false),
-            (dht_create_op_hashed_for_store, false),
+            (to_v2_op_hashed(&dht_delete_op_hashed), false),
+            (to_v2_op_hashed(&dht_create_op_hashed_for_store), false),
         ])
         .await
         .unwrap();
@@ -481,8 +488,8 @@ async fn validate_ops_in_sequence_must_get_action() {
     app_validation_workspace
         .dht_store
         .record_incoming_ops(vec![
-            (dht_delete_op_hashed, false),
-            (dht_create_op_hashed_for_store, false),
+            (to_v2_op_hashed(&dht_delete_op_hashed), false),
+            (to_v2_op_hashed(&dht_create_op_hashed_for_store), false),
         ])
         .await
         .unwrap();
@@ -655,8 +662,8 @@ async fn handle_error_in_op_validation() {
     app_validation_workspace
         .dht_store
         .record_incoming_ops(vec![
-            (dht_create_op_hashed, false),
-            (dht_store_entry_op_hashed, false),
+            (to_v2_op_hashed(&dht_create_op_hashed), false),
+            (to_v2_op_hashed(&dht_store_entry_op_hashed), false),
         ])
         .await
         .unwrap();
@@ -1054,7 +1061,10 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
     let dht_create_op_hash_for_store = dht_create_op_hash.clone();
     app_validation_workspace
         .dht_store
-        .record_incoming_ops(vec![(dht_create_op_hashed_for_store, false)])
+        .record_incoming_ops(vec![(
+            to_v2_op_hashed(&dht_create_op_hashed_for_store),
+            false,
+        )])
         .await
         .unwrap();
     app_validation_workspace

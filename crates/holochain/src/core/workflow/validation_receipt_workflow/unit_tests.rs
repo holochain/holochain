@@ -393,8 +393,32 @@ async fn create_op_with_status(
     // Write the op through the full validation + integration pipeline so that
     // DhtStore::pending_validation_receipts sees it in integrated +
     // require_receipt state.
+    // Legacy DB: write the op in integrated + require_receipt state.
+    vault
+        .write_async({
+            let test_op_hash = test_op_hash.clone();
+            let op = op.clone();
+            move |txn| -> StateMutationResult<()> {
+                holochain_state::mutations::insert_op_dht(txn, &op, 0, None)?;
+                set_require_receipt(txn, &test_op_hash, true)?;
+                set_when_integrated(txn, &test_op_hash, Timestamp::now())?;
+                set_validation_status(txn, &test_op_hash, validation_status)?;
+
+                Ok(())
+            }
+        })
+        .await
+        .unwrap();
+
+    // New-DB: write the same op through the full validation + integration
+    // pipeline so that DhtStore::pending_validation_receipts sees it.
+    // The hash is derived from the same op content, so test_op_hash matches.
+    // `op` is legacy (see the `crate::prelude::DhtOpHashed` import above);
+    // `record_incoming_ops` is v2-native, so project it at this boundary via
+    // `from_legacy_dht_op`.
+    let v2_op = holochain_types::dht_v2::from_legacy_dht_op(&op);
     dht_store
-        .record_incoming_ops(vec![(op, true)])
+        .record_incoming_ops(vec![(v2_op, true)])
         .await
         .unwrap();
 

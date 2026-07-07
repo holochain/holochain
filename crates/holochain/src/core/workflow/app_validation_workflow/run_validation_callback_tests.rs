@@ -121,10 +121,16 @@ async fn validation_callback_must_get_action() {
     // which the cascade's local read now consults.
     let dht_op = ChainOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
     let dht_op_hashed = DhtOpHashed::from_content_sync(dht_op);
+    // `dht_op_hashed` is legacy (see the `holochain_types::dht_op::{ChainOp,
+    // DhtOpHashed, WireOps}` import above); `record_incoming_ops` is
+    // v2-native, so project it at this boundary via `from_legacy_dht_op`.
     test_space
         .space
         .dht_store
-        .record_incoming_ops(vec![(dht_op_hashed, false)])
+        .record_incoming_ops(vec![(
+            holochain_types::dht_v2::from_legacy_dht_op(&dht_op_hashed),
+            false,
+        )])
         .await
         .unwrap();
 
@@ -235,6 +241,31 @@ async fn validation_callback_awaiting_deps_hashes() {
 
     // Wait for the background fetch to put the op into the DhtStore.
     await_action_in_store(&test_space.space.dht_store, &create_action.to_hash()).await;
+    // await while missing record is being fetched in background task
+    await_actions_in_cache(
+        &test_space.space.cache_db,
+        vec![create_action_signed_hashed.as_hash().clone()],
+    )
+    .await;
+
+    // The fetched op carries a synthetic signature, so the signature gate keeps
+    // it out of the DhtStore (it reaches only the legacy cache, confirmed
+    // above). Mirror it into the DhtStore — which the cascade's local read now
+    // consults — standing in for the verified fetch a real signature would allow.
+    test_space
+        .space
+        .dht_store
+        .record_incoming_ops(vec![(
+            holochain_types::dht_v2::from_legacy_dht_op(&DhtOpHashed::from_content_sync(
+                ChainOp::RegisterAgentActivity(
+                    create_action_signed_hashed.signature().clone(),
+                    create_action.clone(),
+                ),
+            )),
+            false,
+        )])
+        .await
+        .unwrap();
 
     // app validation outcome should be accepted, now that the missing record
     // has been fetched

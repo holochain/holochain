@@ -27,7 +27,7 @@ use holochain_state::prelude::{AppEntryBytesFixturator, HeadInfo};
 use holochain_state::prelude::{StateMutationError, StateMutationResult};
 use holochain_state::source_chain;
 use holochain_types::activity::AgentActivityResponse;
-use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
+use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry};
 use holochain_types::prelude::SystemSignal;
 use holochain_types::prelude::{ChainItems, SignedActionHashedExt};
 use holochain_types::signal::Signal;
@@ -1933,10 +1933,12 @@ impl TestHarness {
         entry: Entry,
         entry_hash: EntryHash,
     ) -> SignedAction {
-        // `ChainOp`/`insert_action` are a legacy-island (see
-        // `holochain_types::dht_op`), so the fixture is built as a legacy
-        // action first and then projected to v2 via `from_legacy_action` for
-        // signing, matching the v2 signature basis used everywhere else.
+        // `insert_action`/`insert_op_authored` write the still-legacy
+        // `DbKindAuthored` mirror (Phase 6), so the fixture is built as a
+        // legacy action first and then projected to v2 via
+        // `from_legacy_action` for signing, matching the v2 signature basis
+        // used everywhere else. The DhtStore writes below (the real op
+        // pipeline) build the v2 op directly from the same `signed`.
         let my_action = LegacyAction::from_countersigning_data(
             entry_hash.clone(),
             session_data,
@@ -1956,13 +1958,20 @@ impl TestHarness {
         // Sign the op with the real action signature. The store record is
         // reconstructed from this op, and the completion path verifies the
         // record's signature, so a fixt signature would be rejected.
-        let store_entry_op = ChainOp::StoreEntry(
+        let legacy_store_entry_op = holochain_types::dht_op::ChainOp::StoreEntry(
             signature.clone(),
             my_action.clone().try_into().unwrap(),
             entry.clone(),
         );
-        let dht_op = DhtOp::ChainOp(Box::new(store_entry_op));
-        let dht_op = DhtOpHashed::from_content_sync(dht_op);
+        let legacy_dht_op =
+            holochain_types::dht_op::DhtOp::ChainOp(Box::new(legacy_store_entry_op));
+        let legacy_dht_op = holochain_types::dht_op::DhtOpHashed::from_content_sync(legacy_dht_op);
+
+        // The v2 op-pipeline form of the same `StoreEntry`/`CreateEntry` op,
+        // for the (v2-native) DhtStore writes below.
+        let v2_store_entry_op =
+            ChainOp::CreateEntry(signed.clone(), OpEntry::Present(entry.clone()));
+        let dht_op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(v2_store_entry_op)));
 
         // Write the commit to the DhtStore so the store-backed session reads
         let legacy_sah = LegacySignedActionHashed::with_presigned(
@@ -1978,12 +1987,12 @@ impl TestHarness {
                 let legacy_sah = legacy_sah.clone();
                 let entry = entry.clone();
                 let entry_hash = entry_hash.clone();
-                let dht_op = dht_op.clone();
+                let legacy_dht_op = legacy_dht_op.clone();
                 move |txn| -> StateMutationResult<()> {
                     insert_action(txn, &legacy_sah)?;
                     insert_entry(txn, &entry_hash, &entry)?;
-                    insert_op_authored(txn, &dht_op)?;
-                    set_withhold_publish(txn, &dht_op.hash)?;
+                    insert_op_authored(txn, &legacy_dht_op)?;
+                    set_withhold_publish(txn, &legacy_dht_op.hash)?;
 
                     Ok(())
                 }
@@ -2019,7 +2028,7 @@ impl TestHarness {
         // mirror it here — withheld like the session's other ops — otherwise the
         // committed session head is invisible to the store reads.
         let agent_activity_op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(
-            ChainOp::RegisterAgentActivity(signature.clone(), my_action.clone()),
+            ChainOp::AgentActivity(signed.clone()),
         )));
         self.test_space
             .space

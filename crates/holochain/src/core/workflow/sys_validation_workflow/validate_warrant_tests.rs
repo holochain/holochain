@@ -20,7 +20,7 @@ use holochain_cascade::CascadeSource;
 // `sign_action` fixtures are built from the legacy per-variant `Create`
 // action; `from_legacy_action` converts to the v2 shape actually signed.
 use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
-use holochain_zome_types::dht_v2::{from_legacy_action, to_legacy_signed_action};
+use holochain_zome_types::dht_v2::from_legacy_action;
 
 /// Test that a valid ChainFork warrant is accepted when both actions:
 /// - Have the same author
@@ -569,9 +569,14 @@ impl ChainForkWarrantTestCase {
         action: &SignedActionHashed,
         reason: &str,
     ) -> DhtOpHashed {
-        let chain_op = ChainOp::RegisterAgentActivity(
-            action.signature.clone(),
-            to_legacy_signed_action(action).action().clone(),
+        // `make_invalid_chain_warrant_op` is v2-native, unlike the legacy
+        // `ChainOp` this module otherwise builds (see the other
+        // `ChainOp::RegisterAgentActivity` call sites in this file).
+        let chain_op = holochain_types::dht_v2::ChainOp::AgentActivity(
+            holochain_zome_types::dht_v2::SignedAction::new(
+                action.action().clone(),
+                action.signature.clone(),
+            ),
         );
         crate::core::workflow::sys_validation_workflow::make_invalid_chain_warrant_op(
             &self.keystore,
@@ -681,7 +686,12 @@ impl ChainForkWarrantTestCase {
         warrant_op: holochain_types::warrant::WarrantOp,
     ) -> WorkflowResult<Outcome> {
         let dna_hash = DnaDefHashed::from_content_sync(self.dna_def.clone()).hash;
-        let op = DhtOp::WarrantOp(Box::new(warrant_op));
+        // `holochain_types::warrant::WarrantOp` is the legacy, richer
+        // warrant-processing type this module builds throughout; `validate_op`
+        // is v2-native, so project via the shared `SignedWarrant` (warrant
+        // hashing/signing is unchanged by the v2 flip — see `DhtOp::to_hash`).
+        let signed_warrant: holochain_zome_types::warrant::SignedWarrant = (*warrant_op).clone();
+        let op = holochain_types::dht_v2::DhtOp::from(signed_warrant);
 
         validate_op(&op, &dna_hash, self.validation_dependencies.clone()).await
     }
@@ -689,6 +699,12 @@ impl ChainForkWarrantTestCase {
     /// Validate an already-hashed DhtOp, as produced by `make_invalid_chain_warrant_op`.
     async fn validate_warrant_dht_op(&self, op: DhtOpHashed) -> WorkflowResult<Outcome> {
         let dna_hash = DnaDefHashed::from_content_sync(self.dna_def.clone()).hash;
-        validate_op(&op.content, &dna_hash, self.validation_dependencies.clone()).await
+        let v2_op = holochain_types::dht_v2::from_legacy_dht_op(&op);
+        validate_op(
+            v2_op.as_content(),
+            &dna_hash,
+            self.validation_dependencies.clone(),
+        )
+        .await
     }
 }
