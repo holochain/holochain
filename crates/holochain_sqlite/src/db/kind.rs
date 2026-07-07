@@ -10,6 +10,8 @@ pub enum DbKind {
     Authored(Arc<CellId>),
     /// Specifies the environment used for dht data by all cells on the same [`DnaHash`].
     Dht(Arc<DnaHash>),
+    /// Specifies the environment used by each Cache (one per dna).
+    Cache(Arc<DnaHash>),
     /// Specifies the environment used by a Conductor
     Conductor,
     /// Specifies the environment used to save wasm
@@ -48,6 +50,10 @@ pub struct DbKindAuthored(pub Arc<CellId>);
 /// Specifies the environment used for dht data by all cells on the same [`DnaHash`].
 #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 pub struct DbKindDht(pub Arc<DnaHash>);
+
+/// Specifies the environment used by each Cache (one per dna).
+#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
+pub struct DbKindCache(pub Arc<DnaHash>);
 
 /// Specifies the environment used by a Conductor
 #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
@@ -112,6 +118,31 @@ impl DbKindDht {
         self.0.clone()
     }
 }
+
+impl DbKindT for DbKindCache {
+    fn kind(&self) -> DbKind {
+        DbKind::Cache(self.0.clone())
+    }
+
+    fn filename_inner(&self) -> PathBuf {
+        ["cache", &self.0.to_string()].iter().collect()
+    }
+
+    fn if_corrupt_wipe(&self) -> bool {
+        true
+    }
+}
+
+impl DbKindCache {
+    pub fn dna_hash(&self) -> &DnaHash {
+        &self.0
+    }
+    pub fn to_dna_hash(&self) -> Arc<DnaHash> {
+        self.0.clone()
+    }
+}
+
+impl DbKindOp for DbKindCache {}
 
 impl DbKindT for DbKindConductor {
     fn kind(&self) -> DbKind {

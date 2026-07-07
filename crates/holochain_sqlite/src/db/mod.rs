@@ -18,8 +18,8 @@ pub use access::{DbRead, DbWrite, ReadAccess, Txn};
 pub use guard::PTxnGuard;
 pub use key::DbKey;
 pub use kind::{
-    DbKind, DbKindAuthored, DbKindConductor, DbKindDht, DbKindOp, DbKindPeerMetaStore, DbKindT,
-    DbKindWasm,
+    DbKind, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbKindOp, DbKindPeerMetaStore,
+    DbKindT, DbKindWasm,
 };
 #[cfg(feature = "test_utils")]
 pub use pool::set_connection_timeout;
