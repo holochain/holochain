@@ -407,7 +407,8 @@ pub enum ActionBase {
 /// Base data for Create actions.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub struct CreateBase {
-    entry_type: EntryType,
+    /// The entry type of the create.
+    pub entry_type: EntryType,
 }
 
 impl CreateBase {

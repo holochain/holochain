@@ -7,9 +7,85 @@
 
 pub use holochain_integrity_types::dht_v2::*;
 
+use crate::countersigning::{
+    ActionBase, CounterSigningError, CounterSigningSessionData,
+};
 use crate::op::ChainOpType;
 use crate::signature::Signed;
+use holo_hash::{AgentPubKey, EntryHash};
 use holochain_integrity_types::record::SignedHashed;
+
+/// Build a v2 [`Action`] from its common header and per-variant data.
+///
+/// Every action variant — including the genesis [`ActionData::Dna`], whose
+/// header carries `prev_action: None` — shares the same [`ActionHeader`]
+/// shape, so building an action is just pairing the two up.
+pub fn build_action(header: ActionHeader, data: ActionData) -> Action {
+    Action { header, data }
+}
+
+/// Build the v2 [`Action`] a single agent contributes to a countersigning
+/// session.
+///
+/// Mirrors the legacy `Action::from_countersigning_data`
+/// (`holochain_integrity_types::countersigning`), but builds the v2
+/// [`Action`] directly and carries no weight — the v2 model has no
+/// rate-limiting field.
+pub fn from_countersigning_data(
+    entry_hash: EntryHash,
+    session_data: &CounterSigningSessionData,
+    author: AgentPubKey,
+) -> Result<Action, CounterSigningError> {
+    let agent_state = session_data.agent_state_for_agent(&author)?;
+    let header = ActionHeader {
+        author,
+        timestamp: session_data.to_timestamp(),
+        action_seq: agent_state.action_seq() + 1,
+        prev_action: Some(agent_state.chain_top().clone()),
+    };
+    let data = match &session_data.preflight_request().action_base {
+        ActionBase::Create(base) => ActionData::Create(CreateData {
+            entry_type: base.entry_type.clone(),
+            entry_hash,
+        }),
+        ActionBase::Update(base) => ActionData::Update(UpdateData {
+            original_action_address: base.original_action_address.clone(),
+            original_entry_address: base.original_entry_address.clone(),
+            entry_type: base.entry_type.clone(),
+            entry_hash,
+        }),
+    };
+    Ok(build_action(header, data))
+}
+
+/// Map a countersigning session to the ordered set of v2 [`Action`]s each
+/// participating agent contributes.
+///
+/// Mirrors the legacy `CounterSigningSessionData::build_action_set`
+/// (`holochain_integrity_types::countersigning`), but produces v2
+/// [`Action`]s (no weight). A given session always maps to the same ordered
+/// set of actions or an error. The actions are not signed, since the intent
+/// is to build every participant's action without holding their private key.
+pub fn build_action_set(
+    session_data: &CounterSigningSessionData,
+    entry_hash: EntryHash,
+) -> Result<Vec<Action>, CounterSigningError> {
+    let mut actions = vec![];
+    let mut build_actions =
+        |countersigning_agents: &crate::countersigning::CounterSigningAgents| -> Result<(), CounterSigningError> {
+            for (agent, _role) in countersigning_agents.iter() {
+                actions.push(from_countersigning_data(
+                    entry_hash.clone(),
+                    session_data,
+                    agent.clone(),
+                )?);
+            }
+            Ok(())
+        };
+    build_actions(&session_data.preflight_request().signing_agents)?;
+    build_actions(&session_data.preflight_request().optional_signing_agents)?;
+    Ok(actions)
+}
 
 /// Convert a legacy [`holochain_integrity_types::record::SignedActionHashed`]
 /// (using the variant-per-type `Action` enum) into the v2
