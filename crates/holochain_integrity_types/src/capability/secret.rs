@@ -27,3 +27,11 @@ pub struct CapSecret(CapSecretBytes);
 // such as the ability to revoke a secret, and to assign it to specific recipients ahead of time
 // if they are a known closed set.
 secure_primitive!(CapSecret, CAP_SECRET_BYTES);
+
+impl PartialEq for CapSecret {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl Eq for CapSecret {}

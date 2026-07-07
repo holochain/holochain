@@ -9,8 +9,11 @@ pub struct AppEntryBytes(pub SerializedBytes);
 impl std::fmt::Debug for AppEntryBytes {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!(
-            "AppEntryBytes({})",
-            holochain_util::hex::many_bytes_string(self.0.bytes())
+            "AppEntryBytes([{}{}])",
+            format!("{:?}", &self.0.bytes()[..self.0.bytes().len().min(32)])
+                .trim_matches('[')
+                .trim_end_matches(']'),
+            if self.0.bytes().len() > 32 { ", .." } else { "" }
         ))
     }
 }
@@ -58,5 +61,28 @@ impl TryFrom<SerializedBytes> for AppEntryBytes {
 impl From<AppEntryBytes> for SerializedBytes {
     fn from(aeb: AppEntryBytes) -> Self {
         UnsafeBytes::from(aeb.0).into()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn app_entry_bytes_debug_small() {
+        let bytes = AppEntryBytes(SerializedBytes::from(UnsafeBytes::from(vec![1, 2, 3])));
+        assert_eq!(format!("{:?}", bytes), "AppEntryBytes([1, 2, 3])");
+    }
+
+    #[test]
+    fn app_entry_bytes_debug_boundary() {
+        let bytes = AppEntryBytes(SerializedBytes::from(UnsafeBytes::from(vec![1; 32])));
+        assert_eq!(format!("{:?}", bytes), "AppEntryBytes([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])");
+    }
+
+    #[test]
+    fn app_entry_bytes_debug_large() {
+        let bytes = AppEntryBytes(SerializedBytes::from(UnsafeBytes::from(vec![1; 60])));
+        assert_eq!(format!("{:?}", bytes), "AppEntryBytes([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, ..])");
     }
 }

@@ -4,7 +4,6 @@ use crate::schedule::fn_is_scheduled;
 use crate::scratch::Scratch;
 use crate::validation_db::ValidationStage;
 pub use error::*;
-use holo_hash::encode::blake2b_256;
 use holo_hash::*;
 use holochain_nonce::Nonce256Bits;
 use holochain_sqlite::prelude::DatabaseResult;

@@ -18,6 +18,7 @@ use holochain_zome_types::prelude::{
     ChainQueryFilter, ChainQueryFilterRange, ChainStatus, SignedAction,
 };
 use itertools::Itertools;
+use holochain_types::countersigning_ext::PreflightRequestExt;
 
 /// Resolve an incomplete countersigning session.
 ///

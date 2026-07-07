@@ -41,7 +41,7 @@ pub type HoloHashOf<C> = HoloHash<<C as HashableContent>::HashType>;
 
 #[cfg(feature = "encoding")]
 pub use encode::{
-    blake2b_256, holo_hash_decode, holo_hash_decode_unchecked, holo_hash_encode, sha2_512,
+    holo_hash_decode, holo_hash_decode_unchecked, holo_hash_encode,
 };
 
 /// By default, disable string encoding and just display raw bytes
@@ -70,3 +70,11 @@ pub use hash_ext::*;
 // provides fixturators for all hash types
 #[cfg(feature = "fixturators")]
 pub mod fixt;
+
+#[cfg(any(feature = "encoding", feature = "hashing"))]
+pub mod location;
+
+#[cfg(any(feature = "encoding", feature = "hashing"))]
+pub use location::{
+    blake2b_256, holo_dht_location_bytes, sha2_512
+};

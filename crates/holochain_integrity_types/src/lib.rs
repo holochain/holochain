@@ -9,8 +9,6 @@
 //! the higher level crates.
 
 #![deny(missing_docs)]
-// For proptest-derive
-#![allow(non_local_definitions)]
 
 #[allow(missing_docs)]
 pub mod action;
@@ -46,8 +44,3 @@ pub mod trace;
 pub use action::Action;
 pub use entry::Entry;
 pub use prelude::*;
-
-/// Re-exported dependencies
-pub mod dependencies {
-    pub use ::subtle;
-}

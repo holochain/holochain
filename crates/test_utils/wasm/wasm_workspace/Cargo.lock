@@ -120,15 +120,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "colored"
-version = "3.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "faf9468729b8cbcea668e36183cb69d317348c2e08e994829fb56ebfdfbaac34"
-dependencies = [
- "windows-sys",
-]
-
-[[package]]
 name = "constant_time_eq"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -307,12 +298,6 @@ name = "downcast"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1435fa1053d8b2fbbe9be7e97eca7f33d37b28409959813daefc1446a14247f1"
-
-[[package]]
-name = "dunce"
-version = "1.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
 
 [[package]]
 name = "dyn-clone"
@@ -586,6 +571,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
+name = "hex"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+
+[[package]]
 name = "holo_hash"
 version = "0.7.0-dev.11"
 dependencies = [
@@ -594,8 +585,8 @@ dependencies = [
  "derive_more",
  "fixt",
  "futures",
+ "hex",
  "holochain_serialized_bytes",
- "holochain_util",
  "holochain_wasmer_common",
  "must_future",
  "rand",
@@ -614,11 +605,9 @@ dependencies = [
  "holochain_secure_primitive",
  "holochain_serialized_bytes",
  "holochain_timestamp",
- "holochain_util",
  "schemars",
  "serde",
  "serde_bytes",
- "subtle",
  "subtle-encoding",
  "tracing",
 ]
@@ -638,7 +627,6 @@ version = "0.7.0-dev.1"
 dependencies = [
  "paste",
  "serde",
- "subtle",
 ]
 
 [[package]]
@@ -681,17 +669,6 @@ version = "0.7.0-dev.1"
 dependencies = [
  "chrono",
  "serde",
-]
-
-[[package]]
-name = "holochain_util"
-version = "0.7.0-dev.1"
-dependencies = [
- "cfg-if",
- "colored",
- "dunce",
- "futures",
- "once_cell",
 ]
 
 [[package]]
@@ -738,7 +715,6 @@ dependencies = [
  "shrinkwraprs",
  "strum",
  "strum_macros",
- "subtle",
  "thiserror 2.0.18",
  "tracing",
  "uuid",
@@ -1331,12 +1307,6 @@ dependencies = [
  "quote",
  "syn 2.0.117",
 ]
-
-[[package]]
-name = "subtle"
-version = "2.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "subtle-encoding"
@@ -2274,15 +2244,6 @@ name = "windows-strings"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7837d08f69c77cf6b07689544538e017c1bfcf57e34b4c0ff58e6c2cd3b37091"
-dependencies = [
- "windows-link",
-]
-
-[[package]]
-name = "windows-sys"
-version = "0.61.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae137229bcbd6cdf0f7b80a31df61766145077ddf49416a728b02cb3921ff3fc"
 dependencies = [
  "windows-link",
 ]

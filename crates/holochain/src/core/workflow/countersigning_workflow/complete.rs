@@ -14,6 +14,7 @@ use holochain_timestamp::Timestamp;
 use holochain_types::dht_op::ChainOp;
 use holochain_zome_types::prelude::SignedAction;
 use rusqlite::{named_params, Transaction};
+use holochain_types::countersigning_ext::PreflightRequestExt;
 
 pub(crate) async fn inner_countersigning_session_complete(
     space: Space,

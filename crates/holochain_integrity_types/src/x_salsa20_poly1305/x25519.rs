@@ -9,6 +9,14 @@ pub struct X25519PubKey([u8; X25519_PUB_KEY_BYTES]);
 
 secure_primitive!(X25519PubKey, X25519_PUB_KEY_BYTES);
 
+impl PartialEq for X25519PubKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl Eq for X25519PubKey {}
+
 #[allow(clippy::derived_hash_with_manual_eq)]
 impl Hash for X25519PubKey {
     fn hash<H: Hasher>(&self, state: &mut H) {

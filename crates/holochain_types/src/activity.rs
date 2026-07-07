@@ -167,7 +167,7 @@ mod tests {
         let only = AgentActivityResponse::status_only(response);
 
         assert_eq!(only.status, ChainStatus::Valid(head));
-        assert_eq!(only.valid_activity, ChainItems::NotRequested);
-        assert_eq!(only.rejected_activity, ChainItems::NotRequested);
+        assert!(matches!(only.valid_activity, ChainItems::NotRequested), "Actually got: {:?}", only.valid_activity);
+        assert!(matches!(only.rejected_activity, ChainItems::NotRequested), "Actually got: {:?}", only.rejected_activity);
     }
 }
