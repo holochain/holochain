@@ -23,11 +23,18 @@
 
 pub use dht_store::{DhtStore, DhtStoreRead};
 
-/// Re-exported database handle types so downstream crates can name the
-/// read/write access parameter of [`DhtStore`] and the workspace types.
-pub use holochain_data::kind::Dht;
-pub use holochain_data::{DbRead, DbWrite};
+/// Re-exports from the `holochain_data` crate.
+pub mod data {
+    pub use holochain_data::{
+        conductor::AppInterfaceModel, kind::*, open_db, DatabaseIdentifier, DbKey, DbSyncLevel,
+        HolochainDataConfig, DbRead, DbWrite
+    };
 
+    #[cfg(feature = "test_utils")]
+    pub use holochain_data::test_open_db;
+}
+
+pub mod block;
 pub mod chain_lock;
 pub mod conductor;
 pub mod dht_store;

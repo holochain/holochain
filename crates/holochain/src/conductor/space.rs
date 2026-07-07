@@ -45,8 +45,8 @@ pub struct Spaces {
     pub(crate) wasm_store: holochain_state::wasm::WasmStore,
     pub(crate) dna_def_store: holochain_state::dna_def::DnaDefStore,
     pub(crate) entry_def_store: holochain_state::entry_def::EntryDefStore,
-    pub(crate) space_data_config: holochain_data::HolochainDataConfig,
-    data_db_key: holochain_data::DbKey,
+    pub(crate) space_data_config: holochain_state::data::HolochainDataConfig,
+    data_db_key: holochain_state::data::DbKey,
 }
 
 /// This is the set of data required at the
@@ -148,20 +148,21 @@ impl Spaces {
         };
 
         let db_sync = match db_sync_level {
-            DbSyncLevel::Off => holochain_data::DbSyncLevel::Off,
-            DbSyncLevel::Normal => holochain_data::DbSyncLevel::Normal,
-            DbSyncLevel::Full => holochain_data::DbSyncLevel::Full,
+            DbSyncLevel::Off => holochain_state::data::DbSyncLevel::Off,
+            DbSyncLevel::Normal => holochain_state::data::DbSyncLevel::Normal,
+            DbSyncLevel::Full => holochain_state::data::DbSyncLevel::Full,
         };
 
-        // Convert the DbKey from holochain_sqlite to holochain_data format
-        let data_db_key = holochain_data::DbKey::load(db_key.locked.clone(), passphrase.clone())
-            .await
-            .map_err(ConductorError::other)?;
+        // Convert the DbKey from holochain_sqlite to holochain_state format
+        let data_db_key =
+            holochain_state::data::DbKey::load(db_key.locked.clone(), passphrase.clone())
+                .await
+                .map_err(ConductorError::other)?;
 
-        let conductor_db = holochain_data::open_db(
+        let conductor_db = holochain_state::data::open_db(
             root_db_dir.as_ref(),
-            holochain_data::kind::Conductor,
-            holochain_data::HolochainDataConfig {
+            holochain_state::data::Conductor,
+            holochain_state::data::HolochainDataConfig {
                 key: Some(data_db_key.clone()),
                 sync_level: db_sync,
                 max_readers: config.db_max_readers,
@@ -171,10 +172,10 @@ impl Spaces {
         .map_err(ConductorError::other)?;
         let conductor_store = holochain_state::conductor::ConductorStore::new(conductor_db);
 
-        let wasm_db = holochain_data::open_db(
+        let wasm_db = holochain_state::data::open_db(
             root_db_dir.as_ref(),
-            holochain_data::kind::Wasm,
-            holochain_data::HolochainDataConfig {
+            holochain_state::data::Wasm,
+            holochain_state::data::HolochainDataConfig {
                 key: Some(data_db_key.clone()),
                 sync_level: db_sync,
                 max_readers: config.db_max_readers,
@@ -188,7 +189,7 @@ impl Spaces {
         let dna_def_store = holochain_state::dna_def::DnaDefStore::new(wasm_db.clone());
         let entry_def_store = holochain_state::entry_def::EntryDefStore::new(wasm_db);
 
-        let space_data_config = holochain_data::HolochainDataConfig {
+        let space_data_config = holochain_state::data::HolochainDataConfig {
             key: Some(data_db_key.clone()),
             sync_level: db_sync,
             max_readers: config.db_max_readers,
@@ -483,20 +484,20 @@ impl Space {
         root_db_dir: PathBuf,
         db_sync_strategy: DbSyncStrategy,
         db_max_readers: u16,
-        space_data_config: holochain_data::HolochainDataConfig,
-        data_db_key: Option<holochain_data::DbKey>,
+        space_data_config: holochain_state::data::HolochainDataConfig,
+        data_db_key: Option<holochain_state::data::DbKey>,
     ) -> DatabaseResult<Self> {
         let data_db_sync_level = match db_sync_strategy {
-            DbSyncStrategy::Fast => holochain_data::DbSyncLevel::Off,
-            DbSyncStrategy::Resilient => holochain_data::DbSyncLevel::Normal,
+            DbSyncStrategy::Fast => holochain_state::data::DbSyncLevel::Off,
+            DbSyncStrategy::Resilient => holochain_state::data::DbSyncLevel::Normal,
         };
 
         let (peer_meta_store, dht_store) = tokio::task::block_in_place(|| {
             let peer_meta_store_db = tokio::runtime::Handle::current()
-                .block_on(holochain_data::open_db(
+                .block_on(holochain_state::data::open_db(
                     &root_db_dir,
-                    holochain_data::kind::PeerMetaStore::new(dna_hash.clone()),
-                    holochain_data::HolochainDataConfig {
+                    holochain_state::data::PeerMetaStore::new(dna_hash.clone()),
+                    holochain_state::data::HolochainDataConfig {
                         key: data_db_key,
                         sync_level: data_db_sync_level,
                         max_readers: db_max_readers,
@@ -506,9 +507,9 @@ impl Space {
             let peer_meta_store =
                 holochain_state::peer_metadata_store::PeerMetaStore::new(peer_meta_store_db);
             let new_dht_db = tokio::runtime::Handle::current()
-                .block_on(holochain_data::open_db(
+                .block_on(holochain_state::data::open_db(
                     &root_db_dir,
-                    holochain_data::kind::Dht::new(dna_hash.clone()),
+                    holochain_state::data::Dht::new(dna_hash.clone()),
                     space_data_config,
                 ))
                 .map_err(|e| DatabaseError::Other(e.into()))?;
@@ -607,7 +608,7 @@ impl TestSpace {
             .tempdir()
             .unwrap();
 
-        let test_space_data_config = holochain_data::HolochainDataConfig::default();
+        let test_space_data_config = holochain_state::data::HolochainDataConfig::default();
         Self {
             space: Space::new(
                 Arc::new(dna_hash),

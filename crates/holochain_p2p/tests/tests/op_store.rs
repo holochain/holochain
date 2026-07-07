@@ -592,7 +592,7 @@ async fn overwrite_slice_hashes() {
 
 async fn setup_test() -> (DhtStore, HolochainOpStore) {
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
-    let store = DhtStore::new_test(holochain_data::kind::Dht::new(Arc::new(dna_hash.clone())))
+    let store = DhtStore::new_test(holochain_state::data::Dht::new(Arc::new(dna_hash.clone())))
         .await
         .unwrap();
 

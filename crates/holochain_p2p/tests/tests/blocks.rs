@@ -4,13 +4,13 @@ use holo_hash::{
     fixt::{ActionHashFixturator, AgentPubKeyFixturator, DhtOpHashFixturator, DnaHashFixturator},
     DnaHash,
 };
-use holochain_data::kind::PeerMetaStore;
 use holochain_keystore::{test_keystore, MetaLairClient};
 use holochain_p2p::actor::NetworkRequestOptions;
 use holochain_p2p::{
     actor::DynHcP2p, event::MockHcP2pHandler, spawn_holochain_p2p, HolochainP2pConfig,
     HolochainP2pError, HolochainP2pLocalAgent,
 };
+use holochain_state::data::PeerMetaStore;
 use holochain_timestamp::{InclusiveTimestampInterval, Timestamp};
 use holochain_types::{
     prelude::{Block, BlockTargetId, CellBlockReason, CellId},
@@ -518,13 +518,13 @@ impl TestActor {
         keystore: MetaLairClient,
         bootstrap_addr: &SocketAddr,
     ) -> Self {
-        let dht_store = holochain_state::DhtStore::new_test(holochain_data::kind::Dht::new(
+        let dht_store = holochain_state::DhtStore::new_test(holochain_state::data::Dht::new(
             Arc::new(dna_hash.clone()),
         ))
         .await
         .unwrap();
         let peer_meta_db = holochain_state::peer_metadata_store::PeerMetaStore::new(
-            holochain_data::test_open_db(PeerMetaStore::new(Arc::new(dna_hash.clone())))
+            holochain_state::data::test_open_db(PeerMetaStore::new(Arc::new(dna_hash.clone())))
                 .await
                 .unwrap(),
         );

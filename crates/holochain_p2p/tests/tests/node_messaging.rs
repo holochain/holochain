@@ -1,9 +1,9 @@
 use crate::tests::common::{spawn_test_bootstrap, Handler};
-use holochain_data::kind::PeerMetaStore;
 use holochain_keystore::*;
 use holochain_p2p::actor::{GetLinksRequestOptions, NetworkRequestOptions};
 use holochain_p2p::event::*;
 use holochain_p2p::*;
+use holochain_state::data::PeerMetaStore;
 use holochain_trace::test_run;
 use holochain_types::prelude::*;
 use kitsune2_api::*;
@@ -1241,11 +1241,11 @@ async fn spawn_test(
     bootstrap_addr: &SocketAddr,
 ) -> (AgentPubKey, actor::DynHcP2p, MetaLairClient) {
     let db_peer_meta = holochain_state::peer_metadata_store::PeerMetaStore::new(
-        holochain_data::test_open_db(PeerMetaStore::new(Arc::new(dna_hash.clone())))
+        holochain_state::data::test_open_db(PeerMetaStore::new(Arc::new(dna_hash.clone())))
             .await
             .unwrap(),
     );
-    let dht_store = holochain_state::DhtStore::new_test(holochain_data::kind::Dht::new(Arc::new(
+    let dht_store = holochain_state::DhtStore::new_test(holochain_state::data::Dht::new(Arc::new(
         dna_hash.clone(),
     )))
     .await

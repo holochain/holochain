@@ -729,7 +729,7 @@ impl Ribosome {
         let mut coordinator_zomes: CoordinatorZomes = vec![];
 
         let store = holochain_state::wasm::WasmStore::new(
-            holochain_data::test_open_db(holochain_data::kind::Wasm)
+            holochain_state::data::test_open_db(holochain_state::data::Wasm)
                 .await
                 .unwrap(),
         );
