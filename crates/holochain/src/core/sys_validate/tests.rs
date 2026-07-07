@@ -180,6 +180,51 @@ async fn incoming_ops_filters_private_entry() {
     assert_eq!(num_entries, 0);
 }
 
+/// A `CreateEntry` op is the public entry-authority op, so it must never carry
+/// a private entry — even with the entry body withheld. A peer that crafts one
+/// is attempting to announce a private entry's existence to the entry
+/// authority, so sys validation rejects it as a leak. The guard is
+/// `CreateEntry`-specific: a private entry is legitimate on a `CreateRecord`
+/// op, where a withheld body is expected.
+#[test]
+fn create_entry_op_rejects_private_entry() {
+    use holochain_types::dht_v2::ChainOp;
+    use holochain_types::dht_v2::OpEntry;
+    use holochain_types::dht_v2::SignedAction;
+
+    let private_create = Action::Create(Create {
+        author: fixt!(AgentPubKey),
+        timestamp: Timestamp::now(),
+        action_seq: 5,
+        prev_action: fixt!(ActionHash),
+        entry_type: EntryType::App(AppEntryDef::new(
+            0.into(),
+            0.into(),
+            EntryVisibility::Private,
+        )),
+        entry_hash: fixt!(EntryHash),
+        weight: EntryRateWeight::default(),
+    });
+    let sa = SignedAction::new(
+        from_legacy_action(&private_create),
+        holochain_zome_types::signature::Signature::from([0u8; 64]),
+    );
+
+    for withheld in [OpEntry::Hidden, OpEntry::ActionOnly] {
+        assert_matches!(
+            check_entry_visibility(&ChainOp::CreateEntry(sa.clone(), withheld)),
+            Err(SysValidationError::ValidationOutcome(
+                ValidationOutcome::PrivateEntryLeaked
+            ))
+        );
+    }
+
+    assert_matches!(
+        check_entry_visibility(&ChainOp::CreateRecord(sa, OpEntry::Hidden)),
+        Ok(())
+    );
+}
+
 /// Test that the valid_chain contrafact matches our chain validation function,
 /// since many other tests will depend on this constraint
 #[tokio::test(flavor = "multi_thread")]

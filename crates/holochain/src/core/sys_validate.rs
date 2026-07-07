@@ -357,6 +357,14 @@ pub fn check_entry_visibility(op: &ChainOp) -> SysValidationResult<()> {
         (_, None) => Ok(()),
 
         (Some(Public), Some(Present(_))) => Ok(()),
+
+        // A `CreateEntry` op is the public entry-authority op and is only ever
+        // produced for a public entry, so a private entry under this variant is
+        // a leak attempt whether or not the entry body itself is withheld.
+        (Some(Private), _) if matches!(op, ChainOp::CreateEntry(..)) => {
+            Err(ValidationOutcome::PrivateEntryLeaked.into())
+        }
+
         (Some(Private), Some(Hidden)) => Ok(()),
         (Some(Private), Some(ActionOnly)) => Ok(()),
 
@@ -371,7 +379,12 @@ pub fn check_entry_visibility(op: &ChainOp) -> SysValidationResult<()> {
                 err("Op has public entry type but is missing its data")
             }
         }
-        (None, Some(_)) => err("Entry must be absent for action with no entry type"),
+        // An action with no entry type carries `ActionOnly` — the op records
+        // the action alone, with no entry to store.
+        (None, Some(ActionOnly)) => Ok(()),
+        (None, Some(Present(_) | Hidden)) => {
+            err("Entry must be absent for action with no entry type")
+        }
     }
 }
 
