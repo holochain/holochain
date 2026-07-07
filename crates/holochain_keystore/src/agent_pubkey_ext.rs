@@ -123,14 +123,13 @@ mod tests {
     use holochain_zome_types::dht_v2::from_legacy_action;
 
     /// Mirrors the two production call sites this crate's `sign`/
-    /// `verify_signature` feed: `holochain_state::source_chain::
-    /// sign_legacy_action` (signs `from_legacy_action(&legacy)`) and
-    /// `holochain::core::sys_validate::verify_action_signature` (verifies
-    /// against `from_legacy_action(&legacy)` too). A signature produced this
-    /// way must verify against the v2 projection, and must NOT verify
-    /// against the legacy bytes directly — the two representations
-    /// serialize differently, which is exactly the invariant this change
-    /// depends on.
+    /// `verify_signature` feed: `holochain_state`'s source chain signs over
+    /// the v2 action content, and
+    /// `holochain::core::sys_validate::verify_action_signature` verifies
+    /// against the v2 action content. A signature produced this way must
+    /// verify against the v2 action and must NOT verify against the legacy
+    /// bytes directly — the two representations serialize differently, which
+    /// is exactly the invariant this test pins.
     // `test_keystore()` spawns lair onto a blocking task, which requires a
     // multi-threaded runtime.
     #[tokio::test(flavor = "multi_thread")]
@@ -144,7 +143,7 @@ mod tests {
             hash: DnaHash::from_raw_36(vec![7u8; 36]),
         });
 
-        // Sign, exactly as `sign_legacy_action` does: project to v2 first.
+        // Sign over the v2 action, as the source chain does.
         let v2 = from_legacy_action(&legacy);
         let signature = legacy.signer().sign(&keystore, &v2).await.unwrap();
 
