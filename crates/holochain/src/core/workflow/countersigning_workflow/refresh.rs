@@ -40,7 +40,7 @@ pub async fn refresh_workspace_state(
     let mut locked_for_agent = false;
 
     let agent = cell_id.agent_pubkey().clone();
-    // Only an agent whose chain has been genesised can hold a countersigning
+    // Only an agent whose chain has completed genesis can hold a countersigning
     // session; the session state itself is read from the DhtStore.
     if space
         .dht_store
