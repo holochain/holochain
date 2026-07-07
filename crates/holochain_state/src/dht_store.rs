@@ -1388,6 +1388,7 @@ impl DhtStore<DbWrite<Dht>> {
     /// Test-only: overwrite the `seq` of each of the given actions. Used to
     /// corrupt a source chain for sys-validation tests. Returns the number of
     /// `Action` rows updated.
+    #[cfg(feature = "test_utils")]
     pub async fn test_set_action_seq(
         &self,
         action_hashes: &[ActionHash],
