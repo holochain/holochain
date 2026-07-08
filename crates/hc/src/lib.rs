@@ -133,3 +133,49 @@ impl CliSubcommand {
         Ok(())
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use assert_cmd::Command;
+    use predicates::prelude::*;
+
+    #[test]
+    fn test_help_flag() {
+        let mut cmd = Command::cargo_bin("hc").unwrap();
+
+        cmd.arg("--help")
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("Usage:"));
+    }
+
+    #[test]
+    fn test_no_subcommand() {
+        let mut cmd = Command::cargo_bin("hc").unwrap();
+
+        cmd.assert()
+            .failure()
+            .stderr(predicate::str::contains("Usage:"));
+    }
+
+    #[test]
+    fn test_predefined_subcommand() {
+        let mut cmd = Command::cargo_bin("hc").unwrap();
+
+        cmd.arg("sandbox")
+            .assert()
+            .failure()
+            .stderr(predicate::str::contains("Work with sandboxed environments"));
+    }
+
+    #[test]
+    fn test_undefined_subcommand() {
+        let mut cmd = Command::cargo_bin("hc").unwrap();
+
+        cmd.arg("blah")
+            .assert()
+            .failure()
+            .stderr(predicate::str::contains("not a recognized internal hc subcommand"));
+    }
+}
