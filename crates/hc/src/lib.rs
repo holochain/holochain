@@ -108,10 +108,26 @@ impl CliSubcommand {
             CliSubcommand::Client(cmd) => cmd.run().await?,
             CliSubcommand::External(args) => {
                 let command_suffix = args.first().expect("Missing subcommand name");
-                Command::new(format!("hc-{command_suffix}"))
-                    .args(&args[1..])
-                    .status()
-                    .expect("Failed to run external subcommand");
+                let exe_name = format!("hc-{command_suffix}");
+
+                match Command::new(&exe_name).args(&args[1..]).status() {
+                    Ok(status) => {
+                        if !status.success() {
+                            std::process::exit(status.code().unwrap_or(1));
+                        }
+                    }
+                    Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => {
+                        eprintln!(
+                            "error: `{command_suffix}' is not a recognized internal hc subcommand, nor is '{exe_name}' an external command on your PATH."
+                        );
+
+                        std::process::exit(1);
+                    }
+                    Err(other_err) => {
+                        eprintln!("error: Failed to execute '{exe_name}': {other_err}");
+                        std::process::exit(1);
+                    }
+                }
             }
         }
         Ok(())
