@@ -116,27 +116,15 @@ use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::*;
 // The op pipeline is v2-native: `ChainOp`/`DhtOp`/`DhtOpHashed`/`OpEntry`
 // shadow the legacy re-exports pulled in via `holochain_state::prelude::*`.
-// `WarrantOp` stays the legacy, richer `holochain_types::warrant::WarrantOp`
-// (via the glob) — a general warrant-processing type distinct from the thin
-// `dht_v2::WarrantOp` variant wrapper. The couple of sites that build a fresh
-// `DhtOp::WarrantOp` from scratch (`make_invalid_chain_warrant_op`,
-// `make_fork_warrant_op_inner`) return the legacy `DhtOpHashed` explicitly,
-// fully-qualified, since their output is a warrant destined for the
-// still-legacy `DbKindAuthored`/`DbKindDht` writes alongside it.
-// `to_legacy_signed_action` remains for the few structural checks that are
-// deliberately still legacy (countersigning weight, fork detection's DB row
-// shape).
+// The couple of sites that build a fresh warrant `DhtOp` from scratch
+// (`make_invalid_chain_warrant_op`, `make_fork_warrant_op_inner`) return the
+// legacy `DhtOpHashed` explicitly, fully-qualified. `to_legacy_signed_action`
+// remains for the structural checks that stay legacy (countersigning weight).
 use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry};
-// `LegacyAction` names the legacy per-variant shape the `detect_fork` unit
-// test still needs to deserialize a raw DB-blob row; that test is the only
-// remaining consumer, so the import is test-gated.
-#[cfg(test)]
-use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
 use holochain_zome_types::dht_v2::{
     from_legacy_action, to_legacy_signed_action, ActionData, CreateLinkData, DeleteData,
     DeleteLinkData, UpdateData,
 };
-use rusqlite::Transaction;
 use std::sync::Arc;
 use std::time::Duration;
 use types::Outcome;
@@ -337,12 +325,12 @@ async fn sys_validation_workflow_inner(
 
     for (hashed_op, outcome) in validation_outcomes {
         let (op, op_hash) = hashed_op.into_inner();
-        let op_type = op.get_type();
 
         if let DhtOp::ChainOp(chain_op) = &op {
             // Collect the data needed for async fork detection.
-            let action = chain_op.action();
-            let signature = chain_op.signature().clone();
+            let signed_action = chain_op.signed_action();
+            let action = signed_action.data().clone();
+            let signature = signed_action.signature().clone();
             let action_hash = action.to_hash();
             pending_fork_checks.push((action, signature, action_hash));
         }
@@ -350,57 +338,11 @@ async fn sys_validation_workflow_inner(
         match outcome {
             Outcome::Accepted => {
                 summary.accepted += 1;
-                match op_type {
-                    DhtOpType::Chain(_) => {
+                match &op {
+                    DhtOp::ChainOp(_) => {
                         chain_op_sys_outcomes.push((op_hash.clone(), SysOutcome::Accepted));
-    let (
-        mut summary,
-        invalid_ops,
-        pending_fork_checks,
-        chain_op_sys_outcomes,
-        warrant_sys_outcomes,
-    ) = workspace
-        .dht_db
-        // #5370: legacy DhtOp validation-status dual-write removed; this write
-        // no longer touches the DB (the `txn` and put_*_limbo calls are dead).
-        .write_async(move |_txn| {
-            let mut summary = OutcomeSummary {
-                warrant_deps_copied,
-                ..Default::default()
-            };
-            let mut invalid_ops = vec![];
-            // Collect (action, incoming_signature, incoming_hash) for each chain op so
-            // that fork detection can run asynchronously after this transaction closes.
-            let mut pending_fork_checks: Vec<(Action, Signature, ActionHash)> =
-                Vec::with_capacity(0);
-            let mut chain_op_sys_outcomes: Vec<(DhtOpHash, SysOutcome)> = Vec::new();
-            let mut warrant_sys_outcomes: Vec<(DhtOpHash, SysOutcome)> = Vec::new();
-
-            for (hashed_op, outcome) in validation_outcomes {
-                let (op, op_hash) = hashed_op.into_inner();
-
-                if let DhtOp::ChainOp(chain_op) = &op {
-                    // Collect the data needed for async fork detection after this txn.
-                    let signed_action = chain_op.signed_action();
-                    let action = signed_action.data().clone();
-                    let signature = signed_action.signature().clone();
-                    let action_hash = action.to_hash();
-                    pending_fork_checks.push((action, signature, action_hash));
-                }
-
-                match outcome {
-                    Outcome::Accepted => {
-                        summary.accepted += 1;
-                        match &op {
-                            DhtOp::ChainOp(_) => {
-                                chain_op_sys_outcomes.push((op_hash.clone(), SysOutcome::Accepted));
-                            }
-                            DhtOp::WarrantOp(_) => {
-                                warrant_sys_outcomes.push((op_hash.clone(), SysOutcome::Accepted));
-                            }
-                        };
                     }
-                    DhtOpType::Warrant(_) => {
+                    DhtOp::WarrantOp(_) => {
                         warrant_sys_outcomes.push((op_hash.clone(), SysOutcome::Accepted));
                     }
                 };
@@ -534,46 +476,17 @@ async fn sys_validation_workflow_inner(
         let warranted = warrants.len();
         if warranted > 0 {
             // "self-publish" warrants, i.e. record them as if they were published
-            // to us by another node.
+            // to us by another node. The warrant builders return the legacy
+            // `DhtOpHashed`, so project them to v2 for the v2-native store.
+            let locally_validated_warrants: Vec<DhtOpHashed> = warrants
+                .iter()
+                .map(holochain_types::dht_v2::from_legacy_dht_op)
+                .collect();
             workspace
                 .dht_store
-                .record_locally_validated_warrants(warrants)
+                .record_locally_validated_warrants(locally_validated_warrants)
                 .await?;
         }
-        let authored_warrants = warrants.clone();
-        let warranted = workspace
-            .authored_db
-            .write_async(move |txn| {
-                let mut warranted = 0;
-                for warrant_op in authored_warrants {
-                    insert_op_authored(txn, &warrant_op)?;
-                    warranted += 1;
-                }
-                StateMutationResult::Ok(warranted)
-            })
-            .await?;
-        // Project warrants to v2 before the legacy write so we can mirror them
-        // into the new DB after (`record_locally_validated_warrants` is v2-native).
-        let locally_validated_warrants: Vec<holochain_types::dht_v2::DhtOpHashed> = warrants
-            .iter()
-            .map(holochain_types::dht_v2::from_legacy_dht_op)
-            .collect();
-        // "self-publish" warrants, i.e. insert them into the DHT DB.
-        // This works around the problem that the commonly used function [`holochain_state::integrate::authored_ops_to_dht_db`]
-        // joins on the Action table to filter out private entries.
-        workspace
-            .dht_db
-            .write_async(move |txn| {
-                for warrant_op in warrants {
-                    insert_locally_validated_op(txn, warrant_op)?;
-                }
-                StateMutationResult::Ok(())
-            })
-            .await?;
-        workspace
-            .dht_store
-            .record_locally_validated_warrants(locally_validated_warrants)
-            .await?;
 
         summary.warranted = warranted;
     }
@@ -700,59 +613,6 @@ async fn move_and_check_warrant_deps(
             Ok(true) => true,
             Ok(false) => {
                 materialise_warranted_op_into_limbo(workspace, &action_hash, op_type).await
-            Ok(Some(op)) => {
-                *warrant_deps_copied += 1;
-
-                // Mirror the warrant dep into the new DhtStore as a limbo op so
-                // `ops_pending_sys_validation` picks it up for validation.
-                // `move_warranted_op_to_limbo` relies on the op already being in
-                // the new DhtStore's `ChainOp` table (cache path), but warrant
-                // deps arrive via the network cascade and only land in the legacy
-                // DHT DB via `copy_cached_op_to_dht`. We therefore insert the op
-                // directly into `LimboChainOp` via `record_incoming_ops`.
-                //
-                // Set flag to request a validation receipt for the op to false.
-                if let Err(e) = workspace
-                    .dht_store
-                    .record_incoming_ops(vec![(
-                        holochain_types::dht_v2::from_legacy_dht_op(&op),
-                        false,
-                    )])
-                    .await
-                {
-                    tracing::error!(error = ?e, "Error mirroring warrant dep op into new DhtStore limbo");
-                }
-            }
-            Ok(None) => {
-                // Not in the cache; move a copy already mirrored into the
-                // DhtStore (cache path) into limbo so it gets validated. If
-                // there is nothing to move, the op is either already
-                // integrated/in limbo, or it will be re-fetched and cached on a
-                // later tick.
-                match workspace
-                    .dht_store
-                    .move_warranted_op_to_limbo(&action_hash, op_type)
-                    .await
-                {
-                    Ok(true) => {}
-                    Ok(false) => {
-                        tracing::debug!(
-                            ?action_hash,
-                            ?op_type,
-                            "Warranted op not yet present in the DhtStore"
-                        );
-                    }
-                    Err(e) => {
-                        tracing::debug!(error = ?e, "Could not move warranted op to limbo (may already be integrated)");
-                    }
-                }
-            }
-            Err(StateMutationError::OpNotFoundInCache) => {
-                // The op isn't in the cache, but it may already be present and
-                // validated in the main DhtStore (received via publish/gossip and
-                // integrated). Don't skip — fall through to check its validation
-                // status below so the warrant dependency can resolve.
-                tracing::debug!("Warranted op {} not found in cache", action_hash);
             }
             Err(e) => {
                 tracing::debug!(error = ?e, "Could not move warranted op to limbo (may already be integrated)");
@@ -812,17 +672,22 @@ async fn materialise_warranted_op_into_limbo(
         }
     };
 
-    let signed_action = SignedAction::new(
-        record.action().clone(),
-        record.signed_action().signature().clone(),
-    );
-    let entry = record.entry().as_option().cloned();
-    let chain_op = match ChainOp::from_type(op_type, signed_action, entry) {
-        Ok(chain_op) => chain_op,
-        Err(e) => {
-            tracing::debug!(error = ?e, "Could not build warranted op from its record");
-            return false;
-        }
+    let signed_action = SignedAction::new(record.action().clone(), record.signature().clone());
+    let op_entry = match record.entry() {
+        RecordEntry::Present(entry) => OpEntry::Present(entry.clone()),
+        RecordEntry::Hidden => OpEntry::Hidden,
+        RecordEntry::NA | RecordEntry::NotStored => OpEntry::ActionOnly,
+    };
+    let chain_op = match op_type {
+        ChainOpType::StoreRecord => ChainOp::CreateRecord(signed_action, op_entry),
+        ChainOpType::StoreEntry => ChainOp::CreateEntry(signed_action, op_entry),
+        ChainOpType::RegisterAgentActivity => ChainOp::AgentActivity(signed_action),
+        ChainOpType::RegisterUpdatedContent => ChainOp::UpdateEntry(signed_action, op_entry),
+        ChainOpType::RegisterUpdatedRecord => ChainOp::UpdateRecord(signed_action, op_entry),
+        ChainOpType::RegisterDeletedEntryAction => ChainOp::DeleteEntry(signed_action),
+        ChainOpType::RegisterDeletedBy => ChainOp::DeleteRecord(signed_action),
+        ChainOpType::RegisterAddLink => ChainOp::CreateLink(signed_action),
+        ChainOpType::RegisterRemoveLink => ChainOp::DeleteLink(signed_action),
     };
     let op = DhtOpHashed::from_content_sync(DhtOp::from(chain_op));
 
@@ -917,10 +782,17 @@ fn get_dependency_hashes_from_actions(
                     None => None,
                     hash => hash,
                 },
-                match action {
-                    Action::Update(action) => Some(action.original_action_address),
-                    Action::Delete(action) => Some(action.deletes_address),
-                    Action::DeleteLink(action) => Some(action.link_add_address),
+                match &action.data {
+                    ActionData::Update(UpdateData {
+                        original_action_address,
+                        ..
+                    }) => Some(original_action_address.clone()),
+                    ActionData::Delete(DeleteData {
+                        deletes_address, ..
+                    }) => Some(deletes_address.clone()),
+                    ActionData::DeleteLink(DeleteLinkData {
+                        link_add_address, ..
+                    }) => Some(link_add_address.clone()),
                     _ => None,
                 },
             ]
@@ -955,12 +827,9 @@ fn get_dependencies_from_ops(
                 DhtOp::ChainOp(op) => {
                     let action = op.signed_action().data();
                     let chain_op_dependencies = match &**op {
-                        // `CreateRecord`/`CreateEntry` (legacy `StoreRecord`/`StoreEntry`) share
-                        // the same v2 action, so the countersigning-set and
-                        // Update-reference checks below apply identically to
-                        // both — unlike legacy, which had this logic
-                        // duplicated once per variant over two different
-                        // action-projection types.
+                        // `CreateRecord`/`CreateEntry` share the same v2 action, so
+                        // the countersigning-set and Update-reference checks apply
+                        // identically to both.
                         ChainOp::CreateRecord(_, op_entry) | ChainOp::CreateEntry(_, op_entry) => {
                             let mut actions = match op_entry {
                                 // TODO we should be doing something similar to this in app validation!
@@ -986,7 +855,6 @@ fn get_dependencies_from_ops(
                                 _ => vec![],
                             };
 
-                            if let Action::Update(update) = action {
                             if let ActionData::Update(update) = &action.data {
                                 actions.push(update.original_action_address.clone());
                             }
@@ -1095,24 +963,11 @@ pub(crate) async fn validate_op(
     }
 }
 
-fn action_to_entry_rate_weight(action: &Action) -> SysValidationResult<EntryRateWeight> {
-    action
-        .entry_rate_data()
-        .ok_or_else(|| SysValidationError::NonEntryAction(Box::new(action.clone())))
-}
-
-fn new_entry_action_to_entry_rate_weight(action: &NewEntryAction) -> EntryRateWeight {
-    match action {
-        NewEntryAction::Create(h) => h.weight.clone(),
-        NewEntryAction::Update(h) => h.weight.clone(),
-    }
-/// The `EntryRateWeight` a v2 `Create`/`Update` action carries, for feeding
-/// the still-legacy countersigning-session weight machinery
-/// (`build_action_set`; see the module-level note on why that stays legacy).
-/// The v2 model has retired rate-limiting weight entirely, so this is always
-/// the default value — exactly what a legacy round-trip through
-/// `to_legacy_signed_action` would also produce, since every v2-authored
-/// action's legacy projection already defaults its `weight` field.
+/// The `EntryRateWeight` a v2 `Create`/`Update` action carries, for feeding the
+/// still-legacy countersigning-session weight machinery (`build_action_set`).
+/// The v2 model has retired rate-limiting weight, so this is always the default
+/// value — the same value a legacy round trip would produce, since every
+/// v2-authored action's legacy projection defaults its `weight` field.
 fn action_to_entry_rate_weight(action: &Action) -> SysValidationResult<EntryRateWeight> {
     action
         .entry_data()
@@ -1133,17 +988,13 @@ fn make_action_set_for_session_data(
         .collect())
 }
 
-/// The op's action does not match the per-variant data its `ChainOp`
-/// variant requires (e.g. an `UpdateEntry` op wrapping a `Create` action).
-/// Legacy `ChainOp` enforced this structurally (each variant held its own
-/// narrowed action type, e.g. `RegisterUpdatedContent(Signature, Update,
-/// RecordEntry)`); v2's flat `Action` inside `SignedAction` carries no such
-/// guarantee, so this check is genuinely new surface, not a port of an
-/// existing one. `check_entry_visibility` catches most mismatches already
-/// (an action whose entry-type visibility doesn't fit the op's `OpEntry`
-/// slot), but not a same-shaped swap between two entry-bearing variants
-/// (Create vs. Update) or a mismatch on a non-entry-bearing op
-/// (AgentActivity/Delete*/*Link), which never look at `OpEntry` at all.
+/// The op's action does not match the per-variant data its `ChainOp` variant
+/// requires (e.g. an `UpdateEntry` op wrapping a `Create` action). The v2 flat
+/// `Action` inside `SignedAction` carries no structural guarantee that the
+/// action shape fits the op type, so this check catches a same-shaped swap
+/// between two entry-bearing variants (Create vs. Update) or a mismatch on a
+/// non-entry-bearing op (AgentActivity/Delete*/*Link), which `check_entry_visibility`
+/// does not.
 fn malformed(op: &ChainOp, action: &Action) -> SysValidationError {
     ValidationOutcome::MalformedDhtOp(
         Box::new(action.clone()),
@@ -1161,9 +1012,6 @@ async fn validate_chain_op(
     check_entry_visibility(op)?;
     let action = op.signed_action().data();
     match op {
-        ChainOp::StoreRecord(_, action, entry) => {
-            check_prev_action(action)?;
-            if let Some(entry) = entry.as_option() {
         ChainOp::CreateRecord(_, op_entry) => {
             check_prev_action(action)?;
             if let OpEntry::Present(entry) = op_entry {
@@ -1186,22 +1034,13 @@ async fn validate_chain_op(
                     }
                 }
                 // Has to be async because of signature checks being async
-                store_entry(
-                    (action)
-                        .try_into()
-                        .map_err(|_| ValidationOutcome::NotNewEntry(Box::new(action.clone())))?,
-                    entry,
-                    validation_dependencies,
-                )
-                .await?;
                 store_entry(action, entry, validation_dependencies).await?;
             }
             Ok(())
         }
         ChainOp::CreateEntry(_, op_entry) => {
             // `check_entry_visibility` above already guarantees `CreateEntry`
-            // carries a present entry for a public entry type (the only way
-            // this op is produced — see `produce_ops_from_record`).
+            // carries a present entry for a public entry type.
             let OpEntry::Present(entry) = op_entry else {
                 return Ok(());
             };
@@ -1224,10 +1063,6 @@ async fn validate_chain_op(
                 }
             }
 
-            check_prev_action(&action.clone().into())?;
-            store_entry(action.into(), entry, validation_dependencies.clone()).await
-        }
-        ChainOp::RegisterAgentActivity(_, action) => {
             check_prev_action(action)?;
             store_entry(action, entry, validation_dependencies.clone()).await
         }
@@ -1285,12 +1120,10 @@ async fn validate_chain_op(
 }
 
 /// Verify `sig` against the v2 action content already carried by
-/// `signed_action` — the same v2 bytes it was signed over. Used by the
-/// warrant checks below, which hold their dependency actions in v2 form
-/// (via [`ValidationDependencyValue::as_signed_action`]/
-/// `as_signed_action_and_validation_status`) and so verify directly rather
-/// than going through [`verify_action_signature`] (which takes the legacy
-/// per-variant shape).
+/// `signed_action` — the same v2 bytes it was signed over. Used by the warrant
+/// checks below, which hold their dependency actions in v2 form and so verify
+/// directly rather than going through [`verify_action_signature`] (which takes
+/// the legacy per-variant shape).
 async fn verify_v2_action_signature(
     sig: &Signature,
     signed_action: &SignedActionHashed,
@@ -1326,12 +1159,13 @@ async fn validate_warrant_op(
                 }
                 let (action, validation_status) = {
                     let deps = validation_dependencies.lock().expect("poisoned");
-                    let (action, validation_status) = deps
+                    let (signed_action, validation_status) = deps
                         .get(action_hash)
-                        .and_then(|s| s.as_action_and_validation_status())
+                        .and_then(|s| s.as_signed_action_and_validation_status())
                         .ok_or_else(|| {
                             ValidationOutcome::DepMissingFromDht(action_hash.clone().into())
                         })?;
+                    let action = &signed_action.hashed.content;
 
                     if action.author() != action_author {
                         return Err(ValidationOutcome::InvalidWarrant(
@@ -1340,9 +1174,8 @@ async fn validate_warrant_op(
                         )
                         .into());
                     }
-                    (action.clone(), validation_status)
+                    (signed_action.clone(), validation_status)
                 };
-                verify_action_signature(action_sig, &action).await?;
                 verify_v2_action_signature(action_sig, &action).await?;
 
                 match validation_status {
@@ -1378,14 +1211,16 @@ async fn validate_warrant_op(
             } => {
                 let (action1, action2) = {
                     let deps = validation_dependencies.lock().expect("poisoned");
-                    let action1 = deps
+                    let signed_action1 = deps
                         .get(a1)
-                        .and_then(|s| s.as_action())
+                        .and_then(|s| s.as_signed_action())
                         .ok_or_else(|| ValidationOutcome::DepMissingFromDht(a1.clone().into()))?;
-                    let action2 = deps
+                    let signed_action2 = deps
                         .get(a2)
-                        .and_then(|s| s.as_action())
+                        .and_then(|s| s.as_signed_action())
                         .ok_or_else(|| ValidationOutcome::DepMissingFromDht(a2.clone().into()))?;
+                    let action1 = &signed_action1.hashed.content;
+                    let action2 = &signed_action2.hashed.content;
 
                     // chain_author basis must match the author of the action
                     if action1.author() != chain_author {
@@ -1432,11 +1267,9 @@ async fn validate_warrant_op(
                         .into());
                     }
 
-                    (action1.clone(), action2.clone())
+                    (signed_action1.clone(), signed_action2.clone())
                 };
 
-                verify_action_signature(a1_sig, &action1).await?;
-                verify_action_signature(a2_sig, &action2).await?;
                 verify_v2_action_signature(a1_sig, &action1).await?;
                 verify_v2_action_signature(a2_sig, &action2).await?;
 
@@ -1466,10 +1299,10 @@ pub async fn counterfeit_check_authored_record(record: &Record) -> SysValidation
 /// it is intended to be used for validation of records which have been authored locally so we should always be able to check the previous action.
 ///
 /// The caller must already have verified the record's signature (e.g. via
-/// [`counterfeit_check_action`] on the original record). This function
-/// reconstructs a legacy action internally for structural checks that still
-/// need the legacy per-variant shape (`store_entry`, `register_updated_content`,
-/// ...); that reconstruction never touches the signature.
+/// [`counterfeit_check_authored_record`]). This function reconstructs a legacy
+/// action internally for the structural checks that still need the legacy
+/// per-variant shape (countersigning weight); that reconstruction never touches
+/// the signature.
 pub async fn sys_validate_record(
     record: &Record,
     cascade: Arc<impl Cascade + Send + Sync>,
@@ -1495,21 +1328,7 @@ async fn sys_validate_record_inner(
     record: &Record,
     cascade: Arc<impl Cascade + Send + Sync>,
 ) -> SysValidationResult<()> {
-    let signature = record.signature();
-    let action = record.action();
     let maybe_entry = record.entry().as_option();
-    counterfeit_check_action(signature, action).await?;
-    // Reconstructed for the still-legacy per-op-type structural checks below
-    // (`store_entry`, `register_updated_content`, ...) and the countersigning
-    // entry-rate-weight lookup. This is a structural, non-signature use of
-    // the legacy shape: the checks below never read the hash or signature of
-    // this value, only field values (entry type, tag, referenced hashes), so
-    // the weight lost in the round trip through v2 is not a correctness
-    // problem here (every action authored today carries the default,
-    // zero weight in the first place).
-    let legacy_action = to_legacy_signed_action(record.signed_action())
-        .action()
-        .clone();
     let action = record.action().clone();
 
     async fn validate(
@@ -1527,25 +1346,6 @@ async fn sys_validate_record_inner(
 
         store_record(action, validation_dependencies.clone())?;
         if let Some(maybe_entry) = maybe_entry {
-            store_entry(
-                action
-                    .try_into()
-                    .map_err(|_| ValidationOutcome::NotNewEntry(Box::new(action.clone())))?,
-                maybe_entry,
-                validation_dependencies.clone(),
-            )
-            .await?;
-        }
-        match action {
-            Action::Update(action) => {
-                register_updated_content(action, validation_dependencies.clone())
-            }
-            Action::Delete(action) => {
-                register_deleted_entry_action(action, validation_dependencies.clone())
-            }
-            Action::CreateLink(action) => register_add_link(action),
-            Action::DeleteLink(action) => {
-                register_delete_link(action, validation_dependencies.clone())
             store_entry(action, maybe_entry, validation_dependencies.clone()).await?;
         }
         match &action.data {
@@ -1565,14 +1365,11 @@ async fn sys_validate_record_inner(
 
     match maybe_entry {
         Some(Entry::CounterSign(session, _)) => {
-            if let Some(weight) = action.entry_rate_data() {
-            // The countersigning session's per-agent action set is built by
-            // the still-legacy, weight-bearing `build_action_set` (see the
-            // module-level note); project `action` to the legacy shape
-            // purely to read `entry_rate_data` (a structural, non-signature
-            // use — the weight lost in the v2 round trip is not a
-            // correctness problem here, since every v2-authored action
-            // carries the default, zero weight in the first place).
+            // The countersigning session's per-agent action set is built by the
+            // still-legacy, weight-bearing `build_action_set`; project `action`
+            // to the legacy shape purely to read `entry_rate_data`. The weight
+            // lost in the v2 round trip is not a correctness problem here, since
+            // every v2-authored action carries the default, zero weight already.
             let legacy_action = to_legacy_signed_action(&presigned_v2(&action))
                 .action()
                 .clone();
@@ -1585,10 +1382,6 @@ async fn sys_validate_record_inner(
                 Ok(())
             } else {
                 tracing::error!("Got countersigning entry without rate assigned. This should be impossible. But, let's see what happens.");
-                validate(action, maybe_entry, cascade.clone()).await
-            }
-        }
-        _ => validate(action, maybe_entry, cascade).await,
                 validate(&action, maybe_entry, cascade.clone()).await
             }
         }
@@ -1600,9 +1393,8 @@ async fn sys_validate_record_inner(
 /// Ops that fail this check should be dropped.
 ///
 /// Takes the v2 action directly — the op pipeline carries v2 actions
-/// end-to-end, so this hashes `action` and checks `signature` over it via
-/// the same verification the rest of sys validation uses for v2 actions,
-/// with no legacy projection involved.
+/// end-to-end, so this hashes `action` and checks `signature` over it via the
+/// same verification the rest of sys validation uses for v2 actions.
 pub async fn counterfeit_check_action(
     signature: &Signature,
     action: &Action,
@@ -1639,8 +1431,8 @@ fn register_agent_activity(
             .and_then(|s| s.as_action())
             .ok_or_else(|| ValidationOutcome::DepMissingFromDht(prev_action_hash.clone().into()))?;
 
-        match prev_action {
-            Action::CloseChain(_) => Err(ValidationOutcome::PrevActionError(
+        match prev_action.data {
+            ActionData::CloseChain(_) => Err(ValidationOutcome::PrevActionError(
                 (PrevActionErrorKind::ActionAfterChainClose, action.clone()).into(),
             )
             .into()),
@@ -1672,13 +1464,11 @@ fn store_record(action: &Action, validation_dependencies: SysValDeps) -> SysVali
     Ok(())
 }
 
-/// Wrap a bare v2 action in a throwaway signed-and-hashed form, for feeding
-/// the one structural check below that still operates on the legacy
-/// per-variant shape via `to_legacy_signed_action`: the countersigning
-/// session weight machinery (`check_countersigning_session_data`), which
-/// stays legacy (see the module-level note). The placeholder hash/signature
-/// are never read by that check — only field values (entry type, referenced
-/// hashes) are.
+/// Wrap a bare v2 action in a throwaway signed-and-hashed form, for feeding the
+/// structural checks that still operate on the legacy per-variant shape via
+/// `to_legacy_signed_action` (the countersigning session weight machinery). The
+/// placeholder signature is never read by those checks — only field values
+/// (entry type, referenced hashes) are.
 fn presigned_v2(action: &Action) -> SignedActionHashed {
     let hashed = holo_hash::HoloHashed::from_content_sync(action.clone());
     SignedActionHashed::with_presigned(hashed, Signature::from([0u8; 64]))
@@ -1819,19 +1609,15 @@ fn register_delete_link(
         .and_then(|s| s.as_action())
         .ok_or_else(|| ValidationOutcome::DepMissingFromDht(link_add_address.clone().into()))?;
 
-    match add_link_action {
-        Action::CreateLink(_) => Ok(()),
+    match add_link_action.data {
+        ActionData::CreateLink(_) => Ok(()),
         _ => Err(ValidationOutcome::NotCreateLink(add_link_action.to_hash()).into()),
     }
 }
 
 fn update_check(entry_update: &UpdateData, original_action: &Action) -> SysValidationResult<()> {
     check_new_entry_action(original_action)?;
-    // This shouldn't fail due to the above `check_new_entry_action` check
-    let original_action: NewEntryActionRef = original_action
-        .try_into()
-        .map_err(|_| ValidationOutcome::NotNewEntry(Box::new(original_action.clone())))?;
-    check_update_reference(entry_update, &original_action)?;
+    check_update_reference(entry_update, original_action)?;
     Ok(())
 }
 
@@ -1937,71 +1723,6 @@ pub async fn make_fork_warrant_op_inner(
     let op: holochain_types::dht_op::DhtOp = warrant_op.into();
     let op = op.into_hashed();
     Ok(op)
-}
-
-/// Detects chain forks by finding actions with the same `prev_action`.
-///
-/// The SQL query returns any action sharing the same `prev_hash` but with a
-/// different hash. The author check is performed in memory: if the authors
-/// match, a fork is confirmed. If they differ, a cross-author `prev_action`
-/// collision error is returned.
-///
-/// This function is retained for unit tests; production code uses the async
-/// [`DhtStoreRead::find_fork_for_action`] instead.
-#[cfg(test)]
-fn detect_fork(
-    txn: &mut Transaction<'_>,
-    action: &Action,
-) -> StateQueryResult<Option<(ActionHash, Signature)>> {
-    use holochain_sqlite::sql::sql_cell::ACTION_HASH_BY_PREV;
-    use holochain_state::query::StateQueryError;
-    let mut statement = txn.prepare(ACTION_HASH_BY_PREV)?;
-    let items = statement
-        .query_map(
-            named_params! {
-                ":prev_hash": action.prev_action(),
-                ":hash": action.to_hash(),
-            },
-            // First, try to deserialize the hash as an ActionHash...
-            |row| match row.get("hash") {
-                Ok(hash) => {
-                    let action_blob: Vec<u8> = row.get("blob")?;
-                    Ok(Some((hash, action_blob)))
-                }
-                // ...if that fails, we can skip it if it deserializes as a WarrantHash
-                //    (checking the row type this way makes it so we don't have to join on the DhtOp table in the query)
-                Err(err) => match row.get::<_, WarrantHash>("hash") {
-                    Ok(_) => Ok(None),
-                    Err(_) => Err(err),
-                },
-            },
-        )?
-        .collect::<Result<Vec<_>, _>>()?;
-
-    let incoming_author = action.author();
-
-    for maybe_tuple in items {
-        let Some((hash, action_blob)) = maybe_tuple else {
-            continue;
-        };
-        // The legacy `Action` table stores the legacy signed-action form, so
-        // deserialize the blob as the legacy `Signed<LegacyAction>`.
-        let signed_action =
-            from_blob::<holochain_zome_types::signature::Signed<LegacyAction>>(action_blob)?;
-        let existing_author = signed_action.data().author();
-
-        if existing_author != incoming_author {
-            return Err(StateQueryError::Other(format!(
-                "Cross-author prev_action collision: incoming author {incoming_author} \
-                 differs from existing author {existing_author} for prev_action {:?}",
-                action.prev_action()
-            )));
-        }
-
-        return Ok(Some((hash, signed_action.signature().clone())));
-    }
-
-    Ok(None)
 }
 
 #[derive(Debug, Clone)]

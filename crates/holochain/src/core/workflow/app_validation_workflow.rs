@@ -117,8 +117,8 @@ use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_state::prelude::*;
 // App validation dispatches the v2 `Op` to the wasm `validate` callback; the
-// bare `Op` name (and its variant structs) otherwise resolves to the legacy
-// op module via the glob imports above. The op pipeline itself is v2-native:
+// bare `Op` name (and its variant structs) otherwise resolves to the legacy op
+// module via the glob imports above. The op pipeline itself is v2-native:
 // `ChainOp`/`DhtOp`/`OpEntry` similarly shadow the legacy re-exports.
 use holochain_types::dht_v2::{ChainOp, DhtOp, OpEntry};
 use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
@@ -363,45 +363,10 @@ async fn app_validation_workflow_inner(
                     Outcome::Rejected(_) => {
                         rejected_ops.fetch_add(1, Ordering::SeqCst);
                         tracing::info!(
-                            "Received invalid op. The op author will be blocked. Op: {dht_op_lite:?}"
+                            "Received invalid op. The op author will be blocked. Op: {chain_op:?}"
                         );
                         app_validation_outcomes.push((dht_op_hash, AppOutcome::Rejected));
                     }
-                // Capture the outcome for mirroring into DhtStore (only Accepted/Rejected).
-                let app_outcome_opt = match &outcome {
-                    Outcome::Accepted => Some(AppOutcome::Accepted),
-                    Outcome::AwaitingDeps(_) => None, // status stays NULL; nothing to record
-                    Outcome::Rejected(_) => Some(AppOutcome::Rejected),
-                };
-                let outcome_dht_op_hash = dht_op_hash.clone();
-                let chain_op_debug = format!("{chain_op:?}");
-
-                // #5370: legacy DhtOp validation-status dual-write removed; the
-                // write no longer touches the DB (the `_txn`, `dht_op_hash` and
-                // put_*_limbo calls are dead). Counters/outcome mirroring stay.
-                let write_result = workspace
-                    .dht_db
-                    .write_async(move |_txn| -> WorkflowResult<()> {
-                        match outcome {
-                            Outcome::Accepted => {
-                                accepted_ops.fetch_add(1, Ordering::SeqCst);
-                            }
-                            Outcome::AwaitingDeps(_) => {
-                                awaiting_ops.fetch_add(1, Ordering::SeqCst);
-                            }
-                            Outcome::Rejected(_) => {
-                                rejected_ops.fetch_add(1, Ordering::SeqCst);
-                                tracing::info!("Received invalid op. The op author will be blocked. Op: {chain_op_debug}");
-                            }
-                        }
-                        Ok(())
-                    })
-                    .await;
-                if let Err(err) = write_result {
-                    tracing::error!(?chain_op, ?err, "Error updating dht op in database.");
-                } else if let Some(app_outcome) = app_outcome_opt {
-                    // Capture for mirroring after the legacy write commits.
-                    app_validation_outcomes.push((outcome_dht_op_hash, app_outcome));
                 }
             }
             Err(err) => {
@@ -434,9 +399,8 @@ async fn app_validation_workflow_inner(
     }
 
     // "self-publish" locally-validated warrant ops into the DhtStore as if they
-    // were published to us by another node.
-    // mirror locally-validated warrant ops into the new DhtStore schema
-    // (v2-native; project the legacy-typed warrants built above).
+    // were published to us by another node. The warrant builders return the
+    // legacy-typed op, so project them to v2 for the v2-native store.
     if !warrant_ops_vec.is_empty() {
         let warrant_ops_vec: Vec<holochain_types::dht_v2::DhtOpHashed> = warrant_ops_vec
             .iter()
@@ -461,8 +425,6 @@ async fn app_validation_workflow_inner(
 }
 
 // This fn is only used in the zome call workflow's inline validation.
-// `record` is a v2 record here (the boundary conversion from the legacy
-// authoring/source-chain representation happens in the caller).
 pub async fn record_to_op(
     record: Record,
     op_type: ChainOpType,
@@ -553,8 +515,8 @@ pub async fn record_to_op(
 }
 
 /// The legacy `ActionType` a v2 action projects to, for the
-/// `DhtOpError::OpActionMismatch` diagnostic below (which is defined against
-/// the legacy discriminant — a different enum from v2's own `ActionType`).
+/// `DhtOpError::OpActionMismatch` diagnostic below (which is defined against the
+/// legacy discriminant — a different enum from v2's own `ActionType`).
 /// Error-message-only: never used to decide validation outcomes.
 fn legacy_action_type(action: &Action) -> ActionType {
     let hashed = HoloHashed::from_content_sync(action.clone());
@@ -563,11 +525,10 @@ fn legacy_action_type(action: &Action) -> ActionType {
     (&legacy_action).into()
 }
 
-/// Build the v2 `Op` (the wasm `validate` callback's input) from a
-/// sys-validated `ChainOp`. Sys validation (`check_entry_visibility` +
-/// `validate_chain_op`'s per-variant checks) has already rejected any op
-/// whose action doesn't match its `ChainOp` variant, so the `OpActionMismatch`
-/// branches below are defence-in-depth, not an expected path.
+/// Build the v2 `Op` (the wasm `validate` callback's input) from a sys-validated
+/// `ChainOp`. Sys validation has already rejected any op whose action doesn't
+/// match its `ChainOp` variant, so the `OpActionMismatch` branches below are
+/// defence-in-depth, not an expected path.
 async fn chain_op_to_op(chain_op: ChainOp, cascade: Arc<impl Cascade>) -> AppValidationOutcome<Op> {
     let signed_action = chain_op.signed_action().clone();
     let hashed = HoloHashed::from_content_sync(signed_action.data().clone());

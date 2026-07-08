@@ -11,7 +11,7 @@ use crate::prelude::EntryFixturator;
 use crate::prelude::SignatureFixturator;
 use crate::prelude::SignedAction;
 use crate::prelude::{ActionBase, PreflightBytes, PreflightRequest, PreflightRequestAcceptance};
-use crate::prelude::{ActionHashed, CounterSigningAgentState, SignedActionHashed};
+use crate::prelude::{CounterSigningAgentState, SignedActionHashed};
 use fixt::prelude::*;
 use hdk::prelude::{CounterSigningSessionTimes, Timestamp};
 use hdk::prelude::{Entry, EntryTypeFixturator, Record, RecordEntry};
@@ -34,7 +34,6 @@ use holochain_types::signal::Signal;
 use holochain_zome_types::cell::CellId;
 use holochain_zome_types::countersigning::PreflightResponse;
 use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
-use holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed as LegacySignedActionHashed;
 use holochain_zome_types::dht_v2::from_legacy_action;
 use holochain_zome_types::prelude::{CreateBase, EntryRateWeight};
 use holochain_zome_types::query::{ChainHead, ChainStatus};
@@ -1955,52 +1954,16 @@ impl TestHarness {
 
         let signed = SignedAction::new(v2_action, signature.clone());
 
-        // Sign the op with the real action signature. The store record is
-        // reconstructed from this op, and the completion path verifies the
-        // record's signature, so a fixt signature would be rejected.
-        let legacy_store_entry_op = holochain_types::dht_op::ChainOp::StoreEntry(
-            signature.clone(),
-            my_action.clone().try_into().unwrap(),
-            entry.clone(),
-        );
-        let legacy_dht_op =
-            holochain_types::dht_op::DhtOp::ChainOp(Box::new(legacy_store_entry_op));
-        let legacy_dht_op = holochain_types::dht_op::DhtOpHashed::from_content_sync(legacy_dht_op);
-
-        // The v2 op-pipeline form of the same `StoreEntry`/`CreateEntry` op,
-        // for the (v2-native) DhtStore writes below.
+        // The v2 op-pipeline form of the `StoreEntry`/`CreateEntry` op, for the
+        // (v2-native) DhtStore writes below. It carries the real action
+        // signature: the store record is reconstructed from this op and the
+        // completion path verifies the record's signature, so a fixt signature
+        // would be rejected.
         let v2_store_entry_op =
             ChainOp::CreateEntry(signed.clone(), OpEntry::Present(entry.clone()));
         let dht_op = DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(v2_store_entry_op)));
 
         // Write the commit to the DhtStore so the store-backed session reads
-        let legacy_sah = LegacySignedActionHashed::with_presigned(
-            ActionHashed::from_content_sync(my_action.clone()),
-            signature.clone(),
-        );
-
-        self.test_space
-            .space
-            .get_or_create_authored_db(self.author.clone())
-            .unwrap()
-            .write_async({
-                let legacy_sah = legacy_sah.clone();
-                let entry = entry.clone();
-                let entry_hash = entry_hash.clone();
-                let legacy_dht_op = legacy_dht_op.clone();
-                move |txn| -> StateMutationResult<()> {
-                    insert_action(txn, &legacy_sah)?;
-                    insert_entry(txn, &entry_hash, &entry)?;
-                    insert_op_authored(txn, &legacy_dht_op)?;
-                    set_withhold_publish(txn, &legacy_dht_op.hash)?;
-
-                    Ok(())
-                }
-            })
-            .await
-            .unwrap();
-
-        // Mirror the commit to the DhtStore so the store-backed session reads
         // (`current_countersigning_session`, chain head) see it.
         // The session op is withheld from publishing until the session
         // succeeds, matching the flush path. The entry must be routed by

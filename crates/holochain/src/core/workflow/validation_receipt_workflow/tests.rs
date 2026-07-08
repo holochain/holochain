@@ -1,10 +1,8 @@
 use crate::sweettest::*;
 use crate::test_utils::inline_zomes::simple_create_read_zome;
 use hdk::prelude::*;
-use holo_hash::DhtOpHash;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_state::prelude::*;
-use holochain_zome_types::dependencies::holochain_integrity_types::record::Record;
 
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky, doesn't take into account timing or retries"]
@@ -37,10 +35,9 @@ async fn test_validation_receipt() {
         .await
         .unwrap()
         .unwrap();
-    let ops = produce_ops_from_record(&record)
-        .unwrap()
+    let ops = holochain_types::dht_v2::produce_ops_from_record(&record)
         .into_iter()
-        .map(|op| DhtOpHash::with_data_sync(&op))
+        .map(|op| op.op_hash)
         .collect::<Vec<_>>();
 
     // Wait for receipts to be sent

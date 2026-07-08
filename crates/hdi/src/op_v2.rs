@@ -1,11 +1,10 @@
-//! [`OpHelper`] flattens a v2 [`Op`](holochain_integrity_types::dht_v2::Op)
-//! into the v2 [`FlatOp`](crate::flat_op_v2::FlatOp), for use in the
+//! [`OpHelper`] flattens a v2 [`Op`] into the v2 [`FlatOp`], for use in the
 //! `validate` callback.
 
 use crate::prelude::*;
 
-/// Conversion from a v2 [`Op`](holochain_integrity_types::dht_v2::Op) to a v2
-/// [`FlatOp`](crate::flat_op_v2::FlatOp), for use in the validate callback.
+/// Conversion from a v2 [`Op`] to a v2 [`FlatOp`], for use in the validate
+/// callback.
 pub trait OpHelper {
     /// Convert without consuming, cloning the required internal data.
     fn flattened<ET, LT>(&self) -> Result<crate::flat_op_v2::FlatOp<ET, LT>, WasmError>

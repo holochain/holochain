@@ -1,5 +1,6 @@
 //! [`FlatOp`] flattens a v2 [`Op`](holochain_integrity_types::dht_v2::Op)
-//! into a flatter, more accessible shape than [`Op`]'s deeply nested variants,
+//! into a flatter, more accessible shape than
+//! [`Op`](holochain_integrity_types::dht_v2::Op)'s deeply nested variants,
 //! expressed over the v2 `holochain_integrity_types::dht_v2::Action`.
 
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, DnaHash, EntryHash};

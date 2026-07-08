@@ -5,9 +5,9 @@ use crate::scratch::SyncScratchError;
 use async_recursion::async_recursion;
 pub use error::*;
 // The query-read overlay machinery in `query.rs` still consumes the legacy
-// per-variant `Record`/`SignedActionHashed`. These explicit imports shadow
-// the v2 re-exports pulled in via `crate::prelude::*` so the rest of this
-// module keeps resolving `Record`/`SignedActionHashed` to their legacy shape.
+// per-variant `Record`. This explicit import shadows the v2 re-export pulled
+// in via `crate::prelude::*` so the rest of this module keeps resolving
+// `Record` to its legacy shape.
 // Authoring and op production are v2-native throughout: actions are built
 // directly (via `v2::build_action` and friends), staged in the (v2) scratch,
 // and turned into ops via `v2::produce_ops_from_record` — no legacy
@@ -15,7 +15,6 @@ pub use error::*;
 // needed by the test module's fixtures, so that import is test-gated.
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
-use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
@@ -29,7 +28,6 @@ use holochain_types::prelude::SignedActionHashedExt;
 #[cfg(test)]
 use holochain_zome_types::dependencies::holochain_integrity_types::action::Action;
 use holochain_zome_types::dependencies::holochain_integrity_types::record::Record;
-use holochain_zome_types::dependencies::holochain_integrity_types::record::SignedActionHashed;
 use kitsune2_api::DhtArc;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
@@ -307,11 +305,6 @@ impl SourceChain<DbWrite<Dht>> {
         // If the lock isn't empty this is a countersigning session.
         let is_countersigning_session = !lock_subject.is_empty();
 
-        let ops_to_integrate = ops
-            .iter()
-            .map(|op| (op.op_hash.clone(), op.basis_hash.clone()))
-            .collect::<Vec<_>>();
-
         let author = self.author.clone();
         let persisted_head = self.head_info.as_ref().map(|h| h.action.clone());
 
@@ -577,9 +570,9 @@ impl SourceChain<DbWrite<Dht>> {
                         .verify_signature(warrant.signature(), warrant.data())
                         .await
                     {
-                        Ok(true) => warrant_ops.push(DhtOpHashed::from_content_sync(DhtOp::from(
-                            WarrantOp::from(warrant),
-                        ))),
+                        Ok(true) => warrant_ops.push(v2::DhtOpHashed::from_content_sync(
+                            v2::DhtOp::WarrantOp(Box::new(v2::WarrantOp(warrant))),
+                        )),
                         Ok(false) => {
                             tracing::info!(
                                 "Invalid signature of a warrant in the scratch space. Skipping warrant"
@@ -594,41 +587,9 @@ impl SourceChain<DbWrite<Dht>> {
                 }
 
                 let total_warrants = warrant_ops.len() as u32;
+                // Record valid warrants into the DhtStore so
+                // `ops_pending_sys_validation` picks them up via `LimboWarrant`.
                 if !warrant_ops.is_empty() {
-                // Write warrants to the DHT database and collect the
-                // successfully-inserted ops to insert into the DhtStore.
-                let (total_inserted_warrants, warrant_ops_for_new_db) = match self
-                    .dht_db
-                    // #5370: the `_txn` input and `insert_op_dht` are dead
-                    // pending DbKindDht retirement. Warrants are inserted into
-                    // the DhtStore below.
-                    .write_async(|_txn| -> DatabaseResult<(u32, Vec<v2::DhtOpHashed>)> {
-                        let mut inserted_warrants = 0u32;
-                        let mut inserted_ops: Vec<v2::DhtOpHashed> = Vec::new();
-                        for warrant in warrants_to_insert {
-                            let warrant_op = v2::DhtOpHashed::from_content_sync(
-                                v2::DhtOp::WarrantOp(Box::new(v2::WarrantOp(warrant))),
-                            );
-                            inserted_warrants += 1;
-                            inserted_ops.push(warrant_op);
-                        }
-                        Ok((inserted_warrants, inserted_ops))
-                    })
-                    .await
-                {
-                    Ok(pair) => pair,
-                    Err(err) => {
-                        tracing::warn!(
-                            ?err,
-                            "Error inserting warrants from scratch space into DHT database"
-                        );
-                        (0, Vec::new())
-                    }
-                };
-
-                // Mirror warrants into the new DhtStore so `ops_pending_sys_validation`
-                // picks them up via `LimboWarrant`.
-                if !warrant_ops_for_new_db.is_empty() {
                     // Warrants do not require validation receipts, set all to false.
                     let warrant_ops_with_validation_receipt_required_flag =
                         warrant_ops.into_iter().map(|op| (op, false)).collect();
@@ -1105,38 +1066,6 @@ pub async fn genesis(
         ),
     ));
 
-    // Pre-compute (op, op_hash, timestamp) tuples for the DhtStore write block.
-    // Each op's hash is derived via ChainOpUniqueForm::op_hash upfront so we can
-    // keep the actions and ops available for the DhtStore write without moving
-    // them into the closure.
-    //
-    // Each triple is (ChainOpLite, DhtOpHash, Timestamp) for one op.
-    let mut ops_with_hashes_for_new_db: Vec<(ChainOpLite, DhtOpHash, Timestamp)> = Vec::new();
-    {
-        // Process each (signed_action, ops) pair to compute op hashes.
-        // OP-PIPELINE SHIM (Island 1): converts each v2 action to legacy
-        // before feeding `ChainOpUniqueForm::op_hash` (a still-legacy island).
-        let pairs: &[(&v2::SignedActionHashed, &[ChainOpLite])] = &[
-            (&dna_action, &dna_ops),
-            (&agent_validation_action, &avh_ops),
-            (&agent_action, &agent_ops),
-        ];
-        for (shh, ops) in pairs {
-            let mut action_opt: Option<Action> =
-                Some(to_legacy_signed_action(shh).action().clone());
-            for op in *ops {
-                let op_type = op.get_type();
-                let (action_back, op_hash) = ChainOpUniqueForm::op_hash(
-                    op_type,
-                    action_opt.take().expect("action must be present"),
-                )
-                .map_err(SourceChainError::other)?;
-                let timestamp = action_back.timestamp();
-                action_opt = Some(action_back);
-                ops_with_hashes_for_new_db.push(((*op).clone(), op_hash, timestamp));
-            }
-        }
-    }
     // The ops for all three genesis records, with hashes and basis already
     // computed by `produce_ops_from_record`.
     let ops_with_hashes_for_new_db: Vec<v2::HashedChainOp> = dna_ops

@@ -817,7 +817,6 @@ impl TestCase {
             .as_hash()
             .clone();
 
-        let action = chain_op.action();
         // Build the RenderedOps first so we can pass it to cache_chain_ops.
         let action = from_legacy_action(&chain_op.action());
         let signature = chain_op.signature().clone();
@@ -853,20 +852,7 @@ impl TestCase {
         let op_hashed = DhtOpHashed::from_content_sync(op);
         let hash = op_hashed.as_hash().clone();
 
-        // Write to the legacy DB so that other legacy paths (app-validation query,
-        // integration, etc.) also see this op.
-        let op_for_legacy = op_hashed.clone();
-        self.test_space
-            .space
-            .dht_db
-            .write_async(move |txn| -> StateMutationResult<()> {
-                holochain_state::mutations::insert_op_untyped(txn, &op_for_legacy, 0)?;
-                Ok(())
-            })
-            .await
-            .unwrap();
-
-        // Write to the new DHT store so that `ops_pending_sys_validation` returns it.
+        // Write to the DHT store so that `ops_pending_sys_validation` returns it.
         let v2_op_hashed = holochain_types::dht_v2::from_legacy_dht_op(&op_hashed);
         self.test_space
             .space

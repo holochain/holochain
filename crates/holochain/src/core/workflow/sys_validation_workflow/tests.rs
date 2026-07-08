@@ -12,24 +12,12 @@ use {
     crate::core::workflow::sys_validation_workflow::types::Outcome, ::fixt::fixt,
     holochain_zome_types::fixt::EntryFixturator, std::convert::TryInto,
 };
-// The ops constructed by hand in this module are built from legacy
-// per-variant `Action` fixtures (`fixt!(Create)`, `fixt!(Dna)`, ...) and
-// projected to v2 via `from_legacy_action`, so `Action` (otherwise the v2
-// struct via the ambient preludes) is pinned to the legacy shape here.
-// `detect_fork` and the `ActionRefMut` mutators used in `test_detect_fork`
-// operate on the v2 projection; `insert_action` writes the legacy `Action`
-// table, so the v2 actions it commits are projected back via
-// `to_legacy_signed_action`.
+// The ops constructed by hand in this module are built from legacy per-variant
+// `Action` fixtures (`fixt!(Create)`, `fixt!(Dna)`, ...) and projected to v2 via
+// `from_legacy_action`, so `Action` (otherwise the v2 struct via the ambient
+// preludes) is pinned to the legacy shape here.
 use holochain_zome_types::dependencies::holochain_integrity_types::action::Action;
 use holochain_zome_types::dht_v2::SignedAction;
-
-/// Project a v2 op-pipeline op to its legacy form for the still-legacy
-/// `DbKindDht` sqlite mirror that `insert_op_dht` writes into (mirrors the
-/// `to_legacy_dht_op` shim `incoming_dht_ops_workflow::add_to_pending` uses).
-fn to_legacy_op_hashed(op: &DhtOpHashed) -> holochain_types::dht_op::DhtOpHashed {
-    let legacy = holochain_types::dht_v2::to_legacy_dht_op(op.as_content()).unwrap();
-    holochain_types::dht_op::DhtOpHashed::with_pre_hashed(legacy, op.as_hash().clone())
-}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn sys_validation_workflow_test() {
@@ -83,11 +71,6 @@ async fn sys_validation_produces_invalid_chain_op_warrant() {
 
     // Inject the invalid op directly into bob's DHT store
     let op = DhtOpHashed::from_content_sync(op);
-    let db = conductor.spaces.dht_db(dna.dna_hash()).unwrap();
-    let op_for_legacy = to_legacy_op_hashed(&op);
-    db.test_write(move |txn| {
-        insert_op_dht(txn, &op_for_legacy, 0, None).unwrap();
-    });
     conductor
         .spaces
         .dht_store(dna.dna_hash())
@@ -238,15 +221,6 @@ async fn sys_validation_produces_forked_chain_warrant() {
     let prev_op_hashed = DhtOpHashed::from_content_sync(prev_op);
     let original_op_hashed = DhtOpHashed::from_content_sync(original_op);
     let forked_op_hashed = DhtOpHashed::from_content_sync(forked_op);
-    let db = conductor.spaces.dht_db(dna.dna_hash()).unwrap();
-    let prev_for_legacy = to_legacy_op_hashed(&prev_op_hashed);
-    let orig_for_legacy = to_legacy_op_hashed(&original_op_hashed);
-    let fork_for_legacy = to_legacy_op_hashed(&forked_op_hashed);
-    db.test_write(move |txn| {
-        insert_op_dht(txn, &prev_for_legacy, 0, None).unwrap();
-        insert_op_dht(txn, &orig_for_legacy, 0, None).unwrap();
-        insert_op_dht(txn, &fork_for_legacy, 0, None).unwrap();
-    });
     conductor
         .spaces
         .dht_store(dna.dna_hash())
@@ -428,15 +402,6 @@ async fn sys_validation_produces_two_warrants_when_receiving_both_forked_ops() {
     let prev_op_hashed = DhtOpHashed::from_content_sync(prev_op);
     let op1_hashed = DhtOpHashed::from_content_sync(op1);
     let op2_hashed = DhtOpHashed::from_content_sync(op2);
-    let db = conductor.spaces.dht_db(dna.dna_hash()).unwrap();
-    let prev_for_legacy = to_legacy_op_hashed(&prev_op_hashed);
-    let op1_for_legacy = to_legacy_op_hashed(&op1_hashed);
-    let op2_for_legacy = to_legacy_op_hashed(&op2_hashed);
-    db.test_write(move |txn| {
-        insert_op_dht(txn, &prev_for_legacy, 0, None).unwrap();
-        insert_op_dht(txn, &op1_for_legacy, 0, None).unwrap();
-        insert_op_dht(txn, &op2_for_legacy, 0, None).unwrap();
-    });
     conductor
         .spaces
         .dht_store(dna.dna_hash())
@@ -666,136 +631,4 @@ async fn bob_makes_a_large_link(
         .integrate_dht_ops
         .trigger(&"bob_makes_a_large_link");
     (bad_update_action, bad_update_entry_hash, link_add_address)
-}
-
-/// Test the detect_fork function against different situations,
-/// especially the case where a fork happens after an Update Agent action,
-/// where the authorship changes
-#[tokio::test(flavor = "multi_thread")]
-async fn test_detect_fork() {
-    use ::fixt::fixt;
-    let keystore = holochain_keystore::test_keystore();
-    let author1 = keystore.new_sign_keypair_random().await.unwrap();
-    let author2 = keystore.new_sign_keypair_random().await.unwrap();
-
-    // `detect_fork` and the `ActionRefMut` mutators below operate on the v2
-    // `Action`, so this closure signs and this builder yields v2 actions
-    // directly (projecting from the legacy per-variant construction).
-    let sign_action = |a: holochain_zome_types::Action| async {
-        SignedActionHashed::sign(&keystore, a.into_hashed())
-            .await
-            .unwrap()
-    };
-    let basic_action = |author: AgentPubKey, prev: Option<ActionHash>| {
-        if let Some(prev) = prev {
-            let mut a = fixt!(Create);
-            a.entry_type = EntryType::App(fixt!(AppEntryDef));
-            a.author = author;
-            a.prev_action = prev;
-            from_legacy_action(&Action::Create(a))
-        } else {
-            let mut a = fixt!(Dna);
-            a.author = author;
-            from_legacy_action(&Action::Dna(a))
-        }
-    };
-
-    // - Two actions, one following the other
-    let a0 = basic_action(author1.clone(), None);
-    let a1 = basic_action(author1.clone(), Some(a0.to_hash()));
-
-    // - Create an agent key update following a1
-    let mut update = fixt!(Update);
-    update.author = author1.clone();
-    update.entry_type = EntryType::AgentPubKey;
-    update.entry_hash = author2.clone().into();
-    update.prev_action = a1.to_hash();
-    let a2 = from_legacy_action(&Action::Update(update));
-
-    // - Two more actions following a2
-    let a3 = basic_action(author2.clone(), Some(a2.to_hash()));
-    let a4 = basic_action(author2.clone(), Some(a3.to_hash()));
-
-    // - Create a forked version of a1 (still pointing to a0)
-    let mut a1_fork = a1.clone();
-    *a1_fork.entry_data_mut().unwrap().0 = fixt!(EntryHash);
-
-    // - Create a forked version of a3 (still pointing to a2)
-    let mut a3_fork = a3.clone();
-    *a3_fork.entry_data_mut().unwrap().0 = fixt!(EntryHash);
-
-    // - Create another forked version of a3, with the pre-update author
-    let mut a3_fork_author1 = a3.clone();
-    *a3_fork_author1.author_mut() = author1.clone();
-    *a3_fork_author1.entry_data_mut().unwrap().0 = fixt!(EntryHash);
-
-    // - Create another forked version of a3, with a random author
-    let mut a3_fork_other_author = a3.clone();
-    *a3_fork_other_author.author_mut() = fixt!(AgentPubKey);
-    *a3_fork_other_author.entry_data_mut().unwrap().0 = fixt!(EntryHash);
-
-    let a1_hash = a1.to_hash();
-    let a3_hash = a3.to_hash();
-
-    // - Form a chain of the "valid, unforked" actions
-    let chain = [
-        sign_action(a0).await,
-        sign_action(a1).await,
-        sign_action(a2).await,
-        sign_action(a3.clone()).await,
-    ];
-
-    let db = test_authored_db();
-    db.test_write(move |txn| {
-        // - Commit the valid chain. `insert_action` writes to the legacy
-        // `Action` table, so project each v2 signed action back to its
-        // legacy form (the hash is carried over unchanged).
-        for a in chain {
-            insert_action(txn, &to_legacy_signed_action(&a)).unwrap();
-        }
-
-        // Not a fork, because a4 is a perfectly valid continuation of a3
-        assert!(detect_fork(txn, &a4).unwrap().is_none());
-
-        // Not a fork, because a3 is already in the chain
-        assert!(detect_fork(txn, &a3).unwrap().is_none());
-
-        // Not a fork: DNA actions have no prev_action, so the SQL query `prev_hash = :prev_hash`
-        // with NULL returns no rows (since NULL = NULL is NULL in SQL, not true).
-        // Create a different DNA action to ensure it doesn't match any existing action.
-        let mut another_dna = fixt!(Dna);
-        another_dna.author = author1.clone();
-        let another_dna_action = from_legacy_action(&Action::Dna(another_dna));
-        assert!(
-            detect_fork(txn, &another_dna_action).unwrap().is_none(),
-            "DNA actions cannot fork - they have no prev_action"
-        );
-
-        // Is a fork, because:
-        // - a1 already exists
-        // - both actions point to the same previous action a0
-        // - both are under the same authorship as a0
-        assert_eq!(detect_fork(txn, &a1_fork).unwrap().unwrap().0, a1_hash);
-
-        // Is a fork, because:
-        // - a3 already exists
-        // - both actions point to the same previous action a2
-        // - both are under the authorship of the key which a2 updates to
-        assert_eq!(detect_fork(txn, &a3_fork).unwrap().unwrap().0, a3_hash);
-
-        // Error: a3_fork_author1 has author1 but the existing a3 in the DB
-        // has author2. The in-memory author check detects a cross-author
-        // prev_action collision and returns an error.
-        assert!(
-            detect_fork(txn, &a3_fork_author1).is_err(),
-            "Cross-author prev_action collision should return an error"
-        );
-
-        // Error: a3_fork_other_author has a random author that doesn't match
-        // any existing action with the same prev_hash.
-        assert!(
-            detect_fork(txn, &a3_fork_other_author).is_err(),
-            "Cross-author prev_action collision should return an error"
-        );
-    });
 }

@@ -184,14 +184,11 @@ async fn validation_callback_awaiting_deps_hashes() {
     // a create by alice, signed with alice's real key
     let mut create = fixt!(Create);
     create.author = alice.clone();
-    let create_action = Action::Create(create.clone());
-    let create_action_signed_hashed =
-        SignedActionHashed::sign(&keystore, create_action.clone().into_hashed())
-            .await
-            .unwrap();
     let create_action = LegacyAction::Create(create.clone());
     let create_action_signed_hashed =
-        SignedActionHashed::new_unchecked(from_legacy_action(&create_action), fixt!(Signature));
+        SignedActionHashed::sign(&keystore, from_legacy_action(&create_action).into_hashed())
+            .await
+            .unwrap();
     // a delete by bob that references alice's create
     let mut delete = fixt!(Delete);
     delete.author = bob.clone();
@@ -239,33 +236,10 @@ async fn validation_callback_awaiting_deps_hashes() {
     .unwrap();
     assert_matches!(outcome, Outcome::AwaitingDeps(hashes) if hashes == vec![create_action.clone().to_hash().into()]);
 
-    // Wait for the background fetch to put the op into the DhtStore.
+    // The fetched create carries alice's real signature, so it passes the
+    // signature gate and lands in the DhtStore, which the cascade's local read
+    // consults. Wait for the background fetch to store it.
     await_action_in_store(&test_space.space.dht_store, &create_action.to_hash()).await;
-    // await while missing record is being fetched in background task
-    await_actions_in_cache(
-        &test_space.space.cache_db,
-        vec![create_action_signed_hashed.as_hash().clone()],
-    )
-    .await;
-
-    // The fetched op carries a synthetic signature, so the signature gate keeps
-    // it out of the DhtStore (it reaches only the legacy cache, confirmed
-    // above). Mirror it into the DhtStore — which the cascade's local read now
-    // consults — standing in for the verified fetch a real signature would allow.
-    test_space
-        .space
-        .dht_store
-        .record_incoming_ops(vec![(
-            holochain_types::dht_v2::from_legacy_dht_op(&DhtOpHashed::from_content_sync(
-                ChainOp::RegisterAgentActivity(
-                    create_action_signed_hashed.signature().clone(),
-                    create_action.clone(),
-                ),
-            )),
-            false,
-        )])
-        .await
-        .unwrap();
 
     // app validation outcome should be accepted, now that the missing record
     // has been fetched
@@ -324,14 +298,11 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     let mut create = fixt!(Create);
     create.author = alice.clone();
     create.action_seq = 0;
-    let create_action = Action::Create(create.clone());
-    let create_action_signed_hashed =
-        SignedActionHashed::sign(&keystore, create_action.clone().into_hashed())
-            .await
-            .unwrap();
     let create_action = LegacyAction::Create(create.clone());
     let create_action_signed_hashed =
-        SignedActionHashed::new_unchecked(from_legacy_action(&create_action), fixt!(Signature));
+        SignedActionHashed::sign(&keystore, from_legacy_action(&create_action).into_hashed())
+            .await
+            .unwrap();
     // a delete by alice that references the create
     let mut delete = fixt!(Delete);
     delete.author = alice.clone();
@@ -342,10 +313,9 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     delete.deletes_address = create_action.clone().to_hash();
     let delete_action_v2 = from_legacy_action(&LegacyAction::Delete(delete.clone()));
     let delete_action_signed_hashed =
-        SignedActionHashed::sign(&keystore, delete_action.clone().into_hashed())
+        SignedActionHashed::sign(&keystore, delete_action_v2.clone().into_hashed())
             .await
             .unwrap();
-        SignedActionHashed::new_unchecked(delete_action_v2.clone(), fixt!(Signature));
     let delete_action_op = Op::RegisterDelete(RegisterDelete {
         delete: SignedActionHashed::new_unchecked(delete_action_v2, fixt!(Signature)),
     });
