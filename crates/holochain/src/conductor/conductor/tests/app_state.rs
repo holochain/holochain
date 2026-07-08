@@ -44,13 +44,13 @@ use std::{
 /// Path to the per-DNA DhtStore database file backing `dna_hash` within this
 /// conductor's data directory.
 fn dht_store_db_path(conductor: &SweetConductor, dna_hash: &DnaHash) -> std::path::PathBuf {
-    let id = holochain_data::kind::Dht::new(Arc::new(dna_hash.clone()));
+    let id = holochain_state::data::Dht::new(Arc::new(dna_hash.clone()));
     conductor
         .spaces
         .db_dir
         .as_ref()
         .as_ref()
-        .join(holochain_data::DatabaseIdentifier::database_id(&id))
+        .join(holochain_state::data::DatabaseIdentifier::database_id(&id))
 }
 
 #[tokio::test(flavor = "multi_thread")]

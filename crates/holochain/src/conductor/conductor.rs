@@ -3271,9 +3271,9 @@ impl Conductor {
         // previous installation.
         for dna_hash in dnas_to_purge {
             let dht_store = self.spaces.dht_store(dna_hash)?;
-            let dht_store_id = holochain_data::kind::Dht::new(Arc::new(dna_hash.clone()));
+            let dht_store_id = holochain_state::data::Dht::new(Arc::new(dna_hash.clone()));
             let dht_store_path = self.spaces.db_dir.as_ref().as_ref().join(
-                holochain_data::DatabaseIdentifier::database_id(&dht_store_id),
+                holochain_state::data::DatabaseIdentifier::database_id(&dht_store_id),
             );
             if let Err(err) = ffs::remove_file(&dht_store_path).await {
                 tracing::warn!(

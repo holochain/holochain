@@ -55,10 +55,8 @@ quinn = { version = "=0.11.9", default-features = false, optional = true }
 quinn-proto = { version = "=0.11.14", default-features = false, optional = true }
 socket2 = { version = "=0.6.3", default-features = false, optional = true }
 bytes = "1.10"
-holochain_sqlite = { version = "^0.7.0-dev.24", path = "../holochain_sqlite" }
 parking_lot = "0.12.3"
 holochain_state = { version = "^0.7.0-dev.32", path = "../holochain_state" }
-holochain_data = { version = "^0.7.0-dev.21", path = "../holochain_data" }
 holochain_timestamp = { version = "^0.7.0-dev.1", path = "../timestamp" }
 
 [dev-dependencies]

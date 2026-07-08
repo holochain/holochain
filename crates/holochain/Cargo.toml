@@ -17,7 +17,6 @@ anyhow = "1.0"
 async-trait = "0.1"
 base64 = "0.22"
 bytes = "1"
-cfg-if = "1.0"
 chrono = { version = "0.4.22", default-features = false, features = [
   "clock",
   "std",
@@ -33,9 +32,6 @@ holo_hash = { version = "^0.7.0-dev.11", path = "../holo_hash", features = [
 ] }
 holochain_cascade = { version = "^0.7.0-dev.32", default-features = false, path = "../holochain_cascade" }
 holochain_conductor_api = { version = "^0.7.0-dev.31", path = "../holochain_conductor_api", default-features = false }
-holochain_data = { version = "^0.7.0-dev.21", path = "../holochain_data", features = [
-  "sqlite-encrypted",
-] }
 holochain_keystore = { version = "^0.7.0-dev.20", path = "../holochain_keystore", default-features = false }
 holochain_p2p = { version = "^0.7.0-dev.32", default-features = false, path = "../holochain_p2p" }
 holochain_sqlite = { version = "^0.7.0-dev.24", path = "../holochain_sqlite" }
@@ -170,6 +166,7 @@ workspace = true
 [features]
 default = [
   "sqlite-encrypted",
+  "encryption",
   "schema",
   "wasmer-sys-cranelift",
   "transport-iroh",
@@ -224,8 +221,10 @@ sqlite-encrypted = [
   "holochain_state/sqlite-encrypted",
   "holochain_types/sqlite-encrypted",
   "holochain_zome_types/sqlite-encrypted",
-  "holochain_data/sqlite-encrypted",
 ]
+
+# Enables at-rest encryption of the SQLite database.
+encryption = ["holochain_state/encryption"]
 
 # Compile SQLite from source rather than depending on a library.
 # Incompatible with "sqlite-encrypted"

@@ -81,7 +81,7 @@ impl DatabaseIdentifier for Dht {
 impl Dht {
     /// Create a new DHT database identifier for a DNA.
     pub fn new(dna_hash: Arc<DnaHash>) -> Self {
-        let id = format!("dht-{dna_hash}");
+        let id = format!("dht-{dna_hash}.db");
         Self { dna_hash, id }
     }
 
@@ -104,7 +104,7 @@ pub struct Conductor;
 
 impl DatabaseIdentifier for Conductor {
     fn database_id(&self) -> &str {
-        "conductor_v2.db"
+        "conductor.db"
     }
 
     fn db_kind(&self) -> DbKind {
@@ -120,7 +120,7 @@ pub struct Wasm;
 
 impl DatabaseIdentifier for Wasm {
     fn database_id(&self) -> &str {
-        "wasm"
+        "wasm.db"
     }
 
     fn db_kind(&self) -> DbKind {
@@ -150,7 +150,7 @@ impl DatabaseIdentifier for PeerMetaStore {
 impl PeerMetaStore {
     /// Create a new peer metadata database identifier for a DNA.
     pub fn new(dna_hash: Arc<DnaHash>) -> Self {
-        let id = format!("p2p-peer-meta-{dna_hash}");
+        let id = format!("p2p-peer-meta-{dna_hash}.db");
         Self { dna_hash, id }
     }
 

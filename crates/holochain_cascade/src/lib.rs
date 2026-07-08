@@ -193,7 +193,7 @@ impl CascadeImpl {
         network: DynHolochainP2pDna,
     ) -> CascadeImpl
     where
-        Db: AsRef<holochain_state::DbRead<holochain_state::Dht>>,
+        Db: AsRef<holochain_state::data::DbRead<holochain_state::data::Dht>>,
     {
         let HostFnStores { scratch, dht_store } = workspace.stores();
         let dht_store =
