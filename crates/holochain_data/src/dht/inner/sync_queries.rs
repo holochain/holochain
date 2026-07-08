@@ -12,6 +12,19 @@
 //! `WarrantOp`, so every warrant joined against `WarrantOp` is locally
 //! validated by construction.
 //!
+//! The op-discovery reads (`op_hashes_in_time_slice`, `op_ids_since_time_batch`),
+//! the by-hash content read (`get_chain_ops_for_wire`), and the earliest-data
+//! boundary (`earliest_authored_timestamp_in_arc`) additionally exclude
+//! `StoreEntry` ops (`op_type = 2`) whose action carries a private entry
+//! (`Action.private_entry = 1`), matching [`super::chain_op_publish::get_ops_to_publish`].
+//! A private `StoreEntry` op is produced and stored locally so its author can
+//! validate their own entry, but it must never be advertised or served to
+//! peers: `check_entry_visibility` in `holochain`'s sys-validation rejects any
+//! `StoreEntry` op whose action declares a private entry as
+//! `PrivateEntryLeaked`, so a peer that received one anyway could never
+//! converge on it — leaving it permanently unreconciled between the author's
+//! slice hash and every peer's.
+//!
 //! `check_op_hashes_present` is the exception: it answers "do we already
 //! hold this op in a form that doesn't need re-delivery?" so the fetch logic
 //! never re-requests ops that are already in the validation pipeline. It
@@ -88,6 +101,7 @@ where
                 AND Action.timestamp >= ?
                 AND Action.timestamp <  ?
                 AND ChainOp.locally_validated = 1
+                AND (ChainOp.op_type != 2 OR Action.private_entry = 0)
             UNION ALL
             SELECT
                 Warrant.hash AS op_hash,
@@ -158,6 +172,7 @@ where
                 ChainOp.when_integrated AS when_integrated,
                 ChainOp.serialized_size AS serialized_size
             FROM ChainOp
+            JOIN Action ON ChainOp.action_hash = Action.hash
             WHERE
                 (
                     (? <= ? AND ChainOp.storage_center_loc >= ?
@@ -168,6 +183,7 @@ where
                 )
                 AND ChainOp.when_integrated >= ?
                 AND ChainOp.locally_validated = 1
+                AND (ChainOp.op_type != 2 OR Action.private_entry = 0)
             UNION ALL
             SELECT
                 Warrant.hash AS op_hash,
@@ -283,7 +299,9 @@ where
 }
 
 /// Fetch full chain-op rows (joined with `Action` and optional `Entry`) for
-/// the given op hashes, filtered to `locally_validated = 1`.
+/// the given op hashes, filtered to `locally_validated = 1`. A `StoreEntry`
+/// op carrying a private entry is excluded even if directly requested by
+/// hash — see the module-level doc for why it must never be served.
 pub(crate) async fn get_chain_ops_for_wire<'e, E>(
     executor: E,
     op_hashes: &[Vec<u8>],
@@ -312,6 +330,7 @@ where
          JOIN Action ON ChainOp.action_hash = Action.hash
          LEFT JOIN Entry ON Action.entry_hash = Entry.hash
          WHERE ChainOp.locally_validated = 1
+           AND (ChainOp.op_type != 2 OR Action.private_entry = 0)
            AND ChainOp.hash IN (",
     );
     {
@@ -514,8 +533,9 @@ where
 
 /// Minimum authored timestamp across both `ChainOp` (joined with `Action`)
 /// and integrated warrants (`Warrant` joined with `WarrantOp`), filtered
-/// to `arc` and (for chain ops) `locally_validated = 1`. `None` when no
-/// rows match.
+/// to `arc` and (for chain ops) `locally_validated = 1` with private
+/// `StoreEntry` ops excluded so a withheld private op never sets the
+/// advertised earliest-data boundary. `None` when no rows match.
 pub(crate) async fn earliest_authored_timestamp_in_arc<'e, E>(
     executor: E,
     arc: ArcBounds,
@@ -537,6 +557,7 @@ where
                               OR ChainOp.storage_center_loc >= ?))
                 )
                 AND ChainOp.locally_validated = 1
+                AND (ChainOp.op_type != 2 OR Action.private_entry = 0)
             UNION ALL
             SELECT Warrant.timestamp AS ts
             FROM Warrant
@@ -838,4 +859,205 @@ where
     .fetch_one(executor)
     .await?;
     Ok(n)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::handles::DbWrite;
+    use crate::kind::Dht;
+    use crate::test_open_db;
+    use holo_hash::{AgentPubKey, DnaHash};
+    use sqlx::{Pool, Sqlite};
+    use std::sync::Arc;
+
+    /// `ChainOpType::StoreEntry` discriminant.
+    const STORE_ENTRY: i64 = 2;
+    /// `ChainOpType::StoreRecord` discriminant.
+    const STORE_RECORD: i64 = 1;
+    /// Author shared by every seeded op so the publish read finds them all.
+    const AUTHOR: u8 = 7;
+
+    fn dht_id() -> Dht {
+        Dht::new(Arc::new(DnaHash::from_raw_36(vec![0u8; 36])))
+    }
+
+    /// Insert one integrated, locally-validated chain op with its action, at
+    /// storage location 0 so it falls inside a full arc. `op_tag` makes the
+    /// op/action/basis hashes unique; `private_entry` is the action's
+    /// private-entry flag; `timestamp` is used for both the authored timestamp
+    /// and the integration time. Returns the op hash.
+    async fn seed_op(
+        pool: &Pool<Sqlite>,
+        op_tag: u8,
+        op_type: i64,
+        private_entry: i64,
+        timestamp: i64,
+    ) -> Vec<u8> {
+        let op_hash = vec![op_tag; 36];
+        let action_hash = vec![op_tag + 10; 36];
+        let basis_hash = vec![op_tag + 20; 36];
+
+        sqlx::query(
+            "INSERT INTO Action
+                (hash, author, seq, prev_hash, timestamp, action_type,
+                 action_data, signature, entry_hash, private_entry, record_validity)
+             VALUES (?, ?, 0, NULL, ?, 0, ?, ?, NULL, ?, NULL)",
+        )
+        .bind(&action_hash)
+        .bind(vec![AUTHOR; 36])
+        .bind(timestamp)
+        .bind(vec![0u8]) // dummy ActionData blob; reads under test never decode it
+        .bind(vec![0u8]) // dummy signature blob
+        .bind(private_entry)
+        .execute(pool)
+        .await
+        .unwrap();
+
+        sqlx::query(
+            "INSERT INTO ChainOp
+                (hash, op_type, action_hash, basis_hash, storage_center_loc,
+                 validation_status, locally_validated, require_receipt,
+                 when_received, when_integrated, serialized_size)
+             VALUES (?, ?, ?, ?, 0, 1, 1, 0, ?, ?, 10)",
+        )
+        .bind(&op_hash)
+        .bind(op_type)
+        .bind(&action_hash)
+        .bind(&basis_hash)
+        .bind(timestamp)
+        .bind(timestamp)
+        .execute(pool)
+        .await
+        .unwrap();
+
+        op_hash
+    }
+
+    /// Seed three integrated ops that exercise the private-entry filter:
+    /// a public `StoreEntry` (servable), a private `StoreEntry` (must be
+    /// withheld — it is authored *earliest*, at timestamp 1000, to also probe
+    /// the earliest-timestamp boundary), and a `StoreRecord` carrying a private
+    /// entry (servable, since it withholds the entry body). Returns
+    /// `(db, public_store_entry, private_store_entry, private_store_record)`.
+    async fn seed_filter_fixture() -> (DbWrite<Dht>, Vec<u8>, Vec<u8>, Vec<u8>) {
+        let db = test_open_db(dht_id()).await.unwrap();
+        let public = seed_op(db.pool(), 1, STORE_ENTRY, 0, 2000).await;
+        let private = seed_op(db.pool(), 2, STORE_ENTRY, 1, 1000).await;
+        let record = seed_op(db.pool(), 3, STORE_RECORD, 1, 3000).await;
+        (db, public, private, record)
+    }
+
+    #[tokio::test]
+    async fn time_slice_read_withholds_private_store_entry() {
+        let (db, public, private, record) = seed_filter_fixture().await;
+
+        let hashes: Vec<Vec<u8>> = db
+            .as_ref()
+            .op_hashes_in_time_slice(0, u32::MAX, 0, i64::MAX)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|r| r.hash)
+            .collect();
+
+        assert!(hashes.contains(&public), "public StoreEntry must be served");
+        assert!(
+            hashes.contains(&record),
+            "StoreRecord op with a private entry must be served (body withheld)"
+        );
+        assert!(
+            !hashes.contains(&private),
+            "private StoreEntry op must never be advertised in a time slice"
+        );
+    }
+
+    #[tokio::test]
+    async fn ids_since_read_withholds_private_store_entry() {
+        let (db, public, private, record) = seed_filter_fixture().await;
+
+        let hashes: Vec<Vec<u8>> = db
+            .as_ref()
+            .op_ids_since_time_batch(0, u32::MAX, 0, 100)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|r| r.hash)
+            .collect();
+
+        assert!(hashes.contains(&public), "public StoreEntry must be served");
+        assert!(hashes.contains(&record), "StoreRecord op must be served");
+        assert!(
+            !hashes.contains(&private),
+            "private StoreEntry op must never be advertised in the since cursor"
+        );
+    }
+
+    #[tokio::test]
+    async fn for_wire_read_withholds_private_store_entry_even_when_requested() {
+        let (db, public, private, record) = seed_filter_fixture().await;
+
+        // Request all three by hash — the private StoreEntry must still be
+        // withheld even though it was named explicitly.
+        let requested = vec![public.clone(), private.clone(), record.clone()];
+        let hashes: Vec<Vec<u8>> = db
+            .as_ref()
+            .get_chain_ops_for_wire(&requested)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|r| r.op_hash)
+            .collect();
+
+        assert!(hashes.contains(&public), "public StoreEntry must be served");
+        assert!(hashes.contains(&record), "StoreRecord op must be served");
+        assert!(
+            !hashes.contains(&private),
+            "private StoreEntry op must never be served by hash"
+        );
+    }
+
+    #[tokio::test]
+    async fn earliest_timestamp_ignores_private_store_entry() {
+        let (db, _public, _private, _record) = seed_filter_fixture().await;
+
+        let earliest = db
+            .as_ref()
+            .earliest_authored_timestamp_in_arc(0, u32::MAX)
+            .await
+            .unwrap();
+
+        // The private StoreEntry is authored at 1000 but is never servable, so
+        // it must not set the advertised earliest-data boundary. The earliest
+        // servable op is the public StoreEntry at 2000.
+        assert_eq!(
+            earliest,
+            Some(2000),
+            "earliest timestamp must reflect the earliest *servable* op, not a withheld private one"
+        );
+    }
+
+    #[tokio::test]
+    async fn ops_to_publish_read_withholds_private_store_entry() {
+        let (db, public, private, record) = seed_filter_fixture().await;
+        let author = AgentPubKey::from_raw_36(vec![AUTHOR; 36]);
+
+        let hashes: Vec<Vec<u8>> = db
+            .as_ref()
+            .ops_to_publish_for_wire(&author)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|r| r.op_hash)
+            .collect();
+
+        assert!(
+            hashes.contains(&public),
+            "public StoreEntry must be published"
+        );
+        assert!(hashes.contains(&record), "StoreRecord op must be published");
+        assert!(
+            !hashes.contains(&private),
+            "private StoreEntry op must never be published"
+        );
+    }
 }
