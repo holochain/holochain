@@ -7,8 +7,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Implemented more graceful handling of invalid or missing `hc` subcommands. Originally the code panicked with an ambiguous "File or directory not found error". [\#5867](https://github.com/holochain/holochain/pull/5867)
-
 ## 0.7.0-dev.32
 
 ## 0.7.0-dev.31

@@ -112,9 +112,7 @@ impl CliSubcommand {
 
                 match Command::new(&exe_name).args(&args[1..]).status() {
                     Ok(status) => {
-                        if !status.success() {
-                            std::process::exit(status.code().unwrap_or(1));
-                        }
+                        std::process::exit(status.code().unwrap_or(1));
                     }
                     Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => {
                         eprintln!(
