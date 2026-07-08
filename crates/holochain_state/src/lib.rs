@@ -26,15 +26,14 @@ pub use dht_store::{DhtStore, DhtStoreRead};
 /// Re-exports from the `holochain_data` crate.
 pub mod data {
     pub use holochain_data::{
-        conductor::AppInterfaceModel, kind::*, open_db, DatabaseIdentifier, DbKey, DbSyncLevel,
-        HolochainDataConfig, DbRead, DbWrite
+        conductor::AppInterfaceModel, kind::*, open_db, DatabaseIdentifier, DbKey, DbRead,
+        DbSyncLevel, DbWrite, HolochainDataConfig,
     };
 
     #[cfg(feature = "test_utils")]
     pub use holochain_data::test_open_db;
 }
 
-pub mod block;
 pub mod chain_lock;
 pub mod conductor;
 pub mod dht_store;
