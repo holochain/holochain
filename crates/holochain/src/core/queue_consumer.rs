@@ -83,16 +83,9 @@ pub async fn spawn_queue_consumer_tasks(
     space: &Space,
     conductor: ConductorHandle,
 ) -> ConductorResult<(QueueTriggers, InitialQueueTriggers)> {
-    let Space {
-        dht_db,
-        cache_db: cache,
-        ..
-    } = space;
-
     let keystore = conductor.keystore().clone();
     let dna_hash = Arc::new(cell_id.dna_hash().clone());
     let queue_consumer_map = conductor.get_queue_consumer_workflows();
-    let authored_db = space.get_or_create_authored_db(cell_id.agent_pubkey().clone())?;
 
     // Publish
     let tx_publish = spawn_publish_dht_ops_consumer(
@@ -108,7 +101,6 @@ pub async fn spawn_queue_consumer_tasks(
     let tx_receipt = queue_consumer_map.spawn_once_validation_receipt(dna_hash.clone(), || {
         spawn_validation_receipt_consumer(
             dna_hash.clone(),
-            dht_db.clone(),
             space.dht_store.clone(),
             conductor.clone(),
             network.clone(),
@@ -120,12 +112,10 @@ pub async fn spawn_queue_consumer_tasks(
     let tx_integration = queue_consumer_map.spawn_once_integration(dna_hash.clone(), || {
         spawn_integrate_dht_ops_consumer(
             dna_hash.clone(),
-            dht_db.clone(),
             space.dht_store.clone(),
             conductor.task_manager(),
             tx_receipt.clone(),
             network.clone(),
-            conductor.clone(),
         )
     });
 
@@ -134,13 +124,7 @@ pub async fn spawn_queue_consumer_tasks(
     let tx_app = queue_consumer_map.spawn_once_app_validation(dna_hash.clone(), || {
         spawn_app_validation_consumer(
             dna_hash.clone(),
-            AppValidationWorkspace::new(
-                authored_db.clone(),
-                dht_db.clone(),
-                space.dht_store.clone(),
-                cache.clone(),
-                keystore.clone(),
-            ),
+            AppValidationWorkspace::new(space.dht_store.clone(), keystore.clone()),
             conductor.clone(),
             tx_integration.clone(),
             tx_publish.clone(),
@@ -153,10 +137,7 @@ pub async fn spawn_queue_consumer_tasks(
     let tx_sys = queue_consumer_map.spawn_once_sys_validation(dna_hash.clone(), || {
         spawn_sys_validation_consumer(
             SysValidationWorkspace::new(
-                authored_db.clone(),
-                dht_db.clone(),
                 space.dht_store.clone(),
-                cache.clone(),
                 cell_id.dna_hash().clone(),
                 conductor
                     .get_config()

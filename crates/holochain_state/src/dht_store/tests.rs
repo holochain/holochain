@@ -52,6 +52,77 @@ async fn delete_live_ephemeral_scheduled_functions_roundtrip() {
 }
 
 #[tokio::test]
+async fn chain_lock_acquire_get_release_roundtrip() {
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+    let author = agent(5);
+    let subject = vec![9u8; 32];
+    let expires_at = Timestamp::from_micros(10_000);
+    let now = Timestamp::from_micros(0);
+
+    // Initially there is no lock.
+    assert!(store
+        .as_read()
+        .get_chain_lock(author.clone())
+        .await
+        .unwrap()
+        .is_none());
+
+    // Acquiring succeeds and reports the caller holds the lock.
+    let acquired = store
+        .acquire_chain_lock(&author, &subject, expires_at, now)
+        .await
+        .unwrap();
+    assert!(acquired);
+
+    // The lock is readable with the expected subject.
+    let lock = store
+        .as_read()
+        .get_chain_lock(author.clone())
+        .await
+        .unwrap()
+        .expect("expected an active lock");
+    assert_eq!(lock.subject(), subject.as_slice());
+
+    // Releasing removes the lock.
+    store.release_chain_lock(&author).await.unwrap();
+    assert!(store
+        .as_read()
+        .get_chain_lock(author)
+        .await
+        .unwrap()
+        .is_none());
+}
+
+#[tokio::test]
+async fn chain_lock_get_returns_expired_lock() {
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+    let author = agent(6);
+
+    // Acquire a lock that expires at t=100.
+    store
+        .acquire_chain_lock(
+            &author,
+            &[1u8; 32],
+            Timestamp::from_micros(100),
+            Timestamp::from_micros(0),
+        )
+        .await
+        .unwrap();
+
+    // The store's `get_chain_lock` must still return the lock even though it has
+    // expired (now = 200 > 100). Several countersigning sites rely on this
+    // "respect even expired locks" semantic, which differs from the underlying
+    // `holochain_data` reader that filters expired rows.
+    let lock = store
+        .as_read()
+        .get_chain_lock(author)
+        .await
+        .unwrap()
+        .expect("expired lock must still be returned");
+    assert!(lock.is_expired_at(Timestamp::from_micros(200)));
+}
+
+#[tokio::test]
 async fn upsert_scheduled_function_none_schedule_writes_ephemeral_row() {
     let store = DhtStore::new_test(dht_id()).await.unwrap();
     let author = agent(2);
@@ -666,6 +737,99 @@ async fn apply_countersigning_success_no_op_when_row_absent() {
 }
 
 #[tokio::test]
+async fn remove_countersigning_session_deletes_withheld_session() {
+    use holo_hash::HasHash;
+
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+    let (op, _) = build_test_store_record_op_hashed(40);
+    let chain_op = match op.as_content() {
+        DhtOp::ChainOp(c) => (**c).clone(),
+        DhtOp::WarrantOp(_) => unreachable!(),
+    };
+    let action = chain_op.action();
+    let action_hash = ActionHash::with_data_sync(&action);
+    let entry_hash = action.entry_hash().unwrap().clone();
+
+    // Withheld self-authored op (withhold_publish = Some(true)) plus its entry.
+    store
+        .test_insert_authored_chain_op(op.clone(), None, None, Some(true))
+        .await
+        .unwrap();
+    let entry = match chain_op.entry().into_option() {
+        Some(e) => e.clone(),
+        None => unreachable!(),
+    };
+    store
+        .test_insert_entry(&entry_hash, &entry, None)
+        .await
+        .unwrap();
+
+    store
+        .remove_countersigning_session(action_hash.clone(), entry_hash.clone())
+        .await
+        .unwrap();
+
+    assert!(store
+        .db()
+        .as_ref()
+        .get_action(action_hash)
+        .await
+        .unwrap()
+        .is_none());
+    assert!(store
+        .db()
+        .as_ref()
+        .get_chain_op(op.as_hash().clone())
+        .await
+        .unwrap()
+        .is_none());
+    assert!(store
+        .db()
+        .as_ref()
+        .get_entry(entry_hash, None)
+        .await
+        .unwrap()
+        .is_none());
+}
+
+#[tokio::test]
+async fn remove_countersigning_session_refuses_published() {
+    let store = DhtStore::new_test(dht_id()).await.unwrap();
+    let (op, _) = build_test_store_record_op_hashed(41);
+    let chain_op = match op.as_content() {
+        DhtOp::ChainOp(c) => (**c).clone(),
+        DhtOp::WarrantOp(_) => unreachable!(),
+    };
+    let action = chain_op.action();
+    let action_hash = ActionHash::with_data_sync(&action);
+    let entry_hash = action.entry_hash().unwrap().clone();
+
+    // Published op: withhold_publish cleared (None).
+    store
+        .test_insert_authored_chain_op(op.clone(), None, None, None)
+        .await
+        .unwrap();
+
+    let err = store
+        .remove_countersigning_session(action_hash.clone(), entry_hash)
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        crate::mutations::StateMutationError::CannotRemoveFullyPublished
+    ));
+
+    // The op was not removed.
+    assert!(store
+        .db()
+        .as_ref()
+        .get_action(action_hash)
+        .await
+        .unwrap()
+        .is_some());
+}
+
+#[tokio::test]
 async fn record_published_op_hashes_updates_publish_time() {
     let store = DhtStore::new_test(dht_id()).await.unwrap();
     // Seed an op in ChainOp via the standard pipeline.
@@ -933,8 +1097,8 @@ async fn op_validation_status_returns_status_only_when_locally_validated() {
 #[tokio::test]
 async fn op_validation_status_reads_decided_limbo_op() {
     // A limbo op that has a validation decision but is NOT yet integrated must
-    // still surface its outcome (matching the legacy pre-integration behavior),
-    // so a warrant dependency is ready as soon as it is validated.
+    // still surface its outcome, so a warrant dependency is ready as soon as it
+    // is validated.
     let store = DhtStore::new_test(dht_id()).await.unwrap();
 
     // sys + app accepted (not integrated) -> Valid.

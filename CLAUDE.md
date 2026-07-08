@@ -42,12 +42,14 @@ Design references: `docs/design/state_model.md` and `docs/design/data_model.md` 
 ## Project conventions
 
 - **Where new code goes**: types into `holochain_types`, persistence into `holochain_data` and `holochain_state`, runtime/orchestration into `holochain`. Don't shortcut by piling logic into the top-level crate.
+- **Data-access naming (`holochain_state` / `holochain_cascade`)**: `get_*` reads only local state; `retrieve_*` may combine local and network lookups. The distinction is meaningful at the cascade — a cascade `get` stays local while a cascade `retrieve` can fall back to the network. At the network boundary a fetch is itself called a `get`, and the HDK bundles everything under `get` because how data is returned is transparent to the application.
 - **Testing**:
   - Unit tests are placed inline or in a submodule next to the code under test.
   - Integration tests go under the crate's `tests/` directory, named `{feature}_tests.rs`. If `tests/integration.rs` exists, link new modules there so only one test binary builds. This saves time spent on linking.
   - Use `#[tokio::test]` by default; only switch to `#[tokio::test(flavor = "multi_thread")]` when the test genuinely needs it.
   - Do not introduce new `proptest` or fuzzing suites.
   - Test functions must not be prefixed with `test_` — the `#[test]` / `#[tokio::test]` attribute already marks them.
+  - Test-support code exposed from library crates must be feature-gated so it never compiles into production builds. Read-only inspection queries (op counts, existence checks) use `#[cfg(any(test, feature = "inspection"))]`; test-only writes and fixture builders use `#[cfg(feature = "test_utils")]` (which also enables `inspection`).
 - **Errors**: prefer `thiserror` for crate error types; `anyhow` is for application/binary code, not library APIs.
 - **Compiler warnings are not OK** in shared code (CONTRIBUTING.md). Fix, surgically `#[allow(...)]`, or escalate — don't disable globally.
 - **Public API docs**: `///` rustdoc on public items; module/crate docs should describe structure.

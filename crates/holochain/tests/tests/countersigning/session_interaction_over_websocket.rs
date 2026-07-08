@@ -12,9 +12,7 @@ use hdk::prelude::{
     CapSecret, CellId, FunctionName, PreflightRequest, PreflightRequestAcceptance, Role,
 };
 use holo_hash::{ActionHash, AgentPubKey};
-use holochain::prelude::{
-    CountersigningSessionState, DhtOp, Signal, SystemSignal, CAP_SECRET_BYTES,
-};
+use holochain::prelude::{CountersigningSessionState, Signal, SystemSignal, CAP_SECRET_BYTES};
 use holochain::sweettest::{
     authenticate_app_ws_client, websocket_client_by_port, SweetLocalRendezvous, WsPollRecv,
 };
@@ -26,6 +24,7 @@ use holochain_conductor_api::conductor::{ConductorTuningParams, KeystoreConfig};
 use holochain_conductor_api::AppRequest;
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppResponse};
 use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError};
+use holochain_types::dht_v2::DhtOp;
 use holochain_types::test_utils::{fake_dna_zomes, write_fake_dna_file};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::{ReceiveMessage, WebsocketReceiver, WebsocketSender};
@@ -868,17 +867,19 @@ fn sort_dht(dht: &mut [DhtOp]) {
     dht.sort_by(|a, b| match a {
         DhtOp::ChainOp(chain_op_a) => {
             if let DhtOp::ChainOp(chain_op_b) = b {
+                let action_a = chain_op_a.signed_action().data();
+                let action_b = chain_op_b.signed_action().data();
                 let type_a = format!(
                     "{}{}{}",
-                    chain_op_a.get_type(),
-                    chain_op_a.author(),
-                    chain_op_a.action().action_seq(),
+                    chain_op_a.op_type(),
+                    action_a.header.author,
+                    action_a.header.action_seq,
                 );
                 let type_b = format!(
                     "{}{}{}",
-                    chain_op_b.get_type(),
-                    chain_op_b.author(),
-                    chain_op_b.action().action_seq(),
+                    chain_op_b.op_type(),
+                    action_b.header.author,
+                    action_b.header.action_seq,
                 );
                 type_a.partial_cmp(&type_b).unwrap()
             } else {

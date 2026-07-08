@@ -83,7 +83,7 @@ pub fn state_to_snapshot(state: &ConductorState) -> ConductorResult<ConductorSta
 
     let mut app_interfaces = Vec::with_capacity(state.app_interfaces.len());
     for (interface_id, config) in &state.app_interfaces {
-        let mut model = holochain_data::conductor::AppInterfaceModel::from_driver(
+        let mut model = holochain_state::data::AppInterfaceModel::from_driver(
             &config.driver,
             config.installed_app_id.as_ref().map(|id| id.to_string()),
         )

@@ -151,6 +151,30 @@ where
     .await
 }
 
+/// Count integrated ops authored by `author` that have been published at
+/// least once (i.e. `ChainOpPublish.last_publish_time IS NOT NULL`).
+///
+/// Used by [`crate::dht`] to compute the `published_ops_count` field in the
+/// source-chain dump.
+pub(crate) async fn count_published_ops_for_author<'e, E>(
+    executor: E,
+    author: &AgentPubKey,
+) -> sqlx::Result<i64>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query_scalar(
+        "SELECT COUNT(ChainOp.hash) FROM ChainOp
+         JOIN Action ON ChainOp.action_hash = Action.hash
+         JOIN ChainOpPublish ON ChainOpPublish.op_hash = ChainOp.hash
+         WHERE Action.author = ?
+           AND ChainOpPublish.last_publish_time IS NOT NULL",
+    )
+    .bind(author.get_raw_36())
+    .fetch_one(executor)
+    .await
+}
+
 /// Count ops authored by `author` that may still need to be published.
 ///
 /// Like [`get_ops_to_publish`] but ignores the recency window: an op counts as

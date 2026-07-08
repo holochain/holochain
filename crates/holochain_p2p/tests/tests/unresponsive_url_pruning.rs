@@ -1,10 +1,10 @@
 use holo_hash::DnaHash;
-use holochain_data::kind::PeerMetaStore;
 use holochain_keystore::{test_keystore, MetaLairClient};
 use holochain_p2p::{
     actor::DynHcP2p, event::MockHcP2pHandler, spawn_holochain_p2p, HolochainP2pConfig,
     HolochainP2pLocalAgent,
 };
+use holochain_state::data::PeerMetaStore;
 use holochain_state::prelude::test_db_dir;
 use kitsune2_api::{
     AgentInfo, AgentInfoSigned, DhtArc, DynPeerMetaStore, SpaceId, Timestamp, Url, KEY_PREFIX_ROOT,
@@ -325,15 +325,15 @@ impl TestCase {
         let db_dir = dir.path().join("tmp_database");
         std::fs::create_dir(&db_dir).unwrap();
         let db_peer_meta = holochain_state::peer_metadata_store::PeerMetaStore::new(
-            holochain_data::open_db(
+            holochain_state::data::open_db(
                 &db_dir,
                 PeerMetaStore::new(Arc::new(dna_hash.clone())),
-                holochain_data::HolochainDataConfig::default(),
+                holochain_state::data::HolochainDataConfig::default(),
             )
             .await
             .unwrap(),
         );
-        let dht_store = holochain_state::DhtStore::new_test(holochain_data::kind::Dht::new(
+        let dht_store = holochain_state::DhtStore::new_test(holochain_state::data::Dht::new(
             Arc::new(dna_hash.clone()),
         ))
         .await

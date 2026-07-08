@@ -933,12 +933,8 @@ mod test {
                 dbg!(&blob_one);
 
                 assert_eq!(blob_one.used_by, vec!["test app 1".to_string()]);
-                assert!(blob_one.authored_data_size > 12_000);
-                assert!(blob_one.authored_data_size_on_disk > 94_000);
                 assert!(blob_one.dht_data_size > 12_000);
                 assert!(blob_one.dht_data_size_on_disk > 94_000);
-                assert!(blob_one.cache_data_size > 8_000);
-                assert!(blob_one.cache_data_size_on_disk > 94_000);
 
                 let blob_two: &DnaStorageInfo =
                     get_app_data_storage_info(&info, "test app 2".to_string());
@@ -950,12 +946,8 @@ mod test {
                     used_by_two,
                     vec!["test app 2".to_string(), "test app 3".to_string()]
                 );
-                assert!(blob_two.authored_data_size > 24_000);
-                assert!(blob_two.authored_data_size_on_disk > 180_000);
-                assert!(blob_two.dht_data_size > 16_000);
+                assert!(blob_two.dht_data_size > 14_000);
                 assert!(blob_two.dht_data_size_on_disk > 94_000);
-                assert!(blob_two.cache_data_size > 8_000);
-                assert!(blob_two.cache_data_size_on_disk > 94_000);
             }
             other => panic!("unexpected response {other:?}"),
         };

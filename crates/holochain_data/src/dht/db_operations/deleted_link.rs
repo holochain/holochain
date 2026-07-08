@@ -21,6 +21,7 @@ impl DbRead<Dht> {
         &self,
         create_link_hash: ActionHash,
     ) -> sqlx::Result<Vec<DeletedLinkRow>> {
-        deleted_link::get_deleted_links(self.pool(), create_link_hash).await
+        let mut conn = self.timed_conn().await?;
+        deleted_link::get_deleted_links(&mut *conn, create_link_hash).await
     }
 }

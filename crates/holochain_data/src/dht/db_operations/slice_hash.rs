@@ -21,7 +21,8 @@ impl DbWrite<Dht> {
 impl DbRead<Dht> {
     /// Number of stored slices for the arc, or 0 if none.
     pub async fn slice_hash_count(&self, arc_start: u32, arc_end: u32) -> sqlx::Result<u64> {
-        slice_hash::slice_hash_count(self.pool(), arc_start, arc_end).await
+        let mut conn = self.timed_conn().await?;
+        slice_hash::slice_hash_count(&mut *conn, arc_start, arc_end).await
     }
 
     /// Single slice hash, if any.
@@ -31,7 +32,8 @@ impl DbRead<Dht> {
         arc_end: u32,
         slice_index: u64,
     ) -> sqlx::Result<Option<Vec<u8>>> {
-        slice_hash::get_slice_hash(self.pool(), arc_start, arc_end, slice_index).await
+        let mut conn = self.timed_conn().await?;
+        slice_hash::get_slice_hash(&mut *conn, arc_start, arc_end, slice_index).await
     }
 
     /// Every `(slice_index, hash)` pair stored for the arc.
@@ -40,6 +42,7 @@ impl DbRead<Dht> {
         arc_start: u32,
         arc_end: u32,
     ) -> sqlx::Result<Vec<SliceHashIndexedRow>> {
-        slice_hash::get_slice_hashes(self.pool(), arc_start, arc_end).await
+        let mut conn = self.timed_conn().await?;
+        slice_hash::get_slice_hashes(&mut *conn, arc_start, arc_end).await
     }
 }

@@ -29,14 +29,12 @@ async fn test_validation_receipt() {
     await_consistency([&alice, &bobbo, &carol]).await.unwrap();
 
     // Get op hashes
-    let vault = alice.dht_db();
-    let record = vault
-        .read_async(move |txn| -> StateQueryResult<Record> {
-            Ok(CascadeTxnWrapper::from(txn)
-                .get_record(&hash.clone().into())?
-                .unwrap())
-        })
+    let record = alice
+        .dht_store()
+        .as_read()
+        .retrieve_record(&hash, Some(alice.agent_pubkey()))
         .await
+        .unwrap()
         .unwrap();
     let ops = produce_ops_from_record(&record)
         .unwrap()
@@ -49,15 +47,13 @@ async fn test_validation_receipt() {
         {
             let mut counts = Vec::new();
             for hash in &ops {
-                let count = vault
-                    .read_async({
-                        let query_hash = hash.clone();
-                        move |txn| -> StateQueryResult<usize> {
-                            Ok(list_receipts(txn, &query_hash)?.len())
-                        }
-                    })
+                let count = alice
+                    .dht_store()
+                    .as_read()
+                    .validation_receipts_for_op(hash)
                     .await
-                    .unwrap();
+                    .unwrap()
+                    .len();
                 counts.push(count);
             }
             counts
@@ -67,11 +63,10 @@ async fn test_validation_receipt() {
 
     // Check alice has receipts from both bobbo and carol
     for hash in &ops {
-        let receipts: Vec<_> = vault
-            .read_async({
-                let query_hash = hash.clone();
-                move |txn| list_receipts(txn, &query_hash)
-            })
+        let receipts = alice
+            .dht_store()
+            .as_read()
+            .validation_receipts_for_op(hash)
             .await
             .unwrap();
         assert_eq!(receipts.len(), 2);
@@ -86,23 +81,22 @@ async fn test_validation_receipt() {
         }
     }
 
-    // Check alice has 2 receipts in their authored dht ops table.
+    // Check that each of alice's authored ops has accumulated 2 receipts.
     crate::assert_eq_retry_1m!(
         {
-            vault
-                .read_async(move |txn| -> DatabaseResult<Vec<u32>> {
-                    let mut stmt = txn
-                        .prepare("SELECT COUNT(hash) FROM ValidationReceipt GROUP BY op_hash")
-                        .unwrap();
-                    Ok(stmt
-                        .query_map([], |row| row.get::<_, Option<u32>>(0))
-                        .unwrap()
-                        .filter_map(Result::unwrap)
-                        .collect::<Vec<u32>>())
-                })
-                .await
-                .unwrap()
+            let mut counts = Vec::new();
+            for hash in &ops {
+                let count = alice
+                    .dht_store()
+                    .as_read()
+                    .validation_receipts_for_op(hash)
+                    .await
+                    .unwrap()
+                    .len();
+                counts.push(count);
+            }
+            counts
         },
-        vec![2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
+        vec![2, 2, 2]
     );
 }

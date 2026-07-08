@@ -21,6 +21,7 @@ impl DbRead<Dht> {
         &self,
         deletes_action_hash: ActionHash,
     ) -> sqlx::Result<Vec<DeletedRecordRow>> {
-        deleted_record::get_deleted_records(self.pool(), deletes_action_hash).await
+        let mut conn = self.timed_conn().await?;
+        deleted_record::get_deleted_records(&mut *conn, deletes_action_hash).await
     }
 }

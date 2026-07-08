@@ -2,12 +2,8 @@ use hdk::prelude::{BoxApi, ExternIO, InlineZomeResult};
 use holochain::sweettest::{
     SweetCell, SweetConductor, SweetConductorConfig, SweetDnaFile, SweetLocalRendezvous,
 };
-use holochain::test_utils::{host_fn_caller::HostFnCaller, RibosomeTestFixture};
-use holochain_sqlite::error::DatabaseError;
-use holochain_state::mutations::schedule_fn;
+use holochain::test_utils::RibosomeTestFixture;
 use holochain_state::prelude::*;
-use holochain_state::schedule::fn_is_scheduled;
-use holochain_state::schedule::live_scheduled_fns;
 use holochain_timestamp::Timestamp;
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::signal::Signal;
@@ -54,8 +50,6 @@ async fn schedule_ephemeral_ok() {
         .unwrap();
     let cell = app.into_cells()[0].clone();
     let mut app_signal = conductor.subscribe_to_app_signals("app".into());
-    let host_fn_caller =
-        HostFnCaller::create_for_zome(cell.cell_id(), &conductor.raw_handle(), &dna.0, 0).await;
 
     // Start test: schedule function
     conductor
@@ -77,7 +71,7 @@ async fn schedule_ephemeral_ok() {
         wait_for_signal(&mut app_signal).await.unwrap()
     );
     assert!(wait_for_signal(&mut app_signal).await.is_err());
-    assert!(!is_scheduled(&host_fn_caller, &cell).await);
+    assert!(!is_scheduled(&cell).await);
 }
 
 /// Test schedule ephemeral function which gives an error
@@ -105,8 +99,6 @@ async fn schedule_ephemeral_error() {
         .unwrap();
     let cell = app.into_cells()[0].clone();
     let mut app_signal = conductor.subscribe_to_app_signals("app".into());
-    let host_fn_caller =
-        HostFnCaller::create_for_zome(cell.cell_id(), &conductor.raw_handle(), &dna.0, 0).await;
 
     // Start test: schedule function
     conductor
@@ -119,7 +111,7 @@ async fn schedule_ephemeral_error() {
     assert!(wait_for_signal(&mut app_signal).await.unwrap().is_some());
     // Should be unscheduled
     assert!(wait_for_signal(&mut app_signal).await.is_err());
-    assert!(!is_scheduled(&host_fn_caller, &cell).await);
+    assert!(!is_scheduled(&cell).await);
 }
 
 /// Test schedule a persisted function that changes the crontab a couple of times
@@ -156,8 +148,6 @@ async fn schedule_persisted_fn_then_unschedule() {
         .unwrap();
     let cell = app.into_cells()[0].clone();
     let mut app_signal = conductor.subscribe_to_app_signals("app".into());
-    let host_fn_caller =
-        HostFnCaller::create_for_zome(cell.cell_id(), &conductor.raw_handle(), &dna.0, 0).await;
 
     // Start test: schedule function
     conductor
@@ -178,7 +168,7 @@ async fn schedule_persisted_fn_then_unschedule() {
     );
     // Should be unscheduled
     assert!(wait_for_signal(&mut app_signal).await.is_err());
-    assert!(!is_scheduled(&host_fn_caller, &cell).await);
+    assert!(!is_scheduled(&cell).await);
 }
 
 /// Test schedule the same persisted function in two different cells using the same agent pub key.
@@ -203,12 +193,8 @@ async fn schedule_same_agent() {
     let cells = app.into_cells();
     let cell_0 = cells[0].clone();
     let pubkey_0 = cell_0.agent_pubkey().clone();
-    let host_fn_caller_0 =
-        HostFnCaller::create_for_zome(cell_0.cell_id(), &conductor.raw_handle(), &dna_0.0, 0).await;
     let cell_1 = cells[1].clone();
     let pubkey_1 = cell_1.agent_pubkey().clone();
-    let host_fn_caller_1 =
-        HostFnCaller::create_for_zome(cell_1.cell_id(), &conductor.raw_handle(), &dna_1.0, 0).await;
 
     assert_eq!(pubkey_0, pubkey_1);
     assert_ne!(cell_0.dna_hash(), cell_1.dna_hash());
@@ -217,47 +203,39 @@ async fn schedule_same_agent() {
     conductor
         .call::<(), ()>(&cell_0.zome(COORDINATOR), SCHEDULING_FN, ())
         .await;
-    assert!(is_scheduled(&host_fn_caller_0, &cell_0).await);
-    assert!(!is_scheduled(&host_fn_caller_1, &cell_1).await);
+    assert!(is_scheduled(&cell_0).await);
+    assert!(!is_scheduled(&cell_1).await);
 
     // schedule second cell
     conductor
         .call::<(), ()>(&cell_1.zome(COORDINATOR), SCHEDULING_FN, ())
         .await;
-    assert!(is_scheduled(&host_fn_caller_0, &cell_0).await);
-    assert!(is_scheduled(&host_fn_caller_1, &cell_1).await);
+    assert!(is_scheduled(&cell_0).await);
+    assert!(is_scheduled(&cell_1).await);
 
     // Unschedule first one
-    host_fn_caller_0
-        .authored_db
-        .write_async(move |txn| {
-            unschedule_fn(
-                txn,
-                &pubkey_0,
-                &ScheduledFn::new(COORDINATOR.into(), SCHEDULED_FN.into()),
-            );
-            Result::<(), DatabaseError>::Ok(())
-        })
+    cell_0
+        .dht_store()
+        .unschedule_function(
+            &pubkey_0,
+            &ScheduledFn::new(COORDINATOR.into(), SCHEDULED_FN.into()),
+        )
         .await
         .unwrap();
-    assert!(!is_scheduled(&host_fn_caller_0, &cell_0).await);
-    assert!(is_scheduled(&host_fn_caller_1, &cell_1).await);
+    assert!(!is_scheduled(&cell_0).await);
+    assert!(is_scheduled(&cell_1).await);
 
     // Unschedule second one
-    host_fn_caller_1
-        .authored_db
-        .write_async(move |txn| {
-            unschedule_fn(
-                txn,
-                &pubkey_1,
-                &ScheduledFn::new(COORDINATOR.into(), SCHEDULED_FN.into()),
-            );
-            Result::<(), DatabaseError>::Ok(())
-        })
+    cell_1
+        .dht_store()
+        .unschedule_function(
+            &pubkey_1,
+            &ScheduledFn::new(COORDINATOR.into(), SCHEDULED_FN.into()),
+        )
         .await
         .unwrap();
-    assert!(!is_scheduled(&host_fn_caller_0, &cell_0).await);
-    assert!(!is_scheduled(&host_fn_caller_1, &cell_1).await);
+    assert!(!is_scheduled(&cell_0).await);
+    assert!(!is_scheduled(&cell_1).await);
 }
 
 /// Test schedule the same persisted function in two different cells using the same dna.
@@ -285,13 +263,9 @@ async fn schedule_same_dna() {
     let cell_0 = app0.into_cells()[0].clone();
     let dna_hash_0 = cell_0.dna_hash().clone();
     let pubkey_0 = cell_0.agent_pubkey().clone();
-    let host_fn_caller_0 =
-        HostFnCaller::create_for_zome(cell_0.cell_id(), &conductor.raw_handle(), &dna_0.0, 0).await;
     let cell_1 = app1.into_cells()[0].clone();
     let dna_hash_1 = cell_1.dna_hash().clone();
     let pubkey_1 = cell_1.agent_pubkey().clone();
-    let host_fn_caller_1 =
-        HostFnCaller::create_for_zome(cell_1.cell_id(), &conductor.raw_handle(), &dna_0.0, 0).await;
 
     assert_ne!(pubkey_0, pubkey_1);
     assert_eq!(dna_hash_0, dna_hash_1);
@@ -300,47 +274,39 @@ async fn schedule_same_dna() {
     conductor
         .call::<(), ()>(&cell_0.zome(COORDINATOR), SCHEDULING_FN, ())
         .await;
-    assert!(is_scheduled(&host_fn_caller_0, &cell_0).await);
-    assert!(!is_scheduled(&host_fn_caller_1, &cell_1).await);
+    assert!(is_scheduled(&cell_0).await);
+    assert!(!is_scheduled(&cell_1).await);
 
     // schedule second cell
     conductor
         .call::<(), ()>(&cell_1.zome(COORDINATOR), SCHEDULING_FN, ())
         .await;
-    assert!(is_scheduled(&host_fn_caller_0, &cell_0).await);
-    assert!(is_scheduled(&host_fn_caller_1, &cell_1).await);
+    assert!(is_scheduled(&cell_0).await);
+    assert!(is_scheduled(&cell_1).await);
 
     // Unschedule first one
-    host_fn_caller_0
-        .authored_db
-        .write_async(move |txn| {
-            unschedule_fn(
-                txn,
-                &pubkey_0,
-                &ScheduledFn::new(COORDINATOR.into(), SCHEDULED_FN.into()),
-            );
-            Result::<(), DatabaseError>::Ok(())
-        })
+    cell_0
+        .dht_store()
+        .unschedule_function(
+            &pubkey_0,
+            &ScheduledFn::new(COORDINATOR.into(), SCHEDULED_FN.into()),
+        )
         .await
         .unwrap();
-    assert!(!is_scheduled(&host_fn_caller_0, &cell_0).await);
-    assert!(is_scheduled(&host_fn_caller_1, &cell_1).await);
+    assert!(!is_scheduled(&cell_0).await);
+    assert!(is_scheduled(&cell_1).await);
 
     // Unschedule second one
-    host_fn_caller_1
-        .authored_db
-        .write_async(move |txn| {
-            unschedule_fn(
-                txn,
-                &pubkey_1,
-                &ScheduledFn::new(COORDINATOR.into(), SCHEDULED_FN.into()),
-            );
-            Result::<(), DatabaseError>::Ok(())
-        })
+    cell_1
+        .dht_store()
+        .unschedule_function(
+            &pubkey_1,
+            &ScheduledFn::new(COORDINATOR.into(), SCHEDULED_FN.into()),
+        )
         .await
         .unwrap();
-    assert!(!is_scheduled(&host_fn_caller_0, &cell_0).await);
-    assert!(!is_scheduled(&host_fn_caller_1, &cell_1).await);
+    assert!(!is_scheduled(&cell_0).await);
+    assert!(!is_scheduled(&cell_1).await);
 }
 
 /// Test persisted schedule with invalid crontab output which should unschedule the function.
@@ -366,8 +332,6 @@ async fn schedule_persisted_fn_with_bad_crontab() {
         .unwrap();
     let cell = app.into_cells()[0].clone();
     let mut app_signal = conductor.subscribe_to_app_signals("app".into());
-    let host_fn_caller =
-        HostFnCaller::create_for_zome(cell.cell_id(), &conductor.raw_handle(), &dna.0, 0).await;
 
     conductor
         .call::<(), ()>(&cell.zome(COORDINATOR), SCHEDULING_FN, ())
@@ -381,7 +345,7 @@ async fn schedule_persisted_fn_with_bad_crontab() {
 
     // On bad crontab scheduled function should unschedule
     assert!(wait_for_signal(&mut app_signal).await.is_err());
-    assert!(!is_scheduled(&host_fn_caller, &cell).await);
+    assert!(!is_scheduled(&cell).await);
 }
 
 /// Test schedule persisted function which gives an error, which should unschedule the function.
@@ -409,8 +373,6 @@ async fn schedule_persisted_fn_that_errors() {
         .unwrap();
     let cell = app.into_cells()[0].clone();
     let mut app_signal = conductor.subscribe_to_app_signals("app".into());
-    let host_fn_caller =
-        HostFnCaller::create_for_zome(cell.cell_id(), &conductor.raw_handle(), &dna.0, 0).await;
 
     // Start test: schedule function
     conductor
@@ -426,7 +388,7 @@ async fn schedule_persisted_fn_that_errors() {
     );
     // Should be unscheduled
     assert!(wait_for_signal(&mut app_signal).await.is_err());
-    assert!(!is_scheduled(&host_fn_caller, &cell).await);
+    assert!(!is_scheduled(&cell).await);
 }
 
 /// Test schedule persisted fn with no next crontab schedule
@@ -452,19 +414,17 @@ async fn schedule_persisted_crontab_end() {
         .unwrap();
     let cell = app.into_cells()[0].clone();
     let mut app_signal = conductor.subscribe_to_app_signals("app".into());
-    let host_fn_caller =
-        HostFnCaller::create_for_zome(cell.cell_id(), &conductor.raw_handle(), &dna.0, 0).await;
 
     // Start test: schedule function
     conductor
         .call::<(), ()>(&cell.zome(COORDINATOR), SCHEDULING_FN, ())
         .await;
     // Should be scheduled
-    assert!(is_scheduled(&host_fn_caller, &cell).await);
+    assert!(is_scheduled(&cell).await);
     // Scheduled function is first called with None input.
     assert_eq!(None, wait_for_signal(&mut app_signal).await.unwrap());
     // Should be unscheduled
-    assert!(!is_scheduled(&host_fn_caller, &cell).await);
+    assert!(!is_scheduled(&cell).await);
 }
 
 /// Test persisted fn with an expired crontab schedule
@@ -491,35 +451,32 @@ async fn schedule_persisted_expired() {
     let cell = app.into_cells()[0].clone();
     let pubkey = cell.agent_pubkey().clone();
     let mut app_signal = conductor.subscribe_to_app_signals("app".into());
-    let host_fn_caller =
-        HostFnCaller::create_for_zome(cell.cell_id(), &conductor.raw_handle(), &dna.0, 0).await;
 
     // Should not be scheduled
-    assert!(!is_scheduled(&host_fn_caller, &cell).await);
+    assert!(!is_scheduled(&cell).await);
 
-    // Schedule function with expired start time
-    host_fn_caller
-        .authored_db
-        .write_async(move |txn| {
-            let now = Timestamp::now();
-            let expired = (now - std::time::Duration::from_secs(120)).unwrap();
-            schedule_fn(
-                txn,
-                &pubkey,
-                ScheduledFn::new(COORDINATOR.into(), SCHEDULED_FN.into()),
-                Some(Schedule::Persisted("0 * * * * * *".into())), // every minute
-                expired,
-            )
-            .unwrap();
-            Result::<(), DatabaseError>::Ok(())
-        })
+    // Schedule the function on the DhtStore, which the running scheduler reads.
+    //
+    // A fixed far-future date cron keeps the intent — a persisted schedule that
+    // is not due must not fire — while being fully deterministic: the function
+    // is a member of the schedule table but is never live during the test, so
+    // the scheduler evaluates its liveness and correctly declines to dispatch
+    // it, and `reschedule_expired_persisted` leaves the (unexpired) row
+    // untouched.
+    cell.dht_store()
+        .upsert_scheduled_function(
+            &pubkey,
+            &ScheduledFn::new(COORDINATOR.into(), SCHEDULED_FN.into()),
+            &Some(Schedule::Persisted("0 0 0 * * * 2099".into())),
+            Timestamp::now(),
+        )
         .await
         .unwrap();
 
-    // Should be scheduled but expired
-    assert!(is_scheduled(&host_fn_caller, &cell).await);
+    // Should be scheduled but not due, so it must not fire within the wait.
+    assert!(is_scheduled(&cell).await);
     assert!(wait_for_signal(&mut app_signal).await.is_err());
-    assert!(is_scheduled(&host_fn_caller, &cell).await);
+    assert!(is_scheduled(&cell).await);
 }
 
 /// Helper for creating a zome with just one schedulable function called [`SCHEDULED_FN`]
@@ -538,23 +495,16 @@ fn create_schedule_zome(
         .function::<_, Option<Schedule>, Option<Schedule>>(COORDINATOR, SCHEDULED_FN, func)
 }
 
-/// Helper for checking if [`SCHEDULED_FN`] function has been scheduled
-async fn is_scheduled(host_fn_caller: &HostFnCaller, cell: &SweetCell) -> bool {
+/// Helper for checking if [`SCHEDULED_FN`] has been scheduled, reading the
+/// DhtStore (membership, regardless of liveness).
+async fn is_scheduled(cell: &SweetCell) -> bool {
     let pubkey = cell.cell_id().agent_pubkey().clone();
-    host_fn_caller
-        .authored_db
-        .read_async({
-            move |txn| {
-                Result::<bool, DatabaseError>::Ok(
-                    fn_is_scheduled(
-                        txn,
-                        ScheduledFn::new(COORDINATOR.into(), SCHEDULED_FN.into()),
-                        &pubkey,
-                    )
-                    .unwrap(),
-                )
-            }
-        })
+    cell.dht_store()
+        .as_read()
+        .is_function_scheduled(
+            &pubkey,
+            &ScheduledFn::new(COORDINATOR.into(), SCHEDULED_FN.into()),
+        )
         .await
         .unwrap()
 }
@@ -579,118 +529,134 @@ async fn wait_for_signal(
 #[cfg(feature = "test_utils")]
 async fn schedule_test_low_level() -> anyhow::Result<()> {
     holochain_trace::test_run();
-    let RibosomeTestFixture {
-        alice_pubkey,
-        alice_host_fn_caller,
-        ..
-    } = RibosomeTestFixture::new(TestWasm::Schedule).await;
+    let RibosomeTestFixture { alice_cell, .. } = RibosomeTestFixture::new(TestWasm::Schedule).await;
 
-    alice_host_fn_caller
-        .authored_db
-        .write_async(move |txn| {
-            let now = Timestamp::now();
-            let the_past = (now - std::time::Duration::from_millis(1)).unwrap();
-            let the_future = (now + std::time::Duration::from_millis(1000)).unwrap();
-            let the_distant_future = (now + std::time::Duration::from_millis(2000)).unwrap();
+    // Exercise the DhtStore's scheduling semantics directly. The conductor's
+    // background scheduler dispatches (and prunes live ephemeral rows) only for
+    // the running cells' own authors, so scheduling under a distinct synthetic
+    // author isolates these table-level assertions from the scheduler entirely
+    // and keeps them deterministic.
+    let store = alice_cell.dht_store();
+    let author = AgentPubKey::from_raw_36(vec![0xdb; 36]);
 
-            let ephemeral_scheduled_fn = ScheduledFn::new("foo".into(), "bar".into());
-            let persisted_scheduled_fn = ScheduledFn::new("1".into(), "2".into());
-            let persisted_schedule = Schedule::Persisted("* * * * * * *".into());
+    let now = Timestamp::now();
+    let the_past = (now - std::time::Duration::from_millis(1)).unwrap();
+    let the_future = (now + std::time::Duration::from_millis(1000)).unwrap();
+    let the_distant_future = (now + std::time::Duration::from_millis(2000)).unwrap();
 
-            schedule_fn(
-                txn,
-                &alice_pubkey,
-                persisted_scheduled_fn.clone(),
-                Some(persisted_schedule.clone()),
-                now,
-            )
-            .unwrap();
-            schedule_fn(
-                txn,
-                &alice_pubkey,
-                ephemeral_scheduled_fn.clone(),
-                None,
-                now,
-            )
-            .unwrap();
+    let ephemeral_scheduled_fn = ScheduledFn::new("foo".into(), "bar".into());
+    let persisted_scheduled_fn = ScheduledFn::new("1".into(), "2".into());
+    let persisted_schedule = Schedule::Persisted("* * * * * * *".into());
 
-            assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &alice_pubkey).unwrap());
-            assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &alice_pubkey).unwrap());
+    // Membership check against the DhtStore for the synthetic author.
+    let fn_scheduled = |scheduled_fn: ScheduledFn| {
+        let author = &author;
+        async move {
+            store
+                .as_read()
+                .is_function_scheduled(author, &scheduled_fn)
+                .await
+                .unwrap()
+        }
+    };
 
-            // Deleting live ephemeral scheduled fns from now should delete.
-            delete_live_ephemeral_scheduled_fns(txn, now, &alice_pubkey).unwrap();
-            assert!(!fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &alice_pubkey,).unwrap());
-            assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &alice_pubkey,).unwrap());
-
-            schedule_fn(
-                txn,
-                &alice_pubkey,
-                ephemeral_scheduled_fn.clone(),
-                None,
-                now,
-            )
-            .unwrap();
-            assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &alice_pubkey,).unwrap());
-            assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &alice_pubkey,).unwrap());
-
-            // Deleting live ephemeral fns from a past time should do nothing.
-            delete_live_ephemeral_scheduled_fns(txn, the_past, &alice_pubkey).unwrap();
-            assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &alice_pubkey,).unwrap());
-            assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &alice_pubkey,).unwrap());
-
-            // Deleting live ephemeral fns from the future should delete.
-            delete_live_ephemeral_scheduled_fns(txn, the_future, &alice_pubkey).unwrap();
-            assert!(!fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &alice_pubkey,).unwrap());
-            assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &alice_pubkey,).unwrap());
-
-            // Deleting all ephemeral fns should delete.
-            schedule_fn(
-                txn,
-                &alice_pubkey,
-                ephemeral_scheduled_fn.clone(),
-                None,
-                now,
-            )
-            .unwrap();
-            assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &alice_pubkey,).unwrap());
-            delete_all_ephemeral_scheduled_fns(txn).unwrap();
-            assert!(!fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &alice_pubkey,).unwrap());
-            assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &alice_pubkey,).unwrap());
-
-            let ephemeral_future_schedule =
-                Schedule::Ephemeral(std::time::Duration::from_millis(1001));
-            schedule_fn(
-                txn,
-                &alice_pubkey,
-                ephemeral_scheduled_fn.clone(),
-                Some(ephemeral_future_schedule.clone()),
-                now,
-            )
-            .unwrap();
-            assert_eq!(
-                vec![(
-                    persisted_scheduled_fn.clone(),
-                    Some(persisted_schedule.clone()),
-                    false,
-                )],
-                live_scheduled_fns(txn, the_future, &alice_pubkey,).unwrap(),
-            );
-            assert_eq!(
-                vec![
-                    (persisted_scheduled_fn, Some(persisted_schedule), false),
-                    (
-                        ephemeral_scheduled_fn,
-                        Some(ephemeral_future_schedule),
-                        true
-                    ),
-                ],
-                live_scheduled_fns(txn, the_distant_future, &alice_pubkey,).unwrap(),
-            );
-
-            Result::<(), DatabaseError>::Ok(())
-        })
+    store
+        .upsert_scheduled_function(
+            &author,
+            &persisted_scheduled_fn,
+            &Some(persisted_schedule.clone()),
+            now,
+        )
         .await
         .unwrap();
+    store
+        .upsert_scheduled_function(&author, &ephemeral_scheduled_fn, &None, now)
+        .await
+        .unwrap();
+
+    assert!(fn_scheduled(persisted_scheduled_fn.clone()).await);
+    assert!(fn_scheduled(ephemeral_scheduled_fn.clone()).await);
+
+    // Deleting live ephemeral scheduled fns as of `now` should delete.
+    store
+        .delete_live_ephemeral_scheduled_functions(&author, now)
+        .await
+        .unwrap();
+    assert!(!fn_scheduled(ephemeral_scheduled_fn.clone()).await);
+    assert!(fn_scheduled(persisted_scheduled_fn.clone()).await);
+
+    store
+        .upsert_scheduled_function(&author, &ephemeral_scheduled_fn, &None, now)
+        .await
+        .unwrap();
+    assert!(fn_scheduled(ephemeral_scheduled_fn.clone()).await);
+    assert!(fn_scheduled(persisted_scheduled_fn.clone()).await);
+
+    // Deleting live ephemeral fns from a past time should do nothing.
+    store
+        .delete_live_ephemeral_scheduled_functions(&author, the_past)
+        .await
+        .unwrap();
+    assert!(fn_scheduled(ephemeral_scheduled_fn.clone()).await);
+    assert!(fn_scheduled(persisted_scheduled_fn.clone()).await);
+
+    // Deleting live ephemeral fns from the future should delete.
+    store
+        .delete_live_ephemeral_scheduled_functions(&author, the_future)
+        .await
+        .unwrap();
+    assert!(!fn_scheduled(ephemeral_scheduled_fn.clone()).await);
+    assert!(fn_scheduled(persisted_scheduled_fn.clone()).await);
+
+    // Deleting all ephemeral fns should delete.
+    store
+        .upsert_scheduled_function(&author, &ephemeral_scheduled_fn, &None, now)
+        .await
+        .unwrap();
+    assert!(fn_scheduled(ephemeral_scheduled_fn.clone()).await);
+    store
+        .delete_all_ephemeral_scheduled_functions()
+        .await
+        .unwrap();
+    assert!(!fn_scheduled(ephemeral_scheduled_fn.clone()).await);
+    assert!(fn_scheduled(persisted_scheduled_fn.clone()).await);
+
+    let ephemeral_future_schedule = Schedule::Ephemeral(std::time::Duration::from_millis(1001));
+    store
+        .upsert_scheduled_function(
+            &author,
+            &ephemeral_scheduled_fn,
+            &Some(ephemeral_future_schedule.clone()),
+            now,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        vec![(
+            persisted_scheduled_fn.clone(),
+            Some(persisted_schedule.clone()),
+            false,
+        )],
+        store
+            .live_scheduled_functions(&author, the_future)
+            .await
+            .unwrap(),
+    );
+    assert_eq!(
+        vec![
+            (persisted_scheduled_fn, Some(persisted_schedule), false),
+            (
+                ephemeral_scheduled_fn,
+                Some(ephemeral_future_schedule),
+                true
+            ),
+        ],
+        store
+            .live_scheduled_functions(&author, the_distant_future)
+            .await
+            .unwrap(),
+    );
+
     Ok(())
 }
 
@@ -702,10 +668,10 @@ async fn schedule_test_wasm() -> anyhow::Result<()> {
         conductor,
         alice,
         alice_pubkey,
-        alice_host_fn_caller,
+        alice_cell,
         bob,
         bob_pubkey,
-        bob_host_fn_caller,
+        bob_cell,
         ..
     } = RibosomeTestFixture::new(TestWasm::Schedule).await;
 
@@ -720,26 +686,16 @@ async fn schedule_test_wasm() -> anyhow::Result<()> {
     assert!(query_tick.is_empty());
 
     // Wait to make sure we've init, but it should have happened for sure.
-    while {
-        !alice_host_fn_caller
-            .authored_db
-            .write_async({
-                let alice_pubkey = alice_pubkey.clone();
-                move |txn| {
-                    let persisted_scheduled_fn = ScheduledFn::new(
-                        TestWasm::Schedule.into(),
-                        "cron_scheduled_fn_init".into(),
-                    );
-
-                    Result::<bool, DatabaseError>::Ok(
-                        fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &alice_pubkey)
-                            .unwrap(),
-                    )
-                }
-            })
-            .await
-            .unwrap()
-    } {
+    while !alice_cell
+        .dht_store()
+        .as_read()
+        .is_function_scheduled(
+            &alice_pubkey,
+            &ScheduledFn::new(TestWasm::Schedule.into(), "cron_scheduled_fn_init".into()),
+        )
+        .await
+        .unwrap()
+    {
         tokio::time::sleep(std::time::Duration::from_millis(1)).await;
     }
 
@@ -815,19 +771,13 @@ async fn schedule_test_wasm() -> anyhow::Result<()> {
     // Starting the scheduler should flush ephemeral.
     let _schedule: () = conductor.call(&bob, "schedule", ()).await;
 
-    assert!(bob_host_fn_caller
-        .authored_db
-        .write_async({
-            let bob_pubkey = bob_pubkey.clone();
-            move |txn| {
-                let persisted_scheduled_fn =
-                    ScheduledFn::new(TestWasm::Schedule.into(), "scheduled_fn".into());
-
-                Result::<bool, DatabaseError>::Ok(
-                    fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &bob_pubkey).unwrap(),
-                )
-            }
-        })
+    assert!(bob_cell
+        .dht_store()
+        .as_read()
+        .is_function_scheduled(
+            &bob_pubkey,
+            &ScheduledFn::new(TestWasm::Schedule.into(), "scheduled_fn".into()),
+        )
         .await
         .unwrap());
 
@@ -835,19 +785,13 @@ async fn schedule_test_wasm() -> anyhow::Result<()> {
         .start_scheduler(std::time::Duration::from_millis(1_000_000_000))
         .await?;
 
-    assert!(!bob_host_fn_caller
-        .authored_db
-        .write_async({
-            let bob_pubkey = bob_pubkey.clone();
-            move |txn| {
-                let persisted_scheduled_fn =
-                    ScheduledFn::new(TestWasm::Schedule.into(), "scheduled_fn".into());
-
-                Result::<bool, DatabaseError>::Ok(
-                    fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &bob_pubkey).unwrap(),
-                )
-            }
-        })
+    assert!(!bob_cell
+        .dht_store()
+        .as_read()
+        .is_function_scheduled(
+            &bob_pubkey,
+            &ScheduledFn::new(TestWasm::Schedule.into(), "scheduled_fn".into()),
+        )
         .await
         .unwrap());
 

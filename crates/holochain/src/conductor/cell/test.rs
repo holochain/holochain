@@ -4,7 +4,6 @@ use crate::core::ribosome::real_ribosome::{
     module_cache::make_module_cache, RealRibosome, WasmBackend,
 };
 use crate::core::ribosome::Ribosome;
-use crate::core::workflow::incoming_dht_ops_workflow::op_exists;
 use crate::sweettest::SweetConductorConfig;
 use crate::test_utils::fake_valid_dna_file;
 use holo_hash::HasHash;
@@ -30,11 +29,6 @@ async fn test_cell_handle_publish() {
     let agent = cell_id.agent_pubkey().clone();
 
     let spaces = TestSpaces::new([dna.clone()]).await;
-    let db = spaces.test_spaces[&dna]
-        .space
-        .get_or_create_authored_db(cell_id.agent_pubkey().clone())
-        .unwrap();
-    let dht_db = spaces.test_spaces[&dna].space.dht_db.clone();
 
     let holochain_p2p_cell = HolochainP2pDna::new(Arc::new(MockHcP2p::new()), dna.clone());
 
@@ -78,17 +72,9 @@ async fn test_cell_handle_publish() {
         .unwrap();
 
     let dht_store = spaces.test_spaces[&dna].space.dht_store.clone();
-    super::Cell::genesis(
-        cell_id.clone(),
-        handle.clone(),
-        db.clone(),
-        dht_db.clone(),
-        dht_store,
-        ribosome,
-        None,
-    )
-    .await
-    .unwrap();
+    super::Cell::genesis(cell_id.clone(), handle.clone(), dht_store, ribosome, None)
+        .await
+        .unwrap();
 
     let (_cell, _) = super::Cell::create(
         cell_id,
@@ -128,7 +114,14 @@ async fn test_cell_handle_publish() {
         .await
         .unwrap();
 
-    op_exists(&dht_db, op_hash).await.unwrap();
+    // Reading the DhtStore limbo for the published op must not error.
+    spaces.test_spaces[&dna]
+        .space
+        .dht_store
+        .as_read()
+        .limbo_op_exists(&op_hash)
+        .await
+        .unwrap();
 
     handle.shutdown().await.unwrap().unwrap();
 }

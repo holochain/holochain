@@ -30,9 +30,6 @@ pub enum StateMutationError {
     #[error("Cannot remove a fully published countersigning session")]
     CannotRemoveFullyPublished,
 
-    #[error("The operation was not found in the cache")]
-    OpNotFoundInCache,
-
     #[error("{0}")]
     Other(String),
 }

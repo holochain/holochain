@@ -112,6 +112,11 @@ where
     row.map(row_to_signed_action_hashed).transpose()
 }
 
+/// The author's committed source chain, ordered by sequence.
+///
+/// Restricted to accepted rows (`record_validity = Accepted`): integrated
+/// actions whose ops all pass validation. Pending (limbo) and rejected rows are
+/// excluded, so this agrees with [`chain_head_for_author`].
 pub(crate) async fn get_actions_by_author<'e, E>(
     executor: E,
     author: AgentPubKey,
@@ -122,9 +127,10 @@ where
     let rows: Vec<ActionRow> = sqlx::query_as(
         "SELECT hash, author, seq, prev_hash, timestamp, action_type,
                 action_data, signature, entry_hash, private_entry, record_validity
-         FROM Action WHERE author = ? ORDER BY seq ASC",
+         FROM Action WHERE author = ? AND record_validity = ? ORDER BY seq ASC",
     )
     .bind(author.get_raw_36())
+    .bind(i64::from(RecordValidity::Accepted))
     .fetch_all(executor)
     .await?;
     rows.into_iter().map(row_to_signed_action_hashed).collect()
@@ -148,10 +154,58 @@ where
         .await
 }
 
+/// The author's committed source-chain head: the highest-sequence action they
+/// authored that is marked accepted. Returns `None` for an empty chain
+/// (pre-genesis).
+///
+/// Acceptability is read from the `Action` row's own `record_validity` state,
+/// not by joining to an op row, so the result never depends on holding a
+/// particular op such as `RegisterAgentActivity`. `record_validity` is the
+/// action's aggregated integration status: a self-authored action is `Accepted`
+/// when the flush writes it, and a network-received action becomes `Accepted`
+/// once its ops integrate. Pending (limbo) and rejected actions are excluded, so
+/// a forged high-sequence action — which cannot pass validation to reach
+/// `Accepted` — cannot falsely trip the flush as-at / head-moved check. The
+/// flush writes the action and its ops in one transaction, so a freshly
+/// committed head is immediately visible here. Withheld in-flight countersigning
+/// actions are self-authored and keep `Accepted`, so they remain part of the
+/// head; only their publishing is withheld.
+pub(crate) async fn chain_head_for_author<'e, E>(
+    executor: E,
+    author: &AgentPubKey,
+) -> sqlx::Result<Option<(ActionHash, u32, holochain_timestamp::Timestamp)>>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
+    let row: Option<(Vec<u8>, i64, i64)> = sqlx::query_as(
+        "SELECT hash, seq, timestamp FROM Action
+         WHERE author = ? AND record_validity = ?
+         ORDER BY seq DESC LIMIT 1",
+    )
+    .bind(author.get_raw_36())
+    .bind(i64::from(RecordValidity::Accepted))
+    .fetch_optional(executor)
+    .await?;
+    Ok(row.map(|(hash_bytes, seq, ts)| {
+        (
+            ActionHash::from_raw_36(hash_bytes),
+            seq as u32,
+            holochain_timestamp::Timestamp::from_micros(ts),
+        )
+    }))
+}
+
 /// All actions authored by `author` that have an integrated
 /// `RegisterAgentActivity` op, ordered by chain sequence. When
 /// `include_entries` is set, the public
 /// `Entry` blob is joined in (Full mode); otherwise the entry column is `NULL`.
+///
+/// Ops withheld from publishing (in-flight countersigning sessions, where
+/// `ChainOpPublish.withhold_publish` is set) are excluded: such an op is
+/// authored locally but must not surface as live agent activity until the
+/// session completes and the withhold flag is cleared. The `LEFT JOIN` leaves
+/// ordinary ops — which have either no `ChainOpPublish` row (network/other-agent
+/// activity) or a row with `withhold_publish` `NULL` — unaffected.
 pub(crate) async fn get_agent_activity<'e, E>(
     executor: E,
     author: &AgentPubKey,
@@ -167,7 +221,8 @@ where
          FROM ChainOp c
          JOIN Action a ON c.action_hash = a.hash
          LEFT JOIN Entry e ON a.entry_hash = e.hash
-         WHERE a.author = ? AND c.op_type = ?
+         LEFT JOIN ChainOpPublish cp ON cp.op_hash = c.hash
+         WHERE a.author = ? AND c.op_type = ? AND cp.withhold_publish IS NULL
          ORDER BY a.seq ASC"
     } else {
         "SELECT a.hash, a.author, a.seq, a.prev_hash, a.timestamp, a.action_type,
@@ -175,7 +230,8 @@ where
                 c.validation_status, NULL AS entry_blob
          FROM ChainOp c
          JOIN Action a ON c.action_hash = a.hash
-         WHERE a.author = ? AND c.op_type = ?
+         LEFT JOIN ChainOpPublish cp ON cp.op_hash = c.hash
+         WHERE a.author = ? AND c.op_type = ? AND cp.withhold_publish IS NULL
          ORDER BY a.seq ASC"
     };
     let rows: Vec<AgentActivityRow> = sqlx::query_as(sql)

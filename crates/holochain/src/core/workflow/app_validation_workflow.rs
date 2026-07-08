@@ -113,7 +113,6 @@ use holochain_cascade::CascadeImpl;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::{NetworkRequestOptions as NetworkGetOptions, NetworkRequestOptions};
 use holochain_p2p::DynHolochainP2pDna;
-use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_state::prelude::*;
 use parking_lot::Mutex;
@@ -212,8 +211,7 @@ async fn app_validation_workflow_inner(
     let rejected_ops = Arc::new(AtomicUsize::new(0));
     let failed_ops = Arc::new(Mutex::new(HashSet::new()));
     let mut agent_activity_ops = vec![];
-    let mut warrant_op_hashes: Vec<(DhtOpHash, OpBasis)> = vec![];
-    // Collected for mirroring into DhtStore (new schema).
+    // Locally-validated warrant ops, self-published into the DhtStore.
     let mut warrant_ops_vec: Vec<DhtOpHashed> = vec![];
     let mut app_validation_outcomes: Vec<(DhtOpHash, AppOutcome)> = vec![];
     // Track action hashes already warranted in this batch to avoid creating duplicate
@@ -283,10 +281,6 @@ async fn app_validation_workflow_inner(
                     debug!(?outcome, ?dht_op_lite, "DhtOp cannot be app validated yet");
                 }
 
-                let accepted_ops = accepted_ops.clone();
-                let awaiting_ops = awaiting_ops.clone();
-                let rejected_ops = rejected_ops.clone();
-
                 if let Outcome::Rejected(reason) = &outcome {
                     let action_hash = chain_op.action().to_hash();
 
@@ -337,60 +331,26 @@ async fn app_validation_workflow_inner(
                             )
                             .await?;
 
-                        warrant_op_hashes
-                            .push((warrant_op.to_hash(), warrant_op.dht_basis().clone()));
-
-                        let warrant_op_for_authored = warrant_op.clone();
-                        if let Err(err) = workspace
-                            .authored_db
-                            .write_async(move |txn| {
-                                warn!("Inserting warrant op");
-                                insert_op_authored(txn, &warrant_op_for_authored)
-                            })
-                            .await
-                        {
-                            tracing::warn!("Error writing warrant op: {err}");
-                        } else {
-                            // Mirror into DhtStore only when the legacy write succeeded.
-                            warrant_ops_vec.push(warrant_op);
-                        }
+                        warrant_ops_vec.push(warrant_op);
                     }
                 }
 
-                // Capture the outcome for mirroring into DhtStore (only Accepted/Rejected).
-                let app_outcome_opt = match &outcome {
-                    Outcome::Accepted => Some(AppOutcome::Accepted),
-                    Outcome::AwaitingDeps(_) => None, // status stays NULL; nothing to record
-                    Outcome::Rejected(_) => Some(AppOutcome::Rejected),
-                };
-                let outcome_dht_op_hash = dht_op_hash.clone();
-
-                // #5370: legacy DhtOp validation-status dual-write removed; the
-                // write no longer touches the DB (the `_txn`, `dht_op_hash` and
-                // put_*_limbo calls are dead). Counters/outcome mirroring stay.
-                let write_result = workspace
-                    .dht_db
-                    .write_async(move |_txn| -> WorkflowResult<()> {
-                        match outcome {
-                            Outcome::Accepted => {
-                                accepted_ops.fetch_add(1, Ordering::SeqCst);
-                            }
-                            Outcome::AwaitingDeps(_) => {
-                                awaiting_ops.fetch_add(1, Ordering::SeqCst);
-                            }
-                            Outcome::Rejected(_) => {
-                                rejected_ops.fetch_add(1, Ordering::SeqCst);
-                                tracing::info!("Received invalid op. The op author will be blocked. Op: {dht_op_lite:?}");
-                            }
-                        }
-                        Ok(())
-                    })
-                    .await;
-                if let Err(err) = write_result {
-                    tracing::error!(?chain_op, ?err, "Error updating dht op in database.");
-                } else if let Some(app_outcome) = app_outcome_opt {
-                    // Capture for mirroring after the legacy write commits.
-                    app_validation_outcomes.push((outcome_dht_op_hash, app_outcome));
+                match outcome {
+                    Outcome::Accepted => {
+                        accepted_ops.fetch_add(1, Ordering::SeqCst);
+                        app_validation_outcomes.push((dht_op_hash, AppOutcome::Accepted));
+                    }
+                    Outcome::AwaitingDeps(_) => {
+                        // Status stays NULL; nothing to record.
+                        awaiting_ops.fetch_add(1, Ordering::SeqCst);
+                    }
+                    Outcome::Rejected(_) => {
+                        rejected_ops.fetch_add(1, Ordering::SeqCst);
+                        tracing::info!(
+                            "Received invalid op. The op author will be blocked. Op: {dht_op_lite:?}"
+                        );
+                        app_validation_outcomes.push((dht_op_hash, AppOutcome::Rejected));
+                    }
                 }
             }
             Err(err) => {
@@ -407,25 +367,14 @@ async fn app_validation_workflow_inner(
     let accepted_ops = accepted_ops.load(Ordering::SeqCst);
     let awaiting_ops = awaiting_ops.load(Ordering::SeqCst);
     let rejected_ops = rejected_ops.load(Ordering::SeqCst);
-    let warranted_ops = warrant_op_hashes.len();
+    let warranted_ops = warrant_ops_vec.len();
     let ops_validated = accepted_ops + rejected_ops;
     let failed_ops = Arc::try_unwrap(failed_ops)
         .expect("must be only reference")
         .into_inner();
     tracing::info!("{ops_validated} out of {num_ops_to_validate} validated: {accepted_ops} accepted, {awaiting_ops} awaiting deps, {rejected_ops} rejected, failed ops {failed_ops:?}.");
 
-    // "self-publish" warrants, i.e. insert them into the DHT db as if they were published to us by another node
-    if warranted_ops > 0 {
-        holochain_state::integrate::authored_ops_to_dht_db(
-            network.target_arcs().await?,
-            warrant_op_hashes,
-            workspace.authored_db.clone().into(),
-            workspace.dht_db.clone(),
-        )
-        .await?;
-    }
-
-    // mirror app validation outcomes into the new DhtStore schema.
+    // Record app validation outcomes into the DhtStore.
     if !app_validation_outcomes.is_empty() {
         workspace
             .dht_store
@@ -433,7 +382,8 @@ async fn app_validation_workflow_inner(
             .await?;
     }
 
-    // mirror locally-validated warrant ops into the new DhtStore schema.
+    // "self-publish" locally-validated warrant ops into the DhtStore as if they
+    // were published to us by another node.
     if !warrant_ops_vec.is_empty() {
         workspace
             .dht_store
@@ -908,64 +858,23 @@ impl Default for OutcomeSummary {
 }
 
 pub struct AppValidationWorkspace {
-    // Writeable because of warrants
-    authored_db: DbWrite<DbKindAuthored>,
-    dht_db: DbWrite<DbKindDht>,
     dht_store: DhtStore,
-    cache: DbWrite<DbKindCache>,
     keystore: MetaLairClient,
 }
 
 impl AppValidationWorkspace {
-    pub fn new(
-        // Writeable because of warrants
-        authored_db: DbWrite<DbKindAuthored>,
-        dht_db: DbWrite<DbKindDht>,
-        dht_store: DhtStore,
-        cache: DbWrite<DbKindCache>,
-        keystore: MetaLairClient,
-    ) -> Self {
+    pub fn new(dht_store: DhtStore, keystore: MetaLairClient) -> Self {
         Self {
-            authored_db,
-            dht_db,
             dht_store,
-            cache,
             keystore,
         }
     }
 
     pub async fn validation_workspace(&self) -> AppValidationResult<HostFnWorkspaceRead> {
-        Ok(HostFnWorkspace::new(
-            self.authored_db.clone().into(),
-            self.dht_db.clone().into(),
-            self.dht_store.clone(),
-            self.cache.clone(),
-            self.keystore.clone(),
-            None,
-        )
-        .await?)
+        Ok(HostFnWorkspaceRead::new(self.dht_store.clone(), self.keystore.clone(), None).await?)
     }
 
     pub fn full_cascade(&self, network: DynHolochainP2pDna) -> CascadeImpl {
-        CascadeImpl::empty(self.dht_store.clone()).with_network(network, self.cache.clone())
+        CascadeImpl::empty(self.dht_store.clone()).with_network(network)
     }
-}
-
-pub fn put_validation_limbo(
-    txn: &mut Txn<DbKindDht>,
-    hash: &DhtOpHash,
-    stage: ValidationStage,
-) -> WorkflowResult<()> {
-    set_validation_stage(txn, hash, stage)?;
-    Ok(())
-}
-
-pub fn put_integration_limbo(
-    txn: &mut Txn<DbKindDht>,
-    hash: &DhtOpHash,
-    status: ValidationStatus,
-) -> WorkflowResult<()> {
-    set_validation_status(txn, hash, status)?;
-    set_validation_stage(txn, hash, ValidationStage::AwaitingIntegration)?;
-    Ok(())
 }

@@ -13,8 +13,8 @@ use std::str::FromStr;
 mod key;
 pub use key::DbKey;
 
-pub mod example;
 mod handles;
+mod metrics;
 pub use handles::{DbRead, DbWrite, TxRead, TxWrite};
 pub mod conductor;
 pub mod dht;

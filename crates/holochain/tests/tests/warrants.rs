@@ -12,18 +12,14 @@ use holochain::{
     },
     test_utils::retry_fn_until_timeout,
 };
-use holochain_sqlite::prelude::ReadAccess;
-use holochain_state::prelude::{insert_op_dht, set_validation_status, set_when_integrated};
-use holochain_state::query::{from_blob, CascadeTxnWrapper, StateQueryResult, Store};
 use holochain_timestamp::Timestamp;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::prelude::WarrantOp;
 use holochain_zome_types::op::ChainOpType;
-use holochain_zome_types::prelude::{ChainIntegrityWarrant, ValidationStatus, Warrant};
+use holochain_zome_types::prelude::{ChainIntegrityWarrant, Warrant};
 use holochain_zome_types::record::SignedAction;
 use holochain_zome_types::warrant::WarrantProof;
 use holochain_zome_types::Entry;
-use rusqlite::named_params;
 use serde::{Deserialize, Serialize};
 
 // Alice creates an invalid op and publishes it to Bob. Bob issues a warrant and
@@ -58,18 +54,17 @@ async fn warranted_agent_is_blocked() {
 
     await_consistency([&alice_cell, &bob_cell]).await.unwrap();
 
-    // The warrant against Alice and the warrant op should have been written to Bob's authored database.
+    // The warrant against Alice should have been recorded in Bob's DHT store.
     retry_fn_until_timeout(
         || async {
-            let alice_pubkey = alice_cell.agent_pubkey().clone();
             let warrants = bob_conductor
                 .get_spaces()
-                .get_all_authored_dbs(&dna_hash)
-                .unwrap()[0]
-                .test_read(move |txn| {
-                    let store = CascadeTxnWrapper::from(txn);
-                    store.get_warrants_for_agent(&alice_pubkey, false).unwrap()
-                });
+                .dht_store(&dna_hash)
+                .unwrap()
+                .as_read()
+                .warrants_by_author(bob_cell.agent_pubkey().clone())
+                .await
+                .unwrap();
 
             tracing::info!("number of warrants: {}", warrants.len());
 
@@ -233,22 +228,15 @@ async fn author_of_invalid_warrant_is_blocked() {
     // Wait for Alice and Bob to sync.
     await_consistency([&alice, &bob]).await.unwrap();
 
-    let alice_authored_db = conductors[0]
-        .get_spaces()
-        .get_or_create_authored_db(dna_file.dna_hash(), alice.agent_pubkey().clone())
-        .unwrap();
-    let action = alice_authored_db
-        .read_async(move |txn| -> StateQueryResult<SignedAction> {
-            let action: Vec<u8> = txn.query_row(
-                "SELECT blob FROM Action WHERE hash = :hash",
-                named_params! {":hash": valid_action_hash},
-                |row| row.get(0),
-            )?;
-
-            from_blob(action)
-        })
+    // Fetch Alice's signed action from the DhtStore.
+    let action: SignedAction = alice
+        .dht_store()
+        .as_read()
+        .retrieve_action(&valid_action_hash)
         .await
-        .unwrap();
+        .unwrap()
+        .expect("Alice's valid action should be in the DhtStore")
+        .into();
 
     // Now Bob needs to create a warrant against Alice's perfectly valid action.
     let warrant = Warrant::new(
@@ -269,28 +257,14 @@ async fn author_of_invalid_warrant_is_blocked() {
         .await
         .unwrap();
 
-    // Insert the warrant into Bob's DHT database.
     let warrant_op_hashed = DhtOpHashed::from_content_sync(warrant_op);
 
-    {
-        let warrant_op_hashed = warrant_op_hashed.clone();
-        conductors[1]
-            .get_dht_db(dna_file.dna_hash())
-            .unwrap()
-            .test_write(move |txn| {
-                insert_op_dht(txn, &warrant_op_hashed, 0, None).unwrap();
-                set_validation_status(txn, &warrant_op_hashed.hash, ValidationStatus::Valid)
-                    .unwrap();
-                set_when_integrated(txn, &warrant_op_hashed.hash, Timestamp::now()).unwrap();
-            });
-    }
-
-    // Also seed the warrant in Bob's new DhtStore so K2 gossip can find and
-    // serve it. Use the test-only helper instead of
-    // `record_locally_validated_warrants`: the latter (correctly) drives the
-    // integration workflow to block the warrantee, which would prevent Bob
-    // from gossiping the warrant to Alice. This test injects an objectively
-    // invalid warrant to verify Alice rejects it, so Bob must not act on it.
+    // Seed the warrant in Bob's DhtStore so K2 gossip can find and serve it.
+    // Use the test-only helper instead of `record_locally_validated_warrants`:
+    // the latter (correctly) drives the integration workflow to block the
+    // warrantee, which would prevent Bob from gossiping the warrant to Alice.
+    // This test injects an objectively invalid warrant to verify Alice rejects
+    // it, so Bob must not act on it.
     conductors[1]
         .get_spaces()
         .dht_store(dna_file.dna_hash())

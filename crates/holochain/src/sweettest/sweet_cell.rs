@@ -2,17 +2,13 @@ use super::SweetZome;
 use hdk::prelude::*;
 use holo_hash::DnaHash;
 use holochain_conductor_api::conductor::ConductorConfig;
-use holochain_sqlite::db::{DbKindAuthored, DbKindDht};
 use holochain_state::dht_store::DhtStore;
-use holochain_types::db::DbWrite;
 use std::sync::Arc;
 /// A reference to a Cell created by a SweetConductor installation function.
 /// It has very concise methods for calling a zome on this cell
 #[derive(Clone, Debug)]
 pub struct SweetCell {
     pub(super) cell_id: CellId,
-    pub(super) cell_authored_db: DbWrite<DbKindAuthored>,
-    pub(super) cell_dht_db: DbWrite<DbKindDht>,
     pub(super) cell_dht_store: DhtStore,
     pub(super) conductor_config: Arc<ConductorConfig>,
 }
@@ -21,16 +17,6 @@ impl SweetCell {
     /// Accessor for CellId
     pub fn cell_id(&self) -> &CellId {
         &self.cell_id
-    }
-
-    /// Get the authored environment for this cell
-    pub fn authored_db(&self) -> &DbWrite<DbKindAuthored> {
-        &self.cell_authored_db
-    }
-
-    /// Get the dht environment for this cell
-    pub fn dht_db(&self) -> &DbWrite<DbKindDht> {
-        &self.cell_dht_db
     }
 
     /// Get the DHT store for this cell.

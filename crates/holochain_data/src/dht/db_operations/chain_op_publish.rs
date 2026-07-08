@@ -50,7 +50,15 @@ impl DbRead<Dht> {
         &self,
         op_hash: DhtOpHash,
     ) -> sqlx::Result<Option<ChainOpPublishRow>> {
-        chain_op_publish::get_chain_op_publish(self.pool(), op_hash).await
+        let mut conn = self.timed_conn().await?;
+        chain_op_publish::get_chain_op_publish(&mut *conn, op_hash).await
+    }
+
+    /// Count integrated ops authored by `author` that have been published at
+    /// least once. Used by the source-chain dump to compute `published_ops_count`.
+    pub async fn count_published_ops_for_author(&self, author: &AgentPubKey) -> sqlx::Result<i64> {
+        let mut conn = self.timed_conn().await?;
+        chain_op_publish::count_published_ops_for_author(&mut *conn, author).await
     }
 
     /// Ops eligible to be published for `author`. See
@@ -60,12 +68,14 @@ impl DbRead<Dht> {
         author: &AgentPubKey,
         recency_threshold_micros: i64,
     ) -> sqlx::Result<Vec<OpToPublishRow>> {
-        chain_op_publish::get_ops_to_publish(self.pool(), author, recency_threshold_micros).await
+        let mut conn = self.timed_conn().await?;
+        chain_op_publish::get_ops_to_publish(&mut *conn, author, recency_threshold_micros).await
     }
 
     /// Count ops authored by `author` that may still need publishing. See
     /// `chain_op_publish::num_still_needing_publish`.
     pub async fn num_still_needing_publish(&self, author: &AgentPubKey) -> sqlx::Result<i64> {
-        chain_op_publish::num_still_needing_publish(self.pool(), author).await
+        let mut conn = self.timed_conn().await?;
+        chain_op_publish::num_still_needing_publish(&mut *conn, author).await
     }
 }

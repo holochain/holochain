@@ -21,6 +21,7 @@ impl DbRead<Dht> {
         &self,
         original_action_hash: ActionHash,
     ) -> sqlx::Result<Vec<UpdatedRecordRow>> {
-        updated_record::get_updated_records(self.pool(), original_action_hash).await
+        let mut conn = self.timed_conn().await?;
+        updated_record::get_updated_records(&mut *conn, original_action_hash).await
     }
 }

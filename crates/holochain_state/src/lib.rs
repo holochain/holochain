@@ -2,8 +2,8 @@
 //! with the `holochain_sqlite` crate.
 //!
 //! ## Reads
-//! The main abstraction for creating data read queries is the [`Query`](crate::query::Query) trait.
-//! This can be implemented to make constructing complex queries easier.
+//! The [`DhtStore`] and [`DhtStoreRead`] types are the main abstractions for
+//! reading data, combining database access with the in-memory scratch space.
 //!
 //! The [`source_chain`] module provides the [`SourceChain`](crate::source_chain::SourceChain) type,
 //! which is the abstraction for working with chains of actions.
@@ -20,13 +20,20 @@
 //!
 //! The SourceChain type uses the Scratch for in-memory operations which
 //! can be flushed to the database.
-//!
-//! The Query trait allows combining arbitrary database SQL queries with
-//! the scratch space so reads can union across the database and in-memory data.
 
 pub use dht_store::{DhtStore, DhtStoreRead};
 
-pub mod block;
+/// Re-exports from the `holochain_data` crate.
+pub mod data {
+    pub use holochain_data::{
+        conductor::AppInterfaceModel, kind::*, open_db, DatabaseIdentifier, DbKey, DbRead,
+        DbSyncLevel, DbWrite, HolochainDataConfig,
+    };
+
+    #[cfg(feature = "test_utils")]
+    pub use holochain_data::test_open_db;
+}
+
 pub mod chain_lock;
 pub mod conductor;
 pub mod dht_store;
@@ -34,7 +41,6 @@ pub mod dht_store;
 pub mod dna_def;
 pub mod entry_def;
 pub mod host_fn_workspace;
-pub mod integrate;
 pub mod mutations;
 pub mod peer_metadata_store;
 #[allow(missing_docs)]
@@ -45,7 +51,6 @@ pub mod scratch;
 #[allow(missing_docs)]
 pub mod source_chain;
 pub mod validation_db;
-pub mod validation_receipts;
 #[allow(missing_docs)]
 pub mod wasm;
 

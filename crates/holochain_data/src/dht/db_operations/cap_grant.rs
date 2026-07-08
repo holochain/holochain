@@ -23,7 +23,8 @@ impl DbRead<Dht> {
         author: AgentPubKey,
         cap_access: i64,
     ) -> sqlx::Result<Vec<CapGrantRow>> {
-        cap_grant::get_cap_grants_by_access(self.pool(), author, cap_access).await
+        let mut conn = self.timed_conn().await?;
+        cap_grant::get_cap_grants_by_access(&mut *conn, author, cap_access).await
     }
 
     pub async fn get_cap_grants_by_tag(
@@ -31,6 +32,7 @@ impl DbRead<Dht> {
         author: AgentPubKey,
         tag: &str,
     ) -> sqlx::Result<Vec<CapGrantRow>> {
-        cap_grant::get_cap_grants_by_tag(self.pool(), author, tag).await
+        let mut conn = self.timed_conn().await?;
+        cap_grant::get_cap_grants_by_tag(&mut *conn, author, tag).await
     }
 }

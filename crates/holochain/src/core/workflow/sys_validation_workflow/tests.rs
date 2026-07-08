@@ -4,8 +4,7 @@ use crate::sweettest::*;
 use crate::test_utils::host_fn_caller::*;
 use crate::test_utils::{assert_limbo_empty, wait_for_integration};
 use crate::{conductor::ConductorHandle, core::MAX_TAG_SIZE};
-use holo_hash::fixt::{AgentPubKeyFixturator, EntryHashFixturator};
-use holochain_types::test_utils::ActionRefMut;
+use holo_hash::fixt::AgentPubKeyFixturator;
 use holochain_wasm_test_utils::TestWasm;
 use std::convert::TryFrom;
 use std::time::Duration;
@@ -62,13 +61,8 @@ async fn sys_validation_produces_invalid_chain_op_warrant() {
     .unwrap();
     matches::assert_matches!(outcome, Outcome::Rejected(_));
 
-    //- Inject the invalid op directly into bob's DHT db (legacy) and new DHT store
+    // Inject the invalid op directly into bob's DHT store
     let op = DhtOpHashed::from_content_sync(op);
-    let db = conductor.spaces.dht_db(dna.dna_hash()).unwrap();
-    let op_for_legacy = op.clone();
-    db.test_write(move |txn| {
-        insert_op_dht(txn, &op_for_legacy, 0, None).unwrap();
-    });
     conductor
         .spaces
         .dht_store(dna.dna_hash())
@@ -85,20 +79,18 @@ async fn sys_validation_produces_invalid_chain_op_warrant() {
         .sys_validation
         .trigger(&"test");
 
+    let warrant_author = alice.agent().clone();
     retry_fn_until_timeout(
         || async {
-            let key = bob_pubkey.clone();
             let num_of_warrants = conductor
                 .spaces
-                .get_all_authored_dbs(dna.dna_hash())
-                .unwrap()[0]
-                .test_read(move |txn| {
-                    let store = CascadeTxnWrapper::from(txn);
-
-                    let warrants = store.get_warrants_for_agent(&key, false).unwrap();
-
-                    warrants.len()
-                });
+                .dht_store(dna.dna_hash())
+                .unwrap()
+                .as_read()
+                .warrants_by_author(warrant_author.clone())
+                .await
+                .unwrap()
+                .len();
             num_of_warrants == 1
         },
         Some(10000),
@@ -202,19 +194,10 @@ async fn sys_validation_produces_forked_chain_warrant() {
     matches::assert_matches!(outcome, Outcome::Accepted);
 
     // Inject genesis + original action (as already-integrated data) and the
-    // forked op (as pending validation) into Bob's DHT db (legacy) and new DHT store
+    // forked op (as pending validation) into Bob's DHT store
     let prev_op_hashed = DhtOpHashed::from_content_sync(prev_op);
     let original_op_hashed = DhtOpHashed::from_content_sync(original_op);
     let forked_op_hashed = DhtOpHashed::from_content_sync(forked_op);
-    let db = conductor.spaces.dht_db(dna.dna_hash()).unwrap();
-    let prev_for_legacy = prev_op_hashed.clone();
-    let orig_for_legacy = original_op_hashed.clone();
-    let fork_for_legacy = forked_op_hashed.clone();
-    db.test_write(move |txn| {
-        insert_op_dht(txn, &prev_for_legacy, 0, None).unwrap();
-        insert_op_dht(txn, &orig_for_legacy, 0, None).unwrap();
-        insert_op_dht(txn, &fork_for_legacy, 0, None).unwrap();
-    });
     conductor
         .spaces
         .dht_store(dna.dna_hash())
@@ -237,15 +220,14 @@ async fn sys_validation_produces_forked_chain_warrant() {
             .sys_validation
             .trigger(&"test");
 
-        let query_author = alice_pubkey.clone();
         let warrants: Vec<WarrantOp> = conductor
             .spaces
-            .get_or_create_authored_db(dna.dna_hash(), bob_pubkey.clone())
+            .dht_store(dna.dna_hash())
             .unwrap()
-            .test_read(move |txn| {
-                let store = CascadeTxnWrapper::from(txn);
-                store.get_warrants_for_agent(&query_author, false).unwrap()
-            });
+            .as_read()
+            .warrants_by_author(bob_pubkey.clone())
+            .await
+            .unwrap();
 
         if !warrants.is_empty() {
             let warrant = &warrants[0];
@@ -375,19 +357,10 @@ async fn sys_validation_produces_two_warrants_when_receiving_both_forked_ops() {
     .unwrap();
     matches::assert_matches!(outcome2, Outcome::Accepted);
 
-    // Inject the previous action and both forked ops into Bob's DHT db (legacy) and new DHT store
+    // Inject the previous action and both forked ops into Bob's DHT store
     let prev_op_hashed = DhtOpHashed::from_content_sync(prev_op);
     let op1_hashed = DhtOpHashed::from_content_sync(op1);
     let op2_hashed = DhtOpHashed::from_content_sync(op2);
-    let db = conductor.spaces.dht_db(dna.dna_hash()).unwrap();
-    let prev_for_legacy = prev_op_hashed.clone();
-    let op1_for_legacy = op1_hashed.clone();
-    let op2_for_legacy = op2_hashed.clone();
-    db.test_write(move |txn| {
-        insert_op_dht(txn, &prev_for_legacy, 0, None).unwrap();
-        insert_op_dht(txn, &op1_for_legacy, 0, None).unwrap();
-        insert_op_dht(txn, &op2_for_legacy, 0, None).unwrap();
-    });
     conductor
         .spaces
         .dht_store(dna.dna_hash())
@@ -410,15 +383,14 @@ async fn sys_validation_produces_two_warrants_when_receiving_both_forked_ops() {
             .sys_validation
             .trigger(&"test");
 
-        let query_author = alice_pubkey.clone();
         let warrants: Vec<WarrantOp> = conductor
             .spaces
-            .get_or_create_authored_db(dna.dna_hash(), bob_pubkey.clone())
+            .dht_store(dna.dna_hash())
             .unwrap()
-            .test_read(move |txn| {
-                let store = CascadeTxnWrapper::from(txn);
-                store.get_warrants_for_agent(&query_author, false).unwrap()
-            });
+            .as_read()
+            .warrants_by_author(bob_pubkey.clone())
+            .await
+            .unwrap();
 
         if warrants.len() == 2 {
             // Verify we have exactly 2 warrants
@@ -618,131 +590,4 @@ async fn bob_makes_a_large_link(
         .integrate_dht_ops
         .trigger(&"bob_makes_a_large_link");
     (bad_update_action, bad_update_entry_hash, link_add_address)
-}
-
-/// Test the detect_fork function against different situations,
-/// especially the case where a fork happens after an Update Agent action,
-/// where the authorship changes
-#[tokio::test(flavor = "multi_thread")]
-async fn test_detect_fork() {
-    use ::fixt::fixt;
-    let keystore = holochain_keystore::test_keystore();
-    let author1 = keystore.new_sign_keypair_random().await.unwrap();
-    let author2 = keystore.new_sign_keypair_random().await.unwrap();
-
-    let sign_action = |a: Action| async {
-        SignedActionHashed::sign(&keystore, a.into_hashed())
-            .await
-            .unwrap()
-    };
-    let basic_action = |author: AgentPubKey, prev: Option<ActionHash>| {
-        if let Some(prev) = prev {
-            let mut a = fixt!(Create);
-            a.entry_type = EntryType::App(fixt!(AppEntryDef));
-            a.author = author;
-            a.prev_action = prev;
-            Action::Create(a)
-        } else {
-            let mut a = fixt!(Dna);
-            a.author = author;
-            Action::Dna(a)
-        }
-    };
-
-    // - Two actions, one following the other
-    let a0 = basic_action(author1.clone(), None);
-    let a1 = basic_action(author1.clone(), Some(a0.to_hash()));
-
-    // - Create an agent key update following a1
-    let mut update = fixt!(Update);
-    update.author = author1.clone();
-    update.entry_type = EntryType::AgentPubKey;
-    update.entry_hash = author2.clone().into();
-    update.prev_action = a1.to_hash();
-    let a2 = Action::Update(update);
-
-    // - Two more actions following a2
-    let a3 = basic_action(author2.clone(), Some(a2.to_hash()));
-    let a4 = basic_action(author2.clone(), Some(a3.to_hash()));
-
-    // - Create a forked version of a1 (still pointing to a0)
-    let mut a1_fork = a1.clone();
-    *a1_fork.entry_data_mut().unwrap().0 = fixt!(EntryHash);
-
-    // - Create a forked version of a3 (still pointing to a2)
-    let mut a3_fork = a3.clone();
-    *a3_fork.entry_data_mut().unwrap().0 = fixt!(EntryHash);
-
-    // - Create another forked version of a3, with the pre-update author
-    let mut a3_fork_author1 = a3.clone();
-    *a3_fork_author1.author_mut() = author1.clone();
-    *a3_fork_author1.entry_data_mut().unwrap().0 = fixt!(EntryHash);
-
-    // - Create another forked version of a3, with a random author
-    let mut a3_fork_other_author = a3.clone();
-    *a3_fork_other_author.author_mut() = fixt!(AgentPubKey);
-    *a3_fork_other_author.entry_data_mut().unwrap().0 = fixt!(EntryHash);
-
-    let a1_hash = a1.to_hash();
-    let a3_hash = a3.to_hash();
-
-    // - Form a chain of the "valid, unforked" actions
-    let chain = [
-        sign_action(a0).await,
-        sign_action(a1).await,
-        sign_action(a2).await,
-        sign_action(a3.clone()).await,
-    ];
-
-    let db = test_authored_db();
-    db.test_write(move |txn| {
-        // - Commit the valid chain
-        for a in chain {
-            insert_action(txn, &a).unwrap();
-        }
-
-        // Not a fork, because a4 is a perfectly valid continuation of a3
-        assert!(detect_fork(txn, &a4).unwrap().is_none());
-
-        // Not a fork, because a3 is already in the chain
-        assert!(detect_fork(txn, &a3).unwrap().is_none());
-
-        // Not a fork: DNA actions have no prev_action, so the SQL query `prev_hash = :prev_hash`
-        // with NULL returns no rows (since NULL = NULL is NULL in SQL, not true).
-        // Create a different DNA action to ensure it doesn't match any existing action.
-        let mut another_dna = fixt!(Dna);
-        another_dna.author = author1.clone();
-        let another_dna_action = Action::Dna(another_dna);
-        assert!(
-            detect_fork(txn, &another_dna_action).unwrap().is_none(),
-            "DNA actions cannot fork - they have no prev_action"
-        );
-
-        // Is a fork, because:
-        // - a1 already exists
-        // - both actions point to the same previous action a0
-        // - both are under the same authorship as a0
-        assert_eq!(detect_fork(txn, &a1_fork).unwrap().unwrap().0, a1_hash);
-
-        // Is a fork, because:
-        // - a3 already exists
-        // - both actions point to the same previous action a2
-        // - both are under the authorship of the key which a2 updates to
-        assert_eq!(detect_fork(txn, &a3_fork).unwrap().unwrap().0, a3_hash);
-
-        // Error: a3_fork_author1 has author1 but the existing a3 in the DB
-        // has author2. The in-memory author check detects a cross-author
-        // prev_action collision and returns an error.
-        assert!(
-            detect_fork(txn, &a3_fork_author1).is_err(),
-            "Cross-author prev_action collision should return an error"
-        );
-
-        // Error: a3_fork_other_author has a random author that doesn't match
-        // any existing action with the same prev_hash.
-        assert!(
-            detect_fork(txn, &a3_fork_other_author).is_err(),
-            "Cross-author prev_action collision should return an error"
-        );
-    });
 }

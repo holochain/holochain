@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use crate::query::StmtIter;
 use holo_hash::ActionHash;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
@@ -29,11 +28,6 @@ pub struct Scratch {
 
 #[derive(Debug, Clone)]
 pub struct SyncScratch(Arc<Mutex<Scratch>>);
-
-// MD: hmm, why does this need to be a separate type? Why collect into this?
-pub struct FilteredScratch {
-    actions: Vec<SignedActionHashed>,
-}
 
 impl Scratch {
     pub fn new() -> Self {
@@ -90,11 +84,6 @@ impl Scratch {
         self.respect_chain_top_ordering(chain_top_ordering);
         let (entry, hash) = entry_hashed.into_inner();
         self.entries.insert(hash, Arc::new(entry));
-    }
-
-    pub fn as_filter(&self, f: impl Fn(&SignedActionHashed) -> bool) -> FilteredScratch {
-        let actions = self.actions.iter().filter(|&shh| f(shh)).cloned().collect();
-        FilteredScratch { actions }
     }
 
     pub fn into_sync(self) -> SyncScratch {
@@ -280,35 +269,6 @@ impl Store for Scratch {
         _author: Option<&AgentPubKey>,
     ) -> StateQueryResult<Option<Record>> {
         self.get_record(hash)
-    }
-}
-
-impl FilteredScratch {
-    pub fn drain(&mut self) -> impl Iterator<Item = SignedActionHashed> + '_ {
-        self.actions.drain(..)
-    }
-}
-
-impl<Q> Stores<Q> for Scratch
-where
-    Q: Query<Item = Judged<SignedActionHashed>>,
-{
-    type O = FilteredScratch;
-
-    fn get_initial_data(&self, query: Q) -> StateQueryResult<Self::O> {
-        Ok(self.as_filter(query.as_filter()))
-    }
-}
-
-impl StoresIter<Judged<SignedActionHashed>> for FilteredScratch {
-    fn iter(&mut self) -> StateQueryResult<StmtIter<'_, Judged<SignedActionHashed>>> {
-        // We are assuming data in the scratch space is valid even though
-        // it hasn't been validated yet because if it does fail validation
-        // then this transaction will be rolled back.
-        // TODO: Write test to prove this assumption.
-        Ok(Box::new(fallible_iterator::convert(
-            self.drain().map(Judged::valid).map(Ok),
-        )))
     }
 }
 

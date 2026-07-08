@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use holo_hash::DnaHash;
-use holochain_data::kind::PeerMetaStore;
 use holochain_p2p::HolochainPeerMetaStore;
+use holochain_state::data::PeerMetaStore;
 use kitsune2_api::{PeerMetaStore as _, Timestamp, Url, KEY_PREFIX_ROOT, META_KEY_UNRESPONSIVE};
 use std::sync::Arc;
 use std::time::Duration;
@@ -12,7 +12,9 @@ fn test_db_id() -> PeerMetaStore {
 
 #[tokio::test]
 async fn peer_meta_crd() {
-    let db = holochain_data::test_open_db(test_db_id()).await.unwrap();
+    let db = holochain_state::data::test_open_db(test_db_id())
+        .await
+        .unwrap();
 
     let store = HolochainPeerMetaStore::create(
         holochain_state::peer_metadata_store::PeerMetaStore::new(db),
@@ -47,7 +49,9 @@ async fn peer_meta_crd() {
 
 #[tokio::test]
 async fn get_all_urls_by_key() {
-    let db = holochain_data::test_open_db(test_db_id()).await.unwrap();
+    let db = holochain_state::data::test_open_db(test_db_id())
+        .await
+        .unwrap();
     let store = HolochainPeerMetaStore::create(
         holochain_state::peer_metadata_store::PeerMetaStore::new(db),
     )
@@ -91,7 +95,9 @@ async fn get_all_urls_by_key() {
 
 #[tokio::test]
 async fn get_all_unresponsive_urls_by_key() {
-    let db = holochain_data::test_open_db(test_db_id()).await.unwrap();
+    let db = holochain_state::data::test_open_db(test_db_id())
+        .await
+        .unwrap();
     let store = HolochainPeerMetaStore::create(
         holochain_state::peer_metadata_store::PeerMetaStore::new(db),
     )
@@ -143,7 +149,9 @@ async fn get_all_unresponsive_urls_by_key() {
 
 #[tokio::test]
 async fn prune_on_create() {
-    let db = holochain_data::test_open_db(test_db_id()).await.unwrap();
+    let db = holochain_state::data::test_open_db(test_db_id())
+        .await
+        .unwrap();
 
     {
         let store = HolochainPeerMetaStore::create(
@@ -190,7 +198,9 @@ async fn prune_on_create() {
 
 #[tokio::test]
 async fn set_peer_unresponsive_in_peer_meta_store() {
-    let db = holochain_data::test_open_db(test_db_id()).await.unwrap();
+    let db = holochain_state::data::test_open_db(test_db_id())
+        .await
+        .unwrap();
     let store = Arc::new(
         HolochainPeerMetaStore::create(holochain_state::peer_metadata_store::PeerMetaStore::new(
             db.clone(),
@@ -216,7 +226,9 @@ async fn set_peer_unresponsive_in_peer_meta_store() {
     ignore = "requires Iroh transport for stability"
 )]
 async fn unresponsive_peers_are_removed_from_store_after_expiry() {
-    let db = holochain_data::test_open_db(test_db_id()).await.unwrap();
+    let db = holochain_state::data::test_open_db(test_db_id())
+        .await
+        .unwrap();
     let store = Arc::new(
         HolochainPeerMetaStore::create(holochain_state::peer_metadata_store::PeerMetaStore::new(
             db.clone(),

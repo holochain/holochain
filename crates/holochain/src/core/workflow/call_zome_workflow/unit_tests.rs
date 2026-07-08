@@ -230,12 +230,7 @@ impl TestCase {
         let agent = app.agent().clone();
         let cell_id = CellId::new(dna_hash.clone(), agent.clone());
         let workspace = SourceChainWorkspace::new(
-            conductor
-                .get_or_create_authored_db(&dna_hash, agent.clone())
-                .unwrap(),
-            conductor.get_dht_db(&dna_hash).unwrap(),
             conductor.get_dht_store(&dna_hash).unwrap(),
-            conductor.get_cache_db(&cell_id).await.unwrap(),
             conductor.keystore(),
             agent.clone(),
         )
