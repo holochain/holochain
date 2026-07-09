@@ -128,6 +128,7 @@ mockall::mock! {
         fn get(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Record>>>;
         fn get_details(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Details>>>;
         // CounterSigning
+        #[cfg(feature = "unstable-countersigning")]
         fn accept_countersigning_preflight_request(
             &self,
             preflight_request: PreflightRequest,

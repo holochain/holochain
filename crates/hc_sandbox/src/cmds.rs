@@ -78,7 +78,6 @@ pub enum NetworkType {
     /// Transport that uses the local memory transport protocol.
     Mem,
     /// Transport that uses the QUIC protocol.
-    #[cfg(feature = "transport-iroh")]
     #[command(name = "quic")]
     QUIC {
         /// URL to a Holochain server that serves for NAT and relaying messages.
@@ -223,7 +222,6 @@ impl Network {
 
         match transport {
             NetworkType::Mem => (),
-            #[cfg(feature = "transport-iroh")]
             NetworkType::QUIC { relay_url } => {
                 network_config.relay_url = relay_url;
                 network_config.advanced = Some(serde_json::json!({

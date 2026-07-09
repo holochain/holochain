@@ -88,20 +88,12 @@ use wasmer::Module;
 use wasmer::RuntimeError;
 use wasmer::Store;
 use wasmer::Type;
+use crate::core::ribosome::real_ribosome::module_cache::{make_module_cache, ModuleCache};
 
 pub mod module_cache;
 
 #[cfg(any(feature = "wasmer-sys-cranelift", feature = "wasmer-sys-llvm"))]
 mod wasmer_sys;
-#[cfg(any(feature = "wasmer-sys-cranelift", feature = "wasmer-sys-llvm"))]
-use wasmer_sys::*;
-
-#[cfg(feature = "wasmer-wasmi")]
-mod wasmer_wasmi;
-
-use crate::core::ribosome::real_ribosome::module_cache::{make_module_cache, ModuleCache};
-#[cfg(feature = "wasmer-wasmi")]
-use wasmer_wasmi::*;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 #[non_exhaustive]
@@ -607,7 +599,8 @@ impl RibosomeImplT for RealRibosome {
                 }
 
                 // Reset available metering points to the maximum allowed per zome call
-                reset_metering_points(instance_with_store.clone());
+                #[cfg(any(feature = "wasmer-sys-cranelift", feature = "wasmer-sys-llvm"))]
+                wasmer_sys::reset_metering_points(instance_with_store.clone());
 
                 let input = invocation
                     .take_host_input()?
@@ -623,9 +616,13 @@ impl RibosomeImplT for RealRibosome {
                 let elapsed = start.elapsed().as_secs_f64();
                 ribosome_wasm_call_duration_metric().record(elapsed, &attributes);
 
-                // Get metering points consumed in zome call and save to usage_meter
-                let points_used = get_used_metering_points(instance_with_store.clone());
-                ribosome_wasm_usage_metric().add(points_used, &attributes);
+                #[cfg(any(feature = "wasmer-sys-cranelift", feature = "wasmer-sys-llvm"))]
+                {
+                    // Get metering points consumed in zome call and save to usage_meter
+                    let points_used = wasmer_sys::get_used_metering_points(instance_with_store.clone());
+                    ribosome_wasm_usage_metric().add(points_used, &attributes);
+                }
+
 
                 // remove context from map after call
                 {

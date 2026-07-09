@@ -541,7 +541,6 @@ impl TestActor {
                 let peer_meta_db = peer_meta_db.clone();
                 Box::pin(async move { Ok(peer_meta_db) })
             }),
-            #[cfg(feature = "transport-iroh")]
             network_config: Some(serde_json::json!({
                 "coreBootstrap": {
                     "serverUrl": format!("http://{bootstrap_addr}"),

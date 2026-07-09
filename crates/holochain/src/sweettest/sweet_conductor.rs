@@ -10,7 +10,6 @@ use crate::conductor::{
 };
 use crate::core::ribosome::inline_ribosome::InlineZomeStore;
 use crate::retry_until_timeout;
-#[cfg(feature = "transport-iroh")]
 use crate::test_utils::retry_fn_until_timeout;
 use ::fixt::prelude::StdRng;
 use hdk::prelude::*;
@@ -341,7 +340,6 @@ impl SweetConductor {
             .await?;
         // While it takes ~ 3 seconds to receive a URL from the home relay, await the agent
         // info of each DNA of the just installed app's agent to show up in the peer stores.
-        #[cfg(feature = "transport-iroh")]
         for dna_with_role in dnas_with_roles {
             let dna_hash = dna_with_role.dna().dna_hash();
             retry_fn_until_timeout(

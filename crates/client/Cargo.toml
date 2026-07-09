@@ -47,13 +47,12 @@ kitsune2_test_utils = "0.5.0-dev.6"
 yaml_serde = "0.10"
 
 [features]
-default = ["lair_signing", "transport-iroh"]
+default = ["lair_signing"]
 
 lair_signing = ["dep:lair_keystore_api"]
 
 wasmer-sys-cranelift = ["holochain/wasmer-sys-cranelift"]
 wasmer-wasmi = ["holochain/wasmer-wasmi"]
-transport-iroh = ["holochain/transport-iroh"]
 unstable-migration = [
   "holochain_conductor_api/unstable-migration",
   "holochain_types/unstable-migration",

@@ -61,10 +61,6 @@ async fn test_publish() {
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(
-    not(feature = "transport-iroh"),
-    ignore = "requires Iroh transport for stability"
-)]
 async fn multi_conductor() -> anyhow::Result<()> {
     use holochain::test_utils::inline_zomes::simple_create_read_zome;
 
@@ -114,10 +110,6 @@ async fn multi_conductor() -> anyhow::Result<()> {
 /// Flaky on Windows separately from the pending fixes alongside Iroh networking upgrade.
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(
-    not(feature = "transport-iroh"),
-    ignore = "requires Iroh transport for stability"
-)]
 async fn private_entries_update_consistency() {
     use holochain::sweettest::SweetInlineZomes;
     use holochain_types::inline_zome::InlineZomeSet;
@@ -179,10 +171,6 @@ async fn private_entries_update_consistency() {
 /// Flaky on Windows separately from the pending fixes alongside Iroh networking upgrade.
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(
-    not(feature = "transport-iroh"),
-    ignore = "requires Iroh transport for stability"
-)]
 async fn private_entries_dont_leak() {
     use holochain::sweettest::SweetInlineZomes;
     use holochain_types::inline_zome::InlineZomeSet;

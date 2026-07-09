@@ -31,6 +31,7 @@ pub enum InfluxiveError {
     VersionMismatch(String),
 
     /// Hash verification failed after download.
+    #[cfg(feature = "download-binaries")]
     #[error("Hash mismatch: expected {expected}, got {actual}")]
     HashMismatch {
         /// The expected hash.

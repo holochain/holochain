@@ -610,7 +610,6 @@ impl HolochainP2pActor {
 
         #[cfg(feature = "test_utils")]
         {
-            #[cfg(feature = "transport-iroh")]
             builder
                 .config
                 .set_module_config(&kitsune2_transport_iroh::IrohTransportModConfig {
@@ -702,8 +701,7 @@ impl HolochainP2pActor {
             config.set_module_config(&core_bootstrap_config)?;
         }
 
-        // If Iroh is enabled, capture its transport configuration.
-        #[cfg(feature = "transport-iroh")]
+        // Capture Iroh's transport configuration.
         if let Ok(tx_config) =
             serde_json::from_value::<kitsune2_transport_iroh::IrohTransportModConfig>(value.clone())
         {
@@ -1057,7 +1055,7 @@ impl HolochainP2pActor {
             config.set_module_config(&core_bootstrap_config)?;
             override_needed = true;
         }
-        #[cfg(feature = "transport-iroh")]
+
         if let Some(relay_url) = space_overrides.relay_url.as_ref() {
             // get current iroh transport config and override relay_url
             let mut iroh_transport_config: kitsune2_transport_iroh::IrohTransportModConfig =
@@ -1066,6 +1064,7 @@ impl HolochainP2pActor {
             config.set_module_config(&iroh_transport_config)?;
             override_needed = true;
         }
+
         if override_needed {
             Ok(Some(config))
         } else {
@@ -2757,7 +2756,6 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[cfg(feature = "transport-iroh")]
     async fn creates_overridable_kitsune2_config() {
         let actor = test_p2p_actor().await;
 
@@ -2796,7 +2794,6 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[cfg(feature = "transport-iroh")]
     async fn should_get_no_overrides_for_space_if_default() {
         let actor = test_p2p_actor().await;
         let actor_p2p: Arc<HolochainP2pActor> =
@@ -2811,7 +2808,6 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[cfg(feature = "transport-iroh")]
     async fn should_get_overrides_for_space_if_provided() {
         let actor = test_p2p_actor().await;
         let actor_p2p: Arc<HolochainP2pActor> =
@@ -2846,7 +2842,6 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[cfg(feature = "transport-iroh")]
     async fn should_get_overrides_for_space_with_iroh_relay_url() {
         let actor = test_p2p_actor_iroh().await;
         let actor_p2p: Arc<HolochainP2pActor> =
@@ -2880,7 +2875,6 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "transport-iroh")]
     async fn test_p2p_actor() -> Arc<dyn HcP2p> {
         use kitsune2_core::factories::{CoreBootstrapConfig, CoreBootstrapModConfig};
 
@@ -2921,7 +2915,6 @@ mod tests {
             .expect("failed to create actor")
     }
 
-    #[cfg(feature = "transport-iroh")]
     async fn test_p2p_actor_iroh() -> Arc<dyn HcP2p> {
         use kitsune2_core::factories::{CoreBootstrapConfig, CoreBootstrapModConfig};
 

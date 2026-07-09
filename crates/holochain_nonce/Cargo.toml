@@ -13,6 +13,7 @@ documentation = "https://docs.rs/holochain_nonce"
 getrandom = { version = "0.3", default-features = false, features = ["std"] }
 holochain_timestamp = { version = "^0.7.0-dev.1", path = "../timestamp" }
 holochain_secure_primitive = { version = "^0.7.0-dev.1", path = "../holochain_secure_primitive", default-features = false }
+subtle-encoding = "0.5"
 
 [lints]
 workspace = true

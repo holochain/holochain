@@ -174,7 +174,6 @@ async fn dump_network_stats() {
 
     let network_stats = admin_ws.dump_network_stats().await.unwrap();
 
-    #[cfg(feature = "transport-iroh")]
     assert_eq!("iroh", network_stats.transport_stats.backend);
 }
 
