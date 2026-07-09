@@ -13,7 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Toolchain is pinned in `rust-toolchain.toml` (currently 1.96.1) — do not bump without discussion.
 
 Feature flags worth knowing (defined in the `Makefile`):
-- `DEFAULT_FEATURES` = `transport-iroh,slow_tests,build_wasms,sqlite-encrypted`.
+- `DEFAULT_FEATURES` = `transport-iroh,slow_tests,build_wasms,encryption`.
 - Wasmer backends are tested separately: `wasmer-sys-cranelift` (default), `wasmer-sys-llvm`, or `wasmer-wasmi`. At least one must be enabled or the crate fails to compile.
 - `UNSTABLE_FEATURES` adds `unstable-sharding,unstable-functions,unstable-migration` — use the `*-unstable` Make targets to exercise them.
 
@@ -23,8 +23,7 @@ This is a Cargo workspace; everything ships as crates under `crates/`. The big-p
 
 - **Hashing & primitives** — `holo_hash`, `timestamp`, `holochain_nonce`, `holochain_secure_primitive`, `holochain_util`.
 - **Types** — `holochain_integrity_types` (types available to integrity zomes; minimal, deterministic), `holochain_zome_types` (re-exports + coordinator-zome types), `holochain_types` (host-side rich types built on the above).
-- **Persistence** — Currently in `holochain_sqlite` (SQL strings, schema, connection management; SQL files under `src/sql/`) and `holochain_state` (typed read/write operations layered on top). See the section about the in-progress migration to `holochain_data`.
-- **New Persistence** — `holochain_data` — target crate for primitive data access; see migration section.
+- **Persistence** — `holochain_data` owns primitive SQLx data access and connection setup. `holochain_state` layers typed store APIs and workflow-facing operations on top.
 - **Networking** — `holochain_p2p` wraps `kitsune2` and exposes the gossip / publish / get / block APIs the conductor uses.
 - **Cascade** — Currently, `holochain_cascade` is the "fetch from local DBs, then fall back to the network" layer used by zome calls and validation. See the section about the in-progress migration to `holochain_data`.
 - **Conductor / runtime** — `holochain` is the top crate. It owns:
@@ -84,17 +83,16 @@ It is critical that workflows handle errors properly, and don't conflict with ea
 
 Note that there are subtly different code paths for data that is authored locally, compared with data that is authored on other conductor instances and sent over the network. Differences should be minimized and where possible, diverged code paths should be resolved so that authored data is treated similarly to network-authored data.
 
-## In-progress migration to `holochain_data`
+## `holochain_data` migration
 
-The Holochain data access is currently spread across `holochain_sqlite`, `holochain_state`, `holochain_cascade` and `holochain` itself.
+Holochain data access now centers on `holochain_data`, with remaining higher-level access
+spread across `holochain_state`, `holochain_cascade` and `holochain` itself.
 
 This is intended to change and a refactor is in progress. Always prefer following the input given by the user because the refactor is being done in stages but you should help the user stay on track with the intended direction of the refactor.
 
-The goals for the refactor are:
-- All data access happens in `holochain_data`, which provides primitive data access operations.
-- The `holochain_state` becomes the consumer of `holochain_data` and exposes a "store" pattern for data access where a type with compound operations is exposed.
-- Instead of querying across multiple databases `holochain_cascade` becomes a layer for combining access to the new DHT store with network requests. That part of the logic will largely remain intact, but the complex traits, transaction handling and data merging operations will be removed.
+The remaining goals for the refactor are:
+- Keep primitive SQL access in `holochain_data`.
+- Keep `holochain_state` as the consumer of `holochain_data`, exposing store-style APIs for compound operations.
+- Instead of querying across multiple databases, keep `holochain_cascade` focused on combining access to the DHT store with network requests. That part of the logic will largely remain intact, but the complex traits, transaction handling and data merging operations will be removed.
 - The `holochain` crate will access the `holochain_cascade` and `holochain_state` APIs to do its work. There should be no SQL queries remaining in `holochain` outside of tests. This primarily applies to the workflows, which have complex SQL queries that can and should be tested in isolation.
-- The `holochain_sqlite` crate will be removed entirely.
 - At a later stage, the `holochain_state` types crate could also be eliminated by figuring out the current circular dependency problems and finding a new home for those types.
-

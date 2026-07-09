@@ -8,13 +8,10 @@ use crate::action::NewEntryAction;
 use crate::prelude::*;
 use crate::warrant::WarrantOp;
 use holo_hash::*;
-use holochain_sqlite::rusqlite::types::FromSql;
-use holochain_sqlite::rusqlite::ToSql;
 use holochain_zome_types::action;
 use holochain_zome_types::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
-use std::str::FromStr;
 
 mod error;
 pub use error::*;
@@ -210,31 +207,6 @@ impl std::hash::Hash for ChainOpLite {
 pub enum DhtOpType {
     Chain(ChainOpType),
     Warrant(WarrantOpType),
-}
-
-impl ToSql for DhtOpType {
-    fn to_sql(
-        &self,
-    ) -> holochain_sqlite::rusqlite::Result<holochain_sqlite::rusqlite::types::ToSqlOutput<'_>>
-    {
-        match self {
-            DhtOpType::Chain(op) => op.to_sql(),
-            DhtOpType::Warrant(op) => op.to_sql(),
-        }
-    }
-}
-
-impl FromSql for DhtOpType {
-    fn column_result(
-        value: holochain_sqlite::rusqlite::types::ValueRef<'_>,
-    ) -> holochain_sqlite::rusqlite::types::FromSqlResult<Self> {
-        String::column_result(value).and_then(|string| {
-            ChainOpType::from_str(&string)
-                .map(DhtOpType::from)
-                .or_else(|_| WarrantOpType::from_str(&string).map(DhtOpType::from))
-                .map_err(|_| holochain_sqlite::rusqlite::types::FromSqlError::InvalidType)
-        })
-    }
 }
 
 impl DhtOp {
@@ -1351,16 +1323,5 @@ impl OpOrder {
             }
         };
         Self { order, timestamp }
-    }
-}
-
-impl holochain_sqlite::rusqlite::ToSql for OpOrder {
-    fn to_sql(
-        &self,
-    ) -> holochain_sqlite::rusqlite::Result<holochain_sqlite::rusqlite::types::ToSqlOutput<'_>>
-    {
-        Ok(holochain_sqlite::rusqlite::types::ToSqlOutput::Owned(
-            self.to_string().into(),
-        ))
     }
 }

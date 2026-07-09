@@ -22,9 +22,6 @@ chrono = { version = "0.4.22", default-features = false, features = [
   "serde",
 ], optional = true }
 
-# Dependencies only needed for full.
-rusqlite = { version = "0.37", optional = true }
-
 [dev-dependencies]
 holochain_serialized_bytes = "=0.0.57"
 
@@ -35,9 +32,3 @@ workspace = true
 default = ["now"]
 
 now = ["dep:chrono"]
-
-sqlite-encrypted = [
-  "dep:rusqlite",
-  "rusqlite/bundled-sqlcipher-vendored-openssl",
-]
-sqlite = ["dep:rusqlite", "rusqlite/bundled"]

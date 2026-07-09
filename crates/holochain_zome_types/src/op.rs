@@ -73,23 +73,3 @@ impl ChainOpType {
         }
     }
 }
-
-#[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
-impl rusqlite::ToSql for ChainOpType {
-    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
-        Ok(rusqlite::types::ToSqlOutput::Owned(
-            format!("{self}").into(),
-        ))
-    }
-}
-
-#[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
-impl rusqlite::types::FromSql for ChainOpType {
-    fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
-        use std::str::FromStr;
-
-        String::column_result(value).and_then(|string| {
-            ChainOpType::from_str(&string).map_err(|_| rusqlite::types::FromSqlError::InvalidType)
-        })
-    }
-}

@@ -5,7 +5,6 @@ use super::interface::error::InterfaceError;
 use crate::conductor::cell::error::CellError;
 use crate::core::workflow::WorkflowError;
 use holochain_conductor_api::conductor::ConductorConfigError;
-use holochain_sqlite::error::DatabaseError;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmErrorInner;
 use holochain_zome_types::cell::CellId;
@@ -31,9 +30,6 @@ pub enum ConductorError {
 
     #[error(transparent)]
     AppManifestError(#[from] AppManifestError),
-
-    #[error(transparent)]
-    DatabaseError(#[from] DatabaseError),
 
     #[error("Cell already exists. CellId: {0:?}")]
     CellAlreadyExists(CellId),
@@ -125,9 +121,6 @@ pub enum ConductorError {
 
     #[error(transparent)]
     JoinError(#[from] tokio::task::JoinError),
-
-    #[error(transparent)]
-    RusqliteError(#[from] rusqlite::Error),
 
     #[error(transparent)]
     RibosomeError(#[from] crate::core::ribosome::error::RibosomeError),

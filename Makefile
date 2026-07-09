@@ -2,7 +2,7 @@
 
 # All default features of binaries excluding mutually exclusive features wasmer-sys-cranelift & wasmer-wasmi
 # and iroh transport
-COMMON_DEFAULT_FEATURES=slow_tests,build_wasms,sqlite-encrypted
+COMMON_DEFAULT_FEATURES=slow_tests,build_wasms,encryption
 DEFAULT_FEATURES=transport-iroh,$(COMMON_DEFAULT_FEATURES)
 UNSTABLE_FEATURES=unstable-sharding,unstable-functions,unstable-migration,$(DEFAULT_FEATURES)
 

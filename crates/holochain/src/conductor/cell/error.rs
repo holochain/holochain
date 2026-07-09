@@ -7,7 +7,6 @@ use crate::core::workflow::WorkflowError;
 use crate::core::SourceChainError;
 use holochain_cascade::error::CascadeError;
 use holochain_p2p::HolochainP2pError;
-use holochain_sqlite::error::DatabaseError;
 use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
 use std::path::PathBuf;
@@ -16,8 +15,6 @@ use thiserror::Error;
 #[allow(missing_docs)]
 #[derive(Error, Debug)]
 pub enum CellError {
-    #[error("error dealing with workspace state: {0}")]
-    DatabaseError(#[from] DatabaseError),
     #[error(transparent)]
     CascadeError(#[from] CascadeError),
     #[error("Failed to join the create cell task: {0}")]

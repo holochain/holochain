@@ -1,8 +1,6 @@
 //! Validation database types and functions.
 
 use holochain_serialized_bytes::prelude::*;
-use holochain_sqlite::rusqlite::types::{FromSql, FromSqlResult, ValueRef};
-use holochain_sqlite::rusqlite::ToSql;
 
 /// The status of a [`DhtOp`](holochain_types::dht_op::DhtOp) in limbo
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
@@ -17,38 +15,4 @@ pub enum ValidationStage {
     AwaitingAppDeps,
     /// Is awaiting integration
     AwaitingIntegration,
-}
-
-impl ToSql for ValidationStage {
-    fn to_sql(
-        &self,
-    ) -> holochain_sqlite::rusqlite::Result<holochain_sqlite::rusqlite::types::ToSqlOutput<'_>>
-    {
-        let stage = match self {
-            ValidationStage::Pending => None,
-            ValidationStage::AwaitingSysDeps => Some(0),
-            ValidationStage::SysValidated => Some(1),
-            ValidationStage::AwaitingAppDeps => Some(2),
-            ValidationStage::AwaitingIntegration => Some(3),
-        };
-        Ok(holochain_sqlite::rusqlite::types::ToSqlOutput::Owned(
-            stage.into(),
-        ))
-    }
-}
-
-impl FromSql for ValidationStage {
-    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
-        let stage: Option<i32> = FromSql::column_result(value)?;
-        match stage {
-            None => Ok(ValidationStage::Pending),
-            Some(0) => Ok(ValidationStage::AwaitingSysDeps),
-            Some(1) => Ok(ValidationStage::SysValidated),
-            Some(2) => Ok(ValidationStage::AwaitingAppDeps),
-            Some(3) => Ok(ValidationStage::AwaitingIntegration),
-            Some(_) => Err(holochain_sqlite::rusqlite::types::FromSqlError::Other(
-                Box::new(std::io::Error::other("Invalid ValidationStage value")),
-            )),
-        }
-    }
 }

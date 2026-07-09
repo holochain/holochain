@@ -17,7 +17,6 @@ chrono = { version = "0.4.22", default-features = false, features = [
   "serde",
 ] }
 derive_more = { version = "2.0", features = ["display", "deref", "deref_mut"] }
-holochain_sqlite = { version = "^0.7.0-dev.24", path = "../holochain_sqlite" }
 holo_hash = { version = "^0.7.0-dev.11", path = "../holo_hash", features = [
   "full",
 ] }
@@ -51,7 +50,7 @@ base64 = { version = "0.22", optional = true }
 nanoid = { version = "0.4", optional = true }
 
 [dev-dependencies]
-holochain_state = { path = ".", features = ["test_utils", "sqlite"] }
+holochain_state = { path = ".", features = ["test_utils"] }
 
 fixt = { path = "../fixt" }
 holochain_wasm_test_utils = { path = "../test_utils/wasm", features = [
@@ -82,7 +81,6 @@ test_utils = [
   "holochain_keystore/test_utils",
   "holochain_types/test_utils",
   "holochain_zome_types/test_utils",
-  "holochain_sqlite/test_utils",
   "dep:holochain_timestamp",
   "dep:base64",
   "dep:tempfile",
@@ -92,18 +90,3 @@ test_utils = [
 instrument = []
 
 encryption = ["holochain_data/encryption"]
-
-sqlite-encrypted = [
-  "holo_hash/sqlite-encrypted",
-  "holochain_sqlite/sqlite-encrypted",
-  "holochain_keystore/sqlite-encrypted",
-  "holochain_types/sqlite-encrypted",
-  "holochain_zome_types/sqlite-encrypted",
-]
-sqlite = [
-  "holo_hash/sqlite",
-  "holochain_sqlite/sqlite",
-  "holochain_keystore/sqlite",
-  "holochain_types/sqlite",
-  "holochain_zome_types/sqlite",
-]

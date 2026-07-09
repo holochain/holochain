@@ -7,7 +7,6 @@ pub use crate::app::*;
 pub use crate::chain::*;
 pub use crate::combinators::*;
 pub use crate::countersigning::*;
-pub use crate::db::*;
 pub use crate::dht_op::*;
 pub use crate::dna::wasm::*;
 pub use crate::dna::*;

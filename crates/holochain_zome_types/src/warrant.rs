@@ -6,14 +6,6 @@ use holo_hash::*;
 use holochain_integrity_types::Signature;
 pub use holochain_serialized_bytes::prelude::*;
 use holochain_timestamp::Timestamp;
-#[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
-use {
-    rusqlite::{
-        types::{FromSql, FromSqlError, FromSqlResult, ValueRef},
-        ToSql,
-    },
-    std::str::FromStr,
-};
 
 /// A Warrant is an authored, timestamped proof of wrongdoing by another agent.
 #[derive(
@@ -111,23 +103,6 @@ pub enum WarrantType {
 impl From<Warrant> for WarrantType {
     fn from(warrant: Warrant) -> Self {
         warrant.get_type()
-    }
-}
-
-#[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
-impl ToSql for WarrantType {
-    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
-        Ok(rusqlite::types::ToSqlOutput::Owned(
-            format!("{self:?}").into(),
-        ))
-    }
-}
-
-#[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
-impl FromSql for WarrantType {
-    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
-        String::column_result(value)
-            .and_then(|text| WarrantType::from_str(&text).map_err(|_| FromSqlError::InvalidType))
     }
 }
 

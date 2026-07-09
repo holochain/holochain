@@ -9,7 +9,6 @@ use holochain_wasmer_common::*;
 #[derive(
     Clone, Copy, Hash, serde::Serialize, serde::Deserialize, PartialOrd, Ord, Debug, Eq, PartialEq,
 )]
-#[cfg_attr(feature = "full", derive(num_enum::TryFromPrimitive))]
 #[cfg_attr(feature = "full", repr(i32))]
 pub enum ValidationStatus {
     /// All dependencies were found and validation passed
@@ -42,22 +41,6 @@ impl CallbackResult for ValidateCallbackResult {
             | WasmErrorInner::ErrorWhileError
             | WasmErrorInner::Memory => Err(wasm_error),
         }
-    }
-}
-
-#[cfg(feature = "full")]
-impl rusqlite::ToSql for ValidationStatus {
-    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
-        Ok(rusqlite::types::ToSqlOutput::Owned((*self as i32).into()))
-    }
-}
-
-#[cfg(feature = "full")]
-impl rusqlite::types::FromSql for ValidationStatus {
-    fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
-        i32::column_result(value).and_then(|int| {
-            Self::try_from(int).map_err(|_| rusqlite::types::FromSqlError::InvalidType)
-        })
     }
 }
 
