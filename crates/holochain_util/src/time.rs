@@ -83,20 +83,20 @@ mod tests {
         tokio::time::pause();
 
         timed!([10, 20, 30], "ctx1", {
-        tokio::time::advance(tokio::time::Duration::from_millis(15)).await;
-    });
+            tokio::time::advance(tokio::time::Duration::from_millis(15)).await;
+        });
         assert!(logs.get().contains("ctx1"));
         assert!(logs.get().contains("LOW"));
 
         timed!([1000, 2000, 3000], {
-        tokio::time::advance(tokio::time::Duration::from_millis(2001)).await;
-    });
+            tokio::time::advance(tokio::time::Duration::from_millis(2001)).await;
+        });
         assert!(logs.get().contains("MID"));
         assert!(logs.get().contains("from_millis(2001)"));
 
         timed!([1, 2, 3], {
-        tokio::time::advance(tokio::time::Duration::from_millis(3)).await;
-    });
+            tokio::time::advance(tokio::time::Duration::from_millis(3)).await;
+        });
         assert!(logs.get().contains("HIGH"));
         assert!(logs.get().contains("from_millis(3)"));
     }
