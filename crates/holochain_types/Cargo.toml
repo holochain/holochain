@@ -86,9 +86,7 @@ test_utils = [
   "holochain_zome_types/test_utils",
 ]
 
-unstable-migration = [
-  "holochain_zome_types/unstable-migration"
-]
+unstable-migration = ["holochain_zome_types/unstable-migration"]
 
 fuzzing = [
   "dep:proptest",
