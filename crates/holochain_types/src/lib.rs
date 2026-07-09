@@ -19,7 +19,6 @@ pub mod cell_config_overrides;
 pub mod chain;
 pub mod combinators;
 pub mod countersigning;
-pub mod db;
 pub mod dht_op;
 pub mod dht_v2;
 pub mod dna;
@@ -32,8 +31,6 @@ pub mod record;
 pub mod report;
 pub mod share;
 pub mod signal;
-#[warn(missing_docs)]
-pub mod sql;
 pub mod validation_receipt;
 pub mod warrant;
 pub mod web_app;

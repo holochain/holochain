@@ -6,7 +6,6 @@ use crate::core::workflow::WorkflowError;
 use holo_hash::ActionHash;
 use holo_hash::AnyDhtHash;
 use holochain_keystore::KeystoreError;
-use holochain_sqlite::error::DatabaseError;
 use holochain_types::prelude::*;
 use holochain_zome_types::countersigning::CounterSigningError;
 use holochain_zome_types::countersigning::CounterSigningSessionData;
@@ -27,8 +26,6 @@ use thiserror::Error;
 pub enum SysValidationError {
     #[error(transparent)]
     CascadeError(#[from] holochain_cascade::error::CascadeError),
-    #[error(transparent)]
-    DatabaseError(#[from] DatabaseError),
     #[error(transparent)]
     EntryDefStoreError(#[from] EntryDefStoreError),
     #[error(transparent)]

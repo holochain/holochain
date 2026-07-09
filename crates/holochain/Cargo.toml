@@ -34,7 +34,6 @@ holochain_cascade = { version = "^0.7.0-dev.32", default-features = false, path 
 holochain_conductor_api = { version = "^0.7.0-dev.31", path = "../holochain_conductor_api", default-features = false }
 holochain_keystore = { version = "^0.7.0-dev.20", path = "../holochain_keystore", default-features = false }
 holochain_p2p = { version = "^0.7.0-dev.32", default-features = false, path = "../holochain_p2p" }
-holochain_sqlite = { version = "^0.7.0-dev.24", path = "../holochain_sqlite" }
 holochain_serialized_bytes = "=0.0.57"
 holochain_state = { version = "^0.7.0-dev.32", path = "../holochain_state" }
 holochain_types = { version = "^0.7.0-dev.31", path = "../holochain_types" }
@@ -69,7 +68,6 @@ one_err = "0.0.8"
 parking_lot = "0.12"
 rand = "0.9"
 rand-utf8 = "0.0.2"
-rusqlite = { version = "0.37" }
 # Used to set a crypto provider for TLS connections.
 rustls = "0.23.25"
 serde = { version = "1.0", features = ["derive"] }
@@ -164,13 +162,7 @@ path = "src/bin/holochain/main.rs"
 workspace = true
 
 [features]
-default = [
-  "sqlite-encrypted",
-  "encryption",
-  "schema",
-  "wasmer-sys-cranelift",
-  "transport-iroh",
-]
+default = ["encryption", "schema", "wasmer-sys-cranelift", "transport-iroh"]
 
 # Exposes additional functionality only needed for integration tests.
 # This feature should be turned off for production builds.
@@ -178,7 +170,6 @@ test_utils = [
   "dep:fixt",
   "dep:diff",
   "hdk/test_utils",
-  "holochain_sqlite/test_utils",
   "holochain_state/test_utils",
   "holochain_types/test_utils",
   "holochain_zome_types/test_utils",
@@ -208,38 +199,8 @@ only_check_wasms = ["holochain_wasm_test_utils/only_check"]
 # Enable schema generation for kitsune2 related types in the conductor config
 schema = ["holochain_conductor_api/schema"]
 
-# Enables at-rest encryption of the SQLite database.
-# Incompatible with "sqlite".
-sqlite-encrypted = [
-  "rusqlite/bundled-sqlcipher-vendored-openssl",
-  "holochain_keystore/sqlite-encrypted",
-  "holo_hash/sqlite-encrypted",
-  "holochain_cascade/sqlite-encrypted",
-  "holochain_conductor_api/sqlite-encrypted",
-  "holochain_p2p/sqlite-encrypted",
-  "holochain_sqlite/sqlite-encrypted",
-  "holochain_state/sqlite-encrypted",
-  "holochain_types/sqlite-encrypted",
-  "holochain_zome_types/sqlite-encrypted",
-]
-
-# Enables at-rest encryption of the SQLite database.
+# Enables at-rest encryption of the database.
 encryption = ["holochain_state/encryption"]
-
-# Compile SQLite from source rather than depending on a library.
-# Incompatible with "sqlite-encrypted"
-sqlite = [
-  "rusqlite/bundled",
-  "holo_hash/sqlite",
-  "holochain_cascade/sqlite",
-  "holochain_conductor_api/sqlite",
-  "holochain_keystore/sqlite",
-  "holochain_p2p/sqlite",
-  "holochain_sqlite/sqlite",
-  "holochain_state/sqlite",
-  "holochain_types/sqlite",
-  "holochain_zome_types/sqlite",
-]
 
 transport-iroh = [
   "holochain_p2p/transport-iroh",
@@ -278,7 +239,7 @@ unstable-migration = [
 # a full or empty arc.
 unstable-sharding = []
 
-sweettest = ["test_utils", "sqlite"]
+sweettest = ["test_utils"]
 
 # Enables tracing instrumentation
 # (we experience segfaults in some tests if there is too much instrumentation)

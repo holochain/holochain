@@ -1,17 +1,11 @@
 //! Helpers for unit tests
 
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use base64::Engine;
 use holochain_keystore::MetaLairClient;
-use holochain_sqlite::rusqlite::Statement;
-use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::prelude::*;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tempfile::TempDir;
-
-pub mod mutations_helpers;
 
 /// Create an in-memory [`crate::dht_store::DhtStore`] for use in tests.
 ///
@@ -134,41 +128,4 @@ macro_rules! here {
     ($test: expr) => {
         concat!($test, " !!!_LOOK HERE:---> ", file!(), ":", line!())
     };
-}
-
-#[cfg_attr(feature = "instrument", tracing::instrument(skip(txn)))]
-pub fn dump_db(txn: &Transaction) {
-    let dump = |mut stmt: Statement| {
-        let mut rows = stmt.query([]).unwrap();
-        while let Some(row) = rows.next().unwrap() {
-            for column in row.as_ref().column_names() {
-                let row = row.get_ref_unwrap(column);
-                match row {
-                    holochain_sqlite::rusqlite::types::ValueRef::Null
-                    | holochain_sqlite::rusqlite::types::ValueRef::Integer(_)
-                    | holochain_sqlite::rusqlite::types::ValueRef::Real(_) => {
-                        tracing::debug!(?column, ?row);
-                    }
-                    holochain_sqlite::rusqlite::types::ValueRef::Text(text) => {
-                        tracing::debug!(?column, row = ?String::from_utf8_lossy(text));
-                    }
-                    holochain_sqlite::rusqlite::types::ValueRef::Blob(blob) => {
-                        let blob = URL_SAFE_NO_PAD.encode(blob);
-                        tracing::debug!("column: {:?} row:{}", column, blob);
-                    }
-                }
-            }
-        }
-    };
-    tracing::debug!("Actions:");
-    let stmt = txn.prepare("SELECT * FROM Action").unwrap();
-    dump(stmt);
-
-    tracing::debug!("Entries:");
-    let stmt = txn.prepare("SELECT * FROM Entry").unwrap();
-    dump(stmt);
-
-    tracing::debug!("DhtOps:");
-    let stmt = txn.prepare("SELECT * FROM DhtOp").unwrap();
-    dump(stmt);
 }

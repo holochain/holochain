@@ -15,7 +15,6 @@ futures = "0.3"
 holo_hash = { version = "^0.7.0-dev.11", path = "../holo_hash", features = [
   "full",
 ] }
-holochain_sqlite = { version = "^0.7.0-dev.24", path = "../holochain_sqlite" }
 holochain_keystore = { version = "^0.7.0-dev.20", path = "../holochain_keystore" }
 holochain_p2p = { version = "^0.7.0-dev.32", default-features = false, path = "../holochain_p2p" }
 holochain_serialized_bytes = "=0.0.57"
@@ -57,20 +56,5 @@ test_utils = [
 ]
 
 instrument = []
-
-sqlite-encrypted = [
-  "holo_hash/sqlite-encrypted",
-  "holochain_sqlite/sqlite-encrypted",
-  "holochain_state/sqlite-encrypted",
-  "holochain_types/sqlite-encrypted",
-  "holochain_zome_types/sqlite-encrypted",
-]
-sqlite = [
-  "holo_hash/sqlite",
-  "holochain_sqlite/sqlite",
-  "holochain_state/sqlite",
-  "holochain_types/sqlite",
-  "holochain_zome_types/sqlite",
-]
 
 transport-iroh = ["holochain_p2p/transport-iroh"]

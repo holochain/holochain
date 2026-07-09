@@ -18,7 +18,7 @@ use holochain_conductor_api::conductor::paths::DatabasesRootPath;
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::DynHcP2p;
-use holochain_sqlite::prelude::{DatabaseResult, DbKey, DbSyncLevel, DbSyncStrategy};
+use holochain_state::data::{DbKey, DbSyncLevel};
 use holochain_state::{host_fn_workspace::SourceChainWorkspace, prelude::*};
 use holochain_util::timed;
 use lair_keystore_api::prelude::SharedLockedArray;
@@ -137,27 +137,15 @@ impl Spaces {
         if danger_print_db_secrets {
             eprintln!(
                 "--beg-db-secrets--{}--end-db-secrets--",
-                &String::from_utf8_lossy(&*db_key.unlocked.lock().unwrap().lock())
+                &String::from_utf8_lossy(&*db_key.key.lock().unwrap().lock())
             );
         }
 
-        let db_sync_strategy = config.db_sync_strategy;
-        let db_sync_level = match db_sync_strategy {
-            DbSyncStrategy::Fast => DbSyncLevel::Off,
-            DbSyncStrategy::Resilient => DbSyncLevel::Normal,
-        };
+        let db_sync = convert_db_sync_level(config.db_sync_level);
 
-        let db_sync = match db_sync_level {
-            DbSyncLevel::Off => holochain_state::data::DbSyncLevel::Off,
-            DbSyncLevel::Normal => holochain_state::data::DbSyncLevel::Normal,
-            DbSyncLevel::Full => holochain_state::data::DbSyncLevel::Full,
-        };
-
-        // Convert the DbKey from holochain_sqlite to holochain_state format
-        let data_db_key =
-            holochain_state::data::DbKey::load(db_key.locked.clone(), passphrase.clone())
-                .await
-                .map_err(ConductorError::other)?;
+        let data_db_key = DbKey::load(db_key.locked.clone(), passphrase.clone())
+            .await
+            .map_err(ConductorError::other)?;
 
         let conductor_db = holochain_state::data::open_db(
             root_db_dir.as_ref(),
@@ -210,11 +198,8 @@ impl Spaces {
     }
 
     /// Block some target.
-    pub async fn block(&self, input: Block) -> DatabaseResult<()> {
-        self.conductor_store
-            .block(input)
-            .await
-            .map_err(|e| DatabaseError::Other(e.into()))
+    pub async fn block(&self, input: Block) -> StateMutationResult<()> {
+        self.conductor_store.block(input).await
     }
 
     /// Check if some target is blocked.
@@ -340,7 +325,7 @@ impl Spaces {
     }
 
     /// Get the space if it exists or create it if it doesn't.
-    pub fn get_or_create_space(&self, dna_hash: &DnaHash) -> DatabaseResult<Space> {
+    pub fn get_or_create_space(&self, dna_hash: &DnaHash) -> ConductorResult<Space> {
         self.get_or_create_space_ref(dna_hash, |s| s.clone())
     }
 
@@ -360,7 +345,7 @@ impl Spaces {
         self.queue_consumer_map.remove_all_for_dna(dna_hash);
     }
 
-    fn get_or_create_space_ref<F, R>(&self, dna_hash: &DnaHash, f: F) -> DatabaseResult<R>
+    fn get_or_create_space_ref<F, R>(&self, dna_hash: &DnaHash, f: F) -> ConductorResult<R>
     where
         F: Fn(&Space) -> R,
     {
@@ -374,7 +359,7 @@ impl Spaces {
                         let space = Space::new(
                             Arc::new(dna_hash.clone()),
                             self.db_dir.to_path_buf(),
-                            self.config.db_sync_strategy,
+                            convert_db_sync_level(self.config.db_sync_level),
                             self.config.db_max_readers,
                             self.space_data_config.clone(),
                             Some(self.data_db_key.clone()),
@@ -389,7 +374,7 @@ impl Spaces {
     }
 
     /// Get the new-schema DHT store (this will create the space if it doesn't already exist).
-    pub fn dht_store(&self, dna_hash: &DnaHash) -> DatabaseResult<DhtStore> {
+    pub fn dht_store(&self, dna_hash: &DnaHash) -> ConductorResult<DhtStore> {
         self.get_or_create_space_ref(dna_hash, |space| space.dht_store.clone())
     }
 
@@ -397,7 +382,7 @@ impl Spaces {
     pub fn peer_meta_store(
         &self,
         dna_hash: &DnaHash,
-    ) -> DatabaseResult<holochain_state::peer_metadata_store::PeerMetaStore> {
+    ) -> ConductorResult<holochain_state::peer_metadata_store::PeerMetaStore> {
         self.get_or_create_space_ref(dna_hash, |space| space.peer_meta_store.clone())
     }
 
@@ -482,17 +467,12 @@ impl Space {
     fn new(
         dna_hash: Arc<DnaHash>,
         root_db_dir: PathBuf,
-        db_sync_strategy: DbSyncStrategy,
+        data_db_sync_level: DbSyncLevel,
         db_max_readers: u16,
         space_data_config: holochain_state::data::HolochainDataConfig,
         data_db_key: Option<holochain_state::data::DbKey>,
-    ) -> DatabaseResult<Self> {
-        let data_db_sync_level = match db_sync_strategy {
-            DbSyncStrategy::Fast => holochain_state::data::DbSyncLevel::Off,
-            DbSyncStrategy::Resilient => holochain_state::data::DbSyncLevel::Normal,
-        };
-
-        let (peer_meta_store, dht_store) = tokio::task::block_in_place(|| {
+    ) -> ConductorResult<Self> {
+        tokio::task::block_in_place(|| {
             let peer_meta_store_db = tokio::runtime::Handle::current()
                 .block_on(holochain_state::data::open_db(
                     &root_db_dir,
@@ -503,7 +483,7 @@ impl Space {
                         max_readers: db_max_readers,
                     },
                 ))
-                .map_err(|e| holochain_sqlite::error::DatabaseError::Other(e.into()))?;
+                .map_err(ConductorError::other)?;
             let peer_meta_store =
                 holochain_state::peer_metadata_store::PeerMetaStore::new(peer_meta_store_db);
             let new_dht_db = tokio::runtime::Handle::current()
@@ -512,24 +492,19 @@ impl Space {
                     holochain_state::data::Dht::new(dna_hash.clone()),
                     space_data_config,
                 ))
-                .map_err(|e| DatabaseError::Other(e.into()))?;
+                .map_err(ConductorError::other)?;
             let dht_store = DhtStore::new(new_dht_db);
-            DatabaseResult::Ok((peer_meta_store, dht_store))
-        })?;
 
-        let witnessing_workspace = WitnessingWorkspace::default();
-        let incoming_op_hashes = IncomingOpHashes::default();
-        let incoming_ops_batch = IncomingOpsBatch::default();
-        let r = Self {
-            dna_hash,
-            dht_store,
-            peer_meta_store,
-            countersigning_workspaces: Default::default(),
-            witnessing_workspace,
-            incoming_op_hashes,
-            incoming_ops_batch,
-        };
-        Ok(r)
+            Ok(Self {
+                dna_hash,
+                dht_store,
+                peer_meta_store,
+                countersigning_workspaces: Default::default(),
+                witnessing_workspace: WitnessingWorkspace::default(),
+                incoming_op_hashes: IncomingOpHashes::default(),
+                incoming_ops_batch: IncomingOpsBatch::default(),
+            })
+        })
     }
 
     /// Construct a SourceChain for an author in this Space
@@ -596,6 +571,16 @@ impl TestSpaces {
             spaces,
             test_spaces,
         }
+    }
+}
+
+fn convert_db_sync_level(
+    level: holochain_conductor_api::config::conductor::DbSyncLevel,
+) -> DbSyncLevel {
+    match level {
+        holochain_conductor_api::config::conductor::DbSyncLevel::Off => DbSyncLevel::Off,
+        holochain_conductor_api::config::conductor::DbSyncLevel::Normal => DbSyncLevel::Normal,
+        holochain_conductor_api::config::conductor::DbSyncLevel::Full => DbSyncLevel::Full,
     }
 }
 

@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 
 - Holochain gains a new `encryption` feature to control whether its databases are encrypted or not. This replaces the previous `sqlite-encrypted` feature which no longer has any effect.
+- **BREAKING CHANGE** Remove the `holochain_sqlite` crate now that persistence has moved to `holochain_data`.
 - **BREAKING CHANGE** Databases created by Holochain have been renamed now that the legacy databases are no longer in use.
 - **BREAKING CHANGE**: `DnaStorageInfo` (returned by the `StorageInfo` admin call) drops its `authored_data_size`/`authored_data_size_on_disk` and `cache_data_size`/`cache_data_size_on_disk` fields. An agent's source-chain data now lives in the per-DNA DHT database and is counted in `dht_data_size`/`dht_data_size_on_disk`; the separate cache figure is removed. \#5844
 

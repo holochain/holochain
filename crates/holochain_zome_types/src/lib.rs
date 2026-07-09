@@ -80,31 +80,3 @@ pub mod dependencies {
     pub use ::holochain_integrity_types;
     pub use ::subtle;
 }
-
-/// Helper macro for implementing ToSql, when using rusqlite as a dependency
-#[macro_export]
-macro_rules! impl_to_sql_via_as_ref {
-    ($s: ty) => {
-        impl ::rusqlite::ToSql for $s {
-            fn to_sql(&self) -> ::rusqlite::Result<::rusqlite::types::ToSqlOutput<'_>> {
-                Ok(::rusqlite::types::ToSqlOutput::Borrowed(
-                    self.as_ref().into(),
-                ))
-            }
-        }
-    };
-}
-
-/// Helper macro for implementing ToSql, when using rusqlite as a dependency
-#[macro_export]
-macro_rules! impl_to_sql_via_display {
-    ($s: ty) => {
-        impl ::rusqlite::ToSql for $s {
-            fn to_sql(&self) -> ::rusqlite::Result<::rusqlite::types::ToSqlOutput<'_>> {
-                Ok(::rusqlite::types::ToSqlOutput::Owned(
-                    self.to_string().into(),
-                ))
-            }
-        }
-    };
-}

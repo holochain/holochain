@@ -37,7 +37,6 @@
 
 use crate::conductor::process::ERROR_CODE;
 use crate::config::conductor::paths::DataRootPath;
-use holochain_types::prelude::DbSyncStrategy;
 use schemars::JsonSchema;
 #[cfg(feature = "schema")]
 use schemars::Schema;
@@ -91,14 +90,14 @@ pub struct ConductorConfig {
 
     /// Override the default database synchronous strategy.
     ///
-    /// See [sqlite documentation] for information about database sync levels.
-    /// See [`DbSyncStrategy`] for details.
+    /// See [sqlite documentation](https://www.sqlite.org/pragma.html#pragma_synchronous) for information about database sync levels.
+    /// See [`DbSyncLevel`] for details.
     /// This is best left at its default value unless you know what you
     /// are doing.
     ///
     /// [sqlite documentation]: https://www.sqlite.org/pragma.html#pragma_synchronous
     #[serde(default)]
-    pub db_sync_strategy: DbSyncStrategy,
+    pub db_sync_level: DbSyncLevel,
 
     /// Override the default number of read connections available per database.
     ///
@@ -146,6 +145,21 @@ pub struct ConductorConfig {
     pub tracing_scope: Option<String>,
 }
 
+/// Database synchronous level configuration.
+///
+/// Corresponds to the `PRAGMA synchronous` pragma.
+/// See [sqlite documentation](https://www.sqlite.org/pragma.html#pragma_synchronous).
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize, JsonSchema)]
+pub enum DbSyncLevel {
+    /// Use xSync for all writes. Not needed for WAL mode.
+    Full,
+    /// Sync at critical moments. Default.
+    #[default]
+    Normal,
+    /// Syncing is left to the operating system and power loss could result in corrupted database.
+    Off,
+}
+
 /// Default value is either 8, or the number of CPU cores multiplied by 2, whichever is greater.
 fn default_db_max_readers() -> u16 {
     calculate_default_db_max_readers(num_cpus::get())
@@ -189,7 +203,7 @@ impl Default for ConductorConfig {
             keystore: KeystoreConfig::default(),
             admin_interfaces: None,
             network: NetworkConfig::default(),
-            db_sync_strategy: DbSyncStrategy::default(),
+            db_sync_level: DbSyncLevel::default(),
             db_max_readers: default_db_max_readers(),
             incoming_request_concurrency_limit: default_incoming_request_concurrency_limit(),
             restore_chain_quorum: default_restore_chain_quorum(),
@@ -794,7 +808,7 @@ mod tests {
                 network: NetworkConfig::default(),
                 keystore: KeystoreConfig::DangerTestKeystore,
                 admin_interfaces: None,
-                db_sync_strategy: DbSyncStrategy::default(),
+                db_sync_level: DbSyncLevel::default(),
                 db_max_readers: default_db_max_readers(),
                 tuning_params: None,
                 tracing_scope: None,
@@ -931,7 +945,7 @@ admin_interfaces:
         }
       }
 
-    db_sync_strategy: Fast
+    db_sync_level: Off
     db_max_readers: 100
     incoming_request_concurrency_limit: 100
     "#;
@@ -968,7 +982,7 @@ admin_interfaces:
                     }
                 }]),
                 network: network_config,
-                db_sync_strategy: DbSyncStrategy::Fast,
+                db_sync_level: DbSyncLevel::Off,
                 db_max_readers: 100,
                 incoming_request_concurrency_limit: 100,
                 restore_chain_quorum: default_restore_chain_quorum(),
@@ -998,7 +1012,7 @@ admin_interfaces:
                     connection_url: url2::url2!("unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"),
                 },
                 admin_interfaces: None,
-                db_sync_strategy: DbSyncStrategy::Resilient,
+                db_sync_level: DbSyncLevel::default(),
                 db_max_readers: default_db_max_readers(),
                 tuning_params: None,
                 tracing_scope: None,

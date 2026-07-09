@@ -44,8 +44,7 @@ pub(crate) type WriteTxnDurationMetric = Histogram;
 ///
 /// The histogram carries the same `kind`/`id` attributes as
 /// [`create_connection_use_time_metric`]. It is recorded when a write
-/// transaction is committed, mirroring how `holochain_sqlite` timed its
-/// exclusive write transactions.
+/// transaction is committed, matching the legacy database timing behavior.
 pub(crate) fn create_write_txn_duration_metric<I: DatabaseIdentifier>(
     identifier: &I,
 ) -> WriteTxnDurationMetric {

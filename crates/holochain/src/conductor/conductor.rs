@@ -2019,7 +2019,7 @@ mod app_status_impls {
             );
             let space = self
                 .get_or_create_space(cell_id.dna_hash())
-                .map_err(|e| CellError::FailedToCreateDnaSpace(ConductorError::from(e).into()))?;
+                .map_err(|e| CellError::FailedToCreateDnaSpace(e.into()))?;
             let signal_tx = self
                 .get_signal_tx(cell_id)
                 .await
@@ -2968,14 +2968,14 @@ mod accessor_impls {
         }
 
         /// Get a dna space or create it if one doesn't exist.
-        pub(crate) fn get_or_create_space(&self, dna_hash: &DnaHash) -> DatabaseResult<Space> {
+        pub(crate) fn get_or_create_space(&self, dna_hash: &DnaHash) -> ConductorResult<Space> {
             self.spaces.get_or_create_space(dna_hash)
         }
 
         pub(crate) fn get_or_create_dht_store(
             &self,
             dna_hash: &DnaHash,
-        ) -> DatabaseResult<DhtStore> {
+        ) -> ConductorResult<DhtStore> {
             self.spaces.dht_store(dna_hash)
         }
 
@@ -3493,7 +3493,7 @@ pub(crate) async fn genesis_cells(
         tokio::spawn(async move {
             let space = conductor
                 .get_or_create_space(cell_id_inner.dna_hash())
-                .map_err(|e| CellError::FailedToCreateDnaSpace(ConductorError::from(e).into()))?;
+                .map_err(|e| CellError::FailedToCreateDnaSpace(e.into()))?;
 
             let dht_store = space.dht_store;
             let ribosome = conductor.get_ribosome(&cell_id_inner).map_err(Box::new)?;
