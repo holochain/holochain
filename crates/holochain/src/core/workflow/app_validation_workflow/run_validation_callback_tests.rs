@@ -18,9 +18,10 @@ use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_types::{
     chain::MustGetAgentActivityResponse,
-    dht_op::{ChainOp, DhtOpHashed, WireOps},
+    dht_v2::{ChainOp, DhtOp, DhtOpHashed},
     prelude::SignedActionHashedExt,
     record::WireRecordOps,
+    wire_ops::{RenderedOp, RenderedOps, WireOps},
 };
 use holochain_wasm_test_utils::TestWasm;
 // The wasm `validate(op: Op)` callback decodes the v2 `Op`; `LegacyAction` is
@@ -118,19 +119,14 @@ async fn validation_callback_must_get_action() {
     assert_matches!(outcome, Outcome::AwaitingDeps(hashes) if hashes == vec![create_action.to_hash().into()]);
 
     // Record the action to be must-got during validation into the DhtStore,
-    // which the cascade's local read now consults.
-    let dht_op = ChainOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
+    // which the cascade's local read consults.
+    let signed = SignedAction::new(from_legacy_action(&create_action), fixt!(Signature));
+    let dht_op = DhtOp::from(ChainOp::AgentActivity(signed));
     let dht_op_hashed = DhtOpHashed::from_content_sync(dht_op);
-    // `dht_op_hashed` is legacy (see the `holochain_types::dht_op::{ChainOp,
-    // DhtOpHashed, WireOps}` import above); `record_incoming_ops` is
-    // v2-native, so project it at this boundary via `from_legacy_dht_op`.
     test_space
         .space
         .dht_store
-        .record_incoming_ops(vec![(
-            holochain_types::dht_v2::from_legacy_dht_op(&dht_op_hashed),
-            false,
-        )])
+        .record_incoming_ops(vec![(dht_op_hashed, false)])
         .await
         .unwrap();
 
@@ -437,7 +433,7 @@ async fn validation_callback_rejects_op_depending_on_invalid_op() {
     // Cache the invalid Create record into the DhtStore (integrated, as a
     // fetched op would be) and mark it rejected, so the cascade's
     // get_record_details resolves it as a rejected record.
-    let rendered = holochain_types::dht_op::RenderedOp::new(
+    let rendered = RenderedOp::new(
         create_action.clone(),
         fixt!(Signature),
         None,
@@ -445,7 +441,7 @@ async fn validation_callback_rejects_op_depending_on_invalid_op() {
     )
     .unwrap();
     let create_op_hash = rendered.op_hash.clone();
-    let rendered_ops = holochain_types::dht_op::RenderedOps {
+    let rendered_ops = RenderedOps {
         entry: Some(holochain_types::prelude::EntryHashed::with_pre_hashed(
             create_entry,
             create_entry_hash,

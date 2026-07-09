@@ -1,8 +1,8 @@
 use super::*;
 use holo_hash::{ActionHash, AnyLinkableHash, DnaHash, EntryHash};
-use holochain_types::dht_op::{RenderedOp, RenderedOps};
 use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry};
 use holochain_types::prelude::Signature;
+use holochain_types::wire_ops::{RenderedOp, RenderedOps};
 // This test module seeds the op-cache/limbo pipeline directly with v2
 // `ChainOp`/`DhtOp`; pin `Action` to its v2 shape. The handful of fixture
 // builders that still feed `RenderedOp`/`RenderedOps` (the cascade/cache

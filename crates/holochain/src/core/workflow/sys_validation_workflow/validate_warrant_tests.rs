@@ -19,6 +19,7 @@ use holo_hash::fixt::EntryHashFixturator;
 use holochain_cascade::CascadeSource;
 // `sign_action` fixtures are built from the legacy per-variant `Create`
 // action; `from_legacy_action` converts to the v2 shape actually signed.
+use holochain_types::dht_v2::{DhtOp, DhtOpHashed};
 use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
 use holochain_zome_types::dht_v2::from_legacy_action;
 
@@ -699,9 +700,8 @@ impl ChainForkWarrantTestCase {
     /// Validate an already-hashed DhtOp, as produced by `make_invalid_chain_warrant_op`.
     async fn validate_warrant_dht_op(&self, op: DhtOpHashed) -> WorkflowResult<Outcome> {
         let dna_hash = DnaDefHashed::from_content_sync(self.dna_def.clone()).hash;
-        let v2_op = holochain_types::dht_v2::from_legacy_dht_op(&op);
         validate_op(
-            v2_op.as_content(),
+            op.as_content(),
             &dna_hash,
             self.validation_dependencies.clone(),
         )

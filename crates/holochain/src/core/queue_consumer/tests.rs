@@ -240,8 +240,13 @@ async fn publish_loop() {
     });
     let author = action.author().clone();
     let signature = Signature(vec![3; SIGNATURE_BYTES].try_into().unwrap());
-    let op = ChainOp::RegisterAgentActivity(signature, action);
-    let op = DhtOpHashed::from_content_sync(op);
+    let v2_action = holochain_types::dht_v2::from_legacy_action(&action);
+    let signed = holochain_types::dht_v2::SignedAction::new(v2_action, signature);
+    let op = holochain_types::dht_v2::DhtOpHashed::from_content_sync(
+        holochain_types::dht_v2::DhtOp::from(holochain_types::dht_v2::ChainOp::AgentActivity(
+            signed,
+        )),
+    );
     let op_hash = op.to_hash();
 
     // The DhtStore's sqlx pool has an acquire_timeout driven by tokio time.
@@ -251,12 +256,8 @@ async fn publish_loop() {
     tokio::time::resume();
     let dht_store = test_dht_store(fixt!(DnaHash)).await;
     // Seed the op as an integrated, self-authored op ready to publish.
-    // `op` is legacy (this module builds legacy `ChainOp`/`DhtOp` via
-    // `holochain_types::prelude::*`); `test_insert_authored_chain_op` is
-    // v2-native, so project it at this boundary via `from_legacy_dht_op`.
-    let v2_op = holochain_types::dht_v2::from_legacy_dht_op(&op);
     dht_store
-        .test_insert_authored_chain_op(v2_op, None, None, None)
+        .test_insert_authored_chain_op(op, None, None, None)
         .await
         .unwrap();
     tokio::time::pause();

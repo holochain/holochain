@@ -78,7 +78,7 @@
 //! #### Workflow description
 //!
 //! - The workflow starts by fetching all the ops that need to be validated from the database. The ops are processed as follows:
-//!     - Ops are sorted by [`OpOrder`], to make it more likely that incoming ops will be processed in the order they were created.
+//!     - Ops are sorted by op order, to make it more likely that incoming ops will be processed in the order they were created.
 //!     - The dependencies of these ops are then concurrently fetched from any of the local databases. Missing dependencies are handled later.
 //!     - The [validation checks](#validation-checks) are run for each op.
 //!     - For any chain ops that passed validation, they will be marked as ready for app validation in the database.
@@ -476,15 +476,10 @@ async fn sys_validation_workflow_inner(
         let warranted = warrants.len();
         if warranted > 0 {
             // "self-publish" warrants, i.e. record them as if they were published
-            // to us by another node. The warrant builders return the legacy
-            // `DhtOpHashed`, so project them to v2 for the v2-native store.
-            let locally_validated_warrants: Vec<DhtOpHashed> = warrants
-                .iter()
-                .map(holochain_types::dht_v2::from_legacy_dht_op)
-                .collect();
+            // to us by another node.
             workspace
                 .dht_store
-                .record_locally_validated_warrants(locally_validated_warrants)
+                .record_locally_validated_warrants(warrants)
                 .await?;
         }
 
@@ -1672,7 +1667,7 @@ pub async fn make_invalid_chain_warrant_op(
     warrant_author: AgentPubKey,
     op: &ChainOp,
     reason: &str,
-) -> WorkflowResult<holochain_types::dht_op::DhtOpHashed> {
+) -> WorkflowResult<holochain_types::dht_v2::DhtOpHashed> {
     let signed_action = op.signed_action();
     let action = signed_action.data();
     let action_author = action.author().clone();
@@ -1688,8 +1683,7 @@ pub async fn make_invalid_chain_warrant_op(
     let warrant_op = WarrantOp::sign(keystore, warrant)
         .await
         .map_err(|e| super::WorkflowError::Other(e.into()))?;
-    let op: holochain_types::dht_op::DhtOp = warrant_op.into();
-    let op = op.into_hashed();
+    let op = holochain_types::dht_v2::DhtOp::from((*warrant_op).clone()).into_hashed();
     Ok(op)
 }
 
@@ -1699,7 +1693,7 @@ pub async fn make_fork_warrant_op_inner(
     chain_author: AgentPubKey,
     action_pair: ((ActionHash, Signature), (ActionHash, Signature)),
     seq: u32,
-) -> WorkflowResult<holochain_types::dht_op::DhtOpHashed> {
+) -> WorkflowResult<holochain_types::dht_v2::DhtOpHashed> {
     debug_assert_ne!(action_pair.0 .0, action_pair.1 .0);
     tracing::warn!(
         "Authoring warrant for chain fork by {chain_author}. Action hashes: ({}, {})",
@@ -1720,8 +1714,7 @@ pub async fn make_fork_warrant_op_inner(
     let warrant_op = WarrantOp::sign(keystore, warrant)
         .await
         .map_err(|e| super::WorkflowError::Other(e.into()))?;
-    let op: holochain_types::dht_op::DhtOp = warrant_op.into();
-    let op = op.into_hashed();
+    let op = holochain_types::dht_v2::DhtOp::from((*warrant_op).clone()).into_hashed();
     Ok(op)
 }
 

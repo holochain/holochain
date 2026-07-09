@@ -15,7 +15,9 @@ use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::*;
 use holochain_state::test_utils::test_dht_store;
+use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry, SignedAction};
 use holochain_zome_types::dependencies::holochain_integrity_types::action::Action;
+use holochain_zome_types::dht_v2::from_legacy_action;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -277,41 +279,35 @@ async fn private_entries_are_not_published() {
         }),
     };
     let action = Action::Create(create_action.clone());
-    let new_entry_action = NewEntryAction::Create(create_action.clone());
+    let v2_action = from_legacy_action(&action);
 
-    let register_agent_activity_op = DhtOpHashed::from_content_sync(
-        ChainOp::RegisterAgentActivity(fixt!(Signature), action.clone()),
-    );
-    let store_entry_op = DhtOpHashed::from_content_sync(ChainOp::StoreEntry(
-        fixt!(Signature),
-        new_entry_action.clone(),
-        fixt!(Entry),
+    let register_agent_activity_op = DhtOpHashed::from_content_sync(DhtOp::from(
+        ChainOp::AgentActivity(SignedAction::new(v2_action.clone(), fixt!(Signature))),
     ));
-    let store_record_op = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
-        fixt!(Signature),
-        action,
-        RecordEntry::Hidden,
-    ));
+    let store_entry_op = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::CreateEntry(
+        SignedAction::new(v2_action.clone(), fixt!(Signature)),
+        OpEntry::Present(fixt!(Entry)),
+    )));
+    let store_record_op = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::CreateRecord(
+        SignedAction::new(v2_action, fixt!(Signature)),
+        OpEntry::Hidden,
+    )));
 
-    // Double check that entry is not accessible in the RegisterAgentActivity op,
-    // which does get published.
-    assert!(matches!(
-        register_agent_activity_op.as_chain_op().unwrap().entry(),
-        RecordEntry::Hidden
-    ));
+    // The v2 AgentActivity op structurally carries no entry, so the private
+    // entry cannot leak through the op that gets published.
+    match register_agent_activity_op.as_content() {
+        DhtOp::ChainOp(op) => assert!(op.op_entry().is_none()),
+        DhtOp::WarrantOp(_) => panic!("expected a chain op"),
+    }
 
     let register_agent_activity_op_hash = register_agent_activity_op.as_hash().clone();
     let store_entry_op_hash = store_entry_op.as_hash().clone();
     let store_record_op_hash = store_record_op.as_hash().clone();
 
     // Seed all three ops as integrated, self-authored ops in the DHT store.
-    // `test_insert_authored_chain_op` is v2-native; this module otherwise
-    // builds legacy ops throughout (see `crate::prelude::*`), so project
-    // each one at this boundary via `from_legacy_dht_op`.
     for op in [register_agent_activity_op, store_entry_op, store_record_op] {
-        let v2_op = holochain_types::dht_v2::from_legacy_dht_op(&op);
         dht_store
-            .test_insert_authored_chain_op(v2_op, None, None, None)
+            .test_insert_authored_chain_op(op, None, None, None)
             .await
             .unwrap();
     }
@@ -369,13 +365,12 @@ async fn create_op(dht_store: &DhtStore, author: AgentPubKey) -> StateMutationRe
     create_action.author = author;
     let action = Action::Create(create_action);
 
-    let op =
-        DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(fixt!(Signature), action));
+    let signed = SignedAction::new(from_legacy_action(&action), fixt!(Signature));
+    let op = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::AgentActivity(signed)));
 
     let op_hash = op.as_hash().clone();
-    let v2_op = holochain_types::dht_v2::from_legacy_dht_op(&op);
     dht_store
-        .test_insert_authored_chain_op(v2_op, None, None, None)
+        .test_insert_authored_chain_op(op, None, None, None)
         .await?;
 
     Ok(op_hash)
@@ -411,7 +406,7 @@ fn build_warrant_op(agent: &AgentPubKey) -> DhtOpHashed {
         ),
         fixt!(Signature),
     );
-    DhtOpHashed::from_content_sync(DhtOp::WarrantOp(Box::new(WarrantOp::from(warrant))))
+    DhtOpHashed::from_content_sync(DhtOp::from(warrant))
 }
 
 /// The workflow publishes an integrated, self-authored warrant and records that
@@ -425,9 +420,8 @@ async fn workflow_publishes_warrant_once() {
     let agent = fixt!(AgentPubKey);
 
     let warrant_op = build_warrant_op(&agent);
-    let v2_warrant_op = holochain_types::dht_v2::from_legacy_dht_op(&warrant_op);
     dht_store
-        .test_insert_integrated_warrant(v2_warrant_op)
+        .test_insert_integrated_warrant(warrant_op)
         .await
         .unwrap();
 

@@ -14,12 +14,13 @@ use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::fixt::EntryHashFixturator;
 use holochain_cascade::CascadeSource;
 use holochain_cascade::MockCascade;
-// This whole module is a LEGACY island: `validate_op`/`ChainOp`/`DhtOp` are the
-// legacy op-pipeline types, so `Action` (otherwise the v2 struct via
-// `crate::prelude::*`) is pinned to the legacy per-variant enum. Signing
-// (`SignedActionHashed::sign`) and the `PrevActionError` conversions still
-// only operate on the v2 projection, so actions are converted at those
-// boundaries via `from_legacy_action`.
+// This module builds v2 op-pipeline types (`ChainOp`/`DhtOp`) directly and
+// feeds them to the v2-native `validate_op`. Actions are still authored with
+// the legacy per-variant `Action` enum, because the fixturators (`fixt!(Create)`
+// etc.) produce legacy sub-structs; each is converted to the v2 projection via
+// `from_legacy_action` at the point it is wrapped in a `SignedAction` (see the
+// `signed` helper) or handed to a `PrevActionError`.
+use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry, SignedAction};
 use holochain_zome_types::dependencies::holochain_integrity_types::action::Action;
 use holochain_zome_types::dht_v2::from_legacy_action;
 use std::collections::HashMap;
@@ -36,7 +37,7 @@ async fn validate_valid_dna_op() {
         timestamp: Timestamp::now(),
         hash: test_case.dna_def_hash().hash,
     };
-    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Dna(dna_action)).into();
+    let op = ChainOp::AgentActivity(signed(Action::Dna(dna_action), fixt!(Signature))).into();
 
     let outcome = test_case.with_op(op).run().await.unwrap();
 
@@ -66,7 +67,7 @@ async fn validate_dna_op_mismatched_dna_hash() {
         // Will not match the space hash from the test_case
         hash: mismatched_dna_hash.clone(),
     };
-    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Dna(dna_action)).into();
+    let op = ChainOp::AgentActivity(signed(Action::Dna(dna_action), fixt!(Signature))).into();
 
     let outcome = test_case.with_op(op).run().await.unwrap();
 
@@ -105,7 +106,7 @@ async fn non_dna_op_as_first_action() {
         visibility: EntryVisibility::Public,
     });
     let op =
-        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create.clone())).into();
+        ChainOp::AgentActivity(signed(Action::Create(create.clone()), fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -152,7 +153,7 @@ async fn validate_valid_agent_validation_package_op() {
         membrane_proof: None,
     };
     let op =
-        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::AgentValidationPkg(action)).into();
+        ChainOp::AgentActivity(signed(Action::AgentValidationPkg(action), fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -197,7 +198,7 @@ async fn validate_valid_create_op() {
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action)).into();
+    let op = ChainOp::AgentActivity(signed(Action::Create(create_action), fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -242,7 +243,7 @@ async fn validate_create_op_with_prev_from_network() {
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action)).into();
+    let op = ChainOp::AgentActivity(signed(Action::Create(create_action), fixt!(Signature))).into();
 
     test_case
         .cascade_mut()
@@ -295,7 +296,7 @@ async fn validate_create_op_with_prev_action_not_found() {
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action)).into();
+    let op = ChainOp::AgentActivity(signed(Action::Create(create_action), fixt!(Signature))).into();
 
     test_case
         .cascade_mut()
@@ -344,9 +345,11 @@ async fn validate_create_op_author_mismatch_with_prev() {
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op =
-        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action.clone()))
-            .into();
+    let op = ChainOp::AgentActivity(signed(
+        Action::Create(create_action.clone()),
+        fixt!(Signature),
+    ))
+    .into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -401,9 +404,11 @@ async fn validate_create_op_with_timestamp_same_as_prev() {
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op =
-        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action.clone()))
-            .into();
+    let op = ChainOp::AgentActivity(signed(
+        Action::Create(create_action.clone()),
+        fixt!(Signature),
+    ))
+    .into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -443,9 +448,11 @@ async fn validate_create_op_with_timestamp_before_prev() {
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op =
-        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action.clone()))
-            .into();
+    let op = ChainOp::AgentActivity(signed(
+        Action::Create(create_action.clone()),
+        fixt!(Signature),
+    ))
+    .into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -497,9 +504,11 @@ async fn validate_create_op_seq_number_decrements() {
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op =
-        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action.clone()))
-            .into();
+    let op = ChainOp::AgentActivity(signed(
+        Action::Create(create_action.clone()),
+        fixt!(Signature),
+    ))
+    .into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -548,9 +557,11 @@ async fn validate_create_op_seq_number_reused() {
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op =
-        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action.clone()))
-            .into();
+    let op = ChainOp::AgentActivity(signed(
+        Action::Create(create_action.clone()),
+        fixt!(Signature),
+    ))
+    .into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -601,9 +612,11 @@ async fn validate_create_op_not_preceeded_by_avp() {
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::AgentPubKey;
-    let op =
-        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action.clone()))
-            .into();
+    let op = ChainOp::AgentActivity(signed(
+        Action::Create(create_action.clone()),
+        fixt!(Signature),
+    ))
+    .into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action.clone()])
@@ -655,10 +668,10 @@ async fn validate_avp_op_not_followed_by_create() {
     create_link_action.action_seq = previous_action.hashed.content.action_seq() + 1;
     create_link_action.prev_action = previous_action.as_hash().clone();
     create_link_action.timestamp = Timestamp::now();
-    let op = ChainOp::RegisterAgentActivity(
-        fixt!(Signature),
+    let op = ChainOp::AgentActivity(signed(
         Action::CreateLink(create_link_action.clone()),
-    )
+        fixt!(Signature),
+    ))
     .into();
 
     let outcome = test_case
@@ -713,10 +726,9 @@ async fn validate_valid_store_record_with_no_entry() {
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::CapClaim;
-    let op = ChainOp::StoreRecord(
-        fixt!(Signature),
-        Action::Create(create_action),
-        holochain_zome_types::record::RecordEntry::NotStored,
+    let op = ChainOp::CreateRecord(
+        signed(Action::Create(create_action), fixt!(Signature)),
+        to_op_entry(holochain_zome_types::record::RecordEntry::NotStored),
     )
     .into();
 
@@ -758,10 +770,11 @@ async fn validate_store_record_leaks_entry() {
         zome_index: 0.into(),
         visibility: EntryVisibility::Private, // Private so should not have entry data
     });
-    let op = ChainOp::StoreRecord(
-        fixt!(Signature),
-        Action::Create(create_action),
-        holochain_zome_types::record::RecordEntry::Present(Entry::App(fixt!(AppEntryBytes))), // but go ahead and provide the entry data anyway
+    let op = ChainOp::CreateRecord(
+        signed(Action::Create(create_action), fixt!(Signature)),
+        to_op_entry(holochain_zome_types::record::RecordEntry::Present(
+            Entry::App(fixt!(AppEntryBytes)),
+        )),
     )
     .into();
 
@@ -801,10 +814,11 @@ async fn validate_store_record_with_entry_having_wrong_entry_type() {
     create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::AgentPubKey; // Claiming to be a public key but is actually an app entry
     create_action.entry_hash = entry_hash.as_hash().clone();
-    let op = ChainOp::StoreRecord(
-        fixt!(Signature),
-        Action::Create(create_action),
-        holochain_zome_types::record::RecordEntry::Present(app_entry),
+    let op = ChainOp::CreateRecord(
+        signed(Action::Create(create_action), fixt!(Signature)),
+        to_op_entry(holochain_zome_types::record::RecordEntry::Present(
+            app_entry,
+        )),
     )
     .into();
 
@@ -858,11 +872,11 @@ async fn validate_store_record_with_entry_having_wrong_entry_hash() {
         mismatched_entry = Entry::App(fixt!(AppEntryBytes));
     }
 
-    let op = ChainOp::StoreRecord(
-        fixt!(Signature),
-        Action::Create(create_action),
-        // Create some new data which will have a different hash
-        holochain_zome_types::record::RecordEntry::Present(mismatched_entry),
+    let op = ChainOp::CreateRecord(
+        signed(Action::Create(create_action), fixt!(Signature)),
+        to_op_entry(holochain_zome_types::record::RecordEntry::Present(
+            mismatched_entry,
+        )),
     )
     .into();
 
@@ -920,10 +934,11 @@ async fn validate_store_record_with_large_entry() {
         EntryVisibility::Public,
     ));
     create_action.entry_hash = entry_hash.as_hash().clone();
-    let op = ChainOp::StoreRecord(
-        fixt!(Signature),
-        Action::Create(create_action),
-        holochain_zome_types::record::RecordEntry::Present(app_entry),
+    let op = ChainOp::CreateRecord(
+        signed(Action::Create(create_action), fixt!(Signature)),
+        to_op_entry(holochain_zome_types::record::RecordEntry::Present(
+            app_entry,
+        )),
     )
     .into();
 
@@ -991,10 +1006,11 @@ async fn validate_valid_store_record_update() {
         .unwrap()
         .clone();
     update_action.original_action_address = to_update_signed_action.as_hash().clone();
-    let op = ChainOp::StoreRecord(
-        fixt!(Signature),
-        Action::Update(update_action),
-        holochain_zome_types::record::RecordEntry::Present(app_entry),
+    let op = ChainOp::CreateRecord(
+        signed(Action::Update(update_action), fixt!(Signature)),
+        to_op_entry(holochain_zome_types::record::RecordEntry::Present(
+            app_entry,
+        )),
     )
     .into();
 
@@ -1050,10 +1066,11 @@ async fn validate_store_record_update_prev_which_is_not_updateable() {
     ));
     update_action.entry_hash = entry_hash.as_hash().clone();
     update_action.original_action_address = to_update_signed_action.as_hash().clone();
-    let op = ChainOp::StoreRecord(
-        fixt!(Signature),
-        Action::Update(update_action),
-        holochain_zome_types::record::RecordEntry::Present(app_entry),
+    let op = ChainOp::CreateRecord(
+        signed(Action::Update(update_action), fixt!(Signature)),
+        to_op_entry(holochain_zome_types::record::RecordEntry::Present(
+            app_entry,
+        )),
     )
     .into();
 
@@ -1132,10 +1149,11 @@ async fn validate_store_record_update_changes_entry_type() {
         .unwrap()
         .clone();
     update_action.original_action_address = to_update_signed_action.as_hash().clone();
-    let op = ChainOp::StoreRecord(
-        fixt!(Signature),
-        Action::Update(update_action.clone()),
-        holochain_zome_types::record::RecordEntry::Present(app_entry),
+    let op = ChainOp::CreateRecord(
+        signed(Action::Update(update_action.clone()), fixt!(Signature)),
+        to_op_entry(holochain_zome_types::record::RecordEntry::Present(
+            app_entry,
+        )),
     )
     .into();
 
@@ -1187,10 +1205,14 @@ async fn validate_store_entry_with_entry_having_wrong_entry_type() {
     create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::AgentPubKey; // Claiming to be a public key but is actually an app entry
     create_action.entry_hash = entry_hash.as_hash().clone();
-    let op = ChainOp::StoreEntry(
-        fixt!(Signature),
-        holochain_types::action::NewEntryAction::Create(create_action),
-        app_entry,
+    let op = ChainOp::CreateEntry(
+        signed(
+            Action::from(holochain_types::action::NewEntryAction::Create(
+                create_action,
+            )),
+            fixt!(Signature),
+        ),
+        OpEntry::Present(app_entry),
     )
     .into();
 
@@ -1244,11 +1266,14 @@ async fn validate_store_entry_with_entry_having_wrong_entry_hash() {
         mismatched_entry = Entry::App(fixt!(AppEntryBytes));
     }
 
-    let op = ChainOp::StoreEntry(
-        fixt!(Signature),
-        holochain_types::action::NewEntryAction::Create(create_action),
-        // Create some new data which will have a different hash
-        mismatched_entry,
+    let op = ChainOp::CreateEntry(
+        signed(
+            Action::from(holochain_types::action::NewEntryAction::Create(
+                create_action,
+            )),
+            fixt!(Signature),
+        ),
+        OpEntry::Present(mismatched_entry),
     )
     .into();
 
@@ -1306,10 +1331,14 @@ async fn validate_store_entry_with_large_entry() {
         EntryVisibility::Public,
     ));
     create_action.entry_hash = entry_hash.as_hash().clone();
-    let op = ChainOp::StoreEntry(
-        fixt!(Signature),
-        holochain_types::action::NewEntryAction::Create(create_action),
-        app_entry,
+    let op = ChainOp::CreateEntry(
+        signed(
+            Action::from(holochain_types::action::NewEntryAction::Create(
+                create_action,
+            )),
+            fixt!(Signature),
+        ),
+        OpEntry::Present(app_entry),
     )
     .into();
 
@@ -1377,10 +1406,14 @@ async fn validate_valid_store_entry_update() {
         .unwrap()
         .clone();
     update_action.original_action_address = to_update_signed_action.as_hash().clone();
-    let op = ChainOp::StoreEntry(
-        fixt!(Signature),
-        holochain_types::action::NewEntryAction::Update(update_action),
-        app_entry,
+    let op = ChainOp::CreateEntry(
+        signed(
+            Action::from(holochain_types::action::NewEntryAction::Update(
+                update_action,
+            )),
+            fixt!(Signature),
+        ),
+        OpEntry::Present(app_entry),
     )
     .into();
 
@@ -1433,10 +1466,14 @@ async fn validate_store_entry_update_prev_which_is_not_updateable() {
     ));
     update_action.entry_hash = entry_hash.as_hash().clone();
     update_action.original_action_address = to_update_signed_action.as_hash().clone();
-    let op = ChainOp::StoreEntry(
-        fixt!(Signature),
-        holochain_types::action::NewEntryAction::Update(update_action),
-        app_entry,
+    let op = ChainOp::CreateEntry(
+        signed(
+            Action::from(holochain_types::action::NewEntryAction::Update(
+                update_action,
+            )),
+            fixt!(Signature),
+        ),
+        OpEntry::Present(app_entry),
     )
     .into();
 
@@ -1515,10 +1552,14 @@ async fn validate_store_entry_update_changes_entry_type() {
         .unwrap()
         .clone();
     update_action.original_action_address = to_update_signed_action.as_hash().clone();
-    let op = ChainOp::StoreEntry(
-        fixt!(Signature),
-        holochain_types::action::NewEntryAction::Update(update_action.clone()),
-        app_entry,
+    let op = ChainOp::CreateEntry(
+        signed(
+            Action::from(holochain_types::action::NewEntryAction::Update(
+                update_action.clone(),
+            )),
+            fixt!(Signature),
+        ),
+        OpEntry::Present(app_entry),
     )
     .into();
 
@@ -1582,10 +1623,9 @@ async fn validate_valid_register_updated_content() {
         .unwrap()
         .clone();
     update_action.original_action_address = to_update_signed_action.as_hash().clone();
-    let op = ChainOp::RegisterUpdatedContent(
-        fixt!(Signature),
-        update_action,
-        RecordEntry::Present(app_entry),
+    let op = ChainOp::UpdateEntry(
+        signed(Action::from(update_action), fixt!(Signature)),
+        to_op_entry(RecordEntry::Present(app_entry)),
     )
     .into();
 
@@ -1635,10 +1675,9 @@ async fn validate_register_updated_content_missing_updates_ref() {
         EntryVisibility::Public,
     ));
     update_action.original_action_address = mismatched_action_hash;
-    let op = ChainOp::RegisterUpdatedContent(
-        fixt!(Signature),
-        update_action,
-        RecordEntry::Present(app_entry),
+    let op = ChainOp::UpdateEntry(
+        signed(Action::from(update_action), fixt!(Signature)),
+        to_op_entry(RecordEntry::Present(app_entry)),
     )
     .into();
 
@@ -1691,10 +1730,9 @@ async fn validate_valid_register_updated_record() {
         .unwrap()
         .clone();
     update_action.original_action_address = to_update_signed_action.as_hash().clone();
-    let op = ChainOp::RegisterUpdatedRecord(
-        fixt!(Signature),
-        update_action,
-        RecordEntry::Present(app_entry),
+    let op = ChainOp::UpdateRecord(
+        signed(Action::from(update_action), fixt!(Signature)),
+        to_op_entry(RecordEntry::Present(app_entry)),
     )
     .into();
 
@@ -1744,10 +1782,9 @@ async fn validate_register_updated_record_missing_updates_ref() {
         EntryVisibility::Public,
     ));
     update_action.original_action_address = mismatched_action_hash;
-    let op = ChainOp::RegisterUpdatedRecord(
-        fixt!(Signature),
-        update_action,
-        RecordEntry::Present(app_entry),
+    let op = ChainOp::UpdateRecord(
+        signed(Action::from(update_action), fixt!(Signature)),
+        to_op_entry(RecordEntry::Present(app_entry)),
     )
     .into();
 
@@ -1790,7 +1827,7 @@ async fn validate_valid_register_deleted_by() {
     let mut delete_action = fixt!(Delete);
     delete_action.timestamp = Timestamp::now();
     delete_action.deletes_address = to_delete_signed_action.as_hash().clone();
-    let op = ChainOp::RegisterDeletedBy(fixt!(Signature), delete_action).into();
+    let op = ChainOp::DeleteRecord(signed(Action::from(delete_action), fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![to_delete_signed_action])
@@ -1830,7 +1867,7 @@ async fn validate_register_deleted_by_with_missing_deletes_ref() {
     let mut delete_action = fixt!(Delete);
     delete_action.timestamp = Timestamp::now();
     delete_action.deletes_address = mismatched_action_hash;
-    let op = ChainOp::RegisterDeletedBy(fixt!(Signature), delete_action).into();
+    let op = ChainOp::DeleteRecord(signed(Action::from(delete_action), fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![dummy_action])
@@ -1860,7 +1897,7 @@ async fn validate_register_deleted_by_wrong_delete_target() {
     let mut delete_action = fixt!(Delete);
     delete_action.timestamp = Timestamp::now();
     delete_action.deletes_address = to_delete_signed_action.as_hash().clone();
-    let op = ChainOp::RegisterDeletedBy(fixt!(Signature), delete_action).into();
+    let op = ChainOp::DeleteRecord(signed(Action::from(delete_action), fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![to_delete_signed_action.clone()])
@@ -1906,7 +1943,7 @@ async fn validate_valid_register_deleted_entry_action() {
     let mut delete_action = fixt!(Delete);
     delete_action.timestamp = Timestamp::now();
     delete_action.deletes_address = to_delete_signed_action.as_hash().clone();
-    let op = ChainOp::RegisterDeletedEntryAction(fixt!(Signature), delete_action).into();
+    let op = ChainOp::DeleteEntry(signed(Action::from(delete_action), fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![to_delete_signed_action])
@@ -1946,7 +1983,7 @@ async fn validate_register_deleted_entry_action_with_missing_deletes_ref() {
     let mut delete_action = fixt!(Delete);
     delete_action.timestamp = Timestamp::now();
     delete_action.deletes_address = mismatched_action_hash;
-    let op = ChainOp::RegisterDeletedEntryAction(fixt!(Signature), delete_action).into();
+    let op = ChainOp::DeleteEntry(signed(Action::from(delete_action), fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![dummy_action])
@@ -1976,7 +2013,7 @@ async fn validate_register_deleted_entry_action_wrong_delete_target() {
     let mut delete_action = fixt!(Delete);
     delete_action.timestamp = Timestamp::now();
     delete_action.deletes_address = to_delete_signed_action.as_hash().clone();
-    let op = ChainOp::RegisterDeletedEntryAction(fixt!(Signature), delete_action).into();
+    let op = ChainOp::DeleteEntry(signed(Action::from(delete_action), fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![to_delete_signed_action.clone()])
@@ -2014,8 +2051,11 @@ async fn validate_delete_a_delete_is_rejected() {
     delete_delete_action.deletes_address = delete_action_signed_hashed.as_hash().clone();
 
     // Validate a deleted entry action.
-    let op =
-        ChainOp::RegisterDeletedEntryAction(fixt!(Signature), delete_delete_action.clone()).into();
+    let op = ChainOp::DeleteEntry(signed(
+        Action::from(delete_delete_action.clone()),
+        fixt!(Signature),
+    ))
+    .into();
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![delete_action_signed_hashed.clone()])
         .with_op(op)
@@ -2033,7 +2073,8 @@ async fn validate_delete_a_delete_is_rejected() {
     );
 
     // Validate a deleted by.
-    let op = ChainOp::RegisterDeletedBy(fixt!(Signature), delete_delete_action).into();
+    let op =
+        ChainOp::DeleteRecord(signed(Action::from(delete_delete_action), fixt!(Signature))).into();
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![])
         .with_op(op)
@@ -2061,7 +2102,7 @@ async fn validate_valid_add_link() {
     let mut create_link_action = fixt!(CreateLink);
     create_link_action.tag = "hello".as_bytes().to_vec().into();
     create_link_action.timestamp = Timestamp::now();
-    let op = ChainOp::RegisterAddLink(fixt!(Signature), create_link_action).into();
+    let op = ChainOp::CreateLink(signed(Action::from(create_link_action), fixt!(Signature))).into();
 
     // Note that no mocking is configured so the base and target addressed for the link aren't not going to be checked.
     // This is intentional as the validation isn't meant to check them but not very obvious from this test, hence the comment!
@@ -2080,7 +2121,7 @@ async fn validate_add_link_tag_too_large() {
     let mut create_link_action = fixt!(CreateLink);
     create_link_action.tag = vec![0; 2_000].into();
     create_link_action.timestamp = Timestamp::now();
-    let op = ChainOp::RegisterAddLink(fixt!(Signature), create_link_action).into();
+    let op = ChainOp::CreateLink(signed(Action::from(create_link_action), fixt!(Signature))).into();
 
     // Note that no mocking is configured so the base and target addressed for the link aren't not going to be checked.
     // This is intentional as the validation isn't meant to check them but not very obvious from this test, hence the comment!
@@ -2108,7 +2149,7 @@ async fn validate_valid_remove_link() {
     let mut delete_link_action = fixt!(DeleteLink);
     delete_link_action.timestamp = Timestamp::now();
     delete_link_action.link_add_address = previous_action.as_hash().clone();
-    let op = ChainOp::RegisterRemoveLink(fixt!(Signature), delete_link_action).into();
+    let op = ChainOp::DeleteLink(signed(Action::from(delete_link_action), fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -2146,7 +2187,7 @@ async fn validate_remove_link_missing_link_add_ref() {
     let mut delete_link_action = fixt!(DeleteLink);
     delete_link_action.timestamp = Timestamp::now();
     delete_link_action.link_add_address = mismatched_action_hash;
-    let op = ChainOp::RegisterRemoveLink(fixt!(Signature), delete_link_action).into();
+    let op = ChainOp::DeleteLink(signed(Action::from(delete_link_action), fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![dummy_action])
@@ -2177,7 +2218,7 @@ async fn validate_remove_link_with_wrong_target_type() {
     let mut delete_link_action = fixt!(DeleteLink);
     delete_link_action.timestamp = Timestamp::now();
     delete_link_action.link_add_address = previous_action.as_hash().clone();
-    let op = ChainOp::RegisterRemoveLink(fixt!(Signature), delete_link_action).into();
+    let op = ChainOp::DeleteLink(signed(Action::from(delete_link_action), fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action.clone()])
@@ -2228,7 +2269,7 @@ async fn action_after_close_chain() {
 
     // Use agent activity so that we'll validate the previous action
     let op =
-        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create.clone())).into();
+        ChainOp::AgentActivity(signed(Action::Create(create.clone()), fixt!(Signature))).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -2307,11 +2348,9 @@ async fn crash_case() {
             .boxed()
         });
 
-    // `op` is legacy (this whole module builds legacy `ChainOp`/`DhtOp` — see
-    // the module-level comment); `validate_op` is v2-native, so project it
-    // once here at the boundary via `from_legacy_dht_op`.
-    let legacy_hashed = holochain_types::dht_op::DhtOpHashed::from_content_sync(op);
-    let v2_hashed = holochain_types::dht_v2::from_legacy_dht_op(&legacy_hashed);
+    // `op` is a v2 `DhtOp` built directly (see the module-level comment);
+    // `validate_op` is v2-native, so hash it and pass it straight through.
+    let v2_hashed = DhtOpHashed::from_content_sync(op);
 
     let validation_outcome =
         validate_op(v2_hashed.as_content(), &dna_def.hash, SysValDeps::default())
@@ -2398,17 +2437,15 @@ impl TestCase {
 
         let cascade = Arc::new(new_cascade);
 
-        // `self.op` is legacy (this whole module builds legacy `ChainOp`/
-        // `DhtOp` — see the module-level comment); `retrieve_previous_actions_for_ops`
-        // and `validate_op` are v2-native, so project it once here at the
-        // boundary via `from_legacy_dht_op`.
-        let legacy_op = self
+        // `self.op` is a v2 `DhtOp` built directly (see the module-level
+        // comment); `retrieve_previous_actions_for_ops` and `validate_op` are
+        // v2-native, so hash it and pass it straight through.
+        let op = self
             .op
             .as_ref()
             .expect("No op set, invalid test case")
             .clone();
-        let legacy_hashed = holochain_types::dht_op::DhtOpHashed::from_content_sync(legacy_op);
-        let v2_hashed = holochain_types::dht_v2::from_legacy_dht_op(&legacy_hashed);
+        let v2_hashed = DhtOpHashed::from_content_sync(op);
 
         retrieve_previous_actions_for_ops(
             self.current_validation_dependencies.clone(),
@@ -2426,6 +2463,22 @@ impl TestCase {
     }
 }
 
+/// Wrap a legacy [`Action`] enum value in a v2 [`SignedAction`], converting the
+/// action to its v2 projection. The signature is paired as-is (tests use
+/// `fixt!(Signature)`), so this pairs rather than cryptographically signs.
+fn signed(action: Action, signature: Signature) -> SignedAction {
+    SignedAction::new(from_legacy_action(&action), signature)
+}
+
+/// Map a legacy [`RecordEntry`] to the v2 [`OpEntry`] carried by entry-bearing ops.
+fn to_op_entry(entry: RecordEntry) -> OpEntry {
+    match entry {
+        RecordEntry::Present(e) => OpEntry::Present(e),
+        RecordEntry::Hidden => OpEntry::Hidden,
+        RecordEntry::NA | RecordEntry::NotStored => OpEntry::ActionOnly,
+    }
+}
+
 fn test_op(previous: &SignedActionHashed) -> DhtOp {
     let mut create_action = fixt!(Create);
     create_action.author = previous.hashed.content.author().clone();
@@ -2439,5 +2492,5 @@ fn test_op(previous: &SignedActionHashed) -> DhtOp {
     });
     let action = Action::Create(create_action);
 
-    ChainOp::RegisterAgentActivity(fixt!(Signature), action).into()
+    ChainOp::AgentActivity(signed(action, fixt!(Signature))).into()
 }

@@ -1,7 +1,6 @@
 use crate::core::queue_consumer::WorkComplete;
 use crate::core::workflow::validation_receipt_workflow::validation_receipt_workflow;
 use crate::prelude::CreateFixturator;
-use crate::prelude::DhtOpHashed;
 use crate::prelude::SignatureFixturator;
 use ::fixt::fixt;
 use holo_hash::fixt::AgentPubKeyFixturator;
@@ -385,20 +384,22 @@ async fn create_op_with_status(
     create_action.author = author.clone();
     let action = Action::Create(create_action);
 
-    let op =
-        DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(fixt!(Signature), action));
+    let v2_action = holochain_types::dht_v2::from_legacy_action(&action);
+    let signed = holochain_types::dht_v2::SignedAction::new(v2_action, fixt!(Signature));
+    let op = holochain_types::dht_v2::DhtOpHashed::from_content_sync(
+        holochain_types::dht_v2::DhtOp::from(holochain_types::dht_v2::ChainOp::AgentActivity(
+            signed,
+        )),
+    );
 
     let test_op_hash = op.as_hash().clone();
 
     // Write the op through the full validation + integration pipeline so that
     // DhtStore::pending_validation_receipts sees it in integrated +
     // require_receipt state. The hash is derived from the same op content, so
-    // test_op_hash matches. `op` is legacy (see the `crate::prelude::DhtOpHashed`
-    // import above); `record_incoming_ops` is v2-native, so project it at this
-    // boundary via `from_legacy_dht_op`.
-    let v2_op = holochain_types::dht_v2::from_legacy_dht_op(&op);
+    // test_op_hash matches.
     dht_store
-        .record_incoming_ops(vec![(v2_op, true)])
+        .record_incoming_ops(vec![(op, true)])
         .await
         .unwrap();
 

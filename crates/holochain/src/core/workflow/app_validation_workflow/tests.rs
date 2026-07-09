@@ -22,7 +22,7 @@ use holochain_p2p::actor::MockHcP2p;
 use holochain_p2p::HolochainP2pDna;
 use holochain_state::dht_store::{DhtStore, SysOutcome};
 use holochain_state::test_utils::test_db_dir;
-use holochain_types::dht_op::DhtOpHashed;
+use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry, SignedAction};
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::{TestWasm, TestWasmPair, TestZomes};
@@ -34,6 +34,7 @@ use holochain_zome_types::dependencies::holochain_integrity_types::action::Actio
 use holochain_zome_types::dependencies::holochain_integrity_types::dht_v2::{
     ActionData, DeleteData, Op, RegisterAgentActivity, RegisterDelete, StoreEntry, StoreRecord,
 };
+use holochain_zome_types::dht_v2::from_legacy_action;
 use holochain_zome_types::fixt::{CreateFixturator, DeleteFixturator, SignatureFixturator};
 use holochain_zome_types::timestamp::Timestamp;
 use matches::assert_matches;
@@ -41,13 +42,6 @@ use std::convert::{TryFrom, TryInto};
 use std::hash::Hash;
 use std::sync::Arc;
 use std::time::Duration;
-
-/// Project a legacy op-pipeline op (this module builds legacy `ChainOp`/
-/// `DhtOp` throughout via `holochain_types::prelude::*`) to v2 for
-/// `DhtStore::record_incoming_ops`, which is v2-native.
-fn to_v2_op_hashed(op: &DhtOpHashed) -> holochain_types::dht_v2::DhtOpHashed {
-    holochain_types::dht_v2::from_legacy_dht_op(op)
-}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn main_workflow() {
@@ -108,22 +102,26 @@ async fn main_workflow() {
         visibility: Default::default(),
     });
     let create_action = LegacyAction::Create(create);
-    let dht_create_op = ChainOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
-    let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
+    let dht_create_op_hashed = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::AgentActivity(
+        SignedAction::new(from_legacy_action(&create_action), fixt!(Signature)),
+    )));
 
     // create op that depends on previous create
     let mut delete = fixt!(Delete);
     delete.author = create_action.author().clone();
     delete.deletes_address = create_action.clone().to_hash();
-    let dht_delete_op = ChainOp::RegisterDeletedEntryAction(fixt!(Signature), delete);
-    let dht_delete_op_hash = DhtOpHash::with_data_sync(&dht_delete_op);
-    let dht_delete_op_hashed = DhtOpHashed::from_content_sync(dht_delete_op);
+    let dht_delete_op_hashed =
+        DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::DeleteEntry(SignedAction::new(
+            from_legacy_action(&LegacyAction::Delete(delete)),
+            fixt!(Signature),
+        ))));
+    let dht_delete_op_hash = dht_delete_op_hashed.as_hash().clone();
 
     // Record the op into the DhtStore as sys-validated and ready for app
     // validation; the workflow reads ops to validate from the new store.
     app_validation_workspace
         .dht_store
-        .record_incoming_ops(vec![(to_v2_op_hashed(&dht_delete_op_hashed), false)])
+        .record_incoming_ops(vec![(dht_delete_op_hashed, false)])
         .await
         .unwrap();
     app_validation_workspace
@@ -182,7 +180,7 @@ async fn main_workflow() {
     // read comes from the DhtStore, so the dependency must live there).
     app_validation_workspace
         .dht_store
-        .record_incoming_ops(vec![(to_v2_op_hashed(&dht_create_op_hashed), false)])
+        .record_incoming_ops(vec![(dht_create_op_hashed, false)])
         .await
         .unwrap();
 
@@ -257,8 +255,9 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
         weight: Default::default(),
     };
     let create_action = LegacyAction::Create(create);
-    let dht_create_op = ChainOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
-    let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
+    let dht_create_op_hashed = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::AgentActivity(
+        SignedAction::new(from_legacy_action(&create_action), fixt!(Signature)),
+    )));
     let create_action_hash = create_action.to_hash();
 
     // create op that depends on previous create
@@ -272,9 +271,10 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
         weight: Default::default(),
     };
     let delete_action = LegacyAction::Delete(delete);
-    let dht_delete_op = ChainOp::RegisterAgentActivity(fixt!(Signature), delete_action.clone());
-    let dht_delete_op_hash = DhtOpHash::with_data_sync(&dht_delete_op);
-    let dht_delete_op_hashed = DhtOpHashed::from_content_sync(dht_delete_op);
+    let dht_delete_op_hashed = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::AgentActivity(
+        SignedAction::new(from_legacy_action(&delete_action), fixt!(Signature)),
+    )));
+    let dht_delete_op_hash = dht_delete_op_hashed.as_hash().clone();
 
     let entry_def = EntryDef::default_from_id("entry_def_id");
     let zomes = SweetInlineZomes::new(vec![entry_def.clone()], 0).integrity_function(
@@ -340,8 +340,8 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
     app_validation_workspace
         .dht_store
         .record_incoming_ops(vec![
-            (to_v2_op_hashed(&dht_delete_op_hashed), false),
-            (to_v2_op_hashed(&dht_create_op_hashed_for_store), false),
+            (dht_delete_op_hashed, false),
+            (dht_create_op_hashed_for_store, false),
         ])
         .await
         .unwrap();
@@ -470,17 +470,21 @@ async fn validate_ops_in_sequence_must_get_action() {
         visibility: EntryVisibility::Public,
     });
     let create_op = LegacyAction::Create(create);
-    let dht_create_op = ChainOp::RegisterAgentActivity(fixt!(Signature), create_op.clone());
-    let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
+    let dht_create_op_hashed = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::AgentActivity(
+        SignedAction::new(from_legacy_action(&create_op), fixt!(Signature)),
+    )));
 
     // create op that depends on previous create
     let mut delete = fixt!(Delete);
     delete.author = create_op.author().clone();
     delete.deletes_address = create_op.clone().to_hash();
     delete.deletes_entry_address = create_op.entry_hash().unwrap().clone();
-    let dht_delete_op = ChainOp::RegisterDeletedEntryAction(fixt!(Signature), delete);
-    let dht_delete_op_hash = DhtOpHash::with_data_sync(&dht_delete_op);
-    let dht_delete_op_hashed = DhtOpHashed::from_content_sync(dht_delete_op);
+    let dht_delete_op_hashed =
+        DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::DeleteEntry(SignedAction::new(
+            from_legacy_action(&LegacyAction::Delete(delete)),
+            fixt!(Signature),
+        ))));
+    let dht_delete_op_hash = dht_delete_op_hashed.as_hash().clone();
 
     // Record both ops into the DhtStore as sys-validated.
     let dht_create_op_hashed_for_store = dht_create_op_hashed.clone();
@@ -488,8 +492,8 @@ async fn validate_ops_in_sequence_must_get_action() {
     app_validation_workspace
         .dht_store
         .record_incoming_ops(vec![
-            (to_v2_op_hashed(&dht_delete_op_hashed), false),
-            (to_v2_op_hashed(&dht_create_op_hashed_for_store), false),
+            (dht_delete_op_hashed, false),
+            (dht_create_op_hashed_for_store, false),
         ])
         .await
         .unwrap();
@@ -639,9 +643,10 @@ async fn handle_error_in_op_validation() {
         visibility: Default::default(),
     });
     let create_action = LegacyAction::Create(create);
-    let dht_create_op = ChainOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
-    let dht_create_op_hash = DhtOpHash::with_data_sync(&dht_create_op);
-    let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
+    let dht_create_op_hashed = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::AgentActivity(
+        SignedAction::new(from_legacy_action(&create_action), fixt!(Signature)),
+    )));
+    let dht_create_op_hash = dht_create_op_hashed.as_hash().clone();
 
     // create another op that will be validated successfully
     let mut create = fixt!(Create);
@@ -651,10 +656,15 @@ async fn handle_error_in_op_validation() {
         visibility: Default::default(),
     });
     let entry = fixt!(Entry);
-    let dht_store_entry_op =
-        ChainOp::StoreEntry(fixt!(Signature), NewEntryAction::Create(create), entry);
-    let dht_store_entry_op_hash = DhtOpHash::with_data_sync(&dht_store_entry_op);
-    let dht_store_entry_op_hashed = DhtOpHashed::from_content_sync(dht_store_entry_op);
+    let dht_store_entry_op_hashed =
+        DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::CreateEntry(
+            SignedAction::new(
+                from_legacy_action(&LegacyAction::Create(create)),
+                fixt!(Signature),
+            ),
+            OpEntry::Present(entry),
+        )));
+    let dht_store_entry_op_hash = dht_store_entry_op_hashed.as_hash().clone();
 
     // Record both ops into the DhtStore as sys-validated and ready for app
     // validation.
@@ -662,8 +672,8 @@ async fn handle_error_in_op_validation() {
     app_validation_workspace
         .dht_store
         .record_incoming_ops(vec![
-            (to_v2_op_hashed(&dht_create_op_hashed), false),
-            (to_v2_op_hashed(&dht_store_entry_op_hashed), false),
+            (dht_create_op_hashed, false),
+            (dht_store_entry_op_hashed, false),
         ])
         .await
         .unwrap();
@@ -1048,23 +1058,21 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
         zome_index: 0.into(),
         visibility: Default::default(),
     });
-    let dht_create_op = ChainOp::StoreEntry(
-        fixt!(Signature),
-        NewEntryAction::Create(create),
-        fixt!(Entry),
-    );
-    let dht_create_op_hash = DhtOpHash::with_data_sync(&dht_create_op);
-    let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
+    let dht_create_op_hashed = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::CreateEntry(
+        SignedAction::new(
+            from_legacy_action(&LegacyAction::Create(create)),
+            fixt!(Signature),
+        ),
+        OpEntry::Present(fixt!(Entry)),
+    )));
+    let dht_create_op_hash = dht_create_op_hashed.as_hash().clone();
 
     // Record the op into the DhtStore and mark it ready for app validation.
     let dht_create_op_hashed_for_store = dht_create_op_hashed.clone();
     let dht_create_op_hash_for_store = dht_create_op_hash.clone();
     app_validation_workspace
         .dht_store
-        .record_incoming_ops(vec![(
-            to_v2_op_hashed(&dht_create_op_hashed_for_store),
-            false,
-        )])
+        .record_incoming_ops(vec![(dht_create_op_hashed_for_store, false)])
         .await
         .unwrap();
     app_validation_workspace

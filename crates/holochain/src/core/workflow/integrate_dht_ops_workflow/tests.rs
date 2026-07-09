@@ -7,7 +7,9 @@ use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::dht_store::DhtStore;
 use holochain_state::prelude::SysOutcome;
 use holochain_state::test_utils::test_dht_store;
-use holochain_types::prelude::{ChainOp, DhtOp, DhtOpHashed};
+use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry, SignedAction};
+use holochain_zome_types::dependencies::holochain_integrity_types::action::Action as LegacyAction;
+use holochain_zome_types::dht_v2::from_legacy_action;
 use kitsune2_api::StoredOp;
 use std::sync::Arc;
 
@@ -32,9 +34,13 @@ async fn inform_kitsune_about_integrated_ops() {
             .expect_new_integrated_data()
             .times(1)
             .return_once(move |ops| {
+                let authored_at = match &op {
+                    DhtOp::ChainOp(c) => c.signed_action().data().timestamp(),
+                    DhtOp::WarrantOp(w) => w.timestamp,
+                };
                 let expected_op = StoredOp {
                     op_id: op.to_hash().to_located_k2_op_id(&op.dht_basis()),
-                    created_at: kitsune2_api::Timestamp::from_micros(op.timestamp().as_micros()),
+                    created_at: kitsune2_api::Timestamp::from_micros(authored_at.as_micros()),
                 };
                 assert_eq!(ops, vec![expected_op], "test case {i}");
                 Ok(())
@@ -133,13 +139,8 @@ async fn multiple_local_authors_marked_integrated() {
 /// integration (sys + app validation both accepted).
 async fn insert_validated_op_to_store(dht_store: &DhtStore, op: &DhtOpHashed) {
     let op_hash = op.as_hash().clone();
-    // `op` is legacy (this module builds legacy `ChainOp`/`DhtOp` — see the
-    // `holochain_types::prelude::{ChainOp, DhtOp, DhtOpHashed}` import above);
-    // `record_incoming_ops` is v2-native, so project it at this boundary via
-    // `from_legacy_dht_op`.
-    let v2_op = holochain_types::dht_v2::from_legacy_dht_op(op);
     dht_store
-        .record_incoming_ops(vec![(v2_op, false)])
+        .record_incoming_ops(vec![(op.clone(), false)])
         .await
         .unwrap();
     dht_store
@@ -160,7 +161,9 @@ fn make_store_entry_op(author: AgentPubKey) -> (DhtOp, DhtOpHashed) {
     let mut action = fixt!(Create);
     action.author = author;
     action.entry_hash = EntryHashed::from_content_sync(entry.clone()).into_hash();
-    let op: DhtOp = ChainOp::StoreEntry(fixt!(Signature), action.clone().into(), entry).into();
+    let v2_action = from_legacy_action(&LegacyAction::Create(action));
+    let signed = SignedAction::new(v2_action, fixt!(Signature));
+    let op: DhtOp = ChainOp::CreateEntry(signed, OpEntry::Present(entry)).into();
     let hashed = DhtOpHashed::from_content_sync(op.clone());
     (op, hashed)
 }
@@ -174,8 +177,9 @@ fn make_store_record_op_pair() -> (DhtOp, DhtOpHashed) {
     let mut action = fixt!(Create);
     action.author = fixt!(AgentPubKey);
     action.entry_hash = EntryHashed::from_content_sync(entry.clone()).into_hash();
-    let op: DhtOp =
-        ChainOp::StoreRecord(fixt!(Signature), action.clone().into(), entry.into()).into();
+    let v2_action = from_legacy_action(&LegacyAction::Create(action));
+    let signed = SignedAction::new(v2_action, fixt!(Signature));
+    let op: DhtOp = ChainOp::CreateRecord(signed, OpEntry::Present(entry)).into();
     let hashed = DhtOpHashed::from_content_sync(op.clone());
     (op, hashed)
 }

@@ -1,27 +1,6 @@
 use crate::*;
 use strum_macros::AsRefStr;
 
-/// Struct for encoding DhtOp as bytes.
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct WireDhtOpData {
-    /// The dht op.
-    pub op_data: holochain_types::dht_op::DhtOp,
-}
-
-impl WireDhtOpData {
-    /// Encode as bytes.
-    pub fn encode(self) -> Result<bytes::Bytes, HolochainP2pError> {
-        let mut b = bytes::BufMut::writer(bytes::BytesMut::new());
-        rmp_serde::encode::write_named(&mut b, &self).map_err(HolochainP2pError::other)?;
-        Ok(b.into_inner().freeze())
-    }
-
-    /// Decode from bytes.
-    pub fn decode(data: &[u8]) -> Result<Self, HolochainP2pError> {
-        rmp_serde::decode::from_slice(data).map_err(HolochainP2pError::other)
-    }
-}
-
 /// Encoding for the hcp2p preflight message.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct WirePreflightMessage {

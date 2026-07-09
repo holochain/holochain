@@ -13,7 +13,7 @@ use holochain::{
     test_utils::retry_fn_until_timeout,
 };
 use holochain_timestamp::Timestamp;
-use holochain_types::dht_op::DhtOpHashed;
+use holochain_types::dht_v2::{DhtOp, DhtOpHashed};
 use holochain_types::prelude::WarrantOp;
 use holochain_zome_types::op::ChainOpType;
 use holochain_zome_types::prelude::{ChainIntegrityWarrant, Warrant};
@@ -253,7 +253,7 @@ async fn author_of_invalid_warrant_is_blocked() {
         .await
         .unwrap();
 
-    let warrant_op_hashed = DhtOpHashed::from_content_sync(warrant_op);
+    let warrant_op_hashed = DhtOpHashed::from_content_sync(DhtOp::from((*warrant_op).clone()));
 
     // Seed the warrant in Bob's DhtStore so K2 gossip can find and serve it.
     // Use the test-only helper instead of `record_locally_validated_warrants`:
@@ -261,17 +261,11 @@ async fn author_of_invalid_warrant_is_blocked() {
     // warrantee, which would prevent Bob from gossiping the warrant to Alice.
     // This test injects an objectively invalid warrant to verify Alice rejects
     // it, so Bob must not act on it.
-    //
-    // `warrant_op_hashed` is a legacy `holochain_types::dht_op::DhtOpHashed`;
-    // `test_insert_integrated_warrant` is v2-native, so project it at this
-    // boundary via `from_legacy_dht_op`.
     conductors[1]
         .get_spaces()
         .dht_store(dna_file.dna_hash())
         .unwrap()
-        .test_insert_integrated_warrant(holochain_types::dht_v2::from_legacy_dht_op(
-            &warrant_op_hashed,
-        ))
+        .test_insert_integrated_warrant(warrant_op_hashed)
         .await
         .unwrap();
 

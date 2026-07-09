@@ -148,7 +148,7 @@ pub mod test {
         let action = from_legacy_action(&LegacyAction::Create(create));
         let action_hash = action.to_hash();
 
-        let rendered = holochain_types::dht_op::RenderedOp::new(
+        let rendered = holochain_types::wire_ops::RenderedOp::new(
             action.clone(),
             fixt!(Signature),
             None,
@@ -159,7 +159,7 @@ pub mod test {
             holochain_zome_types::op::ChainOpType::StoreRecord,
             &action,
         );
-        let rendered_ops = holochain_types::dht_op::RenderedOps {
+        let rendered_ops = holochain_types::wire_ops::RenderedOps {
             entry: Some(EntryHashed::with_pre_hashed(entry.clone(), entry_hash)),
             ops: vec![rendered],
             warrant: None,

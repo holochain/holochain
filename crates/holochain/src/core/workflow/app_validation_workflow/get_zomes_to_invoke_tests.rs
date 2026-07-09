@@ -10,7 +10,7 @@ use holo_hash::fixt::{ActionHashFixturator, AgentPubKeyFixturator, EntryHashFixt
 use holo_hash::HashableContentExtSync;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
-use holochain_types::dht_op::{ChainOp, DhtOpHashed};
+use holochain_types::dht_v2::{ChainOp, DhtOp, DhtOpHashed, OpEntry, SignedAction};
 use holochain_types::rate_limit::{EntryRateWeight, RateWeight};
 use holochain_zome_types::action::{AppEntryDef, Create, Delete, EntryType, Update, ZomeIndex};
 // `get_zomes_to_invoke` dispatches on the v2 `Op`; the bare `Op`/`Record`
@@ -41,14 +41,8 @@ async fn seed_dependency_op(test_space: &TestSpace, dht_op: DhtOpHashed) {
     test_space
         .space
         .dht_store
-        // For this op, a validation receipt should not be requested. `dht_op`
-        // is legacy (see the `holochain_types::dht_op::{ChainOp, DhtOpHashed}`
-        // import above); `record_incoming_ops` is v2-native, so project it at
-        // this boundary via `from_legacy_dht_op`.
-        .record_incoming_ops(vec![(
-            holochain_types::dht_v2::from_legacy_dht_op(&dht_op),
-            false,
-        )])
+        // For this op, a validation receipt should not be requested.
+        .record_incoming_ops(vec![(dht_op, false)])
         .await
         .unwrap();
 }
@@ -656,11 +650,10 @@ async fn store_record_delete_without_entry() {
     let network = Arc::new(MockHolochainP2pDnaT::new());
 
     // write original action to dht db
-    let dht_op = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
-        fixt!(Signature),
-        original_action,
-        RecordEntry::NA,
-    ));
+    let dht_op = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::CreateRecord(
+        SignedAction::new(from_legacy_action(&original_action), fixt!(Signature)),
+        OpEntry::ActionOnly,
+    )));
     seed_dependency_op(&test_space, dht_op).await;
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
@@ -706,11 +699,10 @@ async fn store_record_delete_non_app_entry() {
     let network = Arc::new(MockHolochainP2pDnaT::new());
 
     // write original action to dht db
-    let dht_op = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
-        fixt!(Signature),
-        original_action,
-        RecordEntry::NA,
-    ));
+    let dht_op = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::CreateRecord(
+        SignedAction::new(from_legacy_action(&original_action), fixt!(Signature)),
+        OpEntry::ActionOnly,
+    )));
     seed_dependency_op(&test_space, dht_op).await;
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
@@ -754,11 +746,10 @@ async fn store_record_delete_link() {
     let network = Arc::new(MockHolochainP2pDnaT::new());
 
     // write original action to dht db
-    let dht_op = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
-        fixt!(Signature),
-        original_action,
-        RecordEntry::NA,
-    ));
+    let dht_op = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::CreateRecord(
+        SignedAction::new(from_legacy_action(&original_action), fixt!(Signature)),
+        OpEntry::ActionOnly,
+    )));
     seed_dependency_op(&test_space, dht_op).await;
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
@@ -902,11 +893,10 @@ async fn register_delete_create_app_entry() {
     let network = Arc::new(MockHolochainP2pDnaT::new());
 
     // write original action to dht db
-    let dht_op = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
-        fixt!(Signature),
-        original_action,
-        RecordEntry::NA,
-    ));
+    let dht_op = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::CreateRecord(
+        SignedAction::new(from_legacy_action(&original_action), fixt!(Signature)),
+        OpEntry::ActionOnly,
+    )));
     seed_dependency_op(&test_space, dht_op).await;
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
@@ -953,11 +943,10 @@ async fn register_delete_create_non_app_entry() {
     let network = Arc::new(MockHolochainP2pDnaT::new());
 
     // write original action to dht db
-    let dht_op = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
-        fixt!(Signature),
-        original_action,
-        RecordEntry::NA,
-    ));
+    let dht_op = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::CreateRecord(
+        SignedAction::new(from_legacy_action(&original_action), fixt!(Signature)),
+        OpEntry::ActionOnly,
+    )));
     seed_dependency_op(&test_space, dht_op).await;
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
@@ -1010,11 +999,10 @@ async fn register_delete_update_app_entry() {
     let network = Arc::new(MockHolochainP2pDnaT::new());
 
     // write original action to dht db
-    let dht_op = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
-        fixt!(Signature),
-        original_action,
-        RecordEntry::NA,
-    ));
+    let dht_op = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::CreateRecord(
+        SignedAction::new(from_legacy_action(&original_action), fixt!(Signature)),
+        OpEntry::ActionOnly,
+    )));
     seed_dependency_op(&test_space, dht_op).await;
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
@@ -1061,11 +1049,10 @@ async fn register_delete_update_non_app_entry() {
     let network = Arc::new(MockHolochainP2pDnaT::new());
 
     // write original action to dht db
-    let dht_op = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
-        fixt!(Signature),
-        original_action,
-        RecordEntry::NA,
-    ));
+    let dht_op = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::CreateRecord(
+        SignedAction::new(from_legacy_action(&original_action), fixt!(Signature)),
+        OpEntry::ActionOnly,
+    )));
     seed_dependency_op(&test_space, dht_op).await;
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)

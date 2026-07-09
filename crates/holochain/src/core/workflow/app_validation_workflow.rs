@@ -12,7 +12,7 @@
 // All actions are written to the database straight away in the incoming dht ops workflow and do not require validation to be available for validating other ops. See https://github.com/holochain/holochain/issues/3724
 
 //! Ops are validated in sequence based on their op type and the timestamp they
-//! were authored (see [`OpOrder`] and [`OpNumericalOrder`]). Validating one op
+//! were authored (op order). Validating one op
 //! after the other with this ordering was chosen so that ops that depend on earlier
 //! ops will be validated after the earlier ops, and therefore have a higher chance
 //! of being validated successfully. An example is an incoming delete
@@ -226,7 +226,7 @@ async fn app_validation_workflow_inner(
     let failed_ops = Arc::new(Mutex::new(HashSet::new()));
     let mut agent_activity_ops = vec![];
     // Locally-validated warrant ops, self-published into the DhtStore.
-    let mut warrant_ops_vec: Vec<DhtOpHashed> = vec![];
+    let mut warrant_ops_vec: Vec<holochain_types::dht_v2::DhtOpHashed> = vec![];
     let mut app_validation_outcomes: Vec<(DhtOpHash, AppOutcome)> = vec![];
     // Track action hashes already warranted in this batch to avoid creating duplicate
     // warrants for the same action. Multiple op types (StoreRecord, StoreEntry,
@@ -399,13 +399,8 @@ async fn app_validation_workflow_inner(
     }
 
     // "self-publish" locally-validated warrant ops into the DhtStore as if they
-    // were published to us by another node. The warrant builders return the
-    // legacy-typed op, so project them to v2 for the v2-native store.
+    // were published to us by another node.
     if !warrant_ops_vec.is_empty() {
-        let warrant_ops_vec: Vec<holochain_types::dht_v2::DhtOpHashed> = warrant_ops_vec
-            .iter()
-            .map(holochain_types::dht_v2::from_legacy_dht_op)
-            .collect();
         workspace
             .dht_store
             .record_locally_validated_warrants(warrant_ops_vec)

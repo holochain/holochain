@@ -1,8 +1,8 @@
 //! Links interrelate entries in a source chain.
 
-use crate::dht_op::DhtOpResult;
-use crate::dht_op::RenderedOp;
-use crate::dht_op::RenderedOps;
+use crate::error::DhtOpResult;
+use crate::wire_ops::RenderedOp;
+use crate::wire_ops::RenderedOps;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyLinkableHash;

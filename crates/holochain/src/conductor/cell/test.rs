@@ -100,9 +100,6 @@ async fn test_cell_handle_publish() {
     )
     .await
     .unwrap();
-    let op = ChainOp::StoreRecord(shh.signature().clone(), action.clone(), RecordEntry::NA);
-    let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
-
     // The publish wire carries the v2 op form.
     let v2_op = holochain_types::dht_v2::DhtOp::ChainOp(Box::new(
         holochain_types::dht_v2::ChainOp::CreateRecord(
@@ -113,6 +110,8 @@ async fn test_cell_handle_publish() {
             holochain_types::dht_v2::OpEntry::ActionOnly,
         ),
     ));
+    let op_hash =
+        holochain_types::dht_v2::DhtOpHashed::from_content_sync(v2_op.clone()).into_hash();
 
     spaces
         .spaces

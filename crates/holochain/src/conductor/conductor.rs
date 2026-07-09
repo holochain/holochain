@@ -3564,29 +3564,6 @@ pub fn app_manifest_from_dnas(
         .into()
 }
 
-/// Reconstruct legacy [`DhtOp`]s from v2 wire rows read off the [`DhtStore`].
-///
-/// Chain-op and warrant wire rows are rebuilt into v2 ops via the
-/// `holochain_p2p` reconstructors, then converted to the legacy `DhtOp`
-/// encoding the dump/consistency types expect. Rows that fail to rebuild or
-/// convert are dropped (the same lenient behaviour the wire path uses), so the
-/// result is a best-effort view of the ops the store holds.
-pub fn wire_rows_to_legacy_ops(
-    chain: Vec<holochain_state::dht_store::K2ChainOpForWireRow>,
-    warrants: Vec<holochain_state::dht_store::K2WarrantForWireRow>,
-) -> Vec<holochain_types::dht_op::DhtOp> {
-    chain
-        .into_iter()
-        .filter_map(|r| holochain_p2p::build_chain_dht_op_v2(r).ok())
-        .chain(
-            warrants
-                .into_iter()
-                .filter_map(|r| holochain_p2p::build_warrant_dht_op_v2(r).ok()),
-        )
-        .filter_map(|v2| holochain_types::dht_v2::to_legacy_dht_op(&v2).ok())
-        .collect()
-}
-
 /// Reconstruct v2 [`DhtOp`](holochain_types::dht_v2::DhtOp)s from wire rows for
 /// the integration dump. Rows that fail to reconstruct are dropped (the same
 /// lenient behaviour the wire path uses), so the result is a best-effort view.

@@ -19,10 +19,10 @@ pub mod cell_config_overrides;
 pub mod chain;
 pub mod combinators;
 pub mod countersigning;
-pub mod dht_op;
 pub mod dht_v2;
 pub mod dna;
 pub mod entry;
+pub mod error;
 pub mod link;
 mod macros;
 pub mod prelude;
@@ -34,6 +34,7 @@ pub mod signal;
 pub mod validation_receipt;
 pub mod warrant;
 pub mod web_app;
+pub mod wire_ops;
 pub mod zome_types;
 
 #[cfg(feature = "fixturators")]

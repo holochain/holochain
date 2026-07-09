@@ -1,9 +1,10 @@
 //! Utilities for testing the consistency of the dht.
 
-use crate::conductor::wire_rows_to_legacy_ops;
+use crate::conductor::wire_rows_to_v2_ops;
 use holo_hash::AgentPubKey;
 use holochain_state::dht_store::DhtStoreRead;
 use holochain_state::prelude::*;
+use holochain_types::dht_v2::{DhtOp, DhtOpHashed};
 use kitsune2_api::OpId;
 
 /// Request the published ops for the given agent from the DHT store.
@@ -18,7 +19,7 @@ pub async fn request_published_ops(
     author: &AgentPubKey,
 ) -> StateQueryResult<Vec<(u32, OpId, DhtOp)>> {
     let chain = dht_store.ops_to_publish_for_wire(author).await?;
-    Ok(wire_rows_to_legacy_ops(chain, Vec::new())
+    Ok(wire_rows_to_v2_ops(chain, Vec::new())
         .into_iter()
         .map(|op| {
             let basis = op.dht_basis();

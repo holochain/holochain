@@ -9,9 +9,9 @@ use holo_hash::HasHash;
 use holochain_data::dht::{InsertChainOp, InsertLimboWarrant};
 use holochain_data::kind::Dht;
 use holochain_data::DbWrite;
-use holochain_types::dht_op::RenderedOps;
 use holochain_types::prelude::Timestamp;
 use holochain_types::warrant::WarrantOp;
+use holochain_types::wire_ops::RenderedOps;
 use holochain_zome_types::dht_v2::RecordValidity;
 
 use super::action_indexes::insert_action_indexes;
@@ -45,35 +45,19 @@ impl DhtStore<DbWrite<Dht>> {
         }
 
         for op in &ops.ops {
-            tx.insert_action(&op.signed_action_v2, None)
+            tx.insert_action(&op.action, None)
                 .await
                 .map_err(StateMutationError::from)?;
 
-            insert_action_indexes(
-                &mut tx,
-                op.signed_action_v2.as_hash(),
-                &op.signed_action_v2.hashed.content.data,
-            )
-            .await?;
-
-            let basis_hash = op.op_light.dht_basis();
-            let storage_center_loc = basis_hash.get_loc();
-
-            let op_type = match op.op_light.get_type() {
-                holochain_types::dht_op::DhtOpType::Chain(t) => i64::from(t),
-                holochain_types::dht_op::DhtOpType::Warrant(_) => {
-                    return Err(StateMutationError::Other(
-                        "RenderedOp had a Warrant op_light; expected Chain".into(),
-                    ));
-                }
-            };
+            insert_action_indexes(&mut tx, op.action.as_hash(), &op.action.hashed.content.data)
+                .await?;
 
             tx.insert_chain_op(InsertChainOp {
                 op_hash: &op.op_hash,
-                action_hash: op.signed_action_v2.as_hash(),
-                op_type,
-                basis_hash: &basis_hash,
-                storage_center_loc,
+                action_hash: op.action.as_hash(),
+                op_type: i64::from(op.op_type),
+                basis_hash: &op.basis_hash,
+                storage_center_loc: op.storage_center_loc,
                 validation_status: RecordValidity::Accepted,
                 locally_validated: false,
                 require_receipt: false,
@@ -140,13 +124,15 @@ mod tests {
     use super::*;
     use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, DnaHash, EntryHash};
     use holochain_serialized_bytes::UnsafeBytes;
-    use holochain_types::dht_op::{RenderedOp, RenderedOps};
     use holochain_types::prelude::{AppEntryBytes, Entry, EntryHashed, Signature};
     use holochain_types::warrant::WarrantOp;
-    // Builds legacy `RenderedOps`/`Action` to seed the op-cache directly.
+    use holochain_types::wire_ops::{RenderedOp, RenderedOps};
+    // Builds legacy `Action`s to seed the op-cache, then projects them to the v2
+    // form the rendered ops carry via `from_legacy_action`.
     use holochain_zome_types::dependencies::holochain_integrity_types::action::{
         Action, Create, CreateLink, Delete, DeleteLink, EntryType, Update,
     };
+    use holochain_zome_types::dht_v2::ActionData;
     use holochain_zome_types::entry_def::EntryVisibility;
     use holochain_zome_types::op::ChainOpType;
     use holochain_zome_types::prelude::{
@@ -435,8 +421,8 @@ mod tests {
         let store = DhtStore::new_test(dht_id()).await.unwrap();
         let rendered = build_rendered_create_link(3);
         let action_hash = rendered.ops[0].action.as_hash().clone();
-        let base = match rendered.ops[0].action.action() {
-            Action::CreateLink(a) => a.base_address.clone(),
+        let base = match &rendered.ops[0].action.action().data {
+            ActionData::CreateLink(a) => a.base_address.clone(),
             _ => panic!("expected CreateLink"),
         };
 
@@ -451,8 +437,8 @@ mod tests {
     async fn cache_chain_ops_populates_deleted_link_index() {
         let store = DhtStore::new_test(dht_id()).await.unwrap();
         let rendered = build_rendered_delete_link(4);
-        let create_link_hash = match rendered.ops[0].action.action() {
-            Action::DeleteLink(a) => a.link_add_address.clone(),
+        let create_link_hash = match &rendered.ops[0].action.action().data {
+            ActionData::DeleteLink(a) => a.link_add_address.clone(),
             _ => panic!("expected DeleteLink"),
         };
 
@@ -471,8 +457,8 @@ mod tests {
     async fn cache_chain_ops_populates_updated_record_index() {
         let store = DhtStore::new_test(dht_id()).await.unwrap();
         let rendered = build_rendered_update(5);
-        let original_action = match rendered.ops[0].action.action() {
-            Action::Update(a) => a.original_action_address.clone(),
+        let original_action = match &rendered.ops[0].action.action().data {
+            ActionData::Update(a) => a.original_action_address.clone(),
             _ => panic!("expected Update"),
         };
 
@@ -491,8 +477,8 @@ mod tests {
     async fn cache_chain_ops_populates_deleted_record_index() {
         let store = DhtStore::new_test(dht_id()).await.unwrap();
         let rendered = build_rendered_delete(6);
-        let deletes_address = match rendered.ops[0].action.action() {
-            Action::Delete(a) => a.deletes_address.clone(),
+        let deletes_address = match &rendered.ops[0].action.action().data {
+            ActionData::Delete(a) => a.deletes_address.clone(),
             _ => panic!("expected Delete"),
         };
 

@@ -50,10 +50,9 @@ pub(crate) async fn verify_rendered_ops_batch(rendered_all: Vec<RenderedOps>) ->
 
 async fn verify_rendered_ops_signatures(rendered: &RenderedOps) -> bool {
     for op in &rendered.ops {
-        // Verify over `signed_action_v2` — the same v2 bytes the action was
-        // signed over. `op.action` is the legacy cache shape and is not used
-        // for signature checks.
-        let sa = &op.signed_action_v2;
+        // Verify over the v2 signed action — the same v2 bytes the action was
+        // signed over.
+        let sa = &op.action;
         let action = &sa.hashed.content;
         match action
             .signer()
