@@ -132,7 +132,6 @@ impl CliSubcommand {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use assert_cmd::Command;
@@ -174,6 +173,8 @@ mod tests {
         cmd.arg("blah")
             .assert()
             .failure()
-            .stderr(predicate::str::contains("not a recognized internal hc subcommand"));
+            .stderr(predicate::str::contains(
+                "not a recognized internal hc subcommand",
+            ));
     }
 }
