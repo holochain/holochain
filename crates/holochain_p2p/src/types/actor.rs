@@ -105,6 +105,44 @@ impl Default for GetActivityOptions {
     }
 }
 
+/// Options for a multi-peer agent activity request.
+///
+/// Unlike [`GetActivityOptions`], which races peers and returns the first
+/// non-empty response, these options control a fan-out that returns every
+/// peer's response independently.
+#[derive(Debug, Clone)]
+pub struct GetActivityMultiOptions {
+    /// Fan out to up to this many authorities near the agent's DHT
+    /// location.
+    pub target_peer_count: u8,
+    /// Number of non-empty responses required for the call to succeed.
+    ///
+    /// The fan-out stops gathering as soon as this many peers have
+    /// answered with data. If fewer arrive before the timeout, the call
+    /// fails with [`HolochainP2pError::InsufficientResponses`] rather
+    /// than returning a short vector. Must be at least 1 and no greater
+    /// than `target_peer_count`.
+    pub required_responses: u8,
+    /// Overall timeout for gathering responses, also applied to each
+    /// per-peer request.
+    ///
+    /// When `None`, the conductor's default request timeout is used.
+    pub timeout_ms: Option<u64>,
+    /// Options forwarded to each remote agent processing the request.
+    pub remote_options: event::GetActivityOptions,
+}
+
+impl Default for GetActivityMultiOptions {
+    fn default() -> Self {
+        Self {
+            target_peer_count: 3,
+            required_responses: 2,
+            timeout_ms: None,
+            remote_options: Default::default(),
+        }
+    }
+}
+
 /// Trait defining the main holochain_p2p interface.
 #[cfg_attr(feature = "test_utils", automock)]
 pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug + Any {
@@ -290,6 +328,27 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug + Any {
         options: GetActivityOptions,
         zome_call_origin: Option<(ZomeName, FunctionName)>,
     ) -> BoxFut<'_, HolochainP2pResult<Vec<AgentActivityResponse>>>;
+
+    /// Get agent activity from multiple authorities on the DHT.
+    ///
+    /// Fans out to up to `target_peer_count` authorities near the agent's
+    /// DHT location and gathers non-empty responses until
+    /// `options.required_responses` have arrived, each paired with the
+    /// peer that produced it. No merging or first-response racing is
+    /// performed, leaving callers free to apply their own cross-peer
+    /// agreement rules.
+    ///
+    /// Fails with [`HolochainP2pError::InsufficientResponses`] when fewer
+    /// than `options.required_responses` non-empty responses arrive in
+    /// time, and with [`HolochainP2pError::InvalidRequest`] when the
+    /// options are contradictory (see [`GetActivityMultiOptions`]).
+    fn get_agent_activity_multi(
+        &self,
+        dna_hash: DnaHash,
+        agent: AgentPubKey,
+        query: ChainQueryFilter,
+        options: GetActivityMultiOptions,
+    ) -> BoxFut<'_, HolochainP2pResult<Vec<(AgentPubKey, AgentActivityResponse)>>>;
 
     /// A remote node is requesting agent activity from us.
     /// Optional zome call origin for metrics attribution.

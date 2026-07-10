@@ -1551,6 +1551,92 @@ where
     }
 }
 
+/// Collects non-empty responses from `futures` until `required_responses`
+/// have arrived, returning as soon as that threshold is met so one slow
+/// peer cannot stall an operation whose threshold is already reached.
+///
+/// Failed futures are logged and skipped. Responses for which `is_empty`
+/// returns true are discarded and do not count towards the threshold: an
+/// "I hold nothing" answer contributes no data to the caller. This
+/// mirrors [`select_ok_non_empty`], except that all `required_responses`
+/// winners are returned instead of just the first.
+///
+/// Fails with [`HolochainP2pError::InsufficientResponses`] when the
+/// threshold cannot be met, either because every future completed
+/// without enough non-empty responses or because `timeout` elapsed
+/// first. Fewer `futures` than `required_responses` fail immediately,
+/// without waiting for the timeout. Note that the error's `received`
+/// count only covers non-empty responses: empty and failed responses
+/// are excluded, and futures still pending when the threshold becomes
+/// unreachable are abandoned without being counted.
+async fn gather_required_responses<I, O>(
+    tag: &'static str,
+    futures: I,
+    required_responses: usize,
+    timeout: Duration,
+    is_empty: fn(&O) -> bool,
+) -> HolochainP2pResult<Vec<O>>
+where
+    I: IntoIterator,
+    I::Item: Future<Output = HolochainP2pResult<O>> + Unpin,
+{
+    let mut futures = futures
+        .into_iter()
+        .collect::<futures::stream::FuturesUnordered<_>>();
+    let mut responses = Vec::with_capacity(required_responses);
+    let mut empty_count = 0_usize;
+    let mut failed_count = 0_usize;
+
+    // A single overall deadline for the gather; per-peer requests carry
+    // their own timeout inside each future.
+    let gather = async {
+        while responses.len() < required_responses {
+            if futures.len() < required_responses - responses.len() {
+                // Not enough pending futures left to ever meet the threshold.
+                break;
+            }
+
+            match futures::StreamExt::next(&mut futures).await {
+                // A peer responded with data.
+                Some(Ok(response)) if !is_empty(&response) => responses.push(response),
+                // A peer responded without holding anything; it contributes
+                // nothing towards the threshold.
+                Some(Ok(_)) => empty_count += 1,
+                // A peer failed or timed out individually; wait for the rest.
+                Some(Err(err)) => {
+                    failed_count += 1;
+                    tracing::debug!(?err, tag, "peer request failed during multi gather");
+                }
+                // All futures have completed.
+                None => break,
+            }
+        }
+    };
+    // The timeout result is deliberately unused: hitting the deadline is
+    // just another way for the gather to stop short of the threshold,
+    // which the check below reports.
+    let _ = tokio::time::timeout(timeout, gather).await;
+
+    if responses.len() < required_responses {
+        tracing::debug!(
+            tag,
+            non_empty = responses.len(),
+            empty = empty_count,
+            failed = failed_count,
+            pending = futures.len(),
+            required = required_responses,
+            "insufficient non-empty responses during multi gather"
+        );
+        return Err(HolochainP2pError::InsufficientResponses {
+            operation: tag.to_string(),
+            received: responses.len(),
+            required: required_responses,
+        });
+    }
+
+    Ok(responses)
+}
+
 impl actor::HcP2p for HolochainP2pActor {
     #[cfg(feature = "test_utils")]
     fn test_kitsune(&self) -> &DynKitsune {
@@ -2238,25 +2324,110 @@ impl actor::HcP2p for HolochainP2pActor {
                         .await
                     })
                 }),
-                |agent_activity| {
-                    matches!(
-                        agent_activity,
-                        AgentActivityResponse {
-                            valid_activity: ChainItems::NotRequested,
-                            rejected_activity: ChainItems::NotRequested,
-                            status: ChainStatus::Empty,
-                            highest_observed: None,
-                            warrants,
-                            ..
-                        } if warrants.is_empty()
-                    )
-                },
+                AgentActivityResponse::is_empty,
             )
             .await;
 
             timing_trace_out!(out, start, a = "send_get_agent_activity");
 
             out.map(|x| vec![x])
+        })
+    }
+
+    fn get_agent_activity_multi(
+        &self,
+        dna_hash: DnaHash,
+        agent: AgentPubKey,
+        query: ChainQueryFilter,
+        options: actor::GetActivityMultiOptions,
+    ) -> BoxFut<'_, HolochainP2pResult<Vec<(AgentPubKey, AgentActivityResponse)>>> {
+        Box::pin(async move {
+            if options.required_responses == 0
+                || options.required_responses > options.target_peer_count
+            {
+                return Err(HolochainP2pError::InvalidRequest(format!(
+                    "required_responses ({}) must be between 1 and target_peer_count ({})",
+                    options.required_responses, options.target_peer_count
+                )));
+            }
+
+            let space_id = dna_hash.to_k2_space();
+            let space = self
+                .kitsune
+                .space_if_exists(space_id.clone())
+                .await
+                .ok_or(HolochainP2pError::K2SpaceNotFound(space_id))?;
+            let loc = agent.get_loc();
+
+            // Only used for peer selection and the per-request timeout;
+            // aggregation is handled by gather_required_responses below.
+            let network_req_options = NetworkRequestOptions {
+                remote_agent_count: options.target_peer_count,
+                timeout_ms: options.timeout_ms,
+                as_race: false,
+            };
+            let agents = self
+                .get_peers_for_location_weighted(
+                    "get_agent_activity_multi",
+                    &space,
+                    loc,
+                    &network_req_options,
+                )
+                .await?;
+
+            let timeout = match options.timeout_ms {
+                Some(ms) => Duration::from_millis(ms),
+                None => self.request_timeout,
+            };
+
+            let start = std::time::Instant::now();
+
+            let r_options = options.remote_options.clone();
+            let out = gather_required_responses(
+                "get_agent_activity_multi",
+                agents.into_iter().map(|(to_agent, to_url)| {
+                    let r_options = r_options.clone();
+                    Box::pin(async {
+                        let (msg_id, req) = WireMessage::get_agent_activity_req(
+                            to_agent.clone(),
+                            agent.clone(),
+                            query.clone(),
+                            r_options,
+                        );
+
+                        let response = self
+                            .send_request(
+                                "get_agent_activity_multi",
+                                &space,
+                                to_url,
+                                msg_id,
+                                req,
+                                dna_hash.clone(),
+                                network_req_options.clone(),
+                                None,
+                                |res| match res {
+                                    WireMessage::GetAgentActivityRes { response, .. } => {
+                                        Ok(response)
+                                    }
+                                    _ => Err(HolochainP2pError::other(format!(
+                                        "invalid response to get_agent_activity_multi: {res:?}"
+                                    ))),
+                                },
+                            )
+                            .await?;
+
+                        Ok((to_agent, response))
+                    })
+                }),
+                options.required_responses as usize,
+                timeout,
+                |(_, response)| response.is_empty(),
+            )
+            .await;
+
+            timing_trace_out!(out, start, a = "send_get_agent_activity_multi");
+
+            out
         })
     }
 
@@ -3954,6 +4125,195 @@ mod tests {
         assert!(
             result.is_err(),
             "PingRes from wrong peer should not resolve the pending ping"
+        );
+    }
+
+    /// No value is considered empty; used by tests that don't exercise
+    /// the empty-response filter.
+    fn never_empty(_: &u8) -> bool {
+        false
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn select_ok_non_empty_prefers_slow_data_over_fast_empty() {
+        // A fast "I hold nothing" reply must not win the race over a
+        // slower peer that actually has data.
+        let futures = vec![
+            Box::pin(async { Ok::<_, HolochainP2pError>(0u8) }) as BoxFut<'static, _>,
+            Box::pin(async {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+                Ok(7u8)
+            }),
+        ];
+
+        let out = select_ok_non_empty(futures, |v| *v == 0).await.unwrap();
+        assert_eq!(out, 7);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn select_ok_non_empty_falls_back_to_empty_when_no_data() {
+        // When every peer answers empty, the empty response is still
+        // returned once all futures have completed.
+        let futures = vec![
+            Box::pin(async { Ok::<_, HolochainP2pError>(0u8) }) as BoxFut<'static, _>,
+            Box::pin(async { Err(HolochainP2pError::other("boom")) }),
+        ];
+
+        let out = select_ok_non_empty(futures, |v: &u8| *v == 0)
+            .await
+            .unwrap();
+        assert_eq!(out, 0u8);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn gather_required_responses_stops_at_threshold() {
+        let futures = vec![
+            futures::future::ready(Ok::<_, HolochainP2pError>(1u8)),
+            futures::future::ready(Ok(2u8)),
+            futures::future::ready(Ok(3u8)),
+        ];
+
+        let out = gather_required_responses("t", futures, 2, Duration::from_secs(5), never_empty)
+            .await
+            .unwrap();
+        assert_eq!(out.len(), 2, "must stop at the threshold: {out:?}");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn gather_required_responses_skips_errors_but_keeps_successes() {
+        let futures = vec![
+            Box::pin(async { Ok::<_, HolochainP2pError>(1u8) }) as BoxFut<'static, _>,
+            Box::pin(async { Err(HolochainP2pError::other("boom")) }),
+            Box::pin(async { Ok(3u8) }),
+        ];
+
+        let mut out =
+            gather_required_responses("t", futures, 2, Duration::from_secs(5), never_empty)
+                .await
+                .unwrap();
+        out.sort();
+        assert_eq!(out, vec![1u8, 3]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn gather_required_responses_ignores_empty_responses() {
+        // Zeroes are "empty": they must not count towards the threshold.
+        // With at most one non-empty response available the call must
+        // fail as soon as the threshold becomes unreachable.
+        let futures = vec![
+            Box::pin(async { Ok::<_, HolochainP2pError>(0u8) }) as BoxFut<'static, _>,
+            Box::pin(async { Ok(0u8) }),
+            Box::pin(async { Ok(3u8) }),
+        ];
+
+        let err = gather_required_responses("t", futures, 2, Duration::from_secs(5), |v| *v == 0)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(
+                err,
+                HolochainP2pError::InsufficientResponses {
+                    received: 0 | 1,
+                    required: 2,
+                    ..
+                }
+            ),
+            "unexpected error: {err:?}"
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn gather_required_responses_collects_past_empty_responses() {
+        // Empty responses are skipped but non-empty ones from other
+        // peers still satisfy the threshold.
+        let futures = vec![
+            Box::pin(async { Ok::<_, HolochainP2pError>(0u8) }) as BoxFut<'static, _>,
+            Box::pin(async { Ok(2u8) }),
+            Box::pin(async { Ok(3u8) }),
+        ];
+
+        let mut out =
+            gather_required_responses("t", futures, 2, Duration::from_secs(5), |v| *v == 0)
+                .await
+                .unwrap();
+        out.sort();
+        assert_eq!(out, vec![2u8, 3]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn gather_required_responses_times_out_below_threshold() {
+        // One instant success, one peer that never answers: with
+        // required_responses = 2 the deadline fires and the call must
+        // fail with InsufficientResponses(received = 1, required = 2)
+        // instead of hanging or returning a short vector.
+        let futures = vec![
+            Box::pin(async { Ok::<_, HolochainP2pError>(1u8) }) as BoxFut<'static, _>,
+            Box::pin(std::future::pending()),
+        ];
+
+        let err = gather_required_responses("t", futures, 2, Duration::from_secs(5), never_empty)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(
+                err,
+                HolochainP2pError::InsufficientResponses {
+                    received: 1,
+                    required: 2,
+                    ..
+                }
+            ),
+            "unexpected error: {err:?}"
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn gather_required_responses_slow_peer_does_not_block_result() {
+        // A peer that never answers must not delay the call at all once
+        // the threshold has been met.
+        let futures = vec![
+            Box::pin(async { Ok::<_, HolochainP2pError>(1u8) }) as BoxFut<'static, _>,
+            Box::pin(std::future::pending()),
+        ];
+
+        let start = tokio::time::Instant::now();
+        let out = gather_required_responses("t", futures, 1, Duration::from_secs(5), never_empty)
+            .await
+            .unwrap();
+        assert_eq!(out, vec![1u8]);
+        assert_eq!(
+            start.elapsed(),
+            Duration::ZERO,
+            "must return without waiting for the slow peer"
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn gather_required_responses_fails_fast_with_too_few_futures() {
+        // A single peer can never satisfy a threshold of two: the call
+        // must fail immediately instead of burning the whole timeout.
+        let futures =
+            vec![Box::pin(std::future::pending()) as BoxFut<'static, HolochainP2pResult<u8>>];
+
+        let start = tokio::time::Instant::now();
+        let err = gather_required_responses("t", futures, 2, Duration::from_secs(5), never_empty)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(
+                err,
+                HolochainP2pError::InsufficientResponses {
+                    received: 0,
+                    required: 2,
+                    ..
+                }
+            ),
+            "unexpected error: {err:?}"
+        );
+        assert_eq!(
+            start.elapsed(),
+            Duration::ZERO,
+            "must fail without waiting for the timeout"
         );
     }
 }

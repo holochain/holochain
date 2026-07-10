@@ -187,6 +187,18 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
         zome_call_origin: Option<(ZomeName, FunctionName)>,
     ) -> HolochainP2pResult<Vec<AgentActivityResponse>>;
 
+    /// Get agent activity from multiple authorities on the DHT, returning
+    /// each peer's response independently, paired with the responding
+    /// peer.
+    ///
+    /// See [`actor::HcP2p::get_agent_activity_multi`] for semantics.
+    async fn get_agent_activity_multi(
+        &self,
+        agent: AgentPubKey,
+        query: ChainQueryFilter,
+        options: actor::GetActivityMultiOptions,
+    ) -> HolochainP2pResult<Vec<(AgentPubKey, AgentActivityResponse)>>;
+
     /// Get agent activity deterministically from the DHT.
     async fn must_get_agent_activity(
         &self,
@@ -390,6 +402,17 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     ) -> HolochainP2pResult<Vec<AgentActivityResponse>> {
         self.sender
             .get_agent_activity(self.dna_hash(), agent, query, options, zome_call_origin)
+            .await
+    }
+
+    async fn get_agent_activity_multi(
+        &self,
+        agent: AgentPubKey,
+        query: ChainQueryFilter,
+        options: actor::GetActivityMultiOptions,
+    ) -> HolochainP2pResult<Vec<(AgentPubKey, AgentActivityResponse)>> {
+        self.sender
+            .get_agent_activity_multi(self.dna_hash(), agent, query, options)
             .await
     }
 
