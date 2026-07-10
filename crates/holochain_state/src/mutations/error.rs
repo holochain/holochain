@@ -7,7 +7,7 @@ pub enum StateMutationError {
     Sqlx(#[from] sqlx::Error),
 
     #[error(transparent)]
-    DhtOpError(#[from] holochain_types::dht_op::DhtOpError),
+    DhtOpError(#[from] holochain_types::error::DhtOpError),
 
     #[error(transparent)]
     StateQueryError(#[from] StateQueryError),
